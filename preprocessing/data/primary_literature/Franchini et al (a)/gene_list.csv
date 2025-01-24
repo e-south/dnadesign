@@ -1,0 +1,148 @@
+﻿gene,accession,gene_product,cog,ratio_cAmp,ratio_RpoS
+"sfsAf,g",b0146,probable regulator for maltose metabolism,Regulation,5.7,6.7
+"bolAe,h",b0435,possible regulator of murein genes,Regulation,7.5,
+"hupBf,g",b0440,"DNA-binding protein HU-beta, NS1 (HU-1)",Regulation,7.3,
+ompT,b0565,"outer membrane protein 3b (a), protease VII",Regulation,6.5,19.9
+"dpsd,e,h",b0812,"global regulator, starvation conditions",Regulation,6.5,-4.9**
+ybiJ,b0845,putative DEOR-type transcriptional regulator,Regulation,-5.9**,-3.0**
+clpA,b0882,ATP-binding component of serine protease,Regulation,,
+wrbA,b1004,trp repressor binding protein,Regulation,3.6,-3.3**
+phoQ,b1129,sensor protein PhoQ,Regulation,,
+minD,b1175,"cell division inhibitor, a membrane ATPase, activates minC",Regulation,4.1,
+Hns,b1237,"DNA-binding protein HLP-II (HU, BH2, HD, NS), pleiotropic regulator",Regulation,4.1,
+mokB,b1420,"regulatory protein, enables hokB expression",Regulation,4.4,
+ydcI,b1422,putative transcriptional regulator LYSR-type,Regulation,5.6,
+ydeW,b1512,"putative transcriptional regulator, sorC family",Regulation,4.1,
+yneA,b1516,putative LACI-type transcriptional regulator,Regulation,5.6,
+"gatR_2c,i",b2090,"split galactitol utilization operon repressor, fragment 2",Regulation,13,
+yehH,b2116,"molybdate metabolism regulator, second fragment 2",Regulation,7.9,
+rseA,b2572,"sigma-E factor, negative regulatory protein",Regulation,7.9,
+rpoEi,b2573,"RNA polymerase, sigma-E factor heat shock and oxidative stress",Regulation,5,
+yfjN,b2630,putative cell division protein,Regulation,3.8,7.8
+csrAb,b2696,carbon storage regulator,Regulation,8.3,-3.1
+glcCb,b2980,transcriptional activator for glc operon,Regulation,,-3.5**
+damX,b3388,putative membrane protein; interferes with cell division,Regulation,,
+yhiEe,b3512,putative regulator,Regulation,16.6,34.7*
+"yiaGd,e,h",b3555,putative transcriptional regulator,Regulation,5,-6.2**
+soxS,b4062,regulation of superoxide response regulon,Regulation,-3.9**,-3.3
+adiY,b4116,putative ARAC-type regulatory protein,Regulation,-5. 1**,
+yjjMi,b4357,putative transcriptional regulator,Regulation,6.8,-3.3*
+bglJ,b4366,2-component transcriptional regulator,Regulation,,-3.8**
+rsmC,b4371,16S RNA m2G1207 methylase,Regulation,,
+ybjP,b0865,putative lipoprotein,Cell structure,4.3,-3.6**
+lolA,b0891,periplasmic protein effects translocation of lipoproteins ,Cell structure,,-3.7
+ycbQ,b0938,putative fimbrial-like protein,Cell structure,-6.4**,
+sfai,b0991,suppresses fabA and ts growth mutation,Cell structure,-3.9*,-3.0**
+ycdS,b1024,putative outer membrane protein,Cell structure,,
+flgD,b1075,"flagellar biosynthesis, initiation of hook assembly",Cell structure,4.5,11.9
+"ycgBe,g,h",b1188,putative sporulation protein,Cell structure,6.9,-3.3**
+kdsA,b1215,2-dehydro-3-deoxyphosphooctulonate aldolase,Cell structure,,
+ddpX,b1488,D-Ala-D-Ala dipeptidase,Cell structure,4.4,
+ydeS,b1504,putative fimbrial-like protein,Cell structure,5.5,
+lpp,b1677,murein lipoprotein,Cell structure,5.8,
+wbbL,b2031,putaive lipopolysaccharide biosynthesis glycosyl transferase,Cell structure,3.7,
+yfcX,b2341,bifunctional fatty acid oxidation complex protein,Cell structure,5.3,
+pssA,b2585,"phosphatidylserine synthase,  phospholipid synthesis",Cell structure,5.1,
+rfe,b3784,UDP-GlcNAc:undecaprenylphosphate GlcNAc-1-phosphate transferase,Cell structure,,-3.6**
+nlpD,b2742,lipoprotein,Cell structure,4,
+blch,b4149,outer membrane lipoprotein (lipocalin),Cell structure,4.2,5.5
+fimI,b4315,fimbrial protein,Cell structure,-3.5**,
+fimD,b4317,outer membrane protein  export and assembly of type 1 fimbriae,Cell structure,-3.0**,
+fimGb,b4319,fimbrial morphology,Cell structure,-3.2**,-4.5**
+fsr,b0479,fosmidomycin resistance protein,Stress response,,-3.6**
+cspDg,b0880,cold shock protein,Stress response,13,
+mdoG,b1048,periplasmic glucans biosynthesis protein,Stress response,,-3.2**
+umuCi,b1184,SOS mutagenesis and repair,Stress response,-4.2**,
+pspEi,b1308,phage shock protein,Stress response,4,
+"gadBb,e,f,h",b1493,glutamate decarboxylase isozyme,Stress response,,15.4
+marC,b1529,multiple antibiotic resistance protein,Stress response,,10
+cspF,b1558,cold shock protein,Stress response,-5.7*,
+"osmEd,h",b1739,activator of ntrL gene,Stress response,10.4,10.2
+yeaAg,b1778,methionine sulfoxide reductase,Stress response,5.9,
+cspC,b1823,cold shock protein,Stress response,4.2,
+cutC,b1874,copper homeostasis protein,Stress response,4.5,
+"bfrb,d,e,h",b3336,"bacterioferrin, an iron storage homoprotein",Stress response,5.1,14.3
+dcrB,b3472,Resistant to lytic phage C1,Stress response,,-3.2**
+uspB,b3494,universal stress protein B,Stress response,3.7,
+uspA,b3495,universal stress protein A,Stress response,4,
+"hdeBb,e",b3509,periplasmic protein,Stress response,,32.9*
+hdeAe,b3510,periplasmic chaperon of acid-denaturared proteins,Stress response,,23
+creD,b4400,tolerance to colicin E2,Stress response,-3.6**,
+"rpsVb,d,e,h",b1480,30S ribosomal subunit protein S22,Protein processing,9.8,17
+pheT,b1713,"phenylalanine tRNA synthetase, beta-subunit",Protein processing,6.1,
+yfiAg,b2597,Stationary phase translation inhibitor,Protein processing,6.7,
+rpmJ,b3299,50S ribosomal subunit protein L36,Protein processing,3.8,
+hisG,b2019,ATP phosphoribosyltransferase,Amino acids biosynthesis,4.2,
+hisC,b2021,histidinol-phosphate aminotransferase,Amino acids biosynthesis,4.6,
+aroC,b2329,chorismate synthase,Amino acids biosynthesis,7.9,
+"ivbLf,g",b3672,ilvB operon leader peptide,Amino acids biosynthesis,5.2,
+apbA,b0425,"involved in thiamin biosynthesis, pyrimidine biosynthesis",Nucleotide biosynthesis,-8.5**,-6.6**
+purM,b2499,phosphoribosylaminoimidazole synthetase = AIR synthetase,Nucleotide biosynthesis,-4.1**,
+purN,b2500,phosphoribosylglycinamide formyltransferase 1,Nucleotide biosynthesis,-3.0**,
+"deoCe,f,g",b4381,2-deoxyribose-5-phosphate aldolase,Nucleotide biosynthesis,-3.9,
+trs5_1,b0259,IS5 transposase,Miscellaneous functions,5.2,
+ycjK,b1297,putative glutamine synthetase (EC 6.3.1.2),Miscellaneous functions,,-3.4*
+ycjL,b1298,probable amidotransferase subunit,Miscellaneous functions,,-4.0*
+rzpR,b1362,putative Rac prophage endopeptidase,Miscellaneous functions,-4.5**,-4.5**
+ynaK,b1365,Rac prophage,Miscellaneous functions,-3.5**,-3.1**
+rsmC,b4371,16S RNA m2G1207 methylase,Miscellaneous functions,-4.1**,-3.8**
+yaaA,b0006,"orf, hypothetical protein",Unknown or hypothetical functions,,5
+"yahOd,e",b0329,"orf, hypothetical protein",Unknown or hypothetical functions,14.7,7.8
+ybaB,b0471,"orf, hypothetical protein",Unknown or hypothetical functions,,-5.3**
+ybaK,b0481,"orf, hypothetical protein",Unknown or hypothetical functions,-7.5**,-6.4**
+ybaS,b0485,putative glutaminase,Unknown or hypothetical functions,,-3.7*
+ybeD,b0631,"orf, hypothetical protein",Unknown or hypothetical functions,,-3
+ybeL,b0643,putative alpha helical protein,Unknown or hypothetical functions,8.1,
+ybfB,b0702,"orf, hypothetical protein",Unknown or hypothetical functions,-22.3**,-24.5**
+"ybgAd,h",b0707,"orf, hypothetical protein",Unknown or hypothetical functions,,8
+yccV,b0966,"orf, hypothetical protein",Unknown or hypothetical functions,5.3,4.8
+yccW,b0967,putative methyltransferase,Unknown or hypothetical functions,,-3.1**
+yccMi,b0992,putative ferredoxin-type protein,Unknown or hypothetical functions,-3.2**,
+ycdP,b1021,putative membrane protein,Unknown or hypothetical functions,-3.0**,5.3
+ymdB,b1045,putative polyprotein,Unknown or hypothetical functions,5.2,
+grxB,b1064,glutaredoxin 2,Unknown or hypothetical functions,5.4,
+ycfHe,b1100,putative hydrolase,Unknown or hypothetical functions,6,8.8
+"ychHf,i",b1205,"orf, hypothetical protein",Unknown or hypothetical functions,6.8,
+ymjA,b1295,"orf, hypothetical protein",Unknown or hypothetical functions,,-4.1*
+ydbD,b1407,"orf, hypothetical protein",Unknown or hypothetical functions,-4.9**,-3.8**
+ydcX,b1445,"orf, hypothetical protein",Unknown or hypothetical functions,,5.4
+yncH,b1455,"orf, hypothetical protein",Unknown or hypothetical functions,-3.3**,-3.3*
+yneC,b1518,"orf, hypothetical protein",Unknown or hypothetical functions,4.1,
+ynfAd,b1582,putative transmembrane protein,Unknown or hypothetical functions,8.7,11.3
+ydgAh,b1614,"orf, hypothetical protein",Unknown or hypothetical functions,,7
+"ydiZd,e",b1724,"orf, hypothetical protein",Unknown or hypothetical functions,5.4,8.9
+yeaCg,b1777,"orf, hypothetical protein",Unknown or hypothetical functions,3.8,
+"yeaGe,h",b1783,"orf, hypothetical protein",Unknown or hypothetical functions,13.1,22.2
+yobF,b1824,"orf, hypothetical protein",Unknown or hypothetical functions,5.2,
+yebV,b1836,"orf, hypothetical protein",Unknown or hypothetical functions,,23.9
+yebW,b1837,"orf, hypothetical protein",Unknown or hypothetical functions,,5.1
+yodDe,b1953,"orf, hypothetical protein",Unknown or hypothetical functions,4,7.5
+yeeIi,b1976,"orf, hypothetical protein",Unknown or hypothetical functions,23.3*,
+wbbK,b2032,putative glucose transferase,Unknown or hypothetical functions,4.1,
+"elaBe,h",b2266,"orf, hypothetical protein",Unknown or hypothetical functions,,7.7
+yfbN,b2273,"orf, hypothetical protein",Unknown or hypothetical functions,,-3.0**
+yfdY,b2377,"orf, hypothetical protein",Unknown or hypothetical functions,5,
+ucpAi,b2426,putative oxidoreductase,Unknown or hypothetical functions,3.6,
+yfiLh,b2602,"orf, hypothetical protein",Unknown or hypothetical functions,,6
+yfjO,b2631,"orf, hypothetical protein",Unknown or hypothetical functions,4.1,8
+"ygaFd,g,h",b2660,"orf, hypothetical protein",Unknown or hypothetical functions,6.1,5
+ygaMh,b2672,"orf, hypothetical protein",Unknown or hypothetical functions,4.3,8.6
+ygaD,b2700,"orf, hypothetical protein",Unknown or hypothetical functions,4.8,
+ygdH,b2795,"orf, hypothetical protein",Unknown or hypothetical functions,4.1,
+ygfJ,b2877,"orf, hypothetical protein",Unknown or hypothetical functions,32.6*,10
+glcG,b2977,"orf, hypothetical protein",Unknown or hypothetical functions,,-5.1
+yqiB,b3033,putative enzyme,Unknown or hypothetical functions,5.3,
+"yqjCd,e",b3097,"orf, hypothetical protein",Unknown or hypothetical functions,3.8,6.9
+yhcOe,b3239,"orf, hypothetical protein",Unknown or hypothetical functions,,6.1
+smg,b3284,"orf, hypothetical protein",Unknown or hypothetical functions,5.7,
+yjbB,b4020,putative alpha helix protein,Unknown or hypothetical functions,-3.6**,
+"yjbAg,i",b4030,putative membrane protein,Unknown or hypothetical functions,-6.2**,
+yjcBi,b4060,"orf, hypothetical protein",Unknown or hypothetical functions,-3.4**,
+"yjcHf,i",b4068,"orf, hypothetical protein",Unknown or hypothetical functions,9.1,
+phnBh,b4107,"orf, hypothetical protein",Unknown or hypothetical functions,,6.8
+yjdK,b4128,"orf, hypothetical protein",Unknown or hypothetical functions,-3.2**,
+yjfN,b4188,"orf, hypothetical protein",Unknown or hypothetical functions,10.7,
+yjfO,b4189,"orf, hypothetical protein",Unknown or hypothetical functions,63.3*,-3.4
+ytfI,b4215,"orf, hypothetical protein",Unknown or hypothetical functions,-5.1**,
+ytfJ,b4216,"orf, hypothetical protein",Unknown or hypothetical functions,9,
+yjgW,b4274,"orf, hypothetical protein",Unknown or hypothetical functions,-3.5**,-5.9*

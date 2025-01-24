@@ -1,0 +1,2 @@
+Promoter data is available in the file **41467_2022_32829_MOESM5_ESM.xlsx**, located in the 'LaFleur et al' directory. The relevant spreadsheet is titled **'Hossain et al (Fig 3d, S7d)'**.
+

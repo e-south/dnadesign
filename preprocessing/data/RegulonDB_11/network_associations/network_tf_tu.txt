@@ -1,0 +1,2254 @@
+# Copies and Copyright-Notice
+#
+#      RegulonDB is free for academic/noncommercial use
+#
+#      User is not entitled to change or erase data sets of the RegulonDB
+#      database or to eliminate copyright notices from RegulonDB. Furthermore,
+#      User is not entitled to expand RegulonDB or to integrate RegulonDB partly
+#      or as a whole into other databank systems, without prior written consent
+#      from CCG-UNAM.
+#
+#      Please check the license at http://regulondb.ccg.unam.mx/menu/download/full_version/terms_and_conditions.jsp
+#
+# Citation
+#
+#      Santos-Zavaleta A et al. (2019). RegulonDB v 10.5: tackling challenges to unify classic and high throughput knowledge of gene regulation in E. coli K-12.,
+#      Nucleic Acids Res. 2019 Jan 8;47(D1):D212-D220. doi: 10.1093/nar/gky1077.
+#
+#
+# Contact
+#
+#      Person: RegulonDB Team
+#      Web Page: http://regulondb.ccg.unam.mx/menu/about_regulondb/contact_us/index.jsp
+#          (regulondb@ccg.unam.mx)
+#
+#
+# Release: 10.8 Date: 10/12/2020
+# ___________________________________________________________________________
+#
+# Columns:
+#  (1) Transcription Factor (TF) name
+#  (2) TUName (regulated)
+#  (3) Regulatory effect of the TF on the regulated gene (+ activator, - repressor, +- dual, ? unknown)
+#  (4) Evidence that supports the existence of the regulatory interaction
+#  (5) Evidence Type [Weak, Strong, Confirmed] For details see: http://regulondb.ccg.unam.mx/evidenceclassification
+#
+AccB	accBC[accBp]	-	[GEA, IMP, CV(GEA/ROMA)]	Strong	
+AcrR	acrAB[acrAp]	-	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+AcrR	acrR[acrRp]	-	[APIORCISFBSCS, AIBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+AcrR	flhDC[flhDp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+AcrR	marRAB[marRp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+AcrR	micF[micFp]	-	[AIBSCS]	Weak	
+AcrR	soxR[soxRp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+AcrR	soxS[soxSp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Ada	ada-alkB[adap]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Ada	aidB[aidBp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Ada	alkA[alkAp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+AdiY	adiA[adiAp]	+	[BPP, GEA]	Strong	
+AdiY	gadAX[gadAp]	+	[BPP]	Strong	
+AdiY	gadBC[gadBp]	+	[BPP]	Strong	
+AdiY	gltBDF[gltBp]	+	[BPP]	Strong	
+AgaR	agaR[agaRp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+AgaR	agaSYBCDI[agaSp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+AgaR	kbaZ-agaVWA[kbaZp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+AidB	aidB[aidBp]	-	[BPP, GEA]	Strong	
+AlaS	alaS[alaSp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+AllR	allA[allAp]	-	[BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+AllR	allS[allSp]	-	[BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+AllR	gcl-hyi-glxR-ybbVW-allB-ybbY-glxK[gclp]	-	[BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+AllS	allDC-ylbA[allDp]	+	[APIORCISFBSCS, BCE]	Weak	
+AlsR	alsRBACE[alsRp2]	-	[GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+AlsR	alsRBACE[alsRp1]	-	[GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+AlsR	rpiB[rpiBp]	-	[GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+AppY	appCBA-yccB[appCp]	+	[GEA]	Weak	
+AppY	hyaABCDEF[hyaAp]	+	[GEA]	Weak	
+AraC	araBAD[araBp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM), BCE]	Confirmed	
+AraC	araC[araCp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM), BCE]	Confirmed	
+AraC	araE[araEp]	+	[APIORCISFBSCS, BPP]	Strong	
+AraC	araE-ygeA[araEp]	+	[APIORCISFBSCS, BPP]	Strong	
+AraC	araFGH[araFp]	+	[APIORCISFBSCS, AIBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+AraC	araJ[araJp]	+	[APIORCISFBSCS, AIBSCS, BPP]	Strong	
+AraC	xylAB[xylAp]	-	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+AraC	ydeNM[ydeNp]	-	[GEA]	Weak	
+ArcA	aceBAK[aceBp]	-	[RBM]	Weak	
+ArcA	aceEF[aceEp]	-	[GEA]	Weak	
+ArcA	ackA[ackAp]	+	[GEA]	Weak	
+ArcA	acnA[acnAp2]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	acnB[acnBp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	aldA[aldAp]	-	[APIORCISFBSCS, AIBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+ArcA	appCBA-yccB[appCp]	+	[GEA]	Weak	
+ArcA	appY[appYp2]	+	[AIBSCS]	Weak	
+ArcA	arcZ[arcZp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	betIBA[betIp]	-	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	betT[betTp]	-	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	cadBA[cadBp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	caiTABCDE[caiTp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	citCDEFXG[citCp1]	-	[AIBSCS]	Weak	
+ArcA	cydAB[cydAp3]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	cydAB[cydAp4]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	cydAB[cydAp1]	+	[APIORCISFBSCS, AIBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	cydAB[cydAp2]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	cydDC[cydDp]	+	[GEA]	Weak	
+ArcA	cyoABCDE[cyoAp]	-	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	dctA[dctAp]	-	[GEA]	Weak	
+ArcA	dcuC[dcuCp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	dpiBA[dpiBp]	+	[AIBSCS]	Weak	
+ArcA	fadBA[fadBp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	fadD-sroD[fadDp]	-	[AIBSCS, BPP]	Strong	
+ArcA	fadE[fadEp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	fadH[fadHp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	fadIJ[fadIp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	fadL[fadLp]	-	[AIBSCS, BPP]	Strong	
+ArcA	fnr[fnrp]	-	[GEA]	Weak	
+ArcA	focA-pflB[focAp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	focA-pflB[focAp2]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	fumA[fumAp]	-	[GEA]	Weak	
+ArcA	fumAC[fumAp]	-	[GEA]	Weak	
+ArcA	fumB[fumBp]	+	[GEA]	Weak	
+ArcA	fumC[fumCp]	-	[GEA]	Weak	
+ArcA	gadAX[gadAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	gadE[gadEp1]	+	[BPP, GEA]	Strong	
+ArcA	gadE[gadEp3]	+	[BPP, GEA]	Strong	
+ArcA	gatYZABCD[gatYp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	glcDEFGBA[glcDp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	glpABC[glpABCp]	-	[GEA]	Weak	
+ArcA	glpD[glpDp]	-	[GEA]	Weak	
+ArcA	gltA[gltAp1]	-	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	grcA[grcAp1]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	hemA-prfA-prmC[hemAp1]	+	[GEA]	Weak	
+ArcA	hyaABCDEF[hyaAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	hybOABCDEFG[hybOp1]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	icd[icdAp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	iraM[iraMp]	+	[AIBSCS]	Weak	
+ArcA	lldPRD[lldPp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	lpdA[lpdAp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	mdh[mdhp1]	-	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	moeAB[moeAp]	+	[BPP, GEA]	Strong	
+ArcA	ndh[ndhp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	nuoABCEFGHIJKLMN[nuoAp2]	-	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+ArcA	ompW[ompWp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	oppABCDF[oppAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	ptsG[ptsGp1]	-	[BPP, GEA]	Strong	
+ArcA	puuAP[puuAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	puuDRCBE[puuDp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	rhaT[rhaTp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	rmf[rmfp]	-	[BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+ArcA	rpoS[rpoSp]	-	[BPP, GEA]	Strong	
+ArcA	rpsJ-rplCDWB-rpsS-rplV-rpsC-rplP-rpmC-rpsQ[rpsJp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	rsd[rsdp2]	-	[BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+ArcA	rutABCDEFG[rutAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	sdhCDAB-sucABCD-sdhX[sdhCp]	+	[APIORCISFBSCS, BPP, GEA, CV(GEA/ROMA), CV(CHIP-SV/GEA/ROMA)]	Confirmed	
+ArcA	sodA[sodAp]	-	[APIORCISFBSCS, AIBSCS, BCE]	Weak	
+ArcA	ssb[ssbp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	ssb[ssbp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	ssb[ssbp3]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	sucAB[sucAp]	-	[BPP, GEA]	Strong	
+ArcA	sucABCD[sucAp]	-	[BPP, GEA]	Strong	
+ArcA	tpx[tpxp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	treBC[treBp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	ubiCA[ubiCp]	-	[GEA]	Weak	
+ArcA	uvrA[uvrAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArcA	xylR[xylRp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArcA	ybdN[ybdNp]	+	[AIBSCS]	Weak	
+ArcA	ydeA[ydeAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ArgP	argO[argOp]	+	[APIORCISFBSCS, BCE, BPP, GEA, IC, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+ArgP	argP[argPp]	-	[APIORCISFBSCS, GEA, IC, CV(GEA/ROMA)]	Strong	
+ArgP	dapB[dapBp1]	+	[APIORCISFBSCS, BCE, BPP, GEA, IC, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+ArgP	dapD[dapDp]	+	[BPP, GEA]	Strong	
+ArgP	dnaAN-recF[dnaAp1]	+	[BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArgP	gdhA[gdhAp1]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+ArgP	lysA[lysAp]	+	[BPP, GEA]	Strong	
+ArgP	lysC[lysCp1]	+	[BPP, GEA]	Strong	
+ArgP	lysP[lysPp]	+	[APIORCISFBSCS, BPP, GEA, IC, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+ArgP	nrdAB-yfaE[nrdAp]	+	[BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArgR	argA[argAp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArgR	argCBH[argCp]	-	[AIBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+ArgR	argD[argDp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArgR	argE[argEp1]	-	[AIBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+ArgR	argF[argFp]	-	[AIBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+ArgR	argG[argGp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArgR	argI[argIp]	-	[AIBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArgR	argR[argRp1]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArgR	artJ[artJp]	-	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+ArgR	artPIQM[artPp]	-	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+ArgR	astCADBE[astCp2]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArgR	carAB[carAp2]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+ArgR	gltBDF[gltBp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArgR	hisJQMP[hisJp]	-	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+ArgR	lysO[lysOp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+ArgR	metY[metYp2]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArgR	metY-yhbC-nusA-infB-rbfA-truB-rpsO-pnp[metYp2]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ArsR	arsRBC[arsRp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+AscG	ascFB[ascFp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+AscG	htpG[htpGp1]	-	[AIBSCS, BPP]	Strong	
+AscG	prpR[prpRp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+AscG	ybiT[ybiTp]	-	[AIBSCS, BPP]	Strong	
+AsnC	asnA[asnAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+AsnC	asnC[asnCp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+AsnC	asnC-mioC[asnCp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+AsnC	asnC-mioC-mnmG[asnCp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+AtoC	atoDAEB[atoDp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+BaeR	acrD[acrDp2]	+	[BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+BaeR	mdtABCD-baeSR[mdtAp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+BaeR	spy[spyp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+BasR	csgDEFG[csgDp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+BasR	cspI[cspIp]	+	[APIORCISFBSCS, BPP]	Strong	
+BasR	dgkA[dgkAp1]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+BasR	fimB[fimBp2]	+	[APIORCISFBSCS, BPP]	Strong	
+BasR	putA[putAp]	-	[APIORCISFBSCS, BPP]	Strong	
+BasR	qseBC[qseBp2]	+	[BPP, GEA]	Strong	
+BasR	tomB-hha[tomBp1]	+	[APIORCISFBSCS, BPP]	Strong	
+BasR	yrbL[yrbLp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+BetI	betIBA[betIp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+BetI	betT[betTp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+BirA	bioA[bioAp]	-	[SM]	Strong	
+BirA	bioBFCD[bioBp]	-	[SM]	Strong	
+BluR	ycgZ-ymgA-ariR-ymgC[ycgZp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+BolA	ampC[ampCp]	+	[GEA, IMP, CV(GEA/ROMA)]	Strong	
+BolA	dacC[dacCp]	+	[GEA, IMP, CV(GEA/ROMA)]	Strong	
+BolA	mreB[mreBp1]	-	[BPP, GEA]	Strong	
+BolA	mreBCD[mreBp1]	-	[BPP, GEA]	Strong	
+BtsR	csgBAC[csgBp]	-	[AIBSPD, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+BtsR	csgDEFG[csgDp1]	-	[AIBSPD, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+BtsR	mdh[mdhp1]	-	[AIBSPD, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+BtsR	pdhR-aceEF-lpdA[pdhRp]	-	[AIBSPD, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+BtsR	yjiY[yjiYp]	+	[AIBSPD, BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+BtsR	yobF-cspC[yobFp1]	-	[AIBSPD, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+CRP	aaeR[aaeRp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	aaeXAB[aaeXp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	aceBAK[aceBp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	acnA[acnAp2]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	acnB[acnBp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	acs-yjcHG[acsp2]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	aer[aerp]	+	[AIBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	agp[agpp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	aldA[aldAp]	+	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+CRP	aldB[aldBp]	+	[AIBSCS, BPP]	Strong	
+CRP	ampDE[ampD]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	ansB[ansBp2]	+	[BCE, SM]	Strong	
+CRP	araBAD[araBp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	araC[araCp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	araE[araEp]	+	[AIBSCS, BPP]	Strong	
+CRP	araE-ygeA[araEp]	+	[AIBSCS, BPP]	Strong	
+CRP	araFGH[araFp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	araJ[araJp]	+	[APIORCISFBSCS, BPP]	Strong	
+CRP	argG[argGp]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+CRP	ascFB[ascFp]	+	[BPP, ICWHO]	Strong	
+CRP	aspA[aspAp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	aspA-dcuA[aspAp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	azuC[azuCp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	bglG[bglGp]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	bglG[bglGp2]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	bglGFB[bglGp]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	caiF[caiFp]	+	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+CRP	caiTABCDE[caiTp]	+	[APIORCISFBSCS, AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+CRP	cas3[cas3p]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	casABCDE12[casAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	cdd[cddp]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+CRP	chbBCARFG[chbBp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	chiP-ybfN[chiPp]	+	[APIORCISFBSCS]	Weak	
+CRP	cirA[cirAp2]	+	[]	null	
+CRP	cirA[cirAp1]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	citCDEFXG[citCp2]	-	[AIBSCS]	Weak	
+CRP	cpdB[cpdBp]	+	[BCE, SM]	Strong	
+CRP	crp[crpp1]	+	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM), AIBSCS, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	csgDEFG[csgDp1]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	csiD-ygaF-gabDTP[csiDp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	csiE[csiEp]	+	[GEA]	Weak	
+CRP	cspD[cspDp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	cspE[cspEp2]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	csrC[csrCp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	cstA[cstAp1]	+	[GEA, SM]	Strong	
+CRP	cyaA[cyaAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	cyaR[cyaRp]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	cyoABCDE[cyoAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	cytR[cytRp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	dadAX[dadAp2]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	dadAX[dadAp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	dadAX[dadAp3]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	dctA[dctAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	dcuB-fumB[dcuBp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	dcuR[dcuRp]	+	[APIORCISFBSCS, BPP]	Strong	
+CRP	deoCABD[deoCp2]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	dgoRKADT[dgoRp]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	dpiBA[dpiBp]	-	[AIBSCS]	Weak	
+CRP	dsdA[dsdAp]	+	[APIORCISFBSCS]	Weak	
+CRP	dsdXA[dsdXp]	+	[BCE]	Weak	
+CRP	dusB-fis[dusBp]	+	[AIBSCS, BPP, GEA, CV(GEA/ROMA)]	Strong	
+CRP	ebgAC[ebgAp]	+	[APIORCISFBSCS]	Weak	
+CRP	entCEBA-ybdB[entCp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	epd-pgk[epdp]	+	[APIORCISFBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	epd-pgk-fbaA[epdp]	+	[APIORCISFBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	exuR[exuRp2]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	exuT[exuTp2]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	fadD-sroD[fadDp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	fadH[fadHp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	fadL[fadLp]	+	[BPP, GEA]	Strong	
+CRP	feaB[feaBp1]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	feaR[feaRp2]	+	[APIORCISFBSCS]	Weak	
+CRP	fecABCDE[fecAp]	+	[GEA]	Weak	
+CRP	fepA-entD[fepAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	fiu[fiup]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	fixABCX[fixAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	flhDC[flhDp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	focA-pflB[focAp1]	+	[APIORCISFBSCS, AIBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	fucAO[fucAp]	+	[AIBSCS, GEA, IMP, CV(GEA/ROMA)]	Strong	
+CRP	fucPIKUR[fucPp]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA)]	Confirmed	
+CRP	fumA[fumAp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	fumAC[fumAp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	fumC[fumCp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	fur[furpb]	+	[APIORCISFBSCS, SM]	Strong	
+CRP	fur[furpa]	+	[APIORCISFBSCS, SM]	Strong	
+CRP	gadAX[gadAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	gadBC[gadBp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	gadEF-mdtEF[gadEp]	-	[APIORCISFBSCS, BPP]	Strong	
+CRP	galE[galEp1]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	galE[galEp2]	-	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	galET[galEp1]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	galET[galEp2]	-	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	galETK[galEp1]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	galETK[galEp2]	-	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	galETKM[galEp1]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	galETKM[galEp2]	-	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	galP[galPp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	galS[galSp]	+	[APIORCISFBSCS, AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+CRP	gapA[gapAp3]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	gatYZABCD[gatYp]	+	[AIBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	gcd[gcdp1]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	gcvTHP[gcvTp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	gdhA[gdhAp1]	-	[APIORCISFBSCS]	Weak	
+CRP	glcC[glcCp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	glgCAP[glgCp1]	+	[BPP, GEA]	Strong	
+CRP	glgS[glgSp1]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	glnA[glnAp1]	+	[APIORCISFBSCS]	Weak	
+CRP	glnA[glnAp2]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	glnALG[glnAp1]	+	[APIORCISFBSCS]	Weak	
+CRP	glnALG[glnAp2]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	glpABC[glpABCp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	glpD[glpDp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	glpEGR[glpEp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	glpFKX[glpFp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	glpTQ[glpTQp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	gltA[gltAp1]	+	[AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+CRP	gltBDF[gltBp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	gntK[gntKp]	+	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+CRP	gntKU[gntKp]	+	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+CRP	gntP[gntPp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(GEA/ROMA)]	Strong	
+CRP	gntT[gntTp3]	+	[APIORCISFBSCS, BPP, GEA, SM, TASES, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	gntT[gntTp2]	+	[APIORCISFBSCS, BPP, GEA, SM, TASES, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	gntT[gntTp1]	+	[APIORCISFBSCS, BPP, GEA, SM, TASES, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	gntXY[gntXp]	+	[AIBSCS]	Weak	
+CRP	grcA[grcAp1]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	grpE[grpEp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	guaBA[guaBp]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+CRP	gyrA[gyrAp]	+	[GEA]	Weak	
+CRP	hfq-hflXKC[hfqp3]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	hicAB[hicAp1]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	hlyE[hlyEp]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+CRP	hofMNOP[hofMp]	+	[AIBSCS, BPP]	Strong	
+CRP	hpt[hptp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	hupA[hupAp]	+	[BPP, GEA]	Strong	
+CRP	hupB[hupBp3]	+	[BPP, GEA]	Strong	
+CRP	hyfABCDEFGHIJR-focB[hyfAp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	idnDOTR[idnDp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	idnK[idnKp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	ivbL[ivbLp]	+	[APIORCISFBSCS, BPP]	Strong	
+CRP	ivbL-ilvBN[ivbLp]	+	[APIORCISFBSCS, BPP]	Strong	
+CRP	kbaZ-agaVWA[kbaZp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	lacZYA[lacZp3]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	lacZYA[lacZp2]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	lacZYA[lacZp1]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	ldtB[ldtBp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	lgoR[lgoRp4]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	lpdA[lpdAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	lsrACDBFG-tam[lsrAp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	lsrRK[lsrRp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	malEFG[malEp]	+	[APIORCISFBSCS, AIBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+CRP	malI[malIp]	+	[AIBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	malK-lamB-malM[malKp]	+	[APIORCISFBSCS, AIBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+CRP	malS[malSp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	malT[malTp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	malXY[malXp]	+	[AIBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	manA[manAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	manXYZ[manXp]	+	[APIORCISFBSCS, AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+CRP	marRAB[marRp]	+	[AIBSCS, GEA, IMP, CV(GEA/ROMA)]	Strong	
+CRP	mcaS[mcaSp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	mdh[mdhp1]	+	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+CRP	melAB[melAp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	melR[melRp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	metK[metKp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	metY[metYp2]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+CRP	metY-yhbC-nusA-infB-rbfA-truB-rpsO-pnp[metYp2]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+CRP	mglBAC[mglBp]	+	[AIBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	mhpABCDFE[mhpAp]	+	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+CRP	mhpR-lacI[mhpRp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	mlc[mlcp1]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	mlc-ynfK[mlcp2]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	modABC[modAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	mpl[mplp1]	+	[AIBSCS]	Weak	
+CRP	mtlADR[mtlAp]	+	[APIORCISFBSCS, BPP]	Strong	
+CRP	murQP[murQp1]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	murQP[murQp2]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	nadC[nadCp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	nagBACD[nagBp]	+	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	nagE[nagEp]	+	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	nanA[nanAp]	+	[BPP]	Strong	
+CRP	nanATEK-yhcH[nanAp]	+	[BPP]	Strong	
+CRP	nanCM[nanCp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	nanCMS[nanCp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	narQ[narQp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	nirBDC-cysG[nirBp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	nmpC[nmpCp]	+	[APIORCISFBSCS, SM]	Strong	
+CRP	nrdAB-yfaE[nrdAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	nupC[nupCp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	nupG[nupGp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM), BCE]	Confirmed	
+CRP	ompA[ompAp1]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	ompF[ompFp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	ompR-envZ[ompRp2]	+	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+CRP	ompR-envZ[ompRp1]	-	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+CRP	ompR-envZ[ompRp3]	+	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+CRP	ompR-envZ[ompRp4]	-	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+CRP	ompW[ompWp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	osmY[osmYp]	-	[APIORCISFBSCS, GEA, IHBCE, CV(GEA/ROMA)]	Strong	
+CRP	oxyR[oxyRp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	paaABCDEFGHIJK[paaAp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	paaZ[paaZp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	pck[pckp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	pdhR-aceEF-lpdA[pdhRp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	pka[pkap]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	pncB[pncBp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	ppdD-hofBC[ppdDp]	+	[AIBSCS, BPP]	Strong	
+CRP	ppiA[ppiAp2]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	ppiA[ppiAp3]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	ppiA[ppiAp4]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	preTA[preTp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	proP[proPp2]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	proP[proPp1]	-	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	prpBCDE[prpBp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	prpR[prpRp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	psiE[psiEp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	ptsG[ptsGp1]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	ptsHI-crr[ptsHp4]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	ptsHI-crr[ptsHp5]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	ptsHI-crr[ptsHp2]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	ptsHI-crr[ptsHp1]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	putP[putPp4]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	puuDRCBE[puuDp]	-	[APIORCISFBSCS, IEP]	Weak	
+CRP	raiA[raiAp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	rbsDACBKR[rbsDp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	relA-mazEF[relAp2]	+	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+CRP	rhaBAD[rhaBp]	+	[APIORCISFBSCS, AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+CRP	rhaSR[rhaSp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	rhaT[rhaTp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	rmf[rmfp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	rplM-rpsI[rplMp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	rpoE-rseABC[rpoEp2b]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	rpoH[rpoHp5]	+	[AIBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	rpoH[rpoHp4]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	rpoH[rpoHp3]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	rpoS[rpoSp]	-	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	rpsF-priB-rpsR-rplI[rpsFp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	sbmC[sbmCp2]	+	[AIBSCS, BPP, IHBCE]	Strong	
+CRP	sdhCDAB-sucABCD-sdhX[sdhCp]	+	[AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+CRP	sdhDAB[sdhDp2]	+	[BCE]	Weak	
+CRP	secB-gpsA[secBp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	serA[serAp2]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	serC[serCp]	-	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	serC-aroA[serCp]	-	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	sfsA-dksA[sfsAp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	sodA[sodAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	sodB[sodBp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	sohB[sohBp1]	-	[AIBSCS]	Weak	
+CRP	sohB[sohBp2]	-	[AIBSCS]	Weak	
+CRP	speC[speCp]	-	[GEA, IMP, CV(GEA/ROMA)]	Strong	
+CRP	spf[spfp]	-	[APIORCISFBSCS]	Weak	
+CRP	srlAEBD-gutM-srlR-gutQ[srlAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	tdcABCDEFG[tdcAp]	+	[APIORCISFBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	tnaC[tnaCp]	+	[APIORCISFBSCS, AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+CRP	tnaCAB[tnaCp]	+	[APIORCISFBSCS, AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+CRP	treBC[treBp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	trg[trgp1]	+	[AIBSCS, BPP]	Strong	
+CRP	trxA[trxAp1]	-	[BPP, GEA]	Strong	
+CRP	tsx[tsxp2]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	ubiG[ubiGp]	+	[GEA]	Weak	
+CRP	udp[udpP]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	ugpBAECQ[ugpBp2]	+	[APIORCISFBSCS, BPP]	Strong	
+CRP	uhpT[uhpTp]	+	[APIORCISFBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	uidABC[uidAp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	ulaABCDEF[ulaAp]	+	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	uxaB[uxaBp]	+	[APIORCISFBSCS]	Weak	
+CRP	uxaCA[uxaCp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	uxuAB[uxuAp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(GEA/ROMA)]	Strong	
+CRP	uxuR[uxuRp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	xseA[xseAp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+CRP	xylAB[xylAp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	xylE[xylEp]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	xylFGHR[xylFp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	yaeP-rof[yaePp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	yaeQ-arfB-nlpE[yaeQp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	ybiT[ybiTp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	ycdZ[ycdZp4]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	ycfQ[comRp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	ycfR[bhsAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	ychH[ychHp]	+	[AIBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	yeiP[yeiPp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	yeiW[yeiWp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	yhfA[yhfAp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	yiaJ[yiaJp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	yiaKLMNO-lyx-sgbHUE[yiaKp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CRP	yihW[csqRp]	+	[BPP, GEA, MCIBSPD]	Strong	
+CRP	yjhIHG[yjhIp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	yjiY[yjiYp]	+	[AIBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CRP	ykgR[ykgRp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP	zraSR[zraSp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CRP-Sxy	yccR[sxyp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CadC	cadBA[cadBp]	+	[BPP, GEA]	Strong	
+CadC	cadC[cadCp]	+	[GEA]	Weak	
+CaiF	caiTABCDE[caiTp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CaiF	fixABCX[fixAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cbl	ssuEADCB[ssuEp]	+	[BPP, GEA]	Strong	
+Cbl	tauABCD[tauAp]	+	[BPP, GEA]	Strong	
+CdaR	cdaR[cdaRp]	+	[GEA]	Weak	
+CdaR	garD[garDp]	+	[GEA]	Weak	
+CdaR	garPLRK-rnpB[garPp]	+	[GEA]	Weak	
+CdaR	gudPXD[gudPp]	+	[GEA]	Weak	
+CecR	cecR-ybhGFSR[cecRp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+ChbR	chbBCARFG[chbBp]	+	[BPP, GEA]	Strong	
+ComR	ycfR[bhsAp]	-	[BPP, GEA]	Strong	
+CpxR	acrD[acrDp2]	+	[BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	aroG[aroGp]	+	[APIORCISFBSCS, BPP]	Strong	
+CpxR	bacA[bacAp]	+	[ICA]	Weak	
+CpxR	bamE[bamEp]	-	[ICA]	Weak	
+CpxR	cpxPQ[cpxPp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	cpxRA[cpxRp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	csgBAC[csgBp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	csgDEFG[csgDp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	cyaR[cyaRp]	-	[BPP, GEA]	Strong	
+CpxR	degP[degPp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	dgcZ[dgcZp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	dsbC[dsbCp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CpxR	efeU[efeUp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	ftnB[ftnBp2]	+	[APIORCISFBSCS, BPP]	Strong	
+CpxR	hlpA-lpxD-fabZ-lpxA[hlpAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CpxR	ldtC[ldtCp]	+	[APIORCISFBSCS, BPP]	Strong	
+CpxR	ldtD[ldtDp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	marRAB[marRp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	mdtABCD-baeSR[mdtAp]	+	[BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	motAB-cheAW[motAp]	-	[BPP, GEA]	Strong	
+CpxR	ompC[ompCp1]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	ompF[ompFp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	ppiA[ppiAp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	ppiD[ppiDp2]	+	[APIORCISFBSCS, SM]	Strong	
+CpxR	psd-mscM[psdp]	-	[ICA]	Weak	
+CpxR	rpoE-rseABC[rpoEp1a]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CpxR	rpoH[rpoHp1]	+	[GEA]	Weak	
+CpxR	rprA[rprAp]	+	[BPP, GEA]	Strong	
+CpxR	sbmA-yaiW[sbmAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CpxR	slt[sltp7]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, IGI, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	spy[spyp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	srkA-dsbA[srkAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	tomB-hha[tomBp1]	+	[APIORCISFBSCS, BPP]	Strong	
+CpxR	tsr[tsrp1]	-	[BPP]	Strong	
+CpxR	ung[ungp]	-	[BCE, BPP]	Strong	
+CpxR	yccA[yccAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	yebE[yebEp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	yidQ[yidQp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CpxR	yqaE[yqaEp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	yqaE-kbp[yqaEp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CpxR	yqjA-mzrA[yqjAp1]	+	[APIORCISFBSCS, BPP]	Strong	
+Cra	aceBAK[aceBp]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+Cra	acnA[acnAp2]	+	[GEA]	Weak	
+Cra	acnB[acnBp]	-	[GEA]	Weak	
+Cra	adhE[adhEp1]	-	[BCE, GEA, ICWHO, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Cra	aroP[aroPp1]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Cra	aroP[aroPp2]	+	[AIBSCS, GEA, ICWHO, CV(GEA/ROMA)]	Strong	
+Cra	betIBA[betIp]	+	[GEA]	Weak	
+Cra	betT[betTp]	+	[GEA]	Weak	
+Cra	crp[crpp1]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+Cra	csgDEFG[csgDp1]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Cra	cydAB[cydAp5]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cra	cyoABCDE[cyoAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Cra	edd-eda[eddp1]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Cra	eno[enop1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cra	eno[enop2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cra	eno[enop3]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cra	epd-pgk[epdp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Cra	epd-pgk-fbaA[epdp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Cra	fbaB[fbaBp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Cra	fruBKA[fruBp]	-	[AIBSCS, GEA, NAS, CV(GEA/ROMA)]	Strong	
+Cra	gapA[gapAp1]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cra	gapA[gapAp3]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cra	gapA[gapAp4]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cra	gapA-yeaD[gapAp2]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cra	glcC[glcCp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Cra	glk[glkp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Cra	gpmM-envC-yibQ[gpmMp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Cra	hypF[hypFp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cra	hypF[hypFp3]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cra	icd[icdAp2]	+	[BPP]	Strong	
+Cra	manXYZ[manXp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Cra	marRAB[marRp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Cra	mpl[mplp1]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Cra	mtlADR[mtlAp]	-	[BPP, GEA]	Strong	
+Cra	nirBDC-cysG[nirBp]	-	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+Cra	pck[pckp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Cra	pdhR-aceEF-lpdA[pdhRp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Cra	pfkA[pfkAp2]	-	[BPP]	Strong	
+Cra	poxB[poxBp]	+	[GEA]	Weak	
+Cra	ppc[ppcp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Cra	pps[ppsp]	+	[AIBSCS, BPP, GEA, ICWHO, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cra	prpBCDE[prpBp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Cra	ptsHI-crr[ptsHp2]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cra	ptsHI-crr[ptsHp1]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cra	pykF[pykFp]	-	[BCE, SM]	Strong	
+Cra	sgrST-setA[sgrSp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Cra	tpiA[tpiAp2]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Cra	yahA[pdeLp1]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Cra	zwf[zwfp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CreB	creD[creDp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CreB	malEFG[malEp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CreB	talA[talAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CsgD	adrA[adrAp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CsgD	csgBAC[csgBp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CsgD	csgDEFG[csgDp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CsgD	flgMN[flgMp]	-	[APIORCISFBSCS, BPP]	Strong	
+CsgD	fliAZY[fliAp1]	-	[AIBSCS, BPP]	Strong	
+CsgD	fliE[fliEp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CsgD	fliE[fliEp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CsgD	fliFGHIJK[fliFp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CsgD	iraP[iraPp1]	+	[GEA]	Weak	
+CsgD	nlpA[nlpAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CsgD	pepD[pepDp3]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CsgD	ubiT-yhbS[ubiTp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CsgD	wrbA-yccJ[wrbAp]	+	[APIORCISFBSCS, BPP]	Strong	
+CsgD	yccT[yccTp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CspA	gyrA[gyrAp]	+	[APIORCISFBSCS]	Weak	
+CspA	hns[hnsp]	+	[BPP]	Strong	
+CsqR	yihUTS[yihUp5]	-	[BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+CsqR	yihV-csqR[yihVp1]	-	[BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+CsqR	yihW[csqRp]	-	[BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+CueR	copA[copAp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CueR	cueO[cueOp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CueR	moaABCDE[moaAp1]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CusR	cusCFBA[cusCp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CusR	cusRS[cusRp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CusR	cyoABCDE[cyoAp]	+	[APIORCISFBSCS]	Weak	
+CusR	hiuH[hiuHp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CynR	cynR[cynRp]	-	[APIORCISFBSCS, BPP]	Strong	
+CynR	cynTS[cynTp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CynR	cynTSX[cynTp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CysB	cbl[cblp]	+	[BPP, GEA]	Strong	
+CysB	cysB[cysBp]	-	[APIORCISFBSCS]	Weak	
+CysB	cysDNC[cysDp]	+	[BCE]	Weak	
+CysB	cysJIH[cysJp]	+	[APIORCISFBSCS]	Weak	
+CysB	cysK[cysKp1]	+	[APIORCISFBSCS, SM]	Strong	
+CysB	cysPUWAM[cysPp]	+	[BPP, GEA]	Strong	
+CysB	dgcZ[dgcZp]	+	[AIBSCS]	Weak	
+CysB	hslJ[hslJp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CysB	ssuEADCB[ssuEp]	-	[BPP, GEA]	Strong	
+CysB	tauABCD[tauAp]	+	[BPP, GEA]	Strong	
+CysB	tcyJ[tcyJp]	+	[GEA]	Weak	
+CysB	tcyP[tcyPp]	+	[GEA]	Weak	
+CysB	ybdN[ybdNp]	+	[AIBSCS]	Weak	
+CysB	yciW[yciWp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+CysB	ygeH[ygeHp10]	+	[AIBSCS]	Weak	
+CysB	yoaC[yoaCp1]	+	[AIBSCS]	Weak	
+CytR	cdd[cddp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CytR	cytR[cytRp]	-	[APIORCISFBSCS, BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CytR	deoCABD[deoCp2]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CytR	nupC[nupCp]	-	[TAS]	Weak	
+CytR	nupG[nupGp]	-	[APIORCISFBSCS, BPP]	Strong	
+CytR	ppiA[ppiAp2]	-	[APIORCISFBSCS, BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CytR	ppiA[ppiAp3]	-	[APIORCISFBSCS, BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CytR	ppiA[ppiAp4]	-	[APIORCISFBSCS, BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CytR	rpoH[rpoHp5]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CytR	rpoH[rpoHp4]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CytR	rpoH[rpoHp3]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+CytR	tsx[tsxp2]	-	[APIORCISFBSCS, BPP, GEA, IHBCE, IC, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CytR	udp[udpP]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+CytR	ycdZ[ycdZp4]	-	[AIBSCS]	Weak	
+Dan	ttdABT[ttdAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Dan	ttdR[ttdRp]	+	[BPP]	Strong	
+DcuR	aspA[aspAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+DcuR	aspA-dcuA[aspAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+DcuR	dctA[dctAp]	+	[BPP, GEA]	Strong	
+DcuR	dcuB-fumB[dcuBp2]	+	[BPP, GEA]	Strong	
+DcuR	dpiBA[dpiBp2]	+	[APIORCISFBSCS, BPP]	Strong	
+DcuR	frdABCD[frdAp]	+	[BPP, GEA]	Strong	
+DcuR	pck[pckp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+DeoR	deoCABD[deoCp1]	-	[APIORCISFBSCS, SM]	Strong	
+DeoR	deoCABD[deoCp2]	-	[APIORCISFBSCS, SM]	Strong	
+DeoR	nupG[nupGp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+DeoR	tsx[tsxp1]	-	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+DgoR	dgoRKADT[dgoRp]	-	[AIBSPD, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+DhaR	dhaKLM[dhaKp]	+	[GEA]	Weak	
+DhaR	dhaR[dhaRp]	-	[GEA]	Weak	
+DicA	dicB-ydfDE-insD-intQ[dicBp]	-	[GEA]	Weak	
+DicA	dicC-ydfXW[dicCp]	-	[BPP, GEA, IHBCE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+DinJ-YafQ	cspE[cspEp1]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+DinJ-YafQ	dinJ-yafQ[dinJp]	-	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+DnaA	aldA[aldAp]	-	[BPP, GEA]	Strong	
+DnaA	dnaAN-recF[dnaAp1]	-	[BPP, GEA]	Strong	
+DnaA	dnaAN-recF[dnaAp2]	+	[BPP, SM, CV(CHIP-SV/SM), GEA]	Confirmed	
+DnaA	guaBA[guaBp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+DnaA	nrdAB-yfaE[nrdAp]	+	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+DnaA	polA[polAp]	+	[BPP, GEA]	Strong	
+DnaA	recN[recNp]	-	[GEA, ICA, CV(GEA/ROMA)]	Strong	
+DnaA	rpoH[rpoHp4]	-	[APIORCISFBSCS, BCE]	Weak	
+DnaA	rpoH[rpoHp3]	-	[APIORCISFBSCS, BCE]	Weak	
+DnaA	uvrB[uvrBp3]	-	[BPP, GEA, ICA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+DnaA	uvrB[uvrBp2]	-	[BPP, GEA, ICA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+DnaA	yjeV[yjeVp]	-	[BPP, GEA]	Strong	
+DpiA	appY[appYp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+DpiA	citCDEFXG[citCp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+DpiA	citCDEFXG[citCp2]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+DpiA	dpiBA[dpiBp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+DpiA	exuT[exuTp2]	+	[BPP, GEA]	Strong	
+DpiA	exuT[exuTp1]	+	[BPP, GEA]	Strong	
+DpiA	mdh[mdhp1]	+	[BPP, GEA]	Strong	
+DpiA	mdh[mdhp2]	+	[BPP, GEA]	Strong	
+DsdC	dsdA[dsdAp]	+	[GEA]	Weak	
+DsdC	dsdC[dsdCp]	-	[GEA]	Weak	
+DsdC	dsdXA[dsdXp]	+	[GEA]	Weak	
+EbgR	ebgAC[ebgAp]	-	[GEA]	Weak	
+EnvR	acrAB[acrAp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+EnvY	ompC[ompCp1]	+	[IMP]	Weak	
+EnvY	ompF[ompFp]	+	[IMP]	Weak	
+EvgA	acrD[acrDp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+EvgA	emrKY[emrKp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+EvgA	evgAS[evgAp2]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+EvgA	evgAS[evgAp1]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+EvgA	frc[frcp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+EvgA	gadEF-mdtEF[gadEp]	+	[BPP, GEA]	Strong	
+EvgA	safA-ydeO[safAp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+EvgA	ydeP[ydePp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+EvgA	yegRZ[yegRp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+EvgA	yfdX[yfdXp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ExuR	exuR[exuRp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ExuR	exuT[exuTp2]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ExuR	lgoR[lgoRp4]	-	[BPP]	Strong	
+ExuR	uxaB[uxaBp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ExuR	uxaCA[uxaCp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ExuR	uxuAB[uxuAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ExuR	uxuR[uxuRp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	aceEF[aceEp]	-	[GEA]	Weak	
+FNR	ackA[ackAp]	+	[GEA]	Weak	
+FNR	acnA[acnAp2]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	acrEF[acrEp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	adhE[adhEp2]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	aer[aerp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	aldA[aldAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	ansB[ansBp2]	+	[BCE, SM]	Strong	
+FNR	arcA[arcAp1]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	arcA[arcAp3]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	aspA[aspAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	aspA-dcuA[aspAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	aspC[aspCp]	+	[GEA]	Weak	
+FNR	bcsBZ[bcsBp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	cadC[cadCp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	caiF[caiFp]	+	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+FNR	caiTABCDE[caiTp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	citCDEFXG[citCp2]	-	[AIBSCS]	Weak	
+FNR	cydAB[cydAp3]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FNR	cydAB[cydAp4]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FNR	cydAB[cydAp1]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FNR	cydAB[cydAp2]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA), APIORCISFBSCS]	Confirmed	
+FNR	cydDC[cydDp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	cyoABCDE[cyoAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	dcuB-fumB[dcuBp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	dcuC[dcuCp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	dcuSR[dcuSp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	dmsABC[dmsAp1]	+	[BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	dpiBA[dpiBp]	-	[AIBSCS]	Weak	
+FNR	dppABCDF[dppAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	emrKY[emrKp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	fdhF[fdhFp]	+	[GEA]	Weak	
+FNR	fdnGHI[fdnGp]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	feoABC[feoAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	fes-ybdZ-entF-fepE[fesp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	fixABCX[fixAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	fnr[fnrp]	-	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FNR	fnrS[fnrSp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FNR	focA-pflB[focAp1]	+	[APIORCISFBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	focA-pflB[focAp3]	+	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	frdABCD[frdAp]	+	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+FNR	fumA[fumAp]	-	[GEA]	Weak	
+FNR	fumAC[fumAp]	-	[GEA]	Weak	
+FNR	fumB[fumBp]	+	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+FNR	fumC[fumCp]	-	[GEA]	Weak	
+FNR	gadAX[gadAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	gadX[gadXp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	gadXW[gadXp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	garPLRK-rnpB[garPp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	gcvTHP[gcvTp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	gdhA[gdhAp1]	+	[GEA]	Weak	
+FNR	glnD[glnDp]	+	[GEA]	Weak	
+FNR	glnK-amtB[glnKp]	+	[GEA]	Weak	
+FNR	glpABC[glpABCp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	glpTQ[glpTQp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	gltBDF[gltBp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	gnd[gndp]	-	[GEA]	Weak	
+FNR	grcA[grcAp1]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+FNR	hcp-hcr[hcpp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	hcp-hcr-poxB[hcpp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	hemA-prfA-prmC[hemAp1]	-	[BPP, GEA]	Strong	
+FNR	hlyE[hlyEp]	+	[BPP, GEA]	Strong	
+FNR	hmp[hmpp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	hyfABCDEFGHIJR-focB[hyfAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	hypBCDE[hypBp]	+	[BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FNR	hypBCDE-fhlA[hypBp]	+	[BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FNR	iraD[iraDp2]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	iraM[iraMp]	+	[AIBSCS]	Weak	
+FNR	katG[katGp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	lpdA[lpdAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	malPQ[malPp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	moaABCDE[moaAp1]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	moeAB[moeAp]	-	[BPP, GEA]	Strong	
+FNR	nac[nacp]	-	[GEA]	Weak	
+FNR	napFDAGHBC-ccmABCDEFGH[napFp1]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	narGHJI[narGp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	narK[narKp1]	+	[BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	narXL[narXp]	-	[APIORCISFBSCS, BCE, BPP]	Strong	
+FNR	ndh[ndhp]	-	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	nikABCDER[nikAp1]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	nirBDC-cysG[nirBp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	norVW[norVp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	nrdDG[nrdDp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	nrfABCDEFG[nrfAp]	+	[BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FNR	nuoABCEFGHIJKLMN[nuoAp2]	-	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	ompW[ompWp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FNR	ompX[ompXp2]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	pdhR-aceEF-lpdA[pdhRp]	+	[AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+FNR	pepT[pepTp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	pitA[pitAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	pstS[pstSp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	pstSCA[pstSp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	pstSCAB-phoU[pstSp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	purMN[purMp]	-	[APIORCISFBSCS, AIBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	puuAP[puuAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	ravA-viaA[ravAp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	rplM-rpsI[rplMp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	rplT[rplTp]	-	[GEA]	Weak	
+FNR	rplT-pheM[rplTp]	-	[GEA]	Weak	
+FNR	rpsJ-rplCDWB-rpsS-rplV-rpsC-rplP-rpmC-rpsQ[rpsJp]	+	[GEA]	Weak	
+FNR	rpsP-rimM-trmD-rplS[rpsPp]	-	[GEA]	Weak	
+FNR	sdhCDAB-sucABCD-sdhX[sdhCp]	-	[GEA]	Weak	
+FNR	sodA[sodAp]	-	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+FNR	soxR[soxRp]	-	[GEA]	Weak	
+FNR	soxS[soxSp]	-	[GEA]	Weak	
+FNR	ssuEADCB[ssuEp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	sucAB[sucAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	sucABCD[sucAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	tar-tap-cheRBYZ[tarp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	tdcABCDEFG[tdcAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	tpx[tpxp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	ubiCA[ubiCp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	upp-uraA[uppp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	uxaCA[uxaCp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	xdhABC[xdhAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	ybdN[ybdNp]	+	[AIBSCS]	Weak	
+FNR	ychO[ychOp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	ydeJ[ydeJp]	+	[AIBSCS]	Weak	
+FNR	ydhYVWXUT[ydhYp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	yecR[yecRp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	yeiL[yeiLp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	yfgF[yfgFp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FNR	ygbA[ygbAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	yhjA[yhjAp]	+	[AIBSCS, BPP]	Strong	
+FNR	ynfEFGH-dmsD[ynfEp]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FNR	yqjI[yqjIp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	ysgA[ysgAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FNR	ytfE[ytfEp]	-	[GEA]	Weak	
+FNR	zwf[zwfp]	-	[GEA]	Weak	
+FabR	fabA[fabAp]	-	[APIORCISFBSCS, AIBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FabR	fabB[fabBp]	-	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FadR	accA[accAp2]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FadR	accBC[accBp2]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FadR	accD[accDp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FadR	fabA[fabAp]	+	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+FadR	fabB[fabBp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FadR	fabHDG[fabHp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FadR	fabI[fabIp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FadR	fadBA[fadBp]	-	[APIORCISFBSCS, BCE]	Weak	
+FadR	fadD-sroD[fadDp]	-	[BPP]	Strong	
+FadR	fadE[fadEp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FadR	fadH[fadHp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FadR	fadIJ[fadIp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FadR	fadL[fadLp]	-	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FadR	fadM[fadMp1]	-	[APIORCISFBSCS]	Weak	
+FadR	fadR[fadRp]	+	[AIBSCS]	Weak	
+FadR	iclR[iclRp]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+FadR	uspA[uspAp1]	-	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FeaR	feaB[feaBp1]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FeaR	tynA[tynAp1]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FhlA	fdhF[fdhFp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FhlA	hycABCDEFGHI[hycAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FhlA	hydN-hypF[hydNp]	+	[BPP, GEA]	Strong	
+FhlA	hyfABCDEFGHIJR-focB[hyfAp]	+	[GEA]	Weak	
+FhlA	hypABCDE[hypAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FhlA	hypABCDE-fhlA[hypAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	acnB[acnBp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	acs-yjcHG[acsp1]	-	[BPP, GEA]	Strong	
+Fis	acs-yjcHG[acsp2]	-	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Fis	adhE[adhEp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	alaWX[alaWp]	+	[BCE]	Weak	
+Fis	aldB[aldBp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	ansB[ansBp1]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	argU[argUp]	+	[IHBCE]	Weak	
+Fis	argW[argWp]	+	[BCE]	Weak	
+Fis	argX-hisR-leuT-proM[argXp]	+	[BCE]	Weak	
+Fis	aspV[aspVp]	+	[BCE]	Weak	
+Fis	bglG[bglGp]	-	[BPP]	Strong	
+Fis	bglGFB[bglGp]	-	[BPP]	Strong	
+Fis	carAB[carAp1]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	cbpA-cbpM[cbpAp6]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Fis	cbpA-cbpM[cbpAp4]	-	[]	null	
+Fis	crp[crpp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	crp[crpp3]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	crp[crpp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	cspA[cspAp1]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	cspI[cspIp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	cyoABCDE[cyoAp]	+	[GEA]	Weak	
+Fis	deoCABD[deoCp2]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	dmsABC[dmsAp1]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	dps[dpsp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	dusB-fis[dusBp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Fis	fadBA[fadBp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	flxA[flxAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	fumB[fumBp]	-	[GEA]	Weak	
+Fis	gadAX[gadAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	gadBC[gadBp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	glcC[glcCp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	glnA[glnAp2]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	glnALG[glnAp2]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	glnQ[glnQp]	-	[GEA]	Weak	
+Fis	glpABC[glpABCp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	glpTQ[glpTQp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	gltX[gltXp3]	-	[APIORCISFBSCS, AIBSCS, BCE, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+Fis	glyU[glyUp]	+	[BCE]	Weak	
+Fis	grcA[grcAp1]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	guaBA[guaBp]	-	[AIBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+Fis	gyrA[gyrAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	gyrB[gyrBp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	hlyE[hlyEp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	hns[hnsp]	+	[BPP]	Strong	
+Fis	hupA[hupAp]	+	[BPP, GEA]	Strong	
+Fis	hupB[hupBp2]	-	[BPP, GEA]	Strong	
+Fis	hupB[hupBp3]	-	[BPP, GEA]	Strong	
+Fis	hyaABCDEF[hyaAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	katE[katEp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	leuQPV[leuQp]	+	[APIORCISFBSCS, BCE, GEA, IHBCE, CV(GEA/ROMA)]	Strong	
+Fis	leuX[leuXp]	+	[BCE]	Weak	
+Fis	lpdA[lpdAp]	+	[BCE, BPP]	Strong	
+Fis	lysT-valT-lysW[lysTp]	+	[IHBCE]	Weak	
+Fis	malEFG[malEp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	marRAB[marRp]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+Fis	mazEFG[mazEp1]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+Fis	mazEFG[mazEp2]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+Fis	metT-leuW-glnUW-metU-glnVX[metTp]	+	[IHBCE]	Weak	
+Fis	metY[metYp1]	+	[BCE, IHBCE]	Weak	
+Fis	metY-yhbC-nusA-infB[metYp1]	+	[BCE, IHBCE]	Weak	
+Fis	metY-yhbC-nusA-infB-rbfA-truB-rpsO-pnp[metYp1]	+	[BCE, IHBCE]	Weak	
+Fis	mglAC[mglAp]	-	[GEA]	Weak	
+Fis	msrA[msrAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	mtlADR[mtlAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	nanA[nanAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	nanATEK-yhcH[nanAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	narGHJI[narGp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	narK[narKp1]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	ndh[ndhp]	+	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+Fis	nirBDC-cysG[nirBp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	nrdAB-yfaE[nrdAp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Fis	nrfABCDEFG[nrfAp]	-	[BPP, GEA]	Strong	
+Fis	nuoABCEFGHIJKLMN[nuoAp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	ogt[ogtp]	-	[BPP]	Strong	
+Fis	osmE[osmEp]	-	[BPP]	Strong	
+Fis	osmY[osmYp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	patA[patAp]	?	[AIBSCS]	Weak	
+Fis	pdxA-rsmA[pdxAp]	+	[GEA]	Weak	
+Fis	pdxA-rsmA-apaGH[pdxAp]	+	[GEA]	Weak	
+Fis	pflB[pflBp1]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	pheU[pheUp]	+	[IHBCE]	Weak	
+Fis	pheV[pheVp]	+	[BCE]	Weak	
+Fis	proK[proKp]	+	[BCE]	Weak	
+Fis	proL[proLp]	+	[BCE]	Weak	
+Fis	proP[proPp2]	+	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+Fis	ptsG[ptsGp1]	+	[BPP, GEA]	Strong	
+Fis	ptsG[ptsGp2]	-	[BPP, GEA]	Strong	
+Fis	pyrD[pyrDp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	queA[queAp]	+	[BPP, GEA]	Strong	
+Fis	rnpB[rnpBp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	rplM-rpsI[rplMp]	-	[APIORCISFBSCS, AIBSCS]	Weak	
+Fis	rrsA-ileT-alaT-rrlA-rrfA[rrsAp1]	+	[BPP, GEA]	Strong	
+Fis	rrsB-gltT-rrlB-rrfB[rrsBp1]	+	[BPP, GEA]	Strong	
+Fis	rrsC-gltU-rrlC-rrfC[rrsCp1]	+	[BPP, GEA]	Strong	
+Fis	rrsD-ileU-alaU-rrlD-rrfD-thrV-rrfF[rrsDp1]	+	[BPP, GEA]	Strong	
+Fis	rrsE-gltV-rrlE-rrfE[rrsEp]	+	[BPP, GEA]	Strong	
+Fis	rrsG-gltW-rrlG-rrfG[rrsGp1]	+	[BPP, GEA]	Strong	
+Fis	rrsH-ileV-alaV-rrlH-rrfH[rrsHp1]	+	[BPP, GEA]	Strong	
+Fis	serT[serTp]	+	[IHBCE]	Weak	
+Fis	serX[serXp]	+	[BCE]	Weak	
+Fis	sra[srap]	+	[GEA]	Weak	
+Fis	ssrS[ssrSp1]	+	[BPP, GEA]	Strong	
+Fis	ssrS[ssrSp2]	-	[BPP, GEA]	Strong	
+Fis	ssrS-ygfA[ssrSp1]	+	[BPP, GEA]	Strong	
+Fis	ssrS-ygfA[ssrSp2]	-	[BPP, GEA]	Strong	
+Fis	thrU-tyrU-glyT-thrT-tufB[thrUp]	+	[APIORCISFBSCS, BPP, GEA, IHBCE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	thrW[thrWp]	+	[BCE]	Weak	
+Fis	topA[topAp1]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	topA[topAp4]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	trg[trgp1]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	trmA[trmAp]	+	[APIORCISFBSCS]	Weak	
+Fis	tyrTV-tpr[tyrTp]	+	[AIBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fis	valUXY-lysV[valUp]	+	[APIORCISFBSCS, AIBSCS, BCE, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+Fis	xylFGHR[xylFp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fis	yeaR-yoaG[yeaRp]	-	[BPP]	Strong	
+FlhDC	flgAMN[flgAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+FlhDC	flgBCDEFGHIJ[flgBp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FlhDC	flgK[flgKp]	+	[BPP, GEA]	Strong	
+FlhDC	flhBAE[flhBp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FlhDC	fliAZY[fliAp1]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+FlhDC	fliDST[fliDp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FlhDC	fliE[fliEp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FlhDC	fliFGHIJK[fliFp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FlhDC	fliLMNOPQR[fliLp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FlhDC	glpABC[glpABCp]	+	[GEA]	Weak	
+FlhDC	gltIJKL-sroC[gltIp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FlhDC	hydN-hypF[hydNp]	+	[GEA]	Weak	
+FlhDC	mdh[mdhp1]	-	[GEA]	Weak	
+FlhDC	mglBAC[mglBp]	-	[GEA]	Weak	
+FlhDC	napFDAGHBC-ccmABCDEFGH[napFp1]	+	[GEA]	Weak	
+FlhDC	napFDAGHBC-ccmABCDEFGH[napFp2]	+	[GEA]	Weak	
+FlhDC	nrfABCDEFG[nrfAp]	+	[GEA]	Weak	
+FlhDC	ppdAB-ygdB-ppdC-recC[ppdAp]	+	[GEA]	Weak	
+FlhDC	ycgR[ycgRp]	+	[GEA]	Weak	
+FlhDC	yecR[yecRp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+FlhDC	ygbK[ygbKp]	+	[GEA]	Weak	
+FlhDC	yhjH[yhjHp]	+	[GEA]	Weak	
+FliZ	csgBAC[csgBp]	-	[GEA]	Weak	
+FliZ	csgDEFG[csgDp1]	-	[BPP, GEA]	Strong	
+FliZ	csgDEFG[csgDp2]	-	[BPP, GEA]	Strong	
+FliZ	flhDC[flhDp]	-	[BPP, GEA]	Strong	
+FliZ	gadBC[gadBp]	-	[BPP, GEA]	Strong	
+FliZ	gadEF-mdtEF[gadEp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+FliZ	hdeAB-yhiD[hdeAp]	-	[BPP, GEA]	Strong	
+FliZ	mlrA[mlrAp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+FliZ	osmY[osmYp]	-	[BPP, GEA]	Strong	
+FliZ	pdeR[pdeRp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+FucR	fucAO[fucAp]	+	[GEA, IMP, CV(GEA/ROMA)]	Strong	
+FucR	fucPIKUR[fucPp]	+	[GEA]	Weak	
+Fur	aspC[aspCp]	-	[GEA]	Weak	
+Fur	cirA[cirAp2]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	cirA[cirAp1]	-	[APIORCISFBSCS, AIBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	cyoABCDE[cyoAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fur	entCEBA-ybdB[entCp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	entS[entSp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	esrE[esrEp]	+	[BPP, GEA]	Strong	
+Fur	exbBD[exbBp]	-	[APIORCISFBSCS, AIBSCS, BPP]	Strong	
+Fur	exbD[exbDp]	-	[APIORCISFBSCS]	Weak	
+Fur	fecABCDE[fecAp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	fecIR[fecIp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Fur	feoABC[feoAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fur	fepA-entD[fepAp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	fepB[fepBp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Fur	fepDGC[fepDp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	fes-ybdZ-entF-fepE[fesp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	fhuACDB[fhuAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	fhuE[fhuEp]	-	[APIORCISFBSCS, AIBSCS]	Weak	
+Fur	fhuF[fhuFp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	fiu[fiup]	-	[APIORCISFBSCS]	Weak	
+Fur	flhDC[flhDp]	-	[AIBSCS]	Weak	
+Fur	fnr[fnrp]	-	[GEA]	Weak	
+Fur	ftnA[ftnAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	fumB[fumBp]	+	[GEA]	Weak	
+Fur	fumC[fumCp]	-	[GEA]	Weak	
+Fur	fur[furpb]	-	[APIORCISFBSCS, BPP]	Strong	
+Fur	fur[furpa]	-	[APIORCISFBSCS, BPP]	Strong	
+Fur	garPLRK-rnpB[garPp]	-	[APIORCISFBSCS, BPP]	Strong	
+Fur	gdhA[gdhAp1]	+	[GEA]	Weak	
+Fur	glnD[glnDp]	-	[GEA]	Weak	
+Fur	glnK-amtB[glnKp]	+	[GEA]	Weak	
+Fur	gltBDF[gltBp]	-	[GEA]	Weak	
+Fur	gnd[gndp]	-	[GEA]	Weak	
+Fur	gpmA[gpmAp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	grcA[grcAp1]	-	[GEA]	Weak	
+Fur	gspCDEFGHIJKLMO[gspCp3]	-	[APIORCISFBSCS, BPP]	Strong	
+Fur	hmp[hmpp]	-	[APIORCISFBSCS, AS, GEA, IMP, CV(GEA/ROMA)]	Strong	
+Fur	katE[katEp]	+	[IEP]	Weak	
+Fur	katG[katGp]	+	[IEP]	Weak	
+Fur	lpdA[lpdAp]	+	[GEA]	Weak	
+Fur	metH[metHp]	-	[AIBSCS]	Weak	
+Fur	metJ[metJp2]	-	[AIBSCS]	Weak	
+Fur	mntH[mntHp]	-	[APIORCISFBSCS, AIBSCS, IGI]	Weak	
+Fur	mntP[mntPp]	+	[AIBSCS]	Weak	
+Fur	nac[nacp]	-	[GEA]	Weak	
+Fur	ndh[ndhp]	-	[GEA]	Weak	
+Fur	nfeF[yqjHp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fur	nohA-stfQ-tfaQ[nohAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	nrdHIEF[nrdHp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fur	ompF[ompFp]	+	[GEA]	Weak	
+Fur	ompW[ompWp]	+	[GEA]	Weak	
+Fur	oppABCDF[oppAp]	-	[APIORCISFBSCS, BPP]	Strong	
+Fur	purR[purRp]	-	[AIBSCS]	Weak	
+Fur	pyrC[pyrCp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	rcnAB[rcnAp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fur	rpoS[rpoSp]	-	[GEA, IEP, CV(GEA/ROMA)]	Strong	
+Fur	ryhB[yhhXp5]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(GEA/ROMA)]	Strong	
+Fur	sdhCDAB-sucABCD-sdhX[sdhCp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fur	sodA[sodAp]	-	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	soxR[soxRp]	-	[GEA]	Weak	
+Fur	soxS[soxSp]	-	[GEA]	Weak	
+Fur	sufABCDSE[sufAp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Fur	tonB[tonBp]	+	[APIORCISFBSCS, AIBSCS, BPP, BCE]	Strong	
+Fur	ygaC[ygaCp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fur	yhhY[yhhYp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Fur	yjjZ[yjjZp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Fur	zinT[zinTp]	+	[GEA]	Weak	
+Fur	zwf[zwfp]	-	[GEA]	Weak	
+GadE	cyoABCDE[cyoAp]	+	[GEA]	Weak	
+GadE	fliC[fliCp]	+	[GEA]	Weak	
+GadE	gadBC[gadBp]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadE	gadE[gadEp1]	+	[GEA]	Weak	
+GadE	gadEF-mdtEF[gadEp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadE	gadX[gadXp]	+	[BPP, GEA]	Strong	
+GadE	gadXW[gadXp]	+	[BPP, GEA]	Strong	
+GadE	gltBDF[gltBp]	+	[BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadE	gnd[gndp]	+	[GEA]	Weak	
+GadE	hdeAB-yhiD[hdeAp]	+	[APIORCISFBSCS, AIBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadE	hdeD[hdeDp]	+	[APIORCISFBSCS, AIBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadE	hlpA-lpxD-fabZ-lpxA[hlpAp]	+	[GEA]	Weak	
+GadE	lrp[lrpp]	+	[GEA]	Weak	
+GadE	purA[purAp]	+	[GEA]	Weak	
+GadE	rcsA[rcsAp]	+	[BPP, GEA]	Strong	
+GadE	yhiM[yhiMp]	+	[CEUMA, IHBCE, RE]	Weak	
+GadE	yjbQR[yjbQp]	+	[CEUMA, IHBCE, RE]	Weak	
+GadE-RcsB	adiC[adiCp7]	+	[BPP]	Strong	
+GadE-RcsB	aslB[aslBp]	+	[BPP]	Strong	
+GadE-RcsB	cadBA[cadBp]	+	[BPP, GEA]	Strong	
+GadE-RcsB	gadAX[gadAp]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GadE-RcsB	slp-dctR[slpp]	+	[BPP, GEA]	Strong	
+GadE-RcsB	yhiM[yhiMp]	+	[BPP]	Strong	
+GadW	gadAX[gadAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadW	gadBC[gadBp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadW	gadEF-mdtEF[gadEp]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+GadW	gadW[gadWp2]	-	[GEA]	Weak	
+GadW	gadX[gadXp]	-	[GEA]	Weak	
+GadW	gadXW[gadXp]	-	[GEA]	Weak	
+GadW	gadY[gadYp]	-	[GEA]	Weak	
+GadW	hdeAB-yhiD[hdeAp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadW	slp-dctR[slpp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+GadX	asnB[asnBp]	+	[GEA]	Weak	
+GadX	btuB-murI[btuBp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadX	cadBA[cadBp]	+	[GEA]	Weak	
+GadX	gadAX[gadAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadX	gadBC[gadBp]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadX	gadE[gadEp3]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadX	gadEF-mdtEF[gadEp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+GadX	gadW[gadWp2]	-	[CEUMA, GEA, IHBCE, RE]	Weak	
+GadX	gadX[gadXp]	+	[GEA]	Weak	
+GadX	gadXW[gadXp]	+	[GEA]	Weak	
+GadX	gadY[gadYp]	+	[GEA]	Weak	
+GadX	glnK-amtB[glnKp]	+	[GEA]	Weak	
+GadX	glsA-ybaT[glsAp]	+	[CEUMA, GEA, IHBCE, RE, CV(GEA/ROMA)]	Strong	
+GadX	hdeAB-yhiD[hdeAp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadX	hdeD[hdeDp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadX	hns[hnsp]	+	[GEA]	Weak	
+GadX	lon[lonp]	+	[GEA]	Weak	
+GadX	rpoS[rpoSp]	+	[GEA]	Weak	
+GadX	slp-dctR[slpp]	+	[APIORCISFBSCS, AIBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GadX	tppB[tppBp]	-	[CEUMA, IHBCE, RE]	Weak	
+GadX	uspE[uspEp]	+	[GEA]	Weak	
+GadX	ydeNM[ydeNp]	-	[CEUMA, IHBCE, RE]	Weak	
+GadX	ynfB-speG[ynfBp]	-	[CEUMA, IHBCE, RE]	Weak	
+GalR	galE[galEp1]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GalR	galE[galEp2]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GalR	galET[galEp1]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GalR	galET[galEp2]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GalR	galETK[galEp1]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GalR	galETK[galEp2]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GalR	galETKM[galEp1]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GalR	galETKM[galEp2]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GalR	galP[galPp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GalR	galR[galRp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GalR	galS[galSp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+GalR	mglBAC[mglBp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+GalS	galE[galEp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GalS	galE[galEp2]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GalS	galET[galEp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GalS	galET[galEp2]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GalS	galETK[galEp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GalS	galETK[galEp2]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GalS	galETKM[galEp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GalS	galETKM[galEp2]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GalS	galP[galPp]	-	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+GalS	galR[galRp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+GalS	galS[galSp]	-	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+GalS	mglBAC[mglBp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+GatR	gatYZABCD[gatYp]	-	[GEA]	Weak	
+GcvA	gcvA[gcvAp]	-	[APIORCISFBSCS, AIBSCS, BCE, BPP, GEA, IC, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GcvA	gcvB[gcvBp]	+	[APIORCISFBSCS, AIBSCS, BCE, BPP, GEA, IC, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GcvA	gcvTHP[gcvTp]	+	[APIORCISFBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM), IC]	Confirmed	
+GlaR	csiD-ygaF-gabDTP[csiDp]	-	[BPP, GEA, IEP, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GlcC	glcC[glcCp]	-	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GlcC	glcDEFGBA[glcDp]	+	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GlpR	glpABC[glpABCp]	-	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+GlpR	glpD[glpDp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GlpR	glpFKX[glpFp]	-	[APIORCISFBSCS, BPP]	Strong	
+GlpR	glpTQ[glpTQp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+GlrR	glmY[glmYp1]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GlrR	rpoE-rseABC[rpoEp2b]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GntR	edd-eda[eddp1]	-	[APIORCISFBSCS, AIBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+GntR	gntK[gntKp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GntR	gntKU[gntKp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+GntR	gntT[gntTp3]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, TASES, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GntR	gntT[gntTp2]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, TASES, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GntR	gntT[gntTp1]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, TASES, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+GntR	gntXY[gntXp]	-	[AIBSCS]	Weak	
+GntR	idnDOTR[idnDp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+GntR	idnK[idnKp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+GutM	srlAEBD-gutM-srlR-gutQ[srlAp]	+	[GEA]	Weak	
+H-NS	acrEF[acrEp]	-	[GEA]	Weak	
+H-NS	ade[adep]	-	[GEA]	Weak	
+H-NS	adiA[adiAp]	-	[GEA]	Weak	
+H-NS	adiY[adiYp]	-	[BPP]	Strong	
+H-NS	appY[appYp]	-	[BPP, GEA]	Strong	
+H-NS	asr[asrp]	-	[GEA, IMP, CV(GEA/ROMA)]	Strong	
+H-NS	bglG[bglGp]	-	[BPP, GEA]	Strong	
+H-NS	bglGFB[bglGp]	-	[BPP, GEA]	Strong	
+H-NS	bolA[bolAp1]	-	[GEA]	Weak	
+H-NS	cadBA[cadBp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+H-NS	cadC[cadCp]	-	[BPP]	Strong	
+H-NS	caiF[caiFp]	-	[GEA]	Weak	
+H-NS	caiTABCDE[caiTp]	-	[IMP]	Weak	
+H-NS	casABCDE12[casAp]	-	[BPP, GEA]	Strong	
+H-NS	chiA[chiAp]	-	[BPP, GEA]	Strong	
+H-NS	csgDEFG[csgDp1]	-	[BPP, GEA]	Strong	
+H-NS	csiD-ygaF-gabDTP[csiDp]	+	[GEA]	Weak	
+H-NS	csiE[csiEp]	+	[GEA]	Weak	
+H-NS	cspA[cspAp1]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+H-NS	cspD[cspDp]	+	[GEA]	Weak	
+H-NS	cydAB[cydAp3]	-	[BPP, GEA]	Strong	
+H-NS	cydAB[cydAp4]	-	[BPP, GEA]	Strong	
+H-NS	cydAB[cydAp1]	-	[BPP, GEA]	Strong	
+H-NS	cydAB[cydAp2]	-	[BPP, GEA]	Strong	
+H-NS	cysPUWAM[cysPp]	-	[GEA]	Weak	
+H-NS	degP[degPp]	-	[GEA]	Weak	
+H-NS	dps[dpsp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+H-NS	evgAS[evgAp2]	-	[BPP]	Strong	
+H-NS	evgAS[evgAp1]	-	[BPP]	Strong	
+H-NS	fes-ybdZ-entF-fepE[fesp]	+	[GEA]	Weak	
+H-NS	fimAICDFGH[fimAp]	+	[BPP, GEA]	Strong	
+H-NS	fimB[fimBp1]	-	[BPP, GEA]	Strong	
+H-NS	fimB[fimBp2]	-	[BPP, GEA]	Strong	
+H-NS	fimE[fimEp]	-	[BPP, GEA]	Strong	
+H-NS	flhDC[flhDp]	+	[BPP, GEA]	Strong	
+H-NS	fliAZY[fliAp1]	+	[GEA, IMP, CV(GEA/ROMA)]	Strong	
+H-NS	fliC[fliCp]	+	[GEA]	Weak	
+H-NS	ftnA[ftnAp]	-	[BPP, GEA]	Strong	
+H-NS	gadAX[gadAp]	-	[BPP, GEA]	Strong	
+H-NS	gadEF-mdtEF[gadEp]	-	[BPP]	Strong	
+H-NS	gadW[gadWp2]	-	[BPP]	Strong	
+H-NS	gadX[gadXp]	-	[BPP, GEA]	Strong	
+H-NS	gadXW[gadXp]	-	[BPP, GEA]	Strong	
+H-NS	galE[galEp1]	-	[BPP]	Strong	
+H-NS	galET[galEp1]	-	[BPP]	Strong	
+H-NS	galETK[galEp1]	-	[BPP]	Strong	
+H-NS	galETKM[galEp1]	-	[BPP]	Strong	
+H-NS	garPLRK-rnpB[garPp]	-	[GEA]	Weak	
+H-NS	gspAB[gspAp1]	-	[BPP, GEA]	Strong	
+H-NS	gspAB[gspAp2]	-	[BPP, GEA]	Strong	
+H-NS	gspCDEFGHIJKLMO[gspCp3]	-	[BPP, GEA]	Strong	
+H-NS	gspCDEFGHIJKLMO[gspCp2]	-	[BPP, GEA]	Strong	
+H-NS	hchA[hchAp]	-	[BPP, GEA]	Strong	
+H-NS	hchA[hchAp2]	-	[BPP, GEA]	Strong	
+H-NS	hdeAB-yhiD[hdeAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+H-NS	hdeD[hdeDp]	-	[BPP, GEA]	Strong	
+H-NS	hdfR[hdfRp]	-	[BPP]	Strong	
+H-NS	hisJQMP[hisJp]	+	[GEA]	Weak	
+H-NS	hlyE[hlyEp]	+	[BPP, GEA]	Strong	
+H-NS	hns[hnsp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+H-NS	ilvIH[ilvIHp1]	-	[GEA]	Weak	
+H-NS	lacZYA[lacZp1]	-	[BPP]	Strong	
+H-NS	leuO[leuOp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+H-NS	leuO[leuOp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+H-NS	lrp[lrpp]	-	[BPP, GEA]	Strong	
+H-NS	mdtJI[mdtJp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+H-NS	micF[micFp]	-	[GEA]	Weak	
+H-NS	nhaAR[nhaAp1]	-	[GEA]	Weak	
+H-NS	nirBDC-cysG[nirBp]	-	[BPP, GEA]	Strong	
+H-NS	nrdAB-yfaE[nrdAp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+H-NS	nrdDG[nrdDp]	-	[BPP, GEA]	Strong	
+H-NS	osmC[osmCp1]	-	[GEA]	Weak	
+H-NS	osmC[osmCp2]	-	[GEA]	Weak	
+H-NS	proVWX[proVp1]	-	[BPP, GEA]	Strong	
+H-NS	proVWX[proVp3]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+H-NS	rcsA[rcsAp]	-	[GEA, ICWHO, CV(GEA/ROMA)]	Strong	
+H-NS	rcsDB[rcsDp]	-	[BPP]	Strong	
+H-NS	relA-mazEF[relAp2]	+	[GEA]	Weak	
+H-NS	rrsB-gltT-rrlB-rrfB[rrsBp1]	-	[BPP]	Strong	
+H-NS	rrsC-gltU-rrlC-rrfC[rrsCp1]	-	[GEA]	Weak	
+H-NS	rrsD-ileU-alaU-rrlD-rrfD-thrV-rrfF[rrsDp1]	-	[GEA]	Weak	
+H-NS	rrsG-gltW-rrlG-rrfG[rrsGp1]	-	[GEA, TAS, CV(GEA/ROMA)]	Strong	
+H-NS	rrsH-ileV-alaV-rrlH-rrfH[rrsHp1]	-	[GEA]	Weak	
+H-NS	slp-dctR[slpp]	-	[BPP]	Strong	
+H-NS	smtA-mukFEB[cmoMp]	+	[GEA]	Weak	
+H-NS	srlAEBD-gutM-srlR-gutQ[srlAp]	+	[GEA]	Weak	
+H-NS	ssrS[ssrSp1]	-	[BPP, GEA]	Strong	
+H-NS	ssrS[ssrSp2]	-	[BPP, GEA]	Strong	
+H-NS	ssrS-ygfA[ssrSp1]	-	[BPP, GEA]	Strong	
+H-NS	ssrS-ygfA[ssrSp2]	-	[BPP, GEA]	Strong	
+H-NS	stpA[stpAp1]	-	[BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+H-NS	yciG[yciGp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+H-NS	yciGFE[yciGp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+H-NS	ydeO[ydeOp]	-	[BPP]	Strong	
+H-NS	ydeP[ydePp]	-	[BPP]	Strong	
+H-NS	yhiM[yhiMp]	-	[BPP]	Strong	
+H-NS	yjjP[yjjPp]	-	[BPP]	Strong	
+H-NS	yjjQ-bglJ[yjjQp]	-	[BPP]	Strong	
+HU	galE[galEp1]	-	[BPP, GEA]	Strong	
+HU	galE[galEp2]	-	[BPP, GEA]	Strong	
+HU	galET[galEp1]	-	[BPP, GEA]	Strong	
+HU	galET[galEp2]	-	[BPP, GEA]	Strong	
+HU	galETK[galEp1]	-	[BPP, GEA]	Strong	
+HU	galETK[galEp2]	-	[BPP, GEA]	Strong	
+HU	galETKM[galEp1]	-	[BPP, GEA]	Strong	
+HU	galETKM[galEp2]	-	[BPP, GEA]	Strong	
+HU	micF[micFp]	+	[GEA]	Weak	
+HU	mtr[mtrp2]	-	[GEA]	Weak	
+HU	seqA-pgm[seqAp]	-	[GEA]	Weak	
+HU	tyrP[tyrPp1]	-	[GEA]	Weak	
+HcaR	hcaEFCBD[hcaEp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+HcaR	hcaR[hcaRp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+HdfR	flhDC[flhDp]	-	[BPP, GEA]	Strong	
+HdfR	gltBDF[gltBp]	+	[BPP]	Strong	
+HicB	hicAB[hicAp2]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+HigA	higBA[higBp]	-	[BPP, IHBCE]	Strong	
+HipAB	hipBA[hipBp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+HipAB	relA-mazEF[relAp1]	-	[BPP, GEA]	Strong	
+HipB	fadH[fadHp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+HipB	hipBA[hipBp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+HipB	relA-mazEF[relAp1]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+HprR	cusCFBA[cusCp]	+	[APIORCISFBSCS, BPP]	Strong	
+HprR	cusRS[cusRp]	+	[APIORCISFBSCS, BPP]	Strong	
+HprR	cyoABCDE[cyoAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+HprR	hiuH[hiuHp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+HyfR	hyfABCDEFGHIJR-focB[hyfAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+HypT	cydAB[cydAp1]	+	[BPP, GEA]	Strong	
+HypT	cysH[cysHp]	+	[GEA]	Weak	
+HypT	fecABCDE[fecAp]	-	[GEA]	Weak	
+HypT	metBL[metBp]	+	[GEA]	Weak	
+HypT	metNIQ[metNp]	+	[BPP, GEA]	Strong	
+IHF	aceBAK[aceBp]	+	[BPP, GEA]	Strong	
+IHF	acs-yjcHG[acsp1]	-	[BPP, GEA]	Strong	
+IHF	acs-yjcHG[acsp2]	-	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IHF	adiA[adiAp]	+	[GEA, SM]	Strong	
+IHF	amiA-hemF[amiAp]	-	[APIORCISFBSCS]	Weak	
+IHF	atoDAEB[atoDp]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IHF	carAB[carAp1]	+	[APIORCISFBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IHF	csgDEFG[csgDp1]	+	[BPP, GEA]	Strong	
+IHF	csrB[csrBp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+IHF	cysJIH[cysJp]	+	[BPP, GEA]	Strong	
+IHF	dcuD[dcuDp2]	+	[APIORCISFBSCS]	Weak	
+IHF	dmsABC[dmsAp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IHF	dppABCDF[dppAp]	+	[BCE]	Weak	
+IHF	dps[dpsp]	+	[APIORCISFBSCS]	Weak	
+IHF	dusB-fis[dusBp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IHF	fimAICDFGH[fimAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+IHF	fimB[fimBp2]	+	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+IHF	flhDC[flhDp]	-	[APIORCISFBSCS]	Weak	
+IHF	fliAZY[fliAp1]	-	[GEA, IHBCE, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IHF	fnr[fnrp]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+IHF	focA-pflB[focAp1]	+	[APIORCISFBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IHF	folA[folAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+IHF	gcd[gcdp1]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IHF	glcDEFGBA[glcDp]	+	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+IHF	glmY[glmYp1]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IHF	glnHPQ[glnHp2]	+	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+IHF	glpTQ[glpTQp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IHF	gltA[gltAp1]	+	[AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+IHF	gltBDF[gltBp]	+	[BPP, GEA]	Strong	
+IHF	hemA-prfA-prmC[hemAp1]	+	[GEA]	Weak	
+IHF	hemF[hemFp]	-	[APIORCISFBSCS]	Weak	
+IHF	hipBA[hipBp]	+	[APIORCISFBSCS]	Weak	
+IHF	hpt[hptp]	-	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IHF	hycABCDEFGHI[hycAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IHF	hypABCDE[hypAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IHF	hypABCDE-fhlA[hypAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IHF	ibpB[ibpBp]	+	[AIBSCS]	Weak	
+IHF	ihfA[ihfAp4]	-	[APIORCISFBSCS, BPP]	Strong	
+IHF	ihfB[ihfBp]	-	[BPP, GEA]	Strong	
+IHF	ilvL[ilvLp1]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA)]	Confirmed	
+IHF	ilvL[ilvLp2]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA)]	Confirmed	
+IHF	ilvLXG_1G_2MEDA[ilvLp1]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA)]	Confirmed	
+IHF	ilvLXG_1G_2MEDA[ilvLp2]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA)]	Confirmed	
+IHF	micF[micFp]	-	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IHF	mtr[mtrp2]	-	[GEA]	Weak	
+IHF	narGHJI[narGp]	+	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IHF	narK[narKp1]	+	[BPP, GEA]	Strong	
+IHF	ndh[ndhp]	-	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IHF	nirBDC-cysG[nirBp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA), BCE]	Confirmed	
+IHF	nmpC[nmpCp]	-	[APIORCISFBSCS, SM]	Strong	
+IHF	norVW[norVp]	+	[BPP]	Strong	
+IHF	nrfABCDEFG[nrfAp]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IHF	nuoABCEFGHIJKLMN[nuoAp2]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IHF	ompC[ompCp1]	-	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IHF	ompC[ompCp3]	-	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IHF	ompF[ompFp]	+	[APIORCISFBSCS, BCE]	Weak	
+IHF	ompR-envZ[ompRp1]	-	[BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+IHF	osmE[osmEp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+IHF	osmY[osmYp]	-	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IHF	paaABCDEFGHIJK[paaAp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IHF	paaZ[paaZp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IHF	patA[patAp]	?	[AIBSCS]	Weak	
+IHF	proVWX[proVp3]	+	[BPP, GEA]	Strong	
+IHF	pspABCDE[pspAp]	+	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IHF	pspG[pspGp]	+	[ICA]	Weak	
+IHF	pstS[pstSp]	+	[BPP, GEA]	Strong	
+IHF	pstSCA[pstSp]	+	[BPP, GEA]	Strong	
+IHF	pstSCAB-phoU[pstSp]	+	[BPP, GEA]	Strong	
+IHF	rpoE-rseABC[rpoEp1b]	-	[APIORCISFBSCS, GEA, IC, CV(GEA/ROMA)]	Strong	
+IHF	rpoH[rpoHp6]	+	[BPP, GEA]	Strong	
+IHF	rtcBA[rtcBp]	+	[AIBSCS]	Weak	
+IHF	sodA[sodAp]	-	[APIORCISFBSCS, BPP]	Strong	
+IHF	sodB[sodBp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+IHF	sra[srap]	+	[GEA]	Weak	
+IHF	ssuEADCB[ssuEp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IHF	sucAB[sucAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+IHF	sucABCD[sucAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+IHF	sufABCDSE[sufAp]	+	[BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+IHF	tdcABCDEFG[tdcAp]	+	[APIORCISFBSCS, BCE, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+IHF	tyrP[tyrPp1]	-	[GEA]	Weak	
+IHF	ubiCA[ubiCp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+IHF	ulaABCDEF[ulaAp]	-	[BCE, NAS]	Weak	
+IHF	ulaG[ulaGp]	-	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+IHF	uspA[uspAp1]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+IHF	uspB[uspBp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+IHF	yadV-htrE[yadVp1]	+	[GEA]	Weak	
+IHF	yadV-htrE[yadVp2]	+	[GEA]	Weak	
+IHF	yadV-htrE[yadVp3]	+	[GEA]	Weak	
+IHF	yeiL[yeiLp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+IHF	yiaJ[yiaJp]	-	[APIORCISFBSCS, BPP]	Strong	
+IHF	yiaKLMNO-lyx-sgbHUE[yiaKp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IHF	yjbE[yjbEp1]	+	[APIORCISFBSCS, BPP]	Strong	
+IHF	yjbEFGH[yjbEp1]	+	[APIORCISFBSCS, BPP]	Strong	
+IclR	aceBAK[aceBp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IclR	iclR[iclRp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IdnR	gntK[gntKp]	-	[GEA]	Weak	
+IdnR	gntKU[gntKp]	-	[GEA]	Weak	
+IdnR	idnDOTR[idnDp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+IdnR	idnK[idnKp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+IlvY	ilvC[ilvCp]	+	[APIORCISFBSCS, BCE, BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IlvY	ilvY[ilvYp]	-	[APIORCISFBSCS, BCE, BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IscR	erpA[erpAp]	-	[BPP, GEA]	Strong	
+IscR	hyaABCDEF[hyaAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IscR	iscRSUA[iscRp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+IscR	napFDAGHBC[napFp3]	-	[BPP, GEA]	Strong	
+IscR	nfuA[nfuAp1]	-	[BPP, GEA]	Strong	
+IscR	nrdHIEF[nrdHp]	+	[GEA]	Weak	
+IscR	rnlAB[rnlAp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+IscR	sufABCDSE[sufAp]	+	[APIORCISFBSCS, BPP, GEA, IMP, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+IscR	ydiU[ydiUp]	+	[BPP, GEA]	Strong	
+KdgR	eda[edap1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+KdgR	edd-eda[eddp1]	-	[APIORCISFBSCS, AIBSCS]	Weak	
+KdpE	kdpFABC[kdpFp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/GS), CV(GEA/ROMA), CV(GEA/ROMA/SM), CV(GEA/SM/GS), GS]	Confirmed	
+LacI	lacZYA[lacZp1]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/GS), CV(GEA/ROMA), CV(GEA/ROMA/SM), CV(GEA/SM/GS), GS]	Confirmed	
+LeuO	bglG[bglGp]	+	[BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+LeuO	bglGFB[bglGp]	+	[BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+LeuO	cadC[cadCp]	-	[GEA]	Weak	
+LeuO	casABCDE12[casAp]	+	[AIBSCS, BPP, EME, GEA, IC, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+LeuO	dsrA[dsrAp]	-	[GEA]	Weak	
+LeuO	leuL[leuLp]	+	[GEA]	Weak	
+LeuO	leuLABCD[leuLp]	+	[GEA]	Weak	
+LeuO	leuO[leuOp]	+	[BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+LeuO	leuO[leuOp2]	+	[AIBSCS, BPP, GEA, IC, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+LeuO	yjjQ-bglJ[yjjQp]	+	[BPP]	Strong	
+LexA	cho[chop]	-	[APIORCISFBSCS, AIBSCS]	Weak	
+LexA	dinB-yafNOP[dinBp]	-	[APIORCISFBSCS, AIBSCS, ICWHO]	Weak	
+LexA	dinD[dinDp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+LexA	dinG-ybiB[dinGp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+LexA	dinI[dinIp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, IHBCE, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+LexA	dinJ-yafQ[dinJp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+LexA	dinQ[dinQp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+LexA	ftsK[ftsKp1]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+LexA	ftsLI-murEF-mraY-murD-ftsW-murGC-ddlB-ftsQAZ-lpxC[ftsLp2]	-	[APIORCISFBSCS]	Weak	
+LexA	hokE[hokEp]	-	[AIBSCS]	Weak	
+LexA	insK[insKp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+LexA	lexA-dinF[lexAp]	-	[APIORCISFBSCS, BPP]	Strong	
+LexA	phr[phrp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+LexA	polB[polBp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+LexA	ptrA[ptrAp]	-	[BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+LexA	ptrA-recBD[ptrAp]	-	[BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+LexA	recA[recAp]	-	[BPP]	Strong	
+LexA	recAX[recAp]	-	[BPP]	Strong	
+LexA	recN[recNp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+LexA	recQ[recQp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+LexA	rpsU-dnaG-rpoD[rpsUp3]	-	[BCE, SM]	Strong	
+LexA	ruvAB[ruvAp2]	-	[APIORCISFBSCS, BPP]	Strong	
+LexA	ruvAB[ruvAp1]	-	[APIORCISFBSCS, BPP]	Strong	
+LexA	sbmC[sbmCp2]	-	[GEA, IHBCE, CV(GEA/ROMA)]	Strong	
+LexA	ssb[ssbp3]	-	[APIORCISFBSCS, BCE]	Weak	
+LexA	sulA[sulAp]	-	[BCE]	Weak	
+LexA	symE[symEp]	-	[AIBSCS, BPP]	Strong	
+LexA	tisB[tisBp]	-	[GEA, ICA, CV(GEA/ROMA)]	Strong	
+LexA	umuDC[umuDp]	-	[APIORCISFBSCS, BPP]	Strong	
+LexA	uvrA[uvrAp]	-	[APIORCISFBSCS, BCE]	Weak	
+LexA	uvrB[uvrBp3]	-	[BPP, GEA, ICA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+LexA	uvrB[uvrBp2]	-	[APIORCISFBSCS, BPP, GEA, ICA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+LexA	uvrB[uvrBp1]	-	[APIORCISFBSCS, BPP, GEA, ICA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+LexA	uvrC[uvrCp3]	-	[GEA]	Weak	
+LexA	uvrD[uvrDp1]	-	[APIORCISFBSCS]	Weak	
+LexA	uvrYC[uvrYp2]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+LexA	yafNOP[yafNp]	-	[APIORCISFBSCS]	Weak	
+LexA	ybfE[ybfEp]	-	[AIBSCS]	Weak	
+LexA	ydjM[ydjMp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+LexA	yebG[yebGp]	-	[APIORCISFBSCS, AIBSCS, GEA, IHBCE, CV(GEA/ROMA)]	Strong	
+LexA	yehF[yehFp]	-	[AIBSCS]	Weak	
+LldR	lldPRD[lldPp]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM), APIORCISFBSCS]	Confirmed	
+LrhA	fimE[fimEp]	+	[BPP, GEA]	Strong	
+LrhA	flhDC[flhDp]	-	[BPP, GEA]	Strong	
+LrhA	leuO[leuOp]	+	[BPP, GEA]	Strong	
+LrhA	leuO[leuOp1]	+	[BPP, GEA]	Strong	
+LrhA	leuO[leuOp3]	+	[BPP, GEA]	Strong	
+LrhA	lrhA[lrhAp]	+	[BPP, GEA]	Strong	
+Lrp	adhE[adhEp1]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Lrp	aidB[aidBp]	-	[APIORCISFBSCS, BPP]	Strong	
+Lrp	alaA[alaAp9]	-	[GEA]	Weak	
+Lrp	alaE[alaEp]	+	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Lrp	argO[argOp]	+	[APIORCISFBSCS, BPP, GEA]	Strong	
+Lrp	avtA[avtAp]	-	[GEA]	Weak	
+Lrp	cadBA[cadBp]	+	[BPP, GEA]	Strong	
+Lrp	csiD-ygaF-gabDTP[csiDp]	+	[BPP, GEA]	Strong	
+Lrp	dadAX[dadAp2]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Lrp	dadAX[dadAp1]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Lrp	dadAX[dadAp3]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Lrp	fimAICDFGH[fimAp]	+	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+Lrp	fimE[fimEp]	+	[GEA]	Weak	
+Lrp	gcvTHP[gcvTp]	+	[GEA, SM]	Strong	
+Lrp	gltBDF[gltBp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/SM), CV(GEA/ROMA)]	Confirmed	
+Lrp	hdeAB-yhiD[hdeAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Lrp	ilvIH[ilvIp2]	-	[APIORCISFBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Lrp	ilvIH[ilvIHp1]	+	[APIORCISFBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Lrp	ilvL[ilvLp2]	-	[APIORCISFBSCS, SM]	Strong	
+Lrp	ilvLXG_1G_2MEDA[ilvLp2]	-	[APIORCISFBSCS, SM]	Strong	
+Lrp	kbl-tdh[kblp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Lrp	leuE[leuEp]	-	[AIBSCS]	Weak	
+Lrp	livJ[livJp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Lrp	livKHMGF[livKp1]	-	[GEA]	Weak	
+Lrp	lrp[lrpp]	-	[APIORCISFBSCS, AIBSCS, BCE, GEA, SM, CV(GEA/ROMA)]	Strong	
+Lrp	lysP[lysPp]	+	[BPP, GEA]	Strong	
+Lrp	lysU[lysUp1]	-	[APIORCISFBSCS, SM]	Strong	
+Lrp	malT[malTp]	+	[GEA]	Weak	
+Lrp	micF[micFp]	-	[BPP, GEA]	Strong	
+Lrp	ompC[ompCp1]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Lrp	ompC[ompCp2]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Lrp	ompC[ompCp3]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Lrp	oppABCDF[oppAp]	-	[BPP]	Strong	
+Lrp	osmC[osmCp1]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Lrp	osmC[osmCp2]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Lrp	osmY[osmYp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Lrp	ridA[ridAp]	+	[AIBSCS, BPP, CE, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Lrp	rrsA-ileT-alaT-rrlA-rrfA[rrsAp1]	-	[BCE, BPP]	Strong	
+Lrp	rrsB-gltT-rrlB-rrfB[rrsBp1]	-	[BPP, GEA, IEP]	Strong	
+Lrp	rrsC-gltU-rrlC-rrfC[rrsCp1]	-	[BPP, IDA]	Strong	
+Lrp	rrsD-ileU-alaU-rrlD-rrfD-thrV-rrfF[rrsDp1]	-	[GEA]	Weak	
+Lrp	rrsE-gltV-rrlE-rrfE[rrsEp]	-	[GEA]	Weak	
+Lrp	rrsG-gltW-rrlG-rrfG[rrsGp1]	-	[GEA]	Weak	
+Lrp	rrsH-ileV-alaV-rrlH-rrfH[rrsHp1]	-	[GEA]	Weak	
+Lrp	sdaA[sdaAp]	-	[AIBSCS]	Weak	
+Lrp	serA[serAp2]	-	[BPP, GEA]	Strong	
+Lrp	serA[serAp1]	+	[BPP, GEA]	Strong	
+Lrp	serC[serCp]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Lrp	serC-aroA[serCp]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Lrp	ssrS[ssrSp1]	-	[BPP, GEA]	Strong	
+Lrp	ssrS[ssrSp2]	-	[BPP, GEA]	Strong	
+Lrp	ssrS-ygfA[ssrSp1]	-	[BPP, GEA]	Strong	
+Lrp	ssrS-ygfA[ssrSp2]	-	[BPP, GEA]	Strong	
+Lrp	stpA[stpAp1]	+	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Lrp	yeiL[yeiLp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Lrp	yojI[yojIp]	+	[GEA, ICWHO, CV(GEA/ROMA)]	Strong	
+LsrR	lsrACDBFG-tam[lsrAp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+LsrR	lsrRK[lsrRp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+LysR	lysA[lysAp]	+	[GEA]	Weak	
+LysR	lysR[lysRp]	-	[GEA]	Weak	
+MalI	malI[malIp]	-	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MalI	malXY[malXp]	-	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MalT	malEFG[malEp]	+	[APIORCISFBSCS, AIBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+MalT	malK-lamB-malM[malKp]	+	[APIORCISFBSCS, AIBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+MalT	malPQ[malPp]	+	[AIBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+MalT	malS[malSp]	+	[AIBSCS, BCE]	Weak	
+MalT	malZ[malZp]	+	[AIBSCS]	Weak	
+MarA	acnA[acnAp2]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MarA	acrAB[acrAp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MarA	acrZ[acrZp]	+	[GEA, IHBCE, CV(GEA/ROMA)]	Strong	
+MarA	aldA[aldAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+MarA	decR[decRp]	+	[AIBSCS]	Weak	
+MarA	fpr[fprp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MarA	fumC[fumCp]	+	[BPP, GEA]	Strong	
+MarA	hdeAB-yhiD[hdeAp]	-	[APIORCISFBSCS, APPH, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MarA	inaA[inaAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MarA	lacZYA[lacZp1]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+MarA	marRAB[marRp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MarA	micF[micFp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MarA	mlaFEDCB[mlaFp2]	+	[BPP, GEA, ICWHO, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MarA	nfo[nfop]	+	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+MarA	nfsB[nfsBp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MarA	poxB[poxBp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+MarA	pqiABC[pqiAp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MarA	purA[purAp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MarA	putA[putAp]	+	[GEA]	Weak	
+MarA	rfaYZ[waaYp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+MarA	rob[robp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MarA	slp-dctR[slpp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+MarA	sodA[sodAp]	+	[APIORCISFBSCS, BPP]	Strong	
+MarA	tolC-ygiBC[tolCp4]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+MarA	tolC-ygiBC[tolCp3]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+MarA	xseA[xseAp]	+	[BPP, GEA, ICWHO, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MarA	ybjC-nfsA-rimK-ybjN[ybjCp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MarA	ycgZ-ymgA-ariR-ymgC[ycgZp]	+	[AIBSCS, BPP, CE, SM, CV(CHIP-SV/SM)]	Confirmed	
+MarA	yncE[yncEp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+MarA	zwf[zwfp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MarR	marRAB[marRp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/GS), CV(GEA/ROMA), CV(GEA/ROMA/SM), CV(GEA/SM/GS), GS]	Confirmed	
+MatA	ecpA[ecpAp]	+	[BPP]	Strong	
+MatA	ecpR[ecpRp]	+	[BPP]	Strong	
+MatA	flhDC[flhDp]	-	[BPP, GEA]	Strong	
+MatA	flhDC[flhDp2]	-	[BPP, GEA]	Strong	
+MatA	fliAZY[fliAp1]	-	[BPP]	Strong	
+MatA	fliC[fliCp]	-	[BPP]	Strong	
+MazE	mazEFG[mazEp1]	-	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MazE	mazEFG[mazEp2]	-	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MazE-MazF	mazEFG[mazEp1]	-	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MazE-MazF	mazEFG[mazEp2]	-	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+McbR	mcbA[mcbAp5]	-	[BPP, GEA]	Strong	
+McbR	rmf[rmfp]	+	[BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+McbR	rsd[rsdp2]	+	[BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+McbR	yciG[yciGp]	+	[BPP, GEA]	Strong	
+McbR	yciGFE[yciGp]	+	[BPP, GEA]	Strong	
+MelR	melAB[melAp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MelR	melR[melRp]	+	[BPP, GEA, SM, CV(CHIP-SV/SM), APIORCISFBSCS, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MetJ	ahpCF[ahpCp]	-	[AIBSCS]	Weak	
+MetJ	folE-yeiB[folEp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MetJ	metA[metAp1]	-	[AIBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MetJ	metBL[metBp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+MetJ	metC[metCp]	-	[BPP]	Strong	
+MetJ	metE[metEp]	-	[BPP]	Strong	
+MetJ	metF[metFp]	-	[AIBSCS, BCE, SM]	Strong	
+MetJ	metK[metKp]	-	[AIBSCS]	Weak	
+MetJ	metNIQ[metNp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+MetJ	metR[metRp1]	-	[BPP]	Strong	
+MetJ	metR[metRp2]	-	[BPP]	Strong	
+MetR	glyA[glyAp]	+	[APIORCISFBSCS, BPP, GEA, IMP, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MetR	hmp[hmpp]	+	[APIORCISFBSCS, BPP, GEA, IMP, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MetR	metE[metEp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MetR	metH[metHp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+MetR	metR[metRp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MetR	metR[metRp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MhpR	mhpABCDFE[mhpAp]	+	[APIORCISFBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Mlc	malT[malTp]	-	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+Mlc	manXYZ[manXp]	-	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+Mlc	mlc[mlcp1]	-	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+Mlc	mlc-ynfK[mlcp2]	-	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+Mlc	ptsG[ptsGp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Mlc	ptsG[ptsGp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Mlc	ptsHI-crr[ptsHp4]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MlrA	cadC[cadCp]	+	[APIORCISFBSCS, BPP]	Strong	
+MlrA	csgDEFG[csgDp1]	+	[BPP, GEA]	Strong	
+MlrA	ibaG[ibaGp2]	+	[APIORCISFBSCS, BPP]	Strong	
+MlrA	rplU-rpmA[rplUp]	+	[APIORCISFBSCS, BPP]	Strong	
+MlrA	rplU-rpmA-yhbE-obgE[rplUp]	+	[APIORCISFBSCS, BPP]	Strong	
+MngR	mngAB[mngAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MngR	mngR[mngRp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MntR	dps[dpsp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+MntR	mntH[mntHp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MntR	mntP[mntPp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+MntR	rybA-mntS[rybAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+ModE	deoCABD[deoCp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ModE	dmsABC[dmsAp2]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+ModE	hycABCDEFGHI[hycAp]	+	[BPP, GEA]	Strong	
+ModE	moaABCDE[moaAp2]	+	[BPP, GEA]	Strong	
+ModE	modABC[modAp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+ModE	napFDAGHBC-ccmABCDEFGH[napFp1]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+ModE	napFDAGHBC-ccmABCDEFGH[napFp2]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+ModE	narXL[narXp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ModE	oppABCDF[oppAp]	-	[GEA]	Weak	
+MprA	acrAB[acrAp]	-	[AIBSCS]	Weak	
+MprA	emrRAB[mprAp]	-	[BPP]	Strong	
+MprA	nmpC[nmpCp]	-	[AIBSCS]	Weak	
+MqsA	csgDEFG[csgDp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MqsA	cspD[cspDp]	-	[BPP, GEA]	Strong	
+MqsA	mqsRA[mqsRp]	-	[APIORCISFBSCS, BPP, GEA, IHBCE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MqsA	rpoS[rpoSp]	-	[BPP, GEA, IHBCE, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MraZ	mioC[mioCp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MraZ	mraZW-ftsLI-murEF-mraY-murD-ftsW-murGC-ddlB-ftsQAZ-lpxC[mraZp]	-	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+MurR	murQP[murQp1]	-	[BPP, GEA, ICWHO, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MurR	murQP[murQp2]	-	[BPP, GEA, ICWHO, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+MurR	murR[murRp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Nac	asnC[asnCp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Nac	asnC-mioC[asnCp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Nac	asnC-mioC-mnmG[asnCp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Nac	codBA[codBp]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Nac	feaR[feaRp2]	+	[IHBCE]	Weak	
+Nac	gabDTP[gabDp1]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Nac	gdhA[gdhAp1]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Nac	gltBDF[gltBp]	-	[GEA]	Weak	
+Nac	nac[nacp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Nac	nupC[nupCp]	+	[GEA]	Weak	
+Nac	serA[serAp1]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Nac	ydcSTUV-patD[ydcSp1]	+	[APIORCISFBSCS, GEA, IDA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NadR	nadB[nadBp]	-	[AIBSCS, BPP, GEA, IMP, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NadR	pncB[pncBp]	-	[AIBSCS]	Weak	
+NagC	chbBCARFG[chbBp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NagC	chiP-ybfN[chiPp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NagC	creABCD[creAp]	-	[AIBSCS]	Weak	
+NagC	dinI[dinIp]	-	[AIBSCS]	Weak	
+NagC	feoABC[feoAp]	?	[AIBSCS]	Weak	
+NagC	fimB[fimBp2]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NagC	galP[galPp]	-	[AIBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+NagC	glmUS[glmUp1]	+	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+NagC	glmUS[glmUp2]	-	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+NagC	manXYZ[manXp]	-	[APIORCISFBSCS, AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+NagC	nagBACD[nagBp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+NagC	nagE[nagEp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+NagC	nanCM[nanCp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NagC	nanCMS[nanCp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NagC	ptsHI-crr[ptsHp4]	-	[AIBSCS]	Weak	
+NagC	ptsHI-crr[ptsHp5]	-	[AIBSCS]	Weak	
+NagC	ptsHI-crr[ptsHp3]	-	[AIBSCS]	Weak	
+NagC	ydeNM[ydeNp]	-	[AIBSCS]	Weak	
+NagC	ydeP[ydePp]	-	[AIBSCS]	Weak	
+NanR	fimB[fimBp2]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/GS), CV(GEA/ROMA), CV(GEA/ROMA/SM), CV(GEA/SM/GS), GS]	Confirmed	
+NanR	nanA[nanAp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+NanR	nanATEK-yhcH[nanAp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+NanR	nanCM[nanCp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/GS), CV(GEA/ROMA), CV(GEA/ROMA/SM), CV(GEA/SM/GS), GS]	Confirmed	
+NanR	nanCMS[nanCp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/GS), CV(GEA/ROMA), CV(GEA/ROMA/SM), CV(GEA/SM/GS), GS]	Confirmed	
+NanR	yjhBC[yjhBp2]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+NarL	adhE[adhEp1]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NarL	adhE[adhEp2]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NarL	aspA[aspAp]	-	[BPP, GEA]	Strong	
+NarL	aspA-dcuA[aspAp]	-	[BPP, GEA]	Strong	
+NarL	caiF[caiFp]	-	[GEA]	Weak	
+NarL	citCDEFXG[citCp2]	-	[AIBSCS]	Weak	
+NarL	cydDC[cydDp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NarL	dcuB-fumB[dcuBp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NarL	dcuSR[dcuSp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NarL	dmsABC[dmsAp1]	-	[APIORCISFBSCS, BCE, BPP]	Strong	
+NarL	dpiBA[dpiBp]	-	[AIBSCS]	Weak	
+NarL	dpiBA[dpiBp2]	-	[AIBSCS]	Weak	
+NarL	fdhF[fdhFp]	-	[BPP, GEA]	Strong	
+NarL	fdnGHI[fdnGp]	+	[APIORCISFBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NarL	focA-pflB[focAp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NarL	focA-pflB[focAp3]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NarL	frdABCD[frdAp]	-	[APIORCISFBSCS, BPP]	Strong	
+NarL	hcp-hcr[hcpp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NarL	hcp-hcr-poxB[hcpp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NarL	hyaABCDEF[hyaAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NarL	hybOABCDEFG[hybOp1]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NarL	moeAB[moeAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NarL	napFDAGHBC-ccmABCDEFGH[napFp1]	-	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NarL	napFDAGHBC-ccmABCDEFGH[napFp2]	-	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NarL	narGHJI[narGp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NarL	narK[narKp1]	+	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+NarL	nikABCDER[nikAp1]	-	[GEA]	Weak	
+NarL	nirBDC-cysG[nirBp]	+	[BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NarL	norVW[norVp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NarL	nrfABCDEFG[nrfAp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NarL	nuoABCEFGHIJKLMN[nuoAp2]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NarL	ogt[ogtp]	+	[BPP]	Strong	
+NarL	ompW[ompWp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NarL	torCAD[torCp]	-	[IMP]	Weak	
+NarL	ubiCA[ubiCp]	-	[GEA]	Weak	
+NarL	ydeP[ydePp]	+	[BPP, GEA]	Strong	
+NarL	ydhYVWXUT[ydhYp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NarL	yeaR-yoaG[yeaRp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NarL	ynfEFGH-dmsD[ynfEp]	-	[AIBSCS, BPP]	Strong	
+NarL	ytfE[ytfEp]	+	[AIBSCS]	Weak	
+NarP	fdhF[fdhFp]	+	[GEA]	Weak	
+NarP	fdnGHI[fdnGp]	-	[GEA, SM]	Strong	
+NarP	hcp-hcr[hcpp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NarP	hcp-hcr-poxB[hcpp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NarP	hyaABCDEF[hyaAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NarP	napFDAGHBC-ccmABCDEFGH[napFp1]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NarP	napFDAGHBC-ccmABCDEFGH[napFp2]	-	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NarP	nirBDC-cysG[nirBp]	+	[BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NarP	norVW[norVp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NarP	nrfABCDEFG[nrfAp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NarP	ydeP[ydePp]	-	[BPP, GEA]	Strong	
+NarP	ydhYVWXUT[ydhYp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NarP	yeaR-yoaG[yeaRp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NarP	ytfE[ytfEp]	+	[AIBSCS]	Weak	
+NemR	nemRA[nemRp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NemR	nemRA-gloA[nemRp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NfeR	nfeF[yqjHp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NfeR	yqjI[yqjIp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NhaR	nhaAR[nhaAp1]	+	[BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NhaR	osmC[osmCp1]	+	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NhaR	pgaABCD[pgaAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NikR	nikABCDER[nikAp1]	-	[BPP]	Strong	
+NimR	nimT[nimTp]	-	[BPP, GEA, ICWHO, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+NimR	yeaM[nimRp]	-	[BPP, GEA, ICWHO, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+NorR	norR[norRp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NorR	norVW[norVp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NrdR	nrdAB-yfaE[nrdAp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NrdR	nrdDG[nrdDp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NrdR	nrdHIEF[nrdHp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NsrR	aceEF[aceEp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	bamE[bamEp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	bdcA[bdcAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	cdd[cddp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	dkgB[dkgBp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	dsdC[dsdCp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	feaB[feaBp1]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	feaR[feaRp2]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	fliAZY[fliAp1]	-	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NsrR	fliAZY[fliAp2]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	grxD[grxD]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	hcp-hcr[hcpp]	-	[APIORCISFBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NsrR	hcp-hcr-poxB[hcpp]	-	[APIORCISFBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NsrR	hmp[hmpp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	hycABCDEFGHI[hycAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	hypABCDE[hypAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	hypABCDE-fhlA[hypAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	lrp[lrpp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	mepH[mepHp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	mhpT[mhpTp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	ndh[ndhp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	norR[norRp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	nrfABCDEFG[nrfAp]	-	[APIORCISFBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NsrR	pgpC-tadA[pgpCp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	rfe-wzzE-wecBC-rffGHC-wecE-wzxE-wecF-wzyE-rffM[rfep]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	rybB[rybBp]	-	[GEA]	Weak	
+NsrR	sodB[sodBp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	sufABCDSE[sufAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	tehAB[tehAp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	thrS-infC[thrSp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	thrS-infC-rpmI-rplT-pheMST-ihfA[thrSp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	tsgA[tsgAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	ydbD[ydbDp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	yeaE[yeaEp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	yeaR-yoaG[yeaRp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	ygbA[ygbAp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	yibD[yibDp1]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NsrR	ytfE[ytfEp]	-	[APIORCISFBSCS, AIBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NtrC	argT-hisJQMP[argTp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NtrC	astCADBE[astCp2]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+NtrC	cbl[cblp]	+	[GEA]	Weak	
+NtrC	ddpXABCDF[ddpXp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NtrC	glnA[glnAp1]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NtrC	glnA[glnAp2]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NtrC	glnALG[glnAp1]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NtrC	glnALG[glnAp2]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+NtrC	glnHPQ[glnHp2]	+	[APIORCISFBSCS, BPP]	Strong	
+NtrC	glnK-amtB[glnKp]	+	[APIORCISFBSCS]	Weak	
+NtrC	glnLG[glnLp]	-	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+NtrC	nac[nacp]	+	[APIORCISFBSCS]	Weak	
+NtrC	patA[patAp]	+	[AIBSCS, GEA, IEP, CV(GEA/ROMA)]	Strong	
+NtrC	potFGHI[potFp1]	+	[GEA]	Weak	
+NtrC	relA[relAp4]	+	[BPP, GEA]	Strong	
+NtrC	rpoE-rseABC[rpoEp2b]	+	[APIORCISFBSCS, BPP]	Strong	
+NtrC	rutABCDEFG[rutAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+NtrC	yeaGH[yeaGp1]	+	[GEA]	Weak	
+NtrC	yhdWXYZ[yhdWp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+OmpR	bolA[bolAp1]	-	[APIORCISFBSCS, BPP]	Strong	
+OmpR	cadBA[cadBp]	-	[BPP, GEA]	Strong	
+OmpR	cadC[cadCp]	-	[BPP, GEA]	Strong	
+OmpR	csgDEFG[csgDp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+OmpR	ecnB[ecnBp]	-	[APIORCISFBSCS]	Weak	
+OmpR	fadL[fadLp]	-	[APIORCISFBSCS, GEA, SM, CV(GEA/ROMA)]	Strong	
+OmpR	flhDC[flhDp]	-	[APIORCISFBSCS]	Weak	
+OmpR	micF[micFp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+OmpR	nmpC[nmpCp]	-	[APIORCISFBSCS, SM]	Strong	
+OmpR	ompC[ompCp1]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+OmpR	ompF[ompFp]	+	[APIORCISFBSCS, AIBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+OmpR	omrA[omrAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+OmpR	omrB[omrBp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+OmpR	pgaABCD[pgaAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+OmpR	sra[srap]	-	[GEA]	Weak	
+OmpR	tppB[tppBp]	+	[BPP, GEA]	Strong	
+OxyR	ahpCF[ahpCp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+OxyR	ahpCF[ahpCp2]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+OxyR	dps[dpsp]	+	[APIORCISFBSCS, CEUMA, IHBCE, RE]	Weak	
+OxyR	elaB[elaBp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+OxyR	fhuF[fhuFp]	-	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+OxyR	flu[flup]	-	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+OxyR	gntP[gntPp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+OxyR	gor[gorp]	+	[GEA]	Weak	
+OxyR	grxA[grxAp]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+OxyR	hcp-hcr[hcpp]	+	[BPP, GEA]	Strong	
+OxyR	hcp-hcr-poxB[hcpp]	+	[BPP, GEA]	Strong	
+OxyR	hemH[hemHp]	+	[BPP, GEA]	Strong	
+OxyR	katG[katGp]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+OxyR	metE[metEp]	+	[CEUMA, IHBCE, RE]	Weak	
+OxyR	metR[metRp1]	+	[CEUMA, IHBCE, RE]	Weak	
+OxyR	mntH[mntHp]	+	[APIORCISFBSCS, AIBSCS, CEUMA, GEA, IHBCE, RE, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+OxyR	oxyR[oxyRp]	-	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+OxyR	oxyS[oxySp]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+OxyR	sufABCDSE[sufAp]	+	[BPP, CEUMA, GEA, IHBCE, RE, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA)]	Confirmed	
+OxyR	trxC[trxCp]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+OxyR	uof-fur[uofp]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+OxyR	uxuAB[uxuAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+OxyR	ybjC-nfsA-rimK-ybjN[ybjCp]	-	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+OxyR	ychF[ychFp]	-	[APIORCISFBSCS, BPP]	Strong	
+OxyR	yhjA[yhjAp]	+	[APIORCISFBSCS, AIBSCS, BPP, CEUMA, IHBCE, RE]	Strong	
+OxyR	yjjZ[yjjZp]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+OxyR	zinT[zinTp]	+	[CEUMA, IHBCE, RE]	Weak	
+OxyR	znuA[znuAp]	+	[CEUMA, IHBCE, RE]	Weak	
+OxyR	znuCB[znuCp]	+	[CEUMA, IHBCE, RE]	Weak	
+PaaX	paaABCDEFGHIJK[paaAp]	-	[APIORCISFBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PaaX	paaXY[paaXp]	-	[APIORCISFBSCS, BPP]	Strong	
+PaaX	paaZ[paaZp]	-	[APIORCISFBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PdeL	yahA[pdeLp2]	+	[BPP, GEA, IHBCE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PdhR	cyoABCDE[cyoAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PdhR	fecABCDE[fecAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PdhR	glcDEFGBA[glcDp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PdhR	grcA[grcAp1]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PdhR	hemL[hemLp]	-	[AIBSCS]	Weak	
+PdhR	mraZW-ftsLI-murEF-mraY-murD-ftsW-murGC-ddlB-ftsQAZ-lpxC[mraZp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PdhR	ndh[ndhp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PdhR	pdhR-aceEF-lpdA[pdhRp]	-	[APIORCISFBSCS, AIBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PdhR	tomB-hha[tomBp1]	-	[AIBSCS]	Weak	
+PepA	carAB[carAp1]	-	[BPP, GEA, IMP, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PepA	pepA[pepAp1]	-	[BPP]	Strong	
+PgrR	tyrR[tyrRp]	-	[BPP, GEA, IGI, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PgrR	ycjG[ycjGp]	-	[BPP, GEA, IGI, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PgrR	ycjXF-tyrR[ycjXp]	-	[BPP, GEA, IGI, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PgrR	ycjY[ycjYp6]	-	[BPP, GEA, IGI, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PgrR	ycjY-ymjDC-mpaA[ycjYp6]	-	[BPP, GEA, IGI, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	adiC[adiCp7]	+	[GEA]	Weak	
+PhoB	amn[amnp1]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoB	argP[argPp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoB	asr[asrp]	+	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+PhoB	cra[fruRp8]	-	[GEA]	Weak	
+PhoB	cusCFBA[cusCp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	cusRS[cusRp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	eda[edap3]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	feaR[feaRp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	gadX[gadXp]	+	[GEA]	Weak	
+PhoB	gadXW[gadXp]	+	[GEA]	Weak	
+PhoB	hiuH[hiuHp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	mipA[mipAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	ompF[ompFp]	+	[GEA]	Weak	
+PhoB	phnCDEEFGHIJKLMNOP[phnCp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	phoA-psiF[phoAp]	+	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PhoB	phoBR[phoBp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	phoE[phoEp]	+	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PhoB	phoH[phoHp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	phoQ[phoQp5]	+	[GEA]	Weak	
+PhoB	phoU[phoUp]	+	[GEA]	Weak	
+PhoB	pitB[pitBp]	-	[IMP]	Weak	
+PhoB	prpR[prpRp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	psiE[psiEp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	pstS[pstSp]	+	[APIORCISFBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PhoB	pstSCA[pstSp]	+	[APIORCISFBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PhoB	pstSCAB-phoU[pstSp]	+	[APIORCISFBSCS, BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PhoB	sbcDC[sbcDp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	tktB[tktBp]	+	[GEA]	Weak	
+PhoB	ugpBAECQ[ugpBp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	ugpBAECQ[ugpBp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	ydfH[ydfHp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	yegH[yegHp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	yhjC[yhjCp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoB	yibD[yibDp1]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoB	ytfK[ytfKp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	acrAB[acrAp]	-	[GEA]	Weak	
+PhoP	argD[argDp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	borD[borDp]	+	[APIORCISFBSCS, BPP]	Strong	
+PhoP	clpS[clpSp]	-	[BCE, GEA, IHBCE, CV(GEA/ROMA)]	Strong	
+PhoP	cysB[cysBp]	+	[APIORCISFBSCS, AIBSCS]	Weak	
+PhoP	dcuD[dcuDp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	fadL[fadLp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	gadE[gadEp1]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	gadW[gadWp2]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoP	glgAP[glgAp]	+	[GEA]	Weak	
+PhoP	glgBXCAP[glgBp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	hdeAB-yhiD[hdeAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoP	hdeD[hdeDp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoP	hemL[hemLp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoP	iraM[iraMp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoP	iraM[iraMp2]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoP	malS[malSp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	metBL[metBp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	mgrB[mgrBp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoP	mgrR[mgrRp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	mgtA[mgtAp1]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PhoP	mgtS[mgtSp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	nagA[nagAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoP	ompT[ompTp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	pagP[pagPp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	phoPQ[phoPp1]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoP	phoPQ[phoPp2]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoP	purHD[purHp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	rstAB[rstAp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoP	rutABCDEFG[rutAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	safA-ydeO[safAp]	-	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PhoP	slyB[slyBp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoP	slyB[slyBp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PhoP	tolC-ygiBC[tolCp2]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	treR[treRp3]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PhoP	treR[treRp4]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PhoP	ybjG[ybjGp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	ydeP[ydePp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PhoP	yrbL[yrbLp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PrpR	prpBCDE[prpBp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PrpR	prpR[prpRp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PspF	pspABCDE[pspAp]	+	[BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PspF	pspF[pspFp1]	-	[BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PspF	pspG[pspGp]	+	[BPP, GEA, ICA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PurR	carAB[carAp1]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PurR	codBA[codBp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PurR	cvpA-purF-ubiX[cvpAp1]	-	[APIORCISFBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PurR	gcvTHP[gcvTp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+PurR	glnB[glnBp2]	-	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+PurR	glnB[glnBp1]	-	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+PurR	glyA[glyAp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PurR	guaBA[guaBp]	-	[AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+PurR	hflD-purB[hflDp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PurR	prs[prsp]	-	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+PurR	purA[purAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PurR	purC[purCp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PurR	purEK[purEp]	-	[APIORCISFBSCS, AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+PurR	purHD[purHp]	-	[APIORCISFBSCS, AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+PurR	purL[purLp]	-	[APIORCISFBSCS, AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+PurR	purMN[purMp]	-	[APIORCISFBSCS, AIBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PurR	purR[purRp]	-	[APIORCISFBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PurR	purT[purTp]	-	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PurR	pyrC[pyrCp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PurR	pyrD[pyrDp]	-	[APIORCISFBSCS, AIBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+PurR	speAB[speAp]	-	[APIORCISFBSCS, BCE, GEA, CV(GEA/ROMA)]	Strong	
+PutA	putA[putAp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+PutA	putP[putPp1]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+PuuR	puuAP[puuAp]	-	[BPP, GEA, IC, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PuuR	puuDRCBE[puuDp]	-	[BPP, GEA, IC, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+PyrR	yhjX[yhjXp]	+	[BPP, GEA, SM, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/GS), CV(GEA/ROMA), CV(GEA/ROMA/SM), CV(GEA/SM/GS), GS]	Confirmed	
+QseB	feaR[feaRp1]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+QseB	feaR[feaRp2]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+QseB	fimAICDFGH[fimAp]	+	[GEA]	Weak	
+QseB	flhDC[flhDp]	+	[GEA]	Weak	
+QseB	qseBC[qseBp2]	+	[BPP, GEA]	Strong	
+RbsR	add[addp6]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+RbsR	purHD[purHp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+RbsR	rbsDACBKR[rbsDp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+RcdA	asr[asrp]	+	[BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+RcdA	bluF[bluFp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+RcdA	csgDEFG[csgDp1]	+	[BPP, GEA, IC, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+RcdA	rmf[rmfp]	+	[BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+RcdA	rsd[rsdp2]	+	[BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+RcdA	sulA[sulAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+RcdA	yagK[yagKp6]	-	[BPP]	Strong	
+RcdA	ydeI[ydeIp5]	+	[BPP, GEA]	Strong	
+RclR	rclABC[ykgCp1]	+	[BPP, GEA]	Strong	
+RcnR	rcnAB[rcnAp]	-	[BPP, GEA]	Strong	
+RcnR	rcnR[rcnRp]	-	[BPP, GEA]	Strong	
+RcsAB	csgDEFG[csgDp1]	-	[GEA]	Weak	
+RcsAB	flhDC[flhDp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+RcsAB	rcsA[rcsAp]	+	[AIBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/SM), CV(GEA/ROMA)]	Confirmed	
+RcsAB	wza-wzb-wzc-wcaAB[wzap]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/SM), CV(GEA/ROMA)]	Confirmed	
+RcsAB	yjbE[yjbEp1]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+RcsAB	yjbEFGH[yjbEp1]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+RcsB	bdm-sra[bdmp]	+	[BPP, GEA]	Strong	
+RcsB	ftsAZ[ftsAp1]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+RcsB	gadAX[gadAp]	-	[BPP, GEA, IHBCE, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+RcsB	gadBC[gadBp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+RcsB	gadY[gadYp]	+	[GEA]	Weak	
+RcsB	hdeAB-yhiD[hdeAp]	+	[GEA]	Weak	
+RcsB	hdeD[hdeDp]	+	[GEA]	Weak	
+RcsB	lolA-rarA[lolAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+RcsB	osmB[osmBp1]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+RcsB	osmC[osmCp1]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+RcsB	rpoE-rseABC[rpoEp2b]	+	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+RcsB	rprA[rprAp]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+RcsB	safA-ydeO[safAp]	+	[GEA]	Weak	
+RcsB	ydeP[ydePp]	+	[BPP, GEA]	Strong	
+RcsB-BglJ	bglG[bglGp]	+	[APIORCISFBSCS, AIBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+RcsB-BglJ	bglG[bglGp2]	+	[APIORCISFBSCS, AIBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+RcsB-BglJ	bglGFB[bglGp]	+	[APIORCISFBSCS, AIBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+RcsB-BglJ	leuO[leuOp2]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+RcsB-BglJ	sfsB[sfsBp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+RcsB-BglJ	yecT[yecTp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+RcsB-BglJ	yehF[yehFp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+RcsB-BglJ	ygiZ[ygiZp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+RcsB-BglJ	yidL[yidLp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+RcsB-BglJ	ykiA[ykiAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+RcsB-BglJ	ynbABCD[ynbAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+RcsB-BglJ	ynjI[ynjIp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+RcsB-BglJ	yqhG[yqhGp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+RelB	relBE-hokD[relBp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+RhaR	rhaSR[rhaSp]	+	[APIORCISFBSCS, BCE, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+RhaS	rhaBAD[rhaBp]	+	[APIORCISFBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+RhaS	rhaSR[rhaSp]	+	[BPP, GEA, APIORCISFBSCS]	Strong	
+RhaS	rhaT[rhaTp]	+	[APIORCISFBSCS, AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Rob	acnA[acnAp2]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Rob	acrAB[acrAp]	+	[BPP, GEA]	Strong	
+Rob	acrZ[acrZp]	+	[GEA, IHBCE, CV(GEA/ROMA)]	Strong	
+Rob	aldA[aldAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Rob	aslB[aslBp]	+	[GEA]	Weak	
+Rob	fumC[fumCp1]	+	[BPP, GEA, IEP, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Rob	inaA[inaAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Rob	ldtB[ldtBp]	+	[GEA]	Weak	
+Rob	marRAB[marRp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+Rob	micF[micFp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Rob	mltF[mltFp]	+	[GEA]	Weak	
+Rob	nfo[nfop]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Rob	nfsB[nfsBp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Rob	rob[robp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Rob	sodA[sodAp]	+	[APIORCISFBSCS]	Weak	
+Rob	tolC-ygiBC[tolCp4]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Rob	tolC-ygiBC[tolCp3]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Rob	ybjC-nfsA-rimK-ybjN[ybjCp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Rob	zwf[zwfp]	+	[BPP]	Strong	
+RstA	asr[asrp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+RstA	csgDEFG[csgDp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+RstA	csgDEFG[csgDp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+RstA	narGHJI[narGp]	+	[APIORCISFBSCS]	Weak	
+RstA	ompF[ompFp]	-	[APIORCISFBSCS, NAS]	Weak	
+RtcR	rtcBA[rtcBp]	+	[GEA]	Weak	
+RutR	carAB[carAp1]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+RutR	fepB[fepBp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+RutR	gadX[gadXp]	-	[BPP, GEA]	Strong	
+RutR	gadXW[gadXp]	-	[BPP, GEA]	Strong	
+RutR	nemRA[nemRp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+RutR	nemRA-gloA[nemRp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+RutR	pdeR[pdeRp]	-	[GEA]	Weak	
+RutR	rutABCDEFG[rutAp]	-	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+RutR	rutR[rutRp2]	-	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+SdiA	ftsQ[ftsQp2]	+	[BPP, GEA]	Strong	
+SdiA	ftsQAZ[ftsQp1]	-	[BPP, GEA]	Strong	
+SdiA	gadW[gadWp2]	+	[GEA]	Weak	
+SdiA	rmf[rmfp]	+	[BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+SdiA	rsd[rsdp2]	+	[BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+SdiA	ydiV[ydiVp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SgrR	alaC[alaCp]	+	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+SgrR	sgrR-sroA-thiBPQ[sgrRp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+SgrR	sgrST-setA[sgrSp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+SlyA	casABCDE12[casAp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SlyA	fecIR[fecIp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SlyA	gspCDEFGHIJKLMO[gspCp2]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SlyA	hlyE[hlyEp]	+	[BPP, GEA]	Strong	
+SlyA	leuO[leuOp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SlyA	paaABCDEFGHIJK[paaAp]	+	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SlyA	pagP[pagPp]	+	[GEA, MCIBSPD]	Weak	
+SlyA	rmf[rmfp]	+	[BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+SlyA	rsd[rsdp2]	+	[BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+SoxR	aroF-tyrA[aroFp]	+	[CEUMA, IHBCE, RE]	Weak	
+SoxR	fumC[fumCp]	+	[BPP, GEA]	Strong	
+SoxR	sodA[sodAp]	+	[CEUMA, IHBCE, RE]	Weak	
+SoxR	soxR[soxRp]	-	[BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxR	soxS[soxSp]	+	[BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxR	yjcB[yjcBp]	+	[CEUMA, IHBCE, RE]	Weak	
+SoxR	yrbL[yrbLp]	+	[CEUMA, IHBCE, RE]	Weak	
+SoxS	acnA[acnAp2]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxS	acrAB[acrAp]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxS	acrZ[acrZp]	+	[GEA, IHBCE, CV(GEA/ROMA)]	Strong	
+SoxS	aldA[aldAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+SoxS	decR[decRp]	+	[CEUMA, IHBCE, RE]	Weak	
+SoxS	fldA-uof-fur[fldAp]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxS	fldB[fldBp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+SoxS	fpr[fprp]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxS	fumC[fumCp]	+	[BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxS	inaA[inaAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxS	marRAB[marRp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxS	micF[micFp]	+	[BCE, BPP, CEUMA, IHBCE, RE]	Strong	
+SoxS	nepI[nepIp]	+	[CEUMA, IHBCE, RE]	Weak	
+SoxS	nfo[nfop]	+	[APIORCISFBSCS, BCE, CEUMA, GEA, IHBCE, RE, CV(GEA/ROMA)]	Strong	
+SoxS	nfsB[nfsBp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxS	ompW[ompWp]	-	[GEA]	Weak	
+SoxS	pgi[pgip]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+SoxS	poxB[poxBp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+SoxS	pqiABC[pqiAp1]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+SoxS	ptsG[ptsGp1]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxS	rfaYZ[waaYp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxS	ribA[ribAp1]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxS	rob[robp]	-	[APIORCISFBSCS, BPP]	Strong	
+SoxS	sodA[sodAp]	+	[APIORCISFBSCS, BCE, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxS	soxS[soxSp]	-	[BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxS	tolC-ygiBC[tolCp4]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+SoxS	tolC-ygiBC[tolCp3]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+SoxS	uof-fur[uofp]	+	[BPP, CE, IHBCE, RE]	Strong	
+SoxS	ybjC-nfsA-rimK-ybjN[ybjCp]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SoxS	ydbK[ydbKp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+SoxS	ydbK-ompN[ydbKp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+SoxS	yrbL[yrbLp]	+	[CEUMA, IHBCE, RE]	Weak	
+SoxS	zinT[zinTp]	+	[GEA]	Weak	
+SoxS	zwf[zwfp]	+	[APIORCISFBSCS, BPP, CEUMA, GEA, IHBCE, RE, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+SrlR	srlAEBD-gutM-srlR-gutQ[srlAp]	-	[GEA]	Weak	
+StpA	bglG[bglGp]	-	[GEA]	Weak	
+StpA	bglGFB[bglGp]	-	[GEA]	Weak	
+StpA	leuO[leuOp2]	-	[GEA]	Weak	
+StpA	ssrS[ssrSp1]	-	[BPP, GEA]	Strong	
+StpA	ssrS[ssrSp2]	-	[BPP, GEA]	Strong	
+StpA	ssrS-ygfA[ssrSp1]	-	[BPP, GEA]	Strong	
+StpA	ssrS-ygfA[ssrSp2]	-	[BPP, GEA]	Strong	
+StpA	stpA[stpAp1]	-	[GEA]	Weak	
+SutR	cysE[cysEp]	-	[BPP, GEA]	Strong	
+SutR	fliAZY[fliAp1]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+SutR	sutR[sutRp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+TdcA	tdcABCDEFG[tdcAp]	+	[BCE, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+TorR	gadAX[gadAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+TorR	hdeAB-yhiD[hdeAp]	+	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+TorR	tnaC[tnaCp]	+	[BPP, GEA]	Strong	
+TorR	tnaCAB[tnaCp]	+	[BPP, GEA]	Strong	
+TorR	torCAD[torCp]	+	[APIORCISFBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/GS), CV(GEA/ROMA), CV(GEA/ROMA/SM), CV(GEA/SM/GS), GS]	Confirmed	
+TorR	torR[torRp]	-	[APIORCISFBSCS, BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/GS), CV(GEA/ROMA), CV(GEA/ROMA/SM), CV(GEA/SM/GS), GS]	Confirmed	
+TreR	treBC[treBp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+TrpR	aroH[aroHp1]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+TrpR	aroL-yaiA-aroM[aroLp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+TrpR	mtr[mtrp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+TrpR	trpL[trpLp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+TrpR	trpLEDCBA[trpLp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+TrpR	trpR[trpRp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+TyrR	aroF-tyrA[aroFp]	-	[APIORCISFBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+TyrR	aroG[aroGp]	-	[APIORCISFBSCS, BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+TyrR	aroL-yaiA-aroM[aroLp]	-	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+TyrR	aroP[aroPp1]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+TyrR	aroP[aroPp2]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+TyrR	folA[folAp]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+TyrR	mtr[mtrp2]	+	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+TyrR	tyrB[tyrBp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+TyrR	tyrP[tyrPp1]	+	[BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+TyrR	tyrR[tyrRp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+UhpA	uhpT[uhpTp]	+	[BCE, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+UidR	uidABC[uidAp]	-	[GEA]	Weak	
+UidR	uidR[uidRp]	-	[GEA]	Weak	
+UlaR	ulaABCDEF[ulaAp]	-	[BPP, GEA, SM, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/GS), CV(GEA/ROMA), CV(GEA/ROMA/SM), CV(GEA/SM/GS), GS]	Confirmed	
+UlaR	ulaG[ulaGp]	-	[BPP, GEA, CV(CHIP-SV/GEA/GS), CV(CHIP-SV/GEA/ROMA), CV(GEA/GS), CV(GEA/ROMA), GS]	Confirmed	
+UvrY	csrB[csrBp]	+	[BPP, GEA]	Strong	
+UvrY	csrC[csrCp]	+	[BPP, GEA]	Strong	
+UvrY	luxS[luxSp2]	+	[BPP, GEA]	Strong	
+UvrY	uhpT[uhpTp]	+	[BPP, GEA]	Strong	
+UvrY	ydeP[ydePp]	+	[BPP, GEA]	Strong	
+UxuR	exuR[exuRp2]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+UxuR	gntP[gntPp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+UxuR	lgoR[lgoRp4]	-	[BPP, GEA]	Strong	
+UxuR	uidABC[uidAp]	-	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+UxuR	uxuAB[uxuAp]	-	[APIORCISFBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+UxuR	uxuR[uxuRp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+XapR	xapAB[xapAp]	+	[APIORCISFBSCS, GEA, CV(GEA/ROMA)]	Strong	
+XylR	araC[araCp]	-	[AIBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+XylR	xylAB[xylAp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+XylR	xylE[xylEp]	+	[AIBSCS, BPP, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+XylR	xylFGHR[xylFp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+YdeO	appCBA-yccB[appCp]	+	[BPP, GEA, IHBCE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+YdeO	gadE[gadEp3]	+	[BPP, GEA, IHBCE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+YdeO	gadEF-mdtEF[gadEp]	+	[BPP, GEA]	Strong	
+YdeO	gadW[gadWp1]	+	[BPP, GEA, IHBCE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+YdeO	hyaABCDEF[hyaAp]	+	[BPP, GEA, IHBCE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+YdeO	safA-ydeO[safAp]	-	[GEA]	Weak	
+YdeO	slp-dctR[slpp]	+	[BPP, GEA, IHBCE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+YdeO	yiiS-uspD[yiiSp]	+	[BPP, GEA, IHBCE, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+YefM	yefM-yoeB[yefMp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+YeiL	yeiL[yeiLp]	+	[GEA]	Weak	
+YhaJ	bssS[bssSp1]	+	[BPP, GEA]	Strong	
+YiaJ	yiaJ[yiaJp]	-	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+YiaJ	yiaKLMNO-lyx-sgbHUE[yiaKp]	-	[BCE, GEA, CV(GEA/ROMA)]	Strong	
+YjjQ	flhDC[flhDp]	-	[AIBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+YjjQ	gfcA[gfcAp]	-	[AIBSCS, GEA, SM, CV(CHIP-SV/GEA/ROMA), CV(CHIP-SV/SM), CV(GEA/ROMA), CV(GEA/ROMA/SM)]	Confirmed	
+YjjQ	ompC[ompCp1]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+YjjQ	ybhL[ybhLp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+YjjQ	yfiR-dgcN-yfiB[yfiRp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+YjjQ	ymiA-yciX[ymiAp]	-	[AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+YqhC	yqhD-dkgA[yqhDp]	+	[BPP, GEA, SM, CV(CHIP-SV/SM)]	Confirmed	
+ZntR	zntA[zntAp]	+	[BPP, SM, CV(CHIP-SV/SM)]	Confirmed	
+ZraR	zraP[zraPp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+ZraR	zraSR[zraSp]	+	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Zur	ykgMO[ykgMp]	-	[APIORCISFBSCS, AIBSCS, GEA, CV(GEA/ROMA)]	Strong	
+Zur	zinT[zinTp]	-	[AIBSCS]	Weak	
+Zur	znuA[znuAp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
+Zur	znuCB[znuCp]	-	[APIORCISFBSCS, BPP, GEA, CV(CHIP-SV/GEA/ROMA), CV(GEA/ROMA)]	Confirmed	
