@@ -129,6 +129,7 @@ dist/
 *.swp
 *.swo
 *~
+temp.md
 
 # Archives
 *.zip
@@ -160,6 +161,7 @@ libs/
 archived/
 prototypes/
 test_configs/
+batches/
 
 # Ignore specific file types
 *.env

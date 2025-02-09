@@ -1,8 +1,8 @@
 """
 --------------------------------------------------------------------------------
-<sequencedesign project>
+<dnadesign project>
 
-Author(s): Eric J. South
+Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
