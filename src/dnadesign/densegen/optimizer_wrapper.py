@@ -7,14 +7,12 @@ Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
+
 import time
 import random
 import dense_arrays as da
 
 def random_fill(length: int, gc_min: float = 0.40, gc_max: float = 0.60) -> str:
-    """
-    Generates a random nucleotide string of the given length with GC content between gc_min and gc_max.
-    """
     nucleotides = "ATGC"
     for _ in range(1000):
         seq = "".join(random.choices(nucleotides, k=length))
@@ -27,16 +25,6 @@ class DenseArrayOptimizer:
     def __init__(self, library: list, sequence_length: int, solver: str = "CBC",
                  solver_options: list = None, fixed_elements: dict = None, fill_gap: bool = False,
                  fill_gap_end: str = "3prime", fill_gc_min: float = 0.40, fill_gc_max: float = 0.60):
-        """
-        :param library: List of binding site sequences (strings) to optimize.
-        :param sequence_length: Target length for the dense array.
-        :param solver: Solver name (e.g., "CBC", "GUROBI").
-        :param solver_options: List of solver-specific options.
-        :param fixed_elements: Optional dictionary with fixed elements.
-        :param fill_gap: If True, fill the gap if the optimized sequence is shorter than sequence_length.
-        :param fill_gap_end: "5prime" or "3prime" indicating where to append the fill.
-        :param fill_gc_min, fill_gc_max: Desired GC content range for the fill.
-        """
         assert isinstance(library, list) and library, "Library must be a non-empty list of motifs."
         self.library = library
         self.sequence_length = sequence_length
@@ -49,9 +37,6 @@ class DenseArrayOptimizer:
         self.fill_gc_max = fill_gc_max
 
     def get_optimizer_instance(self) -> da.Optimizer:
-        """
-        Create and return a new da.Optimizer instance with fixed elements applied.
-        """
         lib_for_opt = self.library.copy()
         converted_constraints = []
         if "promoter_constraints" in self.fixed_elements and self.fixed_elements["promoter_constraints"]:
@@ -79,18 +64,9 @@ class DenseArrayOptimizer:
         return opt_inst
 
     def optimize(self, timeout_seconds: int = 30) -> da.DenseArray:
-        """
-        Generate a single solution, applying gap fill if enabled and
-        setting a solver time limit when using CBC.
-        """
         start_time = time.time()
-        # Create a fresh optimizer instance.
         opt_inst = self.get_optimizer_instance()
-        
-        # Prepare a local copy of solver options.
         local_solver_options = self.solver_options.copy()
-        
-        # If using CBC, remove unsupported options and extract a time limit.
         time_limit_sec = None
         if self.solver.upper() == "CBC":
             remaining_options = []
@@ -101,17 +77,18 @@ class DenseArrayOptimizer:
                     except ValueError:
                         print("Warning: Could not parse TimeLimit option; ignoring it.")
                 else:
-                    # You might ignore other options for CBC as needed.
                     remaining_options.append(opt)
             local_solver_options = remaining_options
 
         try:
             if self.solver.upper() == "CBC" and time_limit_sec is not None:
-                # Build model with no options and then set the time limit directly.
                 opt_inst.build_model(self.solver, solver_options=[])
-                # Set time limit in milliseconds.
-                opt_inst.model.SetTimeLimit(int(time_limit_sec * 1000))
-                solution = opt_inst.optimal(solver=self.solver, solver_options=[])
+                if hasattr(opt_inst.model, "SupportsTimeLimit") and opt_inst.model.SupportsTimeLimit():
+                    opt_inst.model.SetTimeLimit(int(time_limit_sec * 1000))
+                    print(f"TimeLimit set to {int(time_limit_sec * 1000)} ms for CBC.")
+                else:
+                    print("Warning: CBC solver does not support time limits on this system.")
+                solution = opt_inst.solve()
             else:
                 solution = opt_inst.optimal(solver=self.solver, solver_options=local_solver_options)
         except Exception as e:
@@ -119,14 +96,13 @@ class DenseArrayOptimizer:
             raise
 
         if solution and solution.nb_motifs > 0:
-            sol_seq = str(solution)
-            if self.fill_gap and len(sol_seq) < self.sequence_length:
-                gap = self.sequence_length - len(sol_seq)
+            if self.fill_gap and len(solution.sequence) < self.sequence_length:
+                gap = self.sequence_length - len(solution.sequence)
                 fill_seq = random_fill(gap, self.fill_gc_min, self.fill_gc_max)
                 if self.fill_gap_end.lower() == "5prime":
-                    sol_seq = fill_seq + sol_seq
+                    solution.sequence = fill_seq + solution.sequence
                 else:
-                    sol_seq = sol_seq + fill_seq
+                    solution.sequence = solution.sequence + fill_seq
                 setattr(solution, "meta_gap_fill", True)
                 setattr(solution, "meta_gap_fill_details", {
                     "fill_gap": gap,

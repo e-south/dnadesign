@@ -23,7 +23,10 @@ class ProgressTracker:
                 "target_quota": None,
                 "last_checkpoint": None,
                 "error_flags": [],
-                "system_resources": {}
+                "system_resources": {},
+                "config": {},
+                "meta_gap_fill_used": False,
+                "source": ""
             }
 
     def _load_status(self) -> dict:
@@ -35,7 +38,21 @@ class ProgressTracker:
         self.status["total_entries"] += 1
         self.status["target_quota"] = target_quota
         self.status["last_checkpoint"] = datetime.datetime.now().isoformat()
-        # (Optional) update system resources or error flags here.
+        if new_entry.get("meta_gap_fill", False):
+            self.status["meta_gap_fill_used"] = True
+        self._save_status()
+
+    def update_batch_config(self, config: dict, source_label: str):
+        self.status["config"] = {
+            "sequence_length": config.get("sequence_length"),
+            "quota": config.get("quota"),
+            "subsample_size": config.get("subsample_size"),
+            "arrays_generated_before_resample": config.get("arrays_generated_before_resample"),
+            "solver": config.get("solver"),
+            "solver_options": config.get("solver_options"),
+            "fixed_elements": config.get("fixed_elements")
+        }
+        self.status["source"] = source_label
         self._save_status()
 
     def _save_status(self):
