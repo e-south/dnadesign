@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61", "wheel", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dnadesign"
+version = "0.1.0"
+description = "A collection of Python modules and data analysis pipelines, all related to DNA sequence design."
+authors = [
+    { name = "Eric South", email = "ericjohnsouth@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # List added runtime dependencies here if desired.
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

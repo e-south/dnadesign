@@ -1,4 +1,13 @@
-# dnadesign/densegen/main.py
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+dnadesign/densegen/main.py
+
+Module Author(s): Eric J. South
+Dunlop Lab
+--------------------------------------------------------------------------------
+"""
+
 import yaml
 import random
 import time
@@ -8,7 +17,7 @@ import pandas as pd
 import torch
 
 from dnadesign.utils import BASE_DIR, ConfigLoader, SequenceSaver, generate_sequence_entry
-from dnadesign.densegen.data_ingestor import DEG2TFBSParser  # use the parser directly for one source at a time
+from dnadesign.densegen.data_ingestor import DEG2TFBSParser
 from dnadesign.densegen.sampler import TFSampler
 from dnadesign.densegen.optimizer_wrapper import DenseArrayOptimizer, random_fill
 from dnadesign.densegen.progress_tracker import ProgressTracker
@@ -30,14 +39,14 @@ def main():
     config_loader = ConfigLoader(config_path)
     config = config_loader.config
 
-    input_dir = config.get("input_dir", ".")
-    batch_base_folder = Path(__file__).parent / "batches"
-    batch_base_folder.mkdir(parents=True, exist_ok=True)
+    # Use a batch folder under "sequences" (inside the dnadesign directory).
+    output_base_folder = Path(__file__).parent.parent / "sequences"
+    output_base_folder.mkdir(parents=True, exist_ok=True)
 
     preferred_solver = config.get("solver", "CBC")
     solver_options = config.get("solver_options", ["Threads=16"])
     sequence_length = config.get("sequence_length", 100)
-    quota = config.get("quota", 5)  # now interpreted as a per‐source quota
+    quota = config.get("quota", 5)
     subsample_size = config.get("subsample_size", 15)
     fixed_elements = config.get("fixed_elements", {})
     unique_tf_only = config.get("unique_tf_only", False)
@@ -47,21 +56,20 @@ def main():
     fill_gc_max = config.get("fill_gc_max", 0.60)
     arrays_generated_before_resample = config.get("arrays_generated_before_resample", 1)
     source_names = config.get("sources", [])
-    assert source_names, "No sources defined in configuration."
+    assert source_names, "No tf2tfbs mapping files defined in configuration."
 
     # Process each source independently.
     for src in source_names:
         print(f"\n=== Processing source: {src} ===")
-        date_str = datetime.datetime.now().strftime("%Y-%m-%d")
-        timestamp = int(time.time())
-        # Create a batch folder for this source.
-        batch_folder = batch_base_folder / f"seqbatch_{src}_{date_str}"
+        source_label = src.replace("tfbsbatch_", "")  # Trim prefix.
+        date_str = datetime.datetime.now().strftime("%Y%m%d")
+        results_filename = f"densegenbatch_{date_str}_{source_label}.pt"
+        batch_folder = output_base_folder / f"densegenbatch_{date_str}_{source_label}"
         batch_folder.mkdir(parents=True, exist_ok=True)
-        progress_file = batch_folder / f"progress_status_{src}.yaml"
-        results_filename = f"seqbatch_{src}_{date_str}_{timestamp}.pt"
+        progress_file = batch_folder / f"progress_status_{source_label}.yaml"
         results_file = batch_folder / results_filename
 
-        # Crash recovery: if a progress file exists, load checkpointed totals.
+        # Crash recovery.
         if progress_file.exists():
             with progress_file.open("r") as f:
                 progress_status = yaml.safe_load(f)
@@ -77,13 +85,19 @@ def main():
                 "target_quota": quota,
                 "last_checkpoint": None,
                 "error_flags": [],
-                "system_resources": {}
+                "system_resources": {},
+                "config": {},
+                "meta_gap_fill_used": False,
+                "source": ""
             }
             current_total = 0
             existing_results = []
 
+        progress_tracker = ProgressTracker(str(progress_file))
+        progress_tracker.update_batch_config(config, source_label)
+
         # Ingest data for this specific source.
-        parser = DEG2TFBSParser(input_dir)
+        parser = DEG2TFBSParser(config.get("input_dir", "."))
         try:
             pairs, meta_df = parser.parse_tfbs_file(src)
         except AssertionError as ae:
@@ -95,27 +109,23 @@ def main():
             continue
 
         sampler = TFSampler(meta_df)
-        # Initial sampling for solver selection.
         sampled_pairs = sampler.subsample_binding_sites(subsample_size, unique_tf_only=unique_tf_only)
         library_for_optim = [pair[1] for pair in sampled_pairs]
-        tfs_sample = [pair[0] for pair in sampled_pairs]
         meta_tfbs_parts = [f"{tf}_{tfbs}" for tf, tfbs, _ in sampled_pairs]
 
         selected_solver, extra_solver_options = select_solver(preferred_solver, "CBC", library_for_optim)
         if extra_solver_options:
             solver_options.extend(extra_solver_options)
 
-        progress_tracker = ProgressTracker(str(progress_file))
         sequence_saver = SequenceSaver(str(batch_folder))
-
-        generated_entries = existing_results[:]  # start with any loaded results
+        generated_entries = existing_results[:]  # Start with any loaded results.
         global_generated = current_total
         forbidden_libraries = set()
         max_forbidden_repeats = 5
 
-        # Outer loop: continue until the per‐source quota is met.
+        # Outer loop.
         while global_generated < quota:
-            print(f"\nSource {src}: New tfbs library sample; generating up to {arrays_generated_before_resample} arrays...")
+            print(f"\nSource {src}: New TFBS library sample; generating up to {arrays_generated_before_resample} arrays...")
             sampled_pairs = sampler.subsample_binding_sites(subsample_size, unique_tf_only=unique_tf_only)
             library_for_optim = [pair[1] for pair in sampled_pairs]
             tfs_used = [pair[0] for pair in sampled_pairs]
@@ -141,7 +151,7 @@ def main():
             local_forbidden = set()
             forbidden_repeats = 0
 
-            # Inner loop: generate arrays from the current library sample.
+            # Inner loop.
             while local_generated < arrays_generated_before_resample and global_generated < quota:
                 start_time = time.time()
                 try:
@@ -151,7 +161,7 @@ def main():
                     continue
                 elapsed_time = time.time() - start_time
 
-                fingerprint = solution.sequence  # use the sequence string as a fingerprint
+                fingerprint = solution.sequence
                 if fingerprint in local_forbidden:
                     forbidden_repeats += 1
                     print(f"Source {src}: Duplicate solution encountered. Forbidden repeat count: {forbidden_repeats}")
@@ -160,15 +170,13 @@ def main():
                         break
                     continue
                 local_forbidden.add(fingerprint)
-                # Apply gap fill if needed.
-                sol_seq = str(solution)
-                if fill_gap and len(sol_seq) < sequence_length:
-                    gap = sequence_length - len(sol_seq)
+                if fill_gap and len(solution.sequence) < sequence_length:
+                    gap = sequence_length - len(solution.sequence)
                     fill_seq = random_fill(gap, fill_gc_min, fill_gc_max)
                     if fill_gap_end.lower() == "5prime":
-                        sol_seq = fill_seq + sol_seq
+                        solution.sequence = fill_seq + solution.sequence
                     else:
-                        sol_seq = sol_seq + fill_seq
+                        solution.sequence = solution.sequence + fill_seq
                     setattr(solution, "meta_gap_fill", True)
                     setattr(solution, "meta_gap_fill_details", {
                         "fill_gap": gap,
@@ -180,17 +188,9 @@ def main():
                 except Exception as e:
                     print(f"Source {src}: Warning: Could not forbid solution: {e}")
 
-                # Build the entry.
-                entry = generate_sequence_entry(solution, [src], meta_tfbs_parts)
+                entry = generate_sequence_entry(solution, [src], meta_tfbs_parts, config)
                 entry["tfs_used"] = [f"{tf}_{tfbs}" for tf, tfbs, _ in sampled_pairs]
                 entry["meta_source"] = f"deg2tfbs_{src}"
-                entry["meta_nb_motifs"] = getattr(solution, "nb_motifs", None)
-                entry["meta_gap_fill"] = getattr(solution, "meta_gap_fill", False)
-                entry["meta_gap_fill_details"] = getattr(solution, "meta_gap_fill_details", None)
-                entry["meta_offsets"] = (solution.offset_indices_in_order() if hasattr(solution, "offset_indices_in_order") else None)
-                entry["meta_compression_ratio"] = getattr(solution, "compression_ratio", None)
-                entry["sequence"] = solution.sequence
-
                 generated_entries.append(entry)
                 global_generated += 1
                 progress_tracker.update(entry, target_quota=quota)

@@ -1,84 +1,119 @@
 # dnadesign
 
-This directory contains a collection of Python modules and data analysis pipelines, all related to non-coding DNA sequence design during Eric J. South's PhD research at Boston University.
+This directory contains a collection of Python modules and bioinformatic pipelines, all related to DNA sequence design during Eric J. South's PhD research at Boston University.
 
 ## Installation
 
-1. *(Optional but recommended)* Create an empty conda environment:
-   ```bash
-   conda create -n envname
-   conda activate envname
-   ```
+**Step 1.** Clone the repository
+```bash
+git clone https://github.com/e-south/dnadesign.git
+cd dnadesign
+```
 
-2. Below is an example sequence of shell commands to create and configure your environment:
+**Step 2 (Option A).** Running Locally
+```bash
+# (Optional) Install mamba into your environment to speed up dependency resolution and installation.
+conda install -c conda-forge mamba -y
 
-   ```bash
-   # (Optional) Install mamba into your environment to speed up dependency resolution and installation.
-   conda install -c conda-forge mamba -y
+# Install PyTorch, TorchVision, and TorchAudio from pytorch and nvidia channels.
+mamba install pytorch torchvision torchaudio pytorch scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml -c conda-forge -y
+```   
 
-   # Install PyTorch, TorchVision, and TorchAudio from pytorch and nvidia channels.
-   mamba install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia -y
-   
-   # Note that pytorch-cuda and nvidia are required for running Evo, which uses FlashAttention. You may need to adjust pytorch-cuda=11.8 to match your system's GPU capabilities.
-   
-   # Install ScanPy 1.10.3, seaborn, numpy, pandas, etc.
-   mamba install scanpy=1.10.3 seaborn numpy pandas matplotlib -c conda-forge -y
+Install a cloned [dense-arrays](https://github.com/e-south/dense-arrays) package via pip.
+```bash
+git clone https://gitlab.com/dunloplab/dense-arrays.git
+cd dense-arrays
+pip install .
+```
 
-   # Install the evo-model package via pip
-   pip install evo-model
-   ```   
-   See Evo's installation documentation [here](https://github.com/evo-design/evo/tree/main) for more context.
+Install the Local `dnadesign` Package in Editable Mode
+```bash
+(dnadesign) cd dnadesign
+(dnadesign) pip install -e .
+```
+This allows Python to recognize **dnadesign** as an installed package while still linking directly to the source files in the repository. Any changes made to the source code will be immediately available without requiring reinstallation.
 
-## Pipeline
+**Step 2 (Option B).** Running on a Shared Cluster (for using Evo)
+```bash
+git clone https://github.com/e-south/dnadesign.git
+cd dnadesign
 
-1. **seqfetcher* (more documentation [here](preprocessing/preprocessing-docs.md))
+conda install -c conda-forge mamba -y
+
+# Install PyTorch, TorchVision, and TorchAudio from pytorch and nvidia channels.
+mamba install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia -y
+
+# Install ScanPy 1.10.3, seaborn, numpy, pandas, etc.
+mamba install scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml -c conda-forge -y
+```
+*pytorch-cuda* and *nvidia* are required for running Evo, which uses FlashAttention. You may need to adjust *pytorch-cuda=11.8* to match your system's GPU capabilities.
+
+
+Install the evo-model package via pip
+```bash
+pip install evo-model
+```
+See Evo's installation documentation [here](https://github.com/evo-design/evo/tree/main) for more context.
+
+Install a cloned [dense-arrays](https://github.com/e-south/dense-arrays) package via pip.
+```bash
+git clone https://gitlab.com/dunloplab/dense-arrays.git
+cd dense-arrays
+pip install .
+```
+
+### Directory Layout
+---
+```text
+dnadesign/
+├── README.md
+├── pyproject.toml
+└── src/
+    └── dnadesign/
+        ├── __init__.py
+        ├── utils.py
+        ├── main.py                   # CLI entry point
+        ├── configs/                  # User-defined configurations
+        │   └── example.yaml          # Customize to process different DNA sequences
+        ├── seqfetcher/
+        │   ├── utils.py              # Contains paths to datasets (from dnadesign-data)
+        │   ├── __init__.py 
+        │   ├── <dataset>_module.py   # Each dataset has its own respective module
+        │   └── ...  
+        ├── densegen/
+        │   ├── __init__.py 
+        │   ├── <dataset>_module.py   # Each dataset has its own respective module
+        │   └── ...  
+        ├── sequences/                
+        │   ├── __init__.py    
+        │   ├── seqmanager.py         # Checks that incoming .pt files have proper shape
+        │   └── seqbatch_<name>/      # Batch of sequences ingested from a given run
+        │       ├── seqset_<name>.pt  # Data structure containing sequences
+        │       ├── csvs                
+        │       └── plots     
+        ├── evoinference/            
+        │   ├── __init__.py    
+        │   ├── foo.py        
+        │   └── bar/                
+        │       ├── __init__.py
+        │       └── ...                 
+        └── clustering/            
+            ├── __init__.py    
+            ├── foo.py        
+            └──  bar/                 
+```
+     
+### Subdirectories
+
+1. [**seqfetcher**](seqfetcher/seqfetcher-docs.md)
    - Loads bacterial promoter engineering datasets from the [**dnadesign-dna**](https://github.com/e-south/dnadesign-data) repository.
    - Loads curated experimental datasets, derived from [**RegulonDB**](https://regulondb.ccg.unam.mx/) or [**EcoCyc**](https://ecocyc.org/), also from [**dnadesign-dna**](https://github.com/e-south/dnadesign-data).
    - Loads sets of transcription factor binding sites
 
-     #### Directory Layout
-      ```text
-      dnadesign/
-      ├── README.md
-      ├── __init__.py
-      ├── utils.py
-      ├── main.py                   # CLI entry point
-      ├── configs/                  # User-defined configurations
-      │   └── example.yaml          # Customize to process different DNA sequences
-      ├── seqfetcher/
-      │   ├── utils.py              # Contains paths to datasets (from dnadesign-data)
-      │   ├── __init__.py 
-      │   ├── <dataset>_module.py   # Each dataset has its own respective module
-      │   └── ...  
-      ├── densegen/
-      │   ├── __init__.py 
-      │   ├── <dataset>_module.py   # Each dataset has its own respective module
-      │   └── ...  
-      ├── sequences/                
-      │   ├── __init__.py    
-      │   ├── seqmanager.py         # Checks that incoming .pt files have proper shape (-> datastager -> {})
-      │   └── seqbatch_<name>/      # Batch of sequences ingested from a given run
-      │       ├── seqset_<name>.pt  # Data structure containing sequences
-      │       ├── csvs                
-      │       └── plots     
-      └── evoinference/            
-      │   ├── __init__.py    
-      │   ├── foo.py        
-      │   └── bar/                
-      │       ├── __init__.py
-      │       └── ...                 
-      └── clustering/            
-          ├── __init__.py    
-          ├── foo.py        
-          ├── bar/                
-          │   ├── __init__.py
-          │   └── ...                 
-          └── foo_<date>/ 
-      ```
-     
+2. [**densegen**](densegen/densegen-docs.md) 
+   - 
 
-2. **sequences**
-(more documentation [here](preprocessing/sequences-docs.md))
+2. [**sequences**](sequences/sequences-docs.md)
    - This directory contains sequences outputted from **densegen** and tidied into a standardized data structure. Each sequence entry includes:
      - A **unique identifier** (id).
      - The molecular (DNA) **sequence**.
@@ -130,8 +165,4 @@ This directory contains a collection of Python modules and data analysis pipelin
 
 1. Clone the [**dnadesign-data**](https://github.com/e-south/dnadesign-data) repository to access a curated set of various experimental datasets. Placing it as a sibling directory to **dnadesign** enables **preprocessing** to generate custom lists of dictionaires from these sources. 
 
-
 ---
-
-_Last updated: 2025-02-08_
-
