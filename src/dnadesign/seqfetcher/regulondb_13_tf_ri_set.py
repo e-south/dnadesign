@@ -24,13 +24,20 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+import sys
+from pathlib import Path
+
+current_file = Path(__file__).resolve()
+src_dir = current_file.parent.parent.parent
+sys.path.insert(0, str(src_dir))
+
 import pandas as pd
 import re
 import datetime
 import uuid
 import yaml
-from pathlib import Path
-from dnadesign.utils import SequenceSaver, DATA_FILES, BASE_DIR
+
+from dnadesign.utils import load_dataset, SequenceSaver, DATA_FILES, BASE_DIR
 
 VALID_NUCLEOTIDES = set("ATCG")
 
@@ -82,19 +89,14 @@ def ingest():
     return sequences
 
 def save_output(sequences):
-    output_dir = Path(BASE_DIR) / "sequences" / "seqbatch_regulondb_13_tf_ri_set"
+    output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_regulondb_13_tf_ri_set"
     output_dir.mkdir(parents=True, exist_ok=True)
     saver = SequenceSaver(str(output_dir))
-    saver.save(sequences, "seqset_regulondb_13_tf_ri_set.pt")
-    summary = {
-        "date_created": datetime.datetime.now().isoformat(),
-        "source_file": str(DATA_FILES["regulondb_13_tf_ri_set"]),
-        "num_sequences": len(sequences),
-        "part_type": "tfbs"
+    additional_info = {
+        "source_file": "regulondb_13_tf_ri_set",
+        "part_type": "promoter"
     }
-    with open(output_dir / "summary.yaml", "w") as f:
-        yaml.dump(summary, f)
-    print("Summary saved.")
+    saver.save_with_summary(sequences, "seqbatch_regulondb_13_tf_ri_set.pt", additional_info=additional_info)
 
 if __name__ == "__main__":
     seqs = ingest()

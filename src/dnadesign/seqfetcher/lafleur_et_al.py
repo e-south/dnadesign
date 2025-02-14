@@ -3,6 +3,13 @@
 <dnadesign project>
 seqfetcher/lafleur_et_al.py
 
+Module for loading and data described in Lafleur et al., which combined high‐throughput
+assays, biophysical models, and machine learning to design 34k+ promoters.
+
+"Automated model-predictive design of synthetic promoters to control transcriptional 
+profiles in bacteria"
+DOI: 10.1038/s41467-022-32829-5
+
 Ingests the La Fleur et al promoter dataset from:
     DATA_FILES["lafleur_et_al"]
 Sheet: "La Fleur et al (Fig 3a)"
@@ -17,12 +24,19 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+import sys
+from pathlib import Path
+
+current_file = Path(__file__).resolve()
+src_dir = current_file.parent.parent.parent
+sys.path.insert(0, str(src_dir))
+
 import pandas as pd
 import re
 import datetime
 import uuid
 import yaml
-from pathlib import Path
+
 from dnadesign.utils import load_dataset, SequenceSaver, DATA_FILES, BASE_DIR
 
 VALID_NUCLEOTIDES = set("ATCG")
@@ -72,19 +86,14 @@ def ingest():
     return sequences
 
 def save_output(sequences):
-    output_dir = Path(BASE_DIR) / "sequences" / "seqbatch_lafleur_et_al"
+    output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_lafleur_et_al"
     output_dir.mkdir(parents=True, exist_ok=True)
     saver = SequenceSaver(str(output_dir))
-    saver.save(sequences, "seqset_lafleur_et_al.pt")
-    summary = {
-        "date_created": datetime.datetime.now().isoformat(),
-        "source_file": str(DATA_FILES["lafleur_et_al"]),
-        "num_sequences": len(sequences),
+    additional_info = {
+        "source_file": "lafleur_et_al",
         "part_type": "promoter"
     }
-    with open(output_dir / "summary.yaml", "w") as f:
-        yaml.dump(summary, f)
-    print("Summary saved.")
+    saver.save_with_summary(sequences, "seqbatch_lafleur_et_al.pt", additional_info=additional_info)
 
 if __name__ == "__main__":
     seqs = ingest()

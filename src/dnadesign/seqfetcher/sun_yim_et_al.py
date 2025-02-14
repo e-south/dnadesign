@@ -1,15 +1,26 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-seqfetcher/regulondb_13_promoter_RpoS_set.py
+seqfetcher/sun_yim_et_al.py
 
-Ingests the RegulonDB 13 Promoter RpoS set from:
-    DATA_FILES["regulondb_13_promoter_RpoS_set"]
-File type: CSV (header on row 0)
-Columns:
-  - Name: "promoter_name"
-  - Sequence: "promoter_sequence"
-Sets meta_part_type to "promoter".
+Module for loading and data described in Sun Yim et al., which used active lysates 
+from 10 bacterial species to measure transcription activities of thousands of 
+regulatory sequences.
+
+"Multiplex transcriptional characterizations across diverse bacterial species using 
+cell-free systems"
+DOI: 10.15252/msb.20198875
+
+Ingests the Sun Yim et al dataset from:
+    DATA_FILES["sun_yim_et_al"]
+
+Processing:
+  - Reads the Excel file from the sheet "Fig. 1D" (header=0).
+  - Uses 'Oligo ID' as the name and 'Sequence+ATG+BC(rev)' as the sequence.
+  - Cleans the sequence by trimming the trailing 12 characters (barcode).
+  - Also extracts 'Gen_in vitro_tx' and 'Gen_in vivo_tx' as additional metadata.
+  - Sets meta_part_type to "promoter".
+  - Outputs a standardized list of dictionaries and saves them along with a summary.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -38,7 +49,8 @@ def clean_sequence(seq: str) -> str:
         return ""
     seq = seq.strip().upper()
     seq = re.sub(r"\s+", "", seq)
-    return "".join(c for c in seq if c in VALID_NUCLEOTIDES)
+    # Trim trailing 12 characters (barcode) if possible
+    return seq[:-12] if len(seq) >= 12 else ""
 
 def validate_entry(name: str, seq: str):
     if not name or pd.isna(name):
@@ -50,16 +62,16 @@ def validate_entry(name: str, seq: str):
             raise AssertionError(f"Invalid nucleotide '{c}' in sequence: {seq}")
 
 def ingest():
-    df = load_dataset("regulondb_13_promoter_RpoS_set", header=0)
+    df = load_dataset("sun_yim_et_al", sheet_name="Fig. 1D", header=0)
     sequences = []
     for idx, row in df.iterrows():
-        name = row.get("promoter_name")
-        seq = row.get("promoter_sequence")
+        name = row.get("Oligo ID")
         if pd.isna(name):
             name = f"Row_{idx}"
-        if pd.isna(seq):
+        raw_seq = row.get("Sequence+ATG+BC(rev)")
+        if pd.isna(raw_seq):
             continue
-        seq = clean_sequence(seq)
+        seq = clean_sequence(raw_seq)
         try:
             validate_entry(name, seq)
         except AssertionError as e:
@@ -69,22 +81,24 @@ def ingest():
             "id": str(uuid.uuid4()),
             "name": name,
             "sequence": seq,
-            "meta_source": "regulondb_13_promoter_RpoS_set",
+            "meta_source": "sun_yim_et_al",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
+            "meta_gene_in_vitro_tx": row.get("Gen_in vitro_tx"),
+            "meta_gene_in_vivo_tx": row.get("Gen_in vivo_tx"),
             "meta_part_type": "promoter"
         }
         sequences.append(entry)
     return sequences
 
 def save_output(sequences):
-    output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_regulondb_13_promoter_RpoS_set"
+    output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_sun_yim_et_al"
     output_dir.mkdir(parents=True, exist_ok=True)
     saver = SequenceSaver(str(output_dir))
     additional_info = {
-        "source_file": "regulondb_13_promoter_RpoS_set",
+        "source_file": "sun_yim_et_al",
         "part_type": "promoter"
     }
-    saver.save_with_summary(sequences, "seqbatch_regulondb_13_promoter_RpoS_set.pt", additional_info=additional_info)
+    saver.save_with_summary(sequences, "seqbatch_sun_yim_et_al.pt", additional_info=additional_info)
 
 if __name__ == "__main__":
     seqs = ingest()

@@ -3,6 +3,13 @@
 <dnadesign project>
 seqfetcher/yu_et_al.py
 
+Module for loading and data described in Yu et al., which profiled expression of 
+8269 IPTG‐inducible promoters that vary RNAP and LacI‐binding sites.
+
+"Multiplexed characterization of rationally designed promoter architectures 
+deconstructs combinatorial logic for IPTG-inducible systems"
+DOI: 10.1038/s41467-020-20094-3
+
 Ingests the Yu et al promoter dataset from:
     DATA_FILES["yu_et_al"]
 Sheet: "Yu et al (Fig S3)"
@@ -17,12 +24,19 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+import sys
+from pathlib import Path
+
+current_file = Path(__file__).resolve()
+src_dir = current_file.parent.parent.parent
+sys.path.insert(0, str(src_dir))
+
 import pandas as pd
 import re
 import datetime
 import uuid
 import yaml
-from pathlib import Path
+
 from dnadesign.utils import load_dataset, SequenceSaver, DATA_FILES, BASE_DIR
 
 VALID_NUCLEOTIDES = set("ATCG")
@@ -73,19 +87,14 @@ def ingest():
     return sequences
 
 def save_output(sequences):
-    output_dir = Path(BASE_DIR) / "sequences" / "seqbatch_yu_et_al"
+    output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_yu_et_al"
     output_dir.mkdir(parents=True, exist_ok=True)
     saver = SequenceSaver(str(output_dir))
-    saver.save(sequences, "seqset_yu_et_al.pt")
-    summary = {
-        "date_created": datetime.datetime.now().isoformat(),
-        "source_file": str(DATA_FILES["yu_et_al"]),
-        "num_sequences": len(sequences),
+    additional_info = {
+        "source_file": "yu_et_al",
         "part_type": "promoter"
     }
-    with open(output_dir / "summary.yaml", "w") as f:
-        yaml.dump(summary, f)
-    print("Summary saved.")
+    saver.save_with_summary(sequences, "seqbatch_yu_et_al.pt", additional_info=additional_info)
 
 if __name__ == "__main__":
     seqs = ingest()

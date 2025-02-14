@@ -3,6 +3,13 @@
 <dnadesign project>
 seqfetcher/hossain_et_al.py
 
+Module for loading and data described in Hossain et al., which created and 
+characterized 4,350 E. coli promoters and 1,722 yeast promoters.
+
+"Automated design of thousands of nonrepetitive parts for engineering stable 
+genetic systems"
+DOI: 10.1038/s41587-020-0584-2
+
 Ingests the Hossain et al promoter dataset from:
     DATA_FILES["hossain_et_al"]
 Sheet: "Hossain et al (Fig 3d, S7d)"
@@ -17,15 +24,23 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+import sys
+from pathlib import Path
+
+current_file = Path(__file__).resolve()
+src_dir = current_file.parent.parent.parent
+sys.path.insert(0, str(src_dir))
+
 import pandas as pd
 import re
 import datetime
 import uuid
 import yaml
-from pathlib import Path
+
 from dnadesign.utils import load_dataset, SequenceSaver, DATA_FILES, BASE_DIR
 
 VALID_NUCLEOTIDES = set("ATCG")
+
 
 def clean_sequence(seq: str) -> str:
     if not isinstance(seq, str):
@@ -35,6 +50,7 @@ def clean_sequence(seq: str) -> str:
     # Keep only valid nucleotides
     return "".join([c for c in seq if c in VALID_NUCLEOTIDES])
 
+
 def validate_entry(name: str, seq: str):
     if not name or pd.isna(name):
         raise AssertionError("Entry has an empty name.")
@@ -43,6 +59,7 @@ def validate_entry(name: str, seq: str):
     for c in seq:
         if c not in VALID_NUCLEOTIDES:
             raise AssertionError(f"Invalid nucleotide '{c}' in sequence: {seq}")
+
 
 def ingest():
     df = load_dataset("hossain_et_al", sheet_name="Hossain et al (Fig 3d, S7d)")
@@ -73,20 +90,17 @@ def ingest():
         sequences.append(entry)
     return sequences
 
+
 def save_output(sequences):
-    output_dir = Path(BASE_DIR) / "sequences" / "seqbatch_hossain_et_al"
+    output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_hossain_et_al"
     output_dir.mkdir(parents=True, exist_ok=True)
     saver = SequenceSaver(str(output_dir))
-    saver.save(sequences, "seqset_hossain_et_al.pt")
-    summary = {
-        "date_created": datetime.datetime.now().isoformat(),
-        "source_file": str(DATA_FILES["hossain_et_al"]),
-        "num_sequences": len(sequences),
+    additional_info = {
+        "source_file": "hossain_et_al",
         "part_type": "promoter"
     }
-    with open(output_dir / "summary.yaml", "w") as f:
-        yaml.dump(summary, f)
-    print("Summary saved.")
+    saver.save_with_summary(sequences, "seqbatch_hossain_et_al.pt", additional_info=additional_info)
+
 
 if __name__ == "__main__":
     seqs = ingest()
