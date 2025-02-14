@@ -3,6 +3,14 @@
 <dnadesign project>
 seqfetcher/kosuri_et_al.py
 
+Module for loading data described in Kosuri et al., which synthesized 12,563 
+combinations of common promoters and ribosome binding sites and simultaneously 
+measured DNA, RNA, and protein levels from the entire library.
+
+"Composability of regulatory sequences controlling transcription and translation 
+in Escherichia coli"
+DOI: 10.1073/pnas.1301301110
+
 Ingests the Kosuri et al promoter dataset from:
     DATA_FILES["kosuri_et_al"]
 Sheet: "Promoters"
@@ -18,13 +26,20 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+import sys
+from pathlib import Path
+
+# Add the src directory to sys.path so that "dnadesign" can be found.
+current_file = Path(__file__).resolve()
+src_dir = current_file.parent.parent.parent
+sys.path.insert(0, str(src_dir))
 
 import pandas as pd
 import re
 import datetime
 import uuid
 import yaml
-from pathlib import Path
+
 from dnadesign.utils import load_dataset, SequenceSaver, DATA_FILES, BASE_DIR
 
 VALID_NUCLEOTIDES = set("ATCG")
@@ -59,6 +74,9 @@ def ingest():
     sequences = []
     for idx, row in df.iterrows():
         name = row.get("Promoter")
+        # Remove any surrounding quotation marks and whitespace from the name.
+        if isinstance(name, str):
+            name = name.strip().strip('"')
         seq_raw = row.get("Sequence")
         mean_rna = row.get("mean.RNA")
         sd_rna = row.get("sd.RNA")
@@ -90,19 +108,14 @@ def ingest():
     return sequences
 
 def save_output(sequences):
-    output_dir = Path(BASE_DIR) / "sequences" / "seqbatch_kosuri_et_al"
+    output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_kosuri_et_al"
     output_dir.mkdir(parents=True, exist_ok=True)
     saver = SequenceSaver(str(output_dir))
-    saver.save(sequences, "seqset_kosuri_et_al.pt")
-    summary = {
-        "date_created": datetime.datetime.now().isoformat(),
-        "source_file": str(DATA_FILES["kosuri_et_al"]),
-        "num_sequences": len(sequences),
+    additional_info = {
+        "source_file": "kosuri_et_al",
         "part_type": "promoter"
     }
-    with open(output_dir / "summary.yaml", "w") as f:
-        yaml.dump(summary, f)
-    print("Summary saved.")
+    saver.save_with_summary(sequences, "seqbatch_kosuri_et_al.pt", additional_info=additional_info)
 
 if __name__ == "__main__":
     seqs = ingest()

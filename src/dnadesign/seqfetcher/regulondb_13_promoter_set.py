@@ -16,13 +16,20 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+import sys
+from pathlib import Path
+
+current_file = Path(__file__).resolve()
+src_dir = current_file.parent.parent.parent
+sys.path.insert(0, str(src_dir))
+
 import pandas as pd
 import re
 import datetime
 import uuid
 import yaml
-from pathlib import Path
-from dnadesign.utils import SequenceSaver, DATA_FILES, BASE_DIR
+
+from dnadesign.utils import load_dataset, SequenceSaver, DATA_FILES, BASE_DIR
 
 VALID_NUCLEOTIDES = set("ATCG")
 
@@ -44,7 +51,7 @@ def validate_entry(name: str, seq: str):
 
 def ingest():
     file_path = DATA_FILES["regulondb_13_promoter_set"]
-    df = pd.read_csv(file_path, sep="\t", skiprows=28, header=0)
+    df = pd.read_csv(file_path, sep="\t", skiprows=29, header=0)
     sequences = []
     for idx, row in df.iterrows():
         name = row.get("2)pmName")
@@ -71,19 +78,14 @@ def ingest():
     return sequences
 
 def save_output(sequences):
-    output_dir = Path(BASE_DIR) / "sequences" / "seqbatch_regulondb_13_promoter_set"
+    output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_regulondb_13_promoter_set"
     output_dir.mkdir(parents=True, exist_ok=True)
     saver = SequenceSaver(str(output_dir))
-    saver.save(sequences, "seqset_regulondb_13_promoter_set.pt")
-    summary = {
-        "date_created": datetime.datetime.now().isoformat(),
-        "source_file": str(DATA_FILES["regulondb_13_promoter_set"]),
-        "num_sequences": len(sequences),
+    additional_info = {
+        "source_file": "regulondb_13_promoter_set",
         "part_type": "promoter"
     }
-    with open(output_dir / "summary.yaml", "w") as f:
-        yaml.dump(summary, f)
-    print("Summary saved.")
+    saver.save_with_summary(sequences, "seqbatch_regulondb_13_promoter_set.pt", additional_info=additional_info)
 
 if __name__ == "__main__":
     seqs = ingest()

@@ -3,6 +3,14 @@
 <dnadesign project>
 seqfetcher/urtecho_et_al.py
 
+Module for loading and data described in Urtecho et al., which created and 
+characterized a 10,898‐variant library of bacterial promoters, dissecting 
+−35, −10, UP elements, and spacers to evaluate σ70‐dependent expression.
+
+"Systematic Dissection of Sequence Elements Controlling σ70 Promoters Using a 
+Genomically Encoded Multiplexed Reporter Assay in Escherichia coli"
+DOI: 10.1021/acs.biochem.7b01069
+
 Ingests the Urtecho et al promoter dataset from:
     DATA_FILES["urtecho_et_al"]
 Sheet: "Urtecho et al (Fig 3c, S7b)"
@@ -17,12 +25,19 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+import sys
+from pathlib import Path
+
+current_file = Path(__file__).resolve()
+src_dir = current_file.parent.parent.parent
+sys.path.insert(0, str(src_dir))
+
 import pandas as pd
 import re
 import datetime
 import uuid
 import yaml
-from pathlib import Path
+
 from dnadesign.utils import load_dataset, SequenceSaver, DATA_FILES, BASE_DIR
 
 VALID_NUCLEOTIDES = set("ATCG")
@@ -73,19 +88,14 @@ def ingest():
     return sequences
 
 def save_output(sequences):
-    output_dir = Path(BASE_DIR) / "sequences" / "seqbatch_urtecho_et_al"
+    output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_urtecho_et_al"
     output_dir.mkdir(parents=True, exist_ok=True)
     saver = SequenceSaver(str(output_dir))
-    saver.save(sequences, "seqset_urtecho_et_al.pt")
-    summary = {
-        "date_created": datetime.datetime.now().isoformat(),
-        "source_file": str(DATA_FILES["urtecho_et_al"]),
-        "num_sequences": len(sequences),
+    additional_info = {
+        "source_file": "urtecho_et_al",
         "part_type": "promoter"
     }
-    with open(output_dir / "summary.yaml", "w") as f:
-        yaml.dump(summary, f)
-    print("Summary saved.")
+    saver.save_with_summary(sequences, "seqbatch_urtecho_et_al.pt", additional_info=additional_info)
 
 if __name__ == "__main__":
     seqs = ingest()
