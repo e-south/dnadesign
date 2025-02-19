@@ -15,8 +15,7 @@ import yaml
 import datetime
 import uuid
 
-
-BASE_DIR = Path(__file__).resolve().parent[2]
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DEG2TFBS_DATA = BASE_DIR.parent / "deg2tfbs"
 DNADESIGN_DATA = BASE_DIR.parent / 'dnadesign-data'
 
@@ -24,10 +23,15 @@ DNADESIGN_DATA = BASE_DIR.parent / 'dnadesign-data'
 DATA_FILES = {
     # Promoter Engineering Datasets
     "hossain_et_al": DNADESIGN_DATA / 'primary_literature' / 'LaFleur_et_al' / '41467_2022_32829_MOESM5_ESM.xlsx',
-    "kosuri_et_al": DNADESIGN_DATA / 'primary_literature' / 'LaFleur_et_al' / 'sd01.xls',
+    "kosuri_et_al": DNADESIGN_DATA / 'primary_literature' / 'Kosuri_et_al' / 'sd01.xls',
     "lafleur_et_al": DNADESIGN_DATA / 'primary_literature' / 'LaFleur_et_al' / '41467_2022_32829_MOESM5_ESM.xlsx',
     "urtecho_et_al": DNADESIGN_DATA / 'primary_literature' / 'LaFleur_et_al' / '41467_2022_32829_MOESM5_ESM.xlsx',
     "yu_et_al": DNADESIGN_DATA / 'primary_literature' / 'LaFleur_et_al' / '41467_2022_32829_MOESM5_ESM.xlsx',
+    "hernandez_et_al_positive": DNADESIGN_DATA / 'primary_literature' / 'Hernandez_et_al' /  'positive2860.txt',
+    "hernandez_et_al_negative": DNADESIGN_DATA / 'primary_literature' / 'Hernandez_et_al' /  'negative2860.txt',
+    "johns_et_al_sequences": DNADESIGN_DATA / 'primary_literature' / 'Johns_et_al' / '41592_2018_BFnmeth4633_MOESM3_ESM.xlsx',
+    "johns_et_al_labels": DNADESIGN_DATA / 'primary_literature' / 'Johns_et_al' / '41592_2018_BFnmeth4633_MOESM5_ESM.xlsx',
+    "sun_yim_et_al": DNADESIGN_DATA / 'primary_literature' / 'Sun_Yim_et_al' / 'msb198875-sup-0002-sdatafig1.xlsx',
     
     # EcoCyc Promoter SmartTable(s)
     'ecocyc_28_promoters': DNADESIGN_DATA / 'EcoCyc_28' / 'SmartTable_All_Promoters.txt',
@@ -64,7 +68,11 @@ class ConfigLoader:
             config = yaml.safe_load(f)
         return config.get("densegen", {})
 
+
 class SequenceSaver:
+    """
+    A utility class for saving standardized sequence data along with a summary.
+    """
     def __init__(self, output_dir: str):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -74,23 +82,47 @@ class SequenceSaver:
         torch.save(sequences, file_path)
         print(f"Saved {len(sequences)} entries to {file_path}")
 
+    def generate_summary(self, sequences: list, additional_info: dict = None) -> dict:
+        keys = set()
+        for entry in sequences:
+            for key in entry:
+                keys.add(key)
+        summary = {
+            "date_created": datetime.datetime.now().isoformat(),
+            "num_sequences": len(sequences),
+            "keys": sorted(list(keys))
+        }
+        if additional_info:
+            summary.update(additional_info)
+        return summary
+
+    def save_with_summary(self, sequences: list, data_filename: str, additional_info: dict = None):
+        self.save(sequences, data_filename)
+        summary = self.generate_summary(sequences, additional_info)
+        summary_path = self.output_dir / "summary.yaml"
+        with open(summary_path, "w") as f:
+            yaml.dump(summary, f)
+        print(f"Summary saved to {summary_path}")
+
 
 def generate_sequence_entry(dense_array_solution, source_names: list, tfbs_parts: list, config: dict) -> dict:
-    """
-    Generate a flat dictionary representing the dense array solution with metadata.
-    :param dense_array_solution: The solution returned from the optimizer.
-    :param source_names: List of source names.
-    :param tfbs_parts: List of strings for each TF–TFBS pairing.
-    :param config: Dictionary of configuration parameters.
-    """
     seq_id = str(uuid.uuid4())
     date_accessed = datetime.datetime.now().isoformat()
     meta_source = "deg2tfbs_" + "_AND_".join(source_names)
+    
+    # Use the stored original visual output (which is the solver's all-caps output)
+    visual_str = getattr(dense_array_solution, "original_visual", "")
+    if not visual_str:
+        # Fallback: use the sequence (converted to upper-case) if original_visual is missing.
+        visual_str = "\n" + dense_array_solution.sequence.upper()
+    elif not visual_str.startswith("\n"):
+        visual_str = "\n" + visual_str
+        
     entry = {
         "id": seq_id,
         "meta_date_accessed": date_accessed,
         "meta_source": meta_source,
-        "meta_sequence_visual": str(dense_array_solution),
+        "meta_sequence_visual": visual_str,
         "meta_offsets": (dense_array_solution.offset_indices_in_order()
                          if hasattr(dense_array_solution, "offset_indices_in_order") else None),
         "meta_compression_ratio": getattr(dense_array_solution, "compression_ratio", None),

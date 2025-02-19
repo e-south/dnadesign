@@ -3,7 +3,7 @@
 <dnadesign project>
 seqfetcher/johns_et_al.py
 
-Module for loading and data described in Johns et al., which performed large‐scale 
+Module for loading data described in Johns et al., which performed large‐scale 
 analysis of diverse bacterial regulatory sequences for species‐selective gene expression.
 
 "Metagenomic mining of regulatory elements enables programmable species-selective gene expression"
@@ -20,6 +20,7 @@ Processing:
       • Each sheet contains 'OLIGO ID' and 'tx_norm' (renamed to meta_observed_tx_norm_<sheet>).
   - Merges the sequence and label data on the common "name" field using inner joins.
   - Drops any entries with null or empty fields.
+  - Drops rows where any label value (in tx_raw or tx_norm columns) is 0 or infinite.
   - Sets meta_part_type to "promoter".
   - Saves the standardized data along with a summary.
 
@@ -30,6 +31,8 @@ Dunlop Lab
 
 import sys
 from pathlib import Path
+import math
+import numpy as np
 
 current_file = Path(__file__).resolve()
 src_dir = current_file.parent.parent.parent
@@ -61,6 +64,19 @@ def validate_entry(name: str, seq: str):
         if c not in VALID_NUCLEOTIDES:
             raise AssertionError(f"Invalid nucleotide '{c}' in sequence: {seq}")
 
+def is_invalid_value(val) -> bool:
+    """
+    Returns True if the given value, when converted to a float, is 0 or infinite.
+    If conversion fails, returns True to be conservative.
+    """
+    try:
+        numeric_value = float(val)
+        if numeric_value == 0 or math.isinf(numeric_value) or np.isinf(numeric_value):
+            return True
+        return False
+    except Exception:
+        return True
+
 def ingest():
     # Load sequences
     df_seq = load_dataset("johns_et_al_sequences", sheet_name="Full Constructs", header=0)
@@ -86,8 +102,19 @@ def ingest():
     # Drop rows with any null values in key columns
     df_merged = df_merged.dropna(subset=["name", "sequence"])
     
+    # Remove rows where any tx_raw or tx_norm value is 0 or infinite
+    # Check all columns that start with "meta_observed_tx_norm_" or "meta_observed_tx_raw_"
+    def row_is_invalid(row):
+        for col in df_merged.columns:
+            if col.startswith("meta_observed_tx_norm_") or col.startswith("meta_observed_tx_raw_"):
+                if is_invalid_value(row[col]):
+                    return True
+        return False
+    
+    df_clean = df_merged[~df_merged.apply(row_is_invalid, axis=1)]
+    
     sequences = []
-    for idx, row in df_merged.iterrows():
+    for idx, row in df_clean.iterrows():
         name = row["name"]
         seq = row["sequence"]
         try:
@@ -96,7 +123,7 @@ def ingest():
             print(f"Skipping row {idx}: {e}")
             continue
         # Collect all label meta from the row (all columns starting with meta_observed_tx_norm_)
-        label_meta = {col: row[col] for col in df_merged.columns if col.startswith("meta_observed_tx_norm_")}
+        label_meta = {col: row[col] for col in df_clean.columns if col.startswith("meta_observed_tx_norm_")}
         entry = {
             "id": str(uuid.uuid4()),
             "name": name,

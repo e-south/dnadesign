@@ -8,22 +8,22 @@ config:
       - 18
       upstream: TTGACA
       upstream_pos:
-      - 20
+      - 10
       - 80
     side_biases:
       left: []
       right: []
   quota: 5
   sequence_length: 100
-  solver: GUROBI
+  solver: CBC
   solver_options:
   - Threads=16
   - TimeLimit=20
-  subsample_size: 10
+  subsample_size: 12
 error_flags: []
-last_checkpoint: '2025-02-09T16:08:05.417302'
+last_checkpoint: '2025-02-19T11:23:37.622112'
 meta_gap_fill_used: true
-source: 20250130_poor_carbon_acetate_up
+source: seqbatch_random_tfbs
 system_resources: {}
 target_quota: 5
 total_entries: 5

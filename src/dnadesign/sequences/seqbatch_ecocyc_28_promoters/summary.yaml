@@ -1,0 +1,11 @@
+date_created: '2025-02-13T12:19:13.111875'
+keys:
+- id
+- meta_date_accessed
+- meta_part_type
+- meta_source
+- name
+- sequence
+num_sequences: 3958
+part_type: promoter
+source_file: ecocyc_28_promoters

@@ -1,0 +1,16 @@
+date_created: '2025-02-18T08:53:27.322021'
+keys:
+- id
+- meta_date_accessed
+- meta_observed_tx_norm_Fe_exp
+- meta_observed_tx_norm_LB-stat
+- meta_observed_tx_norm_LB_exp
+- meta_observed_tx_norm_M9-exp
+- meta_observed_tx_norm_NaCl_exp
+- meta_part_type
+- meta_source
+- name
+- sequence
+num_sequences: 10225
+part_type: promoter
+source_file: johns_et_al

@@ -1,0 +1,12 @@
+date_created: '2025-02-17T20:30:20.965440'
+keys:
+- id
+- meta_date_accessed
+- meta_part_type
+- meta_regulator
+- meta_source
+- name
+- sequence
+num_sequences: 3539
+part_type: tfbs
+source_file: ecocyc_28_tfbs_set

@@ -1,0 +1,12 @@
+date_created: '2025-02-18T08:39:03.394111'
+keys:
+- id
+- meta_date_accessed
+- meta_part_type
+- meta_source
+- name
+- regulator
+- sequence
+num_sequences: 4622
+part_type: tfbs
+source_file: regulondb_13_tf_ri_set
