@@ -192,13 +192,27 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
         local_forbidden = set()
         forbidden_repeats = 0
 
+                # Initialize error counter for time-limit errors
+        max_time_error_repeats = 5
+        time_error_repeats = 0
+
         while local_generated < arrays_generated_before_resample and global_generated < quota:
             start_time = time.time()
             try:
                 solution = opt_inst.optimal(solver=selected_solver, solver_options=solver_options)
             except Exception as e:
-                print(f"Source {source_label}: Optimization error: {e}. Retrying same library...")
+                error_str = str(e)
+                print(f"Source {source_label}: Optimization error: {error_str}. Retrying same library...")
+                # Check if the error seems related to time-limit issues.
+                if "TimeLimit" in error_str or "time limit" in error_str or error_str.strip() == "":
+                    time_error_repeats += 1
+                    if time_error_repeats >= max_time_error_repeats:
+                        print(f"Source {source_label}: Too many time-limit errors; moving to a new library sample.")
+                        break  # Breaks out of the inner loop to force resampling.
                 continue
+
+            # Reset the time error counter on a successful solve.
+            time_error_repeats = 0
             elapsed_time = time.time() - start_time
 
             # Immediately capture the original visual output before any gap fill modifications.
@@ -215,7 +229,6 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
             local_forbidden.add(fingerprint)
             if fill_gap and len(solution.sequence) < sequence_length:
                 gap = sequence_length - len(solution.sequence)
-                # Generate lower-case nucleotides for gap fill.
                 fill_seq = random_fill(gap, fill_gc_min, fill_gc_max)
                 if fill_gap_end.lower() == "5prime":
                     solution.sequence = fill_seq + solution.sequence
