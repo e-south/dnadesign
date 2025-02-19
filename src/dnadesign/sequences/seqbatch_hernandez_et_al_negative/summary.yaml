@@ -1,0 +1,11 @@
+date_created: '2025-02-17T20:33:55.750869'
+keys:
+- id
+- meta_date_accessed
+- meta_part_type
+- meta_source
+- name
+- sequence
+num_sequences: 2860
+part_type: promoter
+source_file: hernandez_et_al

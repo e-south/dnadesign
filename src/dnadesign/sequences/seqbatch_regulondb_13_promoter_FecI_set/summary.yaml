@@ -1,0 +1,11 @@
+date_created: '2025-02-13T12:22:00.056774'
+keys:
+- id
+- meta_date_accessed
+- meta_part_type
+- meta_source
+- name
+- sequence
+num_sequences: 1
+part_type: promoter
+source_file: regulondb_13_promoter_FecI_set

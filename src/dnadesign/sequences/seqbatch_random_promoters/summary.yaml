@@ -1,0 +1,17 @@
+date_created: '2025-02-18T08:45:24.360921'
+keys:
+- id
+- meta_date_accessed
+- meta_part_type
+- meta_source
+- name
+- sequence
+num_sequences: 5000
+parameters:
+  gc_range:
+  - 40
+  - 60
+  num_sequences: 5000
+  sequence_length: 100
+part_type: random_promoter
+source_file: seqbatch_random_promoters

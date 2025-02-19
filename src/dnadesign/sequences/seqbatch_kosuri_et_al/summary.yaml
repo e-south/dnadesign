@@ -1,0 +1,15 @@
+date_created: '2025-02-13T12:18:23.101257'
+keys:
+- id
+- meta_date_accessed
+- meta_mean_RNA
+- meta_mean_prot
+- meta_part_type
+- meta_sd_RNA
+- meta_sd_prot
+- meta_source
+- name
+- sequence
+num_sequences: 112
+part_type: promoter
+source_file: kosuri_et_al

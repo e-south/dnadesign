@@ -13,6 +13,7 @@ Reading parameters:
 Expected columns include:
     - "1)riId" (to be used as the unique name)
     - "10)tfrsSeq" (to be renamed to "sequence")
+    - "4)regulatorName" (to be saved as the 'regulator' key)
 Processing:
     - The sequence is cleaned (removing whitespace, uppercasing, and filtering valid nucleotides).
     - The name is taken from "1)riId" (or generated if missing).
@@ -62,11 +63,12 @@ def ingest():
     if not file_path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
     # Skip the first 45 rows (which are comments) and then use the next row as the header.
-    df = pd.read_csv(file_path, sep="\t", skiprows=45, header=0)
+    df = pd.read_csv(file_path, sep="\t", skiprows=44, header=0)
     sequences = []
     for idx, row in df.iterrows():
         name = row.get("1)riId")
         seq = row.get("10)tfrsSeq")
+        regulator = row.get("4)regulatorName")  # Retrieve regulator name
         if pd.isna(name):
             name = f"Row_{idx}"
         if pd.isna(seq):
@@ -81,6 +83,7 @@ def ingest():
             "id": str(uuid.uuid4()),
             "name": name,
             "sequence": seq,
+            "regulator": regulator,  # New key for regulator name
             "meta_source": "regulondb_13_tf_ri_set",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
             "meta_part_type": "tfbs"
@@ -94,7 +97,7 @@ def save_output(sequences):
     saver = SequenceSaver(str(output_dir))
     additional_info = {
         "source_file": "regulondb_13_tf_ri_set",
-        "part_type": "promoter"
+        "part_type": "tfbs"
     }
     saver.save_with_summary(sequences, "seqbatch_regulondb_13_tf_ri_set.pt", additional_info=additional_info)
 

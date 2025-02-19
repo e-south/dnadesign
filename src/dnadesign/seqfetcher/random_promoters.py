@@ -13,8 +13,9 @@ Processing:
   - Random sequences are generated until the desired count is reached,
     each meeting the GC content criteria.
   - Each entry is assigned a unique name and meta_part_type "random_promoter".
-  - The standardized data is saved along with a summary.
-
+  - The standardized data is saved along with a summary that includes the 
+    user-defined parameters.
+    
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
@@ -27,13 +28,14 @@ current_file = Path(__file__).resolve()
 src_dir = current_file.parent.parent.parent
 sys.path.insert(0, str(src_dir))
 
-import pandas as pd
 import re
-import datetime
 import uuid
 import yaml
+import random
+import datetime
+import pandas as pd
 
-from dnadesign.utils import load_dataset, SequenceSaver, DATA_FILES, BASE_DIR
+from dnadesign.utils import SequenceSaver, BASE_DIR
 
 VALID_NUCLEOTIDES = "ATCG"
 
@@ -61,25 +63,26 @@ def ingest(num_sequences: int = 10, length: int = 100, gc_min: float = 40, gc_ma
         sequences.append(entry)
     return sequences
 
-def save_output(sequences):
-    output_dir = Path(BASE_DIR) / "sequences" / "seqbatch_random_promoters"
+def save_output(sequences, num_sequences: int, length: int, gc_min: float, gc_max: float):
+    output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_random_promoters"
     output_dir.mkdir(parents=True, exist_ok=True)
     saver = SequenceSaver(str(output_dir))
-    saver.save(sequences, "seqset_random_promoters.pt")
-    summary = {
-        "date_created": datetime.datetime.now().isoformat(),
+    additional_info = {
+        "source_file": "seqbatch_random_promoters",
+        "part_type": "random_promoter",
         "parameters": {
-            "num_sequences": len(sequences),
-            "sequence_length": len(sequences[0]["sequence"]) if sequences else None,
-            "gc_range": [40, 60]
-        },
-        "part_type": "random_promoter"
+            "num_sequences": num_sequences,
+            "sequence_length": length,
+            "gc_range": [gc_min, gc_max]
+        }
     }
-    with open(output_dir / "summary.yaml", "w") as f:
-        yaml.dump(summary, f)
-    print("Summary saved.")
+    saver.save_with_summary(sequences, "seqbatch_random_promoters.pt", additional_info=additional_info)
 
 if __name__ == "__main__":
-    # You may adjust these parameters as needed
-    seqs = ingest(num_sequences=10, length=100, gc_min=40, gc_max=60)
-    save_output(seqs)
+    # Example parameters; adjust as needed.
+    num_sequences = 5000
+    length = 100
+    gc_min = 40
+    gc_max = 60
+    seqs = ingest(num_sequences=num_sequences, length=length, gc_min=gc_min, gc_max=gc_max)
+    save_output(seqs, num_sequences, length, gc_min, gc_max)

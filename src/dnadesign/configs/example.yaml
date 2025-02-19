@@ -1,38 +1,51 @@
 # configs/example.yaml
-
 densegen:
-  input_dir: "pipeline/tfbsfetcher"         # Relative to deg2tfbs package.
-  output_dir: "output_sequences"            # Defines where to save outputs.
-  progress_file: "progress_status.yaml"     # Minimal progress tracker file.
-  solver: "GUROBI"                          # Preferred solver; falls back to CBC if necessary.
+  # Define multiple input sources with explicit types and paths.
+  input_sources:
+    - type: "deg2tfbs_pipeline_tfbsfetcher"
+      name: "all_DEG_sets"
+      path: "tfbsbatch_20250209_all"
+    - type: "deg2tfbs_cluster_analysis"
+      name: "unfiltered"
+      path: "all_regs"
+      clusters: ["cluster_0", "cluster_1", "cluster_2", "cluster_3"]
+    - type: "deg2tfbs_cluster_analysis"
+      name: "intersects_removed"
+      path: "intersects_removed"
+      clusters: ["cluster_0", "cluster_1", "cluster_2", "cluster_3", "cluster_4", "cluster_5"]
+    - type: "pt"
+      name: "seqbatch_random_tfbs"
+      path: "seqbatch_random_tfbs/seqbatch_random_tfbs.pt"
+      
+  # Other densegen configuration options:
+  output_dir: "sequences"                         
+  progress_file: "progress_status.yaml"            
+  solver: "GUROBI"                                 
   solver_options:
     - "Threads=16"
     - "TimeLimit=20"
-  sequence_length: 100                      # Defines the length of each dense array.
-  quota: 5                                  # Total number of dense arrays to generate.
-  subsample_size: 10
-  arrays_generated_before_resample: 1       # Set >1 to generate multiple arrays per TF-TFBS sample before resampling.
-  sources:
-    - "tfbsbatch_20250130_heat_shock_up"    # Directory name references for data in deg2tfbs. 
-    - "tfbsbatch_20250130_nutrient_lim_up"
-    - "tfbsbatch_20250130_poor_carbon_acetate_up"
-  fixed_elements:                           # Incorporate positional constraints into solutions.
+  sequence_length: 100                             
+  quota: 2500                                
+  subsample_size: 12
+  arrays_generated_before_resample: 1              
+  fixed_elements:
     promoter_constraints:
       - upstream: "TTGACA"
         downstream: "TATAAT"
-        upstream_pos: [20, 80]
+        upstream_pos: [10, 80]
         spacer_length: [16, 18]
     side_biases:
       left: []
       right: []
-  unique_tf_only: true                     # Enforce one binding site per TF per sequence.
-  fill_gap: true                           # Padding with filler sequences to match the desired length.
-  fill_gap_end: "5prime"   
+  unique_tf_only: true
+  fill_gap: true
+  fill_gap_end: "5prime"     
   fill_gc_min: 0.40
   fill_gc_max: 0.60
 
-data_sources:               
-  - name: ecocyc_promoters
-    path: "sequences/EcoCyc/ecocyc_28_promoters_2025-01-23.pt"
-  - name: regulondb_promoters
-    path: "sequences/RegulonDB/regulondb_13_promoters_2025-01-23.pt"
+evoinference:
+  data_sources:               
+    - name: ecocyc_promoters
+      path: "sequences/EcoCyc/ecocyc_28_promoters_2025-01-23.pt"
+    - name: regulondb_promoters
+      path: "sequences/RegulonDB/regulondb_13_promoters_2025-01-23.pt"

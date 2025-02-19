@@ -1,4 +1,4 @@
-# dnadesign
+## dnadesign
 
 This directory contains a collection of Python modules and bioinformatic pipelines, all related to DNA sequence design during Eric J. South's PhD research at Boston University.
 
@@ -111,10 +111,10 @@ dnadesign/
    - Loads sets of transcription factor binding sites
 
 2. [**densegen**](densegen/densegen-docs.md) 
-   - 
+   - A DNA sequence design pipeline, wrapped around the integer linear programming package described in the **dense-arrays** package, for batch assembly of synthetic bacterial promoters with densely packed transcription factor binding sites. 
 
 2. [**sequences**](sequences/sequences-docs.md)
-   - This directory contains sequences outputted from **densegen** and tidied into a standardized data structure. Each sequence entry includes:
+   - This directory contains sequences outputted from **seqfetcher** and **densegen** and tidied into a standardized data structure. Each sequence entry includes:
      - A **unique identifier** (id).
      - The molecular (DNA) **sequence**.
      - **Metadata** describing the sequence, such as:

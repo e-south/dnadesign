@@ -1,0 +1,13 @@
+date_created: '2025-02-18T08:33:37.086463'
+keys:
+- id
+- meta_date_accessed
+- meta_gene_in_vitro_tx
+- meta_gene_in_vivo_tx
+- meta_part_type
+- meta_source
+- name
+- sequence
+num_sequences: 29249
+part_type: promoter
+source_file: sun_yim_et_al

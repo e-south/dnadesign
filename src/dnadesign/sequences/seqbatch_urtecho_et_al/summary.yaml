@@ -1,0 +1,12 @@
+date_created: '2025-02-13T12:06:43.058131'
+keys:
+- id
+- meta_date_accessed
+- meta_observed_log_RNA_over_ref
+- meta_part_type
+- meta_source
+- name
+- sequence
+num_sequences: 10897
+part_type: promoter
+source_file: urtecho_et_al

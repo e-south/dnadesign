@@ -94,19 +94,15 @@ def ingest():
 
 def save_output(sequences_dict: dict):
     for key, sequences in sequences_dict.items():
-        output_dir = Path(BASE_DIR) / "sequences" / f"seqbatch_{key}"
+        output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / f"seqbatch_{key}"
         output_dir.mkdir(parents=True, exist_ok=True)
         saver = SequenceSaver(str(output_dir))
-        saver.save(sequences, f"seqset_{key}.pt")
-        summary = {
-            "date_created": datetime.datetime.now().isoformat(),
-            "source_file": str(DATA_FILES[key]),
-            "num_sequences": len(sequences),
-            "part_type": key.split("_")[-1]  # "positive" or "negative"
+        additional_info = {
+            "source_file": "hernandez_et_al",
+            "part_type": "promoter"
         }
-        with open(output_dir / "summary.yaml", "w") as f:
-            yaml.dump(summary, f)
-        print(f"Summary saved for {key}.")
+        saver.save_with_summary(sequences, f"seqbatch_{key}.pt", additional_info=additional_info)
+        
 
 if __name__ == "__main__":
     seqs = ingest()
