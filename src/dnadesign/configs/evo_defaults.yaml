@@ -1,8 +1,0 @@
-
-
-# configs/evo_default.yaml
-data_sources:
-  - name: ecocyc_promoters
-    path: sequences/EcoCyc/ecocyc_28_promoters_2025-01-23.pt
-  - name: regulondb_promoters
-    path: sequences/RegulonDB/regulondb_13_promoters_2025-01-23.pt
