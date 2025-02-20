@@ -153,7 +153,7 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
     generated_entries = existing_results[:]
     global_generated = current_total
     forbidden_libraries = set()
-    max_forbidden_repeats = 5
+    max_forbidden_repeats = 1
 
     # Generation loop.
     while global_generated < quota:
@@ -192,8 +192,8 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
         local_forbidden = set()
         forbidden_repeats = 0
 
-                # Initialize error counter for time-limit errors
-        max_time_error_repeats = 5
+        # Initialize error counter for time-limit errors
+        max_time_error_repeats = 1
         time_error_repeats = 0
 
         while local_generated < arrays_generated_before_resample and global_generated < quota:

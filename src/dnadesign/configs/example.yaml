@@ -23,7 +23,7 @@ densegen:
   solver: "GUROBI"                                 
   solver_options:
     - "Threads=16"
-    - "TimeLimit=20"
+    - "TimeLimit=5"
   sequence_length: 100                             
   quota: 2500                                
   subsample_size: 12
