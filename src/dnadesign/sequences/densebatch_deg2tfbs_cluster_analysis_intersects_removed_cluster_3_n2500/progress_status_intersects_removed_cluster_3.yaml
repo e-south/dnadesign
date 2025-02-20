@@ -1,0 +1,29 @@
+config:
+  arrays_generated_before_resample: 1
+  fixed_elements:
+    promoter_constraints:
+    - downstream: TATAAT
+      spacer_length:
+      - 16
+      - 18
+      upstream: TTGACA
+      upstream_pos:
+      - 10
+      - 80
+    side_biases:
+      left: []
+      right: []
+  quota: 2500
+  sequence_length: 100
+  solver: GUROBI
+  solver_options:
+  - Threads=16
+  - TimeLimit=5
+  subsample_size: 12
+error_flags: []
+last_checkpoint: '2025-02-19T18:52:20.556022'
+meta_gap_fill_used: true
+source: intersects_removed_cluster_3
+system_resources: {}
+target_quota: 2500
+total_entries: 2500
