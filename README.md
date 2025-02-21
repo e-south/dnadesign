@@ -1,8 +1,11 @@
-## dnadesign
+# dnadesign
 
 This directory contains a collection of Python modules and bioinformatic pipelines, all related to DNA sequence design during Eric J. South's PhD research at Boston University.
 
 ## Installation
+
+### Usage Style 1: Local Machine with no Gurobi or CUDA support
+For situations where you are not generating many dense arrays (see **densegen**) or making calls to Evo 2 (see **evoinference**).
 
 **Step 1.** Clone the repository
 ```bash
@@ -10,57 +13,190 @@ git clone https://github.com/e-south/dnadesign.git
 cd dnadesign
 ```
 
-**Step 2 (Option A).** Running Locally
-```bash
-# (Optional) Install mamba into your environment to speed up dependency resolution and installation.
-conda install -c conda-forge mamba -y
-
-# Install PyTorch, TorchVision, and TorchAudio from pytorch and nvidia channels.
-mamba install pytorch torchvision torchaudio pytorch scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml -c conda-forge -y
+**Step 2.** Create Conda environment and install dependencies
+```
+conda create -n dnadesign_local python=3.11 -y
+conda activate dnadesign_local
+```
+**Step 3.** Install dependencies
+```
+conda install pytorch torchvision torchaudio pytorch scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml -c conda-forge -y
 ```   
 
-Install a cloned [dense-arrays](https://github.com/e-south/dense-arrays) package via pip.
+**Step 4.** (Optional) If planning to use **densegen**, install a cloned [dense-arrays](https://github.com/e-south/dense-arrays) package via pip.
 ```bash
 git clone https://gitlab.com/dunloplab/dense-arrays.git
 cd dense-arrays
 pip install .
 ```
 
-Install the Local `dnadesign` Package in Editable Mode
+**Step 5.** Install the Local `dnadesign` Package in Editable Mode
 ```bash
 (dnadesign) cd dnadesign
 (dnadesign) pip install -e .
 ```
-This allows Python to recognize **dnadesign** as an installed package while still linking directly to the source files in the repository. Any changes made to the source code will be immediately available without requiring reinstallation.
+*This allows Python to recognize **dnadesign** as an installed package while still linking directly to the source files in the repository. Any changes made to the source code will be immediately available without requiring reinstallation.*
 
-**Step 2 (Option B).** Running on a Shared Cluster (for using Evo)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Usage Style 2: Shared Computing Cluster with Gurobi or CUDA support
+For situations where you want to leverage faster solver times with the Gurobi solver, or utilize NVIDIA GPUs with a CUDA Compute Capability of 8.9 which is needed for running Evo 2.
+
+**Step 1.** When submitting your job or starting your interactive session, ensure your resource request specifies at least:
+- **Number of cores:** 3  
+- **Number of GPUs:** 1  
+- **GPU Compute Capability:** 8.9  
+- **Extra qsub options:** `-l mem_per_core=8G`
+
+**Step 2.** Create and activate the Conda environment if you haven't already.
 ```bash
-git clone https://github.com/e-south/dnadesign.git
-cd dnadesign
-
-conda install -c conda-forge mamba -y
-
-# Install PyTorch, TorchVision, and TorchAudio from pytorch and nvidia channels.
-mamba install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia -y
-
-# Install ScanPy 1.10.3, seaborn, numpy, pandas, etc.
-mamba install scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml -c conda-forge -y
+conda create -n dnadesign_cu126 python=3.11 -y
+conda activate dnadesign_cu126
 ```
-*pytorch-cuda* and *nvidia* are required for running Evo, which uses FlashAttention. You may need to adjust *pytorch-cuda=11.8* to match your system's GPU capabilities.
+*Evo 2 requires CUDA support, so here we I indicate latest nvcc version in BU's shared computing cluster.*
+
+**Step 3.** (Optional) Install Mamba to speed up dependency resolution.
+   ```bash
+   conda install -c conda-forge mamba -y
+   # (Optional) Unset mamba shell function if it causes conflicts:
+   unset -f mamba
+   ```
+
+3. Install pip via Mamba and upgrade build tools
+   ```bash
+   mamba install pip -c conda-forge -y
+   pip install --upgrade pip setuptools wheel
+   ```
+
+4. Install PyTorch (with CUDA support)
+   We are installing PyTorch built for CUDA 12.6 via the appropriate index (if you have GPU hardware with compute capability ≥8.9).  
+   *Note: If your hardware does not support FP8, you might instead use a version built for an older CUDA (like cu118) and disable FP8 features in Evo2.*
+
+   ```bash
+   pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu126
+   ```
+
+5. **Install Additional Packages via Mamba**
+
+   ```bash
+   mamba install scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml -c conda-forge -y
+   ```
 
 
-Install the evo-model package via pip
-```bash
-pip install evo-model
+
+
+
+### Interactive Session Requirements for Running Evo 2
+
+
+
+
+1. **Set Up Your CUDA Environment Variables**
+
+   Verify that `nvcc` is found in your CUDA installation, then export the necessary variables:
+
+   ```bash
+   module load cuda/12.5      # Ensure the proper CUDA module is loaded.
+   module load gcc/10.2.0     # Load an appropriate GCC version.
+
+   # Verify nvcc:
+   ls $CUDA_HOME/bin/nvcc  # (This should return the path to nvcc.)
+
+   # Now set the CUDA environment variables:
+   export CUDA_HOME=/share/pkg.8/cuda/12.5/install
+   export CUDA_PATH=/share/pkg.8/cuda/12.5/install
+   export CUDA_TOOLKIT_ROOT_DIR=/share/pkg.8/cuda/12.5/install
+   export CUDA_BIN_PATH=/share/pkg.8/cuda/12.5/install/bin
+   export PATH=$CUDA_BIN_PATH:$PATH
+   export NVCC=$CUDA_BIN_PATH/nvcc
+
+   # (Optional) Check versions:
+   nvcc --version
+   gcc --version
+   ```
+
+
+7. **Install Evo2**
+
+   First, clone Evo2 with its submodules, then install it in editable mode:
+
+   ```bash
+   git clone --recurse-submodules git@github.com:ArcInstitute/evo2.git
+   cd evo2
+   ```
+Despite specifiying where your cuda install is by adding it tothe path, You may need to override where evo2 looks for your nvcc installation. this can be done by modiying the  Makefile in evo2/vortex/Makefile, and changing the following arguments
+
+Modify the Makefile in the vortex directory
+   ```make
+   CUDA_PATH ?= /usr/local/cuda
+   CUDA_HOME ?= $(CUDA_PATH)
+   CUDACXX ?= $(CUDA_PATH)/bin/nvcc
 ```
-See Evo's installation documentation [here](https://github.com/evo-design/evo/tree/main) for more context.
+*this will ensure the makefile though you’ve exported environment variables to point to*
 
-Install a cloned [dense-arrays](https://github.com/e-south/dense-arrays) package via pip.
-```bash
-git clone https://gitlab.com/dunloplab/dense-arrays.git
-cd dense-arrays
-pip install .
-```
+hen execute pip install -e .
+   pip install -e .
+   
+
+   *If you need to build additional components (e.g., the vortex extensions), you can run:*
+
+   ```bash
+   cd vortex
+   make setup-full CUDA_PATH=/share/pkg.8/cuda/12.5/install CUDACXX=/share/pkg.8/cuda/12.5/install/bin/nvcc CUDA_HOME=/share/pkg.8/cuda/12.5/install
+   cd ..
+   ```
+
+
+
+
+
+
+
+
+
+8. **Test the Installation**
+
+   Run a provided test script (for example):
+
+   ```bash
+   python ./test/test_evo2.py --model_name evo2_7b
+   ```
+
+   *Note:* If FP8 execution is enabled by default but your GPU does not support it, you may need to disable FP8 in the model configuration.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ### Directory Layout
 ---

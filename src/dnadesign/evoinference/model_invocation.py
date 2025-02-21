@@ -7,7 +7,6 @@ Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
-
 import torch
 from evo2 import Evo2  # Assumes Evo2 is installed and available
 from logger import get_logger
@@ -17,13 +16,14 @@ logger = get_logger(__name__)
 def initialize_model(model_version: str):
     """
     Initialize and return the Evo2 model for the given version.
+    Note: Evo2 does not support the .to() method.
     """
     try:
         model = Evo2(model_version)
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model.to(device)
-        model.eval()
-        logger.info(f"Model {model_version} initialized on {device}")
+        # If the model has an eval() method, call it.
+        if hasattr(model, 'eval'):
+            model.eval()
+        logger.info(f"Model {model_version} initialized")
         return model
     except Exception as e:
         logger.error(f"Error initializing model {model_version}: {str(e)}")
@@ -32,11 +32,13 @@ def initialize_model(model_version: str):
 def tokenize_sequence(model, sequence: str):
     """
     Tokenize the sequence using the model's tokenizer and return a tensor
-    with the batch dimension, moved to the appropriate device.
+    with the batch dimension, moved to the GPU. Raises an error if a GPU is not available.
     """
     try:
         tokens = model.tokenizer.tokenize(sequence)
-        device = next(model.parameters()).device
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA device not available. GPU is required.")
+        device = 'cuda:0'
         input_tensor = torch.tensor(tokens, dtype=torch.int64).unsqueeze(0).to(device)
         return input_tensor
     except Exception as e:

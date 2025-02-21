@@ -41,13 +41,10 @@ def process_file(filepath, model, output_types, overwrite, checkpoint_every):
     processed = 0
     skipped = 0
 
-    # Determine the progress file path.
+    # Create a unique progress file for this run using a timestamp.
     dir_path = os.path.dirname(filepath)
-    progress_files = [f for f in os.listdir(dir_path) if f.endswith('.yaml')]
-    if progress_files:
-        progress_filepath = os.path.join(dir_path, progress_files[0])
-    else:
-        progress_filepath = os.path.join(dir_path, "progress_status.yaml")
+    run_ts = time.strftime("%Y%m%dT%H%M%S")
+    progress_filepath = os.path.join(dir_path, f"progress_status_{run_ts}.yaml")
 
     progress_data = load_progress(progress_filepath)
     run_summary = {
