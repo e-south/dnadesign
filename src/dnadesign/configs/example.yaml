@@ -46,9 +46,9 @@ densegen:
 evoinference:
   data_sources:
     # Promoter engineering datasets
-    - dir: seqbatch_hernandez_et_al_positive	
+    - dir: seqbatch_hernandez_et_al_positive
     - dir: seqbatch_hernandez_et_al_negative
-    - dir: seqbatch_hossain_et_al	
+    - dir: seqbatch_hossain_et_al
     - dir: seqbatch_johns_et_al
     - dir: seqbatch_kosuri_et_al
     - dir: seqbatch_lafleur_et_al
@@ -57,7 +57,7 @@ evoinference:
     - dir: seqbatch_yu_et_al
     # EcoCyc datasets
     - dir: seqbatch_ecocyc_28_promoters
-    - dir: seqbatch_ecocyc_28_tfbs_set	
+    - dir: seqbatch_ecocyc_28_tfbs_set
     # RegulonDB datasets
     - dir: seqbatch_regulondb_13_promoter_set
     - dir: seqbatch_regulondb_13_promoter_FecI_set
@@ -72,17 +72,17 @@ evoinference:
     - dir: seqbatch_random_promoters
     - dir: seqbatch_random_tfbs
     # densegen sequences
-    - dir: densebatch_deg2tfbs_pipeline_tfbsfetcher_all_DEG_sets_n2500	
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_0_n2500		
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_1_n2500		
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_2_n2500	
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_3_n2500	
-    - dir: densebatch_deg2tfbs_cluster_analysis_intersects_removed_cluster_0_n2500	
-    - dir: densebatch_deg2tfbs_cluster_analysis_intersects_removed_cluster_1_n2500	
-    - dir: densebatch_deg2tfbs_cluster_analysis_intersects_removed_cluster_2_n2500	
-    - dir: densebatch_deg2tfbs_cluster_analysis_intersects_removed_cluster_3_n2500	
-    - dir: densebatch_deg2tfbs_cluster_analysis_intersects_removed_cluster_4_n2500	
-    - dir: densebatch_deg2tfbs_cluster_analysis_intersects_removed_cluster_5_n2500	
+    - dir: densebatch_deg2tfbs_pipeline_tfbsfetcher_all_DEG_sets_n2500
+    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_0_n2500
+    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_1_n2500	
+    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_2_n2500
+    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_3_n2500
+    - dir: densebatch_deg2tfbs_cluster_analysis_intersects_removed_cluster_0_n2500
+    - dir: densebatch_deg2tfbs_cluster_analysis_intersects_removed_cluster_1_n2500
+    - dir: densebatch_deg2tfbs_cluster_analysis_intersects_removed_cluster_2_n2500
+    - dir: densebatch_deg2tfbs_cluster_analysis_intersects_removed_cluster_3_n2500
+    - dir: densebatch_deg2tfbs_cluster_analysis_intersects_removed_cluster_4_n2500
+    - dir: densebatch_deg2tfbs_cluster_analysis_intersects_removed_cluster_5_n2500
 
   evo_model:
     version: "evo2_7b"
@@ -91,8 +91,8 @@ evoinference:
         pooling:            # Optional key for pooling
           method: "mean"
           dim: 1
-      - type: "embeddings"
-        layers: ["blocks_26_mlp_l3"]
+      # - type: "embeddings"
+      #   layers: ["blocks_26_mlp_l3"]
         
   overwrite_existing: false
   checkpoint_every: 100
