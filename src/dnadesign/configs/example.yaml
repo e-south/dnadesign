@@ -74,7 +74,7 @@ evoinference:
     # densegen sequences
     - dir: densebatch_deg2tfbs_pipeline_tfbsfetcher_all_DEG_sets_n2500
     - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_0_n2500
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_1_n2500	
+    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_1_n2500
     - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_2_n2500
     - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_3_n2500
     - dir: densebatch_deg2tfbs_cluster_analysis_intersects_removed_cluster_0_n2500
