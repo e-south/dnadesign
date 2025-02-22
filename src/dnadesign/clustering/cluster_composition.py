@@ -9,6 +9,7 @@ Dunlop Lab
 """
 
 import pandas as pd
+
 import matplotlib.pyplot as plt
 
 def analyze(data_entries, batch_name=None, save_csv=None, save_png=None, plot_dims=(10, 7)):

@@ -33,7 +33,6 @@
   - **Diversity Assessment**: Computes diversity metrics (Shannon entropy, Simpson’s index) and generates grouped bar plots.
   - **Differential Feature Analysis**: Identifies over-represented markers per cluster and exports the results as CSV.
 
-
 ### Configuration
 
 The pipeline is configured via a YAML file (e.g., `configs/example.yaml`). Key configuration elements include:

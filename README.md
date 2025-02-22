@@ -2,6 +2,80 @@
 
 This repository contains a collection of Python modules and bioinformatic pipelines related to DNA sequence design.
 
+### Directory Layout
+```text
+dnadesign/
+├── README.md                           # High-level project documentation
+└── src/
+    └── dnadesign/
+        ├── configs/
+        │   └── example.yaml            # Global configuration for all pipelines
+        ├── utils.py                    # Shared utilities (e.g., config loading, common functions)
+        ├── seqfetcher/                 # Data ingestion modules (one per dataset)
+        │   └── <dataset>_module.py     
+        ├── densegen/                 
+        │   ├── main.py                 # CLI entry point for densegen pipeline
+        │   └── ...  
+        ├── sequences/                  
+        │   ├── seqmanager.py           # Tool for validating and inspecting .pt files
+        │   └── seqbatch_<name>/        # Each subdirectory contains:
+        │       ├── <batch>.pt          # Torch file with a list-of-dicts (each dict represents a sequence)
+        │       └── summary.yaml        # YAML summary of the batch (metadata, parameters, runtime)
+        ├── evoinference/              
+        │   ├── main.py                 # CLI entry point for evoinference pipeline
+        │   └── ...              
+        └── clustering/                
+            ├── main.py                 # CLI entry point for clustering pipeline
+            └── ...                  
+                  
+```
+     
+### Pipelines
+
+1. [**seqfetcher**](src/dnadesign/seqfetcher/README.md)
+   
+   **seqfetcher** is a data ingestion pipeline that is designed to reference a sibling directory [**dnadesign-data**](https://github.com/e-south/dnadesign-data), which includes bacterial promoter engineering datasets curated from primary literature, along with experimental datasets detailing other promoters and transcription factor binding sites derived from [**RegulonDB**](https://regulondb.ccg.unam.mx/) and [**EcoCyc**](https://ecocyc.org/).
+
+2. [**densegen**](src/dnadesign/densegen/README.md) 
+   
+   **densegen** is a DNA sequence design pipeline built on the integer linear programming framework from the [**dense-arrays**](https://github.com/e-south/dense-arrays) package. It assembles batches of synthetic promoters with densely packed transcription factor binding sites. The pipeline references curated datasets from the [**deg2tfbs**](https://github.com/e-south/deg2tfbs) repository, subsampling dozens of binding sites for the solver while enforcing time limits to prevent stalling.
+
+3. [**sequences**](src/dnadesign/sequences/README.md)
+ 
+   **sequences** serves as the central storage location for nucleotide sequences within the project, organizing and updating outputs from **seqfetcher**, **densegen**, and **evoinference** into a standardized data structure. Subdirectories are prefixed with *seqbatch* or *densebatch* to indicate their source and contain both `.yaml` files, which provide batch summaries, and a corresponding `.pt` file storing sequences and metadata. Each sequence file is structured as a list of dictionaries, following this format:  
+   ```python
+   example_sequence_entry = [
+
+      {
+         "id": "90b4e54f-b5f9-48ef-882a-8763653ae826",
+         "meta_date_accessed": "2025-02-19T12:01:30.602571",
+         "meta_source": "deg2tfbs_all_DEG_sets",
+         "sequence": "gtactgCTGCAAGATAGTGTGAATGACGTTCAATATAATGGCTGATCTTATTTCCAGGAAACCGTTGCCACA",
+         "meta_type": "dense-array",
+         "evo2_logits_mean_pooled": tensor([[[-10.3750,  10.3750, ..., 10.3750,  10.3750]]], dtype=torch.bfloat16),
+         "evo2_logits_shape": [1, 512]
+      },
+      # Additional dictionary entries extend the list
+   ]
+   ```
+   **Note:** To process custom sequences through downstream modules, format your data as a list of dictionaries matching the structure above and save it as a `.pt` file.
+
+4. [**evoinference**](src/dnadesign/evoinference/README.md)  
+
+   **evoinference** is a wrapper for **[Evo 2](https://github.com/ArcInstitute/evo2)** (checkpoint: `evo2_7b`), a genomic foundation model for molecular-to-genome-scale modeling and design. This pipeline processes batches of `.pt` files from the sibling **sequences** directory, passing each sequence through Evo 2 and extracting tensors derived from output logits or intermediate layer embeddings from the LLM. The extracted data is then saved in place as additional keys within the original `.pt` file.  
+
+   For more context, see the following papers:  
+
+   - [Semantic mining (preprint)](https://doi.org/10.1101/2024.12.17.628962)  
+   - [Evo 1](https://www.science.org/doi/10.1126/science.ado9336)  
+   - [Evo 2 (preprint)](https://arcinstitute.org/manuscripts/Evo2)
+
+
+4. [**clustering**](src/dnadesign/clustering/README.md) 
+  
+   **clustering** utilizes [Scanpy](https://scanpy.readthedocs.io/en/stable/) for cluster analysis on nucleotide sequences stored in the sibling **sequences** directory. By default, it uses the mean-pooled output logits of **Evo 2** along the sequence dimension as input. The pipeline generates UMAP embeddings, applies Leiden clustering, and also supports downstream analyses, such as cluster composition and diversity assessment.
+
+
 ## Installation
 
 ### Usage Style 1: Local Machine (No Gurobi or CUDA Support)
@@ -152,7 +226,7 @@ This setup is designed for running more resource-intensive workflows on a [share
    ```
 
 10. Test the Evo 2 Installation
-   
+
       Running a test script verifies that the installation was successful and that Evo2 can access the necessary resources and configurations.
       ```bash
       cd evo2
@@ -169,108 +243,8 @@ This setup is designed for running more resource-intensive workflows on a [share
       cd ..
       ```
 
-
-### Directory Layout
----
-```text
-dnadesign/
-├── README.md
-├── pyproject.toml
-└── src/
-    └── dnadesign/
-        ├── __init__.py
-        ├── utils.py
-        ├── main.py                   # CLI entry point
-        ├── configs/                  # User-defined configurations
-        │   └── example.yaml          # Customize to process different DNA sequences
-        ├── seqfetcher/
-        │   ├── utils.py              # Contains paths to datasets (from dnadesign-data)
-        │   ├── __init__.py 
-        │   ├── <dataset>_module.py   # Each dataset has its own respective module
-        │   └── ...  
-        ├── densegen/
-        │   ├── __init__.py 
-        │   ├── <dataset>_module.py   # Each dataset has its own respective module
-        │   └── ...  
-        ├── sequences/                
-        │   ├── __init__.py    
-        │   ├── seqmanager.py         # Checks that incoming .pt files have proper shape
-        │   └── seqbatch_<name>/      # Batch of sequences ingested from a given run
-        │       ├── seqset_<name>.pt  # Data structure containing sequences
-        │       ├── csvs                
-        │       └── plots     
-        ├── evoinference/            
-        │   ├── __init__.py    
-        │   ├── foo.py        
-        │   └── bar/                
-        │       ├── __init__.py
-        │       └── ...                 
-        └── clustering/            
-            ├── __init__.py    
-            ├── foo.py        
-            └──  bar/                 
-```
-     
-### Subdirectories
-
-1. [**seqfetcher**](seqfetcher/seqfetcher-docs.md)
-   - Loads bacterial promoter engineering datasets from the [**dnadesign-dna**](https://github.com/e-south/dnadesign-data) repository.
-   - Loads curated experimental datasets, derived from [**RegulonDB**](https://regulondb.ccg.unam.mx/) or [**EcoCyc**](https://ecocyc.org/), also from [**dnadesign-dna**](https://github.com/e-south/dnadesign-data).
-   - Loads sets of transcription factor binding sites
-
-2. [**densegen**](densegen/densegen-docs.md) 
-   - A DNA sequence design pipeline, wrapped around the integer linear programming package described in the **dense-arrays** package, for batch assembly of synthetic bacterial promoters with densely packed transcription factor binding sites. 
-
-2. [**sequences**](sequences/sequences-docs.md)
-   - This directory contains sequences outputted from **seqfetcher** and **densegen** and tidied into a standardized data structure. Each sequence entry includes:
-     - A **unique identifier** (id).
-     - The molecular (DNA) **sequence**.
-     - **Metadata** describing the sequence, such as:
-       - Type (e.g., promoter or binding site).
-       - Descriptive labels (e.g., ascribed categories or numerical values, such as experimentally observed transcription strength).
-   - Example data structure:
-     ```python
-      my_sequences = [
-         {
-            "id": None,
-            "sequence": None,
-            "meta_type": None,
-            "meta_source": None,
-            "meta_date_accessed": None,
-            "meta_regression_label": None,
-            "meta_category_label": None,
-            "tensor": None,
-         },
-         # Add additional dictionaries here to extend the list
-         ]
-     ```
-   - **Note:** To process your own set of sequences through downstream modules, format your data as a list of dictionaries matching the example structure shown above, and save it as a ```.pt``` file.
-
-3. **evoinference**
-   - This directory passes sequences through **[Evo](https://github.com/evo-design/evo/tree/main)** (checkpoint name: `evo-1.5-8k-base`), a DNA foundation model for molecular-to-genome-scale modeling and design.
-   - **evoinference** generates rich embeddings for sequences produced by **preprocessing**, ultimately adding an `evo_`-prefixed key followed by a tensor embedding.
-   - Example data structure:
-     ```python
-     template = {
-         "id": None,
-         "sequence": None,
-         "meta_type": None,
-         ...
-         "evo_output_head": None,
-         "evo_output_head_mean_pooled": None,
-     }
-     ```
-   - More information on Evo and semantic mining can be found in these papers:
-     - [Sequence modeling and design from molecular to genome scale with Evo](https://www.science.org/doi/10.1126/science.ado9336)
-     - [Semantic mining of functional de novo genes from a genomic language model](https://doi.org/10.1101/2024.12.17.628962)
-
-4. **someclustering**
-   - [Placeholder for description]
-
----
-
 ## **Usage Example**
 
-1. Clone the [**dnadesign-data**](https://github.com/e-south/dnadesign-data) repository to access a curated set of various experimental datasets. Placing it as a sibling directory to **dnadesign** enables **preprocessing** to generate custom lists of dictionaires from these sources. 
+1. Clone the [**dnadesign-data**](https://github.com/e-south/dnadesign-data) repository, and place it as a sibling directory to **dnadesign**. This will enable **seqfetcher** to generate custom lists of dictionaires from these sources. 
 
----
+2. Update the `configs/example.yaml` file as desired and try running different pipelines.

@@ -10,6 +10,7 @@ Dunlop Lab
 
 import numpy as np
 
+
 def normalize_array(arr, method="robust"):
     """
     Normalize an array using the specified method.

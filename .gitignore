@@ -162,6 +162,10 @@ archived/
 prototypes/
 test_configs/
 batches/
+**/batch_results/
+
+# Ignore PyTorch (or similar) model files
+*.pt
 
 # Ignore specific file types
 *.env
