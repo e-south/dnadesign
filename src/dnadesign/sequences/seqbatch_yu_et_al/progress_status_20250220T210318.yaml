@@ -1,0 +1,8 @@
+extracted:
+- logits
+failed_sequences: []
+model: Evo2
+processed_sequences: 1492
+skipped_sequences: 0
+timestamp: '2025-02-20T21:03:18'
+total_sequences: 1492

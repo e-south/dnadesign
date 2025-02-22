@@ -20,9 +20,12 @@ Usage examples:
   $ python seqmanager.py --path seqbatch_random_tfbs
   
   # Inspect entry 3 from a file:
-  $ python seqmanager.py --path densebatch_deg2tfbs_pipeline_tfbsfetcher_all_DEG_sets_n5/densegenbatch_all_DEG_sets_n5.pt --index 3
-  $ python seqmanager.py --path densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_3_n5/densegenbatch_unfiltered_cluster_3_n5.pt --index 3
-  $ python seqmanager.py --path densebatch_pt_seqbatch_random_tfbs_n5/densegenbatch_seqbatch_random_tfbs_n5.pt --index 3
+  $ python seqmanager.py --path densebatch_deg2tfbs_pipeline_tfbsfetcher_all_DEG_sets_n2500/densegenbatch_all_DEG_sets_n2500.pt --index 3
+  $ python seqmanager.py --path densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_3_n2500/densegenbatch_unfiltered_cluster_3_n2500.pt --index 3
+  $ python seqmanager.py --path densebatch_pt_seqbatch_random_tfbs_n2500/densegenbatch_seqbatch_random_tfbs_n2500.pt --index 3
+  $ python seqmanager.py --path seqbatch_hossain_et_al/seqbatch_hossain_et_al.pt --index 3
+  $ python seqmanager.py --path seqbatch_johns_et_al/seqbatch_johns_et_al.pt --index 3
+  $ python seqmanager.py --path seqbatch_sun_yim_et_al/seqbatch_sun_yim_et_al.pt --index 3
   
   # Inspect only the 'sequence' key of entry 3:
   $ python seqmanager.py --path seqbatch_random_tfbs/seqbatch_random_tfbs.pt --index 3 --key sequence
@@ -37,6 +40,9 @@ from pathlib import Path
 import torch
 import yaml
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 def validate_pt_file(file_path: str) -> bool:
     """
     Loads a .pt file, verifies that it is a non-empty list of dictionaries, and
@@ -44,7 +50,7 @@ def validate_pt_file(file_path: str) -> bool:
     """
     pt_path = Path(file_path)
     assert pt_path.exists() and pt_path.is_file(), f"PT file {pt_path} does not exist."
-    checkpoint = torch.load(pt_path)
+    checkpoint = torch.load(pt_path, map_location=torch.device('cpu'))
     assert isinstance(checkpoint, list) and len(checkpoint) > 0, f"{pt_path} must be a non-empty list."
     for i, entry in enumerate(checkpoint):
         assert isinstance(entry, dict), f"Entry {i} in {pt_path} is not a dictionary."
@@ -56,7 +62,7 @@ def inspect_entry(file_path: str, index: int) -> dict:
     Loads a .pt file and returns the entry (a dictionary) at the given index.
     """
     pt_path = Path(file_path)
-    checkpoint = torch.load(pt_path)
+    checkpoint = torch.load(pt_path, map_location=torch.device('cpu'))
     if not (0 <= index < len(checkpoint)):
         raise IndexError(f"Index {index} is out of range for file {pt_path} (length {len(checkpoint)}).")
     return checkpoint[index]
