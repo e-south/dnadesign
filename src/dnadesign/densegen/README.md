@@ -78,3 +78,12 @@ For each ```tf2tfbs_mapping.csv``` file defined in the configuration, it:
 
 
 
+If an input source’s fixed_elements contain multiple promoter constraint definitions, we “split” that source into several sub‐batches—each one using exactly one constraint (its name appears in the sub‐batch’s output folder and final summary). In other words, each unique (input source × promoter constraint) combination is handled as its own batch with its own quota and output directory (so that the summary YAML for that batch shows only the single promoter constraint used).
+
+We add a new Boolean flag (e.g. “round_robin”) in the configuration. When set to true, the system interleaves sequence generation among all sub‐batches. Rather than finishing one batch entirely then moving on to the next, the generator produces one (or a few) sequences per sub‐batch in a cyclic (round‐robin) fashion. This ensures that if the process stops early (or is interrupted), every sub‐batch will have roughly the same number of sequences.
+
+Implementing Round Robin Generation
+We now offer two modes:
+
+Sequential mode (when round_robin: false): Each subbatch is processed to completion (i.e. its entire quota is generated) before moving on.
+Round-robin mode (when round_robin: true): All subbatches are “interleaved” so that one sequence is generated for subbatch 1, then one for subbatch 2, etc. This cycle repeats until each subbatch reaches its quota.

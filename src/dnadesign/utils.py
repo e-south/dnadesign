@@ -32,6 +32,7 @@ DATA_FILES = {
     "johns_et_al_sequences": DNADESIGN_DATA / 'primary_literature' / 'Johns_et_al' / '41592_2018_BFnmeth4633_MOESM3_ESM.xlsx',
     "johns_et_al_labels": DNADESIGN_DATA / 'primary_literature' / 'Johns_et_al' / '41592_2018_BFnmeth4633_MOESM5_ESM.xlsx',
     "sun_yim_et_al": DNADESIGN_DATA / 'primary_literature' / 'Sun_Yim_et_al' / 'msb198875-sup-0002-sdatafig1.xlsx',
+    "xiaowo_et_al": DNADESIGN_DATA / 'primary_literature' / 'Xiaowo_et_al' / '41467_2025_57031_MOESM4_ESM.xlsx',
     
     # EcoCyc Promoter SmartTable(s)
     'ecocyc_28_promoters': DNADESIGN_DATA / 'EcoCyc_28' / 'SmartTable_All_Promoters.txt',
@@ -92,6 +93,14 @@ class SequenceSaver:
             "num_sequences": len(sequences),
             "keys": sorted(list(keys))
         }
+        # Extract promoter constraint names from the configuration in the first sequence entry, if available.
+        if sequences:
+            fixed_elements = sequences[0].get("config", {}).get("fixed_elements", {})
+            promoter_constraints = fixed_elements.get("promoter_constraints", [])
+            if isinstance(promoter_constraints, list):
+                names = [pc.get("name") for pc in promoter_constraints if isinstance(pc, dict) and "name" in pc]
+                if names:
+                    summary["promoter_constraint_names"] = sorted(names)
         if additional_info:
             summary.update(additional_info)
         return summary

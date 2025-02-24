@@ -10,7 +10,10 @@ the module will load that file (assumed to reside in the local directory or subd
 and print the requested entry (or the entire entry if no key is provided).
 If a directory is provided (or no --path is provided, defaulting to the current dir),
 the module recursively scans for .pt files, validates each one, and prints feedback,
-including a summary of how many files passed.
+including a summary of how many files passed. When provided  --update-meta, the module
+updates (or adds) the 'meta_part_type' key for each entry in the .pt file(s) based 
+on the parent directory. If the first entry already has the key, the user is prompted
+to either skip or overwrite (update all entries).
 
 Usage examples:
   # Validate all .pt files under the current directory:
@@ -20,15 +23,18 @@ Usage examples:
   $ python seqmanager.py --path seqbatch_random_tfbs
   
   # Inspect entry 3 from a file:
-  $ python seqmanager.py --path densebatch_deg2tfbs_pipeline_tfbsfetcher_all_DEG_sets_n2500/densegenbatch_all_DEG_sets_n2500.pt --index 3
-  $ python seqmanager.py --path densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_3_n2500/densegenbatch_unfiltered_cluster_3_n2500.pt --index 3
-  $ python seqmanager.py --path densebatch_pt_seqbatch_random_tfbs_n2500/densegenbatch_seqbatch_random_tfbs_n2500.pt --index 3
   $ python seqmanager.py --path seqbatch_hossain_et_al/seqbatch_hossain_et_al.pt --index 3
   $ python seqmanager.py --path seqbatch_johns_et_al/seqbatch_johns_et_al.pt --index 3
   $ python seqmanager.py --path seqbatch_sun_yim_et_al/seqbatch_sun_yim_et_al.pt --index 3
   
   # Inspect only the 'sequence' key of entry 3:
   $ python seqmanager.py --path seqbatch_random_tfbs/seqbatch_random_tfbs.pt --index 3 --key sequence
+  
+  # Update the meta_part_type key for a single file:
+  $ python seqmanager.py --path seqbatch_hossain_et_al/seqbatch_hossain_et_al.pt --update-meta
+  
+  # Recursively update meta_part_type in all .pt files under a directory:
+  $ python seqmanager.py --path . --update-meta
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -39,7 +45,6 @@ import argparse
 from pathlib import Path
 import torch
 import yaml
-
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -76,6 +81,84 @@ def list_all_pt_files(search_path: str) -> list:
     assert base_path.exists() and base_path.is_dir(), f"Directory {base_path} does not exist."
     return list(base_path.rglob("*.pt"))
 
+def update_meta_part_type(file_path: str) -> None:
+    """
+    Loads a .pt file and for each entry ensures that the 'meta_part_type' key exists.
+    The desired value is determined based on the parent directory's name using a lookup
+    (including handling a wildcard for 'densebatch_*'). If the first entry already has the
+    key, the user is prompted once to either skip the file or overwrite the key for all entries.
+    The file is then saved in-place.
+    """
+    pt_path = Path(file_path)
+    checkpoint = torch.load(pt_path, map_location=torch.device('cpu'))
+    if not (isinstance(checkpoint, list) and len(checkpoint) > 0):
+        print(f"File {pt_path} is not a valid .pt file format for meta update.")
+        return
+
+    # Determine the desired meta_part_type based on the parent directory name.
+    parent_dir = pt_path.parent.name
+    meta_mapping = {
+        "seqbatch_hossain_et_al": "engineered promoter",
+        "seqbatch_kosuri_et_al": "engineered promoter",
+        "seqbatch_lafleur_et_al": "engineered promoter",
+        "seqbatch_sun_yim_et_al": "engineered promoter",
+        "seqbatch_urtecho_et_al": "engineered promoter",
+        "seqbatch_yu_et_al": "engineered promoter",
+        "seqbatch_johns_et_al": "engineered promoter",
+        "seqbatch_hernandez_et_al_negative": "natural non-promoter",
+        "seqbatch_hernandez_et_al_positive": "natural promoter",
+        "seqbatch_random_promoters": "random promoter",
+        "seqbatch_random_tfbs": "random TFBS",
+        "seqbatch_regulondb_13_promoter_FecI_set": "natural promoter",
+        "seqbatch_regulondb_13_promoter_FliA_set": "natural promoter",
+        "seqbatch_regulondb_13_promoter_RpoD_set": "natural promoter",
+        "seqbatch_regulondb_13_promoter_RpoE_set": "natural promoter",
+        "seqbatch_regulondb_13_promoter_RpoH_set": "natural promoter",
+        "seqbatch_regulondb_13_promoter_RpoN_set": "natural promoter",
+        "seqbatch_regulondb_13_promoter_RpoS_set": "natural promoter",
+        "seqbatch_regulondb_13_promoter_set": "natural promoter",
+        "seqbatch_regulondb_13_tf_ri_set": "natural TFBS",
+        "seqbatch_ecocyc_28_promoters": "natural promoter",
+        "seqbatch_ecocyc_28_tfbs_set": "natural TFBS"
+    }
+    if parent_dir.startswith("densebatch_"):
+        desired_value = "dense array"
+    elif parent_dir in meta_mapping:
+        desired_value = meta_mapping[parent_dir]
+    else:
+        print(f"No meta_part_type mapping defined for directory '{parent_dir}'. Skipping update for file {pt_path}.")
+        return
+
+    # Check if the first entry already has a meta_part_type key.
+    if "meta_part_type" in checkpoint[0]:
+        current_value = checkpoint[0]["meta_part_type"]
+        if current_value == desired_value:
+            print(f"File '{pt_path}' already has 'meta_part_type' set to '{current_value}'. Nothing to update.")
+            return
+        user_choice = input(
+            f"File '{pt_path}' already has 'meta_part_type' in its first entry: currently '{current_value}', "
+            f"but desired value is '{desired_value}'. Would you like to [s]kip or [o]verwrite it for all entries? "
+        ).strip().lower()
+        if user_choice.startswith("s"):
+            print(f"Skipping update for this file. Current value '{current_value}' will be retained.")
+            return
+        elif user_choice.startswith("o"):
+            # Overwrite meta_part_type for all entries.
+            for entry in checkpoint:
+                entry["meta_part_type"] = desired_value
+        else:
+            print("Invalid choice. Skipping update for this file.")
+            return
+    else:
+        # Add meta_part_type to any entry missing it.
+        for entry in checkpoint:
+            if "meta_part_type" not in entry:
+                entry["meta_part_type"] = desired_value
+
+    # Save the file in place.
+    torch.save(checkpoint, pt_path)
+    print(f"Updated file '{pt_path}' with meta_part_type='{desired_value}'.")
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Validate and inspect .pt files for densegen."
@@ -92,14 +175,42 @@ def parse_args():
         "--key", type=str,
         help="(Optional) Specific key from the entry to display."
     )
+    parser.add_argument(
+        "--update-meta", action="store_true",
+        help="Update meta_part_type key in .pt file entries based on directory mapping."
+    )
     return parser.parse_args()
 
 def main():
     args = parse_args()
     target_path = Path(args.path)
-    # If the target path is a file, then operate in inspection mode.
+
+    # If --update-meta flag is provided, update meta_part_type in file(s).
+    if args.update_meta:
+        if target_path.is_file():
+            try:
+                validate_pt_file(str(target_path))
+            except AssertionError as e:
+                print(f"Validation failed for '{target_path}': {e}")
+                return
+            update_meta_part_type(str(target_path))
+        elif target_path.is_dir():
+            pt_files = list_all_pt_files(str(target_path))
+            if not pt_files:
+                print(f"No .pt files found in directory '{target_path}'.")
+                return
+            for pt_file in pt_files:
+                try:
+                    validate_pt_file(str(pt_file))
+                    update_meta_part_type(str(pt_file))
+                except AssertionError as e:
+                    print(f"Skipping file '{pt_file}' due to validation error: {e}")
+        else:
+            print(f"Path '{target_path}' is neither a file nor a directory.")
+        return
+
+    # Existing functionality: inspection mode (if a file) or validation mode (if a directory)
     if target_path.is_file():
-        # Validate the file and then inspect.
         try:
             validate_pt_file(str(target_path))
             print(f"File '{target_path}' is VALID.")
@@ -118,13 +229,11 @@ def main():
                 else:
                     print(f"Key '{args.key}' not found in entry.")
             else:
-                # Pretty-print the entire entry.
                 for k, v in entry.items():
                     print(f"  {k}: {v}")
         except Exception as e:
             print(f"Error inspecting entry: {e}")
     else:
-        # Assume target_path is a directory.
         pt_files = list_all_pt_files(str(target_path))
         if not pt_files:
             print(f"No .pt files found in directory '{target_path}'.")

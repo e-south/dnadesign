@@ -3,19 +3,19 @@ densegen:
   # Define multiple input sources with explicit types and paths.
   input_sources:
     - type: "deg2tfbs_pipeline_tfbsfetcher"
-      name: "all_DEG_sets"
-      path: "tfbsbatch_20250209_all"
-    - type: "deg2tfbs_cluster_analysis"
-      name: "unfiltered"
-      path: "all_regs"
-      clusters: ["cluster_0", "cluster_1", "cluster_2", "cluster_3"]
-    - type: "deg2tfbs_cluster_analysis"
-      name: "intersects_removed"
-      path: "intersects_removed"
-      clusters: ["cluster_0", "cluster_1", "cluster_2", "cluster_3", "cluster_4", "cluster_5"]
-    - type: "pt"
-      name: "seqbatch_random_tfbs"
-      path: "seqbatch_random_tfbs/seqbatch_random_tfbs.pt"
+      name: "all_TFs"
+      path: "tfbsbatch_20250223_All"
+    # - type: "deg2tfbs_cluster_analysis"
+    #   name: "unfiltered"
+    #   path: "all_regs"
+    #   clusters: ["cluster_0", "cluster_1", "cluster_2", "cluster_3"]
+    # - type: "deg2tfbs_cluster_analysis"
+    #   name: "intersects_removed"
+    #   path: "intersects_removed"
+    #   clusters: ["cluster_0", "cluster_1", "cluster_2", "cluster_3", "cluster_4", "cluster_5"]
+    # - type: "pt"
+    #   name: "seqbatch_random_tfbs"
+    #   path: "seqbatch_random_tfbs/seqbatch_random_tfbs.pt"
       
   # Other densegen configuration options:
   output_dir: "sequences"                         
@@ -24,16 +24,53 @@ densegen:
   solver_options:
     - "Threads=16"
     - "TimeLimit=5"
-  sequence_length: 100                             
-  quota: 2500                                
-  subsample_size: 12
+  sequence_length: 120                             
+  quota: 10000                          
+  subsample_size: 20
+  round_robin: true                         # if true, interleaves generation across batches
   arrays_generated_before_resample: 1              
   fixed_elements:
     promoter_constraints:
-      - upstream: "TTGACA"
+      - name: "sigma70-consensus"
+        upstream: "TTGACA"
         downstream: "TATAAT"
-        upstream_pos: [10, 80]
         spacer_length: [16, 18]
+        upstream_pos: [10, 100]
+      - name: "sigma70-consensus(+)"
+        neg35: "TTGACA"
+        neg10: "TGTATAATGCT"
+        spacing: [16, 18]
+        upstream_pos: [10, 100]
+      - name: "sigma70-consensus(-)"
+        neg35: "TTGACA"
+        neg10: "TCTATAATGAG"
+        spacing: [14, 16]
+        upstream_pos: [10, 100]
+      - name: "sigma70-mid"
+        neg35: "ACCGCG"
+        neg10: "ACCTAA"
+        spacing: [16, 18]
+        upstream_pos: [10, 100]
+      - name: "sigma70-low"
+        neg35: "GCAGGT"
+        neg10: "CCTCGC"
+        spacing: [16, 18]
+        upstream_pos: [10, 100]
+      - name: "sigma38-consensus"
+        neg35: "TTGACA"
+        neg10: "TATACT"
+        spacing: [16, 18]
+        upstream_pos: [10, 100]
+      - name: "sigma24-consensus"
+        neg35: "GGAACTT"
+        neg10: "TCAAA"
+        spacing: [15, 17]
+        upstream_pos: [10, 100]
+      - name: "sigma32-consensus"
+        neg35: "TGTCGCCCTTGAA"
+        neg10: "CCCCATTTA"
+        spacing: [14, 16]
+        upstream_pos: [10, 100]
     side_biases:
       left: []
       right: []
@@ -72,7 +109,7 @@ evoinference:
     - dir: seqbatch_random_promoters
     - dir: seqbatch_random_tfbs
     # densegen sequences
-    - dir: densebatch_deg2tfbs_pipeline_tfbsfetcher_all_DEG_sets_n2500
+    - dir: densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_n2500
     - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_0_n2500
     - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_1_n2500
     - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_2_n2500
@@ -116,9 +153,9 @@ evoinference:
 #     alpha: 0.2
 #     one_hot_key: "sequence"
 #     hue:
-#       method: "input_source"                            # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source"
+#       method: "input_source"                            # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
 #       numeric_hue: None
-#       normalization: "z-score"
+#       normalization: "robust"
 #   output_prefix: "clusterbatch_"
 #   analysis:
 #     cluster_composition: true
@@ -147,8 +184,8 @@ evoinference:
 #     one_hot_key: "sequence"
 #     hue:
 #       method: "gc_content"
-#       numeric_hue: "meta_observed_tx_norm_NaCl_exp"
-#       normalization: "z-score"
+#       numeric_hue: None
+#       normalization: "robust"
 #   output_prefix: "clusterbatch_"
 #   analysis:
 #     cluster_composition: true
@@ -183,8 +220,8 @@ evoinference:
 #     one_hot_key: "sequence"
 #     hue:
 #       method: "input_source"
-#       numeric_hue: "meta_observed_tx_norm_NaCl_exp"
-#       normalization: "z-score"
+#       numeric_hue: None
+#       normalization: "robust"
 #   output_prefix: "clusterbatch_"
 #   analysis:
 #     cluster_composition: true
@@ -215,8 +252,8 @@ evoinference:
 #     one_hot_key: "sequence"
 #     hue:
 #       method: "input_source"
-#       numeric_hue: "meta_observed_tx_norm_NaCl_exp"
-#       normalization: "z-score"
+#       numeric_hue: None
+#       normalization: "robust"
 #   output_prefix: "clusterbatch_"
 #   analysis:
 #     cluster_composition: true
@@ -228,34 +265,34 @@ evoinference:
 # ================================
 # Batch 8: Regulondb, Ecocyc, and Random TFBS
 # ================================
-clustering:
-  batch_name: "regulondb_and_ecocyc_and_random_tfbs"
-  input_sources:
-    - dir: "seqbatch_ecocyc_28_tfbs_set"
-    - dir: "seqbatch_regulondb_13_tf_ri_set"
-    - dir: "seqbatch_random_tfbs"
-  method: "input_source"
-  cluster_selection:
-    num_files: 0
-    order: "max"
-    custom_clusters: []
-  overlay_cluster_numbers: true
-  umap:
-    enabled: true
-    plot_dimensions: [6, 4]
-    alpha: 0.2
-    one_hot_key: "sequence"
-    hue:
-      method: "input_source"
-      numeric_hue: "meta_observed_tx_norm_NaCl_exp"
-      normalization: "z-score"
-  output_prefix: "clusterbatch_"
-  analysis:
-    cluster_composition: true
-    cluster_composition_plot_dimensions: [14, 4]
-    diversity_assessment: true
-    diversity_assessment_plot_dimensions: [10, 4]
-    differential_feature_analysis: true
+# clustering:
+#   batch_name: "regulondb_and_ecocyc_and_random_tfbs"
+#   input_sources:
+#     - dir: "seqbatch_ecocyc_28_tfbs_set"
+#     - dir: "seqbatch_regulondb_13_tf_ri_set"
+#     - dir: "seqbatch_random_tfbs"
+#   method: "input_source"
+#   cluster_selection:
+#     num_files: 0
+#     order: "max"
+#     custom_clusters: []
+#   overlay_cluster_numbers: true
+#   umap:
+#     enabled: true
+#     plot_dimensions: [6, 4]
+#     alpha: 0.2
+#     one_hot_key: "sequence"
+#     hue:
+#       method: "input_source"
+#       numeric_hue: None
+#       normalization: "robust"
+#   output_prefix: "clusterbatch_"
+#   analysis:
+#     cluster_composition: true
+#     cluster_composition_plot_dimensions: [14, 4]
+#     diversity_assessment: true
+#     diversity_assessment_plot_dimensions: [10, 4]
+#     differential_feature_analysis: true
 
 # ================================
 # Batch 9: Hernandez "Positive" and "Negative" Promoters
@@ -278,8 +315,8 @@ clustering:
 #     one_hot_key: "sequence"
 #     hue:
 #       method: "input_source"
-#       numeric_hue: "meta_observed_tx_norm_NaCl_exp"
-#       normalization: "z-score"
+#       numeric_hue: None
+#       normalization: "robust"
 #   output_prefix: "clusterbatch_"
 #   analysis:
 #     cluster_composition: true
@@ -295,12 +332,13 @@ clustering:
   batch_name: "engineered_promoters"
   input_sources:
     # - dir: "seqbatch_hossain_et_al"
-    - dir: "seqbatch_lafleur_et_al"
+    # - dir: "seqbatch_lafleur_et_al"
     # - dir: "seqbatch_johns_et_al"
     # - dir: "seqbatch_kosuri_et_al"
     # - dir: "seqbatch_urtecho_et_al"
     # - dir: "seqbatch_yu_et_al"
     # - dir: "seqbatch_sun_yim_et_al"
+    - dir: "seqbatch_xiaowo_et_al"
   method: "input_source"
   cluster_selection:
     num_files: 0
@@ -316,7 +354,7 @@ clustering:
       method: "numeric"
       numeric_hue: [
                     # "seqbatch_hossain_et_al": "meta_observed_log_RNA_over_ref",
-                    "seqbatch_lafleur_et_al": "meta_observed_log_RNA_over_ref",
+                    # "seqbatch_lafleur_et_al": "meta_observed_log_RNA_over_ref",
                     # "seqbatch_urtecho_et_al": "meta_observed_log_RNA_over_ref",
                     # "seqbatch_yu_et_al": "meta_observed_log_RNA_over_ref",
                     # "seqbatch_kosuri_et_al": "meta_mean_RNA",
@@ -330,6 +368,7 @@ clustering:
                     # "seqbatch_johns_et_al": "meta_observed_tx_norm_M9-exp",
                     # "seqbatch_sun_yim_et_al": "meta_gene_in_vitro_tx",
                     # "seqbatch_sun_yim_et_al": "meta_gene_in_vivo_tx"
+                    "seqbatch_xiaowo_et_al": "meta_exp_mean(log2)"
       ]
       normalization: "robust"
   output_prefix: "clusterbatch_"
@@ -366,8 +405,8 @@ clustering:
 #     one_hot_key: "sequence"
 #     hue:
 #       method: "input_source"
-#       numeric_hue: "meta_observed_tx_norm_NaCl_exp"
-#       normalization: "z-score"
+#       numeric_hue: None
+#       normalization: "robust"
 #   output_prefix: "clusterbatch_"
 #   analysis:
 #     cluster_composition: true
@@ -399,8 +438,8 @@ clustering:
 #     one_hot_key: "sequence"
 #     hue:
 #       method: "input_source"
-#       numeric_hue: "meta_observed_tx_norm_NaCl_exp"
-#       normalization: "z-score"
+#       numeric_hue: None
+#       normalization: "robust"
 #   output_prefix: "clusterbatch_"
 #   analysis:
 #     cluster_composition: true
@@ -437,9 +476,9 @@ clustering:
 #     alpha: 0.2
 #     one_hot_key: "sequence"
 #     hue:
-#       method: "gc_content"
-#       numeric_hue: "meta_observed_tx_norm_NaCl_exp"
-#       normalization: "z-score"
+#       method: "type"
+#       numeric_hue: None
+#       normalization: "robust"
 #   output_prefix: "clusterbatch_"
 #   analysis:
 #     cluster_composition: true

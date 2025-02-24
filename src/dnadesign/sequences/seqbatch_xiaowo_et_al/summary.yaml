@@ -1,0 +1,13 @@
+date_created: '2025-02-22T20:39:29.948510'
+keys:
+- id
+- meta_date_accessed
+- meta_exp_mean(log2)
+- meta_part_type
+- meta_source
+- meta_tags
+- name
+- sequence
+num_sequences: 23614
+part_type: engineered promoter
+source_file: xiaowo_et_al
