@@ -93,14 +93,6 @@ class SequenceSaver:
             "num_sequences": len(sequences),
             "keys": sorted(list(keys))
         }
-        # Extract promoter constraint names from the configuration in the first sequence entry, if available.
-        if sequences:
-            fixed_elements = sequences[0].get("config", {}).get("fixed_elements", {})
-            promoter_constraints = fixed_elements.get("promoter_constraints", [])
-            if isinstance(promoter_constraints, list):
-                names = [pc.get("name") for pc in promoter_constraints if isinstance(pc, dict) and "name" in pc]
-                if names:
-                    summary["promoter_constraint_names"] = sorted(names)
         if additional_info:
             summary.update(additional_info)
         return summary

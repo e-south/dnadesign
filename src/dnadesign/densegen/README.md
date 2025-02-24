@@ -87,3 +87,15 @@ We now offer two modes:
 
 Sequential mode (when round_robin: false): Each subbatch is processed to completion (i.e. its entire quota is generated) before moving on.
 Round-robin mode (when round_robin: true): All subbatches are “interleaved” so that one sequence is generated for subbatch 1, then one for subbatch 2, etc. This cycle repeats until each subbatch reaches its quota.
+
+Explanation
+Splitting by Promoter Constraint:
+In process_source(), we now check if the configuration’s fixed_elements contains more than one promoter constraint. If so, we build a separate (deep‐copied) configuration for each constraint—overwriting the fixed_elements/promoter_constraints with a single item and updating the source name (so that the sub‐batch output folder and final summary include the constraint’s name).
+
+Round Robin vs. Sequential Modes:
+If the new Boolean flag "round_robin" is set to true in the YAML, the code interleaves sub-batches by repeatedly calling _process_single_source() with max_sequences=1 on each sub-batch (the progress is stored in a dedicated progress file for each sub-batch). Otherwise, each sub-batch is processed to completion in sequence.
+
+Limited Generation Calls:
+The helper function _process_single_source() has been modified to accept an optional parameter max_sequences that (if provided) limits how many new sequences are generated during that call. This is used to “pull” one sequence at a time when in round-robin mode.
+
+All other functionality remains the same (including printing the visual string output at each iteration). This design keeps the components decoupled and easily extensible while following pragmatic programming principles.

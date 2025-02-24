@@ -26,9 +26,9 @@ densegen:
     - "TimeLimit=5"
   sequence_length: 120                             
   quota: 10000                          
-  subsample_size: 20
-  round_robin: true                         # if true, interleaves generation across batches
-  arrays_generated_before_resample: 1              
+  subsample_size: 10
+  round_robin: true  # if true, interleaves generation across batches
+  arrays_generated_before_resample: 1          
   fixed_elements:
     promoter_constraints:
       - name: "sigma70-consensus"
@@ -37,43 +37,43 @@ densegen:
         spacer_length: [16, 18]
         upstream_pos: [10, 100]
       - name: "sigma70-consensus(+)"
-        neg35: "TTGACA"
-        neg10: "TGTATAATGCT"
-        spacing: [16, 18]
+        upstream: "TTGACA"
+        downstream: "TGTATAATGCT"
+        spacer_length: [16, 18]
         upstream_pos: [10, 100]
-      - name: "sigma70-consensus(-)"
-        neg35: "TTGACA"
-        neg10: "TCTATAATGAG"
-        spacing: [14, 16]
-        upstream_pos: [10, 100]
-      - name: "sigma70-mid"
-        neg35: "ACCGCG"
-        neg10: "ACCTAA"
-        spacing: [16, 18]
-        upstream_pos: [10, 100]
-      - name: "sigma70-low"
-        neg35: "GCAGGT"
-        neg10: "CCTCGC"
-        spacing: [16, 18]
-        upstream_pos: [10, 100]
-      - name: "sigma38-consensus"
-        neg35: "TTGACA"
-        neg10: "TATACT"
-        spacing: [16, 18]
-        upstream_pos: [10, 100]
-      - name: "sigma24-consensus"
-        neg35: "GGAACTT"
-        neg10: "TCAAA"
-        spacing: [15, 17]
-        upstream_pos: [10, 100]
-      - name: "sigma32-consensus"
-        neg35: "TGTCGCCCTTGAA"
-        neg10: "CCCCATTTA"
-        spacing: [14, 16]
-        upstream_pos: [10, 100]
-    side_biases:
-      left: []
-      right: []
+      # - name: "sigma70-consensus(-)"
+      #   upstream: "TTGACA"
+      #   downstream: "TCTATAATGAG"
+      #   spacer_length: [14, 16]
+      #   upstream_pos: [10, 100]
+      # - name: "sigma70-mid"
+      #   upstream: "ACCGCG"
+      #   downstream: "ACCTAA"
+      #   spacer_length: [16, 18]
+      #   upstream_pos: [10, 100]
+      # - name: "sigma70-low"
+      #   upstream: "GCAGGT"
+      #   downstream: "CCTCGC"
+      #   spacer_length: [16, 18]
+      #   upstream_pos: [10, 100]
+      # - name: "sigma38-consensus"
+      #   upstream: "TTGACA"
+      #   downstream: "TATACT"
+      #   spacer_length: [16, 18]
+      #   upstream_pos: [10, 100]
+      # - name: "sigma24-consensus"
+      #   upstream: "GGAACTT"
+      #   downstream: "TCAAA"
+      #   spacer_length: [15, 17]
+      #   upstream_pos: [10, 100]
+      # - name: "sigma32-consensus"
+      #   upstream: "TGTCGCCCTTGAA"
+      #   downstream: "CCCCATTTA"
+      #   spacer_length: [14, 16]
+      #   upstream_pos: [10, 100]
+    # side_biases:
+    #   left: []
+    #   right: []
   unique_tf_only: true
   fill_gap: true
   fill_gap_end: "5prime"     

@@ -64,23 +64,27 @@ class DenseArrayOptimizer:
         constraints = self.fixed_elements.get("promoter_constraints")
         if constraints:
             for constraint in constraints:
-                # Work on a copy so as not to modify the original config.
+                # Convert any string "None" values to actual None.
                 processed_constraint = {k: self._convert_none(v) for k, v in constraint.items()}
-                # Remove the 'name' key if it exists.
-                processed_constraint.pop("name", None)
+                # Skip constraint if it is None or if all its values are None.
                 if not any(value is not None for value in processed_constraint.values()):
                     continue
                 new_constraint = dict(processed_constraint)
-                # Convert list values to tuples for the expected keys.
-                for key in ["upstream_pos", "downstream_pos", "spacer_length", "spacing"]:
+                # Convert list values to tuples for specific keys.
+                for key in ["upstream_pos", "downstream_pos", "spacer_length"]:
                     if key in new_constraint and isinstance(new_constraint[key], list):
                         new_constraint[key] = tuple(new_constraint[key])
-                # For keys like 'upstream' and 'downstream', add them to the library if needed.
-                for key in ["upstream", "downstream"]:
-                    val = new_constraint.get(key)
-                    if val is not None and val not in lib_for_opt:
-                        lib_for_opt.append(val)
+                # For upstream and downstream, only add if the value is not None.
+                upstream = new_constraint.get("upstream")
+                downstream = new_constraint.get("downstream")
+                if upstream is not None and upstream not in lib_for_opt:
+                    lib_for_opt.append(upstream)
+                if downstream is not None and downstream not in lib_for_opt:
+                    lib_for_opt.append(downstream)
+                # Remove keys with None values and remove the "name" key.
+                new_constraint = {k: v for k, v in new_constraint.items() if v is not None and k != "name"}
                 converted_constraints.append(new_constraint)
+
         opt_inst = da.Optimizer(library=lib_for_opt, sequence_length=self.sequence_length)
         for constraint in converted_constraints:
             try:
@@ -95,6 +99,7 @@ class DenseArrayOptimizer:
             if left and any(item is not None for item in left):
                 opt_inst.add_side_biases(left=left, right=right)
         return opt_inst
+
 
     def optimize(self, timeout_seconds: int = 30) -> da.DenseArray:
         start_time = time.time()
