@@ -85,7 +85,7 @@ def ingest():
             "meta_source": "hossain_et_al",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
             "meta_observed_log_RNA_over_ref": obs_log,
-            "meta_part_type": "promoter"
+            "meta_part_type": "engineered promoter"
         }
         sequences.append(entry)
     return sequences

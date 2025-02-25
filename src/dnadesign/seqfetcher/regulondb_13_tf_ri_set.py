@@ -86,7 +86,7 @@ def ingest():
             "regulator": regulator,  # New key for regulator name
             "meta_source": "regulondb_13_tf_ri_set",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
-            "meta_part_type": "tfbs"
+            "meta_part_type": "natural tfbs"
         }
         sequences.append(entry)
     return sequences

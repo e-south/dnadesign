@@ -85,8 +85,8 @@ def parse_fasta(file_path: Path, meta_part_type: str, source_key: str) -> list:
 
 def ingest():
     sequences_all = {}
-    for key, part_type in [("hernandez_et_al_positive", "promoter"),
-                           ("hernandez_et_al_negative", "non-promoter")]:
+    for key, part_type in [("hernandez_et_al_positive", "natural promoter"),
+                           ("hernandez_et_al_negative", "natural non-promoter")]:
         file_path = DATA_FILES[key]
         seqs = parse_fasta(file_path, meta_part_type=part_type, source_key=key)
         sequences_all[key] = seqs

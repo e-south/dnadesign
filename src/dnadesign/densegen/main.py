@@ -241,57 +241,95 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
     print(f"Source {source_label}: Dense array generation complete. Total sequences: {global_generated}.")
 
 
-def process_source(source_config: dict, densegen_config: dict, output_base_folder: Path):
+def get_sub_batches(source_config: dict, densegen_config: dict) -> list:
     """
-    Processes a single input source. If the densegen configuration’s fixed_elements contain
-    multiple promoter constraint definitions then we “split” the source into sub-batches --
-    each using exactly one promoter constraint. Each sub-batch gets its own output folder
-    and its own quota (as specified in the configuration).
-    
-    If round_robin (Boolean flag) is True, then sub-batches are interleaved so that one sequence
-    is generated per sub-batch in cyclic order.
+    Returns a list of (sub_source_config, sub_densegen_config) tuples for a given input source,
+    splitting by clusters and/or promoter constraints.
     """
+    sub_batches = []
+    clusters = source_config.get("clusters")
     fixed_elements = densegen_config.get("fixed_elements", {})
     promoter_constraints = fixed_elements.get("promoter_constraints")
-    if promoter_constraints and isinstance(promoter_constraints, list) and len(promoter_constraints) > 1:
-        # Create a list of (source_config, densegen_config) pairs—one per promoter constraint.
-        sub_batches = []
-        for constraint in promoter_constraints:
-            sub_source_config = copy.deepcopy(source_config)
-            sub_densegen_config = copy.deepcopy(densegen_config)
-            # Overwrite promoter_constraints with the single constraint.
-            sub_densegen_config.setdefault("fixed_elements", {})["promoter_constraints"] = [constraint]
-            # Append the constraint name to the source name.
-            base_name = sub_source_config.get("name", Path(sub_source_config["path"]).stem)
-            constraint_name = constraint.get("name", "constraint")
-            sub_source_config["name"] = f"{base_name}_{constraint_name}"
-            sub_batches.append((sub_source_config, sub_densegen_config))
-        # If round-robin is NOT enabled, process each sub-batch to completion sequentially.
-        if not densegen_config.get("round_robin", False):
-            for sub_cfg, sub_dense_cfg in sub_batches:
-                _process_single_source(sub_cfg, sub_dense_cfg, output_base_folder)
+    
+    if clusters and isinstance(clusters, list) and len(clusters) > 0:
+        if promoter_constraints and isinstance(promoter_constraints, list) and len(promoter_constraints) > 1:
+            for constraint in promoter_constraints:
+                for cluster in clusters:
+                    sub_source_config = copy.deepcopy(source_config)
+                    sub_densegen_config = copy.deepcopy(densegen_config)
+                    sub_source_config["clusters"] = [cluster]
+                    base_name = sub_source_config.get("name", Path(sub_source_config["path"]).stem)
+                    constraint_name = constraint.get("name", "constraint")
+                    sub_source_config["name"] = f"{base_name}_{cluster}_{constraint_name}"
+                    sub_densegen_config.setdefault("fixed_elements", {})["promoter_constraints"] = [constraint]
+                    sub_batches.append((sub_source_config, sub_densegen_config))
+        elif promoter_constraints and isinstance(promoter_constraints, list) and len(promoter_constraints) > 0:
+            for cluster in clusters:
+                sub_source_config = copy.deepcopy(source_config)
+                sub_densegen_config = copy.deepcopy(densegen_config)
+                sub_source_config["clusters"] = [cluster]
+                base_name = sub_source_config.get("name", Path(sub_source_config["path"]).stem)
+                sub_source_config["name"] = f"{base_name}_{cluster}"
+                sub_batches.append((sub_source_config, sub_densegen_config))
         else:
-            # Round-robin: interleave sub-batches so each gets one sequence per call.
-            all_done = False
-            while not all_done:
-                all_done = True
-                for sub_cfg, sub_dense_cfg in sub_batches:
-                    # Determine progress by reading the sub-batch’s progress file.
-                    out_folder_name = f"densebatch_{sub_cfg['type'].lower()}_{sub_cfg['name']}_n{sub_dense_cfg.get('quota')}"
-                    batch_folder = output_base_folder / out_folder_name
-                    progress_file = batch_folder / f"progress_status_{sub_cfg['name']}.yaml"
-                    current_count = 0
-                    if progress_file.exists():
-                        with progress_file.open("r") as f:
-                            progress_data = yaml.safe_load(f)
-                        current_count = progress_data.get("total_entries", 0)
-                    if current_count < sub_dense_cfg.get("quota", 5):
-                        all_done = False
-                        # Generate just one new sequence in this call.
-                        _process_single_source(sub_cfg, sub_dense_cfg, output_base_folder, max_sequences=1)
+            for cluster in clusters:
+                sub_source_config = copy.deepcopy(source_config)
+                sub_densegen_config = copy.deepcopy(densegen_config)
+                sub_source_config["clusters"] = [cluster]
+                base_name = sub_source_config.get("name", Path(sub_source_config["path"]).stem)
+                sub_source_config["name"] = f"{base_name}_{cluster}"
+                sub_batches.append((sub_source_config, sub_densegen_config))
     else:
-        # If there is only one (or no) promoter constraint defined, process normally.
-        _process_single_source(source_config, densegen_config, output_base_folder)
+        if promoter_constraints and isinstance(promoter_constraints, list) and len(promoter_constraints) > 1:
+            for constraint in promoter_constraints:
+                sub_source_config = copy.deepcopy(source_config)
+                sub_densegen_config = copy.deepcopy(densegen_config)
+                base_name = sub_source_config.get("name", Path(sub_source_config["path"]).stem)
+                constraint_name = constraint.get("name", "constraint")
+                sub_source_config["name"] = f"{base_name}_{constraint_name}"
+                sub_densegen_config.setdefault("fixed_elements", {})["promoter_constraints"] = [constraint]
+                sub_batches.append((sub_source_config, sub_densegen_config))
+        else:
+            sub_batches.append((source_config, densegen_config))
+    # Debug: print the names of sub-batches generated.
+    print("Generated sub-batches:")
+    for cfg, dens in sub_batches:
+        print("  ", cfg["name"], " (type:", cfg["type"], ")")
+    return sub_batches
+
+
+def process_source(source_config: dict, densegen_config: dict, output_base_folder: Path):
+    """
+    Processes a single input source by splitting it into sub-batches.
+    """
+    sub_batches = get_sub_batches(source_config, densegen_config)
+    
+    # Pre-create all output directories for sub-batches
+    for sub_cfg, sub_dense_cfg in sub_batches:
+        out_folder_name = f"densebatch_{sub_cfg['type'].lower()}_{sub_cfg['name']}_n{sub_dense_cfg.get('quota')}"
+        batch_folder = output_base_folder / out_folder_name
+        batch_folder.mkdir(parents=True, exist_ok=True)
+    
+    if not densegen_config.get("round_robin", False):
+        for sub_cfg, sub_dense_cfg in sub_batches:
+            _process_single_source(sub_cfg, sub_dense_cfg, output_base_folder)
+    else:
+        # Round-robin mode: interleave sub-batches from this input source.
+        all_done = False
+        while not all_done:
+            all_done = True
+            for sub_cfg, sub_dense_cfg in sub_batches:
+                out_folder_name = f"densebatch_{sub_cfg['type'].lower()}_{sub_cfg['name']}_n{sub_dense_cfg.get('quota')}"
+                batch_folder = output_base_folder / out_folder_name
+                progress_file = batch_folder / f"progress_status_{sub_cfg['name']}.yaml"
+                current_count = 0
+                if progress_file.exists():
+                    with progress_file.open("r") as f:
+                        progress_data = yaml.safe_load(f)
+                    current_count = progress_data.get("total_entries", 0)
+                if current_count < sub_dense_cfg.get("quota", 5):
+                    all_done = False
+                    _process_single_source(sub_cfg, sub_dense_cfg, output_base_folder, max_sequences=1)
 
 
 def main():
@@ -304,8 +342,37 @@ def main():
     output_base_folder = Path(__file__).parent.parent / densegen_config.get("output_dir", "sequences")
     output_base_folder.mkdir(parents=True, exist_ok=True)
     
-    for src_cfg in input_source_configs:
-        process_source(src_cfg, densegen_config, output_base_folder)
+    if densegen_config.get("round_robin", False):
+        # For round-robin, collect sub-batches from all input sources
+        all_sub_batches = []
+        for src_cfg in input_source_configs:
+            sub_batches = get_sub_batches(copy.deepcopy(src_cfg), copy.deepcopy(densegen_config))
+            all_sub_batches.extend(sub_batches)
+        # Pre-create output directories for all sub-batches
+        for sub_cfg, sub_dense_cfg in all_sub_batches:
+            out_folder_name = f"densebatch_{sub_cfg['type'].lower()}_{sub_cfg['name']}_n{sub_dense_cfg.get('quota')}"
+            batch_folder = output_base_folder / out_folder_name
+            batch_folder.mkdir(parents=True, exist_ok=True)
+        # Interleave across all sub-batches
+        all_done = False
+        while not all_done:
+            all_done = True
+            for sub_cfg, sub_dense_cfg in all_sub_batches:
+                out_folder_name = f"densebatch_{sub_cfg['type'].lower()}_{sub_cfg['name']}_n{sub_dense_cfg.get('quota')}"
+                batch_folder = output_base_folder / out_folder_name
+                progress_file = batch_folder / f"progress_status_{sub_cfg['name']}.yaml"
+                current_count = 0
+                if progress_file.exists():
+                    with progress_file.open("r") as f:
+                        progress_data = yaml.safe_load(f)
+                    current_count = progress_data.get("total_entries", 0)
+                if current_count < sub_dense_cfg.get("quota", 5):
+                    all_done = False
+                    _process_single_source(sub_cfg, sub_dense_cfg, output_base_folder, max_sequences=1)
+    else:
+        # Process each input source separately.
+        for src_cfg in input_source_configs:
+            process_source(copy.deepcopy(src_cfg), copy.deepcopy(densegen_config), output_base_folder)
     
     print("\nAll input sources processed. Dense array generation complete.")
 

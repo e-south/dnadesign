@@ -1,4 +1,4 @@
-date_created: '2025-02-13T12:08:49.528529'
+date_created: '2025-02-25T10:04:48.891834'
 keys:
 - id
 - meta_date_accessed
@@ -8,5 +8,5 @@ keys:
 - name
 - sequence
 num_sequences: 1492
-part_type: promoter
+part_type: engineered promoter
 source_file: yu_et_al

@@ -71,7 +71,7 @@ def ingest():
             "sequence": seq,
             "meta_source": "regulondb_13_promoter_FliA_set",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
-            "meta_part_type": "promoter"
+            "meta_part_type": "natural promoter"
         }
         sequences.append(entry)
     return sequences

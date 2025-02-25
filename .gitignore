@@ -163,6 +163,8 @@ prototypes/
 test_configs/
 batches/
 **/batch_results/
+**/progress_status_*.yaml
+**/summary.yaml
 
 # Ignore PyTorch (or similar) model files
 *.pt

@@ -1,4 +1,4 @@
-date_created: '2025-02-18T08:45:24.360921'
+date_created: '2025-02-25T10:33:31.995379'
 keys:
 - id
 - meta_date_accessed
@@ -12,6 +12,6 @@ parameters:
   - 40
   - 60
   num_sequences: 5000
-  sequence_length: 100
+  sequence_length: 120
 part_type: random_promoter
 source_file: seqbatch_random_promoters

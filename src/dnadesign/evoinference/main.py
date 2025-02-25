@@ -21,7 +21,7 @@ from logger import get_logger
 
 logger = get_logger(__name__)
 
-def process_file(filepath, model, output_types, overwrite, checkpoint_every):
+def process_file(filepath, model, output_types, overwrite, checkpoint_every, save_pooled_only):
     """
     Process a single .pt file:
       - Load sequences from the file.
@@ -54,7 +54,9 @@ def process_file(filepath, model, output_types, overwrite, checkpoint_every):
         "total_sequences": total_sequences,
         "processed_sequences": 0,
         "skipped_sequences": 0,
-        "failed_sequences": []
+        "failed_sequences": [],
+        # Indicate in the summary whether only pooled outputs are saved.
+        "save_pooled_only": save_pooled_only
     }
 
     # Record which keys will be added (for logging purposes).
@@ -93,8 +95,8 @@ def process_file(filepath, model, output_types, overwrite, checkpoint_every):
             input_tensor = tokenize_sequence(model, sequence)
             # Run the model to get raw outputs.
             results = run_model(model, input_tensor, output_types)
-            # Augment outputs with shape information and pooling if configured.
-            results = augment_outputs(results, output_types)
+            # Augment outputs with shape information and pooling (only add raw outputs if flag is False).
+            results = augment_outputs(results, output_types, save_pooled_only)
             # Update entry with augmented model outputs.
             for key, value in results.items():
                 if not overwrite and key in entry:
@@ -124,7 +126,7 @@ def process_file(filepath, model, output_types, overwrite, checkpoint_every):
     return run_summary
 
 def main():
-    # Assume the config file is located at '../configs/example.yaml' relative to this file.
+    # Assume the config file is located at '../configs/example.yaml'
     config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'configs', 'example.yaml')
     try:
         config = load_config(config_path)
@@ -136,6 +138,9 @@ def main():
     evo_model_config = config.get("evo_model", {})
     model_version = evo_model_config.get("version", "evo2_7b")
     output_types = evo_model_config.get("output_types", [{"type": "logits"}])
+    
+    # Get the flag indicating whether to save only pooled outputs.
+    save_pooled_only = evo_model_config.get("save_pooled_only", False)
     overwrite = config.get("overwrite_existing", False)
     checkpoint_every = config.get("checkpoint_every", 100)
 
@@ -163,7 +168,8 @@ def main():
 
         for pt_file in pt_files:
             try:
-                summary = process_file(pt_file, model, output_types, overwrite, checkpoint_every)
+                # Pass 'save_pooled_only' flag to process_file.
+                summary = process_file(pt_file, model, output_types, overwrite, checkpoint_every, save_pooled_only)
                 overall_progress[pt_file] = summary
             except Exception as e:
                 logger.error(f"Error processing file {pt_file}: {str(e)}")

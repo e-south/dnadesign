@@ -92,7 +92,7 @@ This style is appropriate for workflows that ***do not*** require heavy [dense a
 2. Install Dependencies
 
    ```bash
-   conda install pytorch torchvision torchaudio scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml leidenalg igraph openpyxl -c conda-forge -y
+   conda install pytorch torchvision torchaudio scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml leidenalg igraph openpyxl xlrd -c conda-forge -y
    ```
 
 3. Clone and Install the `dnadesign` Repository
@@ -185,7 +185,7 @@ This setup is designed for running more resource-intensive workflows on a [share
 
    These scientific and plotting libraries are required by various subprojects within dnadesign.
    ```bash
-   mamba install scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml leidenalg igraph openpyxl -c conda-forge -y
+   mamba install scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml leidenalg igraph openpyxl xlrd -c conda-forge -y
    ```
 
 6. Install **Evo 2**

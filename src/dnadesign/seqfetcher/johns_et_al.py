@@ -130,7 +130,7 @@ def ingest():
             "sequence": seq,
             "meta_source": "johns_et_al",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
-            "meta_part_type": "promoter"
+            "meta_part_type": "natural promoter"
         }
         entry.update(label_meta)
         sequences.append(entry)

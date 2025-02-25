@@ -73,7 +73,7 @@ def ingest():
             "sequence": seq,
             "meta_source": "ecocyc_28_promoters",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
-            "meta_part_type": "promoter"
+            "meta_part_type": "natural promoter"
         }
         sequences.append(entry)
     return sequences

@@ -81,7 +81,7 @@ def ingest():
             "meta_source": "yu_et_al",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
             "meta_observed_log_RNA_over_ref": obs_log,
-            "meta_part_type": "promoter"
+            "meta_part_type": "engineered promoter"
         }
         sequences.append(entry)
     return sequences
@@ -92,7 +92,7 @@ def save_output(sequences):
     saver = SequenceSaver(str(output_dir))
     additional_info = {
         "source_file": "yu_et_al",
-        "part_type": "promoter"
+        "part_type": "engineered promoter"
     }
     saver.save_with_summary(sequences, "seqbatch_yu_et_al.pt", additional_info=additional_info)
 

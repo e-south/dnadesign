@@ -82,7 +82,7 @@ def save_output(sequences):
     saver = SequenceSaver(str(output_dir))
     additional_info = {
         "source_file": "regulondb_13_promoter_RpoH_set",
-        "part_type": "promoter"
+        "part_type": "natural promoter"
     }
     saver.save_with_summary(sequences, "seqbatch_regulondb_13_promoter_RpoH_set.pt", additional_info=additional_info)
 

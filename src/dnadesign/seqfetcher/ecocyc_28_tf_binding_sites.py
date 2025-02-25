@@ -101,7 +101,7 @@ def save_output(sequences):
     saver = SequenceSaver(str(output_dir))
     additional_info = {
         "source_file": "ecocyc_28_tfbs_set",
-        "part_type": "tfbs"
+        "part_type": "natural tfbs"
     }
     saver.save_with_summary(sequences, "seqbatch_ecocyc_28_tfbs_set.pt", additional_info=additional_info)
 

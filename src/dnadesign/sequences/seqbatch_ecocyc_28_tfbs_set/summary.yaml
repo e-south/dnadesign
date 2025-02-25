@@ -1,4 +1,4 @@
-date_created: '2025-02-17T20:30:20.965440'
+date_created: '2025-02-25T09:50:17.881384'
 keys:
 - id
 - meta_date_accessed
@@ -8,5 +8,5 @@ keys:
 - name
 - sequence
 num_sequences: 3539
-part_type: tfbs
+part_type: natural tfbs
 source_file: ecocyc_28_tfbs_set

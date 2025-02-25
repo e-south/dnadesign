@@ -96,7 +96,7 @@ def save_output(sequences):
     saver = SequenceSaver(str(output_dir))
     additional_info = {
         "source_file": "sun_yim_et_al",
-        "part_type": "promoter"
+        "part_type": "engineered promoter"
     }
     saver.save_with_summary(sequences, "seqbatch_sun_yim_et_al.pt", additional_info=additional_info)
 

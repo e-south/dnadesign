@@ -56,9 +56,9 @@ def ingest(num_sequences: int = 10, length: int = 18, gc_min: float = 40, gc_max
             "id": str(uuid.uuid4()),
             "name": f"random_tfbs_{i+1}",
             "sequence": seq,
-            "meta_source": "random_tfbs",
+            "meta_source": "random tfbs",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
-            "meta_part_type": "random_tfbs"
+            "meta_part_type": "random tfbs"
         }
         sequences.append(entry)
     return sequences

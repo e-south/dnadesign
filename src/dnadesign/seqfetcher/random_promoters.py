@@ -56,9 +56,9 @@ def ingest(num_sequences: int = 10, length: int = 100, gc_min: float = 40, gc_ma
             "id": str(uuid.uuid4()),
             "name": f"random_promoter_{i+1}",
             "sequence": seq,
-            "meta_source": "random_promoters",
+            "meta_source": "random promoters",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
-            "meta_part_type": "random_promoter"
+            "meta_part_type": "random promoter"
         }
         sequences.append(entry)
     return sequences
@@ -81,7 +81,7 @@ def save_output(sequences, num_sequences: int, length: int, gc_min: float, gc_ma
 if __name__ == "__main__":
     # Example parameters; adjust as needed.
     num_sequences = 5000
-    length = 100
+    length = 120
     gc_min = 40
     gc_max = 60
     seqs = ingest(num_sequences=num_sequences, length=length, gc_min=gc_min, gc_max=gc_max)

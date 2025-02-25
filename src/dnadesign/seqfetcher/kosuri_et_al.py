@@ -102,7 +102,7 @@ def ingest():
             "meta_sd_RNA": sd_rna,
             "meta_mean_prot": mean_prot,
             "meta_sd_prot": sd_prot,
-            "meta_part_type": "promoter"
+            "meta_part_type": "engineered promoter"
         }
         sequences.append(entry)
     return sequences
