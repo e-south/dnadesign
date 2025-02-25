@@ -28,6 +28,7 @@ Usage examples:
   $ python seqmanager.py --path seqbatch_sun_yim_et_al/seqbatch_sun_yim_et_al.pt --index 3
   $ python seqmanager.py --path densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_5_sigma70_consensus_n10000/densegenbatch_unfiltered_cluster_5_sigma70_consensus_n10000.pt --index 3
   $ python seqmanager.py --path seqbatch_random_promoters_sigma70_consensus/seqbatch_random_promoters_sigma70_consensus.pt --index 3
+  $ python seqmanager.py --path seqbatch_xiaowo_et_al/seqbatch_xiaowo_et_al.pt --index 3
   
   # Inspect only the 'sequence' key of entry 3:
   $ python seqmanager.py --path seqbatch_random_tfbs/seqbatch_random_tfbs.pt --index 3 --key sequence
