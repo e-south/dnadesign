@@ -49,6 +49,7 @@ from pathlib import Path
 import torch
 import yaml
 import warnings
+import re
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 def validate_pt_file(file_path: str) -> bool:
@@ -88,8 +89,17 @@ def update_meta_part_type(file_path: str) -> None:
     """
     Loads a .pt file and for each entry ensures that the 'meta_part_type' key exists.
     The desired value is determined based on the parent directory's name using a lookup
-    (including handling a wildcard for 'densebatch_*'). If the first entry already has the
-    key, the user is prompted once to either skip the file or overwrite the key for all entries.
+    (including handling a wildcard for 'densebatch_*'). For directories starting with
+    'densebatch_', the user is prompted to decide whether to define dense arrays by constraint.
+    
+    If the user chooses yes, then the file's name is examined via regex to assign:
+      - 'sigma70' if 'sigma70' is in the file name,
+      - 'sigma24' if 'sigma24' is in the file name,
+      - 'sigma38' if 'sigma38' is in the file name,
+      - 'sigma32' if 'sigma32' is in the file name.
+    Otherwise (or if no match is found), the file is labeled as a dense array.
+    
+    If the first entry already has the key, the user is prompted to either skip or overwrite.
     The file is then saved in-place.
     """
     pt_path = Path(file_path)
@@ -124,8 +134,28 @@ def update_meta_part_type(file_path: str) -> None:
         "seqbatch_ecocyc_28_promoters": "natural promoter",
         "seqbatch_ecocyc_28_tfbs_set": "natural TFBS"
     }
+    
     if parent_dir.startswith("densebatch_"):
-        desired_value = "dense array"
+        # Ask the user if they want to define dense arrays by constraint.
+        user_input = input(
+            f"Directory '{parent_dir}' is a densebatch directory. Would you like to define dense arrays by constraint? [y/n]: "
+        ).strip().lower()
+        if user_input.startswith("y"):
+            # Apply regex (or simple substring search) on the file name.
+            file_stem = pt_path.stem.lower()
+            if "sigma70" in file_stem:
+                desired_value = "sigma70"
+            elif "sigma24" in file_stem:
+                desired_value = "sigma24"
+            elif "sigma38" in file_stem:
+                desired_value = "sigma38"
+            elif "sigma32" in file_stem:
+                desired_value = "sigma32"
+            else:
+                print("No sigma pattern found in the file name. Defaulting to 'dense array'.")
+                desired_value = "dense array"
+        else:
+            desired_value = "dense array"
     elif parent_dir in meta_mapping:
         desired_value = meta_mapping[parent_dir]
     else:
