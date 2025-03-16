@@ -67,6 +67,7 @@ dnadesign/
    For more context, see the following papers:  
 
    - [Semantic mining (preprint)](https://doi.org/10.1101/2024.12.17.628962)  
+   - [The Illustrated Hyena](https://ishanjmukherjee.github.io/illustrated-hyena)
    - [Evo 1](https://www.science.org/doi/10.1126/science.ado9336)  
    - [Evo 2 (preprint)](https://arcinstitute.org/manuscripts/Evo2)
 

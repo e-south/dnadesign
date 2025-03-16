@@ -21,6 +21,10 @@ DNADESIGN_DATA = BASE_DIR.parent / 'dnadesign-data'
 
 # A dictionary mapping keys to actual file paths:
 DATA_FILES = {
+    # Transcription Factor Knockdown Datasets
+    "han_et_al_known_interactions": DNADESIGN_DATA / 'primary_literature' / 'Han_et_al' / '41467_2023_41572_MOESM9_ESM.xlsx',
+    "han_et_al_pptp_seq_interactions": DNADESIGN_DATA / 'primary_literature' / 'Han_et_al' / '41467_2023_41572_MOESM8_ESM.xlsx',
+    
     # Promoter Engineering Datasets
     "hossain_et_al": DNADESIGN_DATA / 'primary_literature' / 'LaFleur_et_al' / '41467_2022_32829_MOESM5_ESM.xlsx',
     "kosuri_et_al": DNADESIGN_DATA / 'primary_literature' / 'Kosuri_et_al' / 'sd01.xls',

@@ -1,4 +1,15 @@
 # configs/example.yaml
+tfkdanalysis:
+  batch_name: "araC_and_pspF"
+  regulators: ["araC", "pspF", "phoB", "cueR", "flhC", "csgD", "arcA", "mcbR", "slyA", "marA", "soxS", "rob", "metJ", "lacI", "fadR"] # "metR"
+  media: "glu"
+  volcano_plot: true
+  volcano_point_size: null  # Options include: 'DAP Fold change (peak intensity/background intensity)', etc.
+  threshold: "1.4"
+  tolerate_nas: true
+  annotate_operon: true
+
+
 densegen:
   # Define multiple input sources with explicit types and paths.
   input_sources:
@@ -166,7 +177,7 @@ evoinference:
 #     alpha: 0.2
 #     one_hot_key: "sequence"
 #     hue:
-#       method: "input_source"                            # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
+#       method: "type"                            # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
 #       numeric_hue: None
 #       normalization: "robust"
 #   output_prefix: "clusterbatch_"
@@ -196,7 +207,7 @@ evoinference:
 #     alpha: 0.2
 #     one_hot_key: "sequence"
 #     hue:
-#       method: "gc_content"
+#       method: "seq_length"                          # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
 #       numeric_hue: None
 #       normalization: "robust"
 #   output_prefix: "clusterbatch_"
@@ -232,7 +243,7 @@ evoinference:
 #     alpha: 0.2
 #     one_hot_key: "sequence"
 #     hue:
-#       method: "input_source"
+#       method: "input_source"                          # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
 #       numeric_hue: None
 #       normalization: "robust"
 #   output_prefix: "clusterbatch_"
@@ -264,7 +275,7 @@ evoinference:
 #     alpha: 0.2
 #     one_hot_key: "sequence"
 #     hue:
-#       method: "input_source"
+#       method: "type"                          # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
 #       numeric_hue: None
 #       normalization: "robust"
 #   output_prefix: "clusterbatch_"
@@ -278,34 +289,34 @@ evoinference:
 # ================================
 # Batch 8: Regulondb, Ecocyc, and Random TFBS
 # ================================
-# clustering:
-#   batch_name: "regulondb_and_ecocyc_and_random_tfbs"
-#   input_sources:
-#     - dir: "seqbatch_ecocyc_28_tfbs_set"
-#     - dir: "seqbatch_regulondb_13_tf_ri_set"
-#     - dir: "seqbatch_random_tfbs"
-#   method: "input_source"
-#   cluster_selection:
-#     num_files: 0
-#     order: "max"
-#     custom_clusters: []
-#   overlay_cluster_numbers: true
-#   umap:
-#     enabled: true
-#     plot_dimensions: [6, 4]
-#     alpha: 0.2
-#     one_hot_key: "sequence"
-#     hue:
-#       method: "input_source"
-#       numeric_hue: None
-#       normalization: "robust"
-#   output_prefix: "clusterbatch_"
-#   analysis:
-#     cluster_composition: true
-#     cluster_composition_plot_dimensions: [14, 4]
-#     diversity_assessment: true
-#     diversity_assessment_plot_dimensions: [10, 4]
-#     differential_feature_analysis: true
+clustering:
+  batch_name: "regulondb_and_ecocyc_and_random_tfbs"
+  input_sources:
+    - dir: "seqbatch_ecocyc_28_tfbs_set"
+    - dir: "seqbatch_regulondb_13_tf_ri_set"
+    - dir: "seqbatch_random_tfbs"
+  method: "input_source"
+  cluster_selection:
+    num_files: 0
+    order: "max"
+    custom_clusters: []
+  overlay_cluster_numbers: true
+  umap:
+    enabled: true
+    plot_dimensions: [6, 4]
+    alpha: 0.2
+    one_hot_key: "sequence"
+    hue:
+      method: "gc_content"                          # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
+      numeric_hue: None
+      normalization: "robust"
+  output_prefix: "clusterbatch_"
+  analysis:
+    cluster_composition: true
+    cluster_composition_plot_dimensions: [14, 4]
+    diversity_assessment: true
+    diversity_assessment_plot_dimensions: [10, 4]
+    differential_feature_analysis: true
 
 # ================================
 # Batch 9: Hernandez "Positive" and "Negative" Promoters
@@ -327,7 +338,7 @@ evoinference:
 #     alpha: 0.2
 #     one_hot_key: "sequence"
 #     hue:
-#       method: "input_source"
+#       method: "input_source"                        # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
 #       numeric_hue: None
 #       normalization: "robust"
 #   output_prefix: "clusterbatch_"
@@ -341,56 +352,56 @@ evoinference:
 # ================================
 # Batch 10: Engineered Promoters
 # ================================
-clustering:
-  batch_name: "engineered_promoters"
-  input_sources:
-    # - dir: "seqbatch_hossain_et_al"
-    # - dir: "seqbatch_lafleur_et_al"
-    # - dir: "seqbatch_johns_et_al"
-    # - dir: "seqbatch_kosuri_et_al"
-    # - dir: "seqbatch_urtecho_et_al"
-    # - dir: "seqbatch_yu_et_al"
-    # - dir: "seqbatch_sun_yim_et_al"
-    - dir: "seqbatch_xiaowo_et_al"
-  method: "input_source"
-  cluster_selection:
-    num_files: 0
-    order: "max"
-    custom_clusters: []
-  overlay_cluster_numbers: true
-  umap:
-    enabled: true
-    plot_dimensions: [6, 4]
-    alpha: 0.2
-    one_hot_key: "sequence"
-    hue:
-      method: "numeric"
-      numeric_hue: [
-                    # "seqbatch_hossain_et_al": "meta_observed_log_RNA_over_ref",
-                    # "seqbatch_lafleur_et_al": "meta_observed_log_RNA_over_ref",
-                    # "seqbatch_urtecho_et_al": "meta_observed_log_RNA_over_ref",
-                    # "seqbatch_yu_et_al": "meta_observed_log_RNA_over_ref",
-                    # "seqbatch_kosuri_et_al": "meta_mean_RNA",
-                    # "seqbatch_kosuri_et_al": "meta_sd_RNA",
-                    # "seqbatch_kosuri_et_al": "meta_mean_prot",
-                    # "seqbatch_kosuri_et_al": "meta_sd_prot",
-                    # "seqbatch_johns_et_al": "meta_observed_tx_norm_LB_exp",
-                    # "seqbatch_johns_et_al": "meta_observed_tx_norm_NaCl_exp",
-                    # "seqbatch_johns_et_al": "meta_observed_tx_norm_Fe_exp",
-                    # "seqbatch_johns_et_al": "meta_observed_tx_norm_LB-stat",
-                    # "seqbatch_johns_et_al": "meta_observed_tx_norm_M9-exp",
-                    # "seqbatch_sun_yim_et_al": "meta_gene_in_vitro_tx",
-                    # "seqbatch_sun_yim_et_al": "meta_gene_in_vivo_tx"
-                    "seqbatch_xiaowo_et_al": "meta_exp_mean(log2)"
-      ]
-      normalization: "robust"
-  output_prefix: "clusterbatch_"
-  analysis:
-    cluster_composition: true
-    cluster_composition_plot_dimensions: [10, 4]
-    diversity_assessment: true
-    diversity_assessment_plot_dimensions: [10, 4]
-    differential_feature_analysis: true
+# clustering:
+#   batch_name: "all_engineered_promoters"
+#   input_sources:
+#     - dir: "seqbatch_hossain_et_al"
+#     - dir: "seqbatch_lafleur_et_al"
+#     - dir: "seqbatch_johns_et_al"
+#     - dir: "seqbatch_kosuri_et_al"
+#     - dir: "seqbatch_urtecho_et_al"
+#     - dir: "seqbatch_yu_et_al"
+#     - dir: "seqbatch_sun_yim_et_al"
+#     - dir: "seqbatch_xiaowo_et_al"
+#   method: "input_source"
+#   cluster_selection:
+#     num_files: 0
+#     order: "max"
+#     custom_clusters: []
+#   overlay_cluster_numbers: true
+#   umap:
+#     enabled: true
+#     plot_dimensions: [6, 4]
+#     alpha: 0.2
+#     one_hot_key: "sequence"
+#     hue:
+#       method: "input_source"                                   # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
+#       numeric_hue: [
+#                     "seqbatch_hossain_et_al": "meta_observed_log_RNA_over_ref",
+#                     "seqbatch_lafleur_et_al": "meta_observed_log_RNA_over_ref",
+#                     "seqbatch_urtecho_et_al": "meta_observed_log_RNA_over_ref",
+#                     "seqbatch_yu_et_al": "meta_observed_log_RNA_over_ref",
+#                     "seqbatch_kosuri_et_al": "meta_mean_RNA",
+#                     "seqbatch_kosuri_et_al": "meta_sd_RNA",
+#                     "seqbatch_kosuri_et_al": "meta_mean_prot",
+#                     "seqbatch_kosuri_et_al": "meta_sd_prot",
+#                     "seqbatch_johns_et_al": "meta_observed_tx_norm_LB_exp",
+#                     "seqbatch_johns_et_al": "meta_observed_tx_norm_NaCl_exp",
+#                     "seqbatch_johns_et_al": "meta_observed_tx_norm_Fe_exp",
+#                     "seqbatch_johns_et_al": "meta_observed_tx_norm_LB-stat",
+#                     "seqbatch_johns_et_al": "meta_observed_tx_norm_M9-exp",
+#                     "seqbatch_sun_yim_et_al": "meta_gene_in_vitro_tx",
+#                     "seqbatch_sun_yim_et_al": "meta_gene_in_vivo_tx",
+#                     "seqbatch_xiaowo_et_al": "meta_exp_mean(log2)"
+#       ]
+#       normalization: "robust"
+#   output_prefix: "clusterbatch_"
+#   analysis:
+#     cluster_composition: true
+#     cluster_composition_plot_dimensions: [10, 4]
+#     diversity_assessment: true
+#     diversity_assessment_plot_dimensions: [10, 4]
+#     differential_feature_analysis: true
 
 # ================================
 # Batch 11: Engineered Promoters and Densegen (Wildcard)
@@ -398,12 +409,13 @@ clustering:
 # clustering:
 #   batch_name: "engineered_promoters_and_densegen"
 #   input_sources:
-#     - dir: "seqbatch_johns_et_al"
+#     # - dir: "seqbatch_johns_et_al"
 #     - dir: "seqbatch_kosuri_et_al"
 #     - dir: "seqbatch_lafleur_et_al"
 #     - dir: "seqbatch_sun_yim_et_al"
 #     - dir: "seqbatch_urtecho_et_al"
 #     - dir: "seqbatch_yu_et_al"
+#     - dir: "seqbatch_xiaowo_et_al"
 #     - pattern: "densebatch_*"
 #   method: "input_source"
 #   cluster_selection:
@@ -417,7 +429,7 @@ clustering:
 #     alpha: 0.2
 #     one_hot_key: "sequence"
 #     hue:
-#       method: "input_source"
+#       method: "type"                      # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
 #       numeric_hue: None
 #       normalization: "robust"
 #   output_prefix: "clusterbatch_"
@@ -432,11 +444,16 @@ clustering:
 # Batch 12: Regulondb, Ecocyc, Random, and Densegen Promoter Sets
 # ================================
 # clustering:
-#   batch_name: "regulondb_and_ecocyc_and_random_and_densegen_promoter_sets"
+#   batch_name: "dense_arrays_and_TFBSs"
 #   input_sources:
-#     - dir: "seqbatch_regulondb_13_promoter_set"
-#     - dir: "seqbatch_ecocyc_28_promoters"
-#     - dir: "seqbatch_random_promoters"
+#     # - dir: "seqbatch_regulondb_13_promoter_set"
+#     # - dir: "seqbatch_ecocyc_28_promoters"
+#     - dir: "seqbatch_ecocyc_28_tfbs_set"
+#     - dir: "seqbatch_regulondb_13_tf_ri_set"
+#     # - dir: "seqbatch_random_tfbs"
+#     # - dir: "seqbatch_random_promoters"
+#     # - dir: "seqbatch_random_promoters_sigma70_consensus"
+#     # - dir: "seqbatch_random_promoters_sigma70_consensus_+"
 #     - pattern: "densebatch_*"
 #   method: "input_source"
 #   cluster_selection:
@@ -450,7 +467,7 @@ clustering:
 #     alpha: 0.2
 #     one_hot_key: "sequence"
 #     hue:
-#       method: "input_source"
+#       method: "type"                              # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
 #       numeric_hue: None
 #       normalization: "robust"
 #   output_prefix: "clusterbatch_"
@@ -465,18 +482,63 @@ clustering:
 # Batch 13: All Promoters
 # ================================
 # clustering:
-#   batch_name: "all_promoters"
+#   batch_name: "fully_random_vs_constrained_promoters"
 #   input_sources:
-#     - dir: "seqbatch_regulondb_13_promoter_set"
-#     - dir: "seqbatch_ecocyc_28_promoters"
+#     # - dir: "seqbatch_regulondb_13_promoter_set"
+#     # - dir: "seqbatch_ecocyc_28_promoters"
 #     - dir: "seqbatch_random_promoters"
-#     - dir: "seqbatch_johns_et_al"
-#     - dir: "seqbatch_kosuri_et_al"
-#     - dir: "seqbatch_lafleur_et_al"
-#     - dir: "seqbatch_sun_yim_et_al"
-#     - dir: "seqbatch_urtecho_et_al"
-#     - dir: "seqbatch_yu_et_al"
-#     - pattern: "densebatch_*"
+#     - dir: "seqbatch_random_promoters_sigma70_consensus"
+#     - dir: "seqbatch_random_promoters_sigma70_consensus_+"
+#     # - dir: "seqbatch_johns_et_al"
+#     # - dir: "seqbatch_kosuri_et_al"
+#     # - dir: "seqbatch_lafleur_et_al"
+#     # - dir: "seqbatch_sun_yim_et_al"
+#     # - dir: "seqbatch_urtecho_et_al"
+#     # - dir: "seqbatch_yu_et_al"
+#     # - dir: "seqbatch_xiaowo_et_al"
+#     # - pattern: "densebatch_*"
+#   method: "input_source"
+#   cluster_selection:
+#     num_files: 0
+#     order: "max"
+#     custom_clusters: []
+#   overlay_cluster_numbers: true
+#   umap:
+#     enabled: true
+#     plot_dimensions: [10, 5]
+#     alpha: 0.35
+#     one_hot_key: "sequence"
+#     hue:
+#       method: "input_source"                                  # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
+#       numeric_hue: None
+#       normalization: "robust"
+#   output_prefix: "clusterbatch_"
+#   analysis:
+#     cluster_composition: true
+#     cluster_composition_plot_dimensions: [14, 4]
+#     diversity_assessment: true
+#     diversity_assessment_plot_dimensions: [10, 4]
+#     differential_feature_analysis: true
+
+
+# ================================
+# Batch 13: Different dense array promoter constraints
+# ================================
+# clustering:
+#   batch_name: "dense_arrays_all_TFs_by_sigma70_consensus_mid_low_constraints_simplified"
+#   input_sources:
+#     # - dir: "densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_0_sigma70_consensus_n10000"
+#     # - dir: "densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_1_sigma70_consensus_n10000"
+#     # - dir: "densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_2_sigma70_consensus_n10000"
+#     # - dir: "densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_3_sigma70_consensus_n10000"
+#     # - dir: "densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_4_sigma70_consensus_n10000"
+#     # - dir: "densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_5_sigma70_consensus_n10000"
+#     # - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_consensus_-_n10000"
+#     # - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_consensus_+_n10000"
+#     - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_consensus_n10000"
+#     - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_mid_n10000"
+#     - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_low_n10000"
+    
 #   method: "input_source"
 #   cluster_selection:
 #     num_files: 0
@@ -489,7 +551,7 @@ clustering:
 #     alpha: 0.2
 #     one_hot_key: "sequence"
 #     hue:
-#       method: "type"
+#       method: "input_source"                        # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
 #       numeric_hue: None
 #       normalization: "robust"
 #   output_prefix: "clusterbatch_"
@@ -499,6 +561,7 @@ clustering:
 #     diversity_assessment: true
 #     diversity_assessment_plot_dimensions: [10, 4]
 #     differential_feature_analysis: true
+
 
 subsetter:
   input_sources:

@@ -213,7 +213,13 @@ def main():
         cc_dims = analysis_config.get("cluster_composition_plot_dimensions", [10, 7])
         comp_csv = results_dir / f"cluster_composition_{batch_name}.csv"
         comp_png = results_dir / f"cluster_composition_{batch_name}.png"
-        cluster_composition.analyze(data_entries, batch_name=batch_name, save_csv=str(comp_csv), save_png=str(comp_png), plot_dims=cc_dims)
+        # Use the UMAP hue method to drive grouping: if it's "type", then use that;
+        # otherwise, default to "input_source".
+        hue_method_for_composition = umap_config.get("hue", {}).get("method", "input_source")
+        composition_method = "type" if hue_method_for_composition == "type" else "input_source"
+        cluster_composition.analyze(data_entries, batch_name=batch_name, save_csv=str(comp_csv),
+                                    save_png=str(comp_png), plot_dims=cc_dims,
+                                    composition_method=composition_method)
         print(f"Cluster composition results saved: CSV to {comp_csv}, plot to {comp_png}")
     
     if analysis_config.get("diversity_assessment", False):

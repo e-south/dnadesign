@@ -10,8 +10,8 @@ Dunlop Lab
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 from dnadesign.clustering import normalization
-
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -72,27 +72,63 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
     fig, ax = plt.subplots(figsize=(dims[0], dims[1]))
     
     if hue_method == "input_source":
-        unique_categories = sorted(list(set(hue_values)))
-        cmap = plt.get_cmap("tab10") if len(unique_categories) <= 10 else plt.get_cmap("tab20")
-        category_to_color = {cat: cmap(i / len(unique_categories)) for i, cat in enumerate(unique_categories)}
-        color_values = [category_to_color[cat] for cat in hue_values]
-        sc_plot = ax.scatter(x, y, c=color_values, s=2, alpha=alpha)
+        # Determine unique input sources and count their occurrences.
+        unique_sources = list(set(hue_values))
+        source_counts = {src: hue_values.count(src) for src in unique_sources}
+        
+        # Sort sources in descending order by count (largest plotted first).
+        sorted_sources = sorted(unique_sources, key=lambda src: source_counts[src], reverse=True)
+        
+        # Use seaborn's colorblind palette for maximum contrast.
+        colors = sns.color_palette("colorblind", n_colors=len(sorted_sources))
+        category_to_color = {src: colors[i] for i, src in enumerate(sorted_sources)}
+        
+        # Plot each source individually.
+        for src in sorted_sources:
+            indices = [i for i, s in enumerate(hue_values) if s == src]
+            ax.scatter(x[indices], y[indices],
+                       color=category_to_color[src],
+                       s=2.5,
+                       alpha=alpha,
+                       label=src)
+        
+        # Create a legend placed outside the plot.
         import matplotlib.patches as mpatches
-        legend_handles = [mpatches.Patch(color=category_to_color[cat], label=cat) for cat in unique_categories]
-        legend = ax.legend(handles=legend_handles, title="Input Source", bbox_to_anchor=legend_bbox,
-                           loc="upper left", prop={'size': 6}, ncol=legend_ncol)
+        legend_handles = [mpatches.Patch(color=category_to_color[src], label=src) for src in sorted_sources]
+        legend = ax.legend(handles=legend_handles, title="Input Source",
+                           bbox_to_anchor=legend_bbox, loc="upper left",
+                           prop={'size': 6}, ncol=legend_ncol)
         legend.get_frame().set_linewidth(0)
+        
     elif hue_method == "type":
-        unique_categories = sorted(list(set(hue_values)))
-        cmap = plt.get_cmap("tab10") if len(unique_categories) <= 10 else plt.get_cmap("tab20")
-        category_to_color = {cat: cmap(i / len(unique_categories)) for i, cat in enumerate(unique_categories)}
-        color_values = [category_to_color[cat] for cat in hue_values]
-        sc_plot = ax.scatter(x, y, c=color_values, s=2, alpha=alpha)
+        # Determine unique part types and count their occurrences.
+        unique_categories = list(set(hue_values))
+        category_counts = {cat: hue_values.count(cat) for cat in unique_categories}
+        
+        # Sort categories in descending order by count (largest plotted first).
+        sorted_categories = sorted(unique_categories, key=lambda cat: category_counts[cat], reverse=True)
+        
+        # Use seaborn's colorblind palette for maximum contrast.
+        colors = sns.color_palette("colorblind", n_colors=len(sorted_categories))
+        category_to_color = {cat: colors[i] for i, cat in enumerate(sorted_categories)}
+        
+        # Plot each category individually.
+        for cat in sorted_categories:
+            indices = [i for i, c in enumerate(hue_values) if c == cat]
+            ax.scatter(x[indices], y[indices],
+                       color=category_to_color[cat],
+                       s=2,
+                       alpha=alpha,
+                       label=cat)
+        
+        # Create a legend placed outside the plot.
         import matplotlib.patches as mpatches
-        legend_handles = [mpatches.Patch(color=category_to_color[cat], label=cat) for cat in unique_categories]
-        legend = ax.legend(handles=legend_handles, title="Part Type", bbox_to_anchor=legend_bbox,
-                           loc="upper left", prop={'size': 6}, ncol=legend_ncol)
+        legend_handles = [mpatches.Patch(color=category_to_color[cat], label=cat) for cat in sorted_categories]
+        legend = ax.legend(handles=legend_handles, title="Part Type",
+                           bbox_to_anchor=legend_bbox, loc="upper left",
+                           prop={'size': 6}, ncol=legend_ncol)
         legend.get_frame().set_linewidth(0)
+        
     else:
         sc_plot = ax.scatter(x, y, c=hue_values, cmap='viridis', s=10, alpha=alpha)
         if hue_method in ["numeric", "gc_content", "seq_length", "leiden"]:
@@ -102,7 +138,7 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
     ax.set_ylabel("UMAP2")
     title = f"UMAP Plot with Hue: {hue_method}"
     if batch_name:
-        title += f" ({batch_name})"
+        title += f"\n{batch_name}"
     ax.set_title(title)
     
     ax.spines['top'].set_visible(False)
