@@ -60,6 +60,8 @@ DATA_FILES = {
     # Other Datasets
     'k_12_genome': DNADESIGN_DATA / 'RegulonDB_11' / 'K12_genome' / 'E_coli_K12_MG1655_U00096.3.txt',
     'regulondb_tf_set': DNADESIGN_DATA / 'RegulonDB_11' / 'tf_factors' / 'TFSet.csv',
+    "omalley_et_al": DNADESIGN_DATA / 'primary_literature' / 'OMalley_et_al' / 'escherichia_coli_motifs',   
+    "pancardo_et_al": DNADESIGN_DATA / 'primary_literature' / 'Pancardo_et_al' / '41589_2020_593_MOESM2_ESM.xlsx',   
 }
 
 class ConfigLoader:
