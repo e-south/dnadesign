@@ -11,14 +11,6 @@ Dunlop Lab
 import time
 import random
 import dense_arrays as da
-
-import time
-import random
-import dense_arrays as da
-import itertools as it
-import time
-import random
-import dense_arrays as da
 import itertools as it
 
 class DenseArrayOptimizerWrapper:
@@ -27,7 +19,7 @@ class DenseArrayOptimizerWrapper:
                  fill_gap_end: str = "3prime", fill_gc_min: float = 0.40, fill_gc_max: float = 0.60):
         valid_nucleotides = {"A", "T", "G", "C"}
         filtered_binding_sites = []
-        self.roster = []  # store original "TF:binding_site" strings for metadata
+        self.roster = []  # Store original "TF:binding_site" strings for metadata.
         for motif in library:
             if not isinstance(motif, str):
                 continue
@@ -115,7 +107,7 @@ class DenseArrayOptimizerWrapper:
                     remaining_options.append(opt)
             local_solver_options = remaining_options
 
-        # Build the model once
+        # Build the model once.
         try:
             if self.solver.upper() == "CBC" and time_limit_sec is not None:
                 opt_inst.build_model(self.solver, solver_options=[])
@@ -145,7 +137,7 @@ class DenseArrayOptimizerWrapper:
                 print(f"Invalid solution at iteration {i}.")
                 break
 
-            used_offsets = solution.offset_indices_in_order()  # List of (offset, index)
+            used_offsets = solution.offset_indices_in_order()  # List of (offset, index).
             indices = [index for offset, index in used_offsets]
             roster_used = [self.roster[index % len(self.roster)] for index in indices]
             sol_dict = {
@@ -158,7 +150,6 @@ class DenseArrayOptimizerWrapper:
             }
             solutions.append(sol_dict)
 
-            # Print progress every 5 solutions.
             if (i + 1) % 5 == 0:
                 print(f"Progress: {i + 1} solutions generated so far.")
 
@@ -170,14 +161,17 @@ class DenseArrayOptimizerWrapper:
 
         return solutions
 
+
 def run_solver(library, sequence_length, solver, solver_options):
     optimizer = DenseArrayOptimizerWrapper(library, sequence_length, solver, solver_options)
     solution_dict = optimizer.optimize()  # Assuming an optimize() method exists if needed.
     return solution_dict
 
+
 def run_solver_iteratively(library, sequence_length, solver, solver_options, quota):
     optimizer = DenseArrayOptimizerWrapper(library, sequence_length, solver, solver_options)
     return optimizer.optimize_iteratively(quota)
+
 
 def save_solver_output(solutions, output_file):
     import pickle

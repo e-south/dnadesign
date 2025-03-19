@@ -25,11 +25,11 @@ def parse_meme_file(file_path, consensus_only=True, min_length=5):
                      "type": the identifier from the line (e.g. TF name)
     """
     consensus = None
-    others = []  # use a list for tidy output
+    others = []  # For additional binding sites.
     with open(file_path, 'r') as f:
         lines = f.readlines()
 
-    # Look for consensus from the "Multilevel" line.
+    # Look for consensus on the "Multilevel" line.
     for line in lines:
         stripped = line.strip()
         if stripped.startswith("Multilevel"):
@@ -37,29 +37,28 @@ def parse_meme_file(file_path, consensus_only=True, min_length=5):
             if match:
                 candidate = match.group(1).upper()
                 if len(candidate) >= min_length:
+                    # Validate candidate contains only valid nucleotides.
+                    assert set(candidate).issubset({"A", "C", "G", "T"}), f"Invalid nucleotides found in consensus: {candidate}"
                     consensus = candidate
                     break
 
     if consensus_only:
+        assert consensus is not None, f"Consensus sequence not found in {file_path} when consensus_only=True"
         return consensus
 
-    # Look for additional binding sites in the BLOCKS section.
+    # If consensus_only is False, look for additional binding sites in the BLOCKS section.
     in_blocks = False
     for line in lines:
         stripped = line.strip()
-        # Use a case-insensitive search for the header
         if not in_blocks and "in blocks format" in stripped.lower():
             in_blocks = True
             continue
         if in_blocks:
             if stripped.startswith("//"):
-                break  # End of BLOCKS section
+                break  # End of BLOCKS section.
             if not stripped or set(stripped) == {"-"}:
                 continue
-            # Split the line into fields (whitespace-delimited)
             fields = re.split(r"\s+", stripped)
-            # We expect at least 4 fields: e.g.
-            # "Pseudomonas_fluorescens_ (   34) AGCTCAAAAGCTCA  1"
             if len(fields) >= 4:
                 tf_name = fields[0]
                 candidate = fields[3].upper()

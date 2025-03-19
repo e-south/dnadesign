@@ -25,7 +25,6 @@ def compute_cumulative_score(solution_dict, pancardo_df, score_weights):
     roster = solution_dict.get("tf_roster", [])
     
     for entry in roster:
-        # Expect entry in format "TF:binding_site"
         tf_name = entry.split(":", 1)[0].strip()
         row = pancardo_df[pancardo_df['TF'].str.lower() == tf_name.lower()]
         if row.empty:
@@ -36,6 +35,7 @@ def compute_cumulative_score(solution_dict, pancardo_df, score_weights):
         score_tf = (max_rank + 1) - rank + alpha * silenced - beta * induced
         cumulative_score += score_tf
     return cumulative_score
+
 
 def add_scores_to_solutions(solution_dicts, pancardo_df, score_weights):
     """

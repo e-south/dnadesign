@@ -10,7 +10,7 @@ Dunlop Lab
 
 import pandas as pd
 from pathlib import Path
-from dnadesign.utils import DATA_FILES  # Assumes utils.py is in dnadesign/
+from dnadesign.utils import DATA_FILES
 
 def load_pancardo_dataset():
     """
@@ -24,6 +24,7 @@ def load_pancardo_dataset():
     df = pd.read_excel(file_path, sheet_name='Table 2', header=0)
     df = df[['TF', 'Silenced Genes', 'Induced Genes']].copy()
     df['Rank'] = range(1, len(df) + 1)
+    assert not df.empty, "Loaded Pancardo dataset is empty."
     return df
 
 def save_intermediate_csv(data, output_csv):
@@ -32,4 +33,3 @@ def save_intermediate_csv(data, output_csv):
     """
     df = pd.DataFrame(data)
     df.to_csv(output_csv, index=False)
-

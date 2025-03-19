@@ -4,7 +4,7 @@ densehairpins:
   batch_name: "18_repromin_tfs_all_tfbs"
   batch_label: "test_run"
   regulators: "all"
-  consensus_only: true
+  consensus_only: false
   output_dir: "sequences"
   progress_file: "progress_status.yaml"
   solver: "CBC"
