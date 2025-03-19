@@ -24,9 +24,8 @@ def compute_cumulative_score(solution_dict, pancardo_df, score_weights):
     cumulative_score = 0
     roster = solution_dict.get("tf_roster", [])
     
-    for entry in roster:
-        tf_name = entry.split(":", 1)[0].strip()
-        row = pancardo_df[pancardo_df['TF'].str.lower() == tf_name.lower()]
+    for tf in roster:
+        row = pancardo_df[pancardo_df['TF'].str.lower() == tf.lower()]
         if row.empty:
             continue
         rank = int(row.iloc[0]['Rank'])
@@ -36,12 +35,7 @@ def compute_cumulative_score(solution_dict, pancardo_df, score_weights):
         cumulative_score += score_tf
     return cumulative_score
 
-
 def add_scores_to_solutions(solution_dicts, pancardo_df, score_weights):
-    """
-    For each solution dictionary, compute and attach cumulative score,
-    sequence length, and TF count.
-    """
     for sol in solution_dicts:
         cum_score = compute_cumulative_score(sol, pancardo_df, score_weights)
         seq = sol.get("sequence", "")

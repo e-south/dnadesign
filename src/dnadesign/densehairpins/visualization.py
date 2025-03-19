@@ -11,68 +11,55 @@ Dunlop Lab
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import pandas as pd
 
-def save_ranked_csv(solutions, output_csv):
+def save_ranked_csv(solution_dicts, ranked_csv_path):
     """
-    Saves a CSV file with the following columns:
-      Entry_ID, Sequence_Length, TF_Count, Cumulative_Score, TFs
-    Sorted by Cumulative_Score descending.
+    Saves the ranked solution data to CSV after sorting by 'Cumulative_Score'.
+    If no 'Cumulative_Score' column is present, a warning is printed and data is saved unsorted.
     """
-    data = []
-    for sol in solutions:
-        data.append({
-            "Entry_ID": sol.get("entry_id"),
-            "Sequence_Length": sol.get("Sequence_Length"),
-            "TF_Count": sol.get("TF_Count"),
-            "Cumulative_Score": sol.get("Cumulative_Score"),
-            "TFs": ", ".join(sol.get("tf_roster", []))
-        })
-    df = pd.DataFrame(data)
-    df = df.sort_values(by="Cumulative_Score", ascending=False)
-    df.to_csv(output_csv, index=False)
+    # Ensure solution_dicts is defined.
+    if solution_dicts is None:
+        print("Warning: No solution data provided to save_ranked_csv.")
+        return pd.DataFrame()
+    
+    df = pd.DataFrame(solution_dicts)
+    if df.empty:
+        print("Warning: No solution data available to rank. Skipping ranked CSV saving.")
+        return df
+    if "Cumulative_Score" not in df.columns:
+        print("Warning: 'Cumulative_Score' column not found in solution data. Ranked CSV will be saved unsorted.")
+    else:
+        df = df.sort_values(by="Cumulative_Score", ascending=False)
+    df.to_csv(ranked_csv_path, index=False)
+    print(f"Ranked CSV saved to {ranked_csv_path}")
     return df
 
-def plot_scatter(solutions, output_path):
+
+def plot_scatter(solution_dicts, scatter_plot_path):
     """
-    Creates a scatter plot where:
-      - X-axis: Cumulative_Score
-      - Y-axis: Sequence_Length
-      - Point size: TF_Count
-      - Color: viridis palette
-      - Alpha: 0.5
-    Annotates the top 5 solutions.
+    Generates and saves a scatter plot where the X-axis is Cumulative_Score,
+    Y-axis is Sequence_Length, and point size is proportional to TF_Count.
     """
-    data = []
-    for sol in solutions:
-        data.append({
-            "Entry_ID": sol.get("entry_id"),
-            "Sequence_Length": sol.get("Sequence_Length"),
-            "TF_Count": sol.get("TF_Count"),
-            "Cumulative_Score": sol.get("Cumulative_Score")
-        })
-    df = pd.DataFrame(data)
-    
-    plt.figure(figsize=(8, 6))
-    sns.scatterplot(
-        data=df,
-        x="Cumulative_Score",
-        y="Sequence_Length",
-        size="TF_Count",
-        hue="Cumulative_Score",
-        palette="viridis",
-        alpha=0.5,
-        legend=False
-    )
-    sns.despine()
-    
-    top5 = df.nlargest(5, 'Cumulative_Score')
-    for _, row in top5.iterrows():
-        plt.text(row["Cumulative_Score"], row["Sequence_Length"], str(int(row["Cumulative_Score"])),
-                 fontsize=9, color="black")
-    
+    import matplotlib.pyplot as plt
+
+    # Create DataFrame from solutions.
+    df = pd.DataFrame(solution_dicts)
+    if df.empty:
+        print("Warning: No solution data available to plot scatter chart.")
+        return
+
+    # Check required columns.
+    for col in ["Cumulative_Score", "Sequence_Length", "TF_Count"]:
+        if col not in df.columns:
+            print(f"Warning: Column {col} is missing in solution data; cannot plot scatter chart.")
+            return
+
+    plt.figure()
+    plt.scatter(df["Cumulative_Score"], df["Sequence_Length"], s=df["TF_Count"]*20, alpha=0.6)
     plt.xlabel("Cumulative Score")
     plt.ylabel("Sequence Length")
-    plt.title("Dense Array Solutions: Score vs Sequence Length")
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=600)
+    plt.title("Scatter Plot of Solutions")
+    plt.savefig(scatter_plot_path)
     plt.close()
+    print(f"Scatter plot saved to {scatter_plot_path}")
