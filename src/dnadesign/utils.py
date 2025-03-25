@@ -62,6 +62,7 @@ DATA_FILES = {
     'regulondb_tf_set': DNADESIGN_DATA / 'RegulonDB_11' / 'tf_factors' / 'TFSet.csv',
     "omalley_et_al": DNADESIGN_DATA / 'primary_literature' / 'OMalley_et_al' / 'escherichia_coli_motifs',   
     "pancardo_et_al": DNADESIGN_DATA / 'primary_literature' / 'Pancardo_et_al' / '41589_2020_593_MOESM2_ESM.xlsx',   
+    "urchueguia_et_al": DNADESIGN_DATA / 'primary_literature' / 'Urchueguia_et_al' / 'journal.pbio.3001491.s002.xlsx',
 }
 
 class ConfigLoader:
