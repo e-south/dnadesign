@@ -116,39 +116,44 @@ class SequenceSaver:
 def generate_sequence_entry(dense_array_solution, source_names: list, tfbs_parts: list, config: dict) -> dict:
     seq_id = str(uuid.uuid4())
     date_accessed = datetime.datetime.now().isoformat()
-    meta_source = "deg2tfbs_" + "_AND_".join(source_names)
-    
-    # Use the stored original visual output (which is the solver's all-caps output)
+    meta_source = "deg2tfbs_" + "_AND_".join(source_names)    
     visual_str = getattr(dense_array_solution, "original_visual", "")
-    if not visual_str:
-        # Fallback: use the sequence (converted to upper-case) if original_visual is missing.
-        visual_str = "\n" + dense_array_solution.sequence.upper()
-    elif not visual_str.startswith("\n"):
-        visual_str = "\n" + visual_str
-        
+
+    # Compute meta_tfbs_parts_in_array using offset_indices_in_order.
+    meta_tfbs_parts_in_array = None
+    if hasattr(dense_array_solution, "offset_indices_in_order"):
+        try:
+            meta_tfbs_parts_in_array = [
+                dense_array_solution.library[i % len(dense_array_solution.library)]
+                for offset, i in dense_array_solution.offset_indices_in_order()
+            ]
+        except Exception as e:
+            print(f"Error while generating meta_tfbs_parts_in_array: {e}")
+            meta_tfbs_parts_in_array = []
+
     entry = {
         "id": seq_id,
         "meta_date_accessed": date_accessed,
         "meta_source": meta_source,
         "meta_sequence_visual": visual_str,
-        "meta_offsets": (dense_array_solution.offset_indices_in_order()
-                         if hasattr(dense_array_solution, "offset_indices_in_order") else None),
+        "sequence": dense_array_solution.sequence,
+        "sequence_length": config.get("sequence_length"),
+        "subsample_over_length_budget_by": config.get("subsample_over_length_budget_by"),
+        "arrays_generated_before_resample": config.get("arrays_generated_before_resample"),
+        "solver": config.get("solver"),
+        "solver_options": config.get("solver_options"),
+        "fixed_elements": config.get("fixed_elements"),
+        "diverse_solution": config.get("diverse_solution"),
+        "offset_indices_in_order": (dense_array_solution.offset_indices_in_order()
+                                    if hasattr(dense_array_solution, "offset_indices_in_order") else None),
         "meta_compression_ratio": getattr(dense_array_solution, "compression_ratio", None),
         "meta_nb_motifs": getattr(dense_array_solution, "nb_motifs", None),
         "meta_gap_fill": getattr(dense_array_solution, "meta_gap_fill", False),
         "meta_gap_fill_details": getattr(dense_array_solution, "meta_gap_fill_details", None),
         "meta_tfbs_parts": tfbs_parts,
+        "meta_tfbs_parts_in_array": meta_tfbs_parts_in_array,
         "tfs_sample": source_names,
-        "sequence": dense_array_solution.sequence,
-        "config": {
-            "sequence_length": config.get("sequence_length"),
-            "quota": config.get("quota"),
-            "subsample_size": config.get("subsample_size"),
-            "arrays_generated_before_resample": config.get("arrays_generated_before_resample"),
-            "solver": config.get("solver"),
-            "solver_options": config.get("solver_options"),
-            "fixed_elements": config.get("fixed_elements")
-        }
+        
     }
     return entry
 

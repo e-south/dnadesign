@@ -43,36 +43,25 @@ tfkdanalysis:
   tolerate_nas: true
   annotate_operon: true
 
+
 densegen:
-  # Define multiple input sources with explicit types and paths.
   input_sources:
     - type: "deg2tfbs_pipeline_tfbsfetcher"
       name: "m9_acetate_tfs"
       path: "tfbsbatch_20250321"
-    # - type: "deg2tfbs_cluster_analysis"
-    #   name: "unfiltered"
-    #   path: "all_regs"
-    #   clusters: ["cluster_0", "cluster_1", "cluster_2", "cluster_3", "cluster_4", "cluster_5"]
-    # - type: "deg2tfbs_cluster_analysis"
-    #   name: "intersects_removed"
-    #   path: "intersects_removed"
-    #   clusters: ["cluster_0", "cluster_1", "cluster_2", "cluster_3", "cluster_4", "cluster_5"]
-    # - type: "pt"
-    #   name: "seqbatch_random_tfbs"
-    #   path: "seqbatch_random_tfbs/seqbatch_random_tfbs.pt"
-      
-  # Other densegen configuration options:
-  output_dir: "sequences"                         
-  progress_file: "progress_status.yaml"            
-  solver: "CBC"                                 
+  output_dir: "sequences"
+  progress_file: "progress_status.yaml"
+  solver: "CBC"
+  diverse_solution: false
   solver_options:
     - "Threads=16"
     - "TimeLimit=5"
-  sequence_length: 120                             
-  quota: 10000                     
-  subsample_size: 20
-  round_robin: true  # if true, interleaves generation across batches
-  arrays_generated_before_resample: 1        
+  quota: 10000
+  sequence_length: 120
+  subsample_over_length_budget_by: 100
+  subsample_size: 20  # legacy
+  round_robin: true
+  arrays_generated_before_resample: 10  
   fixed_elements:
     promoter_constraints:
       # - name: "sigma70_consensus"
@@ -99,13 +88,9 @@ densegen:
       #   upstream: "GCAGGT"
       #   downstream: "CCTCGC"
       #   spacer_length: [16, 18]
-      #   upstream_pos: [10, 100]
-    # side_biases:
-    #   left: []
-    #   right: []
   unique_tf_only: true
   fill_gap: true
-  fill_gap_end: "5prime"     
+  fill_gap_end: "5prime"
   fill_gc_min: 0.40
   fill_gc_max: 0.60
 

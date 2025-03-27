@@ -3,6 +3,11 @@
 <dnadesign project>
 dnadesign/densegen/sampler.py
 
+This module provides routines for sampling TFs and selecting binding sites.
+The new method generate_binding_site_subsample() accumulates binding sites
+until the total length reaches (sequence_length + subsample_over_length_budget_by),
+ensuring no duplicate binding sites are included in the input to the solver.
+
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
@@ -11,6 +16,7 @@ Dunlop Lab
 import pandas as pd
 import numpy as np
 import warnings
+import random
 
 class TFSampler:
     def __init__(self, df: pd.DataFrame):
@@ -29,6 +35,7 @@ class TFSampler:
         return sampled_tfs.tolist()
 
     def subsample_binding_sites(self, sample_size: int, unique_tf_only: bool = False) -> list:
+        # This legacy method is preserved for compatibility.
         if unique_tf_only:
             sampled_tfs = self.sample_unique_tfs(sample_size, allow_replacement=False)
             binding_sites = []
@@ -53,3 +60,33 @@ class TFSampler:
             assert not (df_sampled['tfbs'] == "").any(), "Empty TFBS value found in subsample."
             return list(zip(df_sampled['tf'].tolist(), df_sampled['tfbs'].tolist(),
                             df_sampled.get('deg_source', pd.Series(["unknown"]*len(df_sampled))).tolist()))
+
+    def generate_binding_site_subsample(self, sequence_length: int, budget_overhead: int) -> tuple:
+        """
+        Generates a subsample of binding sites until the total length of binding sites
+        is at least (sequence_length + budget_overhead). Duplicate binding sites are skipped.
+        
+        Returns:
+            A tuple (sampled_binding_sites, meta_tfbs_parts) where:
+              - sampled_binding_sites: list of binding site strings.
+              - meta_tfbs_parts: list of metadata strings in the format "tf:tfbs".
+        """
+        target_length = sequence_length + budget_overhead
+        unique_binding_sites = set()
+        sampled_binding_sites = []
+        meta_tfbs_parts = []
+        tf_list = self.df['tf'].unique().tolist()
+        # Continue sampling until the accumulated length meets or exceeds the target.
+        while sum(len(bs) for bs in sampled_binding_sites) < target_length:
+            tf = random.choice(tf_list)
+            group = self.df[self.df['tf'] == tf]
+            chosen = group.sample(n=1, random_state=random.randint(0, 100000))
+            tf_val = chosen['tf'].iloc[0]
+            tfbs_val = chosen['tfbs'].iloc[0]
+            # Skip if this binding site is already in the sample.
+            if tfbs_val in unique_binding_sites:
+                continue
+            unique_binding_sites.add(tfbs_val)
+            sampled_binding_sites.append(tfbs_val)
+            meta_tfbs_parts.append(f"{tf_val}:{tfbs_val}")
+        return sampled_binding_sites, meta_tfbs_parts

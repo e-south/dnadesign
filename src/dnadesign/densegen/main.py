@@ -3,12 +3,11 @@
 <dnadesign project>
 dnadesign/densegen/main.py
 
-This is the CLI entry point for densegen. It loads configuration,
-ingests tf2tfbs_mapping data from input sources (defined under the 
-input_sources key in the configuration), and then processes each source independently.
-For each input source, binding sites are sampled and sequences are generated via
-an optimizer. Each source (or sub‐batch when splitting by promoter constraint)
-produces its own seqbatch output folder.
+CLI entry point for densegen.
+Loads configuration, ingests TF–TFBS mapping data, and processes each input source (or sub‐batch).
+For each source, binding sites are sampled (using a target basepair budget),
+the solver is instantiated, and then dense arrays are generated.
+The solver can be run in a diversity-driven mode (if flagged in the config).
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -45,9 +44,11 @@ def select_solver(preferred: str, fallback: str, library: list, test_length: int
 
 def _process_single_source(source_config: dict, densegen_config: dict, output_base_folder: Path, max_sequences: int = None):
     """
-    Processes a single input source (or sub-batch when already split by promoter constraint).
-    When max_sequences is provided (an integer), only that many new sequences are generated during
-    this call (allowing round-robin interleaving). Otherwise the full quota is generated.
+    Processes a single input source (or sub‐batch).
+    Samples binding sites using a length-budget approach,
+    instantiates the solver, and then generates sequences.
+    Uses the 'diverse_solution' flag in the config to choose between
+    diversity-driven (solutions_diverse) and standard optimal methods.
     """
     # Ensure a name is set.
     if "name" not in source_config or not source_config["name"]:
@@ -59,9 +60,7 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
     source_obj = data_source_factory(source_config)
     data_entries, meta_data = source_obj.load_data()
 
-    # Process based on source type.
     if source_config["type"].lower() == "pt":
-        # PT data: expect data_entries to be a list of dicts with key "sequence"
         all_sequences = [entry["sequence"] for entry in data_entries if "sequence" in entry]
         if not all_sequences:
             raise ValueError(f"PT file for source {source_label} contains no sequences.")
@@ -69,31 +68,30 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
         library_for_optim = [seq.strip().upper() for seq in random.sample(all_sequences, min(subsample_size, len(all_sequences)))]
         meta_tfbs_parts = []  # No TF–TFBS pairing for PT data.
     elif isinstance(meta_data, pd.DataFrame) and not meta_data.empty:
-        # CSV-based data: sample binding site pairs.
         sampler = TFSampler(meta_data)
-        sampled_pairs = sampler.subsample_binding_sites(
-            densegen_config.get("subsample_size", 10),
-            unique_tf_only=densegen_config.get("unique_tf_only", False)
-        )
-        library_for_optim = [pair[1] for pair in sampled_pairs]
-        # Now include the index in the motif library.
-        meta_tfbs_parts = [f"idx_{idx}_{tf}_{tfbs}" for idx, (tf, tfbs, _) in enumerate(sampled_pairs)]
+        sequence_length = densegen_config.get("sequence_length", 100)
+        budget_overhead = densegen_config.get("subsample_over_length_budget_by", 30)
+        library_for_optim, meta_tfbs_parts = sampler.generate_binding_site_subsample(sequence_length, budget_overhead)
     else:
         raise ValueError(f"Expected CSV data for source {source_label} but got none.")
 
-    # Get configuration options.
+    print(f"Feeding {len(library_for_optim)} binding sites to the solver for source {source_label}.")
+
+    # Retrieve configuration options.
     preferred_solver = densegen_config.get("solver", "GUROBI")
     solver_options = densegen_config.get("solver_options", ["Threads=16"])
     sequence_length = densegen_config.get("sequence_length", 100)
     quota = densegen_config.get("quota", 5)
-    arrays_generated_before_resample = densegen_config.get("arrays_generated_before_resample", 1)
+    # Consolidate subsample quota to the user-defined arrays_generated_before_resample key.
+    max_solutions_per_subsample = densegen_config.get("max_solutions_per_subsample", 
+                                        densegen_config.get("arrays_generated_before_resample", 1))
     fixed_elements = densegen_config.get("fixed_elements", {})
     fill_gap = densegen_config.get("fill_gap", False)
     fill_gap_end = densegen_config.get("fill_gap_end", "5prime")
     fill_gc_min = densegen_config.get("fill_gc_min", 0.40)
     fill_gc_max = densegen_config.get("fill_gc_max", 0.60)
+    use_diverse_solver = densegen_config.get("diverse_solution", False)
     
-    # Build output folder and file names.
     out_folder_name = f"densebatch_{source_config['type'].lower()}_{source_label}_n{quota}"
     batch_folder = output_base_folder / out_folder_name
     batch_folder.mkdir(parents=True, exist_ok=True)
@@ -101,14 +99,13 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
     progress_file = batch_folder / f"progress_status_{source_label}.yaml"
     results_file = batch_folder / results_filename
 
-    # Load or initialize progress.
     if progress_file.exists():
         with progress_file.open("r") as f:
             progress_status = yaml.safe_load(f)
         current_total = progress_status.get("total_entries", 0)
         print(f"Resuming from checkpoint for source {source_label}: {current_total} entries processed.")
         try:
-            existing_results = torch.load(results_file)
+            existing_results = torch.load(results_file, weights_only=True)
         except Exception:
             existing_results = []
     else:
@@ -125,7 +122,6 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
         current_total = 0
         existing_results = []
     
-    # Select the solver (which might fall back).
     selected_solver, extra_solver_options = select_solver(preferred_solver, "CBC", library_for_optim or [])
     densegen_config["solver"] = selected_solver
     if extra_solver_options:
@@ -137,26 +133,23 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
     sequence_saver = SequenceSaver(str(batch_folder))
     generated_entries = existing_results[:]
     global_generated = current_total
-    new_generated = 0  # Count how many new sequences are generated in this call.
+    new_generated = 0
     forbidden_libraries = set()
     max_forbidden_repeats = 1
 
-    # Generation loop.
     while global_generated < quota and (max_sequences is None or new_generated < max_sequences):
-        print(f"\nSource {source_label}: New TFBS library sample; generating up to {arrays_generated_before_resample} arrays from this set...")
+        print(f"\nSource {source_label}: New TFBS library sample; generating up to {max_solutions_per_subsample} arrays from this set...")
         if source_config["type"].lower() != "pt":
-            sampled_pairs = sampler.subsample_binding_sites(
-                densegen_config.get("subsample_size", 10),
-                unique_tf_only=densegen_config.get("unique_tf_only", False)
-            )
-            library_for_optim = [pair[1] for pair in sampled_pairs]
-            meta_tfbs_parts = [f"idx_{idx}_{tf}_{tfbs}" for idx, (tf, tfbs, _) in enumerate(sampled_pairs)]
+            sampler = TFSampler(meta_data)
+            budget_overhead = densegen_config.get("subsample_over_length_budget_by", 30)
+            library_for_optim, meta_tfbs_parts = sampler.generate_binding_site_subsample(sequence_length, budget_overhead)
         else:
             subsample_size = densegen_config.get("subsample_size", 10)
             library_for_optim = [seq.strip().upper() for seq in random.sample(all_sequences, min(subsample_size, len(all_sequences)))]
         
+        print(f"Subsample contains {len(library_for_optim)} binding sites.")
         fp_library = tuple(sorted(library_for_optim))
-        if arrays_generated_before_resample == 1 and fp_library in forbidden_libraries:
+        if max_solutions_per_subsample == 1 and fp_library in forbidden_libraries:
             print(f"Source {source_label}: This library has already been used. Resampling a new library.")
             continue
 
@@ -176,64 +169,82 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
         local_forbidden = set()
         forbidden_repeats = 0
 
-        # Initialize error counter for time-limit errors
-        max_time_error_repeats = 1
-        time_error_repeats = 0
+        # Get the solver instance from the optimizer wrapper.
+        opt_inst = optimizer_wrapper.get_optimizer_instance()
 
-        while local_generated < arrays_generated_before_resample and global_generated < quota and (max_sequences is None or new_generated < max_sequences):
-            start_time = time.time()
-            try:
-                solution = opt_inst.optimal(solver=selected_solver, solver_options=solver_options)
-            except Exception as e:
-                error_str = str(e)
-                print(f"Source {source_label}: Optimization error: {error_str}. Retrying same library...")
-                if "TimeLimit" in error_str or "time limit" in error_str or error_str.strip() == "":
-                    time_error_repeats += 1
-                    if time_error_repeats >= max_time_error_repeats:
-                        print(f"Source {source_label}: Too many time-limit errors; moving to a new library sample.")
-                        break
-                continue
+        # Choose a solution generator based on the diverse_solution flag.
+        if use_diverse_solver:
+            sol_generator = opt_inst.solutions_diverse(solver=selected_solver, solver_options=solver_options)
+        else:
+            sol_generator = opt_inst.solutions(solver=selected_solver, solver_options=solver_options)
 
-            time_error_repeats = 0
-            elapsed_time = time.time() - start_time
+        # Initialize counters and duplicate tracking.
+        local_generated = 0
+        consecutive_duplicates = 0
+        max_consecutive_duplicates = 3  # Allow up to 3 consecutive duplicates
+        local_forbidden = set()
 
-            solution.original_visual = str(solution)
-            fingerprint = solution.sequence
+        # Iterate over the chosen solution generator.
+        for sol in sol_generator:
+            # Capture the original visual representation before any gap fill changes.
+            sol.original_visual = str(sol)
+            tf_names = [p.split(":")[0] for p in meta_tfbs_parts]
+            current_global = global_generated + 1
+            global_progress_pct = (current_global / quota) * 100
+            subsample_progress_pct = ((local_generated + 1) / max_solutions_per_subsample) * 100
+
+            print(f"\nGlobal Quota Progress: {current_global}/{quota} ({global_progress_pct:.1f}%)")
+            print(f"Subsample Progress: {local_generated+1}/{max_solutions_per_subsample} ({subsample_progress_pct:.1f}%)")
+            print("Compression Ratio:", sol.compression_ratio)
+            print("Transcription Factors:", ", ".join(tf_names))
+            print("Full Solution Visual:\n", sol.original_visual)
+
+            opt_inst.forbid(sol)
+            fingerprint = sol.sequence
+                                
             if fingerprint in local_forbidden:
-                forbidden_repeats += 1
-                print(f"Source {source_label}: Duplicate solution encountered. Forbidden repeat count: {forbidden_repeats}")
-                if forbidden_repeats >= max_forbidden_repeats:
-                    print(f"Source {source_label}: Too many duplicates; moving to a new library sample.")
+                consecutive_duplicates += 1
+                print(f"Source {source_label}: Duplicate solution encountered; consecutive duplicates: {consecutive_duplicates}")
+                try:
+                    opt_inst.forbid(sol)
+                except Exception as e:
+                    print(f"Source {source_label}: Warning: Could not forbid duplicate solution: {e}")
+                if consecutive_duplicates >= max_consecutive_duplicates:
+                    print(f"Source {source_label}: Too many consecutive duplicates; moving to a new library sample.")
                     break
                 continue
+            consecutive_duplicates = 0
             local_forbidden.add(fingerprint)
-            if fill_gap and len(solution.sequence) < sequence_length:
-                gap = sequence_length - len(solution.sequence)
+
+            # If gap fill is enabled, fill the gap if the sequence is too short.
+            if fill_gap and len(sol.sequence) < sequence_length:
+                gap = sequence_length - len(sol.sequence)
                 fill_seq = random_fill(gap, fill_gc_min, fill_gc_max)
                 if fill_gap_end.lower() == "5prime":
-                    solution.sequence = fill_seq + solution.sequence
+                    sol.sequence = fill_seq + sol.sequence
                 else:
-                    solution.sequence = solution.sequence + fill_seq
-                setattr(solution, "meta_gap_fill", True)
-                setattr(solution, "meta_gap_fill_details", {
+                    sol.sequence = sol.sequence + fill_seq
+                setattr(sol, "meta_gap_fill", True)
+                setattr(sol, "meta_gap_fill_details", {
                     "fill_gap": gap,
                     "fill_end": fill_gap_end,
                     "fill_gc_range": (fill_gc_min, fill_gc_max)
                 })
+
             try:
-                opt_inst.forbid(solution)
+                opt_inst.forbid(sol)
             except Exception as e:
                 print(f"Source {source_label}: Warning: Could not forbid solution: {e}")
-            entry = generate_sequence_entry(solution, [source_label], meta_tfbs_parts, densegen_config)
+            entry = generate_sequence_entry(sol, [source_label], meta_tfbs_parts, densegen_config)
             entry["meta_source"] = f"deg2tfbs_{source_label}"
             generated_entries.append(entry)
             global_generated += 1
             new_generated += 1
             progress_tracker.update(entry, target_quota=quota)
-            print(f"\nSource {source_label}: Generated sequence {global_generated}/{quota} (this call: {new_generated}) in {elapsed_time:.2f} sec.")
-            print(f"Source {source_label}: TFBS parts used: {', '.join(meta_tfbs_parts)}")
-            print(f"Source {source_label}: Meta Sequence Visual:\n{entry['meta_sequence_visual']}")
             local_generated += 1
+
+            if local_generated >= max_solutions_per_subsample:
+                break
 
         forbidden_libraries.add(fp_library)
         sequence_saver.save(generated_entries, results_filename)
@@ -243,8 +254,7 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
 
 def get_sub_batches(source_config: dict, densegen_config: dict) -> list:
     """
-    Returns a list of (sub_source_config, sub_densegen_config) tuples for a given input source,
-    splitting by clusters and/or promoter constraints.
+    Splits an input source into sub-batches based on clusters and/or promoter constraints.
     """
     sub_batches = []
     clusters = source_config.get("clusters")
@@ -291,7 +301,6 @@ def get_sub_batches(source_config: dict, densegen_config: dict) -> list:
                 sub_batches.append((sub_source_config, sub_densegen_config))
         else:
             sub_batches.append((source_config, densegen_config))
-    # Debug: print the names of sub-batches generated.
     print("Generated sub-batches:")
     for cfg, dens in sub_batches:
         print("  ", cfg["name"], " (type:", cfg["type"], ")")
@@ -304,7 +313,7 @@ def process_source(source_config: dict, densegen_config: dict, output_base_folde
     """
     sub_batches = get_sub_batches(source_config, densegen_config)
     
-    # Pre-create all output directories for sub-batches
+    # Pre-create all output directories for sub-batches.
     for sub_cfg, sub_dense_cfg in sub_batches:
         out_folder_name = f"densebatch_{sub_cfg['type'].lower()}_{sub_cfg['name']}_n{sub_dense_cfg.get('quota')}"
         batch_folder = output_base_folder / out_folder_name
@@ -343,17 +352,17 @@ def main():
     output_base_folder.mkdir(parents=True, exist_ok=True)
     
     if densegen_config.get("round_robin", False):
-        # For round-robin, collect sub-batches from all input sources
+        # For round-robin, collect sub-batches from all input sources.
         all_sub_batches = []
         for src_cfg in input_source_configs:
             sub_batches = get_sub_batches(copy.deepcopy(src_cfg), copy.deepcopy(densegen_config))
             all_sub_batches.extend(sub_batches)
-        # Pre-create output directories for all sub-batches
+        # Pre-create output directories for all sub-batches.
         for sub_cfg, sub_dense_cfg in all_sub_batches:
             out_folder_name = f"densebatch_{sub_cfg['type'].lower()}_{sub_cfg['name']}_n{sub_dense_cfg.get('quota')}"
             batch_folder = output_base_folder / out_folder_name
             batch_folder.mkdir(parents=True, exist_ok=True)
-        # Interleave across all sub-batches
+        # Interleave across all sub-batches.
         all_done = False
         while not all_done:
             all_done = True
