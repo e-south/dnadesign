@@ -1,4 +1,37 @@
 # configs/example.yaml
+
+libshuffle:
+  # Directory containing exactly one .pt file
+  input_pt_path: sequences/densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_5_sigma70_consensus_n10000       
+  # (Used in output; see main.py)
+  output_dir_prefix: shuffle_sigma70_test           
+  subsample_size: 100
+  num_draws: 200
+  with_replacement: true
+  random_seed: 42
+  max_attempts_per_draw: 10
+  evo2_metric:
+    # Options: "l2", "log1p_l2", etc.
+    type: "l2"                                    
+  billboard_metric:
+    # Options: "sum_raw" or specific key (e.g., per_tf_entropy_mean)
+    type: "sum_raw"                               
+    use_normalized: false
+  joint_selection:
+    enable: true
+    method: "threshold"
+    billboard_min: 0.68
+    evo2_min: 0.5
+    normalize: false
+    save_top_k: 3
+  save_selected_pt: true
+  plot:
+    highlight_color: "pastel_red"                 
+    base_color: "gray"                            
+    alpha: 0.5
+    dpi: 600
+    filename: scatter_summary.png
+
 billboard:
   dry_run: false
   pt_files:
@@ -43,7 +76,6 @@ tfkdanalysis:
   tolerate_nas: true
   annotate_operon: true
 
-
 densegen:
   input_sources:
     - type: "deg2tfbs_pipeline_tfbsfetcher"
@@ -51,8 +83,8 @@ densegen:
       path: "tfbsbatch_20250321"
   output_dir: "sequences"
   progress_file: "progress_status.yaml"
-  solver: "CBC"
-  diverse_solution: false
+  solver: "GUROBI"
+  diverse_solution: true
   solver_options:
     - "Threads=16"
     - "TimeLimit=5"
@@ -61,14 +93,14 @@ densegen:
   subsample_over_length_budget_by: 100
   subsample_size: 20  # legacy
   round_robin: true
-  arrays_generated_before_resample: 10  
+  arrays_generated_before_resample: 20  
   fixed_elements:
     promoter_constraints:
-      # - name: "sigma70_consensus"
-      #   upstream: "TTGACA"
-      #   downstream: "TATAAT"
-      #   spacer_length: [16, 18]
-      #   upstream_pos: [10, 100]
+      - name: "sigma70_consensus"
+        upstream: "TTGACA"
+        downstream: "TATAAT"
+        spacer_length: [16, 18]
+        upstream_pos: [10, 100]
       # - name: "sigma70_consensus_+"
       #   upstream: "TTGACA"
       #   downstream: "TGTATAATGCT"

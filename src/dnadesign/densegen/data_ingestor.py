@@ -77,7 +77,7 @@ class CSVDataSource(BaseDataSource):
         assert self.dir.exists() and self.dir.is_dir(), f"Directory {self.dir} must exist and be a directory."
     
     def load_data(self):
-        csv_file = self.dir / "tf2tfbs_mapping.csv"
+        csv_file = self.dir / "csvs" / "tf2tfbs_mapping.csv"
         assert csv_file.exists(), f"CSV file {csv_file} does not exist."
         df = pd.read_csv(csv_file)
         required_columns = [
