@@ -134,19 +134,6 @@ class DenseArrayOptimizer:
             raise
 
         if solution and solution.nb_motifs > 0:
-            if self.fill_gap and len(solution.sequence) < self.sequence_length:
-                gap = self.sequence_length - len(solution.sequence)
-                fill_seq = random_fill(gap, self.fill_gc_min, self.fill_gc_max)
-                if self.fill_gap_end.lower() == "5prime":
-                    solution.sequence = fill_seq + solution.sequence
-                else:
-                    solution.sequence = solution.sequence + fill_seq
-                setattr(solution, "meta_gap_fill", True)
-                setattr(solution, "meta_gap_fill_details", {
-                    "fill_gap": gap,
-                    "fill_end": self.fill_gap_end,
-                    "fill_gc_range": (self.fill_gc_min, self.fill_gc_max)
-                })
             return solution
         else:
             raise ValueError("Optimization returned an invalid solution.")

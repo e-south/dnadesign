@@ -87,13 +87,13 @@ densegen:
   diverse_solution: true
   solver_options:
     - "Threads=16"
-    - "TimeLimit=5"
+    - "TimeLimit=10"
   quota: 10000
   sequence_length: 120
   subsample_over_length_budget_by: 100
   subsample_size: 20  # legacy
   round_robin: true
-  arrays_generated_before_resample: 20  
+  arrays_generated_before_resample: 100  
   fixed_elements:
     promoter_constraints:
       - name: "sigma70_consensus"

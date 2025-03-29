@@ -193,22 +193,13 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
             global_progress_pct = (current_global / quota) * 100
             subsample_progress_pct = ((local_generated + 1) / max_solutions_per_subsample) * 100
 
-            print(f"\nGlobal Quota Progress: {current_global}/{quota} ({global_progress_pct:.1f}%)")
-            print(f"Subsample Progress: {local_generated+1}/{max_solutions_per_subsample} ({subsample_progress_pct:.1f}%)")
-            print("Compression Ratio:", sol.compression_ratio)
-            print("Transcription Factors:", ", ".join(tf_names))
-            print("Full Solution Visual:\n", sol.original_visual)
-
+            # Forbid the original solution (which is all uppercase) for duplicate checking.
             opt_inst.forbid(sol)
             fingerprint = sol.sequence
                                 
             if fingerprint in local_forbidden:
                 consecutive_duplicates += 1
                 print(f"Source {source_label}: Duplicate solution encountered; consecutive duplicates: {consecutive_duplicates}")
-                try:
-                    opt_inst.forbid(sol)
-                except Exception as e:
-                    print(f"Source {source_label}: Warning: Could not forbid duplicate solution: {e}")
                 if consecutive_duplicates >= max_consecutive_duplicates:
                     print(f"Source {source_label}: Too many consecutive duplicates; moving to a new library sample.")
                     break
@@ -216,26 +207,23 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
             consecutive_duplicates = 0
             local_forbidden.add(fingerprint)
 
-            # If gap fill is enabled, fill the gap if the sequence is too short.
-            if fill_gap and len(sol.sequence) < sequence_length:
-                gap = sequence_length - len(sol.sequence)
+            # Clone the solution and apply gap fill modifications on the clone.
+            final_sol = copy.deepcopy(sol)
+            if fill_gap and len(final_sol.sequence) < sequence_length:
+                gap = sequence_length - len(final_sol.sequence)
                 fill_seq = random_fill(gap, fill_gc_min, fill_gc_max)
                 if fill_gap_end.lower() == "5prime":
-                    sol.sequence = fill_seq + sol.sequence
+                    final_sol.sequence = fill_seq + final_sol.sequence
                 else:
-                    sol.sequence = sol.sequence + fill_seq
-                setattr(sol, "meta_gap_fill", True)
-                setattr(sol, "meta_gap_fill_details", {
+                    final_sol.sequence = final_sol.sequence + fill_seq
+                setattr(final_sol, "meta_gap_fill", True)
+                setattr(final_sol, "meta_gap_fill_details", {
                     "fill_gap": gap,
                     "fill_end": fill_gap_end,
                     "fill_gc_range": (fill_gc_min, fill_gc_max)
                 })
 
-            try:
-                opt_inst.forbid(sol)
-            except Exception as e:
-                print(f"Source {source_label}: Warning: Could not forbid solution: {e}")
-            entry = generate_sequence_entry(sol, [source_label], meta_tfbs_parts, densegen_config)
+            entry = generate_sequence_entry(final_sol, [source_label], meta_tfbs_parts, densegen_config)
             entry["meta_source"] = f"deg2tfbs_{source_label}"
             generated_entries.append(entry)
             global_generated += 1
@@ -245,6 +233,13 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
 
             if local_generated >= max_solutions_per_subsample:
                 break
+            
+            print(f"\nGlobal Quota Progress: {current_global}/{quota} ({global_progress_pct:.1f}%)")
+            print(f"Subsample Progress: {local_generated+1}/{max_solutions_per_subsample} ({subsample_progress_pct:.1f}%)")
+            print("Compression Ratio:", sol.compression_ratio)
+            print("Transcription Factors:", ", ".join(tf_names))
+            print("Dense Visual:\n", sol.original_visual)
+            print("Sequence:\n", final_sol.sequence)
 
         forbidden_libraries.add(fp_library)
         sequence_saver.save(generated_entries, results_filename)
