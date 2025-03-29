@@ -19,12 +19,6 @@ import platform
 import subprocess
 from pathlib import Path
 
-def get_git_commit_hash():
-    try:
-        commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
-        return commit
-    except Exception:
-        return None
 
 def save_summary(output_dir, config, input_file, sequence_batch_id, num_sequences, run_start_time, duration):
     summary = {
@@ -42,7 +36,6 @@ def save_summary(output_dir, config, input_file, sequence_batch_id, num_sequence
         "input_pt_file": input_file.name,
         "sequence_batch_id": sequence_batch_id,
         "num_sequences": num_sequences,
-        "git_commit_hash": get_git_commit_hash(),
         "python_version": platform.python_version()
     }
     summary_path = Path(output_dir) / "summary.yaml"

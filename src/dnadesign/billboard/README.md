@@ -1,64 +1,182 @@
-## billboard
+## *billboard*
 
-**billboard** performs analyses and calculates entropy metrics on batches of regulatory sequence data stored in its sibling **sequences** directory. **billboard** processes each sequence to extract transcription factor binding site (TFBS) information, computes various entropy metrics that describe both positional (global and per‑TF) and combinatorial diversity, and generates summary CSV files. Optionally, the program can also produce a set of plots to visualize TF frequency, occupancy, motif lengths, and TF statistics.
+**billboard** quantifies the regulatory diversity of dense-array–derived DNA sequences based on transcription factor binding site (TFBS) composition and distribution. It processes batches of sequences, extracts motif information, computes core diversity metrics, and writes a `diversity_summary.csv` file to support downstream workflows.
 
-The program is configured via a YAML file (e.g., `dnadesign/configs/example.yaml`). A special **DRY_RUN** mode is available to quickly perform the analysis and produce only an entropy summary CSV file, without generating plots.
+**billboard** helps to answer: ***how broad, balanced, distinct, and spatially diffuse are the regulatory elements across the dense array library?***
 
-### Modules
+### Pipeline
 
-- **`main.py`**
+Given a `.pt` file containing sequence dictionaries (in the sibling `sequences/` directory), **billboard**:
 
-    The entry point that loads configuration settings, parses input `.pt` files, and directs the program flow (full run or DRY_RUN).
+1. Parses TFBS annotations to extract which transcription factors are present in each sequence.
+2. Constructs strand-specific positional occupancy maps for each TF.
+3. Computes four scalar diversity metrics:
+   - **TF Richness** – Compositional breadth.
+   - **Inverted Gini Coefficient** – Usage balance across TFs.
+   - **Mean Jaccard Dissimilarity** – Combinatorial diversity of TF rosters.
+   - **Positional Entropy** – How diffuse each TF's binding is across the sequence.
+4. Optionally computes a weighted composite score.
+5. Writes results to `diversity_summary.csv`.
+6. Optionally produces diagnostic plots.
 
-- **`core.py`** 
-    
-    Contains the core logic to extract and process transcription factor binding sites (TFBS) from sequences, build positional coverage matrices, and calculate key entropy metrics. 
-    
-    For every sequence, the module:
-    - Parses each entry in `"meta_tfbs_parts"` to extract the TF name and its binding motif.
-    - Searches for the motif in the full sequence and constructs two positional coverage matrices (one for the forward strand and one for the reverse) that record how many times motifs appear at each nucleotide position.
+### Simple Usage
 
-   The module then computes several types of entropy metrics to quantify the diversity and spatial distribution of motifs:
-   
-   **Global Positional Entropy:**  
-     - *Definition:* The Shannon entropy of the motif coverage across all positions in the entire library of sequences.  
-     - *Computation:* Aggregates counts from the forward and reverse coverage matrices, computes the entropy, averages the two, and then normalizes by dividing by log₂(sequence length).  
-     - *Interpretation:* Indicates whether motifs are clustered in specific regions (low entropy) or evenly distributed across the sequence (high entropy).
+1. **Edit your YAML config** (`configs/example.yaml`):
+    ```yaml
+    billboard:
+      output_dir_prefix: example_library
+      pt_files:
+        - example_sequences
+      save_plots: true
+      dry_run: false
+      composite_weights:
+        tf_richness: 0.4
+        1_minus_gini: 0.3
+        mean_jaccard: 0.3
+        median_tf_entropy: 0.1
+    ```
 
-   **Per‑TF Positional Entropy:**  
-     - *Definition:* The entropy calculated for the positional distribution of a specific transcription factor's binding sites.  
-     - *Computation:* For each TF, the entropy is computed from its forward and reverse coverage, averaged, and normalized by log₂(sequence length).  
-     - *Interpretation:* High per‑TF entropy suggests that a TF binds over many positions (flexible binding), while low entropy indicates restricted binding locations. Summary statistics (unweighted mean, frequency‑weighted mean, and top‑K average) can be derived from these values.
-     
-    **TF Frequency Entropy:**  
-    - *Definition:* A measure of how uniformly transcription factors (TFs) are represented across the library.  
-    - *Computation:* Convert the frequency counts of each TF into a probability distribution and compute the Shannon entropy, then normalize by dividing by log₂(the number of unique TFs).  
-    - *Interpretation:* Higher entropy indicates a more even, egalitarian distribution of TF frequencies; lower entropy suggests that a few TFs dominate the library.
+2. **Run the analysis:**
+    ```bash
+    python billboard/main.py
+    ```
 
-    Together, these calculations offer a ensemble view of regulatory sequence diversity, detailing both the global pattern of motif distribution and the individual behavior of transcription factors.
+    Results will appear under:
+    ```
+    batch_results/example_library_YYYYMMDD/
+    ```
 
-- **plot_helpers.py**  
-  
-  Provides functions to generate diagnostic plots (TF frequency bar plot, occupancy heatmap, motif length density plot, etc.).
+### Core Diversity Metrics
 
-- **summary.py**  
+Each metric captures a different aspect of library diversity. All are scalar, interpretable, and suitable for low-N analysis.
 
-  Contains functions to generate CSV outputs. There are two CSV generation paths:  
-  - **Full Run**: Outputs multiple CSVs including summary metrics, per‑TF coverage, mapping failures, TF combination counts, and an overall entropy summary.  
-  - **DRY_RUN Mode**: Generates only the entropy summary CSV.
+#### 1. TF Richness — *Compositional Breadth*
 
-## Simple Usage
+- **Definition**: Counts how many unique TFs are present across the library.
+- **Computation**: Let `T = {t₁, t₂, ..., tₖ}` be the union of TFs; then `TF Richness = |T|`.
+- **Summary**: Measures how many distinct TFs are represented, regardless of how often or where they appear.
 
-- **Configuration:**  
-   Edit the `configs/example.yaml` file to set the desired configuration options.
+#### 2. Inverted Gini Coefficient — *Usage Balance*
 
-- **Execution:**  
-   Run the main program using:
-   ```bash
-   python billboard/main.py
-   ```
-   The program will:
-   - Load the configuration and input `.pt` files.
-   - Process sequences and compute metrics.
-   - Create an output directory under `batch_results/<output_dir_prefix>_<date>`.
-   - Generate CSV files (and plots if not in DRY_RUN mode).
+- **Definition**: Quantifies how evenly TFs are used based on frequency.
+- **Computation**:  
+  `Gini = (∑₁ⁿ ∑₁ⁿ |fᵢ - fⱼ|) / (2n ∑ f)`,  
+  then take `1 - Gini` to reward evenness.
+  ```python
+  # Example
+  tf_counts = [10, 10, 10]  # TF usage counts across the library is perfectly even
+  n = len(tf_counts)
+  total = sum(tf_counts)
+
+  gini_numerator = sum(abs(x - y) for x in tf_counts for y in tf_counts)
+  gini = gini_numerator / (2 * n * total)
+  inverted_gini = 1 - gini
+
+  print(f"Gini: {gini:.2f}, Inverted Gini: {inverted_gini:.2f}")  # → Gini: 0.00, Inverted Gini: 1.00
+
+  # Now try an imbalanced example:
+  tf_counts = [25, 5, 0]
+  n = len(tf_counts)
+  total = sum(tf_counts)
+
+  gini_numerator = sum(abs(x - y) for x in tf_counts for y in tf_counts)
+  gini = gini_numerator / (2 * n * total)
+  inverted_gini = 1 - gini
+
+  print(f"Gini: {gini:.2f}, Inverted Gini: {inverted_gini:.2f}")  # → Gini: 0.56, Inverted Gini: 0.44
+  ```
+
+- **Summary**: Captures inequality in TF usage—higher values indicate more balanced distribution, but does not consider TF identity or binding location.
+
+#### 3. Mean Jaccard Dissimilarity — *Combinatorial Diversity*
+
+- **Definition**: Measures how distinct TF rosters are between sequences.
+- **Computation**:  
+  For two sequences A and B with TF sets `T_A` and `T_B`:  
+  `D(A, B) = 1 - |T_A ∩ T_B| / |T_A ∪ T_B|`
+
+  Average `D(A, B)` across all sequence pairs.
+  ```python
+  # Example
+  Seq1_TFs = {"CRP", "FadR", "LexA"}
+  Seq2_TFs = {"FadR", "ArcA"}
+
+  intersection = Seq1_TFs & Seq2_TFs        # {"FadR"}
+  union = Seq1_TFs | Seq2_TFs               # {"CRP", "FadR", "LexA", "ArcA"}
+
+  jaccard = len(intersection) / len(union)  # 1 / 4 = 0.25
+  dissimilarity = 1 - jaccard               # 0.75
+  ```
+
+- **Summary**: Reflects the diversity of TF combinations across sequences; robust at small sample sizes, but ignores frequency and position.
+
+#### 4. Median Positional Entropy — *Spatial Diffusion*
+
+- **Definition**: Assesses how widely each TF binds across the sequence.
+- **Computation**:
+  - For each TF, build a position-wise count vector `P = [p₁, p₂, ..., p_L]`, normalize it to `P̂`.
+  - Compute entropy: `H = -∑ P̂ᵢ log₂(P̂ᵢ)`, normalized by `log₂(L)`.
+  - Average forward and reverse strand entropy; take the **median** across TFs.
+  ```python
+  # Example
+  import numpy as np
+  # Two TFs binding across a sequence of length 5
+  P_TF1 = np.array([10, 0, 0, 0, 0])     # Clustered binding at position 0
+  P_TF2 = np.array([2, 2, 2, 2, 2])       # Uniformly spread binding
+
+  def entropy(P):
+      P_hat = P / P.sum()
+      return -np.sum(P_hat * np.log2(P_hat))
+
+  H1 = entropy(P_TF1)
+  H2 = entropy(P_TF2)
+  L = 5
+  H1_norm = H1 / np.log2(L)  # → 0.00 (completely focused)
+  H2_norm = H2 / np.log2(L)  # → 1.00 (maximally diffuse)
+
+  print(f"TF1 entropy: {H1_norm:.2f}")
+  print(f"TF2 entropy: {H2_norm:.2f}")
+  # Median Positional Entropy = median([H1_norm, H2_norm]) = 0.50
+  ```
+
+- **Summary**: Captures whether TFs bind diffusely or cluster at specific positions. Robust to strand orientation and motif redundancy, though sparse TFs may skew results.
+
+### Composite Metric
+
+To create a single scalar summary of diversity, **billboard** supports a **weighted sum** of the core metrics:
+
+```yaml
+# YAML config snippet
+composite_weights:
+  tf_richness: 0.5
+  1_minus_gini: 0.3
+  mean_jaccard: 0.2
+  median_tf_entropy: 0.1
+```
+```python
+billboard_weighted_sum = w1 * tf_richness + w2 * (1 - gini) + w3 * mean_jaccard + w4 * median_tf_entropy
+```
+
+### Output
+
+After running, **billboard** writes a results folder under `batch_results/`:
+
+### Key Deliverable
+- `csvs/diversity_summary.csv`
+  - `tf_richness`
+  - `1_minus_gini`
+  - `mean_jaccard`
+  - `median_tf_entropy`
+  - `billboard_weighted_sum`
+
+### Optional Plots
+- `tf_frequency_barplot.png`
+- `tf_occupancy_combined.png`
+- `motif_length_density.png`
+
+### Module Overview
+
+- `main.py`: Orchestrates loading config, processing sequences, and saving outputs.
+- `core.py`: Computes diversity metrics and TF occupancy.
+- `plot_helpers.py`: Generates optional plots.
+- `summary.py`: Writes CSVs, including the diversity summary.

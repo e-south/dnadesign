@@ -33,7 +33,7 @@ def load_pt_file(input_dir: Path):
     return pt_files[0]
 
 def load_sequences(pt_file: Path):
-    sequences = torch.load(pt_file)
+    sequences = torch.load(pt_file, map_location=torch.device('cpu'))
     if not isinstance(sequences, list):
         raise ValueError("Loaded .pt file must contain a list of sequence entries.")
     return sequences
@@ -59,7 +59,7 @@ def main():
         config = config_loader.config
 
         # Resolve input .pt file.
-        input_pt_dir = Path(config.get("input_pt_path"))
+        input_pt_dir = Path(__file__).parent.parent / config.get("input_pt_path")
         if not input_pt_dir.exists():
             logger.error(f"Input directory {input_pt_dir} does not exist.")
             sys.exit(1)

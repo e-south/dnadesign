@@ -106,20 +106,21 @@ def compute_evo2_metric(subsample, config):
         vector = entry.get("evo2_logits_mean_pooled")
         if vector is None:
             raise ValueError("Entry missing 'evo2_logits_mean_pooled' field required for evo2 metric.")
-        if isinstance(vector, list):
-            vector = torch.tensor(vector, dtype=torch.float32).flatten()
-        elif not isinstance(vector, torch.Tensor):
+        # Always convert the vector to a float32 tensor.
+        if isinstance(vector, torch.Tensor):
+            vector = vector.to(torch.float32).flatten()
+        elif isinstance(vector, list):
             vector = torch.tensor(vector, dtype=torch.float32).flatten()
         else:
-            vector = vector.flatten()
+            vector = torch.tensor(vector, dtype=torch.float32).flatten()
         vectors.append(vector)
     if len(vectors) < 2:
         return 0.0
-    # Stack vectors into a matrix and compute pairwise distances.
+    # Stack vectors into a matrix and compute pairwise L2 distances.
     mat = torch.stack(vectors)
     distances = torch.cdist(mat, mat, p=2)
     n = distances.size(0)
-    mask = torch.triu(torch.ones(n, n, dtype=bool), diagonal=1)
+    mask = torch.triu(torch.ones(n, n, dtype=torch.bool), diagonal=1)
     pairwise = distances[mask]
     mean_distance = pairwise.mean().item()
     metric_type = config.get("evo2_metric", {}).get("type", "l2")
@@ -127,3 +128,4 @@ def compute_evo2_metric(subsample, config):
         import math
         return math.log1p(mean_distance)
     return mean_distance
+

@@ -76,6 +76,9 @@ dnadesign/
   
    **clustering** utilizes [Scanpy](https://scanpy.readthedocs.io/en/stable/) for cluster analysis on nucleotide sequences stored in the sibling **sequences** directory. By default, it uses the mean-pooled output logits of **Evo 2** along the sequence dimension as input. The pipeline generates UMAP embeddings, applies Leiden clustering, and also supports downstream analyses, such as cluster composition and diversity assessment.
 
+5. [**billboard**](src/dnadesign/billboard/README.md)  
+
+   **billboard** quantifies the *regulatory diversity* of dense-array DNA libraries based on transcription factor binding site (TFBS) composition and distribution. It processes `.pt` sequence batches from the sibling **sequences** directory and computes interpretable metrics such as TF richness, usage balance (Gini), combinatorial diversity (Jaccard), and spatial entropy. Results are written to `diversity_summary.csv`, with optional plots for visual diagnostics.  
 
 ## Installation
 

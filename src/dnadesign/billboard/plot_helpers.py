@@ -14,82 +14,27 @@ import numpy as np
 import seaborn as sns
 from matplotlib import cm
 from matplotlib.colors import Normalize
+from scipy.stats import entropy as scipy_entropy
 
-# Set seaborn style to "ticks".
 sns.set_theme(style="ticks", font_scale=0.8)
 
-
-def save_tf_frequency_barplot(tf_frequency, tf_entropy, title, output_path, dpi, figsize=(14,7)):
+def save_tf_frequency_barplot(tf_frequency, tf_metric, title, output_path, dpi, figsize=(14,7)):
     """
-    Save a composite TF frequency plot with two subplots:
-      - Left: The original TF frequency bar plot with bars colored by positional entropy.
-      - Right: A horizontal stacked bar plot showing the proportion of each TF in the library.
-    
-    Fixed upstream/downstream keys are filtered out.
-    Left plot:
-      - Bars are sorted in descending order by frequency.
-      - X-tick labels are rotated 90°.
-      - A colorbar indicates the mapping from positional entropy to color.
-    
-    Right plot:
-      - Displays a single horizontal stacked bar where each segment's width represents the 
-        proportion of that TF's frequency relative to the total.
-      - Each segment is colored using a colormap that maps the normalized proportion value to a hue.
-      - Left and bottom spines are retained; top and right spines are removed.
-      - Annotates each segment with the TF name if the segment is wide enough.
+    Save a TF frequency bar plot.
+    Displays a bar chart of TF frequencies in grey.
     """
-    # Filter out fixed elements (upstream/downstream)
+    # Filter out fixed elements (if any)
     filtered = {k: v for k, v in tf_frequency.items() if not (k.endswith("_upstream") or k.endswith("_downstream"))}
-    filtered_entropy = {k: tf_entropy.get(k, 0) for k in filtered.keys()}
-    
-    # Sort items in descending order by frequency
     sorted_items = sorted(filtered.items(), key=lambda item: item[1], reverse=True)
     tf_names = [item[0] for item in sorted_items]
     frequencies = [item[1] for item in sorted_items]
-    entropies = [filtered_entropy.get(tf, 0) for tf in tf_names]
     
-    # Compute proportions for stacked bar plot
-    total = sum(frequencies)
-    proportions = [freq/total for freq in frequencies]
-    
-    # Create composite figure with two subplots (side-by-side)
-    fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=figsize)
-    
-    # Left subplot: TF frequency bar plot colored by positional entropy.
-    cmap_left = cm.get_cmap("YlGnBu")
-    norm_left = Normalize(vmin=min(entropies), vmax=max(entropies))
-    colors_left = [cmap_left(norm_left(val)) for val in entropies]
-    
-    ax_left.bar(tf_names, frequencies, color=colors_left)
-    ax_left.set_ylabel("Frequency", fontsize=10)
-    ax_left.set_title(title, fontsize=12)
-    ax_left.set_xlabel("")
-    plt.setp(ax_left.get_xticklabels(), rotation=90, fontsize=8)
-    sns.despine(ax=ax_left)  # Use seaborn 'ticks' style
-    
-    sm = plt.cm.ScalarMappable(cmap=cmap_left, norm=norm_left)
-    sm.set_array([])
-    cbar = fig.colorbar(sm, ax=ax_left, pad=0.01)
-    cbar.set_label("Positional Entropy", fontsize=10)
-    
-    # Right subplot: Horizontal stacked bar plot showing TF frequency proportions.
-    # Use a separate colormap (e.g., 'viridis') based on normalized proportion values.
-    cmap_right = cm.get_cmap("viridis")
-    norm_right = Normalize(vmin=min(proportions), vmax=max(proportions))
-    colors_right = [cmap_right(norm_right(prop)) for prop in proportions]
-    
-    cumulative = 0
-    for tf, prop, color in zip(tf_names, proportions, colors_right):
-        ax_right.barh(0, width=prop, left=cumulative, color=color, edgecolor='white')
-        # Annotate segment if its width is sufficiently large (e.g., > 5% of the bar)
-        if prop > 0.05:
-            ax_right.text(cumulative + prop/2, 0, tf, va='center', ha='center', fontsize=8, color='white')
-        cumulative += prop
-    ax_right.set_xlim(0, 1)
-    ax_right.set_xlabel("Proportion", fontsize=10)
-    ax_right.set_title("TF Frequency Proportions", fontsize=12)
-    # Retain left and bottom spines; remove top and right spines
-    sns.despine(ax=ax_right, top=True, right=True)
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    ax.bar(tf_names, frequencies, color="grey")
+    ax.set_ylabel("Frequency", fontsize=10)
+    ax.set_title(title, fontsize=12)
+    plt.setp(ax.get_xticklabels(), rotation=90, fontsize=8)
+    sns.despine(ax=ax, top=True, right=True)
     
     plt.tight_layout()
     plt.savefig(output_path, dpi=dpi)
@@ -97,14 +42,6 @@ def save_tf_frequency_barplot(tf_frequency, tf_entropy, title, output_path, dpi,
 
 
 def save_occupancy_plot(forward_matrix, reverse_matrix, tf_list, title, output_path, dpi, figsize=(14,7)):
-    """
-    Save a combined occupancy heatmap.
-    
-    Two subplots share a y-axis, where TF names are sorted in descending order by frequency.
-    Each subplot forces a 1:1 aspect ratio with no whitespace between cells.
-    A common colorbar is added to the right.
-    Y-axis label is removed and y-tick font is reduced.
-    """
     fig, axes = plt.subplots(1, 2, figsize=figsize, sharey=True)
     
     im0 = axes[0].imshow(forward_matrix, aspect="equal", interpolation="none")
@@ -112,18 +49,19 @@ def save_occupancy_plot(forward_matrix, reverse_matrix, tf_list, title, output_p
     axes[0].set_xlabel("Nucleotide Position", fontsize=9)
     axes[0].set_yticks(np.arange(len(tf_list)))
     axes[0].set_yticklabels(tf_list, fontsize=4)
+    sns.despine(ax=axes[0], top=True, right=True)
     
     im1 = axes[1].imshow(reverse_matrix, aspect="equal", interpolation="none")
     axes[1].set_title("Reverse Strand", fontsize=10)
     axes[1].set_xlabel("Nucleotide Position", fontsize=9)
     axes[1].tick_params(axis='y', labelleft=False)
+    sns.despine(ax=axes[1], top=True, right=True)
     
-    fig.suptitle("Library-wide sequence diversity through motif coverage and arrangement variability", fontsize=12, y=0.86)
+    fig.suptitle(title, fontsize=12, y=0.92)
     plt.subplots_adjust(wspace=0.02, left=0.15, right=0.88)
-    
     cbar_ax = fig.add_axes([0.9, 0.15, 0.025, 0.65])
-    cbar = fig.colorbar(im1, cax=cbar_ax)
-    cbar.set_label("Value Count", fontsize=10)
+    fig.colorbar(im1, cax=cbar_ax, label="Count")
+    sns.despine(fig=fig, top=True, right=True)
     
     plt.savefig(output_path, dpi=dpi, bbox_inches='tight')
     plt.close()
@@ -131,70 +69,128 @@ def save_occupancy_plot(forward_matrix, reverse_matrix, tf_list, title, output_p
 
 def save_motif_length_histogram(motif_info, output_path, dpi, figsize=(8,6)):
     """
-    Save a density plot of motif lengths using Seaborn's KDE plot.
-    
-    Uses pastel, colorblind-friendly colors.
-    Legend labels are updated: "pass" → "Appeared", "fail" → "Failed to appear".
-    Title: "Shorter binding sites are more likely to appear in dense arrays"
-    X label: "Length of Binding Site"
-    Y label: "Appearances in Dense Arrays"
-    Legend frame is removed.
+    Plot a KDE of motif lengths with a separate density curve for each TF.
+    Expects motif_info to include keys "motif" and "tf".
     """
     import pandas as pd
     df = pd.DataFrame(motif_info)
-    df["status"] = df["status"].map({"pass": "Appeared", "fail": "Failed to appear"})
-    
+    df["motif_length"] = df["motif"].apply(len)
     plt.figure(figsize=figsize)
-    ax = sns.kdeplot(data=df, x="length", hue="status", fill=True, common_norm=False, palette="pastel", alpha=0.7)
-    ax.set_xlabel("Length of Binding Site", fontsize=10)
-    ax.set_ylabel("Frequency", fontsize=10)
-    ax.set_title("Shorter binding sites are more likely to appear in dense arrays", fontsize=12)
+    ax = sns.kdeplot(data=df, x="motif_length", hue="tf", fill=True, common_norm=False, alpha=0.7, warn_singular=False)
+    ax.set_xlabel("Motif Length", fontsize=10)
+    ax.set_ylabel("Density", fontsize=10)
+    ax.set_title("Distribution of Motif Lengths by Transcription Factors", fontsize=12)
     sns.despine(ax=ax, top=True, right=True)
-    leg = ax.get_legend()
-    if leg is not None:
-        leg.set_frame_on(False)
     plt.tight_layout()
     plt.savefig(output_path, dpi=dpi)
     plt.close()
 
 
-def save_motif_stats_barplot(motif_stats, output_path, dpi, figsize=(14,7)):
+def save_tf_entropy_kde_plot(occupancy_forward_matrix, occupancy_reverse_matrix, tf_list, sequence_length, output_path, dpi, figsize=(10,6)):
     """
-    Save a vertical bar plot with two subplots sharing the x-axis.
-    
-    The x-axis represents unique TFs sorted in descending order by pass ratio.
-    Top subplot: Pass ratio by TF.
-    Bottom subplot: Average motif length for passed motifs (with y-axis inverted).
-    Both subplots have top and right spines removed, x-tick font reduced, and no x label.
-    Uses pastel, colorblind-friendly colors.
+    Overlay KDE plots of positional occupancy for the top 3 and bottom 3 TFs.
+    Combines forward and reverse strand occupancy for each TF.
     """
     import pandas as pd
-    df = pd.DataFrame(motif_stats)
-    df_sorted = df.sort_values(by="ratio", ascending=False)
-    x = df_sorted["tf"]
-    pass_ratio = df_sorted["ratio"]
-    avg_length = df_sorted["avg_length"]
+    # If less than 6 TFs, show all; otherwise, choose top 3 and bottom 3.
+    if len(tf_list) < 6:
+        selected_tf = tf_list
+    else:
+        top3 = tf_list[:3]
+        bottom3 = tf_list[-3:]
+        selected_tf = list(dict.fromkeys(top3 + bottom3))  # preserve order and remove duplicates
     
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
-    pastel_color = sns.color_palette("pastel")[0]
+    positions = np.arange(sequence_length)
+    plt.figure(figsize=figsize)
     
-    sns.barplot(x=x, y=pass_ratio, ax=ax1, color=pastel_color)
-    ax1.set_title("Pass/Fail Ratio by TF\nReflects how often the solver successfully incorporated a binding site for each TF when it was presented as an option", fontsize=10)
-    ax1.set_ylabel("Pass Ratio", fontsize=9)
-    ax1.spines["top"].set_visible(False)
-    ax1.spines["right"].set_visible(False)
-    ax1.set_xlabel("")
+    for tf in selected_tf:
+        try:
+            row = tf_list.index(tf)
+        except ValueError:
+            continue
+        occ_forward = occupancy_forward_matrix[row]
+        occ_reverse = occupancy_reverse_matrix[row]
+        total_occ = occ_forward + occ_reverse
+        if total_occ.sum() > 0:
+            sns.kdeplot(x=positions, weights=total_occ, label=tf, fill=True, common_norm=False, alpha=0.5)
     
-    sns.barplot(x=x, y=avg_length, ax=ax2, color=pastel_color)
-    ax2.set_title("Average Motif Length (Passed) by TF", fontsize=10)
-    ax2.set_ylabel("Average Length", fontsize=9)
-    ax2.invert_yaxis()
-    ax2.spines["top"].set_visible(False)
-    ax2.spines["right"].set_visible(False)
-    ax2.set_xlabel("")
+    plt.xlabel("Nucleotide Position")
+    plt.ylabel("Density")
+    plt.title("Positional Occupancy KDE by TF (Top 3 & Bottom 3)")
+    plt.legend(title="TF")
+    sns.despine(top=True, right=True)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=dpi)
+    plt.close()
+
+
+def save_gini_lorenz_plot(tf_frequency, output_path, dpi, figsize=(8,6)):
+    """
+    Plot a Lorenz curve for the TF frequency distribution and annotate with the inverted Gini coefficient.
+    """
+    freqs = np.array(sorted(tf_frequency.values()))
+    n = freqs.size
+    cumfreq = np.cumsum(freqs)
+    total = cumfreq[-1]
+    cumfreq_norm = cumfreq / total
+    x = np.linspace(1/n, 1, n)
     
-    plt.setp(ax2.get_xticklabels(), rotation=90, fontsize=8)
-    sns.despine()
+    def compute_gini_original(freqs):
+        n = freqs.size
+        cumfreq = np.cumsum(np.sort(freqs))
+        if cumfreq[-1] == 0:
+            return 0.0
+        gini_inv = (n + 1 - 2 * np.sum(cumfreq) / cumfreq[-1]) / n
+        return 1 - gini_inv  # original Gini
+    gini_original = compute_gini_original(freqs)
+    inverted_gini = 1 - gini_original
+    
+    plt.figure(figsize=figsize)
+    plt.plot(x, cumfreq_norm, marker='o', label="Lorenz Curve")
+    plt.plot([0, 1], [0, 1], color='gray', linestyle='--', label="Equality")
+    plt.xlabel("Cumulative proportion of TFs")
+    plt.ylabel("Cumulative proportion of TFBS")
+    plt.title("TF Representation Based on TFBS Frequency (Lorenz Curve)")
+    plt.annotate(f"Inverted Gini: {inverted_gini:.3f}", xy=(0.05, 0.9), xycoords="axes fraction",
+                 fontsize=10, bbox=dict(boxstyle="round", fc="w"))
+    plt.legend()
+    sns.despine(top=True, right=True)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=dpi)
+    plt.close()
+
+
+def save_jaccard_histogram(sequences, output_path, dpi, figsize=(8,6), sample_size=1000):
+    """
+    Compute pairwise Jaccard dissimilarities for a (sampled) set of sequences and plot a histogram.
+    """
+    tf_rosters = []
+    for seq in sequences:
+        roster = set()
+        for part in seq.get("meta_tfbs_parts", []):
+            if ":" in part:
+                tf_name, _ = part.split(":", 1)
+                roster.add(tf_name.lower().strip())
+        tf_rosters.append(roster)
+    
+    n = len(tf_rosters)
+    dissimilarities = []
+    num_pairs = int(n*(n-1)/2)
+    max_pairs = min(sample_size, num_pairs)
+    
+    for _ in range(max_pairs):
+        i, j = np.random.choice(n, 2, replace=False)
+        inter = len(tf_rosters[i].intersection(tf_rosters[j]))
+        union = len(tf_rosters[i].union(tf_rosters[j]))
+        jaccard = inter / union if union > 0 else 0
+        dissimilarities.append(1 - jaccard)
+    
+    plt.figure(figsize=figsize)
+    sns.histplot(dissimilarities, kde=True, color="steelblue")
+    plt.xlabel("Jaccard Dissimilarity")
+    plt.ylabel("Frequency")
+    plt.title("Diversity of TF Combinations Across Sequences (Jaccard Similarities)")
+    sns.despine(top=True, right=True)
     plt.tight_layout()
     plt.savefig(output_path, dpi=dpi)
     plt.close()

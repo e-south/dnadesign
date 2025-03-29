@@ -1,50 +1,83 @@
 # configs/example.yaml
 
 libshuffle:
-  # Directory containing exactly one .pt file
-  input_pt_path: sequences/densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_5_sigma70_consensus_n10000       
-  # (Used in output; see main.py)
-  output_dir_prefix: shuffle_sigma70_test           
-  subsample_size: 100
-  num_draws: 200
-  with_replacement: true
+  # Input/Output
+  input_pt_path: sequences/<input_directory>     # Directory containing exactly one .pt file
+  output_dir_prefix: shuffle_sigma70_test        # Used for naming the batch results directory
+  save_selected_pt: true                         # If true, save selected subsample .pt files in batch results
+
+  # Subsampling parameters
+  subsample_size: 100                            # Default subsample size
+  num_draws: 200                                 # Number of subsampling iterations
+  with_replacement: false
   random_seed: 42
   max_attempts_per_draw: 10
+
+  # Evo2 Metric Configuration
   evo2_metric:
-    # Options: "l2", "log1p_l2", etc.
-    type: "l2"                                    
+    type: "log1p_l2"                            # Options: "l2", "log1p_l2", etc.
+
+  # Billboard / Composite Score Configuration
   billboard_metric:
-    # Options: "sum_raw" or specific key (e.g., per_tf_entropy_mean)
-    type: "sum_raw"                               
-    use_normalized: false
+    # Use composite score or a single raw metric
+    composite_score: true                        # true: compute composite; false: use a single raw metric
+                                                 # When composite_score is true, specify the method and details:
+    method: "zscore_pca"                         # Options: "zscore_pca", "minmax_weighted"
+    normalize: "zscore"                          # Options: "zscore", "minmax", or null (if no normalization)
+    core_metrics:                                # List of core metrics to include (must match columns in diversity_summary.csv)
+      - tf_richness
+      - 1_minus_gini
+      - mean_jaccard
+      - median_tf_entropy
+    # If using weighted sum, provide weights (ignored for PCA method)
+    weights:
+      tf_richness: 0.25
+      1_minus_gini: 0.25
+      mean_jaccard: 0.25
+      median_tf_entropy: 0.25
+
+  # Joint selection for thresholding subsamples
   joint_selection:
     enable: true
-    method: "threshold"
-    billboard_min: 0.68
-    evo2_min: 0.5
-    normalize: false
-    save_top_k: 3
-  save_selected_pt: true
+    method: "threshold"                          # Currently, threshold-based selection
+    billboard_min: 0.68                          # Minimum composite billboard metric required
+    evo2_min: 0.5                                # Minimum evo2 metric required
+    normalize: false                             # (Legacy flag; ensure composite score is used as billboard metric)
+    save_top_k: 3                                # Number of top subsamples to save based on combined metrics
+
+  # Plotting configuration
   plot:
-    highlight_color: "pastel_red"                 
-    base_color: "gray"                            
+    base_color: "gray"                           # Color for regular subsamples
+    highlight_color: "red"                       # Color for threshold-passing (selected) subsamples
     alpha: 0.5
     dpi: 600
     filename: scatter_summary.png
 
+
 billboard:
+  output_dir_prefix: acetate_tf_set_subsample20_diverse
   dry_run: false
+  # Provide only the subdirectory name (or relative path) within the sequences folder.
   pt_files:
-    # - sequences/densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma24_consensus_n10000
-    # - sequences/densebatch_deg2tfbs_pipeline_tfbsfetcher_m9_acetate_tfs_n10000_no_resample
-    - sequences/densebatch_deg2tfbs_pipeline_tfbsfetcher_m9_acetate_tfs_n10000
+    - densebatch_deg2tfbs_pipeline_tfbsfetcher_m9_acetate_tfs_n10000_subsample20_diverse
   track_unique_roster: true
   allow_variable_sequence_length: false
   include_fixed_elements_in_combos: false
-  output_dir_prefix: m9_tf_set
   save_plots: true
   save_csvs: true
   dpi: 600
+  # List of core diversity metrics to compute
+  diversity_metrics:
+    - tf_richness
+    - 1_minus_gini
+    - mean_jaccard
+    - median_tf_entropy
+  # Weights for the weighted sum composite (must sum to 1 if desired)
+  composite_weights:
+    tf_richness: 0.4
+    1_minus_gini: 0.3
+    mean_jaccard: 0.2
+    median_tf_entropy: 0.1
 
 densehairpins:
   batch_name: "repromin_tfs_all_tfbs_subsample20_arrays10"
