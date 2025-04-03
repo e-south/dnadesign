@@ -3,7 +3,7 @@
 <dnadesign project>
 libshuffle/output.py
 
-Provides helper functions to generate summary and results YAML files,
+Provides helper functions to generate global summary and sublibrary YAML files,
 and optionally save selected subsample .pt files.
 
 Module Author(s): Eric J. South
@@ -16,9 +16,7 @@ import yaml
 import torch
 import datetime
 import platform
-import subprocess
 from pathlib import Path
-
 
 def save_summary(output_dir, config, input_file, sequence_batch_id, num_sequences, run_start_time, duration):
     summary = {
@@ -26,24 +24,23 @@ def save_summary(output_dir, config, input_file, sequence_batch_id, num_sequence
         "duration_seconds": duration,
         "libshuffle_config": config,
         "evo2_vector_key": "evo2_logits_mean_pooled",
-        "billboard_fields_used": [
-            "global_positional_entropy",
-            "per_tf_entropy_mean",
-            "per_tf_entropy_weighted",
-            "per_tf_entropy_topk",
-            "tf_combination_entropy"
-        ],
         "input_pt_file": input_file.name,
         "sequence_batch_id": sequence_batch_id,
         "num_sequences": num_sequences,
         "python_version": platform.python_version()
     }
-    summary_path = Path(output_dir) / "summary.yaml"
+    summary_path = Path(output_dir) / "global_summary.yaml"
     with open(summary_path, "w") as f:
         yaml.dump(summary, f)
     return summary_path
 
-def save_results(output_dir, subsamples):
+def save_results(output_dir, subsamples, pca_model_info):
+    """
+    Saves the sublibrary (per-subsample) details into a YAML file.
+    The file (sublibraries.yaml) includes each subsample's indices, computed composite billboard
+    metric, Evo2 metric, and whether thresholds were passed.
+    If available, PCA model info is also included.
+    """
     results = {}
     for s in subsamples:
         results[s["subsample_id"]] = {
@@ -51,11 +48,16 @@ def save_results(output_dir, subsamples):
             "selected_ids": s["selected_ids"],
             "billboard_metric": s["billboard_metric"],
             "evo2_metric": s["evo2_metric"],
-            "passed_threshold": s.get("passed_threshold", False)
+            "passed_threshold": s.get("passed_threshold", False),
+            "raw_billboard_vector": s.get("raw_billboard_vector")
         }
-    results_path = Path(output_dir) / "results.yaml"
+    output_dict = {
+        "pca_model_info": pca_model_info,
+        "sublibraries": results
+    }
+    results_path = Path(output_dir) / "sublibraries.yaml"
     with open(results_path, "w") as f:
-        yaml.dump(results, f)
+        yaml.dump(output_dict, f)
     return results_path
 
 def save_selected_subsamples(subsamples, config, original_sequences, base_output_dir):
@@ -71,7 +73,7 @@ def save_selected_subsamples(subsamples, config, original_sequences, base_output
         return []
 
     selected = [s for s in subsamples if s.get("passed_threshold", False)]
-    # For simplicity, sort by the sum of the two metrics.
+    # Sort by the sum of the two metrics (composite billboard + Evo2).
     selected = sorted(selected, key=lambda s: s["billboard_metric"] + s["evo2_metric"], reverse=True)
     selected = selected[:save_top_k]
 

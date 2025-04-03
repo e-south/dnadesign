@@ -6,6 +6,7 @@ libshuffle/subsampler.py
 Performs iterative random subsampling from a list of sequences.
 Implements deduplication (by unique IDs), caching of computed metrics,
 and progress tracking via tqdm.
+Now, it stores raw Billboard metrics (for composite transformation) and Evo2 metrics.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -60,21 +61,32 @@ class Subsampler:
                     attempts += 1
                     continue
                 subsample = [self.sequences[i] for i in indices]
-                billboard_metric = compute_billboard_metric(subsample, self.config)
+                # Compute raw Billboard metrics.
+                raw_billboard = compute_billboard_metric(subsample, self.config)
+                # Compute Evo2 metric.
                 evo2_metric = compute_evo2_metric(subsample, self.config)
+                # Cache the computed metrics.
                 self.cache[subsample_ids] = {
-                    "billboard_metric": billboard_metric,
+                    "raw_billboard": raw_billboard,
                     "evo2_metric": evo2_metric,
                     "indices": indices,
                     "selected_ids": [self.sequences[i]["id"] for i in indices]
                 }
-                self.subsamples.append({
+                # When composite scoring is enabled, store the raw vector; otherwise, store the scalar.
+                composite_enabled = self.config.get("billboard_metric", {}).get("composite_score", False)
+                entry = {
                     "subsample_id": f"sublibrary_{draws+1:03d}",
-                    "billboard_metric": billboard_metric,
                     "evo2_metric": evo2_metric,
                     "indices": indices,
                     "selected_ids": [self.sequences[i]["id"] for i in indices]
-                })
+                }
+                if composite_enabled:
+                    entry["raw_billboard_vector"] = raw_billboard
+                    # Temporary placeholder; will be updated after composite transformation.
+                    entry["billboard_metric"] = None
+                else:
+                    entry["billboard_metric"] = raw_billboard
+                self.subsamples.append(entry)
                 draws += 1
                 progress_bar.update(1)
                 break

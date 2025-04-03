@@ -5,8 +5,8 @@ libshuffle/main.py
 
 CLI entry point for the libshuffle pipeline.
 Loads the configuration, resolves the input .pt file,
-performs subsampling and metric computations, produces a scatter plot,
-and writes summary and results YAML files.
+performs subsampling and metric computations, applies composite transformation,
+generates a scatter plot, and writes global and sublibrary YAML output files.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -16,15 +16,15 @@ Dunlop Lab
 import sys
 import time
 import torch
-import yaml
 import datetime
 from pathlib import Path
 import logging
 
 from dnadesign.libshuffle.config import LibShuffleConfig
 from dnadesign.libshuffle.subsampler import Subsampler
-from dnadesign.libshuffle.visualization import plot_scatter
+from dnadesign.libshuffle.visualization import plot_scatter, plot_kde_coremetrics, plot_pairplot_coremetrics
 from dnadesign.libshuffle.output import save_summary, save_results, save_selected_subsamples
+from dnadesign.libshuffle.metrics import apply_composite_transformation
 
 def load_pt_file(input_dir: Path):
     pt_files = list(input_dir.glob("*.pt"))
@@ -78,6 +78,10 @@ def main():
         subsampler = Subsampler(sequences, config)
         subsamples = subsampler.run()
 
+        # Apply composite transformation across all subsamples.
+        # This updates each subsample's "billboard_metric" field and returns optional PCA model info.
+        subsamples, pca_model_info = apply_composite_transformation(subsamples, config)
+
         # Generate visualization.
         run_info = {
             "num_draws": config.get("num_draws", 200),
@@ -86,13 +90,19 @@ def main():
         plot_path = plot_scatter(subsamples, config, output_dir, run_info)
         logger.info(f"Scatter plot saved to: {plot_path}")
 
-        # Save summary and results.
+        # Generate new diagnostic visualizations.
+        kde_raw_path, kde_zscore_path = plot_kde_coremetrics(subsamples, config, output_dir)
+        logger.info(f"KDE plots saved to: {kde_raw_path} and {kde_zscore_path}")
+        pairplot_path = plot_pairplot_coremetrics(subsamples, config, output_dir)
+        logger.info(f"Pairwise scatter plot saved to: {pairplot_path}")
+
+        # Save global summary and sublibrary details.
         duration = time.time() - start_time
         summary_path = save_summary(output_dir, config, pt_file, sequence_batch_id, num_sequences, run_start_time, duration)
-        logger.info(f"Summary saved to: {summary_path}")
+        logger.info(f"Global summary saved to: {summary_path}")
 
-        results_path = save_results(output_dir, subsamples)
-        logger.info(f"Results saved to: {results_path}")
+        results_path = save_results(output_dir, subsamples, pca_model_info)
+        logger.info(f"Sublibraries details saved to: {results_path}")
 
         # Optionally, save selected subsamples back to the sequences directory.
         if config.get("save_selected_pt", False):
@@ -104,7 +114,7 @@ def main():
         end_time = time.time()
         logger.info(f"Libshuffle completed in {end_time - start_time:.2f} seconds.")
 
-    except Exception as e:
+    except Exception:
         logging.exception("An error occurred during libshuffle execution.")
         sys.exit(1)
 

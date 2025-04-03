@@ -1,31 +1,84 @@
 # configs/example.yaml
 
+nmf:
+  batch_name: "densebatch_deg2tfbs_pipeline_tfbsfetcher_m9_acetate_tfs_n10000_subsample20_diverse"
+  k_range: [2, 48]              
+  n_init: 10
+  max_iter: 1000
+  init: "nndsvdar"
+  solver: "cd"
+  loss: "frobenius"
+  encoding_mode: "motif_occupancy"      # Only motif_occupancy is supported
+  max_motif_occupancy: 5                # Cap motif counts per sequence
+  strand_aware: false                   # Collapse strand information
+  normalize_coefficients: true          # Row-normalize W after training
+  clip_h_max: 3.0                       # Clip H values to this upper bound
+  best_k: 12
+
+  regularization:
+    enable: false                     
+    type: "l2"
+    alpha: 0.01
+
+  plots:
+    generate_heatmaps: true
+    generate_motif_occurrence_heatmap: true
+    generate_program_association_barplot: true
+    generate_sequence_program_decomposition: false
+    generate_motif_barplots: true
+    generate_elbow_plot: true
+    generate_riverplot: true      
+    generate_stability_plots: true
+    generate_signature_stability_riverplot: true
+
+  clustering:
+    enable_w_clustering: true
+    linkage_method: "ward"
+
+  diagnostics:
+    max_top_tfs: 10
+    barplot_ncols: 4
+    pick_representative_for_stackplot: true
+    n_sequences_for_stackplot: 1000
+
+  diversity_score:
+    enable: true
+    alpha: 0.5
+    plot_across_k: true
+
+  stability_metrics:
+    enable: true
+    metrics: ["frobenius", "amari", "cv", "silhouette_sum", "silhouette_mean", "cophenetic"]
+    similarity_threshold: 0.6
+    min_common_tfs: 3
+    optimal_k_selection_method: "elbow"
+
 libshuffle:
-  # Input/Output
-  input_pt_path: sequences/<input_directory>     # Directory containing exactly one .pt file
+  # Directory containing exactly one .pt file
+  input_pt_path: sequences/densebatch_deg2tfbs_pipeline_tfbsfetcher_m9_acetate_tfs_n10000_subsample20_diverse    
   output_dir_prefix: shuffle_sigma70_test        # Used for naming the batch results directory
   save_selected_pt: true                         # If true, save selected subsample .pt files in batch results
 
   # Subsampling parameters
-  subsample_size: 100                            # Default subsample size
-  num_draws: 200                                 # Number of subsampling iterations
+  subsample_size: 16                             # Default subsample size
+  num_draws: 10000                                 # Number of subsampling iterations
   with_replacement: false
   random_seed: 42
   max_attempts_per_draw: 10
 
   # Evo2 Metric Configuration
   evo2_metric:
-    type: "log1p_l2"                            # Options: "l2", "log1p_l2", etc.
+    type: "cosine"                            # Options: "l2", "log1p_l2", "cosine"
 
   # Billboard / Composite Score Configuration
   billboard_metric:
     # Use composite score or a single raw metric
-    composite_score: true                        # true: compute composite; false: use a single raw metric
+    composite_score: true                   # true: compute composite; false: use a single raw metric
                                                  # When composite_score is true, specify the method and details:
-    method: "zscore_pca"                         # Options: "zscore_pca", "minmax_weighted"
-    normalize: "zscore"                          # Options: "zscore", "minmax", or null (if no normalization)
+    method: "minmax_weighted"                         # Options: "zscore_pca", "minmax_weighted"
+    normalize: "minmax"                          # Options: "zscore", "minmax", or null (if no normalization)
     core_metrics:                                # List of core metrics to include (must match columns in diversity_summary.csv)
-      - tf_richness
+      # - tf_richness
       - 1_minus_gini
       - mean_jaccard
       - median_tf_entropy
@@ -56,7 +109,7 @@ libshuffle:
 
 billboard:
   output_dir_prefix: acetate_tf_set_subsample20_diverse
-  dry_run: false
+  dry_run: true
   # Provide only the subdirectory name (or relative path) within the sequences folder.
   pt_files:
     - densebatch_deg2tfbs_pipeline_tfbsfetcher_m9_acetate_tfs_n10000_subsample20_diverse

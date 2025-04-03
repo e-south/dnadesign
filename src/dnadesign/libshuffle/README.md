@@ -38,6 +38,36 @@ LibShuffle is a module that iteratively subsamples sequence libraries (stored in
     - The composite score becomes the y-axis in the scatter plot.
     - It is recorded in the sublibrary (results) YAML and is used in threshold-based joint selection with the Evo2 metric.
 
+
+Composite Diversity Score (CDS)
+	•	Mathematical Definition:
+Given a subsample S:
+\[
+CDS(S) = \alpha \cdot \underbrace{\left(1 - \frac{1}{|S|\log_2(k)} \sum_{s \in S} H(s)\right)}{\text{Dominance (Entropy-normalized)}} + (1 - \alpha) \cdot \underbrace{\left(\frac{D{\text{inv}}(S)}{k}\right)}_{\text{Effective Program Diversity}}
+\]
+	•	H(s): entropy of sequence s.
+	•	R(S): dominant program richness (number of unique dominant programs in subsample S).
+	•	\alpha: weighting parameter (e.g., 0.5 gives equal weight).
+	•	Intuition:
+	•	Balances two aspects: internally clear dominance within each sequence and broad combinational coverage across sequences.
+	•	Both terms normalized to [0,1] range for interpretability.
+
+  This way:
+	•	Sequences are individually clear and focused (low entropy).
+	•	Subsamples are collectively diverse and balanced across programs.
+
+
+🎯 Why This is a Biologically Sensible Metric
+
+You’re trying to select a small, functionally diverse subset of promoters to test. So your ideal set:
+	1.	Covers distinct regulatory strategies (across-program diversity).
+	2.	Is non-redundant (i.e., not just small variations of the same regulatory theme).
+	3.	Is interpretable (so you can make sense of the TF combinations).
+
+Your CDS metric explicitly balances these two factors:
+	•	High CDS means: sequences are individually meaningful and collectively diverse.
+	•	The drop-off in program diversity after k=15 suggests you’re entering a regime where programs are becoming redundant or splitting hairs — i.e., modeling noise or subtle co-occurrence, not meaningful differences.
+
 - **Configuration Flexibility:**  
   Users can choose between using a composite score (from multiple core metrics) or a single raw metric. The configuration must expose:
   - Whether composite scoring is enabled.
