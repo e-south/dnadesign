@@ -61,6 +61,7 @@ def main():
     nmf_config = config["nmf"]
     batch_name = nmf_config.get("batch_name", "default")
     
+    # Locate the PT file.
     pt_dir = Path(__file__).parent.parent / "sequences" / batch_name
     if not pt_dir.exists() or not pt_dir.is_dir():
         logging.error(f"Sequence directory {pt_dir} not found or is not a directory.")
@@ -71,7 +72,7 @@ def main():
         logging.error(f"No .pt files found in {pt_dir}.")
         sys.exit(1)
     if len(pt_files) > 1:
-        logging.warning(f"More than one .pt file found in {pt_dir}. Using the first one: {pt_files[0]}")
+        logging.warning(f"Multiple .pt files found; using the first: {pt_files[0]}")
     pt_file = pt_files[0]
     
     logging.info(f"Loading sequences from {pt_file}...")
@@ -96,20 +97,29 @@ def main():
     elapsed = time.time() - start_time
     logging.info(f"NMF training completed in {elapsed:.2f} seconds.")
     
-    best_W = results.get("best_W")
-    if best_W is None or best_W.shape[0] != len(sequences):
-        logging.error("Mismatch between number of sequences and rows in best_W.")
-        sys.exit(1)
-    
-    # Determine best_k: either from config or from computed results.
+    # Determine best_k: if specified in config, use that; otherwise, use computed best_k.
     if "best_k" in nmf_config:
         best_k = nmf_config["best_k"]
         logging.info(f"Using best_k from config: {best_k}")
+        # Load best_W from the corresponding subdirectory.
+        best_k_dir = batch_results_dir / f"k_{best_k}"
+        if best_k_dir.exists():
+            W_file = best_k_dir / "W.csv"
+            if W_file.exists():
+                import pandas as pd
+                best_W = pd.read_csv(W_file, index_col=0).values
+            else:
+                logging.error(f"W.csv not found in {best_k_dir}")
+                sys.exit(1)
+        else:
+            logging.error(f"Directory {best_k_dir} does not exist")
+            sys.exit(1)
     else:
         best_k = results.get("best_k")
+        best_W = results.get("best_W")
         logging.info(f"Computed best_k: {best_k}")
     
-    # Annotate sequences with all NMF metadata and save them.
+    # Annotate sequences with NMF metadata using the correct best_W.
     annotate_sequences_with_nmf(sequences, best_W, best_k, str(pt_file))
     
     plots_dir = batch_results_dir / "plots"

@@ -35,12 +35,6 @@ def save_summary(output_dir, config, input_file, sequence_batch_id, num_sequence
     return summary_path
 
 def save_results(output_dir, subsamples, pca_model_info):
-    """
-    Saves the sublibrary (per-subsample) details into a YAML file.
-    The file (sublibraries.yaml) includes each subsample's indices, computed composite billboard
-    metric, Evo2 metric, and whether thresholds were passed.
-    If available, PCA model info is also included.
-    """
     results = {}
     for s in subsamples:
         results[s["subsample_id"]] = {
@@ -62,26 +56,32 @@ def save_results(output_dir, subsamples, pca_model_info):
 
 def save_selected_subsamples(subsamples, config, original_sequences, base_output_dir):
     """
-    Saves the top-k selected subsamples as new .pt files back into the sequences directory.
+    Saves the selected subsamples (as specified by joint_selection.selected_subsample_ids)
+    as new .pt files back into the input sequences directory, within a subdirectory
+    named "shufflebatch_YYYYMMDD" where YYYYMMDD is the current date.
     """
-    joint_selection = config.get("joint_selection", {})
-    if not joint_selection.get("enable", False):
+    from pathlib import Path
+    import datetime
+    import torch
+
+    joint_sel = config.get("joint_selection", {})
+    selected_ids = joint_sel.get("selected_subsample_ids", [])
+    if not selected_ids:
         return []
 
-    save_top_k = joint_selection.get("save_top_k", 0)
-    if save_top_k <= 0:
-        return []
+    # Filter subsamples matching the specified IDs.
+    selected = [s for s in subsamples if s.get("subsample_id") in selected_ids]
 
-    selected = [s for s in subsamples if s.get("passed_threshold", False)]
-    # Sort by the sum of the two metrics (composite billboard + Evo2).
-    selected = sorted(selected, key=lambda s: s["billboard_metric"] + s["evo2_metric"], reverse=True)
-    selected = selected[:save_top_k]
+    # Create a subdirectory with date stamp in the base_output_dir.
+    date_stamp = datetime.datetime.now().strftime("%Y%m%d")
+    batch_subdir = Path(base_output_dir) / f"shufflebatch_{date_stamp}"
+    batch_subdir.mkdir(parents=True, exist_ok=True)
 
     saved_files = []
     for s in selected:
         subsample_sequences = [original_sequences[i] for i in s["indices"]]
         filename = f"{s['subsample_id']}.pt"
-        output_path = Path(base_output_dir) / filename
+        output_path = batch_subdir / filename
         torch.save(subsample_sequences, output_path)
         saved_files.append(str(output_path))
     return saved_files

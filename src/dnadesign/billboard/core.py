@@ -22,7 +22,7 @@ def load_pt_files(pt_paths):
     """Load sequence entries from the provided .pt file paths."""
     sequences = []
     for path in pt_paths:
-        data = torch.load(path, map_location="cpu", weights_only=True)
+        data = torch.load(path, map_location="cpu", weights_only=False)
         if not isinstance(data, list):
             raise ValueError(f"Data in '{path}' is not a list of sequences.")
         sequences.extend(data)

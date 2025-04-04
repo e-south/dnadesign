@@ -61,29 +61,27 @@ class Subsampler:
                     attempts += 1
                     continue
                 subsample = [self.sequences[i] for i in indices]
-                # Compute raw Billboard metrics.
+                unique_clusters = {seq.get("meta_cluster_count") for seq in subsample if "meta_cluster_count" in seq}
+                unique_cluster_count = len(unique_clusters)
                 raw_billboard = compute_billboard_metric(subsample, self.config)
-                # Compute Evo2 metric.
                 evo2_metric = compute_evo2_metric(subsample, self.config)
-                # Cache the computed metrics.
                 self.cache[subsample_ids] = {
                     "raw_billboard": raw_billboard,
                     "evo2_metric": evo2_metric,
                     "indices": indices,
                     "selected_ids": [self.sequences[i]["id"] for i in indices]
                 }
-                # When composite scoring is enabled, store the raw vector; otherwise, store the scalar.
                 composite_enabled = self.config.get("billboard_metric", {}).get("composite_score", False)
                 entry = {
                     "subsample_id": f"sublibrary_{draws+1:03d}",
                     "evo2_metric": evo2_metric,
                     "indices": indices,
-                    "selected_ids": [self.sequences[i]["id"] for i in indices]
+                    "selected_ids": [self.sequences[i]["id"] for i in indices],
+                    "unique_cluster_count": unique_cluster_count
                 }
                 if composite_enabled:
                     entry["raw_billboard_vector"] = raw_billboard
-                    # Temporary placeholder; will be updated after composite transformation.
-                    entry["billboard_metric"] = None
+                    entry["billboard_metric"] = None  # placeholder
                 else:
                     entry["billboard_metric"] = raw_billboard
                 self.subsamples.append(entry)

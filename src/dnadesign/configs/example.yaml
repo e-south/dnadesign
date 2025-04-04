@@ -2,24 +2,28 @@
 
 nmf:
   batch_name: "densebatch_deg2tfbs_pipeline_tfbsfetcher_m9_acetate_tfs_n10000_subsample20_diverse"
-  k_range: [2, 48]              
+  k_range: [2, 36]
   n_init: 10
   max_iter: 1000
   init: "nndsvdar"
   solver: "cd"
   loss: "frobenius"
-  encoding_mode: "motif_occupancy"      # Only motif_occupancy is supported
-  max_motif_occupancy: 5                # Cap motif counts per sequence
-  strand_aware: false                   # Collapse strand information
-  normalize_coefficients: true          # Row-normalize W after training
-  clip_h_max: 3.0                       # Clip H values to this upper bound
-  best_k: 12
+  # Set encoding_mode to "positional_bins" to activate the new approach.
+  encoding_mode: "positional_bins"
 
+  # New configuration section for positional binning.
+  positional_binning:
+    enable: true        # Enable positional binning mode.
+    num_bins: 10        # Number of bins to divide each sequence.
+  max_motif_occupancy: 5
+  strand_aware: false
+  normalize_coefficients: true
+  clip_h_max: 3.0
+  best_k: 12
   regularization:
-    enable: false                     
+    enable: true
     type: "l2"
     alpha: 0.01
-
   plots:
     generate_heatmaps: true
     generate_motif_occurrence_heatmap: true
@@ -27,25 +31,21 @@ nmf:
     generate_sequence_program_decomposition: false
     generate_motif_barplots: true
     generate_elbow_plot: true
-    generate_riverplot: true      
+    generate_riverplot: true
     generate_stability_plots: true
     generate_signature_stability_riverplot: true
-
   clustering:
     enable_w_clustering: true
     linkage_method: "ward"
-
   diagnostics:
     max_top_tfs: 10
     barplot_ncols: 4
     pick_representative_for_stackplot: true
     n_sequences_for_stackplot: 1000
-
   diversity_score:
     enable: true
     alpha: 0.5
     plot_across_k: true
-
   stability_metrics:
     enable: true
     metrics: ["frobenius", "amari", "cv", "silhouette_sum", "silhouette_mean", "cophenetic"]
@@ -54,58 +54,42 @@ nmf:
     optimal_k_selection_method: "elbow"
 
 libshuffle:
-  # Directory containing exactly one .pt file
-  input_pt_path: sequences/densebatch_deg2tfbs_pipeline_tfbsfetcher_m9_acetate_tfs_n10000_subsample20_diverse    
+  input_pt_path: sequences/densebatch_test
   output_dir_prefix: shuffle_sigma70_test        # Used for naming the batch results directory
   save_selected_pt: true                         # If true, save selected subsample .pt files in batch results
-
-  # Subsampling parameters
   subsample_size: 16                             # Default subsample size
-  num_draws: 10000                                 # Number of subsampling iterations
+  num_draws: 1000                                # Number of subsampling iterations
   with_replacement: false
   random_seed: 42
   max_attempts_per_draw: 10
-
-  # Evo2 Metric Configuration
   evo2_metric:
-    type: "cosine"                            # Options: "l2", "log1p_l2", "cosine"
-
-  # Billboard / Composite Score Configuration
+    type: "cosine"                               # Options: "l2", "log1p_l2", "cosine"
   billboard_metric:
-    # Use composite score or a single raw metric
-    composite_score: true                   # true: compute composite; false: use a single raw metric
-                                                 # When composite_score is true, specify the method and details:
-    method: "minmax_weighted"                         # Options: "zscore_pca", "minmax_weighted"
-    normalize: "minmax"                          # Options: "zscore", "minmax", or null (if no normalization)
-    core_metrics:                                # List of core metrics to include (must match columns in diversity_summary.csv)
-      # - tf_richness
+    composite_score: true                        # true: compute composite; false: use a single raw metric
+    method: "percentile_avg"                     # Options: "zscore_pca", "minmax_weighted", "cds", "percentile_avg", "inverse_rank_sum"
+    normalize: "null"                            # Options: "zscore", "minmax", or null (if no normalization)
+    core_metrics:
       - 1_minus_gini
       - mean_jaccard
       - median_tf_entropy
-    # If using weighted sum, provide weights (ignored for PCA method)
-    weights:
-      tf_richness: 0.25
-      1_minus_gini: 0.25
-      mean_jaccard: 0.25
-      median_tf_entropy: 0.25
-
-  # Joint selection for thresholding subsamples
+    weights: {}
   joint_selection:
-    enable: true
-    method: "threshold"                          # Currently, threshold-based selection
-    billboard_min: 0.68                          # Minimum composite billboard metric required
-    evo2_min: 0.5                                # Minimum evo2 metric required
-    normalize: false                             # (Legacy flag; ensure composite score is used as billboard metric)
-    save_top_k: 3                                # Number of top subsamples to save based on combined metrics
-
-  # Plotting configuration
+    method: "both"                               # Options: "null", "x_only", "both"
+    y_percentile: 50                             # Only used when method is "both"
+    selected_subsample_ids: [ "sublibrary_929", "sublibrary_957" ]
   plot:
-    base_color: "gray"                           # Color for regular subsamples
-    highlight_color: "red"                       # Color for threshold-passing (selected) subsamples
-    alpha: 0.5
+    base_color: "gray"                           # Base color for non-filtered points (unused in threshold modes)
+    highlight_color: "red"                       # Color for threshold-passing points (determined by unique cluster count)
+    alpha: 0.35                                  # Default alpha for points
+    hit_zone_alpha: 0.8                          # Alpha for points in the hit zone
+    non_hit_zone_alpha: 0.3                      # Alpha for points outside the hit zone
     dpi: 600
     filename: scatter_summary.png
-
+    size_by_cluster: true                        # If true, marker size scales by unique cluster count
+    size_multiplier: 20                          # Multiplier for sizing by cluster count (ignored if marker_size is set)
+    marker_size: 50                              # Constant marker size (overrides size_by_cluster)
+    log_transform: false                         # When true, applies log₂ transformation to the y-axis
+    annotate_x_threshold: true                   # If true, annotate points exceeding the x threshold with numeric suffix
 
 billboard:
   output_dir_prefix: acetate_tf_set_subsample20_diverse
@@ -214,57 +198,7 @@ densegen:
 
 evoinference:
   data_sources:
-    # Promoter engineering datasets
     - dir: seqbatch_hernandez_et_al_positive
-    - dir: seqbatch_hernandez_et_al_negative
-    - dir: seqbatch_hossain_et_al
-    - dir: seqbatch_johns_et_al
-    - dir: seqbatch_kosuri_et_al
-    - dir: seqbatch_lafleur_et_al
-    - dir: seqbatch_sun_yim_et_al
-    - dir: seqbatch_urtecho_et_al
-    - dir: seqbatch_yu_et_al
-    - dir: seqbatch_xiaowo_et_al
-    # EcoCyc datasets
-    - dir: seqbatch_ecocyc_28_promoters
-    - dir: seqbatch_ecocyc_28_tfbs_set
-    # RegulonDB datasets
-    - dir: seqbatch_regulondb_13_promoter_set
-    - dir: seqbatch_regulondb_13_promoter_FecI_set
-    - dir: seqbatch_regulondb_13_promoter_FliA_set
-    - dir: seqbatch_regulondb_13_promoter_RpoD_set
-    - dir: seqbatch_regulondb_13_promoter_RpoE_set
-    - dir: seqbatch_regulondb_13_promoter_RpoH_set
-    - dir: seqbatch_regulondb_13_promoter_RpoN_set
-    - dir: seqbatch_regulondb_13_promoter_RpoS_set
-    - dir: seqbatch_regulondb_13_tf_ri_set
-    # Randomly generated sequences
-    - dir: seqbatch_random_promoters
-    - dir: seqbatch_random_promoters_sigma70_consensus
-    - dir: seqbatch_random_promoters_sigma70_consensus_+
-    - dir: seqbatch_random_tfbs
-    # densegen sequences
-    - dir: densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma24_consensus_n10000
-    - dir: densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma32_consensus_n10000
-    - dir: densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma38_consensus_n10000
-    - dir: densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_consensus_-_n10000
-    - dir: densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_consensus_+_n10000
-    - dir: densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_consensus_n10000
-    - dir: densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_low_n10000
-    - dir: densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_mid_n10000
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_0_sigma70_consensus_+_n10000
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_0_sigma70_consensus_n10000
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_1_sigma70_consensus_+_n10000
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_1_sigma70_consensus_n10000
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_2_sigma70_consensus_+_n10000
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_2_sigma70_consensus_n10000
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_3_sigma70_consensus_+_n10000
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_3_sigma70_consensus_n10000
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_4_sigma70_consensus_+_n10000
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_4_sigma70_consensus_n10000
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_5_sigma70_consensus_+_n10000
-    - dir: densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_5_sigma70_consensus_n10000
-
   evo_model:
     version: "evo2_7b"
     save_pooled_only: true
@@ -280,143 +214,15 @@ evoinference:
 
 
 # ================================
-# Batch 1: All Densegen
-# ================================
-# clustering:
-#   batch_name: "all_densegen"
-#   input_sources:
-#     - pattern: "densebatch_*"
-#   method: "leiden"
-#   cluster_selection:
-#     num_files: 0
-#     order: "max"
-#     custom_clusters: []
-#   overlay_cluster_numbers: true
-#   umap:
-#     enabled: true
-#     plot_dimensions: [10, 5]
-#     alpha: 0.2
-#     one_hot_key: "sequence"
-#     hue:
-#       method: "type"                            # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
-#       numeric_hue: None
-#       normalization: "robust"
-#   output_prefix: "clusterbatch_"
-#   analysis:
-#     cluster_composition: true
-#     cluster_composition_plot_dimensions: [14, 4]
-#     diversity_assessment: true
-#     diversity_assessment_plot_dimensions: [10, 4]
-#     differential_feature_analysis: true
-
-# ================================
-# Batch 2: All Directories
-# ================================
-# clustering:
-#   batch_name: "all"
-#   input_sources:
-#     - pattern: "*"    # All directories
-#   method: "input_source"
-#   cluster_selection:
-#     num_files: 0
-#     order: "max"
-#     custom_clusters: []
-#   overlay_cluster_numbers: true
-#   umap:
-#     enabled: true
-#     plot_dimensions: [10, 5]
-#     alpha: 0.2
-#     one_hot_key: "sequence"
-#     hue:
-#       method: "seq_length"                          # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
-#       numeric_hue: None
-#       normalization: "robust"
-#   output_prefix: "clusterbatch_"
-#   analysis:
-#     cluster_composition: true
-#     cluster_composition_plot_dimensions: [14, 4]
-#     diversity_assessment: true
-#     diversity_assessment_plot_dimensions: [10, 4]
-#     differential_feature_analysis: true
-
-# ================================
 # Batch 3: Regulondb Promoters by Regulon
 # ================================
-# clustering:
-#   batch_name: "regulondb_promoters_by_regulon"
-#   input_sources:
-#     - dir: "seqbatch_regulondb_13_promoter_FecI_set"
-#     - dir: "seqbatch_regulondb_13_promoter_FliA_set"
-#     - dir: "seqbatch_regulondb_13_promoter_RpoD_set"
-#     - dir: "seqbatch_regulondb_13_promoter_RpoE_set"
-#     - dir: "seqbatch_regulondb_13_promoter_RpoH_set"
-#     - dir: "seqbatch_regulondb_13_promoter_RpoN_set"
-#     - dir: "seqbatch_regulondb_13_promoter_RpoS_set"
-#   method: "input_source"
-#   cluster_selection:
-#     num_files: 0
-#     order: "max"
-#     custom_clusters: []
-#   overlay_cluster_numbers: true
-#   umap:
-#     enabled: true
-#     plot_dimensions: [10, 5]
-#     alpha: 0.2
-#     one_hot_key: "sequence"
-#     hue:
-#       method: "input_source"                          # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
-#       numeric_hue: None
-#       normalization: "robust"
-#   output_prefix: "clusterbatch_"
-#   analysis:
-#     cluster_composition: true
-#     cluster_composition_plot_dimensions: [14, 4]
-#     diversity_assessment: true
-#     diversity_assessment_plot_dimensions: [10, 4]
-#     differential_feature_analysis: true
-
-# ================================
-# Batch 5: Regulondb, Ecocyc, and Random Promoter Sets
-# ================================
-# clustering:
-#   batch_name: "regulondb_and_ecocyc_and_random_promoter_sets"
-#   input_sources:
-#     - dir: "seqbatch_regulondb_13_promoter_set"
-#     - dir: "seqbatch_ecocyc_28_promoters"
-#     - dir: "seqbatch_random_promoters"
-#   method: "input_source"
-#   cluster_selection:
-#     num_files: 0
-#     order: "max"
-#     custom_clusters: []
-#   overlay_cluster_numbers: true
-#   umap:
-#     enabled: true
-#     plot_dimensions: [6, 4]
-#     alpha: 0.2
-#     one_hot_key: "sequence"
-#     hue:
-#       method: "type"                          # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
-#       numeric_hue: None
-#       normalization: "robust"
-#   output_prefix: "clusterbatch_"
-#   analysis:
-#     cluster_composition: true
-#     cluster_composition_plot_dimensions: [14, 4]
-#     diversity_assessment: true
-#     diversity_assessment_plot_dimensions: [10, 4]
-#     differential_feature_analysis: true
-
-# ================================
-# Batch 8: Regulondb, Ecocyc, and Random TFBS
-# ================================
 clustering:
-  batch_name: "regulondb_and_ecocyc_and_random_tfbs"
+  batch_name: "test"
   input_sources:
-    - dir: "seqbatch_ecocyc_28_tfbs_set"
-    - dir: "seqbatch_regulondb_13_tf_ri_set"
-    - dir: "seqbatch_random_tfbs"
+    - dir: "densebatch_test"
   method: "input_source"
+  add_meta_cluster_count: true
+  update_in_place: true
   cluster_selection:
     num_files: 0
     order: "max"
@@ -424,11 +230,11 @@ clustering:
   overlay_cluster_numbers: true
   umap:
     enabled: true
-    plot_dimensions: [6, 4]
+    plot_dimensions: [10, 5]
     alpha: 0.2
     one_hot_key: "sequence"
     hue:
-      method: "gc_content"                          # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
+      method: "input_source"                          # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
       numeric_hue: None
       normalization: "robust"
   output_prefix: "clusterbatch_"
@@ -438,258 +244,5 @@ clustering:
     diversity_assessment: true
     diversity_assessment_plot_dimensions: [10, 4]
     differential_feature_analysis: true
-
-# ================================
-# Batch 9: Hernandez "Positive" and "Negative" Promoters
-# ================================
-# clustering:
-#   batch_name: "hernandez_pos_and_neg"
-#   input_sources:
-#     - dir: "seqbatch_hernandez_et_al_positive"
-#     - dir: "seqbatch_hernandez_et_al_negative"
-#   method: "input_source"
-#   cluster_selection:
-#     num_files: 0
-#     order: "max"
-#     custom_clusters: []
-#   overlay_cluster_numbers: true
-#   umap:
-#     enabled: true
-#     plot_dimensions: [6, 4]
-#     alpha: 0.2
-#     one_hot_key: "sequence"
-#     hue:
-#       method: "input_source"                        # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
-#       numeric_hue: None
-#       normalization: "robust"
-#   output_prefix: "clusterbatch_"
-#   analysis:
-#     cluster_composition: true
-#     cluster_composition_plot_dimensions: [14, 4]
-#     diversity_assessment: true
-#     diversity_assessment_plot_dimensions: [10, 4]
-#     differential_feature_analysis: true
-
-# ================================
-# Batch 10: Engineered Promoters
-# ================================
-# clustering:
-#   batch_name: "all_engineered_promoters"
-#   input_sources:
-#     - dir: "seqbatch_hossain_et_al"
-#     - dir: "seqbatch_lafleur_et_al"
-#     - dir: "seqbatch_johns_et_al"
-#     - dir: "seqbatch_kosuri_et_al"
-#     - dir: "seqbatch_urtecho_et_al"
-#     - dir: "seqbatch_yu_et_al"
-#     - dir: "seqbatch_sun_yim_et_al"
-#     - dir: "seqbatch_xiaowo_et_al"
-#   method: "input_source"
-#   cluster_selection:
-#     num_files: 0
-#     order: "max"
-#     custom_clusters: []
-#   overlay_cluster_numbers: true
-#   umap:
-#     enabled: true
-#     plot_dimensions: [6, 4]
-#     alpha: 0.2
-#     one_hot_key: "sequence"
-#     hue:
-#       method: "input_source"                                   # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
-#       numeric_hue: [
-#                     "seqbatch_hossain_et_al": "meta_observed_log_RNA_over_ref",
-#                     "seqbatch_lafleur_et_al": "meta_observed_log_RNA_over_ref",
-#                     "seqbatch_urtecho_et_al": "meta_observed_log_RNA_over_ref",
-#                     "seqbatch_yu_et_al": "meta_observed_log_RNA_over_ref",
-#                     "seqbatch_kosuri_et_al": "meta_mean_RNA",
-#                     "seqbatch_kosuri_et_al": "meta_sd_RNA",
-#                     "seqbatch_kosuri_et_al": "meta_mean_prot",
-#                     "seqbatch_kosuri_et_al": "meta_sd_prot",
-#                     "seqbatch_johns_et_al": "meta_observed_tx_norm_LB_exp",
-#                     "seqbatch_johns_et_al": "meta_observed_tx_norm_NaCl_exp",
-#                     "seqbatch_johns_et_al": "meta_observed_tx_norm_Fe_exp",
-#                     "seqbatch_johns_et_al": "meta_observed_tx_norm_LB-stat",
-#                     "seqbatch_johns_et_al": "meta_observed_tx_norm_M9-exp",
-#                     "seqbatch_sun_yim_et_al": "meta_gene_in_vitro_tx",
-#                     "seqbatch_sun_yim_et_al": "meta_gene_in_vivo_tx",
-#                     "seqbatch_xiaowo_et_al": "meta_exp_mean(log2)"
-#       ]
-#       normalization: "robust"
-#   output_prefix: "clusterbatch_"
-#   analysis:
-#     cluster_composition: true
-#     cluster_composition_plot_dimensions: [10, 4]
-#     diversity_assessment: true
-#     diversity_assessment_plot_dimensions: [10, 4]
-#     differential_feature_analysis: true
-
-# ================================
-# Batch 11: Engineered Promoters and Densegen (Wildcard)
-# ================================
-# clustering:
-#   batch_name: "engineered_promoters_and_densegen"
-#   input_sources:
-#     # - dir: "seqbatch_johns_et_al"
-#     - dir: "seqbatch_kosuri_et_al"
-#     - dir: "seqbatch_lafleur_et_al"
-#     - dir: "seqbatch_sun_yim_et_al"
-#     - dir: "seqbatch_urtecho_et_al"
-#     - dir: "seqbatch_yu_et_al"
-#     - dir: "seqbatch_xiaowo_et_al"
-#     - pattern: "densebatch_*"
-#   method: "input_source"
-#   cluster_selection:
-#     num_files: 0
-#     order: "max"
-#     custom_clusters: []
-#   overlay_cluster_numbers: true
-#   umap:
-#     enabled: true
-#     plot_dimensions: [10, 5]
-#     alpha: 0.2
-#     one_hot_key: "sequence"
-#     hue:
-#       method: "type"                      # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
-#       numeric_hue: None
-#       normalization: "robust"
-#   output_prefix: "clusterbatch_"
-#   analysis:
-#     cluster_composition: true
-#     cluster_composition_plot_dimensions: [14, 4]
-#     diversity_assessment: true
-#     diversity_assessment_plot_dimensions: [10, 4]
-#     differential_feature_analysis: true
-
-# ================================
-# Batch 12: Regulondb, Ecocyc, Random, and Densegen Promoter Sets
-# ================================
-# clustering:
-#   batch_name: "dense_arrays_and_TFBSs"
-#   input_sources:
-#     # - dir: "seqbatch_regulondb_13_promoter_set"
-#     # - dir: "seqbatch_ecocyc_28_promoters"
-#     - dir: "seqbatch_ecocyc_28_tfbs_set"
-#     - dir: "seqbatch_regulondb_13_tf_ri_set"
-#     # - dir: "seqbatch_random_tfbs"
-#     # - dir: "seqbatch_random_promoters"
-#     # - dir: "seqbatch_random_promoters_sigma70_consensus"
-#     # - dir: "seqbatch_random_promoters_sigma70_consensus_+"
-#     - pattern: "densebatch_*"
-#   method: "input_source"
-#   cluster_selection:
-#     num_files: 0
-#     order: "max"
-#     custom_clusters: []
-#   overlay_cluster_numbers: true
-#   umap:
-#     enabled: true
-#     plot_dimensions: [10, 5]
-#     alpha: 0.2
-#     one_hot_key: "sequence"
-#     hue:
-#       method: "type"                              # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
-#       numeric_hue: None
-#       normalization: "robust"
-#   output_prefix: "clusterbatch_"
-#   analysis:
-#     cluster_composition: true
-#     cluster_composition_plot_dimensions: [14, 4]
-#     diversity_assessment: true
-#     diversity_assessment_plot_dimensions: [10, 4]
-#     differential_feature_analysis: true
-
-# ================================
-# Batch 13: All Promoters
-# ================================
-# clustering:
-#   batch_name: "fully_random_vs_constrained_promoters"
-#   input_sources:
-#     # - dir: "seqbatch_regulondb_13_promoter_set"
-#     # - dir: "seqbatch_ecocyc_28_promoters"
-#     - dir: "seqbatch_random_promoters"
-#     - dir: "seqbatch_random_promoters_sigma70_consensus"
-#     - dir: "seqbatch_random_promoters_sigma70_consensus_+"
-#     # - dir: "seqbatch_johns_et_al"
-#     # - dir: "seqbatch_kosuri_et_al"
-#     # - dir: "seqbatch_lafleur_et_al"
-#     # - dir: "seqbatch_sun_yim_et_al"
-#     # - dir: "seqbatch_urtecho_et_al"
-#     # - dir: "seqbatch_yu_et_al"
-#     # - dir: "seqbatch_xiaowo_et_al"
-#     # - pattern: "densebatch_*"
-#   method: "input_source"
-#   cluster_selection:
-#     num_files: 0
-#     order: "max"
-#     custom_clusters: []
-#   overlay_cluster_numbers: true
-#   umap:
-#     enabled: true
-#     plot_dimensions: [10, 5]
-#     alpha: 0.35
-#     one_hot_key: "sequence"
-#     hue:
-#       method: "input_source"                                  # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
-#       numeric_hue: None
-#       normalization: "robust"
-#   output_prefix: "clusterbatch_"
-#   analysis:
-#     cluster_composition: true
-#     cluster_composition_plot_dimensions: [14, 4]
-#     diversity_assessment: true
-#     diversity_assessment_plot_dimensions: [10, 4]
-#     differential_feature_analysis: true
-
-
-# ================================
-# Batch 13: Different dense array promoter constraints
-# ================================
-# clustering:
-#   batch_name: "dense_arrays_all_TFs_by_sigma70_consensus_mid_low_constraints_simplified"
-#   input_sources:
-#     # - dir: "densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_0_sigma70_consensus_n10000"
-#     # - dir: "densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_1_sigma70_consensus_n10000"
-#     # - dir: "densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_2_sigma70_consensus_n10000"
-#     # - dir: "densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_3_sigma70_consensus_n10000"
-#     # - dir: "densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_4_sigma70_consensus_n10000"
-#     # - dir: "densebatch_deg2tfbs_cluster_analysis_unfiltered_cluster_5_sigma70_consensus_n10000"
-#     # - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_consensus_-_n10000"
-#     # - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_consensus_+_n10000"
-#     - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_consensus_n10000"
-#     - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_mid_n10000"
-#     - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_all_TFs_sigma70_low_n10000"
-    
-#   method: "input_source"
-#   cluster_selection:
-#     num_files: 0
-#     order: "max"
-#     custom_clusters: []
-#   overlay_cluster_numbers: true
-#   umap:
-#     enabled: true
-#     plot_dimensions: [10, 5]
-#     alpha: 0.2
-#     one_hot_key: "sequence"
-#     hue:
-#       method: "input_source"                        # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
-#       numeric_hue: None
-#       normalization: "robust"
-#   output_prefix: "clusterbatch_"
-#   analysis:
-#     cluster_composition: true
-#     cluster_composition_plot_dimensions: [14, 4]
-#     diversity_assessment: true
-#     diversity_assessment_plot_dimensions: [10, 4]
-#     differential_feature_analysis: true
-
-
-subsetter:
-  input_sources:
-    # Explicit or wildcard list of cluster directories to process
-    - dir: "clusterbatch_*"
-  selection_strategy: "random"         # Options: random, top-N, etc.
-  target_sample_size: 100
-  with_replacement: false
 
 # Future section for seqpermuter (to be defined later)

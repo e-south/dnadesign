@@ -5,7 +5,7 @@ libshuffle/main.py
 
 CLI entry point for the libshuffle pipeline.
 Loads the configuration, resolves the input .pt file,
-performs subsampling and metric computations, applies composite transformation,
+performs subsampling and metric computations (including CDS if selected),
 generates a scatter plot, and writes global and sublibrary YAML output files.
 
 Module Author(s): Eric J. South
@@ -79,7 +79,7 @@ def main():
         subsamples = subsampler.run()
 
         # Apply composite transformation across all subsamples.
-        # This updates each subsample's "billboard_metric" field and returns optional PCA model info.
+        # This updates each subsample's "billboard_metric" field (and adds "cds_components" if using CDS)
         subsamples, pca_model_info = apply_composite_transformation(subsamples, config)
 
         # Generate visualization.

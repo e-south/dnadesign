@@ -37,6 +37,8 @@ def load_config(config_path="configs/example.yaml"):
 def load_pt_files(input_dirs, base_path):
     """
     Load .pt files from each input directory on CPU.
+    For each loaded entry, store its original file path in a private key so it
+    can later be updated in place.
     """
     data_entries = []
     base_dir = Path(base_path)
@@ -49,7 +51,9 @@ def load_pt_files(input_dirs, base_path):
             if file_path.suffix == ".pt":
                 entries = torch.load(str(file_path), map_location="cpu")
                 for entry in entries:
+                    # Temporary keys for processing:
                     entry["meta_input_source"] = d
+                    entry["_file_path"] = str(file_path)
                 data_entries.extend(entries)
     return data_entries
 
@@ -68,32 +72,27 @@ def extract_features(data_entries, key="evo2_logits_mean_pooled"):
         features.append(np_val)
     return np.array(features)
 
-def save_cluster_output(cluster_id, entries, output_prefix, batch_name, base_output, extra_summary):
+def update_original_pt_files(data_entries):
     """
-    Save cluster data and summary YAML.
-    Directory and file names do not include timestamps; the current timestamp is saved in the YAML.
+    Group entries by their original file path and update each file in place with the
+    enriched entries. Before saving, remove processing keys that are not needed in
+    the final output so that only the new meta_cluster_count remains.
     """
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    base_dir = Path(base_output)
-    out_dir_name = f"{output_prefix}{batch_name}_{cluster_id}"
-    out_dir = base_dir / out_dir_name
-    out_dir.mkdir(parents=True, exist_ok=True)
+    from collections import defaultdict
+    files_dict = defaultdict(list)
+    for entry in data_entries:
+        file_path = entry.get("_file_path")
+        if not file_path:
+            raise ValueError("Entry missing '_file_path' key; cannot update original file.")
+        files_dict[file_path].append(entry)
     
-    output_pt = out_dir / f"cluster_{cluster_id}.pt"
-    torch.save(entries, str(output_pt))
-    
-    summary = {
-        "cluster_id": cluster_id,
-        "num_entries": len(entries),
-        "timestamp": timestamp,
-        "description": f"Cluster {cluster_id} output from clustering pipeline"
-    }
-    summary.update(extra_summary)
-    
-    output_yaml = out_dir / "summary.yaml"
-    with output_yaml.open("w") as f:
-        yaml.dump(summary, f)
-    print(f"Saved cluster {cluster_id} to {out_dir}")
+    # Remove the temporary processing keys.
+    for file_path, entries in files_dict.items():
+        for entry in entries:
+            for key in ["meta_input_source", "_file_path", "leiden_cluster"]:
+                entry.pop(key, None)
+        torch.save(entries, file_path)
+        print(f"Updated original PT file: {file_path}")
 
 def main():
     parser = argparse.ArgumentParser(description="Clustering Pipeline Main")
@@ -114,14 +113,9 @@ def main():
     # Use batch_name from config.
     batch_name = clustering_config.get("batch_name", "batch")
     
-    # Determine the hue method (for appending to the results folder name).
+    # Determine the hue method (used for analysis outputs).
     umap_config = clustering_config.get("umap", {})
     hue_method = umap_config.get("hue", {}).get("method", "leiden")
-    
-    # Create a results directory including batch_name and hue method.
-    results_dir = base_dir / "clustering" / "batch_results" / f"{batch_name}_{hue_method}"
-    results_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Results directory: {results_dir}")
     
     # Determine input directories.
     input_sources = clustering_config.get("input_sources", [])
@@ -167,6 +161,12 @@ def main():
     clusters = adata.obs["leiden"].to_numpy()
     for i, entry in enumerate(data_entries):
         entry["leiden_cluster"] = clusters[i]
+        # Add the meta_cluster_count annotation.
+        if clustering_config.get("add_meta_cluster_count", False):
+            entry["meta_cluster_count"] = entry["leiden_cluster"]
+            if i == 0:
+                print("meta_cluster_count successfully assigned to clustered entries.")
+            assert "meta_cluster_count" in entry, "Failed to assign meta_cluster_count"
     
     if clustering_config.get("overlay_cluster_numbers", False):
         unique_clusters = sorted(set(clusters))
@@ -193,13 +193,9 @@ def main():
         "input_sources": input_dirs,
     }
     
-    if not args.dry_run:
-        output_prefix = clustering_config.get("output_prefix", "clusterbatch_")
-        for cl in clusters_to_save:
-            cl_entries = [e for e in data_entries if e["leiden_cluster"] == cl]
-            save_cluster_output(cl, cl_entries, output_prefix, batch_name, base_output=str(base_seq_dir), extra_summary=extra_summary)
-    else:
-        print("Dry run enabled: Not saving cluster outputs.")
+    # Generate analysis outputs (plots, CSVs) as usual.
+    results_dir = base_dir / "clustering" / "batch_results" / f"{batch_name}_{hue_method}"
+    results_dir.mkdir(parents=True, exist_ok=True)
     
     if umap_config.get("enabled", False):
         print("Generating UMAP plot...")
@@ -213,8 +209,6 @@ def main():
         cc_dims = analysis_config.get("cluster_composition_plot_dimensions", [10, 7])
         comp_csv = results_dir / f"cluster_composition_{batch_name}.csv"
         comp_png = results_dir / f"cluster_composition_{batch_name}.png"
-        # Use the UMAP hue method to drive grouping: if it's "type", then use that;
-        # otherwise, default to "input_source".
         hue_method_for_composition = umap_config.get("hue", {}).get("method", "input_source")
         composition_method = "type" if hue_method_for_composition == "type" else "input_source"
         cluster_composition.analyze(data_entries, batch_name=batch_name, save_csv=str(comp_csv),
@@ -227,7 +221,8 @@ def main():
         da_dims = analysis_config.get("diversity_assessment_plot_dimensions", [10, 6])
         div_csv = results_dir / f"diversity_assessment_{batch_name}.csv"
         div_png = results_dir / f"diversity_assessment_{batch_name}.png"
-        diversity_analysis.assess(data_entries, batch_name=batch_name, save_csv=str(div_csv), save_png=str(div_png), plot_dims=da_dims)
+        diversity_analysis.assess(data_entries, batch_name=batch_name, save_csv=str(div_csv),
+                                  save_png=str(div_png), plot_dims=da_dims)
         print(f"Diversity assessment saved: CSV to {div_csv}, plot to {div_png}")
     
     if analysis_config.get("differential_feature_analysis", False):
@@ -235,6 +230,13 @@ def main():
         diff_csv = results_dir / f"differential_feature_analysis_{batch_name}.csv"
         differential_feature_analysis.identify_markers(data_entries, save_csv=str(diff_csv))
         print(f"Differential feature analysis CSV saved to {diff_csv}")
+    
+    # After analysis outputs, update the original PT files in place.
+    if not args.dry_run and clustering_config.get("update_in_place", False):
+        print("Updating original PT files in place with only meta_cluster_count (removing extra keys)...")
+        update_original_pt_files(data_entries)
+    else:
+        print("Dry run enabled or update_in_place flag not set: Not updating original PT files.")
     
     print("Clustering pipeline completed successfully.")
 

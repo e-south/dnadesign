@@ -11,9 +11,7 @@ Provides functions to compute diversity metrics for LibShuffle. This module:
   - Computes the Evo2 diversity metric with flexible options (l2, log1p_l2, and cosine similarity).
   - Applies composite transformation (via LibShuffle's own apply_composite_transformation later)
     across subsamples.
-
-This implementation is decoupled from Billboard’s internal logic by using a helper
-to build a complete temporary config.
+  - Integrates the new CDS method when billboard_metric.method is set to "cds".
   
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -35,84 +33,63 @@ def make_temp_billboard_config(config, temp_pt_path):
     Creates a fresh temporary Billboard configuration by merging the global Billboard
     config (from config["billboard"]) with LibShuffle overrides (from config["billboard_metric"]).
     This configuration is used solely for computing the diversity summary.
-    
-    It forces dry_run mode (which should compute the diversity summary without generating plots)
-    and sets pt_files and output_dir_prefix appropriately.
     """
-    # Start with a copy of the global Billboard config.
     global_billboard = config.get("billboard", {}).copy()
-    # Retrieve LibShuffle overrides.
     lib_overrides = config.get("billboard_metric", {})
-    # Force DRY_RUN mode.
     global_billboard["dry_run"] = True
-    # Override pt_files and output directory.
     global_billboard["pt_files"] = [temp_pt_path]
     global_billboard["output_dir_prefix"] = "temp_billboard_" + next(tempfile._get_candidate_names())
-    # Ensure that the key diversity_metrics is present.
+    global_billboard["weights_only"] = False
     if "diversity_metrics" not in global_billboard or not global_billboard["diversity_metrics"]:
         global_billboard["diversity_metrics"] = lib_overrides.get("core_metrics", [])
-    # Ensure composite_weights is present.
     if "composite_weights" not in global_billboard or not global_billboard["composite_weights"]:
         global_billboard["composite_weights"] = lib_overrides.get("weights", {})
     return global_billboard
 
 def compute_billboard_metric(subsample, config):
     """
-    Computes the raw Billboard metrics for a subsample by running the full Billboard pipeline:
-      1. Save the subsample to a temporary .pt file.
-      2. Build a fresh temporary Billboard configuration.
-      3. Run process_sequences() to compute results.
-      4. Compute core diversity metrics via compute_core_metrics().
-      5. Compute composite metrics via compute_composite_metrics() (for diagnostic purposes).
-    
-    Prints the core and composite metrics for debugging and returns the core metrics dictionary.
-    
-    If composite_score is false and only one core metric is expected, returns that single value.
+    Computes the raw Billboard metrics for a subsample.
     """
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Write the current subsample to a temporary .pt file.
-        temp_pt_path = os.path.join(tmpdir, "subsample.pt")
-        torch.save(subsample, temp_pt_path)
-        
-        # Build a fresh temporary Billboard configuration.
-        billboard_config = make_temp_billboard_config(config, temp_pt_path)
-        
-        # Create output directories (in case Billboard needs them).
-        temp_output_dir = os.path.join(tmpdir, "billboard_output")
-        os.makedirs(os.path.join(temp_output_dir, "csvs"), exist_ok=True)
-        os.makedirs(os.path.join(temp_output_dir, "plots"), exist_ok=True)
-        
-        # Run Billboard processing.
-        results = process_sequences([temp_pt_path], billboard_config)
-        
-        # Compute core metrics using Billboard's functions.
-        core_metrics = compute_core_metrics(results, billboard_config)
-        composite_metrics = compute_composite_metrics(core_metrics, billboard_config)
-        results["core_metrics"] = core_metrics
-        results["composite_metrics"] = composite_metrics
-        
-        # print("Core metrics for this subsample:", core_metrics)
-        # print("Composite metrics for this subsample:", composite_metrics)
-        
-        # In LibShuffle we use the core metrics (to be later transformed across subsamples).
-        bm_config = config.get("billboard_metric", {})
-        composite_enabled = bm_config.get("composite_score", False)
-        if not composite_enabled:
-            if len(bm_config.get("core_metrics", [])) != 1:
-                raise ValueError("When composite_score is false, exactly one core metric must be specified.")
-            return core_metrics[bm_config["core_metrics"][0]]
+    import torch.serialization
+    import numpy as np
+    torch.serialization.add_safe_globals([np.generic, np._core.multiarray.scalar, np.dtype])
+    
+    bm_config = config.get("billboard_metric", {})
+    composite_enabled = bm_config.get("composite_score", False)
+
+    if composite_enabled:
+        if bm_config.get("method") == "cds":
+            from dnadesign.libshuffle.cds_score import compute_cds_from_sequences
+            return compute_cds_from_sequences(subsample, bm_config.get("alpha", 0.5))
         else:
-            return core_metrics
+            with tempfile.TemporaryDirectory() as tmpdir:
+                temp_pt_path = os.path.join(tmpdir, "subsample.pt")
+                torch.save(subsample, temp_pt_path)
+                billboard_config = make_temp_billboard_config(config, temp_pt_path)
+                temp_output_dir = os.path.join(tmpdir, "billboard_output")
+                os.makedirs(os.path.join(temp_output_dir, "csvs"), exist_ok=True)
+                os.makedirs(os.path.join(temp_output_dir, "plots"), exist_ok=True)
+                results = process_sequences([temp_pt_path], billboard_config)
+                core_metrics = compute_core_metrics(results, billboard_config)
+                return core_metrics
+    else:
+        core_metrics_list = bm_config.get("core_metrics", [])
+        if len(core_metrics_list) != 1:
+            raise ValueError("When composite_score is false, exactly one core metric must be specified.")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_pt_path = os.path.join(tmpdir, "subsample.pt")
+            torch.save(subsample, temp_pt_path)
+            billboard_config = make_temp_billboard_config(config, temp_pt_path)
+            temp_output_dir = os.path.join(tmpdir, "billboard_output")
+            os.makedirs(os.path.join(temp_output_dir, "csvs"), exist_ok=True)
+            os.makedirs(os.path.join(temp_output_dir, "plots"), exist_ok=True)
+            results = process_sequences([temp_pt_path], billboard_config)
+            core_metrics = compute_core_metrics(results, billboard_config)
+            return core_metrics[core_metrics_list[0]]
 
 def compute_evo2_metric(subsample, config):
     """
     Compute the mean pairwise distance among the evo2 vectors in the subsample.
-    Each subsample entry is expected to have a field "evo2_logits_mean_pooled".
-    
-    The metric_type in the config supports:
-      - "l2": Mean pairwise Euclidean (L2) distance.
-      - "log1p_l2": log1p of the mean pairwise L2 distance.
-      - "cosine": Mean pairwise cosine distance (1 - cosine similarity).
     """
     vectors = []
     for entry in subsample:
@@ -155,23 +132,24 @@ def compute_evo2_metric(subsample, config):
         raise ValueError(f"Unsupported evo2_metric type: {metric_type}")
 
 def apply_composite_transformation(subsamples, config):
-    """
-    Applies composite transformation on the raw Billboard (core) metric values across all subsamples.
-    For each subsample, the raw values (obtained from compute_billboard_metric) are combined
-    into a composite score via the specified method:
-      - "zscore_pca": Normalize (using z-score or min-max) then project onto the first principal component.
-      - "minmax_weighted": Normalize (min-max or zscore as specified) then compute a weighted sum.
-    If composite_score is false, it verifies that each subsample has a single raw value.
-    
-    Returns:
-      updated_subsamples: The list of subsample dicts with "billboard_metric" updated to the composite score.
-      pca_model_info: Dictionary containing PCA artifacts (if PCA is used), else None.
-    """
     bm_config = config.get("billboard_metric", {})
     composite_enabled = bm_config.get("composite_score", False)
+
     if not composite_enabled:
+        core_metrics_list = bm_config.get("core_metrics", [])
+        if len(core_metrics_list) != 1:
+            raise ValueError("When composite_score is false, exactly one core metric must be specified.")
         for sub in subsamples:
             sub["billboard_metric"] = sub.pop("raw_billboard_vector", sub.get("billboard_metric"))
+        return subsamples, None
+
+    if bm_config.get("method") == "cds":
+        for sub in subsamples:
+            raw = sub.pop("raw_billboard_vector", None)
+            if raw is None:
+                raise ValueError("CDS mode enabled but raw_billboard_vector not found in subsample.")
+            sub["billboard_metric"] = float(raw["cds_score"])
+            sub["cds_components"] = raw
         return subsamples, None
 
     core_metrics = bm_config.get("core_metrics", [])
@@ -185,27 +163,35 @@ def apply_composite_transformation(subsamples, config):
         sub["raw_billboard_vector"] = vector
     data = np.array(data)
 
-    norm_method = bm_config.get("normalize", None)
-    if norm_method == "zscore":
-        means = np.mean(data, axis=0)
-        stds = np.std(data, axis=0, ddof=1)
-        stds[stds == 0] = 1.0
-        data_norm = (data - means) / stds
-    elif norm_method == "minmax":
-        mins = np.min(data, axis=0)
-        maxs = np.max(data, axis=0)
-        ranges = np.where((maxs - mins) == 0, 1.0, maxs - mins)
-        data_norm = (data - mins) / ranges
-    else:
-        data_norm = data.copy()
+    if bm_config.get("method") == "inverse_rank_sum":
+        n_samples, n_metrics = data.shape
+        rank_data = np.zeros_like(data, dtype=float)
+        for j in range(n_metrics):
+            col = data[:, j]
+            ranks = (n_samples - 1) - np.argsort(np.argsort(col))
+            rank_data[:, j] = ranks
+        composite_scores = rank_data.sum(axis=1)
+        pca_model_info = None
 
-    method = bm_config.get("method", "zscore_pca")
-    pca_model_info = None
-    if method == "zscore_pca":
+    elif bm_config.get("method") == "percentile_avg":
+        n_samples, n_metrics = data.shape
+        percentile_data = np.zeros_like(data, dtype=float)
+        for j in range(n_metrics):
+            col = data[:, j]
+            ranks = np.argsort(np.argsort(col))
+            if n_samples > 1:
+                percentile_data[:, j] = ranks / (n_samples - 1)
+            else:
+                percentile_data[:, j] = 0.5
+        composite_scores = percentile_data.mean(axis=1)
+        pca_model_info = None
+
+    elif bm_config.get("method") == "zscore_pca":
+        norm_method = bm_config.get("normalize", None)
         if norm_method != "zscore":
-            data_centered = data_norm - np.mean(data_norm, axis=0)
+            data_centered = data - np.mean(data, axis=0)
         else:
-            data_centered = data_norm
+            data_centered = data
         cov = np.cov(data_centered, rowvar=False)
         eig_vals, eig_vecs = np.linalg.eigh(cov)
         sorted_idx = np.argsort(eig_vals)[::-1]
@@ -220,15 +206,31 @@ def apply_composite_transformation(subsamples, config):
             "components": [pc1.tolist()],
             "used_metrics": core_metrics
         }
-    elif method == "minmax_weighted":
+    elif bm_config.get("method") == "minmax_weighted":
+        norm_method = bm_config.get("normalize", None)
+        if norm_method in [None, "null"]:
+            data_norm = data.copy()
+        elif norm_method == "zscore":
+            means = np.mean(data, axis=0)
+            stds = np.std(data, axis=0, ddof=1)
+            stds[stds == 0] = 1.0
+            data_norm = (data - means) / stds
+        elif norm_method == "minmax":
+            mins = np.min(data, axis=0)
+            maxs = np.max(data, axis=0)
+            ranges = np.where((maxs - mins) == 0, 1.0, maxs - mins)
+            data_norm = (data - mins) / ranges
+        else:
+            data_norm = data.copy()
         weights = bm_config.get("weights", {})
         if not all(metric in weights for metric in core_metrics):
             weights = {metric: 1.0/len(core_metrics) for metric in core_metrics}
         weight_vec = np.array([weights.get(metric, 0.0) for metric in core_metrics])
         composite_scores = data_norm.dot(weight_vec)
+        pca_model_info = None
     else:
-        raise ValueError(f"Unsupported composite method: {method}")
-
+        raise ValueError(f"Unsupported composite method: {bm_config.get('method')}")
+        
     for i, sub in enumerate(subsamples):
         sub["billboard_metric"] = float(composite_scores[i])
     return subsamples, pca_model_info
