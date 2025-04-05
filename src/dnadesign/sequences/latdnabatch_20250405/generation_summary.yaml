@@ -1,4 +1,4 @@
-date_generated: '2025-04-05T17:17:38.138727Z'
+date_generated: '2025-04-05T17:26:51.304109Z'
 fixed_elements:
   downstream_seq: TATAAT
   downstream_start: 92
@@ -7,7 +7,7 @@ fixed_elements:
   upstream_start: 70
 latdna_batch: latdnabatch_20250405
 sequence_length: 120
-source_dense_batch: densebatch_test
+source_dense_batch: densebatch_deg2tfbs_pipeline_tfbsfetcher_m9_acetate_tfs_n10000
 tfbs_summary:
   arac:AAGAGATAATTCGCCCCT: 58
   arac:AGGGGCGAATTATCTCTT: 58

@@ -26,6 +26,7 @@ Usage examples:
   $ python seqmanager.py --path seqbatch_hossain_et_al/seqbatch_hossain_et_al.pt --index 3
   $ python seqmanager.py --path seqbatch_johns_et_al/seqbatch_johns_et_al.pt --index 3
   $ python seqmanager.py --path seqbatch_sun_yim_et_al/seqbatch_sun_yim_et_al.pt --index 3
+  $ python seqmanager.py --path latdnabatch_20250405/latdnabatch_20250405.pt --index 3
   $ python seqmanager.py --path densebatch_test/densegenbatch_m9_acetate_tfs_n10000.pt --index 3
   $ python seqmanager.py --path densebatch_deg2tfbs_pipeline_tfbsfetcher_m9_acetate_tfs_n10000_subsample20_diverse/densegenbatch_m9_acetate_tfs_n10000.pt --index 3
   $ python seqmanager.py --path seqbatch_random_promoters_sigma70_consensus/seqbatch_random_promoters_sigma70_consensus.pt --index 3

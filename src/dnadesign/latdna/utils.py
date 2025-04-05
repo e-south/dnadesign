@@ -29,17 +29,18 @@ def create_output_directory(base_dir: Path, prefix: str) -> Path:
     """
     timestamp = datetime.utcnow().strftime("%Y%m%d")
     out_dir = base_dir / f"{prefix}_{timestamp}"
-    out_dir.mkdir(parents=True, exist_ok=False)
+    out_dir.mkdir(parents=True, exist_ok=True)
     return out_dir
 
 def read_single_pt_file_from_subdir(subdir: Path) -> list:
     """
     Read a single .pt file from a directory. Fail if not exactly one file.
+    Uses map_location=torch.device("cpu") to ensure tensors are loaded on the CPU.
     """
     pt_files = list(subdir.glob("*.pt"))
     if len(pt_files) != 1:
         raise FileNotFoundError(f"Expected exactly one .pt file in {subdir}, found {len(pt_files)}.")
-    return torch.load(pt_files[0])
+    return torch.load(pt_files[0], map_location=torch.device("cpu"))
 
 def write_pt_file(data, output_path: Path):
     torch.save(data, output_path)

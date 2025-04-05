@@ -1,7 +1,7 @@
 # configs/example.yaml
 
 latdna:
-  mode: generation  # Set to "analysis" when running analysis
+  mode: analysis  # Set to "analysis" when running analysis
   dry_run: false    # true for dry run (no files written)
   # Generation Mode Settings
   dense_array_for_generation: densebatch_test
