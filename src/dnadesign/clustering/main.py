@@ -115,7 +115,8 @@ def main():
     
     # Determine the hue method (used for analysis outputs).
     umap_config = clustering_config.get("umap", {})
-    hue_method = umap_config.get("hue", {}).get("method", "leiden")
+    hue_config = umap_config.get("hue", {})
+    hue_method = hue_config.get("method", "leiden")
     
     # Determine input directories.
     input_sources = clustering_config.get("input_sources", [])
@@ -135,6 +136,13 @@ def main():
     if not input_dirs:
         print("No input directories found. Exiting.")
         sys.exit(1)
+    
+    # If highlight mode is enabled, warn if any highlight_dir is not in input_sources.
+    if hue_method == "highlight":
+        highlight_dirs = hue_config.get("highlight_dirs", [])
+        for d in highlight_dirs:
+            if d not in input_dirs:
+                print(f"Warning: highlight_dir '{d}' is not listed in input_sources.")
     
     print(f"Input directories found: {input_dirs}")
     print("Loading data entries from input directories...")
@@ -209,7 +217,7 @@ def main():
         cc_dims = analysis_config.get("cluster_composition_plot_dimensions", [10, 7])
         comp_csv = results_dir / f"cluster_composition_{batch_name}.csv"
         comp_png = results_dir / f"cluster_composition_{batch_name}.png"
-        hue_method_for_composition = umap_config.get("hue", {}).get("method", "input_source")
+        hue_method_for_composition = hue_config.get("method", "input_source")
         composition_method = "type" if hue_method_for_composition == "type" else "input_source"
         cluster_composition.analyze(data_entries, batch_name=batch_name, save_csv=str(comp_csv),
                                     save_png=str(comp_png), plot_dims=cc_dims,

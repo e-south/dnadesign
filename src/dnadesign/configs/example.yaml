@@ -1,57 +1,40 @@
 # configs/example.yaml
 
-nmf:
-  batch_name: "densebatch_deg2tfbs_pipeline_tfbsfetcher_m9_acetate_tfs_n10000_subsample20_diverse"
-  k_range: [2, 36]
-  n_init: 10
-  max_iter: 1000
-  init: "nndsvdar"
-  solver: "cd"
-  loss: "frobenius"
-  # Set encoding_mode to "positional_bins" to activate the new approach.
-  encoding_mode: "positional_bins"
-
-  # New configuration section for positional binning.
-  positional_binning:
-    enable: true        # Enable positional binning mode.
-    num_bins: 10        # Number of bins to divide each sequence.
-  max_motif_occupancy: 5
-  strand_aware: false
-  normalize_coefficients: true
-  clip_h_max: 3.0
-  best_k: 12
-  regularization:
-    enable: true
-    type: "l2"
-    alpha: 0.01
+latdna:
+  mode: generation  # Set to "analysis" when running analysis
+  dry_run: false    # true for dry run (no files written)
+  # Generation Mode Settings
+  dense_array_for_generation: densebatch_m9_acetate_tfs_n10000
+  sequence_length: 120
+  gc_content_range: [0.4, 0.6]
+  seed: 42
+  fixed_elements:
+    upstream_seq: "TTGACA"
+    downstream_seq: "TATAAT"
+    upstream_start: 70
+    spacer_range: [16, 18]
+  tiling:
+    step: 6
+  motifs:
+    gadx:
+      - "TTTTTTATAAACATAAGCTAT"
+      - "TTTTTTATAAACATAAGTTAT"
+    crp: "CTTTGTGAGATTGAGCATGGAAA"
+    yiau:
+      - "ACTTATACGGCAACGATTGCGTTGCGCAAATCGGC"
+  # Analysis Mode Settings (used when mode is "analysis")
+  analysis_inputs:
+    dense_batch: densebatch_m9_acetate_tfs_n10000
+    latdna_batch: latdnabatch_20250405
+  metrics:
+    - cosine
+    - euclidean
+    - log1p_euclidean
+  group_by: tf  # Options: "all" or "tf"
   plots:
-    generate_heatmaps: true
-    generate_motif_occurrence_heatmap: true
-    generate_program_association_barplot: true
-    generate_sequence_program_decomposition: false
-    generate_motif_barplots: true
-    generate_elbow_plot: true
-    generate_riverplot: true
-    generate_stability_plots: true
-    generate_signature_stability_riverplot: true
-  clustering:
-    enable_w_clustering: true
-    linkage_method: "ward"
-  diagnostics:
-    max_top_tfs: 10
-    barplot_ncols: 4
-    pick_representative_for_stackplot: true
-    n_sequences_for_stackplot: 1000
-  diversity_score:
-    enable: true
-    alpha: 0.5
-    plot_across_k: true
-  stability_metrics:
-    enable: true
-    metrics: ["frobenius", "amari", "cv", "silhouette_sum", "silhouette_mean", "cophenetic"]
-    similarity_threshold: 0.6
-    min_common_tfs: 3
-    optimal_k_selection_method: "elbow"
+    boxplot: true
+    save_path: "plots/latdna_analysis_20250405.png"
+
 
 libshuffle:
   input_pt_path: sequences/densebatch_test
@@ -91,12 +74,13 @@ libshuffle:
     log_transform: false                         # When true, applies log₂ transformation to the y-axis
     annotate_x_threshold: true                   # If true, annotate points exceeding the x threshold with numeric suffix
 
+
 billboard:
-  output_dir_prefix: acetate_tf_set_subsample20_diverse
-  dry_run: true
+  output_dir_prefix: sub957
+  dry_run: false
   # Provide only the subdirectory name (or relative path) within the sequences folder.
   pt_files:
-    - densebatch_deg2tfbs_pipeline_tfbsfetcher_m9_acetate_tfs_n10000_subsample20_diverse
+    - sub957
   track_unique_roster: true
   allow_variable_sequence_length: false
   include_fixed_elements_in_combos: false
@@ -116,35 +100,6 @@ billboard:
     mean_jaccard: 0.2
     median_tf_entropy: 0.1
 
-densehairpins:
-  batch_name: "repromin_tfs_all_tfbs_subsample20_arrays10"
-  run_post_solve: true
-  consensus_only: false
-  random_subsample_per_solve: true
-  solver: "CBC"
-  solver_options:
-    - "Threads=16"
-    - "TimeLimit=50"
-  sequence_length: 30
-  quota: 10
-  subsample_size: 20
-  analysis_style: "aggregate"  # Options: "per_batch" or "aggregate"
-  target_batch: "repromin_tfs_all_tfbs_subsample200"  # Only needed for per_batch mode
-  score_weights:
-    silenced_genes: 1
-    induced_genes: 1
-    tf_diversity: 2 
-
-tfkdanalysis:
-  batch_name: "araC_and_pspF"
-  # regulators: ["araC", "lacI", "rbsR", "rhaS", "rhaR", "cra", "malT", "treR", "xylR", "galR", "galS", "argR", "trpR", "metJ", "marR", "marA", "soxR", "soxS", "rob", "oxyR", "pspF", "cpxR", "lexA", "phoB", "cueR", "flhC", "csgD", "slyA", "sdiA", "rcdA", "mcbR", "arcA"] # "metR"
-  regulators: ["araC", "lacI", "argR", "marR", "marA", "soxR", "soxS", "rob", "pspF", "cpxR", "lexA", "phoB", "cueR", "arcA"]
-  media: "glu"
-  volcano_plot: true
-  volcano_point_size: null  # Options include: 'DAP Fold change (peak intensity/background intensity)', etc.
-  threshold: "1.2"
-  tolerate_nas: true
-  annotate_operon: true
 
 densegen:
   input_sources:
@@ -213,13 +168,11 @@ evoinference:
     checkpoint_every: 100
 
 
-# ================================
-# Batch 3: Regulondb Promoters by Regulon
-# ================================
 clustering:
   batch_name: "test"
   input_sources:
     - dir: "densebatch_test"
+    - dir: "sub957"
   method: "input_source"
   add_meta_cluster_count: true
   update_in_place: true
@@ -230,13 +183,23 @@ clustering:
   overlay_cluster_numbers: true
   umap:
     enabled: true
-    plot_dimensions: [10, 5]
+    plot_dimensions: [5, 5]
     alpha: 0.2
     one_hot_key: "sequence"
+    # 'alpha' is deprecated when using highlight mode.
+    # Instead, use background_alpha and background_size for background points,
+    # and highlight_alpha and highlight_size for highlight points.
     hue:
-      method: "input_source"                          # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "type"
+      method: "highlight"              # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", highlight", "type"
       numeric_hue: None
-      normalization: "robust"
+      normalization: "robust"                       
+      background_alpha: 0.05
+      background_size: 2.0
+      highlight_alpha: 0.8
+      highlight_size: 16.0
+      # highlight_dirs must be a subset of input_sources.
+      highlight_dirs:
+        - "sub957"
   output_prefix: "clusterbatch_"
   analysis:
     cluster_composition: true
@@ -244,5 +207,90 @@ clustering:
     diversity_assessment: true
     diversity_assessment_plot_dimensions: [10, 4]
     differential_feature_analysis: true
+
+
+nmf:
+  batch_name: "densebatch_deg2tfbs_pipeline_tfbsfetcher_m9_acetate_tfs_n10000_subsample20_diverse"
+  k_range: [2, 36]
+  n_init: 10
+  max_iter: 1000
+  init: "nndsvdar"
+  solver: "cd"
+  loss: "frobenius"
+  # Set encoding_mode to "positional_bins" to activate the new approach.
+  encoding_mode: "positional_bins"
+  positional_binning:
+    enable: true        # Enable positional binning mode.
+    num_bins: 10        # Number of bins to divide each sequence.
+  max_motif_occupancy: 5
+  strand_aware: false
+  normalize_coefficients: true
+  clip_h_max: 3.0
+  best_k: 12
+  regularization:
+    enable: true
+    type: "l2"
+    alpha: 0.01
+  plots:
+    generate_heatmaps: true
+    generate_motif_occurrence_heatmap: true
+    generate_program_association_barplot: true
+    generate_sequence_program_decomposition: false
+    generate_motif_barplots: true
+    generate_elbow_plot: true
+    generate_riverplot: true
+    generate_stability_plots: true
+    generate_signature_stability_riverplot: true
+  clustering:
+    enable_w_clustering: true
+    linkage_method: "ward"
+  diagnostics:
+    max_top_tfs: 10
+    barplot_ncols: 4
+    pick_representative_for_stackplot: true
+    n_sequences_for_stackplot: 1000
+  diversity_score:
+    enable: true
+    alpha: 0.5
+    plot_across_k: true
+  stability_metrics:
+    enable: true
+    metrics: ["frobenius", "amari", "cv", "silhouette_sum", "silhouette_mean", "cophenetic"]
+    similarity_threshold: 0.6
+    min_common_tfs: 3
+    optimal_k_selection_method: "elbow"
+
+
+densehairpins:
+  batch_name: "repromin_tfs_all_tfbs_subsample20_arrays10"
+  run_post_solve: true
+  consensus_only: false
+  random_subsample_per_solve: true
+  solver: "CBC"
+  solver_options:
+    - "Threads=16"
+    - "TimeLimit=50"
+  sequence_length: 30
+  quota: 10
+  subsample_size: 20
+  analysis_style: "aggregate"  # Options: "per_batch" or "aggregate"
+  target_batch: "repromin_tfs_all_tfbs_subsample200"  # Only needed for per_batch mode
+  score_weights:
+    silenced_genes: 1
+    induced_genes: 1
+    tf_diversity: 2 
+
+
+tfkdanalysis:
+  batch_name: "araC_and_pspF"
+  # regulators: ["araC", "lacI", "rbsR", "rhaS", "rhaR", "cra", "malT", "treR", "xylR", "galR", "galS", "argR", "trpR", "metJ", "marR", "marA", "soxR", "soxS", "rob", "oxyR", "pspF", "cpxR", "lexA", "phoB", "cueR", "flhC", "csgD", "slyA", "sdiA", "rcdA", "mcbR", "arcA"] # "metR"
+  regulators: ["araC", "lacI", "argR", "marR", "marA", "soxR", "soxS", "rob", "pspF", "cpxR", "lexA", "phoB", "cueR", "arcA"]
+  media: "glu"
+  volcano_plot: true
+  volcano_point_size: null  # Options include: 'DAP Fold change (peak intensity/background intensity)', etc.
+  threshold: "1.2"
+  tolerate_nas: true
+  annotate_operon: true
+
 
 # Future section for seqpermuter (to be defined later)
