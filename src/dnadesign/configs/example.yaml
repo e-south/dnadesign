@@ -4,7 +4,7 @@ latdna:
   mode: generation  # Set to "analysis" when running analysis
   dry_run: false    # true for dry run (no files written)
   # Generation Mode Settings
-  dense_array_for_generation: densebatch_m9_acetate_tfs_n10000
+  dense_array_for_generation: densebatch_test
   sequence_length: 120
   gc_content_range: [0.4, 0.6]
   seed: 42
@@ -14,17 +14,35 @@ latdna:
     upstream_start: 70
     spacer_range: [16, 18]
   tiling:
-    step: 6
+    step: 1
   motifs:
-    gadx:
-      - "TTTTTTATAAACATAAGCTAT"
-      - "TTTTTTATAAACATAAGTTAT"
-    crp: "CTTTGTGAGATTGAGCATGGAAA"
-    yiau:
-      - "ACTTATACGGCAACGATTGCGTTGCGCAAATCGGC"
+    crp: 
+      - "AACCGTGCTCCCACTCGCAGTC"
+      - "ATTGGTGAGGAACTTAACAATA"
+    arca: "ATGTTAATAAAATGTTAA" # DAP-seq
+    lrp: "AATAACAGAATAAAATGCTGA" # DAP-seq
+    gadx: "AAAATATCAAAATCAGATAT"
+    iclr: "CGGAAACAATTTCCATTTT" # DAP-seq
+    arac: "AGGGGCGAATTATCTCTT"
+    gadw: "AAGTCGTTTTTCTGCTTAG"
+    rob: "GTTTTAGCATTTTGTGCTTTT" # DAP-seq
+    fadr: "TGGTCAGACCTGTTC" # DAP-seq
+    gals: "GTGTAAACGATTCCAC"
+    galr: "CTGTAACCGTTTCCAT"
+    yiau: "AAAAACAATATGTCGTTAT"
+    torr: "TGTCAATATCTGTTCATATCT" # DAP-seq
+    gade: "ATAGGCGTTTACTATATTGA"
+    dcur: "AAATTAATAATTAAGGG"
+    mlc: "ATTTTGATCTGCGAAATTAA" # DAP-seq
+    rutr: "TTTGACCATTTGGTC" # DAP-seq
+    fliz: "AAATTTGACTTAAGT" # DAP-seq
+    rbsr: "CGAAACGTTTCGCT" # DAP-seq
+    pepa: "ATTTGGTCCACTTTTTTCTGCTCGTTT"
+    glcc: "GGTCCTACCTGTGCA"
+    
   # Analysis Mode Settings (used when mode is "analysis")
   analysis_inputs:
-    dense_batch: densebatch_m9_acetate_tfs_n10000
+    dense_batch: densebatch_test
     latdna_batch: latdnabatch_20250405
   metrics:
     - cosine

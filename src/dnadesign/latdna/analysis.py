@@ -15,7 +15,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import yaml
 
-from latdna import utils, validation, metrics
+from dnadesign.latdna import utils, validation, metrics
 
 def compute_pairwise_distances(latent_vectors: np.ndarray, metric_func) -> np.ndarray:
     """

@@ -146,6 +146,7 @@ temp.md
 # EXCEPT allow images in nmf/images/
 !src/dnadesign/nmf/images/
 !src/dnadesign/nmf/images/*.png
+!images/*.png
 
 # Backup and generated files
 *.bak

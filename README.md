@@ -1,3 +1,4 @@
+![Alt text](images/sequence_program_composition.png)
 # dnadesign
 
 This repository contains a collection of Python modules and bioinformatic pipelines related to DNA sequence design.
