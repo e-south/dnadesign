@@ -21,7 +21,8 @@ from dnadesign.billboard.plot_helpers import (
     save_motif_length_histogram,
     save_tf_entropy_kde_plot,
     save_gini_lorenz_plot,
-    save_jaccard_histogram
+    save_jaccard_histogram,
+    save_motif_levenshtein_boxplot
 )
 
 def main():
@@ -143,6 +144,17 @@ def main():
             figsize=(8,6),
             sample_size=1000
         )
+                
+        # Motif Levenshtein Boxplot: visualize the distribution of pairwise edit distances.
+        if "motif_string_levenshtein" in billboard_config.get("diversity_metrics", []):
+            from dnadesign.billboard.plot_helpers import save_motif_levenshtein_boxplot
+            save_motif_levenshtein_boxplot(
+                results["motif_strings"],
+                billboard_config,
+                str(output_dir / "plots" / "motif_levenshtein_boxplot.png"),
+                dpi=billboard_config.get("dpi", 600),
+                figsize=(8,6)
+            )
                 
     print_summary(results)
 

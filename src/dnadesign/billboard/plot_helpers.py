@@ -16,6 +16,8 @@ from matplotlib import cm
 from matplotlib.colors import Normalize
 from scipy.stats import entropy as scipy_entropy
 
+from dnadesign.billboard.core import token_edit_distance
+
 sns.set_theme(style="ticks", font_scale=0.8)
 
 def save_tf_frequency_barplot(tf_frequency, tf_metric, title, output_path, dpi, figsize=(14,7)):
@@ -191,6 +193,44 @@ def save_jaccard_histogram(sequences, output_path, dpi, figsize=(8,6), sample_si
     plt.ylabel("Frequency")
     plt.title("Diversity of TF Combinations Across Sequences (Jaccard Similarities)")
     sns.despine(top=True, right=True)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=dpi)
+    plt.close()
+    
+def save_motif_levenshtein_boxplot(motif_strings, config, output_path, dpi, figsize=(8,6)):
+    """
+    Compute pairwise normalized Levenshtein distances for motif_strings and generate a boxplot.
+    The plot includes a white boxplot with styled ticks and top/right spines removed,
+    and a scatter overlay (with low alpha) in the background to show distribution.
+    """
+    # Retrieve penalty parameters.
+    msl_config = config.get("motif_string_levenshtein", {})
+    tf_penalty = msl_config.get("tf_penalty", 1.0)
+    strand_penalty = msl_config.get("strand_penalty", 0.5)
+    partial_penalty = msl_config.get("partial_penalty", 0.8)
+    
+    distances = []
+    n = len(motif_strings)
+    for i in range(n):
+        tokens_i = motif_strings[i].split(",") if motif_strings[i] else []
+        for j in range(i+1, n):
+            tokens_j = motif_strings[j].split(",") if motif_strings[j] else []
+            if not tokens_i or not tokens_j:
+                raw_distance = max(len(tokens_i), len(tokens_j))
+            else:
+                raw_distance = token_edit_distance(tokens_i, tokens_j, tf_penalty, strand_penalty, partial_penalty)
+            norm_factor = max(len(tokens_i), len(tokens_j))
+            normalized_distance = raw_distance / norm_factor if norm_factor > 0 else 0
+            distances.append(normalized_distance)
+    
+    import pandas as pd
+    df = pd.DataFrame({"Normalized Distance": distances})
+    
+    plt.figure(figsize=figsize)
+    ax = sns.boxplot(data=df, x="Normalized Distance", color="white", fliersize=0)
+    sns.stripplot(data=df, x="Normalized Distance", color="gray", alpha=0.4, ax=ax)
+    ax.set_title("Pairwise Normalized Motif Levenshtein Distances")
+    sns.despine(ax=ax, top=True, right=True)
     plt.tight_layout()
     plt.savefig(output_path, dpi=dpi)
     plt.close()

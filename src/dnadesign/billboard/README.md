@@ -1,4 +1,4 @@
-## *billboard*
+## billboard
 
 **billboard** quantifies the regulatory diversity of dense-array–derived DNA sequences based on transcription factor binding site (TFBS) composition and distribution. It processes batches of sequences, extracts motif information, computes core diversity metrics, and writes a `diversity_summary.csv` file to support downstream workflows.
 
@@ -15,6 +15,11 @@ Given a `.pt` file containing sequence dictionaries (in the sibling `sequences/`
    - **Inverted Gini Coefficient** – Usage balance across TFs.
    - **Mean Jaccard Dissimilarity** – Combinatorial diversity of TF rosters.
    - **Positional Entropy** – How diffuse each TF's binding is across the sequence.
+   - **Edit Distance** – Measures differences in the ordered motif architecture of sequences.  
+     - Each sequence is represented as a motif string (e.g. `crp+,gadX-,fliZ+`), which is built by scanning from the 5′ to 3′ end. Pairwise, length-normalized Levenshtein distances are computed between these motif strings (with default penalties of 1 for a TF mismatch and 1 for a strand mismatch, both tunable via the config).
+
+
+
 4. Optionally computes a weighted composite score.
 5. Writes results to `diversity_summary.csv`.
 6. Optionally produces diagnostic plots.
@@ -27,13 +32,24 @@ Given a `.pt` file containing sequence dictionaries (in the sibling `sequences/`
       output_dir_prefix: example_library
       pt_files:
         - example_sequences
+      include_fixed_elements_in_combos: false
       save_plots: true
       dry_run: false
       composite_weights:
         tf_richness: 0.4
         1_minus_gini: 0.3
-        mean_jaccard: 0.3
+        mean_jaccard: 0.2
         median_tf_entropy: 0.1
+        motif_string_levenshtein: 0.1
+      diversity_metrics:
+        - tf_richness
+        - 1_minus_gini
+        - mean_jaccard
+        - median_tf_entropy
+        - motif_string_levenshtein
+      motif_string_levenshtein:
+        tf_penalty: 1.0
+        strand_penalty: 1.0
     ```
 
 2. **Run the analysis:**
@@ -140,6 +156,18 @@ Each metric captures a different aspect of library diversity. All are scalar, in
   ```
 
 - **Summary**: Captures whether TFs bind diffusely or cluster at specific positions. Robust to strand orientation and motif redundancy, though sparse TFs may skew results.
+
+
+
+#### 5. Levenstein Distance — *Motif Order Diversity*
+- **Definition:** Represents each sequence as a comma-delimited motif string (e.g. `crp+,gadX-,fliZ+`) where:
+   - Each motif is identified from the TF mapping (from `meta_tfbs_parts`) and located in the sequence (using `meta_tfbs_parts_in_array`).
+   - The motif string is ordered by the 5′ position.
+   - The strand is explicit (`+` for forward, `-` for reverse).
+
+- **Computation:**  
+   Computes pairwise, length-normalized Levenshtein distances between motif strings using a custom token-based algorithm (with tunable penalties: default 1.0 for both TF mismatches and strand mismatches).
+
 
 ### Composite Metric
 

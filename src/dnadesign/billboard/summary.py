@@ -49,13 +49,33 @@ def generate_csv_summaries(results, output_dir):
             "metric_name": "median_tf_entropy",
             "value": results["core_metrics"].get("median_tf_entropy"),
             "notes": "Aggregated (median) positional entropy across TFs"
-        },
-        {
-            "metric_name": "billboard_weighted_sum",
-            "value": results["composite_metrics"].get("billboard_weighted_sum"),
-            "notes": "Weighted sum composite metric"
         }
     ]
+    if "motif_string_levenshtein_mean" in results["core_metrics"]:
+        diversity_data.extend([
+            {
+                "metric_name": "motif_string_levenshtein_mean",
+                "value": results["core_metrics"].get("motif_string_levenshtein_mean"),
+                "notes": "Mean normalized Levenshtein distance of motif strings"
+            },
+            {
+                "metric_name": "motif_string_levenshtein_median",
+                "value": results["core_metrics"].get("motif_string_levenshtein_median"),
+                "notes": "Median normalized Levenshtein distance of motif strings"
+            },
+            {
+                "metric_name": "motif_string_levenshtein_std",
+                "value": results["core_metrics"].get("motif_string_levenshtein_std"),
+                "notes": "Standard deviation of normalized Levenshtein distances"
+            }
+        ])
+    
+    diversity_data.append({
+        "metric_name": "billboard_weighted_sum",
+        "value": results["composite_metrics"].get("billboard_weighted_sum"),
+        "notes": "Weighted sum composite metric"
+    })
+    
     df_diversity = pd.DataFrame(diversity_data)
     df_diversity.to_csv(os.path.join(csv_dir, "diversity_summary.csv"), index=False)
 
@@ -81,13 +101,31 @@ def generate_entropy_summary_csv(results, output_dir):
             "metric_name": "median_tf_entropy",
             "value": results["core_metrics"].get("median_tf_entropy"),
             "notes": "Aggregated (median) positional entropy across TFs"
-        },
-        {
-            "metric_name": "billboard_weighted_sum",
-            "value": results["composite_metrics"].get("billboard_weighted_sum"),
-            "notes": "Weighted sum composite metric"
         }
     ]
+    if "motif_string_levenshtein_mean" in results["core_metrics"]:
+        diversity_data.extend([
+            {
+                "metric_name": "motif_string_levenshtein_mean",
+                "value": results["core_metrics"].get("motif_string_levenshtein_mean"),
+                "notes": "Mean normalized Levenshtein distance of motif strings"
+            },
+            {
+                "metric_name": "motif_string_levenshtein_median",
+                "value": results["core_metrics"].get("motif_string_levenshtein_median"),
+                "notes": "Median normalized Levenshtein distance of motif strings"
+            },
+            {
+                "metric_name": "motif_string_levenshtein_std",
+                "value": results["core_metrics"].get("motif_string_levenshtein_std"),
+                "notes": "Standard deviation of normalized Levenshtein distances"
+            }
+        ])
+    diversity_data.append({
+        "metric_name": "billboard_weighted_sum",
+        "value": results["composite_metrics"].get("billboard_weighted_sum"),
+        "notes": "Weighted sum composite metric"
+    })
     df_diversity = pd.DataFrame(diversity_data)
     df_diversity.to_csv(os.path.join(csv_dir, "diversity_summary.csv"), index=False)
 

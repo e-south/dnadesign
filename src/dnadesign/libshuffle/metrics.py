@@ -30,26 +30,22 @@ from dnadesign.billboard.summary import generate_entropy_summary_csv
 
 def make_temp_billboard_config(config, temp_pt_path):
     """
-    Creates a fresh temporary Billboard configuration by merging the global Billboard
-    config (from config["billboard"]) with LibShuffle overrides (from config["billboard_metric"]).
-    This configuration is used solely for computing the diversity summary.
+    Creates a temporary Billboard configuration that is decoupled from the global Billboard config.
+    Instead, it uses the diversity metrics specified under 'libshuffle_core_metrics' in the LibShuffle configuration.
     """
     global_billboard = config.get("billboard", {}).copy()
-    lib_overrides = config.get("billboard_metric", {})
     global_billboard["dry_run"] = True
     global_billboard["pt_files"] = [temp_pt_path]
     global_billboard["output_dir_prefix"] = "temp_billboard_" + next(tempfile._get_candidate_names())
     global_billboard["weights_only"] = False
-    if "diversity_metrics" not in global_billboard or not global_billboard["diversity_metrics"]:
-        global_billboard["diversity_metrics"] = lib_overrides.get("core_metrics", [])
-    if "composite_weights" not in global_billboard or not global_billboard["composite_weights"]:
-        global_billboard["composite_weights"] = lib_overrides.get("weights", {})
+    libshuffle_core = config.get("libshuffle_core_metrics", [])
+    if libshuffle_core:
+        global_billboard["diversity_metrics"] = libshuffle_core
+    elif "diversity_metrics" not in global_billboard or not global_billboard["diversity_metrics"]:
+        global_billboard["diversity_metrics"] = config.get("billboard_metric", {}).get("core_metrics", [])
     return global_billboard
 
 def compute_billboard_metric(subsample, config):
-    """
-    Computes the raw Billboard metrics for a subsample.
-    """
     import torch.serialization
     import numpy as np
     torch.serialization.add_safe_globals([np.generic, np._core.multiarray.scalar, np.dtype])
@@ -85,12 +81,16 @@ def compute_billboard_metric(subsample, config):
             os.makedirs(os.path.join(temp_output_dir, "plots"), exist_ok=True)
             results = process_sequences([temp_pt_path], billboard_config)
             core_metrics = compute_core_metrics(results, billboard_config)
-            return core_metrics[core_metrics_list[0]]
+            key = core_metrics_list[0]
+            if key not in core_metrics:
+                alt_key = key + "_mean"
+                if alt_key in core_metrics:
+                    key = alt_key
+                else:
+                    raise KeyError(f"Key '{core_metrics_list[0]}' not found in computed core metrics: {list(core_metrics.keys())}")
+            return core_metrics[key]
 
 def compute_evo2_metric(subsample, config):
-    """
-    Compute the mean pairwise distance among the evo2 vectors in the subsample.
-    """
     vectors = []
     for entry in subsample:
         vector = entry.get("evo2_logits_mean_pooled")
@@ -158,7 +158,13 @@ def apply_composite_transformation(subsamples, config):
         raw = sub.pop("raw_billboard_vector", None)
         if raw is None:
             raise ValueError("Composite mode enabled but raw_billboard_vector not found in subsample.")
-        vector = [raw.get(metric, 0.0) for metric in core_metrics]
+        vector = []
+        for metric in core_metrics:
+            val = raw.get(metric, None)
+            if val is None:
+                alt_key = metric + "_mean"
+                val = raw.get(alt_key, 0.0)
+            vector.append(val)
         data.append(vector)
         sub["raw_billboard_vector"] = vector
     data = np.array(data)

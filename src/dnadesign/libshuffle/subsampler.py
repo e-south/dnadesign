@@ -64,10 +64,16 @@ class Subsampler:
                 unique_clusters = {seq.get("meta_cluster_count") for seq in subsample if "meta_cluster_count" in seq}
                 unique_cluster_count = len(unique_clusters)
                 raw_billboard = compute_billboard_metric(subsample, self.config)
+                # Compute evo2 metric as per config (e.g., cosine)
                 evo2_metric = compute_evo2_metric(subsample, self.config)
+                # Additionally, compute the L2 (euclidean) evo2 metric for plotting if needed.
+                l2_config = self.config.copy()
+                l2_config["evo2_metric"] = {"type": "l2"}
+                evo2_metric_l2 = compute_evo2_metric(subsample, l2_config)
                 self.cache[subsample_ids] = {
                     "raw_billboard": raw_billboard,
                     "evo2_metric": evo2_metric,
+                    "evo2_metric_l2": evo2_metric_l2,
                     "indices": indices,
                     "selected_ids": [self.sequences[i]["id"] for i in indices]
                 }
@@ -75,6 +81,7 @@ class Subsampler:
                 entry = {
                     "subsample_id": f"sublibrary_{draws+1:03d}",
                     "evo2_metric": evo2_metric,
+                    "evo2_metric_l2": evo2_metric_l2,
                     "indices": indices,
                     "selected_ids": [self.sequences[i]["id"] for i in indices],
                     "unique_cluster_count": unique_cluster_count
