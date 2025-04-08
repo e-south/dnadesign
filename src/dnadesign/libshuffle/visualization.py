@@ -165,35 +165,44 @@ import matplotlib as mpl
 
 def plot_scatter(subsamples, config, output_dir, run_info):
     """
-    Generates a two-panel figure:
-      Left panel: Full scatter plot.
-          - X-axis: Mean pairwise cosine dissimilarity (Evo2).
-          - Y-axis: User-selected metric.
-          - Non-hit-zone points are drawn in a base color.
-          - Hit-zone points are drawn in a highlight color with marker sizes
-            scaled by unique cluster count.
-          - A legend inside the left panel (bottom-right) shows sample marker sizes.
-      Right panel: Ranking plot for hit-zone points.
-          - X-axis: Unique cluster count.
-          - Y-axis: Billboard metric.
-          - Points are plotted in gray.
-          - Top 5 and bottom 5 (by billboard metric) are annotated with subsample IDs.
+    Single-panel scatter plot of subsamples:
+      - X-axis: mean pairwise cosine dissimilarity (Evo2).
+      - Y-axis: user-selected metric ("billboard", "euclidean", or "log1p_euclidean").
+      - Threshold logic (joint_selection) determines which points are 'hit-zone'.
+      - Non-hit-zone points: base_color with non_hit_zone_alpha.
+      - Hit-zone points: colormap based on unique cluster count, with hit_zone_alpha.
+      - A color bar for cluster count is shown on the right.
+      - Only the top 5 hit-zone points by cluster count are annotated.
     """
+    sns.set_style("ticks")
+
     # ------------------
-    # Left Panel Data:
+    # Extract Plot Config
     # ------------------
-    # X-axis: Mean pairwise cosine dissimilarity.
+    plot_cfg = config.get("plot", {})
+    base_color = plot_cfg.get("base_color", "gray")
+    highlight_cmap = plt.get_cmap("coolwarm")  # or another colormap
+    alpha_non_hit = plot_cfg.get("non_hit_zone_alpha", 0.3)
+    alpha_hit = plot_cfg.get("hit_zone_alpha", 0.8)
+    marker_size = plot_cfg.get("marker_size", 20)
+    size_by_cluster = plot_cfg.get("size_by_cluster", False)
+    size_multiplier = plot_cfg.get("size_multiplier", 50)
+    fig_size = plot_cfg.get("figure_size", [7, 5])
+    dpi = plot_cfg.get("dpi", 600)
+    y_axis_metric = plot_cfg.get("y_axis_metric", "billboard")
+    annotate_x_threshold = plot_cfg.get("annotate_x_threshold", False)
+
+    # ------------------
+    # Determine X, Y Axes
+    # ------------------
     x_vals = np.array([s["evo2_metric"] for s in subsamples])
+    bm_cfg = config.get("billboard_metric", {})
+    log_transform = plot_cfg.get("log_transform", False)
 
-    # Y-axis: Determined by "plot.y_axis_metric".
-    plot_config = config.get("plot", {})
-    y_axis_metric = plot_config.get("y_axis_metric", "billboard")
-    log_transform = plot_config.get("log_transform", False)
-    bm_config = config.get("billboard_metric", {})
-
+    # Decide Y based on y_axis_metric
     if y_axis_metric == "billboard":
-        composite = bm_config.get("composite_score", False)
-        if not composite:
+        composite_enabled = bm_cfg.get("composite_score", False)
+        if not composite_enabled:
             raw_y = np.array([s["billboard_metric"] for s in subsamples])
             y_vals = np.log2(raw_y) if log_transform else raw_y
             y_label = "log₂(Core Metric)" if log_transform else "Core Metric"
@@ -212,10 +221,10 @@ def plot_scatter(subsamples, config, output_dir, run_info):
         raise ValueError(f"Unsupported y_axis_metric: {y_axis_metric}")
 
     # ------------------
-    # Threshold Settings:
+    # Threshold Logic
     # ------------------
     joint_sel = config.get("joint_selection", {})
-    sel_method = joint_sel.get("method", "null").lower()  # "null", "x_only", or "both"
+    sel_method = joint_sel.get("method", "null").lower()  # "null", "x_only", "both"
 
     def compute_threshold(values, mode, val):
         if mode == "iqr":
@@ -227,19 +236,21 @@ def plot_scatter(subsamples, config, output_dir, run_info):
         else:
             raise ValueError(f"Unsupported threshold mode: {mode}")
 
-    # X-threshold:
+    # X-threshold
     threshold_x_mode = joint_sel.get("threshold_x_mode", "iqr")
     threshold_x_value = joint_sel.get("threshold_x_value", 1.5)
-    x_threshold = compute_threshold(x_vals, threshold_x_mode, threshold_x_value) if sel_method in ["x_only", "both"] else None
+    x_threshold = None
+    if sel_method in ["x_only", "both"]:
+        x_threshold = compute_threshold(x_vals, threshold_x_mode, threshold_x_value)
 
-    # Y-threshold (only used if sel_method=="both")
-    threshold_y_mode = joint_sel.get("threshold_y_mode", "iqr")
-    threshold_y_value = joint_sel.get("threshold_y_value", 1.5)
-    y_threshold = compute_threshold(y_vals, threshold_y_mode, threshold_y_value) if sel_method == "both" else None
+    # Y-threshold (only if method == "both")
+    y_threshold = None
+    if sel_method == "both":
+        threshold_y_mode = joint_sel.get("threshold_y_mode", "iqr")
+        threshold_y_value = joint_sel.get("threshold_y_value", 1.5)
+        y_threshold = compute_threshold(y_vals, threshold_y_mode, threshold_y_value)
 
-    # ------------------
-    # Identify Hit-Zone Points:
-    # ------------------
+    # Identify hit-zone mask
     if sel_method == "null":
         hit_mask = np.zeros_like(x_vals, dtype=bool)
     elif sel_method == "x_only":
@@ -250,127 +261,103 @@ def plot_scatter(subsamples, config, output_dir, run_info):
         raise ValueError(f"Unsupported joint_selection.method: {sel_method}")
 
     # ------------------
-    # Set up Figure Layout:
+    # Create Figure
     # ------------------
-    subplot_width_ratios = plot_config.get("subplot_width_ratios", [2, 1])
-    figure_size = plot_config.get("figure_size", [16, 6])
-    fig, (ax_left, ax_right) = plt.subplots(ncols=2, figsize=figure_size,
-                                             gridspec_kw={'width_ratios': subplot_width_ratios})
-    sns.set_style("ticks")
+    fig, ax = plt.subplots(figsize=fig_size)
 
-    # ------------------
-    # Left Panel: Full Scatter Plot
-    # ------------------
-    base_color = plot_config.get("base_color", "gray")
-    highlight_color = plot_config.get("highlight_color", "red")
-    # Instead of coloring by unique cluster count, use base colors;
-    # for hit-zone points, vary the marker size by unique cluster count.
-    marker_size = plot_config.get("marker_size", 50)
-    size_multiplier = plot_config.get("size_multiplier", 20)
-    all_uc = np.array([s.get("unique_cluster_count", 0) for s in subsamples])
-    uc_max = all_uc.max() if all_uc.max() > 0 else 1
+    # Unique cluster counts
+    cluster_counts = np.array([s.get("unique_cluster_count", 0) for s in subsamples])
+    cmin, cmax = cluster_counts.min(), cluster_counts.max()
+    spread = cmax - cmin if cmax > cmin else 1.0  # avoid div-by-zero
 
-    sizes_left = []
-    colors_left = []
+    # Prepare arrays for final color, alpha, and size
+    final_colors = []
+    final_alphas = []
+    final_sizes = []
     for i, s in enumerate(subsamples):
         if hit_mask[i]:
-            # Scale marker size by unique cluster count (normalized)
-            uc = s.get("unique_cluster_count", 0)
-            scaled_size = marker_size + (uc / uc_max) * size_multiplier
-            sizes_left.append(scaled_size)
-            colors_left.append(highlight_color)
+            # Hit-zone => color by cluster count
+            norm_val = (cluster_counts[i] - cmin) / spread
+            color = highlight_cmap(norm_val)
+            alpha = alpha_hit
+            if size_by_cluster:
+                final_size = marker_size + (cluster_counts[i] / max(cmax, 1)) * size_multiplier
+            else:
+                final_size = marker_size
         else:
-            sizes_left.append(marker_size)
-            colors_left.append(base_color)
+            # Non-hit => base color
+            color = base_color
+            alpha = alpha_non_hit
+            final_size = marker_size
 
-    # Plot left panel points:
+        final_colors.append(color)
+        final_alphas.append(alpha)
+        final_sizes.append(final_size)
+
+    # Scatter all points
     for i in range(len(x_vals)):
-        ax_left.scatter(x_vals[i], y_vals[i], s=sizes_left[i],
-                        c=colors_left[i], alpha=plot_config.get("alpha", 0.35),
-                        edgecolor="none")
-    # Draw threshold lines if applicable:
-    if sel_method in ["x_only", "both"]:
-        ax_left.axvline(x=x_threshold, linestyle="--", color="lightgray", zorder=1)
-    if sel_method == "both":
-        ax_left.axhline(y=y_threshold, linestyle="--", color="lightgray", zorder=1)
-    # Annotate hit-zone points:
-    if sel_method in ["x_only", "both"] and plot_config.get("annotate_x_threshold", False):
+        ax.scatter(x_vals[i], y_vals[i],
+                   c=[final_colors[i]],
+                   alpha=final_alphas[i],
+                   s=final_sizes[i],
+                   edgecolor="none")
+
+    # Draw threshold lines if relevant
+    if sel_method in ["x_only", "both"] and x_threshold is not None:
+        ax.axvline(x=x_threshold, linestyle="--", color="lightgray")
+    if sel_method == "both" and y_threshold is not None:
+        ax.axhline(y=y_threshold, linestyle="--", color="lightgray")
+
+    # Optionally annotate points above x_threshold if "annotate_x_threshold" is True
+    if (sel_method in ["x_only", "both"]) and annotate_x_threshold:
         for i, s in enumerate(subsamples):
             if hit_mask[i]:
-                numeric_id = s["subsample_id"].split("_")[-1]
-                ax_left.annotate(numeric_id, (x_vals[i], y_vals[i]),
-                                 textcoords="offset points", xytext=(5, 5),
-                                 fontsize=8, color="gray")
-    ax_left.set_xlabel("Mean pairwise cosine dissimilarity in Evo2 latent space")
-    ax_left.set_ylabel(y_label)
-    ax_left.set_title("Isolating Sublibraries with High Latent Space Coverage")
-    ax_left.spines["top"].set_visible(False)
-    ax_left.spines["right"].set_visible(False)
-    
-    # Create legend for marker sizes (mapping unique cluster count to marker size)
-    # Select representative cluster count values (min, median, max)
-    rep_uc = np.array([all_uc.min(), np.median(all_uc), all_uc.max()])
-    legend_sizes = [marker_size + (uc / uc_max) * size_multiplier for uc in rep_uc]
-    # Create dummy scatter plots:
-    handles = [plt.scatter([], [], s=size, color=highlight_color, alpha=plot_config.get("hit_zone_alpha", 0.8))
-               for size in legend_sizes]
-    labels = [f"UC = {int(uc)}" for uc in rep_uc]
-    ax_left.legend(handles, labels, title="Unique Cluster Count", loc="lower right", frameon=False)
+                sub_id = s["subsample_id"].split("_")[-1]
+                ax.annotate(sub_id, (x_vals[i], y_vals[i]),
+                            textcoords="offset points", xytext=(5, 5),
+                            fontsize=8, color="gray")
 
-    # ------------------
-    # Right Panel: Ranking Plot for Hit-Zone Points
-    # ------------------
-    # For right panel, x-axis: unique cluster count, y-axis: billboard metric.
-    # All points are plotted in gray.
-    hit_subsamples = [s for i, s in enumerate(subsamples) if hit_mask[i]]
-    if not hit_subsamples:
-        ax_right.text(0.5, 0.5, "No hit-zone subsamples found",
-                      ha='center', va='center', fontsize=14, color="gray")
-        ax_right.set_xticks([])
-        ax_right.set_yticks([])
-    else:
-        hit_uc = np.array([s.get("unique_cluster_count", 0) for s in hit_subsamples])
-        hit_billboard = np.array([s["billboard_metric"] for s in hit_subsamples])
-        # For right panel, use gray color for all points.
-        ax_right.scatter(hit_uc, hit_billboard, s=marker_size,
-                         c="red", alpha=plot_config.get("hit_zone_alpha", 0.8),
-                         edgecolor="none")
-        # Set x-ticks to unique cluster count values.
-        unique_hit_uc = np.unique(hit_uc)
-        ax_right.set_xticks(unique_hit_uc)
-        ax_right.set_xlabel("Unique Cluster Count")
-        ax_right.set_ylabel("Billboard Metric")
-        ax_right.set_title("Stratify by Billboard Metric(s)")
-        # Remove threshold lines (as per current specification)
-        # Annotate top 5 and bottom 5 hit-zone points by billboard metric.
-        if len(hit_billboard) >= 5:
-            top5_idx = np.argsort(-hit_billboard)[:5]
-            bottom5_idx = np.argsort(hit_billboard)[:5]
-            annotate_idx = np.concatenate([top5_idx, bottom5_idx])
-        else:
-            annotate_idx = np.arange(len(hit_billboard))
-        for idx in annotate_idx:
-            sub_id = hit_subsamples[idx]["subsample_id"].split("_")[-1]
-            ax_right.annotate(sub_id, (hit_uc[idx], hit_billboard[idx]),
-                              textcoords="offset points", xytext=(0, 5),
-                              fontsize=8, color="gray")
-    ax_right.spines["top"].set_visible(False)
-    ax_right.spines["right"].set_visible(False)
+    # Now, among hit-zone points only, find top 5 by cluster count for black annotation
+    hit_indices = np.where(hit_mask)[0]
+    if len(hit_indices) > 0:
+        hit_zone_clusters = cluster_counts[hit_indices]
+        top5_hit = np.argsort(-hit_zone_clusters)[:5]  # top 5 in the hit zone
+        top5_global_indices = hit_indices[top5_hit]
+        # Annotate those top 5 in black
+        for idx in top5_global_indices:
+            sub_id = subsamples[idx]["subsample_id"].split("_")[-1]
+            ax.annotate(sub_id, (x_vals[idx], y_vals[idx]),
+                        textcoords="offset points", xytext=(5, 5),
+                        fontsize=8, color="black")
 
-    # ------------------
-    # Overall Figure Settings:
-    # ------------------
+    # Colorbar for cluster count (only if we have at least one hit-zone point)
+    if hit_mask.any():
+        norm = mpl.colors.Normalize(vmin=cmin, vmax=cmax)
+        sm = mpl.cm.ScalarMappable(norm=norm, cmap=highlight_cmap)
+        sm.set_array([])
+        cbar = fig.colorbar(sm, ax=ax)
+        cbar.set_label("Unique Cluster Count")
+
+    # Axes labels, title, etc.
+    ax.set_xlabel("Mean pairwise cosine dissimilarity in Evo2 latent space")
+    ax.set_ylabel(y_label)
+    ax.set_title("Subsample Diversity (Single Panel)")
+
+    # Final figure title
     overall_title = (f"Subsample Diversity Analysis\n"
                      f"Draws: {run_info.get('num_draws', 'N/A')} · "
                      f"Subsample size: {run_info.get('subsample_size', 'N/A')}")
-    fig.suptitle(overall_title, fontsize=14, y=0.98)
+    fig.suptitle(overall_title, fontsize=12, y=0.98)
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
     plt.tight_layout(rect=[0, 0, 1, 0.95])
 
-    dpi = plot_config.get("dpi", 600)
-    filename = plot_config.get("filename", "scatter_summary.png")
+    filename = plot_cfg.get("filename", "scatter_summary.png")
     output_path = os.path.join(output_dir, filename)
     plt.savefig(output_path, dpi=dpi, bbox_inches="tight")
-    plt.close()
+    plt.close(fig)
+
     return output_path
 
 

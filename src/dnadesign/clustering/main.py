@@ -22,6 +22,8 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 from dnadesign.clustering import cluster_select, plotter, normalization, \
     cluster_composition, diversity_analysis, differential_feature_analysis
 
+from dnadesign.clustering import resolution_sweep
+
 def load_config(config_path="configs/example.yaml"):
     """
     Load the configuration file.
@@ -154,6 +156,17 @@ def main():
     print("Extracting features from data entries...")
     features = extract_features(data_entries, key="evo2_logits_mean_pooled")
     
+    # Check if resolution sweep mode is enabled and branch accordingly.
+    if clustering_config.get("resolution_sweep", {}).get("enabled", False):
+        results_dir = base_dir / "clustering" / "batch_results" / f"{batch_name}_{hue_method}"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        print("Running in Resolution Sweep mode...")
+        resolution_sweep.run_resolution_sweep(features, clustering_config["resolution_sweep"], results_dir)
+        # Exit after sweep mode is complete.
+        sys.exit(0)
+    
+    # --- Continue with normal pipeline if resolution sweep is NOT enabled ---
+    
     print("Creating AnnData object for Scanpy processing...")
     adata = sc.AnnData(features)
     
@@ -164,8 +177,9 @@ def main():
     sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep='X')
     sc.tl.umap(adata, min_dist=min_dist)
     
-    print("Performing Leiden clustering (resolution=0.2)...")
-    sc.tl.leiden(adata, resolution=0.2)
+    leiden_res = clustering_config.get("leiden_resolution", {})
+    print(f"Performing Leiden clustering (resolution={leiden_res})...")
+    sc.tl.leiden(adata, resolution=leiden_res)
     clusters = adata.obs["leiden"].to_numpy()
     for i, entry in enumerate(data_entries):
         entry["leiden_cluster"] = clusters[i]

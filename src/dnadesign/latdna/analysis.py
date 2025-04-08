@@ -198,7 +198,7 @@ def run_analysis_pipeline(config: dict):
     unique_metrics = df["metric"].unique()
     n_metrics = len(unique_metrics)
     
-    fig, axes = plt.subplots(nrows=n_metrics, ncols=1, figsize=(10, 4 * n_metrics), sharex=False)
+    fig, axes = plt.subplots(nrows=n_metrics, ncols=1, figsize=(6, 3 * n_metrics), sharex=False)
     if n_metrics == 1:
         axes = [axes]
     

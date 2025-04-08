@@ -8,6 +8,7 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+# billboard/main.py
 import os
 import datetime
 import yaml
@@ -154,6 +155,19 @@ def main():
                 str(output_dir / "plots" / "motif_levenshtein_boxplot.png"),
                 dpi=billboard_config.get("dpi", 600),
                 figsize=(8,6)
+            )
+        
+        # Cluster Characterization Plot (cluster-level)
+        if billboard_config.get("characterize_by_leiden_cluster", {}).get("enabled", False):
+            from dnadesign.billboard.by_cluster import compute_cluster_metrics, save_cluster_characterization_scatter
+            # Compute the cluster metrics (aggregated over sequences)
+            cluster_df = compute_cluster_metrics(results, billboard_config)
+            save_cluster_characterization_scatter(
+                cluster_df,
+                billboard_config,
+                str(output_dir / "plots" / "cluster_characterization_scatter.png"),
+                dpi=billboard_config.get("dpi", 600),
+                figsize=(10,6)
             )
                 
     print_summary(results)

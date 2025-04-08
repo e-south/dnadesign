@@ -59,20 +59,20 @@ libshuffle:
   output_dir_prefix: shuffle_sigma70_test        # Used for naming the batch results directory
   save_selected_pt: true                         # If true, save selected subsample .pt files in batch results
   subsample_size: 16                             # Default subsample size
-  num_draws: 1000                                # Number of subsampling iterations
+  num_draws: 10000                               # Number of subsampling iterations
   with_replacement: false
   random_seed: 42
   max_attempts_per_draw: 10
   evo2_metric:
     type: "cosine"                               # Options: "l2", "log1p_l2", "cosine"
   billboard_metric:
-    composite_score: true                      # true: compute composite; false: use a single raw metric
+    composite_score: true                    # true: compute composite; false: use a single raw metric
     method: "percentile_avg"                     # Options: "zscore_pca", "minmax_weighted", "cds", "percentile_avg", "inverse_rank_sum"
     normalize: "null"                            # Options: "zscore", "minmax", or null (if no normalization)
     core_metrics:
       - 1_minus_gini
       - mean_jaccard
-      # - median_tf_entropy
+      - median_tf_entropy
       - motif_string_levenshtein
     weights: {}
   joint_selection:
@@ -81,31 +81,30 @@ libshuffle:
     threshold_x_value: 1.5    # e.g. 1.5 means 1.5×IQR, or 75 means 75th percentile
     threshold_y_mode: "percentile"
     threshold_y_value: 75
-    selected_subsample_ids: [ "sublibrary_032", "sublibrary_286" ]
+    selected_subsample_ids: [ "sublibrary_319", "sublibrary_881" ]
   plot:
     base_color: "gray"                           # Base color for non-filtered points (unused in threshold modes)
     highlight_color: "red"                       # Color for threshold-passing points (determined by unique cluster count)
     alpha: 0.25                                  # Default alpha for points
-    hit_zone_alpha: 0.8                          # Alpha for points in the hit zone
-    non_hit_zone_alpha: 0.3                      # Alpha for points outside the hit zone
+    hit_zone_alpha: 0.5                          # Alpha for points in the hit zone
+    non_hit_zone_alpha: 0.2                      # Alpha for points outside the hit zone
     dpi: 600
     filename: scatter_summary.png
     size_by_cluster: true                        # If true, marker size scales by unique cluster count
     size_multiplier: 50                          # Multiplier for sizing by cluster count (ignored if marker_size is set)
-    marker_size: 20                              # Constant marker size (overrides size_by_cluster)
+    marker_size: 15                              # Constant marker size (overrides size_by_cluster)
     log_transform: false                         # When true, applies log₂ transformation to the y-axis
-    annotate_x_threshold: true                   # If true, annotate points exceeding the x threshold with numeric suffix
+    annotate_x_threshold: false                   # If true, annotate points exceeding the x threshold with numeric suffix
     y_axis_metric: "log1p_euclidean"             # Options: "billboard", "euclidean", "log1p_euclidean"
-    subplot_width_ratios: [3, 1]  # e.g. left subplot is 3x as wide as right subplot
     figure_size: [7, 5]         # override default figure size
 
 
 billboard:
-  output_dir_prefix: sub292
+  output_dir_prefix: densebatch_test
   dry_run: false
   # Provide only the subdirectory name (or relative path) within the sequences folder.
   pt_files:
-    - sub292
+    - densebatch_test
   track_unique_roster: true
   allow_variable_sequence_length: false
   include_fixed_elements_in_combos: false
@@ -114,11 +113,11 @@ billboard:
   dpi: 600
   # List of core diversity metrics to compute
   diversity_metrics:
-    - tf_richness
+    # - tf_richness
     - 1_minus_gini
-    - mean_jaccard
+    # - mean_jaccard
     - median_tf_entropy
-    - motif_string_levenshtein
+    # - motif_string_levenshtein
   # Weights for the weighted sum composite (must sum to 1 if desired)
   composite_weights:
     tf_richness: 0.4
@@ -131,6 +130,14 @@ billboard:
     tf_penalty: 1.0
     strand_penalty: 0.5
     partial_penalty: 0.8
+  characterize_by_leiden_cluster:
+    enabled: true
+    plot_title: "Cluster Characterization by Core Metrics"
+    marker_shapes:
+      tf_richness: "o"
+      1_minus_gini: "s"
+      tf_entropy: "D"
+      motif_string_levenshtein: "X"
 
 
 densegen:
@@ -201,15 +208,16 @@ evoinference:
 
 
 clustering:
-  batch_name: "test_latdna"
+  batch_name: "test_sub319"
   input_sources:
     - dir: "densebatch_test"
-    # - dir: "sub957"
-    - dir: "latdnabatch_20250405"
-    - dir: "seqbatch_ecocyc_28_promoters"
+    - dir: "sub319"
+    # - dir: "latdnabatch_20250405"
+    # - dir: "seqbatch_ecocyc_28_promoters"
   method: "input_source"
   add_meta_cluster_count: true
   update_in_place: true
+  leiden_resolution: .8
   cluster_selection:
     num_files: 0
     order: "max"
@@ -224,7 +232,7 @@ clustering:
     # Instead, use background_alpha and background_size for background points,
     # and highlight_alpha and highlight_size for highlight points.
     hue:
-      method: "input_source"              # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", highlight", "type"
+      method: "highlight"              # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", highlight", "type"
       numeric_hue: None
       normalization: "robust"                       
       background_alpha: 0.05
@@ -233,7 +241,7 @@ clustering:
       highlight_size: 16.0
       # highlight_dirs must be a subset of input_sources.
       highlight_dirs:
-        - "sub957"
+        - "sub319"
   output_prefix: "clusterbatch_"
   analysis:
     cluster_composition: true
@@ -241,7 +249,13 @@ clustering:
     diversity_assessment: true
     diversity_assessment_plot_dimensions: [10, 4]
     differential_feature_analysis: true
-
+  resolution_sweep:
+    enabled: false
+    min: 0.1
+    max: 1
+    step: 0.05
+    replicates: 1
+    random_seeds: [42]
 
 nmf:
   batch_name: "densebatch_deg2tfbs_pipeline_tfbsfetcher_m9_acetate_tfs_n10000_subsample20_diverse"
