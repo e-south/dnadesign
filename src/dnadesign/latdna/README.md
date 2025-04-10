@@ -93,3 +93,21 @@ sequence, sequence_length, fixed_elements, meta_tfbs_parts, and meta_tfbs_parts_
       - Compute intra-population pairwise distances for each configured metric.
       - Generate a grouped boxplot for latent diversity and save it as latent_diversity_boxplot.png.
       - Save all analysis outputs in latdna/batch_results/latbatch_YYYYMMDD/.
+
+
+
+
+---
+
+Absolutely — here’s a revised version that tightens the language, removes unsupported assumptions, and aligns with your intended framing:
+
+⸻
+
+To investigate how motif composition and transcription factor (TF) diversity are reflected in the latent space of Evo2, we generated dense promoter arrays composed of known TF binding sites and analyzed their intra-group pairwise distances in embedding space. The central question is whether combinations of binding sites associated with a higher diversity of TFs lead to greater intra-group dissimilarity. If so, this would suggest that the model is sensitive not just to sequence content, but also to combinatorial regulatory grammar — detecting not only the presence of binding sites but also their associated regulatory identities.
+
+We compare three distinct categories of synthetic promoters:
+	1.	Monotypic arrays contain only binding sites for a single transcription factor, using experimentally validated sites drawn from databases such as RegulonDB.
+	2.	Restricted heterotypic arrays contain binding sites from a curated subset of transcription factors responsive to acetate transition. This represents a smaller regulatory vocabulary — a limited set of binding site signatures.
+	3.	Unrestricted heterotypic arrays draw from all available TFs with binding site data, representing the broadest possible diversity and highest number of unique regulatory inputs.
+
+By comparing intra-group distances across these categories, we aim to assess whether Evo2 embeddings reflect the underlying regulatory diversity encoded by binding site composition.

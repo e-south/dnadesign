@@ -4,7 +4,7 @@
 dnadesign/densegen/main.py
 
 CLI entry point for densegen.
-Loads configuration, ingests TF–TFBS mapping data, and processes each input source (or sub‐batch).
+Loads configuration, ingests TF-TFBS mapping data, and processes each input source (or sub‐batch).
 For each source, binding sites are sampled (using a target basepair budget),
 the solver is instantiated, and then dense arrays are generated.
 The solver can be run in a diversity-driven mode (if flagged in the config).

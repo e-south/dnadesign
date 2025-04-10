@@ -143,8 +143,20 @@ billboard:
 densegen:
   input_sources:
     - type: "deg2tfbs_pipeline_tfbsfetcher"
-      name: "m9_acetate_tfs"
-      path: "tfbsbatch_20250321"
+      name: "heterotypic_all_TFs"
+      path: "tfbsbatch_heterotypic_allTFs_EcoCyc28"
+    - type: "deg2tfbs_pipeline_tfbsfetcher"
+      name: "heterotypic_M9_gluc_ace_top20"
+      path: "tfbsbatch_heterotypic_M9_gluc_ace_top20"
+    - type: "deg2tfbs_pipeline_tfbsfetcher"
+      name: "monotypic_CRP"
+      path: "tfbsbatch_monotypic_CRP"
+    - type: "deg2tfbs_pipeline_tfbsfetcher"
+      name: "monotypic_ArcA"
+      path: "tfbsbatch_monotypic_ArcA"
+    - type: "deg2tfbs_pipeline_tfbsfetcher"
+      name: "monotypic_Lrp"
+      path: "tfbsbatch_monotypic_Lrp"
   output_dir: "sequences"
   progress_file: "progress_status.yaml"
   solver: "GUROBI"
@@ -152,19 +164,19 @@ densegen:
   solver_options:
     - "Threads=16"
     - "TimeLimit=10"
-  quota: 10000
-  sequence_length: 120
+  quota: 2500
+  sequence_length: 100
   subsample_over_length_budget_by: 100
-  subsample_size: 20  # legacy
+  # subsample_size: 20  # legacy
   round_robin: true
-  arrays_generated_before_resample: 100  
+  arrays_generated_before_resample: 10  
   fixed_elements:
     promoter_constraints:
       - name: "sigma70_consensus"
         upstream: "TTGACA"
         downstream: "TATAAT"
         spacer_length: [16, 18]
-        upstream_pos: [10, 100]
+        upstream_pos: [15, 75]
       # - name: "sigma70_consensus_+"
       #   upstream: "TTGACA"
       #   downstream: "TGTATAATGCT"
