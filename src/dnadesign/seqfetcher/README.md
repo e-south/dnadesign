@@ -12,7 +12,6 @@ The **seqfetcher** subdirectory is designed to ingest and standardize DNA sequen
     - Metadata such as:
       - `meta_source` (e.g., the dataset key)
       - `meta_date_accessed`
-      - `meta_part_type` (e.g., "promoter" or "tfbs")
-      - Additional dataset-specific fields (e.g., transcription strength)
+      - Additional dataset-specific fields
 
-4. **Output Generation:** Each module saves the standardized data as a `.pt` file under a dedicated subfolder in the `sequences/` directory. A corresponding `summary.yaml` file is also generated to capture key details (source file, number of entries, timestamp, etc.).
+4. **Output Generation:** Each module saves its list of dictionaries as a `.pt` file under a dedicated subfolder in the **sequences** directory. A corresponding `summary.yaml` file is also generated to capture key details (source file, number of entries, timestamp, etc.).

@@ -1,5 +1,24 @@
 ## sequences
 
+  **sequences** serves as the central storage location for nucleotide sequences within the project, organizing outputs from sibling pipelines into a standardized data structure.
+
+  Each sequence file is structured as a list of dictionaries, following the below format:  
+   ```python
+   example_sequence_entry = [
+
+      {
+         "id": "90b4e54f-b5f9-48ef-882a-8763653ae826",
+         "meta_date_accessed": "2025-02-19T12:01:30.602571",
+         "meta_source": "deg2tfbs_all_DEG_sets",
+         "sequence": "gtactgCTGCAAGATAGTGTGAATGACGTTCAATATAATGGCTGATCTTATTTCCAGGAAACCGTTGCCACA",
+         "meta_type": "dense-array",
+         "evo2_logits_mean_pooled": tensor([[[-10.3750,  10.3750, ..., 10.3750,  10.3750]]], dtype=torch.bfloat16),
+         "evo2_logits_shape": [1, 512]
+      },
+      # Additional dictionary entries extend the list
+   ]
+   ```
+
 ### Gitignore considerations
 
 - **Ignored Folders:**  

@@ -10,7 +10,7 @@ Given a `.pt` file containing sequence dictionaries (in the sibling `sequences/`
 
 1. Parses TFBS annotations to extract which transcription factors are present in each sequence.
 2. Constructs strand-specific positional occupancy maps for each TF.
-3. Computes four scalar diversity metrics:
+3. Computes scalar diversity metrics:
    - **TF Richness** – Compositional breadth.
    - **Inverted Gini Coefficient** – Usage balance across TFs.
    - **Mean Jaccard Dissimilarity** – Combinatorial diversity of TF rosters.
@@ -187,20 +187,18 @@ billboard_weighted_sum = w1 * tf_richness + w2 * (1 - gini) + w3 * mean_jaccard 
 
 ### Output
 
-After running, **billboard** writes a results folder under `batch_results/`:
+After running, **billboard** writes a results folder under `batch_results/`, containing:
 
-### Key Deliverable
+
 - `csvs/diversity_summary.csv`
   - `tf_richness`
   - `1_minus_gini`
   - `mean_jaccard`
   - `median_tf_entropy`
   - `billboard_weighted_sum`
-
-### Optional Plots
-- `tf_frequency_barplot.png`
-- `tf_occupancy_combined.png`
-- `motif_length_density.png`
+  - `tf_frequency_barplot.png`
+  - `tf_occupancy_combined.png`
+  - `motif_length_density.png`
 
 ### Module Overview
 

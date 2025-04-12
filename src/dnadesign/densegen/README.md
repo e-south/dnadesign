@@ -1,6 +1,6 @@
 # densegen – Dense Array Generator
 
-**densegen** is a DNA sequence design pipeline built for batch assembly of synthetic bacterial promoters featuring densely packed transcription factor binding sites. It wraps the [**dense-arrays**](https://github.com/e-south/dense-arrays) integer linear programming package and leverages curated transcription factor (TF) to binding site (TFBS) mappings provided by the [**deg2tfbs**](https://github.com/e-south/deg2tfbs) repository.
+**densegen** is a DNA sequence design pipeline built for batch assembly of synthetic bacterial promoters, each composed of densely packed transcription factor binding sites. It wraps the [**dense-arrays**](https://github.com/e-south/dense-arrays) integer linear programming package and leverages curated transcription factor (TF) to binding site (TFBS) mappings provided by the [**deg2tfbs**](https://github.com/e-south/deg2tfbs) repository.
 
 **densegen** automates the process of:
 1. **Data Ingestion:**
@@ -131,7 +131,3 @@ dnadesign/
 
 - **`utils.py`:**  
   Provides shared utilities such as path resolution, configuration loading, and standardized sequence saving.
-
----
-
-**densegen** is designed to be modular, extensible, and robust—facilitating high-throughput design of synthetic promoter sequences with tight regulatory element control. For any questions or contributions, please refer to the repository documentation.
