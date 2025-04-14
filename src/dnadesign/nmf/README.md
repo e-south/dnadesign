@@ -1,6 +1,4 @@
-## NMF-Based Regulatory Signature Discovery
-
-![Alt text](images/sequence_program_composition.png)
+## nmf
 
 **nmf** applies Non-Negative Matrix Factorization (NMF) to dense-array DNA sequences, revealing higher-order **motif combinatoric programs**—groups of transcription factor (TF) motifs that co-occur across a designed library. Unlike simpler metrics (see the **billboard** pipeline), NMF provides a more abstract view of binding site architectures.
 
@@ -37,7 +35,7 @@ At first glance, it’s natural to lean on classic “billboard” metrics when 
 
 These metrics capture surface-level diversity, but in a **highly diverse by design** library, they offer little contrast. Because TFs and their binding sites are uniformly sampled, nearly all sequences appear equally complex, causing these metrics to flatline: they confirm diversity but fail to stratify it.
     
-In contrast, NMF identifies recurrent combinations of TF motifs that explain variation across the entire sequence library. These latent programs often reveal hierarchical motif groupings that shallow diversity metrics cannot detect.
+NMF identifies recurrent combinations of TF motifs that explain variation across the entire sequence library. These latent programs may reveal hierarchical motif groupings that shallow diversity metrics cannot detect.
 
   > Each sequence is expressed as a soft mixture over programs (`W`), and each program is defined as a weighted set of TF motifs (`H`).
 
@@ -93,7 +91,7 @@ This decomposition can reveal TFBS combinatorics underlying the design space.
 
 NMF is parameterized by a rank `k`, which determines the number of latent regulatory programs to learn. Conceptually, `k` reflects the programmatic richness assumed in the dataset.
 
-Because our input sequences are densely encoded with many transcription factor motifs by design, increasing `k` consistently improves reconstruction fidelity (i.e., Frobenius error decreases monotonically). This makes elbow-point heuristics unreliable—the sequences are simply too rich for a clear inflection.
+Because our input sequences are densely encoded with many transcription factor motifs by design, increasing `k` consistently improves reconstruction fidelity (i.e., Frobenius error decreases monotonically). This makes elbow-point heuristics unreliable—the sequences are simply too rich for a clear elbow.
 
   <img src="images/reconstruction_loss.png" alt="Reconstruction Loss" width="500"/>
 

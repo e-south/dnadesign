@@ -96,13 +96,6 @@ sequence, sequence_length, fixed_elements, meta_tfbs_parts, and meta_tfbs_parts_
 
 
 
-
----
-
-Absolutely — here’s a revised version that tightens the language, removes unsupported assumptions, and aligns with your intended framing:
-
-⸻
-
 To investigate how motif composition and transcription factor (TF) diversity are reflected in the latent space of Evo2, we generated dense promoter arrays composed of known TF binding sites and analyzed their intra-group pairwise distances in embedding space. The central question is whether combinations of binding sites associated with a higher diversity of TFs lead to greater intra-group dissimilarity. If so, this would suggest that the model is sensitive not just to sequence content, but also to combinatorial regulatory grammar — detecting not only the presence of binding sites but also their associated regulatory identities.
 
 We compare three distinct categories of synthetic promoters:

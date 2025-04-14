@@ -43,15 +43,32 @@ latdna:
   analysis_inputs:
     dense_batch: densebatch_test
     latdna_batch: latdnabatch_20250405
-    seq_batch: seqbatch_ecocyc_28_promoters
+    seq_batch: 
+      - seqbatch_ecocyc_28_promoters
+      - densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_all_TFs_n2500
+      - densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_M9_gluc_ace_top20_n2500
+      - densebatch_deg2tfbs_pipeline_tfbsfetcher_monotypic_ArcA_n2500
+      - densebatch_deg2tfbs_pipeline_tfbsfetcher_monotypic_CRP_n2500
+      - densebatch_deg2tfbs_pipeline_tfbsfetcher_monotypic_Lrp_n2500
   metrics:
-    - cosine
-    - euclidean
+    # - cosine
+    # - log1p_cosine
+    - sqrt_cosine
+    # - euclidean
     - log1p_euclidean
   group_by: all  # Options: "all" or "tf"
   plots:
     boxplot: true
     save_path: "plots/latdna_analysis_20250405.png"
+    xtic_labels:
+      - "dense_test"
+      - "latdna"
+      - ecocyc_28
+      - hetero_all_TFs
+      - hetero_ace_top20
+      - mono_ArcA
+      - mono_CRP
+      - mono_Lrp
 
 
 libshuffle:
@@ -142,21 +159,21 @@ billboard:
 
 densegen:
   input_sources:
-    - type: "deg2tfbs_pipeline_tfbsfetcher"
-      name: "heterotypic_all_TFs"
-      path: "tfbsbatch_heterotypic_allTFs_EcoCyc28"
+    # - type: "deg2tfbs_pipeline_tfbsfetcher"
+    #   name: "heterotypic_all_TFs"
+    #   path: "tfbsbatch_heterotypic_allTFs_EcoCyc28"
     - type: "deg2tfbs_pipeline_tfbsfetcher"
       name: "heterotypic_M9_gluc_ace_top20"
       path: "tfbsbatch_heterotypic_M9_gluc_ace_top20"
-    - type: "deg2tfbs_pipeline_tfbsfetcher"
-      name: "monotypic_CRP"
-      path: "tfbsbatch_monotypic_CRP"
-    - type: "deg2tfbs_pipeline_tfbsfetcher"
-      name: "monotypic_ArcA"
-      path: "tfbsbatch_monotypic_ArcA"
-    - type: "deg2tfbs_pipeline_tfbsfetcher"
-      name: "monotypic_Lrp"
-      path: "tfbsbatch_monotypic_Lrp"
+    # - type: "deg2tfbs_pipeline_tfbsfetcher"
+    #   name: "monotypic_CRP"
+    #   path: "tfbsbatch_monotypic_CRP"
+    # - type: "deg2tfbs_pipeline_tfbsfetcher"
+    #   name: "monotypic_ArcA"
+    #   path: "tfbsbatch_monotypic_ArcA"
+    # - type: "deg2tfbs_pipeline_tfbsfetcher"
+    #   name: "monotypic_Lrp"
+    #   path: "tfbsbatch_monotypic_Lrp"
   output_dir: "sequences"
   progress_file: "progress_status.yaml"
   solver: "GUROBI"
@@ -164,9 +181,9 @@ densegen:
   solver_options:
     - "Threads=16"
     - "TimeLimit=10"
-  quota: 2500
-  sequence_length: 100
-  subsample_over_length_budget_by: 100
+  quota: 10000
+  sequence_length: 60
+  subsample_over_length_budget_by: 120
   # subsample_size: 20  # legacy
   round_robin: true
   arrays_generated_before_resample: 10  
@@ -176,7 +193,7 @@ densegen:
         upstream: "TTGACA"
         downstream: "TATAAT"
         spacer_length: [16, 18]
-        upstream_pos: [15, 75]
+        upstream_pos: [10, 40]
       # - name: "sigma70_consensus_+"
       #   upstream: "TTGACA"
       #   downstream: "TGTATAATGCT"
@@ -220,10 +237,13 @@ evoinference:
 
 
 clustering:
-  batch_name: "test_sub319"
+  batch_name: "monotypics"
   input_sources:
-    - dir: "densebatch_test"
-    - dir: "sub319"
+    # - dir: "densebatch_test"
+    # - dir: "sub319"
+    - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_monotypic_ArcA_n2500"
+    - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_monotypic_CRP_n2500"
+    - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_monotypic_Lrp_n2500"
     # - dir: "latdnabatch_20250405"
     # - dir: "seqbatch_ecocyc_28_promoters"
   method: "input_source"
@@ -244,7 +264,7 @@ clustering:
     # Instead, use background_alpha and background_size for background points,
     # and highlight_alpha and highlight_size for highlight points.
     hue:
-      method: "highlight"              # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", highlight", "type"
+      method: "input_source"              # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", highlight", "type"
       numeric_hue: None
       normalization: "robust"                       
       background_alpha: 0.05

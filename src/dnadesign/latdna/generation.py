@@ -118,7 +118,7 @@ def run_generation_pipeline(config: dict):
             logging.info(f"TF '{tf}', motif '{motif}': Found {len(valid_positions)} valid tiling positions.")
             
             for pos in valid_positions:
-                # Work on a copy of the base sequence (as a list for mutability).
+                # Work on a copy of the base sequence.
                 sequence_list = list(base_sequence)
                 
                 # Insert fixed elements.

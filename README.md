@@ -25,9 +25,6 @@ dnadesign/
         ├── evoinference/              
         │   ├── main.py
         │   └── ...                             
-        ├── libshuffle/                 
-        │   ├── main.py
-        │   └── ...  
         ├── latdna/                 
         │   ├── main.py
         │   └── ...  
@@ -38,62 +35,72 @@ dnadesign/
 
 1. [**seqfetcher**](src/dnadesign/seqfetcher/README.md)
    
-   **seqfetcher** is a data ingestion pipeline designed to reference a sibling directory, [**dnadesign-data**](https://github.com/e-south/dnadesign-data), which includes datasets from primary literature, [**RegulonDB**](https://regulondb.ccg.unam.mx/), [**EcoCyc**](https://ecocyc.org/), and other curated sources.
+      **seqfetcher** is a data ingestion pipeline designed to reference a sibling directory, [**dnadesign-data**](https://github.com/e-south/dnadesign-data), which includes datasets from primary literature, [**RegulonDB**](https://regulondb.ccg.unam.mx/), [**EcoCyc**](https://ecocyc.org/), and other curated sources.
 
 2. [**sequences**](src/dnadesign/sequences/README.md)
  
-   **sequences** serves as the central storage location for nucleotide sequences within the project, organizing outputs from sibling pipelines into a standardized data structure. Each subdirectory in sequences contains a `.pt` file with sequences and metadata, often accompanied by a `.yaml` file summarizing the batch. Each sequence file is structured as a list of dictionaries, following the below format:  
-   ```python
-   example_sequence_entry = [
+      **sequences** serves as the central storage location for nucleotide sequences within the project, organizing outputs from sibling pipelines into a standardized data structure. Each subdirectory in sequences contains a `.pt` file with sequences and metadata, often accompanied by a `.yaml` file summarizing the batch. Each sequence file is structured as a list of dictionaries, following the below format:  
 
-      {
-         "id": "90b4e54f-b5f9-48ef-882a-8763653ae826",
-         "meta_date_accessed": "2025-02-19T12:01:30.602571",
-         "meta_source": "deg2tfbs_all_DEG_sets",
-         "sequence": "gtactgCTGCAAGATAGTGTGAATGACGTTCAATATAATGGCTGATCTTATTTCCAGGAAACCGTTGCCACA",
-         "meta_type": "dense-array",
-         "evo2_logits_mean_pooled": tensor([[[-10.3750,  10.3750, ..., 10.3750,  10.3750]]], dtype=torch.bfloat16),
-         "evo2_logits_shape": [1, 512]
-      },
-      # Additional dictionary entries extend the list
-   ]
-   ```
-   **Note:** To process custom sequences using the sibling pipelines, format your data as a list of dictionaries matching the structure above. Save it as a `.pt` file and place it in a subdirectory within **sequences**. Most pipeline configurations locate `.pt` files based on subdirectory names.
+      ```python
+      example_sequence_entry = [
+
+         {
+            "id": "90b4e54f-b5f9-48ef-882a-8763653ae826",
+            "meta_date_accessed": "2025-02-19T12:01:30.602571",
+            "meta_source": "deg2tfbs_all_DEG_sets",
+            "sequence": "gtactgCTGCAAGATAGTGTGAATGACGTTCAATATAATGGCTGATCTTATTTCCAGGAAACCGTTGCCACA",
+            "meta_type": "dense-array",
+            "evo2_logits_mean_pooled": tensor([[[-10.3750,  10.3750, ..., 10.3750,  10.3750]]], dtype=torch.bfloat16),
+            "evo2_logits_shape": [1, 512]
+         },
+         # Additional dictionary entries extend the list
+      ]
+      ```
+      **Note:** To process custom sequences using the sibling pipelines, format your data as a list of dictionaries matching the structure above. Save it as a `.pt` file and place it in a subdirectory within **sequences**. Most pipeline configurations locate `.pt` files based on subdirectory names.
 
 3. [**densegen**](src/dnadesign/densegen/README.md) 
    
-   **densegen** is a DNA sequence design pipeline built on the integer linear programming framework from the [**dense-arrays**](https://github.com/e-south/dense-arrays) package. It assembles batches of synthetic promoters, each composed of densely packed transcription factor binding sites. The pipeline references curated datasets from the [**deg2tfbs**](https://github.com/e-south/deg2tfbs) repository, subsampling dozens of binding sites to feed into the solver, with time limits enforced to prevent stalling.
+      **densegen** is a DNA sequence design pipeline built on the integer linear programming framework from the [**dense-arrays**](https://github.com/e-south/dense-arrays) package. It assembles batches of synthetic promoters, each composed of densely packed transcription factor binding sites. The pipeline references curated datasets from the [**deg2tfbs**](https://github.com/e-south/deg2tfbs) repository, subsampling dozens of binding sites to feed into the solver, with time limits enforced to prevent stalling.
 
 4. [**evoinference**](src/dnadesign/evoinference/README.md)  
 
-   **evoinference** is a wrapper for **[Evo 2](https://github.com/ArcInstitute/evo2)** (checkpoint: `evo2_7b`), a genomic foundation model for molecular-to-genome-scale modeling and design. This pipeline processes batches of `.pt` files from the sibling **sequences** directory, running a forward pass of each sequence through Evo 2 and extracting output or intermediate layer embeddings of the language model. The embeddings are then saved in place as additional keys within the original `.pt` file.  
+      **evoinference** is a wrapper for **[Evo 2](https://github.com/ArcInstitute/evo2)** (checkpoint: `evo2_7b`), a genomic foundation model for molecular-to-genome-scale modeling and design. This pipeline processes batches of `.pt` files from the sibling **sequences** directory, running a forward pass of each sequence through Evo 2 and extracting output or intermediate layer embeddings of the language model. The embeddings are then saved in place as additional keys within the original `.pt` file.  
 
-   For more context, refer to the following papers: 
+      For more context, refer to the following papers: 
 
-   - [Semantic mining (preprint)](https://doi.org/10.1101/2024.12.17.628962)  
-   - [The Illustrated Hyena](https://ishanjmukherjee.github.io/illustrated-hyena)
-   - [Evo 1](https://www.science.org/doi/10.1126/science.ado9336)  
-   - [Evo 2 (preprint)](https://arcinstitute.org/manuscripts/Evo2)
+      - [Semantic mining (preprint)](https://doi.org/10.1101/2024.12.17.628962)  
+      - [The Illustrated Hyena](https://ishanjmukherjee.github.io/illustrated-hyena)
+      - [Evo 1](https://www.science.org/doi/10.1126/science.ado9336)  
+      - [Evo 2 (preprint)](https://arcinstitute.org/manuscripts/Evo2)
 
 5. [**clustering**](src/dnadesign/clustering/README.md) 
   
-   **clustering** utilizes [Scanpy](https://scanpy.readthedocs.io/en/stable/) for cluster analysis on nucleotide sequences stored in the sibling **sequences** directory. By default, it uses mean-pooled output embeddings from **Evo 2** (e.g., a 1 × 512 vector) as input. The pipeline then generates UMAP embeddings, applies Leiden clustering, and also supports downstream analyses, such as cluster composition and diversity assessment.
+      **clustering** utilizes [Scanpy](https://scanpy.readthedocs.io/en/stable/) for cluster analysis on nucleotide sequences stored in the sibling **sequences** directory. By default, it uses mean-pooled output embeddings from **Evo 2** (e.g., a 1 × 512 vector) as input. The pipeline then generates UMAP embeddings, applies Leiden clustering, and also supports downstream analyses, such as cluster composition and diversity assessment.
 
 6. [**billboard**](src/dnadesign/billboard/README.md)  
 
-   **billboard** quantifies the regulatory diversity of dense-array DNA libraries generated by **densegen**. The pipeline computes interpretable metrics such as TF richness, TF usage balance (Gini), TF combinatorial diversity (Jaccard), and TF spatial entropy. Results are written to `diversity_summary.csv`, with optional plots for visual diagnostics.  
+      **billboard** quantifies the regulatory diversity of dense-array DNA libraries generated by **densegen**. The pipeline reports and visualizes metrics such as TF richness, TF usage balance (Gini), TF combinatorial diversity (Jaccard), and TF spatial entropy across sequences.
 
 7.  [**libshuffle**](src/dnadesign/libshuffle/README.md)
 
-      **libshuffle** iteratively subsamples sequence libraries from the sibling **sequences** directory and computes diversity metrics using the **billboard** pipeline as its engine.
+      **libshuffle** iteratively subsamples sequence libraries from the sibling **sequences** directory and computes diversity metrics using the **billboard** pipeline as its engine. It can be used to visualize and select representative subsamples of sequences based on configured diversity metrics.
 
 8.	[**nmf**](src/dnadesign/nmf/README.md)
 
-      **nmf** applies Non-Negative Matrix Factorization to a library of sequences generated by **densegen** to uncover higher-order transcription factor binding site combinations. Each sequence is represented as a soft mixture of programs (W), and each program as a weighted motif profile (H).
+      **nmf** applies Non-Negative Matrix Factorization (NMF) to a library of sequences generated by **densegen** to uncover higher-order transcription factor binding site combinations.
 
 9.  [**latdna**](src/dnadesign/latdna/README.md)
 
-      **latdna** is a pipeline for latent space analysis of DNA sequences that compares dense-array and synthetic (latdna) sequence batches. It processes Evo2 embeddings to compute intra-population pairwise distances using cosine, Euclidean, and log1p-Euclidean metrics, and visualizes latent diversity via grouped boxplots
+      **latdna** is a pipeline for latent space analysis of DNA sequences. It computes pairwise distances between Evo 2 embeddings within groups of sequences using metrics such as cosine and Euclidean distance. These distances are used to characterize intra-population diversity and compare it across different sequence types, including dense arrays, natural promoters, and engineered promoters.
+
+10. [**densehairpins**](src/dnadesign/densehairpins/README.md)
+
+      **densehairpins** is a pipeline for short dense-array design. It processes transcription factor binding site datasets, iteratively subsamples these sequences, and runs a [**dense-array**](https://github.com/e-south/dense-arrays) solver to generate short compound sequences. The pipeline then scores solutions based on compaction, sequence length, and the diversity of binding sites, and visualizes the results.
+
+11. [**tfkdanalysis**](src/dnadesign/tfkdanalysis/README.md)
+
+      **tfkdanalysis** is a pipeline for analyzing transcription factor knockdown (TFKD) effects using PPTP-seq (Promoter responses to TF perturbation sequencing) data—a high-throughput approach described in [Han *et al.* (2023)](https://doi.org/10.1038/s41467-023-41572-4).
+
 
 ## Installation
 
