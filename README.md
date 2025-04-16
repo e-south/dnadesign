@@ -102,6 +102,11 @@ dnadesign/
       **tfkdanalysis** is a pipeline for analyzing transcription factor knockdown (TFKD) effects using PPTP-seq (Promoter responses to TF perturbation sequencing) data—a high-throughput approach described in [Han *et al.* (2023)](https://doi.org/10.1038/s41467-023-41572-4).
 
 
+12. [**aligner**](src/dnadesign/aligner/README.md)
+
+      **aligner** is a wrapper for Biopython's [PairwiseAligner](https://biopython.org/docs/dev/Tutorial/chapter_pairwise.html#chapter-pairwise), which is a class for computing Needleman–Wunsch global alignment scores between nucleotide sequences.
+
+
 ## Installation
 
 ### Usage Style 1: Local Machine (No Gurobi or CUDA Support)
@@ -118,7 +123,7 @@ This style is appropriate for workflows that ***do not*** require heavy [dense a
 2. Install Dependencies
 
    ```bash
-   conda install pytorch torchvision torchaudio scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml leidenalg igraph openpyxl xlrd -c conda-forge -y
+   conda install pytorch torchvision torchaudio scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml leidenalg igraph openpyxl xlrd biopython tqdm -c conda-forge -y
    ```
 
 3. Clone and Install the `dnadesign` Repository

@@ -253,6 +253,21 @@ def main():
         differential_feature_analysis.identify_markers(data_entries, save_csv=str(diff_csv))
         print(f"Differential feature analysis CSV saved to {diff_csv}")
     
+    if analysis_config.get("intra_cluster_similarity", False):
+        from dnadesign.clustering import intra_cluster_similarity_analysis as icas
+        print("Computing intra-cluster similarity scores...")
+        icas.compute_intra_cluster_similarity(data_entries,
+                                              match=clustering_config.get("match_score", 2),
+                                              mismatch=clustering_config.get("mismatch_score", -1),
+                                              gap_open=clustering_config.get("gap_open", 10),
+                                              gap_extend=clustering_config.get("gap_extend", 1))
+        print("Intra-cluster similarity scores computed and annotated in each entry.")
+        
+        # Optionally, generate and save a density plot for these scores.
+        icas_plot_path = base_dir / "clustering" / "batch_results" / f"{batch_name}_intra_cluster_similarity.png"
+        print("Generating intra-cluster similarity density plot...")
+        icas.plot_intra_cluster_similarity(data_entries, batch_name=batch_name, save_path=str(icas_plot_path))
+    
     # After analysis outputs, update the original PT files in place.
     if not args.dry_run and clustering_config.get("update_in_place", False):
         print("Updating original PT files in place with only meta_cluster_count (removing extra keys)...")

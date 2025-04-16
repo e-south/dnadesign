@@ -26,8 +26,19 @@ def compute_gc_content(sequence):
 def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None):
     """
     Generate a UMAP plot with hue assigned based on configuration.
-    Supports the new "highlight" mode, where entries from highlight_dirs are emphasized.
-    For non-highlight methods, the existing logic applies.
+    Supports the new "highlight" mode, the previous methods, and the added
+    "intra_pairwise_similarity" hue option which uses the meta_intra_cluster_similarity field.
+    
+    Parameters:
+        adata: AnnData object with UMAP embeddings stored in obsm["X_umap"].
+        umap_config (dict): Config dictionary for UMAP plotting.
+        data_entries (list): List of data entry dictionaries (each must contain a "sequence"
+                             and potentially "meta_intra_cluster_similarity" if computed).
+        batch_name (str, optional): Batch name used in the plot title.
+        save_path (str or Path, optional): Path at which to save the figure.
+    
+    Returns:
+        None. The figure is either shown or saved.
     """
     dims = umap_config.get("plot_dimensions", [14, 14])
     legend_bbox = umap_config.get("legend_bbox", (1.05, 1))
@@ -36,28 +47,23 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
     hue_config = umap_config.get("hue", {})
     hue_method = hue_config.get("method", "leiden")
     
-    # ---- Highlight Mode Branch ----
     if hue_method == "highlight":
-        # Validate required config
+        # Validate required config.
         highlight_dirs = hue_config.get("highlight_dirs", None)
         if not highlight_dirs:
             raise ValueError("Highlight mode selected but 'highlight_dirs' not provided under umap.hue in the config.")
         
-        # Get plotting parameters for background and highlight groups.
         background_alpha = hue_config.get("background_alpha", 0.15)
         background_size = hue_config.get("background_size", 2.0)
         highlight_alpha = hue_config.get("highlight_alpha", 0.8)
         highlight_size = hue_config.get("highlight_size", 6.0)
         
-        # Separate indices for background (not in any highlight_dir) and each highlight group.
         background_indices = []
         highlight_indices = {}  # mapping: dir -> list of indices
         for i, entry in enumerate(data_entries):
             source = entry.get("meta_input_source", "")
             if source in highlight_dirs:
-                if source not in highlight_indices:
-                    highlight_indices[source] = []
-                highlight_indices[source].append(i)
+                highlight_indices.setdefault(source, []).append(i)
             else:
                 background_indices.append(i)
         
@@ -66,36 +72,24 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
         y = umap_coords[:, 1]
         fig, ax = plt.subplots(figsize=(dims[0], dims[1]))
         
-        # Plot background points in gray.
         if background_indices:
             ax.scatter(x[background_indices], y[background_indices],
-                       color="gray", s=background_size, alpha=background_alpha, label="Background")
+                       color="gray", s=background_size,
+                       alpha=background_alpha, label="Background")
         
-        # Determine colors for highlight groups.
-        num_groups = len(highlight_indices)
-        if num_groups == 0:
-            warnings.warn("No entries found for any specified highlight_dirs.")
-        if num_groups == 1:
-            # Use red if only one highlight group is specified.
-            group_names = list(highlight_indices.keys())
-            color_mapping = {group_names[0]: "red"}
-        else:
-            # Use a colorblind-friendly palette if multiple highlight groups.
-            group_names = sorted(highlight_indices.keys())
-            palette = sns.color_palette("colorblind", n_colors=num_groups)
-            color_mapping = {group: palette[i] for i, group in enumerate(group_names)}
-        
-        # Plot each highlight group.
         import matplotlib.patches as mpatches
         legend_handles = []
+        # Use a colorblind-friendly palette.
+        group_names = sorted(highlight_indices.keys())
+        palette = sns.color_palette("colorblind", n_colors=len(group_names))
+        color_mapping = {group: palette[i] for i, group in enumerate(group_names)}
         for group, indices in highlight_indices.items():
             color = color_mapping.get(group, "red")
             ax.scatter(x[indices], y[indices],
-                       color=color, s=highlight_size, alpha=highlight_alpha, label=group)
-            patch = mpatches.Patch(color=color, label=group)
-            legend_handles.append(patch)
+                       color=color, s=highlight_size,
+                       alpha=highlight_alpha, label=group)
+            legend_handles.append(mpatches.Patch(color=color, label=group))
         
-        # Create a minimal legend for highlight groups.
         if legend_handles:
             legend = ax.legend(handles=legend_handles, title="Highlights",
                                bbox_to_anchor=legend_bbox, loc="upper left",
@@ -104,7 +98,7 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
         
         ax.set_xlabel("UMAP1")
         ax.set_ylabel("UMAP2")
-        title = f"UMAP Plot with Hue: highlight"
+        title = "UMAP Plot with Hue: highlight"
         if batch_name:
             title += f"\n{batch_name}"
         ax.set_title(title)
@@ -115,12 +109,12 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
             plt.savefig(save_path, dpi=300, bbox_inches="tight")
         else:
             plt.show()
-        return  # Exit after processing highlight mode.
+        return
     
-    # ---- End Highlight Mode ----
-    
-    # For other hue methods, follow existing logic.
-    if hue_method == "numeric":
+    if hue_method == "intra_pairwise_similarity":
+        # Extract intra-cluster similarity scores; ensure these were computed.
+        hue_values = [entry.get("meta_intra_cluster_similarity", 0.0) for entry in data_entries]
+    elif hue_method == "numeric":
         numeric_hue_config = hue_config.get("numeric_hue", None)
         if numeric_hue_config is None:
             raise ValueError("Numeric hue configuration is missing under umap.hue.numeric_hue in the config.")
@@ -130,7 +124,7 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
     elif hue_method == "type":
         hue_values = normalization.extract_type_hue(data_entries)
     else:
-        # For methods: leiden, gc_content, seq_length, input_source.
+        # For other methods: "leiden", "gc_content", "seq_length", "input_source"
         hue_values = []
         for entry in data_entries:
             if hue_method == "leiden":
@@ -146,12 +140,17 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
             else:
                 raise ValueError(f"Unknown hue method: {hue_method}")
     
+    # Generate UMAP scatter plot.
     umap_coords = adata.obsm["X_umap"]
     x = umap_coords[:, 0]
     y = umap_coords[:, 1]
     fig, ax = plt.subplots(figsize=(dims[0], dims[1]))
     
-    if hue_method == "input_source":
+    if hue_method in ["intra_pairwise_similarity", "numeric", "gc_content", "seq_length", "leiden"]:
+        sc_plot = ax.scatter(x, y, c=hue_values, cmap='viridis', s=10,
+                             alpha=hue_config.get("alpha", 0.5))
+        plt.colorbar(sc_plot, ax=ax)
+    elif hue_method == "input_source":
         unique_sources = list(set(hue_values))
         source_counts = {src: hue_values.count(src) for src in unique_sources}
         sorted_sources = sorted(unique_sources, key=lambda src: source_counts[src], reverse=True)
@@ -190,9 +189,8 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
                            prop={'size': 6}, ncol=legend_ncol)
         legend.get_frame().set_linewidth(0)
     else:
-        sc_plot = ax.scatter(x, y, c=hue_values, cmap='viridis', s=10, alpha=hue_config.get("alpha", 0.5))
-        if hue_method in ["numeric", "gc_content", "seq_length", "leiden"]:
-            plt.colorbar(sc_plot, ax=ax)
+        # Fallback: generic scatter if hue method is unknown (should not occur).
+        ax.scatter(x, y, s=10, alpha=hue_config.get("alpha", 0.5))
     
     ax.set_xlabel("UMAP1")
     ax.set_ylabel("UMAP2")
@@ -202,12 +200,15 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
     ax.set_title(title)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
+    
+    # Overlay cluster centroids if available.
     if "cluster_centroids" in adata.uns and "cluster_labels" in adata.uns:
         centroids = adata.uns["cluster_centroids"]
         cluster_labels = adata.uns["cluster_labels"]
         for cl, centroid in centroids.items():
             ax.text(centroid[0], centroid[1], cluster_labels.get(cl, str(cl)),
                     fontsize=10, color="black", ha="center", va="center", weight="bold")
+    
     plt.tight_layout()
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
