@@ -24,71 +24,77 @@ import os
 import math
 import numpy as np
 import torch.nn.functional as F
-
 from dnadesign.billboard.core import process_sequences, compute_core_metrics, compute_composite_metrics
 from dnadesign.billboard.summary import generate_entropy_summary_csv
+from dnadesign.aligner.metrics import mean_pairwise
 
 def make_temp_billboard_config(config, temp_pt_path):
     """
-    Creates a temporary Billboard configuration that is decoupled from the global Billboard config.
-    Instead, it uses the diversity metrics specified under 'libshuffle_core_metrics' in the LibShuffle configuration.
+    Create a transient Billboard config for this subsample:
+      - base on the global 'billboard' section
+      - override pt_files to point at our temporary .pt
+      - enforce dry_run=True and skip_aligner_call=False
+      - honor libshuffle's core‐metrics override if provided
     """
     global_billboard = config.get("billboard", {}).copy()
     global_billboard["dry_run"] = True
+    
+    # Ensure we also run aligner here
+    global_billboard["skip_aligner_call"] = False
+
     global_billboard["pt_files"] = [temp_pt_path]
     global_billboard["output_dir_prefix"] = "temp_billboard_" + next(tempfile._get_candidate_names())
-    global_billboard["weights_only"] = False
-    libshuffle_core = config.get("libshuffle_core_metrics", [])
-    if libshuffle_core:
-        global_billboard["diversity_metrics"] = libshuffle_core
-    elif "diversity_metrics" not in global_billboard or not global_billboard["diversity_metrics"]:
-        global_billboard["diversity_metrics"] = config.get("billboard_metric", {}).get("core_metrics", [])
+    # Choose which core metrics to compute
+    lib_core = config.get("libshuffle_core_metrics", [])
+    if lib_core:
+        global_billboard["diversity_metrics"] = lib_core
+    else:
+        bm = config.get("billboard_metric", {})
+        global_billboard["diversity_metrics"] = bm.get("core_metrics", [])
     return global_billboard
 
 def compute_billboard_metric(subsample, config):
-    import torch.serialization
-    import numpy as np
-    torch.serialization.add_safe_globals([np.generic, np._core.multiarray.scalar, np.dtype])
-    
-    bm_config = config.get("billboard_metric", {})
-    composite_enabled = bm_config.get("composite_score", False)
+    """
+    Run Billboard on a single subsample. If composite_score=True, return the full
+    core‐metrics dict (with our added NW metrics). Otherwise return the single metric.
+    """
+    # build a temp config that ALWAYS has skip_aligner_call=False
+    with tempfile.TemporaryDirectory() as tmpdir:
+        temp_pt = os.path.join(tmpdir, "subsample.pt")
+        torch.save(subsample, temp_pt)
 
-    if composite_enabled:
-        if bm_config.get("method") == "cds":
-            from dnadesign.libshuffle.cds_score import compute_cds_from_sequences
-            return compute_cds_from_sequences(subsample, bm_config.get("alpha", 0.5))
+        bb_config = make_temp_billboard_config(config, temp_pt)
+        # create required dirs (even if dry_run) so summary routines won't fail
+        out = os.path.join(tmpdir, "batch_results")
+        os.makedirs(os.path.join(out, "csvs"), exist_ok=True)
+        os.makedirs(os.path.join(out, "plots"), exist_ok=True)
+
+        # Run the pipeline
+        results = process_sequences([temp_pt], bb_config)
+        core = compute_core_metrics(results, bb_config)
+
+        # Compute and inject NW alignment metrics
+        seqs = results["sequences"]
+        sim = mean_pairwise(seqs, sequence_key="sequence", use_cache=False)
+        core["nw_similarity"] = sim
+        core["nw_dissimilarity"] = 1.0 - sim
+
+        # 3) if composite_score, return the full dict; else extract the single metric
+        bm_conf = config.get("billboard_metric", {})
+        if bm_conf.get("composite_score", False):
+            return core
         else:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                temp_pt_path = os.path.join(tmpdir, "subsample.pt")
-                torch.save(subsample, temp_pt_path)
-                billboard_config = make_temp_billboard_config(config, temp_pt_path)
-                temp_output_dir = os.path.join(tmpdir, "billboard_output")
-                os.makedirs(os.path.join(temp_output_dir, "csvs"), exist_ok=True)
-                os.makedirs(os.path.join(temp_output_dir, "plots"), exist_ok=True)
-                results = process_sequences([temp_pt_path], billboard_config)
-                core_metrics = compute_core_metrics(results, billboard_config)
-                return core_metrics
-    else:
-        core_metrics_list = bm_config.get("core_metrics", [])
-        if len(core_metrics_list) != 1:
-            raise ValueError("When composite_score is false, exactly one core metric must be specified.")
-        with tempfile.TemporaryDirectory() as tmpdir:
-            temp_pt_path = os.path.join(tmpdir, "subsample.pt")
-            torch.save(subsample, temp_pt_path)
-            billboard_config = make_temp_billboard_config(config, temp_pt_path)
-            temp_output_dir = os.path.join(tmpdir, "billboard_output")
-            os.makedirs(os.path.join(temp_output_dir, "csvs"), exist_ok=True)
-            os.makedirs(os.path.join(temp_output_dir, "plots"), exist_ok=True)
-            results = process_sequences([temp_pt_path], billboard_config)
-            core_metrics = compute_core_metrics(results, billboard_config)
-            key = core_metrics_list[0]
-            if key not in core_metrics:
-                alt_key = key + "_mean"
-                if alt_key in core_metrics:
-                    key = alt_key
-                else:
-                    raise KeyError(f"Key '{core_metrics_list[0]}' not found in computed core metrics: {list(core_metrics.keys())}")
-            return core_metrics[key]
+            cms = bm_conf.get("core_metrics", [])
+            if len(cms) != 1:
+                raise ValueError("When composite_score=False, exactly one core metric must be specified.")
+            key = cms[0]
+            val = core.get(key, None)
+            # allow _mean fallback if present
+            if val is None and key + "_mean" in core:
+                val = core[key + "_mean"]
+            if val is None:
+                raise KeyError(f"Requested metric '{key}' not found among core metrics: {list(core)}")
+            return val
 
 def compute_evo2_metric(subsample, config):
     vectors = []

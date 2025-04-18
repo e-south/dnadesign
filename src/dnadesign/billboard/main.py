@@ -8,14 +8,18 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-# billboard/main.py
 import os
 import datetime
 import yaml
+import logging
 from pathlib import Path
 
-from dnadesign.billboard.core import process_sequences, compute_core_metrics, compute_composite_metrics
-from dnadesign.billboard.summary import generate_csv_summaries, generate_entropy_summary_csv, print_summary
+from dnadesign.billboard.core import process_sequences, compute_core_metrics
+from dnadesign.billboard.summary import (
+    generate_csv_summaries,
+    generate_entropy_summary_csv,
+    print_summary
+)
 from dnadesign.billboard.plot_helpers import (
     save_tf_frequency_barplot,
     save_occupancy_plot,
@@ -23,154 +27,141 @@ from dnadesign.billboard.plot_helpers import (
     save_tf_entropy_kde_plot,
     save_gini_lorenz_plot,
     save_jaccard_histogram,
-    save_motif_levenshtein_boxplot
+)
+from dnadesign.billboard.by_cluster import (
+    compute_cluster_metrics,
+    save_cluster_characterization_scatter
 )
 
+logger = logging.getLogger(__name__)
+
 def main():
-    # Load configuration.
-    config_path = Path(__file__).parent.parent / "configs" / "example.yaml"
-    with config_path.open("r") as f:
-        config = yaml.safe_load(f)
-    billboard_config = config.get("billboard", {})
-    
-    dry_run = billboard_config.get("dry_run", False)
-    if dry_run:
-        print("DRY RUN enabled: Only the diversity summary CSV will be generated. No plots will be produced.")
-    
-    # Assumes PT file is the name of a subdirectory within the project's "sequences" directory.
-    pt_files_config = billboard_config.get("pt_files", [])
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s"
+    )
+    logger.info("Starting billboard pipeline")
+
+    # Load config
+    cfg_path = Path(__file__).parent.parent / "configs" / "example.yaml"
+    with open(cfg_path) as f:
+        cfg = yaml.safe_load(f)["billboard"]
+    logger.info(f"Loaded configuration from {cfg_path}")
+
+    # Validate config
+    assert cfg.get("pt_files"), "Must specify at least one entry in pt_files."
+    metrics = cfg.get("diversity_metrics", [])
+    assert metrics, "diversity_metrics list cannot be empty."
+    logger.info(f"Metrics to compute: {metrics}")
+
+    dry_run = cfg.get("dry_run", False)
+    skip_nw = cfg.get("skip_aligner_call", False)
+
+    # Assemble PT file paths
+    project_root = Path(__file__).parent.parent
     pt_paths = []
-    for p in pt_files_config:
-        path_candidate = Path(p)
-        if not path_candidate.is_absolute():
-            project_root = Path(__file__).parent.parent  # Adjust as needed.
-            base_dir = project_root / "sequences"
-            path_candidate = base_dir / p
-        if path_candidate.is_dir():
-            pt_candidates = list(path_candidate.glob("*.pt"))
-            if len(pt_candidates) != 1:
-                raise ValueError(f"Expected exactly one .pt file in directory '{path_candidate}', found {len(pt_candidates)}")
-            pt_paths.append(str(pt_candidates[0]))
-        else:
-            pt_paths.append(str(path_candidate))
-    
-    # Create output directory using custom prefix plus today's date.
+    for entry in cfg["pt_files"]:
+        p = Path(entry)
+        if not p.is_absolute():
+            p = project_root / "sequences" / entry
+        if p.is_dir():
+            found = list(p.glob("*.pt"))
+            assert len(found) == 1, f"Expected one .pt file in {p}, found {len(found)}"
+            p = found[0]
+        pt_paths.append(str(p))
+    logger.info(f"Found {len(pt_paths)} .pt file(s) to process")
+
+    # Prepare output directories
     today = datetime.datetime.now().strftime("%Y%m%d")
-    custom_prefix = billboard_config.get("output_dir_prefix", "").strip()
-    out_dir_name = f"{custom_prefix}_{today}" if custom_prefix else today
-    output_dir = Path(__file__).parent / "batch_results" / out_dir_name
-    os.makedirs(output_dir / "csvs", exist_ok=True)
-    os.makedirs(output_dir / "plots", exist_ok=True)
-    
-    # Process sequences and compute basic results.
-    results = process_sequences(pt_paths, billboard_config)
-    
-    # Compute core diversity metrics using the full results dictionary.
-    core_metrics = compute_core_metrics(results, billboard_config)
-    
-    # Compute composite metrics (using a weighted sum).
-    composite_metrics = compute_composite_metrics(core_metrics, billboard_config)
-    
-    # Add computed metrics to results for export.
+    prefix = cfg.get("output_dir_prefix", "").strip()
+    out_name = f"{prefix}_{today}" if prefix else today
+    out_dir = project_root / "billboard" / "batch_results" / out_name
+    csv_dir = out_dir / "csvs"
+    plot_dir = out_dir / "plots"
+    csv_dir.mkdir(parents=True, exist_ok=True)
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Output will go to {out_dir}")
+
+    # Process sequences
+    results = process_sequences(pt_paths, cfg)
+    logger.info(f"Loaded and processed {results['num_sequences']} sequences")
+
+    # Compute core metrics
+    core_metrics = compute_core_metrics(results, cfg)
     results["core_metrics"] = core_metrics
-    results["composite_metrics"] = composite_metrics
-    
+    results["skip_aligner_call"] = skip_nw
+    logger.info(f"Computed core metrics: {core_metrics}")
+
+    # Generate summaries & plots
     if dry_run:
-        generate_entropy_summary_csv(results, str(output_dir))
+        logger.info("Dry run enabled: skipping plots, writing only diversity_summary.csv")
+        generate_entropy_summary_csv(results, csv_dir)
     else:
-        generate_csv_summaries(results, str(output_dir))
-        
-        # TF Frequency Bar Plot
-        tf_metric = {}
-        for tf in results["tf_frequency"]:
-            tf_metric[tf] = composite_metrics.get("billboard_weighted_sum", 0)
+        logger.info("Writing CSV summaries")
+        generate_csv_summaries(results, csv_dir)
+
+        logger.info("Generating TF frequency bar plot")
         save_tf_frequency_barplot(
             results["tf_frequency"],
-            tf_metric,
-            "TF Frequency Bar Plot",
-            str(output_dir / "plots" / "tf_frequency_barplot.png"),
-            dpi=billboard_config.get("dpi", 600),
-            figsize=(14,7)
+            title="TF Frequency Bar Plot",
+            path=plot_dir / "tf_frequency.png",
+            dpi=cfg["dpi"],
         )
-        
-        # TF Occupancy Plot
-        occupancy_tf_list = results.get("occupancy_tf_list", [])
-        if occupancy_tf_list:
-            occupancy_tf_list = sorted(occupancy_tf_list, key=lambda tf: results["tf_frequency"].get(tf, 0), reverse=True)
-            order = [results["occupancy_tf_list"].index(tf) for tf in occupancy_tf_list]
-            occ_forward = results["occupancy_forward_matrix"][order, :]
-            occ_reverse = results["occupancy_reverse_matrix"][order, :]
-            save_occupancy_plot(
-                occ_forward,
-                occ_reverse,
-                occupancy_tf_list,
-                "Library-wide sequence diversity through motif coverage and arrangement variability",
-                str(output_dir / "plots" / "tf_occupancy_combined.png"),
-                dpi=1000,
-                figsize=(12,10)
-            )
-        
-        # Motif Length Density Plot.
+
+        logger.info("Generating occupancy plot")
+        save_occupancy_plot(
+            results["occupancy_forward_matrix"],
+            results["occupancy_reverse_matrix"],
+            results["occupancy_tf_list"],
+            title="Library-wide motif coverage",
+            path=plot_dir / "occupancy.png",
+            dpi=cfg["dpi"],
+        )
+
+        logger.info("Generating motif length histogram")
         save_motif_length_histogram(
             results["motif_info"],
-            str(output_dir / "plots" / "motif_length_density.png"),
-            dpi=billboard_config.get("dpi", 600),
-            figsize=(8,6)
+            path=plot_dir / "motif_length.png",
+            dpi=cfg["dpi"],
         )
-                
-        # TF Entropy KDE Plot: Overlay KDE plots for top N TFs based on positional occupancy.
+
+        logger.info("Generating TF entropy KDE plot")
         save_tf_entropy_kde_plot(
             results["occupancy_forward_matrix"],
             results["occupancy_reverse_matrix"],
             results["occupancy_tf_list"],
             results["sequence_length"],
-            str(output_dir / "plots" / "tf_entropy_kde.png"),
-            dpi=billboard_config.get("dpi", 600),
-            figsize=(10,6)
+            path=plot_dir / "tf_entropy_kde.png",
+            dpi=cfg["dpi"],
         )
-        
-        # Gini Lorenz Plot: Plot the Lorenz curve for TF frequency and annotate with the Gini coefficient.
+
+        logger.info("Generating Lorenz (Gini) plot")
         save_gini_lorenz_plot(
             results["tf_frequency"],
-            str(output_dir / "plots" / "tf_gini_lorenz.png"),
-            dpi=billboard_config.get("dpi", 600),
-            figsize=(8,6)
+            path=plot_dir / "gini_lorenz.png",
+            dpi=cfg["dpi"],
         )
-                
-        # Jaccard Histogram: Plot a histogram of pairwise Jaccard dissimilarities.
+
+        logger.info("Generating Jaccard histogram")
         save_jaccard_histogram(
             results["sequences"],
-            str(output_dir / "plots" / "tf_jaccard_histogram.png"),
-            dpi=billboard_config.get("dpi", 600),
-            figsize=(8,6),
-            sample_size=1000
+            path=plot_dir / "jaccard_hist.png",
+            dpi=cfg["dpi"],
         )
-                
-        # Motif Levenshtein Boxplot: visualize the distribution of pairwise edit distances.
-        if "motif_string_levenshtein" in billboard_config.get("diversity_metrics", []):
-            from dnadesign.billboard.plot_helpers import save_motif_levenshtein_boxplot
-            save_motif_levenshtein_boxplot(
-                results["motif_strings"],
-                billboard_config,
-                str(output_dir / "plots" / "motif_levenshtein_boxplot.png"),
-                dpi=billboard_config.get("dpi", 600),
-                figsize=(8,6)
-            )
-        
-        # Cluster Characterization Plot (cluster-level)
-        if billboard_config.get("characterize_by_leiden_cluster", {}).get("enabled", False):
-            from dnadesign.billboard.by_cluster import compute_cluster_metrics, save_cluster_characterization_scatter
-            # Compute the cluster metrics (aggregated over sequences)
-            cluster_df = compute_cluster_metrics(results, billboard_config)
+
+        if cfg.get("characterize_by_leiden_cluster", {}).get("enabled", False):
+            logger.info("Characterizing by Leiden cluster")
+            dfc = compute_cluster_metrics(results, cfg)
             save_cluster_characterization_scatter(
-                cluster_df,
-                billboard_config,
-                str(output_dir / "plots" / "cluster_characterization_scatter.png"),
-                dpi=billboard_config.get("dpi", 600),
-                figsize=(10,6)
+                dfc, cfg,
+                path=plot_dir / "cluster_char.png",
+                dpi=cfg["dpi"],
             )
-                
+
+    # Final summary
     print_summary(results)
+    logger.info("Pipeline complete")
 
 if __name__ == "__main__":
     main()

@@ -157,8 +157,8 @@ def plot_intra_cluster_similarity(data_entries, batch_name, save_path=None):
     )
 
     ax.set_xlabel("Cluster")
-    ax.set_ylabel("Normalized Global Similarity")
-    ax.set_title(f"Intra-Cluster Similarity Box Plot\nBatch: {batch_name}")
+    ax.set_ylabel("Normalized Global Alignment Similarity within Cluster")
+    ax.set_title(f"Intra-Cluster Global Alignment Similarity\nBatch: {batch_name}")
 
     # Potentially rotate x ticks for many clusters
     ax.set_xticklabels(ax.get_xticklabels(), rotation=90)

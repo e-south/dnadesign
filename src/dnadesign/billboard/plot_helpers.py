@@ -9,228 +9,265 @@ Dunlop Lab
 """
 
 import os
-import matplotlib.pyplot as plt
+import logging
 import numpy as np
+import matplotlib.pyplot as plt
 import seaborn as sns
-from matplotlib import cm
-from matplotlib.colors import Normalize
 from scipy.stats import entropy as scipy_entropy
+from dnadesign.billboard.core import robust_parse_tfbs
 
-from dnadesign.billboard.core import token_edit_distance
-
+logger = logging.getLogger(__name__)
 sns.set_theme(style="ticks", font_scale=0.8)
 
-def save_tf_frequency_barplot(tf_frequency, tf_metric, title, output_path, dpi, figsize=(14,7)):
-    """
-    Save a TF frequency bar plot.
-    Displays a bar chart of TF frequencies in grey.
-    """
-    # Filter out fixed elements (if any)
-    filtered = {k: v for k, v in tf_frequency.items() if not (k.endswith("_upstream") or k.endswith("_downstream"))}
-    sorted_items = sorted(filtered.items(), key=lambda item: item[1], reverse=True)
-    tf_names = [item[0] for item in sorted_items]
-    frequencies = [item[1] for item in sorted_items]
-    
-    fig, ax = plt.subplots(1, 1, figsize=figsize)
-    ax.bar(tf_names, frequencies, color="grey")
-    ax.set_ylabel("Frequency", fontsize=10)
-    ax.set_title(title, fontsize=12)
-    plt.setp(ax.get_xticklabels(), rotation=90, fontsize=8)
-    sns.despine(ax=ax, top=True, right=True)
-    
+def save_tf_frequency_barplot(tf_freq, title, path, dpi):
+    logger.info(f"Saving TF frequency barplot to {path}")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    # sort descending
+    names, vals = zip(*sorted(tf_freq.items(), key=lambda x: -x[1]))
+
+    plt.figure(figsize=(10,6))  # narrower than before
+    plt.bar(names, vals, color="grey")
+    plt.title(title, fontsize=16)
+    plt.xlabel("Transcription Factor", fontsize=14)
+    plt.ylabel("Frequency", fontsize=14)
+    plt.xticks(rotation=90, fontsize=12)
+    plt.yticks(fontsize=12)
+    sns.despine()
     plt.tight_layout()
-    plt.savefig(output_path, dpi=dpi)
+    plt.savefig(path, dpi=dpi)
     plt.close()
 
 
-def save_occupancy_plot(forward_matrix, reverse_matrix, tf_list, title, output_path, dpi, figsize=(14,7)):
-    fig, axes = plt.subplots(1, 2, figsize=figsize, sharey=True)
-    
-    im0 = axes[0].imshow(forward_matrix, aspect="equal", interpolation="none")
-    axes[0].set_title("Forward Strand", fontsize=10)
-    axes[0].set_xlabel("Nucleotide Position", fontsize=9)
-    axes[0].set_yticks(np.arange(len(tf_list)))
-    axes[0].set_yticklabels(tf_list, fontsize=4)
-    sns.despine(ax=axes[0], top=True, right=True)
-    
-    im1 = axes[1].imshow(reverse_matrix, aspect="equal", interpolation="none")
-    axes[1].set_title("Reverse Strand", fontsize=10)
-    axes[1].set_xlabel("Nucleotide Position", fontsize=9)
-    axes[1].tick_params(axis='y', labelleft=False)
-    sns.despine(ax=axes[1], top=True, right=True)
-    
-    fig.suptitle(title, fontsize=12, y=0.92)
-    plt.subplots_adjust(wspace=0.02, left=0.15, right=0.88)
-    cbar_ax = fig.add_axes([0.9, 0.15, 0.025, 0.65])
-    fig.colorbar(im1, cax=cbar_ax, label="Count")
-    sns.despine(fig=fig, top=True, right=True)
-    
-    plt.savefig(output_path, dpi=dpi, bbox_inches='tight')
+def save_occupancy_plot(F, R, tf_list, title, path, dpi):
+    """
+    - Shared y-axis, TFs sorted by descending total coverage (F+R).
+    - y‑tick labels only on the first subplot.
+    - 1:1 aspect ratio for each heatmap.
+    - Colorbar horizontally at bottom.
+    - Tight margins so title/subplots/colorbar don't overlap.
+    """
+    logger.info(f"Saving occupancy plot to {path}")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    # sort TFs by descending total occupancy
+    total = F + R
+    sums = total.sum(axis=1)
+    order = np.argsort(sums)[::-1]
+    Fs = F[order]
+    Rs = R[order]
+    tfs = [tf_list[i] for i in order]
+
+    fig, (ax0, ax1) = plt.subplots(1, 2, sharey=True, figsize=(12, 8))
+
+    # forward strand
+    im0 = ax0.imshow(Fs, aspect='equal')
+    ax0.set_title("Forward Strand", fontsize=14)
+    ax0.set_xlabel("Position", fontsize=12)
+    ax0.set_yticks(np.arange(len(tfs)))
+    ax0.set_yticklabels(tfs, fontsize=8)
+
+    # reverse strand
+    im1 = ax1.imshow(Rs, aspect='equal')
+    ax1.set_title("Reverse Strand", fontsize=14)
+    ax1.set_xlabel("Position", fontsize=12)
+    ax1.set_yticks([])  # align but no labels
+
+    # global title
+    fig.suptitle(title, fontsize=16)
+
+    # colorbar at bottom
+    cbar = fig.colorbar(im1, ax=[ax0, ax1],
+                        orientation='horizontal',
+                        pad=0.12,  # nudge down further
+                        shrink=0.8)
+    cbar.set_label("Coverage count", fontsize=12)
+    cbar.ax.tick_params(labelsize=10)
+
+    # tighten layout so nothing overlaps
+    fig.subplots_adjust(
+        top=0.88,    # bring subplots up
+        bottom=0.12, # leave room for colorbar
+        left=0.10,
+        right=0.98,
+        wspace=0.03
+    )
+    sns.despine(fig=fig, left=True, bottom=True)
+
+    plt.savefig(path, dpi=dpi)
     plt.close()
 
 
-def save_motif_length_histogram(motif_info, output_path, dpi, figsize=(8,6)):
+def save_motif_length_histogram(motif_info, path, dpi):
     """
-    Plot a KDE of motif lengths with a separate density curve for each TF.
-    Expects motif_info to include keys "motif" and "tf".
+    - No legend.
+    - Kernel density via seaborn for each TF.
+    - Annotate each TF’s KDE curve at its median length.
+    - Annotations sit just under the title.
     """
+    logger.info(f"Saving motif length histogram to {path}")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     import pandas as pd
+
     df = pd.DataFrame(motif_info)
-    df["motif_length"] = df["motif"].apply(len)
-    plt.figure(figsize=figsize)
-    ax = sns.kdeplot(data=df, x="motif_length", hue="tf", fill=True, common_norm=False, alpha=0.7, warn_singular=False)
-    ax.set_xlabel("Motif Length", fontsize=10)
-    ax.set_ylabel("Density", fontsize=10)
-    ax.set_title("Distribution of Motif Lengths by Transcription Factors", fontsize=12)
-    sns.despine(ax=ax, top=True, right=True)
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=dpi)
-    plt.close()
+    if "motif" not in df.columns:
+        logger.error("motif_info missing 'motif' column—nothing to plot")
+        return
 
+    df["length"] = df["motif"].str.len()
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-def save_tf_entropy_kde_plot(occupancy_forward_matrix, occupancy_reverse_matrix, tf_list, sequence_length, output_path, dpi, figsize=(10,6)):
-    """
-    Overlay KDE plots of positional occupancy for the top 3 and bottom 3 TFs.
-    Combines forward and reverse strand occupancy for each TF.
-    """
-    import pandas as pd
-    # If less than 6 TFs, show all; otherwise, choose top 3 and bottom 3.
-    if len(tf_list) < 6:
-        selected_tf = tf_list
-    else:
-        top3 = tf_list[:3]
-        bottom3 = tf_list[-3:]
-        selected_tf = list(dict.fromkeys(top3 + bottom3))  # preserve order and remove duplicates
-    
-    positions = np.arange(sequence_length)
-    plt.figure(figsize=figsize)
-    
-    for tf in selected_tf:
-        try:
-            row = tf_list.index(tf)
-        except ValueError:
+    # plot one smooth KDE per TF, no legend
+    for tf, sub in df.groupby("tf"):
+        lengths = sub["length"]
+        if lengths.empty:
             continue
-        occ_forward = occupancy_forward_matrix[row]
-        occ_reverse = occupancy_reverse_matrix[row]
-        total_occ = occ_forward + occ_reverse
-        if total_occ.sum() > 0:
-            sns.kdeplot(x=positions, weights=total_occ, label=tf, fill=True, common_norm=False, alpha=0.5)
-    
-    plt.xlabel("Nucleotide Position")
-    plt.ylabel("Density")
-    plt.title("Positional Occupancy KDE by TF (Top 3 & Bottom 3)")
-    plt.legend(title="TF")
-    sns.despine(top=True, right=True)
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=dpi)
+
+        # seaborn will handle edge behavior gracefully
+        sns.kdeplot(
+            data=lengths,
+            fill=False,
+            common_norm=False,
+            alpha=0.8,
+            linewidth=1.5,
+            ax=ax
+        )
+        # annotate at the median
+        med = lengths.median()
+        # get the curve's y-value at that x
+        y_at_med = ax.lines[-1].get_ydata()[ np.argmin(np.abs(ax.lines[-1].get_xdata() - med)) ]
+        ax.text(
+            med,
+            y_at_med * 1.02,
+            tf,
+            ha="center",
+            va="bottom",
+            fontsize=9,  # improved visibility
+            clip_on=False
+        )
+
+    ax.set_title("Distribution of Motif Lengths by TF", fontsize=16)
+    ax.set_xlabel("Motif length", fontsize=14)
+    ax.set_ylabel("Density", fontsize=14)
+    ax.tick_params(axis='both', which='major', labelsize=12)
+
+    sns.despine()
+    # leave a little room for the title and annotations
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.savefig(path, dpi=dpi)
     plt.close()
 
 
-def save_gini_lorenz_plot(tf_frequency, output_path, dpi, figsize=(8,6)):
+def save_tf_entropy_kde_plot(F, R, tf_list, L, path, dpi):
     """
-    Plot a Lorenz curve for the TF frequency distribution and annotate with the inverted Gini coefficient.
+    - Histogram for the single max‐coverage TF vs. the single min‐coverage TF.
+    - Narrower figure.
     """
-    freqs = np.array(sorted(tf_frequency.values()))
-    n = freqs.size
-    cumfreq = np.cumsum(freqs)
-    total = cumfreq[-1]
-    cumfreq_norm = cumfreq / total
-    x = np.linspace(1/n, 1, n)
-    
-    def compute_gini_original(freqs):
-        n = freqs.size
-        cumfreq = np.cumsum(np.sort(freqs))
-        if cumfreq[-1] == 0:
-            return 0.0
-        gini_inv = (n + 1 - 2 * np.sum(cumfreq) / cumfreq[-1]) / n
-        return 1 - gini_inv  # original Gini
-    gini_original = compute_gini_original(freqs)
-    inverted_gini = 1 - gini_original
-    
-    plt.figure(figsize=figsize)
-    plt.plot(x, cumfreq_norm, marker='o', label="Lorenz Curve")
-    plt.plot([0, 1], [0, 1], color='gray', linestyle='--', label="Equality")
-    plt.xlabel("Cumulative proportion of TFs")
-    plt.ylabel("Cumulative proportion of TFBS")
-    plt.title("TF Representation Based on TFBS Frequency (Lorenz Curve)")
-    plt.annotate(f"Inverted Gini: {inverted_gini:.3f}", xy=(0.05, 0.9), xycoords="axes fraction",
-                 fontsize=10, bbox=dict(boxstyle="round", fc="w"))
-    plt.legend()
-    sns.despine(top=True, right=True)
+    logger.info(f"Saving TF entropy histogram to {path}")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    total = F + R
+    sums = total.sum(axis=1)
+    idx_sorted = np.argsort(sums)
+    if len(idx_sorted) < 2:
+        logger.warning("Not enough TFs for entropy plot")
+        return
+
+    low_i, high_i = idx_sorted[0], idx_sorted[-1]
+    choices = [
+        (tf_list[high_i], total[high_i]),
+        (tf_list[low_i], total[low_i])
+    ]
+
+    plt.figure(figsize=(6,6))  # narrower
+    for name, weights in choices:
+        positions = np.arange(L)
+        sns.histplot(
+            x=positions,
+            weights=weights,
+            bins=L,
+            element="step",
+            fill=True,
+            alpha=0.4,
+            label=name
+        )
+
+    plt.xlim(0, L-1)
+    plt.xlabel("Nucleotide Position", fontsize=14)
+    plt.ylabel("Coverage count", fontsize=14)
+    plt.title("Positional Occupancy Histogram (Max vs Min TF)", fontsize=16)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.legend(title="TF", fontsize=12, title_fontsize=12)
+    sns.despine()
     plt.tight_layout()
-    plt.savefig(output_path, dpi=dpi)
+    plt.savefig(path, dpi=dpi)
     plt.close()
 
 
-def save_jaccard_histogram(sequences, output_path, dpi, figsize=(8,6), sample_size=1000):
-    """
-    Compute pairwise Jaccard dissimilarities for a (sampled) set of sequences and plot a histogram.
-    """
-    tf_rosters = []
-    for seq in sequences:
-        roster = set()
-        for part in seq.get("meta_tfbs_parts", []):
-            if ":" in part:
-                tf_name, _ = part.split(":", 1)
-                roster.add(tf_name.lower().strip())
-        tf_rosters.append(roster)
-    
-    n = len(tf_rosters)
-    dissimilarities = []
-    num_pairs = int(n*(n-1)/2)
-    max_pairs = min(sample_size, num_pairs)
-    
-    for _ in range(max_pairs):
+def save_gini_lorenz_plot(tf_freq, path, dpi):
+    # unchanged
+    logger.info(f"Saving Lorenz curve to {path}")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    vals = np.sort(list(tf_freq.values()))
+    cum = np.cumsum(vals) / vals.sum()
+    x = np.linspace(1/len(vals), 1, len(vals))
+
+    plt.figure(figsize=(8,6))
+    plt.plot(x, cum, marker='o', label="Lorenz Curve")
+    plt.plot([0,1], [0,1], '--', color='gray', label="Equality")
+    inv_gini = 1 - (len(vals) + 1 - 2*np.sum(np.cumsum(vals)/vals.sum()))/len(vals)
+    plt.annotate(f"Inverted Gini: {inv_gini:.3f}", xy=(0.05,0.9), xycoords="axes fraction",
+                 fontsize=12)
+    plt.title("TF Representation Based on TFBS Frequency (Lorenz Curve)", fontsize=16)
+    plt.xlabel("Cumulative proportion of TFs", fontsize=14)
+    plt.ylabel("Cumulative proportion of TFBS", fontsize=14)
+    plt.legend(fontsize=12)
+    sns.despine()
+    plt.tight_layout()
+    plt.savefig(path, dpi=dpi)
+    plt.close()
+
+
+def save_jaccard_histogram(seqs, path, dpi, sample_size=1000):
+    # unchanged
+    logger.info(f"Saving Jaccard histogram to {path}")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    rosters = []
+    from dnadesign.billboard.core import robust_parse_tfbs
+    for s in seqs:
+        rf = set()
+        for part in s["meta_tfbs_parts"]:
+            try:
+                tf, _ = robust_parse_tfbs(part, s.get("id"))
+                rf.add(tf)
+            except ValueError:
+                continue
+        rosters.append(rf)
+
+    n = len(rosters)
+    dis = []
+    for _ in range(min(sample_size, n*(n-1)//2)):
         i, j = np.random.choice(n, 2, replace=False)
-        inter = len(tf_rosters[i].intersection(tf_rosters[j]))
-        union = len(tf_rosters[i].union(tf_rosters[j]))
-        jaccard = inter / union if union > 0 else 0
-        dissimilarities.append(1 - jaccard)
-    
-    plt.figure(figsize=figsize)
-    sns.histplot(dissimilarities, kde=True, color="steelblue")
-    plt.xlabel("Jaccard Dissimilarity")
-    plt.ylabel("Frequency")
-    plt.title("Diversity of TF Combinations Across Sequences (Jaccard Similarities)")
-    sns.despine(top=True, right=True)
+        a, b = rosters[i], rosters[j]
+        u = len(a | b)
+        dis.append(1 - len(a & b)/u if u else 0)
+
+    plt.figure(figsize=(8,6))
+    sns.histplot(dis, kde=True)
+    plt.title("Diversity of TF Combinations (Jaccard Dissimilarity)", fontsize=16)
+    plt.xlabel("Dissimilarity", fontsize=14)
+    plt.ylabel("Count", fontsize=14)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    sns.despine()
     plt.tight_layout()
-    plt.savefig(output_path, dpi=dpi)
+    plt.savefig(path, dpi=dpi)
     plt.close()
-    
-def save_motif_levenshtein_boxplot(motif_strings, config, output_path, dpi, figsize=(8,6)):
+
+
+def save_motif_levenshtein_boxplot(*args, **kwargs):
     """
-    Compute pairwise normalized Levenshtein distances for motif_strings and generate a boxplot.
-    The plot includes a white boxplot with styled ticks and top/right spines removed,
-    and a scatter overlay (with low alpha) in the background to show distribution.
+    Disabled: too slow to render.
     """
-    # Retrieve penalty parameters.
-    msl_config = config.get("motif_string_levenshtein", {})
-    tf_penalty = msl_config.get("tf_penalty", 1.0)
-    strand_penalty = msl_config.get("strand_penalty", 0.5)
-    partial_penalty = msl_config.get("partial_penalty", 0.8)
-    
-    distances = []
-    n = len(motif_strings)
-    for i in range(n):
-        tokens_i = motif_strings[i].split(",") if motif_strings[i] else []
-        for j in range(i+1, n):
-            tokens_j = motif_strings[j].split(",") if motif_strings[j] else []
-            if not tokens_i or not tokens_j:
-                raw_distance = max(len(tokens_i), len(tokens_j))
-            else:
-                raw_distance = token_edit_distance(tokens_i, tokens_j, tf_penalty, strand_penalty, partial_penalty)
-            norm_factor = max(len(tokens_i), len(tokens_j))
-            normalized_distance = raw_distance / norm_factor if norm_factor > 0 else 0
-            distances.append(normalized_distance)
-    
-    import pandas as pd
-    df = pd.DataFrame({"Normalized Distance": distances})
-    
-    plt.figure(figsize=figsize)
-    ax = sns.boxplot(data=df, x="Normalized Distance", color="white", fliersize=0)
-    sns.stripplot(data=df, x="Normalized Distance", color="gray", alpha=0.4, ax=ax)
-    ax.set_title("Pairwise Normalized Motif Levenshtein Distances")
-    sns.despine(ax=ax, top=True, right=True)
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=dpi)
-    plt.close()
+    logger.info("Skipping motif-string Levenshtein boxplot (disabled).")

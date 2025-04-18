@@ -8,71 +8,67 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-import numpy as np
+import os
+import logging
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from tqdm import tqdm  # Progress bar support
+from tqdm import tqdm
 
-# Import the core metrics computation from the core module.
-from dnadesign.billboard.core import compute_core_metrics
+from dnadesign.billboard.core import compute_core_metrics, process_sequences
 
-def compute_cluster_metrics(results, config):
+logger = logging.getLogger(__name__)
+sns.set_theme(style="ticks", font_scale=0.8)
+
+def compute_cluster_metrics(results, cfg):
     """
-    Break the sequences down by their pre-computed 'meta_cluster_count' and, for each cluster,
-    compute the core diversity metrics (using the current billboard logic).
-    
-    Returns a DataFrame where each row corresponds to a unique cluster and contains:
-      - meta_cluster_count (the cluster ID)
-      - Aggregated core metrics (computed as the mean value over all sequences in the cluster)
+    Compute core metrics per Leiden cluster by re‐processing each subset of sequences.
+    Logs at DEBUG level to avoid console spam.
     """
-    # Group sequences by cluster.
+    logger.debug("Computing cluster‐level metrics")
     clusters = {}
-    for seq in results.get("sequences", []):
-        if "meta_cluster_count" not in seq:
-            continue  # Skip sequences lacking clustering information.
-        cluster_id = seq["meta_cluster_count"]
-        clusters.setdefault(cluster_id, []).append(seq)
-    
-    cluster_metrics_list = []
-    # Iterate over each cluster with a progress bar.
-    for cluster_id in tqdm(sorted(clusters.keys()), desc="Computing metrics per cluster"):
-        cluster_seqs = clusters[cluster_id]
-        sub_results = {"sequences": cluster_seqs}
-        core_metrics = compute_core_metrics(sub_results, config)
-        record = {"meta_cluster_count": cluster_id}
-        record.update(core_metrics)
-        cluster_metrics_list.append(record)
-    
-    return pd.DataFrame(cluster_metrics_list)
+    for s in results["sequences"]:
+        cid = s.get("meta_cluster_count")
+        if cid is not None:
+            clusters.setdefault(cid, []).append(s)
 
-def save_cluster_characterization_scatter(cluster_df, config, output_path, dpi=600, figsize=(10,6)):
-    """
-    Generate and save a scatter plot for cluster-level characterization.
-    
-    The provided DataFrame (cluster_df) must have one row per cluster (meta_cluster_count)
-    with aggregated core metrics for that cluster. Each core metric is then plotted
-    (with distinct marker shapes as specified in the configuration) versus the cluster ID.
-    """
-    if cluster_df.empty:
-        print("No cluster metrics available for cluster characterization.")
-        return
+    records = []
+    for cid in tqdm(sorted(clusters), desc="Clusters"):
+        seqs = clusters[cid]
+        cluster_results = process_sequences(seqs, cfg)
+        cms = compute_core_metrics(cluster_results, cfg)
+        cms["meta_cluster_count"] = cid
+        records.append(cms)
 
-    marker_shapes = config.get("characterize_by_leiden_cluster", {}).get("marker_shapes", {})
-    plot_title = config.get("characterize_by_leiden_cluster", {}).get("plot_title", "Cluster Characterization by Core Metrics")
-    
-    # Identify the metrics to plot (exclude the cluster id).
-    metrics_to_plot = [col for col in cluster_df.columns if col != "meta_cluster_count"]
-    
+    df = pd.DataFrame(records)
+    logger.debug(f"Computed metrics for {len(df)} clusters")
+    return df
+
+
+def save_cluster_characterization_scatter(df, cfg, path, dpi=600, figsize=(10,6)):
+    logger.info(f"Saving cluster characterization scatter to {path}")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    shapes = cfg["characterize_by_leiden_cluster"]["marker_shapes"]
+    title  = cfg["characterize_by_leiden_cluster"]["plot_title"]
+
     plt.figure(figsize=figsize)
-    for metric in metrics_to_plot:
-        marker = marker_shapes.get(metric, "o")
-        plt.scatter(cluster_df["meta_cluster_count"], cluster_df[metric], label=metric, marker=marker, alpha=0.8)
-    plt.xlabel("Cluster ID (meta_cluster_count)")
-    plt.ylabel("Aggregated Core Metric Value")
-    plt.title(plot_title)
-    plt.legend()
+    for col in df.columns:
+        if col == "meta_cluster_count":
+            continue
+        plt.scatter(
+            df["meta_cluster_count"],
+            df[col],
+            label=col,
+            marker=shapes.get(col, "o"),
+            alpha=0.8
+        )
+    plt.xlabel("Cluster ID", fontsize=14)
+    plt.ylabel("Metric Value", fontsize=14)
+    plt.title(title, fontsize=16)
+    plt.legend(fontsize=12)
     sns.despine()
     plt.tight_layout()
-    plt.savefig(output_path, dpi=dpi)
+    plt.savefig(path, dpi=dpi)
     plt.close()
+    logger.info("Cluster characterization saved")

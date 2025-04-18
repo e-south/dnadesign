@@ -1,8 +1,9 @@
 ## billboard
 
-**billboard** quantifies the regulatory diversity of dense-array–derived DNA sequences based on transcription factor binding site (TFBS) composition and distribution. It processes batches of sequences, extracts motif information, computes core diversity metrics, and writes a `diversity_summary.csv` file to support downstream workflows.
+**billboard** quantifies regulatory diversity in dense‐array DNA libraries by extracting TFBS content and computing a small set of scalar “diversity” metrics. 
 
-**billboard** helps to answer: ***how broad, balanced, distinct, and spatially diffuse are the regulatory elements across the dense array library?***
+The pipeline helps to answer: 
+> *How broad, balanced, distinct, and spatially diffuse are the regulatory elements across the dense array library?*
 
 ### Pipeline
 

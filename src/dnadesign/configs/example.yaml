@@ -87,10 +87,13 @@ libshuffle:
     method: "percentile_avg"                     # Options: "zscore_pca", "minmax_weighted", "cds", "percentile_avg", "inverse_rank_sum"
     normalize: "null"                            # Options: "zscore", "minmax", or null (if no normalization)
     core_metrics:
+      - tf_richness
       - 1_minus_gini
-      - mean_jaccard
-      - median_tf_entropy
-      - motif_string_levenshtein
+      - min_jaccard_dissimilarity
+      - min_tf_entropy
+      - min_motif_string_levenshtein
+      - nw_similarity
+      - nw_dissimilarity
     weights: {}
   joint_selection:
     method: "x_only"          # Options: "null", "x_only", "both"
@@ -116,45 +119,41 @@ libshuffle:
     figure_size: [7, 5]         # override default figure size
 
 
+
 billboard:
   output_dir_prefix: 60bp_acetate
   dry_run: false
-  # Provide only the subdirectory name (or relative path) within the sequences folder.
+  skip_aligner_call: true
   pt_files:
     - densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_M9_gluc_ace_top20_n10000_60bp
-  track_unique_roster: true
   allow_variable_sequence_length: false
   include_fixed_elements_in_combos: false
   save_plots: true
   save_csvs: true
   dpi: 600
-  # List of core diversity metrics to compute
+
+  # List which metrics end up in diversity_summary.csv
   diversity_metrics:
-    # - tf_richness
+    - tf_richness
     - 1_minus_gini
-    # - mean_jaccard
-    - median_tf_entropy
-    # - motif_string_levenshtein
-  # Weights for the weighted sum composite (must sum to 1 if desired)
-  composite_weights:
-    tf_richness: 0.4
-    1_minus_gini: 0.3
-    mean_jaccard: 0.2
-    median_tf_entropy: 0.1
-    motif_string_levenshtein: 0.1
-  motif_string_lev_debug: true
+    - min_jaccard_dissimilarity
+    - min_tf_entropy
+    - min_motif_string_levenshtein
+
   motif_string_levenshtein:
     tf_penalty: 1.0
     strand_penalty: 0.5
     partial_penalty: 0.8
+
   characterize_by_leiden_cluster:
     enabled: true
     plot_title: "Cluster Characterization by Core Metrics"
     marker_shapes:
-      tf_richness: "o"
       1_minus_gini: "s"
-      tf_entropy: "D"
-      motif_string_levenshtein: "X"
+      min_jaccard_dissimilarity: "X"
+      min_tf_entropy: "D"
+
+
 
 
 densegen:

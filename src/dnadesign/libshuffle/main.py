@@ -25,6 +25,8 @@ from dnadesign.libshuffle.subsampler import Subsampler
 from dnadesign.libshuffle.visualization import plot_scatter, plot_kde_coremetrics, plot_pairplot_coremetrics
 from dnadesign.libshuffle.output import save_summary, save_results, save_selected_subsamples
 from dnadesign.libshuffle.metrics import apply_composite_transformation
+from dnadesign.libshuffle.hitzone_visualization import plot_hitzone_details
+
 
 def load_pt_file(input_dir: Path):
     pt_files = list(input_dir.glob("*.pt"))
@@ -95,6 +97,10 @@ def main():
         logger.info(f"KDE plots saved to: {kde_raw_path} and {kde_zscore_path}")
         pairplot_path = plot_pairplot_coremetrics(subsamples, config, output_dir)
         logger.info(f"Pairwise scatter plot saved to: {pairplot_path}")
+
+        # New hit-zone detailed plot
+        hitzone_path = plot_hitzone_details(subsamples, sequences, config, output_dir, run_info)
+        logger.info(f"Hit‑zone details plot saved to: {hitzone_path}")
 
         # Save global summary and sublibrary details.
         duration = time.time() - start_time
