@@ -41,11 +41,11 @@ def save_tf_frequency_barplot(tf_freq, title, path, dpi):
 
 def save_occupancy_plot(F, R, tf_list, title, path, dpi):
     """
-    - Shared y-axis, TFs sorted by descending total coverage (F+R).
-    - y‑tick labels only on the first subplot.
-    - 1:1 aspect ratio for each heatmap.
-    - Colorbar horizontally at bottom.
-    - Tight margins so title/subplots/colorbar don't overlap.
+    - Signature matches new code: (F, R, tf_list, title, path, dpi)
+    - Internals borrowed from the older version you preferred:
+        * two side-by-side heatmaps, sharey=True
+        * vertical colorbar on the right, tight margins
+    - TF rows sorted by descending (F+R) sums.
     """
     logger.info(f"Saving occupancy plot to {path}")
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -56,45 +56,39 @@ def save_occupancy_plot(F, R, tf_list, title, path, dpi):
     order = np.argsort(sums)[::-1]
     Fs = F[order]
     Rs = R[order]
-    tfs = [tf_list[i] for i in order]
+    sorted_tfs = [tf_list[i] for i in order]
 
-    fig, (ax0, ax1) = plt.subplots(1, 2, sharey=True, figsize=(12, 8))
+    # make figure & axes
+    fig, axes = plt.subplots(1, 2, figsize=(14, 7), sharey=True)
 
     # forward strand
-    im0 = ax0.imshow(Fs, aspect='equal')
-    ax0.set_title("Forward Strand", fontsize=14)
-    ax0.set_xlabel("Position", fontsize=12)
-    ax0.set_yticks(np.arange(len(tfs)))
-    ax0.set_yticklabels(tfs, fontsize=8)
+    im0 = axes[0].imshow(Fs, aspect="equal", interpolation="none")
+    axes[0].set_title("Forward Strand", fontsize=10)
+    axes[0].set_xlabel("Nucleotide Position", fontsize=9)
+    axes[0].set_yticks(np.arange(len(sorted_tfs)))
+    axes[0].set_yticklabels(sorted_tfs, fontsize=6)
+    sns.despine(ax=axes[0], top=True, right=True)
 
     # reverse strand
-    im1 = ax1.imshow(Rs, aspect='equal')
-    ax1.set_title("Reverse Strand", fontsize=14)
-    ax1.set_xlabel("Position", fontsize=12)
-    ax1.set_yticks([])  # align but no labels
+    im1 = axes[1].imshow(Rs, aspect="equal", interpolation="none")
+    axes[1].set_title("Reverse Strand", fontsize=10)
+    axes[1].set_xlabel("Nucleotide Position", fontsize=9)
+    axes[1].tick_params(axis="y", labelleft=False)  # hide labels on the 2nd plot
+    sns.despine(ax=axes[1], top=True, right=True)
 
-    # global title
-    fig.suptitle(title, fontsize=16)
+    # super title
+    fig.suptitle(title, fontsize=12, y=0.92)
 
-    # colorbar at bottom
-    cbar = fig.colorbar(im1, ax=[ax0, ax1],
-                        orientation='horizontal',
-                        pad=0.12,  # nudge down further
-                        shrink=0.8)
-    cbar.set_label("Coverage count", fontsize=12)
-    cbar.ax.tick_params(labelsize=10)
+    # adjust margins so subplots sit nicely
+    plt.subplots_adjust(wspace=0.02, left=0.15, right=0.88)
 
-    # tighten layout so nothing overlaps
-    fig.subplots_adjust(
-        top=0.88,    # bring subplots up
-        bottom=0.12, # leave room for colorbar
-        left=0.10,
-        right=0.98,
-        wspace=0.03
-    )
-    sns.despine(fig=fig, left=True, bottom=True)
+    # add a vertical colorbar on the right
+    cbar_ax = fig.add_axes([0.90, 0.15, 0.025, 0.65])  # [left, bottom, width, height]
+    fig.colorbar(im1, cax=cbar_ax, label="Coverage count")
 
-    plt.savefig(path, dpi=dpi)
+    sns.despine(fig=fig, top=True, right=True)
+
+    plt.savefig(path, dpi=dpi, bbox_inches="tight")
     plt.close()
 
 

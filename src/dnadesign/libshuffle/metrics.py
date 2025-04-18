@@ -3,139 +3,201 @@
 <dnadesign project>
 libshuffle/metrics.py
 
-Provides functions to compute diversity metrics for LibShuffle. This module:
-  - Instantiates a fresh temporary Billboard configuration by merging the global
-    Billboard config (from config["billboard"]) with LibShuffle overrides (from config["billboard_metric"]).
-  - Runs the full Billboard processing pipeline (process_sequences, compute_core_metrics,
-    compute_composite_metrics) on a given subsample.
-  - Computes the Evo2 diversity metric with flexible options (l2, log1p_l2, and cosine similarity).
-  - Applies composite transformation (via LibShuffle's own apply_composite_transformation later)
-    across subsamples.
-  - Integrates the new CDS method when billboard_metric.method is set to "cds".
-  
-Module Author(s): Eric J. South
+Utility functions that let **libshuffle** call **billboard** on-the-fly.
+
+A *temporary* Billboard configuration is built from scratch for every
+sub-sample, containing **only** the metric names requested in the libshuffle
+YAML.  Any per-metric option blocks that Billboard needs (currently just the
+`motif_string_levenshtein` penalties) are injected automatically, so users do
+*not* have to embed a full “billboard:” section in their libshuffle config.
+
+Module Author(s): Eric J. South  
 Dunlop Lab
---------------------------------------------------------------------------------
 """
 
-import torch
-import tempfile
-import os
+from __future__ import annotations
+
 import math
+import os
+import tempfile
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Dict, List, Tuple
+
 import numpy as np
+import torch
 import torch.nn.functional as F
-from dnadesign.billboard.core import process_sequences, compute_core_metrics, compute_composite_metrics
-from dnadesign.billboard.summary import generate_entropy_summary_csv
+
 from dnadesign.aligner.metrics import mean_pairwise
+from dnadesign.billboard.core import compute_core_metrics, process_sequences
 
-def make_temp_billboard_config(config, temp_pt_path):
+
+# Helper: temporarily silence **all** dnadesign.billboard loggers
+@contextmanager
+def _silence_billboard():
     """
-    Create a transient Billboard config for this subsample:
-      - base on the global 'billboard' section
-      - override pt_files to point at our temporary .pt
-      - enforce dry_run=True and skip_aligner_call=False
-      - honor libshuffle's core‐metrics override if provided
+    Context‑manager that raises the logging level of every logger whose name
+    starts with ``dnadesign.billboard`` to WARNING, restoring the original
+    levels on exit.
     """
-    global_billboard = config.get("billboard", {}).copy()
-    global_billboard["dry_run"] = True
+    saved_levels: Dict[str, int] = {}
+    for name, lg in logging.root.manager.loggerDict.items():
+        if name.startswith("dnadesign.billboard"):
+            saved_levels[name] = lg.level
+            lg.setLevel(logging.WARNING)
+
+    try:
+        yield
+    finally:
+        for name, lvl in saved_levels.items():
+            logging.getLogger(name).setLevel(lvl)
+
+def _inject(cfg: Dict, key: str, default_block: Dict) -> None:
+    """Insert *default_block* if **key** is missing from *cfg*."""
+    if key not in cfg:
+        cfg[key] = default_block.copy()
+
+
+def make_temp_billboard_config(config: Dict, temp_pt_path: str) -> Dict:
+    """
+    Build a *minimal* Billboard configuration purely from the libshuffle YAML.
+
+    *   Uses only the metric names present under
+        `libshuffle_core_metrics` **or** `billboard_metric.core_metrics`.
+
+    *   Injects metric‑specific option blocks that Billboard expects
+        (`motif_string_levenshtein`, etc.).
+
+    *   Always sets:
+        - `dry_run            = True`   (skip figures / CSVs)
+        - `skip_aligner_call  = False`  (so NW similarities are computed)
+        - `pt_files           = [temp_pt_path]`
+    """
+    bb_cfg: Dict = {}
+
     
-    # Ensure we also run aligner here
-    global_billboard["skip_aligner_call"] = False
+    # Mandatory runtime flags
+    bb_cfg["dry_run"] = True
+    bb_cfg["skip_aligner_call"] = False
+    bb_cfg["pt_files"] = [temp_pt_path]
+    bb_cfg["output_dir_prefix"] = (
+        "temp_billboard_" + next(tempfile._get_candidate_names())
+    )
 
-    global_billboard["pt_files"] = [temp_pt_path]
-    global_billboard["output_dir_prefix"] = "temp_billboard_" + next(tempfile._get_candidate_names())
-    # Choose which core metrics to compute
-    lib_core = config.get("libshuffle_core_metrics", [])
-    if lib_core:
-        global_billboard["diversity_metrics"] = lib_core
-    else:
-        bm = config.get("billboard_metric", {})
-        global_billboard["diversity_metrics"] = bm.get("core_metrics", [])
-    return global_billboard
+    # Collect metrics from libshuffle config
+    lib_core: List[str] = config.get("libshuffle_core_metrics", [])
+    if not lib_core:
+        lib_core = config.get("billboard_metric", {}).get("core_metrics", [])
+    bb_cfg["diversity_metrics"] = lib_core
 
-def compute_billboard_metric(subsample, config):
+    
+    # Inject per‑metric option blocks that Billboard expects
+    if "min_motif_string_levenshtein" in lib_core:
+        _inject(
+            bb_cfg,
+            "motif_string_levenshtein",
+            {
+                "tf_penalty": 1.0,
+                "strand_penalty": 0.5,
+                "partial_penalty": 0.8,
+            },
+        )
+
+    return bb_cfg
+
+
+def compute_billboard_metric(subsample: List[dict], config: Dict):
     """
-    Run Billboard on a single subsample. If composite_score=True, return the full
-    core‐metrics dict (with our added NW metrics). Otherwise return the single metric.
+    Run Billboard on a single *subsample* (list of sequence dicts).
+
+    Returns either:
+    *   the full **core‑metrics dict** (if `billboard_metric.composite_score`
+        is **True**), **or**
+    *   the single requested metric value (if `composite_score` is **False**).
+
+    Needleman–Wunsch similarity / dissimilarity are *always* appended to
+    the core‑metrics dict so they can be used downstream.
     """
-    # build a temp config that ALWAYS has skip_aligner_call=False
     with tempfile.TemporaryDirectory() as tmpdir:
-        temp_pt = os.path.join(tmpdir, "subsample.pt")
+        temp_pt = Path(tmpdir) / "subsample.pt"
         torch.save(subsample, temp_pt)
 
-        bb_config = make_temp_billboard_config(config, temp_pt)
-        # create required dirs (even if dry_run) so summary routines won't fail
-        out = os.path.join(tmpdir, "batch_results")
-        os.makedirs(os.path.join(out, "csvs"), exist_ok=True)
-        os.makedirs(os.path.join(out, "plots"), exist_ok=True)
+        bb_cfg = make_temp_billboard_config(config, str(temp_pt))
 
-        # Run the pipeline
-        results = process_sequences([temp_pt], bb_config)
-        core = compute_core_metrics(results, bb_config)
+        # Billboard *requires* the output folder structure, even in dry‑run.
+        (Path(tmpdir) / "batch_results" / "csvs").mkdir(parents=True, exist_ok=True)
+        (Path(tmpdir) / "batch_results" / "plots").mkdir(parents=True, exist_ok=True)
 
-        # Compute and inject NW alignment metrics
+        # ── Run Billboard
+        results = process_sequences([str(temp_pt)], bb_cfg)
+        core = compute_core_metrics(results, bb_cfg)
+
+        # ── Inject NW metrics
         seqs = results["sequences"]
-        sim = mean_pairwise(seqs, sequence_key="sequence", use_cache=False)
-        core["nw_similarity"] = sim
-        core["nw_dissimilarity"] = 1.0 - sim
+        nw_sim = mean_pairwise(seqs, sequence_key="sequence", use_cache=False)
+        core["nw_similarity"] = nw_sim
+        core["nw_dissimilarity"] = 1.0 - nw_sim
 
-        # 3) if composite_score, return the full dict; else extract the single metric
+        # ── Decide what to return
         bm_conf = config.get("billboard_metric", {})
         if bm_conf.get("composite_score", False):
             return core
-        else:
-            cms = bm_conf.get("core_metrics", [])
-            if len(cms) != 1:
-                raise ValueError("When composite_score=False, exactly one core metric must be specified.")
-            key = cms[0]
-            val = core.get(key, None)
-            # allow _mean fallback if present
-            if val is None and key + "_mean" in core:
-                val = core[key + "_mean"]
-            if val is None:
-                raise KeyError(f"Requested metric '{key}' not found among core metrics: {list(core)}")
-            return val
 
-def compute_evo2_metric(subsample, config):
+        requested_metrics = bm_conf.get("core_metrics", [])
+        if len(requested_metrics) != 1:
+            raise ValueError(
+                "When composite_score is False, exactly **one** core metric "
+                "must be listed in billboard_metric.core_metrics."
+            )
+
+        key = requested_metrics[0]
+        if key not in core and f"{key}_mean" in core:
+            key = f"{key}_mean"  # allow _mean fallback
+        if key not in core:
+            raise KeyError(
+                f"Metric '{key}' not present in Billboard results: {list(core)}"
+            )
+        return core[key]
+
+
+def compute_evo2_metric(subsample: List[dict], config: Dict) -> float:
+    """Mean pairwise distance in Evo2 latent space (L2 / log1p‑L2 / cosine)."""
     vectors = []
     for entry in subsample:
-        vector = entry.get("evo2_logits_mean_pooled")
-        if vector is None:
-            raise ValueError("Entry missing 'evo2_logits_mean_pooled' field required for evo2 metric.")
-        if isinstance(vector, torch.Tensor):
-            vector = vector.to(torch.float32).flatten()
-        elif isinstance(vector, list):
-            vector = torch.tensor(vector, dtype=torch.float32).flatten()
+        vec = entry.get("evo2_logits_mean_pooled")
+        if vec is None:
+            raise ValueError(
+                "Entry missing 'evo2_logits_mean_pooled' field required for Evo2 metric."
+            )
+        if isinstance(vec, torch.Tensor):
+            vec = vec.to(torch.float32).flatten()
         else:
-            vector = torch.tensor(vector, dtype=torch.float32).flatten()
-        vectors.append(vector)
-    if len(vectors) < 2:
+            vec = torch.tensor(vec, dtype=torch.float32).flatten()
+        vectors.append(vec)
+
+    if len(vectors) < 2:  # single‑sequence edge‑case
         return 0.0
+
     mat = torch.stack(vectors)
     metric_type = config.get("evo2_metric", {}).get("type", "l2")
+
     if metric_type == "l2":
         distances = torch.cdist(mat, mat, p=2)
-        n = distances.size(0)
-        mask = torch.triu(torch.ones(n, n, dtype=torch.bool), diagonal=1)
-        pairwise = distances[mask]
+        pairwise = distances[torch.triu(torch.ones_like(distances, dtype=bool), 1)]
         return pairwise.mean().item()
-    elif metric_type == "log1p_l2":
+
+    if metric_type == "log1p_l2":
         distances = torch.cdist(mat, mat, p=2)
-        n = distances.size(0)
-        mask = torch.triu(torch.ones(n, n, dtype=torch.bool), diagonal=1)
-        pairwise = distances[mask]
-        mean_distance = pairwise.mean().item()
-        return math.log1p(mean_distance)
-    elif metric_type == "cosine":
+        pairwise = distances[torch.triu(torch.ones_like(distances, dtype=bool), 1)]
+        return math.log1p(pairwise.mean().item())
+
+    if metric_type == "cosine":
         normed = F.normalize(mat, p=2, dim=1)
-        cosine_sim = normed @ normed.t()
-        cosine_distance = 1 - cosine_sim
-        n = cosine_distance.size(0)
-        mask = torch.triu(torch.ones(n, n, dtype=torch.bool), diagonal=1)
-        pairwise = cosine_distance[mask]
+        cos_dist = 1.0 - (normed @ normed.T)
+        pairwise = cos_dist[torch.triu(torch.ones_like(cos_dist, dtype=bool), 1)]
         return pairwise.mean().item()
-    else:
-        raise ValueError(f"Unsupported evo2_metric type: {metric_type}")
+
+    raise ValueError(f"Unsupported evo2_metric type: {metric_type}")
 
 def apply_composite_transformation(subsamples, config):
     bm_config = config.get("billboard_metric", {})

@@ -10,6 +10,7 @@ Dunlop Lab
 
 import os
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -279,70 +280,91 @@ def plot_kde_coremetrics(subsamples, config, output_dir):
 
 
 def plot_pairplot_coremetrics(subsamples, config, output_dir):
+    """
+    Pairwise scatter‑plot (and upper‑triangle correlations) of:
+
+      • every Billboard core metric requested in the config **plus**  
+      • `evo2_metric`         (cosine dissimilarity)  
+      • `evo2_metric_l2`      (Euclidean distance)
+
+    If `billboard_metric.method == "cds"`, the CDS components are used instead
+    of the raw core metrics, but Evo2 metrics are *still* appended.
+    """
     import pandas as pd
-    import seaborn as sns
+
     sns.set_style("ticks")
-    
-    bm_config = config.get("billboard_metric", {})
-    method = bm_config.get("method", "")
-    
-    if method == "cds":
-        keys = ["cds_score", "dominance", "program_diversity"]
-        data = {key: [] for key in keys}
-        for sub in subsamples:
-            cds = sub.get("cds_components")
-            if not cds:
-                continue
-            for key in keys:
-                data[key].append(cds.get(key))
+    plot_cfg = config.get("plot", {})
+    dpi = plot_cfg.get("dpi", 600)
+
+    bm_cfg = config.get("billboard_metric", {})
+    cds_mode = bm_cfg.get("method") == "cds"
+
+    # ── Decide which metric keys we want ─────────────────────────────────────
+    if cds_mode:
+        wanted = ["cds_score", "dominance", "program_diversity"]
     else:
-        core_metrics = bm_config.get("core_metrics", [])
-        if not core_metrics:
-            raise ValueError("No core metrics defined in config under billboard_metric/core_metrics")
-        if len(core_metrics) == 1:
-            fig, ax = plt.subplots()
-            ax.text(0.5, 0.5, "Pairplot not available for single core metric",
-                    horizontalalignment='center', verticalalignment='center', fontsize=12)
-            ax.axis('off')
-            pairplot_path = os.path.join(output_dir, "pairplot_coremetrics.png")
-            dpi = config.get("plot", {}).get("dpi", 600)
-            plt.savefig(pairplot_path, dpi=dpi, bbox_inches="tight")
-            plt.close()
-            return pairplot_path
-        data = {metric: [] for metric in core_metrics}
-        for sub in subsamples:
-            raw_vector = sub.get("raw_billboard_vector")
-            if raw_vector is None:
-                if len(core_metrics) == 1:
-                    raw_vector = [sub.get("billboard_metric")]
-                else:
-                    continue
-            if len(raw_vector) != len(core_metrics):
-                continue
-            for i, metric in enumerate(core_metrics):
-                data[metric].append(raw_vector[i])
-    
-    df = pd.DataFrame(data)
-    if df.empty:
-        raise ValueError("No data available for pairplot.")
-    
-    import numpy as np
+        wanted = bm_cfg.get("core_metrics", [])
+        if not wanted:
+            raise ValueError(
+                "No core metrics defined in config under billboard_metric/core_metrics"
+            )
+
+    # Always append Evo2 metrics when available
+    evo2_keys = ["evo2_metric", "evo2_metric_l2"]
+    wanted += evo2_keys
+
+    # ── Collect data ─────────────────────────────────────────────────────────
+    rows = []
+    for sub in subsamples:
+        row = {}
+        # 1) Billboard‑derived numbers
+        if cds_mode:
+            cds = sub.get("cds_components", {})
+            for k in ("cds_score", "dominance", "program_diversity"):
+                row[k] = cds.get(k)
+        else:
+            vec = sub.get("raw_billboard_vector")
+            if vec is None:
+                vec = [sub.get("billboard_metric")]
+            core_keys = bm_cfg.get("core_metrics", [])
+            for k, v in zip(core_keys, vec):
+                row[k] = v
+        # 2) Evo2 metrics (may be None)
+        row["evo2_metric"]     = sub.get("evo2_metric")
+        row["evo2_metric_l2"]  = sub.get("evo2_metric_l2")
+        rows.append(row)
+
+    # Build DF → ensure every wanted column exists, then prune empty ones
+    import pandas as pd
+    df = pd.DataFrame(rows).reindex(columns=wanted)
+    df = df.dropna(axis=1, how="all")        # drop metrics that never appeared
+
+    # Need at least 2 numeric columns with some data
+    if df.shape[1] < 2 or df.dropna(how="all").empty:
+        fig, ax = plt.subplots()
+        ax.text(0.5, 0.5,
+                "Pairplot not available (insufficient data)",
+                ha="center", va="center", fontsize=12)
+        ax.axis("off")
+        out = os.path.join(output_dir, "pairplot_coremetrics.png")
+        plt.savefig(out, dpi=dpi, bbox_inches="tight")
+        plt.close(fig)
+        return out
+
+    # ── Build pair‑grid ──────────────────────────────────────────────────────
     def corrfunc(x, y, **kws):
         r = np.corrcoef(x, y)[0, 1]
         ax = plt.gca()
         ax.annotate(f"r={r:.2f}", xy=(0.5, 0.5), xycoords=ax.transAxes,
-                    ha='center', va='center', fontsize=10)
-    
+                    ha="center", va="center", fontsize=9)
+
     g = sns.PairGrid(df, diag_sharey=False)
-    g.map_lower(sns.scatterplot)
+    g.map_lower(sns.scatterplot, s=20, alpha=0.6)
     g.map_upper(corrfunc)
-    g.map_diag(lambda x, **kws: plt.annotate("r=1.00", xy=(0.5, 0.5),
-                                              xycoords=plt.gca().transAxes,
-                                              ha='center', va='center', fontsize=10))
-    
-    dpi = config.get("plot", {}).get("dpi", 600)
-    pairplot_path = os.path.join(output_dir, "pairplot_coremetrics.png")
-    g.fig.suptitle("Pairwise Scatter Plot of Core Metrics", y=1.02)
-    g.fig.savefig(pairplot_path, dpi=dpi, bbox_inches="tight")
+    g.map_diag(sns.histplot, kde=True, linewidth=0)
+
+    g.fig.suptitle("Pairwise Scatter Plot of Core + Evo2 Metrics", y=1.02)
+    out_path = os.path.join(output_dir, "pairplot_coremetrics.png")
+    g.fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
     plt.close(g.fig)
-    return pairplot_path
+    return out_path

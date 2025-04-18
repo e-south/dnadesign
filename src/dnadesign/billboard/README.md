@@ -1,209 +1,241 @@
 ## billboard
 
-**billboard** quantifies regulatory diversity in dense‐array DNA libraries by extracting TFBS content and computing a small set of scalar “diversity” metrics. 
+**billboard** quantifies regulatory diversity in dense‑array DNA libraries by extracting TFBS content and computing a small set of scalar “diversity” metrics and diagnostic plots.
 
-The pipeline helps to answer: 
-> *How broad, balanced, distinct, and spatially diffuse are the regulatory elements across the dense array library?*
+> **The pipeline helps to answer:**  
+> *How broad, balanced, distinct, and spatially diffuse are the transcription‑factor binding sites across a library of sequences?*
 
-### Pipeline
+### Quick Start
 
-Given a `.pt` file containing sequence dictionaries (in the sibling `sequences/` directory), **billboard**:
+Assuming you have a **densegen**-derived `.pt` file under `sequences/` containing a Python list of sequence dicts:
 
-1. Parses TFBS annotations to extract which transcription factors are present in each sequence.
-2. Constructs strand-specific positional occupancy maps for each TF.
-3. Computes scalar diversity metrics:
-   - **TF Richness** – Compositional breadth.
-   - **Inverted Gini Coefficient** – Usage balance across TFs.
-   - **Mean Jaccard Dissimilarity** – Combinatorial diversity of TF rosters.
-   - **Positional Entropy** – How diffuse each TF's binding is across the sequence.
-   - **Edit Distance** – Measures differences in the ordered motif architecture of sequences.  
-     - Each sequence is represented as a motif string (e.g. `crp+,gadX-,fliZ+`), which is built by scanning from the 5′ to 3′ end. Pairwise, length-normalized Levenshtein distances are computed between these motif strings (with default penalties of 1 for a TF mismatch and 1 for a strand mismatch, both tunable via the config).
+```bash
+python billboard/main.py
+```
 
+By default, outputs will be written to  
+```
+batch_results/<output_dir_prefix>_YYYYMMDD/
+```
 
+### Pipeline Overview
 
-4. Optionally computes a weighted composite score.
-5. Writes results to `diversity_summary.csv`.
-6. Optionally produces diagnostic plots.
+1. **Load configuration** (`configs/example.yaml`).  
+2. **Load sequences** from one or more `.pt` files.  
+3. **Parse TFBS annotations** (`meta_tfbs_parts` / `meta_tfbs_parts_in_array`).  
+4. **Build motif strings** (ordered comma‑delimited TF+strand lists).  
+5. **Compute occupancy matrices** for forward/reverse strands.  
+6. **Compute core diversity metrics**:
+   - TF Richness  
+   - Inverted Gini Coefficient  
+   - Minimum Jaccard Dissimilarity  
+   - Minimum Positional Entropy  
+   - Minimum Motif‑String Levenshtein  
+7. **Write CSV summaries** (`diversity_summary.csv`, `tf_coverage_summary.csv`, …).  
+8. **(Optional)** Generate diagnostic plots.  
 
-### Simple Usage
+### Configuration
 
-1. **Edit your YAML config** (`configs/example.yaml`):
-    ```yaml
-    billboard:
-      output_dir_prefix: example_library
-      pt_files:
-        - example_sequences
-      include_fixed_elements_in_combos: false
-      save_plots: true
-      dry_run: false
-      composite_weights:
-        tf_richness: 0.4
-        1_minus_gini: 0.3
-        mean_jaccard: 0.2
-        median_tf_entropy: 0.1
-        motif_string_levenshtein: 0.1
-      diversity_metrics:
-        - tf_richness
-        - 1_minus_gini
-        - mean_jaccard
-        - median_tf_entropy
-        - motif_string_levenshtein
-      motif_string_levenshtein:
-        tf_penalty: 1.0
-        strand_penalty: 1.0
-    ```
+```yaml
+# example.yaml
+billboard:
+  # Prefix for your output folder in billboard's batch_results
+  output_dir_prefix: example_library
 
-2. **Run the analysis:**
-    ```bash
-    python billboard/main.py
-    ```
-
-    Results will appear under:
-    ```
-    batch_results/example_library_YYYYMMDD/
-    ```
+  # Specify one or more PT entries under sequences/
+  pt_files:
+    - example_sequences
+  save_plots: true
+  skip_aligner_call: true
+  # Figure DPI for saved PNGs
+  dpi: 300
+  # Which metrics to compute (order doesn’t matter)
+  diversity_metrics:
+    - tf_richness
+    - 1_minus_gini
+    - min_jaccard_dissimilarity
+    - min_tf_entropy
+    - min_motif_string_levenshtein
+  # Penalties for motif‑string Levenshtein
+  motif_string_levenshtein:
+    tf_penalty: 1.0
+    strand_penalty: 0.5
+    partial_penalty: 0.8
+```
 
 ### Core Diversity Metrics
 
-Each metric captures a different aspect of library diversity. All are scalar, interpretable, and suitable for low-N analysis.
+Each metric is a **single scalar** summarizing one aspect of library diversity. **Higher values correspond to greater diversity.**
 
-#### 1. TF Richness — *Compositional Breadth*
+---
 
-- **Definition**: Counts how many unique TFs are present across the library.
-- **Computation**: Let `T = {t₁, t₂, ..., tₖ}` be the union of TFs; then `TF Richness = |T|`.
-- **Summary**: Measures how many distinct TFs are represented, regardless of how often or where they appear.
+#### **Richness** — *TF Compositional Breadth*
 
-#### 2. Inverted Gini Coefficient — *Usage Balance*
+Count of **unique** TFs placed across all sequences:
 
-- **Definition**: Quantifies how evenly TFs are used based on frequency.
-- **Computation**:  
-  `Gini = (∑₁ⁿ ∑₁ⁿ |fᵢ - fⱼ|) / (2n ∑ f)`,  
-  then take `1 - Gini` to reward evenness.
-  ```python
-  # Example
-  tf_counts = [10, 10, 10]  # TF usage counts across the library is perfectly even
-  n = len(tf_counts)
-  total = sum(tf_counts)
+  $$
+  \mathrm{TF\_Richness}
+  = \bigl|\bigcup_{s}\,T_s\bigr|
+  $$
 
-  gini_numerator = sum(abs(x - y) for x in tf_counts for y in tf_counts)
-  gini = gini_numerator / (2 * n * total)
-  inverted_gini = 1 - gini
+  where \(T_s\) is the set of TFs in sequence \(s\).
 
-  print(f"Gini: {gini:.2f}, Inverted Gini: {inverted_gini:.2f}")  # → Gini: 0.00, Inverted Gini: 1.00
+> A larger TF Richness means more distinct transcription factors appear anywhere in your library—i.e., broader regulatory set.
 
-  # Now try an imbalanced example:
-  tf_counts = [25, 5, 0]
-  n = len(tf_counts)
-  total = sum(tf_counts)
+---
 
-  gini_numerator = sum(abs(x - y) for x in tf_counts for y in tf_counts)
-  gini = gini_numerator / (2 * n * total)
-  inverted_gini = 1 - gini
+#### **Inverted Gini Coefficient** — *TF Usage Balance*
 
-  print(f"Gini: {gini:.2f}, Inverted Gini: {inverted_gini:.2f}")  # → Gini: 0.56, Inverted Gini: 0.44
-  ```
+Measures how evenly TFs occur across all sequences.
 
-- **Summary**: Captures inequality in TF usage—higher values indicate more balanced distribution, but does not consider TF identity or binding location.
+1. Compute raw Gini:
 
-#### 3. Mean Jaccard Dissimilarity — *Combinatorial Diversity*
+   $$
+   G
+   = \frac{\displaystyle\sum_{i=1}^n\sum_{j=1}^n \lvert f_i - f_j\rvert}
+   {2\,n\,\sum_{k=1}^n f_k}
+   $$
 
-- **Definition**: Measures how distinct TF rosters are between sequences.
-- **Computation**:  
-  For two sequences A and B with TF sets `T_A` and `T_B`:  
-  `D(A, B) = 1 - |T_A ∩ T_B| / |T_A ∪ T_B|`
+2. Invert to reward evenness:
 
-  Average `D(A, B)` across all sequence pairs.
-  ```python
-  # Example
-  Seq1_TFs = {"CRP", "FadR", "LexA"}
-  Seq2_TFs = {"FadR", "ArcA"}
+   $$
+   1 - G
+   $$
 
-  intersection = Seq1_TFs & Seq2_TFs        # {"FadR"}
-  union = Seq1_TFs | Seq2_TFs               # {"CRP", "FadR", "LexA", "ArcA"}
+    where \(f_i\) is the total count of TF \(i\).
 
-  jaccard = len(intersection) / len(union)  # 1 / 4 = 0.25
-  dissimilarity = 1 - jaccard               # 0.75
-  ```
+> Values near 1 indicate TFs are used with similar frequency (balanced usage), whereas values near 0 indicate dominance by a few TFs (unequal usage).
 
-- **Summary**: Reflects the diversity of TF combinations across sequences; robust at small sample sizes, but ignores frequency and position.
+---
 
-#### 4. Median Positional Entropy — *Spatial Diffusion*
+#### **Min Jaccard Dissimilarity** — *TF Combinatorial Diversity*
 
-- **Definition**: Assesses how widely each TF binds across the sequence.
-- **Computation**:
-  - For each TF, build a position-wise count vector `P = [p₁, p₂, ..., p_L]`, normalize it to `P̂`.
-  - Compute entropy: `H = -∑ P̂ᵢ log₂(P̂ᵢ)`, normalized by `log₂(L)`.
-  - Average forward and reverse strand entropy; take the **median** across TFs.
-  ```python
-  # Example
-  import numpy as np
-  # Two TFs binding across a sequence of length 5
-  P_TF1 = np.array([10, 0, 0, 0, 0])     # Clustered binding at position 0
-  P_TF2 = np.array([2, 2, 2, 2, 2])       # Uniformly spread binding
+Find the **smallest** pairwise dissimilarity between any two sequences’ TF sets:
 
-  def entropy(P):
-      P_hat = P / P.sum()
-      return -np.sum(P_hat * np.log2(P_hat))
+$$
+D_{ij}
+= 1 \;-\; \frac{\lvert T_i \cap T_j\rvert}{\lvert T_i \cup T_j\rvert}
+\quad,\quad
+\min_{i<j} D_{ij}
+$$
 
-  H1 = entropy(P_TF1)
-  H2 = entropy(P_TF2)
-  L = 5
-  H1_norm = H1 / np.log2(L)  # → 0.00 (completely focused)
-  H2_norm = H2 / np.log2(L)  # → 1.00 (maximally diffuse)
+where \(T_i\) and \(T_j\) are the TF sets of sequences \(i\) and \(j\).
 
-  print(f"TF1 entropy: {H1_norm:.2f}")
-  print(f"TF2 entropy: {H2_norm:.2f}")
-  # Median Positional Entropy = median([H1_norm, H2_norm]) = 0.50
-  ```
+> A higher minimum dissimilarity means **every** pair of sequences differs substantially in TF composition; a zero means at least one pair is identical.
 
-- **Summary**: Captures whether TFs bind diffusely or cluster at specific positions. Robust to strand orientation and motif redundancy, though sparse TFs may skew results.
+---
 
+#### **Min Positional Entropy** — *TF Spatial Diffusion*  
+Assess how “focused” the most localized TF is along the sequence.
 
+1. **Counts → Probabilities**  
+   - For each TF and each position (k = 1 ... L ), let p_k be its binding count on one strand (forward or reverse).  
+   - Normalize:  
+     $$
+       \hat p_k \;=\;\frac{p_k}{\sum_{i=1}^L p_i}, 
+       \quad \sum_{k=1}^L \hat p_k = 1.
+     $$
 
-#### 5. Levenstein Distance — *Motif Order Diversity*
-- **Definition:** Represents each sequence as a comma-delimited motif string (e.g. `crp+,gadX-,fliZ+`) where:
-   - Each motif is identified from the TF mapping (from `meta_tfbs_parts`) and located in the sequence (using `meta_tfbs_parts_in_array`).
-   - The motif string is ordered by the 5′ position.
-   - The strand is explicit (`+` for forward, `-` for reverse).
+2. **Entropy & Normalization**  
+   $$
+     H \;=\; -\sum_{k=1}^L \hat p_k\,\log_2\!\bigl(\hat p_k\bigr),
+     \qquad
+     H_{\mathrm{norm}} = \frac{H}{\log_2 L}\;\in[0,1].
+   $$
 
-- **Computation:**  
-   Computes pairwise, length-normalized Levenshtein distances between motif strings using a custom token-based algorithm (with tunable penalties: default 1.0 for both TF mismatches and strand mismatches).
+3. **Combine & Summarize**  
+   - Compute H_norm separately for forward and reverse, average them for each TF.  
+   - Report the **minimum** of these averages across all TFs.
 
+> H_norm = 0 if a TF binds only at one spot (highly focused), and \(1\) if it binds uniformly. By taking the minimum, a low score flags that at least one TF is very localized; a high score means **every** TF is spatially diffuse.
 
-### Composite Metric
+---
 
-To create a single scalar summary of diversity, **billboard** supports a **weighted sum** of the core metrics:
+#### **Min Motif‑String Levenshtein** — *Sequence Architectural Diversity*
 
-```yaml
-# YAML config snippet
-composite_weights:
-  tf_richness: 0.5
-  1_minus_gini: 0.3
-  mean_jaccard: 0.2
-  median_tf_entropy: 0.1
+1. Represent each sequence as a strand-aware, ordered token list, e.g. `["crp+", "gadX-", …]`.  
+2. Compute pairwise, length‑normalized Levenshtein distance:
+
+   $$
+   d_{\mathrm{norm}}(s_i, s_j)
+   = \frac{\mathrm{Levenshtein}(s_i, s_j)}{\max(|s_i|, |s_j|)}
+   $$
+
+3. Report the **minimum** d_norm over all pairs.
+
+> A higher minimum distance indicates that even the two most similar sequences differ in motif architecture, whereas a value of zero means at least one pair shares an identical ordering of motifs derived from the same transcription factors.
+
+---
+#### **Min Needleman–Wunsch Dissimilarity** — *Global Sequence Diversity*
+
+Evaluates global sequence‐level diversity via optimal alignment.
+
+1.	Compute normalized global alignment similarity for each pair (i,j):
+
+    $$
+    S_{ij}
+    = \frac{\mathrm{NW}(s_i, s_j)}{\max(\ell_i, \ell_j)},
+    $$
+
+    where NW(s_i,s_j) is the Needleman–Wunsch alignment score and l_i is the length of sequence s_i.
+
+2.	Convert to dissimilarity:
+
+    $$
+    D_{ij} = 1 - S_{ij}.
+    $$
+
+3.	Report the minimum (D_{ij}) over all (i<j).
+
+> A high minimum NW dissimilarity means even the two most similar sequences are quite different at the nucleotide level, whereas a zero indicates at least one pair is perfectly alignable.
+
+---
+
+### Output Structure
+
+After running, you’ll find under `batch_results/<prefix>_YYYYMMDD/`:
+
 ```
-```python
-billboard_weighted_sum = w1 * tf_richness + w2 * (1 - gini) + w3 * mean_jaccard + w4 * median_tf_entropy
+csvs/
+  ├ diversity_summary.csv     # core metrics per library
+  ├ tf_coverage_summary.csv   # TF frequencies
+  └ summary_metrics.csv       # basic counts (sequences, TFBS instances)
+
+plots/  (if save_plots: true)
+  ├ tf_frequency.png
+  ├ occupancy.png
+  ├ motif_length.png
+  ├ tf_entropy_hist.png
+  ├ gini_lorenz.png
+  └ jaccard_hist.png
 ```
-
-### Output
-
-After running, **billboard** writes a results folder under `batch_results/`, containing:
-
-
-- `csvs/diversity_summary.csv`
-  - `tf_richness`
-  - `1_minus_gini`
-  - `mean_jaccard`
-  - `median_tf_entropy`
-  - `billboard_weighted_sum`
-  - `tf_frequency_barplot.png`
-  - `tf_occupancy_combined.png`
-  - `motif_length_density.png`
 
 ### Module Overview
 
-- `main.py`: Orchestrates loading config, processing sequences, and saving outputs.
-- `core.py`: Computes diversity metrics and TF occupancy.
-- `plot_helpers.py`: Generates optional plots.
-- `summary.py`: Writes CSVs, including the diversity summary.
+- **`main.py`**  
+  Manages config loading, sequence processing, metric computation, and I/O.
+
+- **`core.py`**  
+  Implements:
+  - Sequence loading & validation  
+  - TFBS parsing & motif‑string building  
+  - Occupancy matrix assembly  
+  - Diversity metrics (`compute_core_metrics`)
+
+- **`summary.py`**  
+  Writes CSV summaries:
+  - `diversity_summary.csv`  
+  - `tf_coverage_summary.csv`  
+  - `summary_metrics.csv`
+
+- **`plot_helpers.py`**  
+  Optional diagnostic plots:
+  - TF frequency barplot  
+  - Occupancy heatmaps  
+  - Motif‑length density  
+  - Positional occupancy histograms  
+  - Lorenz (Gini) curves  
+  - Jaccard dissimilarity histogram  
+
+- **`by_cluster.py`**  
+  Computes metrics per Leiden cluster of sequences, producing a characterization scatter plot. This modules expects an input `.pt` file which has already been passed through the **clustering** pipeline, where each entry receives a cluster ID.

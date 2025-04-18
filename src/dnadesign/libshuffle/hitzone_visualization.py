@@ -52,9 +52,9 @@ def plot_hitzone_details(subsamples, sequences, config, output_dir, run_info):
     bm_cfg = config.get("billboard_metric", {})
     core_keys = bm_cfg.get("core_metrics", [])
     try:
-        me_idx = core_keys.index("median_tf_entropy")
+        me_idx = core_keys.index("min_tf_entropy")
     except ValueError:
-        raise ValueError("`median_tf_entropy` must be listed in billboard_metric/core_metrics")
+        raise ValueError("`min_tf_entropy` must be listed in billboard_metric/core_metrics")
 
     y_vals = []
     clusters = []
@@ -86,15 +86,15 @@ def plot_hitzone_details(subsamples, sequences, config, output_dir, run_info):
     # show ticks but no labels
     ax.set_xticks(np.arange(len(y_sorted)))
     ax.set_xticklabels([""] * len(y_sorted))
-    ax.set_xlabel("Sublibrary (ranked by median_tf_entropy)")
-    ax.set_ylabel("median_tf_entropy")
-    ax.set_title("Hit‑zone subsamples: median_tf_entropy vs. Unique Cluster Count")
+    ax.set_xlabel("Sublibrary (ranked by min_tf_entropy)")
+    ax.set_ylabel("min_tf_entropy")
+    ax.set_title("Hit‑zone subsamples: min_tf_entropy vs. Unique Cluster Count")
     sns.despine(ax=ax, top=True, right=True)
     cbar = fig.colorbar(sc, ax=ax)
     cbar.set_label("Unique Cluster Count")
     plt.tight_layout()
 
-    scatter_path = os.path.join(output_dir, "hitzone_scatter_median_tf_entropy.png")
+    scatter_path = os.path.join(output_dir, "hitzone_scatter_min_tf_entropy.png")
     dpi = config.get("plot", {}).get("dpi", 600)
     fig.savefig(scatter_path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)

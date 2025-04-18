@@ -92,8 +92,7 @@ libshuffle:
       - min_jaccard_dissimilarity
       - min_tf_entropy
       - min_motif_string_levenshtein
-      - nw_similarity
-      - nw_dissimilarity
+      # - nw_dissimilarity
     weights: {}
   joint_selection:
     method: "x_only"          # Options: "null", "x_only", "both"
