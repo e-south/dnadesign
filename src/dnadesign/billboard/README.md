@@ -116,7 +116,7 @@ $$
 D_{ij}
 = 1 \;-\; \frac{\lvert T_i \cap T_j\rvert}{\lvert T_i \cup T_j\rvert}
 \quad,\quad
-\min_{i<j} D_{ij}
+\min_{i<j} D_{ij}\
 $$
 
 where \(T_i\) and \(T_j\) are the TF sets of sequences \(i\) and \(j\).

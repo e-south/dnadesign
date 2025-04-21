@@ -72,51 +72,58 @@ latdna:
 
 
 libshuffle:
-  input_pt_path: sequences/densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_M9_gluc_ace_top20_n10000_60bp
-  output_dir_prefix: 60bp_test_test        # Used for naming the batch results directory
-  save_selected_pt: true                         # If true, save selected subsample .pt files in batch results
-  subsample_size: 16                             # Default subsample size
-  num_draws: 10000                               # Number of subsampling iterations
-  with_replacement: false
+  # I/O paths
+  input_pt_path: "densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_M9_gluc_ace_top20_n10000_60bp"    # Directory with exactly one .pt
+  output_dir_prefix: "my_run2"                    # batch_results/<prefix>_YYYYMMDD
+  subsample_size: 16
+  num_draws: 10000
   random_seed: 42
+  with_replacement: false
   max_attempts_per_draw: 10
-  evo2_metric:
-    type: "cosine"                               # Options: "l2", "log1p_l2", "cosine"
-  billboard_metric:
-    composite_score: true                    # true: compute composite; false: use a single raw metric
-    method: "percentile_avg"                     # Options: "zscore_pca", "minmax_weighted", "cds", "percentile_avg", "inverse_rank_sum"
-    normalize: "null"                            # Options: "zscore", "minmax", or null (if no normalization)
-    core_metrics:
-      - tf_richness
-      - 1_minus_gini
-      - min_jaccard_dissimilarity
-      - min_tf_entropy
-      - min_motif_string_levenshtein
-      # - nw_dissimilarity
-    weights: {}
-  joint_selection:
-    method: "x_only"          # Options: "null", "x_only", "both"
-    threshold_x_mode: "iqr"   # or "percentile"
-    threshold_x_value: 1.5    # e.g. 1.5 means 1.5×IQR, or 75 means 75th percentile
-    threshold_y_mode: "percentile"
-    threshold_y_value: 75
-    selected_subsample_ids: [ "sublibrary_319", "sublibrary_881" ]
+  evo2_metric_type: "cosine"                     # "l2", "log1p_l2", or "cosine"
+  literal_filters:
+    - "jaccard"
+    - "levenshtein"
+  selection:
+    method: "max_min_latent"
+    latent_threshold:
+      type: "iqr"
+      factor: 1.5
+  billboard_core_metrics:
+    - tf_richness
+    - 1_minus_gini
+    - min_jaccard_dissimilarity
+    - min_tf_entropy
+    - min_motif_string_levenshtein
+    - min_nw_dissimilarity
+  # Which subsamples to save (IDs), in addition to the winner
+  save_selected: true
+  save_sublibraries: []                            # e.g. ["s_0001", "s_0010"]
   plot:
-    base_color: "gray"                           # Base color for non-filtered points (unused in threshold modes)
-    highlight_color: "red"                       # Color for threshold-passing points (determined by unique cluster count)
-    alpha: 0.25                                  # Default alpha for points
-    hit_zone_alpha: 0.5                          # Alpha for points in the hit zone
-    non_hit_zone_alpha: 0.2                      # Alpha for points outside the hit zone
-    dpi: 600
-    filename: scatter_summary.png
-    size_by_cluster: true                        # If true, marker size scales by unique cluster count
-    size_multiplier: 50                          # Multiplier for sizing by cluster count (ignored if marker_size is set)
-    marker_size: 15                              # Constant marker size (overrides size_by_cluster)
-    log_transform: false                         # When true, applies log₂ transformation to the y-axis
-    annotate_x_threshold: false                   # If true, annotate points exceeding the x threshold with numeric suffix
-    y_axis_metric: "log1p_euclidean"             # Options: "billboard", "euclidean", "log1p_euclidean"
-    figure_size: [7, 5]         # override default figure size
-
+    scatter:
+      x: "mean_cosine"
+      y: "log1p_mean_euclidean"
+      # x: "mean_cosine"
+      # y: "log1p_mean_euclidean"
+      threshold_line: true
+      threshold:
+        type: "iqr"
+        factor: 1.5
+      colors:
+        base: gray
+        literal_drop:
+          jaccard: lightcoral
+          levenshtein: red
+        winner: limegreen
+      annotate_winner: true
+      annotate_ids: true
+      figsize: [6, 6]
+    kde:
+      figsize: [6, 6]
+    pairplot:
+      figsize: [10, 10]
+    hitzone:
+      figsize: [4, 6]
 
 
 billboard:
@@ -138,6 +145,7 @@ billboard:
     - min_jaccard_dissimilarity
     - min_tf_entropy
     - min_motif_string_levenshtein
+    - min_nw_dissimilarity
 
   motif_string_levenshtein:
     tf_penalty: 1.0

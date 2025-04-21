@@ -29,6 +29,7 @@ import warnings
 import Levenshtein
 from scipy.stats import entropy as scipy_entropy
 
+from dnadesign.aligner.metrics import compute_alignment_scores
 
 # set up module‐level logger
 logger = logging.getLogger(__name__)
@@ -397,10 +398,37 @@ def compute_min_motif_string_levenshtein(results, cfg):
     return 0.0 if best == float("inf") else best
 
 
-def compute_core_metrics(results, cfg):
+def compute_min_nw_dissimilarity(results: dict, cfg: dict) -> float | None:
+    """
+    Compute the *minimum* pairwise Needleman–Wunsch dissimilarity
+    (1 - normalized similarity) across all sequences.
+
+    If skip_aligner_call is True in cfg, returns None.
+    """
+    if cfg.get("skip_aligner_call", False):
+        return None
+
+    seqs = [s["sequence"] for s in results["sequences"]]
+    # get the condensed vector of *normalized* similarities
+    out = compute_alignment_scores(
+        sequences=seqs,
+        sequence_key="sequence",
+        return_formats=("condensed",),
+        normalize=True,
+        return_dissimilarity=False,
+        verbose=False
+    )
+    # compute_alignment_scores returns a dict if return_formats != ("mean",)
+    sims = out["condensed"] if isinstance(out, dict) else np.asarray(out)
+    if sims.size == 0:
+        return 0.0
+    diss = 1.0 - sims
+    return float(np.min(diss))
+
+
+def compute_core_metrics(results: dict, cfg: dict) -> dict:
     """
     Dispatch to each metric implementation based on cfg["diversity_metrics"].
-    Returns a dict metric_name → value.
     """
     mapping = {
         "tf_richness": compute_tf_richness,
@@ -408,12 +436,13 @@ def compute_core_metrics(results, cfg):
         "min_jaccard_dissimilarity": compute_min_jaccard_dissimilarity,
         "min_tf_entropy": compute_min_tf_entropy,
         "min_motif_string_levenshtein": compute_min_motif_string_levenshtein,
+        "min_nw_dissimilarity": compute_min_nw_dissimilarity,
     }
 
     out = {}
     for m in cfg["diversity_metrics"]:
-        assert m in mapping, f"Unknown metric '{m}'"
+        if m not in mapping:
+            raise KeyError(f"Unknown metric '{m}' in diversity_metrics")
         out[m] = mapping[m](results, cfg)
-        logger.info(f"Metric {m}: {out[m]:.4f}")
-
+        logger.info(f"Metric {m}: {out[m]}")
     return out
