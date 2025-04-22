@@ -74,7 +74,7 @@ latdna:
 libshuffle:
   # I/O paths
   input_pt_path: "densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_M9_gluc_ace_top20_n10000_60bp"    # Directory with exactly one .pt
-  output_dir_prefix: "my_run2"                    # batch_results/<prefix>_YYYYMMDD
+  output_dir_prefix: "acetate_60bp_draft"                    # batch_results/<prefix>_YYYYMMDD
   subsample_size: 16
   num_draws: 10000
   random_seed: 42
@@ -105,25 +105,29 @@ libshuffle:
       y: "log1p_mean_euclidean"
       # x: "mean_cosine"
       # y: "log1p_mean_euclidean"
+      low_alpha: 0.25
+      high_alpha: 0.45
       threshold_line: true
       threshold:
         type: "iqr"
         factor: 1.5
       colors:
-        base: gray
+        base: purple
         literal_drop:
-          jaccard: lightcoral
+          jaccard: orange
           levenshtein: red
-        winner: limegreen
+          literal: red
+        cluster_drop: orange
+        winner: purple
       annotate_winner: true
       annotate_ids: true
-      figsize: [6, 6]
+      figsize: [5, 5]
     kde:
-      figsize: [6, 6]
+      figsize: [5, 5]
     pairplot:
-      figsize: [10, 10]
+      figsize: [8, 8]
     hitzone:
-      figsize: [4, 6]
+      figsize: [3, 6]
 
 
 billboard:
@@ -246,7 +250,7 @@ clustering:
   batch_name: "60bp_acetate"
   input_sources:
     # - dir: "densebatch_test"
-    # - dir: "sub319"
+    - dir: "sub6793"
     - dir: densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_M9_gluc_ace_top20_n10000_60bp
     # - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_monotypic_ArcA_n2500"
     # - dir: "densebatch_deg2tfbs_pipeline_tfbsfetcher_monotypic_CRP_n2500"
@@ -271,7 +275,7 @@ clustering:
     # Instead, use background_alpha and background_size for background points,
     # and highlight_alpha and highlight_size for highlight points.
     hue:
-      method: "intra_pairwise_similarity"              # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", highlight", "type", "intra_pairwise_similarity"
+      method: "highlight"              # Options: "leiden", "gc_content", "seq_length", "numeric", "input_source", "highlight", "type", "intra_pairwise_similarity"
       numeric_hue: None
       normalization: "robust"                       
       background_alpha: 0.05
@@ -280,7 +284,7 @@ clustering:
       highlight_size: 16.0
       # highlight_dirs must be a subset of input_sources.
       highlight_dirs:
-        - "sub319"
+        - "sub6793"
   output_prefix: "clusterbatch_"
   analysis:
     cluster_composition: true

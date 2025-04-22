@@ -36,65 +36,156 @@ class Plotter:
 
     def plot_scatter(self, subs, winner, outdir):
         pc = self.cfg.plot.scatter
-        low_alpha, high_alpha = 0.25, 0.45
+        low_a, high_a = pc.low_alpha, pc.high_alpha
 
-        # 1) extract mean_cosine & log1p(mean_euclidean)
-        x     = np.array([s['mean_cosine']       for s in subs], dtype=float)
-        y_euc = np.log1p(np.array([s['mean_euclidean'] for s in subs], dtype=float))
-
-        # 2) threshold
+        x = np.array([s['mean_cosine'] for s in subs], dtype=float)
+        y = np.log1p(np.array([s['mean_euclidean'] for s in subs], dtype=float))
         thr = self.compute_threshold(x[~np.isnan(x)], pc.threshold)
         self.log.info(f"Scatter threshold (mean_cosine): {thr:.3e}")
+        passed = {i for i,m in enumerate(x) if not np.isnan(m) and m >= thr}
 
-        # 3) survivors
-        survivors = {
-            i for i, s in enumerate(subs)
-            if x[i] >= thr
-            and s['raw_billboard'].get('min_jaccard_dissimilarity',1) > 0
-            and s['raw_billboard'].get('min_motif_string_levenshtein',1) > 0
-        }
-        self.log.info(f"Scatter survivors count: {len(survivors)}")
-
-        # 4) plot
         fig, ax = plt.subplots(figsize=pc.figsize)
-        for i, (xi, yi, s) in enumerate(zip(x, y_euc, subs)):
+        for i, (xi, yi, s) in enumerate(zip(x, y, subs)):
             bb = s['raw_billboard']
-            if bb['min_jaccard_dissimilarity'] == 0:
-                c = pc.colors['literal_drop']['jaccard']
-            elif bb['min_motif_string_levenshtein'] == 0:
-                c = pc.colors['literal_drop']['levenshtein']
+            if i not in passed:
+                # de-emphasized
+                ax.scatter(xi, yi, color='lightgray', alpha=low_a, edgecolor='none')
             else:
-                c = pc.colors['base']
-            alpha = high_alpha if i in survivors else low_alpha
-            ax.scatter(xi, yi, color=c, alpha=alpha, edgecolor='none')
+                # consolidate literal flags
+                is_literal = (
+                    bb.get('min_jaccard_dissimilarity', 1) == 0
+                    or bb.get('min_motif_string_levenshtein', 1) == 0
+                )
+                if is_literal:
+                    c = pc.colors['literal_drop']['literal']
+                elif s.get('unique_cluster_count', 0) != self.cfg.subsample_size:
+                    c = pc.colors['cluster_drop']
+                else:
+                    c = pc.colors['base']
+                ax.scatter(xi, yi, color=c, alpha=high_a, edgecolor='none')
 
-        # 5) threshold line
         if pc.threshold_line:
             ax.axvline(thr, ls='--', c=pc.colors.get('threshold_line','lightgray'))
 
-        # 6) star the overall winner
+        # annotate winner
         widx = next(i for i,s in enumerate(subs) if s['subsample_id']==winner['subsample_id'])
-        wx, wy = x[widx], y_euc[widx]
-        ax.scatter(wx, wy, c=pc.colors['winner'], marker='*', s=200)
+        wx, wy = x[widx], y[widx]
+        ax.scatter(wx, wy,
+                   c=pc.colors['winner'],
+                   marker='*',
+                   s=pc.star_size,
+                   edgecolor='none',
+                   zorder=3)
         ax.text(wx, wy, winner['subsample_id'], fontsize=8, va='bottom', ha='right')
-        self.log.info(f"Scatter annotated winner: {winner['subsample_id']} "
-                      f"(cos={wx:.3e}, log1p_mean_euc={wy:.3f})")
 
-        # 7) legend & labels
         legend_elems = [
-            Patch(facecolor=pc.colors['base'],                label='Base',           alpha=low_alpha),
-            Patch(facecolor=pc.colors['literal_drop']['jaccard'],    label='Jaccard drop',   alpha=low_alpha),
-            Patch(facecolor=pc.colors['literal_drop']['levenshtein'],label='Levenshtein drop',alpha=low_alpha),
-            Patch(facecolor=pc.colors['base'],                label='Hitzone',        alpha=high_alpha),
+            Patch(facecolor=pc.colors['base'],                label='Passed',             alpha=high_a),
+            Patch(facecolor=pc.colors['literal_drop']['literal'], label='Literal flagged',    alpha=high_a),
+            Patch(facecolor=pc.colors['cluster_drop'],        label='Leiden flagged',     alpha=high_a),
         ]
         ax.legend(handles=legend_elems, frameon=False, loc='lower right')
+
         ax.set_xlabel("Average Pairwise Cosine Dissimilarity (1 - cosθ)")
         ax.set_ylabel("Average Pairwise log1p E-dist")
-        ax.set_title("Subsample Diversity (Scatter)")
+        ax.set_title("Angular vs. Euclidean Diversity: All 16-member Subsamples")
         sns.despine(ax=ax)
 
         fig.savefig(outdir/"scatter_summary.png", dpi=pc.dpi, bbox_inches='tight')
         plt.close(fig)
+
+
+    def plot_flag_composition(self, subs, outdir):
+        pc = self.cfg.plot.scatter
+        low_a, high_a = pc.low_alpha, pc.high_alpha
+
+        x = np.array([s['mean_cosine'] for s in subs], dtype=float)
+        thr = self.compute_threshold(x[~np.isnan(x)], pc.threshold)
+        filtered = [s for i,s in enumerate(subs) if x[i]>=thr]
+
+        counts = {'Passed':0, 'Literal flagged':0, 'Leiden flagged':0}
+        for s in filtered:
+            bb = s['raw_billboard']
+            if bb.get('min_jaccard_dissimilarity',1)==0 or bb.get('min_motif_string_levenshtein',1)==0:
+                counts['Literal flagged'] += 1
+            elif s.get('unique_cluster_count',0)!= self.cfg.subsample_size:
+                counts['Leiden flagged'] += 1
+            else:
+                counts['Passed'] += 1
+
+        fig, ax = plt.subplots(figsize=(3,6))
+        bottom = 0
+        for label, color_key in [
+            ('Passed','base'),
+            ('Literal flagged',('literal_drop','literal')),
+            ('Leiden flagged','cluster_drop'),
+        ]:
+            if isinstance(color_key, tuple):
+                col = pc.colors[color_key[0]][color_key[1]]
+            else:
+                col = pc.colors[color_key]
+            ax.bar('Subsamples', counts[label], bottom=bottom, label=label, color=col, alpha=high_a)
+            bottom += counts[label]
+
+        ax.set_xlabel("IQR-Filtered Subsamples")
+        ax.set_ylabel("Count")
+        ax.set_title("Composition of IQR-Filtered Subsamples")
+        ax.legend(frameon=False, bbox_to_anchor=(1,1))
+        sns.despine(ax=ax)
+
+        fig.savefig(outdir/"flag_composition.png", dpi=pc.dpi, bbox_inches='tight')
+        plt.close(fig)
+
+
+    def plot_hitzone(self, subs, winner, outdir):
+        pc = self.cfg.plot.scatter
+        low_a, high_a = pc.low_alpha, pc.high_alpha
+        hc = self.cfg.plot.hitzone
+
+        x = np.array([s['mean_cosine'] for s in subs], dtype=float)
+        thr = self.compute_threshold(x[~np.isnan(x)], pc.threshold)
+        hits = [(i, np.log1p(s['min_euclidean']), s) for i,s in enumerate(subs) if x[i]>=thr]
+        if not hits:
+            return
+
+        hits_sorted = sorted(hits, key=lambda t: t[1])
+
+        fig, ax = plt.subplots(figsize=hc.figsize)
+        for pos,(i,yi,s) in enumerate(hits_sorted):
+            bb = s['raw_billboard']
+            is_literal = (
+                bb.get('min_jaccard_dissimilarity',1) == 0
+                or bb.get('min_motif_string_levenshtein',1) == 0
+            )
+            if is_literal:
+                c = pc.colors['literal_drop']['literal']
+            elif s.get('unique_cluster_count',0)!= self.cfg.subsample_size:
+                c = pc.colors['cluster_drop']
+            else:
+                c = pc.colors['base']
+            ax.scatter(pos, yi, color=c, alpha=high_a, edgecolor='none')
+
+        widx = next(i for i,s in enumerate(subs) if s['subsample_id']==winner['subsample_id'])
+        for pos,(i,yi,_) in enumerate(hits_sorted):
+            if i==widx:
+                ax.scatter(pos, yi, c=pc.colors['winner'], marker='*', s=pc.star_size, zorder=3)
+                ax.text(pos, yi, winner['subsample_id'], fontsize=8, va='bottom', ha='right')
+                break
+
+        ax.set_xticks([])
+        ax.set_xlabel("Subsample ID")
+        ax.set_ylabel("Min Pairwise E-dist (log1p)")
+        ax.set_title("Outlier Ranking by Minimum Euclidean Gap")
+        legend_elems = [
+            Patch(facecolor=pc.colors['base'],                label='Passed',             alpha=high_a),
+            Patch(facecolor=pc.colors['literal_drop']['literal'], label='Literal flagged',    alpha=high_a),
+            Patch(facecolor=pc.colors['cluster_drop'],        label='Leiden flagged',     alpha=high_a),
+        ]
+        ax.legend(handles=legend_elems, frameon=False, loc='upper left')
+        sns.despine(ax=ax)
+
+        fig.savefig(outdir/"hitzone_summary.png", dpi=hc.dpi, bbox_inches='tight')
+        plt.close(fig)
+
 
     def plot_kde(self, subs, outdir):
         kc   = self.cfg.plot.kde
@@ -113,9 +204,8 @@ class Plotter:
         fig.savefig(outdir/"kde_coremetrics_raw.png", dpi=kc.dpi, bbox_inches='tight')
         plt.close(fig)
 
-        # Z‑score
         df['Z'] = df.groupby('Metric')['Value'].transform(
-            lambda x: (x - x.mean()) / x.std(ddof=1) if x.std(ddof=1)>0 else 0
+            lambda x: (x - x.mean()) / x.std(ddof=1) if x.std(ddof=1) > 0 else 0
         )
         fig, ax = plt.subplots(figsize=kc.figsize)
         sns.kdeplot(data=df, x='Z', hue='Metric', common_norm=False, warn_singular=False, ax=ax)
@@ -124,6 +214,7 @@ class Plotter:
         fig.savefig(outdir/"kde_coremetrics_zscore.png", dpi=kc.dpi, bbox_inches='tight')
         plt.close(fig)
 
+
     def plot_pairplot(self, subs, outdir):
         pp = self.cfg.plot.pairplot
         rows = []
@@ -131,13 +222,13 @@ class Plotter:
             bb = s['raw_billboard']
             row = {m: bb.get(m, np.nan) for m in self.cfg.billboard_core_metrics}
             row.update({
-                'mean_cosine':        s.get('mean_cosine', np.nan),
-                'min_cosine':         s.get('min_cosine', np.nan),
-                'mean_euclidean':     s.get('mean_euclidean', np.nan),
-                'min_euclidean':      s.get('min_euclidean', np.nan),
-                'log1p_mean_euclidean': math.log1p(s.get('mean_euclidean',0)),
-                'log1p_min_euclidean':  math.log1p(s.get('min_euclidean',0)),
-                'unique_cluster_count': s.get('unique_cluster_count',np.nan),
+                'mean_cosine':         s.get('mean_cosine', np.nan),
+                'min_cosine':          s.get('min_cosine', np.nan),
+                'mean_euclidean':      s.get('mean_euclidean', np.nan),
+                'min_euclidean':       s.get('min_euclidean', np.nan),
+                'log1p_mean_euclidean': math.log1p(s.get('mean_euclidean', 0)),
+                'log1p_min_euclidean':  math.log1p(s.get('min_euclidean', 0)),
+                'unique_cluster_count': s.get('unique_cluster_count', np.nan),
             })
             rows.append(row)
 
@@ -153,69 +244,10 @@ class Plotter:
         if df_sub.shape[1] < 2:
             return
 
-        g = sns.pairplot(df_sub, corner=True, diag_kind='kde', plot_kws={'alpha':0.6,'s':20})
+        g = sns.pairplot(df_sub, corner=True, diag_kind='kde', plot_kws={'alpha': 0.6, 's': 20})
         g.fig.suptitle("Pairwise Scatter of Core + Evo2 Metrics", y=1.02)
         for ax in g.axes.flatten():
             if ax is not None:
                 sns.despine(ax=ax)
         g.fig.savefig(outdir/"pairplot_coremetrics.png", dpi=pp.dpi, bbox_inches='tight')
         plt.close(g.fig)
-
-    def plot_hitzone(self, subs, winner, outdir):
-        pc = self.cfg.plot.scatter
-        hc = self.cfg.plot.hitzone
-
-        # 1) reuse mean_cosine & same threshold
-        x   = np.array([s['mean_cosine'] for s in subs], dtype=float)
-        thr = self.compute_threshold(x[~np.isnan(x)], pc.threshold)
-        self.log.info(f"Hitzone threshold (mean_cosine): {thr:.3e}")
-
-        # 2) compute log1p(min_euclidean)
-        y_min = np.log1p(np.array([s['min_euclidean'] for s in subs], dtype=float))
-
-        # 3) collect ALL hits with x ≥ thr
-        hits = [(i, y_min[i], s) for i, s in enumerate(subs) if x[i] >= thr]
-        self.log.info(f"Hitzone total hits (x ≥ thr): {len(hits)}")
-        if not hits:
-            return
-
-        # 4) sort by ascending y_min → assign x‑axis positions
-        hits_sorted = sorted(hits, key=lambda t: t[1])
-
-        # 5) plot each with the same hue logic
-        fig, ax = plt.subplots(figsize=hc.figsize)
-        for xpos, (i, yi, s) in enumerate(hits_sorted):
-            bb = s['raw_billboard']
-            if bb.get('min_jaccard_dissimilarity',0) == 0:
-                c = pc.colors['literal_drop']['jaccard']
-            elif bb.get('min_motif_string_levenshtein',0) == 0:
-                c = pc.colors['literal_drop']['levenshtein']
-            else:
-                c = pc.colors['base']
-            ax.scatter(xpos, yi, color=c, alpha=1.0, edgecolor='none')
-
-        # 6) annotate the same overall winner
-        #    only if that winner is in this hit‑zone
-        winner_idx = next((i for i,s in enumerate(subs) if s['subsample_id']==winner['subsample_id']), None)
-        if winner_idx is not None and any(i==winner_idx for i,_,_ in hits_sorted):
-            # find its sorted position
-            best_pos = next(pos for pos, (i,_,_) in enumerate(hits_sorted) if i==winner_idx)
-            best_y   = y_min[winner_idx]
-            ax.scatter(best_pos, best_y, c=pc.colors['winner'], marker='*', s=200)
-            ax.text(best_pos, best_y, winner['subsample_id'],
-                    fontsize=8, va='bottom', ha='right')
-            self.log.info(f"Hitzone annotated winner: {winner['subsample_id']} "
-                          f"(rank={best_pos}, log1p_min_euc={best_y:.3f})")
-        else:
-            self.log.warning("Winner not in hit-zone or no non-literal-drop survivor to annotate.")
-
-        # 7) finalize styling
-        ax.set_xticks(range(len(hits_sorted)))
-        ax.set_xticklabels([''] * len(hits_sorted))
-        ax.set_xlabel('Subsample (ranked by log1p min-E-dist)')
-        ax.set_ylabel('Log1p Min Pairwise Euclidean')
-        ax.set_title('Hit-zone: Log1p Min Euclidean Dissimilarity')
-        sns.despine(ax=ax)
-
-        fig.savefig(outdir/'hitzone_summary.png', dpi=hc.dpi, bbox_inches='tight')
-        plt.close(fig)

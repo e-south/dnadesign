@@ -9,7 +9,6 @@ Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
-
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, List, Literal, Dict
@@ -29,13 +28,17 @@ class SelectionConfig:
 class ScatterConfig:
     x: str = 'mean_cosine'
     y: str = 'log1p_euclidean'
+    low_alpha: float = 0.25
+    high_alpha: float = 0.45
+    star_size: int = 100
     threshold_line: bool = True
     threshold: LatentThreshold = field(default_factory=LatentThreshold)
     colors: Dict[str, Any] = field(default_factory=lambda: {
-        'base': 'gray',
-        'literal_drop': {'jaccard': 'lightcoral', 'levenshtein': 'red'},
+        'base': 'purple',
+        'literal_drop': {'jaccard': 'orange', 'levenshtein': 'red', 'literal': 'red'},
         'winner': 'limegreen',
         'threshold_line': 'lightgray',
+        'cluster_drop': "gray"
     })
     annotate_winner: bool = True
     annotate_ids: bool = True
@@ -60,7 +63,7 @@ class HitzoneConfig:
 @dataclass
 class PlotConfig:
     scatter: ScatterConfig = field(default_factory=ScatterConfig)
-    kde: KDEConfig     = field(default_factory=KDEConfig)
+    kde: KDEConfig       = field(default_factory=KDEConfig)
     pairplot: PairplotConfig = field(default_factory=PairplotConfig)
     hitzone: HitzoneConfig   = field(default_factory=HitzoneConfig)
 
@@ -78,7 +81,6 @@ class LibShuffleConfig:
     evo2_metric_type: Literal['l2','log1p_l2','cosine'] = 'cosine'
 
     literal_filters: List[Literal['jaccard','levenshtein']] = field(default_factory=lambda: ['jaccard','levenshtein'])
-
     selection: SelectionConfig = field(default_factory=SelectionConfig)
     billboard_core_metrics: List[str] = field(default_factory=list)
 
@@ -86,17 +88,16 @@ class LibShuffleConfig:
     save_sublibraries: List[str] = field(default_factory=list)
 
     plot: PlotConfig = field(default_factory=PlotConfig)
-
     _raw: Dict[str, Any] = field(default_factory=dict, repr=False)
 
     @classmethod
     def load(cls, path: Any) -> 'LibShuffleConfig':
-        raw = None
+        # read YAML
         p = Path(path)
         if p.exists():
             raw_all = yaml.safe_load(p.read_text())
         else:
-            # search upward for 'path'
+            # search upward
             for anc in Path(__file__).resolve().parents:
                 candidate = anc / path
                 if candidate.exists():
@@ -104,14 +105,17 @@ class LibShuffleConfig:
                     break
             else:
                 raise FileNotFoundError(f"Config file not found: {path}")
+
         if 'libshuffle' not in raw_all:
             raise KeyError("Top-level 'libshuffle' key missing in config.")
         raw = raw_all['libshuffle']
+
         # required keys
         for k in ['input_pt_path','output_dir_prefix','billboard_core_metrics','selection']:
             if k not in raw:
                 raise KeyError(f"Missing required config key: {k}")
-        # build defaults
+
+        # default instance for fallback values
         default = cls(input_pt_path=Path('.'), output_dir_prefix='.')
         cfg: Dict[str, Any] = {
             'input_pt_path': Path(raw['input_pt_path']),
@@ -127,28 +131,37 @@ class LibShuffleConfig:
             'save_selected': raw.get('save_selected', default.save_selected),
             'save_sublibraries': raw.get('save_sublibraries', default.save_sublibraries),
         }
-        # selection
+
+        # selection config
         sel = raw['selection']
         cfg['selection'] = SelectionConfig(
             method=sel['method'],
             latent_threshold=LatentThreshold(**sel.get('latent_threshold', {}))
         )
-        # deep-merge helper
-        def deep_merge(dflt: dict, override: dict) -> dict:
-            merged = dflt.copy()
-            for key,val in override.items():
-                if isinstance(val, dict) and key in merged and isinstance(merged[key], dict):
-                    merged[key] = deep_merge(merged[key], val)
+
+        # helper to deep merge nested dicts
+        def deep_merge(base: dict, override: dict) -> dict:
+            merged = base.copy()
+            for k, v in override.items():
+                if isinstance(v, dict) and k in merged and isinstance(merged[k], dict):
+                    merged[k] = deep_merge(merged[k], v)
                 else:
-                    merged[key] = val
+                    merged[k] = v
             return merged
+
+        # plot subconfigs
         pr = raw.get('plot', {})
+
         # scatter
-        sd, rd = default.plot.scatter, pr.get('scatter', {})
+        sd = default.plot.scatter
+        rd = pr.get('scatter', {})
         colors = deep_merge(sd.colors, rd.get('colors', {}))
         scatter = ScatterConfig(
             x=rd.get('x', sd.x),
             y=rd.get('y', sd.y),
+            low_alpha=rd.get('low_alpha', sd.low_alpha),
+            high_alpha=rd.get('high_alpha', sd.high_alpha),
+            star_size=rd.get('star_size', sd.star_size),
             threshold_line=rd.get('threshold_line', sd.threshold_line),
             threshold=LatentThreshold(**rd.get('threshold', {'type': sd.threshold.type, 'factor': sd.threshold.factor})),
             colors=colors,
@@ -157,16 +170,26 @@ class LibShuffleConfig:
             figsize=rd.get('figsize', sd.figsize),
             dpi=rd.get('dpi', sd.dpi),
         )
+
         # kde
         kd, rk = default.plot.kde, pr.get('kde', {})
         kde = KDEConfig(figsize=rk.get('figsize', kd.figsize), dpi=rk.get('dpi', kd.dpi))
+
         # pairplot
         pd_, rp = default.plot.pairplot, pr.get('pairplot', {})
         pairplot = PairplotConfig(figsize=rp.get('figsize', pd_.figsize), dpi=rp.get('dpi', pd_.dpi))
+
         # hitzone
         hz, rh = default.plot.hitzone, pr.get('hitzone', {})
         hitzone = HitzoneConfig(figsize=rh.get('figsize', hz.figsize), dpi=rh.get('dpi', hz.dpi))
-        cfg['plot'] = PlotConfig(scatter=scatter, kde=kde, pairplot=pairplot, hitzone=hitzone)
+
+        cfg['plot'] = PlotConfig(
+            scatter=scatter,
+            kde=kde,
+            pairplot=pairplot,
+            hitzone=hitzone
+        )
+
         inst = cls(**cfg)
         inst._raw = raw
         return inst
