@@ -49,6 +49,7 @@ billboard:
   skip_aligner_call: true
   # Figure DPI for saved PNGs
   dpi: 300
+
   # Which metrics to compute (order doesn’t matter)
   diversity_metrics:
     - tf_richness
@@ -56,6 +57,7 @@ billboard:
     - min_jaccard_dissimilarity
     - min_tf_entropy
     - min_motif_string_levenshtein
+
   # Penalties for motif‑string Levenshtein
   motif_string_levenshtein:
     tf_penalty: 1.0
@@ -72,13 +74,10 @@ Each metric is a **single scalar** summarizing one aspect of library diversity. 
 #### **Richness** — *TF Compositional Breadth*
 
 Count of **unique** TFs placed across all sequences:
+  
+  TF_Richness = | ⋃ₛ Tₛ |
 
-  $$
-  \mathrm{TF\_Richness}
-  = \bigl|\bigcup_{s}\,T_s\bigr|
-  $$
-
-  where \(T_s\) is the set of TFs in sequence \(s\).
+  where Tₛ is the set of TFs in sequence s.
 
 > A larger TF Richness means more distinct transcription factors appear anywhere in your library—i.e., broader regulatory set.
 
@@ -90,19 +89,14 @@ Measures how evenly TFs occur across all sequences.
 
 1. Compute raw Gini:
 
-   $$
-   G
-   = \frac{\displaystyle\sum_{i=1}^n\sum_{j=1}^n \lvert f_i - f_j\rvert}
-   {2\,n\,\sum_{k=1}^n f_k}
-   $$
+    G = (∑_{i=1}ⁿ ∑_{j=1}ⁿ |fᵢ - fⱼ|) / (2 * n * ∑_{k=1}ⁿ fₖ)
+
 
 2. Invert to reward evenness:
 
-   $$
-   1 - G
-   $$
+    1 - G
 
-    where \(f_i\) is the total count of TF \(i\).
+    where fᵢ is the total count of TF i across all sequences.
 
 > Values near 1 indicate TFs are used with similar frequency (balanced usage), whereas values near 0 indicate dominance by a few TFs (unequal usage).
 
@@ -112,14 +106,12 @@ Measures how evenly TFs occur across all sequences.
 
 Find the **smallest** pairwise dissimilarity between any two sequences’ TF sets:
 
-$$
-D_{ij}
-= 1 \;-\; \frac{\lvert T_i \cap T_j\rvert}{\lvert T_i \cup T_j\rvert}
-\quad,\quad
-\min_{i<j} D_{ij}\
-$$
+  Dᵢⱼ = 1 - |Tᵢ ∩ Tⱼ| / |Tᵢ ∪ Tⱼ|
+  
+  min_over_i<j (Dᵢⱼ)
 
-where \(T_i\) and \(T_j\) are the TF sets of sequences \(i\) and \(j\).
+
+where Tᵢ and Tⱼ are the TF sets of sequences i and j.
 
 > A higher minimum dissimilarity means **every** pair of sequences differs substantially in TF composition; a zero means at least one pair is identical.
 
@@ -129,39 +121,36 @@ where \(T_i\) and \(T_j\) are the TF sets of sequences \(i\) and \(j\).
 Assess how “focused” the most localized TF is along the sequence.
 
 1. **Counts → Probabilities**  
-   - For each TF and each position (k = 1 ... L ), let p_k be its binding count on one strand (forward or reverse).  
-   - Normalize:  
-     $$
-       \hat p_k \;=\;\frac{p_k}{\sum_{i=1}^L p_i}, 
-       \quad \sum_{k=1}^L \hat p_k = 1.
-     $$
+   - Let pₖ be the binding count of a given TF at position k (forward or reverse).
+  
+    Normalize:
+
+    p̂ₖ = pₖ / (∑_{i=1}ᴸ pᵢ)    with   ∑ₖ p̂ₖ = 1
 
 2. **Entropy & Normalization**  
-   $$
-     H \;=\; -\sum_{k=1}^L \hat p_k\,\log_2\!\bigl(\hat p_k\bigr),
-     \qquad
-     H_{\mathrm{norm}} = \frac{H}{\log_2 L}\;\in[0,1].
-   $$
+    H = - ∑ₖ p̂ₖ · log₂(p̂ₖ)
+
+    H_norm = H / log₂(L)
 
 3. **Combine & Summarize**  
-   - Compute H_norm separately for forward and reverse, average them for each TF.  
-   - Report the **minimum** of these averages across all TFs.
+  - Compute H_norm for forward and reverse strands, average per TF.
+  - Take the minimum across TFs.
 
-> H_norm = 0 if a TF binds only at one spot (highly focused), and \(1\) if it binds uniformly. By taking the minimum, a low score flags that at least one TF is very localized; a high score means **every** TF is spatially diffuse.
+> `H_norm = 0` if a TF binds only at one spot (highly focused), and `1` if it binds uniformly. By taking the minimum, a low score flags that at least one TF is very localized; a high score means **every** TF is spatially diffuse.
 
 ---
 
 #### **Min Motif‑String Levenshtein** — *Sequence Architectural Diversity*
 
-1. Represent each sequence as a strand-aware, ordered token list, e.g. `["crp+", "gadX-", …]`.  
+1. Represent each sequence as a strand-aware, ordered token list, e.g.,
+    
+    ["crp+", "gadX-", ...].
+  
 2. Compute pairwise, length‑normalized Levenshtein distance:
 
-   $$
-   d_{\mathrm{norm}}(s_i, s_j)
-   = \frac{\mathrm{Levenshtein}(s_i, s_j)}{\max(|s_i|, |s_j|)}
-   $$
+    d_norm(sᵢ, sⱼ) = Levenshtein(sᵢ, sⱼ) / max(|sᵢ|, |sⱼ|)
 
-3. Report the **minimum** d_norm over all pairs.
+3. Report min_over_i<j (Dᵢⱼ) over all pairs.
 
 > A higher minimum distance indicates that even the two most similar sequences differ in motif architecture, whereas a value of zero means at least one pair shares an identical ordering of motifs derived from the same transcription factors.
 
@@ -172,18 +161,13 @@ Evaluates global sequence‐level diversity via optimal alignment.
 
 1.	Compute normalized global alignment similarity for each pair (i,j):
 
-    $$
-    S_{ij}
-    = \frac{\mathrm{NW}(s_i, s_j)}{\max(\ell_i, \ell_j)},
-    $$
+    Sᵢⱼ = NW(sᵢ, sⱼ) / max(ℓᵢ, ℓⱼ)
 
-    where NW(s_i,s_j) is the Needleman–Wunsch alignment score and l_i is the length of sequence s_i.
+    where NW(sᵢ, sⱼ) is the Needleman–Wunsch alignment score and ℓᵢ is the length of sequence sᵢ.
 
 2.	Convert to dissimilarity:
 
-    $$
-    D_{ij} = 1 - S_{ij}.
-    $$
+    Dᵢⱼ = 1 - Sᵢⱼ
 
 3.	Report the minimum (D_{ij}) over all (i<j).
 
