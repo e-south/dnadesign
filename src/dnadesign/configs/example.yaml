@@ -1,5 +1,41 @@
 # configs/example.yaml
 
+
+
+cruncher:
+  mode: parse
+  motif:                    # ← universal
+    root:  ../dnadesign-data/motifs
+    formats:                # optional override per file-ext
+      .meme: MEME
+      .pfm:  JASPAR
+    plot:
+      logo:      true
+      bits_mode: information   # or "probability"
+      dpi: 200
+  sample:                    # ← used only by `cruncher sample`
+    pairs:   [[crp, fis], [crp, ihf]]
+    optimiser:
+      kind: gibbs
+      gibbs:
+        draws: 80000
+        tune:  20000
+        beta:  2.0
+        chains: 4
+        cores: 4
+        min_dist: 4
+    top_k: 200
+    out_dir: results/
+  analysis:                  # ← used only by `cruncher analyse`
+    runs:   []               # default = MOST_RECENT batch
+    plots:
+      - score_kde
+      - scatter_pwm
+      - logo_elites
+
+
+
+
 latdna:
   mode: analysis  # Set to "analysis" when running analysis
   dry_run: false    # true for dry run (no files written)
@@ -131,11 +167,12 @@ libshuffle:
 
 
 billboard:
-  output_dir_prefix: 60bp_acetate
+  output_dir_prefix: 60bp_acetate_sub6783
   dry_run: false
   skip_aligner_call: true
   pt_files:
-    - densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_M9_gluc_ace_top20_n10000_60bp
+    # - densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_M9_gluc_ace_top20_n10000_60bp
+    - sub6793
   allow_variable_sequence_length: false
   include_fixed_elements_in_combos: false
   save_plots: true

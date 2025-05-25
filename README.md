@@ -1,4 +1,3 @@
-![Alt text](images/sequence_program_composition.png)
 # dnadesign
 
 This repository contains a collection of Python modules and bioinformatic pipelines related to DNA sequence design.
@@ -93,14 +92,13 @@ dnadesign/
 
       **latdna** is a pipeline for latent space analysis of DNA sequences. It computes pairwise distances between Evo 2 embeddings within groups of sequences using metrics such as cosine and Euclidean distance. These distances are used to characterize intra-population diversity and compare it across different sequence types, including dense arrays, natural promoters, and engineered promoters.
 
-10. [**densehairpins**](src/dnadesign/densehairpins/README.md)
+10. [**cruncher**](src/dnadesign/cruncher/README.md)
 
-      **densehairpins** is a pipeline for short dense-array design. It processes transcription factor binding site datasets, iteratively subsamples these sequences, and runs a [**dense-array**](https://github.com/e-south/dense-arrays) solver to generate short compound sequences. The pipeline then scores solutions based on compaction, sequence length, and the diversity of binding sites, and visualizes the results.
+      **cruncher** is a pipeline that parses TF position-weight matrices (MEME, JASPAR, etc.) via plug-in parsers, and then runs a discrete Categorical Gibbs optimiser (or other plug-ins) to discover short DNA sequences that score highly on one or more TFs.
 
 11. [**tfkdanalysis**](src/dnadesign/tfkdanalysis/README.md)
 
       **tfkdanalysis** is a pipeline for analyzing transcription factor knockdown (TFKD) effects using PPTP-seq (Promoter responses to TF perturbation sequencing) data—a high-throughput approach described in [Han *et al.* (2023)](https://doi.org/10.1038/s41467-023-41572-4).
-
 
 12. [**aligner**](src/dnadesign/aligner/README.md)
 
@@ -123,7 +121,7 @@ This style is appropriate for workflows that ***do not*** require heavy [dense a
 2. Install Dependencies
 
    ```bash
-   conda install pytorch torchvision torchaudio scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml leidenalg igraph openpyxl xlrd biopython tqdm python-levenshtein -c conda-forge -y
+   conda install pytorch torchvision torchaudio scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml leidenalg igraph openpyxl xlrd biopython tqdm python-levenshtein **pymc arviz logomaker typer pydantic** -c conda-forge -y
    ```
 
 3. Clone and Install the `dnadesign` Repository
