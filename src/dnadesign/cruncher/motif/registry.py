@@ -33,19 +33,28 @@ class Registry:
         if tf_key in self._cache:
             return self._cache[tf_key]
 
-        path = self._find_path(tf_key)
-        pwm = load_pwm(path)
+        path, fmtname = self._find_path(tf_key)
+        pwm  = load_pwm(path, fmt=fmtname)
         self._cache[tf_key] = pwm
         return pwm
 
     # helpers
-    def _find_path(self, tf_key: str) -> Path:
-        for ext in self.ext_map:
+    def _find_path(self, tf_key: str) -> tuple[Path, str]:
+        # exact‐match using your formats map
+        for ext, fmtname in self.ext_map.items():
             candidate = self.root / f"{tf_key}{ext}"
             if candidate.exists():
-                return candidate
-        # fallback: recursive search
-        matches = list(self.root.rglob(f"{tf_key}.*"))
-        if matches:
-            return matches[0]
-        raise FileNotFoundError(f"No PWM file found for TF '{tf_key}' under {self.root}")
+                return candidate, fmtname
+
+        # fallback: case‐insensitive stem match on any extension
+        for path in self.root.rglob("*"):
+            if path.is_file() and path.stem.lower() == tf_key:
+                fmtname = self.ext_map.get(
+                    path.suffix.lower(),
+                    path.suffix.lstrip(".").upper()
+                )
+                return path, fmtname
+
+        raise FileNotFoundError(
+            f"No PWM file found for TF '{tf_key}' under {self.root}"
+        )

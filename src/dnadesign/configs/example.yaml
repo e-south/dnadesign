@@ -1,39 +1,39 @@
 # configs/example.yaml
 
-
-
 cruncher:
-  mode: parse
-  motif:                    # ← universal
-    root:  ../dnadesign-data/motifs
-    formats:                # optional override per file-ext
-      .meme: MEME
+  mode: sample                    # parse | sample | analyse
+  out_dir: results/               # where all outputs land
+  regulator_sets:                 # list of regulator sets to use   
+    - [cpxR, soxR]                # set #1: two TFs
+    # - [crp, fis, ihf]           # set #2: three TFs
+  motif:                          # parse-specific config
+    formats:
+      .txt: MEME
       .pfm:  JASPAR
     plot:
       logo:      true
-      bits_mode: information   # or "probability"
-      dpi: 200
-  sample:                    # ← used only by `cruncher sample`
-    pairs:   [[crp, fis], [crp, ihf]]
+      bits_mode: information
+      dpi:       200
+  sample:                         # sample-specific config   
+    init: 
+      kind: consensus_longest                  # random | consensus_shortest | consensus_longest | 30
+      pad_with: background          # or a fixed base like "N" or user‐supplied nucleotide frequencies
     optimiser:
       kind: gibbs
       gibbs:
-        draws: 80000
-        tune:  20000
-        beta:  2.0
-        chains: 4
-        cores: 4
+        draws:    80000
+        tune:     20000
+        beta:     2.0
+        chains:   4
+        cores:    4
         min_dist: 4
     top_k: 200
-    out_dir: results/
-  analysis:                  # ← used only by `cruncher analyse`
-    runs:   []               # default = MOST_RECENT batch
+  analysis:                       # analysis-specific config
+    runs: []                      # default = most recent sample
     plots:
       - score_kde
       - scatter_pwm
       - logo_elites
-
-
 
 
 latdna:

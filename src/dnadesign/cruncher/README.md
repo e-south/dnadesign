@@ -28,7 +28,7 @@ dnadesign/
 ├─ configs/            # your YAMLs (examples inside)
 └─ cruncher/
    ├─ motif/           # PWM dataclass + plug-in parsers
-   ├─ overlap/         # state, scorer, optimisers (Gibbs, SA, …)
+   ├─ sample/         # state, scorer, optimisers (Gibbs, SA, …)
    ├─ plots/           # PSSM logos + MCMC diagnostics
    ├─ persistence/     # save/load csv, trace.nc, etc.
    └─ results/         # auto-created batch folders
@@ -37,27 +37,36 @@ dnadesign/
 #### Minimal config
 
 ```yaml
-motif:
-  root:   ../dnadesign-data/motifs          # dir with *.meme / *.pfm / …
-  plot:
-    logo:      true
-    bits_mode: information                  # (or "probability")
-    dpi:       200
-
-sample:
-  pairs:   [[crp, fis], [crp, ihf]]         # TF pairs to optimise
-  optimiser:
-    kind: gibbs
-    gibbs:
-      draws:  80000
-      beta:   2.0
-      min_dist: 4
-  top_k:   200
-  out_dir: results/
-
-analysis:
-  runs:   []                                # [] = most-recent batch
-  plots:  [score_kde, scatter_pwm, logo_elites]
+cruncher:
+  mode: parse                     # parse | sample | analyse
+  out_dir: results/               # where all outputs land
+  regulator_sets:                 # list of regulator sets to use   
+    - [cpxR, soxR]                # set #1: two TFs
+  motif:                          # parse-specific config
+    formats:
+      .txt: MEME
+      .pfm:  JASPAR
+    plot:
+      logo:      true
+      bits_mode: information
+      dpi:       200
+  sample:                         # sample-specific config   
+    optimiser:
+      kind: gibbs
+      gibbs:
+        draws:    80000
+        tune:     20000
+        beta:     2.0
+        chains:   4
+        cores:    4
+        min_dist: 4
+    top_k: 200
+  analysis:                       # analysis-specific config
+    runs: []                      # default = most recent sample
+    plots:
+      - score_kde
+      - scatter_pwm
+      - logo_elites
 ```
 
 ---

@@ -3,11 +3,6 @@
 <dnadesign project>
 cruncher/config.py
 
-Typed YAML → Pydantic models for cruncher.
-Now includes optional `sample` and `analysis` dictionaries so that
-`cfg.sample` / `cfg.analysis` are still available even if we don't model
-them in detail yet.
-
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
@@ -15,42 +10,52 @@ Dunlop Lab
 
 from __future__ import annotations
 from pathlib import Path
-from typing import Dict, Literal, Optional
-
+from typing import Dict, List, Literal, Optional, Union
 import yaml
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel
 
+class PlotConfig(BaseModel):
+    logo: bool
+    bits_mode: Literal["information", "probability"]
+    dpi: int
 
-# motif block
-class MotifPlotCfg(BaseModel):
-    logo: bool = True
-    bits_mode: Literal["probability", "information"] = "information"
-    dpi: int = 200
+class MotifConfig(BaseModel):
+    formats: Dict[str, str]
+    plot: PlotConfig
 
+class GibbsConfig(BaseModel):
+    draws: int
+    tune: int
+    beta: float
+    chains: int
+    cores: int
+    min_dist: int
 
-class MotifCfg(BaseModel):
-    root: Path
-    formats: Dict[str, str] = Field(
-        default_factory=lambda: {".meme": "MEME", ".pfm": "JASPAR"}
-    )
-    plot: MotifPlotCfg = MotifPlotCfg()
+class OptimiserConfig(BaseModel):
+    kind: Literal["gibbs"]
+    gibbs: Optional[GibbsConfig]
 
-    @validator("root", pre=True)
-    def _expand_root(cls, v):
-        return Path(v).expanduser().resolve()
+class InitConfig(BaseModel):
+    kind: Union[int, Literal["random", "consensus_shortest", "consensus_longest"]]
+    pad_with: Literal["background", "A", "C", "G", "T"] = "background"
 
+class SampleConfig(BaseModel):
+    init: InitConfig
+    optimiser: OptimiserConfig
+    top_k: int
 
-# ────────────────────── cruncher root block ───────────────────────
-class CruncherCfg(BaseModel):
-    mode: Literal["parse", "sample", "analyse"] = "parse"
-    motif: MotifCfg
-    sample: Optional[dict] = None     # parsed but not validated yet
-    analysis: Optional[dict] = None
+class AnalysisConfig(BaseModel):
+    runs: Optional[List[str]]
+    plots: List[str]
 
+class CruncherConfig(BaseModel):
+    mode: Literal["parse", "sample", "analyse", "analyze"]
+    out_dir: Path
+    regulator_sets: List[List[str]]
+    motif: MotifConfig
+    sample: Optional[SampleConfig]
+    analysis: Optional[AnalysisConfig]
 
-# ────────────────────────── loader helper ─────────────────────────
-def load_yaml(path: Path) -> CruncherCfg:
-    data = yaml.safe_load(path.read_text())
-    if "cruncher" not in data:
-        raise KeyError(f"'cruncher:' top-level key missing in {path}")
-    return CruncherCfg.parse_obj(data["cruncher"])
+def load_config(path: Path) -> CruncherConfig:
+    raw = yaml.safe_load(path.read_text())["cruncher"]
+    return CruncherConfig.parse_obj(raw)
