@@ -24,12 +24,14 @@ class MotifConfig(BaseModel):
     plot: PlotConfig
 
 class GibbsConfig(BaseModel):
-    draws: int
-    tune: int
-    beta: float
-    chains: int
-    cores: int
-    min_dist: int
+    draws:     int
+    tune:      int
+    beta:      float
+    chains:    int
+    cores:     int
+    min_dist:  int
+    block_size: int   = 1
+    swap_prob:  float = 0.0
 
 class OptimiserConfig(BaseModel):
     kind: Literal["gibbs"]
@@ -37,12 +39,25 @@ class OptimiserConfig(BaseModel):
 
 class InitConfig(BaseModel):
     kind: Union[int, Literal["random", "consensus_shortest", "consensus_longest"]]
-    pad_with: Literal["background", "A", "C", "G", "T"] = "background"
+    pad_with: Literal[
+        "background",      # uniform random
+        "background_pwm",  # sample from PWM‐derived base frequencies
+        "A","C","G","T"
+    ] = "background"
 
 class SampleConfig(BaseModel):
     init: InitConfig
     optimiser: OptimiserConfig
     top_k: int
+    bidirectional: bool = True
+    plots: Dict[
+        Literal["trace","autocorr","convergence","scatter_pwm"], bool
+    ] = {
+        "trace":       True,
+        "autocorr":    True,
+        "convergence": True,
+        "scatter_pwm": False,
+    }
 
 class AnalysisConfig(BaseModel):
     runs: Optional[List[str]]

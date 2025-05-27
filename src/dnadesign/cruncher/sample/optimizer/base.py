@@ -20,4 +20,4 @@ class Optimizer(ABC):
 
     @abstractmethod
     def optimise(self, initial: SequenceState) -> List[SequenceState]:
-        """Return a ranked list (best first) of unique OverlapState objects."""
+        """Return a ranked list (best first) of unique SequenceState objects."""

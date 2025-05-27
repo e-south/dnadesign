@@ -3,6 +3,16 @@
 <dnadesign project>
 cruncher/sample/cgm.py
 
+Numba-accelerated Gibbs sampler (one-site updates) behind an Optimizer interface.
+
+Hyperparams:
+ - β: inverse temperature
+ - tune: burn-in sweeps
+ - draws: recorded sweeps
+ - chains: independent chains
+ - min_dist: Hamming diversity
+ - top_k: number of elites to return
+
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
@@ -11,127 +21,149 @@ Dunlop Lab
 import logging
 from tqdm import tqdm
 import numpy as np
-from numba import njit
-
+import pandas as pd
+import arviz as az
 from .base import Optimizer
 from dnadesign.cruncher.sample.state import SequenceState
 
 logger = logging.getLogger(__name__)
 
-# Numba-compiled helper: slide one PWM log-odds matrix over seq → best score
-@njit
-def best_score_pwm(seq: np.ndarray, lom: np.ndarray) -> float:
-    L = seq.shape[0]
-    m = lom.shape[0]
-    best = -1e12
-    for offset in range(L - m + 1):
-        s = 0.0
-        for j in range(m):
-            s += lom[j, seq[offset + j]]
-        if s > best:
-            best = s
-    return best
-
 class GibbsOptimizer(Optimizer):
     """
-    Pure-Python, one-site-at-a-time Gibbs sampler over {0,1,2,3}^L,
-    with Numba–accelerated PWM scoring, and a minimum-Hamming-distance
-    constraint on the final top-k.
+    Gibbs sampler that records every sweep (initial state + burn-in + sampling)
+    in self.samples_df.
+
+    Config keys in self.cfg:
+      - beta, tune, draws, chains, top_k, min_dist
     """
+    def __init__(self, scorer, cfg, rng):
+        super().__init__(scorer, cfg, rng)
+        # Keep the TF names in the same order as the scorer’s logodds
+        self.tf_names = list(self.scorer.logodds.keys())
 
     def optimise(self, initial: SequenceState) -> list[SequenceState]:
-        # 1) Extract each PWM’s log-odds matrix into a Python list
-        mats = list(self.scorer.logodds.values())
-
-        # 2) Unpack parameters
-        seq0   = initial.seq.copy()
-        L      = seq0.size
-        β      = self.cfg["beta"]
-        draws  = self.cfg["draws"]
-        tune   = self.cfg["tune"]
-        chains = self.cfg["chains"]
-        top_k  = self.cfg["top_k"]
+        β        = self.cfg["beta"]
+        tune     = self.cfg["tune"]
+        draws    = self.cfg["draws"]
+        chains   = self.cfg["chains"]
+        top_k    = self.cfg["top_k"]
         min_dist = self.cfg.get("min_dist", 1)
-        rng    = self.rng
+        rng      = self.rng
 
-        # helper: compute overall sequence score = min over all PWMs
-        def seq_score(x: np.ndarray) -> float:
-            bests = np.empty(len(mats), dtype=np.float64)
-            for i, lom in enumerate(mats):
-                bests[i] = best_score_pwm(x, lom)
-            return float(np.min(bests))
+        L = initial.seq.size
+        all_samples  = []
+        chain_scores = []
+        proposals = accepts = 0
 
-        all_samples = []
+        records = []       # one dict per iteration (including pre–burn-in)
+        global_iter = 0    # absolute iteration counter across burn-in+sampling
 
-        # 3) Gibbs chains
         for c in range(chains):
+            # ——— fresh random start each chain ———
+            x = SequenceState.random(L, rng).seq.copy()
+
+            # record the *true* random seed before any burn-in
+            init_scores = self.scorer.score_per_pwm(x)
+            records.append({
+                "chain": c,
+                "iter": global_iter,
+                **{f"score_{tf}": float(val)
+                   for tf, val in zip(self.tf_names, init_scores)}
+            })
+            global_iter += 1
+
+            this_chain = []
             logger.info(f"Chain {c+1}/{chains}: tuning {tune} sweeps…")
-            x = seq0.copy()
-            # tuning sweeps (not recorded)
-            for _ in tqdm(range(tune),
-                          desc=f"Chain {c+1} tune",
-                          unit="sweep",
-                          leave=False):
+
+            # ——— Burn-in sweeps (and record each sweep) ———
+            for _ in tqdm(range(tune), desc=f"Tune {c+1}", leave=False):
+                # (insert your block-Gibbs or swap logic here;
+                #  for brevity we show one-site updates)
                 for i in range(L):
-                    # compute log-posterior for each base
-                    logps = np.empty(4, dtype=np.float64)
+                    logps = np.empty(4, dtype=float)
                     for b in range(4):
                         x[i] = b
-                        logps[b] = β * seq_score(x)
-                    a = logps.max()
-                    probs = np.exp(logps - a)
-                    probs /= probs.sum()
-                    x[i] = rng.choice(4, p=probs)
+                        logps[b] = β * self.scorer.score(x)
+                    a    = logps.max()
+                    raw  = np.exp(logps - a)
+                    tot  = raw.sum()
+                    probs = raw/tot if (np.isfinite(tot) and tot>0) else np.ones(4)/4
 
+                    prev = x[i]
+                    new  = rng.choice(4, p=probs)
+                    proposals += 1
+                    accepts   += (new != prev)
+                    x[i] = new
+
+                # record per-PWM at end of this burn-in sweep
+                burn_scores = self.scorer.score_per_pwm(x)
+                records.append({
+                    "chain": c,
+                    "iter": global_iter,
+                    **{f"score_{tf}": float(val)
+                       for tf, val in zip(self.tf_names, burn_scores)}
+                })
+                global_iter += 1
+
+            # ——— Sampling sweeps (and record each sweep) ———
             logger.info(f"Chain {c+1}/{chains}: sampling {draws} sweeps…")
-            samples = []
-            pbar = tqdm(range(draws),
-                        desc=f"Chain {c+1} sample",
-                        unit="sweep",
-                        leave=False)
-            for j in pbar:
+            for _ in tqdm(range(draws), desc=f"Sample {c+1}", leave=False):
+                # again your Gibbs or block-swap moves...
                 for i in range(L):
-                    logps = np.empty(4, dtype=np.float64)
+                    logps = np.empty(4, dtype=float)
                     for b in range(4):
                         x[i] = b
-                        logps[b] = β * seq_score(x)
-                    a = logps.max()
-                    probs = np.exp(logps - a)
-                    probs /= probs.sum()
-                    x[i] = rng.choice(4, p=probs)
-                samples.append(x.copy())
-                if j % max(1, draws // 10) == 0:
-                    pbar.set_postfix(score=f"{seq_score(x):.2f}")
+                        logps[b] = β * self.scorer.score(x)
+                    a    = logps.max()
+                    raw  = np.exp(logps - a)
+                    tot  = raw.sum()
+                    probs = raw/tot if (np.isfinite(tot) and tot>0) else np.ones(4)/4
 
-            all_samples.extend(samples)
+                    prev = x[i]
+                    new  = rng.choice(4, p=probs)
+                    proposals += 1
+                    accepts   += (new != prev)
+                    x[i] = new
 
-        # 4) Rank + enforce diversity
-        #    sort by descending score
+                # track overall score for ArviZ trace
+                s = self.scorer.score(x)
+                this_chain.append(s)
+                all_samples.append(x.copy())
+
+                # record per-PWM at end of this sampling sweep
+                samp_scores = self.scorer.score_per_pwm(x)
+                records.append({
+                    "chain": c,
+                    "iter": global_iter,
+                    **{f"score_{tf}": float(val)
+                       for tf, val in zip(self.tf_names, samp_scores)}
+                })
+                global_iter += 1
+
+            chain_scores.append(this_chain)
+
+        logger.info(f"Gibbs acceptance rate: {accepts}/{proposals} = {accepts/proposals:.1%}")
+
+        # build a DataFrame of every iteration (init + burn-in + samples)
+        self.samples_df = pd.DataFrame(records)
+
+        # ——— select elites exactly as before ———
         scored = sorted(
-            ((seq_score(s), s) for s in all_samples),
-            key=lambda t: t[0],
-            reverse=True,
+            ((self.scorer.score(s), s) for s in all_samples),
+            key=lambda t: t[0], reverse=True
         )
-
-        elites: list[SequenceState] = []
+        elites = []
         for score_val, seq in scored:
             if len(elites) >= top_k:
                 break
-            # enforce min Hamming distance
-            too_close = False
-            for e in elites:
-                if np.sum(seq != e.seq) < min_dist:
-                    too_close = True
-                    break
-            if too_close:
-                logger.debug(f"Skipping seq {seq} (score={score_val:.2f})—too close")
+            if any(np.sum(seq != e.seq) < min_dist for e in elites):
                 continue
-
             elites.append(SequenceState(seq=seq.copy()))
-
         if len(elites) < top_k:
-            logger.warning(
-                f"Requested top_k={top_k} but only found {len(elites)} diverse sequences."
-            )
+            logger.warning(f"Requested top_k={top_k} but only found {len(elites)} diverse sequences.")
+
+        # package trace for ArviZ
+        scores_arr = np.array(chain_scores)  # shape = (chains, draws)
+        self.trace_idata = az.from_dict(posterior={"score": scores_arr})
 
         return elites

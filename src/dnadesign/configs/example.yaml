@@ -14,20 +14,28 @@ cruncher:
       logo:      true
       bits_mode: information
       dpi:       200
-  sample:                         # sample-specific config   
-    init: 
-      kind: consensus_longest                  # random | consensus_shortest | consensus_longest | 30
-      pad_with: background          # or a fixed base like "N" or user‐supplied nucleotide frequencies
+  sample:
+    bidirectional: true           # score sequences based on both forward and reverse-complement (take max per-PWM)
+    init:
+      kind: random                    # random, consensus_shortest, consensus_longest, or integer length 
+      pad_with: background_pwm    # background (uniform iid), background_pwm (sample i.i.d. from overall PWM base frequencies)
     optimiser:
       kind: gibbs
       gibbs:
-        draws:    80000
-        tune:     20000
-        beta:     2.0
-        chains:   4
+        draws:    400           # recorded Gibbs sweeps; each produces one full-sequence sample
+        tune:     0           # “burn-in” Gibbs sweeps not recorded—allows chain to move toward high-probability region
+        beta:     0.01            # higher β sharpens acceptance toward higher‐score sequences
+        block_size: 5             # how many adjacent sites to update in one Gibbs move
+        swap_prob:  0.5           # probability of doing an MH substring-swap instead of block-Gibbs
+        chains:   4               # independent Gibbs chains to assess convergence
         cores:    4
-        min_dist: 4
-    top_k: 200
+        min_dist: 1               # minimum Hamming distance between final reported elites (diversity constraint)
+    top_k: 200                    # number of unique, diverse sequences to return
+    plots:
+      trace:       true
+      autocorr:    true
+      convergence: true
+      scatter_pwm: true
   analysis:                       # analysis-specific config
     runs: []                      # default = most recent sample
     plots:

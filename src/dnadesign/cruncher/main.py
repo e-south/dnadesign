@@ -23,16 +23,21 @@ from datetime import datetime
 import json
 import yaml
 import numpy as np
+import pandas as pd
 
 import arviz as az
 from dnadesign.cruncher.config import load_config, CruncherConfig
 from dnadesign.cruncher.motif.registry import Registry
 from dnadesign.cruncher.plots.pssm import plot_pwm
-from dnadesign.cruncher.plots.arviz import mcmc_diagnostics, scatter_pwm
 from dnadesign.cruncher.sample.state import SequenceState
 from dnadesign.cruncher.sample.scorer import Scorer
 from dnadesign.cruncher.sample.optimizer.cgm import GibbsOptimizer
 from dnadesign.cruncher.motif.model import PWM
+from dnadesign.cruncher.utils.traces import save_trace
+from dnadesign.cruncher.sample.plots.trace       import plot_trace
+from dnadesign.cruncher.sample.plots.autocorr    import plot_autocorr
+from dnadesign.cruncher.sample.plots.convergence import report_convergence
+from dnadesign.cruncher.sample.plots.scatter_pwm import plot_scatter_pwm
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 CFG_PATH     = PROJECT_ROOT / "dnadesign" / "src" / "dnadesign" / "configs" / "example.yaml"
@@ -59,10 +64,21 @@ def _run_parse(cfg: CruncherConfig, base_out: Path) -> None:
 
 
 def _initialize_state(init_cfg, pwms: dict[str, PWM], rng) -> SequenceState:
-    # determine target length
+    # If user asked for an integer length, make sure it's at least as long as
+    # the longest PWM, otherwise bump it with a warning.
     if isinstance(init_cfg.kind, int):
-        length = init_cfg.kind
+        max_motif = max(p.length for p in pwms.values())
+        if init_cfg.kind < max_motif:
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"Requested init length {init_cfg.kind} < longest PWM ({max_motif}); "
+                f"bumping to {max_motif}"
+            )
+            length = max_motif
+        else:
+            length = init_cfg.kind
     else:
+        # Determine from consensus logic as before
         max_len = max(p.length for p in pwms.values())
         if init_cfg.kind == 'random':
             length = max_len
@@ -122,50 +138,86 @@ def _run_sample(cfg: CruncherConfig, base_out: Path) -> None:
     sample_cfg = cfg.sample
     rng = np.random.default_rng()
 
-    # 1. prepare batch dir
-    batch_dir = base_out
-    (batch_dir / 'plots').mkdir(parents=True, exist_ok=True)
+    # 1) prepare output dirs
+    sample_dir = base_out / "sample"
+    sample_dir.mkdir(parents=True, exist_ok=True)
 
-    # 2. save config
-    _save_config(cfg, batch_dir)
+    # 2) save the exact config
+    _save_config(cfg, sample_dir)
 
-    # 3. load PWMs
-    reg = Registry(PWM_PATH, cfg.motif.formats)
+    # 3) load PWMs
+    reg  = Registry(PWM_PATH, cfg.motif.formats)
     pwms = {tf: reg.load(tf) for tf in set(sum(cfg.regulator_sets, []))}
 
-    # 4. initialize
+    # 4) initialize sequence
     initial = _initialize_state(sample_cfg.init, pwms, rng)
 
-    # 5. set up scorer + optimizer
-    scorer = Scorer(pwms)
-    gib_cfg = sample_cfg.optimiser.gibbs.dict()
-    gib_cfg['top_k']   = sample_cfg.top_k     # pass top_k in
-    gib_cfg['min_dist'] = sample_cfg.optimiser.gibbs.min_dist
+    # 5) set up Scorer + Optimizer
+    scorer   = Scorer(pwms, bidirectional=sample_cfg.bidirectional)
+    gib_cfg  = sample_cfg.optimiser.gibbs.dict()
+    gib_cfg["top_k"]    = sample_cfg.top_k
+    gib_cfg["min_dist"] = sample_cfg.optimiser.gibbs.min_dist
+    gib_cfg["random_init"] = (sample_cfg.init.kind == "random")
     optimizer = GibbsOptimizer(scorer, gib_cfg, rng)
 
-    # 6. run
+    # 6) run MCMC
     print("Starting MCMC sampling…")
     ranked_states = optimizer.optimise(initial)
     print("Sampling complete.")
 
-    # 7. save hits
-    _save_hits(ranked_states, scorer, pwms, batch_dir, sample_cfg.top_k)
-    print(f"Saved top-{sample_cfg.top_k} hits to hits.csv")
+    # 7) save top‐k hits
+    _save_hits(ranked_states, scorer, pwms, sample_dir, sample_cfg.top_k)
+    print(f"Saved top-{sample_cfg.top_k} hits to {sample_dir/'hits.csv'}")
 
-    # 8. (optional) diagnostics — only if you have a trace file
-    trace_path = batch_dir / 'trace.nc'
-    if trace_path.exists():
-        idata = az.from_netcdf(trace_path)
-        mcmc_diagnostics(idata, batch_dir / 'plots')
-        scatter_pwm(idata, batch_dir / 'plots', pwms=list(pwms.keys()))
-        print("Generated diagnostic plots.")
+    # 7b) save every sample’s per‐PWM scores for scatter
+    if hasattr(optimizer, "samples_df"):
+        optimizer.samples_df.to_csv(sample_dir/"samples.csv", index=False)
+        print(f"Saved samples.csv for scatter diagnostics")
+
+    # 7c) generate a random‐reference set of draws for comparison
+    n_ref = len(optimizer.samples_df) if hasattr(optimizer, "samples_df") else sample_cfg.draws
+    L     = initial.seq.size
+    ref_rows = []
+    rng2  = np.random.default_rng(0)
+    for i in range(n_ref):
+        x_rand = SequenceState.random(L, rng2)
+        scores = scorer.score_per_pwm(x_rand.seq)
+        row = {"iter": i}
+        for tf, sc in zip(pwms, scores):
+            row[f"score_{tf}"] = float(sc)
+        ref_rows.append(row)
+    pd.DataFrame(ref_rows).to_csv(sample_dir/"random_samples.csv", index=False)
+
+    # 8) diagnostics: trace/autocorr/convergence + scatter
+    trace_path = sample_dir / "trace.nc"
+    idata = getattr(optimizer, "trace_idata", None)
+    if idata is not None:
+        save_trace(idata, trace_path)
+
+        plots_cfg = sample_cfg.plots
+        if plots_cfg.get("trace", False):
+            plot_trace(idata, sample_dir)
+            print("  • trace_score.png")
+        if plots_cfg.get("autocorr", False):
+            plot_autocorr(idata, sample_dir)
+            print("  • autocorr_score.png")
+        if plots_cfg.get("convergence", False):
+            report_convergence(idata, sample_dir)
+            print("  • convergence.txt")
+        # scatter‐PWM invocation
+        if plots_cfg.get("scatter_pwm", False):
+            plot_scatter_pwm(sample_dir, pwms, cfg)
+            print("  • scatter_pwm.png")
+
+        print("Generated MCMC diagnostics.")
     else:
-        logger = logging.getLogger(__name__)
-        logger.info("No trace.nc found; skipping ArviZ diagnostics.")
+        logging.getLogger(__name__).info(
+            "No trace data found on optimizer; skipping MCMC diagnostics."
+        )
 
-    # 9. write a README
-    readme = batch_dir / 'README.txt'
-    with readme.open('w') as fh:
+    # 9) write a little README
+    readme = sample_dir / "README.txt"
+    with readme.open("w") as fh:
         fh.write(f"Batch run: {datetime.now().isoformat()}\n")
         fh.write(f"Regulator sets: {cfg.regulator_sets}\n")
         fh.write(f"Initialization: {sample_cfg.init!r}\n")
