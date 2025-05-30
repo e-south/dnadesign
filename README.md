@@ -8,8 +8,6 @@ dnadesign/
 ├── README.md                           # High-level project documentation
 └── src/
     └── dnadesign/
-        ├── configs/
-        │   └── example.yaml            # Global configuration for all pipelines
         ├── utils.py                    # Shared utilities (e.g., config loading, common functions)
         ├── seqfetcher/                 # Data ingestion modules (one per dataset)
         │   └── <dataset>_module.py     
@@ -20,12 +18,15 @@ dnadesign/
         │       └── summary.yaml        # YAML summary of the batch (metadata, parameters, runtime)
         ├── densegen/                 
         │   ├── main.py
+        │   ├── config.yaml
         │   └── ...  
         ├── evoinference/              
         │   ├── main.py
+        │   ├── config.yaml
         │   └── ...                             
-        ├── latdna/                 
+        ├── cruncher/                 
         │   ├── main.py
+        │   ├── config.yaml
         │   └── ...  
         └── ...
 ```

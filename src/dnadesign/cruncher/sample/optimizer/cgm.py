@@ -1,28 +1,35 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-cruncher/sample/cgm.py
+dnadesign/cruncher/sample/optimizer/cgm.py
 
-Numba-accelerated Gibbs sampler (one-site updates) behind an Optimizer interface.
+Gibbs/Metropolis sampler with cooling and move mixture.
 
-Hyperparams:
- - β: inverse temperature
- - tune: burn-in sweeps
- - draws: recorded sweeps
- - chains: independent chains
- - min_dist: Hamming diversity
- - top_k: number of elites to return
+Move types
+----------
+S   : single-nucleotide flip (Gibbs)                 - high acceptance, low step
+B   : contiguous block replacement (Gibbs)           - escapes shallow basins
+M   : k disjoint flips  (Gibbs)                      - mixes mid-exploration
+SL  : window slide  (MH)                             - optional, TODO
+SW  : substring swap/reverse (MH)                    - optional, TODO
+
+The move probabilities evolve with β (annealing) as described in the spec.
 
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+from __future__ import annotations
+
 import logging
+from collections import Counter
+from typing import Dict
 
 import arviz as az
 import numpy as np
 import pandas as pd
+from numba import njit
 from tqdm import tqdm
 
 from dnadesign.cruncher.sample.state import SequenceState
@@ -32,143 +39,167 @@ from .base import Optimizer
 logger = logging.getLogger(__name__)
 
 
+# Helper: contiguous block replacement (compiled, inner-loop speed critical)
+@njit
+def _replace_block(seq: np.ndarray, start: int, length: int, proposal: np.ndarray):
+    seq[start : start + length] = proposal
+
+
 class GibbsOptimizer(Optimizer):
-    """
-    Gibbs sampler that records every sweep (initial state + burn-in + sampling)
-    in self.samples_df.
+    """Cooling Gibbs/Metropolis sampler producing diverse motif-rich sequences."""
 
-    Config keys in self.cfg:
-      - beta, tune, draws, chains, top_k, min_dist
-    """
-
-    def __init__(self, scorer, cfg, rng):
-        super().__init__(scorer, cfg, rng)
-        # Keep the TF names in the same order as the scorer’s logodds
-        self.tf_names = list(self.scorer.logodds.keys())
-
+    #  PUBLIC ENTRY POINT
     def optimise(self, initial: SequenceState) -> list[SequenceState]:
-        β = self.cfg["beta"]
-        tune = self.cfg["tune"]
-        draws = self.cfg["draws"]
-        chains = self.cfg["chains"]
-        top_k = self.cfg["top_k"]
-        min_dist = self.cfg.get("min_dist", 1)
+        cfg = self.cfg  # shorthand
         rng = self.rng
 
-        L = initial.seq.size
-        all_samples = []
-        chain_scores = []
-        proposals = accepts = 0
+        # pre-extract config for speed
+        draws, tune, chains = cfg["draws"], cfg["tune"], cfg["chains"]
+        min_dist, top_k = cfg["min_dist"], cfg["top_k"]
+        cooling_cfg = cfg["cooling"]
+        move_cfg = cfg["moves"]
 
-        records = []  # one dict per iteration (including pre–burn-in)
-        global_iter = 0  # absolute iteration counter across burn-in+sampling
+        #  Pre-compute cooling schedule helper
+        if cooling_cfg["kind"] == "fixed":
+
+            def beta_of(iter_idx: int) -> float:  # noqa: D401
+                return cooling_cfg["beta"]
+
+        else:  # piece-wise
+            stages = sorted(cooling_cfg["stages"], key=lambda s: s["sweeps"])
+            sweep_pts = [s["sweeps"] for s in stages]
+            betas = [s["beta"] for s in stages]
+
+            def beta_of(iter_idx: int) -> float:  # noqa: D401
+                # rightmost stage
+                if iter_idx >= sweep_pts[-1]:
+                    return betas[-1]
+                j = np.searchsorted(sweep_pts, iter_idx, side="right") - 1
+                t0, t1 = sweep_pts[j], sweep_pts[j + 1]
+                b0, b1 = betas[j], betas[j + 1]
+                # linear interp
+                return b0 + (b1 - b0) * ((iter_idx - t0) / (t1 - t0))
+
+        # shorthand to motif scorer
+        score_fn = self.scorer.score
+        per_pwm_fn = self.scorer.score_per_pwm
+
+        # diagnostics
+        move_tally = Counter()
+
+        # storage
+        chain_scores: list[list[float]] = []
+        all_samples: list[np.ndarray] = []
+        records: list[Dict] = []
+        global_iter = 0
 
         for c in range(chains):
-            # ——— fresh random start each chain ———
-            x = SequenceState.random(L, rng).seq.copy()
+            seq = initial.seq.copy()
+            L = seq.size
+            # burn-in + draws per chain
+            total_sweeps = tune + draws
+            chain_trace: list[float] = []
 
-            # record the *true* random seed before any burn-in
-            init_scores = self.scorer.score_per_pwm(x)
-            records.append(
-                {
-                    "chain": c,
-                    "iter": global_iter,
-                    **{f"score_{tf}": float(val) for tf, val in zip(self.tf_names, init_scores)},
-                }
-            )
-            global_iter += 1
+            for sweep in tqdm(range(total_sweeps), desc=f"chain{c+1}", leave=False):
+                beta = beta_of(global_iter)
+                # choose move kind
+                move_kind = self._sample_move_kind(beta, move_cfg, rng)
+                move_tally[move_kind] += 1
 
-            this_chain = []
-            logger.info(f"Chain {c+1}/{chains}: tuning {tune} sweeps…")
-
-            # ——— Burn-in sweeps (and record each sweep) ———
-            for _ in tqdm(range(tune), desc=f"Tune {c+1}", leave=False):
-                # (insert your block-Gibbs or swap logic here;
-                #  for brevity we show one-site updates)
-                for i in range(L):
-                    logps = np.empty(4, dtype=float)
+                if move_kind == "S":  # single flip
+                    i = rng.integers(L)
+                    lods = np.empty(4, float)
+                    old_base = seq[i]
                     for b in range(4):
-                        x[i] = b
-                        logps[b] = β * self.scorer.score(x)
-                    a = logps.max()
-                    raw = np.exp(logps - a)
-                    tot = raw.sum()
-                    probs = raw / tot if (np.isfinite(tot) and tot > 0) else np.ones(4) / 4
+                        seq[i] = b
+                        lods[b] = beta * score_fn(seq)
+                    seq[i] = old_base  # restore
+                    # numerically stable soft-max
+                    lods -= lods.max()
+                    probs = np.exp(lods)
+                    seq[i] = rng.choice(4, p=probs / probs.sum())
 
-                    prev = x[i]
-                    new = rng.choice(4, p=probs)
-                    proposals += 1
-                    accepts += new != prev
-                    x[i] = new
+                elif move_kind == "B":  # contiguous block
+                    min_len, max_len = move_cfg["block_len_range"]
+                    length = rng.integers(min_len, max_len + 1)
+                    start = rng.integers(0, L - length + 1)
+                    proposal = rng.integers(0, 4, size=length)
+                    # Gibbs update over the *entire proposal* jointly:
+                    #   P(new_block) ∝ exp(β·score)
+                    old_block = seq[start : start + length].copy()
+                    _replace_block(seq, start, length, proposal)
+                    new_score = score_fn(seq)
+                    _replace_block(seq, start, length, old_block)
+                    old_score = score_fn(seq)
+                    logp_new = beta * new_score
+                    logp_old = beta * old_score
+                    if rng.random() < np.exp(logp_new - logp_old):
+                        _replace_block(seq, start, length, proposal)
 
-                # record per-PWM at end of this burn-in sweep
-                burn_scores = self.scorer.score_per_pwm(x)
-                records.append(
-                    {
-                        "chain": c,
-                        "iter": global_iter,
-                        **{f"score_{tf}": float(val) for tf, val in zip(self.tf_names, burn_scores)},
-                    }
-                )
+                elif move_kind == "M":  # k disjoint flips
+                    kmin, kmax = move_cfg["multi_k_range"]
+                    k = rng.integers(kmin, kmax + 1)
+                    idx = rng.choice(L, size=k, replace=False)
+                    old = seq[idx].copy()
+                    proposal = rng.integers(0, 4, size=k)
+                    seq[idx] = proposal
+                    new_score = score_fn(seq)
+                    seq[idx] = old
+                    old_score = score_fn(seq)
+                    logp_new = beta * new_score
+                    logp_old = beta * old_score
+                    if rng.random() < np.exp(logp_new - logp_old):
+                        seq[idx] = proposal
+
+                #  Record diagnostics
+                if sweep >= tune:  # draw phase
+                    all_samples.append(seq.copy())
+                    chain_trace.append(score_fn(seq))
+
+                if sweep % 10 == 0:  # cheap – store every 10th sweep
+                    per_pwm = per_pwm_fn(seq)
+                    records.append(
+                        dict(
+                            chain=c,
+                            iter=global_iter,
+                            beta=beta,
+                            **{f"score_{tf}": float(v) for tf, v in zip(self.scorer.logodds, per_pwm)},
+                        )
+                    )
                 global_iter += 1
 
-            # ——— Sampling sweeps (and record each sweep) ———
-            logger.info(f"Chain {c+1}/{chains}: sampling {draws} sweeps…")
-            for _ in tqdm(range(draws), desc=f"Sample {c+1}", leave=False):
-                # again your Gibbs or block-swap moves...
-                for i in range(L):
-                    logps = np.empty(4, dtype=float)
-                    for b in range(4):
-                        x[i] = b
-                        logps[b] = β * self.scorer.score(x)
-                    a = logps.max()
-                    raw = np.exp(logps - a)
-                    tot = raw.sum()
-                    probs = raw / tot if (np.isfinite(tot) and tot > 0) else np.ones(4) / 4
+            chain_scores.append(chain_trace)
 
-                    prev = x[i]
-                    new = rng.choice(4, p=probs)
-                    proposals += 1
-                    accepts += new != prev
-                    x[i] = new
+        #  Final selection & diagnostics
+        logger.info("Move utilisation: %s", dict(move_tally))
 
-                # track overall score for ArviZ trace
-                s = self.scorer.score(x)
-                this_chain.append(s)
-                all_samples.append(x.copy())
-
-                # record per-PWM at end of this sampling sweep
-                samp_scores = self.scorer.score_per_pwm(x)
-                records.append(
-                    {
-                        "chain": c,
-                        "iter": global_iter,
-                        **{f"score_{tf}": float(val) for tf, val in zip(self.tf_names, samp_scores)},
-                    }
-                )
-                global_iter += 1
-
-            chain_scores.append(this_chain)
-
-        logger.info(f"Gibbs acceptance rate: {accepts}/{proposals} = {accepts/proposals:.1%}")
-
-        # build a DataFrame of every iteration (init + burn-in + samples)
-        self.samples_df = pd.DataFrame(records)
-
-        # ——— select elites exactly as before ———
+        # diverse elite filter
         scored = sorted(((self.scorer.score(s), s) for s in all_samples), key=lambda t: t[0], reverse=True)
-        elites = []
+        elites: list[SequenceState] = []
         for score_val, seq in scored:
-            if len(elites) >= top_k:
+            if len(elites) == top_k:
                 break
             if any(np.sum(seq != e.seq) < min_dist for e in elites):
                 continue
-            elites.append(SequenceState(seq=seq.copy()))
-        if len(elites) < top_k:
-            logger.warning(f"Requested top_k={top_k} but only found {len(elites)} diverse sequences.")
+            elites.append(SequenceState(seq.copy()))
 
-        # package trace for ArviZ
-        scores_arr = np.array(chain_scores)  # shape = (chains, draws)
-        self.trace_idata = az.from_dict(posterior={"score": scores_arr})
+        self.samples_df = pd.DataFrame(records)
+        self.trace_idata = az.from_dict(posterior={"score": np.asarray(chain_scores)})
 
         return elites
+
+    #  helpers
+    @staticmethod
+    def _sample_move_kind(beta: float, cfg: Dict, rng) -> str:
+        """Return one of 'S','B','M' according to β-dependent probabilities."""
+        beta_target = 1.0
+        r = min(beta / beta_target, 1.0)
+        probs = {
+            "S": 0.4 + 0.4 * r,
+            "B": 0.4 * (1 - r),
+            "M": 0.2,
+        }
+        kinds = list(probs)
+        weights = np.fromiter(probs.values(), dtype=float)
+        weights /= weights.sum()
+        return rng.choice(kinds, p=weights)

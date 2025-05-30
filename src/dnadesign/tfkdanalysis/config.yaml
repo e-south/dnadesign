@@ -1,0 +1,12 @@
+# dnadesign/tfkdanalysis/config.yaml
+
+tfkdanalysis:
+  batch_name: "araC_and_pspF"
+  # regulators: ["araC", "lacI", "rbsR", "rhaS", "rhaR", "cra", "malT", "treR", "xylR", "galR", "galS", "argR", "trpR", "metJ", "marR", "marA", "soxR", "soxS", "rob", "oxyR", "pspF", "cpxR", "lexA", "phoB", "cueR", "flhC", "csgD", "slyA", "sdiA", "rcdA", "mcbR", "arcA"] # "metR"
+  regulators: ["araC", "lacI", "argR", "marR", "marA", "soxR", "soxS", "rob", "pspF", "cpxR", "lexA", "phoB", "cueR", "arcA"]
+  media: "glu"
+  volcano_plot: true
+  volcano_point_size: null  # Options include: 'DAP Fold change (peak intensity/background intensity)', etc.
+  threshold: "1.2"
+  tolerate_nas: true
+  annotate_operon: true

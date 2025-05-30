@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-cruncher/motif/registry.py
+dnadesign/cruncher/parse/registry.py
 
 Lookup helper that (1) lower-cases TF names, (2) caches PWMs,
 (3) searches allowed extensions according to config.

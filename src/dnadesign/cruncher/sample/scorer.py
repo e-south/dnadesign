@@ -1,10 +1,19 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-cruncher/sample/scorer.py
+dnadesign/cruncher/sample/scorer.py
 
-Scorer uses Numba helper for per-PWM sliding-window scoring.
-Supports optional bidirectional (reverse-complement) mode.
+FIMO-like Scorer: from raw PWM log-odds to calibrated p-value fitness.
+
+1) Precompute:
+   - log-odds matrix under uniform background
+   - exact null distribution and tail p-values via DP lookup
+2) For each sequence:
+   - Slide PWMs (and reverse complement) with Numba → best log-odds per motif
+   - Map best score → p-value by binary search + array indexing
+   - Return -log10(min p-value) as the fitness objective
+
+Inspired by Grant et al. 2011 (DOI: 10.1093/bioinformatics/btr064).
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -13,87 +22,77 @@ Dunlop Lab
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Sequence
 
 import numpy as np
 
-from dnadesign.cruncher.motif.model import PWM
+from dnadesign.cruncher.parse.model import PWM
+from dnadesign.cruncher.parse.pvalue import logodds_to_p_lookup
 from dnadesign.cruncher.sample.numba_helpers import best_score_pwm
 
 
 class Scorer:
     """
-    Given a set of PWMs, compute how well any candidate DNA sequence
-    matches each PWM.  The overall objective is the minimum (worst) of
-    per-PWM best-match scores, but you can also retrieve each PWM's score.
+    Scores DNA sequences against multiple PWMs using exact p-values.
 
-    If bidirectional=True, we also scan the reverse-complement of the
-    sequence and take the higher of forward- or reverse-match.
+    Attributes:
+      logodds: dict of motif_name→(Lx4) log-odds arrays
+      lookups: dict of motif_name→(scores, tail_p) arrays for p-value mapping
+      bidirectional: whether to scan both strands
     """
 
-    def __init__(self, pwms: Dict[str, PWM], bidirectional: bool = True):
-        # Whether to also consider the reverse-complement of each sequence
+    def __init__(
+        self,
+        pwms: Dict[str, PWM],
+        background: Sequence[float] = (0.25, 0.25, 0.25, 0.25),
+        bidirectional: bool = True,
+    ):
         self.bidirectional = bidirectional
-
-        # Precompute each PWM’s log‐odds matrix so we never recompute it on the fly.
-        # If the PWM file itself provided a log‐odds block, we use that directly;
-        # otherwise we compute log2(prob/background) from the probability matrix.
-        self.logodds: Dict[str, np.ndarray] = {
-            name: (pwm.log_odds_matrix if pwm.log_odds_matrix is not None else pwm.log_odds())
-            for name, pwm in pwms.items()
-        }
+        bg = np.array(background, float)
+        # Precompute log-odds and DP-based p-value lookups
+        self.logodds = {name: pwm.log_odds(background=bg) for name, pwm in pwms.items()}
+        self.lookups = {name: logodds_to_p_lookup(lom, bg) for name, lom in self.logodds.items()}
 
     def score_per_pwm(self, seq: np.ndarray) -> np.ndarray:
         """
-        For each PWM, slide its log‐odds matrix across the given sequence
-        (and optionally its reverse‐complement), returning an array of
-        best‐match scores—one per PWM.
-
-        Args:
-            seq: integer‐encoded DNA (0=A,1=C,2=G,3=T)
-
-        Returns:
-            1D numpy array of length = # of PWMs, with each entry the
-            maximum log‐odds sum over all valid alignments.
+        Get the maximum log-odds score per PWM over the sequence.
         """
         scores = []
-        # If bidirectional, compute the reverse‐complement once:
+        rc = None
         if self.bidirectional:
-            # rc: flip each base 0<->3, 1<->2, then reverse order
             rc = (3 - seq)[::-1]
-
         for lom in self.logodds.values():
-            motif_length = lom.shape[0]
-
-            # If the motif is longer than the sequence, it can never match:
-            if motif_length > seq.size:
+            L, w = seq.size, lom.shape[0]
+            if w > L:
                 scores.append(-np.inf)
                 continue
-
-            # Compute forward‐strand best match via Numba helper:
-            forward_score = best_score_pwm(seq, lom)
-
-            if self.bidirectional:
-                # And reverse‐strand best match:
-                reverse_score = best_score_pwm(rc, lom)
-                # Take the better of the two
-                scores.append(max(forward_score, reverse_score))
+            fwd = best_score_pwm(seq, lom)
+            if rc is not None:
+                rev = best_score_pwm(rc, lom)
+                scores.append(max(fwd, rev))
             else:
-                scores.append(forward_score)
+                scores.append(fwd)
+        return np.array(scores)
 
-        return np.array(scores, dtype=float)
+    def _interp_p(self, score: float, scores: np.ndarray, tail: np.ndarray) -> float:
+        """
+        Map a raw score to a tail p-value via binary search + indexing.
+        """
+        idx = np.searchsorted(scores, score, "right") - 1
+        idx = np.clip(idx, 0, len(tail) - 1)
+        return float(tail[idx])
 
     def score(self, seq: np.ndarray) -> float:
         """
-        Overall scoring function: take the worst‐match across all PWMs.
-        This makes the sampler maximize the minimum PWM score, effectively
-        forcing every PWM to bind at least moderately well.
-
-        Args:
-            seq: integer‐encoded DNA (0=A,1=C,2=G,3=T)
-
-        Returns:
-            Single float = min(score_per_pwm(seq))
+        Compute fitness = -log10(min p-value across all PWMs).
         """
-        per_pwm = self.score_per_pwm(seq)
-        return float(per_pwm.min())
+        lods = self.score_per_pwm(seq)
+        pvals = [self._interp_p(lod, *self.lookups[name]) for name, lod in zip(self.logodds, lods)]
+        return -np.log10(min(pvals))
+
+    def score_pvals(self, seq: np.ndarray) -> Dict[str, float]:
+        """
+        Return per-PWM p-values for reporting or thresholding.
+        """
+        lods = self.score_per_pwm(seq)
+        return {name: self._interp_p(lod, *self.lookups[name]) for name, lod in zip(self.logodds, lods)}

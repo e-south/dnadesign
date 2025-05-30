@@ -1,12 +1,12 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-cruncher/motif/backend.py
+dnadesign/cruncher/parse/backend.py
 
 Generic registry for PWM parsers.
 
 Add a new format by:
-    1. creating motif/parsers/<fmt>.py
+    1. creating parse/parsers/<fmt>.py
     2. decorating a function with  @register("MYFMT")
 
 Module Author(s): Eric J. South

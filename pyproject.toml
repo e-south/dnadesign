@@ -1,9 +1,7 @@
-# Build system
 [build-system]
 requires = ["setuptools>=61", "wheel", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
-# Project metadata
 [project]
 name = "dnadesign"
 version = "0.1.0"

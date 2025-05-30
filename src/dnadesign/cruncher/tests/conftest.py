@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from dnadesign.cruncher.config import load_config
+from dnadesign.cruncher.utils.config import load_config
 
 _DATA_DIR = Path(__file__).with_suffix("").parent / "data"
 

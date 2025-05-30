@@ -1,0 +1,52 @@
+# dnadesign/cruncher/config.yaml
+
+cruncher:
+  mode: sample                    # parse | sample | analyse
+  out_dir: results/               # where all outputs land
+  regulator_sets:                 # list of regulator sets to use   
+    - [cpxR, soxR]                # list of TFs
+  parse:                          # parse-specific config
+    formats:
+      .txt: MEME
+      .pfm:  JASPAR
+    plot:
+      logo:      true
+      bits_mode: information
+      dpi:       200
+  sample:
+    bidirectional: true           # score sequences based on both forward and reverse-complement (take max per-PWM)
+    init:
+      length: 30                  # initialize an uniform random (A,C,G,T) sequence of this length
+    optimiser:
+      kind: gibbs
+      gibbs:
+        draws: 40000                # recorded Gibbs sweeps; each produces one full-sequence sample
+        tune: 20000                  # “burn-in” Gibbs sweeps not recorded—allows chain to move toward high-probability region
+        beta: 0.01                # higher β sharpens acceptance toward higher‐score sequences, ignored when cooling.kind != fixed
+        chains:   4               # independent Gibbs chains to assess convergence
+        cores:    4
+        min_dist: 1               # minimum Hamming distance between final reported elites (diversity constraint)
+        cooling:
+          kind: piecewise         # cooling schedule for β | piecewise or fixed
+          stages:
+            - { sweeps: 0,   beta: 0.1 }
+            - { sweeps: 10000, beta: 0.50 }
+            - { sweeps: 35000, beta: 2.00 }
+        moves:
+          block_len_range:  [3, 15]
+          multi_k_range:    [2, 6]
+          slide_max_shift:  2
+          swap_len_range:   [6, 12]
+    top_k: 200
+    plots:
+      trace:       true
+      autocorr:    true
+      convergence: true
+      scatter_pwm: true
+  analysis:                       # analysis-specific config
+    runs: []                      # default = most recent sample
+    plots:
+      - score_kde
+      - scatter_pwm
+      - logo_elites
+  

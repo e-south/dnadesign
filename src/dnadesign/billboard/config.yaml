@@ -1,0 +1,36 @@
+# dnadesign/billboard/config.yaml
+
+billboard:
+  output_dir_prefix: 60bp_acetate_sub6783
+  dry_run: false
+  skip_aligner_call: true
+  pt_files:
+    # - densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_M9_gluc_ace_top20_n10000_60bp
+    - sub6793
+  allow_variable_sequence_length: false
+  include_fixed_elements_in_combos: false
+  save_plots: true
+  save_csvs: true
+  dpi: 600
+
+  # List which metrics end up in diversity_summary.csv
+  diversity_metrics:
+    - tf_richness
+    - 1_minus_gini
+    - min_jaccard_dissimilarity
+    - min_tf_entropy
+    - min_motif_string_levenshtein
+    - min_nw_dissimilarity
+
+  motif_string_levenshtein:
+    tf_penalty: 1.0
+    strand_penalty: 0.5
+    partial_penalty: 0.8
+
+  characterize_by_leiden_cluster:
+    enabled: true
+    plot_title: "Cluster Characterization by Core Metrics"
+    marker_shapes:
+      1_minus_gini: "s"
+      min_jaccard_dissimilarity: "X"
+      min_tf_entropy: "D"

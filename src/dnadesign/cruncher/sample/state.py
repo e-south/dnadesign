@@ -1,17 +1,11 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-cruncher/sample/state.py
+dnadesign/cruncher/sample/state.py
 
 SequenceState handles how we initialize and represent candidate DNA sequences
 for sampler algorithms. It supports:
   - random: completely random background sequences
-  - consensus_shortest / consensus_longest:
-      - embed a PWM consensus at a random location
-      - pad the flanks with either
-          - uniform random bases
-          - PWM-derived base frequencies (reflecting GC/AT bias)
-          - a fixed nucleotide (e.g. "A" repeat)
 
 Each SequenceState stores its sequence as a numpy array of ints [0,1,2,3]
 corresponding to A, C, G, T.
@@ -24,121 +18,89 @@ Dunlop Lab
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Literal
+from typing import Dict
 
 import numpy as np
 
-from dnadesign.cruncher.motif.model import PWM
+from dnadesign.cruncher.parse.model import PWM
 
-# Map integer codes back to bases for human-readable output
+# Index ↔ base mapping for sequence representation
 _ALPH = np.array(["A", "C", "G", "T"], dtype="<U1")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SequenceState:
-    seq: np.ndarray  # 1D array of ints in {0,1,2,3}
+    """
+    Lightweight container for candidate sequences used by the sampler.
+    Stores sequences as integer arrays (0=A,1=C,2=G,3=T) and provides helpers.
+    """
+
+    seq: np.ndarray  # 1-D int array, values in {0,1,2,3}
 
     @staticmethod
-    def random(length: int, rng) -> SequenceState:
-        """
-        Create a completely random sequence of given length.
-        Each position is drawn iid from {A,C,G,T} uniformly.
-
-        Args:
-            length: desired sequence length (must be >0)
-            rng: numpy.random.Generator for reproducibility
-        Returns:
-            SequenceState wrapping the random array
-        """
-        assert length > 0, "Length must be positive"
-        # rng.integers(0,4) yields values 0,1,2,3 corresponding to A,C,G,T
-        random_seq = rng.integers(0, 4, size=length, dtype=int)
-        return SequenceState(seq=random_seq)
+    def random(length: int, rng) -> "SequenceState":
+        """Return a new random sequence of *length* bases drawn i.i.d. uniform."""
+        if length <= 0:
+            raise ValueError("length must be > 0")
+        return SequenceState(seq=rng.integers(0, 4, size=length, dtype=np.int8))
 
     @staticmethod
     def from_consensus(
         pwms: Dict[str, PWM],
-        mode: Literal["shortest", "longest"],
+        mode: str,
         target_length: int,
-        pad_with: Literal["background", "background_pwm", "A", "C", "G", "T"],
+        pad_with: str,
         rng,
-    ) -> SequenceState:
+    ) -> "SequenceState":
         """
-        Initialize a sequence by embedding the consensus of one PWM,
-        then padding both sides to reach `target_length`.
+        Construct a consensus-based sequence from a PWM.
 
-        Steps:
-          1) Pick the PWM with shortest or longest motif length.
-          2) Compute its consensus: at each column, take the base with max probability.
-          3) Choose a random insertion point: uniformly pick left padding size.
-          4) Pad flanks:
-             - "background": uniform iid bases
-             - "background_pwm": sample according to overall PWM base frequencies
-             - fixed base ("A"/"C"/"G"/"T"): repeat that base
+        Parameters
+        ----------
+        pwms : dict of {name: PWM}
+            At least one PWM must be provided; the first is used.
+        mode : str
+            'longest' to take the full PWM length (truncating if > target_length).
+            Other values treated similarly.
+        target_length : int
+            Desired final sequence length; consensus is padded or truncated to match.
+        pad_with : str
+            How to pad if consensus shorter than target_length:
+            - 'background' or 'background_pwm': random uniform draws of A/C/G/T
+            - one of 'A','C','G','T': repeat that base
+        rng : numpy.random.Generator
+            Random number generator for padding.
 
-        Args:
-            pwms: dict mapping TF name to PWM object
-            mode: "shortest" or "longest" to select which PWM
-            target_length: final sequence length (>= motif length)
-            pad_with: how to fill outside the consensus region
-            rng: numpy.random.Generator for reproducibility
-
-        Returns:
-            A new SequenceState with the embedded consensus.
+        Returns
+        -------
+        SequenceState
         """
-        # 1) choose PWM by length
-        pwm = (min if mode == "shortest" else max)(pwms.values(), key=lambda m: m.length)
-        # consensus: int codes for most likely base at each position
-        consensus = np.argmax(pwm.matrix, axis=1).astype(int)
-        motif_len = consensus.size
+        # Select the first PWM
+        pwm = next(iter(pwms.values()))
+        # Derive consensus by argmax across PWM probability matrix rows
+        consensus_ints = np.argmax(pwm.matrix, axis=1).astype(np.int8)
+        L0 = consensus_ints.size
 
-        if motif_len > target_length:
-            raise ValueError(f"Motif length {motif_len} > target_length {target_length}")
-
-        # 2) determine how many bases remain for padding
-        total_pad = target_length - motif_len
-        # choose left pad size uniformly from [0, total_pad]
-        left_pad = rng.integers(0, total_pad + 1)
-        right_pad = total_pad - left_pad
-
-        # 3) build padding arrays
-        if pad_with == "background":
-            # uniform random among {A,C,G,T}
-            left_arr = rng.integers(0, 4, size=left_pad)
-            right_arr = rng.integers(0, 4, size=right_pad)
-
-        elif pad_with == "background_pwm":
-            # compute overall base frequencies from all PWMs
-            counts = np.zeros(4, dtype=float)
-            total_positions = 0
-            for motif in pwms.values():
-                # sum probabilities per column
-                counts += motif.matrix.sum(axis=0)
-                total_positions += motif.length
-            # compute overall base frequencies and renormalize
-            freqs = counts / total_positions
-            freqs = freqs / freqs.sum()  # ensure sum==1
-            left_arr = rng.choice(4, size=left_pad, p=freqs)
-            right_arr = rng.choice(4, size=right_pad, p=freqs)
-
+        # Truncate or pad consensus to match target_length
+        if L0 >= target_length:
+            seq_arr = consensus_ints[:target_length]
         else:
-            # fixed base padding
-            base_idx = int(np.where(_ALPH == pad_with)[0])
-            left_arr = np.full(left_pad, base_idx, dtype=int)
-            right_arr = np.full(right_pad, base_idx, dtype=int)
-
-        # 4) concatenate padding + consensus + padding
-        full_seq = np.concatenate([left_arr, consensus, right_arr])
-        return SequenceState(seq=full_seq)
+            pad_n = target_length - L0
+            if pad_with.lower() in ("background", "background_pwm"):
+                pad_arr = rng.integers(0, 4, size=pad_n, dtype=np.int8)
+            else:
+                base = pad_with.upper()
+                idxs = np.where(_ALPH == base)[0]
+                if idxs.size == 0:
+                    raise ValueError(f"Unknown pad_with value '{pad_with}'")
+                pad_arr = np.full(pad_n, idxs[0], dtype=np.int8)
+            seq_arr = np.concatenate([consensus_ints, pad_arr])
+        return SequenceState(seq=seq_arr)
 
     def seq_str(self) -> str:
-        """
-        Convert the internal int array back to a string of ACGT.
-        """
+        """Return ACGT string representation of the sequence."""
         return "".join(_ALPH[self.seq])
 
     def seq_array(self) -> np.ndarray:
-        """
-        Return a copy of the internal numpy array for downstream processing.
-        """
+        """Return a *copy* of the underlying integer array."""
         return self.seq.copy()
