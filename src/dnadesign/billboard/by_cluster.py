@@ -8,10 +8,11 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-import os
 import logging
-import pandas as pd
+import os
+
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
 from tqdm import tqdm
 
@@ -19,6 +20,7 @@ from dnadesign.billboard.core import compute_core_metrics, process_sequences
 
 logger = logging.getLogger(__name__)
 sns.set_theme(style="ticks", font_scale=0.8)
+
 
 def compute_cluster_metrics(results, cfg):
     """
@@ -45,24 +47,18 @@ def compute_cluster_metrics(results, cfg):
     return df
 
 
-def save_cluster_characterization_scatter(df, cfg, path, dpi=600, figsize=(10,6)):
+def save_cluster_characterization_scatter(df, cfg, path, dpi=600, figsize=(10, 6)):
     logger.info(f"Saving cluster characterization scatter to {path}")
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     shapes = cfg["characterize_by_leiden_cluster"]["marker_shapes"]
-    title  = cfg["characterize_by_leiden_cluster"]["plot_title"]
+    title = cfg["characterize_by_leiden_cluster"]["plot_title"]
 
     plt.figure(figsize=figsize)
     for col in df.columns:
         if col == "meta_cluster_count":
             continue
-        plt.scatter(
-            df["meta_cluster_count"],
-            df[col],
-            label=col,
-            marker=shapes.get(col, "o"),
-            alpha=0.8
-        )
+        plt.scatter(df["meta_cluster_count"], df[col], label=col, marker=shapes.get(col, "o"), alpha=0.8)
     plt.xlabel("Cluster ID", fontsize=14)
     plt.ylabel("Metric Value", fontsize=14)
     plt.title(title, fontsize=16)

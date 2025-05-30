@@ -121,7 +121,7 @@ This style is appropriate for workflows that ***do not*** require heavy [dense a
 2. Install Dependencies
 
    ```bash
-   conda install pytorch torchvision torchaudio scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml leidenalg igraph openpyxl xlrd biopython tqdm python-levenshtein **pymc arviz logomaker typer pydantic** -c conda-forge -y
+   conda install pytorch torchvision torchaudio scanpy=1.10.3 seaborn numpy pandas matplotlib pyyaml leidenalg igraph openpyxl xlrd biopython tqdm python-levenshtein **pymc arviz logomaker typer pydantic** -c conda-forge -y
    ```
 
 3. Clone and Install the `dnadesign` Repository

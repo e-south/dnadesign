@@ -12,10 +12,14 @@ Dunlop Lab
 """
 
 from __future__ import annotations
+
 from typing import Dict
+
 import numpy as np
-from dnadesign.cruncher.sample.numba_helpers import best_score_pwm
+
 from dnadesign.cruncher.motif.model import PWM
+from dnadesign.cruncher.sample.numba_helpers import best_score_pwm
+
 
 class Scorer:
     """
@@ -35,11 +39,7 @@ class Scorer:
         # If the PWM file itself provided a log‐odds block, we use that directly;
         # otherwise we compute log2(prob/background) from the probability matrix.
         self.logodds: Dict[str, np.ndarray] = {
-            name: (
-                pwm.log_odds_matrix
-                if pwm.log_odds_matrix is not None
-                else pwm.log_odds()
-            )
+            name: (pwm.log_odds_matrix if pwm.log_odds_matrix is not None else pwm.log_odds())
             for name, pwm in pwms.items()
         }
 

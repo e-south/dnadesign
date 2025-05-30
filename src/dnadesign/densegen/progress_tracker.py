@@ -8,9 +8,11 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-from pathlib import Path
-import yaml
 import datetime
+from pathlib import Path
+
+import yaml
+
 
 class ProgressTracker:
     def __init__(self, progress_file: str):
@@ -26,7 +28,7 @@ class ProgressTracker:
                 "system_resources": {},
                 "config": {},
                 "meta_gap_fill_used": False,
-                "source": ""
+                "source": "",
             }
 
     def _load_status(self) -> dict:
@@ -50,7 +52,7 @@ class ProgressTracker:
             "arrays_generated_before_resample": config.get("arrays_generated_before_resample"),
             "solver": config.get("solver"),
             "solver_options": config.get("solver_options"),
-            "fixed_elements": config.get("fixed_elements")
+            "fixed_elements": config.get("fixed_elements"),
         }
         self.status["source"] = source_label
         self._save_status()

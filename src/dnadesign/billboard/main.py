@@ -8,39 +8,30 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-import os
 import datetime
-import yaml
 import logging
 from pathlib import Path
 
-from dnadesign.billboard.core import process_sequences, compute_core_metrics
-from dnadesign.billboard.summary import (
-    generate_csv_summaries,
-    generate_entropy_summary_csv,
-    print_summary
-)
+import yaml
+
+from dnadesign.billboard.by_cluster import compute_cluster_metrics, save_cluster_characterization_scatter
+from dnadesign.billboard.core import compute_core_metrics, process_sequences
 from dnadesign.billboard.plot_helpers import (
-    save_tf_frequency_barplot,
-    save_occupancy_plot,
-    save_motif_length_histogram,
-    save_tf_entropy_kde_plot,
     save_gini_lorenz_plot,
     save_jaccard_histogram,
+    save_motif_length_histogram,
+    save_occupancy_plot,
+    save_tf_entropy_kde_plot,
+    save_tf_frequency_barplot,
 )
-from dnadesign.billboard.by_cluster import (
-    compute_cluster_metrics,
-    save_cluster_characterization_scatter
-)
+from dnadesign.billboard.summary import generate_csv_summaries, generate_entropy_summary_csv, print_summary
 
 logger = logging.getLogger(__name__)
 
+
 def main():
     # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
     logger.info("Starting billboard pipeline")
 
     # Load config
@@ -154,7 +145,8 @@ def main():
             logger.info("Characterizing by Leiden cluster")
             dfc = compute_cluster_metrics(results, cfg)
             save_cluster_characterization_scatter(
-                dfc, cfg,
+                dfc,
+                cfg,
                 path=plot_dir / "cluster_char.png",
                 dpi=cfg["dpi"],
             )
@@ -162,6 +154,7 @@ def main():
     # Final summary
     print_summary(results)
     logger.info("Pipeline complete")
+
 
 if __name__ == "__main__":
     main()

@@ -37,10 +37,10 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-import sys
-from pathlib import Path
 import datetime
+import sys
 import uuid
+from pathlib import Path
 
 import pandas as pd
 
@@ -49,25 +49,26 @@ current_file = Path(__file__).resolve()
 src_dir = current_file.parent.parent.parent
 sys.path.insert(0, str(src_dir))
 
-from dnadesign.utils import load_dataset, SequenceSaver, BASE_DIR
+from dnadesign.utils import BASE_DIR, SequenceSaver, load_dataset
 
 # Constants for the module
 DATASET_KEY = "xiaowo_et_al"
 SHEETS = ["Lib2-EC", "Lib1-EC"]
 OUTPUT_SUBDIR = "seqbatch_xiaowo_et_al"
 
+
 def process_sheet(sheet_name: str) -> pd.DataFrame:
     """
     Process a single sheet from the xiaowo_et_al dataset.
-    
+
     For the given sheet:
       - Loads the sheet (header=0) using load_dataset().
       - Renames the first (unnamed) column to "name" and prepends the sheet name
         to each value.
-      - Renames the "Sequence" column (case-insensitive) to "sequence"; all other 
+      - Renames the "Sequence" column (case-insensitive) to "sequence"; all other
         columns are prefixed with "meta_".
       - Drops any rows that contain null values or any cell with a 0 value.
-    
+
     Returns:
         A cleaned pandas DataFrame.
     """
@@ -115,10 +116,11 @@ def process_sheet(sheet_name: str) -> pd.DataFrame:
     df = df[~df.apply(row_has_zero, axis=1)]
     return df
 
+
 def ingest():
     """
     Ingests and processes the xiaowo_et_al dataset across all defined sheets.
-    
+
     Returns:
         A list of dictionary entries representing standardized sequence data with only
         the desired keys:
@@ -147,7 +149,7 @@ def ingest():
             "sequence": row["sequence"],
             "meta_date_accessed": datetime.datetime.now().isoformat(),
             "meta_source": DATASET_KEY,
-            "meta_part_type": "engineered promoter"
+            "meta_part_type": "engineered promoter",
         }
         # Only include the allowed meta fields if they exist in the row.
         if "meta_exp_mean(log2)" in row:
@@ -158,20 +160,19 @@ def ingest():
         entries.append(entry)
     return entries
 
+
 def save_output(sequences: list):
     """
     Saves the list of sequence entries using the SequenceSaver utility.
-    
+
     The output is stored in a dedicated subfolder under the sequences/ directory.
     """
     output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / OUTPUT_SUBDIR
     output_dir.mkdir(parents=True, exist_ok=True)
     saver = SequenceSaver(str(output_dir))
-    additional_info = {
-        "source_file": DATASET_KEY,
-        "part_type": "engineered promoter"
-    }
+    additional_info = {"source_file": DATASET_KEY, "part_type": "engineered promoter"}
     saver.save_with_summary(sequences, f"{OUTPUT_SUBDIR}.pt", additional_info=additional_info)
+
 
 if __name__ == "__main__":
     seq_entries = ingest()

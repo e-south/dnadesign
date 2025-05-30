@@ -14,7 +14,7 @@ import numpy as np
 def normalize_array(arr, method="robust"):
     """
     Normalize an array using the specified method.
-    
+
     - If method is 'z-score', compute (arr - mean) / std.
     - If method is 'robust' (the default), compute (arr - median) / IQR,
       where IQR is the interquartile range (75th percentile minus 25th percentile).
@@ -34,6 +34,7 @@ def normalize_array(arr, method="robust"):
         return (arr - median) / iqr
     else:
         raise ValueError(f"Unknown normalization method: {method}")
+
 
 def extract_numeric_hue(data_entries, numeric_hue_config, normalization_method="robust"):
     """
@@ -61,7 +62,9 @@ def extract_numeric_hue(data_entries, numeric_hue_config, normalization_method="
             raise ValueError(f"Each numeric_hue config dictionary must have exactly one key-value pair, got: {item}.")
         for source, meta_key in item.items():
             if source in source_to_key:
-                raise ValueError(f"Multiple hue keys provided for source '{source}'. Please ensure only one meta key is provided per source (or comment out the extras).")
+                raise ValueError(
+                    f"Multiple hue keys provided for source '{source}'. Please ensure only one meta key is provided per source (or comment out the extras)."
+                )
             source_to_key[source] = meta_key
 
     # Extract values using the mapping
@@ -69,7 +72,9 @@ def extract_numeric_hue(data_entries, numeric_hue_config, normalization_method="
     for entry in data_entries:
         source = entry.get("meta_input_source")
         if source not in source_to_key:
-            raise ValueError(f"Data entry source '{source}' not found in numeric_hue configuration. Please update your config.")
+            raise ValueError(
+                f"Data entry source '{source}' not found in numeric_hue configuration. Please update your config."
+            )
         meta_key = source_to_key[source]
         val = entry.get(meta_key, None)
         if val is None:
@@ -84,25 +89,30 @@ def extract_numeric_hue(data_entries, numeric_hue_config, normalization_method="
     # Determine if we need to normalize
     unique_sources = set(entry.get("meta_input_source") for entry in data_entries)
     if len(unique_sources) > 1:
-        print(f"Applying {normalization_method} normalization to numeric hue values across {len(unique_sources)} sources.")
+        print(
+            f"Applying {normalization_method} normalization to numeric hue values across {len(unique_sources)} sources."
+        )
         hue_values = normalize_array(hue_values, method=normalization_method)
     else:
         print("Only one numeric hue entry provided; skipping normalization.")
 
     return hue_values
 
+
 def extract_type_hue(data_entries):
     """
     Extract hue values based on the part type. This function looks for the key
     'meta_part_type' in each data entry. If an entry is missing that key, an error is
     raised with a helpful hint.
-    
+
     Returns:
         A list of type values (one per data entry).
     """
     type_values = []
     for entry in data_entries:
         if "meta_part_type" not in entry:
-            raise ValueError("Data entry missing 'meta_part_type'. Please ensure every .pt file entry has this key (or update your configuration to use a different hue method).")
+            raise ValueError(
+                "Data entry missing 'meta_part_type'. Please ensure every .pt file entry has this key (or update your configuration to use a different hue method)."
+            )
         type_values.append(entry["meta_part_type"])
     return type_values

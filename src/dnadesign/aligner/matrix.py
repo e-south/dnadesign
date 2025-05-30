@@ -10,23 +10,23 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-import numpy as np
 from typing import List
-from .align import global_alignment
-from .utils import validate_sequence
 
-def build_score_matrix(sequences: List[str],
-                       match: int = 2,
-                       mismatch: int = -1,
-                       gap_open: int = 10,
-                       gap_extend: int = 1) -> np.ndarray:
+import numpy as np
+
+from .align import global_alignment
+
+
+def build_score_matrix(
+    sequences: List[str], match: int = 2, mismatch: int = -1, gap_open: int = 10, gap_extend: int = 1
+) -> np.ndarray:
     """
     Build a full symmetric score matrix for a list of sequences using global alignment.
-    
+
     Parameters:
         sequences: List of nucleotide sequences (already validated and uppercase).
         match, mismatch, gap_open, gap_extend: Alignment parameters.
-    
+
     Returns:
         An N x N NumPy array of pairwise alignment scores.
     """
@@ -37,20 +37,21 @@ def build_score_matrix(sequences: List[str],
             if i == j:
                 score_matrix[i, j] = match * len(sequences[i])
             else:
-                score = global_alignment(sequences[i], sequences[j],
-                                         match=match, mismatch=mismatch,
-                                         gap_open=gap_open, gap_extend=gap_extend)
+                score = global_alignment(
+                    sequences[i], sequences[j], match=match, mismatch=mismatch, gap_open=gap_open, gap_extend=gap_extend
+                )
                 score_matrix[i, j] = score
                 score_matrix[j, i] = score
     return score_matrix
 
+
 def matrix_to_condensed(score_matrix: np.ndarray) -> np.ndarray:
     """
     Convert a full square matrix to a SciPy-style condensed (upper-triangular) vector.
-    
+
     Parameters:
         score_matrix: An N x N symmetric NumPy array.
-    
+
     Returns:
         A 1D NumPy array containing the upper-triangular elements (excluding the diagonal).
     """

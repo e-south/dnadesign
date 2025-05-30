@@ -14,24 +14,24 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-import yaml
+import copy
 import random
-import time
 from pathlib import Path
-import datetime
+
 import pandas as pd
 import torch
-import copy
+import yaml
 
-from dnadesign.utils import BASE_DIR, ConfigLoader, SequenceSaver, generate_sequence_entry
 from dnadesign.densegen.data_ingestor import data_source_factory
-from dnadesign.densegen.sampler import TFSampler
 from dnadesign.densegen.optimizer_wrapper import DenseArrayOptimizer, random_fill
 from dnadesign.densegen.progress_tracker import ProgressTracker
+from dnadesign.densegen.sampler import TFSampler
+from dnadesign.utils import BASE_DIR, ConfigLoader, SequenceSaver, generate_sequence_entry
 
 
 def select_solver(preferred: str, fallback: str, library: list, test_length: int = 10) -> tuple[str, list]:
     import dense_arrays as da
+
     try:
         dummy_optimizer = da.Optimizer(library=library, sequence_length=test_length)
         _ = dummy_optimizer.optimal(solver=preferred)
@@ -42,7 +42,9 @@ def select_solver(preferred: str, fallback: str, library: list, test_length: int
         return fallback, []
 
 
-def _process_single_source(source_config: dict, densegen_config: dict, output_base_folder: Path, max_sequences: int = None):
+def _process_single_source(
+    source_config: dict, densegen_config: dict, output_base_folder: Path, max_sequences: int = None
+):
     """
     Processes a single input source (or sub‐batch).
     Samples binding sites using a length-budget approach,
@@ -55,7 +57,7 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
         source_config["name"] = Path(source_config["path"]).stem
     source_label = source_config["name"]
     print(f"\n=== Processing source: {source_label} ===")
-    
+
     # Load data using the data source factory.
     source_obj = data_source_factory(source_config)
     data_entries, meta_data = source_obj.load_data()
@@ -65,7 +67,9 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
         if not all_sequences:
             raise ValueError(f"PT file for source {source_label} contains no sequences.")
         subsample_size = densegen_config.get("subsample_size", 10)
-        library_for_optim = [seq.strip().upper() for seq in random.sample(all_sequences, min(subsample_size, len(all_sequences)))]
+        library_for_optim = [
+            seq.strip().upper() for seq in random.sample(all_sequences, min(subsample_size, len(all_sequences)))
+        ]
         meta_tfbs_parts = []  # No TF–TFBS pairing for PT data.
     elif isinstance(meta_data, pd.DataFrame) and not meta_data.empty:
         sampler = TFSampler(meta_data)
@@ -83,15 +87,16 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
     sequence_length = densegen_config.get("sequence_length", 100)
     quota = densegen_config.get("quota", 5)
     # Consolidate subsample quota to the user-defined arrays_generated_before_resample key.
-    max_solutions_per_subsample = densegen_config.get("max_solutions_per_subsample", 
-                                        densegen_config.get("arrays_generated_before_resample", 1))
+    max_solutions_per_subsample = densegen_config.get(
+        "max_solutions_per_subsample", densegen_config.get("arrays_generated_before_resample", 1)
+    )
     fixed_elements = densegen_config.get("fixed_elements", {})
     fill_gap = densegen_config.get("fill_gap", False)
     fill_gap_end = densegen_config.get("fill_gap_end", "5prime")
     fill_gc_min = densegen_config.get("fill_gc_min", 0.40)
     fill_gc_max = densegen_config.get("fill_gc_max", 0.60)
     use_diverse_solver = densegen_config.get("diverse_solution", False)
-    
+
     out_folder_name = f"densebatch_{source_config['type'].lower()}_{source_label}_n{quota}"
     batch_folder = output_base_folder / out_folder_name
     batch_folder.mkdir(parents=True, exist_ok=True)
@@ -117,19 +122,19 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
             "system_resources": {},
             "config": {},
             "meta_gap_fill_used": False,
-            "source": source_label
+            "source": source_label,
         }
         current_total = 0
         existing_results = []
-    
+
     selected_solver, extra_solver_options = select_solver(preferred_solver, "CBC", library_for_optim or [])
     densegen_config["solver"] = selected_solver
     if extra_solver_options:
         solver_options.extend(extra_solver_options)
-    
+
     progress_tracker = ProgressTracker(str(progress_file))
     progress_tracker.update_batch_config(densegen_config, source_label)
-    
+
     sequence_saver = SequenceSaver(str(batch_folder))
     generated_entries = existing_results[:]
     global_generated = current_total
@@ -138,15 +143,21 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
     max_forbidden_repeats = 1
 
     while global_generated < quota and (max_sequences is None or new_generated < max_sequences):
-        print(f"\nSource {source_label}: New TFBS library sample; generating up to {max_solutions_per_subsample} arrays from this set...")
+        print(
+            f"\nSource {source_label}: New TFBS library sample; generating up to {max_solutions_per_subsample} arrays from this set..."
+        )
         if source_config["type"].lower() != "pt":
             sampler = TFSampler(meta_data)
             budget_overhead = densegen_config.get("subsample_over_length_budget_by", 30)
-            library_for_optim, meta_tfbs_parts = sampler.generate_binding_site_subsample(sequence_length, budget_overhead)
+            library_for_optim, meta_tfbs_parts = sampler.generate_binding_site_subsample(
+                sequence_length, budget_overhead
+            )
         else:
             subsample_size = densegen_config.get("subsample_size", 10)
-            library_for_optim = [seq.strip().upper() for seq in random.sample(all_sequences, min(subsample_size, len(all_sequences)))]
-        
+            library_for_optim = [
+                seq.strip().upper() for seq in random.sample(all_sequences, min(subsample_size, len(all_sequences)))
+            ]
+
         print(f"Subsample contains {len(library_for_optim)} binding sites.")
         fp_library = tuple(sorted(library_for_optim))
         if max_solutions_per_subsample == 1 and fp_library in forbidden_libraries:
@@ -162,7 +173,7 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
             fill_gap=fill_gap,
             fill_gap_end=fill_gap_end,
             fill_gc_min=fill_gc_min,
-            fill_gc_max=fill_gc_max
+            fill_gc_max=fill_gc_max,
         )
         opt_inst = optimizer_wrapper.get_optimizer_instance()
         local_generated = 0
@@ -196,10 +207,12 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
             # Forbid the original solution (which is all uppercase) for duplicate checking.
             opt_inst.forbid(sol)
             fingerprint = sol.sequence
-                                
+
             if fingerprint in local_forbidden:
                 consecutive_duplicates += 1
-                print(f"Source {source_label}: Duplicate solution encountered; consecutive duplicates: {consecutive_duplicates}")
+                print(
+                    f"Source {source_label}: Duplicate solution encountered; consecutive duplicates: {consecutive_duplicates}"
+                )
                 if consecutive_duplicates >= max_consecutive_duplicates:
                     print(f"Source {source_label}: Too many consecutive duplicates; moving to a new library sample.")
                     break
@@ -217,11 +230,11 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
                 else:
                     final_sol.sequence = final_sol.sequence + fill_seq
                 setattr(final_sol, "meta_gap_fill", True)
-                setattr(final_sol, "meta_gap_fill_details", {
-                    "fill_gap": gap,
-                    "fill_end": fill_gap_end,
-                    "fill_gc_range": (fill_gc_min, fill_gc_max)
-                })
+                setattr(
+                    final_sol,
+                    "meta_gap_fill_details",
+                    {"fill_gap": gap, "fill_end": fill_gap_end, "fill_gc_range": (fill_gc_min, fill_gc_max)},
+                )
 
             entry = generate_sequence_entry(final_sol, [source_label], meta_tfbs_parts, densegen_config)
             entry["meta_source"] = f"deg2tfbs_{source_label}"
@@ -233,9 +246,11 @@ def _process_single_source(source_config: dict, densegen_config: dict, output_ba
 
             if local_generated >= max_solutions_per_subsample:
                 break
-            
+
             print(f"\nGlobal Quota Progress: {current_global}/{quota} ({global_progress_pct:.1f}%)")
-            print(f"Subsample Progress: {local_generated+1}/{max_solutions_per_subsample} ({subsample_progress_pct:.1f}%)")
+            print(
+                f"Subsample Progress: {local_generated+1}/{max_solutions_per_subsample} ({subsample_progress_pct:.1f}%)"
+            )
             print("Compression Ratio:", sol.compression_ratio)
             print("Transcription Factors:", ", ".join(tf_names))
             print("Dense Visual:\n", sol.original_visual)
@@ -255,7 +270,7 @@ def get_sub_batches(source_config: dict, densegen_config: dict) -> list:
     clusters = source_config.get("clusters")
     fixed_elements = densegen_config.get("fixed_elements", {})
     promoter_constraints = fixed_elements.get("promoter_constraints")
-    
+
     if clusters and isinstance(clusters, list) and len(clusters) > 0:
         if promoter_constraints and isinstance(promoter_constraints, list) and len(promoter_constraints) > 1:
             for constraint in promoter_constraints:
@@ -307,13 +322,13 @@ def process_source(source_config: dict, densegen_config: dict, output_base_folde
     Processes a single input source by splitting it into sub-batches.
     """
     sub_batches = get_sub_batches(source_config, densegen_config)
-    
+
     # Pre-create all output directories for sub-batches.
     for sub_cfg, sub_dense_cfg in sub_batches:
         out_folder_name = f"densebatch_{sub_cfg['type'].lower()}_{sub_cfg['name']}_n{sub_dense_cfg.get('quota')}"
         batch_folder = output_base_folder / out_folder_name
         batch_folder.mkdir(parents=True, exist_ok=True)
-    
+
     if not densegen_config.get("round_robin", False):
         for sub_cfg, sub_dense_cfg in sub_batches:
             _process_single_source(sub_cfg, sub_dense_cfg, output_base_folder)
@@ -323,7 +338,9 @@ def process_source(source_config: dict, densegen_config: dict, output_base_folde
         while not all_done:
             all_done = True
             for sub_cfg, sub_dense_cfg in sub_batches:
-                out_folder_name = f"densebatch_{sub_cfg['type'].lower()}_{sub_cfg['name']}_n{sub_dense_cfg.get('quota')}"
+                out_folder_name = (
+                    f"densebatch_{sub_cfg['type'].lower()}_{sub_cfg['name']}_n{sub_dense_cfg.get('quota')}"
+                )
                 batch_folder = output_base_folder / out_folder_name
                 progress_file = batch_folder / f"progress_status_{sub_cfg['name']}.yaml"
                 current_count = 0
@@ -339,13 +356,13 @@ def process_source(source_config: dict, densegen_config: dict, output_base_folde
 def main():
     config_path = BASE_DIR / "src" / "dnadesign" / "configs" / "example.yaml"
     config_loader = ConfigLoader(config_path)
-    densegen_config = config_loader.config  
+    densegen_config = config_loader.config
     input_source_configs = densegen_config.get("input_sources", [])
     assert input_source_configs, "No input sources defined in configuration."
-    
+
     output_base_folder = Path(__file__).parent.parent / densegen_config.get("output_dir", "sequences")
     output_base_folder.mkdir(parents=True, exist_ok=True)
-    
+
     if densegen_config.get("round_robin", False):
         # For round-robin, collect sub-batches from all input sources.
         all_sub_batches = []
@@ -362,7 +379,9 @@ def main():
         while not all_done:
             all_done = True
             for sub_cfg, sub_dense_cfg in all_sub_batches:
-                out_folder_name = f"densebatch_{sub_cfg['type'].lower()}_{sub_cfg['name']}_n{sub_dense_cfg.get('quota')}"
+                out_folder_name = (
+                    f"densebatch_{sub_cfg['type'].lower()}_{sub_cfg['name']}_n{sub_dense_cfg.get('quota')}"
+                )
                 batch_folder = output_base_folder / out_folder_name
                 progress_file = batch_folder / f"progress_status_{sub_cfg['name']}.yaml"
                 current_count = 0
@@ -377,7 +396,7 @@ def main():
         # Process each input source separately.
         for src_cfg in input_source_configs:
             process_source(copy.deepcopy(src_cfg), copy.deepcopy(densegen_config), output_base_folder)
-    
+
     print("\nAll input sources processed. Dense array generation complete.")
 
 

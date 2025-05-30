@@ -10,19 +10,20 @@ Dunlop Lab
 
 from typing import Any
 
+
 def validate_sequence(seq: Any) -> str:
     """
     Validate and clean a nucleotide sequence.
-    
+
     Ensures that the sequence is a non-empty string, converts it to uppercase,
     and checks that it contains only valid nucleotide characters (A, C, G, T, N).
-    
+
     Parameters:
         seq: The input sequence (expected to be a string).
-    
+
     Returns:
         The cleaned and validated sequence in uppercase.
-    
+
     Raises:
         ValueError: If the sequence is invalid.
     """
@@ -35,17 +36,18 @@ def validate_sequence(seq: Any) -> str:
             raise ValueError(f"Invalid character '{base}' in sequence: {seq}")
     return seq
 
+
 def extract_sequence(item: Any, key: str = "sequence") -> str:
     """
     Extract a sequence from an item, which can be either a string or a dictionary.
-    
+
     Parameters:
         item: A sequence string or a dict containing a sequence.
         key: The key to use for extraction if item is a dict.
-    
+
     Returns:
         The cleaned and validated sequence.
-    
+
     Raises:
         ValueError: If the sequence cannot be extracted.
     """

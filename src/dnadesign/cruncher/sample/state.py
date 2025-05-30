@@ -22,14 +22,17 @@ Dunlop Lab
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Dict, Literal
+
 import numpy as np
 
 from dnadesign.cruncher.motif.model import PWM
 
 # Map integer codes back to bases for human-readable output
 _ALPH = np.array(["A", "C", "G", "T"], dtype="<U1")
+
 
 @dataclass(frozen=True)
 class SequenceState:
@@ -84,17 +87,13 @@ class SequenceState:
             A new SequenceState with the embedded consensus.
         """
         # 1) choose PWM by length
-        pwm = (min if mode == "shortest" else max)(
-            pwms.values(), key=lambda m: m.length
-        )
+        pwm = (min if mode == "shortest" else max)(pwms.values(), key=lambda m: m.length)
         # consensus: int codes for most likely base at each position
         consensus = np.argmax(pwm.matrix, axis=1).astype(int)
         motif_len = consensus.size
 
         if motif_len > target_length:
-            raise ValueError(
-                f"Motif length {motif_len} > target_length {target_length}"
-            )
+            raise ValueError(f"Motif length {motif_len} > target_length {target_length}")
 
         # 2) determine how many bases remain for padding
         total_pad = target_length - motif_len
@@ -106,7 +105,7 @@ class SequenceState:
         if pad_with == "background":
             # uniform random among {A,C,G,T}
             left_arr = rng.integers(0, 4, size=left_pad)
-            right_arr= rng.integers(0, 4, size=right_pad)
+            right_arr = rng.integers(0, 4, size=right_pad)
 
         elif pad_with == "background_pwm":
             # compute overall base frequencies from all PWMs
@@ -118,14 +117,14 @@ class SequenceState:
                 total_positions += motif.length
             # compute overall base frequencies and renormalize
             freqs = counts / total_positions
-            freqs = freqs / freqs.sum()        # ensure sum==1
-            left_arr  = rng.choice(4, size=left_pad,  p=freqs)
+            freqs = freqs / freqs.sum()  # ensure sum==1
+            left_arr = rng.choice(4, size=left_pad, p=freqs)
             right_arr = rng.choice(4, size=right_pad, p=freqs)
 
         else:
             # fixed base padding
             base_idx = int(np.where(_ALPH == pad_with)[0])
-            left_arr  = np.full(left_pad,  base_idx, dtype=int)
+            left_arr = np.full(left_pad, base_idx, dtype=int)
             right_arr = np.full(right_pad, base_idx, dtype=int)
 
         # 4) concatenate padding + consensus + padding

@@ -9,8 +9,9 @@ Dunlop Lab
 """
 
 from pathlib import Path
+
 import arviz as az
-import json
+
 
 def report_convergence(idata: az.InferenceData, out_dir: Path) -> None:
     """
@@ -18,7 +19,7 @@ def report_convergence(idata: az.InferenceData, out_dir: Path) -> None:
     save a JSON or TXT summary → convergence.txt
     """
     rhat = az.rhat(idata, var_names=["score"])["score"].item()
-    ess  = az.ess(idata, var_names=["score"])["score"].item()
+    ess = az.ess(idata, var_names=["score"])["score"].item()
     out = out_dir / "convergence.txt"
     out_dir.mkdir(exist_ok=True, parents=True)
     with out.open("w") as fh:

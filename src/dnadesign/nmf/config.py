@@ -9,7 +9,9 @@ Dunlop Lab
 """
 
 import os
+
 import yaml
+
 
 def load_config(config_path: str = "../configs/example.yaml") -> dict:
     """

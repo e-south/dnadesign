@@ -23,15 +23,16 @@ current_file = Path(__file__).resolve()
 src_dir = current_file.parent.parent.parent
 sys.path.insert(0, str(src_dir))
 
-import pandas as pd
-import re
 import datetime
+import re
 import uuid
-import yaml
 
-from dnadesign.utils import load_dataset, SequenceSaver, DATA_FILES, BASE_DIR
+import pandas as pd
+
+from dnadesign.utils import BASE_DIR, SequenceSaver, load_dataset
 
 VALID_NUCLEOTIDES = set("ATCG")
+
 
 def clean_sequence(seq: str) -> str:
     if not isinstance(seq, str):
@@ -39,6 +40,7 @@ def clean_sequence(seq: str) -> str:
     seq = seq.strip().upper()
     seq = re.sub(r"\s+", "", seq)
     return "".join(c for c in seq if c in VALID_NUCLEOTIDES)
+
 
 def validate_entry(name: str, seq: str):
     if not name or pd.isna(name):
@@ -48,6 +50,7 @@ def validate_entry(name: str, seq: str):
     for c in seq:
         if c not in VALID_NUCLEOTIDES:
             raise AssertionError(f"Invalid nucleotide '{c}' in sequence: {seq}")
+
 
 def ingest():
     df = load_dataset("regulondb_13_promoter_FliA_set", header=0)
@@ -71,20 +74,19 @@ def ingest():
             "sequence": seq,
             "meta_source": "regulondb_13_promoter_FliA_set",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
-            "meta_part_type": "natural promoter"
+            "meta_part_type": "natural promoter",
         }
         sequences.append(entry)
     return sequences
+
 
 def save_output(sequences):
     output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_regulondb_13_promoter_FliA_set"
     output_dir.mkdir(parents=True, exist_ok=True)
     saver = SequenceSaver(str(output_dir))
-    additional_info = {
-        "source_file": "regulondb_13_promoter_FliA_set",
-        "part_type": "promoter"
-    }
+    additional_info = {"source_file": "regulondb_13_promoter_FliA_set", "part_type": "promoter"}
     saver.save_with_summary(sequences, "seqbatch_regulondb_13_promoter_FliA_set.pt", additional_info=additional_info)
+
 
 if __name__ == "__main__":
     seqs = ingest()

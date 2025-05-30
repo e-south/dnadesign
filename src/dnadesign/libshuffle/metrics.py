@@ -14,20 +14,23 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-import torch
-import numpy as np
-import torch.nn.functional as F
-from typing import List, Dict, Any
-from dnadesign.aligner.metrics import mean_pairwise
-from pathlib import Path
-import tempfile
-from dnadesign.billboard.core import process_sequences, compute_core_metrics
-from contextlib import contextmanager
 import logging
+import tempfile
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any, Dict, List
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+
+from dnadesign.aligner.metrics import mean_pairwise
+from dnadesign.billboard.core import compute_core_metrics, process_sequences
+
 
 @contextmanager
 def _silence_billboard():
-    keys = [n for n in logging.root.manager.loggerDict if n.startswith('dnadesign.billboard')]
+    keys = [n for n in logging.root.manager.loggerDict if n.startswith("dnadesign.billboard")]
     orig_levels = {n: logging.getLogger(n).level for n in keys}
     for n in keys:
         logging.getLogger(n).setLevel(logging.WARNING)
@@ -47,14 +50,14 @@ def compute_pairwise_stats(subsample: List[dict]) -> Dict[str, float]:
     """
     vecs = []
     for e in subsample:
-        v = e.get('evo2_logits_mean_pooled')
+        v = e.get("evo2_logits_mean_pooled")
         if v is None:
             raise KeyError("Missing Evo2 embedding in subsample.")
         t = v.flatten().float() if isinstance(v, torch.Tensor) else torch.tensor(v, dtype=torch.float32)
         vecs.append(t)
     M = torch.stack(vecs)
     if M.size(0) < 2:
-        return {k: 0.0 for k in ['mean_cosine','min_cosine','mean_euclidean','min_euclidean']}
+        return {k: 0.0 for k in ["mean_cosine", "min_cosine", "mean_euclidean", "min_euclidean"]}
     D_euc = torch.cdist(M, M, p=2)
     N = F.normalize(M, dim=1)
     D_cos = 1.0 - (N @ N.T)
@@ -62,10 +65,10 @@ def compute_pairwise_stats(subsample: List[dict]) -> Dict[str, float]:
     vals_euc = D_euc[mask]
     vals_cos = D_cos[mask]
     return {
-        'mean_cosine': float(vals_cos.mean().item()),
-        'min_cosine':   float(vals_cos.min().item()),
-        'mean_euclidean': float(vals_euc.mean().item()),
-        'min_euclidean':   float(vals_euc.min().item()),
+        "mean_cosine": float(vals_cos.mean().item()),
+        "min_cosine": float(vals_cos.min().item()),
+        "mean_euclidean": float(vals_euc.mean().item()),
+        "min_euclidean": float(vals_euc.min().item()),
     }
 
 
@@ -75,7 +78,7 @@ def compute_evo2_pairwise_matrix(sequences: List[dict], indices: List[int], cfg:
     """
     vecs = []
     for i in indices:
-        emb = sequences[i].get('evo2_logits_mean_pooled')
+        emb = sequences[i].get("evo2_logits_mean_pooled")
         if emb is None:
             raise KeyError(f"Missing Evo2 embedding for sequence index {i}")
         t = emb.flatten().float() if isinstance(emb, torch.Tensor) else torch.tensor(emb, dtype=torch.float32)
@@ -99,17 +102,17 @@ def compute_billboard_metric(subsample: List[dict], cfg: Any) -> dict:
         torch.save(subsample, temp_pt)
 
         bb_cfg = {
-            'diversity_metrics': cfg.billboard_core_metrics,
-            'pt_files': [str(temp_pt)],
-            'dry_run': True,
-            'skip_aligner_call': False,
+            "diversity_metrics": cfg.billboard_core_metrics,
+            "pt_files": [str(temp_pt)],
+            "dry_run": True,
+            "skip_aligner_call": False,
         }
         # ensure motif_string penalty injected if needed
-        if 'min_motif_string_levenshtein' in cfg.billboard_core_metrics:
-            bb_cfg['motif_string_levenshtein'] = {
-                'tf_penalty': 1.0,
-                'strand_penalty': 0.5,
-                'partial_penalty': 0.8,
+        if "min_motif_string_levenshtein" in cfg.billboard_core_metrics:
+            bb_cfg["motif_string_levenshtein"] = {
+                "tf_penalty": 1.0,
+                "strand_penalty": 0.5,
+                "partial_penalty": 0.8,
             }
 
         results = process_sequences([str(temp_pt)], bb_cfg)
@@ -117,9 +120,7 @@ def compute_billboard_metric(subsample: List[dict], cfg: Any) -> dict:
 
     # 2) compute NW similarity *without* on‑disk caching
     nw_sim = mean_pairwise(
-        subsample,
-        use_cache=False,    # ← turn off disk cache
-        cache_dir=None      # ← avoids any default cache directory
+        subsample, use_cache=False, cache_dir=None  # ← turn off disk cache  # ← avoids any default cache directory
     )
 
     # 3) assemble final core dict, mapping Billboard + our NW dissimilarity
@@ -127,11 +128,11 @@ def compute_billboard_metric(subsample: List[dict], cfg: Any) -> dict:
     for m in cfg.billboard_core_metrics:
         if m in full_core:
             core[m] = full_core[m]
-        elif m == 'min_nw_dissimilarity' and 'nw_dissimilarity' in full_core:
+        elif m == "min_nw_dissimilarity" and "nw_dissimilarity" in full_core:
             # if user asked for min_nw_dissimilarity but we only got nw_dissimilarity
-            core[m] = full_core['nw_dissimilarity']
+            core[m] = full_core["nw_dissimilarity"]
 
     # overwrite / add the true fresh min_nw_dissimilarity
-    core['min_nw_dissimilarity'] = 1.0 - nw_sim
+    core["min_nw_dissimilarity"] = 1.0 - nw_sim
 
     return core

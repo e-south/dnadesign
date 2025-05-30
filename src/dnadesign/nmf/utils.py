@@ -8,12 +8,14 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+
 def reverse_complement(seq: str) -> str:
     """
     Return the reverse complement of a DNA sequence.
     """
     complement = str.maketrans("ATCG", "TAGC")
     return seq.translate(complement)[::-1]
+
 
 def build_motif2tf_map(sequences):
     """

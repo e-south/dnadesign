@@ -8,9 +8,11 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-import time
 import random
+import time
+
 import dense_arrays as da
+
 
 def random_fill(length: int, gc_min: float = 0.40, gc_max: float = 0.60) -> str:
     nucleotides = "atgc"  # lower-case nucleotides for gap fill
@@ -23,9 +25,18 @@ def random_fill(length: int, gc_min: float = 0.40, gc_max: float = 0.60) -> str:
 
 
 class DenseArrayOptimizer:
-    def __init__(self, library: list, sequence_length: int, solver: str = "CBC",
-                 solver_options: list = None, fixed_elements: dict = None, fill_gap: bool = False,
-                 fill_gap_end: str = "3prime", fill_gc_min: float = 0.40, fill_gc_max: float = 0.60):
+    def __init__(
+        self,
+        library: list,
+        sequence_length: int,
+        solver: str = "CBC",
+        solver_options: list = None,
+        fixed_elements: dict = None,
+        fill_gap: bool = False,
+        fill_gap_end: str = "3prime",
+        fill_gc_min: float = 0.40,
+        fill_gc_max: float = 0.60,
+    ):
         # Filter out motifs that are not strings, are empty, or contain invalid characters.
         valid_nucleotides = {"A", "T", "G", "C"}
         filtered_library = []
@@ -99,7 +110,6 @@ class DenseArrayOptimizer:
             if left and any(item is not None for item in left):
                 opt_inst.add_side_biases(left=left, right=right)
         return opt_inst
-
 
     def optimize(self, timeout_seconds: int = 30) -> da.DenseArray:
         start_time = time.time()

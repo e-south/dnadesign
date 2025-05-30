@@ -34,15 +34,16 @@ current_file = Path(__file__).resolve()
 src_dir = current_file.parent.parent.parent
 sys.path.insert(0, str(src_dir))
 
-import pandas as pd
-import re
 import datetime
+import re
 import uuid
-import yaml
 
-from dnadesign.utils import load_dataset, SequenceSaver, DATA_FILES, BASE_DIR
+import pandas as pd
+
+from dnadesign.utils import BASE_DIR, SequenceSaver, load_dataset
 
 VALID_NUCLEOTIDES = set("ATCG")
+
 
 def clean_sequence(seq: str) -> str:
     if not isinstance(seq, str):
@@ -52,6 +53,7 @@ def clean_sequence(seq: str) -> str:
     # Trim trailing 12 characters (barcode) if possible
     return seq[:-12] if len(seq) >= 12 else ""
 
+
 def validate_entry(name: str, seq: str):
     if not name or pd.isna(name):
         raise AssertionError("Empty name field.")
@@ -60,6 +62,7 @@ def validate_entry(name: str, seq: str):
     for c in seq:
         if c not in VALID_NUCLEOTIDES:
             raise AssertionError(f"Invalid nucleotide '{c}' in sequence: {seq}")
+
 
 def ingest():
     df = load_dataset("sun_yim_et_al", sheet_name="Fig. 1D", header=0)
@@ -85,20 +88,19 @@ def ingest():
             "meta_date_accessed": datetime.datetime.now().isoformat(),
             "meta_gene_in_vitro_tx": row.get("Gen_in vitro_tx"),
             "meta_gene_in_vivo_tx": row.get("Gen_in vivo_tx"),
-            "meta_part_type": "promoter"
+            "meta_part_type": "promoter",
         }
         sequences.append(entry)
     return sequences
+
 
 def save_output(sequences):
     output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_sun_yim_et_al"
     output_dir.mkdir(parents=True, exist_ok=True)
     saver = SequenceSaver(str(output_dir))
-    additional_info = {
-        "source_file": "sun_yim_et_al",
-        "part_type": "engineered promoter"
-    }
+    additional_info = {"source_file": "sun_yim_et_al", "part_type": "engineered promoter"}
     saver.save_with_summary(sequences, "seqbatch_sun_yim_et_al.pt", additional_info=additional_info)
+
 
 if __name__ == "__main__":
     seqs = ingest()

@@ -8,8 +8,10 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+from typing import Dict, List, Tuple
+
 import torch
-from typing import Tuple, List, Dict
+
 
 def robust_parse_tfbs(part: str, seq_id: str = "unknown") -> Tuple[str, str]:
     """
@@ -43,6 +45,7 @@ def robust_parse_tfbs(part: str, seq_id: str = "unknown") -> Tuple[str, str]:
         raise ValueError(f"Motif candidate '{motif_candidate}' is not valid in sequence {seq_id}")
     tf_name = "_".join(parts[1:-1]).strip().lower() if len(parts) > 2 else parts[0].strip().lower()
     return tf_name, motif_candidate
+
 
 def load_pt_file(pt_path: str) -> List[Dict]:
     """

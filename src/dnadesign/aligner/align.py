@@ -25,36 +25,40 @@ Dunlop Lab
 
 from Bio.Align import PairwiseAligner
 
-def global_alignment(seqA: str, seqB: str, 
-                     match: int = 2, 
-                     mismatch: int = -1, 
-                     gap_open: int = 10,   # Updated default for affine gap: 10 (=> -10 internally)
-                     gap_extend: int = 1,  # Updated default for affine gap: 1 (=> -1 internally)
-                     return_alignment_str: bool = False):
+
+def global_alignment(
+    seqA: str,
+    seqB: str,
+    match: int = 2,
+    mismatch: int = -1,
+    gap_open: int = 10,  # Updated default for affine gap: 10 (=> -10 internally)
+    gap_extend: int = 1,  # Updated default for affine gap: 1 (=> -1 internally)
+    return_alignment_str: bool = False,
+):
     """
     Perform a global alignment between two sequences using PairwiseAligner
     with affine gap penalties.
-    
+
     Parameters:
         seqA (str): First nucleotide sequence.
         seqB (str): Second nucleotide sequence.
         match (int): Score for a match (default: 2).
         mismatch (int): Penalty for a mismatch (default: -1).
-        gap_open (int): Gap opening penalty (positive value; default: 10), 
+        gap_open (int): Gap opening penalty (positive value; default: 10),
                         internally used as -10.
         gap_extend (int): Gap extension penalty (positive value; default: 1),
                           internally used as -1.
         return_alignment_str (bool): If True, returns a tuple (score, alignment_str)
                                      where alignment_str is the full (global) alignment.
                                      Otherwise, returns only the score.
-    
+
     Returns:
         If return_alignment_str is False:
             float: The best alignment score.
         Else:
             tuple: (score (float), alignment_str (str)) where the alignment_str is the
                    full, end-to-end global alignment.
-    
+
     Raises:
         RuntimeError: If an error occurs during alignment.
     """
@@ -66,7 +70,7 @@ def global_alignment(seqA: str, seqB: str,
         # Convert the positive gap penalties to negatives for proper affine gap scoring.
         aligner.open_gap_score = -abs(gap_open)
         aligner.extend_gap_score = -abs(gap_extend)
-        
+
         # Compute alignments.
         alignments = aligner.align(seqA, seqB)
         if not alignments:

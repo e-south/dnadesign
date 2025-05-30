@@ -28,7 +28,7 @@ dnadesign/
 ├─ configs/            # your YAMLs (examples inside)
 └─ cruncher/
    ├─ motif/           # PWM dataclass + plug-in parsers
-   ├─ sample/         # state, scorer, optimisers (Gibbs, SA, …)
+   ├─ sample/          # state, scorer, optimisers (Gibbs, SA, …)
    ├─ plots/           # PSSM logos + MCMC diagnostics
    ├─ persistence/     # save/load csv, trace.nc, etc.
    └─ results/         # auto-created batch folders
@@ -38,10 +38,11 @@ dnadesign/
 
 ```yaml
 cruncher:
-  mode: parse                     # parse | sample | analyse
+  mode: sample                    # parse | sample | analyse
   out_dir: results/               # where all outputs land
   regulator_sets:                 # list of regulator sets to use   
     - [cpxR, soxR]                # set #1: two TFs
+    # - [crp, fis, ihf]           # set #2: three TFs
   motif:                          # parse-specific config
     formats:
       .txt: MEME
@@ -50,17 +51,28 @@ cruncher:
       logo:      true
       bits_mode: information
       dpi:       200
-  sample:                         # sample-specific config   
+  sample:
+    bidirectional: true           # score sequences based on both forward and reverse-complement (take max per-PWM)
+    init:
+      kind: random                # random, consensus_shortest, consensus_longest, or integer length 
+      pad_with: background_pwm    # background (uniform iid), background_pwm (sample i.i.d. from overall PWM base frequencies)
     optimiser:
       kind: gibbs
       gibbs:
-        draws:    80000
-        tune:     20000
-        beta:     2.0
-        chains:   4
+        draws:    400             # recorded Gibbs sweeps; each produces one full-sequence sample
+        tune:     0               # “burn-in” Gibbs sweeps not recorded—allows chain to move toward high-probability region
+        beta:     0.01            # higher β sharpens acceptance toward higher‐score sequences
+        block_size: 5             # how many adjacent sites to update in one Gibbs move
+        swap_prob:  0.5           # probability of doing an MH substring-swap instead of block-Gibbs
+        chains:   4               # independent Gibbs chains to assess convergence
         cores:    4
-        min_dist: 4
-    top_k: 200
+        min_dist: 1               # minimum Hamming distance between final reported elites (diversity constraint)
+    top_k: 200                    # number of unique, diverse sequences to return
+    plots:
+      trace:       true
+      autocorr:    true
+      convergence: true
+      scatter_pwm: true
   analysis:                       # analysis-specific config
     runs: []                      # default = most recent sample
     plots:

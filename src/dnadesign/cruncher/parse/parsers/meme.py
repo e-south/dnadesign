@@ -11,20 +11,24 @@ Dunlop Lab
 """
 
 from __future__ import annotations
-from pathlib import Path
+
 import re
+from pathlib import Path
+from typing import Optional
+from xml.etree import ElementTree
+
 import numpy as np
 from Bio import motifs
-from xml.etree import ElementTree
+
 from dnadesign.cruncher.motif.backend import register
 from dnadesign.cruncher.motif.model import PWM
-from typing import Optional
+
 
 @register("MEME")
 def parse_meme(path: Path) -> PWM:
     lines = path.read_text().splitlines()
     logodds_rows: list[list[float]] = []
-    prob_rows:    list[list[float]] = []
+    prob_rows: list[list[float]] = []
     nsites: Optional[int] = None
     evalue: Optional[float] = None
 
@@ -35,10 +39,7 @@ def parse_meme(path: Path) -> PWM:
         if mlist:
             m = mlist[0]
             prob_mat = np.array(m.pwm).T.astype("float32")
-            return PWM(
-                name=m.name or path.stem,
-                matrix=prob_mat
-            )
+            return PWM(name=m.name or path.stem, matrix=prob_mat)
     except (ValueError, ElementTree.ParseError):
         pass
 
@@ -78,10 +79,4 @@ def parse_meme(path: Path) -> PWM:
     prob_mat = np.array(prob_rows, dtype="float32")
     logodds_mat = np.array(logodds_rows, dtype="float32") if logodds_rows else None
 
-    return PWM(
-        name=path.stem,
-        matrix=prob_mat,
-        nsites=nsites,
-        evalue=evalue,
-        log_odds_matrix=logodds_mat
-    )
+    return PWM(name=path.stem, matrix=prob_mat, nsites=nsites, evalue=evalue, log_odds_matrix=logodds_mat)

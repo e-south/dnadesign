@@ -19,14 +19,18 @@ Dunlop Lab
 """
 
 import logging
-from tqdm import tqdm
+
+import arviz as az
 import numpy as np
 import pandas as pd
-import arviz as az
-from .base import Optimizer
+from tqdm import tqdm
+
 from dnadesign.cruncher.sample.state import SequenceState
 
+from .base import Optimizer
+
 logger = logging.getLogger(__name__)
+
 
 class GibbsOptimizer(Optimizer):
     """
@@ -36,27 +40,28 @@ class GibbsOptimizer(Optimizer):
     Config keys in self.cfg:
       - beta, tune, draws, chains, top_k, min_dist
     """
+
     def __init__(self, scorer, cfg, rng):
         super().__init__(scorer, cfg, rng)
         # Keep the TF names in the same order as the scorer’s logodds
         self.tf_names = list(self.scorer.logodds.keys())
 
     def optimise(self, initial: SequenceState) -> list[SequenceState]:
-        β        = self.cfg["beta"]
-        tune     = self.cfg["tune"]
-        draws    = self.cfg["draws"]
-        chains   = self.cfg["chains"]
-        top_k    = self.cfg["top_k"]
+        β = self.cfg["beta"]
+        tune = self.cfg["tune"]
+        draws = self.cfg["draws"]
+        chains = self.cfg["chains"]
+        top_k = self.cfg["top_k"]
         min_dist = self.cfg.get("min_dist", 1)
-        rng      = self.rng
+        rng = self.rng
 
         L = initial.seq.size
-        all_samples  = []
+        all_samples = []
         chain_scores = []
         proposals = accepts = 0
 
-        records = []       # one dict per iteration (including pre–burn-in)
-        global_iter = 0    # absolute iteration counter across burn-in+sampling
+        records = []  # one dict per iteration (including pre–burn-in)
+        global_iter = 0  # absolute iteration counter across burn-in+sampling
 
         for c in range(chains):
             # ——— fresh random start each chain ———
@@ -64,12 +69,13 @@ class GibbsOptimizer(Optimizer):
 
             # record the *true* random seed before any burn-in
             init_scores = self.scorer.score_per_pwm(x)
-            records.append({
-                "chain": c,
-                "iter": global_iter,
-                **{f"score_{tf}": float(val)
-                   for tf, val in zip(self.tf_names, init_scores)}
-            })
+            records.append(
+                {
+                    "chain": c,
+                    "iter": global_iter,
+                    **{f"score_{tf}": float(val) for tf, val in zip(self.tf_names, init_scores)},
+                }
+            )
             global_iter += 1
 
             this_chain = []
@@ -84,25 +90,26 @@ class GibbsOptimizer(Optimizer):
                     for b in range(4):
                         x[i] = b
                         logps[b] = β * self.scorer.score(x)
-                    a    = logps.max()
-                    raw  = np.exp(logps - a)
-                    tot  = raw.sum()
-                    probs = raw/tot if (np.isfinite(tot) and tot>0) else np.ones(4)/4
+                    a = logps.max()
+                    raw = np.exp(logps - a)
+                    tot = raw.sum()
+                    probs = raw / tot if (np.isfinite(tot) and tot > 0) else np.ones(4) / 4
 
                     prev = x[i]
-                    new  = rng.choice(4, p=probs)
+                    new = rng.choice(4, p=probs)
                     proposals += 1
-                    accepts   += (new != prev)
+                    accepts += new != prev
                     x[i] = new
 
                 # record per-PWM at end of this burn-in sweep
                 burn_scores = self.scorer.score_per_pwm(x)
-                records.append({
-                    "chain": c,
-                    "iter": global_iter,
-                    **{f"score_{tf}": float(val)
-                       for tf, val in zip(self.tf_names, burn_scores)}
-                })
+                records.append(
+                    {
+                        "chain": c,
+                        "iter": global_iter,
+                        **{f"score_{tf}": float(val) for tf, val in zip(self.tf_names, burn_scores)},
+                    }
+                )
                 global_iter += 1
 
             # ——— Sampling sweeps (and record each sweep) ———
@@ -114,15 +121,15 @@ class GibbsOptimizer(Optimizer):
                     for b in range(4):
                         x[i] = b
                         logps[b] = β * self.scorer.score(x)
-                    a    = logps.max()
-                    raw  = np.exp(logps - a)
-                    tot  = raw.sum()
-                    probs = raw/tot if (np.isfinite(tot) and tot>0) else np.ones(4)/4
+                    a = logps.max()
+                    raw = np.exp(logps - a)
+                    tot = raw.sum()
+                    probs = raw / tot if (np.isfinite(tot) and tot > 0) else np.ones(4) / 4
 
                     prev = x[i]
-                    new  = rng.choice(4, p=probs)
+                    new = rng.choice(4, p=probs)
                     proposals += 1
-                    accepts   += (new != prev)
+                    accepts += new != prev
                     x[i] = new
 
                 # track overall score for ArviZ trace
@@ -132,12 +139,13 @@ class GibbsOptimizer(Optimizer):
 
                 # record per-PWM at end of this sampling sweep
                 samp_scores = self.scorer.score_per_pwm(x)
-                records.append({
-                    "chain": c,
-                    "iter": global_iter,
-                    **{f"score_{tf}": float(val)
-                       for tf, val in zip(self.tf_names, samp_scores)}
-                })
+                records.append(
+                    {
+                        "chain": c,
+                        "iter": global_iter,
+                        **{f"score_{tf}": float(val) for tf, val in zip(self.tf_names, samp_scores)},
+                    }
+                )
                 global_iter += 1
 
             chain_scores.append(this_chain)
@@ -148,10 +156,7 @@ class GibbsOptimizer(Optimizer):
         self.samples_df = pd.DataFrame(records)
 
         # ——— select elites exactly as before ———
-        scored = sorted(
-            ((self.scorer.score(s), s) for s in all_samples),
-            key=lambda t: t[0], reverse=True
-        )
+        scored = sorted(((self.scorer.score(s), s) for s in all_samples), key=lambda t: t[0], reverse=True)
         elites = []
         for score_val, seq in scored:
             if len(elites) >= top_k:

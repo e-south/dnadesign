@@ -47,12 +47,13 @@ Dunlop Lab
 """
 
 import argparse
-from pathlib import Path
-import torch
-import yaml
 import warnings
-import re
+from pathlib import Path
+
+import torch
+
 warnings.filterwarnings("ignore", category=FutureWarning)
+
 
 def validate_pt_file(file_path: str) -> bool:
     """
@@ -61,22 +62,24 @@ def validate_pt_file(file_path: str) -> bool:
     """
     pt_path = Path(file_path)
     assert pt_path.exists() and pt_path.is_file(), f"PT file {pt_path} does not exist."
-    checkpoint = torch.load(pt_path, map_location=torch.device('cpu'))
+    checkpoint = torch.load(pt_path, map_location=torch.device("cpu"))
     assert isinstance(checkpoint, list) and len(checkpoint) > 0, f"{pt_path} must be a non-empty list."
     for i, entry in enumerate(checkpoint):
         assert isinstance(entry, dict), f"Entry {i} in {pt_path} is not a dictionary."
         assert "sequence" in entry, f"Entry {i} in {pt_path} is missing the 'sequence' key."
     return True
 
+
 def inspect_entry(file_path: str, index: int) -> dict:
     """
     Loads a .pt file and returns the entry (a dictionary) at the given index.
     """
     pt_path = Path(file_path)
-    checkpoint = torch.load(pt_path, map_location=torch.device('cpu'))
+    checkpoint = torch.load(pt_path, map_location=torch.device("cpu"))
     if not (0 <= index < len(checkpoint)):
         raise IndexError(f"Index {index} is out of range for file {pt_path} (length {len(checkpoint)}).")
     return checkpoint[index]
+
 
 def list_all_pt_files(search_path: str) -> list:
     """
@@ -87,25 +90,26 @@ def list_all_pt_files(search_path: str) -> list:
     assert base_path.exists() and base_path.is_dir(), f"Directory {base_path} does not exist."
     return list(base_path.rglob("*.pt"))
 
+
 def update_meta_part_type(file_path: str) -> None:
     """
     Loads a .pt file and for each entry ensures that the 'meta_part_type' key exists.
     The desired value is determined based on the parent directory's name using a lookup
     (including handling a wildcard for 'densebatch_*'). For directories starting with
     'densebatch_', the user is prompted to decide whether to define dense arrays by constraint.
-    
+
     If the user chooses yes, then the file's name is examined via regex to assign:
       - 'sigma70' if 'sigma70' is in the file name,
       - 'sigma24' if 'sigma24' is in the file name,
       - 'sigma38' if 'sigma38' is in the file name,
       - 'sigma32' if 'sigma32' is in the file name.
     Otherwise (or if no match is found), the file is labeled as a dense array.
-    
+
     If the first entry already has the key, the user is prompted to either skip or overwrite.
     The file is then saved in-place.
     """
     pt_path = Path(file_path)
-    checkpoint = torch.load(pt_path, map_location=torch.device('cpu'))
+    checkpoint = torch.load(pt_path, map_location=torch.device("cpu"))
     if not (isinstance(checkpoint, list) and len(checkpoint) > 0):
         print(f"File {pt_path} is not a valid .pt file format for meta update.")
         return
@@ -134,14 +138,18 @@ def update_meta_part_type(file_path: str) -> None:
         "seqbatch_regulondb_13_promoter_set": "natural promoter",
         "seqbatch_regulondb_13_tf_ri_set": "natural TFBS",
         "seqbatch_ecocyc_28_promoters": "natural promoter",
-        "seqbatch_ecocyc_28_tfbs_set": "natural TFBS"
+        "seqbatch_ecocyc_28_tfbs_set": "natural TFBS",
     }
-    
+
     if parent_dir.startswith("densebatch_"):
         # Ask the user if they want to define dense arrays by constraint.
-        user_input = input(
-            f"Directory '{parent_dir}' is a densebatch directory. Would you like to define dense arrays by constraint? [y/n]: "
-        ).strip().lower()
+        user_input = (
+            input(
+                f"Directory '{parent_dir}' is a densebatch directory. Would you like to define dense arrays by constraint? [y/n]: "
+            )
+            .strip()
+            .lower()
+        )
         if user_input.startswith("y"):
             # Apply regex (or simple substring search) on the file name.
             file_stem = pt_path.stem.lower()
@@ -170,10 +178,14 @@ def update_meta_part_type(file_path: str) -> None:
         if current_value == desired_value:
             print(f"File '{pt_path}' already has 'meta_part_type' set to '{current_value}'. Nothing to update.")
             return
-        user_choice = input(
-            f"File '{pt_path}' already has 'meta_part_type' in its first entry: currently '{current_value}', "
-            f"but desired value is '{desired_value}'. Would you like to [s]kip or [o]verwrite it for all entries? "
-        ).strip().lower()
+        user_choice = (
+            input(
+                f"File '{pt_path}' already has 'meta_part_type' in its first entry: currently '{current_value}', "
+                f"but desired value is '{desired_value}'. Would you like to [s]kip or [o]verwrite it for all entries? "
+            )
+            .strip()
+            .lower()
+        )
         if user_choice.startswith("s"):
             print(f"Skipping update for this file. Current value '{current_value}' will be retained.")
             return
@@ -194,27 +206,24 @@ def update_meta_part_type(file_path: str) -> None:
     torch.save(checkpoint, pt_path)
     print(f"Updated file '{pt_path}' with meta_part_type='{desired_value}'.")
 
+
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Validate and inspect .pt files for densegen."
-    )
+    parser = argparse.ArgumentParser(description="Validate and inspect .pt files for densegen.")
     parser.add_argument(
-        "--path", type=str, default=".",
-        help="File or directory path. If a file is given, --index (and optionally --key) must be provided."
+        "--path",
+        type=str,
+        default=".",
+        help="File or directory path. If a file is given, --index (and optionally --key) must be provided.",
     )
+    parser.add_argument("--index", type=int, help="(Optional) Index of the entry to inspect (if --path is a file).")
+    parser.add_argument("--key", type=str, help="(Optional) Specific key from the entry to display.")
     parser.add_argument(
-        "--index", type=int,
-        help="(Optional) Index of the entry to inspect (if --path is a file)."
-    )
-    parser.add_argument(
-        "--key", type=str,
-        help="(Optional) Specific key from the entry to display."
-    )
-    parser.add_argument(
-        "--update-meta", action="store_true",
-        help="Update meta_part_type key in .pt file entries based on directory mapping."
+        "--update-meta",
+        action="store_true",
+        help="Update meta_part_type key in .pt file entries based on directory mapping.",
     )
     return parser.parse_args()
+
 
 def main():
     args = parse_args()
@@ -283,6 +292,7 @@ def main():
             except AssertionError as e:
                 print(f"  INVALID: {pt_file} --> {e}")
         print(f"\nSummary: {len(valid_files)} out of {len(pt_files)} .pt files in '{target_path}' are valid.")
+
 
 if __name__ == "__main__":
     main()

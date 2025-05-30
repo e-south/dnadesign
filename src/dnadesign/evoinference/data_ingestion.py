@@ -9,11 +9,13 @@ Dunlop Lab
 """
 
 import os
-import torch
 import re
+
+import torch
 from logger import get_logger
 
 logger = get_logger(__name__)
+
 
 def list_pt_files(directory: str):
     """
@@ -22,14 +24,15 @@ def list_pt_files(directory: str):
     if not os.path.isdir(directory):
         logger.error(f"Directory not found: {directory}")
         raise NotADirectoryError(f"Directory not found: {directory}")
-    return [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.pt')]
+    return [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".pt")]
+
 
 def load_sequences(filepath: str):
     """
     Load sequences from a .pt file. The file should contain a list of dictionaries.
     """
     try:
-        data = torch.load(filepath, map_location='cpu')
+        data = torch.load(filepath, map_location="cpu")
     except Exception as e:
         logger.error(f"Error loading file {filepath}: {str(e)}")
         raise e
@@ -42,9 +45,10 @@ def load_sequences(filepath: str):
             raise ValueError(f"One entry in {filepath} is not a dictionary.")
     return data
 
+
 def validate_sequence(entry: dict) -> bool:
     """
-    Validate that the entry has a 'sequence' key and that the sequence 
+    Validate that the entry has a 'sequence' key and that the sequence
     contains only A, T, G, C characters (case-insensitive).
     """
     if "sequence" not in entry:
@@ -52,6 +56,6 @@ def validate_sequence(entry: dict) -> bool:
     seq = entry["sequence"]
     if not isinstance(seq, str):
         return False
-    if not re.fullmatch(r'[ATGCatgc]+', seq):
+    if not re.fullmatch(r"[ATGCatgc]+", seq):
         return False
     return True

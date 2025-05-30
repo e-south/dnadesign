@@ -9,6 +9,7 @@ Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
+
 # cruncher/sample/numba_helpers.py
 
 """
@@ -35,12 +36,13 @@ Core functionality:
 import numpy as np
 from numba import njit
 
+
 @njit
 def best_score_pwm(seq: np.ndarray, lom: np.ndarray) -> float:
     """
     Slide the log-odds matrix 'lom' over every window of 'seq' and
     return the maximum sum of log-odds:
-    
+
       - seq: array of ints (0=A,1=C,2=G,3=T), length L
       - lom: array of floats, shape (m,4) for a PWM of length m
 
@@ -49,7 +51,7 @@ def best_score_pwm(seq: np.ndarray, lom: np.ndarray) -> float:
     """
     L = seq.shape[0]
     m = lom.shape[0]
-    best = -1e12            # start lower than any realistic log-odds
+    best = -1e12  # start lower than any realistic log-odds
     # for each possible alignment of motif within sequence:
     for offset in range(L - m + 1):
         s = 0.0

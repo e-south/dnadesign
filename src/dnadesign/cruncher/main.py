@@ -11,37 +11,38 @@ Dunlop Lab
 """
 
 from __future__ import annotations
+
+import json
 import logging
+import sys
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import yaml
+
+from dnadesign.cruncher.config import CruncherConfig, load_config
+from dnadesign.cruncher.parse.model import PWM
+from dnadesign.cruncher.parse.plots.pssm import plot_pwm
+from dnadesign.cruncher.parse.registry import Registry
+from dnadesign.cruncher.sample.optimizer.cgm import GibbsOptimizer
+from dnadesign.cruncher.sample.plots.autocorr import plot_autocorr
+from dnadesign.cruncher.sample.plots.convergence import report_convergence
+from dnadesign.cruncher.sample.plots.scatter_pwm import plot_scatter_pwm
+from dnadesign.cruncher.sample.plots.trace import plot_trace
+from dnadesign.cruncher.sample.scorer import Scorer
+from dnadesign.cruncher.sample.state import SequenceState
+from dnadesign.cruncher.utils.traces import save_trace
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)-5s %(name)s: %(message)s",
 )
 
-import sys
-from pathlib import Path
-from datetime import datetime
-import json
-import yaml
-import numpy as np
-import pandas as pd
-
-import arviz as az
-from dnadesign.cruncher.config import load_config, CruncherConfig
-from dnadesign.cruncher.motif.registry import Registry
-from dnadesign.cruncher.plots.pssm import plot_pwm
-from dnadesign.cruncher.sample.state import SequenceState
-from dnadesign.cruncher.sample.scorer import Scorer
-from dnadesign.cruncher.sample.optimizer.cgm import GibbsOptimizer
-from dnadesign.cruncher.motif.model import PWM
-from dnadesign.cruncher.utils.traces import save_trace
-from dnadesign.cruncher.sample.plots.trace       import plot_trace
-from dnadesign.cruncher.sample.plots.autocorr    import plot_autocorr
-from dnadesign.cruncher.sample.plots.convergence import report_convergence
-from dnadesign.cruncher.sample.plots.scatter_pwm import plot_scatter_pwm
-
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-CFG_PATH     = PROJECT_ROOT / "dnadesign" / "src" / "dnadesign" / "configs" / "example.yaml"
-PWM_PATH     = PROJECT_ROOT / "dnadesign-data" / "primary_literature" / "OMalley_et_al" / "escherichia_coli_motifs"
+CFG_PATH = PROJECT_ROOT / "dnadesign" / "src" / "dnadesign" / "configs" / "example.yaml"
+PWM_PATH = PROJECT_ROOT / "dnadesign-data" / "primary_literature" / "OMalley_et_al" / "escherichia_coli_motifs"
 
 
 def _run_parse(cfg: CruncherConfig, base_out: Path) -> None:
@@ -71,8 +72,7 @@ def _initialize_state(init_cfg, pwms: dict[str, PWM], rng) -> SequenceState:
         if init_cfg.kind < max_motif:
             logger = logging.getLogger(__name__)
             logger.warning(
-                f"Requested init length {init_cfg.kind} < longest PWM ({max_motif}); "
-                f"bumping to {max_motif}"
+                f"Requested init length {init_cfg.kind} < longest PWM ({max_motif}); " f"bumping to {max_motif}"
             )
             length = max_motif
         else:
@@ -80,19 +80,19 @@ def _initialize_state(init_cfg, pwms: dict[str, PWM], rng) -> SequenceState:
     else:
         # Determine from consensus logic as before
         max_len = max(p.length for p in pwms.values())
-        if init_cfg.kind == 'random':
+        if init_cfg.kind == "random":
             length = max_len
-        elif init_cfg.kind == 'consensus_shortest':
+        elif init_cfg.kind == "consensus_shortest":
             length = min(p.length for p in pwms.values())
-        elif init_cfg.kind == 'consensus_longest':
+        elif init_cfg.kind == "consensus_longest":
             length = max_len
         else:
             raise ValueError(f"Unknown init kind: {init_cfg.kind}")
 
-    if init_cfg.kind == 'random' or isinstance(init_cfg.kind, int):
+    if init_cfg.kind == "random" or isinstance(init_cfg.kind, int):
         return SequenceState.random(length, rng)
 
-    mode = init_cfg.kind.split('_')[1]  # 'shortest' or 'longest'
+    mode = init_cfg.kind.split("_")[1]  # 'shortest' or 'longest'
     return SequenceState.from_consensus(
         pwms,
         mode=mode,
@@ -108,10 +108,10 @@ def _save_config(cfg: CruncherConfig, batch_dir: Path) -> None:
     via JSON round-trip before writing YAML.
     """
     cfg_path = batch_dir / "config_used.yaml"
-    with cfg_path.open('w') as fh:
+    with cfg_path.open("w") as fh:
         # JSON‐serialize then reload gives us pure dicts/lists/primitives
         data = json.loads(cfg.json())
-        yaml.safe_dump({'cruncher': data}, fh)
+        yaml.safe_dump({"cruncher": data}, fh)
 
 
 def _save_hits(
@@ -122,15 +122,16 @@ def _save_hits(
     top_k: int,
 ) -> None:
     import pandas as pd
+
     hits = []
     for rank, state in enumerate(ranked[:top_k], start=1):
-        row = {'rank': rank, 'sequence': state.seq_str()}
+        row = {"rank": rank, "sequence": state.seq_str()}
         per_pwm = scorer.score_per_pwm(state.seq_array())
         for tf, score in zip(pwms, per_pwm):
-            row[f'score_{tf}'] = float(score)
+            row[f"score_{tf}"] = float(score)
         hits.append(row)
     df = pd.DataFrame(hits)
-    df.to_csv(batch_dir / 'hits.csv', index=False)
+    df.to_csv(batch_dir / "hits.csv", index=False)
 
 
 def _run_sample(cfg: CruncherConfig, base_out: Path) -> None:
@@ -146,18 +147,18 @@ def _run_sample(cfg: CruncherConfig, base_out: Path) -> None:
     _save_config(cfg, sample_dir)
 
     # 3) load PWMs
-    reg  = Registry(PWM_PATH, cfg.motif.formats)
+    reg = Registry(PWM_PATH, cfg.motif.formats)
     pwms = {tf: reg.load(tf) for tf in set(sum(cfg.regulator_sets, []))}
 
     # 4) initialize sequence
     initial = _initialize_state(sample_cfg.init, pwms, rng)
 
     # 5) set up Scorer + Optimizer
-    scorer   = Scorer(pwms, bidirectional=sample_cfg.bidirectional)
-    gib_cfg  = sample_cfg.optimiser.gibbs.dict()
-    gib_cfg["top_k"]    = sample_cfg.top_k
+    scorer = Scorer(pwms, bidirectional=sample_cfg.bidirectional)
+    gib_cfg = sample_cfg.optimiser.gibbs.dict()
+    gib_cfg["top_k"] = sample_cfg.top_k
     gib_cfg["min_dist"] = sample_cfg.optimiser.gibbs.min_dist
-    gib_cfg["random_init"] = (sample_cfg.init.kind == "random")
+    gib_cfg["random_init"] = sample_cfg.init.kind == "random"
     optimizer = GibbsOptimizer(scorer, gib_cfg, rng)
 
     # 6) run MCMC
@@ -171,14 +172,14 @@ def _run_sample(cfg: CruncherConfig, base_out: Path) -> None:
 
     # 7b) save every sample’s per‐PWM scores for scatter
     if hasattr(optimizer, "samples_df"):
-        optimizer.samples_df.to_csv(sample_dir/"samples.csv", index=False)
-        print(f"Saved samples.csv for scatter diagnostics")
+        optimizer.samples_df.to_csv(sample_dir / "samples.csv", index=False)
+        print("Saved samples.csv for scatter diagnostics")
 
     # 7c) generate a random‐reference set of draws for comparison
     n_ref = len(optimizer.samples_df) if hasattr(optimizer, "samples_df") else sample_cfg.draws
-    L     = initial.seq.size
+    L = initial.seq.size
     ref_rows = []
-    rng2  = np.random.default_rng(0)
+    rng2 = np.random.default_rng(0)
     for i in range(n_ref):
         x_rand = SequenceState.random(L, rng2)
         scores = scorer.score_per_pwm(x_rand.seq)
@@ -186,7 +187,7 @@ def _run_sample(cfg: CruncherConfig, base_out: Path) -> None:
         for tf, sc in zip(pwms, scores):
             row[f"score_{tf}"] = float(sc)
         ref_rows.append(row)
-    pd.DataFrame(ref_rows).to_csv(sample_dir/"random_samples.csv", index=False)
+    pd.DataFrame(ref_rows).to_csv(sample_dir / "random_samples.csv", index=False)
 
     # 8) diagnostics: trace/autocorr/convergence + scatter
     trace_path = sample_dir / "trace.nc"
@@ -211,9 +212,7 @@ def _run_sample(cfg: CruncherConfig, base_out: Path) -> None:
 
         print("Generated MCMC diagnostics.")
     else:
-        logging.getLogger(__name__).info(
-            "No trace data found on optimizer; skipping MCMC diagnostics."
-        )
+        logging.getLogger(__name__).info("No trace data found on optimizer; skipping MCMC diagnostics.")
 
     # 9) write a little README
     readme = sample_dir / "README.txt"
@@ -230,20 +229,20 @@ def _run_analyse(cfg: CruncherConfig, base_out: Path) -> None:
 
 def main(cfg_path: str | Path | None = None) -> None:
     cfg_file = Path(cfg_path) if cfg_path else CFG_PATH
-    cfg      = load_config(cfg_file)
+    cfg = load_config(cfg_file)
 
     ts = datetime.now().strftime("%Y%m%dT%H%M")
     batch = PROJECT_ROOT / "dnadesign" / "src" / "dnadesign" / "cruncher" / cfg.out_dir / f"batch_{ts}"
     batch.mkdir(parents=True, exist_ok=True)
 
     match cfg.mode:
-        case 'parse':
+        case "parse":
             _run_parse(cfg, batch)
-        case 'sample':
+        case "sample":
             _run_sample(cfg, batch)
         case m:
             raise ValueError(f"Unknown mode '{m}'")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main(sys.argv[1] if len(sys.argv) > 1 else None)

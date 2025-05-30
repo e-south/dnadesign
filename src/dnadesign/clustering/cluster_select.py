@@ -8,6 +8,7 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+
 def select_clusters(data_entries, selection_config):
     """
     Select clusters to export based on configuration.
@@ -26,19 +27,17 @@ def select_clusters(data_entries, selection_config):
         if cl is None:
             continue
         cluster_sizes[cl] = cluster_sizes.get(cl, 0) + 1
-    
+
     if order == "custom":
         selected = custom_clusters
     else:
-        sorted_clusters = sorted(cluster_sizes.items(),
-                                 key=lambda x: x[1],
-                                 reverse=(order == "max"))
+        sorted_clusters = sorted(cluster_sizes.items(), key=lambda x: x[1], reverse=(order == "max"))
         if num_files == 0:
             selected = []  # If num_files is 0, do not select any clusters.
         elif num_files:
             selected = [cl for cl, size in sorted_clusters[:num_files]]
         else:
             selected = [cl for cl, size in sorted_clusters]
-    
+
     print(f"Selected clusters: {selected}")
     return selected

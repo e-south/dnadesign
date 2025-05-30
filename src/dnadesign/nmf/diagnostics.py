@@ -7,6 +7,7 @@ Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
+
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -17,21 +18,22 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-import os
-import math
 import csv
 import logging
+import math
+import os
+from collections import defaultdict
+
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 import pandas as pd
-from sklearn.metrics import silhouette_score
-from scipy.cluster.hierarchy import linkage, cophenet
-from scipy.spatial.distance import pdist
-from collections import defaultdict
 
 # Use Plotly for the Sankey riverplot
 import plotly.graph_objects as go
+import seaborn as sns
+from scipy.cluster.hierarchy import cophenet, linkage
+from scipy.spatial.distance import pdist
+from sklearn.metrics import silhouette_score
 
 logger = logging.getLogger(__name__)
 sns.set_style("ticks")
@@ -53,7 +55,9 @@ def plot_reconstruction_loss(metrics: dict, output_path: str) -> None:
     logger.info(f"Saved reconstruction loss plot to {output_path}")
 
 
-def plot_heatmaps(W: np.ndarray, H: np.ndarray, output_dir: str, encoding_mode: str = "motif_occupancy", feature_names: list = None) -> None:
+def plot_heatmaps(
+    W: np.ndarray, H: np.ndarray, output_dir: str, encoding_mode: str = "motif_occupancy", feature_names: list = None
+) -> None:
     """
     Plot heatmaps for the W and H matrices with clustering reordering.
 
@@ -66,16 +70,16 @@ def plot_heatmaps(W: np.ndarray, H: np.ndarray, output_dir: str, encoding_mode: 
     The reordering is strictly for visual interpretability.
     """
     import scipy.cluster.hierarchy as sch
-    from scipy.spatial.distance import pdist
+
     os.makedirs(output_dir, exist_ok=True)
-    
+
     # --- Cluster and reorder W matrix ---
     # W has shape (num_sequences, num_programs)
     # Cluster the rows (sequences) using Ward's method.
-    row_linkage = sch.linkage(W, method='ward')
+    row_linkage = sch.linkage(W, method="ward")
     row_order = sch.leaves_list(row_linkage)
     W_ordered = W[row_order, :]
-    
+
     plt.figure(figsize=(12, 8))
     ax = sns.heatmap(W_ordered, cmap="viridis", cbar_kws={"label": "Normalized Program Contribution"})
     ax.set_xlabel("Program Index")
@@ -85,32 +89,37 @@ def plot_heatmaps(W: np.ndarray, H: np.ndarray, output_dir: str, encoding_mode: 
     plt.savefig(os.path.join(output_dir, "W_heatmap.png"), bbox_inches="tight")
     plt.close()
     logger.info(f"Saved clustered W heatmap to {output_dir}")
-    
+
     # --- Cluster and reorder H matrix ---
     # H has shape (num_programs, num_features)
     # First, cluster the rows (programs):
-    row_linkage_H = sch.linkage(H, method='ward')
+    row_linkage_H = sch.linkage(H, method="ward")
     row_order_H = sch.leaves_list(row_linkage_H)
     H_ordered = H[row_order_H, :]
-    
+
     # Next, cluster the columns (features/motifs):
-    col_linkage_H = sch.linkage(H_ordered.T, method='ward')
+    col_linkage_H = sch.linkage(H_ordered.T, method="ward")
     col_order_H = sch.leaves_list(col_linkage_H)
     H_ordered = H_ordered[:, col_order_H]
-    
+
     # Reorder the labels accordingly.
     row_labels = [f"Program {i}" for i in row_order_H]
-    
+
     # For motif_occupancy, we need the feature names.
     feature_names_ordered = None
     if encoding_mode == "motif_occupancy":
         if feature_names is None:
             raise ValueError("Feature names must be provided for motif_occupancy encoding.")
         feature_names_ordered = [feature_names[i] for i in col_order_H]
-    
+
     plt.figure(figsize=(12, 8))
-    ax = sns.heatmap(H_ordered, cmap="viridis", cbar_kws={"label": "Contribution Weight (clipped at 3)"},
-                     xticklabels=False, yticklabels=row_labels)
+    ax = sns.heatmap(
+        H_ordered,
+        cmap="viridis",
+        cbar_kws={"label": "Contribution Weight (clipped at 3)"},
+        xticklabels=False,
+        yticklabels=row_labels,
+    )
     ax.set_xlabel("Features (Motifs)")
     ax.set_ylabel("Program Index (clustered)")
     ax.set_title("Clustered Heatmap of H (Basis Matrix)")
@@ -144,32 +153,34 @@ def plot_motif_occurrence_heatmap(X: np.ndarray, output_path: str, max_occ: int 
     logger.info(f"Saved motif occurrence heatmap to {output_path}")
 
 
-def plot_program_association_stacked_barplot(H: np.ndarray, feature_names: list, output_path: str,
-                                               motif2tf_map: dict = None, normalize: bool = True) -> None:
+def plot_program_association_stacked_barplot(
+    H: np.ndarray, feature_names: list, output_path: str, motif2tf_map: dict = None, normalize: bool = True
+) -> None:
     """
     Plot a stacked bar plot where each row corresponds to a transcription factor (TF).
     For each TF, the contributions from each NMF program (from matrix H) are aggregated.
     Then each TF row is normalized to sum to 1 (if normalization is enabled) and plotted as a horizontal stacked bar.
     A colorblind-friendly palette ("Set2") is used and the legend is removed.
     """
+
     # Function to get the TF label from a feature.
     def get_tf(motif):
         return motif2tf_map.get(motif.upper(), motif.upper()) if motif2tf_map else motif.upper()
-    
+
     # Convert each feature name to its TF label.
     tf_labels_all = [get_tf(feat) for feat in feature_names]
-    
+
     # H is assumed to be of shape (num_programs, num_features).
     num_programs = H.shape[0]
-    
+
     # Determine the unique TFs (sorted for consistency).
     tf_set = sorted(set(tf_labels_all))
-    
+
     # Initialize an array to hold aggregated contributions:
     # Rows: programs (NMF components); Columns: TFs.
     # We start with a matrix of zeros with shape (num_programs, len(tf_set)).
     agg = np.zeros((num_programs, len(tf_set)))
-    
+
     # For each program (i.e. for each row in H), aggregate contributions for each TF.
     for prog in range(num_programs):
         for feat_idx, tf in enumerate(tf_labels_all):
@@ -177,11 +188,11 @@ def plot_program_association_stacked_barplot(H: np.ndarray, feature_names: list,
             # (Using index lookup for tf_set; if speed is a concern, one could precompute a mapping.)
             col_idx = tf_set.index(tf)
             agg[prog, col_idx] += H[prog, feat_idx]
-    
+
     # Now, we want to have rows correspond to TFs and columns to programs.
     df_data = pd.DataFrame(agg, index=[f"Program {i}" for i in range(num_programs)], columns=tf_set)
     df_data = df_data.T  # Now rows = TF, columns = Programs.
-    
+
     # For each TF (each row), normalize so that the sum is 1.
     if normalize:
         row_sums = df_data.sum(axis=1)
@@ -190,9 +201,9 @@ def plot_program_association_stacked_barplot(H: np.ndarray, feature_names: list,
         df_norm = df_data.div(row_sums, axis=0)
     else:
         df_norm = df_data.copy()
-    
+
     # Plot the horizontal stacked bar plot using the "Set2" palette.
-    ax = df_norm.plot(kind='barh', stacked=True, figsize=(10, 8), colormap="tab20", legend=False)
+    ax = df_norm.plot(kind="barh", stacked=True, figsize=(10, 8), colormap="tab20", legend=False)
     ax.set_xlabel("Proportion of Contribution")
     ax.set_ylabel("Transcription Factor")
     ax.set_title("Program Association Stacked Bar Plot")
@@ -203,9 +214,15 @@ def plot_program_association_stacked_barplot(H: np.ndarray, feature_names: list,
     logger.info(f"Saved program association stacked bar plot to {output_path}")
 
 
-def plot_top_motifs_grid(H: np.ndarray, feature_names: list, output_dir: str,
-                           motif2tf_map: dict, max_top_tfs: int = 5, ncols: int = 4,
-                           encoding_mode: str = "motif_occupancy") -> None:
+def plot_top_motifs_grid(
+    H: np.ndarray,
+    feature_names: list,
+    output_dir: str,
+    motif2tf_map: dict,
+    max_top_tfs: int = 5,
+    ncols: int = 4,
+    encoding_mode: str = "motif_occupancy",
+) -> None:
     """
     For each program (row in H), compute the top motifs (converted to TF names) and plot a horizontal
     bar plot with the TF names on the y-axis. Remove top/right spines and use reduced tick fonts.
@@ -229,13 +246,12 @@ def plot_top_motifs_grid(H: np.ndarray, feature_names: list, output_dir: str,
         else:
             tf_labels, contribs = ([], [])
         ax = axes[i]
-        sns.barplot(x=list(contribs), y=list(tf_labels), color="slategray",
-                    ax=ax, errorbar=None, dodge=False)
+        sns.barplot(x=list(contribs), y=list(tf_labels), color="slategray", ax=ax, errorbar=None, dodge=False)
         ax.set_title(f"Program {i}", fontsize=10)
         ax.set_xlabel("Contribution", fontsize=9)
         ax.set_ylabel("", fontsize=9)
-        ax.tick_params(axis='x', labelsize=8)
-        ax.tick_params(axis='y', labelsize=8)
+        ax.tick_params(axis="x", labelsize=8)
+        ax.tick_params(axis="y", labelsize=8)
         sns.despine(ax=ax, top=True, right=True)
     for j in range(i + 1, len(axes)):
         axes[j].axis("off")
@@ -262,7 +278,7 @@ def plot_sequence_program_composition(W: np.ndarray, output_path: str) -> None:
             W_normalized[i, :] = W[i, :] / row_sum
         else:
             W_normalized[i, :] = W[i, :]
-    
+
     height = 100  # vertical resolution per column
     img = np.zeros((height, num_sequences), dtype=int)
     for seq_idx in range(num_sequences):
@@ -279,6 +295,7 @@ def plot_sequence_program_composition(W: np.ndarray, output_path: str) -> None:
         if cumulative < 1:
             img[-1, seq_idx] = np.argmax(W_normalized[seq_idx, :]) + 1
     import matplotlib.colors as mcolors
+
     # Use a colorblind-friendly palette; here we use "Set2" for consistency.
     if num_programs <= 10:
         base_cmap = plt.get_cmap("Set2")
@@ -309,20 +326,20 @@ def compute_composite_diversity_score(W: np.ndarray, alpha: float) -> (float, fl
     """
     Compute the Composite Diversity Score (CDS) for a given coefficient matrix W.
     W is of shape (n_sequences, k) and is assumed to be row-normalized.
-    
+
     Returns a tuple: (CDS, Dominance, Program Diversity)
-    
+
     Dominance is defined as:
        1 - (1/|S|) * sum_{s in S} [H(s) / log2(k)]
     where H(s) = -sum_i p_i log2(p_i) and p_i = W[s,i].
-    
+
     Program Diversity is defined as:
        D_inv / k, where D_inv = 1 / sum_i (q_i^2)
     and q_i is the fraction of sequences whose dominant program is i.
-    
+
     Composite Diversity Score is then:
        CDS = α * Dominance + (1 - α) * Program Diversity.
-       
+
     Lower within-sequence entropy (i.e. higher dominance) and higher across-sequence program balance yield a higher CDS.
     """
     # Assert that each row of W sums to 1 (within a tolerance)
@@ -340,14 +357,14 @@ def compute_composite_diversity_score(W: np.ndarray, alpha: float) -> (float, fl
         normalized_entropies.append(normalized_entropy)
     # Dominance is one minus the average normalized entropy.
     dominance = 1 - np.mean(normalized_entropies)
-    
+
     # Compute Program Diversity (Inverse Simpson)
     dominant = np.argmax(W, axis=1)
     counts = np.bincount(dominant, minlength=k)
     q = counts / float(n_sequences)
     D_inv = 1.0 / (np.sum(q**2) + 1e-8)
     program_diversity = D_inv / k
-    
+
     composite = alpha * dominance + (1 - alpha) * program_diversity
     return composite, dominance, program_diversity
 
@@ -357,7 +374,7 @@ def plot_composite_diversity_curve(batch_results_dir: str, k_range: list, alpha:
     dominance_scores = []
     diversity_scores = []
     valid_ks = []
-    
+
     for k in k_range:
         k_dir = os.path.join(batch_results_dir, f"k_{k}")
         W_path = os.path.join(k_dir, "W.csv")
@@ -378,7 +395,7 @@ def plot_composite_diversity_curve(batch_results_dir: str, k_range: list, alpha:
             valid_ks.append(k)
         except Exception as e:
             logger.error(f"Error computing CDS for k={k}: {str(e)}")
-    
+
     if not valid_ks:
         logger.error("No valid W matrices found for computing Composite Diversity Score.")
         return
@@ -397,15 +414,15 @@ def plot_composite_diversity_curve(batch_results_dir: str, k_range: list, alpha:
     plt.close()
     logger.info(f"Saved composite diversity curve to {output_path}")
 
+
 def compute_stability_metrics(batch_results_dir: str, k_range: list) -> dict:
-    from sklearn.metrics import silhouette_score
-    from scipy.cluster.hierarchy import linkage, cophenet
+
     stability = {
         "Frobenius Error": {"k": [], "values": []},
         "Coefficient Variation": {"k": [], "values": []},
         "Silhouette Score": {"k": [], "values": []},
         "Cophenetic Coefficient": {"k": [], "values": []},
-        "Amari Distance": {"k": [], "values": []}
+        "Amari Distance": {"k": [], "values": []},
     }
     for k in k_range:
         k_dir = os.path.join(batch_results_dir, f"k_{k}")
@@ -416,6 +433,7 @@ def compute_stability_metrics(batch_results_dir: str, k_range: list) -> dict:
             W = W_df.values
             with open(metrics_yaml, "r") as f:
                 import yaml
+
                 mdata = yaml.safe_load(f)
             frob = float(mdata.get("mean_loss", 0))
             rep_losses = mdata.get("replicate_losses", [])
@@ -465,6 +483,7 @@ def plot_stability_metrics_grid(stability_data: dict, output_path: str) -> None:
 
 def compute_program_flow(batch_results_dir: str, k_range: list, similarity_threshold: float) -> dict:
     from sklearn.metrics.pairwise import cosine_similarity
+
     nodes = []
     edges = []
     prev_H = None
@@ -508,8 +527,9 @@ def plot_signature_stability_riverplot(program_flow: dict, output_path: str, k_r
         node_labels_set.update([src_label, dst_label])
     if not flows_list:
         fig = go.Figure()
-        fig.add_annotation(text="No program flow data available",
-                           xref="paper", yref="paper", showarrow=False, font_size=16)
+        fig.add_annotation(
+            text="No program flow data available", xref="paper", yref="paper", showarrow=False, font_size=16
+        )
         fig.update_layout(title_text="Signature Stability Sankey Diagram")
         fig.write_image(output_path)
         logger.info(f"Saved placeholder riverplot to {output_path}")
@@ -549,27 +569,17 @@ def plot_signature_stability_riverplot(program_flow: dict, output_path: str, k_r
             node_x[idx] = x_coord
             node_y[idx] = y_positions[i]
 
-    fig = go.Figure(go.Sankey(
-        arrangement="fixed",
-        node=dict(
-            pad=15,
-            thickness=20,
-            line=dict(color="black", width=0.5),
-            label=all_nodes_sorted,
-            x=node_x,
-            y=node_y
-        ),
-        link=dict(
-            source=sources,
-            target=targets,
-            value=values
+    fig = go.Figure(
+        go.Sankey(
+            arrangement="fixed",
+            node=dict(
+                pad=15, thickness=20, line=dict(color="black", width=0.5), label=all_nodes_sorted, x=node_x, y=node_y
+            ),
+            link=dict(source=sources, target=targets, value=values),
         )
-    ))
+    )
     fig.update_layout(
-        title_text="Signature Stability Sankey Diagram (Riverplot Style)",
-        font_size=10,
-        width=1400,
-        height=800
+        title_text="Signature Stability Sankey Diagram (Riverplot Style)", font_size=10, width=1400, height=800
     )
     for k_val in k_sorted:
         x_coord = (k_val - k_min) / float(k_range_span)
@@ -581,7 +591,7 @@ def plot_signature_stability_riverplot(program_flow: dict, output_path: str, k_r
             text=f"K={k_val}",
             showarrow=False,
             font_size=12,
-            align="center"
+            align="center",
         )
     fig.write_image(output_path)
     logger.info(f"Saved signature stability riverplot to {output_path}")

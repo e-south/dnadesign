@@ -11,15 +11,16 @@ Dunlop Lab
 import os
 import sys
 import time
-import torch
+
+from aggregations import augment_outputs
 from config import load_config
 from data_ingestion import list_pt_files, load_sequences, validate_sequence
-from model_invocation import initialize_model, tokenize_sequence, run_model
-from storage import write_results, update_progress, load_progress
-from aggregations import augment_outputs
 from logger import get_logger
+from model_invocation import initialize_model, run_model, tokenize_sequence
+from storage import load_progress, update_progress, write_results
 
 logger = get_logger(__name__)
+
 
 def process_file(filepath, model, output_types, overwrite, checkpoint_every, save_pooled_only):
     """
@@ -32,7 +33,7 @@ def process_file(filepath, model, output_types, overwrite, checkpoint_every, sav
       - Update the entry with all model outputs.
       - Save progress (checkpoint) every 'checkpoint_every' sequences.
       - Write the updated data back to the file.
-    
+
     Returns a dictionary summarizing the progress for this file.
     """
     logger.info(f"Processing file: {filepath}")
@@ -56,7 +57,7 @@ def process_file(filepath, model, output_types, overwrite, checkpoint_every, sav
         "skipped_sequences": 0,
         "failed_sequences": [],
         # Indicate in the summary whether only pooled outputs are saved.
-        "save_pooled_only": save_pooled_only
+        "save_pooled_only": save_pooled_only,
     }
 
     # Record which keys will be added (for logging purposes).
@@ -84,10 +85,9 @@ def process_file(filepath, model, output_types, overwrite, checkpoint_every, sav
         if not validate_sequence(entry):
             logger.error(f"Skipping entry {idx} in {filepath}: invalid or missing sequence.")
             skipped += 1
-            run_summary["failed_sequences"].append({
-                "index": idx,
-                "reason": "Invalid sequence format or missing 'sequence' key"
-            })
+            run_summary["failed_sequences"].append(
+                {"index": idx, "reason": "Invalid sequence format or missing 'sequence' key"}
+            )
             continue
 
         try:
@@ -105,10 +105,7 @@ def process_file(filepath, model, output_types, overwrite, checkpoint_every, sav
             processed += 1
         except Exception as e:
             logger.error(f"Error processing entry {idx} in {filepath}: {str(e)}")
-            run_summary["failed_sequences"].append({
-                "index": idx,
-                "reason": str(e)
-            })
+            run_summary["failed_sequences"].append({"index": idx, "reason": str(e)})
             continue
 
         # Save progress every checkpoint_every processed sequences.
@@ -125,9 +122,10 @@ def process_file(filepath, model, output_types, overwrite, checkpoint_every, sav
     write_results(filepath, data, overwrite)
     return run_summary
 
+
 def main():
     # Assume the config file is located at '../configs/example.yaml'
-    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'configs', 'example.yaml')
+    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "configs", "example.yaml")
     try:
         config = load_config(config_path)
     except Exception as e:
@@ -138,7 +136,7 @@ def main():
     evo_model_config = config.get("evo_model", {})
     model_version = evo_model_config.get("version", "evo2_7b")
     output_types = evo_model_config.get("output_types", [{"type": "logits"}])
-    
+
     # Get the flag indicating whether to save only pooled outputs.
     save_pooled_only = evo_model_config.get("save_pooled_only", False)
     overwrite = config.get("overwrite_existing", False)
@@ -152,7 +150,7 @@ def main():
         sys.exit(1)
 
     # Process each data source directory. The directories are assumed to be under '../sequences'.
-    base_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'sequences')
+    base_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sequences")
     overall_progress = {}
     for source in data_sources:
         dir_name = source.get("dir")
@@ -177,6 +175,7 @@ def main():
 
     logger.info("Processing complete. Summary:")
     logger.info(overall_progress)
+
 
 if __name__ == "__main__":
     main()

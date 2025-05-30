@@ -21,10 +21,12 @@ Dunlop Lab
 
 import abc
 from pathlib import Path
+
 import pandas as pd
 import torch
 
-from dnadesign.utils import DEG2TFBS_DATA, BASE_DIR  # BASE_DIR is defined in utils.py
+from dnadesign.utils import BASE_DIR, DEG2TFBS_DATA  # BASE_DIR is defined in utils.py
+
 
 # --- Helper to resolve paths based on source type ---
 def resolve_source_path(src_type: str, given_path: str) -> Path:
@@ -47,6 +49,7 @@ def resolve_source_path(src_type: str, given_path: str) -> Path:
     else:
         raise ValueError(f"Unsupported source type: {src_type}")
 
+
 # --- Abstract Base Class ---
 class BaseDataSource(abc.ABC):
     @abc.abstractmethod
@@ -63,49 +66,56 @@ class BaseDataSource(abc.ABC):
         """
         pass
 
+
 # --- CSV File Data Source (for tfbsfetcher) ---
 class CSVDataSource(BaseDataSource):
     def __init__(self, directory: str, src_type: str = "deg2tfbs_pipeline_tfbsfetcher"):
         """
         Initializes a CSVDataSource for a single tfbsbatch directory.
-        
+
         Preconditions:
           - directory is a valid directory path (relative paths are resolved appropriately)
             containing a file named "tf2tfbs_mapping.csv".
         """
         self.dir = resolve_source_path(src_type, directory)
         assert self.dir.exists() and self.dir.is_dir(), f"Directory {self.dir} must exist and be a directory."
-    
+
     def load_data(self):
         csv_file = self.dir / "csvs" / "tf2tfbs_mapping.csv"
         assert csv_file.exists(), f"CSV file {csv_file} does not exist."
         df = pd.read_csv(csv_file)
         required_columns = [
-            'tf', 'tfbs', 'gene', 'deg_source', 
-            'polarity', 'tfbs_source', 'is_sigma_factor', 
-            'is_global_regulator'
+            "tf",
+            "tfbs",
+            "gene",
+            "deg_source",
+            "polarity",
+            "tfbs_source",
+            "is_sigma_factor",
+            "is_global_regulator",
         ]
         for col in required_columns:
             assert col in df.columns, f"Required column {col} missing in {csv_file}."
-        df = df.dropna(subset=['tf', 'tfbs'])
-        df['tf'] = df['tf'].astype(str).str.strip()
-        df['tfbs'] = df['tfbs'].astype(str).str.strip()
-        df = df[df['tf'] != ""]
-        df = df[df['tfbs'] != ""]
-        df = df.drop_duplicates(subset=['tf', 'tfbs'])
-        data_entries = list(zip(df['tf'].tolist(), df['tfbs'].tolist(), [str(csv_file)] * len(df)))
+        df = df.dropna(subset=["tf", "tfbs"])
+        df["tf"] = df["tf"].astype(str).str.strip()
+        df["tfbs"] = df["tfbs"].astype(str).str.strip()
+        df = df[df["tf"] != ""]
+        df = df[df["tfbs"] != ""]
+        df = df.drop_duplicates(subset=["tf", "tfbs"])
+        data_entries = list(zip(df["tf"].tolist(), df["tfbs"].tolist(), [str(csv_file)] * len(df)))
         return data_entries, df
+
 
 # --- Cluster Data Source (for analysis outputs) ---
 class ClusterDataSource(BaseDataSource):
     def __init__(self, parent_dir: str, clusters: list, src_type: str = "deg2tfbs_cluster_analysis"):
         self.parent_dir = resolve_source_path(src_type, parent_dir)
-        assert self.parent_dir.exists() and self.parent_dir.is_dir(), (
-            f"Parent directory {self.parent_dir} does not exist or is not a directory."
-        )
+        assert (
+            self.parent_dir.exists() and self.parent_dir.is_dir()
+        ), f"Parent directory {self.parent_dir} does not exist or is not a directory."
         assert clusters and isinstance(clusters, list), "clusters must be a non-empty list."
         self.clusters = clusters
-    
+
     def load_data(self):
         all_entries = []
         meta_frames = []
@@ -116,35 +126,42 @@ class ClusterDataSource(BaseDataSource):
             assert csv_file.exists(), f"CSV file {csv_file} does not exist in cluster {cluster}."
             df = pd.read_csv(csv_file)
             required_columns = [
-                'tf', 'tfbs', 'gene', 'deg_source', 
-                'polarity', 'tfbs_source', 'is_sigma_factor', 
-                'is_global_regulator'
+                "tf",
+                "tfbs",
+                "gene",
+                "deg_source",
+                "polarity",
+                "tfbs_source",
+                "is_sigma_factor",
+                "is_global_regulator",
             ]
             for col in required_columns:
                 assert col in df.columns, f"Required column {col} missing in {csv_file}."
-            df = df.dropna(subset=['tf', 'tfbs'])
-            df['tf'] = df['tf'].astype(str).str.strip()
-            df['tfbs'] = df['tfbs'].astype(str).str.strip()
-            df = df[df['tf'] != ""]
-            df = df[df['tfbs'] != ""]
-            df = df.drop_duplicates(subset=['tf', 'tfbs'])
-            entries = list(zip(df['tf'].tolist(), df['tfbs'].tolist(), [str(cluster_dir)] * len(df)))
+            df = df.dropna(subset=["tf", "tfbs"])
+            df["tf"] = df["tf"].astype(str).str.strip()
+            df["tfbs"] = df["tfbs"].astype(str).str.strip()
+            df = df[df["tf"] != ""]
+            df = df[df["tfbs"] != ""]
+            df = df.drop_duplicates(subset=["tf", "tfbs"])
+            entries = list(zip(df["tf"].tolist(), df["tfbs"].tolist(), [str(cluster_dir)] * len(df)))
             all_entries.extend(entries)
             meta_frames.append(df)
         combined_meta = pd.concat(meta_frames, ignore_index=True) if meta_frames else None
         return all_entries, combined_meta
+
 
 # --- PyTorch File Data Source ---
 class PTDataSource(BaseDataSource):
     def __init__(self, pt_file: str):
         self.pt_file = resolve_source_path("pt", pt_file)
         assert self.pt_file.exists() and self.pt_file.is_file(), f"PT file {self.pt_file} does not exist."
-    
+
     def load_data(self):
         data = torch.load(self.pt_file)
         for entry in data:
             assert "sequence" in entry, f"An entry in {self.pt_file} is missing the 'sequence' key."
         return data, None
+
 
 # --- Factory Function ---
 def data_source_factory(source_config: dict) -> BaseDataSource:
@@ -163,12 +180,13 @@ def data_source_factory(source_config: dict) -> BaseDataSource:
     else:
         raise ValueError(f"Unsupported source type: {src_type}")
 
+
 # --- Main Ingestor Class ---
 class TFBSMappingDataIngestor:
     def __init__(self, source_configs: list):
         assert source_configs and isinstance(source_configs, list), "source_configs must be a non-empty list."
         self.sources = [data_source_factory(cfg) for cfg in source_configs]
-    
+
     def load_all_sources(self) -> tuple[list, list]:
         all_entries = []
         all_meta = []

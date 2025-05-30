@@ -7,28 +7,25 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-import pytest
 import pandas as pd
+import pytest
 import torch
-from pathlib import Path
-import tempfile
-import datetime
-import time
 
+from dnadesign.densegen.optimizer_wrapper import DenseArrayOptimizer
 from dnadesign.densegen.sampler import TFSampler
-from dnadesign.utils import generate_sequence_entry, SequenceSaver
-from dnadesign.densegen.progress_tracker import ProgressTracker
-from dnadesign.densegen.optimizer_wrapper import DenseArrayOptimizer, random_fill
+from dnadesign.utils import SequenceSaver, generate_sequence_entry
 
 # --- Dummy Classes for Testing the Optimizer and Gap-Fill Logic ---
+
 
 class DummyDenseArray:
     """
     A dummy implementation of a DenseArray solution.
     """
+
     def __init__(self, sequence, offsets, nb_motifs):
         self.sequence = sequence  # The raw sequence (e.g., "ACGT")
-        self._offsets = offsets   # A list of dummy offset tuples (for testing)
+        self._offsets = offsets  # A list of dummy offset tuples (for testing)
         self.nb_motifs = nb_motifs
         # For simplicity, let compression_ratio be a fixed value.
         self.compression_ratio = 1.0
@@ -43,11 +40,13 @@ class DummyDenseArray:
         # Return a dummy visual representation.
         return f"DummyVisual: {self.sequence}"
 
+
 class DummyOptimizer:
     """
     A dummy optimizer that always returns the given dummy solution.
     Also implements a minimal dummy model with a SetTimeLimit method.
     """
+
     def __init__(self, dummy_solution):
         self.dummy_solution = dummy_solution
 
@@ -59,10 +58,13 @@ class DummyOptimizer:
         class DummyModel:
             def __init__(self):
                 self.time_limit = None
+
             def SetTimeLimit(self, ms):
                 self.time_limit = ms
+
             def SupportsTimeLimit(self):
                 return True
+
         self.model = DummyModel()
 
     def solve(self):
@@ -71,6 +73,7 @@ class DummyOptimizer:
     def forbid(self, solution):
         # Dummy forbid does nothing.
         pass
+
 
 # Subclass DenseArrayOptimizer to override get_optimizer_instance to return our dummy optimizer.
 class DummyDenseArrayOptimizer(DenseArrayOptimizer):
@@ -81,7 +84,9 @@ class DummyDenseArrayOptimizer(DenseArrayOptimizer):
     def get_optimizer_instance(self):
         return DummyOptimizer(self.dummy_solution)
 
+
 # --- Tests ---
+
 
 def test_tfsampler_sampling():
     """
@@ -90,7 +95,7 @@ def test_tfsampler_sampling():
     data = {
         "tf": ["TF1", "TF1", "TF2", "TF3", "TF3", "TF4"],
         "tfbs": ["bs1", "bs2", "bs3", "bs4", "bs5", "bs6"],
-        "deg_source": ["source1"] * 6
+        "deg_source": ["source1"] * 6,
     }
     df = pd.DataFrame(data)
     sampler = TFSampler(df)
@@ -102,8 +107,9 @@ def test_tfsampler_sampling():
     assert len(set(tfs)) == 3
     # Optionally, check that each returned binding site is one of the binding sites associated with its TF.
     for tf, tfbs, _ in result:
-        tf_rows = df[df['tf'] == tf]
-        assert tfbs in tf_rows['tfbs'].values
+        tf_rows = df[df["tf"] == tf]
+        assert tfbs in tf_rows["tfbs"].values
+
 
 def test_generate_sequence_entry():
     """
@@ -118,12 +124,13 @@ def test_generate_sequence_entry():
         "arrays_generated_before_resample": 1,
         "solver": "CBC",
         "solver_options": ["Threads=16", "TimeLimit=20"],
-        "fixed_elements": {"promoter_constraints": []}
+        "fixed_elements": {"promoter_constraints": []},
     }
     entry = generate_sequence_entry(dummy_solution, ["TFBS_SRC"], ["TF1_bs1"], config)
     for key in ["id", "meta_date_accessed", "meta_source", "meta_sequence_visual", "sequence", "config"]:
         assert key in entry, f"Key '{key}' not found in generated entry."
         assert entry[key] is not None, f"Key '{key}' is None."
+
 
 def test_save_and_load_pt(tmp_path):
     """
@@ -131,7 +138,7 @@ def test_save_and_load_pt(tmp_path):
     """
     entries = [
         {"id": "test1", "sequence": "ACGT", "meta_source": "dummy_source"},
-        {"id": "test2", "sequence": "TGCA", "meta_source": "dummy_source"}
+        {"id": "test2", "sequence": "TGCA", "meta_source": "dummy_source"},
     ]
     saver = SequenceSaver(str(tmp_path))
     filename = "test.pt"
@@ -142,6 +149,7 @@ def test_save_and_load_pt(tmp_path):
     for entry in loaded:
         for key in ["id", "sequence", "meta_source"]:
             assert key in entry and entry[key], f"Key '{key}' missing or empty in entry: {entry}"
+
 
 def test_gap_fill():
     """
@@ -163,7 +171,7 @@ def test_gap_fill():
         fill_gap=True,
         fill_gap_end="5prime",
         fill_gc_min=0.40,
-        fill_gc_max=0.60
+        fill_gc_max=0.60,
     )
     # Override the dummy solution's sequence to be short.
     dummy_solution.sequence = "ACGT"
@@ -175,6 +183,7 @@ def test_gap_fill():
     assert getattr(solution, "meta_gap_fill", False) is True, "meta_gap_fill attribute not set after gap fill."
     # Since we are filling at the 5prime end, the original "ACGT" should appear at the end.
     assert solution.sequence.endswith("ACGT"), "Original sequence not found at the end after 5prime gap fill."
+
 
 if __name__ == "__main__":
     pytest.main()

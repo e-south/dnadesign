@@ -11,15 +11,17 @@ Dunlop Lab
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Sequence, Optional
+from typing import Optional, Sequence
 
 import numpy as np
+
 
 @dataclass(slots=True, frozen=True)
 class PWM:
     name: str
-    matrix: np.ndarray              # position‐specific probability matrix (L×4)
+    matrix: np.ndarray  # position‐specific probability matrix (L×4)
     alphabet: Sequence[str] = ("A", "C", "G", "T")
     nsites: Optional[int] = None
     evalue: Optional[float] = None

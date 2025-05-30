@@ -9,6 +9,7 @@ Dunlop Lab
 """
 
 from __future__ import annotations
+
 from pathlib import Path
 
 import logomaker
@@ -38,8 +39,8 @@ def plot_pwm(
     logomaker.Logo(df, ax=ax, shade_below=0.5)
 
     # strip top & right spines
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
     # Title and labels
     title = pwm.name
@@ -47,11 +48,7 @@ def plot_pwm(
         title += f" (n={pwm.nsites}, E={pwm.evalue:.1e})"
     ax.set_title(title)
     ax.set_xlabel("Position")
-    ylabel = (
-        "Information Content (bits)"
-        if mode == "information"
-        else "Probability"
-    )
+    ylabel = "Information Content (bits)" if mode == "information" else "Probability"
     ax.set_ylabel(ylabel)
 
     ax.axhline(0, color="black", lw=0.5)

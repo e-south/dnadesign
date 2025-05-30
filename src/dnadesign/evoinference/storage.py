@@ -9,11 +9,13 @@ Dunlop Lab
 """
 
 import os
+
 import torch
 import yaml
 from logger import get_logger
 
 logger = get_logger(__name__)
+
 
 def write_results(filepath: str, data: list, overwrite: bool):
     """
@@ -27,17 +29,19 @@ def write_results(filepath: str, data: list, overwrite: bool):
         logger.error(f"Error writing results to {filepath}: {str(e)}")
         raise e
 
+
 def update_progress(progress_filepath: str, progress_data: dict):
     """
     Write progress summary data to a YAML file.
     """
     try:
-        with open(progress_filepath, 'w') as f:
+        with open(progress_filepath, "w") as f:
             yaml.safe_dump(progress_data, f)
         logger.info(f"Progress updated in {progress_filepath}")
     except Exception as e:
         logger.error(f"Error writing progress file {progress_filepath}: {str(e)}")
         raise e
+
 
 def load_progress(progress_filepath: str):
     """
@@ -45,7 +49,7 @@ def load_progress(progress_filepath: str):
     """
     if os.path.exists(progress_filepath):
         try:
-            with open(progress_filepath, 'r') as f:
+            with open(progress_filepath, "r") as f:
                 data = yaml.safe_load(f)
             return data if data is not None else {}
         except Exception as e:

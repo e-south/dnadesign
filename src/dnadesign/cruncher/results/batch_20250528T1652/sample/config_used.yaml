@@ -1,0 +1,42 @@
+cruncher:
+  analysis:
+    plots:
+    - score_kde
+    - scatter_pwm
+    - logo_elites
+    runs: []
+  mode: sample
+  motif:
+    formats:
+      .pfm: JASPAR
+      .txt: MEME
+    plot:
+      bits_mode: information
+      dpi: 200
+      logo: true
+  out_dir: results
+  regulator_sets:
+  - - cpxR
+    - soxR
+  sample:
+    bidirectional: true
+    init:
+      kind: random
+      pad_with: background_pwm
+    optimiser:
+      gibbs:
+        beta: 0.01
+        block_size: 5
+        chains: 4
+        cores: 4
+        draws: 400
+        min_dist: 1
+        swap_prob: 0.5
+        tune: 0
+      kind: gibbs
+    plots:
+      autocorr: true
+      convergence: true
+      scatter_pwm: true
+      trace: true
+    top_k: 200

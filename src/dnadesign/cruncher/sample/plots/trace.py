@@ -9,9 +9,11 @@ Dunlop Lab
 """
 
 from pathlib import Path
+
 import arviz as az
-import seaborn as sns
 import matplotlib.pyplot as plt
+import seaborn as sns
+
 
 def plot_trace(idata: az.InferenceData, out_dir: Path) -> None:
     """

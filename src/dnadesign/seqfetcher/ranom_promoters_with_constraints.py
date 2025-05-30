@@ -30,16 +30,14 @@ current_file = Path(__file__).resolve()
 src_dir = current_file.parent.parent.parent
 sys.path.insert(0, str(src_dir))
 
-import re
-import uuid
-import yaml
-import random
 import datetime
-import pandas as pd
+import random
+import uuid
 
-from dnadesign.utils import SequenceSaver, BASE_DIR
+from dnadesign.utils import BASE_DIR, SequenceSaver
 
 VALID_NUCLEOTIDES = "ATCG"
+
 
 def generate_random_sequence(length: int, gc_min: float, gc_max: float) -> str:
     while True:
@@ -47,6 +45,7 @@ def generate_random_sequence(length: int, gc_min: float, gc_max: float) -> str:
         gc_content = 100 * (seq.count("G") + seq.count("C")) / length
         if gc_min <= gc_content <= gc_max:
             return seq
+
 
 def ingest(num_sequences: int = 10, length: int = 100, gc_min: float = 40, gc_max: float = 60) -> list:
     sequences = []
@@ -60,10 +59,11 @@ def ingest(num_sequences: int = 10, length: int = 100, gc_min: float = 40, gc_ma
             "sequence": seq,
             "meta_source": "random promoters",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
-            "meta_part_type": "random promoter"
+            "meta_part_type": "random promoter",
         }
         sequences.append(entry)
     return sequences
+
 
 def apply_promoter_constraint(seq: str, constraint: dict) -> (str, dict):
     """
@@ -71,7 +71,7 @@ def apply_promoter_constraint(seq: str, constraint: dict) -> (str, dict):
     Inserts the upstream motif at a random position within `upstream_pos` range,
     then places the downstream motif at an offset (randomly chosen within the
     provided `spacer_length` range) from the end of the upstream motif.
-    
+
     Returns the modified sequence and metadata about the insertion, including
     the actual upstream and downstream motifs used.
     """
@@ -90,19 +90,20 @@ def apply_promoter_constraint(seq: str, constraint: dict) -> (str, dict):
         if downstream_pos + len(downstream) <= seq_length:
             seq_list = list(seq)
             # Replace bases with the upstream motif.
-            seq_list[pos: pos + len(upstream)] = list(upstream)
+            seq_list[pos : pos + len(upstream)] = list(upstream)
             # Replace bases with the downstream motif.
-            seq_list[downstream_pos: downstream_pos + len(downstream)] = list(downstream)
+            seq_list[downstream_pos : downstream_pos + len(downstream)] = list(downstream)
             meta = {
                 "promoter_constraint": constraint["name"],
                 "upstream_insertion_position": pos,
                 "spacer_length_used": spacer,
                 "downstream_insertion_position": downstream_pos,
                 "upstream_motif": upstream,
-                "downstream_motif": downstream
+                "downstream_motif": downstream,
             }
             return "".join(seq_list), meta
     raise ValueError("Could not apply promoter constraint: sequence length or specified ranges may be insufficient.")
+
 
 def process_promoter_constraints(sequences: list, constraint: dict) -> list:
     """
@@ -116,7 +117,10 @@ def process_promoter_constraints(sequences: list, constraint: dict) -> list:
         entry["meta_promoter_constraint"] = meta
     return sequences
 
-def save_output(sequences, num_sequences: int, length: int, gc_min: float, gc_max: float, promoter_constraint: dict = None):
+
+def save_output(
+    sequences, num_sequences: int, length: int, gc_min: float, gc_max: float, promoter_constraint: dict = None
+):
     # If a promoter constraint is provided, incorporate its name into the file and directory.
     if promoter_constraint:
         out_dir_name = f"seqbatch_random_promoters_{promoter_constraint['name']}"
@@ -130,15 +134,12 @@ def save_output(sequences, num_sequences: int, length: int, gc_min: float, gc_ma
     additional_info = {
         "source_file": out_file_name,
         "part_type": "random_promoter",
-        "parameters": {
-            "num_sequences": num_sequences,
-            "sequence_length": length,
-            "gc_range": [gc_min, gc_max]
-        }
+        "parameters": {"num_sequences": num_sequences, "sequence_length": length, "gc_range": [gc_min, gc_max]},
     }
     if promoter_constraint:
         additional_info["promoter_constraint"] = promoter_constraint
     saver.save_with_summary(sequences, out_file_name, additional_info=additional_info)
+
 
 if __name__ == "__main__":
     # Example parameters; adjust as needed.
@@ -147,7 +148,7 @@ if __name__ == "__main__":
     gc_min = 40
     gc_max = 60
     seqs = ingest(num_sequences=num_sequences, length=length, gc_min=gc_min, gc_max=gc_max)
-    
+
     # Define the promoter constraint as specified.
     # promoter_constraint = {
     #     "name": "sigma70_consensus",
@@ -156,15 +157,15 @@ if __name__ == "__main__":
     #     "spacer_length": [16, 18],
     #     "downstream": "TATAAT"
     # }
-    
+
     promoter_constraint = {
-    "name": "sigma70_consensus_+",
-    "upstream": "TTGACA",
-    "upstream_pos": [10, 100],
-    "spacer_length": [14, 16],
-    "downstream": "TGTATAATGCT"
-   }
-    
+        "name": "sigma70_consensus_+",
+        "upstream": "TTGACA",
+        "upstream_pos": [10, 100],
+        "spacer_length": [14, 16],
+        "downstream": "TGTATAATGCT",
+    }
+
     # Apply promoter constraints in a decoupled module step.
     seqs = process_promoter_constraints(seqs, promoter_constraint)
     save_output(seqs, num_sequences, length, gc_min, gc_max, promoter_constraint)

@@ -29,31 +29,33 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+import math
 import sys
 from pathlib import Path
-import math
+
 import numpy as np
 
 current_file = Path(__file__).resolve()
 src_dir = current_file.parent.parent.parent
 sys.path.insert(0, str(src_dir))
 
-import pandas as pd
-import re
 import datetime
 import uuid
-import yaml
 
-from dnadesign.utils import load_dataset, SequenceSaver, DATA_FILES, BASE_DIR
+import pandas as pd
+
+from dnadesign.utils import BASE_DIR, SequenceSaver, load_dataset
 
 VALID_NUCLEOTIDES = set("ATCG")
 LABEL_SHEETS = ["LB_exp", "NaCl_exp", "Fe_exp", "LB-stat", "M9-exp"]
+
 
 def trim_barcode(seq: str) -> str:
     if not isinstance(seq, str):
         return ""
     seq = seq.strip().upper().replace(" ", "")
     return seq[:-12] if len(seq) >= 12 else ""
+
 
 def validate_entry(name: str, seq: str):
     if not name or pd.isna(name):
@@ -63,6 +65,7 @@ def validate_entry(name: str, seq: str):
     for c in seq:
         if c not in VALID_NUCLEOTIDES:
             raise AssertionError(f"Invalid nucleotide '{c}' in sequence: {seq}")
+
 
 def is_invalid_value(val) -> bool:
     """
@@ -77,31 +80,26 @@ def is_invalid_value(val) -> bool:
     except Exception:
         return True
 
+
 def ingest():
     # Load sequences
     df_seq = load_dataset("johns_et_al_sequences", sheet_name="Full Constructs", header=0)
-    df_seq = df_seq.rename(columns={
-        "Oligo ID": "name",
-        "Regulatory Sequence + ATG + 12bp Barcode": "sequence"
-    })
+    df_seq = df_seq.rename(columns={"Oligo ID": "name", "Regulatory Sequence + ATG + 12bp Barcode": "sequence"})
     df_seq["sequence"] = df_seq["sequence"].apply(trim_barcode)
-    
+
     # Merge labels from each sheet
     df_merged = df_seq.copy()
     for sheet in LABEL_SHEETS:
         df_label = load_dataset("johns_et_al_labels", sheet_name=sheet, header=0)
-        df_label = df_label.rename(columns={
-            "OLIGO ID": "name",
-            "tx_norm": f"meta_observed_tx_norm_{sheet}"
-        })
+        df_label = df_label.rename(columns={"OLIGO ID": "name", "tx_norm": f"meta_observed_tx_norm_{sheet}"})
         # Only keep the key and the tx_norm column
         df_label = df_label[["name", f"meta_observed_tx_norm_{sheet}"]]
         # Merge using inner join to drop non-matches
         df_merged = pd.merge(df_merged, df_label, on="name", how="inner")
-    
+
     # Drop rows with any null values in key columns
     df_merged = df_merged.dropna(subset=["name", "sequence"])
-    
+
     # Remove rows where any tx_raw or tx_norm value is 0 or infinite
     # Check all columns that start with "meta_observed_tx_norm_" or "meta_observed_tx_raw_"
     def row_is_invalid(row):
@@ -110,9 +108,9 @@ def ingest():
                 if is_invalid_value(row[col]):
                     return True
         return False
-    
+
     df_clean = df_merged[~df_merged.apply(row_is_invalid, axis=1)]
-    
+
     sequences = []
     for idx, row in df_clean.iterrows():
         name = row["name"]
@@ -130,21 +128,20 @@ def ingest():
             "sequence": seq,
             "meta_source": "johns_et_al",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
-            "meta_part_type": "natural promoter"
+            "meta_part_type": "natural promoter",
         }
         entry.update(label_meta)
         sequences.append(entry)
     return sequences
 
+
 def save_output(sequences):
     output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_johns_et_al"
     output_dir.mkdir(parents=True, exist_ok=True)
     saver = SequenceSaver(str(output_dir))
-    additional_info = {
-        "source_file": "johns_et_al",
-        "part_type": "promoter"
-    }
+    additional_info = {"source_file": "johns_et_al", "part_type": "promoter"}
     saver.save_with_summary(sequences, "seqbatch_johns_et_al.pt", additional_info=additional_info)
+
 
 if __name__ == "__main__":
     seqs = ingest()

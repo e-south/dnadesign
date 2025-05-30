@@ -9,7 +9,9 @@ Dunlop Lab
 """
 
 from pathlib import Path
+
 import arviz as az
+
 
 def plot_autocorr(idata: az.InferenceData, out_dir: Path) -> None:
     """Autocorrelation up to lag=100 → autocorr_score.png"""
@@ -17,5 +19,6 @@ def plot_autocorr(idata: az.InferenceData, out_dir: Path) -> None:
     out = out_dir / "autocorr_score.png"
     out_dir.mkdir(exist_ok=True, parents=True)
     import matplotlib.pyplot as plt
+
     plt.savefig(out, dpi=300)
     plt.close()

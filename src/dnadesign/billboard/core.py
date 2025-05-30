@@ -23,10 +23,10 @@ Dunlop Lab
 """
 
 import logging
-import torch
-import numpy as np
-import warnings
+
 import Levenshtein
+import numpy as np
+import torch
 from scipy.stats import entropy as scipy_entropy
 
 from dnadesign.aligner.metrics import compute_alignment_scores
@@ -90,11 +90,7 @@ def robust_parse_tfbs(part, seq_id="unknown"):
     if len(tokens) < 2:
         raise ValueError(f"Bad legacy format '{part}' in {seq_id}")
     motif = tokens[-1]
-    tf = (
-        "_".join(tokens[1:-1]).lower()
-        if len(tokens) > 2
-        else tokens[0].lower()
-    )
+    tf = "_".join(tokens[1:-1]).lower() if len(tokens) > 2 else tokens[0].lower()
     return tf, motif
 
 
@@ -189,11 +185,7 @@ def token_edit_distance(t1, t2, tf_penalty, strand_penalty, partial_penalty):
                 else:
                     cost = tf_penalty
 
-            dp[i, j] = min(
-                dp[i - 1, j] + 1,
-                dp[i, j - 1] + 1,
-                dp[i - 1, j - 1] + cost
-            )
+            dp[i, j] = min(dp[i - 1, j] + 1, dp[i, j - 1] + 1, dp[i - 1, j - 1] + cost)
 
     return dp[m, n]
 
@@ -237,9 +229,9 @@ def process_sequences(pt_paths, cfg):
 
     # 4) initialize accumulators
     tf_frequency = {}
-    occupancy_fwd  = {}
-    occupancy_rev  = {}
-    motif_info     = []
+    occupancy_fwd = {}
+    occupancy_rev = {}
+    motif_info = []
     total_instances = 0
 
     # 5) count only placed motifs (meta_tfbs_parts_in_array)
@@ -271,7 +263,7 @@ def process_sequences(pt_paths, cfg):
                 arr, pos = occupancy_rev, seq.find(reverse_complement(motif))
 
             if pos >= 0:
-                arr.setdefault(tf, np.zeros(sequence_length, dtype=int))[pos:pos+len(motif)] += 1
+                arr.setdefault(tf, np.zeros(sequence_length, dtype=int))[pos : pos + len(motif)] += 1
 
     # 6) build occupancy matrices
     tf_list = sorted(set(occupancy_fwd) | set(occupancy_rev))
@@ -283,15 +275,15 @@ def process_sequences(pt_paths, cfg):
     log2L = np.log2(sequence_length)
     for i, tf in enumerate(tf_list):
         pf, pr = F[i], R[i]
+
         def ent(arr):
             s = arr.sum()
-            return 0.0 if s == 0 else float(scipy_entropy(arr/s, base=2) / log2L)
+            return 0.0 if s == 0 else float(scipy_entropy(arr / s, base=2) / log2L)
+
         per_tf_entropy.append({"tf": tf, "avg_entropy": (ent(pf) + ent(pr)) / 2})
 
     logger.info(
-        f"Done processing: {len(seqs)} seqs | "
-        f"{total_instances} TFBS instances | "
-        f"{len(tf_list)} unique TFs"
+        f"Done processing: {len(seqs)} seqs | " f"{total_instances} TFBS instances | " f"{len(tf_list)} unique TFs"
     )
 
     return {
@@ -305,12 +297,14 @@ def process_sequences(pt_paths, cfg):
         "motif_strings": motif_strings,
         "motif_info": motif_info,
         "per_tf_entropy": per_tf_entropy,
-        "total_tfbs_instances": total_instances
+        "total_tfbs_instances": total_instances,
     }
+
 
 # -------------------------------------------------------------------------
 # Core diversity metrics
 # -------------------------------------------------------------------------
+
 
 def compute_tf_richness(results, cfg):
     """
@@ -328,7 +322,7 @@ def compute_inverted_gini(results, cfg):
     total = freqs.sum()
     if n == 0 or total == 0:
         return 0.0
-    diffs = np.abs(freqs.reshape(-1,1) - freqs.reshape(1,-1)).sum()
+    diffs = np.abs(freqs.reshape(-1, 1) - freqs.reshape(1, -1)).sum()
     gini = diffs / (2 * n * total)
     return 1.0 - gini
 
@@ -346,7 +340,7 @@ def compute_min_jaccard_dissimilarity(results, cfg):
                 mp[motif] = tf
             except ValueError:
                 continue
-        tset = { mp[m] for m in s["meta_tfbs_parts_in_array"] if m in mp }
+        tset = {mp[m] for m in s["meta_tfbs_parts_in_array"] if m in mp}
         sets.append(tset)
 
     best = 1.0
@@ -354,7 +348,7 @@ def compute_min_jaccard_dissimilarity(results, cfg):
     if N < 2:
         return 0.0
     for i in range(N):
-        for j in range(i+1, N):
+        for j in range(i + 1, N):
             a, b = sets[i], sets[j]
             U = len(a | b)
             if U:
@@ -384,7 +378,7 @@ def compute_min_motif_string_levenshtein(results, cfg):
     for i in range(N):
         si = "|".join(toks[i])
         li = len(toks[i])
-        for j in range(i+1, N):
+        for j in range(i + 1, N):
             sj = "|".join(toks[j])
             lj = len(toks[j])
             if li == 0 or lj == 0:
@@ -416,7 +410,7 @@ def compute_min_nw_dissimilarity(results: dict, cfg: dict) -> float | None:
         return_formats=("condensed",),
         normalize=True,
         return_dissimilarity=False,
-        verbose=False
+        verbose=False,
     )
     # compute_alignment_scores returns a dict if return_formats != ("mean",)
     sims = out["condensed"] if isinstance(out, dict) else np.asarray(out)

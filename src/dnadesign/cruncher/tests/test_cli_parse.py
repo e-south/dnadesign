@@ -6,5 +6,3 @@ Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
-
-from .parsers import meme

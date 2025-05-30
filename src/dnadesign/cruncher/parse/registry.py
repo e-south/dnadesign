@@ -12,6 +12,7 @@ Dunlop Lab
 """
 
 from __future__ import annotations
+
 from pathlib import Path
 from typing import Dict
 
@@ -34,7 +35,7 @@ class Registry:
             return self._cache[tf_key]
 
         path, fmtname = self._find_path(tf_key)
-        pwm  = load_pwm(path, fmt=fmtname)
+        pwm = load_pwm(path, fmt=fmtname)
         self._cache[tf_key] = pwm
         return pwm
 
@@ -49,12 +50,7 @@ class Registry:
         # fallback: case‐insensitive stem match on any extension
         for path in self.root.rglob("*"):
             if path.is_file() and path.stem.lower() == tf_key:
-                fmtname = self.ext_map.get(
-                    path.suffix.lower(),
-                    path.suffix.lstrip(".").upper()
-                )
+                fmtname = self.ext_map.get(path.suffix.lower(), path.suffix.lstrip(".").upper())
                 return path, fmtname
 
-        raise FileNotFoundError(
-            f"No PWM file found for TF '{tf_key}' under {self.root}"
-        )
+        raise FileNotFoundError(f"No PWM file found for TF '{tf_key}' under {self.root}")

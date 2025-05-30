@@ -13,6 +13,7 @@ from logger import get_logger
 
 logger = get_logger(__name__)
 
+
 def apply_pooling(tensor: torch.Tensor, method: str = "mean", dim: int = 1) -> torch.Tensor:
     """
     Apply a pooling operation on the given tensor along dimension `dim`.
@@ -28,13 +29,14 @@ def apply_pooling(tensor: torch.Tensor, method: str = "mean", dim: int = 1) -> t
     else:
         raise ValueError(f"Unsupported pooling method: {method}")
 
+
 def augment_outputs(results: dict, output_types: list, save_pooled_only: bool = False) -> dict:
     """
     Augment the raw results from run_model by adding additional keys:
       - For each output tensor, add a key with '_shape' appended that holds the shape (as a list).
       - If a pooling configuration is provided in the output type config, apply pooling (e.g., mean)
         along the specified dimension and add keys with the pooling method suffix and their shape.
-    
+
     If save_pooled_only is True, only the pooled outputs (and their shape) will be added.
     """
     augmented = {}
@@ -42,7 +44,7 @@ def augment_outputs(results: dict, output_types: list, save_pooled_only: bool = 
     for config in output_types:
         typ = config.get("type")
         pooling_conf = config.get("pooling")
-        
+
         if typ == "logits":
             key = "evo2_logits"
             if key in results:
@@ -61,7 +63,7 @@ def augment_outputs(results: dict, output_types: list, save_pooled_only: bool = 
                     if not save_pooled_only:
                         augmented[key] = tensor
                         augmented[f"{key}_shape"] = list(tensor.shape)
-                        
+
         elif typ == "embeddings" and "layers" in config:
             for layer in config["layers"]:
                 key = f"evo2_embeddings_{layer}"

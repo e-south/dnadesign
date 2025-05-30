@@ -18,22 +18,21 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-import tqdm
+import warnings
 from collections import defaultdict
+
+import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import matplotlib.pyplot as plt
-import warnings
+import tqdm
 
 # Import the pairwise scoring function from our aligner package.
 from dnadesign.aligner.metrics import score_pairwise
 
-def compute_intra_cluster_similarity(data_entries,
-                                     match=2,
-                                     mismatch=-1,
-                                     gap_open=10,
-                                     gap_extend=1,
-                                     normalization="max_score"):
+
+def compute_intra_cluster_similarity(
+    data_entries, match=2, mismatch=-1, gap_open=10, gap_extend=1, normalization="max_score"
+):
     """
     For each cluster in data_entries, compute per-sequence mean normalized global alignment
     similarity to all other sequences in that cluster.
@@ -44,7 +43,7 @@ def compute_intra_cluster_similarity(data_entries,
 
     A progress bar shows progress across clusters.
     """
-    from collections import defaultdict
+
     clusters = defaultdict(list)
     for entry in data_entries:
         cl = entry.get("leiden_cluster")
@@ -53,9 +52,7 @@ def compute_intra_cluster_similarity(data_entries,
         clusters[cl].append(entry)
 
     # Progress over clusters
-    for cl, entries in tqdm.tqdm(clusters.items(),
-                                 desc="Computing intra-cluster similarity",
-                                 unit="cluster"):
+    for cl, entries in tqdm.tqdm(clusters.items(), desc="Computing intra-cluster similarity", unit="cluster"):
         n = len(entries)
         if n == 1:
             # Singleton cluster => similarity = 1.0
@@ -74,15 +71,19 @@ def compute_intra_cluster_similarity(data_entries,
             for j, seq_j in enumerate(seqs):
                 if i == j:
                     continue
-                norm_sim = score_pairwise(seq_i, seq_j,
-                                          match=match,
-                                          mismatch=mismatch,
-                                          gap_open=gap_open,
-                                          gap_extend=gap_extend,
-                                          normalization=normalization,
-                                          return_raw=False)
+                norm_sim = score_pairwise(
+                    seq_i,
+                    seq_j,
+                    match=match,
+                    mismatch=mismatch,
+                    gap_open=gap_open,
+                    gap_extend=gap_extend,
+                    normalization=normalization,
+                    return_raw=False,
+                )
                 sim_scores.append(norm_sim)
             entry["meta_intra_cluster_similarity"] = float(np.mean(sim_scores)) if sim_scores else 1.0
+
 
 def plot_intra_cluster_similarity(data_entries, batch_name, save_path=None):
     """
@@ -99,7 +100,6 @@ def plot_intra_cluster_similarity(data_entries, batch_name, save_path=None):
     If save_path is given, the plot is saved there. Otherwise, show interactively.
     """
     import pandas as pd
-    from matplotlib import patches
 
     # Group similarity scores
     clusters_dict = {}
@@ -137,7 +137,7 @@ def plot_intra_cluster_similarity(data_entries, batch_name, save_path=None):
         color="black",
         alpha=0.3,
         jitter=True,
-        zorder=1
+        zorder=1,
     )
 
     # 2) Box plot on top (white fill, gray edges, no fliers)
@@ -153,7 +153,7 @@ def plot_intra_cluster_similarity(data_entries, batch_name, save_path=None):
         medianprops=dict(color="gray"),
         width=0.6,
         zorder=2,
-        ax=ax
+        ax=ax,
     )
 
     ax.set_xlabel("Cluster")

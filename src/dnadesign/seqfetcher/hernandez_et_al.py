@@ -34,15 +34,14 @@ current_file = Path(__file__).resolve()
 src_dir = current_file.parent.parent.parent
 sys.path.insert(0, str(src_dir))
 
-import pandas as pd
-import re
 import datetime
+import re
 import uuid
-import yaml
 
-from dnadesign.utils import load_dataset, SequenceSaver, DATA_FILES, BASE_DIR
+from dnadesign.utils import BASE_DIR, DATA_FILES, SequenceSaver
 
 VALID_NUCLEOTIDES = set("ATCG")
+
 
 def clean_sequence(seq: str) -> str:
     if not isinstance(seq, str):
@@ -50,6 +49,7 @@ def clean_sequence(seq: str) -> str:
     seq = seq.strip().upper()
     seq = re.sub(r"\s+", "", seq)
     return "".join(c for c in seq if c in VALID_NUCLEOTIDES)
+
 
 def parse_fasta(file_path: Path, meta_part_type: str, source_key: str) -> list:
     sequences = []
@@ -77,32 +77,33 @@ def parse_fasta(file_path: Path, meta_part_type: str, source_key: str) -> list:
                     "sequence": seq,
                     "meta_source": source_key,
                     "meta_date_accessed": datetime.datetime.now().isoformat(),
-                    "meta_part_type": meta_part_type
+                    "meta_part_type": meta_part_type,
                 }
                 sequences.append(entry)
                 header = None  # reset header for next entry
     return sequences
 
+
 def ingest():
     sequences_all = {}
-    for key, part_type in [("hernandez_et_al_positive", "natural promoter"),
-                           ("hernandez_et_al_negative", "natural non-promoter")]:
+    for key, part_type in [
+        ("hernandez_et_al_positive", "natural promoter"),
+        ("hernandez_et_al_negative", "natural non-promoter"),
+    ]:
         file_path = DATA_FILES[key]
         seqs = parse_fasta(file_path, meta_part_type=part_type, source_key=key)
         sequences_all[key] = seqs
     return sequences_all
+
 
 def save_output(sequences_dict: dict):
     for key, sequences in sequences_dict.items():
         output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / f"seqbatch_{key}"
         output_dir.mkdir(parents=True, exist_ok=True)
         saver = SequenceSaver(str(output_dir))
-        additional_info = {
-            "source_file": "hernandez_et_al",
-            "part_type": "promoter"
-        }
+        additional_info = {"source_file": "hernandez_et_al", "part_type": "promoter"}
         saver.save_with_summary(sequences, f"seqbatch_{key}.pt", additional_info=additional_info)
-        
+
 
 if __name__ == "__main__":
     seqs = ingest()

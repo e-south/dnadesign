@@ -8,13 +8,15 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+import logging
 import os
+
 import numpy as np
 import pandas as pd
 import yaml
-import logging
 
 logger = logging.getLogger(__name__)
+
 
 def convert_metrics(m):
     """Recursively convert numpy types to native Python types."""
@@ -26,6 +28,7 @@ def convert_metrics(m):
         return [convert_metrics(x) for x in m]
     else:
         return m
+
 
 def save_nmf_results(W, H, metric_data: dict, output_dir: str) -> None:
     """
@@ -46,7 +49,10 @@ def save_nmf_results(W, H, metric_data: dict, output_dir: str) -> None:
     except Exception as e:
         logger.error(f"Error saving NMF results in {output_dir}: {str(e)}")
 
-def annotate_sequences_with_nmf(sequences: list, W: np.ndarray, best_k: int, pt_path: str, assert_normalized: bool = True) -> None:
+
+def annotate_sequences_with_nmf(
+    sequences: list, W: np.ndarray, best_k: int, pt_path: str, assert_normalized: bool = True
+) -> None:
     """
     Annotate each sequence with NMF metadata and save the updated sequences back to the .pt file.
 
@@ -77,27 +83,31 @@ def annotate_sequences_with_nmf(sequences: list, W: np.ndarray, best_k: int, pt_
 
     n_sequences, k_actual = W.shape
     if k_actual != best_k:
-        raise ValueError(f"Dimension mismatch: W has {k_actual} columns but best_k is set to {best_k}. "
-                         "Ensure that you load the W matrix from the correct k subdirectory.")
-    
+        raise ValueError(
+            f"Dimension mismatch: W has {k_actual} columns but best_k is set to {best_k}. "
+            "Ensure that you load the W matrix from the correct k subdirectory."
+        )
+
     for i in range(n_sequences):
         p = W[i, :]
         dominant_program = int(np.argmax(p))
         entropy = -np.sum(p * np.log2(p + 1e-8))
         normalized_entropy = entropy / np.log2(best_k)
-        
+
         sequences[i]["meta_nmf"] = {
             "k_used": best_k,
             "program_composition": p.tolist(),
             "dominant_program": dominant_program,
-            "program_entropy": normalized_entropy
+            "program_entropy": normalized_entropy,
         }
     try:
         import torch
+
         torch.save(sequences, pt_path)
         logger.info(f"Annotated sequences saved to {pt_path}")
     except Exception as e:
         logger.error(f"Error saving annotated sequences to {pt_path}: {str(e)}")
+
 
 def export_feature_names(feature_names: list, output_path: str) -> None:
     """
@@ -110,6 +120,7 @@ def export_feature_names(feature_names: list, output_path: str) -> None:
         logger.info(f"Exported feature names to {output_path}")
     except Exception as e:
         logger.error(f"Error exporting feature names: {str(e)}")
+
 
 def export_row_ids(row_ids: list, output_path: str) -> None:
     """

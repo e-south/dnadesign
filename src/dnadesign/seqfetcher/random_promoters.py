@@ -28,16 +28,14 @@ current_file = Path(__file__).resolve()
 src_dir = current_file.parent.parent.parent
 sys.path.insert(0, str(src_dir))
 
-import re
-import uuid
-import yaml
-import random
 import datetime
-import pandas as pd
+import random
+import uuid
 
-from dnadesign.utils import SequenceSaver, BASE_DIR
+from dnadesign.utils import BASE_DIR, SequenceSaver
 
 VALID_NUCLEOTIDES = "ATCG"
+
 
 def generate_random_sequence(length: int, gc_min: float, gc_max: float) -> str:
     while True:
@@ -45,6 +43,7 @@ def generate_random_sequence(length: int, gc_min: float, gc_max: float) -> str:
         gc_content = 100 * (seq.count("G") + seq.count("C")) / length
         if gc_min <= gc_content <= gc_max:
             return seq
+
 
 def ingest(num_sequences: int = 10, length: int = 100, gc_min: float = 40, gc_max: float = 60) -> list:
     sequences = []
@@ -58,10 +57,11 @@ def ingest(num_sequences: int = 10, length: int = 100, gc_min: float = 40, gc_ma
             "sequence": seq,
             "meta_source": "random promoters",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
-            "meta_part_type": "random promoter"
+            "meta_part_type": "random promoter",
         }
         sequences.append(entry)
     return sequences
+
 
 def save_output(sequences, num_sequences: int, length: int, gc_min: float, gc_max: float):
     output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_random_promoters"
@@ -70,13 +70,10 @@ def save_output(sequences, num_sequences: int, length: int, gc_min: float, gc_ma
     additional_info = {
         "source_file": "seqbatch_random_promoters",
         "part_type": "random_promoter",
-        "parameters": {
-            "num_sequences": num_sequences,
-            "sequence_length": length,
-            "gc_range": [gc_min, gc_max]
-        }
+        "parameters": {"num_sequences": num_sequences, "sequence_length": length, "gc_range": [gc_min, gc_max]},
     }
     saver.save_with_summary(sequences, "seqbatch_random_promoters.pt", additional_info=additional_info)
+
 
 if __name__ == "__main__":
     # Example parameters; adjust as needed.

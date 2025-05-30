@@ -31,13 +31,13 @@ current_file = Path(__file__).resolve()
 src_dir = current_file.parent.parent.parent
 sys.path.insert(0, str(src_dir))
 
-import pandas as pd
-import re
 import datetime
+import re
 import uuid
-import yaml
 
-from dnadesign.utils import load_dataset, SequenceSaver, DATA_FILES, BASE_DIR
+import pandas as pd
+
+from dnadesign.utils import BASE_DIR, SequenceSaver, load_dataset
 
 VALID_NUCLEOTIDES = set("ATCG")
 
@@ -85,7 +85,7 @@ def ingest():
             "meta_source": "hossain_et_al",
             "meta_date_accessed": datetime.datetime.now().isoformat(),
             "meta_observed_log_RNA_over_ref": obs_log,
-            "meta_part_type": "engineered promoter"
+            "meta_part_type": "engineered promoter",
         }
         sequences.append(entry)
     return sequences
@@ -95,10 +95,7 @@ def save_output(sequences):
     output_dir = Path(BASE_DIR) / "src" / "dnadesign" / "sequences" / "seqbatch_hossain_et_al"
     output_dir.mkdir(parents=True, exist_ok=True)
     saver = SequenceSaver(str(output_dir))
-    additional_info = {
-        "source_file": "hossain_et_al",
-        "part_type": "promoter"
-    }
+    additional_info = {"source_file": "hossain_et_al", "part_type": "promoter"}
     saver.save_with_summary(sequences, "seqbatch_hossain_et_al.pt", additional_info=additional_info)
 
 

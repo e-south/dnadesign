@@ -8,20 +8,20 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-import os
-import uuid
 import random
-import logging
-from pathlib import Path
+import uuid
 from datetime import datetime
+from pathlib import Path
 
-import torch
 import numpy as np
+import torch
 import yaml
+
 
 def load_yaml(yaml_path: Path) -> dict:
     with yaml_path.open("r") as f:
         return yaml.safe_load(f)
+
 
 def create_output_directory(base_dir: Path, prefix: str) -> Path:
     """
@@ -31,6 +31,7 @@ def create_output_directory(base_dir: Path, prefix: str) -> Path:
     out_dir = base_dir / f"{prefix}_{timestamp}"
     out_dir.mkdir(parents=True, exist_ok=True)
     return out_dir
+
 
 def read_single_pt_file_from_subdir(subdir: Path) -> list:
     """
@@ -42,8 +43,10 @@ def read_single_pt_file_from_subdir(subdir: Path) -> list:
         raise FileNotFoundError(f"Expected exactly one .pt file in {subdir}, found {len(pt_files)}.")
     return torch.load(pt_files[0], map_location=torch.device("cpu"))
 
+
 def write_pt_file(data, output_path: Path):
     torch.save(data, output_path)
+
 
 def generate_random_dna_sequence(length: int, gc_range: tuple, seed: int = 42) -> str:
     """
@@ -51,15 +54,16 @@ def generate_random_dna_sequence(length: int, gc_range: tuple, seed: int = 42) -
     """
     random.seed(seed)
     np.random.seed(seed)
-    bases = ['A', 'T', 'C', 'G']
-    
+    bases = ["A", "T", "C", "G"]
+
     max_attempts = 1000
     for _ in range(max_attempts):
-        seq = ''.join(random.choices(bases, k=length))
-        gc_content = (seq.count('G') + seq.count('C')) / length
+        seq = "".join(random.choices(bases, k=length))
+        gc_content = (seq.count("G") + seq.count("C")) / length
         if gc_range[0] <= gc_content <= gc_range[1]:
             return seq
     raise ValueError("Failed to generate random DNA sequence within GC content range after multiple attempts.")
+
 
 def reverse_complement(seq: str) -> str:
     """
@@ -68,8 +72,10 @@ def reverse_complement(seq: str) -> str:
     complement = str.maketrans("ATCGatcg", "TAGCtagc")
     return seq.translate(complement)[::-1]
 
+
 def generate_uuid() -> str:
     return str(uuid.uuid4())
+
 
 def current_utc_timestamp() -> str:
     return datetime.utcnow().isoformat() + "Z"

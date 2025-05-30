@@ -8,12 +8,15 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-import numpy as np
-from typing import List, Dict, Tuple
-from .utils import reverse_complement, build_motif2tf_map
 import logging
+from typing import Dict, List, Tuple
+
+import numpy as np
+
+from .utils import build_motif2tf_map, reverse_complement
 
 logger = logging.getLogger(__name__)
+
 
 def find_all_occurrences(seq: str, motif: str) -> List[int]:
     """
@@ -29,6 +32,7 @@ def find_all_occurrences(seq: str, motif: str) -> List[int]:
         start = pos + 1  # continue searching after this match
     return positions
 
+
 def encode_with_positional_bins(sequences: List[Dict], config: dict) -> Tuple[np.ndarray, List[str]]:
     """
     Encode sequences into a feature matrix using positional binning.
@@ -39,7 +43,7 @@ def encode_with_positional_bins(sequences: List[Dict], config: dict) -> Tuple[np
       - Finds all occurrences (start positions) of the motif.
       - Determines which bins (of equal width over the sequence) the motif occupies.
       - Increments the corresponding feature(s) in the output matrix.
-    
+
     The final feature columns are named as "tf_fwd_bin{b}" and "tf_rev_bin{b}".
     """
     num_bins = config["nmf"]["positional_binning"]["num_bins"]
@@ -55,7 +59,9 @@ def encode_with_positional_bins(sequences: List[Dict], config: dict) -> Tuple[np
             if motif_candidate in motif2tf:
                 global_tfs.add(motif2tf[motif_candidate])
             else:
-                logger.warning(f"No TF mapping found for motif '{motif_candidate}' in sequence {seq.get('id', 'unknown')}.")
+                logger.warning(
+                    f"No TF mapping found for motif '{motif_candidate}' in sequence {seq.get('id', 'unknown')}."
+                )
     sorted_tfs = sorted(global_tfs)
 
     # Create feature names: for each TF, for each strand (fwd, rev), for each bin.
@@ -80,7 +86,9 @@ def encode_with_positional_bins(sequences: List[Dict], config: dict) -> Tuple[np
             motif_candidate = motif_str.upper()
             # Retrieve the TF name using the mapping.
             if motif_candidate not in motif2tf:
-                logger.error(f"Motif '{motif_candidate}' has no corresponding TF mapping in sequence {seq_dict.get('id', 'unknown')}.")
+                logger.error(
+                    f"Motif '{motif_candidate}' has no corresponding TF mapping in sequence {seq_dict.get('id', 'unknown')}."
+                )
                 continue
             tf_name = motif2tf[motif_candidate]
 
@@ -104,7 +112,7 @@ def encode_with_positional_bins(sequences: List[Dict], config: dict) -> Tuple[np
                 s_end = s_start + motif_len
                 # Determine bins spanned by the motif: from the bin containing s_start to the bin containing s_end-1.
                 binA = (s_start * num_bins) // L
-                binB = (((s_end - 1) * num_bins) // L)
+                binB = ((s_end - 1) * num_bins) // L
 
                 # Determine the column offset for the given TF.
                 try:
@@ -122,28 +130,29 @@ def encode_with_positional_bins(sequences: List[Dict], config: dict) -> Tuple[np
                     X[seq_idx, col_idx] += 1.0
     return X, feature_names
 
+
 def encode_sequence_matrix(sequences: List[Dict], config: dict) -> Tuple[np.ndarray, List[str]]:
     """
     Encode sequence dictionaries into a feature matrix X.
-    
+
     Supports two encoding modes:
       - "motif_occupancy": existing occupancy-based encoding.
       - "positional_bins": new positional and strand-aware binning encoding.
-    
+
     Depending on the encoding_mode in the configuration, the appropriate method is called.
     """
     encoding_mode = config["nmf"].get("encoding_mode", "motif_occupancy")
-    
+
     if encoding_mode == "positional_bins":
         if config["nmf"].get("positional_binning", {}).get("enable", False):
             return encode_with_positional_bins(sequences, config)
         else:
             raise ValueError("Positional bins encoding mode selected but positional_binning.enable is False in config.")
-    
+
     elif encoding_mode == "motif_occupancy":
         # Legacy motif occupancy encoding.
         max_occ = config["nmf"].get("max_motif_occupancy", 5)
-        
+
         def extract_fixed_motifs(seq):
             fixed = set()
             if "fixed_elements" in seq:
