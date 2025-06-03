@@ -1,0 +1,60 @@
+cruncher:
+  analysis:
+    plots:
+    - score_kde
+    - scatter_pwm
+    - logo_elites
+    runs: []
+  mode: sample
+  out_dir: results
+  parse:
+    formats:
+      .pfm: JASPAR
+      .txt: MEME
+    plot:
+      bits_mode: information
+      dpi: 200
+      logo: true
+  regulator_sets:
+  - - cpxR
+    - soxR
+  sample:
+    bidirectional: true
+    chains: 4
+    draws: 2000
+    init:
+      kind: consensus_mix
+      length: 30
+      pad_with: background
+      regulator: cpxR
+    min_dist: 1
+    moves:
+      block_len_range:
+      - 5
+      - 25
+      multi_k_range:
+      - 2
+      - 8
+      slide_max_shift: 4
+      swap_len_range:
+      - 8
+      - 20
+    optimiser:
+      cooling:
+        beta:
+        - 0.05
+        - 1.5
+        kind: linear
+      kind: gibbs
+      softmax_beta: null
+      swap_prob: 0.1
+    penalties:
+      same_pwm_extra_hit: 0.5
+    plots:
+      autocorr: true
+      convergence: true
+      scatter_pwm: true
+      trace: true
+    scorer_scale: logp
+    top_k: 200
+    tune: 1000

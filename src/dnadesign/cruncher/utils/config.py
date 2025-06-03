@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-cruncher/utils/config.py
+dnadesign/cruncher/utils/config.py
+
+Central config-loading and validation via Pydantic.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -11,54 +13,43 @@ Dunlop Lab
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Sequence, Union
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import yaml
 from pydantic import BaseModel, root_validator, validator
 
 
-# Low-level plot & parse objects
+# PARSE MODE SECTION
 class PlotConfig(BaseModel):
+    """
+    Settings needed to draw PWM logos (parse mode).
+    """
+
     logo: bool
     bits_mode: Literal["information", "probability"]
     dpi: int
 
 
 class ParseConfig(BaseModel):
-    formats: Dict[str, str]
+    """
+    Settings needed to load and parse PWMs.
+    """
+
+    formats: Dict[str, str]  # e.g. {".txt": "MEME", ".pfm": "JASPAR"}
     plot: PlotConfig
 
 
-# Cooling & move mixer configuration
-class CoolingStage(BaseModel):
-    sweeps: int
-    beta: float
-
-    @validator("sweeps", "beta")
-    def _non_negative(cls, v, field):
-        assert v >= 0, f"{field.name} must be ≥ 0"
-        return v
-
-
-class CoolingConfig(BaseModel):
-    kind: Literal["piecewise", "fixed"] = "fixed"
-    stages: Optional[List[CoolingStage]] = None
-    beta: Optional[float] = None  # may be back-filled
-
-    @validator("beta", always=True)
-    def _validate_beta(cls, v, values):
-        if values.get("kind") == "fixed" and v is not None:
-            assert v > 0, "beta must be > 0"
-        return v
-
-
+# SAMPLE MODE SECTION
 class MoveConfig(BaseModel):
-    block_len_range: Sequence[int] = (3, 12)
-    multi_k_range: Sequence[int] = (2, 6)
-    slide_max_shift: int = 2
-    swap_len_range: Sequence[int] = (6, 12)
+    """
+    Shared move-kernel parameters for MCMC.
+    """
 
-    # *Only* coerce the ranges into tuples — leave slide_max_shift as-is.
+    block_len_range: Tuple[int, int] = (3, 12)
+    multi_k_range: Tuple[int, int] = (2, 6)
+    slide_max_shift: int = 2
+    swap_len_range: Tuple[int, int] = (6, 12)
+
     @validator("block_len_range", "multi_k_range", "swap_len_range", pre=True)
     def _list_to_tuple(cls, v):
         if isinstance(v, (list, tuple)):
@@ -66,69 +57,172 @@ class MoveConfig(BaseModel):
         return v
 
 
-class GibbsConfig(BaseModel):
-    draws: int
-    tune: int
-    chains: int
-    cores: int
-    min_dist: int
-    cooling: CoolingConfig = CoolingConfig()
-    moves: MoveConfig = MoveConfig()
+class CoolingFixed(BaseModel):
+    """
+    A single-value fixed β (e.g., always β = 1.0).
+    """
 
-    # legacy keys
-    beta: Optional[float] = 1.0
-    block_size: Optional[int] = None
-    swap_prob: Optional[float] = None
+    kind: Literal["fixed"] = "fixed"
+    beta: float = 1.0
 
-    @validator("cooling", always=True)
-    def _backward_fill_cooling(cls, v, values):
-        if values.get("beta") is not None and v.kind == "fixed" and v.beta is None:
-            v.beta = values["beta"]
+    @validator("beta")
+    def _check_positive_beta(cls, v):
+        if v <= 0:
+            raise ValueError("Fixed cooling beta must be > 0")
         return v
 
 
+class CoolingLinear(BaseModel):
+    """
+    Linear ramp from β_start → β_end over the entire run (tune + draws).
+    """
+
+    kind: Literal["linear"] = "linear"
+    beta: Tuple[float, float]
+
+    @validator("beta")
+    def _two_positive(cls, v):
+        if len(v) != 2:
+            raise ValueError("Linear cooling.beta must be length-2 [beta_start, beta_end]")
+        if v[0] <= 0 or v[1] <= 0:
+            raise ValueError("Both β_start and β_end must be > 0")
+        return v
+
+
+class CoolingGeometric(BaseModel):
+    """
+    Explicit list of β values (a “ladder”) used in Parallel Tempering.
+    """
+
+    kind: Literal["geometric"] = "geometric"
+    beta: List[float]
+
+    @validator("beta")
+    def _check_list_positive(cls, v):
+        if not isinstance(v, list) or len(v) < 2:
+            raise ValueError("Geometric cooling.beta must be a list of at least two positive floats")
+        if any(x <= 0 for x in v):
+            raise ValueError("All entries in geometric β list must be > 0")
+        return v
+
+
+CoolingConfig = Union[CoolingFixed, CoolingLinear, CoolingGeometric]
+
+
 class OptimiserConfig(BaseModel):
-    kind: Literal["gibbs"]
-    gibbs: GibbsConfig
+    """
+    Common “optimiser” block for both Gibbs and PT.
+
+    - kind: “gibbs” or “pt”
+    - scorer_scale: “llr” | “z” | “p” | “logp” | “logp_norm”
+    - cooling: one of fixed | linear | geometric
+    - swap_prob: intra-chain swap (Gibbs) or inter-chain swap (PT)
+    - softmax_beta: only required if kind == “pt”
+    """
+
+    kind: Literal["gibbs", "pt"]
+    scorer_scale: Literal["llr", "z", "p", "logp", "logp_norm"]
+    cooling: CoolingConfig
+    swap_prob: float = 0.10
+    softmax_beta: Optional[float] = None
+
+    @root_validator
+    def _check_pt_needs_softmax(cls, values):
+        kind = values.get("kind")
+        sb = values.get("softmax_beta")
+        if kind == "pt":
+            if sb is None:
+                raise ValueError("softmax_beta must be supplied when optimiser.kind == 'pt'")
+            if sb <= 0:
+                raise ValueError("softmax_beta must be > 0")
+        return values
 
 
 class InitConfig(BaseModel):
-    # allow legacy 'length' → 'kind'
-    kind: Union[int, Literal["random", "consensus_shortest", "consensus_longest"]]
-    pad_with: Literal["background", "background_pwm", "A", "C", "G", "T"] = "background"
+    """
+    Settings for sequence initialization in sample mode.
+    """
 
-    @root_validator(pre=True)
-    def alias_length_to_kind(cls, values):
-        if "length" in values and "kind" not in values:
-            values["kind"] = values.pop("length")
+    kind: Literal["random", "consensus", "consensus_mix"]
+    length: int
+    regulator: Optional[str] = None
+    pad_with: Optional[Literal["background", "A", "C", "G", "T"]] = "background"
+
+    @validator("length")
+    def _check_length_positive(cls, v):
+        if v < 1:
+            raise ValueError("init.length must be >= 1")
+        return v
+
+    @root_validator
+    def _check_fields_for_modes(cls, values):
+        kind = values.get("kind")
+        regulator = values.get("regulator")
+        if kind == "consensus" and not regulator:
+            raise ValueError("When init.kind=='consensus', you must supply init.regulator=<PWM_name>")
         return values
 
 
 class SampleConfig(BaseModel):
-    init: InitConfig
-    optimiser: OptimiserConfig
-    top_k: int
+    """
+    Top-level “sample” section: MCMC settings.
+    """
+
     bidirectional: bool = True
-    plots: Dict[Literal["trace", "autocorr", "convergence", "scatter_pwm"], bool] = {
-        "trace": True,
-        "autocorr": True,
-        "convergence": True,
-        "scatter_pwm": False,
-    }
+    penalties: Dict[str, float] = {}
+
+    init: InitConfig
+    draws: int
+    tune: int
+    chains: int
+    min_dist: int
+    top_k: int
+
+    moves: MoveConfig = MoveConfig()
+    optimiser: OptimiserConfig
+
+    @validator("draws", "tune", "chains", "min_dist", "top_k")
+    def _check_positive_ints(cls, v, field):
+        if not isinstance(v, int) or v < 0:
+            raise ValueError(f"{field.name} must be a non-negative integer")
+        return v
 
 
+# ANALYSIS MODE SECTION
 class AnalysisConfig(BaseModel):
+    """
+    Top-level “analysis” section.
+
+    runs:         list of batch-name strings to re-analyse
+    plots:        which plots to generate (trace, autocorr, convergence, scatter_pwm)
+    scatter_scale: which scale to use for scatter_pwm (llr, z, p, logp, logp_norm)
+    """
+
     runs: Optional[List[str]]
-    plots: List[str]
+    plots: Dict[Literal["trace", "autocorr", "convergence", "scatter_pwm"], bool]
+    scatter_scale: Literal["llr", "z", "p", "logp", "logp_norm"]
 
 
 class CruncherConfig(BaseModel):
     mode: Literal["parse", "sample", "analyse", "analyze"]
     out_dir: Path
     regulator_sets: List[List[str]]
+
     parse: ParseConfig
     sample: Optional[SampleConfig]
     analysis: Optional[AnalysisConfig]
+
+    @root_validator
+    def _check_mode_sections(cls, values):
+        mode = values.get("mode")
+        has_sample = values.get("sample") is not None
+        has_analysis = values.get("analysis") is not None
+
+        if mode == "sample" and not has_sample:
+            raise ValueError("When mode='sample', a [sample:] section is required.")
+        if mode in ("analyse", "analyze") and not has_analysis:
+            raise ValueError("When mode='analyse', an [analysis:] section is required.")
+        return values
 
 
 def load_config(path: Path) -> CruncherConfig:

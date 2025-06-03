@@ -1,5 +1,101 @@
 ## cruncher
 
+
+How Scorer + SequenceEvaluator Fit Into the Gibbs Sampler
+	1.	SequenceState ➔ Scoring
+The optimizer maintains a candidate sequence as a SequenceState (an integer‐encoded DNA string). At each MCMC step, it proposes a small change (e.g. flipping one base, replacing a block, or flipping multiple sites).
+	2.	Evaluator as a Simple Adapter
+Rather than calling Scorer directly, the optimizer always invokes evaluator(state). Internally, the SequenceEvaluator does two things:
+	•	It asks Scorer for each PWM’s best log-odds (LLR) score on that sequence.
+	•	It converts those per-PWM LLRs into one unified “fitness” number (by applying the chosen scale—e.g. “log-p” or “z” or “raw LLR”—and then taking the minimum across all PWMs).
+	3.	Scorer’s Responsibilities
+	•	Per-PWM null distributions are built once at startup: for each PWM, we precompute a grid of possible LLR sums (lom) and the exact tail‐probabilities (p-values).
+	•	When asked to score a sequence, Scorer scans every possible window (forward and reverse complement) for each PWM, finds the single highest LLR, and—if needed—turns it into a p-value or z-score or normalized “log-p.”
+	•	The result is that each PWM ends up with one number (e.g. “−log₁₀(p_seq)” or “z-score”) for the current sequence.
+	4.	Reduction to a Single Fitness
+Once every PWM has its own scaled score, the SequenceEvaluator simply takes the minimum of those numbers. The Gibbs sampler treats that minimum as its target fitness (higher = better). In other words, optimizing means “raise the worst PWM match” until all PWMs appear strongly anywhere in the sequence.
+	5.	Optimizer Logic (in cgm.py)
+	•	The Gibbs loop proposes a move → calls fitness_old = evaluator(old_state) → applies the change → calls fitness_new = evaluator(new_state) → accepts or rejects based on the Metropolis rule at the current inverse temperature (β).
+	•	Because SequenceEvaluator hides all the per-PWM bookkeeping, the optimizer code never needs to know about null distributions, p-values, or even how many PWMs exist. It just asks “What is the fitness of this sequence?” and uses that to guide acceptance.
+
+By cleanly separating “how to turn a DNA string into a single number” (Scorer + Evaluator) from “how to propose and accept/reject moves” (GibbsOptimizer), we keep each component focused, easy to read, and modular.
+
+
+The score is 0 if the sequence has the same probability of being a functional site and of being a random site. The score is greater than 0 if it is more likely to be a functional site than a random site, and less than 0 if it is more likely to be a random site than a functional site.[1] The sequence score can also be interpreted in a physical framework as the binding energy for that sequence.
+
+The p-value already tells you “how surprising is the best window of this PWM in this sequence compared with random DNA of the same length?”  
+
+
+A more informative axis: “consensus-normalised logp”
+Below is an easy drop-in normalisation that preserves all the good properties of the FIMO p-value but spreads the dynamic range uniformly between 0 and 1:
+
+score
+norm
+  
+=
+  
+−
+log
+⁡
+10
+(
+𝑝
+seq
+)
+−
+log
+⁡
+10
+(
+𝑝
+consensus
+)
+  
+,
+clipped to 
+[
+0
+,
+1
+]
+.
+score 
+norm
+​
+ = 
+−log 
+10
+​
+ (p 
+consensus
+​
+ )
+−log 
+10
+​
+ (p 
+seq
+​
+ )
+
+ 
+​
+ ,clipped to [0,1].
+p_seq = Bonferroni-corrected p-value of the best window in this sequence
+
+p_consensus = Bonferroni-corrected p-value of the PWM’s own consensus embedded in the same L-bp background
+
+interpretation	value
+sequence has no convincing hit	0
+sequence’s best hit is as good as the consensus	1
+halfway in log-space between random and consensus	0.5
+
+Because both numerator and denominator are bona-fide FIMO p-values, the ratio stays monotonic in the raw evidence. You keep the nice cross-PWM comparability and you never suffer the “all zeros” collapse.
+	•	Keep using p-values – they are the right way to compare heterogeneous PWMs.
+	•	Normalise them by the PWM’s own consensus strength to map everything into 0, 1.
+	•	Update the config to scorer_scale: logp_norm; the plot will immediately give you an intuitive “fraction-of-perfect” picture for every sequence in every chain.
+
+
 **cruncher** is a pipeline that automates the design of short DNA sequences embedding strong matches for all user-supplied transcription-factor PWMs:
 
 1. **Parse**

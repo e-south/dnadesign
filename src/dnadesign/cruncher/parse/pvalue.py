@@ -26,7 +26,7 @@ from numba import njit
 @njit
 def _dp_convolve(lom_int: np.ndarray, bg: np.ndarray, offset: int, length: int) -> np.ndarray:
     """
-    Build the null distribution by dynamic‐programming convolution, fully in Numba.
+    Build the null distribution by dynamic-programming convolution, fully in Numba.
     """
     w = lom_int.shape[0]
     # default zeros() dtype is float64 under Numba

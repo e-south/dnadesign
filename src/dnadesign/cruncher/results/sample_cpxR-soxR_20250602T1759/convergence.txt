@@ -1,0 +1,2 @@
+rhat: nan
+ess:  8000.0

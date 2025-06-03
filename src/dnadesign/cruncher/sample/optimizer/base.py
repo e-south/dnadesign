@@ -3,6 +3,8 @@
 <dnadesign project>
 cruncher/sample/optimizer/base.py
 
+Abstract base class for optimizers (Gibbs & PT share the same interface).
+
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
@@ -16,9 +18,24 @@ from dnadesign.cruncher.sample.state import SequenceState
 
 
 class Optimizer(ABC):
+    """
+    Abstract interface for all optimizers in `sample/optimizer/`.
+    """
+
     def __init__(self, scorer: Scorer, cfg: Dict, rng):
-        self.scorer, self.cfg, self.rng = scorer, cfg, rng
+        """
+        scorer:  a fully-initialized Scorer object
+        cfg:     a flattened dict of all parameters (draws, tune, moves, cooling, etc.)
+        rng:     numpy.random.Generator
+        """
+        self.scorer = scorer
+        self.cfg = cfg
+        self.rng = rng
 
     @abstractmethod
     def optimise(self, initial: SequenceState) -> List[SequenceState]:
-        """Return a ranked list (best first) of unique SequenceState objects."""
+        """
+        Run the MCMC procedure and return a list of SequenceState objects,
+        sorted by descending fitness.
+        """
+        ...
