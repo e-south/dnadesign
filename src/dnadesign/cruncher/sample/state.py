@@ -119,7 +119,7 @@ def make_seed(cfg_init: Any, pwms: Dict[str, PWM], rng: np.random.Generator) -> 
 
       • “consensus”: embed one PWM's consensus (argmax) into background of length = cfg_init.length.
 
-      • “consensus_mix”: randomly choose “random” or choose one PWM’s consensus to embed.
+      • “consensus_mix”: randomly choose “random” or choose one PWM's consensus to embed.
     """
     kind = getattr(cfg_init, "kind", None)
     length = int(getattr(cfg_init, "length", 0))

@@ -37,31 +37,55 @@ CFG_PATH = PROJECT_ROOT / "dnadesign" / "src" / "dnadesign" / "cruncher" / "conf
 
 def main(cfg_path: str | Path | None = None) -> None:
     """
-    Dispatch entrypoint: load config, compute the batch directory name,
-    and call the appropriate run_<mode> function.
+    Dispatch entrypoint: load config, compute the batch directory name, and dispatch to
+    run_parse, run_sample, run_analyse, or a combined sample+analyse mode ("sample-analysis").
     """
     cfg_file = Path(cfg_path) if cfg_path else CFG_PATH
     cfg = load_config(cfg_file)
 
-    # Build a unique batch name: <mode>_<tf1>-<tf2>-<YYYYMMDD>
+    # 1) If the mode is "analyse" or "analyze", run analysis only.
+    if cfg.mode in ("analyse", "analyze"):
+        run_analyse(cfg)
+        return
+
+    # 2) If the mode is "sample-analyse", first run sample, then run analyse on the same batch.
+    if cfg.mode == "sample-analyse":
+        # Build batch name exactly as in "sample" mode
+        today = datetime.now().strftime("%Y%m%d")
+        regs = [r for group in cfg.regulator_sets for r in group]
+        regs_label = "-".join(regs)
+        batch_name = f"sample_{regs_label}_{today}"
+
+        # Create or reuse batch dir under <PROJECT_ROOT>/dnadesign/src/dnadesign/cruncher/<cfg.out_dir>/<batch_name>
+        batch_dir = PROJECT_ROOT / "dnadesign" / "src" / "dnadesign" / "cruncher" / cfg.out_dir / batch_name
+        batch_dir.mkdir(parents=True, exist_ok=True)
+
+        # 2a) Run sample mode
+        run_sample(cfg, batch_dir)
+
+        # 2b) Once sampling completes, immediately run analysis on that very batch
+        #     We temporarily inject a single‐entry list into cfg.analysis.runs.
+        if cfg.analysis is None:
+            raise ValueError("sample-analysis mode requires an [analysis:] section in config.yaml")
+        cfg.analysis.runs = [batch_name]
+        run_analyse(cfg)
+        return
+
+    # 3) Otherwise (mode == "parse" or "sample"), proceed as before
     today = datetime.now().strftime("%Y%m%d")
     regs = [r for group in cfg.regulator_sets for r in group]
     regs_label = "-".join(regs)
     batch_name = f"{cfg.mode}_{regs_label}_{today}"
 
-    # Create (or reuse) batch directory under:
-    # <PROJECT_ROOT>/dnadesign/src/dnadesign/cruncher/<cfg.out_dir>/<batch_name>
-    batch = PROJECT_ROOT / "dnadesign" / "src" / "dnadesign" / "cruncher" / cfg.out_dir / batch_name
-    # If it already exists, overwrite is okay (exist_ok=True)
-    batch.mkdir(parents=True, exist_ok=True)
+    # Create (or reuse) batch directory under <PROJECT_ROOT>/dnadesign/src/dnadesign/cruncher/<cfg.out_dir>/<batch_name>
+    batch_dir = PROJECT_ROOT / "dnadesign" / "src" / "dnadesign" / "cruncher" / cfg.out_dir / batch_name
+    batch_dir.mkdir(parents=True, exist_ok=True)
 
     match cfg.mode:
         case "parse":
-            run_parse(cfg, batch)
+            run_parse(cfg, batch_dir)
         case "sample":
-            run_sample(cfg, batch)
-        case "analyse" | "analyze":
-            run_analyse(cfg, batch)
+            run_sample(cfg, batch_dir)
         case other:
             raise ValueError(f"Unknown mode '{other}'")
 

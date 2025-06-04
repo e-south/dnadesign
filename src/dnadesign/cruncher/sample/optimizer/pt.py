@@ -10,20 +10,20 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+# dnadesign/cruncher/sample/optimizer/pt.py
+
 from __future__ import annotations
 
 import logging
 from collections import Counter
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import arviz as az
 import numpy as np
-import pandas as pd
-from tqdm import trange
 
 from dnadesign.cruncher.sample.optimizer.base import Optimizer
 from dnadesign.cruncher.sample.optimizer.cooling import make_beta_ladder
-from dnadesign.cruncher.sample.scorer import Scorer
+from dnadesign.cruncher.sample.optimizer.helpers import _replace_block
 from dnadesign.cruncher.sample.state import SequenceState, make_seed
 
 logger = logging.getLogger(__name__)
@@ -31,35 +31,20 @@ logger = logging.getLogger(__name__)
 
 class PTGibbsOptimizer(Optimizer):
     """
-    Parallel-Tempering Gibbs sampler with the same `optimise()` API as GibbsOptimizer.
-
-    Expected cfg keys:
-      • draws       : int
-      • tune        : int
-      • chains      : int         (must equal len(beta_ladder))
-      • min_dist    : int
-      • top_k       : int
-      • block_len_range  : (int,int)
-      • multi_k_range    : (int,int)
-      • slide_max_shift  : int
-      • swap_len_range   : (int,int)
-      • kind        : “geometric” or “fixed”  (from cooling block)
-      • beta        : List[float] or float
-      • swap_prob   : float
-      • softmax_beta: float   (required if kind == "pt")
+    Parallel‐Tempered Gibbs/Metropolis sampler. Identical API to GibbsOptimizer,
+    but runs multiple “β‐ladders” & swaps between chains. Stores per‐TF scores
+    at each draw, and uses evaluator.combined(...) for acceptance.
     """
 
-    def __init__(self, scorer: Scorer, cfg: Dict[str, Any], rng, *, pwms: Dict[str, "PWM"], init_cfg):
+    def __init__(self, evaluator: Any, cfg: Dict[str, Any], rng, *, pwms: Dict[str, object], init_cfg: Any):
         """
-        scorer:   instance of Scorer
-        cfg:      flattened dict containing keys above
-        rng:      numpy.random.Generator
-        pwms:     dictionary of name→PWM (for random baseline)
-        init_cfg: InitConfig (for consensus seeding in other chains)
+        evaluator: SequenceEvaluator (returns per‐TF dict + .combined())
+        cfg:       flattened config dict
+        rng:       numpy.random.Generator
+        pwms:      dict of loaded PWMs (names → PWM objects)
+        init_cfg:  the init block so that we can seed each chain
         """
-        super().__init__(scorer, cfg, rng)
-        self._pwms = pwms
-        self._init_cfg = init_cfg
+        super().__init__(evaluator, cfg, rng)
 
         self.draws = int(cfg["draws"])
         self.tune = int(cfg["tune"])
@@ -67,95 +52,209 @@ class PTGibbsOptimizer(Optimizer):
         self.min_dist = int(cfg["min_dist"])
         self.top_k = int(cfg["top_k"])
         self.swap_prob = float(cfg["swap_prob"])
-        self.softmax_beta = float(cfg["softmax_beta"])
 
-        # Move kernel parameters (shared with Gibbs)
-        self.block_len_range = tuple(cfg["block_len_range"])
-        self.multi_k_range = tuple(cfg["multi_k_range"])
-        self.slide_max_shift = int(cfg["slide_max_shift"])
-        self.swap_len_range = tuple(cfg["swap_len_range"])
+        # Build β‐ladder from config: list of β values, one per chain
+        self.beta_ladder = make_beta_ladder(cfg["beta_ladder"])  # e.g. [0.02,0.05,0.1,...]
+        if len(self.beta_ladder) != self.chains:
+            raise ValueError("PTGibbs requires chains == len(beta_ladder)")
 
-        self.samples_df: pd.DataFrame | None = None
+        # Extract move_cfg (same keys as Gibbs)
+        self.move_cfg = {
+            "block_len_range": tuple(cfg["block_len_range"]),
+            "multi_k_range": tuple(cfg["multi_k_range"]),
+            "slide_max_shift": int(cfg["slide_max_shift"]),
+            "swap_len_range": tuple(cfg["swap_len_range"]),
+        }
+
+        self.pwms = pwms
+        self.init_cfg = init_cfg
+
+        self.move_tally: Counter = Counter()
+
+        # Store every sequence-array + (chain, draw) + per‐TF
+        self.all_samples: List[np.ndarray] = []
+        self.all_meta: List[Tuple[int, int]] = []
+        self.all_scores: List[Dict[str, float]] = []
+
+        self.elites_meta: List[Tuple[int, int]] = []
+
+        # We'll still build an ArviZ InferenceData of combined fitness per (chain, draw)
         self.trace_idata = None
-        self.random_df: pd.DataFrame | None = None
 
     def optimise(self, initial: SequenceState) -> List[SequenceState]:
         """
-        Main PT loop. Runs `chains` parallel chains, each at a different β from the ladder,
-        performing intra-chain moves & inter-chain swaps, then returns “elites.”
+        Parallel‐Tempered MCMC with two phases (burn‐in, sampling). Each chain has its own β.
+        Records per‐TF at every draw, and uses evaluator.combined(...) to accept/reject.
         """
-        scorer = self.scorer
+
         rng = self.rng
+        evaluator: Any = self.scorer  # SequenceEvaluator
+        tune = self.tune
+        draws = self.draws
+        chains = self.chains
+        min_dist = self.min_dist
+        top_k = self.top_k
+        beta_ladder = self.beta_ladder
+        move_cfg = self.move_cfg
 
-        # Build β‐ladder (list of floats)
-        betas = make_beta_ladder(self.cfg["cooling"])
-        if len(betas) != self.chains:
-            raise ValueError("In PT: chains must equal len(beta_ladder)")
+        # Track combined fitness per chain/draw
+        chain_scores: List[List[float]] = [[] for _ in range(chains)]
 
-        # Seed each chain: first chain gets `initial`; others get make_seed(...)
-        states = [initial] + [make_seed(self._init_cfg, self._pwms, rng) for _ in range(self.chains - 1)]
-        energies = np.array([scorer.score(s.seq) for s in states])
+        # Clear old storage
+        self.all_samples.clear()
+        self.all_meta.clear()
+        self.all_scores.clear()
 
-        draws, tune = self.draws, self.tune
-        total = draws + tune
-        records: List[Dict[str, Any]] = []
-        move_ct: Counter = Counter()
+        # Initialize each chain’s state independently
+        chain_states: List[np.ndarray] = []
+        for c in range(chains):
+            seed_state = make_seed(self.init_cfg, self.pwms, rng).seq.copy()
+            chain_states.append(seed_state)
 
-        # ─── Parallel‐tempering sweeps ───────────────────────────────────────────
-        for sweep in trange(total, desc="pt-gibbs"):
-            # ── Within‐chain moves ────────────────────────────────────────────────
-            for t_idx, beta in enumerate(betas):
-                seq = states[t_idx].seq.copy()
-                L = seq.size
+        # Phase 1: Burn‐in (no recording)
+        total_iters = tune + draws
+        for c in range(chains):
+            seq = chain_states[c]
+            β = beta_ladder[c]
+            for _ in range(tune):
+                self._single_chain_move(seq, β, evaluator, move_cfg, rng)
+                # no recording during burn‐in
 
-                # Randomly choose either single flip (50%) or block replacement (50%)
-                if rng.random() < 0.5:
-                    pos = rng.integers(L)
-                    # single flip: pick a random new base different from current
-                    seq[pos] = (seq[pos] + 1 + rng.integers(3)) % 4
-                else:
-                    # block replacement
-                    blk_len = rng.integers(*self.block_len_range)
-                    start = rng.integers(0, L - blk_len + 1)
-                    seq[start : start + blk_len] = rng.integers(0, 4, size=blk_len)
+        # Phase 2: Sampling + occasional inter‐chain swaps
+        for d in range(draws):
+            for c in range(chains):
+                β = beta_ladder[c]
+                seq = chain_states[c]
+                self._single_chain_move(seq, β, evaluator, move_cfg, rng)
 
-                # MH acceptance: if beta<1 use soft‐min; if beta=1 use direct score
-                new_E = scorer.soft_min(seq, self.softmax_beta) if beta < 1.0 else scorer.score(seq)
-                delta = beta * (new_E - energies[t_idx])
-                if delta >= 0 or np.log(rng.random()) < delta:
-                    states[t_idx] = SequenceState(seq)
-                    energies[t_idx] = new_E
+                # Record this chain’s new sequence, per‐TF, combined
+                current_arr = seq.copy()
+                current_state = SequenceState(current_arr)
+                per_tf_map: Dict[str, float] = evaluator(current_state)
+                combined_val = evaluator.combined(current_state)
 
-            # ── Between‐chain swaps ──────────────────────────────────────────────
-            for i in range(self.chains - 1):
-                if rng.random() > self.swap_prob:
-                    continue
-                d = (betas[i + 1] - betas[i]) * (energies[i + 1] - energies[i])
-                if d >= 0 or np.log(rng.random()) < d:
-                    states[i], states[i + 1] = states[i + 1], states[i]
-                    energies[i], energies[i + 1] = energies[i + 1], energies[i]
+                self.all_samples.append(current_arr)
+                self.all_meta.append((c, d))
+                self.all_scores.append(per_tf_map)
+                chain_scores[c].append(combined_val)
 
-            # Record only after burn‐in
-            if sweep >= tune:
-                for t_idx, state in enumerate(states):
-                    records.append({"iter": sweep, "chain": t_idx, "beta": betas[t_idx], "fitness": energies[t_idx]})
+            # Now attempt swaps between adjacent β‐pairs with probability swap_prob
+            for c in range(chains - 1):
+                if rng.random() < self.swap_prob:
+                    seq_c = chain_states[c]
+                    seq_cp1 = chain_states[c + 1]
+                    β_c = beta_ladder[c]
+                    β_cp1 = beta_ladder[c + 1]
 
-        # ─── Elite selection & diagnostics ─────────────────────────────────────
-        ranked = sorted(zip(energies, states), key=lambda t: t[0], reverse=True)
-        elites = [s for _, s in ranked[: self.top_k]]
+                    # Combined fitness under each chain’s β
+                    comb_c = evaluator.combined(SequenceState(seq_c.copy()))
+                    comb_cp1 = evaluator.combined(SequenceState(seq_cp1.copy()))
 
-        self.samples_df = pd.DataFrame(records)
-        self.trace_idata = az.from_dict(posterior={"fitness": np.array(energies)[None, :]})
+                    # Metropolis‐Hastings swap acceptance
+                    Δ = (β_cp1 - β_c) * (comb_c - comb_cp1)
+                    if Δ >= 0 or np.log(rng.random()) < Δ:
+                        # Swap states
+                        chain_states[c], chain_states[c + 1] = seq_cp1, seq_c
 
-        # Build a random baseline (for scatter plot) of equal length to samples_df
-        rand_scores = []
-        rng2 = np.random.default_rng(0)
-        for _ in range(len(self.samples_df)):
-            x = SequenceState.random(initial.seq.size, rng2)
-            pwm_scores = scorer.score_per_pwm(x.seq)
-            rand_scores.append(
-                {"iter": len(rand_scores), **{f"score_{tf}": float(s) for tf, s in zip(self._pwms, pwm_scores)}}
-            )
-        self.random_df = pd.DataFrame(rand_scores)
+        logger.info("Move utilization: %s", dict(self.move_tally))
 
+        # Build ArviZ InferenceData from chain_scores
+        scores_arr = np.asarray(chain_scores)  # shape = (C, draws)
+        self.trace_idata = az.from_dict(posterior={"score": scores_arr})
+
+        # Rank all sampled sequences by combined fitness (we already stored per‐TF but need combined again)
+        scored_list: List[Tuple[float, np.ndarray, int]] = []
+        for idx, seq_arr in enumerate(self.all_samples):
+            combined_val = evaluator.combined(SequenceState(seq_arr.copy()))
+            scored_list.append((combined_val, seq_arr.copy(), idx))
+        scored_list.sort(key=lambda x: x[0], reverse=True)
+
+        elites: List[SequenceState] = []
+        used_indices: List[int] = []
+        for combined_val, seq_arr, idx in scored_list:
+            if len(elites) >= top_k:
+                break
+            if any(np.sum(seq_arr != e.seq) < min_dist for e in elites):
+                continue
+            elites.append(SequenceState(seq_arr.copy()))
+            used_indices.append(idx)
+
+        self.elites_meta = [self.all_meta[i] for i in used_indices]
         return elites
+
+    def _single_chain_move(
+        self,
+        seq: np.ndarray,
+        β: float,
+        evaluator: Any,
+        move_cfg: Dict[str, Any],
+        rng: np.random.Generator,
+    ) -> None:
+        """
+        Apply exactly one Gibbs-style update (S/B/M) at inverse-temperature β to seq in place.
+        Uses evaluator.combined(...) for acceptance.
+        """
+        L = seq.size
+        move_kind = self._sample_move_kind(β, move_cfg, rng)
+        self.move_tally[move_kind] += 1
+
+        if move_kind == "S":
+            i = rng.integers(L)
+            old_base = seq[i]
+            lods = np.empty(4, float)
+            for b in range(4):
+                seq[i] = b
+                lods[b] = β * evaluator.combined(SequenceState(seq.copy()))
+            seq[i] = old_base
+            lods -= lods.max()
+            probs = np.exp(lods)
+            seq[i] = rng.choice(4, p=probs / probs.sum())
+
+        elif move_kind == "B":
+            min_len, max_len = move_cfg["block_len_range"]
+            length = rng.integers(min_len, max_len + 1)
+            start = rng.integers(0, L - length + 1)
+            proposal = rng.integers(0, 4, size=length)
+
+            old_block = seq[start : start + length].copy()
+            _replace_block(seq, start, length, proposal)
+            new_comb = evaluator.combined(SequenceState(seq.copy()))
+            _replace_block(seq, start, length, old_block)
+            old_comb = evaluator.combined(SequenceState(seq.copy()))
+
+            Δ = (β * new_comb) - (β * old_comb)
+            if Δ >= 0 or np.log(rng.random()) < Δ:
+                _replace_block(seq, start, length, proposal)
+
+        else:  # move_kind == "M"
+            kmin, kmax = move_cfg["multi_k_range"]
+            k = rng.integers(kmin, kmax + 1)
+            idxs = rng.choice(L, size=k, replace=False)
+            old_bases = seq[idxs].copy()
+            proposal = rng.integers(0, 4, size=k)
+
+            seq[idxs] = proposal
+            new_comb = evaluator.combined(SequenceState(seq.copy()))
+            seq[idxs] = old_bases
+            old_comb = evaluator.combined(SequenceState(seq.copy()))
+
+            Δ = (β * new_comb) - (β * old_comb)
+            if Δ >= 0 or np.log(rng.random()) < Δ:
+                seq[idxs] = proposal
+
+    @staticmethod
+    def _sample_move_kind(beta: float, move_cfg: Dict[str, Any], rng: np.random.Generator) -> str:
+        """
+        Return one of "S","B","M" with β-dependent weights (same as GibbsOptimizer).
+        """
+        beta_target = 1.0
+        r = min(beta / beta_target, 1.0)
+        probs = {
+            "S": 0.4 + 0.4 * r,
+            "B": 0.4 * (1 - r),
+            "M": 0.2,
+        }
+        kinds = list(probs)
+        weights = np.fromiter(probs.values(), dtype=float)
+        weights /= weights.sum()
+        return rng.choice(kinds, p=weights)

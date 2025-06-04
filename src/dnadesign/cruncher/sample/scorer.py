@@ -5,10 +5,15 @@ dnadesign/cruncher/sample/scorer.py
 FIMO-like Scorer (inspired by Grant et al. 2011, 10.1093/bioinformatics/btr064).
 
 Utility class that turns raw PWM log-odds into a single fitness value. Supports four scales:
-    • "llr"        - raw log-odds ratio (max over PWMs)
-    • "z"          - z-score vs. PWM-specific null distribution
-    • "p"          - Bonferroni-corrected p-value (min over PWMs)
-    • "logp_norm"  - −log10(p) / −log10(p_consensus)
+    • "llr"                 → raw max LLR per PWM
+    • "z"                   → z-score of the raw LLR against its null distribution
+    • "logp"                → -log10(p_seq) per PWM
+    • "consensus-neglop-sum"→ normalized (-log10(p_seq) / -log10(p_consensus)) per PWM
+
+Everything that has to do with “given a PWM + sequence → what's its (LLR, z, p, or
+-log₁₀(p))?” should live in one place: Scorer.  Whenever you need per-PWM, per-sequence
+scores (whether you're doing MCMC, gather_everyN, random baseline, or consensus
+points) → call Scorer.compute_all_per_pwm(...)
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -16,42 +21,57 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, Sequence, Tuple
 
 import numpy as np
-from scipy.special import logsumexp
 
 from dnadesign.cruncher.parse.model import PWM
 from dnadesign.cruncher.parse.pvalue import logodds_to_p_lookup
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
 class _PWMInfo:
     """
-    Immutable container for per‐PWM metadata used in Scorer.
+    Holds all precomputed data for one PWM:
+      • lom               : log‐odds matrix (w × 4)
+      • null_scores, tail_p: DP table → P(X ≥ LLR) for each possible LLR
+      • width             : motif length
+      • consensus_llr     : sum of column‐max LLRs (for normalization)
+      • consensus_neglogp : −log₁₀(p_seq) of that consensus LLR (once seq_length is known)
+      • null_mean         : mean of the null distribution of single‐window LLRs
+      • null_std          : standard deviation of that null distribution
     """
 
-    lom: np.ndarray  # log‐odds matrix (motif_length × 4)
-    null_scores: np.ndarray  # ascending grid of possible log‐odds sums
-    tail_p: np.ndarray  # P(X ≥ score) for each entry in null_scores
-    width: int  # motif length
-    mu: Optional[float] = None
-    sigma: Optional[float] = None
+    lom: np.ndarray
+    null_scores: np.ndarray
+    tail_p: np.ndarray
+    width: int
+
+    consensus_llr: float = 0.0
+    consensus_neglogp: float = 0.0
+
+    null_mean: float = 0.0
+    null_std: float = 1.0
 
 
 class Scorer:
     """
-    Multi‐PWM scorer that computes raw LLRs, p‐values, z‐scores, or normalized log‐p for a DNA sequence.
+    Multi‐PWM scorer with exactly four supported scales:
+      • "llr"                 → raw max LLR per PWM
+      • "z"                   → z-score of raw LLR vs the PWM-specific null distribution
+      • "logp"                → −log10(p_seq) per PWM
+      • "consensus-neglop-sum"→ normalized (−log10(p_seq) / −log10(p_consensus)) per PWM
 
-    After instantiation, call Scorer.score(seq_array) to obtain a single fitness value
-    according to the chosen scale. It also provides utility methods for per‐PWM diagnostics:
-      - score_per_pwm(seq) → numpy.ndarray of raw LLRs (one per PWM)
-      - neglogp_vector(seq) → numpy.ndarray of −log10(p_seq) (one per PWM)
-      - soft_min(seq, beta) → soft‐minimum over the −log10(p_seq) vector (for PT)
+    Usage:
+        scorer = Scorer(pwms, background=(0.25,0.25,0.25,0.25), bidirectional=True, scale="z")
+        per_tf = scorer.compute_all_per_pwm(seq_array, seq_length)
     """
 
-    SUPPORTED_SCALES = {"llr", "z", "p", "logp", "logp_norm"}
+    SUPPORTED_SCALES = {"llr", "z", "logp", "consensus-neglop-sum"}
 
     def __init__(
         self,
@@ -59,18 +79,11 @@ class Scorer:
         *,
         background: Sequence[float] = (0.25, 0.25, 0.25, 0.25),
         bidirectional: bool = True,
-        scale: str = "logp_norm",
+        scale: str = "logp",
     ) -> None:
-        """
-        Args:
-          pwms:         dict of {name: PWM}, each PWM provides .matrix → (w×4) freq/log‐odds.
-          background:   length‐4 background frequencies (must sum to 1.0). Default=(0.25,0.25,0.25,0.25).
-          bidirectional: if True, scan both forward and reverse‐complement strands.
-          scale:        one of "llr", "z", "p", "logp", or "logp_norm".
-        """
         self.scale = scale.lower()
         if self.scale not in self.SUPPORTED_SCALES:
-            raise ValueError(f"Unsupported scale '{scale}'. Choose from {self.SUPPORTED_SCALES}.")
+            raise ValueError(f"Unsupported scale '{scale}'; choose from {self.SUPPORTED_SCALES}.")
 
         self.bg = np.asarray(background, dtype=float)
         if self.bg.shape != (4,) or not np.isclose(self.bg.sum(), 1.0):
@@ -78,209 +91,150 @@ class Scorer:
 
         self.bidirectional = bool(bidirectional)
 
-        # Build a _PWMInfo entry for each PWM: precompute log‐odds and null distributions
-        self._cache: Dict[str, _PWMInfo] = {name: self._build_one_pwm_info(pwm) for name, pwm in pwms.items()}
+        logger.info("Building Scorer (scale=%r, bidirectional=%s)", self.scale, self.bidirectional)
 
-        # If z‐score scale is requested, precompute μ and σ for each PWM’s null distribution
-        if self.scale == "z":
-            for info in self._cache.values():
-                info.mu, info.sigma = self._compute_null_zstats(info)
+        # Build per‐PWM info (lom, null_scores, tail_p, width, plus compute null mean/std).
+        self._cache: Dict[str, _PWMInfo] = {}
+        for name, pwm in pwms.items():
+            logger.debug("  Precomputing PWM info for %s", name)
+            info = self._build_one_pwm_info(pwm)
+
+            # Precompute consensus_llr for each PWM (sum of column‐maxes).
+            info.consensus_llr = float(np.max(info.lom, axis=1).sum())
+
+            # Compute null distribution's PMF, mean, and variance for single-window LLRs.
+            # null_scores[i] is sorted list of unique LLR values.
+            # tail_p[i] = P(LLR >= null_scores[i]).
+            # Then P(LLR = null_scores[i]) = tail_p[i] - tail_p[i+1], with tail_p[last+1] = 0.
+            scores = info.null_scores
+            tails = info.tail_p
+            # Append a zero at the end for tail_p[last+1]
+            tails_extended = np.concatenate([tails, [0.0]])
+            pmf = tails_extended[:-1] - tails_extended[1:]
+            pmf = np.clip(pmf, 0.0, 1.0)  # numerical safeguards
+
+            mean_null = float((scores * pmf).sum())
+            var_null = float(((scores - mean_null) ** 2 * pmf).sum())
+            std_null = float(np.sqrt(var_null)) if var_null > 0 else 1.0
+
+            info.null_mean = mean_null
+            info.null_std = std_null
+
+            self._cache[name] = info
+
+        logger.info("Finished building cache with %d PWMs", len(self._cache))
 
     @staticmethod
     def _build_one_pwm_info(pwm: PWM) -> _PWMInfo:
         """
-        Create a _PWMInfo by computing the log‐odds matrix and exact tail probabilities.
+        Given a PWM, compute its log‐odds matrix and null distribution lookup table.
         """
-        lom = pwm.log_odds()  # shape = (w, 4)
+        lom = pwm.log_odds()  # shape (w, 4)
         null_scores, tail_p = logodds_to_p_lookup(lom, np.full(4, 0.25))
         return _PWMInfo(lom=lom, null_scores=null_scores, tail_p=tail_p, width=lom.shape[0])
 
-    @staticmethod
-    def _compute_null_zstats(info: _PWMInfo) -> Tuple[float, float]:
+    def _interp_tail_p(self, raw_llr: float, info: _PWMInfo) -> float:
         """
-        From tail_p and null_scores, compute μ and σ for the null distribution of LLRs.
+        Return P(X ≥ raw_llr) from the DP table.
         """
-        tail = info.tail_p
-        pmf = np.empty_like(tail)
-        pmf[:-1] = tail[:-1] - tail[1:]
-        pmf[-1] = tail[-1]
-        mu = float(np.sum(info.null_scores * pmf))
-        var = float(np.sum(((info.null_scores - mu) ** 2) * pmf))
-        return mu, float(np.sqrt(var)) if var > 0 else 1.0
-
-    def _interp_tail_p(self, score: float, info: _PWMInfo) -> float:
-        """
-        Given a raw LLR `score`, look up its tail probability P(X ≥ score) from the DP table.
-        """
-        idx = np.searchsorted(info.null_scores, score, side="right") - 1
+        idx = np.searchsorted(info.null_scores, raw_llr, side="right") - 1
         idx = np.clip(idx, 0, info.tail_p.size - 1)
         return float(info.tail_p[idx])
 
+    def _per_pwm_neglogp(self, raw_llr: float, info: _PWMInfo, seq_length: int) -> float:
+        """
+        Compute −log10(p_seq) for a single PWM:
+          p_win = P(X ≥ raw_llr) on one window,
+          n_win = max(1, seq_length − width + 1),
+          p_seq = 1 − (1 − p_win)^n_win,
+          return −log10(p_seq).
+        """
+        w = info.width
+        p_win = self._interp_tail_p(raw_llr, info)
+        n_win = max(1, seq_length - w + 1)
+        p_seq = 1.0 - (1.0 - p_win) ** n_win
+        p_seq = max(p_seq, 1e-300)
+        neglogp = -np.log10(p_seq)
+        logger.debug("    PWMCALC: raw_llr=%.3f, width=%d, n_win=%d, neglogp=%.3f", raw_llr, w, n_win, neglogp)
+        return neglogp
+
     def _best_llr_and_location(self, seq: np.ndarray, info: _PWMInfo) -> Tuple[float, int, str]:
         """
-        Scan a numeric‐encoded sequence `seq` to find:
-          1) best raw LLR (sum of log‐odds over a window)
-          2) the offset (0‐based index) and strand label ("+" or "-") of that best window.
-
-        Returns:
-          (best_llr, best_offset, best_strand).
-
-        Note: We no longer count or penalize “extra hits.” extras are always zero.
+        Scan a numeric‐encoded sequence to find the best raw LLR (and its offset & strand).
         """
         L, w = seq.size, info.width
         if L < w:
-            # If sequence shorter than motif length, no hits possible.
             return float("-inf"), 0, "+"
 
         best_llr = float("-inf")
         best_offset = 0
         best_strand = "+"
 
-        # Prepare strands: forward (“+”) and, if requested, reverse complement (“-”)
-        strands: List[tuple[np.ndarray, str]] = [(seq, "+")]
+        to_scan = [(seq, "+")]
         if self.bidirectional:
             rev = (3 - seq)[::-1]
-            strands.append((rev, "-"))
+            to_scan.append((rev, "-"))
 
-        for strand_array, strand_label in strands:
+        for arr, strand_label in to_scan:
             for off in range(L - w + 1):
-                window = strand_array[off : off + w]
-                llr_val = float(info.lom[np.arange(w), window].sum())
-                if llr_val > best_llr:
-                    best_llr = llr_val
+                window = arr[off : off + w]
+                llr_value = float(info.lom[np.arange(w), window].sum())
+                if llr_value > best_llr:
+                    best_llr = llr_value
                     best_offset = off
                     best_strand = strand_label
 
+        logger.debug("    BEST_LLR: best_llr=%.3f at offset=%d, strand=%s", best_llr, best_offset, best_strand)
         return best_llr, best_offset, best_strand
 
-    def _scale_llr(self, raw_llr: float, info: _PWMInfo, *, seq_length: int | None) -> float:
+    def compute_all_per_pwm(self, seq: np.ndarray, seq_length: int) -> Dict[str, float]:
         """
-        Convert a raw LLR to “logp_norm” = −log10(p_seq) / −log10(p_consensus).
-        If scale != "logp_norm", dispatch to _scale_other.
+        For each PWM (TF), compute exactly one “scaled” value, depending on self.scale:
+
+          • "llr" : raw LLR
+          • "z"   : z-score → (raw_llr − null_mean) / null_std
+          • "logp": −log10(p_seq)
+          • "consensus-neglop-sum":
+              (−log10(p_seq) / precomputed_neglogp(consensus_llr))
+
+        On the very first call for a given PWM, we fill in info.consensus_neglogp using
+        info.consensus_llr and the same Bonferroni formula.
         """
-        if self.scale != "logp_norm":
-            return self._scale_other(raw_llr, info, seq_length)
+        out: Dict[str, float] = {}
+        logger.debug("compute_all_per_pwm: seq_length=%d, scale=%s", seq_length, self.scale)
 
-        if seq_length is None:
-            raise ValueError("seq_length is required for logp_norm scale")
+        for tf, info in self._cache.items():
+            raw_llr, offset, strand = self._best_llr_and_location(seq, info)
 
-        # Compute p_seq for this raw LLR
-        n_win = max(1, seq_length - info.width + 1)
-        p_win = self._interp_tail_p(raw_llr, info)
-        p_seq = 1.0 - (1.0 - p_win) ** n_win
-        p_seq = max(p_seq, 1e-300)
+            if self.scale == "llr":
+                out[tf] = float(raw_llr)
+                continue
 
-        # Compute consensus LLR (argmax per column) and its p_seq
-        cons_llr = float(info.lom.max(axis=1).sum())
-        p_win_cons = self._interp_tail_p(cons_llr, info)
-        p_cons = 1.0 - (1.0 - p_win_cons) ** n_win
-        p_cons = max(p_cons, 1e-300)
+            # If z-score requested:
+            if self.scale == "z":
+                # z = (raw_llr - mean_null) / std_null
+                z_val = (raw_llr - info.null_mean) / info.null_std
+                out[tf] = float(z_val)
+                continue
 
-        # If raw_llr ≈ cons_llr, clamp to 1.0
-        if np.isclose(raw_llr, cons_llr, atol=1e-6, rtol=0.0):
-            return 1.0
+            # For any neglogp‐based result (logp or consensus‐neglop-sum):
+            neglogp_seq = self._per_pwm_neglogp(raw_llr, info, seq_length)
+            if self.scale == "logp":
+                out[tf] = float(neglogp_seq)
+                continue
 
-        return -np.log10(p_seq) / -np.log10(p_cons)
+            # Now scale must be "consensus-neglop-sum"
+            if info.consensus_neglogp <= 0.0:
+                cons_llr = info.consensus_llr
+                neglogp_cons = self._per_pwm_neglogp(cons_llr, info, seq_length)
+                info.consensus_neglogp = neglogp_cons
+                logger.debug("    Set consensus_neglogp for %s = %.3f", tf, neglogp_cons)
 
-    def _scale_other(self, raw_llr: float, info: _PWMInfo, seq_length: int | None) -> float:
-        """
-        Handle scales "llr", "z", "p", "logp":
-          - "llr"  → raw_llr
-          - "z"    → (raw_llr − μ) / σ
-          - "p"    → p_seq (Bonferroni correction)
-          - "logp" → −log10(p_seq)
-        """
-        if self.scale == "llr":
-            return raw_llr
+            if info.consensus_neglogp > 0.0:
+                normalized = float(neglogp_seq / info.consensus_neglogp)
+                out[tf] = normalized
+            else:
+                out[tf] = 0.0
 
-        if self.scale == "z":
-            assert info.mu is not None and info.sigma is not None
-            return (raw_llr - info.mu) / info.sigma
-
-        # For "p" and "logp", we need seq_length
-        if seq_length is None:
-            raise ValueError("seq_length is required for p/logp scales")
-
-        p_win = self._interp_tail_p(raw_llr, info)
-        p_seq = min(1.0, p_win * (seq_length - info.width + 1))
-
-        if self.scale == "p":
-            return p_seq
-
-        # "logp"
-        return -np.log10(p_seq if p_seq > 0 else 1e-300)
-
-    def score_per_pwm(self, seq: np.ndarray) -> np.ndarray:
-        """
-        Return an array of raw LLRs (no scaling) for each PWM in the cache.
-        """
-        out = []
-        for info in self._cache.values():
-            best_llr, _, _ = self._best_llr_and_location(seq, info)
-            out.append(best_llr)
-        return np.array(out, float)
-
-    def neglogp_vector(self, seq: np.ndarray) -> np.ndarray:
-        """
-        Compute −log10(p_seq) for each PWM (no extra‐hit penalty).
-        Returns a numpy array of length = number of PWMs.
-        """
-        L = seq.size
-        out: List[float] = []
-        for info in self._cache.values():
-            best_llr, _, _ = self._best_llr_and_location(seq, info)
-            p_win = self._interp_tail_p(best_llr, info)
-            p_seq = min(1.0, p_win * (L - info.width + 1))
-            val = -np.log10(p_seq if p_seq > 0 else 1e-300)
-            out.append(val)
-        return np.asarray(out, float)
-
-    def score(self, seq: np.ndarray) -> float:
-        """
-        Compute a single fitness value for the whole sequence `seq`:
-          • If "llr": return max(raw LLR over all PWMs).
-          • If "z":   return min(z‐score over all PWMs).
-          • If "p" or "logp":
-              – Build neglogp_vector; if "p", return min(p_seq); if "logp", return min(−log10(p_seq)).
-          • If "logp_norm": return min(logp_norm over all PWMs).
-        """
-        L = seq.size
-
-        if self.scale == "llr":
-            return float(np.max(self.score_per_pwm(seq)))
-
-        if self.scale == "z":
-            zs = [
-                self._scale_other(
-                    self._best_llr_and_location(seq, info)[0],
-                    info,
-                    seq_length=L,
-                )
-                for info in self._cache.values()
-            ]
-            return float(np.min(zs))
-
-        if self.scale in {"p", "logp"}:
-            vec = self.neglogp_vector(seq)
-            if self.scale == "p":
-                # Convert neglogp back to p_seq via 10^(−neglogp), then take minimum
-                return float(10 ** (-np.max(vec)))
-            return float(np.min(vec))
-
-        # "logp_norm"
-        norm = [
-            self._scale_llr(
-                self._best_llr_and_location(seq, info)[0],
-                info,
-                seq_length=L,
-            )
-            for info in self._cache.values()
-        ]
-        return float(np.min(norm))
-
-    def soft_min(self, seq: np.ndarray, beta: float) -> float:
-        """
-        Compute the soft‐minimum of the −log10(p_seq) vector at inverse temperature beta.
-        Useful for Parallel Tempering.
-        """
-        return -logsumexp(-beta * self.neglogp_vector(seq)) / beta
+        logger.debug("  Per-TF scaled map: %s", out)
+        return out

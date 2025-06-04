@@ -2,77 +2,78 @@
 
 cruncher:
   # GLOBAL SETTINGS
-  mode: sample                   # “parse” | “sample” | “analyse”
-  out_dir: results/              # relative path under cruncher/ where batches go
-
-  # Each entry is a list of TF names.  All PWMs from all sets will be loaded/combined.
-  regulator_sets:
+  mode: sample-analyse                      # “parse” | “sample” | “analyse” | “sample-analyse”
+  out_dir: results/                         # relative path under cruncher/ where batches go
+  regulator_sets:                           # each entry is a list of TF names
     - [cpxR, soxR]
 
   # PARSE MODE (sanity‐check PWMs, draw logos, print log‐odds)
   parse:
-    formats:                     # map file‐extension → parser name (MEME, JASPAR, …)
+    formats:                                # map file‐extension → parser name (MEME, JASPAR, …)
       .txt: MEME
       .pfm: JASPAR
     plot:
-      logo: true                 # whether to generate a logo (PNG) per PWM
-      bits_mode: information     # “information” (bits) vs “probability” mode
-      dpi: 200                   # resolution for output PNG
+      logo: true                            # whether to generate a logo (PNG) per PWM
+      bits_mode: information                # “information” (bits) vs “probability” mode
+      dpi: 200                              # resolution for output PNG
 
   # SAMPLE MODE (MCMC‐based sequence search)
   sample:
-    bidirectional: true          # scan both strands (forward + reverse)
+    bidirectional: true                     # scan both strands (forward + reverse)
     penalties:
-      same_pwm_extra_hit: 0.5    # λ penalty for duplicate hits
-    
-    init:
-      kind: consensus_mix         # “random” | “consensus” | “consensus_mix”
-      length: 30                  # overall length of the output sequence (must be ≥ 1)
-      pad_with: background        # “background” (uniform-random pad) or “A”|“C”|“G”|“T”
-      regulator: cpxR             # If kind == “consensus”, supply a regulator name that exists in regulator_sets
-    
-    draws: 2000                 # number of MCMC draws (after tune)
-    tune: 1000                   # number of burn‐in sweeps
-    chains: 4                    # number of parallel chains (Gibbs or PT)
-    min_dist: 1                  # Hamming‐distance threshold for “diverse elites”
-    top_k: 200                   # how many top sequences to save
+      same_pwm_extra_hit: 0.5               # λ penalty for duplicate hits
 
-    # Move‐kernel parameters (shared by Gibbs and PT)
+    init:
+      kind: random                       # “random” | “consensus” | “consensus_mix”
+      length: 30                            # overall length of the output sequence (must be ≥ 1)
+      pad_with: background                  # “background” (uniform-random pad) or “A”|“C”|“G”|“T”
+      regulator: soxR                       # If kind == “consensus”, supply a regulator name that exists in regulator_sets
+
+    draws: 20000                               # number of MCMC draws (after tune)
+    tune: 10000                                  # number of burn‐in sweeps
+    chains: 4                               # number of parallel chains (Gibbs or PT)
+    min_dist: 1                             # Hamming‐distance threshold for “diverse elites”
+    top_k: 10                               # how many top sequences to save
+
+    # Move‐kernel parameters
     moves:
-      block_len_range: [5, 25]   # contiguous block proposals ∈ [5,25] bp
-      multi_k_range:   [2, 8]    # number of disjoint flips ∈ [2,8] sites
-      slide_max_shift: 4         # maximum shift for “slide” moves (reserved)
-      swap_len_range:  [8, 20]   # length of blocks to swap ∈ [8,20] (reserved)
+      block_len_range: [2, 6]               # contiguous block proposals ∈ [5,25] bp
+      multi_k_range:   [2, 6]               # number of disjoint flips ∈ [2,8] sites
+      slide_max_shift: 4                    # maximum shift for “slide” moves (reserved)
+      swap_len_range:  [2, 8]               # length of blocks to swap ∈ [8,20] (reserved)
+
+      move_probs:
+        S: 0.80                             # probability of a single‐base‐flip move
+        B: 0.10                             # probability of a contiguous block replacement
+        M: 0.10                             # probability of a multi‐site flip (k sites)
 
     optimiser:
-      kind: gibbs                # “gibbs” | “pt”
-      scorer_scale: logp         # what the optimiser sees internally “llr" | “logp” (fitness scale)
+      kind: gibbs                           # “gibbs” | “pt”
+      scorer_scale: llr                     # “llr" | "z" | “logp” | "consensus-neglop-sum"
 
       # GIBBS (LINEAR‐RAMP COOLING) BUILT‐IN
-      # We implement β(t) = β_start + (β_end – β_start) * (t / (tune + draws)),
-      # where t ∈ [0, tune+draws].  In other words, “start hot, end cold.”
       cooling:
-        kind: linear              # "fixed" | “linear” | “geometric” (geometric is for PT only) 
-        beta: [0.05, 1.5]         # [β_start, β_end]
+        kind: linear                        # "fixed" | “linear” | “geometric” (geometric is for PT only)
+        beta: [0.00001, 0.0001]                    # [β_start, β_end]
 
       # If kind == “pt”, uncomment & use the block below instead:
       # cooling:
       #   kind: geometric
       #   beta: [0.02, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 6.0]
 
-      # swap_prob: for Gibbs, this is the intra‐chain “block swap” probability;
-      # for PT, it becomes the probability of exchanging states between ladders.
-      swap_prob: 0.10
-      
-      # softmax_beta: 0.20      # only used by PT (must be a positive float)
+      swap_prob: 0.10                       # intra‐chain block‐swap probability (Gibbs); inter‐chain exchange prob (PT)
+      # softmax_beta: 0.20                  # only used by PT (must be a positive float)
+
+    save_sequences: true                    # whether to write sequences.csv for downstream analysis
 
   # ANALYSIS MODE
   analysis:
-    runs:                         # list of batch names (strings) to re‐analyse
-      - sample_cpxR-soxR_20250602
+    runs:                                   # list of batch names to re‐analyse
+      - sample_cpxR-soxR_20250603
     plots:
-      trace:       true           # plot MCMC trace
-      autocorr:    true           # plot autocorrelation
-      convergence: true           # convergence diagnostics
-      scatter_pwm: true           # PWM‐score scatter (requires samples_df)
-    scatter_scale: logp_norm
+      trace:       true                     # plot MCMC trace
+      autocorr:    true                     # plot autocorrelation
+      convergence: true                     # convergence diagnostics
+      scatter_pwm: true                     # PWM‐score scatter (requires gathered_per_pwm.csv)
+    scatter_scale: llr
+    gather_nth_iteration_for_scaling: 10    # how many draws to skip between per‐PWM scoring

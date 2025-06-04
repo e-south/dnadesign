@@ -43,6 +43,12 @@ class ParseConfig(BaseModel):
 class MoveConfig(BaseModel):
     """
     Shared move-kernel parameters for MCMC.
+
+    In addition to block_len_range / multi_k_range / slide_max_shift / swap_len_range,
+    we now allow the user to specify the relative probability of choosing each move kind:
+      • "S" = single-nucleotide flip
+      • "B" = contiguous block replacement
+      • "M" = k disjoint flips
     """
 
     block_len_range: Tuple[int, int] = (3, 12)
@@ -50,11 +56,51 @@ class MoveConfig(BaseModel):
     slide_max_shift: int = 2
     swap_len_range: Tuple[int, int] = (6, 12)
 
+    # Probability mass for each move kind (must sum to 1.0)
+    move_probs: Dict[Literal["S", "B", "M"], float] = {
+        "S": 0.50,
+        "B": 0.30,
+        "M": 0.20,
+    }
+
     @validator("block_len_range", "multi_k_range", "swap_len_range", pre=True)
     def _list_to_tuple(cls, v):
         if isinstance(v, (list, tuple)):
             return tuple(int(x) for x in v)
         return v
+
+    @validator("move_probs", pre=True)
+    def _check_move_probs_keys_and_values(cls, v):
+        """
+        Ensure that:
+          • Exactly keys "S","B","M" are present
+          • Each value is a float ≥ 0
+          • The three values sum to (approximately) 1.0
+        """
+        if not isinstance(v, dict):
+            raise ValueError("move_probs must be a mapping {S: float, B: float, M: float}")
+
+        # Check exactly the expected keys
+        expected_keys = {"S", "B", "M"}
+        got_keys = set(v.keys())
+        if got_keys != expected_keys:
+            raise ValueError(f"move_probs keys must be exactly {expected_keys}, but got {got_keys}")
+
+        # Check each value is non‐negative float
+        for k, val in v.items():
+            try:
+                fv = float(val)
+            except (TypeError, ValueError):
+                raise ValueError(f"move_probs['{k}'] must be a float, got {val!r}")
+            if fv < 0:
+                raise ValueError(f"move_probs['{k}'] must be ≥ 0, but got {fv}")
+        # Check they sum to 1.0 (allow slight numerical tolerance)
+        total = sum(float(v[k]) for k in expected_keys)
+        if abs(total - 1.0) > 1e-6:
+            raise ValueError(f"move_probs values must sum to 1.0; got sum={total:.6f}")
+
+        # Return as floats
+        return {k: float(v[k]) for k in expected_keys}
 
 
 class CoolingFixed(BaseModel):
@@ -114,14 +160,14 @@ class OptimiserConfig(BaseModel):
     Common “optimiser” block for both Gibbs and PT.
 
     - kind: “gibbs” or “pt”
-    - scorer_scale: “llr” | “z” | “p” | “logp” | “logp_norm”
+    - scorer_scale: “llr” | “z” | “p” | “logp” | “logp_norm” | “consensus-neglop-sum”
     - cooling: one of fixed | linear | geometric
     - swap_prob: intra-chain swap (Gibbs) or inter-chain swap (PT)
     - softmax_beta: only required if kind == “pt”
     """
 
     kind: Literal["gibbs", "pt"]
-    scorer_scale: Literal["llr", "z", "p", "logp", "logp_norm"]
+    scorer_scale: Literal["llr", "z", "p", "logp", "logp_norm", "consensus-neglop-sum"]
     cooling: CoolingConfig
     swap_prob: float = 0.10
     softmax_beta: Optional[float] = None
@@ -180,11 +226,12 @@ class SampleConfig(BaseModel):
 
     moves: MoveConfig = MoveConfig()
     optimiser: OptimiserConfig
+    save_sequences: bool = True
 
     @validator("draws", "tune", "chains", "min_dist", "top_k")
     def _check_positive_ints(cls, v, field):
         if not isinstance(v, int) or v < 0:
-            raise ValueError(f"{field.name} must be a non-negative integer")
+            raise ValueError(f"{field.name} must be a non‐negative integer")
         return v
 
 
@@ -196,15 +243,23 @@ class AnalysisConfig(BaseModel):
     runs:         list of batch-name strings to re-analyse
     plots:        which plots to generate (trace, autocorr, convergence, scatter_pwm)
     scatter_scale: which scale to use for scatter_pwm (llr, z, p, logp, logp_norm)
+    gather_nth_iteration_for_scaling: take every Nth draw for per-PWM scoring
     """
 
     runs: Optional[List[str]]
     plots: Dict[Literal["trace", "autocorr", "convergence", "scatter_pwm"], bool]
     scatter_scale: Literal["llr", "z", "p", "logp", "logp_norm"]
+    gather_nth_iteration_for_scaling: int
+
+    @validator("gather_nth_iteration_for_scaling")
+    def _check_positive_n(cls, v):
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("gather_nth_iteration_for_scaling must be a positive integer")
+        return v
 
 
 class CruncherConfig(BaseModel):
-    mode: Literal["parse", "sample", "analyse", "analyze"]
+    mode: Literal["parse", "sample", "analyse", "analyze", "sample-analyse"]
     out_dir: Path
     regulator_sets: List[List[str]]
 

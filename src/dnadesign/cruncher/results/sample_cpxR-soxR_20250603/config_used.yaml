@@ -1,0 +1,277 @@
+cruncher:
+  mode: sample-analyse
+  out_dir: results
+  regulator_sets:
+  - - cpxR
+    - soxR
+  parse:
+    formats:
+      .txt: MEME
+      .pfm: JASPAR
+    plot:
+      logo: true
+      bits_mode: information
+      dpi: 200
+  sample:
+    bidirectional: true
+    penalties:
+      same_pwm_extra_hit: 0.5
+    init:
+      kind: random
+      length: 30
+      regulator: soxR
+      pad_with: background
+    draws: 20000
+    tune: 10000
+    chains: 4
+    min_dist: 1
+    top_k: 10
+    moves:
+      block_len_range:
+      - 2
+      - 6
+      multi_k_range:
+      - 2
+      - 6
+      slide_max_shift: 4
+      swap_len_range:
+      - 2
+      - 8
+      move_probs:
+        B: 0.1
+        S: 0.8
+        M: 0.1
+    optimiser:
+      kind: gibbs
+      scorer_scale: llr
+      cooling:
+        kind: linear
+        beta:
+        - 1.0e-05
+        - 0.0001
+      swap_prob: 0.1
+      softmax_beta: null
+    save_sequences: true
+  analysis:
+    runs:
+    - sample_cpxR-soxR_20250603
+    plots:
+      trace: true
+      autocorr: true
+      convergence: true
+      scatter_pwm: true
+    scatter_scale: llr
+    gather_nth_iteration_for_scaling: 10
+  pwms_info:
+    cpxR:
+      alphabet:
+      - A
+      - C
+      - G
+      - T
+      pwm_matrix:
+      - - 0.34
+        - 0.36
+        - 0.2
+        - 0.1
+      - - 0.0
+        - 0.12
+        - 0.02
+        - 0.86
+      - - 0.04
+        - 0.0
+        - 0.0
+        - 0.96
+      - - 0.0
+        - 0.0
+        - 0.12
+        - 0.88
+      - - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+      - - 0.08
+        - 0.92
+        - 0.0
+        - 0.0
+      - - 0.8
+        - 0.1
+        - 0.1
+        - 0.0
+      - - 0.2
+        - 0.22
+        - 0.18
+        - 0.4
+      - - 0.56
+        - 0.0
+        - 0.06
+        - 0.38
+      - - 0.4
+        - 0.0
+        - 0.02
+        - 0.58
+      - - 0.48
+        - 0.48
+        - 0.02
+        - 0.02
+      - - 0.0
+        - 0.08
+        - 0.0
+        - 0.92
+      - - 0.02
+        - 0.0
+        - 0.0
+        - 0.98
+      - - 0.0
+        - 0.02
+        - 0.28
+        - 0.7
+      - - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+      - - 0.0
+        - 1.0
+        - 0.0
+        - 0.0
+      - - 0.88
+        - 0.02
+        - 0.06
+        - 0.04
+      - - 0.46
+        - 0.18
+        - 0.08
+        - 0.28
+      - - 0.48
+        - 0.0
+        - 0.0
+        - 0.52
+      - - 0.4
+        - 0.16
+        - 0.0
+        - 0.44
+      - - 0.42
+        - 0.28
+        - 0.22
+        - 0.08
+      consensus: CTTTACATATATTTACAATTA
+    soxR:
+      alphabet:
+      - A
+      - C
+      - G
+      - T
+      pwm_matrix:
+      - - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+      - - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+      - - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+      - - 0.4
+        - 0.0
+        - 0.0
+        - 0.6
+      - - 0.4
+        - 0.0
+        - 0.0
+        - 0.6
+      - - 0.0
+        - 1.0
+        - 0.0
+        - 0.0
+      - - 0.0
+        - 1.0
+        - 0.0
+        - 0.0
+      - - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+      - - 0.0
+        - 0.9
+        - 0.0
+        - 0.1
+      - - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+      - - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+      - - 0.0
+        - 0.1
+        - 0.9
+        - 0.0
+      - - 0.0
+        - 0.1
+        - 0.0
+        - 0.9
+      - - 0.1
+        - 0.0
+        - 0.0
+        - 0.9
+      - - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+      - - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+      - - 0.0
+        - 0.8
+        - 0.2
+        - 0.0
+      - - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+      - - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+      - - 0.0
+        - 0.0
+        - 1.0
+        - 0.0
+      - - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+      - - 0.0
+        - 0.0
+        - 1.0
+        - 0.0
+      - - 0.0
+        - 0.0
+        - 1.0
+        - 0.0
+      - - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+      - - 0.6
+        - 0.4
+        - 0.0
+        - 0.0
+      - - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+      - - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+      - - 0.0
+        - 0.0
+        - 1.0
+        - 0.0
+      consensus: TAATTCCTCAAGTTAACTTGAGGTAAAG
