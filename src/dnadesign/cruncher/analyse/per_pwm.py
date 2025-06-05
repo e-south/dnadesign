@@ -8,13 +8,10 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-# dnadesign/cruncher/analyse/per_pwm.py
-
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 
 from dnadesign.cruncher.analyse.plots.scatter_utils import _TRANS
 from dnadesign.cruncher.sample.scorer import Scorer
@@ -22,52 +19,106 @@ from dnadesign.cruncher.sample.scorer import Scorer
 
 def gather_per_pwm_scores(
     run_dir: Path,
-    every_n: int,
+    change_threshold: float,
     pwms: dict[str, object],
     bidirectional: bool,
     penalties: dict[str, float],  # (unused—consider dropping)
     scale: str,
 ) -> None:
+    """
+    Replace “first N + every_n” subsampling with “keep when per-PWM score changes by ≥ ε.”
+
+    Steps:
+      1. Read sequences.csv (must have 'chain', 'draw', 'sequence').
+      2. Build a single Scorer(pwms, bidirectional, scale).
+      3. For each chain (grouped & sorted by 'draw'):
+         a. Always keep the very first draw (index 0).
+         b. Compute per-TF scores for draw i using scorer.compute_all_per_pwm(...).
+         c. If Euclidean distance between current per-TF vector and last-kept per-TF vector ≥ change_threshold,
+            keep this draw.
+         d. After finishing, also force-keep the very last draw of that chain.
+      4. Write out all kept rows (chain, draw, score_<tf>...) → gathered_per_pwm_everyN.csv
+    """
+
     seq_path = run_dir / "sequences.csv"
     if not seq_path.exists():
         raise FileNotFoundError(f"[gather] sequences.csv not found in '{run_dir}'")
-
-    if every_n < 1:
-        raise ValueError("gather_per_pwm_scores: every_n must be a positive integer")
 
     df_all = pd.read_csv(seq_path)
     if "draw" not in df_all.columns or "sequence" not in df_all.columns:
         raise ValueError("gather_per_pwm_scores: sequences.csv must have 'draw' and 'sequence' columns")
 
-    # Always keep the first `initial_keep` draws from each chain, then every `every_n`th draw.
-    initial_keep = 10
-    # “initial_mask” is True if a row’s draw < initial_keep within its own chain.
-    initial_mask = df_all.groupby("chain")["draw"].transform(lambda d: d < initial_keep)
-    # “sampling_mask” is True if the draw is a multiple of every_n (for all chains).
-    sampling_mask = (df_all["draw"] % every_n) == 0
-    mask = initial_mask | sampling_mask
-    filtered = df_all.loc[mask].reset_index(drop=True)
-    if filtered.empty:
-        print(f"[gather] No rows where (draw < {initial_keep}) or (draw % {every_n} == 0) (total rows: {len(df_all)})")
-        return
-
     # Build a single Scorer to do all of the “raw→z/p/logp” logic:
     scorer = Scorer(pwms, bidirectional=bidirectional, scale=scale)
 
+    # We will collect “kept” entries here
     records: list[dict[str, object]] = []
-    for row in tqdm(filtered.itertuples(index=False), total=len(filtered), desc="Scoring per-PWM"):
-        c = int(getattr(row, "chain"))
-        d = int(getattr(row, "draw"))
-        seq_str = getattr(row, "sequence")
+
+    # For each chain, walk through its draws in ascending order
+    for chain_id, df_chain in df_all.groupby("chain", sort=False):
+        # Sort by draw index
+        df_chain = df_chain.sort_values("draw").reset_index(drop=True)
+        n_rows = len(df_chain)
+
+        if n_rows == 0:
+            continue
+
+        # Keep the first draw unconditionally:
+        first_row = df_chain.iloc[0]
+        seq_str = first_row["sequence"]
         ascii_arr = np.frombuffer(seq_str.encode("ascii"), dtype=np.uint8)
         seq_ints = _TRANS[ascii_arr].astype(np.int8)
 
-        per_tf: dict[str, float] = scorer.compute_all_per_pwm(seq_ints, len(seq_ints))
-        entry = {"chain": c, "draw": d}
-        for tf_name, sc_val in per_tf.items():
-            entry[f"score_{tf_name}"] = float(sc_val)
-        records.append(entry)
+        # Compute per-TF scores for the first draw:
+        per_tf_last: dict[str, float] = scorer.compute_all_per_pwm(seq_ints, len(seq_ints))
+        entry0 = {"chain": int(chain_id), "draw": int(first_row["draw"])}
+        for tf_name, sc_val in per_tf_last.items():
+            entry0[f"score_{tf_name}"] = float(sc_val)
+        records.append(entry0)
 
+        # Now iterate over interior rows, deciding which to keep
+        for idx in range(1, n_rows - 1):
+            row = df_chain.iloc[idx]
+            seq_str = row["sequence"]
+            ascii_arr = np.frombuffer(seq_str.encode("ascii"), dtype=np.uint8)
+            seq_ints = _TRANS[ascii_arr].astype(np.int8)
+
+            per_tf_curr = scorer.compute_all_per_pwm(seq_ints, len(seq_ints))
+
+            # Compute Euclidean distance in per‐TF‐score space:
+            squared_diff_sum = 0.0
+            for tf_name in per_tf_curr:
+                diff = per_tf_curr[tf_name] - per_tf_last[tf_name]
+                squared_diff_sum += diff * diff
+            dist = squared_diff_sum**0.5
+
+            # If the chain moved “far enough,” keep this draw
+            if dist >= change_threshold:
+                rec = {"chain": int(chain_id), "draw": int(row["draw"])}
+                for tf_name, sc_val in per_tf_curr.items():
+                    rec[f"score_{tf_name}"] = float(sc_val)
+                records.append(rec)
+
+                # Update “last kept” to current
+                per_tf_last = per_tf_curr
+
+        # Finally, always keep the very last draw of this chain
+        last_row = df_chain.iloc[-1]
+        seq_str = last_row["sequence"]
+        ascii_arr = np.frombuffer(seq_str.encode("ascii"), dtype=np.uint8)
+        seq_ints = _TRANS[ascii_arr].astype(np.int8)
+
+        per_tf_final = scorer.compute_all_per_pwm(seq_ints, len(seq_ints))
+        rec_final = {"chain": int(chain_id), "draw": int(last_row["draw"])}
+        for tf_name, sc_val in per_tf_final.items():
+            rec_final[f"score_{tf_name}"] = float(sc_val)
+        records.append(rec_final)
+
+    # Build a DataFrame and write to CSV
     out_df = pd.DataFrame(records)
-    out_df.to_csv(run_dir / "gathered_per_pwm_everyN.csv", index=False)
-    print(f"[gather] Wrote per-PWM scores every {every_n} (plus first {initial_keep}) → 'gathered_per_pwm_everyN.csv'")
+    # Sort by chain then draw so the output is nicely ordered
+    out_df = out_df.sort_values(["chain", "draw"]).reset_index(drop=True)
+
+    out_path = run_dir / "gathered_per_pwm_everyN.csv"
+    out_df.to_csv(out_path, index=False)
+    print(f"[gather] Wrote change-threshold per-PWM scores → '{out_path.name}'")

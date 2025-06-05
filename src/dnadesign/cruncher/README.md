@@ -179,3 +179,10 @@ cruncher:
 ```
 
 e-south
+
+
+
+###### Notes
+
+not all PWMs are created equal in terms of realtive information, how can this be controlled for?
+hamming constraints to isolate multiple "diverse" hits

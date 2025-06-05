@@ -29,25 +29,34 @@ from tqdm import tqdm
 from dnadesign.cruncher.sample.optimizer.base import Optimizer
 from dnadesign.cruncher.sample.optimizer.cooling import make_beta_scheduler
 from dnadesign.cruncher.sample.optimizer.helpers import _replace_block
-from dnadesign.cruncher.sample.state import SequenceState
+from dnadesign.cruncher.sample.state import SequenceState, make_seed
 
 logger = logging.getLogger(__name__)
 
 
 class GibbsOptimizer(Optimizer):
     """
-    Cooling Gibbs/Metropolis sampler producing diverse motif-rich sequences.
-
-    Now chooses among moves “S” | “B” | “M” according to move_probs from the config.
-    Stores every sequence *and* its per-TF scores at each draw, so that run_sample.py
-    can dump them without recomputing. Uses evaluator.combined(state, beta) to decide acceptance.
+    Cooling Gibbs/Metropolis sampler producing diverse motif‐rich sequences.
+    Now creates an independent seed for each chain according to init_cfg,
+    and records *all* states with a non‐negative “draw” index.
     """
 
-    def __init__(self, evaluator: Any, cfg: Dict[str, Any], rng):
+    def __init__(
+        self,
+        evaluator: Any,
+        cfg: Dict[str, Any],
+        rng: np.random.Generator,
+        *,
+        init_cfg: Any,
+        pwms: Dict[str, Any],
+    ):
         """
-        evaluator: SequenceEvaluator (which now has `combined(state, beta)`)
-        cfg:       flattened config dict (contains keys like 'block_len_range', 'move_probs', etc.)
-        rng:       numpy.random.Generator
+        evaluator: SequenceEvaluator
+        cfg: flattened config dict (keys include 'draws','tune','chains', etc.)
+        rng: numpy.random.Generator
+
+        init_cfg: Original InitConfig (with kind, length, pad_with, regulator)
+        pwms: full dict of {tf_name: PWM} for seeding
         """
         super().__init__(evaluator, cfg, rng)
         logger.info("Initializing GibbsOptimizer with config: %s", cfg)
@@ -70,7 +79,6 @@ class GibbsOptimizer(Optimizer):
         logger.debug("  Move config: %s", self.move_cfg)
 
         # Unpack move_probs into a NumPy array (S,B,M)
-        #    – keys guaranteed to be exactly "S","B","M" by MoveConfig’s validator
         self.move_probs = np.array(
             [cfg["move_probs"]["S"], cfg["move_probs"]["B"], cfg["move_probs"]["M"]],
             dtype=float,
@@ -83,14 +91,16 @@ class GibbsOptimizer(Optimizer):
         self.beta_of = make_beta_scheduler(cooling_cfg, total)
         logger.debug("  Cooling config (beta_of scheduler) built with total=%d sweeps", total)
 
+        # Keep references for seeding each chain
+        self.init_cfg = init_cfg
+        self.pwms = pwms
+
         # Tally of which move‐types happened
         self.move_tally: Counter = Counter()
 
-        # STORE: every raw sequence-array and its (chain, draw)
+        # STORAGE: sequences, metadata (chain, draw), and scores
         self.all_samples: List[np.ndarray] = []
         self.all_meta: List[Tuple[int, int]] = []
-
-        # Store every per‐TF vector alongside
         self.all_scores: List[Dict[str, float]] = []
 
         # After ranking, store (chain, draw) for elites
@@ -99,16 +109,16 @@ class GibbsOptimizer(Optimizer):
         # ArviZ object for combined scalar
         self.trace_idata = None
 
-    def optimise(self, initial: SequenceState) -> List[SequenceState]:
+    def optimise(self) -> List[SequenceState]:
         """
-        Run MCMC in two phases:
-         1) Burn-in: tune sweeps (record each state & per-TF scores)
-         2) Sampling: draws sweeps (record each state & per-TF scores)
+        Run MCMC in two phases for each chain, using an independently drawn seed for each chain:
+          1) Burn‐in: tune sweeps (record each state & per‐TF scores, draw indices = 0..tune−1)
+          2) Sampling: draws sweeps (record each state & per‐TF scores, draw indices = tune..tune+draws−1)
 
-        Returns a list of elite SequenceState objects (max K, Hamming-distinct).
+        Returns a list of elite SequenceState objects (max K, Hamming‐distinct).
         """
         rng = self.rng
-        evaluator: Any = self.scorer  # type: ignore (“scorer” is actually SequenceEvaluator)
+        evaluator: Any = self.scorer  # Actually SequenceEvaluator
         tune = self.tune
         draws = self.draws
         chains = self.chains
@@ -118,7 +128,7 @@ class GibbsOptimizer(Optimizer):
 
         logger.info("Beginning optimise: chains=%d, tune=%d, draws=%d", chains, tune, draws)
 
-        # 2D array for raw combined fitness: chain_scores[c][d]
+        # Will store combined‐fitness for each chain's sampled draws
         chain_scores: List[List[float]] = []
 
         # Clear old storage
@@ -126,56 +136,50 @@ class GibbsOptimizer(Optimizer):
         self.all_meta.clear()
         self.all_scores.clear()
 
-        # We'll record *all* states (burn‐in & sampling) for final ranking.
-        global_iter = 0
+        global_iter = 0  # global sweep index across all chains
 
         for c in range(chains):
-            seq = initial.seq.copy()  # numpy array (L,)
+            # ─── 1) Create an independent seed for this chain ───
+            seed_state = make_seed(self.init_cfg, self.pwms, rng)
+            seq = seed_state.seq.copy()  # numpy array (L,)
             chain_trace: List[float] = []
 
-            # Record the initial seed before any moves, with draw index = -1
-            beta0 = self.beta_of(global_iter)
-            init_state = SequenceState(seq.copy())
-            per_tf_init = evaluator(init_state)
-            self.all_samples.append(seq.copy())
-            self.all_meta.append((c, -1))
-            self.all_scores.append(per_tf_init)
-            logger.debug("Chain %d: recorded initial seed (beta=%.3f) as draw_index=-1", c + 1, beta0)
+            logger.info("Chain %d: starting burn‐in", c + 1)
 
-            logger.info("Chain %d: starting burn-in", c + 1)
-            # Phase 1: Burn‐in (record each state)
-            for b in tqdm(range(tune), desc=f"chain{c+1} burn-in", leave=False):
+            # ─── Phase 1: Burn‐in (record each state; draw_i = 0..tune−1) ───
+            for b in tqdm(range(tune), desc=f"chain{c+1} burn‐in", leave=False):
                 beta_mcmc = self.beta_of(global_iter)
                 self._perform_single_move(seq, beta_mcmc, evaluator, move_cfg, rng)
 
-                # After the move, record current state and per‐TF scores
+                # Record current state and per‐TF scores with draw index = b
                 current_state = SequenceState(seq.copy())
                 per_tf_map = evaluator(current_state)
-                burn_meta = b - tune - 1  # yields -tune-1 ... -2
+                draw_i = b  # 0 … tune−1
                 self.all_samples.append(seq.copy())
-                self.all_meta.append((c, burn_meta))
+                self.all_meta.append((c, draw_i))
                 self.all_scores.append(per_tf_map)
-                logger.debug("Chain %d burn-in %d: recorded state draw_index=%d", c + 1, b, burn_meta)
+                logger.debug("Chain %d burn‐in %d: recorded state draw_index=%d", c + 1, b, draw_i)
 
                 global_iter += 1
 
-            logger.info("Chain %d: burn-in complete. Starting sampling", c + 1)
-            # Phase 2: Sampling (record each new state + its per‐TF scores)
+            logger.info("Chain %d: burn‐in complete. Starting sampling", c + 1)
+
+            # ─── Phase 2: Sampling (record each state; draw_i = tune..tune+draws−1) ───
             for d in tqdm(range(draws), desc=f"chain{c+1} sampling", leave=False):
                 beta_mcmc = self.beta_of(global_iter)
                 self._perform_single_move(seq, beta_mcmc, evaluator, move_cfg, rng)
 
-                # Record this sampling state
                 current_state = SequenceState(seq.copy())
                 per_tf_map = evaluator(current_state)
                 combined_scalar = evaluator.combined(current_state, beta=beta_mcmc)
 
+                draw_i = tune + d  # tune … tune+draws−1
                 self.all_samples.append(seq.copy())
-                self.all_meta.append((c, d))
+                self.all_meta.append((c, draw_i))
                 self.all_scores.append(per_tf_map)
                 chain_trace.append(combined_scalar)
 
-                logger.debug("Chain %d draw %d: combined_scalar=%.6f, per_tf=%s", c, d, combined_scalar, per_tf_map)
+                logger.debug("Chain %d draw %d: combined_scalar=%.6f, per_tf=%s", c + 1, d, combined_scalar, per_tf_map)
                 global_iter += 1
 
             chain_scores.append(chain_trace)
@@ -192,12 +196,11 @@ class GibbsOptimizer(Optimizer):
         self.trace_idata = az.from_dict(posterior={"score": scores_arr})
         logger.info("Built ArviZ InferenceData with shape %s", scores_arr.shape)
 
-        # Rank all recorded sequences (burn‐in & sampling) by **combined fitness at final β**
+        # ─── Rank all recorded sequences by combined fitness at final β ───
         total_sweeps = self.tune + self.draws
-        beta_final = self.beta_of(total_sweeps - 1)  # last iteration's β
+        beta_final = self.beta_of(total_sweeps - 1)
         logger.info("Ranking sequences at final β=%.3f", beta_final)
 
-        # Compute combined at final β for each recorded sample
         scored_list: List[Tuple[float, np.ndarray, int]] = []
         for idx, seq_arr in enumerate(self.all_samples):
             state = SequenceState(seq_arr.copy())
@@ -233,11 +236,11 @@ class GibbsOptimizer(Optimizer):
         rng: np.random.Generator,
     ) -> None:
         """
-        Choose one move (S, B, or M) based on cfg.sample.moves.move_probs, then apply it.
+        Choose one move (S, B, or M) based on self.move_probs, then apply it.
         Uses evaluator.combined(state, beta) to accept/reject.
         """
         L = seq.size
-        move_kind = self._sample_move_kind(rng)  # ← no longer β‐dependent here
+        move_kind = self._sample_move_kind(rng)
         self.move_tally[move_kind] += 1
 
         if move_kind == "S":
@@ -325,12 +328,9 @@ class GibbsOptimizer(Optimizer):
 
     def _sample_move_kind(self, rng: np.random.Generator) -> str:
         """
-        Sample a move‐kind among {"S","B","M"} *exactly* according to self.move_probs.
-
-        move_probs was loaded from cfg.sample.moves.move_probs and guaranteed to sum to 1.0.
+        Sample a move‐kind among {"S","B","M"} according to self.move_probs.
         """
         kinds = ["S", "B", "M"]
-        # rng.choice will pick index 0/1/2 with the specified probabilities
         idx = rng.choice(3, p=self.move_probs)
         choice = kinds[idx]
         logger.debug(

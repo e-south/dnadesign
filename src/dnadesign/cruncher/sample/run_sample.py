@@ -26,7 +26,7 @@ from dnadesign.cruncher.sample.evaluator import SequenceEvaluator
 from dnadesign.cruncher.sample.optimizer.cgm import GibbsOptimizer
 from dnadesign.cruncher.sample.optimizer.pt import PTGibbsOptimizer
 from dnadesign.cruncher.sample.scorer import Scorer
-from dnadesign.cruncher.sample.state import SequenceState, make_seed
+from dnadesign.cruncher.sample.state import SequenceState
 from dnadesign.cruncher.utils.config import CruncherConfig
 
 logger = logging.getLogger(__name__)
@@ -78,7 +78,7 @@ def _save_config(cfg: CruncherConfig, batch_dir: Path) -> None:
 def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
     """
     Run MCMC sampler, save enriched config, trace.nc, sequences.csv (including per-TF scores),
-    and elites.json.
+    and elites.json.  Each chain now gets its own independent seed (random/consensus/consensus_mix).
     """
     sample_cfg = cfg.sample
     rng = np.random.default_rng()
@@ -130,41 +130,7 @@ def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
     logger.debug("  SequenceEvaluator.scale = %r", evaluator._scale)
     logger.debug("  SequenceEvaluator.combiner = %r", evaluator._combiner)
 
-    # 3) INITIALIZE seed sequence
-    logger.info("Initializing seed sequence (kind=%r)", sample_cfg.init.kind)
-    initial: SequenceState = make_seed(sample_cfg.init, pwms, rng)
-    logger.debug("  Seed sequence (length=%d): %s", len(initial), initial.to_string())
-
-    # DEBUG: Which init and what scores
-    logger.debug(
-        "=== DEBUG: init.kind = %s ; init.regulator = %s",
-        sample_cfg.init.kind,
-        getattr(sample_cfg.init, "regulator", None),
-    )
-    logger.debug("    → SequenceState length: %d", len(initial))
-    logger.debug("    → SequenceState string: %s", initial.to_string())
-
-    raw_scores = evaluator(initial)
-    logger.debug("=== DEBUG: SequenceEvaluator returns per-TF values: %s", raw_scores)
-
-    sc = evaluator._scorer
-    for tf_name, info in sc._cache.items():
-        raw_llr, offset, strand = sc._best_llr_and_location(initial.seq, info)
-        neglogp = sc._per_pwm_neglogp(raw_llr, info, len(initial))
-        logger.debug(
-            "→ PWM %-5s  raw_llr = %8.3f,  neglog10(p_seq) = %8.3f,  offset,strand = (%d,%s)",
-            tf_name,
-            raw_llr,
-            neglogp,
-            offset,
-            strand,
-        )
-
-    logger.debug("=== DEBUG: SequenceEvaluator scale = %r", evaluator._scale)
-    logger.debug("    → combiner object: %r", evaluator._combiner)
-    logger.debug("--- Now instantiating optimizer, combined(seed) will be shown once beta scheduler is available ---")
-
-    # 4) FLATTEN optimiser config for Gibbs/PT
+    # 3) FLATTEN optimiser config for Gibbs/PT
     optblock = sample_cfg.optimiser
     opt_cfg: dict[str, object] = {
         "draws": sample_cfg.draws,
@@ -179,83 +145,75 @@ def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
     if optblock.kind == "pt":
         opt_cfg["softmax_beta"] = optblock.softmax_beta
 
+    if optblock.cooling.kind == "geometric":
+        logger.info(
+            "β-ladder (%d levels): %s",
+            len(optblock.cooling.beta),
+            ", ".join(f"{b:g}" for b in optblock.cooling.beta),
+        )
+
     logger.debug("Optimizer config flattened: %s", opt_cfg)
 
-    # 5) INSTANTIATE OPTIMIZER (Gibbs or PT)
+    # 4) INSTANTIATE OPTIMIZER (Gibbs or PT), passing in init_cfg and pwms
     if sample_cfg.optimiser.kind == "gibbs":
         logger.info("Instantiating GibbsOptimizer")
-        optimizer = GibbsOptimizer(evaluator, opt_cfg, rng)
+        optimizer = GibbsOptimizer(
+            evaluator=evaluator,
+            cfg=opt_cfg,
+            rng=rng,
+            init_cfg=sample_cfg.init,
+            pwms=pwms,
+        )
     else:
         logger.info("Instantiating PTGibbsOptimizer")
         optimizer = PTGibbsOptimizer(
-            evaluator,
-            opt_cfg,
-            rng,
+            evaluator=evaluator,
+            cfg=opt_cfg,
+            rng=rng,
             pwms=pwms,
             init_cfg=sample_cfg.init,
         )
 
-    # Now that optimizer exists, we can compute beta_final and show combined(seed)
-    total_sweeps = sample_cfg.tune + sample_cfg.draws
-    beta_final = optimizer.beta_of(total_sweeps - 1) if total_sweeps > 0 else optimizer.beta_of(0)
-    combined_seed = evaluator.combined(initial, beta=beta_final)
-    logger.debug("=== DEBUG: combined(seed) at beta_final=%.3f  → %.6f", beta_final, combined_seed)
-    logger.debug("--- Now entering optimizer.optimise(...) ---")
-
-    # 6) (REMOVED) We no longer explicitly record the seed here,
-    #    because GibbsOptimizer.optimise(...) already pushes the initial state
-    #    (draw_index = -1) into optimizer.all_samples, all_meta, and all_scores.
-
+    # 5) RUN the MCMC sampling (no separate “initial seed” is recorded here)
     logger.info("Starting MCMC sampling …")
-    ranked_states = optimizer.optimise(initial)
+    ranked_states = optimizer.optimise()
     logger.info("MCMC sampling complete.")
 
-    # 7) SAVE enriched config
+    # 6) SAVE enriched config
     _save_config(cfg, out_dir)
 
-    # 8) SAVE trace.nc
+    # 7) SAVE trace.nc
     if hasattr(optimizer, "trace_idata") and optimizer.trace_idata is not None:
         from dnadesign.cruncher.utils.traces import save_trace
 
         save_trace(optimizer.trace_idata, out_dir / "trace.nc")
         logger.info("Saved MCMC trace → %s", (out_dir / "trace.nc").relative_to(out_dir.parent))
 
-    # 9) SAVE sequences.csv (chain, draw, phase, sequence_string, per-TF scaled scores)
+    # 8) SAVE sequences.csv (chain, draw, phase, sequence_string, per-TF scaled scores)
     if (
         sample_cfg.save_sequences
         and hasattr(optimizer, "all_samples")
         and hasattr(optimizer, "all_meta")
         and hasattr(optimizer, "all_scores")
     ):
-        # We will re-index negative (burn-in) draws to [0 .. tune-1] and sampling draws to [tune .. tune+draws-1],
-        # and add a "phase" column indicating "tune" vs "draw".
-        total_tune = sample_cfg.tune
-
         seq_csv = out_dir / "sequences.csv"
         with seq_csv.open("w", newline="") as fh:
             writer = csv.writer(fh)
 
-            # New header includes a "phase" column
+            # Header with “phase” column (either “tune” or “draw”)
             header = ["chain", "draw", "phase", "sequence"] + [f"score_{tf}" for tf in sorted(pwms.keys())]
             writer.writerow(header)
 
-            for (chain_id, raw_draw_i), seq_arr, per_tf_map in zip(
+            for (chain_id, draw_i), seq_arr, per_tf_map in zip(
                 optimizer.all_meta, optimizer.all_samples, optimizer.all_scores
             ):
-                # Decide phase and re-index the draw number
-                if raw_draw_i < 0:
-                    # burn-in sweep → phase = "tune"
+                # Decide phase by comparing draw_i to tune
+                if draw_i < sample_cfg.tune:
                     phase = "tune"
-                    # raw_draw_i runs from −(tune+1) … −2, −1
-                    # We want to map (−(tune+1)) → 0, … , (−2) → tune-2, (−1) → tune-1
-                    burn_index = raw_draw_i + (total_tune + 1)
-                    draw_i_to_write = burn_index
+                    draw_i_to_write = draw_i
                 else:
-                    # sampling sweep → phase = "draw"
                     phase = "draw"
-                    # raw_draw_i runs from 0 … draws−1
-                    # We want to map 0 → total_tune, 1 → total_tune+1, …, draws-1 → total_tune + (draws-1)
-                    draw_i_to_write = total_tune + raw_draw_i
+                    draw_i_to_write = draw_i  # >= tune
 
                 seq_str = SequenceState(seq_arr).to_string()
                 row = [
@@ -268,7 +226,7 @@ def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
 
         logger.info("Saved all sequences with per-TF scores → %s", seq_csv.relative_to(out_dir.parent))
 
-    # 10) BUILD elites.json, tagging each with (chain, draw_index)
+    # 9) BUILD elites.json, tagging each with (chain, draw_index)
     elites_data: list[dict[str, object]] = []
     for rank, (state, (chain_id, draw_i)) in enumerate(zip(ranked_states, optimizer.elites_meta), start=1):
         seq_str = state.to_string()

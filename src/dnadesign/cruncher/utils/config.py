@@ -231,7 +231,7 @@ class SampleConfig(BaseModel):
     @validator("draws", "tune", "chains", "min_dist", "top_k")
     def _check_positive_ints(cls, v, field):
         if not isinstance(v, int) or v < 0:
-            raise ValueError(f"{field.name} must be a non‐negative integer")
+            raise ValueError(f"{field.name} must be a non-negative integer")
         return v
 
 
@@ -243,19 +243,19 @@ class AnalysisConfig(BaseModel):
     runs:         list of batch-name strings to re-analyse
     plots:        which plots to generate (trace, autocorr, convergence, scatter_pwm)
     scatter_scale: which scale to use for scatter_pwm (llr, z, p, logp, logp_norm)
-    gather_nth_iteration_for_scaling: take every Nth draw for per-PWM scoring
+    subsampling_epsilon: minimum Euclidean distance Δ in per-TF-score space to keep a new draw
     """
 
     runs: Optional[List[str]]
     plots: Dict[Literal["trace", "autocorr", "convergence", "scatter_pwm"], bool]
     scatter_scale: Literal["llr", "z", "p", "logp", "logp_norm"]
-    gather_nth_iteration_for_scaling: int
+    subsampling_epsilon: float
 
-    @validator("gather_nth_iteration_for_scaling")
-    def _check_positive_n(cls, v):
-        if not isinstance(v, int) or v < 1:
-            raise ValueError("gather_nth_iteration_for_scaling must be a positive integer")
-        return v
+    @validator("subsampling_epsilon")
+    def _check_positive_epsilon(cls, v):
+        if not isinstance(v, (int, float)) or v <= 0.0:
+            raise ValueError("subsampling_epsilon must be a positive number (float or int)")
+        return float(v)
 
 
 class CruncherConfig(BaseModel):
