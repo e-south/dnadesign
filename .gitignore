@@ -114,10 +114,6 @@ nbproject/private/
 build/
 dist/
 
-# -----------------
-# Others
-# -----------------
-
 # Logs
 *.log
 *.out
@@ -169,6 +165,7 @@ prototypes/
 test_configs/
 batches/
 **/batch_results/
+**/results/
 **/progress_status_*.yaml
 **/summary.yaml
 

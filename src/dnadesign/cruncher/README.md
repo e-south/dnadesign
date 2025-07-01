@@ -155,6 +155,7 @@ cruncher:
         kind: linear                        # "fixed" | “linear” | “geometric” (geometric is for PT only)
         beta: [0.0001, 0.001]               # [β_start, β_end]
 
+      # replica exchange MCMC sampling
       # If kind == “pt”, uncomment & use the block below instead:
       # cooling:
       #   kind: geometric

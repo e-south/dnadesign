@@ -11,12 +11,32 @@ Dunlop Lab
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Tuple
 
 import arviz as az
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import xarray as xr
+
+from dnadesign.cruncher.utils.config import CruncherConfig
+
+
+#  Generic helpers
+def _tf_pair(cfg: CruncherConfig) -> Tuple[str, str]:
+    if not cfg.regulator_sets or len(cfg.regulator_sets[0]) < 2:
+        raise ValueError("Need ≥2 regulators in cfg.regulator_sets[0]")
+    return tuple(cfg.regulator_sets[0][:2])  # (x_tf, y_tf)
+
+
+def _flatten_axes(obj: object) -> list[plt.Axes]:
+    flat: list[plt.Axes] = []
+    if isinstance(obj, plt.Axes):
+        return [obj]
+    if isinstance(obj, (list, tuple, np.ndarray)):
+        for sub in obj:
+            flat.extend(_flatten_axes(sub))
+    return flat
 
 
 def plot_trace(idata: az.InferenceData, out_dir: Path) -> None:
@@ -206,12 +226,14 @@ def plot_ess_local_and_quantile(idata: az.InferenceData, out_dir: Path) -> None:
         plt.close(fig2)
 
 
-def make_pair_idata(sample_dir: Path) -> az.InferenceData:
+def make_pair_idata(sample_dir: Path, cfg: CruncherConfig) -> az.InferenceData:
     """
-    Reads <sample_dir>/sequences.csv and builds an InferenceData that contains
-    two DataArrays: score_cpxR and score_soxR (dims=('chain','draw')).
+    Build an ArviZ InferenceData with two DataArrays: score_<TF1>, score_<TF2>.
+    The TFs are taken from cfg.regulator_sets[0][:2].
     """
     import pandas as pd
+
+    x_tf, y_tf = _tf_pair(cfg)
 
     df = pd.read_csv(sample_dir / "sequences.csv")
     if "phase" in df.columns:
@@ -219,40 +241,29 @@ def make_pair_idata(sample_dir: Path) -> az.InferenceData:
 
     chains = sorted(df["chain"].unique())
     draws = sorted(df["draw"].unique())
-    n_chains = len(chains)
-    n_draws = len(draws)
+    n_chains, n_draws = len(chains), len(draws)
 
     arr_x = np.zeros((n_chains, n_draws))
     arr_y = np.zeros((n_chains, n_draws))
 
     for i, c in enumerate(chains):
         sub = df[df["chain"] == c].sort_values("draw")
-        arr_x[i, :] = sub["score_cpxR"].to_numpy()
-        arr_y[i, :] = sub["score_soxR"].to_numpy()
+        arr_x[i, :] = sub[f"score_{x_tf}"].to_numpy()
+        arr_y[i, :] = sub[f"score_{y_tf}"].to_numpy()
 
-    da_x = xr.DataArray(
-        arr_x,
-        dims=("chain", "draw"),
-        coords={"chain": chains, "draw": draws},
-        name="score_cpxR",
-    )
-    da_y = xr.DataArray(
-        arr_y,
-        dims=("chain", "draw"),
-        coords={"chain": chains, "draw": draws},
-        name="score_soxR",
-    )
+    da_x = xr.DataArray(arr_x, dims=("chain", "draw"), coords={"chain": chains, "draw": draws}, name=f"score_{x_tf}")
+    da_y = xr.DataArray(arr_y, dims=("chain", "draw"), coords={"chain": chains, "draw": draws}, name=f"score_{y_tf}")
 
-    ds = da_x.to_dataset().merge(da_y.to_dataset())
-    return az.InferenceData(posterior=ds)
+    return az.InferenceData(posterior=da_x.to_dataset().merge(da_y.to_dataset()))
 
 
-def plot_pair_pwm_scores(idata_pair: az.InferenceData, out_dir: Path) -> None:
+def plot_pair_pwm_scores(idata_pair: az.InferenceData, out_dir: Path, cfg: CruncherConfig) -> None:
     """
-    Draw a 2D KDE + marginals for (score_cpxR, score_soxR) → pair_pwm_scores.png.
+    2-D KDE + marginals for the first two TFs in cfg.regulator_sets[0].
     """
+    x_tf, y_tf = _tf_pair(cfg)
     out = out_dir / "pair_pwm_scores.png"
-    out_dir.mkdir(exist_ok=True, parents=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     sns.set_style("ticks", {"axes.grid": False})
     sns.set_palette("colorblind")
@@ -260,64 +271,41 @@ def plot_pair_pwm_scores(idata_pair: az.InferenceData, out_dir: Path) -> None:
     with az.style.context("arviz-doc"):
         az.plot_pair(
             idata_pair,
-            var_names=["score_cpxR", "score_soxR"],
+            var_names=[f"score_{x_tf}", f"score_{y_tf}"],
             kind="kde",
             marginals=True,
             point_estimate=None,
         )
-
-        fig = plt.gcf()
-        fig.suptitle("Joint & Marginal KDE of PWM Scores (cpxR vs. soxR)", fontsize=14)
-        fig.savefig(out, dpi=300, bbox_inches="tight")
-        plt.close(fig)
+        plt.gcf().suptitle(f"Joint & Marginal KDE of PWM Scores ({x_tf} vs {y_tf})", fontsize=14)
+        plt.savefig(out, dpi=300, bbox_inches="tight")
+        plt.close()
 
 
-def plot_parallel_pwm_scores(idata_pair: az.InferenceData, out_dir: Path) -> None:
+def plot_parallel_pwm_scores(idata_pair: az.InferenceData, out_dir: Path, cfg: CruncherConfig) -> None:
     """
-    Draw a Parallel Coordinates plot of (score_cpxR, score_soxR) → parallel_pwm_scores.png.
-
-    Each draw (across all chains) is a line between x=0 (“cpxR”) and x=1 (“soxR”),
-    colored by chain.
+    Parallel-coordinates line plot for the two primary TF scores.
     """
+
+    x_tf, y_tf = _tf_pair(cfg)
     out = out_dir / "parallel_pwm_scores.png"
-    out_dir.mkdir(exist_ok=True, parents=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Convert to a flat DataFrame with columns: chain, draw, score_cpxR, score_soxR
     df = idata_pair.posterior.to_dataframe().reset_index()
 
     chains = sorted(df["chain"].unique())
-    palette = dict(zip(chains, sns.color_palette("colorblind", n_colors=len(chains))))
+    palette = dict(zip(chains, sns.color_palette("colorblind", len(chains))))
 
     sns.set_style("ticks", {"axes.grid": False})
-
     fig, ax = plt.subplots(figsize=(4, 6))
+
     for _, row in df.iterrows():
-        ax.plot(
-            [0, 1],
-            [row["score_cpxR"], row["score_soxR"]],
-            color=palette[row["chain"]],
-            alpha=0.3,
-            linewidth=0.5,
-        )
+        ax.plot([0, 1], [row[f"score_{x_tf}"], row[f"score_{y_tf}"]], color=palette[row["chain"]], alpha=0.3, lw=0.5)
 
     ax.set_xticks([0, 1])
-    ax.set_xticklabels(["cpxR", "soxR"], fontsize=10)
+    ax.set_xticklabels([x_tf, y_tf], fontsize=10)
     ax.set_ylabel("Score value", fontsize=10)
     ax.set_title("Parallel Coordinates of PWM Scores", fontsize=14)
     sns.despine(ax=ax)
 
     fig.savefig(out, dpi=300, bbox_inches="tight")
-    plt.close(fig)
-
-
-def _flatten_axes(obj: object) -> list[plt.Axes]:
-    """
-    Helper: given nested lists/tuples/ndarrays of Axes, recursively flatten.
-    """
-    flat: list[plt.Axes] = []
-    if isinstance(obj, plt.Axes):
-        return [obj]
-    if isinstance(obj, (list, tuple, np.ndarray)):
-        for sub in obj:
-            flat.extend(_flatten_axes(sub))
-    return flat
+    plt.close()

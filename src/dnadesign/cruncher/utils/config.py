@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import yaml
-from pydantic import BaseModel, root_validator, validator
+from pydantic import BaseModel, Field, root_validator, validator
 
 
 # PARSE MODE SECTION
@@ -228,6 +228,10 @@ class SampleConfig(BaseModel):
     optimiser: OptimiserConfig
     save_sequences: bool = True
 
+    pwm_sum_threshold: float = Field(
+        0.0, description="If >0, only sequences with sum(per-TF scaled_score) ≥ this are written to elites.json"
+    )
+
     @validator("draws", "tune", "chains", "min_dist", "top_k")
     def _check_positive_ints(cls, v, field):
         if not isinstance(v, int) or v < 0:
@@ -250,6 +254,7 @@ class AnalysisConfig(BaseModel):
     plots: Dict[Literal["trace", "autocorr", "convergence", "scatter_pwm"], bool]
     scatter_scale: Literal["llr", "z", "p", "logp", "logp_norm"]
     subsampling_epsilon: float
+    scatter_style: Literal["edges", "thresholds"] = "edges"
 
     @validator("subsampling_epsilon")
     def _check_positive_epsilon(cls, v):

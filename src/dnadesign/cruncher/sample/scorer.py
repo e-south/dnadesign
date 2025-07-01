@@ -37,12 +37,12 @@ logger = logging.getLogger(__name__)
 class _PWMInfo:
     """
     Holds all precomputed data for one PWM:
-      • lom               : log‐odds matrix (w × 4)
+      • lom               : log-odds matrix (w x 4)
       • null_scores, tail_p: DP table → P(X ≥ LLR) for each possible LLR
       • width             : motif length
-      • consensus_llr     : sum of column‐max LLRs (for normalization)
-      • consensus_neglogp : −log₁₀(p_seq) of that consensus LLR (once seq_length is known)
-      • null_mean         : mean of the null distribution of single‐window LLRs
+      • consensus_llr     : sum of column-max LLRs (for normalization)
+      • consensus_neglogp : -log₁₀(p_seq) of that consensus LLR (once seq_length is known)
+      • null_mean         : mean of the null distribution of single-window LLRs
       • null_std          : standard deviation of that null distribution
     """
 
@@ -63,8 +63,8 @@ class Scorer:
     Multi‐PWM scorer with exactly four supported scales:
       • "llr"                 → raw max LLR per PWM
       • "z"                   → z-score of raw LLR vs the PWM-specific null distribution
-      • "logp"                → −log10(p_seq) per PWM
-      • "consensus-neglop-sum"→ normalized (−log10(p_seq) / −log10(p_consensus)) per PWM
+      • "logp"                → -log10(p_seq) per PWM
+      • "consensus-neglop-sum"→ normalized (-log10(p_seq) / -log10(p_consensus)) per PWM
 
     Usage:
         scorer = Scorer(pwms, background=(0.25,0.25,0.25,0.25), bidirectional=True, scale="z")
@@ -87,7 +87,7 @@ class Scorer:
 
         self.bg = np.asarray(background, dtype=float)
         if self.bg.shape != (4,) or not np.isclose(self.bg.sum(), 1.0):
-            raise ValueError("background must be a length‐4 probability vector summing to 1.0.")
+            raise ValueError("background must be a length-4 probability vector summing to 1.0.")
 
         self.bidirectional = bool(bidirectional)
 
@@ -195,7 +195,7 @@ class Scorer:
           • "z"   : z-score → (raw_llr − null_mean) / null_std
           • "logp": −log10(p_seq)
           • "consensus-neglop-sum":
-              (−log10(p_seq) / precomputed_neglogp(consensus_llr))
+              (-log10(p_seq) / precomputed_neglogp(consensus_llr))
 
         On the very first call for a given PWM, we fill in info.consensus_neglogp using
         info.consensus_llr and the same Bonferroni formula.

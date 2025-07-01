@@ -110,37 +110,41 @@ dnadesign/
 
 ### Usage Style 1: Local Machine (No Gurobi or CUDA Support)
 
-This style is appropriate for workflows that ***do not*** require heavy [dense array](https://gitlab.com/dunloplab/dense-arrays) computations or [Evo 2](https://github.com/ArcInstitute/evo2) inference.
+This style is suitable for workflows that do not require Gurobi-based [dense array](https://gitlab.com/dunloplab/dense-arrays) computations or [Evo 2](https://github.com/ArcInstitute/evo2) inference.
 
-1. Create and Activate a Conda Environment
-
+1. Install uv (adds the binary to ~/.local/bin by default)
+   
    ```bash
-   conda create -n dnadesign_local python=3.11 -y
-   conda activate dnadesign_local
+   curl -Ls https://astral.sh/uv/install | sh
    ```
 
-2. Install Dependencies
-
-   ```bash
-   conda install pytorch torchvision torchaudio scanpy=1.10.3 seaborn numpy pandas matplotlib pyyaml leidenalg igraph openpyxl xlrd biopython tqdm python-levenshtein **pymc arviz logomaker typer pydantic** -c conda-forge -y
-   ```
-
-3. Clone and Install the `dnadesign` Repository
+2. Grab the source
 
    ```bash
    git clone https://github.com/e-south/dnadesign.git
    cd dnadesign
-   pip install -e . # Install the local dnadesign package in editable mode
    ```
-   *Installing in editable mode ensures that changes to the source files are immediately reflected without needing a reinstall.*
 
-4. (Optional) Clone the [`dense-arrays`](https://gitlab.com/dunloplab/dense-arrays) Package
+3. Create a local virtual env (uses the Python on your PATH)
+
+   ```bash
+   uv venv --python 3.12          # creates .venv/
+   source .venv/bin/activate
+   which python                   # sanity-check → …/dnadesign/.venv/bin/python
+   ```
+
+4. Reproduce the exact dependency graph (from pyproject.lock)
+
+   ```bash
+   uv sync 
+   ```
+
+4. Editable installs for active development
 
    The **densegen** workflow relies on the dense-arrays package. Install it as a sibling directory to `dnadesign`.
    ```bash
-   git clone https://gitlab.com/dunloplab/dense-arrays.git
-   cd dense-arrays
-   pip install .
+   uv pip install -e .[dev]            # dnadesign + tests / linters / hooks
+   uv pip install -e ../dense-arrays   # dense-arrays companion library
    ```
    
 ---

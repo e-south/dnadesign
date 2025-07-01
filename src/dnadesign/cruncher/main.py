@@ -38,7 +38,7 @@ CFG_PATH = PROJECT_ROOT / "dnadesign" / "src" / "dnadesign" / "cruncher" / "conf
 def main(cfg_path: str | Path | None = None) -> None:
     """
     Dispatch entrypoint: load config, compute the batch directory name, and dispatch to
-    run_parse, run_sample, run_analyse, or a combined sample+analyse mode ("sample-analysis").
+    run_parse, run_sample, run_analyse, or a combined sample+analyse mode ("sample-analysis")
     """
     cfg_file = Path(cfg_path) if cfg_path else CFG_PATH
     cfg = load_config(cfg_file)

@@ -15,9 +15,12 @@ from __future__ import annotations
 import csv
 import json
 import logging
+import uuid
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
+import torch
 import yaml
 
 from dnadesign.cruncher.parse.model import PWM
@@ -78,10 +81,10 @@ def _save_config(cfg: CruncherConfig, batch_dir: Path) -> None:
 def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
     """
     Run MCMC sampler, save enriched config, trace.nc, sequences.csv (including per-TF scores),
-    and elites.json.  Each chain now gets its own independent seed (random/consensus/consensus_mix).
+    and elites.json. Each chain gets its own independent seed (random/consensus/consensus_mix).
     """
     sample_cfg = cfg.sample
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(42)
 
     logger.info("=== RUN SAMPLE: %s ===", out_dir)
     logger.debug("Full sample config: %s", sample_cfg.json())
@@ -174,9 +177,9 @@ def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
             init_cfg=sample_cfg.init,
         )
 
-    # 5) RUN the MCMC sampling (no separate “initial seed” is recorded here)
+    # 5) RUN the MCMC sampling
     logger.info("Starting MCMC sampling …")
-    ranked_states = optimizer.optimise()
+    optimizer.optimise()
     logger.info("MCMC sampling complete.")
 
     # 6) SAVE enriched config
@@ -226,41 +229,156 @@ def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
 
         logger.info("Saved all sequences with per-TF scores → %s", seq_csv.relative_to(out_dir.parent))
 
-    # 9) BUILD elites.json, tagging each with (chain, draw_index)
-    elites_data: list[dict[str, object]] = []
-    for rank, (state, (chain_id, draw_i)) in enumerate(zip(ranked_states, optimizer.elites_meta), start=1):
-        seq_str = state.to_string()
-        per_tf_scaled = evaluator(state)  # Dict[tf → scaled_value]
+    # 9)  BUILD elites list — keep draws whose ∑ normalised ≥ pwm_sum_threshold
+    #     + enforce a per-sequence Hamming-distance diversity filter
+    thr_norm: float = cfg.sample.pwm_sum_threshold  # e.g. 1.50
+    min_dist: int = cfg.sample.min_dist  # e.g. 1
+    raw_elites: list[tuple[np.ndarray, int, int, float, dict[str, float]]] = []
+    norm_sums: list[float] = []  # diagnostics only
 
-        per_tf: dict[str, dict[str, object]] = {}
-        for tf, info in scorer._cache.items():
-            raw_llr, offset, strand = scorer._best_llr_and_location(state.seq, info)
-            scaled_val = float(per_tf_scaled[tf])
+    for (chain_id, draw_idx), seq_arr, per_tf_map in zip(
+        optimizer.all_meta, optimizer.all_samples, optimizer.all_scores
+    ):
 
-            w = info.width
+        # ---------- per-PWM normalisation --------------------------
+        #   raw_llr  →   frac = (raw_llr – μ_null) / (llr_consensus – μ_null)
+        #   • μ_null  = null_mean  (expected background)
+        #   • frac < 0  ⇒ treat as 0  (below background contributes nothing)
+        #   • frac may exceed 1 if a window scores better than “column max”
+        # -------------------------------------------------------------------
+        fracs: list[float] = []
+        for info in scorer._cache.values():
+            raw_llr, *_ = scorer._best_llr_and_location(seq_arr, info)
+            num, denom = raw_llr - info.null_mean, info.consensus_llr - info.null_mean
+            frac = 0.0 if denom <= 0 else max(0.0, num / denom)  # no upper clamp
+            fracs.append(frac)
+
+        total_norm = float(sum(fracs))  # 0 … n_TF + ε
+        norm_sums.append(total_norm)
+
+        if total_norm >= thr_norm:
+            raw_elites.append((seq_arr, chain_id, draw_idx, total_norm, per_tf_map))
+
+    # -------- percentile diagnostics ----------------------------------------
+    if norm_sums:
+        p50, p90 = np.percentile(norm_sums, [50, 90])
+        n_tf = len(scorer._cache)
+        avg_thr_pct = 100 * thr_norm / n_tf
+        logger.info("Normalised-sum percentiles  |  median %.2f   90%% %.2f", p50, p90)
+        logger.info(
+            "Threshold %.2f ⇒ ~%.0f%%-of-consensus on average per TF " "(%d regulators)", thr_norm, avg_thr_pct, n_tf
+        )
+        logger.info(
+            "Typical draw: med %.2f (≈ %.0f%%/TF); top-10%% %.2f (≈ %.0f%%/TF)",
+            p50,
+            100 * p50 / n_tf,
+            p90,
+            100 * p90 / n_tf,
+        )
+
+    # -------- rank raw_elites by score --------------------------------------
+    raw_elites.sort(key=lambda t: t[3], reverse=True)  # highest first
+
+    # -------- apply Hamming diversity filter -------------------------------
+    kept_elites: list[tuple[np.ndarray, int, int, float, dict[str, float]]] = []
+    kept_seqs: list[np.ndarray] = []
+
+    def _hamming(a: np.ndarray, b: np.ndarray) -> int:
+        return int((a != b).sum())
+
+    for tpl in raw_elites:
+        seq_arr = tpl[0]
+        if all(_hamming(seq_arr, s) >= min_dist for s in kept_seqs):
+            kept_elites.append(tpl)
+            kept_seqs.append(seq_arr)
+
+    if min_dist > 0:
+        logger.info(
+            "Diversity filter (≥%d mismatches): kept %d / %d candidates", min_dist, len(kept_elites), len(raw_elites)
+        )
+    else:
+        kept_elites = raw_elites  # no filtering
+
+    # serialise elites
+    elites: list[dict[str, object]] = []
+    want_cons = bool(getattr(cfg.sample, "include_consensus_in_elites", False))
+
+    for rank, (seq_arr, chain_id, draw_idx, total_norm, per_tf_map) in enumerate(kept_elites, 1):
+        seq_str = SequenceState(seq_arr).to_string()
+        per_tf_details: dict[str, dict[str, object]] = {}
+
+        for tf_name, info in scorer._cache.items():
+            # best site in this *sequence*
+            raw_llr, offset, strand = scorer._best_llr_and_location(seq_arr, info)
+            width = info.width
             start_pos = offset + 1
             strand_label = f"{strand}1"
-            motif_diagram = f"{start_pos}_[{strand_label}]_{w}"
+            motif_diag = f"{start_pos}_[{strand_label}]_{width}"
 
-            per_tf[tf] = {
+            # OPTIONAL – consensus of the PWM (window only, no padding)
+            if want_cons:
+                idx_vec = np.argmax(info.lom, axis=1)  # (w,)
+                consensus = "".join("ACGT"[i] for i in idx_vec)  # string
+            else:
+                consensus = None
+
+            per_tf_details[tf_name] = {
                 "raw_llr": float(raw_llr),
-                "offset": int(offset),
+                "offset": offset,
                 "strand": strand,
-                "motif_diagram": motif_diagram,
-                "scaled_score": scaled_val,
+                "motif_diagram": motif_diag,
+                "scaled_score": float(per_tf_map[tf_name]),
             }
+            if want_cons:
+                per_tf_details[tf_name]["consensus"] = consensus
 
-        elites_data.append(
+        elites.append(
             {
-                "rank": rank,
-                "chain": int(chain_id),
-                "draw_index": int(draw_i),
+                "id": str(uuid.uuid4()),
                 "sequence": seq_str,
-                "per_tf": per_tf,
+                "rank": rank,
+                "norm_sum": total_norm,
+                "chain": chain_id,
+                "draw_idx": draw_idx,
+                "per_tf": per_tf_details,
+                "meta_type": "mcmc-elite",
+                "meta_source": out_dir.name,
+                "meta_date": datetime.now().isoformat(),
             }
         )
 
-    elites_path = out_dir / "elites.json"
-    with elites_path.open("w") as fh:
-        json.dump(elites_data, fh, indent=2)
-    logger.info("Saved top-%d elites → %s", sample_cfg.top_k, elites_path.relative_to(out_dir.parent))
+    logger.info(
+        "Final elite count: %d (normalised-sum ≥ %.2f, min_dist ≥ %d)",
+        len(elites),
+        thr_norm,
+        min_dist,
+    )
+
+    tf_label = "-".join(cfg.regulator_sets[0])
+    date_stamp = datetime.now().strftime("%Y%m%d")
+    prefix = "cruncher_elites"
+    base_name = f"{prefix}_{tf_label}_{date_stamp}"
+
+    save_dir = out_dir / base_name
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1)  .pt payload --------------------------------------------------------
+    pt_path = save_dir / f"{base_name}.pt"
+    torch.save(elites, str(pt_path))
+    logger.info("Saved elites  → %s", pt_path.relative_to(out_dir.parent))
+
+    # 2)  .yaml run-metadata -----------------------------------------------
+    meta = {
+        "generated": datetime.now().isoformat(),
+        "n_elites": len(elites),
+        "threshold_norm_sum": thr_norm,
+        "min_hamming_dist": min_dist,
+        "tf_label": tf_label,
+        "sequence_length": cfg.sample.init.length,
+        #  you can inline the full cfg if you prefer – this keeps it concise
+        "config_file": str((out_dir / "config_used.yaml").resolve()),
+    }
+    yaml_path = save_dir / f"{base_name}.yaml"
+    with yaml_path.open("w") as fh:
+        yaml.safe_dump(meta, fh, sort_keys=False)
+    logger.info("Saved metadata → %s", yaml_path.relative_to(out_dir.parent))

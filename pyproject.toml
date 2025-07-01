@@ -1,67 +1,82 @@
 [build-system]
-requires = ["setuptools>=61", "wheel", "setuptools_scm"]
+requires = [
+  "setuptools>=69",
+  "wheel",
+  "setuptools_scm"
+]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dnadesign"
-version = "0.1.0"
-description = "DNA sequence design pipelines and bioinformatics helpers."
-authors = [{ name = "Eric South", email = "ericjohnsouth@gmail.com" }]
-readme = "README.md"
+name            = "dnadesign"
+version         = "0.1.0"
+description     = "DNA sequence design pipelines and bio-informatics helpers."
+authors         = [{ name = "Eric South", email = "ericjohnsouth@gmail.com" }]
+readme          = "README.md"
 requires-python = ">=3.11"
-dependencies = []    # keep runtime deps empty → Conda handles heavy libs
 
-# Tell setuptools to look under src/
-[tool.setuptools.packages.find]
-where = ["src"]
+dependencies = [
+  # core scientific stack
+  "numpy",
+  "pandas",
+  "matplotlib",
+  "seaborn",
+  "scanpy==1.10.3",
+  "tqdm",
 
-# Developer / test extras  (pip install -e .[dev])
+  # deep-learning (CPU wheels by default)
+  "torch",
+  "torchvision",
+  "torchaudio",
+
+  # bioinformatics
+  "biopython",
+  "leidenalg",
+  "igraph",
+  "logomaker",
+
+  # statistics & probabilistic programming
+  "pymc",
+  "arviz",
+
+  # utilities
+  "pyyaml",
+  "openpyxl",
+  "xlrd",
+  "python-levenshtein",
+  "typer",
+  "pydantic"
+]
+
+# ---------------------------------------------------------------------
 [project.optional-dependencies]
+viz = [
+  "matplotlib",
+  "seaborn"
+]
+
 dev = [
-  # testing
   "pytest>=8.2",
   "pytest-cov",
   "hypothesis>=6.100",
-  # formatting & linting
-  "black>=24.4",
-  "ruff>=0.4",           # fast linter (optional but nice)
-  # pre-commit hook runner (optional)
+  "ruff>=0.4",
   "pre-commit>=3.7"
 ]
 
-# Black configuration
-[tool.black]
-line-length = 120           # Black default; change if you prefer 88/100
-target-version = ["py311"]
-exclude = '''
-(
-    /(
-        \.git
-      | \.eggs
-      | build
-      | dist
-      | _build
-      | \.venv
-    )/
-)
-'''
+[tool.setuptools.packages.find]
+where = ["src"]
 
-# PyTest configuration
 [tool.pytest.ini_options]
 addopts = "-ra -q"
 testpaths = ["src/dnadesign"]
-python_paths = ["src"]         # ensures dnadesign is importable
+python_paths = ["src"]
 markers = [
   "slow: sampling-heavy tests (>10 s)",
 ]
 
-# Ruff configuration
 [tool.ruff]
-line-length   = 120        # global formatting setting
-target-version = "py312"   # matches your runtime
+line-length = 120
+target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]   # error, pyflakes, isort
+select = ["E", "F", "I"]
 ignore-init-module-imports = true
-# (optional) enable preview fixes and rules
-# preview = true

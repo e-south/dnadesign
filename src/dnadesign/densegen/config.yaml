@@ -2,21 +2,12 @@
 
 densegen:
   input_sources:
-    # - type: "deg2tfbs_pipeline_tfbsfetcher"
-    #   name: "heterotypic_all_TFs"
-    #   path: "tfbsbatch_heterotypic_allTFs_EcoCyc28"
     - type: "deg2tfbs_pipeline_tfbsfetcher"
-      name: "heterotypic_M9_gluc_ace_top20"
-      path: "tfbsbatch_heterotypic_M9_gluc_ace_top20"
+      name: "lexA_and_cpxR"
+      path: "tfbsbatch_20250630"
     # - type: "deg2tfbs_pipeline_tfbsfetcher"
     #   name: "monotypic_CRP"
     #   path: "tfbsbatch_monotypic_CRP"
-    # - type: "deg2tfbs_pipeline_tfbsfetcher"
-    #   name: "monotypic_ArcA"
-    #   path: "tfbsbatch_monotypic_ArcA"
-    # - type: "deg2tfbs_pipeline_tfbsfetcher"
-    #   name: "monotypic_Lrp"
-    #   path: "tfbsbatch_monotypic_Lrp"
   output_dir: "sequences"
   progress_file: "progress_status.yaml"
   solver: "GUROBI"
@@ -32,8 +23,13 @@ densegen:
   arrays_generated_before_resample: 10  
   fixed_elements:
     promoter_constraints:
-      - name: "sigma70_consensus"
-        upstream: "TTGACA"
+      # - name: "sigma70_consensus"
+      #   upstream: "TTGACA"
+      #   downstream: "TATAAT"
+      #   spacer_length: [16, 18]
+      #   upstream_pos: [10, 40]
+      - name: "sigma70_mid_35_strong_10"
+        upstream: "ACCGCG"
         downstream: "TATAAT"
         spacer_length: [16, 18]
         upstream_pos: [10, 40]
