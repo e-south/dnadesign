@@ -16,6 +16,9 @@ from typing import Any, Dict, List, Literal
 
 import yaml
 
+# extend the allowed filter literals
+AllowedLiteral = Literal["jaccard", "levenshtein", "nw"]
+
 
 @dataclass
 class LatentThreshold:
@@ -41,7 +44,11 @@ class ScatterConfig:
     colors: Dict[str, Any] = field(
         default_factory=lambda: {
             "base": "purple",
-            "literal_drop": {"jaccard": "orange", "levenshtein": "red", "literal": "red"},
+            "literal_drop": {
+                "jaccard": "orange",
+                "levenshtein": "red",
+                "literal": "red",
+            },
             "winner": "limegreen",
             "threshold_line": "lightgray",
             "cluster_drop": "gray",
@@ -92,7 +99,12 @@ class LibShuffleConfig:
 
     evo2_metric_type: Literal["l2", "log1p_l2", "cosine"] = "cosine"
 
-    literal_filters: List[Literal["jaccard", "levenshtein"]] = field(default_factory=lambda: ["jaccard", "levenshtein"])
+    literal_filters: List[AllowedLiteral] = field(
+        default_factory=lambda: ["jaccard", "levenshtein"]
+    )
+    literal_min_bp_diff: int = 0
+    min_tf_richness: int = 2
+
     selection: SelectionConfig = field(default_factory=SelectionConfig)
     billboard_core_metrics: List[str] = field(default_factory=list)
 
@@ -123,31 +135,54 @@ class LibShuffleConfig:
         raw = raw_all["libshuffle"]
 
         # required keys
-        for k in ["input_pt_path", "output_dir_prefix", "billboard_core_metrics", "selection"]:
+        for k in [
+            "input_pt_path",
+            "output_dir_prefix",
+            "billboard_core_metrics",
+            "selection",
+        ]:
             if k not in raw:
                 raise KeyError(f"Missing required config key: {k}")
 
         # default instance for fallback values
         default = cls(input_pt_path=Path("."), output_dir_prefix=".")
         cfg: Dict[str, Any] = {
+            # required
             "input_pt_path": Path(raw["input_pt_path"]),
             "output_dir_prefix": raw["output_dir_prefix"],
+            "billboard_core_metrics": raw["billboard_core_metrics"],
+            "selection": SelectionConfig(
+                method=raw["selection"]["method"],
+                latent_threshold=LatentThreshold(
+                    **raw["selection"]["latent_threshold"]
+                ),
+            ),
+            # optional / new
+            "literal_filters": raw.get("literal_filters", default.literal_filters),
+            "literal_min_bp_diff": raw.get(
+                "literal_min_bp_diff", default.literal_min_bp_diff
+            ),
+            "min_tf_richness": raw.get("min_tf_richness", default.min_tf_richness),
+            # everything else (unchanged)
             "subsample_size": raw.get("subsample_size", default.subsample_size),
             "num_draws": raw.get("num_draws", default.num_draws),
             "random_seed": raw.get("random_seed", default.random_seed),
             "with_replacement": raw.get("with_replacement", default.with_replacement),
-            "max_attempts_per_draw": raw.get("max_attempts_per_draw", default.max_attempts_per_draw),
+            "max_attempts_per_draw": raw.get(
+                "max_attempts_per_draw", default.max_attempts_per_draw
+            ),
             "evo2_metric_type": raw.get("evo2_metric_type", default.evo2_metric_type),
-            "literal_filters": raw.get("literal_filters", default.literal_filters),
-            "billboard_core_metrics": raw["billboard_core_metrics"],
             "save_selected": raw.get("save_selected", default.save_selected),
-            "save_sublibraries": raw.get("save_sublibraries", default.save_sublibraries),
+            "save_sublibraries": raw.get(
+                "save_sublibraries", default.save_sublibraries
+            ),
         }
 
         # selection config
         sel = raw["selection"]
         cfg["selection"] = SelectionConfig(
-            method=sel["method"], latent_threshold=LatentThreshold(**sel.get("latent_threshold", {}))
+            method=sel["method"],
+            latent_threshold=LatentThreshold(**sel.get("latent_threshold", {})),
         )
 
         # helper to deep merge nested dicts
@@ -175,7 +210,10 @@ class LibShuffleConfig:
             star_size=rd.get("star_size", sd.star_size),
             threshold_line=rd.get("threshold_line", sd.threshold_line),
             threshold=LatentThreshold(
-                **rd.get("threshold", {"type": sd.threshold.type, "factor": sd.threshold.factor})
+                **rd.get(
+                    "threshold",
+                    {"type": sd.threshold.type, "factor": sd.threshold.factor},
+                )
             ),
             colors=colors,
             annotate_winner=rd.get("annotate_winner", sd.annotate_winner),
@@ -186,17 +224,25 @@ class LibShuffleConfig:
 
         # kde
         kd, rk = default.plot.kde, pr.get("kde", {})
-        kde = KDEConfig(figsize=rk.get("figsize", kd.figsize), dpi=rk.get("dpi", kd.dpi))
+        kde = KDEConfig(
+            figsize=rk.get("figsize", kd.figsize), dpi=rk.get("dpi", kd.dpi)
+        )
 
         # pairplot
         pd_, rp = default.plot.pairplot, pr.get("pairplot", {})
-        pairplot = PairplotConfig(figsize=rp.get("figsize", pd_.figsize), dpi=rp.get("dpi", pd_.dpi))
+        pairplot = PairplotConfig(
+            figsize=rp.get("figsize", pd_.figsize), dpi=rp.get("dpi", pd_.dpi)
+        )
 
         # hitzone
         hz, rh = default.plot.hitzone, pr.get("hitzone", {})
-        hitzone = HitzoneConfig(figsize=rh.get("figsize", hz.figsize), dpi=rh.get("dpi", hz.dpi))
+        hitzone = HitzoneConfig(
+            figsize=rh.get("figsize", hz.figsize), dpi=rh.get("dpi", hz.dpi)
+        )
 
-        cfg["plot"] = PlotConfig(scatter=scatter, kde=kde, pairplot=pairplot, hitzone=hitzone)
+        cfg["plot"] = PlotConfig(
+            scatter=scatter, kde=kde, pairplot=pairplot, hitzone=hitzone
+        )
 
         inst = cls(**cfg)
         inst._raw = raw

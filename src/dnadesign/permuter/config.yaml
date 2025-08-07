@@ -1,0 +1,30 @@
+# dnadesign/permuter/config.yaml
+permuter:
+  experiment:
+    name: permuter_2025_08_02
+  jobs:
+    - name: example_scan
+      input_file: refs.csv
+      references: ["retron_Eco1_msr_msd_wt"]
+      protocol: scan_dna    # scan_dna, scan_codon
+      
+      permute:
+        regions: []         # [] = full sequence; or [[start,end),…]
+        lookup_tables: []   # e.g. ["data/codon_ecoli.csv"]
+      
+      evaluate:
+        evaluator: evo2_7b
+        metric: log_likelihood_ratio  # or log_likelihood, or euclidean_distance
+        euclidean_reference_sequence: ["MMLV_RT_wt"]
+
+      select:
+        strategy: top_k     # or threshold, or top_k
+        k: 10               # only used if strategy is top_k  
+        threshold: 1.0      # only used if strategy is threshold
+      
+      iterate:
+        enabled: false
+        total_rounds: 3
+      
+      report:
+        plots: true

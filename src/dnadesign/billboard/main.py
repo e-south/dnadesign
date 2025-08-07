@@ -14,7 +14,10 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.billboard.by_cluster import compute_cluster_metrics, save_cluster_characterization_scatter
+from dnadesign.billboard.by_cluster import (
+    compute_cluster_metrics,
+    save_cluster_characterization_scatter,
+)
 from dnadesign.billboard.core import compute_core_metrics, process_sequences
 from dnadesign.billboard.plot_helpers import (
     save_gini_lorenz_plot,
@@ -24,18 +27,24 @@ from dnadesign.billboard.plot_helpers import (
     save_tf_entropy_kde_plot,
     save_tf_frequency_barplot,
 )
-from dnadesign.billboard.summary import generate_csv_summaries, generate_entropy_summary_csv, print_summary
+from dnadesign.billboard.summary import (
+    generate_csv_summaries,
+    generate_entropy_summary_csv,
+    print_summary,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def main():
     # Configure logging
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s"
+    )
     logger.info("Starting billboard pipeline")
 
     # Load config
-    cfg_path = Path(__file__).parent.parent / "configs" / "example.yaml"
+    cfg_path = Path(__file__).parent / "config.yaml"
     with open(cfg_path) as f:
         cfg = yaml.safe_load(f)["billboard"]
     logger.info(f"Loaded configuration from {cfg_path}")
@@ -86,7 +95,9 @@ def main():
 
     # Generate summaries & plots
     if dry_run:
-        logger.info("Dry run enabled: skipping plots, writing only diversity_summary.csv")
+        logger.info(
+            "Dry run enabled: skipping plots, writing only diversity_summary.csv"
+        )
         generate_entropy_summary_csv(results, csv_dir)
     else:
         logger.info("Writing CSV summaries")
@@ -106,14 +117,14 @@ def main():
             results["occupancy_reverse_matrix"],
             results["occupancy_tf_list"],
             title="Library-wide motif coverage",
-            path=plot_dir / "occupancy.png",
+            path=plot_dir / "occupancy.pdf",
             dpi=cfg["dpi"],
         )
 
         logger.info("Generating motif length histogram")
         save_motif_length_histogram(
             results["motif_info"],
-            path=plot_dir / "motif_length.png",
+            path=plot_dir / "motif_length.pdf",
             dpi=cfg["dpi"],
         )
 
@@ -123,7 +134,7 @@ def main():
             results["occupancy_reverse_matrix"],
             results["occupancy_tf_list"],
             results["sequence_length"],
-            path=plot_dir / "tf_entropy_kde.png",
+            path=plot_dir / "tf_entropy_kde.pdf",
             dpi=cfg["dpi"],
         )
 

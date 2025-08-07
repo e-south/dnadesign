@@ -1,12 +1,12 @@
 # dnadesign/billboard/config.yaml
 
 billboard:
-  output_dir_prefix: 60bp_acetate_sub6783
+  output_dir_prefix: densebatch_deg2tfbs_pipeline_tfbsfetcher_lexA_and_cpxR_n10000
   dry_run: false
   skip_aligner_call: true
   pt_files:
-    # - densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_M9_gluc_ace_top20_n10000_60bp
-    - sub6793
+    - densebatch_deg2tfbs_pipeline_tfbsfetcher_lexA_and_cpxR_n10000
+    # - sub677228
   allow_variable_sequence_length: false
   include_fixed_elements_in_combos: false
   save_plots: true

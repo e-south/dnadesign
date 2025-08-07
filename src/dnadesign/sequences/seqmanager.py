@@ -11,33 +11,32 @@ and print the requested entry (or the entire entry if no key is provided).
 If a directory is provided (or no --path is provided, defaulting to the current dir),
 the module recursively scans for .pt files, validates each one, and prints feedback,
 including a summary of how many files passed. When provided  --update-meta, the module
-updates (or adds) the 'meta_part_type' key for each entry in the .pt file(s) based 
+updates (or adds) the 'meta_part_type' key for each entry in the .pt file(s) based
 on the parent directory. If the first entry already has the key, the user is prompted
 to either skip or overwrite (update all entries).
 
 Usage examples:
   # Validate all .pt files under the current directory:
   $ python seqmanager.py --path .
-  
+
   # Validate all .pt files in a specific directory:
   $ python seqmanager.py --path seqbatch_random_tfbs
-  
+
   # Inspect entry 3 from a file:
   $ python seqmanager.py --path seqbatch_hossain_et_al/seqbatch_hossain_et_al.pt --index 3
   $ python seqmanager.py --path seqbatch_johns_et_al/seqbatch_johns_et_al.pt --index 3
   $ python seqmanager.py --path seqbatch_sun_yim_et_al/seqbatch_sun_yim_et_al.pt --index 3
   $ python seqmanager.py --path latdnabatch_20250405/latdnabatch_20250405.pt --index 3
   $ python seqmanager.py --path densebatch_test/densegenbatch_m9_acetate_tfs_n10000.pt --index 3
-  $ python seqmanager.py --path densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_M9_gluc_ace_top20_n10000_60bp/densegenbatch_heterotypic_M9_gluc_ace_top20_n10000.pt --index 3
-  $ python seqmanager.py --path seqbatch_random_promoters_sigma70_consensus/seqbatch_random_promoters_sigma70_consensus.pt --index 3
   $ python seqmanager.py --path seqbatch_xiaowo_et_al/seqbatch_xiaowo_et_al.pt --index 3
-  
+  $ python seqmanager.py --path sub677228/s_677228.pt --index 0
+
   # Inspect only the 'sequence' key of entry 3:
   $ python seqmanager.py --path seqbatch_random_tfbs/seqbatch_random_tfbs.pt --index 3 --key sequence
-  
+
   # Update the meta_part_type key for a single file:
   $ python seqmanager.py --path seqbatch_hossain_et_al/seqbatch_hossain_et_al.pt --update-meta
-  
+
   # Recursively update meta_part_type in all .pt files under a directory:
   $ python seqmanager.py --path . --update-meta
 
@@ -63,10 +62,14 @@ def validate_pt_file(file_path: str) -> bool:
     pt_path = Path(file_path)
     assert pt_path.exists() and pt_path.is_file(), f"PT file {pt_path} does not exist."
     checkpoint = torch.load(pt_path, map_location=torch.device("cpu"))
-    assert isinstance(checkpoint, list) and len(checkpoint) > 0, f"{pt_path} must be a non-empty list."
+    assert (
+        isinstance(checkpoint, list) and len(checkpoint) > 0
+    ), f"{pt_path} must be a non-empty list."
     for i, entry in enumerate(checkpoint):
         assert isinstance(entry, dict), f"Entry {i} in {pt_path} is not a dictionary."
-        assert "sequence" in entry, f"Entry {i} in {pt_path} is missing the 'sequence' key."
+        assert (
+            "sequence" in entry
+        ), f"Entry {i} in {pt_path} is missing the 'sequence' key."
     return True
 
 
@@ -77,7 +80,9 @@ def inspect_entry(file_path: str, index: int) -> dict:
     pt_path = Path(file_path)
     checkpoint = torch.load(pt_path, map_location=torch.device("cpu"))
     if not (0 <= index < len(checkpoint)):
-        raise IndexError(f"Index {index} is out of range for file {pt_path} (length {len(checkpoint)}).")
+        raise IndexError(
+            f"Index {index} is out of range for file {pt_path} (length {len(checkpoint)})."
+        )
     return checkpoint[index]
 
 
@@ -87,7 +92,9 @@ def list_all_pt_files(search_path: str) -> list:
     Returns a list of Path objects.
     """
     base_path = Path(search_path)
-    assert base_path.exists() and base_path.is_dir(), f"Directory {base_path} does not exist."
+    assert (
+        base_path.exists() and base_path.is_dir()
+    ), f"Directory {base_path} does not exist."
     return list(base_path.rglob("*.pt"))
 
 
@@ -145,7 +152,7 @@ def update_meta_part_type(file_path: str) -> None:
         # Ask the user if they want to define dense arrays by constraint.
         user_input = (
             input(
-                f"Directory '{parent_dir}' is a densebatch directory. Would you like to define dense arrays by constraint? [y/n]: "
+                f"Directory '{parent_dir}' is a densebatch directory. Define dense arrays by constraint? [y/n]: "
             )
             .strip()
             .lower()
@@ -162,21 +169,27 @@ def update_meta_part_type(file_path: str) -> None:
             elif "sigma32" in file_stem:
                 desired_value = "sigma32"
             else:
-                print("No sigma pattern found in the file name. Defaulting to 'dense array'.")
+                print(
+                    "No sigma pattern found in the file name. Defaulting to 'dense array'."
+                )
                 desired_value = "dense array"
         else:
             desired_value = "dense array"
     elif parent_dir in meta_mapping:
         desired_value = meta_mapping[parent_dir]
     else:
-        print(f"No meta_part_type mapping defined for directory '{parent_dir}'. Skipping update for file {pt_path}.")
+        print(
+            f"No meta_part_type mapping defined for directory '{parent_dir}'. Skipping update for file {pt_path}."
+        )
         return
 
     # Check if the first entry already has a meta_part_type key.
     if "meta_part_type" in checkpoint[0]:
         current_value = checkpoint[0]["meta_part_type"]
         if current_value == desired_value:
-            print(f"File '{pt_path}' already has 'meta_part_type' set to '{current_value}'. Nothing to update.")
+            print(
+                f"File '{pt_path}' already has 'meta_part_type' set to '{current_value}'. Nothing to update."
+            )
             return
         user_choice = (
             input(
@@ -187,7 +200,9 @@ def update_meta_part_type(file_path: str) -> None:
             .lower()
         )
         if user_choice.startswith("s"):
-            print(f"Skipping update for this file. Current value '{current_value}' will be retained.")
+            print(
+                f"Skipping update for this file. Current value '{current_value}' will be retained."
+            )
             return
         elif user_choice.startswith("o"):
             # Overwrite meta_part_type for all entries.
@@ -208,15 +223,23 @@ def update_meta_part_type(file_path: str) -> None:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Validate and inspect .pt files for densegen.")
+    parser = argparse.ArgumentParser(
+        description="Validate and inspect .pt files for densegen."
+    )
     parser.add_argument(
         "--path",
         type=str,
         default=".",
         help="File or directory path. If a file is given, --index (and optionally --key) must be provided.",
     )
-    parser.add_argument("--index", type=int, help="(Optional) Index of the entry to inspect (if --path is a file).")
-    parser.add_argument("--key", type=str, help="(Optional) Specific key from the entry to display.")
+    parser.add_argument(
+        "--index",
+        type=int,
+        help="(Optional) Index of the entry to inspect (if --path is a file).",
+    )
+    parser.add_argument(
+        "--key", type=str, help="(Optional) Specific key from the entry to display."
+    )
     parser.add_argument(
         "--update-meta",
         action="store_true",
@@ -262,7 +285,9 @@ def main():
             print(f"Validation failed for '{target_path}': {e}")
             return
         if args.index is None:
-            print("Error: When a file is specified, you must provide --index to inspect an entry.")
+            print(
+                "Error: When a file is specified, you must provide --index to inspect an entry."
+            )
             return
         try:
             entry = inspect_entry(str(target_path), args.index)
@@ -291,7 +316,9 @@ def main():
                     valid_files.append(pt_file)
             except AssertionError as e:
                 print(f"  INVALID: {pt_file} --> {e}")
-        print(f"\nSummary: {len(valid_files)} out of {len(pt_files)} .pt files in '{target_path}' are valid.")
+        print(
+            f"\nSummary: {len(valid_files)} out of {len(pt_files)} .pt files in '{target_path}' are valid."
+        )
 
 
 if __name__ == "__main__":

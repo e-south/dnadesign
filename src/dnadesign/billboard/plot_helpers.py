@@ -64,7 +64,7 @@ def save_occupancy_plot(F, R, tf_list, title, path, dpi):
     fig, axes = plt.subplots(1, 2, figsize=(14, 7), sharey=True)
 
     # forward strand
-    im0 = axes[0].imshow(Fs, aspect="equal", interpolation="none")
+    axes[0].imshow(Fs, aspect="equal", interpolation="none")
     axes[0].set_title("Forward Strand", fontsize=10)
     axes[0].set_xlabel("Nucleotide Position", fontsize=9)
     axes[0].set_yticks(np.arange(len(sorted_tfs)))
@@ -111,7 +111,7 @@ def save_motif_length_histogram(motif_info, path, dpi):
         return
 
     df["length"] = df["motif"].str.len()
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(5, 5))
 
     # plot one smooth KDE per TF, no legend
     for tf, sub in df.groupby("tf"):
@@ -120,12 +120,24 @@ def save_motif_length_histogram(motif_info, path, dpi):
             continue
 
         # seaborn will handle edge behavior gracefully
-        sns.kdeplot(data=lengths, fill=False, common_norm=False, alpha=0.8, linewidth=1.5, ax=ax)
+        sns.kdeplot(
+            data=lengths, fill=False, common_norm=False, alpha=0.8, linewidth=1.5, ax=ax
+        )
         # annotate at the median
         med = lengths.median()
         # get the curve's y-value at that x
-        y_at_med = ax.lines[-1].get_ydata()[np.argmin(np.abs(ax.lines[-1].get_xdata() - med))]
-        ax.text(med, y_at_med * 1.02, tf, ha="center", va="bottom", fontsize=9, clip_on=False)  # improved visibility
+        y_at_med = ax.lines[-1].get_ydata()[
+            np.argmin(np.abs(ax.lines[-1].get_xdata() - med))
+        ]
+        ax.text(
+            med,
+            y_at_med * 1.02,
+            tf,
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            clip_on=False,
+        )  # improved visibility
 
     ax.set_title("Distribution of Motif Lengths by TF", fontsize=16)
     ax.set_xlabel("Motif length", fontsize=14)
@@ -157,10 +169,18 @@ def save_tf_entropy_kde_plot(F, R, tf_list, L, path, dpi):
     low_i, high_i = idx_sorted[0], idx_sorted[-1]
     choices = [(tf_list[high_i], total[high_i]), (tf_list[low_i], total[low_i])]
 
-    plt.figure(figsize=(6, 6))  # narrower
+    plt.figure(figsize=(13, 3))
     for name, weights in choices:
         positions = np.arange(L)
-        sns.histplot(x=positions, weights=weights, bins=L, element="step", fill=True, alpha=0.4, label=name)
+        sns.histplot(
+            x=positions,
+            weights=weights,
+            bins=L,
+            element="step",
+            fill=True,
+            alpha=0.4,
+            label=name,
+        )
 
     plt.xlim(0, L - 1)
     plt.xlabel("Nucleotide Position", fontsize=14)
@@ -186,8 +206,15 @@ def save_gini_lorenz_plot(tf_freq, path, dpi):
     plt.figure(figsize=(8, 6))
     plt.plot(x, cum, marker="o", label="Lorenz Curve")
     plt.plot([0, 1], [0, 1], "--", color="gray", label="Equality")
-    inv_gini = 1 - (len(vals) + 1 - 2 * np.sum(np.cumsum(vals) / vals.sum())) / len(vals)
-    plt.annotate(f"Inverted Gini: {inv_gini:.3f}", xy=(0.05, 0.9), xycoords="axes fraction", fontsize=12)
+    inv_gini = 1 - (len(vals) + 1 - 2 * np.sum(np.cumsum(vals) / vals.sum())) / len(
+        vals
+    )
+    plt.annotate(
+        f"Inverted Gini: {inv_gini:.3f}",
+        xy=(0.05, 0.9),
+        xycoords="axes fraction",
+        fontsize=12,
+    )
     plt.title("TF Representation Based on TFBS Frequency (Lorenz Curve)", fontsize=16)
     plt.xlabel("Cumulative proportion of TFs", fontsize=14)
     plt.ylabel("Cumulative proportion of TFBS", fontsize=14)

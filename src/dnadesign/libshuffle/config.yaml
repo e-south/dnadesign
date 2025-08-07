@@ -2,8 +2,8 @@
 
 libshuffle:
   # I/O paths
-  input_pt_path: "densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_M9_gluc_ace_top20_n10000_60bp"    # Directory with exactly one .pt
-  output_dir_prefix: "acetate_60bp_draft"                    # batch_results/<prefix>_YYYYMMDD
+  input_pt_path: "densebatch_deg2tfbs_pipeline_tfbsfetcher_lexA_and_cpxR_n10000"
+  output_dir_prefix: "lexA_cpxR_60bp_draft"                    # batch_results/<prefix>_YYYYMMDD
   subsample_size: 16
   num_draws: 10000
   random_seed: 42
@@ -11,8 +11,11 @@ libshuffle:
   max_attempts_per_draw: 10
   evo2_metric_type: "cosine"                     # "l2", "log1p_l2", or "cosine"
   literal_filters:
-    - "jaccard"
-    - "levenshtein"
+    # - "jaccard"
+    # - "levenshtein"
+    - "hamming"
+  literal_min_bp_diff: 20                         # require at least x bp difference per subsample
+  min_tf_richness: 2
   selection:
     method: "max_min_latent"
     latent_threshold:

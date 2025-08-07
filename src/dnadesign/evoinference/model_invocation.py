@@ -3,90 +3,107 @@
 <dnadesign project>
 dnadesign/evoinference/model_invocation.py
 
+Provides initialization, tokenization, and inference adapters for Evo2 models,
+including support for logits, embeddings, and log-likelihood output types.
+
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
 import torch
-from evo2 import Evo2  # Assumes Evo2 is installed and available
+from evo2 import Evo2  # Assumes Evo2 is installed
 from logger import get_logger
 
 logger = get_logger(__name__)
 
 
-def initialize_model(model_version: str):
+def initialize_model(model_version: str) -> Evo2:
     """
-    Initialize and return the Evo2 model for the given version.
-    Note: Evo2 does not support the .to() method.
+    Instantiate and prepare an Evo2 model by version name.
     """
-    try:
-        model = Evo2(model_version)
-        # If the model has an eval() method, call it.
-        if hasattr(model, "eval"):
-            model.eval()
-        logger.info(f"Model {model_version} initialized")
-        return model
-    except Exception as e:
-        logger.error(f"Error initializing model {model_version}: {str(e)}")
-        raise e
+    model = Evo2(model_version)
+    if hasattr(model, "eval"):
+        model.eval()
+    logger.info(f"Initialized Evo2 model '{model_version}'")
+    return model
 
 
-def tokenize_sequence(model, sequence: str):
+def tokenize_sequence(model: Evo2, sequence: str) -> torch.Tensor:
     """
-    Tokenize the sequence using the model's tokenizer and return a tensor
-    with the batch dimension, moved to the GPU. Raises an error if a GPU is not available.
+    Tokenize a nucleotide sequence and move to GPU as int64 tensor [1, seq_len].
+    Raises if CUDA is unavailable.
     """
-    try:
-        tokens = model.tokenizer.tokenize(sequence)
-        if not torch.cuda.is_available():
-            raise RuntimeError("CUDA device not available. GPU is required.")
-        device = "cuda:0"
-        input_tensor = torch.tensor(tokens, dtype=torch.int64).unsqueeze(0).to(device)
-        return input_tensor
-    except Exception as e:
-        logger.error(f"Error tokenizing sequence: {str(e)}")
-        raise e
+    tokens = model.tokenizer.tokenize(sequence)
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA device not available. GPU is required.")
+    return torch.tensor(tokens, dtype=torch.int64).unsqueeze(0).cuda()
 
 
-def run_model(model, input_tensor, output_types: list):
+def score_log_likelihood(
+    model: Evo2, sequences: list[str], reduction: str = "sum"
+) -> list[float]:
     """
-    Run the model on the input tensor.
-
-    Parameters:
-      output_types: list of dicts, for example:
-          [
-              {"type": "logits"},
-              {"type": "embeddings", "layers": ["blocks_28_mlp_l3", "blocks_10_mlp_l3"]}
-          ]
-
-    Returns a dictionary with keys like 'evo2_logits' and 'evo2_embeddings_<layer>'.
+    Batch compute log-likelihoods via Evo2's built-in score_sequences method.
+    Returns a list of floats matching input order.
+    If reduction is 'mean', divides each score by its sequence length.
     """
-    logits_requested = any(item.get("type") == "logits" for item in output_types)
-    embedding_layers = []
-    for item in output_types:
-        if item.get("type") == "embeddings" and "layers" in item:
-            for layer in item["layers"]:
-                # Convert underscore notation to dot notation for model input
-                embedding_layers.append(layer.replace("_", "."))
-    return_embeddings = len(embedding_layers) > 0
+    # Use Evo2's optimized batch scorer
+    ll_values = model.score_sequences(sequences)
+    if reduction == "mean":
+        return [ll / len(seq) for ll, seq in zip(ll_values, sequences)]
+    return ll_values
 
-    try:
-        outputs, embeddings = model(input_tensor, return_embeddings=return_embeddings, layer_names=embedding_layers)
-    except Exception as e:
-        logger.error(f"Error during model forward pass: {str(e)}")
-        raise e
+
+def run_model(
+    model: Evo2, input_tensor: torch.Tensor, output_types: list[dict], raw_sequence: str
+) -> dict:
+    """
+    Execute inference and extract requested outputs.
+    Supports:
+      - logits: returns evo2_logits tensor
+      - embeddings: returns evo2_embeddings_<layer>
+      - log_likelihood: returns evo2_log_likelihood float
+
+    raw_sequence is required if type 'log_likelihood' is requested.
+    """
+    # Determine requested outputs
+    want_logits = any(conf.get("type") == "logits" for conf in output_types)
+    ll_conf = next(
+        (conf for conf in output_types if conf.get("type") == "log_likelihood"), None
+    )
+    want_ll = ll_conf is not None
+    reduction = ll_conf.get("reduction", "sum") if ll_conf else None
+
+    # Embedding layers
+    embed_layers = []
+    for conf in output_types:
+        if conf.get("type") == "embeddings":
+            embed_layers += [lyr.replace("_", ".") for lyr in conf.get("layers", [])]
+    want_embeds = bool(embed_layers)
 
     results = {}
-    if logits_requested:
-        results["evo2_logits"] = outputs[0]
-    if return_embeddings:
-        for item in output_types:
-            if item.get("type") == "embeddings" and "layers" in item:
-                for layer in item["layers"]:
-                    dot_layer = layer.replace("_", ".")
-                    if dot_layer not in embeddings:
-                        logger.error(f"Requested layer {dot_layer} not found in model outputs.")
-                        raise ValueError(f"Requested layer {dot_layer} not found in model outputs.")
-                    results[f"evo2_embeddings_{layer}"] = embeddings[dot_layer]
+
+    # Compute log-likelihood first if requested (uses batch API)
+    if want_ll:
+        ll_value = score_log_likelihood(model, [raw_sequence], reduction=reduction)[0]
+        results["evo2_log_likelihood"] = ll_value
+
+    # Only run forward pass if logits or embeddings are requested
+    if want_logits or want_embeds:
+        outputs, embeddings = model(
+            input_tensor, return_embeddings=want_embeds, layer_names=embed_layers
+        )
+        if want_logits:
+            results["evo2_logits"] = outputs[0]
+        if want_embeds:
+            for conf in output_types:
+                if conf.get("type") == "embeddings":
+                    for lyr in conf.get("layers", []):
+                        key = lyr.replace(".", "_")
+                        dot = lyr.replace("_", ".")
+                        if dot not in embeddings:
+                            raise ValueError(f"Layer '{dot}' not found in embeddings")
+                        results[f"evo2_embeddings_{key}"] = embeddings[dot]
+
     return results

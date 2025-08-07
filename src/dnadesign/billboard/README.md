@@ -155,6 +155,7 @@ Assess how “focused” the most localized TF is along the sequence.
 > A higher minimum distance indicates that even the two most similar sequences differ in motif architecture, whereas a value of zero means at least one pair shares an identical ordering of motifs derived from the same transcription factors.
 
 ---
+
 #### **Min Needleman–Wunsch Dissimilarity** — *Global Sequence Diversity*
 
 Evaluates global sequence‐level diversity via optimal alignment.

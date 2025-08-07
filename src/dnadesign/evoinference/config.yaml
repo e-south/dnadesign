@@ -7,11 +7,13 @@ evoinference:
     version: "evo2_7b"
     save_pooled_only: true
     output_types:
-      - type: "logits"
-        pooling:            # Optional key for pooling
-          method: "mean"
-          dim: 1
+      # - type: "logits"
+      #   pooling:            # Optional key for pooling
+      #     method: "mean"
+      #     dim: 1
       # - type: "embeddings"
       #   layers: ["blocks_26_mlp_l3"]
+      - type: log_likelihood
+        reduction: sum
     overwrite_existing: false
     checkpoint_every: 100

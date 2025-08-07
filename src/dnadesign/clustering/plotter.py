@@ -55,7 +55,9 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
         # Validate required config.
         highlight_dirs = hue_config.get("highlight_dirs", None)
         if not highlight_dirs:
-            raise ValueError("Highlight mode selected but 'highlight_dirs' not provided under umap.hue in the config.")
+            raise ValueError(
+                "Highlight mode selected but 'highlight_dirs' not provided under umap.hue in the config."
+            )
 
         background_alpha = hue_config.get("background_alpha", 0.15)
         background_size = hue_config.get("background_size", 2.0)
@@ -95,19 +97,26 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
         color_mapping = {group: palette[i] for i, group in enumerate(group_names)}
         for group, indices in highlight_indices.items():
             color = color_mapping.get(group, "red")
-            ax.scatter(x[indices], y[indices], color=color, s=highlight_size, alpha=highlight_alpha, label=group)
+            ax.scatter(
+                x[indices],
+                y[indices],
+                color=color,
+                s=highlight_size,
+                alpha=highlight_alpha,
+                label=group,
+            )
             legend_handles.append(mpatches.Patch(color=color, label=group))
 
-        if legend_handles:
-            legend = ax.legend(
-                handles=legend_handles,
-                title="Highlights",
-                bbox_to_anchor=legend_bbox,
-                loc="upper left",
-                prop={"size": 6},
-                ncol=legend_ncol,
-            )
-            legend.get_frame().set_linewidth(0)
+        # if legend_handles:
+        #     legend = ax.legend(
+        #         handles=legend_handles,
+        #         title="Highlights",
+        #         bbox_to_anchor=legend_bbox,
+        #         loc="upper left",
+        #         prop={"size": 6},
+        #         ncol=legend_ncol,
+        #     )
+        #     legend.get_frame().set_linewidth(0)
 
         ax.set_xlabel("UMAP1")
         ax.set_ylabel("UMAP2")
@@ -126,13 +135,19 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
 
     if hue_method == "intra_pairwise_similarity":
         # Extract intra-cluster similarity scores; ensure these were computed.
-        hue_values = [entry.get("meta_intra_cluster_similarity", 0.0) for entry in data_entries]
+        hue_values = [
+            entry.get("meta_intra_cluster_similarity", 0.0) for entry in data_entries
+        ]
     elif hue_method == "numeric":
         numeric_hue_config = hue_config.get("numeric_hue", None)
         if numeric_hue_config is None:
-            raise ValueError("Numeric hue configuration is missing under umap.hue.numeric_hue in the config.")
+            raise ValueError(
+                "Numeric hue configuration is missing under umap.hue.numeric_hue in the config."
+            )
         hue_values = normalization.extract_numeric_hue(
-            data_entries, numeric_hue_config, normalization_method=hue_config.get("normalization", "none")
+            data_entries,
+            numeric_hue_config,
+            normalization_method=hue_config.get("normalization", "none"),
         )
     elif hue_method == "type":
         hue_values = normalization.extract_type_hue(data_entries)
@@ -159,13 +174,23 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
     y = umap_coords[:, 1]
     fig, ax = plt.subplots(figsize=(dims[0], dims[1]))
 
-    if hue_method in ["intra_pairwise_similarity", "numeric", "gc_content", "seq_length", "leiden"]:
-        sc_plot = ax.scatter(x, y, c=hue_values, cmap="viridis", s=10, alpha=hue_config.get("alpha", 0.5))
+    if hue_method in [
+        "intra_pairwise_similarity",
+        "numeric",
+        "gc_content",
+        "seq_length",
+        "leiden",
+    ]:
+        sc_plot = ax.scatter(
+            x, y, c=hue_values, cmap="viridis", s=10, alpha=hue_config.get("alpha", 0.5)
+        )
         plt.colorbar(sc_plot, ax=ax)
     elif hue_method == "input_source":
         unique_sources = list(set(hue_values))
         source_counts = {src: hue_values.count(src) for src in unique_sources}
-        sorted_sources = sorted(unique_sources, key=lambda src: source_counts[src], reverse=True)
+        sorted_sources = sorted(
+            unique_sources, key=lambda src: source_counts[src], reverse=True
+        )
         colors = sns.color_palette("colorblind", n_colors=len(sorted_sources))
         category_to_color = {src: colors[i] for i, src in enumerate(sorted_sources)}
         for src in sorted_sources:
@@ -180,7 +205,10 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
             )
         import matplotlib.patches as mpatches
 
-        legend_handles = [mpatches.Patch(color=category_to_color[src], label=src) for src in sorted_sources]
+        legend_handles = [
+            mpatches.Patch(color=category_to_color[src], label=src)
+            for src in sorted_sources
+        ]
         legend = ax.legend(
             handles=legend_handles,
             title="Input Source",
@@ -193,17 +221,27 @@ def plot_umap(adata, umap_config, data_entries, batch_name=None, save_path=None)
     elif hue_method == "type":
         unique_categories = list(set(hue_values))
         category_counts = {cat: hue_values.count(cat) for cat in unique_categories}
-        sorted_categories = sorted(unique_categories, key=lambda cat: category_counts[cat], reverse=True)
+        sorted_categories = sorted(
+            unique_categories, key=lambda cat: category_counts[cat], reverse=True
+        )
         colors = sns.color_palette("colorblind", n_colors=len(sorted_categories))
         category_to_color = {cat: colors[i] for i, cat in enumerate(sorted_categories)}
         for cat in sorted_categories:
             indices = [i for i, c in enumerate(hue_values) if c == cat]
             ax.scatter(
-                x[indices], y[indices], color=category_to_color[cat], s=2, alpha=hue_config.get("alpha", 0.5), label=cat
+                x[indices],
+                y[indices],
+                color=category_to_color[cat],
+                s=2,
+                alpha=hue_config.get("alpha", 0.5),
+                label=cat,
             )
         import matplotlib.patches as mpatches
 
-        legend_handles = [mpatches.Patch(color=category_to_color[cat], label=cat) for cat in sorted_categories]
+        legend_handles = [
+            mpatches.Patch(color=category_to_color[cat], label=cat)
+            for cat in sorted_categories
+        ]
         legend = ax.legend(
             handles=legend_handles,
             title="Part Type",

@@ -21,12 +21,14 @@ from dnadesign.libshuffle.selection import select_best_subsample
 from dnadesign.libshuffle.subsampler import Subsampler
 from dnadesign.libshuffle.visualization import Plotter
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("libshuffle")
 
 
 def main():
-    cfg = LibShuffleConfig.load("configs/example.yaml")
+    cfg = LibShuffleConfig.load("libshuffle/config.yaml")
 
     project_root = Path(__file__).resolve().parent.parent
     pt_dir = project_root / cfg.input_pt_path
@@ -45,11 +47,13 @@ def main():
     pt_file = pts[0]
 
     ts = datetime.datetime.now().strftime("%Y%m%d")
-    outdir = project_root / "libshuffle" / "batch_results" / f"{cfg.output_dir_prefix}_{ts}"
+    outdir = (
+        project_root / "libshuffle" / "batch_results" / f"{cfg.output_dir_prefix}_{ts}"
+    )
     outdir.mkdir(parents=True, exist_ok=True)
     logger.info(f"Writing results to {outdir.resolve()}")
 
-    sequences = torch.load(pt_file, weights_only=True)
+    sequences = torch.load(pt_file, map_location="cpu", weights_only=True)
     if not isinstance(sequences, list):
         logger.error(".pt must contain a list of sequence dicts.")
         sys.exit(1)
@@ -59,10 +63,18 @@ def main():
     logger.info(f"Selected subsample: {winner['subsample_id']}")
 
     plotter = Plotter(cfg)
-    plotter.plot_scatter(subsamples, winner, outdir)
+
+    # Only draw high-cost plots if we have ≤ 2e5 subsamples
+    N = len(subsamples)
+    if N <= 200_000:
+        plotter.plot_scatter(subsamples, winner, outdir)
+        plotter.plot_kde(subsamples, outdir)
+        plotter.plot_pairplot(subsamples, outdir)
+    else:
+        logger.info(f"Skipping heavy plots because N={N:,} » 200 k")
+
+    # Always cheap
     plotter.plot_flag_composition(subsamples, outdir)
-    plotter.plot_kde(subsamples, outdir)
-    plotter.plot_pairplot(subsamples, outdir)
     plotter.plot_hitzone(subsamples, winner, outdir)
 
     writer = OutputWriter(outdir, cfg)

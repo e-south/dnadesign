@@ -18,8 +18,6 @@ import scanpy as sc
 import torch
 import yaml
 
-warnings.filterwarnings("ignore", category=FutureWarning)
-
 from dnadesign.clustering import (
     cluster_composition,
     cluster_select,
@@ -29,12 +27,14 @@ from dnadesign.clustering import (
     resolution_sweep,
 )
 
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 
 def load_config(config_path="configs/example.yaml"):
     """
     Load the configuration file.
     """
-    base_dir = Path(__file__).resolve().parent.parent
+    base_dir = Path(__file__).resolve().parent
     config_file = base_dir / config_path
     if not config_file.exists():
         raise FileNotFoundError(f"Config file not found: {config_file}")
@@ -95,7 +95,9 @@ def update_original_pt_files(data_entries):
     for entry in data_entries:
         file_path = entry.get("_file_path")
         if not file_path:
-            raise ValueError("Entry missing '_file_path' key; cannot update original file.")
+            raise ValueError(
+                "Entry missing '_file_path' key; cannot update original file."
+            )
         files_dict[file_path].append(entry)
 
     # Remove the temporary processing keys.
@@ -112,10 +114,14 @@ def main():
     parser.add_argument(
         "--config",
         type=str,
-        default="configs/example.yaml",
+        default="config.yaml",
         help="Path to configuration file (relative to project root)",
     )
-    parser.add_argument("--dry_run", action="store_true", help="Perform a dry run without writing outputs")
+    parser.add_argument(
+        "--dry_run",
+        action="store_true",
+        help="Perform a dry run without writing outputs",
+    )
     args = parser.parse_args()
 
     print("Loading configuration...")
@@ -144,7 +150,9 @@ def main():
             try:
                 all_dirs = [d.name for d in base_seq_dir.iterdir() if d.is_dir()]
             except FileNotFoundError as e:
-                raise FileNotFoundError(f"Sequences directory not found: {base_seq_dir}") from e
+                raise FileNotFoundError(
+                    f"Sequences directory not found: {base_seq_dir}"
+                ) from e
             pattern = source["pattern"].replace("*", "")
             matched = [d for d in all_dirs if pattern in d]
             input_dirs.extend(matched)
@@ -172,10 +180,14 @@ def main():
 
     # Check if resolution sweep mode is enabled and branch accordingly.
     if clustering_config.get("resolution_sweep", {}).get("enabled", False):
-        results_dir = base_dir / "clustering" / "batch_results" / f"{batch_name}_{hue_method}"
+        results_dir = (
+            base_dir / "clustering" / "batch_results" / f"{batch_name}_{hue_method}"
+        )
         results_dir.mkdir(parents=True, exist_ok=True)
         print("Running in Resolution Sweep mode...")
-        resolution_sweep.run_resolution_sweep(features, clustering_config["resolution_sweep"], results_dir)
+        resolution_sweep.run_resolution_sweep(
+            features, clustering_config["resolution_sweep"], results_dir
+        )
         # Exit after sweep mode is complete.
         sys.exit(0)
 
@@ -187,7 +199,9 @@ def main():
     n_neighbors = umap_config.get("n_neighbors", 15)
     min_dist = umap_config.get("min_dist", 0.1)
 
-    print(f"Computing neighbors (n_neighbors={n_neighbors}, use_rep='X') and UMAP (min_dist={min_dist})...")
+    print(
+        f"Computing neighbors (n_neighbors={n_neighbors}, use_rep='X') and UMAP (min_dist={min_dist})..."
+    )
     sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep="X")
     sc.tl.umap(adata, min_dist=min_dist)
 
@@ -209,7 +223,11 @@ def main():
         centroids = {}
         umap_coords = adata.obsm["X_umap"]
         for cl in unique_clusters:
-            idx = [i for i, entry in enumerate(data_entries) if entry["leiden_cluster"] == cl]
+            idx = [
+                i
+                for i, entry in enumerate(data_entries)
+                if entry["leiden_cluster"] == cl
+            ]
             coords = umap_coords[idx, :]
             centroids[cl] = np.mean(coords, axis=0)
         cluster_label_map = {cl: str(i) for i, cl in enumerate(unique_clusters, 1)}
@@ -218,25 +236,35 @@ def main():
         print("Computed cluster centroids for overlaying cluster numbers.")
 
     print("Selecting clusters based on configuration...")
-    clusters_to_save = cluster_select.select_clusters(data_entries, clustering_config.get("cluster_selection", {}))
+    clusters_to_save = cluster_select.select_clusters(
+        data_entries, clustering_config.get("cluster_selection", {})
+    )
     print(f"Selected clusters: {clusters_to_save}")
 
-    extra_summary = {
-        "num_leiden_clusters": int(len(set(clusters))),
-        "umap_parameters": {"n_neighbors": n_neighbors, "min_dist": min_dist},
-        "leiden_parameters": {"resolution": 0.2},
-        "input_sources": input_dirs,
-    }
+    # extra_summary = {
+    #     "num_leiden_clusters": int(len(set(clusters))),
+    #     "umap_parameters": {"n_neighbors": n_neighbors, "min_dist": min_dist},
+    #     "leiden_parameters": {"resolution": 0.2},
+    #     "input_sources": input_dirs,
+    # }
 
     # Generate analysis outputs (plots, CSVs) as usual.
-    results_dir = base_dir / "clustering" / "batch_results" / f"{batch_name}_{hue_method}"
+    results_dir = (
+        base_dir / "clustering" / "batch_results" / f"{batch_name}_{hue_method}"
+    )
     results_dir.mkdir(parents=True, exist_ok=True)
 
     if umap_config.get("enabled", False):
         print("Generating UMAP plot...")
-        umap_plot_name = f"umap_{batch_name}.png"
+        umap_plot_name = f"umap_{batch_name}.pdf"
         plot_path = results_dir / umap_plot_name
-        plotter.plot_umap(adata, umap_config, data_entries, batch_name=batch_name, save_path=str(plot_path))
+        plotter.plot_umap(
+            adata,
+            umap_config,
+            data_entries,
+            batch_name=batch_name,
+            save_path=str(plot_path),
+        )
         print(f"UMAP plot saved to {plot_path}")
 
     if analysis_config.get("cluster_composition", False):
@@ -245,7 +273,9 @@ def main():
         comp_csv = results_dir / f"cluster_composition_{batch_name}.csv"
         comp_png = results_dir / f"cluster_composition_{batch_name}.png"
         hue_method_for_composition = hue_config.get("method", "input_source")
-        composition_method = "type" if hue_method_for_composition == "type" else "input_source"
+        composition_method = (
+            "type" if hue_method_for_composition == "type" else "input_source"
+        )
         cluster_composition.analyze(
             data_entries,
             batch_name=batch_name,
@@ -254,7 +284,9 @@ def main():
             plot_dims=cc_dims,
             composition_method=composition_method,
         )
-        print(f"Cluster composition results saved: CSV to {comp_csv}, plot to {comp_png}")
+        print(
+            f"Cluster composition results saved: CSV to {comp_csv}, plot to {comp_png}"
+        )
 
     if analysis_config.get("diversity_assessment", False):
         print("Performing Diversity Assessment...")
@@ -262,14 +294,20 @@ def main():
         div_csv = results_dir / f"diversity_assessment_{batch_name}.csv"
         div_png = results_dir / f"diversity_assessment_{batch_name}.png"
         diversity_analysis.assess(
-            data_entries, batch_name=batch_name, save_csv=str(div_csv), save_png=str(div_png), plot_dims=da_dims
+            data_entries,
+            batch_name=batch_name,
+            save_csv=str(div_csv),
+            save_png=str(div_png),
+            plot_dims=da_dims,
         )
         print(f"Diversity assessment saved: CSV to {div_csv}, plot to {div_png}")
 
     if analysis_config.get("differential_feature_analysis", False):
         print("Performing Differential Feature Analysis...")
         diff_csv = results_dir / f"differential_feature_analysis_{batch_name}.csv"
-        differential_feature_analysis.identify_markers(data_entries, save_csv=str(diff_csv))
+        differential_feature_analysis.identify_markers(
+            data_entries, save_csv=str(diff_csv)
+        )
         print(f"Differential feature analysis CSV saved to {diff_csv}")
 
     if analysis_config.get("intra_cluster_similarity", False):
@@ -286,16 +324,27 @@ def main():
         print("Intra-cluster similarity scores computed and annotated in each entry.")
 
         # Optionally, generate and save a density plot for these scores.
-        icas_plot_path = base_dir / "clustering" / "batch_results" / f"{batch_name}_intra_cluster_similarity.png"
+        icas_plot_path = (
+            base_dir
+            / "clustering"
+            / "batch_results"
+            / f"{batch_name}_intra_cluster_similarity.png"
+        )
         print("Generating intra-cluster similarity density plot...")
-        icas.plot_intra_cluster_similarity(data_entries, batch_name=batch_name, save_path=str(icas_plot_path))
+        icas.plot_intra_cluster_similarity(
+            data_entries, batch_name=batch_name, save_path=str(icas_plot_path)
+        )
 
     # After analysis outputs, update the original PT files in place.
     if not args.dry_run and clustering_config.get("update_in_place", False):
-        print("Updating original PT files in place with only meta_cluster_count (removing extra keys)...")
+        print(
+            "Updating original PT files in place with only meta_cluster_count (removing extra keys)..."
+        )
         update_original_pt_files(data_entries)
     else:
-        print("Dry run enabled or update_in_place flag not set: Not updating original PT files.")
+        print(
+            "Dry run enabled or update_in_place flag not set: Not updating original PT files."
+        )
 
     print("Clustering pipeline completed successfully.")
 
