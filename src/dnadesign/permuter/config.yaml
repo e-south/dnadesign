@@ -1,4 +1,5 @@
 # dnadesign/permuter/config.yaml
+
 permuter:
   experiment:
     name: permuter_2025_08_02
@@ -10,12 +11,12 @@ permuter:
       
       permute:
         regions: []         # [] = full sequence; or [[start,end),…]
-        lookup_tables: []   # e.g. ["data/codon_ecoli.csv"]
+        lookup_tables: []   # e.g. ["input/codon_ecoli.csv"]
       
       evaluate:
-        evaluator: evo2_7b
-        metric: log_likelihood_ratio  # or log_likelihood, or euclidean_distance
-        euclidean_reference_sequence: ["MMLV_RT_wt"]
+        evaluator: placeholder  # placeholder, evo2_7b
+        metric: log_likelihood_ratio  # or log_likelihood, or embedding_distance
+        embedding_reference_sequence: ["MMLV_RT_wt"]
 
       select:
         strategy: top_k     # or threshold, or top_k
@@ -23,8 +24,9 @@ permuter:
         threshold: 1.0      # only used if strategy is threshold
       
       iterate:
-        enabled: false
+        enabled: true
         total_rounds: 3
       
       report:
-        plots: true
+        plots: ["scatter_metric_by_position", "metric_by_mutation_count", "heatmap_mutation_effects"]
+        

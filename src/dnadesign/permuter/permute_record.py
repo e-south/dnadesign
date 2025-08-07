@@ -3,42 +3,55 @@
 <dnadesign project>
 dnadesign/permuter/permute_record.py
 
-Generate variant sequences given a reference entry and a protocol.
+Responsible for dispatching a single reference entry to the chosen permutation
+protocol module.  This layer keeps the main pipeline decoupled from individual
+protocol implementations.
 
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+from __future__ import annotations
+
 import importlib
 from typing import Dict, List
-
-from logger import get_logger
-
-logger = get_logger(__name__)
 
 
 def permute_record(
     ref_entry: Dict,
     protocol: str,
     params: Dict,
-    regions: List = None,
-    lookup_tables: List[str] = None,
+    regions: List | None,
+    lookup_tables: List[str] | None,
 ) -> List[Dict]:
-    assert isinstance(ref_entry, dict), "ref_entry must be a dict"
-    regions = regions or []
-    lookup_tables = lookup_tables or []
+    """
+    Look up and call the protocol-specific `generate_variants()` function.
 
-    module = importlib.import_module(f"permuter.protocols.{protocol}")
-    assert hasattr(
-        module, "generate_variants"
-    ), f"Protocol '{protocol}' missing generate_variants"
-    variants = module.generate_variants(ref_entry, params, regions, lookup_tables)
-    for v in variants:
-        # inherit metadata
-        v.setdefault("ref_name", ref_entry["ref_name"])
-        v.setdefault("protocol", ref_entry["protocol"])
-        v.setdefault("meta_source", ref_entry["meta_source"])
-        v.setdefault("meta_date_accessed", ref_entry["meta_date_accessed"])
-        v.setdefault("meta_type", "variant")
-    return variants
+    Args:
+      ref_entry: {
+        "id": str,
+        "ref_name": str,
+        "protocol": str,
+        "sequence": str,
+        "modifications": List[str],
+        "round": int
+      }
+      protocol: name of the protocol module under `protocols/`
+      params: protocol-specific parameters
+      regions: list of [start,end) ranges to mutate (empty → full length)
+      lookup_tables: optional auxiliary tables (e.g. codon maps)
+
+    Returns:
+      List of new variant dicts, each containing:
+        - a unique "id"
+        - the updated "sequence"
+        - a "modifications" list describing the edit(s)
+    """
+    # Dynamically import the requested protocol module
+    module = importlib.import_module(f"dnadesign.permuter.protocols.{protocol}")
+    # Sanity check: ensure the module exposes the expected API
+    if not hasattr(module, "generate_variants"):  # pragma: no cover
+        raise AttributeError(f"Protocol '{protocol}' lacks generate_variants()")
+    # Delegate to the protocol’s generator
+    return module.generate_variants(ref_entry, params, regions, lookup_tables)

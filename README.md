@@ -105,6 +105,10 @@ dnadesign/
 
       **aligner** is a wrapper for Biopython's [PairwiseAligner](https://biopython.org/docs/dev/Tutorial/chapter_pairwise.html#chapter-pairwise), which is a class for computing Needleman–Wunsch global alignment scores between nucleotide sequences.
 
+13. [**permuter**](src/dnadesign/permuter/README.md)
+
+      **permuter** permuter is a pipeline for biological sequence permutation and subsequent evaluation workflows.
+
 
 ## Installation
 

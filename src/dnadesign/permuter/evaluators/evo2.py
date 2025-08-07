@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/permuter/evo2_wrapper.py
+dnadesign/permuter/evaluators/evo2.py
 
 Facade for evoinference: compute LL and LLR via API.
 
