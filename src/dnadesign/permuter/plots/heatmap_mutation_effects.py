@@ -3,6 +3,14 @@
 <dnadesign project>
 dnadesign/permuter/plots/heatmap_mutation_effects.py
 
+Heatmap: x = position, y = mutated residue → average score.
+Prefers provided ref_sequence; falls back to seed; avoids seaborn.
+
+Notes:
+  • Only simple single-nucleotide edits like "A5T" are visualized.
+    Complex tokens (e.g., codon edits "AAA@10→GCT(ALA)") are ignored.
+  • Reference residue at each position is outlined.
+
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
@@ -11,21 +19,48 @@ Dunlop Lab
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-import seaborn as sns
 
 
-def _parse_mod(token: str) -> tuple[int, str, str]:
+def _choose_y_series(df: pd.DataFrame) -> Tuple[pd.Series, str]:
+    if "objective_score" in df.columns:
+        return df["objective_score"], "Objective score"
+
+    if "norm_metrics" in df.columns and not df["norm_metrics"].isna().all():
+        key: Optional[str] = None
+        for d in df["norm_metrics"]:
+            if isinstance(d, dict) and d:
+                key = next(iter(d.keys()))
+                break
+        if key:
+            return (
+                df["norm_metrics"].apply(lambda d: (d or {}).get(key, None)),
+                f"Norm {key}",
+            )
+
+    if "score" in df.columns:
+        return df["score"], "Score"
+
+    raise RuntimeError("No objective_score, norm_metrics, or score available to plot.")
+
+
+def _parse_simple_nt_edit(token: str) -> Optional[tuple[int, str, str]]:
     """
-    Parse a modification string like "A5T" → (position=5, from='A', to='T').
+    Parse "A5T" → (position=5, from='A', to='T').
+    Return None for non-conforming tokens (e.g., codon edits).
     """
-    from_res = token[0]
-    to_res = token[-1]
-    pos = int(token[1:-1])
-    return pos, from_res, to_res
+    s = str(token).strip()
+    if len(s) < 3:
+        return None
+    first, last = s[0], s[-1]
+    mid = s[1:-1]
+    if not (first.isalpha() and last.isalpha() and mid.isdigit()):
+        return None
+    return int(mid), first.upper(), last.upper()
 
 
 def plot(
@@ -33,98 +68,120 @@ def plot(
     all_df: pd.DataFrame,
     output_path: Path,
     job_name: str,
+    ref_sequence: Optional[str] = None,
 ) -> None:
     """
-    Heatmap: x=position, y=mutated residue → average metric.
-    Highlights the original reference residue row in white for every position.
-    Uses 'crest' diverging palette, square cells, with a slim horizontal colorbar
-    placed below the heatmap. No cell borders.
+    Heatmap of average score by position × mutated residue.
     """
-    # 1) collect per‐mutation records
+    df = all_df.copy()
+
+    # y-series selection
+    y, y_label = _choose_y_series(df)
+    df = df.assign(_y=y).dropna(subset=["_y"])
+
+    # pick reference sequence (prefer explicit arg, else seed fallback)
+    ref_seq = (ref_sequence or "").strip().upper()
+    if not ref_seq:
+        seed = next(
+            (
+                r
+                for r in df.to_dict("records")
+                if int(r.get("round", 0)) == 1
+                and isinstance(r.get("modifications"), list)
+                and len(r["modifications"]) == 0
+            ),
+            None,
+        )
+        if seed and seed.get("sequence"):
+            ref_seq = str(seed["sequence"]).upper()
+
+    if not ref_seq:
+        raise RuntimeError(
+            f"{job_name}: reference sequence unavailable. "
+            f"Re-run the job (or analysis mode) so MANIFEST contains ref_sequence."
+        )
+
+    # collect simple per-mutation records
     records: List[Dict] = []
-    for _, row in all_df.iterrows():
-        for mod in row["modifications"]:
-            pos, _from, to = _parse_mod(mod)
-            records.append(
-                {
-                    "position": pos,
-                    "to_res": to,
-                    "score": row["score"],
-                }
-            )
+    for _, row in df.iterrows():
+        mods = row.get("modifications", [])
+        if not isinstance(mods, list):
+            continue
+        for token in mods:
+            parsed = _parse_simple_nt_edit(token)
+            if parsed is None:
+                continue
+            pos, _from, to = parsed
+            records.append({"position": pos, "to_res": to, "y": float(row["_y"])})
 
     if not records:
-        raise RuntimeError(f"{job_name}: no mutation records to plot")
+        raise RuntimeError(f"{job_name}: no simple single-nucleotide edits to plot")
 
     dfm = pd.DataFrame(records)
 
-    # 2) extract the original reference sequence (unmutated seed)
-    seed = next(
-        (
-            r
-            for r in all_df.to_dict("records")
-            if r["round"] == 1 and not r["modifications"]
-        ),
-        None,
-    )
-    if seed is None:
-        raise RuntimeError(f"{job_name}: original reference not found")
-    ref_seq = seed["sequence"]
-
-    # 3) full range of positions and residues
+    # define full axes
     full_positions = list(range(1, len(ref_seq) + 1))
-    residues = sorted(set(dfm["to_res"]).union(set(ref_seq)))
+    residues = sorted(set(dfm["to_res"]).union(set(list(ref_seq))))
+    if not residues:
+        raise RuntimeError(f"{job_name}: no residues available for heatmap")
 
-    # 4) pivot to wide form, ensure all rows & cols present
+    # aggregate mean per cell
     pivot = dfm.pivot_table(
-        index="to_res", columns="position", values="score", aggfunc="mean"
+        index="to_res", columns="position", values="y", aggfunc="mean"
     ).reindex(index=residues, columns=full_positions)
+    mat = pivot.to_numpy(dtype=float)
 
-    # 5) styling
-    sns.set_style("white")
-    fig, ax = plt.subplots(figsize=(len(full_positions) * 0.3, len(residues) * 0.3))
-    ax.grid(False)
-    ax.set_aspect("equal", "box")
+    # figure sizing
+    fig_w = max(6, min(14, len(full_positions) * 0.15 + 2))
+    fig_h = max(3.5, min(10, len(residues) * 0.3 + 1.5))
 
-    metric_label = all_df["score_type"].iloc[0].replace("_", " ").title()
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    im = ax.imshow(mat, aspect="auto", interpolation="nearest")
 
-    # 6) draw heatmap with no cell borders and a slim horizontal colorbar below
-    hm = sns.heatmap(
-        pivot,
-        cmap="crest",
-        linewidths=0,  # no borders between cells
-        linecolor=None,
-        square=True,
-        ax=ax,
-        cbar=True,
-        cbar_kws={
-            "orientation": "horizontal",
-            "shrink": 0.2,
-            "pad": 0.02,
-            "aspect": 20,
-            "label": metric_label,
-        },
+    # axes & ticks
+    ax.set_xlabel("Sequence position", fontsize=9)
+    ax.set_ylabel("Mutated residue", fontsize=9)
+    ref_name = (
+        df["ref_name"].iloc[0] if "ref_name" in df.columns and not df.empty else ""
     )
+    ax.set_title(f"{job_name}{f' ({ref_name})' if ref_name else ''}", fontsize=10)
 
-    # 7) labels & ticks
-    ax.set_xlabel("Sequence position", fontsize=8)
-    ax.set_ylabel("Mutated residue", fontsize=8)
-    ax.set_title(f"{job_name} ({all_df['ref_name'].iloc[0]})", fontsize=10)
-    ax.tick_params(axis="x", labelsize=6, rotation=0)
-    ax.tick_params(axis="y", labelsize=6, rotation=0)
+    ax.set_xticks(
+        np.linspace(
+            0, len(full_positions) - 1, num=min(12, len(full_positions)), dtype=int
+        )
+    )
+    ax.set_xticklabels(
+        [str(full_positions[i]) for i in ax.get_xticks().astype(int)], fontsize=7
+    )
+    ax.set_yticks(range(len(residues)))
+    ax.set_yticklabels(residues, fontsize=7)
 
-    # 8) highlight the reference residue cell at each position
+    # colorbar
+    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cbar.ax.set_ylabel(y_label, rotation=90, va="center", fontsize=8)
+    cbar.ax.tick_params(labelsize=7)
+
+    # highlight reference residue at each position (outline box)
     for j, pos in enumerate(full_positions):
         ref_res = ref_seq[pos - 1]
-        i = residues.index(ref_res)
-        hm.add_patch(
-            plt.Rectangle(
-                (j, i), 1, 1, fill=True, edgecolor="white", facecolor="white", lw=0
+        if ref_res in residues:
+            i = residues.index(ref_res)
+            ax.add_patch(
+                plt.Rectangle(
+                    (j - 0.5, i - 0.5),
+                    1.0,
+                    1.0,
+                    fill=False,
+                    edgecolor="white",
+                    linewidth=0.8,
+                )
             )
-        )
 
-    # 9) tighten layout
-    fig.subplots_adjust(top=0.90, bottom=0.10, left=0.10, right=0.95)
+    # clean style
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
 
+    fig.tight_layout(pad=1.5)
     fig.savefig(output_path, dpi=300)
     plt.close(fig)

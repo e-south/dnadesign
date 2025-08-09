@@ -1,172 +1,255 @@
-## **permuter**
+# **permuter**
 
-_A bioinformatic pipeline for systematic permutation and evaluation of biological sequences._
-
+*A bioinformatic pipeline for systematic permutation and **multi-metric** evaluation of biological sequences.*
 
 ---
 
-#### Overview
+## Overview
 
 Given one or more reference sequences, **permuter** can
 
-1. **Permute**  
-   * Nucleotide saturation – `scan_dna`  
-   * Codon scanning – `scan_codon`
+1. **Permute**
 
-2. **Evaluate** each variant with a pluggable **Evaluator**  
-   * Log-likelihood (LL)  
-   * Log-likelihood ratio (LLR) versus the reference  
-   * Embedding distance (negative Euclidean; larger = better)
+   * Nucleotide swapping – `scan_dna`
+   * Codon swapping – `scan_codon` (requires a codon lookup table)
 
-3. **Select** elites (`top_k` or `threshold`).
+2. **Evaluate** each variant with pluggable **Evaluators** (per metric)
 
-4. **Iterate** permutation → evaluation → selection for _N_ rounds (optional).
+   * `log_likelihood` (LL)
+   * `log_likelihood_ratio` (LLR) versus the reference
+   * `embedding_distance` (negative Euclidean to the reference embedding; larger = better)
 
-5. **Report** tidy CSV/JSONL outputs **and** any plots you request.
+3. **Combine** metrics via an **objective** (e.g., `weighted_sum` with per-metric weights).
+
+4. **Select** elites using a **strategy** (`top_k` or `threshold`).
+
+5. **Iterate** permutation → evaluation → objective → selection for *N* rounds (optional).
+
+6. **Report** JSONL (+ optional CSV) and any plots you request.
 
 ---
 
-#### Quick start
+## Quick start
 
 ```bash
-# 1. Run an example config
-python -m permuter.main --config my_config.yaml
-````
+# 1) Put your references in CSV (two columns): ref_name,sequence
+#    See: dnadesign/permuter/input/refs.csv
 
-A dry-run requires **no GPU / heavy model**:
-
-```yaml
-evaluate:
-  evaluator: placeholder   # deterministic stub
-  metric: log_likelihood
+# 2) Run an example config (see full example below)
+python -m dnadesign.permuter.main --config my_config.yaml
 ```
 
-The default scatter plot is still produced.
+### “Plots-only” / analysis without recompute
+
+If you already have JSONL outputs in `batch_results/<job>_<ref>/`:
+
+```yaml
+run:
+  mode: analysis   # only (re)generate plots/CSVs from existing JSONL
+```
+
+Or let **permuter** decide automatically:
+
+```yaml
+run:
+  mode: auto       # if outputs exist → plots-only; else → full pipeline
+```
 
 ---
 
-#### Directory layout
+## Configuration
 
-```
-permuter/
-├── main.py                    # single entry-point
-├── config.py                  # YAML validator
-├── logging_utils.py
-├── permute_record.py
-├── iterator.py
-├── selector.py
-├── reporter.py                # tables + dynamic plotting
-│
-├── protocols/                 # mutation strategies
-│   ├── scan_dna.py
-│   └── scan_codon.py
-│
-├── evaluators/                # scoring back ends
-│   ├── base.py
-│   ├── placeholder.py
-│   └── evo2.py                # (optional) Evo-2 wrapper
-│
-├── plots/                     # 🔌 drop-in visualisations
-│   └── scatter_metric_by_position.py
-│
-└── input/                     # user data
-    ├── refs.csv               # required columns: ref_name,sequence
-    └── codon_ecoli.csv        # example codon table
-```
-
-Outputs land in `batch_results/YYYY-MM-DD/<job>/<ref>/`.
-
----
-
-#### Configuration (`config.yaml`)
+Define behavior in `config.yaml`.
 
 ```yaml
+# dnadesign/permuter/config.yaml
+
 permuter:
   experiment:
     name: demo
+
   jobs:
-    - name: lacI_scan
-      input_file: input/refs.csv
-      references: ["lacI"]
-      protocol: scan_dna
+    - name: example_scan
+      input_file: dnadesign/permuter/input/refs.csv
+      references: ["retron_Eco1_msr_msd_wt"]
+
+      # run mode
+      run:
+        mode: full                # one of: full | analysis | auto
 
       permute:
-        regions: []                 # [] = full sequence; or [[start,end),…]
-        lookup_tables: []           # e.g. ["data/codon_ecoli.csv"]
+        protocol: scan_dna        # scan_dna | scan_codon | ...
+        regions: []               # [] = full sequence; or [[start,end), …]
+        lookup_tables: []         # e.g. ["dnadesign/permuter/input/codon_ecoli.csv"] for scan_codon
 
       evaluate:
-        evaluator: placeholder      # or evo2_7b
-        metric: log_likelihood_ratio
+        metrics:
+          - id: ll
+            name: log_likelihood
+            evaluator: placeholder
+            goal: max
+            norm: {method: rank, scope: round}
+          - id: llr
+            name: log_likelihood_ratio
+            evaluator: placeholder
+            goal: max
+            norm: {method: rank, scope: round}
 
       select:
-        strategy: top_k
-        k: 50
+        objective:
+          type: weighted_sum
+          weights: { ll: 0.7, llr: 0.3 }  # keys must match metric ids
+        strategy:
+          type: top_k
+          k: 10
+          include_ties: true
 
       iterate:
         enabled: true
         total_rounds: 3
 
       report:
-        plots:                      # pick any modules under permuter.plots
+        csv: true
+        plots:
           - scatter_metric_by_position
 ```
 
-#### Validation rules (asserted at start-up)
+#### Threshold strategy
 
-| Field                | Rule (abridged)                                   |
-| -------------------- | ------------------------------------------------- |
-| `references[]`       | must exist in `refs.csv`                          |
-| `permute.regions`    | `0 ≤ start < end ≤ len(seq)`                      |
-| `scan_codon`         | requires at least one codon table                 |
-| `select.strategy`    | must supply **only** the args it needs            |
-| `embedding_distance` | supply exactly one `embedding_reference_sequence` |
+You can threshold the **objective** or a specific **metric** (by id). Use either a **numeric threshold** or a **percentile**.
 
-Mis-configurations raise **ConfigError**.
-
----
-
-#### Plots
-
-Add your own:
-
-```python
-# permuter/plots/heatmap_llr.py
-def plot(elite_df, all_df, output_path, job_name):
-    ...
-```
-
-Then list it:
+**Objective percentile (top 20% by objective):**
 
 ```yaml
-report:
-  plots: ["scatter_metric_by_position", "heatmap_llr"]
+select:
+  objective:
+    type: weighted_sum
+    weights: { ll: 0.5, llr: 0.5 }
+  strategy:
+    type: threshold
+    target: objective
+    percentile: 80            # keep variants >= 80th percentile (within round)
+```
+
+**Metric threshold (normalized metric id `llr`, keep >= 0.8):**
+
+```yaml
+select:
+  objective:
+    type: weighted_sum
+    weights: { ll: 0.5, llr: 0.5 }
+  strategy:
+    type: threshold
+    target: metric
+    metric_id: llr
+    use_normalized: true      # default; keeps 0..1, goal-aware
+    threshold: 0.8
+```
+
+> If you set `target: metric` and use `percentile`, you must use `use_normalized: true` (default).
+
+
+---
+
+#### Directory layout
+
+```
+dnadesign/permuter/
+├── main.py                        # single entry-point
+├── config.py                      # YAML validator
+├── logging_utils.py
+├── evaluate.py                    # multi-metric evaluation helpers
+├── permute_record.py
+├── reporter.py                    # JSONL/CSV + dynamic plotting
+│
+├── protocols/                     # mutation strategies
+│   ├── __init__.py
+│   ├── scan_dna.py
+│   └── scan_codon.py              # (if present) requires lookup table
+│
+├── evaluators/                    # scoring back ends
+│   ├── __init__.py
+│   ├── base.py
+│   └── placeholder.py             # deterministic stub (no GPU)
+│
+├── selector/                      # 🔌 selection plugins
+│   ├── __init__.py
+│   ├── objectives/
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   └── weighted_sum.py
+│   └── strategies/
+│       ├── __init__.py
+│       ├── base.py
+│       ├── top_k.py
+│       └── threshold.py
+│
+├── plots/                         # 🔌 drop-in visualisations
+│   └── scatter_metric_by_position.py
+│
+└── input/                         # user data
+    ├── refs.csv                   # required columns: ref_name,sequence
+    └── codon_ecoli.csv            # example codon table
+```
+
+Outputs land in `batch_results/<job>_<ref>/`.
+
+---
+
+## Output files
+
+```
+batch_results/lacI_scan_lacI/
+├── MANIFEST.json
+├── config_snapshot.yaml
+├── r1_variants.jsonl
+├── r1_elites.jsonl
+├── norm_stats_r1.json
+├── r2_variants.jsonl
+├── r2_elites.jsonl
+├── norm_stats_r2.json
+├── plots/
+│   └── lacI_scan_scatter_metric_by_position.png
+├── lacI_scan.csv                  # optional (report.csv: true)
+└── lacI_scan_elites.csv           # optional (report.csv: true)
+```
+
+### JSONL record (example)
+
+```json
+{
+  "var_id": "FQ2FZ8S1L1GX",
+  "parent_var_id": "9K7U5Z4YB2QC",
+  "job_name": "lacI_scan",
+  "ref_name": "lacI",
+  "protocol": "scan_dna",
+  "round": 2,
+  "sequence": "ACGT…",
+  "modifications": ["A5T","G12C"],
+  "metrics": {"llr": 0.14, "emb": -0.82},
+  "norm_metrics": {"llr": 0.73, "emb": 0.58},
+  "objective_score": 0.684,
+  "objective_meta": {
+    "type": "weighted_sum",
+    "weights": {"llr": 0.7, "emb": 0.3},
+    "norm_scope": "round",
+    "norm_stats_id": "r2_9A3F10"
+  }
+}
 ```
 
 ---
 
-####  Extending permuter
+## Extending **permuter**
 
-| Want to add …         | Where / how                                                                 |
-| --------------------- | --------------------------------------------------------------------------- |
-| **Mutation protocol** | Create `permuter/protocols/my_protocol.py` with `generate_variants()`       |
-| **Evaluator / model** | Sub-class `evaluators.base.Evaluator`, register in `evaluators/__init__.py` |
-| **Plot**              | Drop a module in `permuter/plots/` exposing `plot()`                        |
-| **Selector**          | Tweak logic in `selector.py` (it’s \~25 lines)                              |
-
-
----
-
-#### Output files
-
-```
-batch_results/2025-08-07/lacI_scan/lacI/
-├── lacI_scan.csv              # all variants (tidy)
-├── lacI_scan_elites.csv       # elite subset
-├── lacI_scan_scatter_metric_by_position.png
-└── ... more plots as requested
-```
+| Want to add …           | Where / how                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------- |
+| **Mutation protocol**   | Create `permuter/protocols/my_protocol.py` with `generate_variants()`                       |
+| **Evaluator / model**   | Subclass `evaluators.base.Evaluator`, register in `evaluators/__init__.py`                  |
+| **Objective (combine)** | Add under `selector/objectives/`, subclass `Objective`, register in `__init__.py`           |
+| **Strategy (select)**   | Add under `selector/strategies/`, subclass `Strategy`, register in `__init__.py`            |
+| **Plot**                | Drop a module in `permuter/plots/` exposing `plot(elite_df, all_df, output_path, job_name)` |
 
 ---
 
 Eric J. South (ericjohnsouth@gmail.com)
-

@@ -46,8 +46,8 @@ class Evaluator(abc.ABC):
         Args:
           sequences: list of strings to score
           metric: which scoring mode
-          ref_sequence: for ratio metrics
-          ref_embedding: for embedding_distance
+          ref_sequence: for ratio/distance metrics
+          ref_embedding: optional precomputed embedding for distance metrics
 
         Returns:
           list of floats (same order as `sequences`), where higher is better.

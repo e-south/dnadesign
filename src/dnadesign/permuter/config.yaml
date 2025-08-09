@@ -1,32 +1,51 @@
 # dnadesign/permuter/config.yaml
-
 permuter:
   experiment:
-    name: permuter_2025_08_02
+    name: permuter_demo
+
   jobs:
     - name: example_scan
-      input_file: refs.csv
+      input_file: dnadesign/permuter/input/refs.csv
       references: ["retron_Eco1_msr_msd_wt"]
-      protocol: scan_dna    # scan_dna, scan_codon
-      
+
+      run:
+        mode: auto             # full | analysis | auto
+
       permute:
-        regions: []         # [] = full sequence; or [[start,end),…]
-        lookup_tables: []   # e.g. ["input/codon_ecoli.csv"]
-      
+        protocol: scan_dna     # scan_dna | scan_codon
+        regions: []            # [] = full sequence; or [[start,end), …]
+        lookup_tables: []      # required for scan_codon
+
       evaluate:
-        evaluator: placeholder  # placeholder, evo2_7b
-        metric: log_likelihood_ratio  # or log_likelihood, or embedding_distance
-        embedding_reference_sequence: ["MMLV_RT_wt"]
+        metrics:
+          - id: llr
+            name: log_likelihood_ratio
+            evaluator: placeholder
+            goal: max
+            norm: {method: rank, scope: round}
+
+          # - id: emb
+          #   name: embedding_distance
+          #   evaluator: placeholder
+          #   goal: max
+          #   norm: {method: z2cdf, scope: round}
 
       select:
-        strategy: top_k     # or threshold, or top_k
-        k: 10               # only used if strategy is top_k  
-        threshold: 1.0      # only used if strategy is threshold
-      
+        objective:
+          type: weighted_sum
+          weights: { llr: 1 }
+        strategy:
+          type: top_k
+          k: 10
+          include_ties: true
+
       iterate:
         enabled: true
         total_rounds: 3
-      
+
       report:
-        plots: ["scatter_metric_by_position", "metric_by_mutation_count", "heatmap_mutation_effects"]
-        
+        csv: true
+        plots:
+          - scatter_metric_by_position
+          - metric_by_mutation_count
+          - heatmap_mutation_effects

@@ -62,7 +62,7 @@ class PlaceholderEvaluator(Evaluator):
         Compute scores according to `metric`:
           - "log_likelihood": hashed stub
           - "log_likelihood_ratio": stub(seq) - stub(ref_sequence)
-          - "embedding_distance": -||embed(seq)-ref_embedding|| (higher=beter)
+          - "embedding_distance": -||embed(seq)-ref_embedding|| (higher=better)
         """
         if metric == "log_likelihood":
             return [_stable_float(s) for s in sequences]
@@ -74,8 +74,12 @@ class PlaceholderEvaluator(Evaluator):
             return [_stable_float(s) - base for s in sequences]
 
         if metric == "embedding_distance":
+            # If a reference embedding wasn't passed, compute from ref_sequence.
             if ref_embedding is None:
-                raise ValueError("ref_embedding required for embedding_distance")
+                if ref_sequence is None:
+                    raise ValueError("ref_sequence required for embedding_distance")
+                ref_embedding = self._embed(ref_sequence)
+            ref_embedding = np.asarray(ref_embedding, dtype=np.float32)
             return [
                 -float(np.linalg.norm(self._embed(s) - ref_embedding))
                 for s in sequences

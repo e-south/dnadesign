@@ -30,7 +30,7 @@ def permute_record(
 
     Args:
       ref_entry: {
-        "id": str,
+        "var_id": str,
         "ref_name": str,
         "protocol": str,
         "sequence": str,
@@ -44,14 +44,11 @@ def permute_record(
 
     Returns:
       List of new variant dicts, each containing:
-        - a unique "id"
         - the updated "sequence"
         - a "modifications" list describing the edit(s)
+        (IDs are assigned upstream deterministically.)
     """
-    # Dynamically import the requested protocol module
     module = importlib.import_module(f"dnadesign.permuter.protocols.{protocol}")
-    # Sanity check: ensure the module exposes the expected API
     if not hasattr(module, "generate_variants"):  # pragma: no cover
         raise AttributeError(f"Protocol '{protocol}' lacks generate_variants()")
-    # Delegate to the protocol’s generator
     return module.generate_variants(ref_entry, params, regions, lookup_tables)
