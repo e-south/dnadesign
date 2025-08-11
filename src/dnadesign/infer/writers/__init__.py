@@ -1,6 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
+dnadesign/infer/writers/__init__.py
 
 Module Author(s): Eric J. South
 Dunlop Lab

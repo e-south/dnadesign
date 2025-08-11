@@ -1,0 +1,21 @@
+dnadesign/infer/config.yaml
+
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
+
+jobs:
+  - id: evo_keys
+    operation: extract
+    ingest: { source: pt_file, field: sequence }
+    outputs:
+      - id: emb_l28_mean
+        fn: evo2.embedding
+        params: { layer: "blocks.28.mlp.l3", pool: { method: mean, dim: 1 } }
+        format: list
+    io:
+      write_back: true
+      overwrite: false
+      checkpoint: { enabled: true, every_n: 100 }

@@ -62,16 +62,9 @@ dnadesign/
    
       **densegen** is a DNA sequence design pipeline built on the integer linear programming framework from the [**dense-arrays**](https://github.com/e-south/dense-arrays) package. It assembles batches of synthetic promoters, each composed of densely packed transcription factor binding sites. The pipeline references curated datasets from the [**deg2tfbs**](https://github.com/e-south/deg2tfbs) repository, subsampling dozens of binding sites to feed into the solver, with time limits enforced to prevent stalling.
 
-4. [**evoinference**](src/dnadesign/evoinference/README.md)  
+4. [**infer**](src/dnadesign/infer/README.md)  
 
-      **evoinference** is a wrapper for **[Evo 2](https://github.com/ArcInstitute/evo2)** (checkpoint: `evo2_7b`), a genomic foundation model for molecular-to-genome-scale modeling and design. This pipeline processes batches of `.pt` files from the sibling **sequences** directory, running a forward pass of each sequence through Evo 2 and extracting output or intermediate layer embeddings of the language model. The embeddings are then saved in place as additional keys within the original `.pt` file.  
-
-      For more context, refer to the following papers: 
-
-      - [Semantic mining (preprint)](https://doi.org/10.1101/2024.12.17.628962)  
-      - [The Illustrated Hyena](https://ishanjmukherjee.github.io/illustrated-hyena)
-      - [Evo 1](https://www.science.org/doi/10.1126/science.ado9336)  
-      - [Evo 2 (preprint)](https://arcinstitute.org/manuscripts/Evo2)
+      **infer** is a model-agnostic inference engine for DNA/protein language models.
 
 5. [**clustering**](src/dnadesign/clustering/README.md) 
   

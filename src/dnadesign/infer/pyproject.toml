@@ -1,0 +1,30 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# pyproject.toml
+# ─────────────────────────────────────────────────────────────────────────────
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dnadesign-infer"
+version = "0.1.0"
+description = "Model-agnostic inference engine for DNA/protein sequence models (Evo2 fully implemented; ESM2 stubbed)."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "Dunlop Lab", email = "" }]
+dependencies = [
+  "pydantic>=2.6.0",
+  "pyyaml>=6.0",
+  "torch>=2.1.0",
+  "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+evo2 = ["evo2 @ git+https://github.com/ArcInstitute/evo2.git"]
+esm2 = ["fair-esm"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

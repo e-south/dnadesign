@@ -1,20 +1,18 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/permuter/__init__.py
+dnadesign/infer/__init__.py
+
+Public API:
+  - run_extract
+  - run_generate
+  - run_job (YAML-driven)
 
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-__all__ = [
-    "config",
-    "iterator",
-    "permute_record",
-    "protocols",
-    "evaluators",
-    "selector",
-    "reporter",
-]
-__version__ = "0.4.0"
+from .api import run_extract, run_generate, run_job
+
+__all__ = ["run_extract", "run_generate", "run_job"]

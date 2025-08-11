@@ -4,8 +4,8 @@
 dnadesign/permuter/permute_record.py
 
 Responsible for dispatching a single reference entry to the chosen permutation
-protocol module.  This layer keeps the main pipeline decoupled from individual
-protocol implementations.
+protocol class via the Protocol registry. This layer keeps the main pipeline
+decoupled from individual protocol implementations.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -14,41 +14,40 @@ Dunlop Lab
 
 from __future__ import annotations
 
-import importlib
-from typing import Dict, List
+from typing import Dict, Iterable
+
+import numpy as np
+
+from dnadesign.permuter.protocols import get_protocol
 
 
 def permute_record(
     ref_entry: Dict,
     protocol: str,
     params: Dict,
-    regions: List | None,
-    lookup_tables: List[str] | None,
-) -> List[Dict]:
+) -> Iterable[Dict]:
     """
-    Look up and call the protocol-specific `generate_variants()` function.
+    Look up and call the protocol's generate() method (streaming).
 
     Args:
-      ref_entry: {
-        "var_id": str,
-        "ref_name": str,
-        "protocol": str,
-        "sequence": str,
-        "modifications": List[str],
-        "round": int
-      }
-      protocol: name of the protocol module under `protocols/`
-      params: protocol-specific parameters
-      regions: list of [start,end) ranges to mutate (empty → full length)
-      lookup_tables: optional auxiliary tables (e.g. codon maps)
+      ref_entry: seed variant dict with fields:
+        - var_id, ref_name, protocol, sequence, modifications, round
+      protocol: protocol id (e.g., "scan_dna", "scan_codon", "scan_stem_loop")
+      params: protocol-specific parameters (validated by the protocol)
 
     Returns:
-      List of new variant dicts, each containing:
-        - the updated "sequence"
-        - a "modifications" list describing the edit(s)
-        (IDs are assigned upstream deterministically.)
+      Iterable of new variant dicts. Each includes:
+        - 'sequence': new full sequence
+        - 'modifications': [summary, ...]
+        - protocol-specific flat keys (e.g., nt_*, codon_*, hp_*, gen_*)
+      (IDs are assigned upstream deterministically.)
     """
-    module = importlib.import_module(f"dnadesign.permuter.protocols.{protocol}")
-    if not hasattr(module, "generate_variants"):  # pragma: no cover
-        raise AttributeError(f"Protocol '{protocol}' lacks generate_variants()")
-    return module.generate_variants(ref_entry, params, regions, lookup_tables)
+    proto = get_protocol(protocol)
+    proto.validate_cfg(params=params)
+    base_seed = params.get("_derived_seed")
+    rng = (
+        np.random.default_rng(base_seed)
+        if base_seed is not None
+        else np.random.default_rng()
+    )
+    return proto.generate(ref_entry=ref_entry, params=params, rng=rng)

@@ -77,25 +77,15 @@ class _Validator:
                 f"[{name}] run.mode must be one of {sorted(_VALID_RUN_MODES)}"
             )
 
-        # permute.protocol sanity
+        # permute.protocol sanity (protocol-specific details are validated inside the protocol)
         permute = job.get("permute", {}) or {}
         protocol = permute.get("protocol")
         if not protocol:
             raise ConfigError(f"[{name}] permute.protocol is required")
-        if protocol == "scan_codon" and not permute.get("lookup_tables"):
-            raise ConfigError(f"[{name}] scan_codon requires a codon table")
 
         # references list must be non-empty
         if not isinstance(job["references"], list) or not job["references"]:
             raise ConfigError(f"[{name}] `references` must be a non-empty list")
-
-        # region bounds sanity
-        regions = permute.get("regions", [])
-        for region in regions:
-            if not (isinstance(region, (list, tuple)) and len(region) == 2):
-                raise ConfigError(f"[{name}] region must be [start,end) pair: {region}")
-            if not 0 <= region[0] < region[1]:
-                raise ConfigError(f"[{name}] invalid region bounds: {region}")
 
         # symbol/column sanity (quick regex)
         if not re.match(r"^[A-Za-z0-9_\-]+$", name):

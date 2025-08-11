@@ -17,12 +17,15 @@ from functools import lru_cache
 from typing import Dict, Type
 
 from .base import Evaluator
+from .evo2_ll import Evo2LogLikelihoodEvaluator
+from .evo2_llr import Evo2LogLikelihoodRatioEvaluator
 from .placeholder import PlaceholderEvaluator
 
 # Map short names → Evaluator subclasses
 _EVAL_REGISTRY: Dict[str, Type[Evaluator]] = {
     "placeholder": PlaceholderEvaluator,
-    # future evaluators go here, e.g. "evo2_7b": Evo2Evaluator,
+    "evo2_ll": Evo2LogLikelihoodEvaluator,
+    "evo2_llr": Evo2LogLikelihoodRatioEvaluator,
 }
 
 

@@ -1,0 +1,16 @@
+# dnadesign/permuter/workspace.yaml
+
+permuter:
+  workspace:
+    # Root that contains per-experiment folders
+    experiments_dir: dnadesign/permuter/experiments
+
+    # List the experiments you want available
+    runs:
+      - name: example_nt_scan
+        config: config.yaml   # relative to experiments_dir/<name>
+        enabled: true
+
+      # - name: another_experiment
+      #   config: config.yaml
+      #   enabled: false

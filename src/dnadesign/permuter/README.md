@@ -1,104 +1,169 @@
-# **permuter**
+## permuter
 
 *A bioinformatic pipeline for systematic permutation and **multi-metric** evaluation of biological sequences.*
+
+
+---
+
+### Table of contents
+
+* [Overview](#overview)
+* [Install](#install)
+* [Quick start](#quick-start)
+* [Configuration](#configuration)
+
+  * [workspace.yaml](#workspaceyaml)
+  * [Experiment config.yaml](#experiment-configyaml)
+  * [Run modes](#run-modes)
+  * [Selection strategies](#selection-strategies)
+* [Outputs](#outputs)
+* [Directory layout](#directory-layout)
+* [Extending permuter](#extending-permuter)
 
 ---
 
 ## Overview
 
-Given one or more reference sequences, **permuter** can
+Given one or more reference sequences, **permuter**:
 
-1. **Permute**
+1. **Permutes** sequences via a protocol
 
-   * Nucleotide swapping – `scan_dna`
-   * Codon swapping – `scan_codon` (requires a codon lookup table)
+   * `scan_dna` — nucleotide substitutions
+   * `scan_codon` — codon substitutions (requires a codon lookup table)
 
-2. **Evaluate** each variant with pluggable **Evaluators** (per metric)
+2. **Evaluates** each variant using pluggable **Evaluators** (one per metric)
+   Examples in tree:
 
    * `log_likelihood` (LL)
-   * `log_likelihood_ratio` (LLR) versus the reference
-   * `embedding_distance` (negative Euclidean to the reference embedding; larger = better)
+   * `log_likelihood_ratio` (LLR) vs reference
+   * `embedding_distance` (negative Euclidean to reference embedding)
 
-3. **Combine** metrics via an **objective** (e.g., `weighted_sum` with per-metric weights).
+3. **Combines** metrics with an **objective** (e.g., `weighted_sum` with per-metric weights)
 
-4. **Select** elites using a **strategy** (`top_k` or `threshold`).
+4. **Selects** elites via a **strategy** (`top_k` or `threshold`)
 
-5. **Iterate** permutation → evaluation → objective → selection for *N* rounds (optional).
+5. **Iterates** (optional): permutation → evaluation → objective → selection for N rounds
 
-6. **Report** JSONL (+ optional CSV) and any plots you request.
+6. **Reports** JSONL (+ optional CSV) and dynamic plots you specify
 
 ---
 
-## Quick start
+## Install
 
 ```bash
-# 1) Put your references in CSV (two columns): ref_name,sequence
-#    See: dnadesign/permuter/input/refs.csv
-
-# 2) Run an example config (see full example below)
-python -m dnadesign.permuter.main --config my_config.yaml
-```
-
-### “Plots-only” / analysis without recompute
-
-If you already have JSONL outputs in `batch_results/<job>_<ref>/`:
-
-```yaml
-run:
-  mode: analysis   # only (re)generate plots/CSVs from existing JSONL
-```
-
-Or let **permuter** decide automatically:
-
-```yaml
-run:
-  mode: auto       # if outputs exist → plots-only; else → full pipeline
+# From the project root (editable install recommended during development)
+pip install -e .
 ```
 
 ---
 
-## Configuration
+### Quick start
 
-Define behavior in `config.yaml`.
+The workspace lets you manage multiple experiments cleanly, each with its own `config.yaml` and inputs.
+
+1. Ensure a workspace file exists:
+
+```
+dnadesign/permuter/workspace.yaml
+```
+
+Example (see full schema below):
 
 ```yaml
-# dnadesign/permuter/config.yaml
+permuter:
+  workspace:
+    experiments_dir: dnadesign/permuter/experiments
+    runs:
+      - name: example_nt_scan
+        config: config.yaml
+        enabled: true
+```
 
+2. Create the experiment folder:
+
+```
+dnadesign/permuter/experiments/example_nt_scan/
+  ├─ config.yaml
+  └─ input/
+     └─ refs.csv   # columns: ref_name,sequence
+```
+
+3. Run:
+
+```bash
+# list experiments
+python -m dnadesign.permuter.main --config dnadesign/permuter/workspace.yaml --list
+
+# run all enabled experiments
+python -m dnadesign.permuter.main --config dnadesign/permuter/workspace.yaml
+
+# run a subset by name
+python -m dnadesign.permuter.main --config dnadesign/permuter/workspace.yaml --only example_nt_scan
+
+```
+
+---
+
+### Configuration
+
+### `workspace.yaml`
+
+Located at the repo root. It simply enumerates experiments and where to find their configs.
+
+```yaml
+permuter:
+  workspace:
+    # Folder that contains subfolders per experiment:
+    experiments_dir: dnadesign/permuter/experiments
+
+    runs:
+      - name: example_nt_scan     # must be unique
+        config: config.yaml       # path relative to experiments_dir/<name>
+        enabled: true             # included when running without --only
+      # - name: another_experiment
+      #   config: config.yaml
+      #   enabled: false
+```
+
+### Experiment `config.yaml`
+
+Each experiment is self-contained. Minimal example:
+
+```yaml
 permuter:
   experiment:
-    name: demo
+    name: permuter_demo
 
   jobs:
-    - name: example_scan
-      input_file: dnadesign/permuter/input/refs.csv
+    - name: example_nt_scan
+      input_file: input/refs.csv                 # must include ref_name, sequence
       references: ["retron_Eco1_msr_msd_wt"]
 
-      # run mode
       run:
-        mode: full                # one of: full | analysis | auto
+        mode: auto                               # full | analysis | auto
 
       permute:
-        protocol: scan_dna        # scan_dna | scan_codon | ...
-        regions: []               # [] = full sequence; or [[start,end), …]
-        lookup_tables: []         # e.g. ["dnadesign/permuter/input/codon_ecoli.csv"] for scan_codon
+        protocol: scan_dna                       # scan_dna | scan_codon
+        regions: []                              # [] = full sequence; or [[start,end), …]
+        lookup_tables: []                        # required for scan_codon
 
       evaluate:
         metrics:
-          - id: ll
-            name: log_likelihood
-            evaluator: placeholder
-            goal: max
-            norm: {method: rank, scope: round}
           - id: llr
             name: log_likelihood_ratio
-            evaluator: placeholder
+            evaluator: evo2_llr
             goal: max
-            norm: {method: rank, scope: round}
+            params:
+              model_id: evo2_7b
+              device: cuda:0
+              precision: bf16
+              alphabet: dna
+              reduction: mean
 
       select:
         objective:
           type: weighted_sum
-          weights: { ll: 0.7, llr: 0.3 }  # keys must match metric ids
+          weights: { llr: 1 }                     # keys must match metric ids exactly
         strategy:
           type: top_k
           k: 10
@@ -109,70 +174,123 @@ permuter:
         total_rounds: 3
 
       report:
-        csv: true
+        csv: false
         plots:
-          - scatter_metric_by_position
+          - position_scatter_and_heatmap
+          - metric_by_mutation_count
 ```
 
-#### Threshold strategy
 
-You can threshold the **objective** or a specific **metric** (by id). Use either a **numeric threshold** or a **percentile**.
+### Run modes
 
-**Objective percentile (top 20% by objective):**
+```yaml
+run:
+  mode: full      # do all rounds, write JSONL/plots
+  # or
+  mode: analysis  # ONLY (re)generate plots/CSVs from existing JSONL in batch_results
+  # or
+  mode: auto      # if outputs exist → behave like analysis; else → full
+```
+
+### Selection strategies
+
+**Top-K**
 
 ```yaml
 select:
   objective:
     type: weighted_sum
-    weights: { ll: 0.5, llr: 0.5 }
+    weights: { ll: 1 }
+  strategy:
+    type: top_k
+    k: 10
+    include_ties: true
+```
+
+**Threshold (objective percentile)**
+
+```yaml
+select:
+  objective:
+    type: weighted_sum
+    weights: { ll: 1 }
   strategy:
     type: threshold
     target: objective
-    percentile: 80            # keep variants >= 80th percentile (within round)
+    percentile: 80        # keep variants >= 80th percentile within the round
 ```
 
-**Metric threshold (normalized metric id `llr`, keep >= 0.8):**
+**Threshold (metric by id)**
 
 ```yaml
 select:
   objective:
     type: weighted_sum
-    weights: { ll: 0.5, llr: 0.5 }
+    weights: { ll: 1 }
   strategy:
     type: threshold
     target: metric
-    metric_id: llr
-    use_normalized: true      # default; keeps 0..1, goal-aware
+    metric_id: ll
+    use_normalized: true  # required when using percentile with target=metric
     threshold: 0.8
 ```
 
-> If you set `target: metric` and use `percentile`, you must use `use_normalized: true` (default).
+---
 
+### Outputs
+
+Each job×reference pair writes to:
+
+```
+dnadesign/permuter/experiments/<exp>/batch_results/<job>_<ref>/
+├── MANIFEST.json
+├── config_snapshot.yaml
+├── r1_variants.jsonl
+├── r1_elites.jsonl
+├── r2_variants.jsonl
+├── r2_elites.jsonl
+├── ...
+├── plots/
+│   ├── <metric>_<ref>_position_scatter_and_heatmap.png
+│   └── <metric>_<ref>_metric_by_mutation_count.png
+├── <job>.csv            # optional (report.csv: true)
+└── <job>_elites.csv     # optional
+```
+
+**JSONL** is the single source of truth. The MANIFEST tracks rounds, plot paths, and reference metadata to support “analysis” reruns without recomputation.
 
 ---
 
-#### Directory layout
+### Directory layout
 
 ```
 dnadesign/permuter/
-├── main.py                        # single entry-point
-├── config.py                      # YAML validator
+├── main.py                          # thin CLI entry; detects single vs workspace
+├── runner.py                        # experiment/job orchestration
+├── workspace.py                     # workspace.yaml loader
+├── config.py                        # config validator
 ├── logging_utils.py
-├── evaluate.py                    # multi-metric evaluation helpers
-├── permute_record.py
-├── reporter.py                    # JSONL/CSV + dynamic plotting
+├── evaluate.py
+├── permute_record.py                # protocol dispatch (decoupled)
+├── reporter.py                      # JSONL/CSV + dynamic plotting w/ subtitles
 │
-├── protocols/                     # mutation strategies
+├── experiments/
+│   └── example_nt_scan/
+│       ├── config.yaml
+│       └── input/                   # experiment-local inputs live here
+│           └── refs.csv
+│
+├── protocols/
 │   ├── __init__.py
 │   ├── scan_dna.py
-│   └── scan_codon.py              # (if present) requires lookup table
+│   └── scan_codon.py
 │
-├── evaluators/                    # scoring back ends
+├── evaluators/
 │   ├── __init__.py
 │   ├── base.py
-│   └── placeholder.py             # deterministic stub (no GPU)
+│   └── placeholder.py
 │
-├── selector/                      # 🔌 selection plugins
+├── selector/
 │   ├── __init__.py
 │   ├── objectives/
 │   │   ├── __init__.py
@@ -184,72 +302,26 @@ dnadesign/permuter/
 │       ├── top_k.py
 │       └── threshold.py
 │
-├── plots/                         # 🔌 drop-in visualisations
-│   └── scatter_metric_by_position.py
-│
-└── input/                         # user data
-    ├── refs.csv                   # required columns: ref_name,sequence
-    └── codon_ecoli.csv            # example codon table
-```
-
-Outputs land in `batch_results/<job>_<ref>/`.
-
----
-
-## Output files
-
-```
-batch_results/lacI_scan_lacI/
-├── MANIFEST.json
-├── config_snapshot.yaml
-├── r1_variants.jsonl
-├── r1_elites.jsonl
-├── norm_stats_r1.json
-├── r2_variants.jsonl
-├── r2_elites.jsonl
-├── norm_stats_r2.json
-├── plots/
-│   └── lacI_scan_scatter_metric_by_position.png
-├── lacI_scan.csv                  # optional (report.csv: true)
-└── lacI_scan_elites.csv           # optional (report.csv: true)
-```
-
-### JSONL record (example)
-
-```json
-{
-  "var_id": "FQ2FZ8S1L1GX",
-  "parent_var_id": "9K7U5Z4YB2QC",
-  "job_name": "lacI_scan",
-  "ref_name": "lacI",
-  "protocol": "scan_dna",
-  "round": 2,
-  "sequence": "ACGT…",
-  "modifications": ["A5T","G12C"],
-  "metrics": {"llr": 0.14, "emb": -0.82},
-  "norm_metrics": {"llr": 0.73, "emb": 0.58},
-  "objective_score": 0.684,
-  "objective_meta": {
-    "type": "weighted_sum",
-    "weights": {"llr": 0.7, "emb": 0.3},
-    "norm_scope": "round",
-    "norm_stats_id": "r2_9A3F10"
-  }
-}
+└── plots/
+    ├── position_scatter_and_heatmap.py
+    └── metric_by_mutation_count.py
 ```
 
 ---
 
-## Extending **permuter**
+### Extending **permuter**
 
-| Want to add …           | Where / how                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------------- |
-| **Mutation protocol**   | Create `permuter/protocols/my_protocol.py` with `generate_variants()`                       |
-| **Evaluator / model**   | Subclass `evaluators.base.Evaluator`, register in `evaluators/__init__.py`                  |
-| **Objective (combine)** | Add under `selector/objectives/`, subclass `Objective`, register in `__init__.py`           |
-| **Strategy (select)**   | Add under `selector/strategies/`, subclass `Strategy`, register in `__init__.py`            |
-| **Plot**                | Drop a module in `permuter/plots/` exposing `plot(elite_df, all_df, output_path, job_name)` |
+| Add…                  | How                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **Mutation protocol** | Create `protocols/my_protocol.py` with `generate_variants(ref_entry, params, regions, lookup_tables) -> List[Dict]` |
+| **Evaluator / model** | Implement `evaluators.base.Evaluator.score()`, register in `evaluators/__init__.py`                                 |
+| **Objective**         | Add under `selector/objectives/`, subclass `Objective`, register in `__init__.py`                                   |
+| **Strategy**          | Add under `selector/strategies/`, subclass `Strategy`, register in `__init__.py`                                    |
+| **Plot**              | Drop a module in `plots/` exposing `plot(elite_df, all_df, output_path, job_name, ...)`                             |
+
+Plots receive a compact evaluator subtitle automatically (e.g., `"placeholder"` or `"eva + evb"`).
+
 
 ---
 
-Eric J. South (ericjohnsouth@gmail.com)
+**Author:** Eric J. South (ericjohnsouth@gmail.com)

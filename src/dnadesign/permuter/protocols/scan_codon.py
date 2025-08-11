@@ -3,9 +3,8 @@
 <dnadesign project>
 dnadesign/permuter/protocols/scan_codon.py
 
-Codon-level saturation - for each codon in the reference, replace it
-with the most-frequent codon of every other amino acid, based on
-a lookup CSV with columns: codon, amino_acid, fraction, frequency.
+Codon-level saturation. For each codon in the selected region, replace with
+the most frequent codon of every other amino acid from a usage table.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -15,20 +14,26 @@ Dunlop Lab
 from __future__ import annotations
 
 import csv
+import re
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, Iterable, List, Tuple
+
+import numpy as np
+
+from . import register
+from .base import Protocol
 
 _TRIPLE = 3
+_REQUIRED_COLUMNS = {"codon", "amino_acid", "frequency"}
 
 
-def _load_codon_table(path: str | Path) -> Dict[str, List[str]]:
+def _load_codon_table(path: str | Path) -> Tuple[Dict[str, List[str]], Dict[str, str]]:
     aa2entries: Dict[str, List[Tuple[str, float]]] = {}
     with open(path, newline="") as fh:
         reader = csv.DictReader(fh, delimiter=",")
-        expected = {"codon", "amino_acid", "frequency"}
-        if not expected.issubset(reader.fieldnames or []):
+        if not _REQUIRED_COLUMNS.issubset(reader.fieldnames or []):
             raise ValueError(
-                f"Codon table must include columns {expected}, got {reader.fieldnames}"
+                f"scan_codon: codon_table must include columns {_REQUIRED_COLUMNS}, got {reader.fieldnames}"
             )
         for row in reader:
             aa = row["amino_acid"]
@@ -36,55 +41,82 @@ def _load_codon_table(path: str | Path) -> Dict[str, List[str]]:
             freq = float(row["frequency"])
             aa2entries.setdefault(aa, []).append((codon, freq))
     aa2codons: Dict[str, List[str]] = {}
+    codon2aa: Dict[str, str] = {}
     for aa, entries in aa2entries.items():
         sorted_codons = sorted(entries, key=lambda cf: cf[1], reverse=True)
         aa2codons[aa] = [codon for codon, _ in sorted_codons]
-    return aa2codons
+        for c, _ in sorted_codons:
+            codon2aa[c] = aa
+    return aa2codons, codon2aa
 
 
-def generate_variants(
-    ref_entry: Dict,
-    params: Dict,
-    regions: List[Tuple[int, int]] | None = None,
-    lookup_tables: List[str] | None = None,
-) -> List[Dict]:
-    if not lookup_tables:
-        raise ValueError("scan_codon requires at least one codon lookup table")
-    aa2codons = _load_codon_table(lookup_tables[0])
+@register
+class ScanCodon(Protocol):
+    id = "scan_codon"
+    version = "1.0"
 
-    seq = ref_entry["sequence"].upper()
-    if len(seq) % _TRIPLE != 0:
-        raise ValueError("Sequence length must be divisible by 3 for codon scanning")
-    codons = [seq[i : i + _TRIPLE] for i in range(0, len(seq), _TRIPLE)]
+    def validate_cfg(self, *, params: Dict) -> None:
+        # Required: codon_table path
+        table = params.get("codon_table")
+        if not table or not Path(table).expanduser().exists():
+            raise ValueError(
+                "scan_codon: params.codon_table is required and must exist"
+            )
+        # Optional: region_codons must be [start,end]
+        rc = params.get("region_codons")
+        if rc is not None:
+            if not (isinstance(rc, (list, tuple)) and len(rc) == 2):
+                raise ValueError(
+                    "scan_codon: params.region_codons must be [start,end] in codon units"
+                )
 
-    total = len(codons)
-    if regions:
-        start, end = regions[0]
-        scan_ix = range(start, min(end, total))
-    else:
-        scan_ix = range(total)
+    def generate(
+        self, *, ref_entry: Dict, params: Dict, rng: np.random.Generator
+    ) -> Iterable[Dict]:
+        table = params.get("codon_table")
+        aa2codons, codon2aa = _load_codon_table(Path(table).expanduser())
 
-    variants: List[Dict] = []
-    ref_name = ref_entry["ref_name"]
+        seq = str(ref_entry["sequence"]).upper()
+        name = ref_entry.get("ref_name", "<unknown>")
+        if not re.fullmatch(r"[ACGT]+", seq or ""):
+            raise ValueError(f"[{name}] invalid characters in sequence")
 
-    for ci in scan_ix:
-        wt = codons[ci]
-        wt_aa = next((aa for aa, clist in aa2codons.items() if wt in clist), None)
-        if wt_aa is None:
-            continue
-        for aa, codon_list in aa2codons.items():
-            if aa == wt_aa or not codon_list:
-                continue
-            new_codon = codon_list[0]
-            mutated = codons.copy()
-            mutated[ci] = new_codon
-            variants.append(
-                {
-                    "ref_name": ref_name,
-                    "protocol": "scan_codon",
-                    "sequence": "".join(mutated),
-                    "modifications": [f"{wt}@{ci}→{new_codon}({aa})"],
-                }
+        if len(seq) % _TRIPLE != 0:
+            raise ValueError(
+                "scan_codon: sequence length must be divisible by 3 for codon scanning"
             )
 
-    return variants
+        codons = [seq[i : i + _TRIPLE] for i in range(0, len(seq), _TRIPLE)]
+        total = len(codons)
+
+        rc = params.get("region_codons")
+        if rc:
+            start, end = int(rc[0]), int(rc[1])
+            if not (0 <= start <= end <= total):
+                raise ValueError(
+                    f"scan_codon: region_codons out of bounds for {total} codons: {rc}"
+                )
+            scan_ix = range(start, end)
+        else:
+            scan_ix = range(total)
+
+        for ci in scan_ix:
+            wt = codons[ci]
+            wt_aa = codon2aa.get(wt)
+            if wt_aa is None:
+                # unknown / stop codon not represented in table; skip
+                continue
+            for aa, codon_list in aa2codons.items():
+                if aa == wt_aa or not codon_list:
+                    continue
+                new_codon = codon_list[0]
+                mutated = codons.copy()
+                mutated[ci] = new_codon
+                yield {
+                    "sequence": "".join(mutated),
+                    "modifications": [f"codon i={ci} wt={wt} new={new_codon} aa={aa}"],
+                    "codon_index": ci,
+                    "codon_wt": wt,
+                    "codon_new": new_codon,
+                    "codon_aa": aa,
+                }
