@@ -28,7 +28,7 @@ from dnadesign.permuter.reporter import (
     write_results,
     write_round_files,
 )
-from dnadesign.permuter.selector import select
+from dnadesign.permuter.selector import select  # <-- needed
 
 _LOG = init_logger("INFO")
 
@@ -129,21 +129,40 @@ def _resolve_input_file(
     input_file: str | Path, *, config_path: Path, base_output: Path
 ) -> Path:
     """
-    Resolve a job's input_file with robust, predictable precedence:
+    Resolve a job-specified path (refs.csv, lookup tables, etc.) with robust,
+    predictable precedence:
 
       1) absolute path as-is (if exists)
-      2) relative to the config file's directory
-      3) relative to base_output (experiment directory)
-      4) FINAL fallback: dnadesign/permuter/input/<basename>
+      2) relative to the CONFIG file's directory (experiments/<name>/config.yaml)
+      3) relative to base_output (the experiment directory)
+      4) relative to the EXPERIMENTS ROOT (parent folder that contains all experiments)
+      5) EXPERIMENTS ROOT / input / <basename>
+      6) FINAL fallback: dnadesign/permuter/input/<basename>
+
+    Notes
+    -----
+    - This lets you keep a single global refs.csv or codon table under:
+        experiments/refs.csv                 (case 4)
+        experiments/input/refs.csv          (case 5)
+      while still supporting per-experiment inputs.
     """
     p = Path(input_file)
+    exp_root = config_path.parent.parent  # experiments/<name>/ -> experiments/
     cands = []
+
     if p.is_absolute():
         cands.append(p)
     else:
-        cands.append((config_path.parent / p))
-        cands.append((base_output / p))
-        cands.append(Path(__file__).replace("runner.py", "").parent / "input" / p.name)
+        # local to the config.yaml
+        cands.append(config_path.parent / p)
+        # local to the experiment folder (base_output)
+        cands.append(base_output / p)
+        # at the experiments root
+        cands.append(exp_root / p)
+        # experiments root / input / <basename>
+        cands.append(exp_root / "input" / p.name)
+        # module fallback
+        cands.append(Path(__file__).parent / "input" / p.name)
 
     for c in cands:
         c = c.expanduser().resolve()
@@ -331,6 +350,62 @@ def _run_job(job: Dict, base_dir: Path, cfg_path: Path) -> None:
                     params=params,
                 )
 
+                # ─── protocol-specific path fixups / aliases ───────────────
+                if protocol == "scan_codon":
+                    # Accept multiple config shapes:
+                    #   permute.params.codon_table: str
+                    #   permute.codon_table(s): str | list[str]
+                    #   permute.lookup_table(s): str | list[str]
+                    codon_table_value = (
+                        params.get("codon_table")
+                        or permute_cfg.get("codon_table")
+                        or permute_cfg.get("codon_tables")     # <— NEW supported alias
+                        or permute_cfg.get("lookup_table")
+                        or permute_cfg.get("lookup_tables")
+                    )
+                    if isinstance(codon_table_value, (list, tuple)):
+                        codon_table_value = next(
+                            (str(x) for x in codon_table_value if str(x).strip()), ""
+                        )
+                    if not codon_table_value:
+                        raise ValueError(
+                            f"[{job_name}] scan_codon requires params.codon_table (path to CSV)."
+                        )
+                    resolved_ct = _resolve_input_file(
+                        codon_table_value, config_path=cfg_path, base_output=base_dir
+                    )
+                    if not resolved_ct.exists():
+                        raise FileNotFoundError(
+                            f"[{job_name}] codon_table not found at {resolved_ct}"
+                        )
+                    params["codon_table"] = str(resolved_ct)
+
+                    # Optional: convert nt-based regions → codon units if clean
+                    if "region_codons" not in params and permute_cfg.get("regions"):
+                        regs = permute_cfg["regions"]
+                        if isinstance(regs, list) and len(regs) in (0, 1):
+                            if regs:
+                                r = regs[0]
+                                if (
+                                    isinstance(r, (list, tuple))
+                                    and len(r) == 2
+                                    and all(isinstance(x, int) for x in r)
+                                ):
+                                    s, e = int(r[0]), int(r[1])
+                                    if s % 3 == 0 and e % 3 == 0:
+                                        params["region_codons"] = [s // 3, e // 3]
+                                    else:
+                                        _LOG.warning(
+                                            f"[{job_name}/{ref_name}] regions [{s},{e}) not on codon boundaries; "
+                                            f"ignoring region for scan_codon."
+                                        )
+                        elif isinstance(regs, list) and len(regs) > 1:
+                            _LOG.warning(
+                                f"[{job_name}/{ref_name}] multiple regions provided; "
+                                f"scan_codon currently supports at most one contiguous region."
+                            )
+
+                # generate variants
                 raw_iter = permute_record(seed, protocol, params=params)
 
                 for var in raw_iter:

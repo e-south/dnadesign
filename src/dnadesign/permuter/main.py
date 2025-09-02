@@ -36,13 +36,34 @@ from dnadesign.permuter.workspace import (
 _LOG = init_logger("INFO")
 
 
+def _autodetect_config() -> Path | None:
+    """
+    Search order:
+      1) ./workspace.yaml
+      2) ./config.yaml
+      3) <module_dir>/workspace.yaml
+      4) <module_dir>/config.yaml
+    """
+    here = Path.cwd()
+    moddir = Path(__file__).parent
+    for cand in [
+        here / "workspace.yaml",
+        here / "config.yaml",
+        moddir / "workspace.yaml",
+        moddir / "config.yaml",
+    ]:
+        if cand.is_file():
+            return cand.resolve()
+    return None
+
+
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Run the permuter pipeline")
     p.add_argument(
         "--config",
         type=Path,
-        default=Path(__file__).parent / "config.yaml",
-        help="YAML file: single experiment config OR workspace.yaml",
+        default=None,  # <-- allow autodetect
+        help="YAML file: single experiment config OR workspace.yaml (autodetect if omitted)",
     )
     p.add_argument(
         "--only",
@@ -67,10 +88,16 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = _parse_args()
-    cfg = args.config.resolve()
+    cfg = args.config.resolve() if args.config is not None else _autodetect_config()
 
-    if not cfg.is_file():
-        _LOG.error(f"Config file not found: {cfg}")
+    if cfg is None or not cfg.is_file():
+        _LOG.error(
+            "No config found. Pass --config or place one of:\n"
+            "  - ./workspace.yaml\n"
+            "  - ./config.yaml\n"
+            f"  - {Path(__file__).parent / 'workspace.yaml'}\n"
+            f"  - {Path(__file__).parent / 'config.yaml'}"
+        )
         sys.exit(1)
 
     # Workspace mode
@@ -79,7 +106,6 @@ def main() -> None:
         if args.list:
             for e in exps:
                 mark = "[x]" if e.enabled else "[ ]"
-                # Show path relative to the workspace experiments root
                 rel = e.config_path.relative_to(exp_root)
                 print(f"{mark} {e.name:20s}  ({rel})")
             return

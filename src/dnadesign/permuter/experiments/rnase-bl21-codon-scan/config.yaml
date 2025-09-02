@@ -1,0 +1,50 @@
+# dnadesign/permuter/experiments/.../config.yaml
+
+permuter:
+  experiment:
+    name: rnase-bl21-codon-scan
+
+  jobs:
+    - name: rnase-bl21-codon-scan
+      input_file: input/refs.csv                 # must include ref_name, sequence
+      references: ["BL21_RNase_H1_wt"]
+
+      run:
+        mode: auto                               # full | analysis | auto
+
+      permute:
+        protocol: scan_codon                       # scan_dna | scan_codon
+        regions: []                                # [] = full sequence; or [[start,end), …]
+        codon_tables: input/codon_ecoli.csv           # required for scan_codon
+
+      evaluate:
+        metrics:
+          - id: llr
+            name: log_likelihood_ratio
+            evaluator: evo2_llr
+            goal: max
+            params:
+              model_id: evo2_7b
+              device: cuda:0
+              precision: bf16
+              alphabet: dna
+              reduction: mean
+
+      select:
+        objective:
+          type: weighted_sum
+          weights: { llr: 1 }                     # keys must match metric ids exactly
+        strategy:
+          type: top_k
+          k: 10
+          include_ties: true
+
+      iterate:
+        enabled: true
+        total_rounds: 1
+
+      report:
+        csv: false
+        plots:
+          - position_scatter_and_heatmap
+          - metric_by_mutation_count

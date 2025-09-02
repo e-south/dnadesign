@@ -58,7 +58,8 @@ class Evo2Adapter:
       - generate      : prompt-based sequence generation.
 
     The engine constructs this adapter with (model_id, device, precision). We
-    instantiate the Evo 2 model by id and place it in eval mode.
+    instantiate the Evo 2 model by id and (when possible) set the underlying
+    torch module to eval mode. All ops also run under torch.inference_mode().
     """
 
     model_id: str
@@ -83,16 +84,35 @@ class Evo2Adapter:
         self.device = device
         self.precision = precision
 
+        # Instantiate upstream wrapper
         try:
             model = _Evo2(model_id)
         except Exception as e:  # pragma: no cover
             raise ModelLoadError(f"Failed to instantiate Evo 2('{model_id}'): {e}")
 
-        # Always eval-mode for inference.
-        try:
-            model.eval()
-        except Exception as e:  # pragma: no cover
-            _LOG.warning(f"Evo2 model did not enter eval mode cleanly: {e}")
+        # ──────────────────────────────────────────────────────────────────────
+        # Safe eval-mode handling
+        # The Evo2 wrapper itself isn't a torch.nn.Module, so calling .eval() on
+        # it raises an AttributeError. Look for a real module inside the wrapper
+        # and call eval() there; otherwise proceed silently (we still use
+        # torch.inference_mode() for all ops).
+        # ──────────────────────────────────────────────────────────────────────
+        torch_mod = None
+        for attr in ("model", "net", "module", "_model"):
+            obj = getattr(model, attr, None)
+            if obj is not None and hasattr(obj, "eval") and callable(getattr(obj, "eval")):
+                torch_mod = obj
+                break
+
+        if torch_mod is not None:
+            try:
+                torch_mod.eval()
+            except Exception as e:  # extremely defensive; shouldn't happen
+                _LOG.debug("Evo2 underlying module eval() failed: %s", e)
+        else:
+            _LOG.debug(
+                "Evo2 wrapper exposes no torch module with eval(); proceeding under inference_mode()."
+            )
 
         # Basic tokenizer sanity check (README guarantees presence)
         if not hasattr(model, "tokenizer"):
@@ -100,7 +120,8 @@ class Evo2Adapter:
                 "Evo2 model missing tokenizer; unexpected install/runtime state."
             )
 
-        self.model = model  # keep as-is; no model.to(...)
+        self.model = model  # keep as-is; upstream handles device placement
+        self._torch_module = torch_mod  # optional: might be useful for future hooks
 
     # -------------------------------------------------------------------------
     # Helpers
