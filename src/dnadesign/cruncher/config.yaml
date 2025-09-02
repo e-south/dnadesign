@@ -5,7 +5,7 @@ cruncher:
   mode: sample-analyse                      # “parse” | “sample” | “analyse” | “sample-analyse”
   out_dir: results/                         # relative path under cruncher/ where batches go
   regulator_sets:                           # each entry is a list of TF names
-    - [lexA, cpxR]
+    - [lexA, soxR]
 
   # PARSE MODE (sanity‐check PWMs, draw logos, print log‐odds)
   parse:
@@ -25,13 +25,13 @@ cruncher:
 
     init:
       kind: random                          # “random” | “consensus” | “consensus_mix”
-      length: 25                            # overall length of the output sequence (must be ≥ 1)
+      length: 35                            # overall length of the output sequence (must be ≥ 1)
       pad_with: background                  # “background” (uniform-random pad) or “A”|“C”|“G”|“T”
       regulator: soxR                       # If kind == “consensus”, supply a regulator name that exists in regulator_sets
 
-    draws: 1000                             # number of MCMC draws (after tune)
+    draws: 5000                              # number of MCMC draws (after tune)
     tune: 0                                 # number of burn‐in sweeps
-    chains: 14                              # number of parallel chains (Gibbs or PT)
+    chains: 6                               # number of parallel chains (Gibbs or PT); set 14 for pt
     min_dist: 5                             # Hamming‐distance threshold for “diverse elites”
     top_k: 25                               # how many top sequences to save
     pwm_sum_threshold: 1.50                 # keep (raw_llr/consensus_llr) ∈ (0, 2] (two TFs ⇒ max sum = 2).
@@ -51,20 +51,20 @@ cruncher:
         M: 0.33                             # probability of a multi‐site flip (k sites)
 
     optimiser:
-      kind: pt                             # “gibbs” | “pt”
+      kind: gibbs                             # “gibbs” | “pt”
       scorer_scale: llr                    # “llr" | "z" | “logp” | "consensus-neglop-sum"
 
       # GIBBS (LINEAR‐RAMP COOLING) BUILT‐IN
-      # cooling:
-      #   kind: linear                        # "fixed" | “linear” | “geometric” (geometric is for PT only)
-      #   beta: [1e-6, 1e-3]                  # [β_start, β_end]
+      cooling:
+        kind: linear                        # "fixed" | “linear” | “geometric” (geometric is for PT only)
+        beta: [1e-6, 1e-3]                  # [β_start, β_end]
 
       # If kind == “pt”, uncomment & use the block below instead:
-      cooling:
-        kind: geometric
-        beta: [1.0, 0.8, 0.64, 0.512, 0.41, 0.328,
-              0.262, 0.21, 0.168, 0.134, 0.107,
-              0.086, 0.069, 0.05]  # length must match the number of chains
+      # cooling:
+      #   kind: geometric
+      #   beta: [1.0, 0.8, 0.64, 0.512, 0.41, 0.328,
+      #         0.262, 0.21, 0.168, 0.134, 0.107,
+      #         0.086, 0.069, 0.05]  # length must match the number of chains
 
       swap_prob: 0.65                       # intra‐chain block‐swap probability (Gibbs); inter‐chain exchange prob (PT)
       softmax_beta: 0.20                    # only used by PT (must be a positive float)

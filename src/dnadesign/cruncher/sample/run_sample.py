@@ -35,7 +35,13 @@ from dnadesign.cruncher.utils.config import CruncherConfig
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-PWM_PATH = PROJECT_ROOT.parent / "dnadesign-data" / "primary_literature" / "OMalley_et_al" / "escherichia_coli_motifs"
+PWM_PATH = (
+    PROJECT_ROOT.parent
+    / "dnadesign-data"
+    / "primary_literature"
+    / "OMalley_et_al"
+    / "escherichia_coli_motifs"
+)
 
 
 def _save_config(cfg: CruncherConfig, batch_dir: Path) -> None:
@@ -74,7 +80,9 @@ def _save_config(cfg: CruncherConfig, batch_dir: Path) -> None:
 
     data["pwms_info"] = pwms_info
     with cfg_path.open("w") as fh:
-        yaml.safe_dump({"cruncher": data}, fh, sort_keys=False, default_flow_style=False)
+        yaml.safe_dump(
+            {"cruncher": data}, fh, sort_keys=False, default_flow_style=False
+        )
     logger.info("Wrote config_used.yaml to %s", cfg_path.relative_to(batch_dir.parent))
 
 
@@ -98,11 +106,21 @@ def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
         logger.debug("  Loading PWM for %s", tf)
         pwms[tf] = reg.load(tf)
 
+    max_w = max(pwm.length for pwm in pwms.values())
+    if cfg.sample.init.length < max_w:
+        names = ", ".join(f"{tf}:{pwms[tf].length}" for tf in sorted(pwms))
+        raise ValueError(
+            f"init.length={cfg.sample.init.length} is shorter than the widest PWM (max={max_w}). "
+            f"Per-TF lengths: {names}. Increase sample.init.length."
+        )
+
     # 2) INSTANTIATE SCORER and SequenceEvaluator
     scale = sample_cfg.optimiser.scorer_scale
     logger.info("Using scorer_scale = %r", scale)
     if scale == "consensus-neglop-sum":
-        logger.debug("Building Scorer with inner scale='logp' in order to feed SequenceEvaluator(consensus-neglop-sum)")
+        logger.debug(
+            "Building Scorer with inner scale='logp' in order to feed SequenceEvaluator(consensus-neglop-sum)"
+        )
         scorer = Scorer(
             pwms,
             bidirectional=sample_cfg.bidirectional,
@@ -190,7 +208,9 @@ def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
         from dnadesign.cruncher.utils.traces import save_trace
 
         save_trace(optimizer.trace_idata, out_dir / "trace.nc")
-        logger.info("Saved MCMC trace → %s", (out_dir / "trace.nc").relative_to(out_dir.parent))
+        logger.info(
+            "Saved MCMC trace → %s", (out_dir / "trace.nc").relative_to(out_dir.parent)
+        )
 
     # 8) SAVE sequences.csv (chain, draw, phase, sequence_string, per-TF scaled scores)
     if (
@@ -204,7 +224,9 @@ def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
             writer = csv.writer(fh)
 
             # Header with “phase” column (either “tune” or “draw”)
-            header = ["chain", "draw", "phase", "sequence"] + [f"score_{tf}" for tf in sorted(pwms.keys())]
+            header = ["chain", "draw", "phase", "sequence"] + [
+                f"score_{tf}" for tf in sorted(pwms.keys())
+            ]
             writer.writerow(header)
 
             for (chain_id, draw_i), seq_arr, per_tf_map in zip(
@@ -227,7 +249,10 @@ def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
                 ] + [per_tf_map[tf] for tf in sorted(per_tf_map.keys())]
                 writer.writerow(row)
 
-        logger.info("Saved all sequences with per-TF scores → %s", seq_csv.relative_to(out_dir.parent))
+        logger.info(
+            "Saved all sequences with per-TF scores → %s",
+            seq_csv.relative_to(out_dir.parent),
+        )
 
     # 9)  BUILD elites list — keep draws whose ∑ normalised ≥ pwm_sum_threshold
     #     + enforce a per-sequence Hamming-distance diversity filter
@@ -266,7 +291,11 @@ def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
         avg_thr_pct = 100 * thr_norm / n_tf
         logger.info("Normalised-sum percentiles  |  median %.2f   90%% %.2f", p50, p90)
         logger.info(
-            "Threshold %.2f ⇒ ~%.0f%%-of-consensus on average per TF " "(%d regulators)", thr_norm, avg_thr_pct, n_tf
+            "Threshold %.2f ⇒ ~%.0f%%-of-consensus on average per TF "
+            "(%d regulators)",
+            thr_norm,
+            avg_thr_pct,
+            n_tf,
         )
         logger.info(
             "Typical draw: med %.2f (≈ %.0f%%/TF); top-10%% %.2f (≈ %.0f%%/TF)",
@@ -294,7 +323,10 @@ def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
 
     if min_dist > 0:
         logger.info(
-            "Diversity filter (≥%d mismatches): kept %d / %d candidates", min_dist, len(kept_elites), len(raw_elites)
+            "Diversity filter (≥%d mismatches): kept %d / %d candidates",
+            min_dist,
+            len(kept_elites),
+            len(raw_elites),
         )
     else:
         kept_elites = raw_elites  # no filtering
@@ -303,7 +335,9 @@ def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
     elites: list[dict[str, object]] = []
     want_cons = bool(getattr(cfg.sample, "include_consensus_in_elites", False))
 
-    for rank, (seq_arr, chain_id, draw_idx, total_norm, per_tf_map) in enumerate(kept_elites, 1):
+    for rank, (seq_arr, chain_id, draw_idx, total_norm, per_tf_map) in enumerate(
+        kept_elites, 1
+    ):
         seq_str = SequenceState(seq_arr).to_string()
         per_tf_details: dict[str, dict[str, object]] = {}
 

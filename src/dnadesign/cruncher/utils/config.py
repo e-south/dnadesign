@@ -13,10 +13,10 @@ Dunlop Lab
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import yaml
-from pydantic import BaseModel, Field, root_validator, validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # PARSE MODE SECTION
@@ -63,14 +63,20 @@ class MoveConfig(BaseModel):
         "M": 0.20,
     }
 
-    @validator("block_len_range", "multi_k_range", "swap_len_range", pre=True)
-    def _list_to_tuple(cls, v):
+    @field_validator(
+        "block_len_range", "multi_k_range", "swap_len_range", mode="before"
+    )
+    @classmethod
+    def _list_to_tuple(cls, v: Any) -> Any:
         if isinstance(v, (list, tuple)):
             return tuple(int(x) for x in v)
         return v
 
-    @validator("move_probs", pre=True)
-    def _check_move_probs_keys_and_values(cls, v):
+    @field_validator("move_probs")
+    @classmethod
+    def _check_move_probs_keys_and_values(
+        cls, v: Dict[str, float]
+    ) -> Dict[Literal["S", "B", "M"], float]:
         """
         Ensure that:
           • Exactly keys "S","B","M" are present
@@ -78,29 +84,32 @@ class MoveConfig(BaseModel):
           • The three values sum to (approximately) 1.0
         """
         if not isinstance(v, dict):
-            raise ValueError("move_probs must be a mapping {S: float, B: float, M: float}")
+            raise ValueError(
+                "move_probs must be a mapping {S: float, B: float, M: float}"
+            )
 
-        # Check exactly the expected keys
         expected_keys = {"S", "B", "M"}
         got_keys = set(v.keys())
         if got_keys != expected_keys:
-            raise ValueError(f"move_probs keys must be exactly {expected_keys}, but got {got_keys}")
+            raise ValueError(
+                f"move_probs keys must be exactly {expected_keys}, but got {got_keys}"
+            )
 
-        # Check each value is non‐negative float
-        for k, val in v.items():
+        # Validate non-negativity and coerce to float
+        out: Dict[Literal["S", "B", "M"], float] = {}  # type: ignore[assignment]
+        for k in ("S", "B", "M"):
             try:
-                fv = float(val)
-            except (TypeError, ValueError):
-                raise ValueError(f"move_probs['{k}'] must be a float, got {val!r}")
+                fv = float(v[k])
+            except (TypeError, ValueError, KeyError):
+                raise ValueError(f"move_probs['{k}'] must be a float, got {v.get(k)!r}")
             if fv < 0:
                 raise ValueError(f"move_probs['{k}'] must be ≥ 0, but got {fv}")
-        # Check they sum to 1.0 (allow slight numerical tolerance)
-        total = sum(float(v[k]) for k in expected_keys)
+            out[k] = fv  # type: ignore[index]
+
+        total = out["S"] + out["B"] + out["M"]
         if abs(total - 1.0) > 1e-6:
             raise ValueError(f"move_probs values must sum to 1.0; got sum={total:.6f}")
-
-        # Return as floats
-        return {k: float(v[k]) for k in expected_keys}
+        return out
 
 
 class CoolingFixed(BaseModel):
@@ -111,8 +120,9 @@ class CoolingFixed(BaseModel):
     kind: Literal["fixed"] = "fixed"
     beta: float = 1.0
 
-    @validator("beta")
-    def _check_positive_beta(cls, v):
+    @field_validator("beta")
+    @classmethod
+    def _check_positive_beta(cls, v: float) -> float:
         if v <= 0:
             raise ValueError("Fixed cooling beta must be > 0")
         return v
@@ -126,10 +136,13 @@ class CoolingLinear(BaseModel):
     kind: Literal["linear"] = "linear"
     beta: Tuple[float, float]
 
-    @validator("beta")
-    def _two_positive(cls, v):
+    @field_validator("beta")
+    @classmethod
+    def _two_positive(cls, v: Tuple[float, float]) -> Tuple[float, float]:
         if len(v) != 2:
-            raise ValueError("Linear cooling.beta must be length-2 [beta_start, beta_end]")
+            raise ValueError(
+                "Linear cooling.beta must be length-2 [beta_start, beta_end]"
+            )
         if v[0] <= 0 or v[1] <= 0:
             raise ValueError("Both β_start and β_end must be > 0")
         return v
@@ -143,10 +156,13 @@ class CoolingGeometric(BaseModel):
     kind: Literal["geometric"] = "geometric"
     beta: List[float]
 
-    @validator("beta")
-    def _check_list_positive(cls, v):
+    @field_validator("beta")
+    @classmethod
+    def _check_list_positive(cls, v: List[float]) -> List[float]:
         if not isinstance(v, list) or len(v) < 2:
-            raise ValueError("Geometric cooling.beta must be a list of at least two positive floats")
+            raise ValueError(
+                "Geometric cooling.beta must be a list of at least two positive floats"
+            )
         if any(x <= 0 for x in v):
             raise ValueError("All entries in geometric β list must be > 0")
         return v
@@ -172,16 +188,16 @@ class OptimiserConfig(BaseModel):
     swap_prob: float = 0.10
     softmax_beta: Optional[float] = None
 
-    @root_validator
-    def _check_pt_needs_softmax(cls, values):
-        kind = values.get("kind")
-        sb = values.get("softmax_beta")
-        if kind == "pt":
-            if sb is None:
-                raise ValueError("softmax_beta must be supplied when optimiser.kind == 'pt'")
-            if sb <= 0:
+    @model_validator(mode="after")
+    def _check_pt_needs_softmax(self) -> "OptimiserConfig":
+        if self.kind == "pt":
+            if self.softmax_beta is None:
+                raise ValueError(
+                    "softmax_beta must be supplied when optimiser.kind == 'pt'"
+                )
+            if self.softmax_beta <= 0:
                 raise ValueError("softmax_beta must be > 0")
-        return values
+        return self
 
 
 class InitConfig(BaseModel):
@@ -194,19 +210,20 @@ class InitConfig(BaseModel):
     regulator: Optional[str] = None
     pad_with: Optional[Literal["background", "A", "C", "G", "T"]] = "background"
 
-    @validator("length")
-    def _check_length_positive(cls, v):
+    @field_validator("length")
+    @classmethod
+    def _check_length_positive(cls, v: int) -> int:
         if v < 1:
             raise ValueError("init.length must be >= 1")
         return v
 
-    @root_validator
-    def _check_fields_for_modes(cls, values):
-        kind = values.get("kind")
-        regulator = values.get("regulator")
-        if kind == "consensus" and not regulator:
-            raise ValueError("When init.kind=='consensus', you must supply init.regulator=<PWM_name>")
-        return values
+    @model_validator(mode="after")
+    def _check_fields_for_modes(self) -> "InitConfig":
+        if self.kind == "consensus" and not self.regulator:
+            raise ValueError(
+                "When init.kind=='consensus', you must supply init.regulator=<PWM_name>"
+            )
+        return self
 
 
 class SampleConfig(BaseModel):
@@ -229,13 +246,15 @@ class SampleConfig(BaseModel):
     save_sequences: bool = True
 
     pwm_sum_threshold: float = Field(
-        0.0, description="If >0, only sequences with sum(per-TF scaled_score) ≥ this are written to elites.json"
+        0.0,
+        description="If >0, only sequences with sum(per-TF scaled_score) ≥ this are written to elites.json",
     )
 
-    @validator("draws", "tune", "chains", "min_dist", "top_k")
-    def _check_positive_ints(cls, v, field):
+    @field_validator("draws", "tune", "chains", "min_dist", "top_k")
+    @classmethod
+    def _check_positive_ints(cls, v: int) -> int:
         if not isinstance(v, int) or v < 0:
-            raise ValueError(f"{field.name} must be a non-negative integer")
+            raise ValueError("must be a non-negative integer")
         return v
 
 
@@ -256,10 +275,13 @@ class AnalysisConfig(BaseModel):
     subsampling_epsilon: float
     scatter_style: Literal["edges", "thresholds"] = "edges"
 
-    @validator("subsampling_epsilon")
-    def _check_positive_epsilon(cls, v):
+    @field_validator("subsampling_epsilon")
+    @classmethod
+    def _check_positive_epsilon(cls, v: float) -> float:
         if not isinstance(v, (int, float)) or v <= 0.0:
-            raise ValueError("subsampling_epsilon must be a positive number (float or int)")
+            raise ValueError(
+                "subsampling_epsilon must be a positive number (float or int)"
+            )
         return float(v)
 
 
@@ -272,19 +294,18 @@ class CruncherConfig(BaseModel):
     sample: Optional[SampleConfig]
     analysis: Optional[AnalysisConfig]
 
-    @root_validator
-    def _check_mode_sections(cls, values):
-        mode = values.get("mode")
-        has_sample = values.get("sample") is not None
-        has_analysis = values.get("analysis") is not None
+    @model_validator(mode="after")
+    def _check_mode_sections(self) -> "CruncherConfig":
+        has_sample = self.sample is not None
+        has_analysis = self.analysis is not None
 
-        if mode == "sample" and not has_sample:
+        if self.mode == "sample" and not has_sample:
             raise ValueError("When mode='sample', a [sample:] section is required.")
-        if mode in ("analyse", "analyze") and not has_analysis:
+        if self.mode in ("analyse", "analyze") and not has_analysis:
             raise ValueError("When mode='analyse', an [analysis:] section is required.")
-        return values
+        return self
 
 
 def load_config(path: Path) -> CruncherConfig:
     raw = yaml.safe_load(path.read_text())["cruncher"]
-    return CruncherConfig.parse_obj(raw)
+    return CruncherConfig.model_validate(raw)
