@@ -10,8 +10,7 @@ usr/
 ├─ datasets/
 │    └─ <dataset_name>/
 │         ├─ records.parquet
-│         ├─ meta.yaml
-│         └─ .snapshots/
+│         └─ _snapshots/
 └─ template_demo/        # example CSVs for the README walkthrough
 ````
 
@@ -21,7 +20,7 @@ usr/
 |------------|--------------------|-------------------------------------------|
 | id         | string             | `sha1(bio_type|sequence_upper)`           |
 | bio_type   | string             | `"dna"` or `"protein"`                    |
-| sequence   | string             | normalized (e.g., DNA uppercased)         |
+| sequence   | string             | case-insensitive                          |
 | alphabet   | string             | e.g. `"dna_4"`                            |
 | length     | int32              | `len(sequence)`                           |
 | source     | string             | ingest provenance                         |
@@ -29,18 +28,15 @@ usr/
 
 > **Contract:** one `records.parquet` per dataset directory. Everything else (derivatives, working files) lives elsewhere.
 
-### Validation notes
-- For `alphabet="dna_4"`, sequences must contain only `[ACGTacgt]` (case-insensitive check). Case is **not** coerced; lowercase may carry information and is preserved.
-
 ### Namespacing (core rule)
 
-All **derived** columns must be prefixed `"<tool>__<field>"`, e.g.:
+All **secondary** columns must be prefixed `"<tool>__<field>"`, e.g.:
 
 - `opal__score`, `opal__rank`
 - `infer__llr`, `infer__model`
 - `clustering__leiden`, `clustering__umap_x`
 
-Essential columns** (table above) are immutable.
+Essential columns (table above) are immutable.
 
 ### CLI walkthrough with the included template
 
@@ -126,7 +122,7 @@ print(ds.head(5))
 
 ### Optional console scripts (shortcuts)
 
-If you add these to `pyproject.toml` and install in editable mode, you’ll get shell commands you can run from anywhere:
+If you add these to `pyproject.toml` and install `dnadesign` in editable mode, you’ll get shell commands you can run from anywhere:
 
 ```toml
 [project.scripts]
@@ -146,10 +142,19 @@ USR head mock_dataset -n 5
 
 ### Remote Sync (cluster ↔ local)
 
-`usr` includes a lightweight, SSH-backed sync for dataset folders you **don’t** want in git (e.g., `records.parquet`, `_snapshots/`, `.events.log`).
+`usr` includes a lightweight, SSH-backed sync for dataset folders you **don’t** want in git (e.g., large `records.parquet`, `_snapshots/`, `.events.log` files).
 
 
 **Rule of thumb:** run the command **on the machine where you want the files to end up.** In practice, that means you usually run from your **laptop**.
+
+- datasets live as folders (containing `records.parquet`, `_snapshots`, etc.).
+- `usr pull <dataset> --from cluster` copies that folder down (safe overwrite).
+- `usr push` sends your local folder back up.
+- `usr` uses ssh under the hood, so authentication choices are:
+  - Password prompts
+  - SSH keys
+
+For more information on how to set this up, see the sibling [**SYNC.md**](SYNC.md) documentation.
 
 #### 1) Configure once
 
@@ -161,27 +166,12 @@ You can add a remote via CLI **or** by creating `usr/remotes.yaml`.
 # Define the cluster remote once
 usr remotes add cluster --type ssh \
   --host scc1.bu.edu --user esouth \
-  --base-dir /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets \
-  --ssh-key-env USR_SSH_KEY
+  --base-dir /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets
 
 # (Optional) Inspect
 usr remotes list
 usr remotes show cluster
 ```
-
-**File (`usr/remotes.yaml`):**
-
-```yaml
-remotes:
-  cluster:
-    type: ssh
-    host: scc1.bu.edu
-    user: esouth
-    base_dir: /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets
-    # ssh_key_env: USR_SSH_KEY   # optional; otherwise ssh-agent/default key
-```
-
-> Make sure your key is available (e.g., `export USR_SSH_KEY=~/.ssh/id_ed25519`) or your agent is loaded.
 
 #### 2) When working locally
 
@@ -200,13 +190,6 @@ usr pull 60bp_dual_promoter_cpxR_Lex --from cluster
 usr push 60bp_dual_promoter_cpxR_Lex --to cluster
 ```
 
-Handy flags:
-
-* `-y/--yes` non-interactive
-* `--primary-only` only `records.parquet`
-* `--skip-snapshots` omit `_snapshots/`
-* `--dry-run` show the plan, don’t copy
-
 #### 3) From the **cluster** (only if needed)
 
 If you’re logged into the cluster and want data to **end up on your laptop**, the simplest path is to **exit to your laptop and run `usr pull … --from cluster`**.
@@ -222,8 +205,6 @@ By default: the **entire dataset folder**:
   .events.log
   _snapshots/
 ```
-
-Use `--primary-only` / `--skip-snapshots` to trim what’s copied.
 
 #### Safety
 

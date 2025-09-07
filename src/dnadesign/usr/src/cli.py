@@ -29,15 +29,14 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 import pyarrow.parquet as pq
 
+from .config import SSHRemoteConfig, get_remote, load_all, save_remote
 from .dataset import Dataset
-from .config import SSHRemoteConfig, load_all, save_remote, get_remote
-from .sync import SyncOptions, plan_diff, execute_pull, execute_push
-from .errors import UserAbort, SequencesError
+from .errors import SequencesError, UserAbort
+from .sync import SyncOptions, execute_pull, execute_push, plan_diff
 
 
 def main() -> None:
@@ -68,7 +67,9 @@ def main() -> None:
 
     sp_imp = sp.add_parser("import", help="Import sequences into a dataset")
     sp_imp.add_argument("dataset")
-    sp_imp.add_argument("--from", dest="source_format", choices=["csv", "jsonl"], required=True)
+    sp_imp.add_argument(
+        "--from", dest="source_format", choices=["csv", "jsonl"], required=True
+    )
     sp_imp.add_argument("--path", type=Path, required=True)
     sp_imp.add_argument("--bio-type", default="dna", choices=["dna", "protein"])
     sp_imp.add_argument("--alphabet", default="dna_4")
@@ -148,7 +149,9 @@ def main() -> None:
     def add_sync_common(p_: argparse.ArgumentParser):
         p_.add_argument("dataset")
         p_.add_argument("--remote", "--from", "--to", dest="remote", required=True)
-        p_.add_argument("-y", "--yes", action="store_true", help="Assume yes (no prompt)")
+        p_.add_argument(
+            "-y", "--yes", action="store_true", help="Assume yes (no prompt)"
+        )
         p_.add_argument("--dry-run", action="store_true")
         p_.add_argument("--primary-only", action="store_true")
         p_.add_argument("--skip-snapshots", action="store_true")
@@ -182,17 +185,25 @@ def main() -> None:
 
 # ---------- existing simple commands ----------
 
+
 def list_datasets(root: Path):
     root = root.resolve()
     if not root.exists():
         return []
-    return sorted([p.name for p in root.iterdir() if p.is_dir() and (p / "records.parquet").exists()])
+    return sorted(
+        [
+            p.name
+            for p in root.iterdir()
+            if p.is_dir() and (p / "records.parquet").exists()
+        ]
+    )
 
 
 def cmd_ls(args):
     ds = list_datasets(args.root)
     if not ds:
-        print(f"(no datasets under {args.root})"); return
+        print(f"(no datasets under {args.root})")
+        return
     for name in ds:
         rp = args.root / name / "records.parquet"
         try:
@@ -211,9 +222,13 @@ def cmd_init(args):
 def cmd_import(args):
     d = Dataset(args.root, args.dataset)
     n = (
-        d.import_csv(args.path, default_bio_type=args.bio_type, default_alphabet=args.alphabet)
-        if args.source_format == "csv" else
-        d.import_jsonl(args.path, default_bio_type=args.bio_type, default_alphabet=args.alphabet)
+        d.import_csv(
+            args.path, default_bio_type=args.bio_type, default_alphabet=args.alphabet
+        )
+        if args.source_format == "csv"
+        else d.import_jsonl(
+            args.path, default_bio_type=args.bio_type, default_alphabet=args.alphabet
+        )
     )
     print(f"Imported {n} records into {d.name}")
 
@@ -222,8 +237,12 @@ def cmd_attach(args):
     d = Dataset(args.root, args.dataset)
     cols = [c.strip() for c in args.columns.split(",")] if args.columns else None
     n = d.attach(
-        args.path, namespace=args.namespace, id_col=args.id_col, columns=cols,
-        allow_overwrite=bool(args.allow_overwrite), note=args.note,
+        args.path,
+        namespace=args.namespace,
+        id_col=args.id_col,
+        columns=cols,
+        allow_overwrite=bool(args.allow_overwrite),
+        note=args.note,
     )
     print(f"Attached {n} rows worth of {args.namespace} columns into {d.name}")
 
@@ -280,6 +299,7 @@ def cmd_snapshot(args):
 
 # ---------- remotes commands ----------
 
+
 def cmd_remotes_list(args):
     remotes = load_all()
     if not remotes:
@@ -292,7 +312,7 @@ def cmd_remotes_list(args):
 def cmd_remotes_show(args):
     cfg = get_remote(args.name)
     print(f"name     : {cfg.name}")
-    print(f"type     : ssh")
+    print("type     : ssh")
     print(f"ssh      : {cfg.user}@{cfg.host}")
     print(f"base_dir : {cfg.base_dir}")
     print(f"ssh_key  : {cfg.ssh_key_env or '(ssh-agent or default key)'}")
@@ -314,24 +334,37 @@ def cmd_remotes_add(args):
 
 # ---------- diff/pull/push ----------
 
+
 def _print_diff(summary):
     def fmt_sz(n):
-        if n is None: return "?"
-        for unit in ["B","KB","MB","GB","TB"]:
-            if n < 1024: return f"{n:.0f}{unit}"
+        if n is None:
+            return "?"
+        for unit in ["B", "KB", "MB", "GB", "TB"]:
+            if n < 1024:
+                return f"{n:.0f}{unit}"
             n /= 1024
         return f"{n:.0f}PB"
 
     pl, pr = summary.primary_local, summary.primary_remote
     print(f"Dataset: {summary.dataset}")
-    print(f"Local  : {pl.sha256 or '?'}  size={fmt_sz(pl.size)}  rows={pl.rows or '?'}  cols={pl.cols or '?'}")
-    print(f"Remote : {pr.sha256 or '?'}  size={fmt_sz(pr.size)}  rows={pr.rows or '?'}  cols={pr.cols or '?'}")
+    print(
+        f"Local  : {pl.sha256 or '?'}  size={fmt_sz(pl.size)}  rows={pl.rows or '?'}  cols={pl.cols or '?'}"
+    )
+    print(
+        f"Remote : {pr.sha256 or '?'}  size={fmt_sz(pr.size)}  rows={pr.rows or '?'}  cols={pr.cols or '?'}"
+    )
     eq = "==" if (pl.sha256 and pr.sha256 and pl.sha256 == pr.sha256) else "≠"
     print(f"Primary sha: {pl.sha256 or '?'} {eq} {pr.sha256 or '?'}")
-    print(f"meta.yaml   mtime: {summary.meta_local_mtime or '-'}  →  {summary.meta_remote_mtime or '-'}")
+    print(
+        f"meta.yaml   mtime: {summary.meta_local_mtime or '-'}  →  {summary.meta_remote_mtime or '-'}"
+    )
     delta_evt = max(0, summary.events_remote_lines - summary.events_local_lines)
-    print(f".events.log lines: local={summary.events_local_lines}  remote={summary.events_remote_lines}  (+{delta_evt} on remote)")
-    print(f"_snapshots : remote_count={summary.snapshots.count}  newer_than_local={summary.snapshots.newer_than_local}")
+    print(
+        f".events.log lines: local={summary.events_local_lines}  remote={summary.events_remote_lines}  (+{delta_evt} on remote)"
+    )
+    print(
+        f"_snapshots : remote_count={summary.snapshots.count}  newer_than_local={summary.snapshots.newer_than_local}"
+    )
     print("Status     :", "CHANGES" if summary.has_change else "up-to-date")
 
 

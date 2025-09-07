@@ -20,12 +20,18 @@ from .errors import (
     ValidationError,
     WriteBackError,
 )
-from .ingest.sources import load_pt_file_input, load_records_input, load_sequences_input
+from .ingest.sources import (
+    load_pt_file_input,
+    load_records_input,
+    load_sequences_input,
+    load_usr_input,
+)
 from .ingest.validators import validate_dna, validate_protein
 from .logging import get_logger
 from .registry import get_adapter_cls, resolve_fn
 from .writers.pt_file import write_back_pt_file
 from .writers.records import write_back_records
+from .writers.usr import write_back_usr
 
 _LOG = get_logger(__name__)
 
@@ -58,29 +64,45 @@ def _validate_alphabet(alphabet: str, seqs: List[str]) -> None:
 def run_extract_job(
     inputs, *, model: ModelConfig, job: JobConfig
 ) -> Dict[str, List[object]]:
-    # ingest
-    if job.ingest.source == "sequences":
+    # ── ingest
+    source = job.ingest.source
+    if source == "sequences":
         seqs = load_sequences_input(inputs)
+        ids = None
         records = None
         pt_path = None
-    elif job.ingest.source == "records":
-        seqs, records = load_records_input(inputs, job.ingest.field)
+        ds = None
+    elif source == "records":
+        seqs, records = load_records_input(inputs, job.ingest.field or "sequence")
+        ids = None
         pt_path = None
-    elif job.ingest.source == "pt_file":
+        ds = None
+    elif source == "pt_file":
         if not isinstance(inputs, str):
             raise ValidationError("inputs must be a path string for pt_file ingest")
-        seqs, records = load_pt_file_input(inputs, job.ingest.field)
+        seqs, records = load_pt_file_input(inputs, job.ingest.field or "sequence")
+        ids = None
         pt_path = inputs
+        ds = None
+    elif source == "usr":
+        seqs, ids, ds = load_usr_input(
+            dataset_name=job.ingest.dataset,  # type: ignore[arg-type]
+            field=job.ingest.field or "sequence",
+            root=job.ingest.root,
+            ids=job.ingest.ids,
+        )
+        records = None
+        pt_path = None
     else:
-        raise ConfigError(f"Unknown ingest source: {job.ingest.source}")
+        raise ConfigError(f"Unknown ingest source: {source}")
 
-    # Validate alphabet (strict defaults)
+    # ── validate alphabet
     _validate_alphabet(model.alphabet, seqs)
 
-    # Adapter
+    # ── adapter
     adapter = _get_adapter(model)
 
-    # Validate all fns are supported by adapter namespace
+    # ── ensure one namespace per job (e.g., all 'evo2.*')
     namespace = job.outputs[0].fn.split(".")[0] if job.outputs else None
     for out in job.outputs or []:
         ns = out.fn.split(".")[0]
@@ -89,7 +111,7 @@ def run_extract_job(
                 "All outputs in a job must share the same adapter namespace"
             )
 
-    # Execute
+    # ── execute
     try:
         columnar: Dict[str, List[object]] = {}
         for out in job.outputs or []:
@@ -97,15 +119,17 @@ def run_extract_job(
             fn = getattr(adapter, method_name, None)
             if fn is None:
                 raise CapabilityError(f"Adapter does not implement '{out.fn}'")
-            # Dispatch by function name
+
             if method_name == "log_likelihood":
                 vals = fn(seqs, **out.params)
             elif method_name in {"logits", "embedding"}:
                 vals = fn(seqs, **out.params, fmt=out.format)
             else:
                 raise CapabilityError(f"Unsupported extract function '{out.fn}' in v1")
+
             if len(vals) != len(seqs):
                 raise RuntimeError("Adapter returned wrong number of outputs")
+
             columnar[out.id] = vals
     except RuntimeError as e:
         msg = str(e)
@@ -113,9 +137,9 @@ def run_extract_job(
             raise RuntimeOOMError(msg)
         raise
 
-    # Optional write-back
+    # ── optional write-back
     if job.io.write_back:
-        if job.ingest.source == "records":
+        if source == "records":
             write_back_records(
                 records,
                 model_id=model.id,
@@ -123,19 +147,28 @@ def run_extract_job(
                 columnar=columnar,
                 overwrite=job.io.overwrite,
             )
-        elif job.ingest.source == "pt_file":
+        elif source == "pt_file":
             write_back_pt_file(
-                pt_path,
-                records,
+                pt_path,  # type: ignore[arg-type]
+                records,  # type: ignore[arg-type]
+                model_id=model.id,
+                job_id=job.id,
+                columnar=columnar,
+                overwrite=job.io.overwrite,
+            )
+        elif source == "usr":
+            if ids is None or ds is None:
+                raise WriteBackError("USR write-back requires ids and dataset handle")
+            write_back_usr(
+                ds,
+                ids=ids,
                 model_id=model.id,
                 job_id=job.id,
                 columnar=columnar,
                 overwrite=job.io.overwrite,
             )
         else:
-            raise WriteBackError(
-                "write_back is only supported for records/pt_file sources"
-            )
+            raise WriteBackError("write_back not supported for this ingest source")
 
     return columnar
 
@@ -143,32 +176,34 @@ def run_extract_job(
 def run_generate_job(
     inputs, *, model: ModelConfig, job: JobConfig
 ) -> Dict[str, List[object]]:
-    # ingest → prompts
-    if job.ingest.source == "sequences":
+    source = job.ingest.source
+    if source == "sequences":
         prompts = load_sequences_input(inputs)
-    elif job.ingest.source == "records":
-        prompts, _ = load_records_input(inputs, job.ingest.field)
-    elif job.ingest.source == "pt_file":
+    elif source == "records":
+        prompts, _ = load_records_input(inputs, job.ingest.field or "sequence")
+    elif source == "pt_file":
         if not isinstance(inputs, str):
             raise ValidationError("inputs must be a path string for pt_file ingest")
-        prompts, _ = load_pt_file_input(inputs, job.ingest.field)
+        prompts, _ = load_pt_file_input(inputs, job.ingest.field or "sequence")
+    elif source == "usr":
+        prompts, _, _ = load_usr_input(
+            dataset_name=job.ingest.dataset,  # type: ignore[arg-type]
+            field=job.ingest.field or "sequence",
+            root=job.ingest.root,
+            ids=job.ingest.ids,
+        )
     else:
-        raise ConfigError(f"Unknown ingest source: {job.ingest.source}")
+        raise ConfigError(f"Unknown ingest source: {source}")
 
-    # Validate alphabet (based on model)
     _validate_alphabet(model.alphabet, prompts)
 
     adapter = _get_adapter(model)
 
-    # Dispatch generate
-    from .registry import resolve_fn
-
-    # Namespaced must match adapter; we accept only evo2.generate in v1
+    # Force 'evo2.generate' resolve; adapters may expand later
     gen_fn_name = resolve_fn("evo2.generate") if hasattr(adapter, "generate") else None
     if not gen_fn_name or not getattr(adapter, gen_fn_name, None):
         raise CapabilityError("Adapter does not support generation in v1")
 
     fn = getattr(adapter, gen_fn_name)
     out = fn(prompts, **(job.params or {}))
-    # returns is advisory; simply pass through adapter result keys
     return out

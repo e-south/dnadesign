@@ -76,7 +76,10 @@ class SSHRemote:
             "--delay-updates",
         ]
         if self.cfg.ssh_key_env:
-            cmd += ["-e", f"ssh -i {shlex.quote(__import__('os').environ[self.cfg.ssh_key_env])}"]
+            cmd += [
+                "-e",
+                f"ssh -i {shlex.quote(__import__('os').environ[self.cfg.ssh_key_env])}",
+            ]
         return cmd
 
     def _ssh_run(self, remote_cmd: str, check: bool = True) -> Tuple[int, str, str]:
@@ -125,9 +128,7 @@ class SSHRemote:
     def _remote_parquet_shape(self, path: str) -> Tuple[Optional[int], Optional[int]]:
         # Try python3 -> pyarrow; then python
         py = "python3"
-        cmd = (
-            f"""{py} -c "import sys;import pyarrow.parquet as pq;f=pq.ParquetFile(sys.argv[1]);m=f.metadata;print(m.num_rows, m.num_columns)" {shlex.quote(path)}"""
-        )
+        cmd = f"""{py} -c "import sys;import pyarrow.parquet as pq;f=pq.ParquetFile(sys.argv[1]);m=f.metadata;print(m.num_rows, m.num_columns)" {shlex.quote(path)}"""
         rc, out, _ = self._ssh_run(cmd, check=False)
         if rc == 0 and out.strip():
             try:
@@ -136,9 +137,7 @@ class SSHRemote:
             except Exception:
                 pass
         py = "python"
-        cmd = (
-            f"""{py} -c "import sys;import pyarrow.parquet as pq;f=pq.ParquetFile(sys.argv[1]);m=f.metadata;print(m.num_rows, m.num_columns)" {shlex.quote(path)}"""
-        )
+        cmd = f"""{py} -c "import sys;import pyarrow.parquet as pq;f=pq.ParquetFile(sys.argv[1]);m=f.metadata;print(m.num_rows, m.num_columns)" {shlex.quote(path)}"""
         rc, out, _ = self._ssh_run(cmd, check=False)
         if rc == 0 and out.strip():
             try:
@@ -156,7 +155,9 @@ class SSHRemote:
 
     def _remote_list_snapshots(self, snap_dir: str) -> List[str]:
         # Names like records-YYYYMMDDThhmmss.parquet
-        rc, out, _ = self._ssh_run(f"ls -1 {shlex.quote(snap_dir)} 2>/dev/null", check=False)
+        rc, out, _ = self._ssh_run(
+            f"ls -1 {shlex.quote(snap_dir)} 2>/dev/null", check=False
+        )
         if rc != 0 or not out.strip():
             return []
         names = [ln.strip() for ln in out.splitlines() if ln.strip()]
@@ -221,7 +222,12 @@ class SSHRemote:
             if skip_snapshots:
                 include_args += ["--exclude", "_snapshots/**"]
 
-        cmd = rsync + include_args + ([ "--dry-run"] if dry_run else []) + [src, str(dest_dir)]
+        cmd = (
+            rsync
+            + include_args
+            + (["--dry-run"] if dry_run else [])
+            + [src, str(dest_dir)]
+        )
         proc = subprocess.run(cmd)
         if proc.returncode != 0:
             raise TransferError(f"rsync pull failed with code {proc.returncode}")
@@ -247,9 +253,13 @@ class SSHRemote:
                 include_args += ["--exclude", "_snapshots/**"]
 
         # Ensure remote dataset directory exists
-        self._ssh_run(f"mkdir -p {shlex.quote(self.cfg.dataset_path(dataset))}", check=True)
+        self._ssh_run(
+            f"mkdir -p {shlex.quote(self.cfg.dataset_path(dataset))}", check=True
+        )
 
-        cmd = rsync + include_args + ([ "--dry-run"] if dry_run else []) + [src + "/", dst]
+        cmd = (
+            rsync + include_args + (["--dry-run"] if dry_run else []) + [src + "/", dst]
+        )
         proc = subprocess.run(cmd)
         if proc.returncode != 0:
             raise TransferError(f"rsync push failed with code {proc.returncode}")

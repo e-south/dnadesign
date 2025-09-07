@@ -12,7 +12,7 @@ version         = "0.1.0"
 description     = "DNA sequence design pipelines and bio-informatics helpers."
 authors         = [{ name = "Eric South", email = "ericjohnsouth@gmail.com" }]
 readme          = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.13"
 
 dependencies = [
   "numpy",
@@ -21,9 +21,6 @@ dependencies = [
   "seaborn",
   "scanpy==1.10.3",
   "tqdm",
-  "torch",
-  "torchvision",
-  "torchaudio",
   "biopython",
   "leidenalg",
   "igraph",
@@ -47,6 +44,14 @@ USR = "dnadesign.usr.src.cli:main"
 viz = [
   "matplotlib",
   "seaborn"
+]
+infer-evo2 = [
+  "evo2",                      
+]
+infer-evo2-fast = [
+  "evo2",
+  "flash-attn==2.8.0.post2",   # recommended, may be site-specific
+  "transformer-engine>=2.0.0", # required by upstream for FP8/mixed precision
 ]
 
 dev = [

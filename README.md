@@ -1,29 +1,18 @@
 # dnadesign
 
-This repository contains a collection of in-progress and complete bioinformatic pipelines related to DNA sequence design.
+`dnadesign` is a collection of modular bioinformatic pipelines and helper packages related to DNA sequence design.
 
 ### Directory Layout
 ```text
 dnadesign/
 ├── README.md            # High-level project documentation
+├─ uv.lock
 └── src/
     └── dnadesign/ 
-        ├── usr/         # Many repo-wide sequence records live here
-        ├── infer/  
-        │   ├── README.md               
-        │   ├── main.py
-        │   ├── config.yaml
-        │   └── ...  
-        ├── opal/   
-        │   ├── README.md            
-        │   ├── main.py
-        │   ├── config.yaml
-        │   └── ...                             
+        ├── usr/         # Parquet-backed datasets + CLI
+        ├── infer/       # model-agnostic inference (Evo2 adapter)
+        ├── densegen/    # solver-backed promoter assembly           
         ├── cruncher/     
-        │   ├── README.md             
-        │   ├── main.py
-        │   ├── config.yaml
-        │   └── ...  
         └── ...
 ```
      
@@ -39,7 +28,7 @@ dnadesign/
       └─ datasets/             # default root for dataset folders
            └─ <dataset_name>/
                 ├─ records.parquet
-                ├─ meta.yaml
+                ├─ .events.log
                 └─ .snapshots/
       ```
       
@@ -51,10 +40,12 @@ dnadesign/
 
 2. [**infer**](src/dnadesign/infer)  
 
-      **infer** is a model-agnostic inference engine for DNA/protein language models.
+      **infer** is a model-agnostic wrapper for DNA/protein language models (e.g., Evo2).
 
 
 3. [**opal**](src/dnadesign/opal)
+
+      WIP.
 
 3. [**clustering**](src/dnadesign/clustering) 
   
@@ -95,54 +86,67 @@ dnadesign/
 
       **archived** contains a mix of old legacy projects and prototypes.
 
-## Installation
+## Quickstart
 
-### Usage Style 1: Local Machine (No Gurobi or CUDA Support)
+### 1. Install UV
+```bash
+curl -Ls https://astral.sh/uv/install | sh
+# ensure ~/.local/bin (or your UV bin dir) is on PATH
+```
 
-This style is suitable for workflows that do not require Gurobi-based [dense array](https://gitlab.com/dunloplab/dense-arrays) computations or [Evo 2](https://github.com/ArcInstitute/evo2) inference.
+#### 2. Grab the source
+```bash
+git clone https://github.com/e-south/dnadesign.git
+cd dnadesign
+```
 
-1. Install uv (adds the binary to ~/.local/bin by default)
-   
-   ```bash
-   curl -Ls https://astral.sh/uv/install | sh
-   ```
+#### 3. Create & activate the venv
+```bash
+uv venv --python 3.12        # creates .venv/
+source .venv/bin/activate
+which python                 # sanity → …/dnadesign/.venv/bin/python
+```
 
-2. Grab the source
+#### 4. Reproduce the dependency graph (from uv.lock)
+```bash
+uv sync
+```
 
-   ```bash
-   git clone https://github.com/e-south/dnadesign.git
-   cd dnadesign
-   ```
+#### 5. Editable install (dev tools, linters, tests)
+```bash
+uv pip install -e .[dev]
+```
 
-3. Create a local virtual env (uses the Python on your PATH)
+#### 6. (Optional) dense-arrays as a sibling
+```bash
+# from the parent dir of dnadesign/
+git clone https://gitlab.com/dunloplab/dense-arrays.git
+uv pip install -e ./dense-arrays
+```
 
-   ```bash
-   uv venv --python 3.12          # creates .venv/
-   source .venv/bin/activate
-   which python                   # sanity-check → …/dnadesign/.venv/bin/python
-   ```
+#### 7. Sanity checks
+```bash
+python -c "import dnadesign, pyarrow, pandas; print('ok')"
+python -m dnadesign.usr ls || true
+```
+### (Optional) Extended installation for resource-intensive  workflows
+Some pipelines are more resource-intensive and are designed to run on a [shared computing cluster](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/), such as solving dense arrays with [Gurobi](https://www.gurobi.com/), or running inference with [Evo 2](https://github.com/ArcInstitute/evo2).
 
-4. Reproduce the exact dependency graph (from uv.lock)
+##### 1. Cluster setup
 
-   ```bash
-   uv sync 
-   ```
+In practice you can:
 
-4. Editable installs for active development
+- create/sync the repo’s UV environment,
+- layer PyTorch built for your node’s CUDA,
+- add Transformer Engine and FlashAttention,
+- install Evo2 from PyPI, and
+- run pipelines.
 
-   ```bash
-   uv pip install -e .[dev]  # dnadesign + internal packages / tests / linters / hooks
+Below uses CUDA 12.6 wheels as an example; change the index URL to match your cluster’s CUDA toolchain.
 
-   # If needing the dense-array package, install it as a sibling directory to `dnadesign`.
-   uv pip install -e ../dense-arrays   # dense-arrays companion library
-   ```
-   
----
+#####  2. (Optional) Request an interactive GPU session
+SCC Interactive Session Resource Request Example:
 
-### Usage Style 2: Shared Computing Cluster (With Gurobi/CUDA Support)
-This setup is designed for running more resource-intensive workflows on a [shared computing cluster](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/), such as solving dense array with [Gurobi](https://www.gurobi.com/), or performing inference with [Evo 2](https://github.com/ArcInstitute/evo2). For Evo 2’s FP8 features, a GPU with compute capability **8.9 or higher** is required.
-
-> Interactive Session Resource Request Example:
 > - **densegen** workflow:
 >   - Modules: miniconda gurobi
 >   - Cores: 16  
@@ -153,122 +157,82 @@ This setup is designed for running more resource-intensive workflows on a [share
 >   - GPUs: 1  
 >   - GPU Compute Capability: 8.9  
 >   - Extra options: `-l mem_per_core=8G`  
->   
-> (Check your cluster documentation for submission details.)
 
-1. Set Up the CUDA Environment
+Check your cluster documentation for submission details.
 
-   Evo 2’s GPU-accelerated components require NVIDIA’s CUDA toolkit. This step loads the necessary CUDA and GCC modules, verifies the presence of the CUDA compiler (nvcc), and exports environment variables so that both Python and build scripts can locate the CUDA installation. These settings are crucial for compiling CUDA extensions and ensuring compatibility with PyTorch.
+##### 3. Load site toolchains
 
-   ```bash
-   module load cuda/12.5      # Load the CUDA module appropriate for your cluster
-   module load gcc/10.2.0     # Load a GCC version that is compatible with CUDA
+```bash
+module load cuda/12.5         # Load the CUDA module appropriate for your cluster
+module load gcc/10.2.0        # Load a GCC version that is compatible with CUDA
 
-   # Verify that nvcc is available:
-   ls $CUDA_HOME/bin/nvcc  # This should display the path to the nvcc binary
+# Optional sanity; verify that nvcc is available:
+ls $CUDA_HOME/bin/nvcc
+nvcc --version && gcc --version             
+```
 
-   # Export CUDA environment variables:
-   export CUDA_HOME=/share/pkg.8/cuda/12.5/install
-   export CUDA_PATH=/share/pkg.8/cuda/12.5/install
-   export CUDA_TOOLKIT_ROOT_DIR=/share/pkg.8/cuda/12.5/install
-   export CUDA_BIN_PATH=/share/pkg.8/cuda/12.5/install/bin
-   export PATH=$CUDA_BIN_PATH:$PATH
-   export NVCC=$CUDA_BIN_PATH/nvcc
+##### 4. Create and sync the base env (from repo root)
+```bash
+uv venv --python 3.12         # 3.12 required for Evo2
+source .venv/bin/activate
+uv sync                       # uses the checked-in uv.lock
+```
 
-   # Optional: Check versions to verify correct module load and installation
-   nvcc --version
-   gcc --version
-      ```
+##### 4. Install PyTorch for your CUDA
 
-2. Create and Activate the Conda Environment
+Installing PyTorch built for CUDA ensures that GPU acceleration is enabled for Evo 2’s computations. Here, we install a version built for CUDA 12.6, which is optimal for GPUs with compute capability ≥8.9.
 
-   ```bash
-   conda create -n dnadesign_cu126 python=3.11 -y
-   conda activate dnadesign_cu126
-   ```
+```bash
+# Example: CUDA 12.6 wheels
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
+  --index-url https://download.pytorch.org/whl/cu126
+```
 
-3. (Optional) Install Mamba and Upgrade Build Tools
+> **Note:** If your GPU does not support FP8 or if you encounter compatibility issues, consider installing a version built for a different CUDA (e.g., cu118).
 
-   Mamba speeds up dependency resolution and installation. Upgrading build tools (pip, setuptools, wheel) just ensures compatibility and access to the latest features.
-   ```bash
-   conda install -c conda-forge mamba -y
-   unset -f mamba  # (Optional: Unset mamba shell function if conflicts occur)
-   mamba install pip -c conda-forge -y
-   pip install --upgrade pip setuptools wheel
-   ```
+##### 5. Install Transformer Engine + FlashAttention
+```bash
+# FlashAttention (prebuilt wheels; no build isolation is recommended upstream)
+pip install flash-attn==2.8.0.post2 --no-build-isolation
 
-4. Install PyTorch with CUDA Support
+# Transformer Engine (PyPI)
+pip install transformer-engine>=2.0.0
+```
+##### 6. Install Evo2 (PyPI)
 
-   Installing PyTorch built for CUDA ensures that GPU acceleration is enabled for Evo 2’s computations. Here, we install a version built for CUDA 12.6, which is optimal for GPUs with compute capability ≥8.9.
-   ```bash
-   pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu126
-   ```
-   > **Note:** If your GPU does not support FP8 or if you encounter compatibility issues, consider installing a version built for an older CUDA (e.g., cu118) and try and adjust Evo 2’s configuration.
+```bash
+pip install evo2
+```
 
-5. Install Additional Packages via Mamba
+##### 7. Validate the install
 
-   These scientific and plotting libraries are required by various subprojects within dnadesign.
-   ```bash
-   mamba install scanpy=1.10.3 seaborn numpy pandas matplotlib pytest pyyaml leidenalg igraph openpyxl xlrd -c conda-forge -y
-   ```
+```bash
+# single-GPU 7B
+python -m evo2.test.test_evo2_generation --model_name evo2_7b
+```
 
-6. Install **Evo 2**
+##### Lockfile hygiene with UV
 
-   Cloning with submodules ensures that all dependencies, including those in external repositories, are included.
-   ```bash
-   git clone --recurse-submodules git@github.com:ArcInstitute/evo2.git
-   cd evo2
-   ```
+Keep the base env managed by uv sync, and overlay Torch/TE/FA/Evo2 on the GPU nodes via pip (or site modules).
 
-7. Override CUDA Paths in the Makefile (if necessary)
+```python
+uv add --extra infer-evo2 evo2
+uv add flash-attn==2.8.0.post2
+uv add transformer-engine>=2.0.0
+uv lock && uv sync
+```
 
-   If Evo 2’s build system does not detect your CUDA installation correctly, update the Makefile in the vortex directory to use the correct paths:
+Add packages to the project and update uv.lock as needed.
+```bash
+uv add <pkg>==<ver>
+# remove
+uv remove <pkg>
+# upgrade a specific package in the lock
+uv lock --upgrade-package <pkg>
+# enforce exact lock during CI
+uv sync --frozen
+```
 
-   ```makefile
-   # Change the ":=" to "?=" for these lines
-   CUDA_PATH ?= /usr/local/cuda
-   CUDA_HOME ?= $(CUDA_PATH)
-   CUDACXX ?= $(CUDA_PATH)/bin/nvcc
-   ```
-   Change these defaults so that your exported environment variables take precedence.
-
-
-8. Install Evo 2 in Editable Mode
-   ```bash
-   cd evo2
-   pip install -e .
-   ```
-
-9. (Optional) Build Additional Components
-
-   Some Evo 2 features, such as custom CUDA extensions, require a build step. Running make setup-full compiles these extensions.
-   ```bash
-   cd vortex
-   make setup-full CUDA_PATH=/share/pkg.8/cuda/12.5/install CUDACXX=/share/pkg.8/cuda/12.5/install/bin/nvcc CUDA_HOME=/share/pkg.8/cuda/12.5/install
-   cd ..
-   ```
-
-10. Test the Evo 2 Installation
-
-      Running a test script verifies that the installation was successful and that Evo2 can access the necessary resources and configurations.
-      ```bash
-      cd evo2
-      python ./test/test_evo2.py --model_name evo2_7b
-      ```
-
-11. (Optional) Clone the [`dense-arrays`](https://gitlab.com/dunloplab/dense-arrays) Package
-
-      The **densegen** workflow relies on the dense-arrays package. Install it as a sibling directory to `dnadesign`.
-      ```bash
-      git clone https://gitlab.com/dunloplab/dense-arrays.git
-      cd dense-arrays
-      pip install .
-      ```
-
-## **Usage Example**
-
-1. Clone the [**dnadesign-data**](https://github.com/e-south/dnadesign-data) repository, and place it as a sibling directory to **dnadesign**. This will enable **seqfetcher** to generate custom lists of dictionaires from these sources. 
-
-2. Update the `configs/example.yaml` file as desired and try running different pipelines.
+---
 
 @e-south

@@ -10,7 +10,8 @@ Resolution order for config:
   2) ./config.yaml (current working directory)
   3) <this_dir>/config.yaml (sibling to this module)
 
-For pt_file ingest, inputs are resolved as: <config_dir>/{job.id}.pt
+Module Author(s): Eric J. South
+Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -31,19 +32,13 @@ _LOG = get_logger("dnadesign.infer.main")
 
 
 def _default_config_search() -> Path | None:
-    """
-    Find a default config.yaml without flags, in priority order:
-      1) ./config.yaml
-      2) <module_dir>/config.yaml
-    """
+    """Find default config.yaml in priority order: ./config.yaml → module sibling."""
     cwd_cfg = Path.cwd() / "config.yaml"
     if cwd_cfg.is_file():
         return cwd_cfg
-
     module_cfg = Path(__file__).with_name("config.yaml")
     if module_cfg.is_file():
         return module_cfg
-
     return None
 
 
@@ -102,24 +97,28 @@ def main() -> None:
         _LOG.info("✔ Config validated (dry run).")
         return
 
-    # CLI supports files or embedded sequences via records/pt_file; for sequences
-    # ingestion, prefer the Python API. Here we only run pt_file robustly.
+    # CLI: now supports pt_file (legacy) AND usr (new). 'records'/'sequences' remain Python-API only.
     for job in jobs:
-        if job.ingest.source != "pt_file":
+        if job.ingest.source not in {"pt_file", "usr"}:
             _LOG.error(
-                "CLI currently supports only ingest.source=pt_file. "
-                "Use the Python API for sequences/records."
+                "CLI supports ingest.source in {'usr','pt_file'}. "
+                "Use the Python API for 'sequences' or 'records'."
             )
             sys.exit(1)
 
-        # Inputs are resolved relative to the config.yaml directory:
-        input_path = (cfg_path.parent / f"{job.id}.pt").as_posix()
-        _LOG.info(f"▶ Running job '{job.id}' on {input_path}")
+        # For pt_file we resolve path from config dir; for usr we don't need a path.
+        input_arg = (
+            (cfg_path.parent / f"{job.id}.pt").as_posix()
+            if job.ingest.source == "pt_file"
+            else None
+        )
+        shown = input_arg if input_arg else f"usr:{job.ingest.dataset}"
+        _LOG.info(f"▶ Running job '{job.id}' on {shown}")
         try:
             if job.operation == "extract":
-                res = run_extract_job(input_path, model=model, job=job)
+                res = run_extract_job(input_arg, model=model, job=job)
             else:
-                res = run_generate_job(input_path, model=model, job=job)
+                res = run_generate_job(input_arg, model=model, job=job)
         except InferError as e:
             _LOG.error(str(e))
             sys.exit(1)

@@ -11,13 +11,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from .config import SSHRemoteConfig, get_remote
-from .remote import SSHRemote, RemoteDatasetStat
 from .diff import DiffSummary, compute_diff
 from .errors import VerificationError
 from .io import append_event
+from .remote import RemoteDatasetStat, SSHRemote
 
 
 @dataclass
@@ -31,6 +30,7 @@ class SyncOptions:
 def _verify_after_pull(local_dir: Path, summary: DiffSummary) -> None:
     # Recompute local stats and ensure they match remote where known
     from .diff import parquet_stats
+
     local = parquet_stats(local_dir / "records.parquet")
     remote = summary.primary_remote
 
@@ -40,26 +40,40 @@ def _verify_after_pull(local_dir: Path, summary: DiffSummary) -> None:
             f"Post-transfer SHA mismatch: local={local.sha256} remote={remote.sha256}"
         )
     # Fallback to size
-    if (remote.size is not None) and (local.size is not None) and remote.size != local.size:
+    if (
+        (remote.size is not None)
+        and (local.size is not None)
+        and remote.size != local.size
+    ):
         raise VerificationError(
             f"Post-transfer size mismatch: local={local.size} remote={remote.size}"
         )
     # Optional shape check if remote provided rows/cols
-    if (remote.rows is not None) and (local.rows is not None) and remote.rows != local.rows:
+    if (
+        (remote.rows is not None)
+        and (local.rows is not None)
+        and remote.rows != local.rows
+    ):
         raise VerificationError(
             f"Post-transfer row count mismatch: local={local.rows} remote={remote.rows}"
         )
-    if (remote.cols is not None) and (local.cols is not None) and remote.cols != local.cols:
+    if (
+        (remote.cols is not None)
+        and (local.cols is not None)
+        and remote.cols != local.cols
+    ):
         raise VerificationError(
             f"Post-transfer col count mismatch: local={local.cols} remote={remote.cols}"
         )
 
 
-def _verify_after_push(remote: SSHRemote, dataset: str, summary_before: DiffSummary) -> None:
+def _verify_after_push(
+    remote: SSHRemote, dataset: str, summary_before: DiffSummary
+) -> None:
     # Probe remote again and ensure it now matches local
     after: RemoteDatasetStat = remote.stat_dataset(dataset)
     # Create a synthetic summary comparing local (previous local) to new remote
-    from .diff import DiffSummary as DS, FileStat, SnapshotStat
+    from .diff import FileStat
 
     # local side (from before push) is summary_before.primary_local
     local = summary_before.primary_local
@@ -77,7 +91,11 @@ def _verify_after_push(remote: SSHRemote, dataset: str, summary_before: DiffSumm
         raise VerificationError(
             f"Post-push SHA mismatch: local={local.sha256} remote={remote_now.sha256}"
         )
-    if (local.size is not None) and (remote_now.size is not None) and local.size != remote_now.size:
+    if (
+        (local.size is not None)
+        and (remote_now.size is not None)
+        and local.size != remote_now.size
+    ):
         raise VerificationError(
             f"Post-push size mismatch: local={local.size} remote={remote_now.size}"
         )
@@ -156,4 +174,3 @@ def execute_push(
             },
         )
     return summary
-

@@ -32,13 +32,37 @@ class ModelConfig(BaseModel):
 
 
 class IngestConfig(BaseModel):
-    source: Literal["sequences", "records", "pt_file"]
-    field: Optional[str] = None  # for records/pt_file
+    """
+    Unified ingest config (discriminated by .source).
+
+    sources:
+      - "sequences": inputs provided directly as list[str]
+      - "records"  : in-memory list[dict]
+      - "pt_file"  : torch .pt list[dict] on disk
+      - "usr"      : load from USR dataset (Parquet) by dataset name
+
+    Fields:
+      field   : for 'records'/'pt_file'/'usr' — which key/column has the sequence (default "sequence")
+      dataset : for 'usr'                     — dataset name
+      root    : for 'usr' (optional)          — datasets root folder; defaults to repo's usr/datasets
+      ids     : for 'usr' (optional)          — subset by id list if provided
+    """
+
+    source: Literal["sequences", "records", "pt_file", "usr"]
+    field: Optional[str] = "sequence"
+    dataset: Optional[str] = None
+    root: Optional[str] = None
+    ids: Optional[List[str]] = None
 
     @model_validator(mode="after")
-    def _check_field(self) -> "IngestConfig":
+    def _validate_by_source(self) -> "IngestConfig":
         if self.source in {"records", "pt_file"} and not self.field:
             raise ConfigError("ingest.field is required for records/pt_file sources")
+        if self.source == "usr":
+            if not self.dataset:
+                raise ConfigError("ingest.dataset is required for source='usr'")
+            if not self.field:
+                self.field = "sequence"
         return self
 
 
@@ -51,8 +75,7 @@ class OutputSpec(BaseModel):
     @field_validator("fn")
     @classmethod
     def _known_fn(cls, v: str) -> str:
-        # Only checks presence (registry must be imported beforehand)
-        resolve_fn(v)
+        resolve_fn(v)  # ensures it was registered by adapters/__init__.py
         return v
 
 
@@ -76,7 +99,7 @@ class JobConfig(BaseModel):
     # generate
     params: Optional[Dict[str, Any]] = None
     returns: Optional[List[Dict[str, str]]] = None
-    # io (only for records/pt_file)
+    # io (write-back only applies to records/pt_file/usr)
     io: IOConfig = Field(default_factory=IOConfig)
 
     @model_validator(mode="after")

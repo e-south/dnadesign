@@ -12,7 +12,7 @@ densegen:
       path: outputs/60bp_dual_promoter_cpxR_LexA.jsonl
 
   usr:
-    dataset: 60bp_dual_promoter_cpxR_Lex
+    dataset: 60bp_dual_promoter_cpxR_LexA
     root: null
     namespace: densegen
     chunk_size: 10

@@ -14,7 +14,6 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -37,7 +36,7 @@ class FileStat:
 class SnapshotStat:
     count: int
     newest_ts: Optional[str]  # "YYYYMMDDThhmmss"
-    newer_than_local: int     # computed relative to other side
+    newer_than_local: int  # computed relative to other side
 
 
 @dataclass
@@ -136,7 +135,9 @@ def snapshots_stat(dir_path: Path, remote_names: List[str]) -> SnapshotStat:
     )
 
 
-def compute_diff(dataset_dir: Path, remote: RemoteDatasetStat, dataset_name: str) -> DiffSummary:
+def compute_diff(
+    dataset_dir: Path, remote: RemoteDatasetStat, dataset_name: str
+) -> DiffSummary:
     dataset_dir = Path(dataset_dir)
     primary_local = parquet_stats(dataset_dir / "records.parquet")
     meta_local = file_mtime(dataset_dir / "meta.yaml")
@@ -157,10 +158,14 @@ def compute_diff(dataset_dir: Path, remote: RemoteDatasetStat, dataset_name: str
     changes = {
         "primary_sha_diff": (
             (primary_local.sha256 != primary_remote.sha256)
-            if (primary_local.exists and primary_remote.exists and primary_remote.sha256)
-            else (primary_local.size != primary_remote.size)
-            if (primary_local.exists and primary_remote.exists)
-            else (primary_local.exists != primary_remote.exists)
+            if (
+                primary_local.exists and primary_remote.exists and primary_remote.sha256
+            )
+            else (
+                (primary_local.size != primary_remote.size)
+                if (primary_local.exists and primary_remote.exists)
+                else (primary_local.exists != primary_remote.exists)
+            )
         ),
         "meta_mtime_diff": (meta_local != remote.meta_mtime),
         "events_new_remote_lines": max(0, remote.events_lines - events_local),
