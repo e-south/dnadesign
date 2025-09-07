@@ -1,133 +1,201 @@
-# densegen – Dense Array Generator
+# DenseGen — Dense Array Generator
 
-**densegen** is a DNA sequence design pipeline built for batch assembly of synthetic bacterial promoters, each composed of densely packed transcription factor binding sites. It wraps the [**dense-arrays**](https://github.com/e-south/dense-arrays) integer linear programming package and leverages curated transcription factor (TF) to binding site (TFBS) mappings provided by the [**deg2tfbs**](https://github.com/e-south/deg2tfbs) repository.
+**DenseGen** is a DNA sequence design pipeline for **batch assembly of synthetic bacterial promoters** composed of **densely packed transcription factor binding sites (TFBSs)**. It wraps the [`dense-arrays`](https://github.com/e-south/dense-arrays) ILP solver.
 
-**densegen** automates the process of:
-1. **Data Ingestion:**
-  
-    Reads `tf2tfbs_mapping.csv` files from deg2tfbs (either from **pipeline/tfbsfetcher** or **analysis** subdirectories) or directly from PyTorch `.pt` files.
+- **Add TFBS data:** Provide a CSV of TF→TFBS pairs or seed from a USR dataset.
+- **Add explicit constraints:** Use YAML to define **per-constraint output quotas** and **fixed elements** (e.g., σ70 promoter motifs).
+- **Generate dense arrays:** Build a motif library sized to your target length, run the ILP, and avoid stalling via resampling + duplicate guards.
+- **Flexible outputs:** Write to **USR** (default) or **JSONL** (or **both**) with identical metadata.
 
-2.  **Sampling:**
-  
-    Randomly samples TFs and their corresponding binding sites.
+### Pipeline overview
 
-3. **Optimization:** 
+1. **Inputs**
+  - **CSV TF/TFBS**: two columns `tf`, `tfbs`. Place under `densegen/inputs/` and reference in YAML.
+  - **USR sequences**: import sequences from an existing USR dataset.
 
-    Generates synthetic promoter sequences using the **dense-arrays** package.
+2. **Sampling**
+  - A motif library is drawn until the sum of lengths ≳ `sequence_length + subsample_over_length_budget_by`.
+  - **TF coverage (optional):** `cover_all_tfs: true` ensures ≥1 TFBS per unique TF in the CSV (diversity across TFs).
+  - **Binding-site diversity (optional):** `unique_binding_sites: true` forbids duplicate TFBS strings in the same library.
+  - **Tuning:** Larger `subsample_over_length_budget_by` ⇒ more options (potentially denser packing) but longer solves.
 
-4. **Output:** 
-  
-    Saves dense arrays along with their metadata as PyTorch `.pt` files in a structured batch directory, while tracking progress via YAML status files.
+3. **Optimization**
+  - Uses `dense-arrays` to generate dense arrays.
+  - `solver.diverse_solution: true` (if supported) biases away from recent motif choices **within a single solver instance**.
 
-### Directory Layout
+4. **Outputs**
 
-```plaintext
+  - **USR (default):** sequences are imported with de-dup and namespaced metadata (`densegen__*`).
+  - **JSONL:** line-delimited records with the same essential + derived fields (resume-safe via deterministic IDs).
+
+### Directory layout
+
+```
 dnadesign/
-├── __init__.py               
-├── config/
-│   └── example.yaml           # User-defined configurations.
-├── utils.py                   # Central utilities (paths, constants, etc.).
-├── densegen/
-│   ├── __init__.py            
-│   ├── main.py                # CLI entry point.
-│   ├── data_ingestor.py       # Ingests CSV or PT data.
-│   ├── sampler.py             # Samples TFs and selects binding sites.
-│   ├── optimizer_wrapper.py   # Wraps the dense-arrays Optimizer.
-│   ├── progress_tracker.py    # Tracks batch sequence generation in YAML.
-│   └── batches/
-│       └── seqbatch_<id>.pt   # Timestamped directories storing outputs.
-└── sequences/                 # Final sequence outputs.
+└─ densegen/
+    ├─ src/                      # code
+    ├─ config.yaml               # edit me
+    ├─ inputs/                   # CSVs (e.g., tf2tfbs_mapping.csv)
+    └─ outputs/                  # JSONL output (if enabled)
 ```
 
-### Simple Usage
+### Minimal CSV example
 
-1. **Clone the deg2tfbs Repository:**  
-   Obtain the curated `tf2tfbs_mapping.csv` files by cloning [deg2tfbs](https://github.com/e-south/deg2tfbs) and placing it as a sibling directory to **dnadesign**.
+`inputs/tf2tfbs_mapping.csv`
+```csv
+tf,tfbs
+LexA,TACTGTATATATACAGTA
+LexA,CTGTATATACAGTATACG
+LexA,ATACAGTATACGTTACAT
+LexA,GGTTACATATGTACAGTA
+LexA,TATACAGTATACGATGTA
+CpxR,GTAAACCAATTGTTTAC
+CpxR,ACCAATTGTTTACGGTA
+CpxR,TTGTTTACGGTAAACCA
+CpxR,AACCAATTGTTTACGTA
+CpxR,CAATTGTTTACGTAAAC
+```
 
-2. **Configure Parameters:**  
-   Update your custom YAML configuration (e.g., `mycustomparams.yaml`) with desired input/output paths, batch IDs, solver preferences, sequence length, and design options. For example:
+### Configuration reference (key fields)
 
-    ```yaml
-    # densegen/configs/mycustomparams.yaml
-    densegen:
-      input_sources:
-        - type: "deg2tfbs_pipeline_tfbsfetcher" # Data source directories (from deg2tfbs).
-          name: "all_TFs"
-          path: "tfbsbatch_20250223_All"
-      output_dir: "sequences"                   # Output directory for generated sequences.           
-      progress_file: "progress_status.yaml"     # Progress tracking file.  
-      solver: "GUROBI"                          # Preferred solver; falls back to CBC if necessary.  
-      solver_options:
-        - "Threads=16"
-        - "TimeLimit=5"
-      sequence_length: 120                      # Length of each dense array.                         
-      quota: 10000                              # Number of arrays to generate per batch.        
-      subsample_size: 16
-      round_robin: true                         # Enable round-robin interleaving among sub-batches.
-      arrays_generated_before_resample: 1       # Generate multiple arrays per TF–TFBS sample.       
-      fixed_elements:                           # Positional constraints for promoter design.
-        promoter_constraints:
-          - name: "sigma70_consensus"
+```yaml
+densegen:
+  inputs:
+    - name: 60bp_dual_promoter_cpxR_LexA
+      type: csv_tfbs
+      path: inputs/tf2tfbs_mapping_cpxR_LexA.csv
+
+  output:
+    kind: usr         # usr | jsonl | both
+    jsonl:
+      path: outputs/60bp_dual_promoter_cpxR_LexA.jsonl
+
+  usr:
+    dataset: 60bp_dual_promoter_cpxR_Lex
+    root: null
+    namespace: densegen
+    chunk_size: 128
+    allow_overwrite: true
+
+  generation:
+    sequence_length: 60
+    quota: 30000
+    sampling:
+      subsample_over_length_budget_by: 120
+      cover_all_tfs: true            # ensure ≥1 TFBS per unique TF in the CSV
+      unique_binding_sites: true     # forbid duplicate TFBS strings in a library
+      max_sites_per_tf: null         # cap per TF after coverage (null = no cap)
+      relax_on_exhaustion: true      # if we can't meet budget under caps, relax
+
+    plan:
+      - name: sigma70_high
+        quota: 10000
+        fixed_elements:
+          promoter_constraints:
             upstream: "TTGACA"
             downstream: "TATAAT"
             spacer_length: [16, 18]
-            upstream_pos: [10, 100]
-          - name: "sigma32_consensus"
-            upstream: "TGTCGCCCTTGAA"
-            downstream: "CCCCATTTA"
-            spacer_length: [14, 16]
-            upstream_pos: [10, 100]
-        side_biases:
-          left: []
-          right: []
-      unique_tf_only: true                       # One binding site per TF per sequence.
-      fill_gap: true                             # Pad sequences to the desired length.
-      fill_gap_end: "5prime"     
-      fill_gc_min: 0.40
-      fill_gc_max: 0.60
-    ```
+            upstream_pos: [0, 60]
+      - name: sigma70_mid
+        quota: 10000
+        fixed_elements:
+          promoter_constraints:
+            upstream: "ACCGCG"
+            downstream: "TATAAT"
+            spacer_length: [16, 18]
+            upstream_pos: [0, 60]
+      - name: sigma70_low
+        quota: 10000
+        fixed_elements:
+          promoter_constraints:
+            upstream: "GCAGGT"
+            downstream: "TATAAT"
+            spacer_length: [16, 18]
+            upstream_pos: [0, 60]
 
-3. **Run densegen:**  
-   Execute the main module via the command line:
-   ```bash
-   cd densegen
-   python main.py
-   ```
+  solver:
+    backend: CBC
+    diverse_solution: true
+    options:
+      - "Threads=16"
+      - "TimeLimit=10"
 
-   For each defined `tf2tfbs_mapping.csv` source, **densegen** will:
-   - Load and the mapping data.
-   - Sample binding sites and prepare the motif library.
-   - Generate promoter sequences using the ILP-based optimizer.
-   - Track progress and save outputs as PyTorch `.pt` files in designated batch directories.
+  runtime:
+    round_robin: true
+    arrays_generated_before_resample: 20
+    # Enforce that the *final solution* must include at least N sites per TF
+    # present in the sampled library (post-solve check).
+    require_min_count_per_tf: true
+    # min_count_per_tf: 1             # optional explicit integer (overrides boolean)
+    max_duplicate_solutions: 3        # dup-guard (consecutive)
+    stall_seconds_before_resample: 30 # stall-guard (no solution within this many seconds)
+    stall_warning_every_seconds: 15
+    max_resample_attempts: 3          # see semantics below
+    random_seed: 42
 
-### Generation Modes & Sub-Batch Processing
+  postprocess:
+    fill_gap: true
+    fill_gap_end: "5prime"            # or "3prime"
+    fill_gc_min: 0.40
+    fill_gc_max: 0.60
 
-- **Splitting by Promoter Constraint:**  
-  If multiple `fixed_elements` constraints are specified in the YAML configuration, **densegen** automatically splits each input source into sub‐batches, ensuring that a unique combination of input source and promoter constraint is handled with its own quota and output directory.
+  logging:
+    level: INFO
+    suppress_solver_stderr: true
+    print_visual: true
+```
 
-- **Round-Robin vs. Sequential Modes:**  
-  - **Sequential Mode:** Processes each sub-batch to completion before moving on.
-  - **Round-Robin Mode:** When `round_robin` is set to `true`, **densegen** interleaves sequence generation across all sub-batches. This means it generates one (or a few) sequences per sub-batch in a cyclic fashion, ensuring balanced output even if the process stops early.
+**Resampling is triggered by:**
 
-- **Limited Generation Calls:**  
-  A helper function limits the number of sequences generated per call (using a `max_sequences` parameter), which supports round-robin interleaving without overloading any single sub-batch.
+* completing a subsample (i.e., after producing `arrays_generated_before_resample` sequences),
+* stall guard (`stall_seconds_before_resample`) if **no** solution appears in that time, or
+* duplicate guard (`max_duplicate_solutions`) when we see that many identical sequences in a row from the solver.
 
-### Module Overview
+**`max_resample_attempts` semantics (applies in RR and non-RR):**
 
-- **`main.py`:**  
-  The CLI entry point that loads configurations, coordinates data ingestion, manages sub-batch splitting, and triggers sequence generation.
+* Interpreted **within a single “subsample try”** to reach `arrays_generated_before_resample`.
+* If we can’t hit that local target after at most `max_resample_attempts` resamples, we **move on**:
 
-- **`data_ingestor.py`:**  
-  Contains classes for loading CSV or PyTorch data. Supports various source types from the deg2tfbs repository (pipeline fetcher or cluster analysis).
+  * **RR:** return to the scheduler (other items get a turn).
+  * **Non-RR:** start a fresh try toward the global quota (we don’t kill the run).
 
-- **`sampler.py`:**  
-  Implements routines to randomly sample transcription factors and binding sites, ensuring diversity (with an option for unique TF-only sampling).
+## Output schema
 
-- **`optimizer_wrapper.py`:**  
-  Extends the dense-arrays Optimizer, adding functionalities like fixed element constraints and gap-filling for achieving the desired sequence length and GC content.
+All derived fields are stored **namespaced** as `densegen__<key>` in USR and exactly as keys in JSONL (with `densegen__` prefix already applied by the JSONL sink). Below is the logical schema (keys shown un-namespaced for readability):
 
-- **`progress_tracker.py`:**  
-  Tracks sequence generation progress in YAML files, allowing **densegen** to resume processing and maintain batch status.
+### Essentials
 
-- **`utils.py`:**  
-  Provides shared utilities such as path resolution, configuration loading, and standardized sequence saving.
+* `sequence` — the designed sequence (post gap-fill if enabled)
+* `bio_type` — `"dna"`
+* `alphabet` — `"dna_4"`
+* `source` — `"densegen:<input_name>:<plan_name>"`
+* `id` (JSONL only) — deterministic SHA256 of `(bio_type|alphabet|sequence)`
+
+### Derived (metadata)
+
+* `plan` — name of the plan item (e.g., `sigma70_high`)
+* `sequence_length` — configured target length
+* `library_size` — motifs in the library shown to the solver
+* `solver` — backend, e.g., `CBC`; `diverse` — whether diverse solutions were requested
+* `visual` — ASCII visual of the dense placement (forward & reverse)
+* `compression_ratio` — total motif length in solution / sequence\_length
+* `promoter_constraint` — name (if provided) of the promoter constraint used
+* `gap_fill_used`, `gap_fill_bases`, `gap_fill_end`, `gap_fill_gc_min`, `gap_fill_gc_max` * gap-fill details if padding was added
+* `tf_list` — **unique** TF names present in the sampled library for this subsample
+* `tfbs_parts` — one-to-one with the library order: `"TF:TFBS"` strings
+* `used_tfbs` — **what actually made it into the final sequence**, one entry per placement (`"TF:TFBS"`, duplicates allowed)
+* `used_tfbs_detail` — list of objects `{tf, tfbs, orientation, offset}` for each placement actually used
+* `used_tf_counts` — map of TF→count in the final sequence (e.g., `{"LexA": 2, "CpxR": 1}`)
+* `used_tf_list` — sorted list of TFs actually present in the final sequence
+* `covers_all_tfs_in_solution` — `true/false` if the **post-solve** check passed
+* `min_count_per_tf_required` — the requirement used (0 means disabled)
+
+### Tips
+
+* If you want stricter per-TF representation in the **final sequence**, set:
+
+  * `runtime.require_min_count_per_tf: true` (defaults to 1), or
+  * `runtime.min_count_per_tf: N` for N≥1.
+    Solutions violating this are rejected (the solver is asked not to repeat them), and sampling continues.
+
+@e-south

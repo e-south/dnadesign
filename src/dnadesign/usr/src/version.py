@@ -1,9 +1,10 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/densegen/__init__.py
+dnadesign/usr/src/version.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
+
+__version__ = "0.1.0"

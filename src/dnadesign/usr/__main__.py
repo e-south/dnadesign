@@ -1,9 +1,17 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/densegen/__init__.py
+dnadesign/usr/src/__main__.py
+
+Entrypoint for `python -m dnadesign.usr`.
+
+It simply forwards to the CLI defined in `dnadesign.usr.src.cli:main`.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
+
+from .src.cli import main
+
+if __name__ == "__main__":
+    main()

@@ -128,6 +128,7 @@ dist/
 temp.md
 
 # Archives
+archived/
 *.zip
 *.tar.gz
 *.rar
@@ -160,7 +161,7 @@ libs/
 # -----------------
 
 # Ignore specific directories
-archived/
+datasets/
 prototypes/
 test_configs/
 batches/
@@ -173,5 +174,9 @@ batches/
 *.pt
 
 # Ignore specific file types
+records.parquet
+_snapshots/
+.events.log
+meta.yaml
 *.env
 *.key

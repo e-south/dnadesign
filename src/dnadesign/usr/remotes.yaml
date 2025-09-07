@@ -1,0 +1,26 @@
+# USR remotes configuration
+# Location: dnadesign/src/dnadesign/usr/remotes.yaml
+
+remotes:
+  cluster:
+    type: ssh
+    host: scc1.bu.edu              # your HPC/cluster login host
+    user: esouth                   # your cluster username
+    base_dir: /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets
+
+  # Optional: a second cluster or staging box
+  cluster_staging:
+    type: ssh
+    host: scc2.bu.edu
+    user: esouth
+    base_dir: /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets
+
+  # (Usually NOT needed)
+  # Drive sync from the cluster back to your laptop, only works if 
+  # your laptop is reachable (public IP/VPN+port forward)
+  # local_laptop:
+  #   type: ssh
+  #   host: my.public.ip.or.dns
+  #   user: Shockwing
+  #   base_dir: .../dnadesign/src/dnadesign/usr/datasets
+  #   ssh_key_env: USR_SSH_KEY

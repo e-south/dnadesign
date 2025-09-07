@@ -1,59 +1,84 @@
-# dnadesign/densegen/config.yaml
+# densegen/config.yaml
 
 densegen:
-  input_sources:
-    - type: "deg2tfbs_pipeline_tfbsfetcher"
-      name: "lexA_and_cpxR"
-      path: "tfbsbatch_20250630"
-    # - type: "deg2tfbs_pipeline_tfbsfetcher"
-    #   name: "monotypic_CRP"
-    #   path: "tfbsbatch_monotypic_CRP"
-  output_dir: "sequences"
-  progress_file: "progress_status.yaml"
-  solver: "GUROBI"
-  diverse_solution: true
-  solver_options:
-    - "Threads=16"
-    - "TimeLimit=10"
-  quota: 10000
-  sequence_length: 60
-  subsample_over_length_budget_by: 120
-  # subsample_size: 20  # legacy
-  round_robin: true
-  arrays_generated_before_resample: 10  
-  fixed_elements:
-    promoter_constraints:
-      # - name: "sigma70_consensus"
-      #   upstream: "TTGACA"
-      #   downstream: "TATAAT"
-      #   spacer_length: [16, 18]
-      #   upstream_pos: [10, 40]
-      - name: "sigma70_mid_35_strong_10"
-        upstream: "ACCGCG"
-        downstream: "TATAAT"
-        spacer_length: [16, 18]
-        upstream_pos: [10, 40]
-      # - name: "sigma70_consensus_+"
-      #   upstream: "TTGACA"
-      #   downstream: "TGTATAATGCT"
-      #   spacer_length: [14, 16]
-      #   upstream_pos: [10, 100]
-      # - name: "sigma70_consensus_-"
-      #   upstream: "TTGACA"
-      #   downstream: "TCTATAATGAG"
-      #   spacer_length: [14, 16]
-      #   upstream_pos: [10, 100]
-      # - name: "sigma70_mid"
-      #   upstream: "ACCGCG"
-      #   downstream: "ACCTAA"
-      #   spacer_length: [16, 18]
-      #   upstream_pos: [10, 100]
-      # - name: "sigma70_low"
-      #   upstream: "GCAGGT"
-      #   downstream: "CCTCGC"
-      #   spacer_length: [16, 18]
-  unique_tf_only: true
-  fill_gap: true
-  fill_gap_end: "5prime"
-  fill_gc_min: 0.40
-  fill_gc_max: 0.60
+  inputs:
+    - name: 60bp_dual_promoter_cpxR_LexA
+      type: csv_tfbs
+      path: inputs/tf2tfbs_mapping_cpxR_LexA.csv
+
+  output:
+    kind: usr               # usr | jsonl | both
+    jsonl:
+      path: outputs/60bp_dual_promoter_cpxR_LexA.jsonl
+
+  usr:
+    dataset: 60bp_dual_promoter_cpxR_Lex
+    root: null
+    namespace: densegen
+    chunk_size: 10
+    allow_overwrite: true
+
+  generation:
+    sequence_length: 60
+    quota: 30000
+    sampling:
+      subsample_over_length_budget_by: 120
+      cover_all_tfs: true              # ≥1 TFBS per TF
+      unique_binding_sites: true       # no duplicate TFBS strings
+      max_sites_per_tf: null           # (optional) allow extra per TF after coverage
+      relax_on_exhaustion: true
+
+    plan:
+      - name: sigma70_high
+        quota: 10000
+        fixed_elements:
+          promoter_constraints:
+            upstream: "TTGACA"
+            downstream: "TATAAT"
+            spacer_length: [16, 18]
+            upstream_pos: [0, 60]
+      - name: sigma70_mid
+        quota: 10000
+        fixed_elements:
+          promoter_constraints:
+            upstream: "ACCGCG"
+            downstream: "TATAAT"
+            spacer_length: [16, 18]
+            upstream_pos: [0, 60]
+      - name: sigma70_low
+        quota: 10000
+        fixed_elements:
+          promoter_constraints:
+            upstream: "GCAGGT"
+            downstream: "TATAAT"
+            spacer_length: [16, 18]
+            upstream_pos: [0, 60]
+
+  solver:
+    backend: GUROBI                      # chosen once at startup; if probe fails we fall back to CBC
+    diverse_solution: true
+    options:
+      - "Threads=16"
+      - "TimeLimit=10"
+
+  runtime:
+    round_robin: true
+    arrays_generated_before_resample: 20
+    require_min_count_per_tf: true  # enforce >= 1 site per TF in the final solution (post-solve check).
+    # min_count_per_tf: 1   # (optional, overrides the boolean above if provided)
+    max_duplicate_solutions: 3
+    stall_seconds_before_resample: 5
+    stall_warning_every_seconds: 15
+    max_resample_attempts: 3
+    random_seed: 42
+
+  postprocess:
+    fill_gap: true
+    fill_gap_end: "5prime"
+    fill_gc_min: 0.40
+    fill_gc_max: 0.60
+
+  logging:
+    level: INFO
+    suppress_solver_stderr: true       # dedupe native CBC "parameters as string not supported" spam
+    print_visual: true                 # print the ILP visual per solution (fresh line, un-clipped)

@@ -15,39 +15,34 @@ readme          = "README.md"
 requires-python = ">=3.11"
 
 dependencies = [
-  # core scientific stack
   "numpy",
   "pandas",
   "matplotlib",
   "seaborn",
   "scanpy==1.10.3",
   "tqdm",
-
-  # deep-learning (CPU wheels by default)
   "torch",
   "torchvision",
   "torchaudio",
-
-  # bioinformatics
   "biopython",
   "leidenalg",
   "igraph",
   "logomaker",
-
-  # statistics & probabilistic programming
   "pymc",
   "arviz",
-
-  # utilities
   "pyyaml",
   "openpyxl",
   "xlrd",
   "python-levenshtein",
   "typer",
-  "pydantic"
+  "pydantic",
+  "pyarrow>=16"
 ]
 
-# ---------------------------------------------------------------------
+[project.scripts]
+usr = "dnadesign.usr.src.cli:main"
+USR = "dnadesign.usr.src.cli:main"
+
 [project.optional-dependencies]
 viz = [
   "matplotlib",

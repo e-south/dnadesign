@@ -1,30 +1,26 @@
 # dnadesign
 
-This repository contains a collection of Python modules and bioinformatic pipelines related to DNA sequence design.
+This repository contains a collection of in-progress and complete bioinformatic pipelines related to DNA sequence design.
 
 ### Directory Layout
 ```text
 dnadesign/
-├── README.md                           # High-level project documentation
+├── README.md            # High-level project documentation
 └── src/
-    └── dnadesign/
-        ├── utils.py                    # Shared utilities (e.g., config loading, common functions)
-        ├── seqfetcher/                 # Data ingestion modules (one per dataset)
-        │   └── <dataset>_module.py     
-        ├── sequences/                  
-        │   ├── seqmanager.py           # Tool for validating and inspecting .pt files
-        │   └── seqbatch_<name>/        # Each subdirectory contains:
-        │       ├── <batch>.pt          # Torch file with a list-of-dicts (each dict represents a sequence)
-        │       └── summary.yaml        # YAML summary of the batch (metadata, parameters, runtime)
-        ├── densegen/                 
+    └── dnadesign/ 
+        ├── usr/         # Many repo-wide sequence records live here
+        ├── infer/  
+        │   ├── README.md               
         │   ├── main.py
         │   ├── config.yaml
         │   └── ...  
-        ├── evoinference/              
+        ├── opal/   
+        │   ├── README.md            
         │   ├── main.py
         │   ├── config.yaml
         │   └── ...                             
-        ├── cruncher/                 
+        ├── cruncher/     
+        │   ├── README.md             
         │   ├── main.py
         │   ├── config.yaml
         │   └── ...  
@@ -33,75 +29,71 @@ dnadesign/
      
 ### Pipelines
 
-1. [**seqfetcher**](src/dnadesign/seqfetcher/README.md)
-   
-      **seqfetcher** is a data ingestion pipeline designed to reference a sibling directory, [**dnadesign-data**](https://github.com/e-south/dnadesign-data), which includes datasets from primary literature, [**RegulonDB**](https://regulondb.ccg.unam.mx/), [**EcoCyc**](https://ecocyc.org/), and other curated sources.
+1. [**usr**](src/dnadesign/usr) 
 
-2. [**sequences**](src/dnadesign/sequences/README.md)
- 
-      **sequences** serves as the central storage location for nucleotide sequences within the project, organizing outputs from sibling pipelines into a standardized data structure. Each subdirectory in sequences contains a `.pt` file with sequences and metadata, often accompanied by a `.yaml` file summarizing the batch. Each sequence file is structured as a list of dictionaries, following the below format:  
+      **usr (Universal Sequence Record)** is the centralized repository and API for datasets of biological sequences used across the `dnadesign` ecosystem.
 
       ```python
-      example_sequence_entry = [
-
-         {
-            "id": "90b4e54f-b5f9-48ef-882a-8763653ae826",
-            "meta_date_accessed": "2025-02-19T12:01:30.602571",
-            "meta_source": "deg2tfbs_all_DEG_sets",
-            "sequence": "gtactgCTGCAAGATAGTGTGAATGACGTTCAATATAATGGCTGATCTTATTTCCAGGAAACCGTTGCCACA",
-            "meta_type": "dense-array",
-            "evo2_logits_mean_pooled": tensor([[[-10.3750,  10.3750, ..., 10.3750,  10.3750]]], dtype=torch.bfloat16),
-            "evo2_logits_shape": [1, 512]
-         },
-         # Additional dictionary entries extend the list
-      ]
+      usr/
+      ├─ src/
+      └─ datasets/             # default root for dataset folders
+           └─ <dataset_name>/
+                ├─ records.parquet
+                ├─ meta.yaml
+                └─ .snapshots/
       ```
-      **Note:** To process custom sequences using the sibling pipelines, format your data as a list of dictionaries matching the structure above. Save it as a `.pt` file and place it in a subdirectory within **sequences**. Most pipeline configurations locate `.pt` files based on subdirectory names.
+      
+      **usr** represents as single source of truth: one Parquet file per dataset with sequences + metadata + derived representations. Sibling pipelines can read/write their own namespaced columns without breaking other workflows.
 
-3. [**densegen**](src/dnadesign/densegen/README.md) 
+2. [**densegen**](src/dnadesign/densegen) 
    
       **densegen** is a DNA sequence design pipeline built on the integer linear programming framework from the [**dense-arrays**](https://github.com/e-south/dense-arrays) package. It assembles batches of synthetic promoters, each composed of densely packed transcription factor binding sites. The pipeline references curated datasets from the [**deg2tfbs**](https://github.com/e-south/deg2tfbs) repository, subsampling dozens of binding sites to feed into the solver, with time limits enforced to prevent stalling.
 
-4. [**infer**](src/dnadesign/infer/README.md)  
+2. [**infer**](src/dnadesign/infer)  
 
       **infer** is a model-agnostic inference engine for DNA/protein language models.
 
-5. [**clustering**](src/dnadesign/clustering/README.md) 
+
+3. [**opal**](src/dnadesign/opal)
+
+3. [**clustering**](src/dnadesign/clustering) 
   
       **clustering** utilizes [Scanpy](https://scanpy.readthedocs.io/en/stable/) for cluster analysis on nucleotide sequences stored in the sibling **sequences** directory. By default, it uses mean-pooled output embeddings from **Evo 2** (e.g., a 1 × 512 vector) as input. The pipeline then generates UMAP embeddings, applies Leiden clustering, and also supports downstream analyses, such as cluster composition and diversity assessment.
 
-6. [**billboard**](src/dnadesign/billboard/README.md)  
+4. [**billboard**](src/dnadesign)  
 
       **billboard** quantifies the regulatory diversity of dense-array DNA libraries generated by **densegen**. The pipeline reports and visualizes metrics such as TF richness, TF usage balance (Gini), TF combinatorial diversity (Jaccard), and TF spatial entropy across sequences.
 
-7.  [**libshuffle**](src/dnadesign/libshuffle/README.md)
+5.  [**libshuffle**](src/dnadesign/libshuffle)
 
       **libshuffle** iteratively subsamples sequence libraries from the sibling **sequences** directory and computes diversity metrics using the **billboard** pipeline as its engine. It can be used to visualize and select representative subsamples of sequences based on configured diversity metrics.
 
-8.	[**nmf**](src/dnadesign/nmf/README.md)
+6.	[**nmf**](src/dnadesign/nmf)
 
       **nmf** applies Non-Negative Matrix Factorization (NMF) to a library of sequences generated by **densegen** to uncover higher-order transcription factor binding site combinations.
 
-9.  [**latdna**](src/dnadesign/latdna/README.md)
+7.  [**latdna**](src/dnadesign/latdna)
 
       **latdna** is a pipeline for latent space analysis of DNA sequences. It computes pairwise distances between Evo 2 embeddings within groups of sequences using metrics such as cosine and Euclidean distance. These distances are used to characterize intra-population diversity and compare it across different sequence types, including dense arrays, natural promoters, and engineered promoters.
 
-10. [**cruncher**](src/dnadesign/cruncher/README.md)
+8. [**cruncher**](src/dnadesign/cruncher)
 
       **cruncher** is a pipeline that parses TF position-weight matrices (MEME, JASPAR, etc.) via plug-in parsers, and then runs a discrete Categorical Gibbs optimiser (or other plug-ins) to discover short DNA sequences that score highly on one or more TFs.
 
-11. [**tfkdanalysis**](src/dnadesign/tfkdanalysis/README.md)
+9. [**tfkdanalysis**](src/dnadesign/tfkdanalysis)
 
       **tfkdanalysis** is a pipeline for analyzing transcription factor knockdown (TFKD) effects using PPTP-seq (Promoter responses to TF perturbation sequencing) data—a high-throughput approach described in [Han *et al.* (2023)](https://doi.org/10.1038/s41467-023-41572-4).
 
-12. [**aligner**](src/dnadesign/aligner/README.md)
+12. [**aligner**](src/dnadesign/aligner)
 
       **aligner** is a wrapper for Biopython's [PairwiseAligner](https://biopython.org/docs/dev/Tutorial/chapter_pairwise.html#chapter-pairwise), which is a class for computing Needleman–Wunsch global alignment scores between nucleotide sequences.
 
-13. [**permuter**](src/dnadesign/permuter/README.md)
+13. [**permuter**](src/dnadesign/permuter)
 
       **permuter** permuter is a pipeline for biological sequence permutation and subsequent evaluation workflows.
+14. [**archived**](src/dnadesign/archived)
 
+      **archived** contains a mix of old legacy projects and prototypes.
 
 ## Installation
 
@@ -130,7 +122,7 @@ This style is suitable for workflows that do not require Gurobi-based [dense arr
    which python                   # sanity-check → …/dnadesign/.venv/bin/python
    ```
 
-4. Reproduce the exact dependency graph (from pyproject.lock)
+4. Reproduce the exact dependency graph (from uv.lock)
 
    ```bash
    uv sync 
@@ -138,9 +130,10 @@ This style is suitable for workflows that do not require Gurobi-based [dense arr
 
 4. Editable installs for active development
 
-   The **densegen** workflow relies on the dense-arrays package. Install it as a sibling directory to `dnadesign`.
    ```bash
-   uv pip install -e .[dev]            # dnadesign + tests / linters / hooks
+   uv pip install -e .[dev]  # dnadesign + internal packages / tests / linters / hooks
+
+   # If needing the dense-array package, install it as a sibling directory to `dnadesign`.
    uv pip install -e ../dense-arrays   # dense-arrays companion library
    ```
    
@@ -277,3 +270,5 @@ This setup is designed for running more resource-intensive workflows on a [share
 1. Clone the [**dnadesign-data**](https://github.com/e-south/dnadesign-data) repository, and place it as a sibling directory to **dnadesign**. This will enable **seqfetcher** to generate custom lists of dictionaires from these sources. 
 
 2. Update the `configs/example.yaml` file as desired and try running different pipelines.
+
+@e-south
