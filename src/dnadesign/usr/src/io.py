@@ -3,7 +3,11 @@
 <dnadesign project>
 dnadesign/usr/src/io.py
 
-Arrow I/O + snapshot retention + small filesystem helpers.
+Thin wrappers around Arrow/Parquet I/O:
+
+- `write_parquet_atomic`: atomic write with a timestamped snapshot
+- `read_parquet`: convenience wrapper with optional column projection
+- `append_event`: append-only JSONL log of operations (init/import/attach/snapshot)
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

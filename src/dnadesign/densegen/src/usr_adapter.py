@@ -16,7 +16,7 @@ Dunlop Lab
 """
 
 from __future__ import annotations
-import os
+
 import json
 import tempfile
 from dataclasses import dataclass, field
@@ -29,61 +29,38 @@ from dnadesign.usr.src.dataset import Dataset
 from dnadesign.usr.src.normalize import compute_id, normalize_sequence
 
 
-# --- NEW: robust repo-root resolver (finds the folder that has both 'densegen' and 'usr') ---
 def _repo_root_from(file_path: Path) -> Path:
-    p = file_path.resolve()
-    for parent in p.parents:
-        if (parent / "densegen").is_dir() and (parent / "usr").is_dir():
-            return parent
-    # Fallback: best guess is five levels up from .../dnadesign/densegen/src/usr_adapter.py
-    # (.../dnadesign)
-    return p.parents[4]
+    return file_path.resolve().parents[2]
 
 
-def _resolve_usr_root(requested: Optional[Path | str]) -> Path:
-    """
-    Resolution precedence:
-      1) explicit 'requested' (relative => repo-relative)
-      2) $USR_ROOT env var (relative => repo-relative)
-      3) default: <repo>/usr/datasets
-    """
-    repo = _repo_root_from(Path(__file__))
-    # explicit config value
-    if requested:
-        p = Path(requested)
-        if not p.is_absolute():
-            p = repo / p
-        return p.resolve()
-    # environment override
-    env = os.environ.get("USR_ROOT")
-    if env:
-        p = Path(env)
-        if not p.is_absolute():
-            p = repo / p
-        return p.resolve()
-    # default
-    return (repo / "usr" / "datasets").resolve()
+def _default_usr_root() -> Path:
+    return _repo_root_from(Path(__file__)) / "usr" / "datasets"
 
 
 @dataclass
 class USRWriter:
     dataset: str
-    root: Optional[Path | str] = None
+    root: Optional[Path] = None
     namespace: str = "densegen"
     chunk_size: int = 128
     allow_overwrite: bool = True
     default_bio_type: str = "dna"
     default_alphabet: str = "dna_4"
 
-    _seq_buf: List[Tuple[str, str]] = field(default_factory=list)
-    _meta_buf: List[Dict] = field(default_factory=list)
+    # internal buffers
+    _seq_buf: List[Tuple[str, str]] = field(
+        default_factory=list
+    )  # (sequence, source_label)
+    _meta_buf: List[Dict] = field(
+        default_factory=list
+    )  # each has 'id' + free-form keys
     _seen_ids: set = field(default_factory=set)
 
     def __post_init__(self):
-        # NOTE: relative roots are interpreted repo-relative (folder that contains 'densegen/' and 'usr/')
-        self.root = _resolve_usr_root(self.root)
+        self.root = (
+            Path(self.root).resolve() if self.root else _default_usr_root().resolve()
+        )
         self.root.mkdir(parents=True, exist_ok=True)
-
         self.ds = Dataset(self.root, self.dataset)
         if not self.ds.records_path.exists():
             self.ds.init(source="densegen init")

@@ -144,43 +144,96 @@ usr ls
 USR head mock_dataset -n 5
 ```
 
-### Add a **“Remote Sync”**
-
-````md
 ### Remote Sync (cluster ↔ local)
 
-Configure your HPC as a remote once:
+`usr` includes a lightweight, SSH-backed sync for dataset folders you **don’t** want in git (e.g., `records.parquet`, `_snapshots/`, `.events.log`).
+
+
+**Rule of thumb:** run the command **on the machine where you want the files to end up.** In practice, that means you usually run from your **laptop**.
+
+#### 1) Configure once
+
+You can add a remote via CLI **or** by creating `usr/remotes.yaml`.
+
+**CLI:**
 
 ```bash
+# Define the cluster remote once
 usr remotes add cluster --type ssh \
   --host scc1.bu.edu --user esouth \
   --base-dir /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets \
   --ssh-key-env USR_SSH_KEY
-````
 
-**Pull** results from the cluster:
-
-```bash
-# See a compact diff (sha, rows, cols). Confirm to overwrite local.
-usr pull 60bp_dual_promoter_cpxR_Lex --from cluster
+# (Optional) Inspect
+usr remotes list
+usr remotes show cluster
 ```
 
-**Push** local changes up:
+**File (`usr/remotes.yaml`):**
+
+```yaml
+remotes:
+  cluster:
+    type: ssh
+    host: scc1.bu.edu
+    user: esouth
+    base_dir: /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets
+    # ssh_key_env: USR_SSH_KEY   # optional; otherwise ssh-agent/default key
+```
+
+> Make sure your key is available (e.g., `export USR_SSH_KEY=~/.ssh/id_ed25519`) or your agent is loaded.
+
+#### 2) When working locally
+
+Bring results **down** from the cluster, then push updates **up** later.
 
 ```bash
+# See a compact diff (sha/rows/cols) before any transfer
+usr diff 60bp_dual_promoter_cpxR_Lex --remote cluster
+
+# Pull cluster → local (prompt to confirm if different; add -y to skip prompt)
+usr pull 60bp_dual_promoter_cpxR_Lex --from cluster
+
+# Commit code changes as usual (datasets are not in git)
+
+# Push local → cluster (same safety prompt)
 usr push 60bp_dual_promoter_cpxR_Lex --to cluster
 ```
 
-Dry run, no changes:
+Handy flags:
 
-```bash
-usr diff 60bp_dual_promoter_cpxR_Lex --remote cluster
+* `-y/--yes` non-interactive
+* `--primary-only` only `records.parquet`
+* `--skip-snapshots` omit `_snapshots/`
+* `--dry-run` show the plan, don’t copy
+
+#### 3) From the **cluster** (only if needed)
+
+If you’re logged into the cluster and want data to **end up on your laptop**, the simplest path is to **exit to your laptop and run `usr pull … --from cluster`**.
+
+#### What gets transferred
+
+By default: the **entire dataset folder**:
+
+```
+<dataset>/
+  records.parquet      # primary
+  meta.yaml
+  .events.log
+  _snapshots/
 ```
 
-Power flags:
-- `--yes` (no prompt), `--dry-run`
-- `--primary-only` (just `records.parquet`)
-- `--skip-snapshots` (omit `_snapshots/`)
+Use `--primary-only` / `--skip-snapshots` to trim what’s copied.
+
+#### Safety
+
+On every `pull`/`push`, `usr` shows a one-screen diff (sha/rows/cols) and will **ask before overwriting** unless you pass `-y`. If nothing changed, it prints “Already up to date.”
+
+
+
+
+
+
 
 ### Extending USR
 

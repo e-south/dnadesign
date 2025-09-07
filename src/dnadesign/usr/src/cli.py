@@ -11,11 +11,15 @@ Default layout (editable install):
       ├─ datasets/             # <-- default root for dataset folders
       │    └─ <dataset_name>/
       │         ├─ records.parquet
-      │         ├─ meta.yaml            # optional; embedded metadata lives in records.parquet
-      │         └─ _snapshots/          # bounded by module-level retention (see io.py)
+      │         ├─ meta.yaml
+      │         └─ .snapshots/
       └─ template_demo/        # example CSVs for the README walkthrough
 
 You can override the root with --root (or just cd into the datasets/ dir and use ".").
+
+If you installed the console script alias (see pyproject.toml), you may also run:
+    usr ls
+    USR head mock_dataset -n 5
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

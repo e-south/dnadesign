@@ -175,8 +175,6 @@ batches/
 
 # Ignore specific file types
 records.parquet
-_snapshots/
-.events.log
 meta.yaml
 *.env
 *.key

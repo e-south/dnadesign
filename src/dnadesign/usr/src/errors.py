@@ -42,8 +42,6 @@ class EmbeddingDimensionError(ValidationError):
     pass
 
 
-# ----- Remote/Sync specific -----
-
 class RemoteConfigError(SequencesError):
     """Bad or missing remote configuration."""
     pass

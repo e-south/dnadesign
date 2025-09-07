@@ -3,20 +3,15 @@
 <dnadesign project>
 dnadesign/usr/src/dataset.py
 
-Parquet-backed dataset with fail-fast schema checks, atomic writes, bounded snapshots,
+Parquet-backed dataset with fail-fast schema checks, atomic writes, snapshots,
 and an append-only event log. Datasets have immutable essential columns and are
 extended by namespaced derived columns via `Dataset.attach(...)`.
 
 Key ideas:
 - One `records.parquet` per dataset directory (single source of truth)
-- Metadata embedded in Parquet schema (and optional meta.yaml for human read)
 - Case-preserving sequences; `id = sha1(bio_type|sequence)` on trimmed text
 - Strict namespacing: derived columns must look like `<tool>__<field>`
-- Pragmatic safety: atomic writes + bounded snapshots + event log
-
-Module-level controls (edit to taste; no env vars required):
-  - SNAPDIR: subdirectory name for snapshots (default comes from io.SNAPSHOT_DIR_NAME)
-  - WRITE_META_FILE: whether to write a human-readable meta.yaml (default True)
+- Pragmatic safety: atomic writes + timestamped snapshots + event log
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -42,26 +37,14 @@ from .errors import (
     SchemaError,
     SequencesError,
 )
-from .io import (
-    append_event,
-    now_utc,
-    read_parquet,
-    write_parquet_atomic,
-    SNAPSHOT_DIR_NAME,   # default snapshot dir name
-)
+from .io import append_event, now_utc, read_parquet, write_parquet_atomic
 from .normalize import compute_id, normalize_sequence  # case-preserving
 from .schema import ARROW_SCHEMA, REQUIRED_COLUMNS
 
-
-# ---------------------------
-# Module-level configuration
-# ---------------------------
 RECORDS = "records.parquet"
-SNAPDIR = SNAPSHOT_DIR_NAME
+SNAPDIR = ".snapshots"
 META_YAML = "meta.yaml"
 EVENTS_LOG = ".events.log"
-WRITE_META_FILE: bool = True  # set False to skip writing meta.yaml
-
 
 _NS_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 LEGACY_ALLOW = {
@@ -70,19 +53,6 @@ LEGACY_ALLOW = {
     "logits_mean_model_id",
     "logits_mean_version",
 }
-
-
-def _embed_meta(schema: pa.Schema, meta_dict: Dict[str, str]) -> pa.Schema:
-    """
-    Merge `meta_dict` into Arrow schema metadata (keys under 'usr:*').
-    Arrow requires bytes->bytes dict.
-    """
-    meta = dict(schema.metadata or {})
-    for k, v in meta_dict.items():
-        meta_key = f"usr:{k}".encode("utf-8")
-        meta_val = (v if isinstance(v, str) else json.dumps(v)).encode("utf-8")
-        meta[meta_key] = meta_val
-    return schema.with_metadata(meta)
 
 
 @dataclass
@@ -94,7 +64,7 @@ class Dataset:
 
     @property
     def dir(self) -> Path:
-        return Path(self.root) / self.name
+        return self.root / self.name
 
     @property
     def records_path(self) -> Path:
@@ -111,7 +81,7 @@ class Dataset:
     @property
     def events_path(self) -> Path:
         return self.dir / EVENTS_LOG
-
+    
     # ---- quick stats for CLI and sync ----
     def stats(self):
         """Return local primary FileStat (sha/size/rows/cols/mtime)."""
@@ -120,40 +90,20 @@ class Dataset:
 
     # ---- lifecycle ----
 
-    def init(self, source: str = "", notes: str = "") -> None:
-        """Create a new, empty dataset directory with canonical schema + embedded metadata."""
+    def init(self, source: str = "") -> None:
+        """Create a new, empty dataset directory with canonical schema."""
         self.dir.mkdir(parents=True, exist_ok=True)
         if self.records_path.exists():
             raise SequencesError(f"Dataset already initialized: {self.records_path}")
-
-        # Prepare embedded metadata
-        meta = {
-            "name": self.name,
-            "schema": "USR v1",
-            "created_at": now_utc(),
-            "source": source,
-            "notes": notes,
-        }
-        schema_with_meta = _embed_meta(ARROW_SCHEMA, meta)
-
         empty = pa.Table.from_arrays(
-            [pa.array([], type=f.type) for f in schema_with_meta], schema=schema_with_meta
+            [pa.array([], type=f.type) for f in ARROW_SCHEMA], schema=ARROW_SCHEMA
         )
-
-        # First write persists metadata into records.parquet (and snapshot per policy)
         write_parquet_atomic(empty, self.records_path, self.snapshot_dir)
-
-        # Optional plain-text meta.yaml for human-readability
-        if WRITE_META_FILE:
-            yaml = (
-                f"name: {self.name}\n"
-                f"created_at: {meta['created_at']}\n"
-                f"source: {source}\n"
-                f"notes: {notes}\n"
-                f"schema: {meta['schema']}\n"
-            )
-            self.meta_path.write_text(yaml, encoding="utf-8")
-
+        meta = (
+            f"name: {self.name}\ncreated_at: {now_utc()}\nsource: {source}\n"
+            "notes: \nschema: USR v1\n"
+        )
+        self.meta_path.write_text(meta, encoding="utf-8")
         append_event(
             self.events_path, {"action": "init", "dataset": self.name, "source": source}
         )
@@ -178,26 +128,12 @@ class Dataset:
                 and "__" in c
             }
         )
-
-        # Extract embedded metadata if present
-        md = tbl.schema.metadata or {}
-        meta = {}
-        for bkey, bval in md.items():
-            k = bkey.decode("utf-8")
-            if k.startswith("usr:"):
-                try:
-                    v = bval.decode("utf-8")
-                    meta[k[4:]] = v
-                except Exception:
-                    pass
-
         return {
             "name": self.name,
             "path": str(self.records_path),
             "rows": tbl.num_rows,
             "columns": cols,
             "namespaces": namespaces,
-            "meta": meta,
         }
 
     def schema(self):
@@ -317,16 +253,10 @@ class Dataset:
                 raise DuplicateIDError(
                     f"Duplicate ids already present in dataset: {len(inter)} conflict(s)."
                 )
+            # pyarrow deprecation fix (replaces promote=True)
             combined = pa.concat_tables([existing, incoming], promote_options="default")
-            # Preserve embedded metadata from the existing table
-            write_parquet_atomic(
-                combined,
-                self.records_path,
-                self.snapshot_dir,
-                preserve_metadata_from=existing,
-            )
+            write_parquet_atomic(combined, self.records_path, self.snapshot_dir)
         else:
-            # First write; ensure metadata is embedded (init usually handles this)
             write_parquet_atomic(incoming, self.records_path, self.snapshot_dir)
         return len(ids)
 
@@ -350,7 +280,7 @@ class Dataset:
         - Essential columns are immutable
         - Overwriting existing columns requires `allow_overwrite=True`
         - Values align by `id`; unknown ids are ignored; missing values become NULL
-        - Strings that look like JSON arrays/objects are parsed (generic vector support)
+        - Strings that look like JSON arrays are parsed (generic vector support)
 
         Supported input formats: .parquet, .csv, .jsonl
         """
@@ -381,20 +311,18 @@ class Dataset:
         if not attach_cols:
             return 0
 
-        # Parse JSON arrays/objects if given as strings (robust to NaNs etc.)
-        def _maybe_parse_json_value(x):
-            if isinstance(x, str):
-                s = x.strip()
-                if s.startswith("[") or s.startswith("{"):
-                    try:
-                        return json.loads(s)
-                    except Exception:
-                        return x
+        # Parse JSON arrays (vectors) if given as strings
+        def _maybe_parse_json_array(x):
+            if isinstance(x, str) and x.strip().startswith("["):
+                try:
+                    return json.loads(x)
+                except Exception:
+                    return x
             return x
 
         work = inc[[id_col] + attach_cols].copy()
         for c in attach_cols:
-            work[c] = work[c].map(_maybe_parse_json_value)
+            work[c] = work[c].map(_maybe_parse_json_array)
 
         def target_name(c: str) -> str:
             return c if c.startswith(namespace + "__") else f"{namespace}__{c}"
@@ -435,10 +363,12 @@ class Dataset:
                 return False
             if isinstance(x, np.ndarray):
                 return False
+            # numpy/pandas scalar types OK here
             try:
                 res = pd.isna(x)
             except Exception:
                 return False
+            # pd.isna(np.array([...])) returns array -> guard
             if isinstance(res, (list, tuple, np.ndarray)):
                 return False
             return bool(res)
@@ -488,7 +418,7 @@ class Dataset:
             incoming_map = maps[col]
             if col in existing_names:
                 # Overwrite existing column
-                field = new_tbl.schema.field(col)
+                field = new_tbl.schema.field(col)  # deprec-safe
                 base_values = new_tbl.column(col).to_pylist()
                 for rid, v in incoming_map.items():
                     idx = pos.get(str(rid))
@@ -511,10 +441,8 @@ class Dataset:
                     new_tbl.num_columns, pa.field(col, arr.type, nullable=True), arr
                 )
 
-        # Atomic write, preserving embedded metadata
-        write_parquet_atomic(
-            new_tbl, self.records_path, self.snapshot_dir, preserve_metadata_from=existing_tbl
-        )
+        # Atomic write
+        write_parquet_atomic(new_tbl, self.records_path, self.snapshot_dir)
 
         n_attached = int(work.shape[0])
         append_event(
@@ -600,7 +528,6 @@ class Dataset:
         """Export current table to CSV or JSONL."""
         self._require_exists()
         df = read_parquet(self.records_path).to_pandas()
-        out_path = Path(out_path)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         if fmt == "csv":
             df.to_csv(out_path, index=False)
@@ -610,10 +537,8 @@ class Dataset:
             raise SequencesError("Unsupported export format. Use csv|jsonl.")
 
     def snapshot(self) -> None:
-        """Write a timestamped snapshot (per policy) and atomically persist current table."""
+        """Write a timestamped snapshot and atomically persist current table."""
         self._require_exists()
         tbl = read_parquet(self.records_path)
-        write_parquet_atomic(
-            tbl, self.records_path, self.snapshot_dir, preserve_metadata_from=tbl
-        )
+        write_parquet_atomic(tbl, self.records_path, self.snapshot_dir)
         append_event(self.events_path, {"action": "snapshot", "dataset": self.name})
