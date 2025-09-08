@@ -1,7 +1,0 @@
-remotes:
-  cluster:
-    base_dir: /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets
-    host: scc1.bu.edu
-    ssh_key_env: null
-    type: ssh
-    user: esouth

@@ -4,13 +4,14 @@ model:
   device: cuda:0
   precision: bf16
   alphabet: dna
+  batch_size: 128
 
 jobs:
-  - id: evo_usr_demo
+  - id: 60bp_dual_promoter_cpxR_LexA
     operation: extract
     ingest:
       source: usr
-      dataset: 60bp_dual_promoter_cpxR_Lex      # name under usr/datasets/
+      dataset: 60bp_dual_promoter_cpxR_LexA     # name under usr/datasets/
       root: null                                # optional; auto-detected if omitted
       field: sequence                           # column to read
       # ids: ["<optional-specific-id>", "..."]  # subset if desired
@@ -25,4 +26,4 @@ jobs:
         format: float
     io:
       write_back: true
-      overwrite: false
+      overwrite: true

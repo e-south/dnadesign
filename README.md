@@ -129,13 +129,12 @@ uv pip install -e ./dense-arrays
 python -c "import dnadesign, pyarrow, pandas; print('ok')"
 python -m dnadesign.usr ls || true
 ```
-### (Optional) Extended installation for resource-intensive  workflows
+### (Optional) Alternative installation for resource-intensive  workflows
 Some pipelines are more resource-intensive and are designed to run on a [shared computing cluster](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/), such as solving dense arrays with [Gurobi](https://www.gurobi.com/), or running inference with [Evo 2](https://github.com/ArcInstitute/evo2).
-
-##### 1. Cluster setup
 
 In practice you can:
 
+- clone this repo,
 - create/sync the repo’s UV environment,
 - layer PyTorch built for your node’s CUDA,
 - add Transformer Engine and FlashAttention,
@@ -144,7 +143,7 @@ In practice you can:
 
 Below uses CUDA 12.6 wheels as an example; change the index URL to match your cluster’s CUDA toolchain.
 
-#####  2. (Optional) Request an interactive GPU session
+#####  1. (Optional) Request an interactive GPU session
 SCC Interactive Session Resource Request Example:
 
 > - **densegen** workflow:
@@ -160,51 +159,146 @@ SCC Interactive Session Resource Request Example:
 
 Check your cluster documentation for submission details.
 
-##### 3. Load site toolchains
+##### 2. Install UV
+```bash
+curl -Ls https://astral.sh/uv/install | sh
+# ensure ~/.local/bin (or your UV bin dir) is on PATH
+```
+
+##### 3. Put UV caches on project space
+Add this once to your ~/.bashrc (or run it inline before installing):
+```bash
+# --- uv cache/temp on project space (HPC) ---
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/project/dunlop/esouth/.uvcache}"
+export UV_LINK_MODE=copy
+export TMPDIR="${TMPDIR:-/project/dunlop/esouth/.uvtmp}"
+[ -d "$UV_CACHE_DIR" ] || mkdir -p "$UV_CACHE_DIR"
+[ -d "$TMPDIR" ] || mkdir -p "$TMPDIR"
+# Avoid picking up user-site packages (~/.local) that can conflict
+export PYTHONNOUSERSITE=1
+# --- end uv config ---
+```
+Reload your shell:
+```bash
+source ~/.bashrc
+```
+
+##### 4. Grab the source
+```bash
+git clone https://github.com/e-south/dnadesign.git
+cd dnadesign
+```
+
+##### 5. Create and activate the base env (from repo root)
+```bash
+uv python install 3.12
+uv venv --python 3.12         # 3.12 required for Evo2
+source .venv/bin/activate
+which python
+```
+
+##### 6. Reproduce base deps (from uv.lock) + dev extras
+```bash
+uv sync                       # uses the uv.lock file
+uv pip install -e .[dev]
+```
+
+##### 7. Load cluster CUDA toolchain (match to your node)
 
 ```bash
 module load cuda/12.5         # Load the CUDA module appropriate for your cluster
 module load gcc/10.2.0        # Load a GCC version that is compatible with CUDA
 
-# Optional sanity; verify that nvcc is available:
+# Sanity; verify that nvcc is available:
 ls $CUDA_HOME/bin/nvcc
-nvcc --version && gcc --version             
+nvcc --version && gcc --version  
+
+# explicit paths (adjust for your site if needed)
+export CUDA_HOME=/share/pkg.8/cuda/12.5/install
+export CUDA_PATH=$CUDA_HOME
+export CUDACXX=$CUDA_HOME/bin/nvcc
+export PATH=$CUDA_HOME/bin:$PATH
+
+export CC=/share/pkg.7/gcc/10.2.0/install/bin/gcc
+export CXX=/share/pkg.7/gcc/10.2.0/install/bin/g++
 ```
 
-##### 4. Create and sync the base env (from repo root)
+> GPU arch hint: set the SM you actually run on.
+> Ada (e.g., L40S/4090): export TORCH_CUDA_ARCH_LIST=8.9
+> H100: export TORCH_CUDA_ARCH_LIST=9.0
+
 ```bash
-uv venv --python 3.12         # 3.12 required for Evo2
-source .venv/bin/activate
-uv sync                       # uses the checked-in uv.lock
+export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-8.9}"
+export FORCE_CUDA=1
 ```
 
-##### 4. Install PyTorch for your CUDA
+##### 8. Install PyTorch matched to your CUDA
 
 Installing PyTorch built for CUDA ensures that GPU acceleration is enabled for Evo 2’s computations. Here, we install a version built for CUDA 12.6, which is optimal for GPUs with compute capability ≥8.9.
 
 ```bash
 # Example: CUDA 12.6 wheels
-pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
+uv pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
   --index-url https://download.pytorch.org/whl/cu126
 ```
 
 > **Note:** If your GPU does not support FP8 or if you encounter compatibility issues, consider installing a version built for a different CUDA (e.g., cu118).
 
-##### 5. Install Transformer Engine + FlashAttention
+Quick check:
 ```bash
-# FlashAttention (prebuilt wheels; no build isolation is recommended upstream)
-pip install flash-attn==2.8.0.post2 --no-build-isolation
-
-# Transformer Engine (PyPI)
-pip install transformer-engine>=2.0.0
-```
-##### 6. Install Evo2 (PyPI)
-
-```bash
-pip install evo2
+python - <<'PY'
+import torch
+print("Torch:", torch.__version__, "CUDA:", torch.version.cuda, "avail:", torch.cuda.is_available())
+PY
 ```
 
-##### 7. Validate the install
+##### 9. Install Transformer Engine (builds the PyTorch extension)
+Install the TE meta-package with the PyTorch extra (this pulls and builds transformer-engine-torch to match your toolchain):
+```bash
+uv pip install --no-build-isolation "transformer-engine[pytorch]==2.6.0.post1"
+```
+
+Sanity:
+```bash
+python - <<'PY'
+from transformer_engine.pytorch import Linear
+print("TransformerEngine Linear OK")
+PY
+```
+
+##### 10. Build FlashAttention from source
+```bash
+# Helpful build tools
+uv pip install ninja packaging
+
+# Ensure we don't keep an incompatible wheel around
+# (if prompted to uninstall, confirm)
+uv pip uninstall flash-attn || true
+
+git clone https://github.com/Dao-AILab/flash-attention.git
+cd flash-attention
+# Optionally checkout a specific tag, e.g. v2.8.0.post2 or latest stable
+# git checkout v2.8.3
+```
+
+Verify FA + TE load together:
+```bash
+python - <<'PY'
+import importlib.util as iu, torch
+print("Torch:", torch.__version__, "CUDA:", torch.version.cuda, "avail:", torch.cuda.is_available())
+print("flash-attn present:", iu.find_spec("flash_attn") is not None)
+from transformer_engine.pytorch import Linear
+print("TE Linear OK (with FlashAttention)")
+PY
+```
+
+##### 11. Install Evo2 (PyPI)
+
+```bash
+uv pip install evo2
+```
+
+##### 12. Validate the install
 
 ```bash
 # single-GPU 7B
@@ -231,6 +325,21 @@ uv remove <pkg>
 uv lock --upgrade-package <pkg>
 # enforce exact lock during CI
 uv sync --frozen
+```
+
+##### Cluster allocation hygiene
+
+Cap all CPU thread pools to your allocation:
+```bash
+# Match thread counts to the slots SGE gave you
+export OMP_NUM_THREADS=${NSLOTS:-1}
+export MKL_NUM_THREADS=${NSLOTS:-1}
+export OPENBLAS_NUM_THREADS=${NSLOTS:-1}
+export BLIS_NUM_THREADS=${NSLOTS:-1}
+export NUMEXPR_NUM_THREADS=${NSLOTS:-1}
+export OMP_DYNAMIC=false
+# HF tokenizers can spin up threads too
+export TOKENIZERS_PARALLELISM=false
 ```
 
 ---

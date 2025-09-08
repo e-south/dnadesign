@@ -102,7 +102,7 @@ model:
   alphabet: dna
 
 jobs:
-  - id: evo_usr_demo
+  - id: evo2_usr_demo
     operation: extract
     ingest:
       source: usr

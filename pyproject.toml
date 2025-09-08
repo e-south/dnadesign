@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name            = "dnadesign"
 version         = "0.1.0"
-description     = "DNA sequence design pipelines and bio-informatics helpers."
+description     = "DNA sequence design pipelines and bioinformatics helpers."
 authors         = [{ name = "Eric South", email = "ericjohnsouth@gmail.com" }]
 readme          = "README.md"
 requires-python = ">=3.12,<3.13"
