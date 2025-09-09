@@ -1,7 +1,10 @@
-# -----------------
-# OS-specific files
-# -----------------
+# =============================================================================
+# dnadesign — .gitignore
+# =============================================================================
 
+# -----------------------------------------------------------------------------
+# OS & Editor cruft
+# -----------------------------------------------------------------------------
 # macOS
 .DS_Store
 .AppleDouble
@@ -13,168 +16,135 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
-# Linux
+# Linux/Unix temp
 *.~lock.*
+*~
 *.swp
 *.swo
-*~
 
-# -----------------
-# Application-specific files
-# -----------------
-
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-*.pkl
-*.egg
-*.egg-info/
-dist/
-build/
-env/
-venv/
+# VS Code / JetBrains
+.vscode/
+*.code-workspace
 .idea/
+*.iml
+out/
 
-# Jupyter Notebooks
+# Jupyter
 .ipynb_checkpoints/
 
-# Node.js
+# -----------------------------------------------------------------------------
+# Python build & tooling
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.pyd
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+*.whl
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Test/analysis caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# -----------------------------------------------------------------------------
+# Node / JS (if present)
+# -----------------------------------------------------------------------------
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Java
-*.class
-*.jar
-*.war
-*.ear
-*.log
-
-# C/C++
-*.o
-*.out
-*.obj
-*.exe
-*.gch
-*.so
-*.dll
-
-# R
-.Rhistory
-.Rapp.history
-.Rproj.user/
-
-# Go
-bin/
-*.test
-*.exe
-
-# Rust
-/target/
-
-# Ruby
-*.gem
-*.rbc
-.ruby-version
-.ruby-gemset
-.rvmrc
-
-# JavaScript/TypeScript
-coverage/
-*.log
-
-# PHP
-vendor/
-*.phpunit.result.cache
-.php_cs.cache
-
-# -----------------
-# IDEs and editors
-# -----------------
-
-# VS Code
-.vscode/
-*.code-workspace
-
-# JetBrains (IntelliJ, PyCharm, WebStorm, etc.)
-.idea/
-*.iml
-out/
-
-# Eclipse
-.metadata/
-bin/
-tmp/
-
-# NetBeans
-nbproject/private/
-build/
-dist/
-
-# Logs
+# -----------------------------------------------------------------------------
+# Logs, temp, archives
+# -----------------------------------------------------------------------------
 *.log
 *.out
-
-# Temporary files
 *.tmp
 *.temp
 *.bak
-*.swp
-*.swo
-*~
+*.old
+*.orig
+*.rej
 temp.md
 
-# Archives
 archived/
 *.zip
+*.tar
 *.tar.gz
+*.tgz
 *.rar
 *.7z
 
-# Images
+# -----------------------------------------------------------------------------
+# Large/binary data artifacts (keep out of git)
+# -----------------------------------------------------------------------------
+*.parquet
+*.parq
+*.pq
+*.feather
+*.joblib
+*.pkl
+*.pt
+
+# -----------------------------------------------------------------------------
+# Images: ignore by default; allow curated exceptions
+# -----------------------------------------------------------------------------
 *.png
 *.jpg
 *.jpeg
 *.gif
 
-# EXCEPT allow images in nmf/images/
+# allow curated PNGs
 !src/dnadesign/nmf/images/
 !src/dnadesign/nmf/images/*.png
 !src/dnadesign/libshuffle/images/*.png
 !images/*.png
 
-# Backup and generated files
-*.bak
-*.old
-*.orig
-*.rej
+# -----------------------------------------------------------------------------
+# Project-specific (OPAL / USR)
+# -----------------------------------------------------------------------------
+# OPAL campaigns (private, large). Keep only a tiny tracked template.
+src/dnadesign/opal/campaigns/**
+!src/dnadesign/opal/campaigns/.template/**
+!src/dnadesign/opal/campaigns/.template/**/**
 
-# Libraries
-lib/
-libs/
+# OPAL per-run products anywhere
+**/outputs/
+**/campaign.log.jsonl
+**/round.log.jsonl
+**/state.json
 
-# -----------------
-# Custom additions
-# -----------------
+# USR datasets (large, not for git)
+src/dnadesign/usr/datasets/**
 
-# Ignore specific directories
+# Common local project dirs (optional; keep private)
+campaigns/
 datasets/
 prototypes/
 test_configs/
 batches/
 **/batch_results/
 **/results/
+
+# Misc project-generated YAML summaries
 **/progress_status_*.yaml
 **/summary.yaml
 
-# Ignore PyTorch (or similar) model files
-*.pt
-
-# Ignore specific file types
-records.parquet
+# Misc project metadata/secrets
 meta.yaml
 *.env
+*.env.*
 *.key

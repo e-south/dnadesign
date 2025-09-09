@@ -347,23 +347,40 @@ def _print_diff(summary):
 
     pl, pr = summary.primary_local, summary.primary_remote
     print(f"Dataset: {summary.dataset}")
-    print(
-        f"Local  : {pl.sha256 or '?'}  size={fmt_sz(pl.size)}  rows={pl.rows or '?'}  cols={pl.cols or '?'}"
+
+    local_line = (
+        f"Local  : {pl.sha256 or '?'}  "
+        f"size={fmt_sz(pl.size)}  "
+        f"rows={pl.rows or '?'}  "
+        f"cols={pl.cols or '?'}"
     )
-    print(
-        f"Remote : {pr.sha256 or '?'}  size={fmt_sz(pr.size)}  rows={pr.rows or '?'}  cols={pr.cols or '?'}"
+    print(local_line)
+
+    remote_line = (
+        f"Remote : {pr.sha256 or '?'}  "
+        f"size={fmt_sz(pr.size)}  "
+        f"rows={pr.rows or '?'}  "
+        f"cols={pr.cols or '?'}"
     )
+    print(remote_line)
+
     eq = "==" if (pl.sha256 and pr.sha256 and pl.sha256 == pr.sha256) else "≠"
     print(f"Primary sha: {pl.sha256 or '?'} {eq} {pr.sha256 or '?'}")
     print(
-        f"meta.yaml   mtime: {summary.meta_local_mtime or '-'}  →  {summary.meta_remote_mtime or '-'}"
+        "meta.yaml   mtime: "
+        f"{summary.meta_local_mtime or '-'}  →  {summary.meta_remote_mtime or '-'}"
     )
     delta_evt = max(0, summary.events_remote_lines - summary.events_local_lines)
     print(
-        f".events.log lines: local={summary.events_local_lines}  remote={summary.events_remote_lines}  (+{delta_evt} on remote)"
+        ".events.log lines: "
+        f"local={summary.events_local_lines}  "
+        f"remote={summary.events_remote_lines}  "
+        f"(+{delta_evt} on remote)"
     )
     print(
-        f"_snapshots : remote_count={summary.snapshots.count}  newer_than_local={summary.snapshots.newer_than_local}"
+        "_snapshots : "
+        f"remote_count={summary.snapshots.count}  "
+        f"newer_than_local={summary.snapshots.newer_than_local}"
     )
     print("Status     :", "CHANGES" if summary.has_change else "up-to-date")
 
@@ -398,7 +415,7 @@ def cmd_pull(args):
     s = plan_diff(args.root, args.dataset, args.remote)
     _print_diff(s)
     _confirm_or_abort(s, assume_yes=args.yes)
-    res = execute_pull(args.root, args.dataset, args.remote, _opts_from_args(args))
+    execute_pull(args.root, args.dataset, args.remote, _opts_from_args(args))
     if not args.dry_run:
         print("Pull complete.")
 
@@ -407,6 +424,6 @@ def cmd_push(args):
     s = plan_diff(args.root, args.dataset, args.remote)
     _print_diff(s)
     _confirm_or_abort(s, assume_yes=args.yes)
-    res = execute_push(args.root, args.dataset, args.remote, _opts_from_args(args))
+    execute_push(args.root, args.dataset, args.remote, _opts_from_args(args))
     if not args.dry_run:
         print("Push complete.")

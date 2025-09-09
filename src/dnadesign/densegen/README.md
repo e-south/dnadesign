@@ -1,6 +1,6 @@
 # DenseGen — Dense Array Generator
 
-**DenseGen** is a DNA sequence design pipeline for **batch assembly of synthetic bacterial promoters** composed of **densely packed transcription factor binding sites (TFBSs)**. It wraps the [`dense-arrays`](https://github.com/e-south/dense-arrays) ILP solver.
+**DenseGen** is a DNA sequence design pipeline for **batch assembly of synthetic promoters** composed of **densely packed transcription factor binding sites (TFBSs)**. It wraps the [`dense-arrays`](https://github.com/e-south/dense-arrays) ILP solver.
 
 - **Add TFBS data:** Provide a CSV of TF→TFBS pairs or seed from a USR dataset.
 - **Add explicit constraints:** Use YAML to define **per-constraint output quotas** and **fixed elements** (e.g., σ70 promoter motifs).

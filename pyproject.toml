@@ -38,7 +38,7 @@ dependencies = [
 
 [project.scripts]
 usr = "dnadesign.usr.src.cli:main"
-USR = "dnadesign.usr.src.cli:main"
+opal = "dnadesign.opal.src.cli:main"
 
 [project.optional-dependencies]
 viz = [

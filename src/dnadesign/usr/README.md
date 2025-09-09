@@ -9,9 +9,10 @@ usr/
 ├─ src/
 ├─ datasets/
 │    └─ <dataset_name>/
-│         ├─ records.parquet
+│         ├─ records.parquet  # data lives here
+|         ├─ .events.log      # action history
 │         └─ _snapshots/
-└─ template_demo/        # example CSVs for the README walkthrough
+└─ template_demo/             # example CSVs for the README walkthrough
 ````
 
 ### Schema (USR v1)
@@ -39,8 +40,6 @@ All **secondary** columns must be prefixed `"<tool>__<field>"`, e.g.:
 Essential columns (table above) are immutable.
 
 ### CLI walkthrough with the included template
-
-All commands assume you’re inside: `src/dnadesign/usr/`
 
 #### 1) Create a dataset from the provided CSV
 The repo ships a small CSV at `template_demo/template_sequences.csv`. We’ll import it into a new dataset called `mock_dataset`.
@@ -179,15 +178,13 @@ Bring results **down** from the cluster, then push updates **up** later.
 
 ```bash
 # See a compact diff (sha/rows/cols) before any transfer
-usr diff 60bp_dual_promoter_cpxR_Lex --remote cluster
+usr diff 60bp_dual_promoter_cpxR_LexA --remote cluster
 
 # Pull cluster → local (prompt to confirm if different; add -y to skip prompt)
-usr pull 60bp_dual_promoter_cpxR_Lex --from cluster
-
-# Commit code changes as usual (datasets are not in git)
+usr pull 60bp_dual_promoter_cpxR_LexA --from cluster
 
 # Push local → cluster (same safety prompt)
-usr push 60bp_dual_promoter_cpxR_Lex --to cluster
+usr push 60bp_dual_promoter_cpxR_LexA --to cluster
 ```
 
 #### 3) From the **cluster** (only if needed)

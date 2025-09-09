@@ -9,10 +9,10 @@ dnadesign/
 ├─ uv.lock
 └── src/
     └── dnadesign/ 
-        ├── usr/         # Parquet-backed datasets + CLI
+        ├── usr/         # sequence datasets
         ├── infer/       # model-agnostic inference (Evo2 adapter)
         ├── densegen/    # solver-backed promoter assembly           
-        ├── cruncher/     
+        ├── opal/     
         └── ...
 ```
      
@@ -25,11 +25,11 @@ dnadesign/
       ```python
       usr/
       ├─ src/
-      └─ datasets/             # default root for dataset folders
+      └─ datasets/                  # default root for dataset folders
            └─ <dataset_name>/
-                ├─ records.parquet
-                ├─ .events.log
-                └─ .snapshots/
+                ├─ records.parquet  # data lives here
+                ├─ .events.log      # action history
+                └─ _snapshots/
       ```
       
       **usr** represents as single source of truth: one Parquet file per dataset with sequences + metadata + derived representations. Sibling pipelines can read/write their own namespaced columns without breaking other workflows.
@@ -42,10 +42,9 @@ dnadesign/
 
       **infer** is a model-agnostic wrapper for DNA/protein language models (e.g., Evo2).
 
-
 3. [**opal**](src/dnadesign/opal)
 
-      WIP.
+      **opal** is an [EVOLVEpro-style](https://www.science.org/doi/10.1126/science.adr6006) active-learning tool for DNA/protein sequence design campaigns. Provide a feature column (X) and a label column (Y); OPAL trains a regressor, predicts Ŷ for all sequence candidates, and selects the top-k each round.
 
 3. [**clustering**](src/dnadesign/clustering) 
   
