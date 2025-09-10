@@ -3,11 +3,12 @@
 <dnadesign project>
 src/dnadesign/opal/src/artifacts.py
 
-Defines where round outputs live and how they're written:
+Round artifacts helpers.
 
 - model.joblib (frozen model),
 - selection_top_k.csv (lab handoff),
 - feature_importance.csv,
+- predictions_with_uncertainty.csv,
 - round_model_metrics.json.
 
 Module Author(s): Eric J. South
@@ -17,14 +18,20 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict
 
-import numpy as np
 import pandas as pd
 
-from .utils import ensure_dir, file_sha256, write_json
+from .utils import file_sha256
+
+
+def round_dir(workdir: Path, round_index: int) -> Path:
+    d = workdir / "outputs" / f"round_{round_index}"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 @dataclass
@@ -34,32 +41,22 @@ class ArtifactPaths:
     feature_importance_csv: Path
     metrics_json: Path
     round_log_jsonl: Path
+    preds_with_uncertainty_csv: Path
 
 
-def round_dir(workdir: Path, k: int) -> Path:
-    return workdir / "outputs" / f"round_{k}"
-
-
-def write_selection_csv(path: Path, selected_df: pd.DataFrame) -> str:
-    ensure_dir(path.parent)
-    cols = ["rank_competition", "id", "sequence", "y_pred"]
-    selected_df[cols].to_csv(path, index=False)
+def write_selection_csv(path: Path, df_selected: pd.DataFrame) -> str:
+    df_selected.to_csv(path, index=False)
     return file_sha256(path)
 
 
-def write_feature_importance(path: Path, importances: np.ndarray | None) -> str:
-    ensure_dir(path.parent)
+def write_feature_importance(path: Path, importances) -> str:
     if importances is None:
-        df = pd.DataFrame(
-            {"feature_index": [], "feature_importance": [], "feature_rank": []}
-        )
+        df = pd.DataFrame({"feature_index": [], "feature_importance": []})
     else:
-        order = np.argsort(-importances)
         df = pd.DataFrame(
             {
-                "feature_index": order.astype(int),
-                "feature_importance": importances[order],
-                "feature_rank": np.arange(1, len(order) + 1, dtype=int),
+                "feature_index": range(len(importances)),
+                "feature_importance": importances,
             }
         )
     df.to_csv(path, index=False)
@@ -67,5 +64,10 @@ def write_feature_importance(path: Path, importances: np.ndarray | None) -> str:
 
 
 def write_round_metrics(path: Path, metrics: Dict[str, Any]) -> str:
-    write_json(path, metrics)
+    Path(path).write_text(json.dumps(metrics, indent=2))
+    return file_sha256(path)
+
+
+def write_predictions_with_uncertainty(path: Path, df: pd.DataFrame) -> str:
+    df.to_csv(path, index=False)
     return file_sha256(path)

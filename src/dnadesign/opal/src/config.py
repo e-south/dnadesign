@@ -3,9 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/config.py
 
-Defines pydantic models for campaign configuration (campaign/data/training/
-selection/scoring/safety/metadata). Normalizes paths, slugifies names, and
-converts YAML into strongly-typed objects consumed by the rest of OPAL.
+Defines campaign configuration as dataclasses.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -14,120 +12,288 @@ Dunlop Lab
 
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import yaml
-from pydantic import BaseModel, Field, validator
 
-from .utils import ExitCodes, OpalError, slugify
+# ---------- Data location ----------
 
 
-class LocationUSR(BaseModel):
-    kind: Literal["usr"]
+@dataclass
+class LocationUSR:
+    kind: str
     dataset: str
     usr_root: str
 
 
-class LocationLocal(BaseModel):
-    kind: Literal["local"]
-    path: str  # path to records.parquet in campaign root
+@dataclass
+class LocationLocal:
+    kind: str
+    path: str
 
 
-class TransformConfig(BaseModel):
-    name: Literal["identity", "concat"] = "identity"
-    params: Dict[str, Any] = Field(default_factory=dict)
+DataLocation = Union[LocationUSR, LocationLocal]
 
 
-class ModelParamsRF(BaseModel):
+# ---------- Ingest transform (CSV -> Y) ----------
+
+
+@dataclass
+class IngestTransformParams:
+    schema: Dict[str, str] = field(default_factory=dict)
+    enforce_single_timepoint: bool = True
+    replicate_aggregation: str = "mean"
+    replicate_warn_threshold: int = 3
+    pre_processing: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class IngestTransform:
+    name: str = "logic5_from_tidy_v1"
+    params: IngestTransformParams = field(default_factory=IngestTransformParams)
+
+
+# ---------- Representation transform (X) ----------
+
+
+@dataclass
+class RepTransform:
+    name: str = "identity"
+    params: Dict[str, Any] = field(default_factory=dict)
+
+
+# ---------- Data block ----------
+
+
+@dataclass
+class DataBlock:
+    location: DataLocation
+    representation_column_name: str
+    label_source_column_name: str
+    y_expected_length: Optional[int] = None
+    ingest: IngestTransform = field(default_factory=IngestTransform)
+    representation_transform: RepTransform = field(default_factory=RepTransform)
+
+
+# ---------- Selection ----------
+
+
+@dataclass
+class ObjectiveParams:
+    setpoint_vector: List[float]
+    weighting_between_logic_and_effect: Dict[str, float] = field(
+        default_factory=lambda: {"logic_weight": 0.5, "effect_weight": 0.5}
+    )
+    combination_of_logic_and_effect: Dict[str, float] = field(
+        default_factory=lambda: {
+            "formula": "product",
+            "logic_exponent_beta": 1.0,
+            "effect_exponent_gamma": 1.0,
+        }
+    )
+    logic_fidelity_measure: Dict[str, str] = field(
+        default_factory=lambda: {
+            "distance": "l2_to_setpoint",
+            "normalization": "per_state_max_deviation_to_unit_interval",
+        }
+    )
+    effect_size_scaling_for_selection: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "scaling_method": "per_round_percentile_clip",
+            "scaling_pool": "labeled_rows_only",
+            "percentile": 95,
+            "low_sample_fallback": {
+                "min_labeled_count": 5,
+                "fallback_percentile": 75,
+                "epsilon": 1e-8,
+            },
+        }
+    )
+
+
+@dataclass
+class Objective:
+    name: str = "logic_plus_effect_v1"
+    params: ObjectiveParams = field(
+        default_factory=lambda: ObjectiveParams([0, 0, 0, 1])
+    )
+
+
+@dataclass
+class SelectionBlock:
+    strategy: str = "top_n"
+    top_k_default: int = 12
+    tie_handling: str = "competition_rank"
+    objective: Objective = field(default_factory=Objective)
+
+
+# ---------- Training ----------
+
+
+@dataclass
+class RFParams:
     n_estimators: int = 100
-    criterion: Literal["friedman_mse", "squared_error"] = "friedman_mse"
+    criterion: str = "friedman_mse"
+    max_depth: Optional[int] = None
+    min_samples_split: int = 2
+    min_samples_leaf: int = 1
+    min_weight_fraction_leaf: float = 0.0
+    max_features: Union[str, float] = 1.0
+    max_leaf_nodes: Optional[int] = None
+    min_impurity_decrease: float = 0.0
     bootstrap: bool = True
     oob_score: bool = True
     random_state: int = 7
     n_jobs: int = -1
 
 
-class ModelConfig(BaseModel):
-    name: Literal["random_forest"] = "random_forest"
-    params: ModelParamsRF = Field(default_factory=ModelParamsRF)
+@dataclass
+class TargetScalerCfg:
+    enable: bool = True
+    method: str = "robust_iqr_per_target"
+    minimum_labels_required: int = 5
+    center_statistic: str = "median"
+    scale_statistic: str = "iqr"
 
 
-class TrainingPolicy(BaseModel):
-    cumulative_training: bool = True
-    label_cross_round_deduplication_policy: Literal["latest_only"] = "latest_only"
-    allow_resuggesting_candidates_until_labeled: bool = True
+@dataclass
+class ModelBlock:
+    name: str = "random_forest"
+    params: RFParams = field(default_factory=RFParams)
+    target_scaler: TargetScalerCfg = field(default_factory=TargetScalerCfg)
 
 
-class SelectionConfig(BaseModel):
-    strategy: Literal["top_n"] = "top_n"
-    top_k_default: int = 12
-    tie_handling: Literal["competition_rank"] = "competition_rank"
+@dataclass
+class TrainingBlock:
+    model: ModelBlock = field(default_factory=ModelBlock)
+    policy: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "cumulative_training": True,
+            "label_cross_round_deduplication_policy": "latest_only",
+            "allow_resuggesting_candidates_until_labeled": True,
+        }
+    )
 
 
-class ScoringConfig(BaseModel):
+# ---------- Scoring / Safety / Meta ----------
+
+
+@dataclass
+class ScoringBlock:
     score_batch_size: int = 10_000
-    sort_stability: Literal["(-y_pred, id)"] = "(-y_pred, id)"
+    sort_stability: str = (
+        "(-opal__{slug}__r{round}__selection_score__logic_plus_effect_v1, id)"
+    )
 
 
-class SafetyConfig(BaseModel):
+@dataclass
+class SafetyBlock:
     fail_on_mixed_biotype_or_alphabet: bool = True
     require_biotype_and_alphabet_on_init: bool = True
-    conflict_policy_on_duplicate_ids: Literal["error"] = "error"
+    conflict_policy_on_duplicate_ids: str = "error"
     write_back_requires_columns_present: bool = True
     accept_x_mismatch: bool = False
 
 
-class MetaConfig(BaseModel):
-    objective: Literal["maximize"] = "maximize"
+@dataclass
+class CampaignBlock:
+    name: str
+    slug: str
+    workdir: str
+
+
+@dataclass
+class MetadataBlock:
+    objective: str = "maximize"
     notes: str = ""
 
 
-class DataConfig(BaseModel):
-    location: LocationUSR | LocationLocal
-    representation_column_name: str
-    label_source_column_name: str
-    transform: TransformConfig = Field(default_factory=TransformConfig)
+@dataclass
+class RootConfig:
+    campaign: CampaignBlock
+    data: DataBlock
+    selection: SelectionBlock
+    training: TrainingBlock
+    scoring: ScoringBlock
+    safety: SafetyBlock
+    metadata: MetadataBlock
+
+    def asdict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
-class CampaignConfig(BaseModel):
-    name: str
-    slug: Optional[str] = None
-    workdir: str
-
-    @validator("slug", always=True)
-    def _auto_slug(cls, v, values):
-        if v:
-            return slugify(v)
-        return slugify(values.get("name", "campaign"))
+# ---------- Loader ----------
 
 
-class RootConfig(BaseModel):
-    campaign: CampaignConfig
-    data: DataConfig
-    training: Dict[str, Any]
-    selection: SelectionConfig = Field(default_factory=SelectionConfig)
-    scoring: ScoringConfig = Field(default_factory=ScoringConfig)
-    safety: SafetyConfig = Field(default_factory=SafetyConfig)
-    metadata: MetaConfig = Field(default_factory=MetaConfig)
-
-    @validator("training")
-    def _validate_training(cls, v):
-        # Accept dict; normalize into {"model": ModelConfig, "policy": TrainingPolicy}
-        model_cfg = v.get("model", {})
-        policy_cfg = v.get("policy", {})
-        model = ModelConfig(**model_cfg)
-        policy = TrainingPolicy(**policy_cfg)
-        return {"model": model, "policy": policy}
+def _coerce_location(d: Dict[str, Any]) -> DataLocation:
+    kind = d.get("kind")
+    if kind == "usr":
+        return LocationUSR(kind="usr", dataset=d["dataset"], usr_root=d["usr_root"])
+    if kind == "local":
+        return LocationLocal(kind="local", path=d["path"])
+    raise ValueError(f"Unknown data.location.kind: {kind}")
 
 
 def load_config(path: Path) -> RootConfig:
-    if not path.exists():
-        raise OpalError(f"Config not found: {path}", ExitCodes.NOT_FOUND)
-    with open(path, "r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
-    cfg = RootConfig(**raw)
-    # normalize workdir path to absolute
-    wd = Path(cfg.campaign.workdir).resolve()
-    cfg.campaign.workdir = str(wd)
-    return cfg
+    raw = yaml.safe_load(Path(path).read_text())
+
+    # campaign
+    c = raw["campaign"]
+    campaign = CampaignBlock(name=c["name"], slug=c["slug"], workdir=c["workdir"])
+
+    # data
+    d = raw["data"]
+    loc = _coerce_location(d["location"])
+    ingest_raw = d.get("ingest", {}) or {}
+    ingest_tf = IngestTransform(
+        name=(ingest_raw.get("transform", {}) or {}).get("name", "logic5_from_tidy_v1"),
+        params=IngestTransformParams(
+            **((ingest_raw.get("transform", {}) or {}).get("params", {}) or {})
+        ),
+    )
+    rep_tf = RepTransform(**(d.get("representation_transform", {}) or {}))
+    dblock = DataBlock(
+        location=loc,
+        representation_column_name=d["representation_column_name"],
+        label_source_column_name=d["label_source_column_name"],
+        y_expected_length=d.get("y_expected_length"),
+        ingest=ingest_tf,
+        representation_transform=rep_tf,
+    )
+
+    # selection
+    s = raw.get("selection", {}) or {}
+    obj = s.get("objective", {}) or {}
+    op = ObjectiveParams(**(obj.get("params", {}) or {"setpoint_vector": [0, 0, 0, 1]}))
+    selection = SelectionBlock(
+        strategy=s.get("strategy", "top_n"),
+        top_k_default=s.get("top_k_default", 12),
+        tie_handling=s.get("tie_handling", "competition_rank"),
+        objective=Objective(name=obj.get("name", "logic_plus_effect_v1"), params=op),
+    )
+
+    # training
+    tr = raw.get("training", {}) or {}
+    m = tr.get("model", {}) or {}
+    model = ModelBlock(
+        name=m.get("name", "random_forest"),
+        params=RFParams(**(m.get("params", {}) or {})),
+        target_scaler=TargetScalerCfg(**(m.get("target_scaler", {}) or {})),
+    )
+    training = TrainingBlock(model=model, policy=tr.get("policy", {}) or {})
+
+    scoring = ScoringBlock(**(raw.get("scoring", {}) or {}))
+    safety = SafetyBlock(**(raw.get("safety", {}) or {}))
+    metadata = MetadataBlock(**(raw.get("metadata", {}) or {}))
+
+    return RootConfig(
+        campaign=campaign,
+        data=dblock,
+        selection=selection,
+        training=training,
+        scoring=scoring,
+        safety=safety,
+        metadata=metadata,
+    )

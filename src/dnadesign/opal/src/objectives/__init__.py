@@ -1,13 +1,13 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/src/selection/__init__.py
+src/dnadesign/opal/src/objectives/__init__.py
 
-Importing this package triggers registration side-effects for built-in selections.
+Trigger registration of built-in objectives.
 
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-from . import top_n  # noqa: F401
+from . import logic_plus_effect_v1  # noqa: F401

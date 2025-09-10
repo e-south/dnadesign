@@ -40,11 +40,7 @@ def build_status(
         out["rounds"] = [r.__dict__ for r in st.rounds]
         return out
     if round_k is None:
-        if st.rounds:
-            r = st.rounds[-1]
-            out["latest_round"] = r.__dict__
-        else:
-            out["latest_round"] = None
+        out["latest_round"] = st.rounds[-1].__dict__ if st.rounds else None
     else:
         matches = [r for r in st.rounds if r.round_index == round_k]
         out["round"] = matches[0].__dict__ if matches else None

@@ -20,6 +20,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
@@ -27,15 +28,8 @@ from typing import Any, Dict, Iterable, List, Tuple
 import numpy as np
 import pandas as pd
 
-from .transforms.registry import get_transform
-from .utils import (
-    ExitCodes,
-    OpalError,
-    compute_records_sha256,
-    ensure_dir,
-    now_iso,
-    usr_compatible_id,
-)
+from .registries.rep_transforms import get_rep_transform
+from .utils import ExitCodes, OpalError, ensure_dir, now_iso
 
 ESSENTIAL_COLS = [
     "id",
@@ -55,8 +49,8 @@ class RecordsStore:
     campaign_slug: str
     x_col: str
     y_col: str
-    transform_name: str
-    transform_params: Dict[str, Any]
+    rep_transform_name: str
+    rep_transform_params: Dict[str, Any]
 
     # ---------- IO ----------
     def load(self) -> pd.DataFrame:
@@ -83,116 +77,75 @@ class RecordsStore:
     def label_hist_col(self) -> str:
         return f"opal__{self.campaign_slug}__label_hist"
 
-    def append_labels(
+    def append_labels_from_df(
         self,
         df: pd.DataFrame,
-        labels: pd.DataFrame,
+        labels_df: pd.DataFrame,  # must contain id, y (y can be float or list[float])
         r: int,
-        allow_overwrite_meta: bool = False,
     ) -> pd.DataFrame:
         """
-        labels must have: id, y [, sequence, bio_type, alphabet, ...]
-        - if id not found -> require essential columns + x_col present
-        - else validate optional sequence match (if provided)
-        - write y to y_col, append {r,y,ts} to label_hist
+        Append labels (id, y) for round r. If id is new, caller must have added the row with essentials+X.
+        This method enforces per-(id, round) immutability.
         """
-        lab_required = ["id", "y"]
-        missing = [c for c in lab_required if c not in labels.columns]
-        if missing:
-            raise OpalError(
-                f"Labels missing required columns: {missing}", ExitCodes.BAD_ARGS
-            )
+        if not {"id", "y"}.issubset(labels_df.columns):
+            raise OpalError("labels_df must contain columns: id, y")
 
-        df = df.copy()
+        out = df.copy()
         lh = self.label_hist_col()
-        if lh not in df.columns:
-            df[lh] = [[] for _ in range(len(df))]
+        if lh not in out.columns:
+            out[lh] = [[] for _ in range(len(out))]
 
-        # map id -> row index
-        id_to_idx = {i: idx for idx, i in enumerate(df["id"].tolist())}
+        id_to_idx = {i: idx for idx, i in enumerate(out["id"].astype(str).tolist())}
 
-        added_rows: List[dict] = []
-        to_update_idx: List[int] = []
-
-        for rec in labels.to_dict(orient="records"):
-            _id = rec["id"]
-            y = float(rec["y"])
+        for rec in labels_df.to_dict(orient="records"):
+            _id = str(rec["id"])
+            y = rec["y"]
             now = now_iso()
 
-            if _id in id_to_idx:
-                idx = id_to_idx[_id]
-                # optional integrity checks
-                if "sequence" in rec and isinstance(rec["sequence"], str):
-                    if str(df.at[idx, "sequence"]).upper() != rec["sequence"].upper():
-                        raise OpalError(
-                            f"Sequence mismatch for id {_id}; refusing to append label."
-                        )
-                # write y
-                df.at[idx, self.y_col] = y
-                # append history (immutability per r)
-                hist = list(df.at[idx, lh] or [])
-                conflict = [h for h in hist if int(h.get("r", -1)) == int(r)]
-                if conflict and any(
-                    abs(float(h.get("y")) - y) > 1e-12 for h in conflict
-                ):
+            if _id not in id_to_idx:
+                raise OpalError(
+                    f"Unknown id in append_labels_from_df: {_id}. Add row with essentials+X first."
+                )
+            idx = id_to_idx[_id]
+
+            # write Y column (accept float or list[float])
+            out.at[idx, self.y_col] = y
+
+            # append history, enforce immutability per round
+            hist = list(out.at[idx, lh] or [])
+            for ev in hist:
+                if int(ev.get("r", -1)) == int(r):
+                    # idempotent if equal, else refuse
+                    if ev.get("y") == y:
+                        break
+                    if isinstance(ev.get("y"), str) and json.dumps(y) == ev.get("y"):
+                        break
+                    if isinstance(y, str) and json.dumps(ev.get("y")) == y:
+                        break
                     raise OpalError(
                         f"Label history conflict for id {_id} at r={r}; refusing to change history."
                     )
-                hist.append({"r": int(r), "y": y, "ts": now})
-                df.at[idx, lh] = hist
-                to_update_idx.append(idx)
             else:
-                # require essential cols to add a new row
-                essentials_missing = [
-                    c
-                    for c in ["sequence", "bio_type", "alphabet"]
-                    if c not in rec or pd.isna(rec[c])
-                ]
-                if essentials_missing:
-                    raise OpalError(
-                        f"New id {_id} missing required fields {essentials_missing} to add row. "
-                        f"Provide: sequence,bio_type,alphabet and {self.x_col}.",
-                        ExitCodes.CONTRACT_VIOLATION,
-                    )
-                if self.x_col not in rec or rec[self.x_col] is None:
-                    raise OpalError(
-                        f"New id {_id} missing {self.x_col} (representation) for labeled import.",
-                        ExitCodes.CONTRACT_VIOLATION,
-                    )
-                seq = str(rec["sequence"])
-                biotype = str(rec["bio_type"])
-                alphabet = str(rec["alphabet"])
-                length = int(len(seq))
-                new_id = _id or usr_compatible_id(biotype, seq)
-                added_rows.append(
-                    {
-                        "id": new_id,
-                        "bio_type": biotype,
-                        "sequence": seq,
-                        "alphabet": alphabet,
-                        "length": length,
-                        "source": f"opal_labels_import_r{r}",
-                        "created_at": now,
-                        self.y_col: y,
-                        self.x_col: rec[self.x_col],
-                        lh: [{"r": int(r), "y": y, "ts": now}],
-                    }
-                )
+                hist.append({"r": int(r), "y": y, "ts": now})
+                out.at[idx, lh] = hist
 
-        if added_rows:
-            df = pd.concat([df, pd.DataFrame(added_rows)], ignore_index=True)
+        return out
 
-        return df
-
-    # ---------- Representation coercion ----------
+    # ---------- Representation matrix ----------
     def transform_matrix(
         self, df: pd.DataFrame, ids: List[str]
     ) -> Tuple[np.ndarray, int]:
-        sub = df.loc[df["id"].isin(ids), self.x_col]
-        # maintain order
-        sub = sub.reindex(df.index[df["id"].isin(ids)])
-        transform = get_transform(self.transform_name, self.transform_params)
+        ids = [str(i) for i in ids]
+        sub = df.loc[df["id"].astype(str).isin(ids), self.x_col]
+        # Keep the original order of ids as provided
+        idx_order = df.index[df["id"].astype(str).isin(ids)]
+        sub = sub.reindex(idx_order)
+        transform = get_rep_transform(
+            self.rep_transform_name, self.rep_transform_params
+        )
         X, d = transform.transform(sub)
+        if X.shape[0] != len(ids):
+            raise OpalError("transform_matrix row count mismatch.")
         return X, d
 
     # ---------- Effective labels ----------
@@ -203,37 +156,28 @@ class RecordsStore:
         """
         lh = self.label_hist_col()
         out = []
-        for row in df[["id", lh]].itertuples(index=False):
-            rid, hist = row
-            if not hist:
-                continue
-            if not isinstance(hist, list):
+        for rid, hist in df[["id", lh]].itertuples(index=False):
+            if not hist or not isinstance(hist, list):
                 continue
             elig = [h for h in hist if int(h.get("r", -1)) <= int(k)]
             if not elig:
                 continue
             hbest = max(elig, key=lambda h: int(h.get("r", -1)))
-            out.append(
-                {"id": rid, "y": float(hbest["y"]), "src_round": int(hbest["r"])}
-            )
+            out.append({"id": str(rid), "y": hbest["y"], "src_round": int(hbest["r"])})
         return pd.DataFrame(out)
 
-    def candidate_universe(
-        self, df: pd.DataFrame, k: int, allow_repeats_until_labeled: bool = True
-    ) -> pd.DataFrame:
+    # ---------- Candidate universe ----------
+    def candidate_universe(self, df: pd.DataFrame, k: int) -> pd.DataFrame:
         """
         Candidates are rows with x_col present and NOT labeled in rounds <= k.
-        If previously selected but unlabeled, they remain eligible (since eligibility is defined by label history only).
         """
         if self.x_col not in df.columns:
-            raise OpalError(
-                f"Representation column not found: {self.x_col}",
-                ExitCodes.CONTRACT_VIOLATION,
-            )
+            raise OpalError(f"Representation column not found: {self.x_col}")
 
         df = df.copy()
         lh = self.label_hist_col()
-        df[lh] = df.get(lh, [[]])
+        if lh not in df.columns:
+            df[lh] = [[] for _ in range(len(df))]
 
         def has_labeled_le_k(hist) -> bool:
             if not isinstance(hist, list):
@@ -242,13 +186,16 @@ class RecordsStore:
 
         has_x = df[self.x_col].notna()
         labeled = df[lh].map(has_labeled_le_k)
-        return df[has_x & (~labeled)]
+        return df[has_x & (~labeled)][["id", "sequence", self.x_col]]
 
-    # ---------- Preflight helpers ----------
+    # ---------- Uniformity checks ----------
     def check_biotype_alphabet_uniformity(
         self, df: pd.DataFrame, ids: Iterable[str]
     ) -> None:
-        subset = df.loc[df["id"].isin(list(ids)), ["bio_type", "alphabet", "id"]]
+        ids = set([str(i) for i in ids])
+        subset = df.loc[
+            df["id"].astype(str).isin(list(ids)), ["bio_type", "alphabet", "id"]
+        ]
         if subset.empty:
             return
         bvals = set(subset["bio_type"].dropna().unique().tolist())
@@ -261,6 +208,75 @@ class RecordsStore:
                 ExitCodes.CONTRACT_VIOLATION,
             )
 
-    # ---------- Misc ----------
-    def records_sha256(self) -> str:
-        return compute_records_sha256(self.records_path)
+    # ---------- Ensure new rows for new IDs ----------
+    def ensure_rows_exist(
+        self, df: pd.DataFrame, ids: List[str], csv_df: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        For any id in `ids` not present in df, add a row using essentials pulled from `csv_df`.
+        Requires columns: id (or design_id), sequence, bio_type, alphabet, and the configured X column.
+        """
+        out = df.copy()
+        existing = set(out["id"].astype(str))
+        needed = [str(i) for i in ids if str(i) not in existing]
+        if not needed:
+            return out
+
+        # normalize CSV id column
+        csv = csv_df.copy()
+        id_col = (
+            "id"
+            if "id" in csv.columns
+            else ("design_id" if "design_id" in csv.columns else None)
+        )
+        if id_col is None:
+            raise OpalError(
+                "CSV must contain 'id' or 'design_id' to add new rows.",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
+        if self.x_col not in csv.columns:
+            raise OpalError(
+                f"CSV missing representation column '{self.x_col}' required for new rows.",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
+        for col in ("sequence", "bio_type", "alphabet"):
+            if col not in csv.columns:
+                raise OpalError(
+                    f"CSV missing essential column '{col}' for new rows.",
+                    ExitCodes.CONTRACT_VIOLATION,
+                )
+
+        csv[id_col] = csv[id_col].astype(str)
+        by_id = {r[id_col]: r for r in csv.to_dict(orient="records")}
+        rows = []
+        for _id in needed:
+            if _id not in by_id:
+                raise OpalError(
+                    f"New id '{_id}' not found in CSV to create essentials+X."
+                )
+            rec = by_id[_id]
+            seq = str(rec["sequence"])
+            row = {
+                "id": _id,
+                "bio_type": rec["bio_type"],
+                "sequence": seq,
+                "alphabet": rec["alphabet"],
+                "length": int(len(seq)),
+                "source": "opal_ingest",
+                "created_at": now_iso(),
+                self.x_col: rec[self.x_col],
+            }
+            rows.append(row)
+
+        # ensure all essential columns in df to align
+        for c in ESSENTIAL_COLS:
+            if c not in out.columns:
+                out[c] = pd.NA
+        if self.y_col not in out.columns:
+            out[self.y_col] = pd.NA
+        lh = self.label_hist_col()
+        if lh not in out.columns:
+            out[lh] = [[] for _ in range(len(out))]
+
+        out = pd.concat([out, pd.DataFrame(rows)], axis=0, ignore_index=True)
+        return out

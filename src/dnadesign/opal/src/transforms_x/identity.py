@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/src/transforms/identity.py
+src/dnadesign/opal/src/transforms_x/identity.py
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -16,7 +16,13 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
+from ..registries.rep_transforms import register_rep_transform
 from ..utils import ExitCodes, OpalError
+
+
+@register_rep_transform("identity")
+def _identity_factory(params):
+    return IdentityTransform(**params)
 
 
 class IdentityTransform:
@@ -52,7 +58,6 @@ class IdentityTransform:
         )
 
     def fit_transform(self, series: pd.Series) -> Tuple[np.ndarray, int]:
-        # For v1, stateless => fit_transform == transform
         return self.transform(series)
 
     def transform(self, series: pd.Series) -> Tuple[np.ndarray, int]:

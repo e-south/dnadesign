@@ -41,7 +41,7 @@ def build_record_report(
         "id": row["id"],
         "length": (
             int(row["length"])
-            if "length" in row and pd.notna(row["length"])
+            if pd.notna(row.get("length"))
             else len(str(row["sequence"]))
         ),
     }
@@ -49,24 +49,23 @@ def build_record_report(
         out["sequence"] = row["sequence"]
 
     # ground truth + source round
-    # derive from label history
     lh_col = f"opal__{campaign_slug}__label_hist"
     if lh_col in df.columns and isinstance(row.get(lh_col), list) and row[lh_col]:
         best = max(row[lh_col], key=lambda h: int(h.get("r", -1)))
-        out["ground_truth_label"] = float(best["y"])
+        out["ground_truth_label"] = best["y"]
         out["ground_truth_src_round"] = int(best["r"])
 
     # per-round predictions if present
     per_round = {}
     prefix = f"opal__{campaign_slug}__r"
     for col in df.columns:
-        if col.startswith(prefix) and col.endswith("__pred"):
+        if col.startswith(prefix) and col.endswith("__pred_y"):
             r = int(col[len(prefix) :].split("__")[0])
             y_pred = row[col]
             rank_col = f"{prefix}{r}__rank_competition"
             sel_col = f"{prefix}{r}__selected_top_k_bool"
             per_round[r] = {
-                "y_pred": None if pd.isna(y_pred) else float(y_pred),
+                "y_pred": y_pred,
                 "rank": None if pd.isna(row.get(rank_col)) else int(row.get(rank_col)),
                 "selected": bool(row.get(sel_col)),
             }

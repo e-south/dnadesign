@@ -10,6 +10,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Dict
 
@@ -20,10 +21,4 @@ def append_jsonl(path: Path, event: Dict[str, Any]) -> None:
     ensure_dir(path.parent)
     event = {"ts": now_iso(), **event}
     with open(path, "a", encoding="utf-8") as f:
-        f.write(jsonl(event))
-
-
-def jsonl(obj: Dict[str, Any]) -> str:
-    import json
-
-    return json.dumps(obj, sort_keys=True) + "\n"
+        f.write(json.dumps(event, sort_keys=True) + "\n")

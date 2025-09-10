@@ -1,13 +1,11 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/src/selection/__init__.py
-
-Importing this package triggers registration side-effects for built-in selections.
+src/dnadesign/opal/src/cli/__init__.py
 
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-from . import top_n  # noqa: F401
+from .app import main  # noqa: F401

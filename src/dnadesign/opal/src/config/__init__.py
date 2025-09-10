@@ -1,13 +1,16 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/src/selection/__init__.py
+src/dnadesign/opal/src/config/__init__.py
 
-Importing this package triggers registration side-effects for built-in selections.
+Re-exports for config loading.
 
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-from . import top_n  # noqa: F401
+from .loader import load_config  # noqa: F401
+from .types import RootConfig  # noqa: F401
+
+__all__ = ["load_config", "RootConfig"]

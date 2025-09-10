@@ -59,7 +59,7 @@ class CampaignState:
     representation_column_name: str = ""
     representation_vector_dimension: int = 0
     label_source_column_name: str = ""
-    transform: dict = field(default_factory=dict)
+    representation_transform: dict = field(default_factory=dict)
     training_policy: dict = field(default_factory=dict)
     performance: dict = field(default_factory=dict)
     rounds: List[RoundEntry] = field(default_factory=list)
@@ -68,7 +68,6 @@ class CampaignState:
     @classmethod
     def load(cls, path: Path) -> "CampaignState":
         raw = read_json(path)
-        # Simple dict -> dataclass hydration
         st = cls(**{k: v for k, v in raw.items() if k != "rounds"})
         st.rounds = [RoundEntry(**r) for r in raw.get("rounds", [])]
         return st

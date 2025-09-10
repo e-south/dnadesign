@@ -1,11 +1,11 @@
 ## OPAL — Optimization with Active Learning
 
-**OPAL** is an [EVOLVEpro-style](https://www.science.org/doi/10.1126/science.adr6006) active-learning engine for DNA/protein sequence design. It fits a top-layer regressor (e.g., `RandomForestRegressor`) on a chosen representation column **X** and a label column **Y**, predicts **Ŷ** for the wider candidate set, and **selects the top-k** per round based on **Ŷ**.
+**OPAL** is an [EVOLVEpro-style](https://www.science.org/doi/10.1126/science.adr6006) active-learning engine for DNA/protein sequence design. It fits a top-layer regressor (e.g., `RandomForestRegressor`) on a chosen representation column **X** and a label column **Y**, predicts **Ŷ** for a broader sequence population, and **selects the top-k** per round based on **Ŷ**.
 
-* Works with [**USR**](../usr/README.md) datasets or a local `records.parquet` (standalone).
-* Writes per-round predictions/ranks/selection flags back to the **source table**; models and selection files live in the **campaign folder**.
-* Uses registries for **models**, **transforms**, and **selection strategies** to stay extensible.
-* Built for iterative use: as new experimental labels arrive, OPAL lets you import labels, train a new top-layer model, and surface new top candidates—while keeping a reproducible history of past models, predictions, and label events.
+* Reads a **records.parquet** (either from a [**USR**](../usr/README.md) dataset or a local path).
+* Writes per-round outputs back to the **campaign state** and artifacts to `outputs/round_<k>/`.
+* Uses registries for **transforms**, **models**, **objectives**, and **selection strategies** to stay extensible.
+* **Built for iterative use**: as new experimental labels arrive, OPAL lets you add labels to new or existing sequences, train a fresh top-layer model, and surface new top candidates—while keeping a reproducible history of past models, predictions, and label events.
 
 ---
 
@@ -23,13 +23,52 @@
 
 ---
 
+## OPAL Layout
+
+```bash
+src/dnadesign/opal/src/
+├─ cli/
+│  ├─ app.py
+│  ├─ registry.py
+│  └─ commands/
+│     ├─ _common.py
+│     ├─ init.py
+│     ├─ ingest_y.py
+│     ├─ run.py
+│     ├─ explain.py
+│     ├─ predict.py
+│     ├─ model_show.py
+│     ├─ record_show.py
+|     ├─ validate.py
+│     └─ status.py
+├─ config/
+│  ├─ types.py
+│  ├─ plugin_schemas.py
+│  └─ loader.py
+├─ registries/
+│  ├─ transforms_x.py
+│  ├─ transforms_y.py
+│  ├─ models.py
+│  ├─ objectives.py
+│  └─ selections.py
+├─ transforms_x/…     
+├─ transforms_y/…
+├─ models/…   
+├─ objectives/…               
+├─ selection/…                  
+├─ artifacts.py, data_access.py, explain.py, ingest.py, …
+└─ …
+```
+
+---
+
 ## Quick install
 
 OPAL lives inside the `dnadesign` repo, with a CLI shortcut inside `pyproject.toml`:
 
 ```toml
 [project.scripts]
-opal = "dnadesign.opal.src.cli:main"
+opal = "dnadesign.opal.src.cli.app:main"
 ```
 
 Install in editable mode (from the `dnadesign` repo root):
@@ -48,7 +87,7 @@ src/dnadesign/opal/
 ├─ src/                        # OPAL code (modules)
 ├─ campaigns/                  # all OPAL campaigns live here
 │   └─ <campaign_name>/
-│       ├─ campaign.yaml       # campaign initialization criteria lives here 
+│       ├─ campaign.yaml
 │       ├─ state.json
 │       ├─ campaign.log.jsonl
 │       ├─ outputs/
@@ -56,10 +95,12 @@ src/dnadesign/opal/
 │       │       ├─ model.joblib
 │       │       ├─ selection_top_k.csv
 │       │       ├─ feature_importance.csv
+│       │       ├─ predictions_with_uncertainty.csv
 │       │       ├─ round_model_metrics.json
 │       │       └─ round.log.jsonl
-│       └─ records.parquet     # where X and y live
+│       └─ records.parquet     # where X and Y live; OPAL writes back round columns here
 └─ README.md
+
 ```
 
 **USR datasets** live elsewhere (usually `src/dnadesign/usr/datasets/<dataset>/records.parquet`) and are **not copied** into campaigns.
@@ -68,72 +109,28 @@ src/dnadesign/opal/
 
 ## Core concepts
 
-* **records.parquet**: single source of truth for sequences and derived columns (X, y, ŷ).
-* **Representation (X)**: explicitly named column (e.g., `infer__...__logits_mean`), accepted as **Arrow list<float>** or **JSON array string**, coerced to `float32`. 
-  - Fixed dimension across all used rows is required.
-* **Label (Y)**: explicitly named numeric column (e.g., `exp__two_factor_output_activity_pdual10`).
-* **Label history (per campaign)**: `opal__<campaign>__label_hist` stores append-only events `{"r": <round>, "y": <float>, "ts": <iso8601>}` (for reproducibility).
-* **Rounds**: When you `run --round k`, OPAL trains on labels from rounds `≤ k`, scores the candidate universe, ranks by predicted Y, and writes selection for the **next** lab round.
-* **Write-backs** (per round):
-  `opal__<slug>__r<k>__pred`, `opal__<slug>__r<k>__rank_competition`, `opal__<slug>__r<k>__selected_top_k_bool`.
+* **records.parquet**: single source of truth for sequences and derived columns (**X**, **Y**, **Ŷ**, selection scores, etc.).
+* **Representation (X)**: explicitly named column (e.g., `infer__...__logits_mean`), accepted as **Arrow `list<float>`** or **JSON array string**, coerced to `float32`. Fixed dimension across all used rows is required.
+* **Label (Y)**: explicitly named column; may be **scalar** or **vector**.
+* **Label history (per campaign)**: `opal__<slug>__label_hist` stores append-only events `{"r": <round>, "y": "<json array or number>", "shape": [optional], "ts": "<iso8601>"}`.
+* **Rounds**: `--round k` trains on labels from rounds `≤ k`, scores the candidate universe, ranks, and writes selection metadata for the next lab round.
+* **Per-round write-backs (records.parquet)** include:
+
+  * Vector predictions: `opal__<slug>__r{k}__pred_y`
+  * **Persisted selection score**: `opal__<slug>__r{k}__selection_score__<objective>`
+  * Competition rank: `opal__<slug>__r{k}__rank_competition`
+  * Selection flag: `opal__<slug>__r{k}__selected_top_k_bool`
+  * **Uncertainty (scalar)**: `opal__<slug>__r{k}__uncertainty__mean_all_std` (mean of per-output stds)
 
 ---
 
 ## Configuration (`campaign.yaml`)
 
-Minimal USR-backed example:
+Below is a template that shows the key blocks you’ll typically configure for an OPAL
+campaign. Keep comments for guidance; trim fields that don’t apply to you.
 
 ```yaml
-campaign:
-  name: "T7 Polymerase"
-  slug: "t7_polymerase"
-  workdir: "./src/dnadesign/opal/campaigns/t7_polymerase"
 
-data:
-  location:
-    kind: "usr"
-    dataset: "60bp_dual_promoter_cpxR_LexA"
-    usr_root: "./src/dnadesign/usr/datasets"
-  representation_column_name: "infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean"
-  label_source_column_name: "exp__two_factor_output_activity_pdual10"
-  transform:
-    name: "identity"
-    params: {}
-
-training:
-  model:
-    name: "random_forest"
-    params:
-      n_estimators: 100
-      criterion: "friedman_mse"
-      bootstrap: true
-      oob_score: true
-      random_state: 7
-      n_jobs: -1
-  policy:
-    cumulative_training: true
-    label_cross_round_deduplication_policy: "latest_only"
-    allow_resuggesting_candidates_until_labeled: true
-
-selection:
-  strategy: "top_n"
-  top_k_default: 12
-  tie_handling: "competition_rank"
-
-scoring:
-  score_batch_size: 10000
-  sort_stability: "(-y_pred, id)"
-
-safety:
-  fail_on_mixed_biotype_or_alphabet: true
-  require_biotype_and_alphabet_on_init: true
-  conflict_policy_on_duplicate_ids: "error"
-  write_back_requires_columns_present: true
-  accept_x_mismatch: false
-
-metadata:
-  objective: "maximize"
-  notes: ""
 ```
 
 **Standalone**: set `data.location.kind: "local"` and `path: "./src/dnadesign/opal/campaigns/<slug>/records.parquet"`.
@@ -149,25 +146,25 @@ opal --help
 **Commands**
 
 * `init --config <yaml>`
-  Create/validate the campaign workspace and write initial `state.json`.
+  Initialize/validate the campaign workspace; write `state.json`.
+
+* `ingest-y --config <yaml> --round <k> --csv <path> [--transform <name>] [--params <path.json>]`
+  Ingest external data via a configured transform → preview → interactive → write Y to `records.parquet` and append `label_hist`. Strict checks (essentials present, X present).
 
 * `run|fit --config <yaml> --round <k> [--k <n>] [--resume|--force] [--score-batch-size <n>]`
-  Train on labels ≤k, score the universe, write round artifacts, write-back predictions/ranks/selection.
-
-* `labels-import --config <yaml> --round <k> --path <csv|parquet> [--allow-overwrite-meta]`
-  Import labels (id,y,\[sequence,bio\_type,alphabet,…]); update label column and `label_hist`. Fail fast if any labeled id lacks X.
+  Train on labels ≤k, score the universe, write round artifacts, and write back predictions/ranks/selection/uncertainty.
 
 * `predict --config <yaml> --model-path <outputs/round_k/model.joblib> [--in <csv|parquet>] [--out <csv|parquet>]`
-  Ephemeral inference with an explicit model path; no write-backs.
+  Ephemeral inference with a frozen model; no write-backs.
 
 * `record-show --config <yaml> (--id <ID> | --sequence <SEQ> --bio-type <dna|protein> --alphabet <...>) [--with-sequence] [--json]`
-  Compact per-record report: ground truth + src round from history; per-round y\_pred/rank/selected if present.
+  Per-record report: ground truth & history; per-round predictions, ranks, selection flag.
 
 * `model-show --model-path <outputs/round_k/model.joblib> [--out-dir <dir>]`
-  Show model type/params; optionally dump full feature importances.
+  Show model params; optionally dump full feature importances.
 
 * `explain --config <yaml> --round <k>`
-  Dry-run planner: counts, dedup policy effects, model config, seeds, universe size. **No writes**.
+  Dry-run planner (counts, dedup policy, model config, seeds, universe size). **No writes**.
 
 * `status --config <yaml> [--round <k> | --all] [--json]`
   Dashboard from `state.json` (latest round by default).
@@ -219,44 +216,49 @@ opal run --<TAB>
 ### 1) Initialize a campaign (USR)
 
 ```bash
-opal init --config src/dnadesign/opal/campaigns/t7_polymerase/campaign.yaml
+opal init --config src/dnadesign/opal/campaigns/prom60-etoh-cipro-andgate/campaign.yaml
 ```
 
-### 2) Import labels for round 0
+### 2) Ingest labels for a round (CSV → Y)
 
-`labels.csv` must have: `id,y` (optionally `sequence,bio_type,alphabet` and **namespaced** meta).
-Labeled new rows must also include the configured **X column**.
+`my_new_data_with_labels.csv` should include **at minimum** `design_id`, `experiment_id`, and any **transform-specific** columns required by your ingestion transform to compute model-ready Y. If a design is **not already present** in `records.parquet`, the file must also supply the **essentials** to create it: `sequence`, `bio_type`, `alphabet`, and the configured **X representation** column. OPAL validates the schema and transform preconditions, prints a preview, and then prompts you to confirm before writing.
 
 ```bash
-opal labels-import \
-  --config src/dnadesign/opal/campaigns/t7_polymerase/campaign.yaml \
+opal ingest-y \
+  --campaign my_campaign_name \
   --round 0 \
-  --path data/R0_labels.csv
+  --csv data/my_new_data_with_labels.csv
+# OPAL prints a preview + warnings (if any), then prompts:
+# Proceed to write labels for round 0? (y/N)
 ```
 
-### 3) Train & score round 0 (produce selections for round 1)
+### 3) Train and score a round (produce selections for round n+1)
 
 ```bash
 opal run \
-  --config src/dnadesign/opal/campaigns/t7_polymerase/campaign.yaml \
+  --config src/dnadesign/opal/campaigns/my_campaign_name/campaign.yaml \
   --round 0 --k 12
 ```
 
 Artifacts appear at:
 
 ```
-campaigns/t7_polymerase/outputs/round_0/
+campaigns/my_campaign_name/outputs/round_0/
   model.joblib
   selection_top_k.csv
   feature_importance.csv
+  predictions_with_uncertainty.csv
   round_model_metrics.json
+  round.log.jsonl
 ```
 
-Predictions/ranks/flags are written back to `records.parquet`:
+Write-backs in `records.parquet`:
 
-* `opal__t7_polymerase__r0__pred`
-* `opal__t7_polymerase__r0__rank_competition`
-* `opal__t7_polymerase__r0__selected_top_k_bool`
+* `opal__my_campaign_name__r0__pred_vec5`
+* `opal__my_campaign_name__r0__selection_score__logic_plus_effect_v1`
+* `opal__my_campaign_name__r0__rank_competition`
+* `opal__my_campaign_name__r0__selected_top_k_bool`
+* `opal__my_campaign_name__r0__uncertainty__mean_all_std`
 
 ### 4) Status / explain / model / record reports
 
@@ -272,7 +274,7 @@ opal record-show --config .../campaign.yaml --id e153ebc...
 ```bash
 opal predict \
   --config .../campaign.yaml \
-  --model-path campaigns/t7_polymerase/outputs/round_0/model.joblib \
+  --model-path campaigns/my_campaign_name/outputs/round_0/model.joblib \
   --in new_candidates.parquet \
   --out preds.csv
 ```
@@ -296,48 +298,54 @@ opal predict \
 **Namespacing rule**: Secondary columns are `<tool>__<field>`. OPAL writes only:
 
 * `opal__<slug>__label_hist` (append-only per id)
-* `opal__<slug>__r<k>__pred`
+* `opal__<slug>__r<k>__pred_y`
+* `opal__<slug>__r{k}__selection_score__<objective>`
 * `opal__<slug>__r<k>__rank_competition`
 * `opal__<slug>__r<k>__selected_top_k_bool`
+* `opal__<slug>__r{k}__uncertainty__mean_all_std`
 
-**Representation column (X)**
+**X (representation)**: Arrow `list<float>` or JSON array string. **Fixed dim** across used rows.
+*Tensor convention*: store flattened vector in the main column and an optional shape sidecar.
 
-* Explicit name (`data.representation_column_name`)
-* Accepts Arrow `list<float>` or JSON array string like `"[0.1, 0.2]"`
-* Coerced to `np.float32`; **fixed dimension** across all used rows; ragged/non-numeric → **fail fast**.
-
-**Label column (Y)**
-
-* Explicit name (`data.label_source_column_name`)
-* Numeric; training dedup across rounds ≤k: **latest\_only**.
-
-**Uniformity**
-
-* Mixed `bio_type`/`alphabet` across training or candidate rows → **fail fast** with a concise summary and sample IDs.
+**Y (labels)**: Arrow `list<float>` for main vector columns; **history `y` stored as a compact JSON string** inside each event to preserve shape flexibly.
 
 ---
 
-## Determinism, performance, locks
+## Predictions & uncertainty artifacts
 
-* **Deterministic ordering**: sort by `(-y_pred, id)`.
-* **Ranking**: competition ranking (`1,2,3,3,5`) and **include all ties** at the k-th boundary.
-* **Performance**: `n_jobs=-1` for RF; scoring in batches (default **10,000**, configurable).
-* **Locking**: campaign-level file lock; rely on USR’s atomic writes for `records.parquet`.
+**File**: `campaigns/<slug>/outputs/round_<k>/predictions_with_uncertainty.csv`
+
+**Columns**
+
+* `id`
+* `round`
+* `y_pred_vec` — JSON string of the length-5 vector
+* `y_pred_std_vec` — JSON string (per-output std across RF trees, length-5)
+* `logic_fidelity_l2_norm01` — `[0,1]` (from `v` vs setpoint)
+* `effect_scaled_p95` — `[0,1]` (from `e` and per-round denom)
+* `selection_score_logic_x_effect_v1` — scalar used for ranking
+* `selection_score_std` — std across **tree-level scalar scores** (evaluate objective per tree)
+* `model_params_sha256` — hash of RF + scaler params
+* `generated_at` — ISO8601 timestamp
+
+**Uncertainty in records.parquet** (scalar):
+`opal__<slug>__r{k}__uncertainty__mean_all_std = mean(y_pred_std_vec)`.
 
 ---
 
-## Exit codes
+## Notes
 
-* `0` success (no warnings)
-* `2` success with warnings
-* `3` contract/pre-flight violation (missing X, ragged dims, mixed bio/alphabet, no labels ≤k, etc.)
-* `4` not found / path errors
-* `5` invalid CLI usage / bad arguments
-* `6` artifact exists; refused without `--resume/--force`
-* `7` lock acquisition failed
-* `8` checksum mismatch / corruption detected
-* `9` uncaught/internal error
+#### Training defaults & per-target scaling
+
+* **Model**: `RandomForestRegressor` multi-output, fixed hyperparams (Evolve-style): `n_estimators=100`, `criterion="friedman_mse"`, `bootstrap=True`, `oob_score=True`, `max_features=1.0`, `random_state=7`, `n_jobs=-1`.
+* **Per-target scaling (fit-time only)**: enabled by default (`robust_iqr_per_target`).
+
+  * Center: median; Scale: `IQR/1.349`; **skip** if `n_labels < 5` or scale ≈ 0.
+  * Predictions are **inverse-transformed** back to original units before scoring/writes.
 
 ---
 
 @e-south
+
+
+

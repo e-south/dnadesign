@@ -17,12 +17,13 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
 
 from .data_access import RecordsStore
-from .models.registry import get_model
+from .models.random_forest import RandomForestModel
 from .utils import ExitCodes, OpalError
 
 
@@ -32,7 +33,7 @@ def run_predict_ephemeral(
     model_path: Path,
     ids: list[str] | None = None,
 ) -> pd.DataFrame:
-    mdl = get_model("random_forest", {}).load(str(model_path))
+    mdl = RandomForestModel.load(str(model_path))
     if ids is None:
         ids = df["id"].tolist()
     X, _ = store.transform_matrix(df, ids)
@@ -42,8 +43,13 @@ def run_predict_ephemeral(
             ExitCodes.INTERNAL_ERROR,
         )
     yhat = mdl.predict(X)
-    out = pd.DataFrame({"id": ids, "y_pred": yhat})
-    # attach sequences for convenience
+    # normalize to list for dataframe export
+    y_list = [
+        json.dumps(list(map(float, row))) if yhat.ndim == 2 else float(row)
+        for row in yhat
+    ]
+    out = pd.DataFrame({"id": ids, "y_pred_vec": y_list})
+    # add sequence
     seq_map = df.set_index("id")["sequence"].to_dict()
     out["sequence"] = [seq_map.get(i, "") for i in ids]
-    return out[["id", "sequence", "y_pred"]]
+    return out[["id", "sequence", "y_pred_vec"]]

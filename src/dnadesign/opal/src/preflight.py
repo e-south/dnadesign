@@ -5,16 +5,6 @@ src/dnadesign/opal/src/preflight.py
 
 Preflight validation for run and related commands.
 
-Runs assertive checks before training/scoring:
-- essential columns present,
-- representation column exists, numeric, fixed width,
-- labels available ≤ round k,
-- labeled rows have X; candidate universe is well-formed,
-- optional uniformity enforcement for bio_type/alphabet.
-
-Returns a compact PreflightReport (warnings, x_dim, counts). Any violation
-raises OpalError with a specific exit code and actionable message.
-
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
@@ -46,24 +36,20 @@ def ensure_required_on_init(df: pd.DataFrame, require_bio_alphabet: bool) -> Non
             f"Missing essential columns in records: {missing}",
             ExitCodes.CONTRACT_VIOLATION,
         )
-    if require_bio_alphabet:
-        if df["bio_type"].isna().any() or df["alphabet"].isna().any():
-            raise OpalError(
-                "bio_type/alphabet must be present for all rows.",
-                ExitCodes.CONTRACT_VIOLATION,
-            )
+    if require_bio_alphabet and (
+        df["bio_type"].isna().any() or df["alphabet"].isna().any()
+    ):
+        raise OpalError(
+            "bio_type/alphabet must be present for all rows.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
 
 
 def validate_x_column_fixed_dim(
     store: RecordsStore, df: pd.DataFrame, ids: List[str]
 ) -> int:
-    sub = df.loc[df["id"].isin(ids), store.x_col]
-    # coerce + check in small pass
-    from .transforms.registry import get_transform
-
-    t = get_transform(store.transform_name, store.transform_params)
-    X, d = t.transform(sub)
-    # confirm all have same dim:
+    # Derive matrix once through the registered transform and assert fixed width.
+    X, d = store.transform_matrix(df, ids)
     if X.shape[1] != d:
         raise OpalError(
             "Internal error: dim mismatch after transform", ExitCodes.INTERNAL_ERROR
@@ -79,7 +65,7 @@ def preflight_run(
 ) -> PreflightReport:
     rep = PreflightReport()
 
-    # essential validation
+    # essentials (strict by default)
     ensure_required_on_init(df, require_bio_alphabet=True)
 
     # effective labels
@@ -106,12 +92,12 @@ def preflight_run(
     if rep.n_candidates == 0:
         rep.warnings.append("Candidate universe is empty at this round.")
 
-    # check bio/alphabet uniformity
+    # uniformity
     if fail_on_mixed_bio_alphabet:
         store.check_biotype_alphabet_uniformity(df, labels_eff["id"].tolist())
         store.check_biotype_alphabet_uniformity(df, cand["id"].tolist())
 
-    # fixed dimension checks (labeled + candidates)
+    # fixed dimension checks
     ids_to_check = labels_eff["id"].tolist() + cand["id"].tolist()
     if ids_to_check:
         rep.x_dim = validate_x_column_fixed_dim(store, df, ids_to_check)

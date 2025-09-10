@@ -40,7 +40,7 @@ dnadesign/
 
 2. [**infer**](src/dnadesign/infer)  
 
-      **infer** is a model-agnostic wrapper for DNA/protein language models (e.g., Evo2).
+      **infer** is a model-agnostic wrapper for DNA/protein language models (e.g., [Evo2](https://github.com/ArcInstitute/evo2/tree/main)).
 
 3. [**opal**](src/dnadesign/opal)
 

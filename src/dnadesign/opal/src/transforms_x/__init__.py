@@ -1,13 +1,15 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/src/selection/__init__.py
+src/dnadesign/opal/src/transforms_x/__init__.py
 
-Importing this package triggers registration side-effects for built-in selections.
+Import concrete transforms to trigger registration side-effects.
 
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-from . import top_n  # noqa: F401
+from . import (
+    identity,  # noqa: F401
+)

@@ -3,8 +3,6 @@
 <dnadesign project>
 src/dnadesign/opal/src/utils.py
 
-Generic utilities: time, hashing, atomic I/O, ids, exit codes.
-
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
@@ -12,113 +10,86 @@ Dunlop Lab
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import json
-import os
-import re
-import tempfile
-import time
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Tuple
 
-ISO8601 = "%Y-%m-%dT%H:%M:%SZ"
-
-
-def now_iso() -> str:
-    return datetime.now(timezone.utc).strftime(ISO8601)
+import numpy as np
 
 
-def slugify(name: str) -> str:
-    s = name.strip().lower()
-    s = re.sub(r"[^a-z0-9\-_]+", "_", s)
-    s = re.sub(r"_+", "_", s).strip("_")
-    return s or "campaign"
-
-
-def ensure_dir(p: Path) -> None:
-    p.mkdir(parents=True, exist_ok=True)
-
-
-def atomic_write_bytes(target: Path, data: bytes) -> None:
-    ensure_dir(target.parent)
-    with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as tf:
-        tf.write(data)
-        tmp = Path(tf.name)
-    os.replace(tmp, target)
-
-
-def atomic_write_text(target: Path, text: str) -> None:
-    atomic_write_bytes(target, text.encode("utf-8"))
-
-
-def write_json(target: Path, obj: Any, indent: int = 2) -> None:
-    atomic_write_text(target, json.dumps(obj, indent=indent, sort_keys=True))
-
-
-def read_json(path: Path) -> Any:
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def file_sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def compute_records_sha256(records_path: Path) -> str:
-    # hash the whole parquet file (simple and robust)
-    return file_sha256(records_path)
-
-
-def usr_compatible_id(bio_type: str, sequence: str) -> str:
-    s = f"{bio_type}|{sequence.upper()}"
-    return hashlib.sha1(s.encode("utf-8")).hexdigest()
-
-
-@contextlib.contextmanager
-def timer() -> Iterable[float]:
-    t0 = time.perf_counter()
-    yield
-    time.perf_counter() - t0
-    # consumer measures inside if needed
-
-
-@dataclass
 class ExitCodes:
-    SUCCESS = 0
-    SUCCESS_WITH_WARNINGS = 2
+    OK = 0
+    BAD_ARGS = 2
     CONTRACT_VIOLATION = 3
     NOT_FOUND = 4
-    BAD_ARGS = 5
-    EXISTS_NEEDS_RESUME = 6
-    LOCK_FAILED = 7
-    CHECKSUM_MISMATCH = 8
-    INTERNAL_ERROR = 9
+    INTERNAL_ERROR = 5
 
 
-class OpalError(RuntimeError):
-    """Base class for OPAL controlled failures (maps to specific exit codes)."""
-
-    def __init__(self, message: str, code: int = ExitCodes.CONTRACT_VIOLATION):
+class OpalError(Exception):
+    def __init__(self, message: str, exit_code: int | None = None):
         super().__init__(message)
-        self.exit_code = code
+        self.exit_code = ExitCodes.BAD_ARGS if exit_code is None else exit_code
+
+
+def print_stdout(msg: str) -> None:
+    print(msg)
 
 
 def print_stderr(msg: str) -> None:
     import sys
 
-    sys.stderr.write(msg.rstrip() + "\n")
-    sys.stderr.flush()
+    print(msg, file=sys.stderr)
 
 
-def print_stdout(msg: str) -> None:
-    import sys
+def ensure_dir(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
 
-    sys.stdout.write(msg.rstrip() + "\n")
-    sys.stdout.flush()
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def read_json(path: Path) -> dict:
+    return json.loads(Path(path).read_text())
+
+
+def write_json(path: Path, data: dict) -> None:
+    ensure_dir(path.parent)
+    Path(path).write_text(json.dumps(data, indent=2))
+
+
+def file_sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def robust_center_scale(Y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    med = np.nanmedian(Y, axis=0)
+    q75 = np.nanpercentile(Y, 75, axis=0)
+    q25 = np.nanpercentile(Y, 25, axis=0)
+    iqr = q75 - q25
+    scale = np.where(iqr < 1e-12, 1.0, iqr / 1.349)
+    return med, scale
+
+
+def competition_rank(scores_desc_sorted: np.ndarray) -> np.ndarray:
+    """Competition ranking (1,2,3,3,5) given scores sorted descending."""
+    n = len(scores_desc_sorted)
+    ranks = np.empty(n, dtype=int)
+    if n == 0:
+        return ranks
+    rank = 1
+    i = 0
+    while i < n:
+        j = i
+        while j < n and scores_desc_sorted[j] == scores_desc_sorted[i]:
+            j += 1
+        ranks[i:j] = rank
+        rank = j + 1
+        i = j
+    return ranks

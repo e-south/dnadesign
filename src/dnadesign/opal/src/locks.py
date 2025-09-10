@@ -3,9 +3,6 @@
 <dnadesign project>
 src/dnadesign/opal/src/locks.py
 
-Provides a minimal file-based lock to prevent concurrent mutation of a campaign
-workspace.
-
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
@@ -20,30 +17,31 @@ from .utils import ExitCodes, OpalError
 
 
 class CampaignLock:
-    def __init__(self, workdir: Path):
-        self.lock_path = workdir / ".campaign.lock"
+    """Very simple file lock to serialize write operations per campaign.
+    Not distributed; good enough for single-host workflows.
+    """
 
-    def acquire(self) -> None:
+    def __init__(self, workdir: Path):
+        self.workdir = Path(workdir)
+        self.lockfile = self.workdir / ".opal.lock"
+
+    def __enter__(self):
+        self.workdir.mkdir(parents=True, exist_ok=True)
+        # atomic create if not exists
         try:
-            # exclusive create; fail if exists
-            fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            fd = os.open(self.lockfile, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode("utf-8"))
             os.close(fd)
         except FileExistsError as e:
             raise OpalError(
-                f"Lock acquisition failed: {self.lock_path}", ExitCodes.LOCK_FAILED
+                f"Campaign is locked by another process: {self.lockfile}",
+                ExitCodes.CONTRACT_VIOLATION,
             ) from e
-
-    def release(self) -> None:
-        try:
-            if self.lock_path.exists():
-                self.lock_path.unlink()
-        except Exception:
-            # don't raise on cleanup
-            pass
-
-    def __enter__(self):
-        self.acquire()
         return self
 
     def __exit__(self, exc_type, exc, tb):
-        self.release()
+        try:
+            self.lockfile.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return False
