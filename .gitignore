@@ -99,6 +99,15 @@ archived/
 *.pkl
 *.pt
 
+# Allow curated demo assets (tracked for the tutorial)
+!src/dnadesign/opal/campaigns/demo/**/*.parquet
+!src/dnadesign/opal/campaigns/demo/**/*.parq
+!src/dnadesign/opal/campaigns/demo/**/*.pq
+!src/dnadesign/opal/campaigns/demo/**/*.feather
+!src/dnadesign/opal/campaigns/demo/**/*.joblib
+!src/dnadesign/opal/campaigns/demo/**/*.pkl
+!src/dnadesign/opal/campaigns/demo/**/*.pt
+
 # -----------------------------------------------------------------------------
 # Images: ignore by default; allow curated exceptions
 # -----------------------------------------------------------------------------
@@ -116,10 +125,14 @@ archived/
 # -----------------------------------------------------------------------------
 # Project-specific (OPAL / USR)
 # -----------------------------------------------------------------------------
-# OPAL campaigns (private, large). Keep only a tiny tracked template.
+# OPAL campaigns (private, large). Keep only curated examples.
 src/dnadesign/opal/campaigns/**
+# Keep the demo campaign (self-contained tutorial)
+!src/dnadesign/opal/campaigns/demo/
+!src/dnadesign/opal/campaigns/demo/**
+# Keep skeleton/template if present
+!src/dnadesign/opal/campaigns/.template/
 !src/dnadesign/opal/campaigns/.template/**
-!src/dnadesign/opal/campaigns/.template/**/**
 
 # OPAL per-run products anywhere
 **/outputs/
