@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 from ..exceptions import IngestError
-from ..registries.ingest_transforms import register_ingest_transform
+from ..registries.transforms_y import register_ingest_transform
 
 
 @register_ingest_transform("logic5_from_tidy_v1")
@@ -24,10 +24,14 @@ def transform_logic5_from_tidy_v1(
     df_tidy: pd.DataFrame,
     params: Dict[str, Any],
     setpoint_vector: List[float],
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, Dict[str, Any]]:
     """
-    Returns a DataFrame with columns: ['id', 'y'] where y is list[float] length 5:
-    [v00, v10, v01, v11, effect_linear]. Strictly enforces a complete quartet.
+    Ingest tidy fluorescence reads into vec8 labels per design id.
+
+    Returns: (df_id_y, meta)
+      - df_id_y with columns ['id','y'] where y is list[float] length 8:
+        [v00, v10, v01, v11, y00_log2, y10_log2, y01_log2, y11_log2]
+      - meta: dict with counts, warnings, and parameters actually used.
     """
     schema = params["schema"]
     id_col = schema["design_id"]
@@ -54,8 +58,10 @@ def transform_logic5_from_tidy_v1(
     logic_cfg.setdefault("minmax_epsilon", 1e-9)
     logic_cfg.setdefault("equal_states_fallback", "uniform_quarters_and_warn")
 
-    eff_cfg = pre.get("aggregate_effect_size_from_yfp", {})
-    eff_cfg.setdefault("base_signal_channel", "yfp")
+    # intensity: we store per-state log2(YFP) as y* (reference anchor optional)
+    int_cfg = pre.get("intensity_log2_per_state", {})
+    int_cfg.setdefault("signal_channel", "yfp")
+    int_cfg.setdefault("log2_epsilon", 1e-9)
 
     # Normalize channel case
     df = df_tidy.copy()
@@ -138,17 +144,11 @@ def transform_logic5_from_tidy_v1(
             )
             logic_01[eq, :] = 0.25
 
-    # Effect: setpoint-weighted geometric mean of YFP over ON states (stored as linear units)
-    s = np.array(list(setpoint_vector), dtype=float)
-    if s.shape[0] != 4:
-        raise IngestError("setpoint_vector must have length 4 for logic5.")
-    s = np.clip(s, 0.0, None)
-    w = np.zeros_like(s) if s.sum() == 0 else (s / s.sum())
-
+    # Per-state log2 intensity from YFP channel (reference-normalization optional; not applied here)
     log2_yfp = (
         df[df[chan_col] == yfp_name]
         .groupby([id_col, state_col], dropna=False)[val_col]
-        .apply(lambda x: np.log2(np.mean(x.values)))
+        .apply(lambda x: np.log2(max(np.mean(x.values), float(int_cfg["log2_epsilon"])) ))
         .unstack(fill_value=np.nan)
     )
     for st in required_states:
@@ -158,21 +158,37 @@ def transform_logic5_from_tidy_v1(
     if log2_yfp.isna().any(axis=None):
         bad = log2_yfp[log2_yfp.isna().any(axis=1)].index.tolist()
         raise IngestError(
-            f"Missing YFP values for effect aggregation. Bad ids: {bad[:10]}"
+            f"Missing YFP values for intensity computation. Bad ids: {bad[:10]}"
         )
 
-    m = (log2_yfp.values * w.reshape(1, -1)).sum(axis=1)
-    effect_linear = np.power(2.0, m)
+    # Assemble vec8: [v00,v10,v01,v11,y00*,y10*,y01*,y11*]
+    ystar = log2_yfp[required_states].values.astype(float)
+    y_vec8 = np.concatenate([logic_01, ystar], axis=1)
 
     out = pd.DataFrame(
         {
             "id": wide.index.astype(str),
-            "y": [
-                list(map(float, v))
-                for v in np.concatenate(
-                    [logic_01, effect_linear.reshape(-1, 1)], axis=1
-                )
-            ],
+            "y": [list(map(float, row)) for row in y_vec8],
         }
     ).reset_index(drop=True)
-    return out
+
+    meta = {
+        "num_ids": int(len(out)),
+        "replicate_warn_threshold": int(rep_warn_threshold),
+        "ratio": {
+            "numerator": yfp_name,
+            "denominator": cfp_name,
+            "division_epsilon": float(eps),
+            "apply_log2": bool(apply_log2),
+        },
+        "logic": {
+            "expected_state_order": required_states,
+            "minmax_epsilon": float(mm_eps),
+        },
+        "intensity": {
+            "signal_channel": yfp_name,
+            "log2_epsilon": float(int_cfg["log2_epsilon"]),
+        },
+        "warnings": [],
+    }
+    return out, meta

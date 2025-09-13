@@ -63,16 +63,16 @@ def cmd_ingest_y(
         )
 
         # choose effective transform name & params
-        t_name = (transform or cfg.data.ingest.name).strip()
-        t_params = cfg.data.ingest.params.__dict__
+        t_name = (transform or cfg.data.transforms_y.name).strip()
+        t_params = cfg.data.transforms_y.params
         if params:
             import json as _json
 
             t_params = _json.loads(Path(params).read_text())
             typer.echo("[WARN] Transform params overridden via --params", err=True)
-        if t_name != cfg.data.ingest.name:
+        if t_name != cfg.data.transforms_y.name:
             typer.echo(
-                f"[WARN] CLI transform '{t_name}' != YAML '{cfg.data.ingest.name}'",
+                f"[WARN] CLI transform '{t_name}' != YAML '{cfg.data.transforms_y.name}'",
                 err=True,
             )
 
@@ -82,7 +82,7 @@ def cmd_ingest_y(
             transform_name=t_name,
             transform_params=t_params,
             y_expected_length=cfg.data.y_expected_length,
-            setpoint_vector=cfg.selection.objective.params.setpoint_vector,
+            setpoint_vector=cfg.objective.objective.params.get("setpoint_vector", [0,0,0,1]),
         )
 
         # PREVIEW: counts + head (no flag, always printed)

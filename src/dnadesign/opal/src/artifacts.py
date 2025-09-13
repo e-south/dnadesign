@@ -42,6 +42,8 @@ class ArtifactPaths:
     metrics_json: Path
     round_log_jsonl: Path
     preds_with_uncertainty_csv: Path
+    round_ctx_json: Path
+    objective_meta_json: Path
 
 
 def write_selection_csv(path: Path, df_selected: pd.DataFrame) -> str:
@@ -70,4 +72,20 @@ def write_round_metrics(path: Path, metrics: Dict[str, Any]) -> str:
 
 def write_predictions_with_uncertainty(path: Path, df: pd.DataFrame) -> str:
     df.to_csv(path, index=False)
+    return file_sha256(path)
+
+
+def append_round_log_event(path: Path, event: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(event, separators=(",", ":")) + "\n")
+
+
+def write_round_ctx(path: Path, ctx: dict) -> str:
+    Path(path).write_text(json.dumps(ctx, indent=2))
+    return file_sha256(path)
+
+
+def write_objective_meta(path: Path, meta: Dict[str, Any]) -> str:
+    Path(path).write_text(json.dumps(meta, indent=2))
     return file_sha256(path)

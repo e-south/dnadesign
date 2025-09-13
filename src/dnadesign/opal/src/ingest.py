@@ -23,7 +23,7 @@ from typing import List
 
 import pandas as pd
 
-from .registries.ingest_transforms import get_ingest_transform
+from .registries.transforms_y import get_ingest_transform
 from .utils import OpalError
 
 
@@ -49,11 +49,12 @@ def run_ingest(
     Returns (labels_df[id,y], preview)
     """
     tf = get_ingest_transform(transform_name)
-    labels = tf(
+    out = tf(
         csv_df,
         transform_params or {},
         setpoint_vector,
     )
+    labels = out[0] if isinstance(out, tuple) and len(out) == 2 else out
     if not {"id", "y"}.issubset(labels.columns):
         raise OpalError("Ingest transform did not return columns: id,y")
 

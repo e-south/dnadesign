@@ -52,13 +52,13 @@ def cmd_init(
             representation_column_name=cfg.data.representation_column_name,
             label_source_column_name=cfg.data.label_source_column_name,
             representation_transform={
-                "name": cfg.data.representation_transform.name,
-                "params": cfg.data.representation_transform.params,
+                "name": cfg.data.transforms_x.name,
+                "params": cfg.data.transforms_x.params,
             },
             training_policy=cfg.training.policy,
             performance={
                 "score_batch_size": cfg.scoring.score_batch_size,
-                "objective": cfg.selection.objective.name,
+                "objective": cfg.objective.objective.name,
             },
             representation_vector_dimension=0,
             backlog={"number_of_selected_but_not_yet_labeled_candidates_total": 0},

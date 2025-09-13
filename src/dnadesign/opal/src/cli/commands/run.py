@@ -19,9 +19,12 @@ import typer
 
 from ...artifacts import (
     ArtifactPaths,
+    append_round_log_event,
     round_dir,
     write_feature_importance,
+    write_objective_meta,
     write_predictions_with_uncertainty,
+    write_round_ctx,
     write_round_metrics,
     write_selection_csv,
 )
@@ -30,13 +33,15 @@ from ...locks import CampaignLock
 from ...preflight import preflight_run
 from ...registries.models import get_model
 from ...registries.objectives import get_objective
-from ...selection.top_n import select_top_n_df
+from ...registries.selections import get_selection
+from ...round_context import RoundContext
 from ...state import CampaignState, RoundEntry
 from ...utils import (
     ExitCodes,
     OpalError,
     ensure_dir,
     file_sha256,
+    now_iso,
 )
 from ...writebacks import write_round_columns
 from ..registry import cli_command
@@ -107,9 +112,9 @@ def cmd_run(
 
             # model
             mdl = get_model(
-                cfg.training.model.name,
-                cfg.training.model.params.__dict__,
-                cfg.training.model.target_scaler.__dict__,
+                cfg.training.models.name,
+                cfg.training.models.params,
+                cfg.training.target_scaler.__dict__,
             )
 
             import time
@@ -152,34 +157,97 @@ def cmd_run(
             scored["sequence"] = scored["id"].map(seq_map)
 
             # objective
-            obj_fn = get_objective(cfg.selection.objective.name)
+            obj_name = cfg.objective.objective.name
+            obj_params = cfg.objective.objective.params
+            obj_fn = get_objective(obj_name)
+
             ypred_mat = np.array(
                 [np.array(v, dtype=float) for v in scored["y_pred_vec"].tolist()],
                 dtype=float,
             )
-            e_labels_for_scaling = []
+            # Build RoundContext (includes effect scaling pool from labels)
+            setpoint = list(obj_params.get("setpoint_vector", [0, 0, 0, 1]))
+            delta = float(obj_params.get("intensity_log2_offset_delta", 0.0))
+            # compute effect pool from labels (vec8) -> y_lin -> w·y_lin
+            effect_pool: list[float] = []
             for v in y_vals:
-                if isinstance(v, list) and len(v) >= 5:
-                    e_labels_for_scaling.append(float(v[4]))
-            e_labels_for_scaling = np.array(e_labels_for_scaling, dtype=float)
+                if isinstance(v, list) and len(v) == 8:
+                    ystar = np.asarray(v[4:8], dtype=float)
+                    ylin = np.maximum(0.0, np.power(2.0, ystar) - delta)
+                    s = np.asarray(setpoint, dtype=float)
+                    w = (
+                        np.zeros_like(s)
+                        if float(np.sum(s)) <= 0
+                        else (s / float(np.sum(s)))
+                    )
+                    effect_pool.append(float(np.sum(ylin * w)))
+            percentile_cfg = obj_params.get("scaling", {})
+            run_id = f"r{round}-{now_iso()}"
+            rctx = RoundContext.build(
+                slug=cfg.campaign.slug,
+                round_index=int(round),
+                setpoint=setpoint,
+                label_ids=[str(_id) for _id in tr_ids],
+                effect_pool_for_scaling=effect_pool,
+                percentile_cfg={
+                    "p": int(percentile_cfg.get("percentile", 95)),
+                    "fallback_p": int(percentile_cfg.get("fallback_p", 75)),
+                    "min_n": int(percentile_cfg.get("min_n", 5)),
+                    "eps": float(percentile_cfg.get("eps", 1e-8)),
+                },
+                model_name=cfg.training.models.name,
+                model_params=cfg.training.models.params,
+                x_transform={
+                    "name": cfg.data.transforms_x.name,
+                    "params": cfg.data.transforms_x.params,
+                },
+                y_ingest_transform={
+                    "name": cfg.data.transforms_y.name,
+                    "params": cfg.data.transforms_y.params,
+                },
+                y_expected_length=cfg.data.y_expected_length,
+                run_id=run_id,
+            )
+
             obj_res = obj_fn(
-                y_pred_vec5=ypred_mat,
-                params=cfg.selection.objective.params.__dict__,
-                e_labels_for_scaling=e_labels_for_scaling,
+                y_pred=ypred_mat,
+                params=obj_params,
+                round_ctx=rctx,
             )
             scored["selection_score"] = obj_res.score
-            scored["logic_fidelity_l2_norm01"] = getattr(
-                obj_res, "logic_fidelity", np.nan
-            )
-            scored["effect_scaled"] = getattr(obj_res, "effect_scaled", np.nan)
+            diag = obj_res.diagnostics or {}
+            scored["logic_fidelity_l2_norm01"] = diag.get("logic_fidelity", np.nan)
+            scored["effect_scaled"] = diag.get("effect_scaled", np.nan)
 
-            # deterministic order and selection
-            scored = scored.sort_values(
-                by=["selection_score", "id"], ascending=[False, True]
-            ).reset_index(drop=True)
-            scored_ranked, top_k_effective = select_top_n_df(
-                scored, score_col="selection_score", top_k=int(k)
+            # flags: simple QC
+            def _flags_row(vpred: list[float], e_scaled: float) -> str:
+                flags = []
+                arr = np.asarray(vpred, dtype=float)
+                if not np.all(np.isfinite(arr)):
+                    flags.append("nan_pred")
+                if float(e_scaled) >= 1.0:
+                    flags.append("clip_effect")
+                return "|".join(flags)
+
+            scored["flags"] = [
+                _flags_row(v, e)
+                for v, e in zip(scored["y_pred_vec"], scored["effect_scaled"])
+            ]
+
+            # deterministic order and selection via registry
+            ids_arr = scored["id"].astype(str).to_numpy()
+            sel_fn = get_selection(cfg.selection.selection.name)
+            sel_res = sel_fn(
+                ids=ids_arr,
+                scores=scored["selection_score"].to_numpy(dtype=float),
+                top_k=int(k),
+                tie_handling=cfg.selection.tie_handling or "competition_rank",
             )
+            order = sel_res["order_idx"]
+            scored_ranked = scored.iloc[order].copy().reset_index(drop=True)
+            scored_ranked["rank_competition"] = sel_res["ranks"].astype(int)
+            scored_ranked["selected_top_k_bool"] = sel_res["selected_bool"].astype(bool)
+            top_k_effective = int(scored_ranked["selected_top_k_bool"].sum())
 
             # artifacts
             apaths = ArtifactPaths(
@@ -189,6 +257,8 @@ def cmd_run(
                 metrics_json=rdir / "round_model_metrics.json",
                 round_log_jsonl=rdir / "round.log.jsonl",
                 preds_with_uncertainty_csv=rdir / "predictions_with_uncertainty.csv",
+                round_ctx_json=rdir / "round_ctx.json",
+                objective_meta_json=rdir / "objective_meta.json",
             )
             mdl.save(str(apaths.model))
             model_sha = file_sha256(apaths.model)
@@ -209,6 +279,16 @@ def cmd_run(
                 "score_seconds": score_dt,
             }
             met_sha = write_round_metrics(apaths.metrics_json, met)
+
+            # write round_ctx and objective_meta
+            ctx_sha = write_round_ctx(apaths.round_ctx_json, rctx.to_dict())
+            obj_meta = {
+                "denom_percentile": rctx.percentile_cfg.get("p"),
+                "denom_value": float(diag.get("denom_used", float("nan"))),
+                "beta": float(obj_params.get("logic_exponent_beta", 1.0)),
+                "gamma": float(obj_params.get("intensity_exponent_gamma", 1.0)),
+            }
+            objm_sha = write_objective_meta(apaths.objective_meta_json, obj_meta)
 
             preds_out = scored_ranked[
                 [
@@ -233,6 +313,8 @@ def cmd_run(
                 round,
                 scored_ranked.rename(columns={"y_pred_vec": "y_pred_vec"}),
                 allow_overwrite=resume or force,
+                objective_name=obj_name,
+                fingerprint_short=rctx.fingerprint_short,
             )
             store.save_atomic(df2)
 
@@ -246,13 +328,13 @@ def cmd_run(
             st.label_source_column_name = cfg.data.label_source_column_name
             st.representation_vector_dimension = rep.x_dim
             st.representation_transform = {
-                "name": cfg.data.representation_transform.name,
-                "params": cfg.data.representation_transform.params,
+                "name": cfg.data.transforms_x.name,
+                "params": cfg.data.transforms_x.params,
             }
             st.training_policy = cfg.training.policy
             st.performance = {
                 "score_batch_size": score_batch_size or cfg.scoring.score_batch_size,
-                "objective": cfg.selection.objective.name,
+                "objective": obj_name,
             }
             st.data_location = {
                 "kind": store.kind,
@@ -270,16 +352,16 @@ def cmd_run(
                     selection_top_k_requested=int(k),
                     selection_top_k_effective_after_ties=int(top_k_effective),
                     model={
-                        "type": cfg.training.model.name,
-                        "params": cfg.training.model.params.__dict__,
+                        "type": cfg.training.models.name,
+                        "params": cfg.training.models.params,
                         "artifact_path": str(apaths.model.resolve()),
                         "artifact_sha256": model_sha,
                     },
                     metrics=met,
                     durations_sec={"fit": fit_dt, "score": score_dt},
                     seeds={
-                        "global": cfg.training.model.params.random_state,
-                        "model": cfg.training.model.params.random_state,
+                        "global": cfg.training.models.params.get("random_state", None),
+                        "model": cfg.training.models.params.get("random_state", None),
                     },
                     artifacts={
                         "selection_top_k_csv": str(apaths.selection_csv.resolve()),
@@ -290,26 +372,75 @@ def cmd_run(
                             apaths.preds_with_uncertainty_csv.resolve()
                         ),
                         "round_model_metrics_json": str(apaths.metrics_json.resolve()),
+                        "round_ctx_json": str(apaths.round_ctx_json.resolve()),
+                        "objective_meta_json": str(
+                            apaths.objective_meta_json.resolve()
+                        ),
                         "checksums": {
                             "selection_top_k_csv": sel_sha,
                             "feature_importance_csv": fi_sha,
                             "predictions_with_uncertainty_csv": preds_sha,
                             "round_model_metrics_json": met_sha,
+                            "round_ctx_json": ctx_sha,
+                            "objective_meta_json": objm_sha,
                         },
                     },
                     writebacks={
                         "records_columns_written": [
                             f"opal__{cfg.campaign.slug}__r{round}__pred_y",
-                            f"opal__{cfg.campaign.slug}__r{round}__selection_score__{cfg.selection.objective.name}",
+                            f"opal__{cfg.campaign.slug}__r{round}__selection_score__{obj_name}",
                             f"opal__{cfg.campaign.slug}__r{round}__rank_competition",
                             f"opal__{cfg.campaign.slug}__r{round}__selected_top_k_bool",
                             f"opal__{cfg.campaign.slug}__r{round}__uncertainty__mean_all_std",
+                            f"opal__{cfg.campaign.slug}__r{round}__flags",
+                            f"opal__{cfg.campaign.slug}__r{round}__fingerprint",
                         ]
                     },
                     warnings=[],
                 )
             )
             st.save(st_path)
+
+            # round log events (append-only)
+            append_round_log_event(
+                apaths.round_log_jsonl,
+                {
+                    "ts": now_iso(),
+                    "round": int(round),
+                    "stage": "fit",
+                    "labels": int(len(tr_ids)),
+                    "oob_r2": metrics.oob_r2,
+                },
+            )
+            append_round_log_event(
+                apaths.round_log_jsonl,
+                {
+                    "ts": now_iso(),
+                    "round": int(round),
+                    "stage": "predict",
+                    "universe": int(len(cand_ids)),
+                },
+            )
+            append_round_log_event(
+                apaths.round_log_jsonl,
+                {
+                    "ts": now_iso(),
+                    "round": int(round),
+                    "stage": "objective",
+                    "denom_p": rctx.percentile_cfg.get("p"),
+                    "denom": float(diag.get("denom_used", float("nan"))),
+                },
+            )
+            append_round_log_event(
+                apaths.round_log_jsonl,
+                {
+                    "ts": now_iso(),
+                    "round": int(round),
+                    "stage": "selection",
+                    "top_k": int(k),
+                    "effective": int(top_k_effective),
+                },
+            )
 
             json_out(
                 {

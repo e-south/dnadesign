@@ -1,4 +1,4 @@
-## `setpoint_fidelity_x_intensity_v1`
+## setpoint_fidelity_x_intensity `sfxi`
 
 **Intent.** Combine a model’s predicted **logic pattern** and **absolute fluorescent intensity** into a single score that rewards sequence designs that are both **right** (match the target setpoint) and **bright** (intense in the target conditions).
 
@@ -239,10 +239,37 @@ Only proximity of $\widehat{v}$ to $p$ (being OFF everywhere) is rewarded.
 
 ### 9. Column slugs (diagnostics)
 
-* `opal__{slug}__r{k}__logic_fidelity__l2_to_setpoint__normalized_0_1`
-* `opal__{slug}__r{k}__effect_size__setpoint_weighted_yfp__p95_scaled_0_1`
-* `opal__{slug}__r{k}__score__logic_x_intensity__beta{β}_gamma{γ}`
+##### Minimal per-sample columns (persist)
+
+* `opal__{campaign}__r{k}__sfxi__score`; final scalar used for ranking.
+* `opal__{campaign}__r{k}__sfxi__logic_fidelity`; normalized RMSE→similarity in \[0,1].
+* `opal__{campaign}__r{k}__sfxi__intensity_effect_scaled`; setpoint-weighted intensity, scaled to \[0,1].
+* `opal__{campaign}__r{k}__sfxi__vhat_vec4`; predicted logic vector \[00,10,01,11].
+* `opal__{campaign}__r{k}__sfxi__yhat_linear_vec4`; predicted linear intensities \[00,10,01,11].
+* `opal__{campaign}__r{k}__sfxi__p_vec4`; setpoint used \[00,10,01,11] (self-contained scoring context).
+* `opal__{campaign}__r{k}__sfxi__flags`; compact QC flags (e.g., flat\_logic, tiny\_anchor, clipped).
+* `opal__{campaign}__r{k}__sfxi__setpoint_id`; human-readable tag for p (e.g., `AND`, `custom_v3`).
+* `opal__{campaign}__r{k}__sfxi__version`; objective/schema version for reproducibility.
+
+##### Round-level metadata (log once per round/batch; not per sample)
+
+* `opal__{campaign}__r{k}__sfxi__intensity_denominator_p`; percentile used for scaling (e.g., 95).
+* `opal__{campaign}__r{k}__sfxi__intensity_denominator_value`; the actual P-value used as the denominator.
+* `opal__{campaign}__r{k}__sfxi__beta_gamma`; curvature params used (e.g., `1,1`).
+* `opal__{campaign}__r{k}__sfxi__robust_scaler_stats`; medians/IQRs for each intensity target (stored with the model or round log).
+* `opal__{campaign}__r{k}__sfxi__anchors_epsilons`; `{alpha, delta, epsilon}` and anchor summary for traceability.
+
+##### Recomputable at runtime (don’t persist per sample)
+
+* `opal__{campaign}__r{k}__sfxi__intensity_effect_raw`; recompute: `w·yhat_linear`.
+* `opal__{campaign}__r{k}__sfxi__rmse_to_setpoint`; recompute from `vhat_vec4` and `p_vec4`.
+* `opal__{campaign}__r{k}__sfxi__max_dist_D`; recompute from `p_vec4`.
+* `opal__{campaign}__r{k}__sfxi__P_sum`; recompute from `p_vec4`.
+* `opal__{campaign}__r{k}__sfxi__weights_vec4`; recompute as `p / sum(p)` (or zeros if sum=0).
+* `opal__{campaign}__r{k}__score__logic_x_intensity__beta{β}_gamma{γ}`
 
 ---
 
 @e-south
+
+

@@ -70,5 +70,16 @@ def build_record_report(
                 "selected": bool(row.get(sel_col)),
             }
     if per_round:
-        out["per_round"] = dict(sorted(per_round.items(), key=lambda kv: kv[0]))
+        per_round = dict(sorted(per_round.items(), key=lambda kv: kv[0]))
+        out["per_round"] = per_round
+        # synthesize compact progress card
+        parts = []
+        for r, info in per_round.items():
+            status = []
+            if info["y_pred"] is not None:
+                status.append("scored ✓")
+            if info.get("selected"):
+                status.append("sel ✓")
+            parts.append(f"r{r}: " + (" ".join(status) if status else "—"))
+        out["progress"] = " | ".join(parts)
     return out

@@ -132,7 +132,7 @@ class PScoring(BaseModel):
     model_config = ConfigDict(extra="forbid")
     score_batch_size: int = 10_000
     sort_stability: str = (
-        "(-opal__{slug}__r{round}__selection_score__logic_plus_effect_v1, id)"
+        "(-opal__{slug}__r{round}__selection_score__{objective}, id)"
     )
 
 
@@ -196,7 +196,7 @@ def load_config(path: Path | str) -> RootConfig:
     tx = cfg.transforms_x or PPluginRef(name="identity", params={})
     ty = cfg.transforms_y or PPluginRef(name="logic5_from_tidy_v1", params={})
     mdl = cfg.models or PPluginRef(name="random_forest", params={})
-    obj = cfg.objectives or PPluginRef(name="logic_plus_effect_v1", params={})
+    obj = cfg.objectives or PPluginRef(name="sfxi_v1", params={})
     sel = cfg.selection or PPluginRef(name="top_n", params={})
 
     tx_params = validate_params("transform_x", tx.name, tx.params)

@@ -70,8 +70,8 @@ def store_from_cfg(cfg: RootConfig) -> RecordsStore:
         campaign_slug=cfg.campaign.slug,
         x_col=cfg.data.representation_column_name,
         y_col=cfg.data.label_source_column_name,
-        rep_transform_name=cfg.data.representation_transform.name,
-        rep_transform_params=cfg.data.representation_transform.params,
+        rep_transform_name=cfg.data.transforms_x.name,
+        rep_transform_params=cfg.data.transforms_x.params,
     )
 
 

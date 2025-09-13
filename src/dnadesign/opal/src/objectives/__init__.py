@@ -10,4 +10,4 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-from . import logic_plus_effect_v1  # noqa: F401
+from . import sfxi_v1  # noqa: F401

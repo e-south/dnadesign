@@ -67,12 +67,17 @@ class SelectionBlock:
 
 @dataclass
 class ObjectiveBlock:
-    objective: PluginRef = field(
-        default_factory=lambda: PluginRef("logic_plus_effect_v1", {})
-    )
+    objective: PluginRef = field(default_factory=lambda: PluginRef("sfxi_v1", {}))
 
 
 # ---- Training / Safety / Meta ----
+@dataclass
+class TargetScalerCfg:
+    enable: bool = True
+    method: str = "robust_iqr_per_target"
+    minimum_labels_required: int = 5
+    center_statistic: str = "median"
+    scale_statistic: str = "iqr"
 @dataclass
 class TrainingBlock:
     # model plugin (e.g., random_forest)
@@ -84,7 +89,7 @@ class TrainingBlock:
             "allow_resuggesting_candidates_until_labeled": True,
         }
     )
-    universe_score_batch_size: int = 10_000  # batch size knob when scoring the universe
+    target_scaler: TargetScalerCfg = field(default_factory=TargetScalerCfg)
 
 
 @dataclass
@@ -109,12 +114,21 @@ class MetadataBlock:
 
 
 @dataclass
+class ScoringBlock:
+    score_batch_size: int = 10_000
+    sort_stability: str = (
+        "(-opal__{slug}__r{round}__selection_score__{objective}, id)"
+    )
+
+
+@dataclass
 class RootConfig:
     campaign: CampaignBlock
     data: DataBlock
     selection: SelectionBlock
     objective: ObjectiveBlock
     training: TrainingBlock
+    scoring: ScoringBlock
     safety: SafetyBlock
     metadata: MetadataBlock
 

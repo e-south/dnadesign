@@ -16,7 +16,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
-from ..registries.rep_transforms import register_rep_transform
+from ..registries.transforms_x import register_rep_transform
 from ..utils import ExitCodes, OpalError
 
 

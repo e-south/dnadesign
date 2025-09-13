@@ -129,37 +129,19 @@ class _RFParams(BaseModel):
     target_scaler: _TargetScalerParams = Field(default_factory=_TargetScalerParams)
 
 
-# objective: logic_plus_effect_v1
-@register_param_schema("objective", "logic_plus_effect_v1")
-class _LogicPlusEffectParams(BaseModel):
+@register_param_schema("objective", "sfxi_v1")
+class _SFXIParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
     setpoint_vector: List[float]
-    weighting_between_logic_and_effect: Dict[str, float] = Field(
-        default_factory=lambda: {"logic_weight": 0.5, "effect_weight": 0.5}
-    )
-    combination_of_logic_and_effect: Dict[str, float] = Field(
+    logic_exponent_beta: float = 1.0
+    intensity_exponent_gamma: float = 1.0
+    intensity_log2_offset_delta: float = 0.0
+    scaling: Dict[str, Any] = Field(
         default_factory=lambda: {
-            "formula": "product",
-            "logic_exponent_beta": 1.0,
-            "effect_exponent_gamma": 1.0,
-        }
-    )
-    logic_fidelity_measure: Dict[str, str] = Field(
-        default_factory=lambda: {
-            "distance": "l2_to_setpoint",
-            "normalization": "per_state_max_deviation_to_unit_interval",
-        }
-    )
-    effect_size_scaling_for_selection: Dict[str, Any] = Field(
-        default_factory=lambda: {
-            "scaling_method": "per_round_percentile_clip",
-            "scaling_pool": "labeled_rows_only",
             "percentile": 95,
-            "low_sample_fallback": {
-                "min_labeled_count": 5,
-                "fallback_percentile": 75,
-                "epsilon": 1e-8,
-            },
+            "min_n": 5,
+            "fallback_p": 75,
+            "eps": 1e-8,
         }
     )
 

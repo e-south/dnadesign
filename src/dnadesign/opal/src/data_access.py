@@ -28,7 +28,7 @@ from typing import Any, Dict, Iterable, List, Tuple
 import numpy as np
 import pandas as pd
 
-from .registries.rep_transforms import get_rep_transform
+from .registries.transforms_x import get_rep_transform
 from .utils import ExitCodes, OpalError, ensure_dir, now_iso
 
 ESSENTIAL_COLS = [
