@@ -6,7 +6,7 @@
 
 ### 1. What the model predicts
 
-The model predicts an **8-vector (Y)** per input sequence. The first four entries describe the **shape** of a two-factor logic response (bounded from 0 to 1). The last four capture **absolute fluorescent intensity** per state, but stored in **log2 space** for modeling stability.
+The model predicts an **8-vector (Ŷ)** per input sequence. The first four entries describe the **shape** of a two-factor logic response (bounded from 0 to 1). The last four capture **absolute fluorescent intensity** per state, but stored in **log2 space** for modeling stability.
 
 $$
 \underbrace{v_{00}, v_{10}, v_{01}, v_{11}}_{\text{logic in }[0,1]^4}\;,\;
