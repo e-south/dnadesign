@@ -16,7 +16,7 @@ Default layout (editable install):
       │    └─ <dataset_name>/
       │         ├─ records.parquet
       │         ├─ meta.yaml
-      │         └─ .snapshots/
+      │         └─ _snapshots/
       └─ template_demo/     # example CSVs for README walkthrough
 
 You can override the root on the CLI via --root, or when using the Python API:

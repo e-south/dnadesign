@@ -125,7 +125,7 @@ A dataset is a **folder**:
 ```
 <dataset>/
   records.parquet      # primary table
-  meta.yaml
+  meta.md
   .events.log
   _snapshots/          # rolling parquet checkpoints
 ```

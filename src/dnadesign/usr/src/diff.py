@@ -140,7 +140,7 @@ def compute_diff(
 ) -> DiffSummary:
     dataset_dir = Path(dataset_dir)
     primary_local = parquet_stats(dataset_dir / "records.parquet")
-    meta_local = file_mtime(dataset_dir / "meta.yaml")
+    meta_local = file_mtime(dataset_dir / "meta.md")
     events_local = events_tail_count(dataset_dir / ".events.log")
 
     # Convert remote stat to FileStat for unified view

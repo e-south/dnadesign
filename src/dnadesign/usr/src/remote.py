@@ -3,7 +3,6 @@
 <dnadesign project>
 dnadesign/usr/src/remote.py
 
-
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -128,7 +127,7 @@ class SSHRemote:
     def _remote_parquet_shape(self, path: str) -> Tuple[Optional[int], Optional[int]]:
         # Try python3 -> pyarrow; then python
         py = "python3"
-        cmd = f"""{py} -c "import sys;import pyarrow.parquet as pq;f=pq.ParquetFile(sys.argv[1]);m=f.metadata;print(m.num_rows, m.num_columns)" {shlex.quote(path)}"""
+        cmd = f"""{py} -c "import sys;import pyarrow.parquet as pq;f=pq.ParquetFile(sys.argv[1]);m=f.metadata;print(m.num_rows, m.num_columns)" {shlex.quote(path)}"""  # noqa
         rc, out, _ = self._ssh_run(cmd, check=False)
         if rc == 0 and out.strip():
             try:
@@ -137,7 +136,7 @@ class SSHRemote:
             except Exception:
                 pass
         py = "python"
-        cmd = f"""{py} -c "import sys;import pyarrow.parquet as pq;f=pq.ParquetFile(sys.argv[1]);m=f.metadata;print(m.num_rows, m.num_columns)" {shlex.quote(path)}"""
+        cmd = f"""{py} -c "import sys;import pyarrow.parquet as pq;f=pq.ParquetFile(sys.argv[1]);m=f.metadata;print(m.num_rows, m.num_columns)" {shlex.quote(path)}"""  # noqa
         rc, out, _ = self._ssh_run(cmd, check=False)
         if rc == 0 and out.strip():
             try:
@@ -169,7 +168,7 @@ class SSHRemote:
     def stat_dataset(self, dataset: str) -> RemoteDatasetStat:
         base = self.cfg.dataset_path(dataset)
         primary = f"{base}/records.parquet"
-        meta = f"{base}/meta.yaml"
+        meta = f"{base}/meta.md"
         events = f"{base}/.events.log"
         snaps_d = f"{base}/_snapshots"
 

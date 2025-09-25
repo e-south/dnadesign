@@ -5,19 +5,6 @@ dnadesign/usr/src/cli.py
 
 USR CLI: thin wrapper around the Dataset API.
 
-Default layout (editable install):
-    src/dnadesign/usr/
-      ├─ src/                  # package code (this file lives here)
-      ├─ datasets/             # <-- default root for dataset folders
-      │    └─ <dataset_name>/
-      │         ├─ records.parquet
-      │         └─ _snapshots/
-      └─ template_demo/        # example CSVs for the README walkthrough
-
-If the console script alias is installed (see pyproject.toml), you may also run:
-    usr ls
-    USR head mock_dataset -n 5
-
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -31,10 +18,77 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from .config import SSHRemoteConfig, get_remote, load_all, save_remote
+from .convert_legacy import convert_legacy, profile_60bp_dual_promoter
 from .dataset import Dataset
 from .errors import SequencesError, UserAbort
+from .merge_datasets import (
+    MergeColumnsMode,
+    MergePolicy,
+    merge_usr_to_usr,
+)
 from .mock import MockSpec, add_demo_columns, create_mock_dataset
 from .sync import SyncOptions, execute_pull, execute_push, plan_diff
+
+# ---------------- path helpers: resolve paths relative to the installed package ----------------
+
+
+def _pkg_usr_root() -> Path:
+    """
+    Return the installed dnadesign/usr package directory.
+    This is stable no matter where the user runs 'usr' from.
+    """
+    # .../dnadesign/usr/src/cli.py -> parents[1] = .../dnadesign/usr
+    return Path(__file__).resolve().parents[1]
+
+
+def _resolve_path_anywhere(p: Path) -> Path:
+    """
+    Make file arguments robust:
+      1) absolute path → as-is
+      2) relative path existing under CWD → as-is
+      3) otherwise, try to resolve relative to the installed dnadesign/usr package,
+         including common repo-style prefixes like 'src/dnadesign/usr/...'
+         or 'usr/...'.
+    """
+    p = Path(p)
+
+    # 1) absolute
+    if p.is_absolute() and p.exists():
+        return p
+
+    # 2) relative under CWD
+    if p.exists():
+        return p
+
+    # 3) under installed package
+    base = _pkg_usr_root()
+
+    # direct join
+    cand = base / p
+    if cand.exists():
+        return cand
+
+    # repo-style prefix: src/dnadesign/usr/<...>
+    parts = p.parts
+    if "dnadesign" in parts and "usr" in parts:
+        try:
+            i = parts.index("dnadesign")
+            if parts[i + 1] == "usr":
+                sub = Path(*parts[i + 2 :])
+                cand2 = base / sub
+                if cand2.exists():
+                    return cand2
+        except Exception:
+            pass
+
+    # prefix starting with 'usr/...'
+    if parts and parts[0] == "usr":
+        cand3 = base / Path(*parts[1:])
+        if cand3.exists():
+            return cand3
+
+    # give up (let caller raise if needed)
+    return p
 
 
 def main() -> None:
@@ -42,7 +96,7 @@ def main() -> None:
         prog="usr",
         description="USR CLI (Parquet-backed datasets; includes SSH remotes sync).",
     )
-    default_root = (Path(__file__).resolve().parents[1] / "datasets").resolve()
+    default_root = (_pkg_usr_root() / "datasets").resolve()
     p.add_argument(
         "--root",
         type=Path,
@@ -75,7 +129,11 @@ def main() -> None:
     sp_att.add_argument("dataset")
     sp_att.add_argument("--path", type=Path, required=True)
     sp_att.add_argument("--namespace", required=True)
-    sp_att.add_argument("--id-col", default="id")
+    sp_att.add_argument(
+        "--id-col",
+        default="id",
+        help="Identifier column in the input. Use 'id' (sha1) or 'sequence'.",
+    )
     sp_att.add_argument("--columns", default="")
     sp_att.add_argument("--allow-overwrite", action="store_true")
     sp_att.add_argument("--note", default="")
@@ -192,6 +250,84 @@ def main() -> None:
     sp_r_add.add_argument("--ssh-key-env", default=None)
     sp_r_add.set_defaults(func=cmd_remotes_add)
 
+    # ---------------- convert-legacy (PT -> fresh dataset) ----------------
+    sp_conv = sp.add_parser(
+        "convert-legacy",
+        help="Convert legacy .pt (list[dict]) files into a NEW USR dataset (records.parquet).",
+    )
+    sp_conv.add_argument("dataset", help="Name for the new USR dataset to create")
+    sp_conv.add_argument(
+        "--paths",
+        nargs="+",
+        type=Path,
+        required=True,
+        help="One or more .pt files or directories to scan recursively.",
+    )
+    sp_conv.add_argument(
+        "--expected-length",
+        type=int,
+        default=None,
+        help="Fail if sequences differ from this length (default: profile default).",
+    )
+    sp_conv.add_argument(
+        "--plan",
+        default=None,
+        help="Value for densegen__plan (default: profile default 'sigma70_mid').",
+    )
+    sp_conv.add_argument(
+        "--force",
+        action="store_true",
+        help="If dataset exists, destroy and recreate it.",
+    )
+    sp_conv.set_defaults(func=cmd_convert_legacy)
+
+    # ---------------- MERGE DATASETS ----------------
+    sp_merge = sp.add_parser(
+        "merge-datasets",
+        help="Merge rows from a source USR dataset into a destination dataset.",
+    )
+    sp_merge.add_argument("--dest", required=True, help="Destination dataset name")
+    sp_merge.add_argument("--src", required=True, help="Source dataset name")
+
+    mode = sp_merge.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--require-same-columns",
+        dest="require_same",
+        action="store_true",
+        help="Require identical column sets and types (strict).",
+    )
+    mode.add_argument(
+        "--union-columns",
+        dest="union_cols",
+        action="store_true",
+        help="Use column union (fill missing with NULLs). Default.",
+    )
+
+    sp_merge.add_argument(
+        "--if-duplicate",
+        dest="dup_policy",
+        choices=["error", "skip", "prefer-src", "prefer-dest"],
+        default="skip",
+        help="Row duplicate policy by id (default: skip).",
+    )
+    sp_merge.add_argument(
+        "--columns",
+        default="",
+        help="Optional CSV list of columns to keep (essentials always included).",
+    )
+    sp_merge.add_argument("--dry-run", action="store_true")
+    sp_merge.add_argument("-y", "--yes", action="store_true", help="Assume yes")
+    sp_merge.add_argument("--note", default="", help="Note to write into .events.log")
+    sp_merge.set_defaults(func=cmd_merge_datasets)
+
+    sp_merge.add_argument(
+        "--coerce-overlap",
+        choices=["none", "to-dest"],
+        default="to-dest",
+        help="If types differ on overlapping columns, attempt safe coercion to the "
+        "destination column type (JSON->struct/list, numeric strings->numbers).",
+    )
+
     # ---------------- diff/status/pull/push ----------------
     def add_sync_common(p_: argparse.ArgumentParser):
         p_.add_argument("dataset")
@@ -271,30 +407,49 @@ def cmd_init(args):
 
 def cmd_import(args):
     d = Dataset(args.root, args.dataset)
-    n = (
-        d.import_csv(
-            args.path, default_bio_type=args.bio_type, default_alphabet=args.alphabet
-        )
-        if args.source_format == "csv"
-        else d.import_jsonl(
-            args.path, default_bio_type=args.bio_type, default_alphabet=args.alphabet
-        )
+    in_path = _resolve_path_anywhere(args.path)
+    if args.source_format == "csv":
+        df = pd.read_csv(in_path)
+    else:
+        df = pd.read_json(in_path, lines=True)
+    n = d.import_rows(
+        df,
+        default_bio_type=args.bio_type,
+        default_alphabet=args.alphabet,
+        source=str(in_path),
     )
     print(f"Imported {n} records into {d.name}")
+    try:
+        cmd = f"usr import {args.dataset} --from {args.source_format} --path {in_path} --bio-type {args.bio_type} --alphabet {args.alphabet}"  # noqa
+        d.append_meta_note(f"Imported {n} records from {in_path}", cmd)
+    except Exception:
+        pass
 
 
 def cmd_attach(args):
     d = Dataset(args.root, args.dataset)
+    in_path = _resolve_path_anywhere(args.path)
     cols = [c.strip() for c in args.columns.split(",")] if args.columns else None
-    n = d.attach(
-        args.path,
+    n = d.attach_columns(  # friendly alias
+        in_path,
         namespace=args.namespace,
         id_col=args.id_col,
         columns=cols,
         allow_overwrite=bool(args.allow_overwrite),
         note=args.note,
     )
-    print(f"Attached {n} rows worth of {args.namespace} columns into {d.name}")
+    print(
+        f"Attached {n} matched row(s) of {args.namespace} columns into {d.name} "
+        f"(input file: {in_path})"
+    )
+    try:
+        cols = args.columns or "(all columns)"
+        cmd = f'usr attach {args.dataset} --path {in_path} --namespace {args.namespace} --id-col {args.id_col} --columns "{cols}"'  # noqa
+        d.append_meta_note(
+            f"Attached columns under '{args.namespace}' ({n} row match)", cmd
+        )
+    except Exception:
+        pass
 
 
 def cmd_info(args):
@@ -345,6 +500,33 @@ def cmd_snapshot(args):
     d = Dataset(args.root, args.dataset)
     d.snapshot()
     print(f"Snapshot saved under {d.snapshot_dir}")
+    try:
+        d.append_meta_note("Snapshot saved", f"usr snapshot {args.dataset}")
+    except Exception:
+        pass
+
+
+def cmd_convert_legacy(args):
+    # Resolve each provided path robustly (supports repo-relative and package-relative)
+    in_paths = [_resolve_path_anywhere(p) for p in args.paths]
+
+    stats = convert_legacy(
+        dataset_root=args.root,
+        dataset_name=args.dataset,
+        pt_paths=in_paths,
+        profile=profile_60bp_dual_promoter(),  # current supported profile
+        expected_length=args.expected_length,
+        plan_override=args.plan,
+        force=bool(args.force),
+    )
+
+    msg = (
+        f"Converted {stats.rows} row(s) from {stats.files} file(s) "
+        f"into dataset '{args.dataset}'."
+    )
+    if stats.skipped_bad_len:
+        msg += f" Skipped (length≠expected): {stats.skipped_bad_len}."
+    print(msg)
 
 
 # ---------- make-mock ----------
@@ -356,7 +538,7 @@ def cmd_make_mock(args):
         y_dim=int(args.y_dim),
         seed=int(args.seed),
         namespace=str(args.namespace),
-        csv_path=args.from_csv if args.from_csv else None,
+        csv_path=_resolve_path_anywhere(args.from_csv) if args.from_csv else None,
     )
     created = create_mock_dataset(args.root, args.dataset, spec, force=bool(args.force))
     print(
@@ -364,6 +546,16 @@ def cmd_make_mock(args):
         f"{spec.namespace}__x_representation[{spec.x_dim}] and {spec.namespace}__label_vec8[{spec.y_dim}]"
         + (" (from CSV)" if args.from_csv else " (random sequences)")
     )
+    try:
+        src = (
+            f"--from-csv {spec.csv_path}"
+            if spec.csv_path
+            else f"--length {spec.length}"
+        )
+        cmd = f"usr make-mock {args.dataset} --n {spec.n} {src} --namespace {spec.namespace} --x-dim {spec.x_dim} --y-dim {spec.y_dim}"  # noqa
+        Dataset(args.root, args.dataset).append_meta_note("Created mock dataset", cmd)
+    except Exception:
+        pass
 
 
 # ---------- add-demo-cols ----------
@@ -381,6 +573,73 @@ def cmd_add_demo(args):
         f"Added demo columns to {n} rows in '{args.dataset}' "
         f"({args.namespace}__x_representation[{args.x_dim}], {args.namespace}__label_vec8[{args.y_dim}])."
     )
+    try:
+        cmd = f"usr add-demo-cols {args.dataset} --x-dim {args.x_dim} --y-dim {args.y_dim} --namespace {args.namespace}"
+        Dataset(args.root, args.dataset).append_meta_note("Added demo columns", cmd)
+    except Exception:
+        pass
+
+
+# ---------- MERGE DATASETS ----------
+def _policy_from_str(s: str) -> MergePolicy:
+    return {
+        "error": MergePolicy.ERROR,
+        "skip": MergePolicy.SKIP,
+        "prefer-src": MergePolicy.PREFER_SRC,
+        "prefer-dest": MergePolicy.PREFER_DEST,
+    }[s]
+
+
+def cmd_merge_datasets(args):
+    cols_subset = (
+        [c.strip() for c in args.columns.split(",") if c.strip()]
+        if args.columns
+        else None
+    )
+    mode = (
+        MergeColumnsMode.REQUIRE_SAME if args.require_same else MergeColumnsMode.UNION
+    )
+    policy = _policy_from_str(args.dup_policy)
+
+    preview = merge_usr_to_usr(
+        root=args.root,
+        dest=args.dest,
+        src=args.src,
+        columns_mode=mode,
+        duplicate_policy=policy,
+        columns_subset=cols_subset,
+        dry_run=bool(args.dry_run),
+        assume_yes=bool(args.yes),
+        note=args.note or "",
+        overlap_coercion=("to-dest" if args.coerce_overlap == "to-dest" else "none"),
+    )
+
+    # Always print a compact summary
+    action = "DRY-RUN" if args.dry_run else "MERGED"
+    print(
+        f"[{action}] dest='{args.dest}'  src='{args.src}'  "
+        f"rows_src={preview.src_rows}  "
+        f"duplicates_total={preview.duplicates_total}  "
+        f"duplicates_skipped={preview.duplicates_skipped}  "
+        f"duplicates_replaced={preview.duplicates_replaced}  "
+        f"rows_added={preview.new_rows}  "
+        f"dest_rows: {preview.dest_rows_before} → {preview.dest_rows_after}  "
+        f"columns(total={preview.columns_total}, overlap={preview.overlapping_columns})  "
+        f"dup_policy={preview.duplicate_policy.value}"
+    )
+    if not args.dry_run:
+        try:
+            cmd = (
+                f"usr merge-datasets --dest {args.dest} --src {args.src} "
+                f"{'--require-same-columns' if args.require_same else '--union-columns'} "
+                f"--if-duplicate {args.dup_policy}"
+            )
+            Dataset(args.root, args.dest).append_meta_note(
+                f"Merged from '{args.src}' → '{args.dest}' (added {preview.new_rows} rows; dup_policy={preview.duplicate_policy.value})",  # noqa
+                cmd,
+            )
+        except Exception:
+            pass
 
 
 # ---------- remotes commands ----------
@@ -453,7 +712,7 @@ def _print_diff(summary):
     eq = "==" if (pl.sha256 and pr.sha256 and pl.sha256 == pr.sha256) else "≠"
     print(f"Primary sha: {pl.sha256 or '?'} {eq} {pr.sha256 or '?'}")
     print(
-        "meta.yaml   mtime: "
+        "meta.md     mtime: "
         f"{summary.meta_local_mtime or '-'}  →  {summary.meta_remote_mtime or '-'}"
     )
     delta_evt = max(0, summary.events_remote_lines - summary.events_local_lines)

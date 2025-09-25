@@ -23,7 +23,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -42,8 +42,8 @@ from .normalize import compute_id, normalize_sequence  # case-preserving
 from .schema import ARROW_SCHEMA, REQUIRED_COLUMNS
 
 RECORDS = "records.parquet"
-SNAPDIR = ".snapshots"
-META_YAML = "meta.yaml"
+SNAPDIR = "_snapshots"  # standardized
+META_MD = "meta.md"
 EVENTS_LOG = ".events.log"
 
 _NS_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -76,21 +76,22 @@ class Dataset:
 
     @property
     def meta_path(self) -> Path:
-        return self.dir / META_YAML
+        return self.dir / META_MD
 
     @property
     def events_path(self) -> Path:
         return self.dir / EVENTS_LOG
-    
+
     # ---- quick stats for CLI and sync ----
     def stats(self):
         """Return local primary FileStat (sha/size/rows/cols/mtime)."""
         from .diff import parquet_stats
+
         return parquet_stats(self.records_path)
 
     # ---- lifecycle ----
 
-    def init(self, source: str = "") -> None:
+    def init(self, source: str = "", notes: str = "") -> None:
         """Create a new, empty dataset directory with canonical schema."""
         self.dir.mkdir(parents=True, exist_ok=True)
         if self.records_path.exists():
@@ -99,14 +100,36 @@ class Dataset:
             [pa.array([], type=f.type) for f in ARROW_SCHEMA], schema=ARROW_SCHEMA
         )
         write_parquet_atomic(empty, self.records_path, self.snapshot_dir)
-        meta = (
-            f"name: {self.name}\ncreated_at: {now_utc()}\nsource: {source}\n"
-            "notes: \nschema: USR v1\n"
+        ts = now_utc()
+        date = ts.split("T")[0]
+        meta_md = (
+            f"name: {self.name}\n"
+            f"created_at: {ts}\n"
+            f"source: {source}\n"
+            f"notes: {notes}\n"
+            f"schema: USR v1\n\n"
+            f"### Updates ({date})\n"
+            f"- {ts}: initialized dataset.\n"
         )
-        self.meta_path.write_text(meta, encoding="utf-8")
+        self.meta_path.write_text(meta_md, encoding="utf-8")
         append_event(
             self.events_path, {"action": "init", "dataset": self.name, "source": source}
         )
+
+    # --- lightweight, best-effort scratch-pad logging in meta.md ---
+    def append_meta_note(self, title: str, code_block: Optional[str] = None) -> None:
+        ts = now_utc()
+        self.dir.mkdir(parents=True, exist_ok=True)
+        if not self.meta_path.exists():
+            # create minimal header if missing
+            hdr = f"name: {self.name}\ncreated_at: {ts}\nsource: \nnotes: \nschema: USR v1\n\n### Updates ({ts.split('T')[0]})\n"  # noqa
+            self.meta_path.write_text(hdr, encoding="utf-8")
+        with self.meta_path.open("a", encoding="utf-8") as f:
+            f.write(f"- {ts}: {title}\n")
+            if code_block:
+                f.write("```bash\n")
+                f.write(code_block.strip() + "\n")
+                f.write("```\n")
 
     def _require_exists(self) -> None:
         if not self.records_path.exists():
@@ -148,6 +171,140 @@ class Dataset:
 
     # ---- ingest ----
 
+    def import_rows(
+        self,
+        rows: Union[pd.DataFrame, Sequence[Dict[str, object]]],
+        *,
+        default_bio_type: str = "dna",
+        default_alphabet: str = "dna_4",
+        source: Optional[str] = None,
+        strict_id_check: bool = True,
+    ) -> int:
+        """
+        Import sequence rows (DataFrame or sequence of dicts).
+
+        Expectations per row (case-preserving):
+          - 'sequence' (required): string; trimmed; validated by (bio_type, alphabet)
+          - 'bio_type'  (optional): defaults to `default_bio_type`
+          - 'alphabet'  (optional): defaults to `default_alphabet`
+          - 'id'        (optional): if present and `strict_id_check`, must equal
+                                   sha1(bio_type|sequence_norm)
+          - 'created_at'(optional): if missing, set to now (UTC)
+          - 'source'    (optional): defaults to `source` param or ""
+
+        Behavior:
+          - computes 'length' from normalized sequence
+          - rejects duplicate ids within incoming
+          - rejects ids that already exist on disk (append-only semantics)
+          - atomic write + snapshot + event log
+        """
+        self._require_exists()
+
+        # Normalize input → DataFrame
+        if isinstance(rows, pd.DataFrame):
+            df_in = rows.copy()
+        else:
+            df_in = pd.DataFrame(list(rows) if rows else [])
+
+        if "sequence" not in df_in.columns:
+            raise SchemaError("Missing required column: 'sequence'.")
+
+        # Default columns
+        bio = (
+            df_in["bio_type"].astype(str)
+            if "bio_type" in df_in.columns
+            else pd.Series([default_bio_type] * len(df_in), dtype="string")
+        )
+        alph = (
+            df_in["alphabet"].astype(str)
+            if "alphabet" in df_in.columns
+            else pd.Series([default_alphabet] * len(df_in), dtype="string")
+        )
+
+        # Compute normalized sequences + ids + lengths
+        ids, seqs, lens = [], [], []
+        for s, bt, ab in zip(df_in["sequence"], bio, alph):
+            s_norm = normalize_sequence(str(s), str(bt), str(ab))
+            seqs.append(s_norm)
+            ids.append(compute_id(str(bt), s_norm))
+            lens.append(len(s_norm))
+
+        # Optional user-supplied ids must match
+        if "id" in df_in.columns and strict_id_check:
+            bad_idx = [
+                i
+                for i, (given, want) in enumerate(zip(df_in["id"].astype(str), ids))
+                if str(given) != str(want)
+            ]
+            if bad_idx:
+                raise SchemaError(
+                    f"'id' mismatch for {len(bad_idx)} row(s); ids must equal sha1(bio_type|sequence_norm)."
+                )
+
+        # created_at: robust tz-aware timestamp
+        if "created_at" in df_in.columns:
+            created = pd.to_datetime(df_in["created_at"], utc=True)
+        else:
+            ts_utc = pd.Timestamp.now(tz="UTC")
+            created = pd.Series([ts_utc] * len(df_in), dtype="datetime64[ns, UTC]")
+
+        # source column: prefer explicit param; fall back to per-row source or ""
+        src_str = source if source is not None else ""
+        if "source" in df_in.columns:
+            src_col = df_in["source"].astype(str)
+            src_vals = [src_str if src_str else s for s in src_col.tolist()]
+        else:
+            src_vals = [src_str] * len(df_in)
+
+        # Build outgoing Pandas frame in canonical order/types
+        out_df = pd.DataFrame(
+            {
+                "id": ids,
+                "bio_type": bio.astype(str).tolist(),
+                "sequence": seqs,
+                "alphabet": alph.astype(str).tolist(),
+                "length": lens,
+                "source": src_vals,
+                "created_at": created,
+            }
+        )
+
+        # Duplicate ids within incoming?
+        if len(out_df["id"]) != out_df["id"].nunique():
+            raise DuplicateIDError(
+                "Duplicate ids in incoming rows (likely duplicate sequences)."
+            )
+
+        incoming = pa.Table.from_pandas(
+            out_df, schema=ARROW_SCHEMA, preserve_index=False
+        )
+
+        # Merge with existing (append-only; reject collisions)
+        if self.records_path.exists():
+            existing = read_parquet(self.records_path)
+            existing_ids = set(existing.column("id").to_pylist())
+            inter = existing_ids.intersection(set(out_df["id"].tolist()))
+            if inter:
+                raise DuplicateIDError(
+                    f"Duplicate ids already present in dataset: {len(inter)} conflict(s)."
+                )
+            combined = pa.concat_tables([existing, incoming], promote_options="default")
+            write_parquet_atomic(combined, self.records_path, self.snapshot_dir)
+        else:
+            write_parquet_atomic(incoming, self.records_path, self.snapshot_dir)
+
+        append_event(
+            self.events_path,
+            {
+                "action": "import_rows",
+                "dataset": self.name,
+                "n": len(out_df),
+                "source_param": source or "",
+            },
+        )
+        return int(len(out_df))
+
+    # Legacy file import entry points now route to import_rows (no special logic)
     def import_csv(
         self,
         csv_path: Path,
@@ -155,21 +312,13 @@ class Dataset:
         default_alphabet="dna_4",
         source: Optional[str] = None,
     ) -> int:
-        """Import sequences from CSV; trims, validates, computes ids, appends."""
         df = pd.read_csv(csv_path)
-        n = self._import_df(
-            df, default_bio_type, default_alphabet, source or str(csv_path)
+        return self.import_rows(
+            df,
+            default_bio_type=default_bio_type,
+            default_alphabet=default_alphabet,
+            source=source or str(csv_path),
         )
-        append_event(
-            self.events_path,
-            {
-                "action": "import_csv",
-                "dataset": self.name,
-                "path": str(csv_path),
-                "n": n,
-            },
-        )
-        return n
 
     def import_jsonl(
         self,
@@ -178,87 +327,13 @@ class Dataset:
         default_alphabet="dna_4",
         source: Optional[str] = None,
     ) -> int:
-        """Import sequences from JSONL (records)."""
         df = pd.read_json(jsonl_path, lines=True)
-        n = self._import_df(
-            df, default_bio_type, default_alphabet, source or str(jsonl_path)
+        return self.import_rows(
+            df,
+            default_bio_type=default_bio_type,
+            default_alphabet=default_alphabet,
+            source=source or str(jsonl_path),
         )
-        append_event(
-            self.events_path,
-            {
-                "action": "import_jsonl",
-                "dataset": self.name,
-                "path": str(jsonl_path),
-                "n": n,
-            },
-        )
-        return n
-
-    def _import_df(
-        self,
-        df: pd.DataFrame,
-        default_bio_type: str,
-        default_alphabet: str,
-        source: str,
-    ) -> int:
-        if "sequence" not in df.columns:
-            raise SchemaError("Missing required column: sequence")
-        bio = (
-            df["bio_type"]
-            if "bio_type" in df.columns
-            else pd.Series([default_bio_type] * len(df))
-        ).astype(str)
-        alph = (
-            df["alphabet"]
-            if "alphabet" in df.columns
-            else pd.Series([default_alphabet] * len(df))
-        ).astype(str)
-
-        ids, seqs, lens = [], [], []
-        for s, bt, ab in zip(df["sequence"], bio, alph):
-            s_norm = normalize_sequence(str(s), bt, ab)
-            seqs.append(s_norm)
-            ids.append(compute_id(bt, s_norm))
-            lens.append(len(s_norm))
-
-        # robust tz-aware timestamp for all pandas versions
-        ts_utc = pd.Timestamp.now(tz="UTC")
-        created = pd.Series([ts_utc] * len(df), dtype="datetime64[ns, UTC]")
-
-        out_df = pd.DataFrame(
-            {
-                "id": ids,
-                "bio_type": bio.tolist(),
-                "sequence": seqs,
-                "alphabet": alph.tolist(),
-                "length": lens,
-                "source": [source] * len(df),
-                "created_at": created,
-            }
-        )
-        incoming = pa.Table.from_pandas(
-            out_df, schema=ARROW_SCHEMA, preserve_index=False
-        )
-
-        if len(ids) != len(set(ids)):
-            raise DuplicateIDError(
-                "Duplicate ids in incoming data (likely duplicate sequences)."
-            )
-
-        if self.records_path.exists():
-            existing = read_parquet(self.records_path)
-            existing_ids = set(existing.column("id").to_pylist())
-            inter = existing_ids.intersection(set(ids))
-            if inter:
-                raise DuplicateIDError(
-                    f"Duplicate ids already present in dataset: {len(inter)} conflict(s)."
-                )
-            # pyarrow deprecation fix (replaces promote=True)
-            combined = pa.concat_tables([existing, incoming], promote_options="default")
-            write_parquet_atomic(combined, self.records_path, self.snapshot_dir)
-        else:
-            write_parquet_atomic(incoming, self.records_path, self.snapshot_dir)
-        return len(ids)
 
     # ---- generic attach ----
 
@@ -296,7 +371,7 @@ class Dataset:
         elif path.suffix.lower() in {".csv"}:
             inc = pd.read_csv(path)
         elif path.suffix.lower() in {".jsonl", ".json"}:
-            inc = pd.read_json(path, lines=path.suffix.lower().endswith("jsonl"))
+            inc = pd.read_json(path, lines=(path.suffix.lower() == ".jsonl"))
         else:
             raise SchemaError("Unsupported input format. Use parquet|csv|jsonl.")
         if id_col not in inc.columns:
@@ -311,26 +386,84 @@ class Dataset:
         if not attach_cols:
             return 0
 
-        # Parse JSON arrays (vectors) if given as strings
-        def _maybe_parse_json_array(x):
-            if isinstance(x, str) and x.strip().startswith("["):
+        # Parse JSON arrays/objects if given as strings (robust to whitespace and single quotes)
+        def _maybe_parse_json_str(x):
+            if not isinstance(x, str):
+                return x
+            s = x.strip()
+            if not s:
+                return x
+            # Fast path: JSON array/object
+            if s.startswith("[") or s.startswith("{"):
                 try:
-                    return json.loads(x)
+                    return json.loads(s)
                 except Exception:
+                    # try a very small fix for single-quoted CSV-y lists
+                    if s.startswith("[") and ("'" in s) and ('"' not in s):
+                        try:
+                            return json.loads(s.replace("'", '"'))
+                        except Exception:
+                            return x
                     return x
             return x
 
         work = inc[[id_col] + attach_cols].copy()
         for c in attach_cols:
-            work[c] = work[c].map(_maybe_parse_json_array)
+            work[c] = work[c].map(_maybe_parse_json_str)
 
         def target_name(c: str) -> str:
             return c if c.startswith(namespace + "__") else f"{namespace}__{c}"
 
         targets = [target_name(c) for c in attach_cols]
-        work.columns = ["id"] + targets
 
-        # Read existing once; check policy
+        # --- Map sequence → id if requested ---
+        existing_tbl = read_parquet(
+            self.records_path, columns=["id", "sequence", "bio_type"]
+        )
+        if id_col.lower() == "sequence":
+            seq_to_ids: Dict[str, List[str]] = {}
+            pair_to_id: Dict[tuple, str] = {}
+            # build maps from current dataset
+            ds_ids = existing_tbl.column("id").to_pylist()
+            ds_seqs = [
+                str(s).strip() for s in existing_tbl.column("sequence").to_pylist()
+            ]
+            ds_types = [str(bt) for bt in existing_tbl.column("bio_type").to_pylist()]
+            for rid, bt, seq in zip(ds_ids, ds_types, ds_seqs):
+                pair_to_id[(bt, seq)] = rid
+                seq_to_ids.setdefault(seq, []).append(rid)
+
+            incoming_seq = work[id_col].astype(str).map(lambda s: s.strip()).tolist()
+            incoming_type = (
+                inc["bio_type"].astype(str).tolist()
+                if "bio_type" in inc.columns
+                else [None] * len(incoming_seq)
+            )
+            resolved: List[Optional[str]] = []
+            for bt, seq in zip(incoming_type, incoming_seq):
+                rid: Optional[str] = None
+                if bt is not None and (bt, seq) in pair_to_id:
+                    rid = pair_to_id[(bt, seq)]
+                else:
+                    ids = seq_to_ids.get(seq, [])
+                    if len(ids) == 1:
+                        rid = ids[0]
+                    else:
+                        # ambiguous or missing → leave None (row will be dropped)
+                        rid = None
+                resolved.append(rid)
+
+            work.insert(0, "id", resolved)
+            work = work.drop(columns=[id_col])  # remove 'sequence' identifier column
+            # Drop rows that couldn't be matched to an existing id
+            work = work[work["id"].notna()].reset_index(drop=True)
+            # Rename incoming columns to namespaced targets (mirror the --id-col 'id' path)
+            work.columns = ["id"] + targets
+        else:
+            # keep provided 'id' as-is
+            work.columns = ["id"] + targets
+
+        # Read existing once; check policy (full schema)
         existing_tbl = read_parquet(self.records_path)
         existing_names = set(existing_tbl.schema.names)
 
@@ -363,12 +496,10 @@ class Dataset:
                 return False
             if isinstance(x, np.ndarray):
                 return False
-            # numpy/pandas scalar types OK here
             try:
                 res = pd.isna(x)
             except Exception:
                 return False
-            # pd.isna(np.array([...])) returns array -> guard
             if isinstance(res, (list, tuple, np.ndarray)):
                 return False
             return bool(res)
@@ -389,7 +520,6 @@ class Dataset:
             if pa.types.is_string(target_type):
                 coerced = [None if v is None else str(v) for v in cleaned]
                 return pa.array(coerced, type=target_type)
-            # list/struct or other complex: let Arrow accept cleaned Python values
             return pa.array(cleaned, type=target_type)
 
         def _infer_arrow(values: List) -> pa.Array:
@@ -403,7 +533,7 @@ class Dataset:
             return pa.array(cleaned)
 
         # id->value map per target (latest wins)
-        id_series = work["id"].tolist()
+        id_series = [str(r) for r in work["id"].tolist()]
         maps: Dict[str, Dict[str, object]] = {}
         for col in targets:
             colvals = work[col].tolist()
@@ -417,8 +547,7 @@ class Dataset:
         for col in targets:
             incoming_map = maps[col]
             if col in existing_names:
-                # Overwrite existing column
-                field = new_tbl.schema.field(col)  # deprec-safe
+                field = new_tbl.schema.field(col)
                 base_values = new_tbl.column(col).to_pylist()
                 for rid, v in incoming_map.items():
                     idx = pos.get(str(rid))
@@ -430,7 +559,6 @@ class Dataset:
                     col_idx, pa.field(col, arr.type, nullable=True), arr
                 )
             else:
-                # Brand new column
                 base_values = [None] * nrows
                 for rid, v in incoming_map.items():
                     idx = pos.get(str(rid))
@@ -459,6 +587,26 @@ class Dataset:
             },
         )
         return n_attached
+
+    # Friendly alias for didactic API name in README/examples
+    def attach_columns(
+        self,
+        path: Path,
+        namespace: str,
+        *,
+        id_col: str = "id",
+        columns: Optional[Iterable[str]] = None,
+        allow_overwrite: bool = False,
+        note: str = "",
+    ) -> int:
+        return self.attach(
+            path,
+            namespace,
+            id_col=id_col,
+            columns=columns,
+            allow_overwrite=allow_overwrite,
+            note=note,
+        )
 
     # ---- validation & utils ----
 
