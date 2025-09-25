@@ -26,9 +26,13 @@ app = typer.Typer(
 
 
 @app.callback()
-def _root_callback() -> None:
-    """Root callback (reserved for future global flags like --verbose)."""
-    os.environ.setdefault("OPAL_DEBUG", "0")
+def _root_callback(
+    debug: bool = typer.Option(
+        True, "--debug/--no-debug", help="Print full tracebacks on internal errors."
+    )
+) -> None:
+    """Root callback sets global debug behavior."""
+    os.environ["OPAL_DEBUG"] = "1" if debug else "0"
 
 
 def _build() -> typer.Typer:

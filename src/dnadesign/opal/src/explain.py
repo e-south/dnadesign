@@ -35,8 +35,8 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
     )
     info = {
         "round_index": round_k,
-        "representation_column_name": cfg.data.representation_column_name,
-        "label_source_column_name": cfg.data.label_source_column_name,
+        "x_column_name": cfg.data.x_column_name,
+        "y_column_name": cfg.data.y_column_name,
         "representation_vector_dimension": rep.x_dim,
         "model": {
             "name": cfg.training.models.name,

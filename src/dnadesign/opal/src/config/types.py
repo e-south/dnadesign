@@ -42,10 +42,8 @@ class PluginRef:
 @dataclass
 class DataBlock:
     location: DataLocation
-    # Accept x_column_name via the loader (aliases).
-    representation_column_name: str
-    # Accept y_column_name via the loader (aliases).
-    label_source_column_name: str
+    x_column_name: str
+    y_column_name: str
     y_expected_length: Optional[int] = None
     # plugin-configured transforms
     transforms_x: PluginRef = field(default_factory=lambda: PluginRef("identity", {}))
@@ -78,6 +76,8 @@ class TargetScalerCfg:
     minimum_labels_required: int = 5
     center_statistic: str = "median"
     scale_statistic: str = "iqr"
+
+
 @dataclass
 class TrainingBlock:
     # model plugin (e.g., random_forest)
@@ -116,9 +116,7 @@ class MetadataBlock:
 @dataclass
 class ScoringBlock:
     score_batch_size: int = 10_000
-    sort_stability: str = (
-        "(-opal__{slug}__r{round}__selection_score__{objective}, id)"
-    )
+    sort_stability: str = "(-opal__{slug}__r{round}__selection_score__{objective}, id)"
 
 
 @dataclass

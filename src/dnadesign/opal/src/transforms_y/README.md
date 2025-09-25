@@ -1,6 +1,6 @@
 # OPAL Transform Strategies
 
-Transforms convert raw measurement tables (often *tidy*, long format) into the
+Transforms convert raw measurement tables into the
 campaign’s canonical **Y** label **per design**.
 
 ## Contract
@@ -13,9 +13,8 @@ def transform_fn(df_tidy: pd.DataFrame, *, params: dict, setpoint_vector: list[f
 
 #### Input:
 
-- `df_tidy`: raw measurements (e.g., per design/state/channel/replicate).
+- `df_tidy`: raw measurements (e.g., design or campaign-specific).
 - `params`: transform-specific schema and pre-processing controls (from YAML).
-- `setpoint_vector`: single source of truth for logic setpoint (from objective).
 
 #### Output:
 

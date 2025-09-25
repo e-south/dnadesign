@@ -23,7 +23,12 @@ from ._common import internal_error, json_out, resolve_config_path, store_from_c
 
 
 @cli_command(
-    "ingest-y", help="Ingest tidy CSV → Y (preview + confirmation; strict checks)."
+    "ingest-y",
+    help=(
+        "Ingest tidy CSV → Y (preview + confirmation; strict checks). "
+        "If the CSV lacks an 'id' column, OPAL resolves rows by 'sequence'. "
+        "IDs are never inferred from other columns."
+    ),
 )
 def cmd_ingest_y(
     config: Path = typer.Option(
@@ -45,21 +50,60 @@ def cmd_ingest_y(
 ):
     """
     Behavior:
-      • Reads transform+params from YAML (overridable with flags).
-      • Validates strict preflights (single timepoint, quartet completeness, etc).
-      • Always prints a preview (counts + sample), then asks to proceed.
-      • For NEW ids: requires essentials (sequence, bio_type, alphabet, X).
-      • Idempotent per (id, round): if already labeled with a different Y → abort.
+      • Uses transform from YAML (overridable via flags).
+      • Prints a preview (counts + sample) before any write.
+      • If CSV has no 'id', OPAL resolves by 'sequence':
+          - If sequence exists → use that row's id.
+          - If already labeled in this campaign → fail fast.
+          - If not present → add a new row with essentials and a generated id.
+      • History is immutable: per-(id, round) conflicts cause an error.
     """
     try:
         cfg = load_config(resolve_config_path(config))
         store = store_from_cfg(cfg)
         df = store.load()
 
+        # Resolve CSV path with helpful fallbacks
+        def _resolve_csv(p: Path) -> Path:
+            if p.is_absolute() and p.exists():
+                return p
+            # try CWD
+            q = Path.cwd() / p
+            if q.exists():
+                return q
+            # try workdir
+            wd = Path(cfg.campaign.workdir)
+            q = wd / p
+            if q.exists():
+                return q
+            # try common input locations
+            candidates = [
+                wd / "inputs" / p.name,
+                wd / "inputs" / f"r{round}" / p.name,
+                wd / "inputs" / f"r{round}" / str(p),
+            ]
+            for c in candidates:
+                if c.exists():
+                    return c
+            # last resort: search by basename under inputs/
+            matches = list((wd / "inputs").rglob(p.name))
+            if len(matches) == 1:
+                return matches[0]
+            hint = (
+                ("\n  suggestions:\n    - " + "\n    - ".join(map(str, matches[:10])))
+                if matches
+                else ""
+            )
+            raise OpalError(
+                f"CSV not found: {p}.\n  cwd={Path.cwd()}\n  workdir={wd}{hint}"
+            )
+
+        csv_path = _resolve_csv(Path(csv))
+        # Load with format sniffing
         csv_df = (
-            pd.read_parquet(csv)
-            if csv.suffix.lower() in (".pq", ".parquet")
-            else pd.read_csv(csv)
+            pd.read_parquet(csv_path)
+            if csv_path.suffix.lower() in (".pq", ".parquet")
+            else pd.read_csv(csv_path)
         )
 
         # choose effective transform name & params
@@ -82,11 +126,19 @@ def cmd_ingest_y(
             transform_name=t_name,
             transform_params=t_params,
             y_expected_length=cfg.data.y_expected_length,
-            setpoint_vector=cfg.objective.objective.params.get("setpoint_vector", [0,0,0,1]),
+            setpoint_vector=cfg.objective.objective.params.get(
+                "setpoint_vector", [0, 0, 0, 1]
+            ),
         )
 
-        # PREVIEW: counts + head (no flag, always printed)
-        json_out({"preview": preview.__dict__})
+        # PREVIEW
+        json_out(
+            {
+                "preview": preview.__dict__,
+                "sample": labels_df.head(5).to_dict(orient="records"),
+                "source_csv": str(csv_path),
+            }
+        )
 
         # Prompt unless --yes
         if not yes:
@@ -99,11 +151,16 @@ def cmd_ingest_y(
                 print_stdout("Aborted by user.")
                 return
 
-        # Ensure rows exist for NEW ids (essentials pulled from the CSV if present)
-        df = store.ensure_rows_exist(df, labels_df["id"].tolist(), csv_df)
+        # Ensure rows exist / resolve IDs (by sequence when id is absent)
+        df = store.ensure_rows_exist(df, labels_df, csv_df)
 
-        # Append labels and save atomically
-        df2 = store.append_labels_from_df(df, labels_df, r=round)
+        # Append labels and save atomically (fail if the sample already has ANY labels)
+        df2 = store.append_labels_from_df(
+            df,
+            labels_df[["id", "y"]],
+            r=round,
+            fail_if_any_existing_labels=True,
+        )
         store.save_atomic(df2)
 
         json_out(
@@ -111,10 +168,9 @@ def cmd_ingest_y(
                 "ok": True,
                 "round": int(round),
                 "labels_ingested": int(len(labels_df)),
-                "y_column": cfg.data.label_source_column_name,
+                "y_column": cfg.data.y_column_name,
             }
         )
-
     except OpalError as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(code=e.exit_code)

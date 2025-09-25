@@ -45,10 +45,8 @@ def cmd_predict(
                 else pd.read_csv(input_path)
             )
         )
-        if cfg.data.representation_column_name not in df.columns:
-            raise OpalError(
-                f"Input missing representation column: {cfg.data.representation_column_name}"
-            )
+        if cfg.data.x_column_name not in df.columns:
+            raise OpalError(f"Input missing X column: {cfg.data.x_column_name}")
         preds = run_predict_ephemeral(store, df, model_path)
         if out_path:
             if out_path.suffix.lower() == ".csv":

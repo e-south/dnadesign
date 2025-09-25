@@ -11,6 +11,7 @@ Dunlop Lab
 """
 
 from .loader import load_config  # noqa: F401
-from .types import RootConfig  # noqa: F401
+from .types import LocationLocal, LocationUSR, RootConfig  # noqa: F401
 
-__all__ = ["load_config", "RootConfig"]
+# Re-export common config types for convenient imports in the CLI layer.
+__all__ = ["load_config", "RootConfig", "LocationLocal", "LocationUSR"]

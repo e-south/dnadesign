@@ -34,6 +34,21 @@ def cmd_init(
         cfg = load_config(cfg_path)
         workdir = Path(cfg.campaign.workdir)
         ensure_dir(workdir / "outputs")
+        ensure_dir(workdir / "inputs")
+
+        # Write a workspace marker so future commands can resolve fast from any child
+        marker_dir = workdir / ".opal"
+        ensure_dir(marker_dir)
+        # store the path relative to the marker for portability
+        rel = cfg_path if cfg_path.is_absolute() else cfg_path.resolve()
+        try:
+            rel = rel.relative_to(marker_dir)
+        except Exception:
+            try:
+                rel = rel.relative_to(workdir)
+            except Exception:
+                pass
+        (marker_dir / "config").write_text(str(rel))
 
         store = store_from_cfg(cfg)
         st = CampaignState(
@@ -49,8 +64,8 @@ def cmd_init(
                     else ""
                 ),
             },
-            representation_column_name=cfg.data.representation_column_name,
-            label_source_column_name=cfg.data.label_source_column_name,
+            x_column_name=cfg.data.x_column_name,
+            y_column_name=cfg.data.y_column_name,
             representation_transform={
                 "name": cfg.data.transforms_x.name,
                 "params": cfg.data.transforms_x.params,

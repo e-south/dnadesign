@@ -324,8 +324,8 @@ def cmd_run(
             st.campaign_slug = cfg.campaign.slug
             st.campaign_name = cfg.campaign.name
             st.workdir = str(workdir.resolve())
-            st.representation_column_name = cfg.data.representation_column_name
-            st.label_source_column_name = cfg.data.label_source_column_name
+            st.x_column_name = cfg.data.x_column_name
+            st.y_column_name = cfg.data.y_column_name
             st.representation_vector_dimension = rep.x_dim
             st.representation_transform = {
                 "name": cfg.data.transforms_x.name,

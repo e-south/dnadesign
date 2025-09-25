@@ -109,6 +109,7 @@ dnadesign/opal/
 │       ├─ campaign.yaml                    # configuration (plugin refs + policies)
 │       ├─ state.json                       # append-only campaign state across rounds
 │       ├─ campaign.log.jsonl               # high-level event log
+│       ├─ inputs/                          # add sequence:experimental label data here
 │       ├─ outputs/
 │       │   └─ round_<k>/
 │       │       ├─ model.joblib             # frozen model (includes scaler state)
@@ -131,7 +132,7 @@ dnadesign/opal/
 ### Key blocks
 
 * `campaign`: `name`, `slug`, `workdir`
-* `data`: `location` (USR/local), `representation_column_name`, `label_source_column_name`, `y_expected_length`
+* `data`: `location` (USR/local), `x_column_name`, `y_column_name`, `y_expected_length`
 * `transforms_x`: `{ name, params }` (raw X → model-ready X)
 * `transforms_y`: `{ name, params }` (tidy CSV → model-ready Y)
 * `models`: `{ name, params }`
@@ -146,8 +147,8 @@ campaign: { name: My Campaign, slug: my_campaign, workdir: src/dnadesign/opal/ca
 
 data:
   location: { kind: local, path: campaigns/my_campaign/records.parquet }
-  representation_column_name: rep__vec
-  label_source_column_name: y
+  x_column_name: rep__vec
+  y_column_name: y
   y_expected_length: 8
 
 transforms_x: { name: identity,            params: {} }

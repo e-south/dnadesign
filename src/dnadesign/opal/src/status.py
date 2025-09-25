@@ -31,8 +31,8 @@ def build_status(
         "campaign_slug": st.campaign_slug,
         "campaign_name": st.campaign_name,
         "workdir": st.workdir,
-        "representation_column_name": st.representation_column_name,
-        "label_source_column_name": st.label_source_column_name,
+        "x_column_name": st.x_column_name,
+        "y_column_name": st.y_column_name,
         "representation_vector_dimension": st.representation_vector_dimension,
         "rounds_count": len(st.rounds),
     }

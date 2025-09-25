@@ -11,13 +11,10 @@ Default layout (editable install):
       ├─ datasets/             # <-- default root for dataset folders
       │    └─ <dataset_name>/
       │         ├─ records.parquet
-      │         ├─ meta.yaml
-      │         └─ .snapshots/
+      │         └─ _snapshots/
       └─ template_demo/        # example CSVs for the README walkthrough
 
-You can override the root with --root (or just cd into the datasets/ dir and use ".").
-
-If you installed the console script alias (see pyproject.toml), you may also run:
+If the console script alias is installed (see pyproject.toml), you may also run:
     usr ls
     USR head mock_dataset -n 5
 
@@ -36,6 +33,7 @@ import pyarrow.parquet as pq
 from .config import SSHRemoteConfig, get_remote, load_all, save_remote
 from .dataset import Dataset
 from .errors import SequencesError, UserAbort
+from .mock import MockSpec, add_demo_columns, create_mock_dataset
 from .sync import SyncOptions, execute_pull, execute_push, plan_diff
 
 
@@ -44,9 +42,7 @@ def main() -> None:
         prog="usr",
         description="USR CLI (Parquet-backed datasets; includes SSH remotes sync).",
     )
-
     default_root = (Path(__file__).resolve().parents[1] / "datasets").resolve()
-
     p.add_argument(
         "--root",
         type=Path,
@@ -55,7 +51,7 @@ def main() -> None:
     )
     sp = p.add_subparsers(dest="cmd", required=True)
 
-    # ---------------- core dataset commands (unchanged) ----------------
+    # ---------------- core dataset commands ----------------
     sp_ls = sp.add_parser("ls", help="List datasets under root")
     sp_ls.set_defaults(func=cmd_ls)
 
@@ -125,7 +121,58 @@ def main() -> None:
     sp_snap.add_argument("dataset")
     sp_snap.set_defaults(func=cmd_snapshot)
 
-    # ---------------- new: remotes management ----------------
+    # ---------------- make-mock ----------------
+    sp_mock = sp.add_parser(
+        "make-mock",
+        help="Create a mock dataset (optionally from CSV) with demo columns",
+    )
+    sp_mock.add_argument("dataset")
+    sp_mock.add_argument(
+        "--n",
+        type=int,
+        default=100,
+        help="Number of rows (ignored if --from-csv is shorter)",
+    )
+    sp_mock.add_argument(
+        "--length",
+        type=int,
+        default=60,
+        help="DNA length for RANDOM sequences (ignored with --from-csv)",
+    )
+    sp_mock.add_argument(
+        "--x-dim", type=int, default=512, help="Length of demo X vector"
+    )
+    sp_mock.add_argument("--y-dim", type=int, default=8, help="Length of demo Y vector")
+    sp_mock.add_argument("--seed", type=int, default=7, help="Random seed")
+    sp_mock.add_argument(
+        "--namespace",
+        default="demo",
+        help="Namespace for derived columns (default 'demo')",
+    )
+    sp_mock.add_argument(
+        "--from-csv",
+        type=Path,
+        default=None,
+        help="Use sequences from a CSV (must have 'sequence' column)",
+    )
+    sp_mock.add_argument(
+        "--force", action="store_true", help="Overwrite existing dataset if present"
+    )
+    sp_mock.set_defaults(func=cmd_make_mock)
+
+    # ---------------- add-demo-cols ----------------
+    sp_add = sp.add_parser(
+        "add-demo-cols", help="Add demo vectors/labels to an existing dataset"
+    )
+    sp_add.add_argument("dataset")
+    sp_add.add_argument("--x-dim", type=int, default=512)
+    sp_add.add_argument("--y-dim", type=int, default=8)
+    sp_add.add_argument("--seed", type=int, default=7)
+    sp_add.add_argument("--namespace", default="demo")
+    sp_add.add_argument("--allow-overwrite", action="store_true")
+    sp_add.set_defaults(func=cmd_add_demo)
+
+    # ---------------- remotes management ----------------
     sp_r = sp.add_parser("remotes", help="List/Add/Show SSH remotes")
     sp_r_sub = sp_r.add_subparsers(dest="r_cmd", required=False)
 
@@ -145,7 +192,7 @@ def main() -> None:
     sp_r_add.add_argument("--ssh-key-env", default=None)
     sp_r_add.set_defaults(func=cmd_remotes_add)
 
-    # ---------------- new: diff/status/pull/push ----------------
+    # ---------------- diff/status/pull/push ----------------
     def add_sync_common(p_: argparse.ArgumentParser):
         p_.add_argument("dataset")
         p_.add_argument("--remote", "--from", "--to", dest="remote", required=True)
@@ -181,9 +228,12 @@ def main() -> None:
     except SequencesError as e:
         print(f"ERROR: {e}")
         raise SystemExit(2)
+    except FileExistsError as e:
+        print(f"ERROR: {e}")
+        raise SystemExit(3)
 
 
-# ---------- existing simple commands ----------
+# ---------- helpers & command impls ----------
 
 
 def list_datasets(root: Path):
@@ -295,6 +345,42 @@ def cmd_snapshot(args):
     d = Dataset(args.root, args.dataset)
     d.snapshot()
     print(f"Snapshot saved under {d.snapshot_dir}")
+
+
+# ---------- make-mock ----------
+def cmd_make_mock(args):
+    spec = MockSpec(
+        n=int(args.n),
+        length=int(args.length),
+        x_dim=int(args.x_dim),
+        y_dim=int(args.y_dim),
+        seed=int(args.seed),
+        namespace=str(args.namespace),
+        csv_path=args.from_csv if args.from_csv else None,
+    )
+    created = create_mock_dataset(args.root, args.dataset, spec, force=bool(args.force))
+    print(
+        f"Created mock dataset '{args.dataset}' with {created} rows, "
+        f"{spec.namespace}__x_representation[{spec.x_dim}] and {spec.namespace}__label_vec8[{spec.y_dim}]"
+        + (" (from CSV)" if args.from_csv else " (random sequences)")
+    )
+
+
+# ---------- add-demo-cols ----------
+def cmd_add_demo(args):
+    n = add_demo_columns(
+        args.root,
+        args.dataset,
+        x_dim=int(args.x_dim),
+        y_dim=int(args.y_dim),
+        seed=int(args.seed),
+        namespace=str(args.namespace),
+        allow_overwrite=bool(args.allow_overwrite),
+    )
+    print(
+        f"Added demo columns to {n} rows in '{args.dataset}' "
+        f"({args.namespace}__x_representation[{args.x_dim}], {args.namespace}__label_vec8[{args.y_dim}])."
+    )
 
 
 # ---------- remotes commands ----------

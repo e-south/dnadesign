@@ -15,14 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 import yaml
-from pydantic import (
-    AliasChoices,
-    BaseModel,
-    ConfigDict,
-    Field,
-    ValidationError,
-    field_validator,
-)
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from typing_extensions import Literal
 
 from .plugin_schemas import validate_params
@@ -89,13 +82,8 @@ class PPluginRef(BaseModel):
 class PData(BaseModel):
     model_config = ConfigDict(extra="forbid")
     location: PLocation
-    # Support both the old and the clearer new names via alias choices.
-    representation_column_name: str = Field(
-        validation_alias=AliasChoices("x_column_name", "representation_column_name")
-    )
-    label_source_column_name: str = Field(
-        validation_alias=AliasChoices("y_column_name", "label_source_column_name")
-    )
+    x_column_name: str
+    y_column_name: str
     y_expected_length: Optional[int] = None
 
 
@@ -132,7 +120,7 @@ class PScoring(BaseModel):
     model_config = ConfigDict(extra="forbid")
     score_batch_size: int = 10_000
     sort_stability: str = (
-        "(-opal__{slug}__r{round}__selection_score__{objective}, id)"
+        "(-opal__{{slug}}__r{{round}}__selection_score__{objective}, id)"
     )
 
 
@@ -147,7 +135,6 @@ class PSafety(BaseModel):
 
 class PMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    objective: str = "maximize"
     notes: str = ""
 
 
@@ -174,10 +161,9 @@ def _coerce_location(loc: PLocation):
 
 
 def _auto_sort_stability(tpl: str, objective_name: str) -> str:
-    # If template references __selection_score__ but omits the chosen objective,
-    # inject the objective name.
     if "__selection_score__" in tpl and "{objective}" in tpl:
-        return tpl.format(objective=objective_name)
+        # Replace only {objective}; leave {slug}/{round} for later formatting.
+        return tpl.replace("{objective}", objective_name)
     if "__selection_score__" in tpl and objective_name not in tpl:
         return f"(-opal__{{slug}}__r{{round}}__selection_score__{objective_name}, id)"
     return tpl
@@ -185,7 +171,13 @@ def _auto_sort_stability(tpl: str, objective_name: str) -> str:
 
 # ---- Main loader ----
 def load_config(path: Path | str) -> RootConfig:
-    p = Path(path)
+    p = Path(path).resolve()
+    base = p.parent
+
+    def _abs(v: str) -> str:
+        q = Path(v)
+        return str((q if q.is_absolute() else (base / q)).resolve())
+    
     raw = yaml.load(p.read_text(), Loader=_StrictLoader)
     try:
         cfg = PRoot.model_validate(raw)
@@ -206,10 +198,17 @@ def load_config(path: Path | str) -> RootConfig:
     sel_params = validate_params("selection", sel.name, sel.params)
 
     # Build dataclasses (public API)
+    # coerce + ABS paths for data location
+    loc = cfg.data.location
+    if isinstance(loc, PLocationUSR):
+        loc_dc = LocationUSR(kind="usr", dataset=loc.dataset, usr_root=_abs(loc.usr_root))
+    else:
+        loc_dc = LocationLocal(kind="local", path=_abs(loc.path))
+
     data_dc = DataBlock(
-        location=_coerce_location(cfg.data.location),
-        representation_column_name=cfg.data.representation_column_name,
-        label_source_column_name=cfg.data.label_source_column_name,
+        location=loc_dc,
+        x_column_name=cfg.data.x_column_name,
+        y_column_name=cfg.data.y_column_name,
         y_expected_length=cfg.data.y_expected_length,
         transforms_x=PluginRef(tx.name, tx_params),
         transforms_y=PluginRef(ty.name, ty_params),
@@ -239,8 +238,12 @@ def load_config(path: Path | str) -> RootConfig:
         ),
     )
 
+    # precedence: CLI flag (handled later) > selection.params.score_batch_size > scoring block
+    _resolved_sbatch = (
+        sel_params.get("score_batch_size") or cfg.scoring.score_batch_size
+    )
     scoring_dc = ScoringBlock(
-        score_batch_size=cfg.scoring.score_batch_size,
+        score_batch_size=int(_resolved_sbatch),
         sort_stability=_auto_sort_stability(cfg.scoring.sort_stability, obj.name),
     )
 
@@ -254,7 +257,7 @@ def load_config(path: Path | str) -> RootConfig:
 
     root = RootConfig(
         campaign=CampaignBlock(
-            name=cfg.campaign.name, slug=cfg.campaign.slug, workdir=cfg.campaign.workdir
+            name=cfg.campaign.name, slug=cfg.campaign.slug, workdir=_abs(cfg.campaign.workdir)
         ),
         data=data_dc,
         selection=selection_dc,
@@ -262,8 +265,6 @@ def load_config(path: Path | str) -> RootConfig:
         training=training_dc,
         scoring=scoring_dc,
         safety=safety_dc,
-        metadata=MetadataBlock(
-            objective=cfg.metadata.objective, notes=cfg.metadata.notes
-        ),
+        metadata=MetadataBlock(notes=cfg.metadata.notes),
     )
     return root

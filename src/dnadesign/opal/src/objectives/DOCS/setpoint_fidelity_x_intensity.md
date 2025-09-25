@@ -19,7 +19,7 @@ $$
 ### 1.1 From experimental data → vec8
 
 We start from raw fluorescent readouts for each state $i$:
-$Y^{\mathrm{RFU}}_i$ (YFP) and $C^{\mathrm{RFU}}_i$ (CFP).
+$Y^{\mathrm{RFU}}_i$ (YFP/OD600) and $C^{\mathrm{RFU}}_i$ (CFP/OD600).
 
 We also include, in every experiment, a **reference strain** with constitutive YFP to serve as an anchor—a per-experiment, per-state reference that removes gain/time/instrument drift while preserving a meaningful **effect size** of fluorescent intensity. Let
 

@@ -9,5 +9,5 @@ Dunlop Lab
 """
 
 from . import (
-    logic5_from_tidy_v1,  # noqa: F401
+    sfxi_vec8_from_table_v1,  # noqa: F401
 )

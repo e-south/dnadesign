@@ -44,58 +44,55 @@ def validate_params(category: str, name: str, params: Dict[str, Any]) -> Dict[st
 
 
 # ---------------------------
-# Built-in schemas (examples)
+# Built-in schemas
 # ---------------------------
 
 
-# transform_x: identity (no params)
+# transform_x schemas
 @register_param_schema("transform_x", "identity")
 class _IdentityParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-# transform_y: logic5_from_tidy_v1 (FLATTENED params)
-class _ComputeRatio(BaseModel):
+# transform_y schemas
+@register_param_schema("transform_y", "sfxi_vec8_from_table_v1")
+class _Vec8TableParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    input_numerator_channel: str
-    input_denominator_channel: str
-    division_epsilon: float = 1e-8
-    apply_log2_to_ratio: bool = True
-
-
-class _BuildLogicVec(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    method: Literal["log2_minmax_per_design"]
-    expected_state_order: List[Literal["00", "10", "01", "11"]]
-    minmax_epsilon: float = 1e-6
-    equal_states_fallback: Literal[
-        "uniform_quarters_and_warn", "uniform_quarters", "error"
-    ] = "uniform_quarters_and_warn"
-
-
-class _AggregateEffect(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    base_signal_channel: str = "yfp"
-    pre_aggregation_transform: Literal["log2", "none"] = "log2"
-    on_state_weighting: Literal["setpoint_proportional", "uniform"] = (
-        "setpoint_proportional"
+    id_column: Optional[str] = None  # must be exactly "id" if provided
+    sequence_column: str = "sequence"
+    logic_columns: List[Literal["v00", "v10", "v01", "v11"]] = Field(
+        default_factory=lambda: ["v00", "v10", "v01", "v11"]
     )
-    aggregation_kind: Literal["geometric_mean", "arithmetic_mean"] = "geometric_mean"
-    output_units: Literal["linear", "log2"] = "linear"
+    intensity_columns: List[str] = Field(
+        default_factory=lambda: ["y00_star", "y10_star", "y01_star", "y11_star"]
+    )
+    strict_bounds: bool = True
+    clip_bounds_eps: float = 1e-6
 
+    @field_validator("id_column")
+    @classmethod
+    def _id_col_must_be_lit_id(cls, v):
+        if v is None:
+            return v
+        if v != "id":
+            raise ValueError("id_column, if set, must be exactly 'id' (no aliases).")
+        return v
 
-@register_param_schema("transform_y", "logic5_from_tidy_v1")
-class _Logic5Params(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    schema: Dict[str, str] = Field(default_factory=dict)
-    enforce_single_timepoint: bool = True
-    replicate_aggregation: Literal["mean", "median"] = "mean"
-    replicate_warn_threshold: int = 3
+    @field_validator("logic_columns")
+    @classmethod
+    def _logic_len4(cls, v):
+        if len(v) != 4:
+            raise ValueError("logic_columns must have length 4 in order [00,10,01,11]")
+        return v
 
-    # flat (no nested pre_processing)
-    compute_per_state_ratio: Optional[_ComputeRatio] = None
-    build_logic_intensity_vector: Optional[_BuildLogicVec] = None
-    aggregate_effect_size_from_yfp: Optional[_AggregateEffect] = None
+    @field_validator("intensity_columns")
+    @classmethod
+    def _intensity_len4(cls, v):
+        if len(v) != 4:
+            raise ValueError(
+                "intensity_columns must have length 4 in order [00,10,01,11]"
+            )
+        return v
 
 
 # ---- model: random_forest (with nested target_scaler) ----
@@ -163,13 +160,23 @@ class _TopNParams(BaseModel):
     tie_handling: Literal["competition_rank", "dense_rank", "ordinal"] = (
         "competition_rank"
     )
-    # NEW: direction + sort template live under selection jurisdiction
     objective: Literal["maximize", "minimize"] = "maximize"
     sort_stability: str = "(-opal__{slug}__r{round}__selection_score__{objective}, id)"
-
+    # Optional: allow users to colocate scoring perf knobs with selection
+    score_batch_size: Optional[int] = None
+    
     @field_validator("top_k_default")
     @classmethod
     def _positive(cls, v):
         if v <= 0:
             raise ValueError("top_k_default must be > 0")
+        return v
+
+    @field_validator("score_batch_size")
+    @classmethod
+    def _sbatch_positive(cls, v):
+        if v is None:
+            return v
+        if v <= 0:
+            raise ValueError("score_batch_size must be > 0 when provided")
         return v
