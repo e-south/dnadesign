@@ -39,6 +39,7 @@ dependencies = [
 [project.scripts]
 usr = "dnadesign.usr.src.cli:main"
 opal = "dnadesign.opal.src.cli:main"
+infer = "dnadesign.infer.main:main"
 
 [project.optional-dependencies]
 viz = [

@@ -19,7 +19,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ..errors import WriteBackError
-from ..logging import get_logger
+from .._logging import get_logger
 
 _LOG = get_logger(__name__)
 

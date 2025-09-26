@@ -21,7 +21,7 @@ from typing import Dict, List, Tuple
 import torch
 
 from ..errors import ValidationError
-from ..logging import get_logger
+from .._logging import get_logger
 
 _LOG = get_logger(__name__)
 

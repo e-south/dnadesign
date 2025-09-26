@@ -28,7 +28,7 @@ from .ingest.sources import (
     load_usr_input,
 )
 from .ingest.validators import validate_dna, validate_protein
-from .logging import get_logger
+from ._logging import get_logger
 from .registry import get_adapter_cls, resolve_fn
 from .writers.pt_file import write_back_pt_file
 from .writers.records import write_back_records

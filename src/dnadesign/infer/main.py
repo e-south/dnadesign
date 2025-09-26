@@ -26,7 +26,7 @@ import yaml
 from .config import RootConfig
 from .engine import run_extract_job, run_generate_job
 from .errors import InferError
-from .logging import get_logger
+from ._logging import get_logger
 
 _LOG = get_logger("dnadesign.infer.main")
 
@@ -125,5 +125,6 @@ def main() -> None:
         _LOG.info(f"✔ Job '{job.id}' complete. Outputs: {list(res.keys())}")
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    print("Please run as a module, e.g. `python -m dnadesign.infer --config ...`")
+    raise SystemExit(1)

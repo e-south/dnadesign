@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional, Sequence
 import torch
 
 from ..errors import CapabilityError, ModelLoadError
-from ..logging import get_logger
+from .._logging import get_logger
 from ..utils import pool_tensor, to_format
 
 _LOG = get_logger(__name__)
@@ -313,43 +313,15 @@ class Evo2Adapter:
             results.append(to_format(e, fmt))
         return results
 
-    def log_likelihood(
-        self,
-        seqs: List[str],
-        *,
-        method: str = "native",
-        reduction: str = "sum",
-    ) -> List[float]:
+    def log_likelihood(self, seqs: List[str], *, method: str = "native", reduction: str = "sum") -> List[float]:
         """
         Compute (log-)likelihoods using Evo 2's native batch scorer.
-
-        method
-          Must be "native" for Evo 2 (per upstream implementation).
-
-        reduction
-          - "sum"  : return the raw score per sequence (as provided by Evo 2).
-          - "mean" : divide by sequence length for length-normalized scores.
-
-        Returns list[float] aligned to input order.
         """
         if method != "native":
-            raise CapabilityError(
-                "Evo2 supports only method='native' for log_likelihood in v1."
-            )
-
+            raise CapabilityError("Evo2 supports only method='native' in v1.")
+        red = "mean" if reduction == "mean" else "sum"
         with torch.inference_mode():
-            try:
-                values = self.model.score_sequences(seqs)  # list[float]
-            except Exception as e:
-                raise CapabilityError(f"Evo2.score_sequences failed: {e}")
-
-        if reduction == "mean":
-            out: List[float] = []
-            for s, v in zip(seqs, values):
-                L = max(1, len(s))
-                out.append(float(v) / float(L))
-            return out
-
+            values = self.model.score_sequences(seqs, reduce_method=red)
         return [float(v) for v in values]
 
     def generate(
