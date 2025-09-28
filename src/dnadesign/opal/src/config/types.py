@@ -10,21 +10,21 @@ Dunlop Lab
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Union
 
 
 # ---- Data location ----
 @dataclass
 class LocationUSR:
-    kind: str
+    kind: str  # "usr"
     dataset: str
-    usr_root: str
+    path: str  # unified key (replaces former usr_root)
 
 
 @dataclass
 class LocationLocal:
-    kind: str
+    kind: str  # "local"
     path: str
 
 
@@ -56,11 +56,9 @@ class DataBlock:
 @dataclass
 class SelectionBlock:
     selection: PluginRef = field(default_factory=lambda: PluginRef("top_n", {}))
-    # convenience surface for common params (auto-populated by loader)
     top_k_default: Optional[int] = None
     tie_handling: Optional[str] = None
     objective: Optional[str] = None  # "maximize" | "minimize"
-    sort_stability: Optional[str] = None  # resolved stable sort key
 
 
 @dataclass
@@ -70,17 +68,20 @@ class ObjectiveBlock:
 
 # ---- Training / Safety / Meta ----
 @dataclass
-class TargetScalerCfg:
+class TargetNormalizerCfg:
+    """
+    Per-target Y normalization used at model fit-time and inverted on prediction.
+    """
+
     enable: bool = True
     method: str = "robust_iqr_per_target"
     minimum_labels_required: int = 5
     center_statistic: str = "median"
-    scale_statistic: str = "iqr"
+    scale_statistic: str = "iqr"  # keep name 'scale_statistic' in config for clarity
 
 
 @dataclass
 class TrainingBlock:
-    # model plugin (e.g., random_forest)
     models: PluginRef = field(default_factory=lambda: PluginRef("random_forest", {}))
     policy: Dict[str, Any] = field(
         default_factory=lambda: {
@@ -89,7 +90,12 @@ class TrainingBlock:
             "allow_resuggesting_candidates_until_labeled": True,
         }
     )
-    target_scaler: TargetScalerCfg = field(default_factory=TargetScalerCfg)
+    target_normalizer: TargetNormalizerCfg = field(default_factory=TargetNormalizerCfg)
+
+
+@dataclass
+class ScoringBlock:
+    score_batch_size: int = 10_000
 
 
 @dataclass
@@ -102,21 +108,15 @@ class SafetyBlock:
 
 
 @dataclass
-class CampaignBlock:
-    name: str
-    slug: str
-    workdir: str
-
-
-@dataclass
 class MetadataBlock:
     notes: str = ""
 
 
 @dataclass
-class ScoringBlock:
-    score_batch_size: int = 10_000
-    sort_stability: str = "(-opal__{slug}__r{round}__selection_score__{objective}, id)"
+class CampaignBlock:
+    name: str
+    slug: str
+    workdir: str
 
 
 @dataclass
@@ -129,6 +129,3 @@ class RootConfig:
     scoring: ScoringBlock
     safety: SafetyBlock
     metadata: MetadataBlock
-
-    def asdict(self):
-        return asdict(self)

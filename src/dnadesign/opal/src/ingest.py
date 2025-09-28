@@ -3,12 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/ingest.py
 
-Ingestion pipeline for Y — opal ingest-y
- - Transform CSV → vector/scalar y
- - Strict completeness & fail-fast checks
- - "Add if missing" with essentials enforced
- - Idempotent for (id, round)
- - Label history append: opal__<slug>__label_hist
+Transform tidy inputs -> model-ready labels with a structured preview.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -17,93 +12,157 @@ Dunlop Lab
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from typing import List
+from typing import Any, Dict, List, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 
-from .registries.transforms_y import get_ingest_transform
 from .utils import OpalError
 
 
 @dataclass
 class IngestPreview:
-    num_rows_in_csv: int
-    num_unique_sequences: int
-    num_with_explicit_id: int
-    num_new_sequences: int
-    new_sequences: List[str]
-    will_write_count: int
+    # Input overview
+    total_rows_in_csv: int
+    rows_with_id: int
+    rows_with_sequence: int
+
+    # Resolution counts
+    resolved_ids_by_sequence: int
+    unknown_sequences: int
+
+    # Vector checks
+    y_expected_length: Optional[int]
+    y_length_ok: int
+    y_length_bad: int
+
+    # What we will write
+    y_column_name: str
+
+    # Notes/warnings
+    warnings: List[str]
+
+
+def _vec_len(v: Any) -> int:
+    if isinstance(v, list):
+        return len(v)
+    if isinstance(v, (np.ndarray,)):
+        return int(v.shape[-1])
+    return 1
+
+
+def _transform_vec8_from_table(
+    csv_df: pd.DataFrame,
+    params: Dict[str, Any],
+) -> pd.DataFrame:
+    seq_col = params.get("sequence_column", "sequence")
+    logic_cols = params.get("logic_columns", ["v00", "v10", "v01", "v11"])
+    inten_cols = params.get(
+        "intensity_columns", ["y00_star", "y10_star", "y01_star", "y11_star"]
+    )
+
+    need = [seq_col, *logic_cols, *inten_cols]
+    missing = [c for c in need if c not in csv_df.columns]
+    if missing:
+        raise OpalError(f"Input CSV missing columns: {missing}")
+
+    df = csv_df.copy()
+    # bounds check for logic in [0,1]
+    logic = df[logic_cols].to_numpy(dtype=float)
+    if np.any(~np.isfinite(logic)):
+        raise OpalError("Non-finite values in logic columns.")
+    if (logic < -1e-9).any() or (logic > 1 + 1e-9).any():
+        # don't hard fail; log later in preview
+        pass
+
+    inten = df[inten_cols].to_numpy(dtype=float)
+    if np.any(~np.isfinite(inten)):
+        raise OpalError("Non-finite values in intensity columns.")
+
+    y = np.hstack([logic, inten]).tolist()
+    out = pd.DataFrame({"sequence": df[seq_col].astype(str).tolist(), "y": y})
+    return out
+
+
+def _apply_transform(
+    name: str, params: Dict[str, Any], csv_df: pd.DataFrame
+) -> pd.DataFrame:
+    # For now, support the shipped demo transform name explicitly.
+    if name == "sfxi_vec8_from_table_v1":
+        return _transform_vec8_from_table(csv_df, params or {})
+    # If you have additional transforms registered via a registry, you can wire them here.
+    raise OpalError(f"Unknown Y transform: {name!r}")
 
 
 def run_ingest(
-    df_records: pd.DataFrame,
+    records_df: pd.DataFrame,
     csv_df: pd.DataFrame,
     *,
     transform_name: str,
-    transform_params: dict,
-    y_expected_length: int | None,
-    setpoint_vector: list[float],
-) -> tuple[pd.DataFrame, IngestPreview]:
+    transform_params: Dict[str, Any],
+    y_expected_length: Optional[int],
+    setpoint_vector: Optional[List[float]] = None,  # kept for future previews
+    y_column_name: str,
+) -> Tuple[pd.DataFrame, IngestPreview]:
     """
     Returns:
-      labels_df: DataFrame with columns ['id','y'] or ['sequence','y'] (id optional)
+      labels_df: DataFrame with at least ['sequence','y'] and, where resolvable, 'id'
       preview:   IngestPreview
     """
-    tf = get_ingest_transform(transform_name)
+    # 1) Transform tidy -> (sequence, y)
+    labels = _apply_transform(transform_name, transform_params, csv_df)
+
+    # 2) Try to resolve ids by sequence (existing rows only; new rows remain without id for now)
+    seq2id = {}
+    if "sequence" in records_df.columns and "id" in records_df.columns:
+        seq2id = (
+            records_df.drop_duplicates(subset=["sequence"])
+            .set_index("sequence")["id"]
+            .astype(str)
+            .to_dict()
+        )
+    labels["id"] = labels["sequence"].map(seq2id)
+
+    # 3) Preview stats
+    total = int(len(csv_df))
+    rows_with_id = int("id" in csv_df.columns)
+    rows_with_seq = int("sequence" in csv_df.columns)
+
+    resolved = int(labels["id"].notna().sum())
+    unknown = int((~labels["id"].notna()).sum())
+
+    # vector length checks (best-effort)
+    y_len_ok = 0
+    y_len_bad = 0
+    if y_expected_length:
+        for v in labels["y"].head(200).tolist():  # sample
+            if _vec_len(v) == y_expected_length:
+                y_len_ok += 1
+            else:
+                y_len_bad += 1
+
+    # Logic bounds warning (best-effort)
+    warnings: List[str] = []
     try:
-        out = tf(csv_df, transform_params or {}, setpoint_vector, records_df=df_records)
-    except TypeError:
-        out = tf(csv_df, transform_params or {}, setpoint_vector)
+        v = np.asarray([yy[:4] for yy in labels["y"].tolist()], dtype=float)
+        if (v < -1e-9).any() or (v > 1 + 1e-9).any():
+            warnings.append("logic_out_of_bounds_detected")
+    except Exception:
+        pass
 
-    labels = out[0] if isinstance(out, tuple) and len(out) == 2 else out
-    if not {"y"}.issubset(labels.columns):
-        raise OpalError("Ingest transform must return a 'y' column.")
-
-    # coerce y to list if possible
-    def _coerce(y):
-        if isinstance(y, str):
-            try:
-                return json.loads(y)
-            except Exception:
-                pass
-        return y
-
-    labels["y"] = labels["y"].map(_coerce)
-
-    # expected length (if vector)
-    if y_expected_length is not None:
-        bad = labels[
-            labels["y"].map(
-                lambda v: isinstance(v, list) and len(v) != y_expected_length
-            )
-        ]
-        if not bad.empty:
-            raise OpalError(
-                f"Some y vecs don't match expected length {y_expected_length}: sample seqs/ids {bad.head(10).to_dict(orient='records')}"  # noqa
-            )
-
-    has_id = "id" in labels.columns
-    if has_id:
-        labels["id"] = labels["id"].astype(str)
-
-    if "sequence" not in labels.columns and not has_id:
-        raise OpalError("Ingest transform returned neither 'id' nor 'sequence'.")
-
-    # Preview by sequences (the resolution key when id is absent)
-    seqs_in_labels = (
-        set(labels["sequence"].astype(str)) if "sequence" in labels.columns else set()
+    preview = IngestPreview(
+        total_rows_in_csv=total,
+        rows_with_id=rows_with_id,
+        rows_with_sequence=rows_with_seq,
+        resolved_ids_by_sequence=resolved,
+        unknown_sequences=unknown,
+        y_expected_length=y_expected_length,
+        y_length_ok=y_len_ok,
+        y_length_bad=y_len_bad,
+        y_column_name=y_column_name,
+        warnings=warnings,
     )
-    seqs_in_records = set(df_records["sequence"].astype(str))
-    new_seqs = sorted(seqs_in_labels - seqs_in_records) if seqs_in_labels else []
 
-    prev = IngestPreview(
-        num_rows_in_csv=int(len(csv_df)),
-        num_unique_sequences=int(len(seqs_in_labels)) if seqs_in_labels else 0,
-        num_with_explicit_id=int(labels["id"].notna().sum()) if has_id else 0,
-        num_new_sequences=int(len(new_seqs)),
-        new_sequences=new_seqs[:20],
-        will_write_count=int(len(labels)),
-    )
-    return labels.copy(), prev
+    # 4) Return labels (sequence, id?, y) and the preview
+    return labels[["sequence", "id", "y"]], preview

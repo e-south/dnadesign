@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/models/random_forest.py
 
-RandomForest wrapper with optional per-target robust scaling during fit.
+RandomForest wrapper with optional per-target robust normalization during fit.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -29,9 +29,9 @@ class FitMetrics:
     oob_mse: Optional[float]
 
 
-class _TargetScaler:
+class _TargetNormalizer:
     """
-    Robust per-target scaler (median, IQR/1.349). Safe on small-N; can be disabled.
+    Robust per-target normalizer (median, IQR/1.349). Safe on small-N; can be disabled.
     """
 
     def __init__(
@@ -86,31 +86,45 @@ class _TargetScaler:
         }
 
     @staticmethod
-    def from_dict(d: Dict[str, Any]) -> "_TargetScaler":
-        ts = _TargetScaler(
+    def from_dict(d: Dict[str, Any]) -> "_TargetNormalizer":
+        tn = _TargetNormalizer(
             enable=d.get("enable", True),
             minimum_labels_required=d.get("minimum_labels_required", 5),
             center_statistic=d.get("center_statistic", "median"),
             scale_statistic=d.get("scale_statistic", "iqr"),
         )
         if d.get("center_") is not None:
-            ts.center_ = np.asarray(d["center_"], dtype=float)
+            tn.center_ = np.asarray(d["center_"], dtype=float)
         if d.get("scale_") is not None:
-            ts.scale_ = np.asarray(d["scale_"], dtype=float)
-        return ts
+            tn.scale_ = np.asarray(d["scale_"], dtype=float)
+        return tn
 
 
 class RandomForestModel:
     """
     Thin wrapper around sklearn RandomForestRegressor that:
-      - handles robust per-target scaling at fit-time,
+      - handles robust per-target Y normalization at fit-time,
       - exposes per-tree predictions for uncertainty,
-      - saves/loads via joblib with scaler state.
+      - saves/loads via joblib with normalizer state.
     """
 
-    def __init__(self, rf: RandomForestRegressor, target_scaler: _TargetScaler):
+    def __init__(self, rf: RandomForestRegressor, target_normalizer: Any):
         self.rf = rf
-        self._scaler = target_scaler
+        # Accept _TargetNormalizer | dict | dataclass-like
+        if isinstance(target_normalizer, _TargetNormalizer):
+            self._normalizer = target_normalizer
+        else:
+            d = {}
+            if isinstance(target_normalizer, dict):
+                d = dict(target_normalizer)
+            elif hasattr(target_normalizer, "__dict__"):
+                d = dict(target_normalizer.__dict__)
+            self._normalizer = _TargetNormalizer(
+                enable=bool(d.get("enable", True)),
+                minimum_labels_required=int(d.get("minimum_labels_required", 5)),
+                center_statistic=str(d.get("center_statistic", "median")),
+                scale_statistic=str(d.get("scale_statistic", "iqr")),
+            )
 
     # ---------- Training ----------
     def fit(self, X: np.ndarray, Y: np.ndarray) -> FitMetrics:
@@ -118,10 +132,9 @@ class RandomForestModel:
         if Y.ndim == 1:
             Y = Y.reshape(-1, 1)
 
-        self._scaler.fit(Y)
-        Y_scaled = self._scaler.transform(Y)
+        self._normalizer.fit(Y)
+        Y_scaled = self._normalizer.transform(Y)
 
-        # Ensure OOB enabled if requested in params
         self.rf.fit(X, Y_scaled)
 
         oob_r2 = getattr(self.rf, "oob_score_", None)
@@ -129,7 +142,6 @@ class RandomForestModel:
         if hasattr(self.rf, "oob_prediction_"):
             oob_pred = self.rf.oob_prediction_
             if oob_pred is not None:
-                # MSE on scaled space; single number averaged across outputs
                 err = (oob_pred - Y_scaled) ** 2
                 oob_mse = float(np.nanmean(err))
         return FitMetrics(
@@ -141,7 +153,7 @@ class RandomForestModel:
         yh_scaled = self.rf.predict(X)
         if yh_scaled.ndim == 1:
             yh_scaled = yh_scaled.reshape(-1, 1)
-        yh = self._scaler.inverse_transform(yh_scaled)
+        yh = self._normalizer.inverse_transform(yh_scaled)
         return yh
 
     def predict_per_tree(self, X: np.ndarray) -> np.ndarray:
@@ -153,7 +165,7 @@ class RandomForestModel:
             y = est.predict(X)
             if y.ndim == 1:
                 y = y.reshape(-1, 1)
-            y = self._scaler.inverse_transform(y)
+            y = self._normalizer.inverse_transform(y)
             preds.append(y)
         return np.asarray(preds, dtype=float)
 
@@ -166,7 +178,7 @@ class RandomForestModel:
 
     # ---------- Persistence ----------
     def save(self, path: str | Path) -> None:
-        obj = {"sk_model": self.rf, "target_scaler": self._scaler.to_dict()}
+        obj = {"sk_model": self.rf, "target_normalizer": self._normalizer.to_dict()}
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(obj, path)
 
@@ -174,8 +186,8 @@ class RandomForestModel:
     def load(path: str | Path) -> "RandomForestModel":
         obj = joblib.load(path)
         rf = obj["sk_model"]
-        scaler = _TargetScaler.from_dict(obj.get("target_scaler", {}))
-        return RandomForestModel(rf, scaler)
+        normalizer = _TargetNormalizer.from_dict(obj.get("target_normalizer", {}))
+        return RandomForestModel(rf, normalizer)
 
 
 # ---------- Registry factory ----------
@@ -183,8 +195,42 @@ class RandomForestModel:
 
 @register_model("random_forest")
 def _factory(
-    params: Dict[str, Any], target_scaler_cfg: Dict[str, Any]
+    params: Dict[str, Any], target_normalizer: Dict[str, Any]
 ) -> RandomForestModel:
-    rf = RandomForestRegressor(**params)
-    scaler = _TargetScaler(**target_scaler_cfg)
-    return RandomForestModel(rf, scaler)
+    # Copy and sanitize params before passing to sklearn
+    rf_params = dict(params) if params else {}
+
+    # model-local override (no backcompat with old key)
+    normalizer_from_model = rf_params.pop("target_normalizer", None)
+
+    # Normalize criteria aliases that sklearn RF doesn't accept
+    crit = rf_params.get("criterion")
+    if isinstance(crit, str):
+        _CRIT_ALIAS = {
+            "mse": "squared_error",
+            "mae": "absolute_error",
+            "friedman_mse": "squared_error",  # not valid for RF
+        }
+        rf_params["criterion"] = _CRIT_ALIAS.get(crit, crit)
+
+    rf = RandomForestRegressor(**rf_params)
+
+    # Build a _TargetNormalizer instance from dicts/dataclasses.
+    def _mk_normalizer(cfg) -> _TargetNormalizer:
+        if isinstance(cfg, _TargetNormalizer):
+            return cfg
+        d = {}
+        if isinstance(cfg, dict):
+            d = dict(cfg)
+        elif hasattr(cfg, "__dict__"):
+            d = dict(cfg.__dict__)
+        return _TargetNormalizer(
+            enable=bool(d.get("enable", True)),
+            minimum_labels_required=int(d.get("minimum_labels_required", 5)),
+            center_statistic=str(d.get("center_statistic", "median")),
+            scale_statistic=str(d.get("scale_statistic", "iqr")),
+        )
+
+    effective_cfg = normalizer_from_model or target_normalizer
+    normalizer = _mk_normalizer(effective_cfg)
+    return RandomForestModel(rf, target_normalizer=normalizer)

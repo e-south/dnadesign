@@ -15,14 +15,14 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
-from ..registries.transforms_y import register_ingest_transform
+from ..registries.transforms_y import register_transform_y
 
 
 def _clip01(x: np.ndarray, eps: float) -> np.ndarray:
     return np.clip(x, 0.0 + eps, 1.0 - eps)
 
 
-@register_ingest_transform("sfxi_vec8_from_table_v1")
+@register_transform_y("sfxi_vec8_from_table_v1")
 def sfxi_vec8_from_table_v1(
     csv_df: pd.DataFrame,
     params: Dict,

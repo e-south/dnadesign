@@ -11,64 +11,41 @@ Dunlop Lab
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 
-from ..registries import register_selection
-from ..utils import competition_rank
+from ..registries.selections import register_selection
 
 
 @register_selection("top_n")
-def select_top_n(
-    ids: np.ndarray,
-    scores: np.ndarray,
+def top_n(
     *,
-    top_k: int,
-    tie_handling: str = "competition_rank",
-) -> dict:
-    ids = np.asarray(ids)
+    ids,
+    scores,
+    top_k: int,  # not used here; registry will use it
+    objective: str = "maximize",
+    tie_handling: str = "competition_rank",  # not used here; registry will use it
+    **_,
+):
+    """
+    Minimal 'top_n' that emits a deterministic best-first order.
+    - Primary key = score (desc if maximize, asc if minimize)
+    - Secondary key = id (always ascending)
+    - Non-finite scores (NaN/Inf) are pushed to the end.
+    Registry fills ranks/selected.
+    """
+    ids = np.asarray(ids, dtype=str)
     scores = np.asarray(scores, dtype=float)
-    assert ids.shape[0] == scores.shape[0]
+    if ids.shape[0] != scores.shape[0]:
+        raise ValueError("ids and scores must have same length")
 
-    # Stable sort key (-score, id) for determinism
-    order = np.lexsort((ids, -scores))
-    scores_sorted = scores[order]
-    ranks = competition_rank(scores_sorted)
+    maximize = str(objective).strip().lower().startswith("max")
 
-    if tie_handling != "competition_rank":
-        raise ValueError(f"Unsupported tie_handling: {tie_handling}")
+    # Build a primary sort key so that np.lexsort can always sort ASC,
+    # keeping id ASC as the tie-breaker regardless of objective.
+    primary = np.where(
+        np.isfinite(scores), -scores if maximize else scores, np.inf
+    )  # sink non-finite
 
-    if top_k <= 0 or len(scores_sorted) == 0:
-        selected = np.zeros_like(scores_sorted, dtype=bool)
-    else:
-        max_rank = ranks[min(top_k - 1, len(ranks) - 1)]
-        selected = ranks <= max_rank
+    # lexsort uses the *last* key as primary → (ids, primary)
+    order_idx = np.lexsort((ids, primary)).astype(int)
 
-    return dict(order_idx=order, rank_competition=ranks, selected_bool=selected)
-
-
-def select_top_n_df(
-    df: pd.DataFrame,
-    *,
-    score_col: str = "selection_score",
-    top_k: int,
-    tie_handling: str = "competition_rank",
-) -> tuple[pd.DataFrame, int]:
-    """
-    Returns:
-      df_out: sorted by (-score, id) with added columns:
-        - rank_competition (int)
-        - selected_top_k_bool (bool)
-      top_k_effective: number of selected after tie inclusion
-    """
-    if score_col not in df.columns:
-        raise KeyError(f"score_col '{score_col}' not found in DataFrame")
-
-    ids = df["id"].astype(str).to_numpy()
-    scores = df[score_col].to_numpy(dtype=float)
-    res = select_top_n(ids, scores, top_k=top_k, tie_handling=tie_handling)
-
-    out = df.iloc[res["order_idx"]].copy().reset_index(drop=True)
-    out["rank_competition"] = res["rank_competition"].astype(int)
-    out["selected_top_k_bool"] = res["selected_bool"].astype(bool)
-    top_k_effective = int(out["selected_top_k_bool"].sum())
-    return out, top_k_effective
+    return {"order_idx": order_idx}

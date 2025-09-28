@@ -95,8 +95,8 @@ class _Vec8TableParams(BaseModel):
         return v
 
 
-# ---- model: random_forest (with nested target_scaler) ----
-class _TargetScalerParams(BaseModel):
+# ---- model: random_forest (with nested target_normalizer) ----
+class _TargetNormalizerParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enable: bool = True
     method: str = "robust_iqr_per_target"
@@ -122,8 +122,10 @@ class _RFParams(BaseModel):
     random_state: int = 7
     n_jobs: int = -1
 
-    # model-local scaler config
-    target_scaler: _TargetScalerParams = Field(default_factory=_TargetScalerParams)
+    # model-local normalizer config
+    target_normalizer: _TargetNormalizerParams = Field(
+        default_factory=_TargetNormalizerParams
+    )
 
 
 @register_param_schema("objective", "sfxi_v1")
@@ -152,7 +154,6 @@ class _SFXIParams(BaseModel):
         return v
 
 
-# selection: top_n
 @register_param_schema("selection", "top_n")
 class _TopNParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -161,22 +162,10 @@ class _TopNParams(BaseModel):
         "competition_rank"
     )
     objective: Literal["maximize", "minimize"] = "maximize"
-    sort_stability: str = "(-opal__{slug}__r{round}__selection_score__{objective}, id)"
-    # Optional: allow users to colocate scoring perf knobs with selection
-    score_batch_size: Optional[int] = None
-    
+
     @field_validator("top_k_default")
     @classmethod
     def _positive(cls, v):
         if v <= 0:
             raise ValueError("top_k_default must be > 0")
-        return v
-
-    @field_validator("score_batch_size")
-    @classmethod
-    def _sbatch_positive(cls, v):
-        if v is None:
-            return v
-        if v <= 0:
-            raise ValueError("score_batch_size must be > 0 when provided")
         return v

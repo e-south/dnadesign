@@ -27,12 +27,18 @@ from .preflight import preflight_run
 
 
 def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
+    # Preflight: no writes/backfill during explain
     rep = preflight_run(
         store,
         df,
         round_k,
-        fail_on_mixed_bio_alphabet=cfg.safety.fail_on_mixed_biotype_or_alphabet,
+        cfg.safety.fail_on_mixed_biotype_or_alphabet,
+        auto_backfill=False,
     )
+    # Derive counts the same way 'run' does
+    train_df = store.training_labels_from_y(df, round_k)
+    cand_df = store.candidate_universe(df, round_k)
+
     info = {
         "round_index": round_k,
         "x_column_name": cfg.data.x_column_name,
@@ -53,8 +59,8 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
                 "params": cfg.objective.objective.params,
             },
         },
-        "number_of_training_examples_used_in_round": rep.n_labels,
-        "number_of_candidates_scored_in_round": rep.n_candidates,
-        "warnings": rep.warnings,
+        "number_of_training_examples_used_in_round": int(len(train_df)),
+        "number_of_candidates_scored_in_round": int(len(cand_df)),
+        "warnings": getattr(rep, "warnings", []),
     }
     return info

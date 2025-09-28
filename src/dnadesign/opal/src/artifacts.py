@@ -5,12 +5,6 @@ src/dnadesign/opal/src/artifacts.py
 
 Round artifacts helpers.
 
-- model.joblib (frozen model),
-- selection_top_k.csv (lab handoff),
-- feature_importance.csv,
-- predictions_with_uncertainty.csv,
-- round_model_metrics.json.
-
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
@@ -38,40 +32,13 @@ def round_dir(workdir: Path, round_index: int) -> Path:
 class ArtifactPaths:
     model: Path
     selection_csv: Path
-    feature_importance_csv: Path
-    metrics_json: Path
     round_log_jsonl: Path
-    preds_with_uncertainty_csv: Path
     round_ctx_json: Path
     objective_meta_json: Path
 
 
 def write_selection_csv(path: Path, df_selected: pd.DataFrame) -> str:
     df_selected.to_csv(path, index=False)
-    return file_sha256(path)
-
-
-def write_feature_importance(path: Path, importances) -> str:
-    if importances is None:
-        df = pd.DataFrame({"feature_index": [], "feature_importance": []})
-    else:
-        df = pd.DataFrame(
-            {
-                "feature_index": range(len(importances)),
-                "feature_importance": importances,
-            }
-        )
-    df.to_csv(path, index=False)
-    return file_sha256(path)
-
-
-def write_round_metrics(path: Path, metrics: Dict[str, Any]) -> str:
-    Path(path).write_text(json.dumps(metrics, indent=2))
-    return file_sha256(path)
-
-
-def write_predictions_with_uncertainty(path: Path, df: pd.DataFrame) -> str:
-    df.to_csv(path, index=False)
     return file_sha256(path)
 
 
@@ -88,4 +55,21 @@ def write_round_ctx(path: Path, ctx: dict) -> str:
 
 def write_objective_meta(path: Path, meta: Dict[str, Any]) -> str:
     Path(path).write_text(json.dumps(meta, indent=2))
+    return file_sha256(path)
+
+
+def events_path(workdir: Path) -> Path:
+    d = workdir / "outputs"
+    d.mkdir(parents=True, exist_ok=True)
+    return d / "events.parquet"
+
+
+def append_events(path: Path, df: pd.DataFrame) -> str:
+    # create if missing; append otherwise
+    if not path.exists():
+        df.to_parquet(path, index=False)
+    else:
+        existing = pd.read_parquet(path)
+        out = pd.concat([existing, df], ignore_index=True)
+        out.to_parquet(path, index=False)
     return file_sha256(path)

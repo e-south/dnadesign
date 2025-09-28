@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/transforms_x/__init__.py
 
-Import concrete transforms to trigger registration side-effects.
+Importing this package triggers registration of built-in X transforms.
 
 Module Author(s): Eric J. South
 Dunlop Lab

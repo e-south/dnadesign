@@ -72,9 +72,7 @@ def resolve_config_path(opt: Optional[Path]) -> Path:
 
     # 3) Fallback: unique campaign under repo campaigns/ (resolve relative to this file)
     try:
-        pkg_root = (
-            Path(__file__).resolve().parents[4]
-        )  # .../opal/src/cli/commands/_common.py -> repo root
+        pkg_root = Path(__file__).resolve().parents[4]
     except Exception:
         pkg_root = Path.cwd()
     root = pkg_root / "src" / "dnadesign" / "opal" / "campaigns"
@@ -94,16 +92,20 @@ def resolve_config_path(opt: Optional[Path]) -> Path:
 def store_from_cfg(cfg: RootConfig) -> RecordsStore:
     loc = cfg.data.location
     if isinstance(loc, LocationUSR):
-        records = Path(loc.usr_root) / loc.dataset / "records.parquet"
+        records = Path(loc.path) / loc.dataset / "records.parquet"
         data_location = {
             "kind": "usr",
             "dataset": loc.dataset,
-            "usr_root": str(Path(loc.usr_root).resolve()),
+            "path": str(Path(loc.path).resolve()),
             "records_path": str(records.resolve()),
         }
     elif isinstance(loc, LocationLocal):
         records = Path(loc.path)
-        data_location = {"kind": "local", "records_path": str(records.resolve())}
+        data_location = {
+            "kind": "local",
+            "path": str(Path(loc.path).resolve()),
+            "records_path": str(records.resolve()),
+        }
     else:
         raise OpalError("Unknown data location kind.", ExitCodes.BAD_ARGS)
 
@@ -113,8 +115,8 @@ def store_from_cfg(cfg: RootConfig) -> RecordsStore:
         campaign_slug=cfg.campaign.slug,
         x_col=cfg.data.x_column_name,
         y_col=cfg.data.y_column_name,
-        rep_transform_name=cfg.data.transforms_x.name,
-        rep_transform_params=cfg.data.transforms_x.params,
+        x_transform_name=cfg.data.transforms_x.name,
+        x_transform_params=cfg.data.transforms_x.params,
     )
 
 

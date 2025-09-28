@@ -68,35 +68,34 @@ pip install -e .
 We will use some ready-made demo CSVs:
 
 * Sequences: `usr/demo_material/demo_sequences.csv`
-* Attachments/annotations: `usr/demo_material/demo_attachments.csv`
+* Attachments/annotations: `usr/demo_material/demo_attachment_{one|two}.csv`
+* Attachments used in the `OPAL` demo: `usr/demo_material/demo_y_sfxi.csv`
 
 #### Create a dataset
 
 ```bash
-usr init toy --source "readme quickstart" --notes "hello, world"
+usr init demo --source "readme quickstart" --notes "hello, world"
 ```
 
 #### Import sequences to an existing dataset
 
+`usr import` only ingests the essential USR schema (id, bio_type, sequence, alphabet, length, source, created_at). It ignores any extra columns in the CSV.
 ```bach
-usr import toy --from csv \
+usr import demo --from csv \
   --path src/dnadesign/usr/demo_material/demo_sequences.csv \
   --bio-type dna --alphabet dna_4
 ```
 
-#### Attach namespaced columns from the demo CSV
+#### Attach some meta data associated with these sequences
 
-The demo attachments CSV includes per-sequence annotations. Attach them under a user-defined namespace (example: `mock`).
-(Adjust `--columns` to the columns you want to bring in.)
+Attach the per-sequence metadata—`X_value` and `y_label` (split across two files)—under a user-defined namespace (e.g., `mock`). Use `--columns` to choose which fields to bring in.
 
 ```bash
-usr attach toy \
-  --path src/dnadesign/usr/demo_material/demo_attachments.csv \
-  --namespace mock \
-  --id-col sequence \
-  --columns "tag,label" \
-  --note "demo attach"
+usr attach demo --path src/dnadesign/usr/demo_material/demo_attachment_one.csv --namespace mock --id-col sequence --columns X_value --note "attach X"
+usr attach demo --path src/dnadesign/usr/demo_material/demo_attachment_two.csv --namespace mock --id-col sequence --columns y_label --note "attach label"
+
 ```
+
 
 Resulting columns in `records.parquet` (examples):
 
@@ -110,24 +109,24 @@ Re-attaching the same columns requires `--allow-overwrite`.
 
 ```bash
 usr ls                                    # list datasets under usr/datasets
-usr head toy -n 5                         # peek at rows
-usr info toy                              # rows, columns, discovered namespaces
-usr grep toy --pattern "ATG" --limit 10   # regex over sequences
-usr validate toy --strict                 # enforce namespacing & alphabet strictly
-usr schema toy                            # dtypes per column
+usr head demo -n 5                         # peek at rows
+usr info demo                              # rows, columns, discovered namespaces
+usr grep demo --pattern "ATG" --limit 10   # regex over sequences
+usr validate demo --strict                 # enforce namespacing & alphabet strictly
+usr schema demo                            # dtypes per column
 ```
 
 #### Export to CSV or JSONL
 
 ```bash
-usr export toy --fmt csv   --out usr/demo_material/out.csv
-usr export toy --fmt jsonl --out usr/demo_material/out.jsonl
+usr export demo --fmt csv   --out usr/demo_material/out.csv
+usr export demo --fmt jsonl --out usr/demo_material/out.jsonl
 ```
 
 #### Snapshots (roll a new copy into _snapshots/)
 You can stash a current copy of `records.parquet` in a sibling `_snapshots/` directory.
 ```bash
-usr snapshot toy
+usr snapshot demo
 ```
 
 #### Merging datasets
@@ -184,7 +183,7 @@ from dnadesign.usr import Dataset
 root = Path(__file__).resolve().parent / "usr" / "datasets"
 
 # 1) init
-ds = Dataset(root, "toy_py")
+ds = Dataset(root, "demo_py")
 ds.init(source="python quickstart")
 
 # 2) import one row

@@ -3,42 +3,40 @@
 <dnadesign project>
 src/dnadesign/opal/src/registries/transforms_x.py
 
-Transforms-X registry (raw -> model-ready X).
+A minimal, explicit registry for X (representation) transforms.
 
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-from dataclasses import dataclass
-from typing import Any, Callable, Dict
+from __future__ import annotations
 
-from ..exceptions import RegistryError
+from typing import Callable, Dict, List
 
-
-@dataclass(frozen=True)
-class RepTransformSpec:
-    name: str
-    factory: Callable[
-        [dict], Any
-    ]  # returns object with .transform(series)->(np.ndarray, d)
+# Registry: name -> callable(df: pd.DataFrame, ids: list[str], *, params: dict) -> (X: np.ndarray, meta: dict)
+_REG_X: Dict[str, Callable] = {}
 
 
-_REG: Dict[str, RepTransformSpec] = {}
+def register_transform_x(name: str):
+    """Decorator to register an X transform by name."""
 
-
-def register_rep_transform(name: str):
-    def _wrap(factory: Callable[[dict], Any]):
-        if name in _REG:
-            raise RegistryError(f"Duplicate rep transform: {name}")
-        _REG[name] = RepTransformSpec(name, factory)
-        return factory
+    def _wrap(func: Callable):
+        if name in _REG_X:
+            raise ValueError(f"transform_x '{name}' already registered")
+        _REG_X[name] = func
+        return func
 
     return _wrap
 
 
-def get_rep_transform(name: str, params: dict):
+def get_transform_x(name: str) -> Callable:
+    """Return the registered X transform callable."""
     try:
-        return _REG[name].factory(params)
+        return _REG_X[name]
     except KeyError:
-        raise RegistryError(f"Unknown rep transform: {name}. Choices: {list(_REG)}")
+        raise KeyError(f"transform_x '{name}' not found. Available: {sorted(_REG_X)}")
+
+
+def list_transforms_x() -> List[str]:
+    return sorted(_REG_X)

@@ -3,12 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/status.py
 
-Reads state.json and assembles a concise view:
-- latest round summary by default,
-- specific round or --all on request,
-- echoes explicit snake_case fields (counts, metrics, artifacts).
-
-Used by the status command and suitable for dashboards/CI logs.
+Robust status reader that does not depend on internal CampaignState attributes.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -17,31 +12,54 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from .state import CampaignState
+
+def _read_state(p: Path) -> Dict[str, Any]:
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text())
+    except Exception:
+        return {}
 
 
 def build_status(
-    state_path: Path, round_k: Optional[int] = None, show_all: bool = False
+    state_path: Path, *, round_k: Optional[int] = None, show_all: bool = False
 ) -> Dict[str, Any]:
-    st = CampaignState.load(state_path)
-    out: Dict[str, Any] = {
-        "campaign_slug": st.campaign_slug,
-        "campaign_name": st.campaign_name,
-        "workdir": st.workdir,
-        "x_column_name": st.x_column_name,
-        "y_column_name": st.y_column_name,
-        "representation_vector_dimension": st.representation_vector_dimension,
-        "rounds_count": len(st.rounds),
+    st = _read_state(state_path)
+    if not st:
+        return {"ok": False, "error": f"state.json not found at {state_path}"}
+
+    rounds = st.get("rounds", [])
+    rounds_sorted = sorted(rounds, key=lambda r: r.get("round_index", -1))
+    latest = rounds_sorted[-1] if rounds_sorted else None
+
+    base = {
+        "ok": True,
+        "campaign_slug": st.get("campaign_slug"),
+        "campaign_name": st.get("campaign_name"),
+        "workdir": st.get("workdir"),
+        "data_location": st.get("data_location"),
+        "x_column_name": st.get("x_column_name"),
+        "y_column_name": st.get("y_column_name"),
+        "representation_vector_dimension": st.get("representation_vector_dimension"),
+        "training_policy": st.get("training_policy"),
+        "performance": st.get("performance"),
     }
+
     if show_all:
-        out["rounds"] = [r.__dict__ for r in st.rounds]
-        return out
-    if round_k is None:
-        out["latest_round"] = st.rounds[-1].__dict__ if st.rounds else None
-    else:
-        matches = [r for r in st.rounds if r.round_index == round_k]
-        out["round"] = matches[0].__dict__ if matches else None
-    return out
+        base["rounds"] = rounds_sorted
+        return base
+
+    if round_k is not None:
+        match = next(
+            (r for r in rounds_sorted if r.get("round_index") == int(round_k)), None
+        )
+        base["round"] = match
+        return base
+
+    base["latest_round"] = latest
+    return base
