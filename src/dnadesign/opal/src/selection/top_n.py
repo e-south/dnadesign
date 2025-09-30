@@ -13,8 +13,10 @@ from __future__ import annotations
 import numpy as np
 
 from ..registries.selections import register_selection
+from ..round_context import roundctx_contract
 
 
+@roundctx_contract(category="selection", requires=[], produces=[])
 @register_selection("top_n")
 def top_n(
     *,
@@ -23,6 +25,7 @@ def top_n(
     top_k: int,  # not used here; registry will use it
     objective: str = "maximize",
     tie_handling: str = "competition_rank",  # not used here; registry will use it
+    ctx=None,
     **_,
 ):
     """

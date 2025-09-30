@@ -1,28 +1,20 @@
-# OPAL Transform Strategies
+## OPAL X‑Transforms
 
-Transforms convert raw measurement tables (often *tidy*, long format) into the
-campaign’s canonical **Y** label **per design**.
+X‑transforms convert your stored representation column (**X**) into a fixed‑width numeric matrix for models.
 
-## Contract
+**Contract**
 
-A transform is a **pure function** registered in `opal.registries.TRANSFORMS`:
+Registered under `registries/transforms_x.py`, a factory returns a callable:
 
 ```python
-def transform_fn(df_tidy: pd.DataFrame, *, params: dict, setpoint_vector: list[float]) -> pd.DataFrame
+def factory(params: dict) -> Callable[[pd.Series], np.ndarray]:
+    ...
 ```
 
-#### Input:
+The callable:
 
-- `df_tidy`: raw measurements (e.g., per design/state/channel/replicate).
-- `params`: transform-specific schema and pre-processing controls (from YAML).
-- `setpoint_vector`: single source of truth for logic setpoint (from objective).
+* accepts a **Series** of per‑record X values (scalar, list, JSON string, etc.),
+* returns an `np.ndarray` of shape `(N, F)` with finite floats,
+* raises with a clear message on mismatch (e.g., inconsistent widths).
 
-#### Output:
-
-- DataFrame with at least columns:
-
-- `id` (design_id)
-- `y_vec` (list[float]) — the canonical label for this campaign.
-
-Transforms must fail fast (raise `IngestError`) on schema or invariant violations
-(duplicate timepoints, missing states/channels, NaNs/Inf, wrong lengths).
+Example: `identity` transforms scalars and vectors as‑is, coercing to `(N, F)` and enforcing finiteness.

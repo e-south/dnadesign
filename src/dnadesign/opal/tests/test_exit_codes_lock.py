@@ -1,14 +1,15 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/src/transforms_y/__init__.py
+src/dnadesign/opal/tests/test_exit_codes_lock.py
 
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-from . import (
-    intensity_median_iqr,  # noqa: F401
-    sfxi_vec8_from_table_v1,  # noqa: F401
-)
+from dnadesign.opal.src.utils import ExitCodes
+
+
+def test_exit_codes_has_contract_violation():
+    assert hasattr(ExitCodes, "CONTRACT_VIOLATION")

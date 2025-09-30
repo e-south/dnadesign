@@ -15,7 +15,7 @@ Dashboard of current entries (see details below):
 
 | name            | X expected  | Y expected           | features (brief)                                        |
 | --------------- | ----------- | -------------------- | ------------------------------------------------------- |
-| `random_forest` | `X: (N, F)` | `Y: (N,)` or `(N,D)` | uncertainty: per‑tree std · y‑scaling: robust IQR · OOB |
+| `random_forest` | `X: (N, F)` | `Y: (N,)` or `(N,D)` | uncertainty: per-tree std · OOB |
 
 Quick check:
 
@@ -93,10 +93,9 @@ models:
 
 **Features**
 
-* **Per‑target robust scaling (IQR):** during **fit** only, each target is median‑centered and scaled by **IQR/1.349**; predictions are inverse‑transformed to original units. Guards: skip when labeled `N` is small (configurable) or scale≈0.
-* **Uncertainty:** `predict_per_tree` returns per‑tree predictions; compute `std_vec = per_tree.std(axis=0, ddof=1)` (original units).
-* **OOB diagnostics:** with `bootstrap: true` and `oob_score: true`, returns `FitMetrics(oob_r2, oob_mse)` (MSE in scaled space).
-* **Persistence:** joblib bundle includes sklearn model and scaler state.
+* **Uncertainty:** `predict_per_tree` returns per-tree predictions; compute `std_vec = per_tree.std(axis=0, ddof=1)`.
+* **OOB diagnostics:** with `bootstrap: true` and `oob_score: true`, returns `FitMetrics(oob_r2, oob_mse)`.
+* **No target scaling inside the model:** apply any label scaling via **training `y_ops`** (e.g., `intensity_median_iqr`), which the runner fits/applies and inverts at prediction time.
 
 **Notes**
 

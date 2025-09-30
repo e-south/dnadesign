@@ -28,7 +28,9 @@ app = typer.Typer(
 @app.callback()
 def _root_callback(
     debug: bool = typer.Option(
-        True, "--debug/--no-debug", help="Print full tracebacks on internal errors."
+        False,
+        "--debug/--no-debug",
+        help="Print full tracebacks on internal errors (OPAL_DEBUG=1).",
     )
 ) -> None:
     """Root callback sets global debug behavior."""

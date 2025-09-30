@@ -26,8 +26,6 @@ def _clip01(x: np.ndarray, eps: float) -> np.ndarray:
 def sfxi_vec8_from_table_v1(
     csv_df: pd.DataFrame,
     params: Dict,
-    setpoint_vector: List[float],
-    records_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
     Input columns:
@@ -46,8 +44,8 @@ def sfxi_vec8_from_table_v1(
     if id_col is not None and id_col != "id":
         raise ValueError("id_column, if set, must be exactly 'id'.")
     seq_col = p.get("sequence_column", "sequence")
-    logic_cols = p.get("logic_columns", ["v00", "v10", "v01", "v11"])
-    inten_cols = p.get(
+    logic_cols: List[str] = p.get("logic_columns", ["v00", "v10", "v01", "v11"])
+    inten_cols: List[str] = p.get(
         "intensity_columns", ["y00_star", "y10_star", "y01_star", "y11_star"]
     )
     strict = bool(p.get("strict_bounds", True))

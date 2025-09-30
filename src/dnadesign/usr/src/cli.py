@@ -148,9 +148,26 @@ def main() -> None:
     sp_schema.set_defaults(func=cmd_schema)
 
     sp_head = sp.add_parser("head", help="Show first N rows")
-    sp_head.add_argument("dataset")
+    sp_head.add_argument("target", help="Dataset name OR a filesystem path")
     sp_head.add_argument("-n", type=int, default=10)
     sp_head.set_defaults(func=cmd_head)
+
+    # lightweight parquet inspection (path-oriented)
+    sp_cols = sp.add_parser("cols", help="List columns for a Parquet file")
+    sp_cols.add_argument("path", type=Path)
+    sp_cols.add_argument(
+        "--glob",
+        default=None,
+        help="When path is a directory, limit matches (e.g. 'events*.parquet').",
+    )
+    sp_cols.set_defaults(func=cmd_cols)
+
+    sp_cell = sp.add_parser("cell", help="Print a single cell from a Parquet file")
+    sp_cell.add_argument("--path", type=Path, required=True)
+    sp_cell.add_argument("--row", type=int, required=True)
+    sp_cell.add_argument("--col", required=True)
+    sp_cell.add_argument("--glob", default=None)
+    sp_cell.set_defaults(func=cmd_cell)
 
     sp_val = sp.add_parser("validate", help="Validate dataset")
     sp_val.add_argument("dataset")
@@ -464,11 +481,83 @@ def cmd_schema(args):
     print(d.schema())
 
 
-def cmd_head(args):
-    d = Dataset(args.root, args.dataset)
-    df = d.head(args.n)
+def _resolve_parquet_from_dir(dir_path: Path, glob: str | None = None) -> Path:
+    dir_path = Path(dir_path)
+    if not dir_path.exists() or not dir_path.is_dir():
+        raise FileNotFoundError(f"{dir_path} is not a directory")
+    cands = []
+    if (dir_path / "events.parquet").exists():
+        return dir_path / "events.parquet"
+    if glob:
+        cands = sorted(dir_path.glob(glob))
+    if not cands:
+        cands = sorted(dir_path.glob("events*.parquet"))
+    if not cands and (dir_path / "records.parquet").exists():
+        return dir_path / "records.parquet"
+    if not cands:
+        cands = sorted(dir_path.glob("*.parquet"))
+    if not cands:
+        raise FileNotFoundError(f"No Parquet files found under {dir_path}")
+    # newest by mtime (deterministic pick)
+    cands.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return cands[0]
+
+
+def _resolve_parquet_target(path_like: Path, glob: str | None = None) -> Path:
+    p = Path(path_like)
+    if p.is_file() and p.suffix.lower() == ".parquet":
+        return p
+    if p.is_dir():
+        return _resolve_parquet_from_dir(p, glob=glob)
+    raise FileNotFoundError(f"Target not found: {p}")
+
+
+def _print_df(df: pd.DataFrame) -> None:
     pd.set_option("display.max_colwidth", 120)
-    print(df)
+    print(df.to_string(index=False))
+
+
+def cmd_head(args):
+    # If the token resolves to a file/dir, do path-oriented head; else dataset mode.
+    try:
+        p = Path(args.target)
+        if p.exists():
+            pq_path = _resolve_parquet_target(p)
+            tbl = pq.read_table(
+                pq_path
+            )  # full or consider row group projection if needed
+            df = tbl.to_pandas().head(int(args.n))
+            print(f"# {pq_path}  rows={tbl.num_rows} cols={tbl.num_columns}")
+            _print_df(df)
+            return
+    except Exception:
+        pass
+    # dataset mode (unchanged)
+    d = Dataset(args.root, args.target)
+    df = d.head(args.n)
+    _print_df(df)
+
+
+def cmd_cols(args):
+    pq_path = _resolve_parquet_target(args.path, glob=args.glob)
+    pf = pq.ParquetFile(str(pq_path))
+    print(f"# {pq_path}  rows={pf.metadata.num_rows} cols={pf.metadata.num_columns}")
+    for i in range(pf.schema_arrow.names.__len__()):
+        f = pf.schema_arrow.field(i)
+        print(f"- {f.name}: {f.type}")
+
+
+def cmd_cell(args):
+    pq_path = _resolve_parquet_target(args.path, glob=args.glob)
+    col = str(args.col)
+    row = int(args.row)
+    # column projection for speed
+    tbl = pq.read_table(pq_path, columns=[col])
+    if row < 0 or row >= tbl.num_rows:
+        raise IndexError(f"row {row} out of range (0..{tbl.num_rows-1})")
+    val = tbl.column(0)[row].as_py()
+    # print exactly one value to stdout (no decoration)
+    print(val)
 
 
 def cmd_validate(args):

@@ -44,16 +44,14 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
         "x_column_name": cfg.data.x_column_name,
         "y_column_name": cfg.data.y_column_name,
         "representation_vector_dimension": rep.x_dim,
-        "model": {
-            "name": cfg.training.models.name,
-            "params": cfg.training.models.params,
-            "target_scaler": cfg.training.target_scaler.__dict__,
-        },
+        "model": {"name": cfg.model.name, "params": cfg.model.params},
         "training_policy": cfg.training.policy,
+        "training_y_ops": [
+            {"name": p.name, "params": p.params} for p in (cfg.training.y_ops or [])
+        ],
         "selection": {
             "strategy": cfg.selection.selection.name,
-            "top_k_default": cfg.selection.top_k_default,
-            "tie_handling": cfg.selection.tie_handling,
+            "params": cfg.selection.selection.params,
             "objective": {
                 "name": cfg.objective.objective.name,
                 "params": cfg.objective.objective.params,

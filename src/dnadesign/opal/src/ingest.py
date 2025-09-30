@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+from .registries.transforms_y import get_transform_y
 from .utils import OpalError
 
 
@@ -52,47 +53,23 @@ def _vec_len(v: Any) -> int:
     return 1
 
 
-def _transform_vec8_from_table(
-    csv_df: pd.DataFrame,
-    params: Dict[str, Any],
-) -> pd.DataFrame:
-    seq_col = params.get("sequence_column", "sequence")
-    logic_cols = params.get("logic_columns", ["v00", "v10", "v01", "v11"])
-    inten_cols = params.get(
-        "intensity_columns", ["y00_star", "y10_star", "y01_star", "y11_star"]
-    )
-
-    need = [seq_col, *logic_cols, *inten_cols]
-    missing = [c for c in need if c not in csv_df.columns]
-    if missing:
-        raise OpalError(f"Input CSV missing columns: {missing}")
-
-    df = csv_df.copy()
-    # bounds check for logic in [0,1]
-    logic = df[logic_cols].to_numpy(dtype=float)
-    if np.any(~np.isfinite(logic)):
-        raise OpalError("Non-finite values in logic columns.")
-    if (logic < -1e-9).any() or (logic > 1 + 1e-9).any():
-        # don't hard fail; log later in preview
-        pass
-
-    inten = df[inten_cols].to_numpy(dtype=float)
-    if np.any(~np.isfinite(inten)):
-        raise OpalError("Non-finite values in intensity columns.")
-
-    y = np.hstack([logic, inten]).tolist()
-    out = pd.DataFrame({"sequence": df[seq_col].astype(str).tolist(), "y": y})
-    return out
-
-
-def _apply_transform(
+def _apply_transform_via_registry(
     name: str, params: Dict[str, Any], csv_df: pd.DataFrame
 ) -> pd.DataFrame:
-    # For now, support the shipped demo transform name explicitly.
-    if name == "sfxi_vec8_from_table_v1":
-        return _transform_vec8_from_table(csv_df, params or {})
-    # If you have additional transforms registered via a registry, you can wire them here.
-    raise OpalError(f"Unknown Y transform: {name!r}")
+    """
+    Call the registered Y-ingest transform. We tolerate (csv_df, params)
+    or (csv_df, **params) call patterns for plugin friendliness.
+    """
+    fn = get_transform_y(name)
+    try:
+        return fn(csv_df, params)  # fn(df, params)
+    except TypeError:
+        try:
+            return fn(csv_df, **(params or {}))  # fn(df, **params)
+        except TypeError as e:
+            raise OpalError(
+                f"Y transform '{name}' has an unsupported signature."
+            ) from e
 
 
 def run_ingest(
@@ -102,7 +79,6 @@ def run_ingest(
     transform_name: str,
     transform_params: Dict[str, Any],
     y_expected_length: Optional[int],
-    setpoint_vector: Optional[List[float]] = None,  # kept for future previews
     y_column_name: str,
 ) -> Tuple[pd.DataFrame, IngestPreview]:
     """
@@ -111,7 +87,7 @@ def run_ingest(
       preview:   IngestPreview
     """
     # 1) Transform tidy -> (sequence, y)
-    labels = _apply_transform(transform_name, transform_params, csv_df)
+    labels = _apply_transform_via_registry(transform_name, transform_params, csv_df)
 
     # 2) Try to resolve ids by sequence (existing rows only; new rows remain without id for now)
     seq2id = {}
@@ -122,7 +98,8 @@ def run_ingest(
             .astype(str)
             .to_dict()
         )
-    labels["id"] = labels["sequence"].map(seq2id)
+    if "id" not in labels.columns:
+        labels["id"] = labels["sequence"].map(seq2id)
 
     # 3) Preview stats
     total = int(len(csv_df))
@@ -142,7 +119,7 @@ def run_ingest(
             else:
                 y_len_bad += 1
 
-    # Logic bounds warning (best-effort)
+    # Logic bounds warning (best-effort): try to read first 4 entries as logic
     warnings: List[str] = []
     try:
         v = np.asarray([yy[:4] for yy in labels["y"].tolist()], dtype=float)
@@ -165,4 +142,5 @@ def run_ingest(
     )
 
     # 4) Return labels (sequence, id?, y) and the preview
-    return labels[["sequence", "id", "y"]], preview
+    cols = ["sequence", "id", "y"] if "id" in labels.columns else ["sequence", "y"]
+    return labels[cols], preview

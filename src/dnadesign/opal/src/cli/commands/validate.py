@@ -16,11 +16,17 @@ from pathlib import Path
 
 import typer
 
-from ...config import load_config
 from ...data_access import ESSENTIAL_COLS
 from ...utils import ExitCodes, OpalError, print_stdout
+from ..formatting import kv_block
 from ..registry import cli_command
-from ._common import internal_error, resolve_config_path, store_from_cfg
+from ._common import (
+    internal_error,
+    load_cli_config,
+    opal_error,
+    resolve_config_path,
+    store_from_cfg,
+)
 
 
 @cli_command(
@@ -31,7 +37,7 @@ def cmd_validate(
 ):
     try:
         cfg_path = resolve_config_path(config)
-        cfg = load_config(cfg_path)
+        cfg = load_cli_config(config)
         store = store_from_cfg(cfg)
         df = store.load()
 
@@ -39,12 +45,18 @@ def cmd_validate(
         cfg_abs = str(Path(cfg_path).resolve())
         wd_abs = str(Path(cfg.campaign.workdir).resolve())
         rec_abs = str(store.records_path.resolve())
-        print_stdout(f"Config:  {cfg_abs}")
-        print_stdout(f"Workdir: {wd_abs}")
-        print_stdout(f"Records: {rec_abs}")
-        print_stdout(f"X in YAML: {cfg.data.x_column_name}")
-        print_stdout(f"Y in YAML: {cfg.data.y_column_name}")
-        print_stdout(f"Table shape: {df.shape[0]} rows × {df.shape[1]} cols")
+        ctx = kv_block(
+            "Context",
+            {
+                "Config": cfg_abs,
+                "Workdir": wd_abs,
+                "Records": rec_abs,
+                "X (YAML)": cfg.data.x_column_name,
+                "Y (YAML)": cfg.data.y_column_name,
+                "Table shape": f"{df.shape[0]} rows × {df.shape[1]} cols",
+            },
+        )
+        print_stdout(ctx)
 
         missing = [c for c in ESSENTIAL_COLS if c not in df.columns]
         if missing:
@@ -171,7 +183,7 @@ def cmd_validate(
             pass
 
     except OpalError as e:
-        typer.echo(str(e), err=True)
+        opal_error("run", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("validate", e)

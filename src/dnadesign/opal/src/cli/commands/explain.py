@@ -14,11 +14,17 @@ from pathlib import Path
 
 import typer
 
-from ...config import load_config
 from ...explain import explain_round
-from ...utils import ExitCodes, OpalError
+from ...utils import ExitCodes, OpalError, print_stdout
+from ..formatting import render_explain_human
 from ..registry import cli_command
-from ._common import internal_error, json_out, resolve_config_path, store_from_cfg
+from ._common import (
+    internal_error,
+    json_out,
+    load_cli_config,
+    opal_error,
+    store_from_cfg,
+)
 
 
 @cli_command(
@@ -29,15 +35,31 @@ def cmd_explain(
         None, "--config", "-c", envvar="OPAL_CONFIG", help="campaign.yaml"
     ),
     round: int = typer.Option(..., "--round", "-r"),
+    json: bool = typer.Option(
+        False,
+        "--json/--human",
+        help="Output as JSON (default: human).",
+    ),
+    format: str = typer.Option(  # deprecated alias
+        None,
+        "--format",
+        "-f",
+        help="(deprecated) Use --json/--human instead. Allowed: 'json' or 'human'.",
+        case_sensitive=False,
+    ),
 ):
     try:
-        cfg = load_config(resolve_config_path(config))
+        cfg = load_cli_config(config)
         store = store_from_cfg(cfg)
         df = store.load()
         info = explain_round(store, df, cfg, round)
-        json_out(info)
+        fmt = str(format).lower() if format else None
+        if json or fmt == "json":
+            json_out(info)
+        else:
+            print_stdout(render_explain_human(info))
     except OpalError as e:
-        typer.echo(str(e), err=True)
+        opal_error("run", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("explain", e)

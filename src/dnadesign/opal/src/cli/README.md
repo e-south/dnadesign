@@ -1,22 +1,18 @@
-# OPAL -- Command Line Interface
 
-The OPAL CLI is a thin layer over OPAL’s application modules. It lets you initialize a campaign, ingest new labeled samples, train/score/select for a round, inspect records and models, validate your dataset, and generate plots.
+# OPAL — Command Line Interface
+
+The OPAL CLI is a thin layer over OPAL’s application modules. It lets you initialize a campaign, ingest labeled samples, train/score/select for a round, inspect records and models, validate your dataset, and generate plots.
 
 This document is **CLI-focused**:
 
-* [Quick start](#quick-start)
-* [Command overview](#command-overview)
-* [Typical workflows](#typical-workflows)
+- [Quick start](#quick-start)
+- [Command overview](#command-overview)
+- [Typical workflows](#typical-workflows)
+- [Typing less](#typing-less)
+- [Extending the CLI](#extending-the-cli)
+- [CLI directory map](#cli-directory-map)
 
-  * [Initialize a campaign](#initialize-a-campaign)
-  * [Ingest labels for round *k* (CSV → Y)](#ingest-labels-for-round-k)
-  * [Train, score, and select for a round](#train-score-select-for-a-round)
-  * [Inspect the campaign state](#inspect-the-campaign-state)
-  * [Ephemeral predictions](#ephemeral-predictions)
-  * [Generate plots](#generate-plots)
-* [Typing less](#typing-less)
-* [Extending the CLI](#extending-the-cli)
-* [CLI directory map](#cli-directory-map)
+For architecture & concepts, see the **[Top-level README](../../README.md)**.
 
 ---
 
@@ -26,15 +22,13 @@ See all available commands and flags:
 
 ```bash
 opal --help
-```
+````
 
 ---
 
 ## Command overview
 
-Command modules are thin wrappers; they call into OPAL’s application layer and are designed to fail fast. Each command does one thing.
-
-> Tip: Most commands accept `--config /path/to/campaign.yaml`. You can often omit it—see [Typing less](#typing-less).
+Commands are thin wrappers; they call into OPAL’s application layer. Each command should do one thing.
 
 ### `init`
 
@@ -44,75 +38,77 @@ Initialize/validate a campaign workspace and write `state.json`.
 opal init --config <yaml>
 ```
 
-* Ensures the campaign `workdir` exists with `outputs/` and `inputs/`.
+* Ensures the campaign `workdir` has `outputs/` and `inputs/`.
 * Writes/updates `state.json` with campaign identity, data location, and settings.
 
 ### `ingest-y`
 
-Transform a tidy CSV/Parquet to model-ready **Y**, preview, confirm, and append to label history.
+Transform a tidy CSV/Parquet to model-ready **Y**, which lands in a campaign's `records.parquet`; preview, confirm, and append to label history.
 
 ```
 opal ingest-y \
   --config <yaml> \
-  --round <r> \
+  --observed-round <r> \
   --csv <path> \
   [--transform <name>] \
-  [--params <path.json>] \
+  [--params <transform_params.json>] \
   [--yes]
 ```
 
 Behavior & checks:
 
-* Uses `transforms_y` from your YAML (overridable via flags).
-* **Strict preflights**: schema expectations, completeness, etc.
-* **Preview is always printed** (counts + sample) before any write.
-* **New IDs** are allowed if your CSV includes **essentials**: `sequence`, `bio_type`, `alphabet`, and the configured **X** column (representation).
+* Uses `transforms_y` from YAML (overridable via flags).
+* **Strict preflights**: schema checks, completeness.
+* **Preview is printed** (counts + sample) before any write.
+* **New IDs** allowed if your CSV includes essentials: `sequence`, `bio_type`, `alphabet`, and the configured X column.
 * Appends to `opal__<slug>__label_hist` and writes the current Y column.
-* Idempotent per `(id, round)`: refuses to change label history for the same `(id, r)`.
+* Emits `label` events into `outputs/events.parquet`.
 
 ### `run`
 
-Train on all labels **≤ round k**, score the candidate universe, evaluate the objective, select top-k, write artifacts, and update caches.
+Train on labels with **`observed_round ≤ R`** (where `R` comes from `--labels-as-of`), score the candidate universe, evaluate the objective, select top-k, write artifacts, append canonical events, and update caches.
 
 ```
 opal run \
   --config <yaml> \
-  --round <r> \
+  --labels-as-of <r> \
   [--k <n>] \
   [--resume] \
-  [--force] \
   [--score-batch-size <n>]
 ```
 
 Pipeline:
 
-* Pulls eligible IDs up to round `r` using label history, then trains on the current Y column.
-* Predicts in batches.
+* Pulls effective labels with `observed_round ≤ R`, then trains on the current Y column.
+* Predicts in batches (`scoring.score_batch_size` or `--score-batch-size`).
 * Applies your **objective** to produce a scalar **selection score**.
-* Selects with the configured **selection strategy** and tie handling.
+* Selects with the configured strategy + tie handling.  
+  * If `selection.params.exclude_already_labeled: true` (default), designs already labeled at or before `--round` are **excluded from scoring/selection**.
 
-**Artifacts written**:
 
-* Per-round folder: `outputs/round_<r>/`
+**Artifacts written** (`outputs/round_<r>/`):
 
-  * `model.joblib`
-  * `selection_top_k.csv`
-  * `round_ctx.json` (RoundContext)
-  * `objective_meta.json`
-  * `round.log.jsonl`
-* **Canonical event log (append-only):** `outputs/events.parquet`
-  Per-(round, id) entries capturing the selection score, rank, selection flag, etc.
+* `model.joblib`
+* `selection_top_k.csv`
+* `round_ctx.json`
+* `objective_meta.json`
+* `round.log.jsonl` — compact JSONL with stage events and prediction batch progress
 
-**Write-backs to `records.parquet`:**
+**Events appended** to **`outputs/events.parquet`**:
 
-* **Caches only**: `opal__<slug>__latest_round`, `opal__<slug>__latest_score`.
-  (Per-round details live in `outputs/events.parquet`.)
+* `run_pred` — one row per candidate with **`pred__y_hat_model`** and **`pred__y_obj_scalar`**, selection rank/flag, and diagnostics.
+* `run_meta` — one row per run with model/config/selection snapshot and artifact checksums.
+
+**Write-backs to `records.parquet` (caches only):**
+
+* `opal__<slug>__latest_as_of_round`
+* `opal__<slug>__latest_pred_scalar`
 
 Flags to know:
 
-* `--resume`/`--force` allow overwriting existing per-round artifacts if you re-run a round.
-* `--r` overrides the default top-k from YAML.
-* `--score-batch-size` overrides YAML for one run.
+* `--k` overrides `selection.params.top_k`.
+* `--score-batch-size` overrides `scoring.score_batch_size` for this run.
+* `--resume` allows overwriting existing per-round artifacts.
 
 ### `predict`
 
@@ -121,18 +117,18 @@ Run **ephemeral** predictions from a frozen model. No writes to `records.parquet
 ```
 opal predict \
   --config <yaml> \
-  --model-path outputs/round_<r>/model.joblib \
+  [--model-path outputs/round_<r>/model.joblib | --round <r>] \
   [--in <csv|parquet>] \
   [--out <csv|parquet>]
 ```
 
-* Scores your input table (defaults to `records.parquet` if `--in` not provided).
-* Writes to stdout as CSV by default; or to `--out` file.
-* Validates that the representation column **X** exists.
+* Scores your input table (defaults to `records.parquet`).
+* Writes to stdout as CSV by default; or to `--out`.
+* Validates the X column exists.
 
 ### `record-show`
 
-Compact per-record history report (ground truth + per-round predictions/rank/selected).
+Per-record history report (ground truth + per-round predictions/rank/selected).
 
 ```
 opal record-show \
@@ -157,36 +153,37 @@ opal model-show \
 
 ### `explain`
 
-Dry-run planner for a round: prints counts, plan, and warnings. **No writes.**
+Dry-run planner for a round: counts, plan, warnings. **No writes.**
 
 ```
 opal explain --config <yaml> --round <k>
 ```
 
-* Shows number of training labels, candidate universe size, transforms/models/selection used, vector dimension, and any preflight warnings.
+Prints: number of training labels, candidate universe size, transforms/models/selection used, vector dimension, and any preflight warnings.
 
 ### `status`
 
-View a dashboard from `state.json`.
+Dashboard from `state.json`.
 
 ```
 opal status --config <yaml> [--round <k> | --all] [--json]
 ```
 
-* By default: latest round summary.
+* Default: latest round summary.
 * `--round k`: specific round details.
 * `--all`: dump every round (JSON-friendly).
 
 ### `validate`
 
-End-to-end table checks (essentials present; X column present).
+End-to-end table checks (essentials present; X present).
 
 ```
 opal validate --config <yaml>
 ```
 
-* Verifies required **USR essentials** exist in `records.parquet`.
-* Verifies the configured representation column **X** exists.
+* Verifies **USR essentials** exist in `records.parquet`.
+* Verifies the configured **X** column exists.
+* If Y is present, validates vector length & numeric/finite cells.
 
 ### `plot`
 
@@ -196,37 +193,29 @@ Generate plots declared in the campaign’s `plots:` block. Plots are plugin-dri
 opal plot --config <yaml-or-dir> [--round <selector>] [--name <plot-name>]
 ```
 
-* `--round <selector>`: `latest | all | 3 | 1,3,7 | 2-5`.
-  If omitted, plugins decide (starter plot defaults to **latest**).
-* `--name <plot-name>`: run a single plot by `name`; omit to run **all**.
-* Overwrites output files by default.
-* Continues on failure; prints full traceback; exit code **1** if any plot failed.
+* `--round <selector>`: `latest | all | 3 | 1,3,7 | 2-5` (plugin may define defaults).
+* `--name <plot-name>`: run a single plot by name; omit to run **all**.
+* Overwrites files by default; continues on error; exit code **1** if any plot failed.
 
-**Campaign YAML (minimal)**
+**Campaign YAML (example)**
 
 ```yaml
 plots:
   - name: score_vs_rank_latest
-    kind: scatter_score_vs_rank           # plot plugin id
+    kind: scatter_score_vs_rank     # plot plugin id
     params:
-      score_field: "score_sfxi"           # required by this starter plugin
+      score_field: "pred__y_obj_scalar"  # field from run_pred rows
       hue: null                           # or "round"
       highlight_selected: false
     output:
-      format: "png"                       # default png; supports svg/pdf
+      format: "png"                       # png/svg/pdf
       dpi: 600
       dir: "{campaign}/plots/{kind}/{name}"
       filename: "{name}{round_suffix}.png"
 ```
 
 **Data sources**
-When run in a campaign, built-ins are auto-available to plugins:
-
-* `events` → `./outputs/events.parquet`
-* `records` → `./records.parquet`
-* `artifacts` → `./artifacts/` (if used by plugins)
-
-You may add extra sources per plot:
+Plot plugins typically read from the campaign’s **`outputs/events.parquet`** and/or **`records.parquet`**. You may add extra sources per plot entry via:
 
 ```yaml
 data:
@@ -238,77 +227,38 @@ data:
 
 ## Typical workflows
 
-Below are usage examples. Adjust paths and names to your campaign.
-
 ### Initialize a campaign
 
 ```bash
 opal init --config src/dnadesign/opal/campaigns/my_campaign/campaign.yaml
 ```
 
-What this does:
+Creates `outputs/` and writes/updates `state.json`.
 
-* Validates your config and data references.
-* Creates `outputs/` and writes/updates `state.json`.
+### Ingest labels observed in round *r*
 
-### Ingest labels for round *r*
-
-Prepare a tidy file (CSV/Parquet) with:
-
-* Required identifiers: typically `id` (or `design_id`) and any fields your `transforms_y` needs.
-* For **new** records not yet in `records.parquet`, include **essentials**:
-  `sequence`, `bio_type`, `alphabet`, and the configured **X** column.
 
 ```bash
 opal ingest-y \
   --config src/dnadesign/opal/campaigns/my_campaign/campaign.yaml \
-  --round 0 \
+  --observed-round 0 \
   --csv data/my_new_data_with_labels.csv
-# OPAL prints a preview; confirm to proceed.
 ```
 
-This appends to label history (`opal__<slug>__label_hist`) and writes the current Y column.
+Appends to label history (`opal__<slug>__label_hist`) and emits `label` events.
 
-### Train-score-select for a round
+### Train–score–select with labels as of round *r*
 
 ```bash
 opal run \
   --config src/dnadesign/opal/campaigns/my_campaign/campaign.yaml \
-  --round 0 \
+  --labels-as-of 0 \
   --k 12
 ```
 
-You’ll get:
-
-* **Artifacts** in `outputs/round_0/`:
-
-  * `model.joblib`, `selection_top_k.csv`,
-  * `round_ctx.json`, `objective_meta.json`, `round.log.jsonl`
-* **Event log** appended at `outputs/events.parquet` (canonical per-round results).
-* **Caches updated** in `records.parquet`:
-
-  * `opal__<slug>__latest_round`
-  * `opal__<slug>__latest_score`
-
-### Inspect the campaign state
-
-```bash
-# Campaign status
-opal status --config src/dnadesign/opal/campaigns/my_campaign/campaign.yaml
-
-# Dry-run planner for next round
-opal explain --config src/dnadesign/opal/campaigns/my_campaign/campaign.yaml --round 1
-
-# Per-record card
-opal record-show --config src/dnadesign/opal/campaigns/my_campaign/campaign.yaml --id e153ebc...
-
-# Inspect saved model params & optional feature importances
-opal model-show --model-path src/dnadesign/opal/campaigns/my_campaign/outputs/round_0/model.joblib
-```
+You’ll get per-round artifacts, appended `run_pred`/`run_meta` events, and updated caches.
 
 ### Ephemeral predictions
-
-Use a frozen model to score a new table:
 
 ```bash
 opal predict \
@@ -320,29 +270,9 @@ opal predict \
 
 ### Generate plots
 
-Run all declared plots (defaults to latest round if the plugin chooses so):
-
 ```bash
 opal plot --config src/dnadesign/opal/campaigns/my_campaign/campaign.yaml
-```
-
-Run a single plot instance by name:
-
-```bash
-opal plot -c src/dnadesign/opal/campaigns/my_campaign/campaign.yaml --name score_vs_rank_latest
-```
-
-Select rounds:
-
-```bash
-# specific round
-opal plot -c . --round 3
-# set of rounds
-opal plot -c . --round 1,3,7
-# range of rounds
-opal plot -c . --round 2-5
-# all rounds
-opal plot -c . --round all
+opal plot -c . --name score_vs_rank_latest --round latest
 ```
 
 ---
@@ -351,60 +281,29 @@ opal plot -c . --round all
 
 You can often omit `--config` thanks to **auto-discovery**. The CLI tries, in order:
 
-1. **Explicit flag**: If you pass `--config`, it uses that path.
+1. **Explicit flag** (`--config`)
+2. **Environment variable** `OPAL_CONFIG`
+3. **Nearest campaign.yaml** in current or parent folders
+4. **Single fallback** under `src/dnadesign/opal/campaigns/`
 
-2. **Environment variable (`OPAL_CONFIG`)**:
-
-   ```bash
-   export OPAL_CONFIG=/absolute/path/to/campaign.yaml
-   ```
-
-3. **Current or parent folders**: If your CWD (or any parent) contains a `campaign.yaml`, OPAL auto-uses it:
-
-   ```bash
-   # from campaigns/my_campaign/
-   opal status
-   opal run -r 0
-   opal explain -r 1
-   opal plot
-   ```
-
-4. **Single fallback**: If there is **exactly one** `campaign.yaml` under `src/dnadesign/opal/campaigns/`, it will be used.
-
-#### Shell completions (press TAB for suggestions)
-
-Install once per shell:
+Shell completions:
 
 ```bash
-opal --install-completion zsh   # or: bash / fish / powershell
-exec $SHELL -l                  # reload your shell; or source your rc file
+opal --install-completion zsh   # bash / fish / powershell also supported
+exec $SHELL -l
 ```
 
-Then try:
+Debug tip:
 
 ```bash
-opal <TAB>
-opal run --<TAB>
+export OPAL_DEBUG=1  # full tracebacks on internal errors
 ```
-
-#### Debugging tip
-
-Set `OPAL_DEBUG=1` to print full tracebacks on internal errors:
-
-```bash
-export OPAL_DEBUG=1
-```
-
-(Otherwise, the CLI prints a concise message and a hint.)
 
 ---
 
 ## Extending the CLI
 
-Add your own command in three steps:
-
-1. Create a new module under `src/dnadesign/opal/src/cli/commands/`, e.g. `my_cmd.py`.
-2. Decorate your function:
+Add your own command:
 
 ```python
 from ..registry import cli_command
@@ -414,22 +313,22 @@ def cmd_my_cmd(...):
     ...
 ```
 
-3. The CLI auto-discovers it via `discover_commands()` and mounts it with `install_registered_commands()`.
+The CLI auto-discovers via `discover_commands()` and mounts with `install_registered_commands()`.
 
-**Guidelines**
+Guidelines:
 
-* Keep the command thin: parse flags, load config/store, call application code.
-* Reuse `_common.py` helpers for config resolution, stores, and JSON output.
-* Raise `OpalError` for user-correctable issues; let the CLI handle messaging/exit codes.
+* Keep commands thin: parse flags, load config/store, call application code.
+* Reuse `_common.py` helpers (`resolve_config_path`, `store_from_cfg`, etc.).
+* Raise `OpalError` for user-correctable issues; the CLI manages messaging/exit codes.
 
 ---
 
 ## CLI directory map
 
-```text
+```bash
 opal/src/cli/
   app.py            # builds Typer app; root callback & Ctrl-C handling
-  registry.py       # @cli_command decorator; discovery; install into app
+  registry.py       # @cli_command; discovery; install into app
   commands/
     _common.py      # resolve_config_path, store_from_cfg, json_out, internal_error
     init.py
@@ -447,3 +346,5 @@ opal/src/cli/
 *One command = one job.* Business logic stays in application modules.
 
 ---
+
+@e-south

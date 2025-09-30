@@ -95,21 +95,12 @@ class _Vec8TableParams(BaseModel):
         return v
 
 
-# ---- model: random_forest (with nested target_normalizer) ----
-class _TargetNormalizerParams(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    enable: bool = True
-    method: str = "robust_iqr_per_target"
-    minimum_labels_required: int = 5
-    center_statistic: str = "median"
-    scale_statistic: str = "iqr"
-
-
 @register_param_schema("model", "random_forest")
 class _RFParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
     n_estimators: int = 100
     criterion: str = "friedman_mse"
+    emit_feature_importance: bool = False
     max_depth: Optional[int] = None
     min_samples_split: int = 2
     min_samples_leaf: int = 1
@@ -121,11 +112,6 @@ class _RFParams(BaseModel):
     oob_score: bool = True
     random_state: int = 7
     n_jobs: int = -1
-
-    # model-local normalizer config
-    target_normalizer: _TargetNormalizerParams = Field(
-        default_factory=_TargetNormalizerParams
-    )
 
 
 @register_param_schema("objective", "sfxi_v1")
@@ -157,15 +143,16 @@ class _SFXIParams(BaseModel):
 @register_param_schema("selection", "top_n")
 class _TopNParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    top_k_default: int = 12
+    top_k: int = 12
     tie_handling: Literal["competition_rank", "dense_rank", "ordinal"] = (
         "competition_rank"
     )
-    objective: Literal["maximize", "minimize"] = "maximize"
+    objective_mode: Optional[Literal["maximize", "minimize"]] = None
+    exclude_already_labeled: bool = True
 
-    @field_validator("top_k_default")
+    @field_validator("top_k")
     @classmethod
     def _positive(cls, v):
         if v <= 0:
-            raise ValueError("top_k_default must be > 0")
+            raise ValueError("top_k must be > 0")
         return v

@@ -128,7 +128,9 @@ def cmd_plot(
 
     # Built-in data sources (auto-injected if present)
     builtins = {
-        "events": campaign_dir / "events.parquet",
+        # Canonical ledger thin index (SoT for plots):
+        "events": campaign_dir / "outputs" / "ledger.index.parquet",
+        # Optional convenience if a local records cache is colocated with campaign:
         "records": campaign_dir / "records.parquet",
         "artifacts": campaign_dir / "artifacts",
     }
@@ -162,9 +164,8 @@ def cmd_plot(
             data_paths[n] = pp
 
         out_cfg = entry.get("output") or {}
-        out_dir = (out_cfg.get("dir") or "{campaign}/plots/{kind}/{name}").format(
-            campaign=str(campaign_dir), kind=pkind, name=pname
-        )
+        # Force a flat output directory for all plots
+        out_dir = (campaign_dir / "outputs" / "plots").resolve()
         fmt = (out_cfg.get("format") or "png").lower()
         dpi = int(out_cfg.get("dpi", 600))
         fname = (out_cfg.get("filename") or "{name}{round_suffix}.png").format(

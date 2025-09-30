@@ -11,6 +11,7 @@ Dunlop Lab
 from __future__ import annotations
 
 import importlib
+import os
 import pkgutil
 from dataclasses import dataclass
 from typing import Callable, Dict
@@ -66,10 +67,32 @@ def discover_commands(package: str = "dnadesign.opal.src.cli.commands") -> None:
         placeholder_name = name.replace("_", "-")
 
         def _make_placeholder(n=name, exc=err):
-            def _fail_cmd():
-                raise typer.Exit(
-                    code=1
-                ) from None  # keeps Typer's clean message; full TB with OPAL_DEBUG=1
+            def _fail_cmd() -> None:
+                debug = str(os.getenv("OPAL_DEBUG", "")).strip().lower() in (
+                    "1",
+                    "true",
+                    "yes",
+                    "on",
+                )
+                if debug:
+                    import traceback
+
+                    typer.echo(
+                        f"[opal:{n}] import error while loading command module:",
+                        err=True,
+                    )
+                    typer.echo(f"{exc!r}", err=True)
+                    tb = "".join(
+                        traceback.format_exception(type(exc), exc, exc.__traceback__)
+                    )
+                    typer.echo(tb, err=True)
+                else:
+                    typer.echo(
+                        f"[opal:{n}] unavailable due to an import error. "
+                        f"Re-run with --debug (or OPAL_DEBUG=1) for full traceback.",
+                        err=True,
+                    )
+                raise typer.Exit(code=1)
 
             return _fail_cmd
 

@@ -3,6 +3,8 @@
 <dnadesign project>
 src/dnadesign/opal/src/config/types.py
 
+Dataclasses exposed to app/CLI layers. These are constructed by loader.py.
+
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
@@ -11,7 +13,7 @@ Dunlop Lab
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 
 # ---- Data location ----
@@ -19,7 +21,7 @@ from typing import Any, Dict, Optional, Union
 class LocationUSR:
     kind: str  # "usr"
     dataset: str
-    path: str  # unified key (replaces former usr_root)
+    path: str
 
 
 @dataclass
@@ -38,59 +40,32 @@ class PluginRef:
     params: Dict[str, Any] = field(default_factory=dict)
 
 
-# ---- Data block ----
+# ---- Blocks ----
 @dataclass
 class DataBlock:
     location: DataLocation
     x_column_name: str
     y_column_name: str
+    transforms_x: PluginRef
+    transforms_y: PluginRef
     y_expected_length: Optional[int] = None
-    # plugin-configured transforms
-    transforms_x: PluginRef = field(default_factory=lambda: PluginRef("identity", {}))
-    transforms_y: PluginRef = field(
-        default_factory=lambda: PluginRef("logic5_from_tidy_v1", {})
-    )
 
 
-# ---- Selection & objective (plugin-driven) ----
 @dataclass
 class SelectionBlock:
-    selection: PluginRef = field(default_factory=lambda: PluginRef("top_n", {}))
-    top_k_default: Optional[int] = None
-    tie_handling: Optional[str] = None
-    objective: Optional[str] = None  # "maximize" | "minimize"
+    selection: PluginRef  # params must contain top_k, tie_handling; optional objective_mode override
 
 
 @dataclass
 class ObjectiveBlock:
-    objective: PluginRef = field(default_factory=lambda: PluginRef("sfxi_v1", {}))
-
-
-# ---- Training / Safety / Meta ----
-@dataclass
-class TargetNormalizerCfg:
-    """
-    Per-target Y normalization used at model fit-time and inverted on prediction.
-    """
-
-    enable: bool = True
-    method: str = "robust_iqr_per_target"
-    minimum_labels_required: int = 5
-    center_statistic: str = "median"
-    scale_statistic: str = "iqr"  # keep name 'scale_statistic' in config for clarity
+    objective: PluginRef
 
 
 @dataclass
 class TrainingBlock:
-    models: PluginRef = field(default_factory=lambda: PluginRef("random_forest", {}))
-    policy: Dict[str, Any] = field(
-        default_factory=lambda: {
-            "cumulative_training": True,
-            "label_cross_round_deduplication_policy": "latest_only",
-            "allow_resuggesting_candidates_until_labeled": True,
-        }
-    )
-    target_normalizer: TargetNormalizerCfg = field(default_factory=TargetNormalizerCfg)
+    policy: Dict[str, Any] = field(default_factory=dict)
+    # NEW: ephemeral per-round Y operations (fit/transform/inverse). Optional; default = [].
+    y_ops: List[PluginRef] = field(default_factory=list)
 
 
 @dataclass
@@ -123,6 +98,7 @@ class CampaignBlock:
 class RootConfig:
     campaign: CampaignBlock
     data: DataBlock
+    model: PluginRef
     selection: SelectionBlock
     objective: ObjectiveBlock
     training: TrainingBlock

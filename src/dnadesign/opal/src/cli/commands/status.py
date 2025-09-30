@@ -14,11 +14,11 @@ from pathlib import Path
 
 import typer
 
-from ...config import load_config
 from ...status import build_status
 from ...utils import ExitCodes, OpalError, print_stdout
+from ..formatting import render_status_human
 from ..registry import cli_command
-from ._common import internal_error, json_out, resolve_config_path
+from ._common import internal_error, json_out, load_cli_config, opal_error
 
 
 @cli_command("status", help="Dashboard from state.json (latest round by default).")
@@ -29,23 +29,16 @@ def cmd_status(
     json: bool = typer.Option(False, "--json"),
 ):
     try:
-        cfg = load_config(resolve_config_path(config))
+        cfg = load_cli_config(config)
         st = build_status(
             Path(cfg.campaign.workdir) / "state.json", round_k=round, show_all=all
         )
         if json or all:
             json_out(st)
         else:
-            if st.get("latest_round"):
-                lr = st["latest_round"]
-                print_stdout(
-                    f"latest round: r={lr['round_index']}, n_train={lr['number_of_training_examples_used_in_round']}, \
-                        n_scored={lr['number_of_candidates_scored_in_round']}"
-                )
-            else:
-                print_stdout("No completed rounds.")
+            print_stdout(render_status_human(st))
     except OpalError as e:
-        typer.echo(str(e), err=True)
+        opal_error("run", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("status", e)

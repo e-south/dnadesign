@@ -16,9 +16,16 @@ import typer
 
 from ...config import load_config
 from ...state import CampaignState
-from ...utils import ExitCodes, OpalError, ensure_dir, file_sha256
+from ...utils import ExitCodes, OpalError, ensure_dir, file_sha256, print_stdout
+from ..formatting import render_init_human
 from ..registry import cli_command
-from ._common import internal_error, json_out, resolve_config_path, store_from_cfg
+from ._common import (
+    internal_error,
+    json_out,
+    opal_error,
+    resolve_config_path,
+    store_from_cfg,
+)
 
 
 @cli_command(
@@ -27,7 +34,10 @@ from ._common import internal_error, json_out, resolve_config_path, store_from_c
 def cmd_init(
     config: Path = typer.Option(
         None, "--config", "-c", help="Path to campaign.yaml", envvar="OPAL_CONFIG"
-    )
+    ),
+    json: bool = typer.Option(
+        False, "--json/--human", help="Output format (default: human)"
+    ),
 ):
     try:
         cfg_path = resolve_config_path(config)
@@ -79,9 +89,13 @@ def cmd_init(
             backlog={"number_of_selected_but_not_yet_labeled_candidates_total": 0},
         )
         st.save(Path(cfg.campaign.workdir) / "state.json")
-        json_out({"ok": True, "workdir": str(workdir.resolve())})
+        out = {"ok": True, "workdir": str(workdir.resolve())}
+        if json:
+            json_out(out)
+        else:
+            print_stdout(render_init_human(workdir=Path(out["workdir"])))
     except OpalError as e:
-        typer.echo(str(e), err=True)
+        opal_error("run", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("init", e)

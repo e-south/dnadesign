@@ -11,14 +11,14 @@ Dunlop Lab
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from typing_extensions import Literal
 
+from ..utils import OpalError
 from .plugin_schemas import validate_params
 from .types import (
     CampaignBlock,
@@ -32,12 +32,11 @@ from .types import (
     SafetyBlock,
     ScoringBlock,
     SelectionBlock,
-    TargetNormalizerCfg,
     TrainingBlock,
 )
 
 
-# ---- Strict YAML loader (duplicate keys fail fast) ----
+# ---- Strict YAML loader ----
 class _StrictLoader(yaml.SafeLoader):
     pass
 
@@ -57,7 +56,6 @@ _StrictLoader.add_constructor(
 )
 
 
-# ---- path helpers ----
 def _expand(p: str | os.PathLike) -> Path:
     return Path(os.path.expanduser(os.path.expandvars(str(p))))
 
@@ -70,12 +68,12 @@ def resolve_path_like(cfg_path: Path, value: str | os.PathLike) -> Path:
     return _resolve_relative_to(cfg_path, _expand(value))
 
 
-# ---- Pydantic model shells for top-level YAML (strict) ----
+# ---- Pydantic shells for strict validation of top-level YAML ----
 class PLocationUSR(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["usr"]
     dataset: str
-    path: str  # unified key (replaces former usr_root)
+    path: str
 
 
 class PLocationLocal(BaseModel):
@@ -110,29 +108,22 @@ class PCampaign(BaseModel):
     @field_validator("slug")
     @classmethod
     def _slug_ok(cls, v: str) -> str:
-        if not re.fullmatch(r"[a-z0-9_-]+", v):
+        import re as _re
+
+        if not _re.fullmatch(r"[a-z0-9_-]+", v):
             raise ValueError("campaign.slug must match ^[a-z0-9_-]+$")
         return v
-
-
-class PTargetNormalizer(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    enable: bool = True
-    method: str = "robust_iqr_per_target"
-    minimum_labels_required: int = 5
-    center_statistic: str = "median"
-    scale_statistic: str = "iqr"
 
 
 class PTraining(BaseModel):
     model_config = ConfigDict(extra="forbid")
     policy: Dict[str, Any] = Field(default_factory=dict)
-    target_normalizer: PTargetNormalizer = Field(default_factory=PTargetNormalizer)
+    y_ops: List[PPluginRef] = Field(default_factory=list)
 
 
 class PScoring(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    score_batch_size: int = 10_000  # single source of truth
+    score_batch_size: int = 10_000
 
 
 class PSafety(BaseModel):
@@ -153,65 +144,35 @@ class PRoot(BaseModel):
     model_config = ConfigDict(extra="forbid")
     campaign: PCampaign
     data: PData
-    transforms_x: Optional[PPluginRef] = None
-    transforms_y: Optional[PPluginRef] = None
-    models: Optional[PPluginRef] = None
-    objectives: Optional[PPluginRef] = None
-    selection: Optional[PPluginRef] = None
+    transforms_x: PPluginRef
+    transforms_y: PPluginRef
+    model: PPluginRef
+    objective: PPluginRef
+    selection: PPluginRef
     training: PTraining = Field(default_factory=PTraining)
     scoring: PScoring = Field(default_factory=PScoring)
     safety: PSafety = Field(default_factory=PSafety)
     metadata: PMetadata = Field(default_factory=PMetadata)
+    # Non-core, optional block used by the `opal plot` CLI.
+    plots: List[Dict[str, Any]] = Field(default_factory=list)
 
 
-# ---- Main loader (intentionally no backcompat for normalizer key) ----
 def load_config(path: Path | str) -> RootConfig:
     cfg_path = Path(path).resolve()
     raw = yaml.load(cfg_path.read_text(), Loader=_StrictLoader)
 
-    # --- pragmatic, unrelated migrations kept ---
-    # A) data.location.usr_root -> data.location.path
-    try:
-        loc = raw.get("data", {}).get("location", {})
-        if isinstance(loc, dict) and loc.get("kind") == "usr" and "usr_root" in loc:
-            loc["path"] = loc.pop("usr_root")
-    except Exception:
-        pass
-
-    # B) scoring.sort_stability -> removed
-    try:
-        if "scoring" in raw and isinstance(raw["scoring"], dict):
-            raw["scoring"].pop("sort_stability", None)
-    except Exception:
-        pass
-
-    # C) selection.params.score_batch_size -> scoring.score_batch_size
-    try:
-        sel = raw.get("selection")
-        if isinstance(sel, dict):
-            params = sel.get("params", {})
-            if isinstance(params, dict) and "score_batch_size" in params:
-                raw.setdefault("scoring", {})
-                sc = raw["scoring"]
-                if "score_batch_size" not in sc:
-                    sc["score_batch_size"] = params["score_batch_size"]
-                params.pop("score_batch_size", None)
-    except Exception:
-        pass
-    # --- end migrations ---
-
-    # Validate via strict Pydantic shells
     try:
         pyd = PRoot.model_validate(raw)
-    except ValidationError as e:
-        raise ValueError(f"Invalid campaign.yaml: {e}") from e
 
-    # Validate plugin params via schema registry (pass-through if unknown)
-    tx = pyd.transforms_x or PPluginRef(name="identity", params={})
-    ty = pyd.transforms_y or PPluginRef(name="logic5_from_tidy_v1", params={})
-    mdl = pyd.models or PPluginRef(name="random_forest", params={})
-    obj = pyd.objectives or PPluginRef(name="sfxi_v1", params={})
-    sel = pyd.selection or PPluginRef(name="top_n", params={})
+    except ValidationError as e:
+        raise OpalError(f"Invalid campaign.yaml: {e}")
+
+    # Validate params with schemas
+    tx = pyd.transforms_x
+    ty = pyd.transforms_y
+    mdl = pyd.model
+    obj = pyd.objective
+    sel = pyd.selection
 
     tx_params = validate_params("transform_x", tx.name, tx.params)
     ty_params = validate_params("transform_y", ty.name, ty.params)
@@ -219,17 +180,18 @@ def load_config(path: Path | str) -> RootConfig:
     obj_params = validate_params("objective", obj.name, obj.params)
     sel_params = validate_params("selection", sel.name, sel.params)
 
-    # Build dataclasses (public API) with ABS paths
+    # Build dataclasses
     def _abs(v: str) -> str:
         return str(resolve_path_like(cfg_path, v))
 
-    loc_model = pyd.data.location
-    if isinstance(loc_model, PLocationUSR):
+    if isinstance(pyd.data.location, PLocationUSR):
         loc_dc = LocationUSR(
-            kind="usr", dataset=loc_model.dataset, path=_abs(loc_model.path)
+            kind="usr",
+            dataset=pyd.data.location.dataset,
+            path=_abs(pyd.data.location.path),
         )
     else:
-        loc_dc = LocationLocal(kind="local", path=_abs(loc_model.path))
+        loc_dc = LocationLocal(kind="local", path=_abs(pyd.data.location.path))
 
     data_dc = DataBlock(
         location=loc_dc,
@@ -240,33 +202,13 @@ def load_config(path: Path | str) -> RootConfig:
         transforms_y=PluginRef(ty.name, ty_params),
     )
 
-    selection_dc = SelectionBlock(
-        selection=PluginRef(sel.name, sel_params),
-        top_k_default=sel_params.get("top_k_default"),
-        tie_handling=sel_params.get("tie_handling"),
-        objective=sel_params.get("objective"),
-    )
+    selection_dc = SelectionBlock(selection=PluginRef(sel.name, sel_params))
     objective_dc = ObjectiveBlock(objective=PluginRef(obj.name, obj_params))
-
     training_dc = TrainingBlock(
-        models=PluginRef(mdl.name, mdl_params),
-        policy=pyd.training.policy
-        or {
-            "cumulative_training": True,
-            "label_cross_round_deduplication_policy": "latest_only",
-            "allow_resuggesting_candidates_until_labeled": True,
-        },
-        target_normalizer=TargetNormalizerCfg(
-            enable=pyd.training.target_normalizer.enable,
-            method=pyd.training.target_normalizer.method,
-            minimum_labels_required=pyd.training.target_normalizer.minimum_labels_required,
-            center_statistic=pyd.training.target_normalizer.center_statistic,
-            scale_statistic=pyd.training.target_normalizer.scale_statistic,
-        ),
+        policy=pyd.training.policy or {},
+        y_ops=[PluginRef(t.name, t.params) for t in pyd.training.y_ops],
     )
-
     scoring_dc = ScoringBlock(score_batch_size=int(pyd.scoring.score_batch_size))
-
     safety_dc = SafetyBlock(
         fail_on_mixed_biotype_or_alphabet=pyd.safety.fail_on_mixed_biotype_or_alphabet,
         require_biotype_and_alphabet_on_init=pyd.safety.require_biotype_and_alphabet_on_init,
@@ -282,6 +224,7 @@ def load_config(path: Path | str) -> RootConfig:
             workdir=str(resolve_path_like(cfg_path, pyd.campaign.workdir)),
         ),
         data=data_dc,
+        model=PluginRef(mdl.name, mdl_params),
         selection=selection_dc,
         objective=objective_dc,
         training=training_dc,

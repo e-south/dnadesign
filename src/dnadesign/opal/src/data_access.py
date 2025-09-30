@@ -4,12 +4,16 @@
 src/dnadesign/opal/src/data_access.py
 
 RecordsStore abstracts reading/writing the records Parquet (USR or local),
-validating essential schema, label history, candidate universe, and the single
-representation transform (X) path.
+schema validation, label history caches, candidate universe, and the single
+representation (X) transform path.
 
-- Adds append_predictions_history(...), keeping predictions in append-only history.
-- Provides ensure_rows_exist / append_labels_from_df used by ingest.
-- Finishes candidate_universe and exposes labeled_id_set_leq_round.
+This file implements the caches:
+  - opal__<slug>__label_hist: list<struct{ r:int, ts:str, y:list<double>, src:str }>
+  - opal__<slug>__latest_as_of_round: int
+  - opal__<slug>__latest_pred_scalar: double
+
+No predictions are stored here otherwise; canonical predictions live in the
+ledger under outputs/ledger.* (predictions/runs/labels).
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -18,9 +22,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
-import hashlib
 import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
@@ -29,39 +31,19 @@ import numpy as np
 import pandas as pd
 
 from .registries.transforms_x import get_transform_x
-from .utils import ExitCodes, OpalError, ensure_dir, now_iso
+from .utils import OpalError
 
 ESSENTIAL_COLS = [
     "id",
     "bio_type",
     "sequence",
     "alphabet",
-    "length",
-    "source",
-    "created_at",
 ]
-
-
-def _infer_bio(sequence: str) -> tuple[str, str]:
-    """Heuristically infer (bio_type, alphabet) from the sequence."""
-    s = (sequence or "").upper()
-    if re.fullmatch(r"[ACGT]+", s):
-        return "dna", "dna_4"
-    return "protein", "protein_20"
-
-
-def _stable_id_from_sequence(sequence: str) -> str:
-    """Generate a stable hex id from the sequence."""
-    return hashlib.sha256((sequence or "").encode("utf-8")).hexdigest()
-
-
-def _is_null_like(v) -> bool:
-    return v is None or (isinstance(v, float) and pd.isna(v))
 
 
 @dataclass
 class RecordsStore:
-    kind: str  # "usr" or "local"
+    kind: str  # "usr" | "local"
     records_path: Path
     campaign_slug: str
     x_col: str
@@ -69,465 +51,401 @@ class RecordsStore:
     x_transform_name: str
     x_transform_params: Dict[str, Any]
 
-    # ---------- IO ----------
+    # --------------- basic IO ---------------
     def load(self) -> pd.DataFrame:
         if not self.records_path.exists():
-            raise OpalError(
-                f"records.parquet not found: {self.records_path}", ExitCodes.NOT_FOUND
-            )
+            raise OpalError(f"records.parquet not found: {self.records_path}")
         return pd.read_parquet(self.records_path)
 
     def save_atomic(self, df: pd.DataFrame) -> None:
-        """
-        Write Parquet atomically and normalize datetime columns to avoid
-        mixed dtypes with pyarrow.
-        """
-        ensure_dir(self.records_path.parent)
         tmp = self.records_path.with_suffix(".tmp.parquet")
-        df2 = df.copy()
-
-        # Normalize 'created_at' to UTC timestamps
-        if "created_at" in df2.columns:
-            ca = pd.to_datetime(df2["created_at"], errors="coerce", utc=True)
-            # retry with common integer units if needed
-            mask = ca.isna() & df2["created_at"].notna()
-            if mask.any():
-                ca.loc[mask] = pd.to_datetime(
-                    df2.loc[mask, "created_at"], errors="coerce", utc=True, unit="ms"
-                )
-                mask = ca.isna() & df2["created_at"].notna()
-            if mask.any():
-                ca.loc[mask] = pd.to_datetime(
-                    df2.loc[mask, "created_at"], errors="coerce", utc=True, unit="s"
-                )
-            df2["created_at"] = ca
-
-        df2.to_parquet(tmp, index=False)
+        df.to_parquet(tmp, index=False)
         tmp.replace(self.records_path)
 
-    def schema_validate_essential(self, df: pd.DataFrame) -> None:
-        missing = [c for c in ESSENTIAL_COLS if c not in df.columns]
-        if missing:
-            raise OpalError(
-                f"Missing essential columns: {missing}", ExitCodes.CONTRACT_VIOLATION
-            )
-
-    # ---------- Label history helpers ----------
+    # --------------- cache column names ---------------
     def label_hist_col(self) -> str:
         return f"opal__{self.campaign_slug}__label_hist"
 
-    @staticmethod
-    def _normalize_hist_cell(v) -> list[dict]:
-        """
-        Label history cells may be Python lists (preferred) or JSON strings.
-        Always return list-of-dicts (possibly empty).
-        """
-        if v is None:
-            return []
-        if isinstance(v, list):
-            return v
-        if isinstance(v, str):
-            try:
-                vv = json.loads(v)
-                return vv if isinstance(vv, list) else []
-            except Exception:
-                return []
-        return []
+    def latest_as_of_round_col(self) -> str:
+        return f"opal__{self.campaign_slug}__latest_as_of_round"
 
-    @staticmethod
-    def _labeled_leq_round(hist_cell, k: int) -> bool:
-        """True if ANY history entry has r <= k (treat r==-1 as eligible)."""
-        try:
-            for e in RecordsStore._normalize_hist_cell(hist_cell):
-                r = int(e.get("r", 9_999_999))
-                t = e.get("t", "label")
-                if t == "label" and r <= int(k):
-                    return True
-        except Exception:
-            return False
-        return False
+    def latest_pred_scalar_col(self) -> str:
+        return f"opal__{self.campaign_slug}__latest_pred_scalar"
 
-    # ---------- Cells parsing ----------
-    @staticmethod
-    def _parse_y_cell_to_vec(v) -> list[float] | None:
-        """
-        Parse a Y cell into list[float]. Returns None if invalid.
-        Accepts: list/tuple/ndarray/Series or JSON-like strings. Scalars -> [scalar].
-        """
-        if v is None:
-            return None
-        if isinstance(v, (list, tuple, np.ndarray, pd.Series)):
-            try:
-                arr = np.asarray(v, dtype=float).ravel()
-            except Exception:
-                return None
-            if not np.all(np.isfinite(arr)):
-                return None
-            return [float(x) for x in arr.tolist()]
-        if isinstance(v, str):
-            s = v.strip()
-            if s == "":
-                return None
-            try:
-                vv = json.loads(s)
-                return RecordsStore._parse_y_cell_to_vec(vv)
-            except Exception:
-                pass
-            if s.startswith("[") and s.endswith("]"):
-                inner = s[1:-1].strip()
-                parts = [] if inner == "" else [p.strip() for p in inner.split(",")]
-                try:
-                    arr = np.asarray([float(p) for p in parts], dtype=float)
-                except Exception:
-                    return None
-                if not np.all(np.isfinite(arr)):
-                    return None
-                return [float(x) for x in arr.tolist()]
-            try:
-                f = float(s)
-                if np.isfinite(f):
-                    return [float(f)]
-            except Exception:
-                return None
-            return None
-        try:
-            f = float(v)
-            if np.isfinite(f):
-                return [float(f)]
-        except Exception:
-            return None
-        return None
-
-    @staticmethod
-    def _parse_x_cell_to_vec(v) -> list[float] | None:
-        """Normalize X cell to list[float]."""
-        if v is None:
-            return None
-        if isinstance(v, (list, tuple, np.ndarray, pd.Series)):
-            arr = np.asarray(v, dtype=float).ravel()
-            if arr.ndim != 1:
-                return None
-            if not np.all(np.isfinite(arr)):
-                return None
-            return [float(x) for x in arr.tolist()]
-        if isinstance(v, str):
-            s = v.strip()
-            if s.startswith("[") and s.endswith("]"):
-                try:
-                    vv = json.loads(s)
-                    return RecordsStore._parse_x_cell_to_vec(vv)
-                except Exception:
-                    return None
-            try:
-                f = float(s)
-                return [float(f)] if np.isfinite(f) else None
-            except Exception:
-                return None
-        try:
-            f = float(v)
-            return [float(f)] if np.isfinite(f) else None
-        except Exception:
-            return None
-
-    # ---------- Training labels (Y-column is the source of truth) ----------
-    def training_labels_from_y(self, df: pd.DataFrame, round_k: int) -> pd.DataFrame:
-        """
-        Return rows eligible for training at round_k with columns ['id','y'].
-        Eligibility:
-          • X present & non-null AND
-          • Y present & parses to finite vector AND
-          • (no history) OR (history empty) OR (ANY history event 'label' has r <= round_k)
-            (r==-1 allowed and treated as eligible for all rounds)
-        """
-        if self.x_col not in df.columns or self.y_col not in df.columns:
-            return pd.DataFrame(columns=["id", "y"])
-
-        lh = self.label_hist_col()
-        have_h = lh in df.columns
-
-        rows: list[dict] = []
-        for _, row in df.iterrows():
-            vx = row.get(self.x_col, None)
-            if _is_null_like(vx):
-                continue
-            y_vec = self._parse_y_cell_to_vec(row.get(self.y_col, None))
-            if y_vec is None:
-                continue
-            eligible = (
-                (not have_h)
-                or (len(self._normalize_hist_cell(row.get(lh))) == 0)
-                or self._labeled_leq_round(row.get(lh), round_k)
-            )
-            if eligible:
-                rows.append({"id": str(row["id"]), "y": y_vec})
-        return pd.DataFrame(rows, columns=["id", "y"])
-
-    def labeled_id_set_leq_round(self, df: pd.DataFrame, round_k: int) -> set[str]:
-        """Set of IDs that have at least one label history entry with r <= round_k."""
-        lh = self.label_hist_col()
-        if lh not in df.columns:
-            return set()
-        out: set[str] = set()
-        for _, row in df.iterrows():
-            if self._labeled_leq_round(row.get(lh), round_k):
-                out.add(str(row["id"]))
-        return out
-
-    # ---------- Candidate universe ----------
-    def candidate_universe(self, df: pd.DataFrame, round_k: int) -> pd.DataFrame:
-        """
-        Return rows with X present and NOT labeled ≤ round_k.
-        """
-        lh = self.label_hist_col()
-        have_h = lh in df.columns
-
-        mask_x = (
-            df[self.x_col].apply(lambda v: not _is_null_like(v))
-            if self.x_col in df.columns
-            else pd.Series(False, index=df.index)
-        )
-        if have_h:
-            mask_not_labeled = df[lh].apply(
-                lambda hist: not self._labeled_leq_round(hist, round_k)
-            )
-        else:
-            mask_not_labeled = pd.Series(True, index=df.index)
-
-        out = df.loc[mask_x & mask_not_labeled, ["id", "sequence"]].copy()
-        return out.reset_index(drop=True)
-
-    # ---------- X transform ----------
-    def transform_matrix(
-        self, df: pd.DataFrame, ids: Iterable[str]
-    ) -> Tuple[np.ndarray, List[str]]:
-        """
-        Extract X vectors (after transform_x) for the given ids.
-        Returns (X_matrix, id_list_in_order). Raises OpalError on any transform issue.
-        """
-        ids = [str(x) for x in ids]
-        if not ids:
-            return np.zeros((0, 0), dtype=float), []
-
-        # Subset and keep lookup by id
-        df_id_map = (
-            df.set_index(df["id"].astype(str), drop=False)
-            if "id" in df.columns
-            else None
-        )
-        if df_id_map is None:
-            raise OpalError("Records table missing 'id' column.")
-
-        tx = get_transform_x(self.x_transform_name)
-        rows: list[np.ndarray] = []
-        id_list: list[str] = []
-
-        for rid in ids:
-            if rid not in df_id_map.index:
-                raise OpalError(f"ID not found in records: {rid}")
-            row = df_id_map.loc[rid]
-
-            v = row.get(self.x_col, None)
-            if _is_null_like(v):
-                raise OpalError(
-                    f"Missing X value in column '{self.x_col}' for id={rid}"
-                )
-            # Apply transform_x plugin
-            try:
-                x_vec = tx(v, params=self.x_transform_params)
-            except Exception as e:
-                raise OpalError(
-                    f"X transform '{self.x_transform_name}' failed for id={rid}: {e}"
-                ) from e
-
-            # Validate 1-D finite vector
-            try:
-                arr = np.asarray(x_vec, dtype=float).ravel()
-            except Exception as e:
-                raise OpalError(
-                    f"X transform '{self.x_transform_name}' returned non-numeric for id={rid}"
-                ) from e
-            if arr.size == 0 or not np.all(np.isfinite(arr)):
-                raise OpalError(
-                    f"X transform '{self.x_transform_name}' produced invalid vector for id={rid} (empty or NaN/Inf)"
-                )
-            rows.append(arr)
-            id_list.append(rid)
-
-        # Enforce constant width and give a pinpoint error otherwise
-        lengths = {r.shape[0] for r in rows}
-        if len(lengths) != 1:
-            dim_counts: Dict[int, List[str]] = {}
-            for rid, arr in zip(id_list, rows):
-                dim_counts.setdefault(arr.shape[0], []).append(str(rid))
-            detail = ", ".join(
-                f"d={d} (n={len(vs)}; e.g. {vs[0]})"
-                for d, vs in sorted(dim_counts.items())
-            )
-            raise OpalError(
-                f"X vectors must have a constant dimension across rows; got {detail}"
-            )
-
-        X = np.vstack(rows).astype(float, copy=False)
-        return X, id_list
-
-    # ---------- Ingest helpers ----------
-    def ensure_rows_exist(
-        self, df: pd.DataFrame, labels_df: pd.DataFrame, csv_df: pd.DataFrame
+    def upsert_current_y_column(
+        self, df: pd.DataFrame, labels_resolved: pd.DataFrame, y_col_name: str
     ) -> pd.DataFrame:
         """
-        When ingesting labels: if labels_df has sequences not present in df,
-        create minimal rows (essentials) with a stable id.
+        Ensure the configured y-column holds the latest label for the affected ids.
+        'labels_resolved' must have columns ['id','y'] with concrete ids (no NaN).
         """
-        new = df.copy()
-        seq_col = "sequence"
-        if seq_col not in labels_df.columns:
-            return new  # nothing to create
-        have = set(new["sequence"].astype(str)) if "sequence" in new.columns else set()
-        need = [s for s in labels_df[seq_col].astype(str).tolist() if s not in have]
-        if not need:
-            return new
+        out = df.copy()
+        if y_col_name not in out.columns:
+            out[y_col_name] = None
 
-        essentials: list[dict] = []
-        for s in need:
-            bio, alpha = _infer_bio(s)
-            rid = _stable_id_from_sequence(s)
-            essentials.append(
-                {
-                    "id": rid,
-                    "bio_type": bio,
-                    "sequence": s,
-                    "alphabet": alpha,
-                    "length": len(s or ""),
-                    "source": "ingest",
-                    "created_at": now_iso(),
-                }
-            )
+        id_to_y = dict(zip(labels_resolved["id"].astype(str), labels_resolved["y"]))
+        mapped = out["id"].astype(str).map(id_to_y)  # list-or-NaN per row
+        mask = mapped.notna()
+        out.loc[mask, y_col_name] = mapped[mask]
+        return out
 
-        new_rows = pd.DataFrame(essentials)
-        # Create missing columns in df for essentials
-        for c in ESSENTIAL_COLS:
-            if c not in new.columns:
-                new[c] = pd.Series(dtype=new_rows[c].dtype)
-        # Also ensure label history column exists
-        lh = self.label_hist_col()
-        if lh not in new.columns:
-            new[lh] = None
+    # --------------- label history ops ---------------
+    @staticmethod
+    def _normalize_hist_cell(cell: Any) -> List[Dict[str, Any]]:
+        """
+        Normalize a 'label_hist' cell into a Python List[Dict] where each dict has:
+          {r:int, ts:str, src:str, y: List[float]}
+        Be permissive on container types to tolerate different Parquet round-trips.
+        Accepted inputs:
+          - list / tuple of dicts
+          - numpy.ndarray (object) containing dicts or lists
+          - pandas.Series of dicts
+          - a single dict (treated as 1-element list)
+          - JSON string
+          - pyarrow scalars/arrays (via .as_py() / .to_pylist())
+        Any malformed entry is dropped; empty/unknown → [] (assertive default).
+        """
 
-        new = pd.concat([new, new_rows], ignore_index=True)
-        return new
+        def _deep_as_py(x: Any) -> Any:
+            # pyarrow scalars/arrays/structs
+            try:
+                if hasattr(x, "as_py"):
+                    return x.as_py()
+                if hasattr(x, "to_pylist"):
+                    return x.to_pylist()
+            except Exception:
+                pass
+            # numpy containers / scalars
+            if isinstance(x, np.ndarray):
+                return [_deep_as_py(v) for v in x.tolist()]
+            if isinstance(x, np.generic):
+                return x.item()
+            # pandas Series
+            if isinstance(x, pd.Series):
+                return [_deep_as_py(v) for v in x.to_list()]
+            # plain python
+            if isinstance(x, dict):
+                return {k: _deep_as_py(v) for k, v in x.items()}
+            if isinstance(x, (list, tuple)):
+                return [_deep_as_py(v) for v in x]
+            return x
+
+        if cell is None or (isinstance(cell, float) and np.isnan(cell)):
+            return []
+
+        # JSON string?
+        if isinstance(cell, str):
+            try:
+                cell = json.loads(cell)
+            except Exception:
+                return []
+
+        # Convert any nested structures deeply to Python
+        cell = _deep_as_py(cell)
+
+        # Normalize top-level to a list
+        if isinstance(cell, dict):
+            cell = [cell]
+        elif isinstance(cell, tuple):
+            cell = list(cell)
+        elif not isinstance(cell, list):
+            # e.g., still some exotic scalar → give up assertively
+            return []
+
+        out: List[Dict[str, Any]] = []
+        for e in cell:
+            if not isinstance(e, dict):
+                continue
+            # Coerce r to int (or drop if missing)
+            r = e.get("r", None)
+            try:
+                e["r"] = int(r) if r is not None else None
+            except Exception:
+                e["r"] = None
+            # Coerce y to list[float]
+            y = e.get("y", [])
+            y = _deep_as_py(y)
+            try:
+                e["y"] = [float(v) for v in (y or [])]
+            except Exception:
+                e["y"] = []
+            # Keep only minimally valid entries
+            if e["r"] is not None and isinstance(e.get("y", None), list):
+                out.append(e)
+        return out
 
     def append_labels_from_df(
         self,
         df: pd.DataFrame,
-        labels_id_y: pd.DataFrame,
+        labels: pd.DataFrame,  # must have columns: id, y
         r: int,
         *,
+        src: str = "ingest_y",
         fail_if_any_existing_labels: bool = True,
     ) -> pd.DataFrame:
         """
-        Append label rows (id, y) to label history, and write current Y column.
+        Append to label history with immutable semantics.
+        One new entry per (id, r). Fails if (id, r) already present and
+        fail_if_any_existing_labels is True.
         """
-        if not {"id", "y"}.issubset(set(labels_id_y.columns)):
-            raise OpalError("append_labels_from_df expects columns ['id','y']")
-
-        new = df.copy()
         lh = self.label_hist_col()
-        if lh not in new.columns:
-            new[lh] = None
+        out = df.copy()
+        if lh not in out.columns:
+            out[lh] = None
 
-        # Check conflicts per-(id, r)
-        if fail_if_any_existing_labels:
-            id_set = set(labels_id_y["id"].astype(str))
-            for _, row in new.iterrows():
-                if str(row["id"]) in id_set:
-                    for e in self._normalize_hist_cell(row.get(lh)):
-                        if e.get("t", "label") == "label" and int(
-                            e.get("r", -999)
-                        ) == int(r):
-                            raise OpalError(
-                                f"Label history already has a label for id={row['id']} at r={r}."
-                            )
+        # Build map id -> list(hist entries)
+        hist_map: Dict[str, List[Dict[str, Any]]] = {}
+        for _id, hist_cell in out[["id", lh]].itertuples(index=False, name=None):
+            hist_map[str(_id)] = self._normalize_hist_cell(hist_cell)
 
-        # Build map id -> y
-        id2y = {}
-        for i, y in labels_id_y[["id", "y"]].to_records(index=False):
-            if isinstance(y, (list, tuple, np.ndarray)):
-                vec = list(np.asarray(y, dtype=float).ravel())
-            else:
-                vec = [float(y)]
-            if not np.all(np.isfinite(vec)):
-                raise OpalError(f"Non-finite values in label for id={i}")
-            id2y[str(i)] = vec
+        new_ids = labels["id"].astype(str).tolist()
+        new_ys = labels["y"].tolist()
+        for i, _id in enumerate(new_ids):
+            cur = hist_map.get(_id, [])
+            # Duplicate guard
+            if any((int(e.get("r", -1)) == int(r)) for e in cur):
+                if fail_if_any_existing_labels:
+                    raise OpalError(f"Label history already has (id={_id}, r={r})")
+            entry = {
+                "r": int(r),
+                "ts": pd.Timestamp.utcnow().isoformat(),
+                "y": list(map(float, new_ys[i])),
+                "src": src,
+            }
+            cur.append(entry)
+            hist_map[_id] = cur
 
-        # Update Y column and history
-        for idx, row in new.iterrows():
-            sid = str(row["id"])
-            if sid not in id2y:
-                continue
-            yv = id2y[sid]
-            new.at[idx, self.y_col] = yv
-            hist = self._normalize_hist_cell(row.get(lh))
-            hist.append({"t": "label", "r": int(r), "y": yv, "ts": now_iso()})
-            new.at[idx, lh] = hist
+        # materialize back to column
+        hist_series = out["id"].astype(str).map(hist_map.get)
+        out[lh] = hist_series
+        return out
 
-        return new
-
-    # ---------- Predictions history ----------
-    def append_predictions_history(
-        self,
-        df: pd.DataFrame,
-        preds_df: pd.DataFrame,
-        r: int,
-        y_expected_length: int | None = None,
+    def training_labels_from_y(
+        self, df: pd.DataFrame, as_of_round: int
     ) -> pd.DataFrame:
         """
-        Append prediction entries to the same label history column (single source of truth).
+        Compute effective training labels at or before 'as_of_round' from label_hist cache.
+        Returns a frame with columns: id, y
         """
-        required = {"id", "yhat", "unc_mean_std", "score", "rank", "selected"}
-        if not required.issubset(set(preds_df.columns)):
-            missing = required - set(preds_df.columns)
-            raise OpalError(f"append_predictions_history missing columns: {missing}")
-
-        new = df.copy()
         lh = self.label_hist_col()
-        if lh not in new.columns:
-            new[lh] = None
-
-        pmap = {
-            str(rw["id"]): {
-                "yhat": (
-                    list(rw["yhat"])
-                    if isinstance(rw["yhat"], (list, tuple, np.ndarray))
-                    else rw["yhat"]
-                ),
-                "unc": (
-                    float(rw["unc_mean_std"]) if pd.notna(rw["unc_mean_std"]) else None
-                ),
-                "score": float(rw["score"]) if pd.notna(rw["score"]) else None,
-                "rank": int(rw["rank"]) if pd.notna(rw["rank"]) else None,
-                "selected": bool(rw["selected"]),
-            }
-            for _, rw in preds_df.iterrows()
-        }
-
-        for idx, row in new.iterrows():
-            sid = str(row["id"])
-            if sid not in pmap:
-                continue
-            entry = pmap[sid]
-            hist = self._normalize_hist_cell(row.get(lh))
-            hist.append(
-                {
-                    "t": "pred",
-                    "r": int(r),
-                    "yhat": entry["yhat"],
-                    "unc": entry["unc"],
-                    "score": entry["score"],
-                    "rank": entry["rank"],
-                    "selected": entry["selected"],
-                    "ts": now_iso(),
-                }
+        if lh not in df.columns:
+            raise OpalError(
+                f"Expected label history column '{lh}' not found in records.parquet. "
             )
-            new.at[idx, lh] = hist
+        recs: List[Tuple[str, List[float]]] = []
+        for _id, hist_cell in df[["id", lh]].itertuples(index=False, name=None):
+            _id = str(_id)
+            hist = self._normalize_hist_cell(hist_cell)
+            # choose latest entry with r <= as_of_round
+            best = None
+            for e in hist:
+                try:
+                    rr = int(e.get("r", 9_999_999))
+                    if rr <= as_of_round and (
+                        best is None or rr > int(best.get("r", -1))
+                    ):
+                        best = e
+                except Exception:
+                    continue
+            if best is not None:
+                recs.append((_id, [float(v) for v in best.get("y", [])]))
+        import os
+        import sys
 
-        return new
+        if not recs and os.getenv("OPAL_DEBUG_LABELS", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            non_empty = df[lh].dropna()
+            print(
+                f"[opal.debug] label_hist={lh} non_empty_rows={len(non_empty)} as_of_round={as_of_round}",
+                file=sys.stderr,
+            )
+            for i, (_, cell) in enumerate(non_empty.iloc[:3].items()):
+                print(
+                    f"[opal.debug] sample_cell_{i} type={type(cell)} preview={str(cell)[:160]}",
+                    file=sys.stderr,
+                )
+        return pd.DataFrame(recs, columns=["id", "y"])
+
+    def training_labels_with_round(
+        self, df: pd.DataFrame, as_of_round: int
+    ) -> pd.DataFrame:
+        """
+        Like training_labels_from_y, but also returns the observed round for the effective label.
+        Returns: DataFrame columns: id, y, r
+        """
+        lh = self.label_hist_col()
+        if lh not in df.columns:
+            raise OpalError(
+                f"Expected label history column '{lh}' not found in records.parquet. "
+            )
+        recs: List[Tuple[str, List[float], int]] = []
+        for _id, hist_cell in df[["id", lh]].itertuples(index=False, name=None):
+            _id = str(_id)
+            hist = self._normalize_hist_cell(hist_cell)
+            best = None
+            for e in hist:
+                try:
+                    rr = int(e.get("r", 9_999_999))
+                    if rr <= as_of_round and (
+                        best is None or rr > int(best.get("r", -1))
+                    ):
+                        best = e
+                except Exception:
+                    continue
+            if best is not None:
+                y = [float(v) for v in (best.get("y", []) or [])]
+                r = int(best.get("r", as_of_round))
+                recs.append((_id, y, r))
+        return pd.DataFrame(recs, columns=["id", "y", "r"])
+
+    # --------------- candidate universe & transforms ---------------
+    def candidate_universe(self, df: pd.DataFrame, as_of_round: int) -> pd.DataFrame:
+        """
+        Return a DataFrame with at least 'id' and 'sequence' for all rows with X present.
+        We do not exclude labeled rows from scoring; selection policy can decide.
+        """
+        if self.x_col not in df.columns:
+            raise OpalError(f"Candidate universe requires X column '{self.x_col}'.")
+        keep = df[self.x_col].notna()
+        cols = ["id", "sequence", self.x_col]
+        cols = [c for c in cols if c in df.columns]
+        return df.loc[keep, cols].copy()
+
+    def transform_matrix(
+        self, df: pd.DataFrame, ids: Iterable[str]
+    ) -> Tuple[np.ndarray, List[str]]:
+        """
+        Build X matrix for given ids using configured transform_x plugin.
+        Returns (X, id_order)
+        """
+        id_set = set(map(str, ids))
+        cols = ["id", self.x_col]
+        subset = df.loc[df["id"].astype(str).isin(id_set), cols].copy()
+        subset = subset.dropna(subset=[self.x_col])
+        subset = subset.sort_values("id")
+        tx = get_transform_x(self.x_transform_name, self.x_transform_params)
+        X = tx(subset[self.x_col])
+        return np.asarray(X), subset["id"].astype(str).tolist()
+
+    # --------------- ensure rows exist for ingest ---------------
+    def ensure_rows_exist(
+        self, df: pd.DataFrame, labels_df: pd.DataFrame, csv_df: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        If labels_df contains sequences that are not in df, create new rows with essentials from csv_df.
+        We do not write X here; X should arrive via normal data pipelines.
+        """
+        out = df.copy()
+        need_cols = set(ESSENTIAL_COLS + ["id"])
+        for c in need_cols:
+            if c not in out.columns:
+                out[c] = None
+
+        have_id_col = "id" in labels_df.columns
+        have_seq_col = "sequence" in labels_df.columns
+        if not have_id_col and not have_seq_col:
+            return out  # nothing to do
+
+        known_ids = (
+            set(out["id"].astype(str).tolist()) if "id" in out.columns else set()
+        )
+        seq_to_id = (
+            out[["sequence", "id"]]
+            .dropna()
+            .astype(str)
+            .drop_duplicates()
+            .set_index("sequence")["id"]
+            .to_dict()
+            if "sequence" in out.columns and "id" in out.columns
+            else {}
+        )
+
+        def _gen_id(seq: str) -> str:
+            # simple deterministic hash-based id for reproducibility when creating by sequence
+            import hashlib
+
+            return "s" + hashlib.sha1(seq.encode("utf-8")).hexdigest()[:16]
+
+        rows_to_add: List[Dict[str, Any]] = []
+        # a) rows WITH a real id → ensure that id exists (attach sequence if provided)
+        if have_id_col:
+            rows_with_id = labels_df.loc[labels_df["id"].notna()]
+            for _id, seq in rows_with_id[["id", "sequence"]].itertuples(
+                index=False, name=None
+            ):
+                _id = str(_id)
+                if _id not in known_ids:
+                    rows_to_add.append(
+                        {
+                            "id": _id,
+                            "sequence": (
+                                None
+                                if not have_seq_col
+                                else (None if pd.isna(seq) else str(seq))
+                            ),
+                        }
+                    )
+        # b) rows WITHOUT id but WITH sequence → create or reuse by sequence
+        if have_seq_col:
+            rows_no_id = (
+                labels_df.loc[~labels_df["id"].notna()] if have_id_col else labels_df
+            )
+            for seq in rows_no_id["sequence"].dropna().astype(str).tolist():
+                if seq not in seq_to_id:
+                    rows_to_add.append({"id": _gen_id(seq), "sequence": seq})
+
+        if rows_to_add:
+            new_df = pd.DataFrame(rows_to_add)
+            for c in need_cols:
+                if c not in new_df.columns:
+                    new_df[c] = None
+            out = pd.concat([out, new_df], ignore_index=True)
+
+        return out
+
+    # --------------- update ergonomic caches ---------------
+    def update_latest_cache(
+        self,
+        df: pd.DataFrame,
+        *,
+        slug: str,
+        latest_as_of_round: int,
+        latest_scalar_by_id: Dict[str, float],
+    ) -> pd.DataFrame:
+        out = df.copy()
+        col_r = self.latest_as_of_round_col()
+        col_s = self.latest_pred_scalar_col()
+        if col_r not in out.columns:
+            out[col_r] = None
+        if col_s not in out.columns:
+            out[col_s] = None
+
+        out[col_r] = int(latest_as_of_round)
+        # map assignments
+        id_series = out["id"].astype(str)
+        # prefer new values when provided, otherwise keep existing
+        mapped = id_series.map(latest_scalar_by_id)
+        # Prefer new values when provided; leave existing otherwise.
+        mask_new = mapped.notna()
+        out.loc[mask_new, col_s] = mapped[mask_new]
+        return out
+
+    # --------------- labeled ids ≤ round ---------------
+    def labeled_id_set_leq_round(self, df: pd.DataFrame, as_of_round: int) -> set[str]:
+        lh = self.label_hist_col()
+        s: set[str] = set()
+        if lh not in df.columns:
+            return s
+        for _id, hist_cell in df[["id", lh]].itertuples(index=False, name=None):
+            _id = str(_id)
+            for e in self._normalize_hist_cell(hist_cell):
+                try:
+                    if int(e.get("r", 9_999_999)) <= as_of_round:
+                        s.add(_id)
+                        break
+                except Exception:
+                    continue
+        return s

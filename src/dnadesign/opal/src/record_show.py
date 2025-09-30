@@ -3,7 +3,9 @@
 <dnadesign project>
 src/dnadesign/opal/src/record_show.py
 
-Per-record reporting utilities used by the CLI command `record-show`.
+Record-centric report: gathers label history from records.parquet AND all
+run_pred entries for the record from outputs/events.parquet, respecting
+each event's as_of_round.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -12,210 +14,140 @@ Dunlop Lab
 
 from __future__ import annotations
 
-import json
-from typing import Any, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 import pandas as pd
 
-from .utils import OpalError
+from .data_access import RecordsStore
 
 
-def _label_hist_col(slug: str) -> str:
-    """Single source of truth for the label-history column name."""
-    return f"opal__{slug}__label_hist"
-
-
-def _is_null_like(v: Any) -> bool:
-    # Avoid importing numpy: handle common nulls and pandas NA
-    if v is None:
-        return True
+def _relpath(p: Path) -> str:
     try:
-        # pd.isna is robust across numpy/pandas scalars and python None
-        return bool(pd.isna(v))
+        return str(Path(p).resolve().relative_to(Path.cwd().resolve()))
     except Exception:
-        return False
-
-
-def _as_list(v: Any) -> List[Any]:
-    if v is None:
-        return []
-    if isinstance(v, list):
-        return v
-    if isinstance(v, tuple):
-        return list(v)
-    # JSON-encoded string?
-    if isinstance(v, str):
-        s = v.strip()
-        if (s.startswith("[") and s.endswith("]")) or (
-            s.startswith("{") and s.endswith("}")
-        ):
-            try:
-                obj = json.loads(s)
-                if isinstance(obj, list):
-                    return obj
-                return [obj]
-            except Exception:
-                return []
-    # dict-like single entry
-    if isinstance(v, dict):
-        return [v]
-    return []
-
-
-def _normalize_hist_cell(cell: Any) -> List[Dict[str, Any]]:
-    """
-    Normalize the "label history" cell into a list[dict].
-
-    The store writes append-only snapshots per round with keys typically like:
-      - labels: {"r": int, "y": list[float]}
-      - preds : {"r": int, "yhat": list[float], "unc_mean_std": float, "score": float,
-                 "rank": int, "selected": bool}
-
-    We are defensive here because history can evolve over time.
-    """
-    if _is_null_like(cell):
-        return []
-    items = _as_list(cell)
-    out: List[Dict[str, Any]] = []
-    for it in items:
-        if not isinstance(it, dict):
-            # tolerate stringly-typed entries that failed json.loads above
-            continue
-        # Make a shallow copy and ensure 'r' is int when present
-        e = dict(it)
-        if "r" in e:
-            try:
-                e["r"] = int(e["r"])
-            except Exception:
-                # drop bad 'r' so it sorts last
-                e.pop("r", None)
-        out.append(e)
-    # sort by round if present
-    out.sort(key=lambda d: (d.get("r", 9_999_999),))
-    return out
-
-
-def _select_row_by_id_or_sequence(
-    df: pd.DataFrame, id_: Optional[str], sequence: Optional[str]
-) -> Tuple[int, Dict[str, Any]]:
-    if id_:
-        mask = df["id"].astype(str) == str(id_)
-        if not mask.any():
-            raise OpalError(f"id not found: {id_}")
-        idx = int(df.index[mask][0])
-        return idx, {"id": str(df.at[idx, "id"])}
-    if sequence:
-        if "sequence" not in df.columns:
-            raise OpalError("records table has no 'sequence' column.")
-        # exact match (string)
-        mask = df["sequence"].astype(str) == str(sequence)
-        if not mask.any():
-            # try case-insensitive match as a helpful fallback
-            seqs = df["sequence"].astype(str)
-            mask = seqs.str.lower() == str(sequence).lower()
-        if not mask.any():
-            raise OpalError(f"sequence not found: {sequence}")
-        # if multiple match (dup sequences), pick the first deterministically and signal
-        matches = df.index[mask].tolist()
-        idx = int(matches[0])
-        info = {"id": str(df.at[idx, "id"]), "sequence_match_count": len(matches)}
-        return idx, info
-    raise OpalError("Provide either id or sequence.")
+        return str(Path(p).resolve())
 
 
 def build_record_report(
-    df: pd.DataFrame,
+    df_records: pd.DataFrame,
     campaign_slug: str,
+    *,
     id_: Optional[str] = None,
     sequence: Optional[str] = None,
-    with_sequence: bool = False,
+    with_sequence: bool = True,
+    events_path: Optional[Path] = None,
+    records_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
-    """
-    Create a compact per-record report with ground truth & history, and per-round
-    prediction/selection snapshots (when present).
-
-    Parameters
-    ----------
-    df : DataFrame
-        The records table (must include 'id'; 'sequence' is optional if selecting by id).
-    campaign_slug : str
-        Campaign namespace slug used to resolve the label-history column name.
-    id_ : Optional[str]
-        Record id selector.
-    sequence : Optional[str]
-        Sequence selector (used when `id_` is None).
-    with_sequence : bool
-        If True, include the actual sequence string in the report.
-
-    Returns
-    -------
-    Dict[str, Any]
-        A plain dict safe for JSON or simple text rendering.
-    """
-    if "id" not in df.columns:
-        raise OpalError("records table missing required column: 'id'")
-
-    idx, sel_info = _select_row_by_id_or_sequence(df, id_, sequence)
-    rec_id = str(df.at[idx, "id"])
-    seq_val = (
-        str(df.at[idx, "sequence"])
-        if ("sequence" in df.columns and with_sequence)
-        else None
-    )
-
-    # Label-history parsing
-    lh_col = _label_hist_col(campaign_slug)
-    hist_entries: List[Dict[str, Any]] = (
-        _normalize_hist_cell(df.at[idx, lh_col]) if lh_col in df.columns else []
-    )
-
-    # Partition by round; keep the latest entry per round for compactness
-    per_round: Dict[int, Dict[str, Any]] = {}
-    rounds_labeled = 0
-    rounds_pred = 0
-    for e in hist_entries:
-        r = int(e.get("r", -1))
-        if r < 0:
-            # unscoped entry; keep it in a special bucket
-            per_round.setdefault(-1, {}).update(e)
-            continue
-        # we prefer later entries in case the same round has multiple snapshots
-        per_round[r] = {**per_round.get(r, {}), **e}
-        if "y" in e:
-            rounds_labeled += 1
-        if "yhat" in e or "score" in e:
-            rounds_pred += 1
-
-    latest_round = max([rk for rk in per_round.keys() if rk >= 0], default=None)
-
-    # Present a compact, human-friendly view
-    rounds_card = []
-    for rk in sorted([r for r in per_round.keys() if r >= 0]):
-        entry = per_round[rk]
-        rounds_card.append(
-            {
-                "r": rk,
-                "label_present": "y" in entry,
-                "pred_present": ("yhat" in entry) or ("score" in entry),
-                "score": entry.get("score"),
-                "rank": entry.get("rank"),
-                "selected": entry.get("selected"),
-                "unc_mean_std": entry.get("unc_mean_std"),
-            }
+    if id_ is None and sequence is None:
+        raise ValueError("Provide id or sequence.")
+    row = None
+    if id_ is not None:
+        m = df_records["id"].astype(str) == str(id_)
+        if m.any():
+            row = df_records.loc[m].head(1)
+    if row is None and sequence is not None:
+        m = (
+            (df_records.get("sequence") == sequence)
+            if "sequence" in df_records.columns
+            else None
         )
+        if m is not None and m.any():
+            row = df_records.loc[m].head(1)
+    if row is None:
+        return {"error": "record not found"}
+
+    row = row.iloc[0]
+    rid = str(row["id"])
+    # Prefer sequence from records if present; else we can pick it from events later.
+    seq_val = None
+    if "sequence" in df_records.columns:
+        try:
+            v = row.get("sequence", None)
+            seq_val = None if pd.isna(v) else str(v)
+        except Exception:
+            seq_val = None
 
     report: Dict[str, Any] = {
-        "id": rec_id,
-        "campaign": campaign_slug,
-        "label_history_column": lh_col if lh_col in df.columns else None,
-        "history_entries_total": len(hist_entries),
-        "latest_round_seen": latest_round,
-        "rounds_with_labels": rounds_labeled,
-        "rounds_with_predictions": rounds_pred,
-        "rounds": rounds_card,
+        "id": rid,
+        "sequence": (seq_val if with_sequence else None),
+        "label_hist_column": f"opal__{campaign_slug}__label_hist",
     }
-    report.update(sel_info)
-    if seq_val is not None:
-        report["sequence"] = seq_val
+
+    lh_col = f"opal__{campaign_slug}__label_hist"
+    hist = row.get(lh_col)
+    report["labels"] = (
+        RecordsStore._normalize_hist_cell(hist) if hist is not None else []
+    )
+
+    # Sources (succinct, relative) for clarity when many parquets exist
+    srcs: Dict[str, str] = {}
+    if records_path is not None:
+        srcs["records"] = _relpath(Path(records_path))
+    if events_path is not None:
+        srcs["events"] = _relpath(Path(events_path))
+    if srcs:
+        report["sources"] = srcs
+
+    latest_rank_comp: Optional[int] = None
+    avg_rank_comp: Optional[float] = None
+
+    if events_path is not None and events_path.exists():
+        ev = pd.read_parquet(events_path)
+        col = (
+            "event"
+            if "event" in ev.columns
+            else ("kind" if "kind" in ev.columns else None)
+        )
+        if col is None:
+            report["runs"] = []
+            return report
+        ev = ev[(ev[col] == "run_pred") & (ev["id"].astype(str) == rid)]
+        # compact per-round view
+        cols = [
+            c
+            for c in ev.columns
+            if c.startswith("pred__") or c.startswith("unc__") or c.startswith("sel__")
+        ]
+        cols = ["as_of_round", "run_id", "sequence"] + cols
+
+        out = ev[cols].sort_values(["as_of_round", "run_id"])
+        report["runs"] = out.to_dict(orient="records")
+
+        # If we didn't have a sequence in records, adopt first non-null from events.
+        if with_sequence and report.get("sequence") is None:
+            try:
+                nonnull = out["sequence"].dropna()
+                if not nonnull.empty:
+                    report["sequence"] = str(nonnull.iloc[0])
+            except Exception:
+                pass
+
+        # Rank summaries (competition rank). Robust to missing col.
+        if "sel__rank_competition" in out.columns and not out.empty:
+            try:
+                # latest round = max as_of_round; within that, prefer the max run_id (most recent)
+                lr = int(out["as_of_round"].max())
+                latest = out[out["as_of_round"] == lr]
+                # pick the last lexicographic run_id (they include ISO timestamp) → most recent
+                latest = latest.sort_values(["run_id"]).tail(1)
+                v = latest["sel__rank_competition"].iloc[0]
+                latest_rank_comp = int(v) if pd.notna(v) else None
+            except Exception:
+                latest_rank_comp = None
+            try:
+                avg_rank_comp = float(
+                    pd.to_numeric(out["sel__rank_competition"], errors="coerce")
+                    .dropna()
+                    .mean()
+                )
+            except Exception:
+                avg_rank_comp = None
+    else:
+        report["runs"] = []
+
+    # Attach summaries outside the branch for clarity
+    report["latest_rank_competition"] = latest_rank_comp
+    report["avg_rank_competition_across_rounds"] = avg_rank_comp
 
     return report

@@ -10,14 +10,23 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import dataclasses as _dc
 import json
 import os
+import traceback
 from pathlib import Path
+from pathlib import Path as _Path
 from typing import Optional
+
+from ...utils import ExitCodes, OpalError, print_stderr, print_stdout
+
+try:
+    import numpy as _np
+except Exception:
+    _np = None
 
 from ...config import LocationLocal, LocationUSR, RootConfig
 from ...data_access import RecordsStore
-from ...utils import ExitCodes, OpalError, print_stderr, print_stdout
 
 
 def resolve_config_path(opt: Optional[Path]) -> Path:
@@ -89,6 +98,85 @@ def resolve_config_path(opt: Optional[Path]) -> Path:
     )
 
 
+def _format_validation_error(e, cfg_path: Path) -> str:
+    """
+    Turn a Pydantic ValidationError into an actionable, human-first message,
+    keeping strict validation (no fallbacks).
+    """
+    try:
+        from pydantic import ValidationError  # type: ignore
+    except Exception:
+        # If pydantic isn't present for some reason, fall back to repr
+        return f"Invalid configuration in {cfg_path}:\n{e!r}"
+
+    if not isinstance(e, ValidationError):
+        return f"Invalid configuration in {cfg_path}:\n{e!r}"
+
+    lines = [f"Config schema error: {cfg_path}"]
+    errs = getattr(e, "errors", None)
+    errs = errs() if callable(errs) else (errs or [])
+    for err in errs:
+        loc = err.get("loc", [])
+        loc_str = ".".join(str(x) for x in loc) if loc else "(root)"
+        typ = err.get("type", "")
+        msg = err.get("msg", "")
+        lines.append(f"  - at: {loc_str}")
+        lines.append(f"    type: {typ}")
+        lines.append(f"    detail: {msg}")
+
+        # Assertive, context-specific hint: extra key under model.params for RF
+        if typ == "extra_forbidden" and loc_str.startswith("model.params."):
+            bad_key = loc[-1] if loc else "<?>"
+            lines.append(
+                "    hint: Remove this key; it is not a valid RandomForest parameter."
+            )
+            lines.append(
+                "          Typical params include: n_estimators, criterion, bootstrap,"
+            )
+            lines.append(
+                "          oob_score, random_state, n_jobs, max_depth, min_samples_split,"
+            )
+            lines.append("          min_samples_leaf, max_features, max_leaf_nodes,")
+            lines.append("          min_impurity_decrease, ccp_alpha, warm_start.")
+            if str(bad_key) == "emit_feature_importance":
+                lines.append(
+                    "          To export importances, run: opal model-show --out-dir <dir>"
+                )
+
+    return "\n".join(lines)
+
+
+def load_cli_config(config_opt: Optional[Path]) -> RootConfig:
+    """
+    Strict config loader for CLI commands. Converts Pydantic ValidationError into
+    an OpalError with a friendly, path-aware message.
+    """
+    cfg_path = resolve_config_path(config_opt)
+    try:
+        from ...config import load_config as _load_config
+
+        return _load_config(cfg_path)
+    except Exception as e:
+        # Prefer a precise message if it's a Pydantic validation error
+        try:
+            from pydantic import ValidationError  # type: ignore
+
+            cause = getattr(e, "__cause__", None)
+            ve = (
+                cause
+                if isinstance(cause, ValidationError)
+                else (e if isinstance(e, ValidationError) else None)
+            )
+            if ve is not None:
+                raise OpalError(
+                    _format_validation_error(ve, cfg_path), ExitCodes.BAD_ARGS
+                )
+        except Exception:
+            pass
+        # Otherwise, preserve the original exception semantics
+        raise
+
+
 def store_from_cfg(cfg: RootConfig) -> RecordsStore:
     loc = cfg.data.location
     if isinstance(loc, LocationUSR):
@@ -120,8 +208,23 @@ def store_from_cfg(cfg: RootConfig) -> RecordsStore:
     )
 
 
+def _json_default(o):
+    if _dc.is_dataclass(o):
+        return _dc.asdict(o)
+    if isinstance(o, _Path):
+        return str(o)
+    if _np is not None:
+        if isinstance(o, (_np.integer,)):
+            return int(o)
+        if isinstance(o, (_np.floating,)):
+            return float(o)
+        if isinstance(o, (_np.ndarray,)):
+            return o.tolist()
+    return str(o)
+
+
 def json_out(obj) -> None:
-    print_stdout(json.dumps(obj, indent=2))
+    print_stdout(json.dumps(obj, indent=2, default=_json_default))
 
 
 def internal_error(ctx: str, e: Exception) -> None:
@@ -134,3 +237,11 @@ def internal_error(ctx: str, e: Exception) -> None:
         print_stderr(
             f"Internal error during {ctx}: {e}\n(Hint: set OPAL_DEBUG=1 for a full traceback)"
         )
+
+
+def opal_error(ctx: str, e: OpalError) -> None:
+    """When OPAL_DEBUG=1, include a traceback for OpalError too."""
+    if str(os.getenv("OPAL_DEBUG", "")).strip().lower() in ("1", "true", "yes", "on"):
+        print_stderr(f"OpalError during {ctx}: {e}\n{traceback.format_exc()}")
+    else:
+        print_stderr(str(e))

@@ -1,12 +1,14 @@
 ## setpoint_fidelity_x_intensity `sfxi`
 
-**Intent.** Combine a model’s predicted **logic pattern** and **absolute fluorescent intensity** into a single score that rewards sequence designs that are both **right** (match the target setpoint) and **bright** (intense in the target conditions).
+> **Scope.** This document describes the end‑to‑end selection scalar used by OPAL’s demo pipeline (logic fidelity × intensity). It spans ingest, Y‑ops, modeling, objective, and events.
 
----
+**Objective intent:** Combine a model’s predicted **logic pattern** and **absolute fluorescent intensity** into a single score that rewards sequence designs that are both **right** (match the target setpoint) and **bright** (intense in the target conditions).
+
+--- 
 
 ### 1. What the model predicts
 
-The model predicts an **8-vector (Ŷ)** per input sequence. The first four entries describe the **shape** of a two-factor logic response (bounded from 0 to 1). The last four capture **absolute fluorescent intensity** per state, but stored in **log2 space** for modeling stability.
+The model predicts an **8-vector (Ŷ)** per input sequence (kept as `pred__y_hat_model`). The first four entries describe the **shape** of a two-factor logic response (bounded from 0 to 1). The last four capture **absolute fluorescent intensity** per state, but stored in **log2 space** for modeling stability.
 
 $$
 \underbrace{v_{00}, v_{10}, v_{01}, v_{11}}_{\text{logic in }[0,1]^4}\;,\;
@@ -16,7 +18,7 @@ $$
 * $v \in [0,1]^4$: **observed logic profile** in state order $[00,10,01,11]$.
 * $y^\star \in \mathbb{R}^4$: **per-state absolute fluorescent intensity** in log2 space.
 
-### 1.1 From experimental data → vec8
+### 1.1 From experimental data → 8-vector
 
 We start from raw fluorescent readouts for each state $i$:
 $Y^{\mathrm{RFU}}_i$ (YFP/OD600) and $C^{\mathrm{RFU}}_i$ (CFP/OD600).
@@ -61,7 +63,7 @@ $$
 y^\star_i = \log_2\!\big(y^{\mathrm{linear}}_i + \delta\big)
 $$
 
-**Vec8 label (stored):**
+**8-vector label (stored under `y_column_name`):**
 
 $$
 Y = [\,v_{00}, v_{10}, v_{01}, v_{11},\; y^\star_{00}, y^\star_{10}, y^\star_{01}, y^\star_{11}\,]
@@ -69,7 +71,8 @@ $$
 
 ### 1.2 Modeling note (median–IQR robust scaling):
 
-Random forest (RF) models can handle mixed targets (our vec8: four bounded logic $v$ + four log-intensity $y^\star$), but with low sample counts the per-state log-intensities risks having large variance, letting one state potentially dominate RF-internal split decisions. A affine, monotonic, and reversible median–IQR scaling puts the four intensity targets on a comparable scale so early fits aren’t skewed.
+Random forest (RF) models can handle mixed targets (our 8-vector: four bounded logic $v$ + four log-intensity $y^\star$), but with low sample counts the per-state log-intensities risks having large variance, letting one state potentially dominate RF-internal split decisions. An affine, monotonic, and reversible median–IQR scaling
+ puts the four intensity targets on a comparable scale so early fits aren’t skewed.
 
 * Fit-time transform (applied to all training samples, per state): compute campaign-cumulative training median and IQR for each intensity target $y^\star_i$, then
 
@@ -160,15 +163,18 @@ With predicted linear intensities $\widehat{y}^{\mathrm{linear}}_i$,
 
 $$
 E_{\mathrm{raw}} = \sum_{i=1}^{4} w_i \,\widehat{y}^{\mathrm{linear}}_i
-\quad\text{(equivalently } E_{\mathrm{raw}}=\tfrac{p\cdot \widehat{y}^{\mathrm{linear}}}{\max(P,\epsilon)}\text{).}
+\quad\text{(equivalently } E_{\mathrm{raw}}=\tfrac{p\cdot \widehat{y}^{\mathrm{linear}}}{\max(P,\epsilon)}\text{, with } \epsilon>0 \text{ a small guard).}
 $$
 
-Raising intensity where $p_i$ is large **always** increases $E_{\mathrm{raw}}$; intensity where $p_i=0$ does **not**. If $P=0$ (an “all-OFF” setpoint), set $E_{\mathrm{raw}}=0$ and let the logic term carry the score.
+Raising intensity where $p_i$ is large **always** increases $E_{\mathrm{raw}}$; intensity where $p_i=0$ does **not**. 
+
+If $P=0$ (an “all-OFF” setpoint), define $w=\mathbf{0}$ and set $E_{\mathrm{raw}}=0$; the score is then fully determined by the logic term.
+
 
 **Round-internal robust scaling.**
 We now map $E_{\mathrm{raw}}$ to $[0,1]$ using only **this round’s labeled designs**:
 
-* The denominator, **$\mathrm{denom}$**, is the **95th percentile** of $\{E_{\mathrm{raw}}\}$ recomputed over the round’s labeled rows under the current setpoint $p$, with a small floor $\epsilon>0$:
+* The denominator, **$\mathrm{denom}$**, is the **95th percentile** of $\{E_{\mathrm{raw}}\}$ recomputed over the round’s labels under the current setpoint $p$, with a small floor $\epsilon>0$:
 
   $$
   \mathrm{denom} \;=\; \max\!\Big(\text{95th percentile of } \{E^{\mathrm{(round)}}_{\mathrm{raw}}\},\ \epsilon\Big).
@@ -179,7 +185,8 @@ We now map $E_{\mathrm{raw}}$ to $[0,1]$ using only **this round’s labeled des
   E_{\mathrm{scaled}} \;=\; \min\!\Big(1,\ \max\!\big(0,\ \tfrac{E_{\mathrm{raw}}}{\mathrm{denom}}\big)\Big).
   $$
 
-Using the **same-round** labeled set makes the scale **self-calibrating** to that experiment/day; the 95th percentile is **robust** to a few extreme bright wells (they map to \~1 instead of blowing up the scale). As a result, $E_{\mathrm{scaled}}$ is unit-free, bounded, and comparable **within the round** without hard thresholds.
+Using the **same-round** labeled set makes the scale **self-calibrating** to that experiment/day; the 95th percentile is robust to a few extreme bright wells (they map to ~1). The realized denominator is a **per-run constant** and must be snapshotted in the **round context / objective meta artifact** (referenced by `run_meta`), not duplicated per-ID. As a result, $E_{\mathrm{scaled}}$ is unit-free, bounded, and comparable **within the round**.
+
 
 ---
 
@@ -237,36 +244,41 @@ Only proximity of $\widehat{v}$ to $p$ (being OFF everywhere) is rewarded.
 
 ---
 
-### 9. Column slugs (diagnostics)
+### 9. Emissions
 
-##### Minimal per-sample columns (persist)
+All outputs are namespaced in `events.parquet`.
 
-* `opal__{campaign}__r{k}__sfxi__score`; final scalar used for ranking.
-* `opal__{campaign}__r{k}__sfxi__logic_fidelity`; normalized RMSE→similarity in \[0,1].
-* `opal__{campaign}__r{k}__sfxi__intensity_effect_scaled`; setpoint-weighted intensity, scaled to \[0,1].
-* `opal__{campaign}__r{k}__sfxi__vhat_vec4`; predicted logic vector \[00,10,01,11].
-* `opal__{campaign}__r{k}__sfxi__yhat_linear_vec4`; predicted linear intensities \[00,10,01,11].
-* `opal__{campaign}__r{k}__sfxi__p_vec4`; setpoint used \[00,10,01,11] (self-contained scoring context).
-* `opal__{campaign}__r{k}__sfxi__flags`; compact QC flags (e.g., flat\_logic, tiny\_anchor, clipped).
-* `opal__{campaign}__r{k}__sfxi__setpoint_id`; human-readable tag for p (e.g., `AND`, `custom_v3`).
-* `opal__{campaign}__r{k}__sfxi__version`; objective/schema version for reproducibility.
+**Per-ID predictions (`kind="run_pred"`)**
 
-##### Round-level metadata (log once per round/batch; not per sample)
+- `pred__y_obj_scalar: double`                    ← the SFXI score used for ranking
+- `pred__y_hat_model: list<float>`                ← model-space vector
+- `obj__logic_fidelity_l2_norm01: float ∈ [0,1]`  ← \(F_\text{logic}\)
+- `obj__effect_scaled: float ∈ [0,1]`             ← \(E_\text{scaled}\)
 
-* `opal__{campaign}__r{k}__sfxi__intensity_denominator_p`; percentile used for scaling (e.g., 95).
-* `opal__{campaign}__r{k}__sfxi__intensity_denominator_value`; the actual P-value used as the denominator.
-* `opal__{campaign}__r{k}__sfxi__beta_gamma`; curvature params used (e.g., `1,1`).
-* `opal__{campaign}__r{k}__sfxi__robust_scaler_stats`; medians/IQRs for each intensity target (stored with the model or round log).
-* `opal__{campaign}__r{k}__sfxi__anchors_epsilons`; `{alpha, delta, epsilon}` and anchor summary for traceability.
+**Per-run metadata (`kind="run_meta"`)**
 
-##### Recomputable at runtime (don’t persist per sample)
+- `obj__name="sfxi_v1"`
+* `obj__params_hash`
+- `sel__score_field="pred__y_obj_scalar"`  ← selection ranks on this field
 
-* `opal__{campaign}__r{k}__sfxi__intensity_effect_raw`; recompute: `w·yhat_linear`.
-* `opal__{campaign}__r{k}__sfxi__rmse_to_setpoint`; recompute from `vhat_vec4` and `p_vec4`.
-* `opal__{campaign}__r{k}__sfxi__max_dist_D`; recompute from `p_vec4`.
-* `opal__{campaign}__r{k}__sfxi__P_sum`; recompute from `p_vec4`.
-* `opal__{campaign}__r{k}__sfxi__weights_vec4`; recompute as `p / sum(p)` (or zeros if sum=0).
-* `opal__{campaign}__r{k}__score__logic_x_intensity__beta{β}_gamma{γ}`
+Objective parameters surfaced to aid auditability without opening artifacts:
+
+  - `obj__logic_exponent_beta: double`
+  - `obj__intensity_exponent_gamma: double`
+  - `obj__log2_offset_delta: double` (the delta used to invert log2)
+  - `obj__setpoint_vec4: list<double>[4]`
+  - `obj__scale_percentile_p: int` (e.g., 95)
+  - `obj__scale_fallback_p: int`
+  - `obj__scale_min_n: int`
+  - `obj__scale_eps: double`
+  - `obj__scale_denom_value: double`
+
+
+**Recomputable at runtime (not persisted per-ID)**
+
+- `E_raw = dot(w, yhat_linear)` where `yhat_linear` is recovered by **inverting** `pred__y_hat_model[4:8]` using transforms in `run_meta` (target normalizer stats + `obj__log2_offset_delta`).
+- `F_logic` from `v_hat = pred__y_hat_model[0:4]` and the setpoint in `run_meta`.
+- `D` (worst-case distance) and weights `w` derived from the setpoint in `run_meta`.
 
 ---
 
