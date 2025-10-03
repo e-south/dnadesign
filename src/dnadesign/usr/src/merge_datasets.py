@@ -83,6 +83,12 @@ def _field_map(tbl: pa.Table):
     return {f.name: f for f in tbl.schema}
 
 
+def _casefold_keys(tbl: pa.Table) -> set[tuple[str, str]]:
+    bt = [str(x) for x in tbl.column("bio_type").to_pylist()]
+    sq = [str(x) for x in tbl.column("sequence").to_pylist()]
+    return {(b.lower(), s.upper()) for b, s in zip(bt, sq)}
+
+
 def _coerce_jsonish_to_type(
     col: "pa.ChunkedArray | pa.Array", target_type: pa.DataType, colname: str
 ) -> pa.Array:
@@ -98,7 +104,6 @@ def _coerce_jsonish_to_type(
 
     Returns a pyarrow.Array with the *destination* type.
     """
-    import json
     import math
 
     vals = col.to_pylist()
@@ -306,113 +311,6 @@ def _index_map(values: List[str]) -> dict:
     return {v: i for i, v in enumerate(values)}
 
 
-def _coerce_jsonish_to_type(
-    col: pa.ChunkedArray, target_type: pa.DataType, col_name: str
-) -> pa.Array:
-    """Try to coerce strings/dicts/lists into `target_type` (struct/list/primitive)."""
-    vals = col.to_pylist()
-
-    def parse(v):
-        if v is None:
-            return None
-        if isinstance(v, (list, dict)):
-            return v
-        if isinstance(v, str):
-            s = v.strip()
-            if not s:
-                return None
-            try:
-                return json.loads(s.replace("'", '"'))
-            except Exception:
-                return None
-        return v
-
-    parsed = [parse(v) for v in vals]
-
-    # struct<{...}>
-    if pa.types.is_struct(target_type):
-        field_names = [f.name for f in target_type]
-        out = []
-        for x in parsed:
-            if not isinstance(x, dict):
-                out.append({k: None for k in field_names})
-                continue
-            xx = {str(k).lower(): x[k] for k in x}  # case-fold keys
-            row = {}
-            for f in target_type:
-                v = xx.get(f.name.lower())
-                if v is None:
-                    row[f.name] = 0 if pa.types.is_integer(f.type) else None
-                else:
-                    try:
-                        if pa.types.is_integer(f.type):
-                            row[f.name] = int(v)
-                        elif pa.types.is_floating(f.type):
-                            row[f.name] = float(v)
-                        elif pa.types.is_string(f.type):
-                            row[f.name] = str(v)
-                        else:
-                            row[f.name] = v
-                    except Exception:
-                        row[f.name] = None
-            out.append(row)
-        return pa.array(out, type=target_type)
-
-    # list<...>
-    if pa.types.is_list(target_type):
-        inner = target_type.value_type
-        casted = []
-        for x in parsed:
-            if x is None:
-                casted.append(None)
-                continue
-            if not isinstance(x, list):
-                casted.append(None)
-                continue
-            if pa.types.is_string(inner):
-                casted.append([None if e is None else str(e) for e in x])
-            elif pa.types.is_integer(inner):
-                tmp = []
-                for e in x:
-                    try:
-                        tmp.append(int(e))
-                    except Exception:
-                        tmp.append(None)
-                casted.append(tmp)
-            elif pa.types.is_floating(inner):
-                tmp = []
-                for e in x:
-                    try:
-                        tmp.append(float(e))
-                    except Exception:
-                        tmp.append(None)
-                casted.append(tmp)
-            else:
-                casted.append(x)
-        return pa.array(casted, type=target_type)
-
-    # primitives
-    cleaned = []
-    for v in parsed:
-        if v is None:
-            cleaned.append(None)
-            continue
-        try:
-            if pa.types.is_integer(target_type):
-                cleaned.append(int(v))
-            elif pa.types.is_floating(target_type):
-                cleaned.append(float(v))
-            elif pa.types.is_boolean(target_type):
-                cleaned.append(bool(v))
-            elif pa.types.is_string(target_type):
-                cleaned.append(str(v))
-            else:
-                cleaned.append(v)
-        except Exception:
-            cleaned.append(None)
-    return pa.array(cleaned, type=target_type)
-
-
 # -------------------- core merge --------------------
 def merge_usr_to_usr(
     *,
@@ -426,6 +324,7 @@ def merge_usr_to_usr(
     assume_yes: bool = False,
     note: str = "",
     overlap_coercion: str = "none",  # "none" | "to-dest"
+    avoid_casefold_dups: bool = True,
 ) -> MergePreview:
     """
     Merge rows from a source USR dataset into a destination dataset.
@@ -488,6 +387,17 @@ def merge_usr_to_usr(
     s_aligned = _ensure_all_columns(
         src_tbl.select([c for c in src_tbl.schema.names if c in names]), fields
     )
+
+    # -------- drop source rows whose (bio_type, upper(sequence)) already exist in dest --------
+    if avoid_casefold_dups:
+        dest_cf = _casefold_keys(d_aligned)
+        s_bt = [str(x) for x in s_aligned.column("bio_type").to_pylist()]
+        s_sq = [str(x) for x in s_aligned.column("sequence").to_pylist()]
+        keep_mask_cf = [
+            (b.lower(), s.upper()) not in dest_cf for b, s in zip(s_bt, s_sq)
+        ]
+        if not all(keep_mask_cf):
+            s_aligned = s_aligned.filter(pa.array(keep_mask_cf))
 
     # ------- duplicate policy by id -------
     dest_ids = set(d_aligned.column("id").to_pylist())

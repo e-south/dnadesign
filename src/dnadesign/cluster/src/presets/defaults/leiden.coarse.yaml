@@ -1,0 +1,8 @@
+
+name: "leiden.coarse"
+kind: "fit"
+params:
+  neighbors: 10
+  resolution: 0.15
+  scale: false
+  metric: "euclidean"

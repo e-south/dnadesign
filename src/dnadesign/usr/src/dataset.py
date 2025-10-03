@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Union
@@ -32,6 +33,7 @@ import pyarrow.parquet as pq
 
 from .errors import (
     AlphabetError,
+    DuplicateGroup,
     DuplicateIDError,
     NamespaceError,
     SchemaError,
@@ -269,12 +271,74 @@ class Dataset:
             }
         )
 
-        # Duplicate ids within incoming?
-        if len(out_df["id"]) != out_df["id"].nunique():
-            raise DuplicateIDError(
-                "Duplicate ids in incoming rows (likely duplicate sequences)."
+        # ---------- Duplicate diagnostics (EXACT & CASE-INSENSITIVE) ----------
+        # EXACT duplicate groups (same canonical id → byte-for-byte duplicates)
+        by_id: Dict[str, List[int]] = defaultdict(list)  # id -> [1-based row idx]
+        for i, rid in enumerate(ids, start=1):
+            by_id[str(rid)].append(i)
+        exact_groups = [
+            DuplicateGroup(
+                id=rid,
+                count=len(rows_idx),
+                rows=rows_idx,
+                sequence=seqs[rows_idx[0] - 1],
             )
+            for rid, rows_idx in by_id.items()
+            if len(rows_idx) > 1
+        ]
+        exact_groups.sort(key=lambda g: (-g.count, g.id))
 
+        # CASE-INSENSITIVE duplicate groups
+        # Treat sequences that are the same *ignoring case* as duplicates too
+        # (helps catch accidental duplicates when case encodes no biology).
+        # Key: (bio_type_lower, uppercase(sequence))
+        bio_list = bio.astype(str).tolist()
+        casefold_map: Dict[tuple, List[int]] = defaultdict(list)
+        for i, (bt, s) in enumerate(zip(bio_list, seqs), start=1):
+            casefold_map[(bt.lower(), s.upper())].append(i)
+        casefold_groups_all = [
+            (key, rows_idx)
+            for key, rows_idx in casefold_map.items()
+            if len(rows_idx) > 1
+        ]
+        # Only show groups that are NOT already exact dup groups
+        exact_row_sets = {tuple(g.rows) for g in exact_groups}
+        casefold_groups = []
+        for (_, _), rows_idx in casefold_groups_all:
+            rows_idx_sorted = sorted(rows_idx)
+            # If this set is identical to an exact dup, skip (we already report it)
+            if tuple(rows_idx_sorted) in exact_row_sets:
+                continue
+            rid_example = ids[rows_idx_sorted[0] - 1]
+            seq_example = seqs[rows_idx_sorted[0] - 1]
+            casefold_groups.append(
+                DuplicateGroup(
+                    id=rid_example,
+                    count=len(rows_idx_sorted),
+                    rows=rows_idx_sorted,
+                    sequence=seq_example,
+                )
+            )
+        casefold_groups.sort(key=lambda g: (-g.count, g.id))
+
+        if exact_groups:
+            raise DuplicateIDError(
+                "Duplicate sequences detected in incoming data (same canonical id).",
+                groups=exact_groups[:5],
+                hint=(
+                    "Remove repeated rows before importing. If you need to keep a single copy, "
+                    "deduplicate by the 'sequence' column (case preserved)."
+                ),
+            )
+        if casefold_groups:
+            raise DuplicateIDError(
+                "Case-insensitive duplicate sequences detected in incoming data "
+                "(same letters, different capitalization).",
+                casefold_groups=casefold_groups[:5],
+                hint=(
+                    "Sequences that differ only by case are treated as duplicates at import time. "
+                ),
+            )
         incoming = pa.Table.from_pandas(
             out_df, schema=ARROW_SCHEMA, preserve_index=False
         )
@@ -282,11 +346,59 @@ class Dataset:
         # Merge with existing (append-only; reject collisions)
         if self.records_path.exists():
             existing = read_parquet(self.records_path)
+            # -------- case-insensitive duplicate check vs existing on disk --------
+            try:
+                ex_bt = [str(x) for x in existing.column("bio_type").to_pylist()]
+                ex_sq = [str(x) for x in existing.column("sequence").to_pylist()]
+                existing_cf = {(bt.lower(), sq.upper()) for bt, sq in zip(ex_bt, ex_sq)}
+                conflicts = [
+                    i
+                    for i, (bt, s) in enumerate(
+                        zip(bio.astype(str).tolist(), seqs), start=1
+                    )
+                    if (bt.lower(), s.upper()) in existing_cf
+                ]
+                if conflicts:
+                    preview = [
+                        DuplicateGroup(
+                            id=ids[i - 1], count=1, rows=[i], sequence=seqs[i - 1]
+                        )
+                        for i in conflicts[:5]
+                    ]
+                    raise DuplicateIDError(
+                        "Case-insensitive duplicate sequences already exist in this dataset.",
+                        casefold_groups=preview,
+                        hint="Run 'usr dedupe-sequences <dataset>' or remove duplicates from the import file.",
+                    )
+            except Exception:
+                # Don’t mask unrelated errors; limit to pretty-preview failure only.
+                pass
             existing_ids = set(existing.column("id").to_pylist())
             inter = existing_ids.intersection(set(out_df["id"].tolist()))
             if inter:
+                # Build a compact report for the first few conflicts, with input row indices
+                row_index_by_id = defaultdict(list)
+                for i, rid in enumerate(ids, start=1):
+                    row_index_by_id[rid].append(i)
+                preview = []
+                for rid in list(inter)[:5]:
+                    rows_idx = row_index_by_id.get(rid, [])
+                    seq_example = seqs[rows_idx[0] - 1] if rows_idx else ""
+                    preview.append(
+                        DuplicateGroup(
+                            id=rid,
+                            count=max(1, len(rows_idx)),
+                            rows=rows_idx,
+                            sequence=seq_example,
+                        )
+                    )
                 raise DuplicateIDError(
-                    f"Duplicate ids already present in dataset: {len(inter)} conflict(s)."
+                    f"Duplicate ids already present in dataset: {len(inter)} conflict(s).",
+                    groups=preview,
+                    hint=(
+                        "These sequences already exist in this dataset. "
+                        "Remove them from your import file or put new rows in a separate dataset."
+                    ),
                 )
             combined = pa.concat_tables([existing, incoming], promote_options="default")
             write_parquet_atomic(combined, self.records_path, self.snapshot_dir)
@@ -629,11 +741,28 @@ class Dataset:
         if len(ids) != len(set(ids)):
             raise DuplicateIDError("Duplicate ids detected.")
 
+        # id<->sequence bijection (case-insensitive on sequence)
+        seqs = tbl.column("sequence").to_pylist()
+        bt = tbl.column("bio_type").to_pylist()
+        # id -> sequence consistency (paranoid; impossible if ids are sha of (bio_type|sequence_norm))
+        # and sequence (casefold) -> one id
+        seq_key = [(str(b).lower(), str(s).upper()) for b, s in zip(bt, seqs)]
+        k_to_ids = defaultdict(set)
+        for rid, k in zip(ids, seq_key):
+            k_to_ids[k].add(rid)
+        bad = [k for k, s in k_to_ids.items() if len(s) > 1]
+        if bad:
+            msg = "Case-insensitive duplicate sequences found (same letters map to different ids)."
+            if strict:
+                raise DuplicateIDError(msg)
+            else:
+                print(f"WARNING: {msg} Run 'usr dedupe-sequences {self.name}'.")
+
         # alphabet check for dna_4 (case-insensitive)
         if "dna_4" in set(tbl.column("alphabet").to_pylist()):
             seqs = tbl.column("sequence").to_pylist()
-            bad = [s for s in seqs if s and re.search(r"[^ACGTacgt]", s)]
-            if bad:
+            non_acgt = [s for s in seqs if s and re.search(r"[^ACGTacgt]", s)]
+            if non_acgt:
                 msg = "Non-ACGT characters found under dna_4."
                 if strict:
                     raise AlphabetError(msg)

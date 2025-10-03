@@ -54,6 +54,9 @@ opal ingest-y -c campaign.yaml --observed-round 0 --csv inputs/r0/demo_y_sfxi.cs
 
 # 4) Train, score, select for round 0
 opal run -c campaign.yaml --labels-as-of 0
+
+# 5) Lists objective‑level info per round for row‑level diagnostics
+opal objective-meta -c campaign.yaml --round latest
 ````
 
 Artifacts appear in `outputs/round_0/`:

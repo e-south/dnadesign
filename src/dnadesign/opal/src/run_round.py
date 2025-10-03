@@ -365,6 +365,32 @@ def run_round(
     tv = _TrainView(Y_train, R_train, int(req.as_of_round))
     obj_res = obj_fn(y_pred=Y_hat, params=obj_params, ctx=octx, train_view=tv)
     y_obj_scalar = np.asarray(obj_res.score, dtype=float).ravel()
+    # Assert that objective returned finite scalars (no fallbacks)
+    non_finite_mask = ~np.isfinite(y_obj_scalar)
+    if non_finite_mask.any():
+        n = int(non_finite_mask.sum())
+        n_total = int(y_obj_scalar.size)
+        n_nan = int(np.isnan(y_obj_scalar).sum())
+        n_pinf = int(np.isposinf(y_obj_scalar).sum())
+        n_ninf = int(np.isneginf(y_obj_scalar).sum())
+        # We have id_order_pool already; build preview with ids (and optional sequences if available)
+        bad_ids = np.array(id_order_pool)[non_finite_mask]
+        preview_pairs = [
+            f"{bad_ids[i]}={y_obj_scalar[non_finite_mask][i]:.6g}"
+            for i in range(min(20, n))
+        ]
+        raise OpalError(
+            "Objective produced non-finite scores for {n}/{N} candidates "
+            "(NaN={na}, +Inf={pi}, -Inf={ni}). Sample: {pv}. "
+            "Ensure objective/Y-ops produce finite scalars.".format(
+                n=n,
+                N=n_total,
+                na=n_nan,
+                pi=n_pinf,
+                ni=n_ninf,
+                pv=", ".join(preview_pairs),
+            )
+        )
     diag = obj_res.diagnostics or {}
     obj_mode = getattr(obj_res, "mode", "maximize")
 

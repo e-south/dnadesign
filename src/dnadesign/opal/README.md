@@ -82,6 +82,7 @@ opal record-show -c path/to/campaign.yaml --id <some_id>
 opal explain -c path/to/campaign.yaml --round 1
 opal plot -c path/to/campaign.yaml
 opal predict -c path/to/campaign.yaml --round latest  # or --model-path
+opal objective-meta -c campaign.yaml --round latest
 
 ```
 

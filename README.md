@@ -46,9 +46,9 @@ dnadesign/
 
       **opal** is an [EVOLVEpro-style](https://www.science.org/doi/10.1126/science.adr6006) active-learning tool for DNA/protein sequence design campaigns. Provide a feature column (X) and a label column (Y); OPAL trains a regressor, predicts Ŷ for all sequence candidates, and selects the top-k each round.
 
-3. [**clustering**](src/dnadesign/clustering) 
+3. [**cluster**](src/dnadesign/cluster) 
   
-      **clustering** utilizes [Scanpy](https://scanpy.readthedocs.io/en/stable/) for cluster analysis on nucleotide sequences stored in the sibling **sequences** directory. By default, it uses mean-pooled output embeddings from **Evo 2** (e.g., a 1 × 512 vector) as input. The pipeline then generates UMAP embeddings, applies Leiden clustering, and also supports downstream analyses, such as cluster composition and diversity assessment.
+      **cluster** is a Parquet/CSV-first tool for Leiden clustering, UMAP visualisation, and a mix of other analyses.
 
 4. [**billboard**](src/dnadesign)  
 

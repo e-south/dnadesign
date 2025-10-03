@@ -424,11 +424,28 @@ class RecordsStore:
             out[col_s] = None
 
         out[col_r] = int(latest_as_of_round)
-        # map assignments
+        # Validate incoming values are finite — fail fast with context
+        import numpy as _np
+        import pandas as _pd
+
+        incoming = _pd.Series(latest_scalar_by_id, dtype="float64")
+        non_finite = ~_np.isfinite(incoming.to_numpy())
+        if non_finite.any():
+            bad = incoming[non_finite]
+            # preview up to 15 offenders
+            preview = [
+                {"id": str(k), "value": (None if _pd.isna(v) else float(v))}
+                for k, v in bad.head(15).items()
+            ]
+            raise OpalError(
+                "update_latest_cache received non‑finite values for opal__{slug}__latest_pred_scalar "
+                "({n} offender(s)). Sample: {pv}".format(
+                    slug=slug, n=int(non_finite.sum()), pv=preview
+                )
+            )
+        # map assignments (all finite)
         id_series = out["id"].astype(str)
-        # prefer new values when provided, otherwise keep existing
-        mapped = id_series.map(latest_scalar_by_id)
-        # Prefer new values when provided; leave existing otherwise.
+        mapped = id_series.map(incoming.to_dict())
         mask_new = mapped.notna()
         out.loc[mask_new, col_s] = mapped[mask_new]
         return out

@@ -85,19 +85,42 @@ def events_path(workdir: Path) -> Path:
 
 def _append_parquet(path: Path, df: pd.DataFrame) -> None:
     """
-    Append rows efficiently as a new row group.
-    Schema must be stable; caller ensures column set/order.
+    Append rows by **atomic concatenate-write** (no version-specific flags).
+    Steps:
+      • if file missing → write new file
+      • else → read existing, validate schema, concat, write tmp, atomic replace
     """
     ensure_dir(path.parent)
     import pyarrow as pa
     import pyarrow.parquet as pq
 
-    table = pa.Table.from_pandas(df, preserve_index=False)
+    new_tbl = pa.Table.from_pandas(df, preserve_index=False)
+
     if not path.exists():
-        pq.write_table(table, path)  # creates file with schema
+        pq.write_table(new_tbl, path)
         return
-    # append new row group; fails fast if schema mismatches (assertive)
-    pq.write_table(table, path, append=True)
+
+    try:
+        old_tbl = pq.read_table(path)
+    except Exception as e:
+        raise RuntimeError(
+            f"[ledger.index] failed to read existing Parquet file at {path!s}"
+        ) from e
+
+    # Assert schema compatibility (strict & explicit, easy to change later)
+    if list(old_tbl.schema.names) != list(new_tbl.schema.names):
+        raise RuntimeError(
+            "Ledger index schema mismatch.\n"
+            f"  existing: {list(old_tbl.schema.names)}\n"
+            f"  new     : {list(new_tbl.schema.names)}\n"
+            "Refusing to merge. You may delete the index to rebuild it, "
+            "or run a migration step."
+        )
+
+    out_tbl = pa.concat_tables([old_tbl, new_tbl], promote_options="default")
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    pq.write_table(out_tbl, tmp)
+    tmp.replace(path)
 
 
 def append_events(index_path: Path, df: pd.DataFrame) -> str:
@@ -229,4 +252,10 @@ def append_events(index_path: Path, df: pd.DataFrame) -> str:
             else:
                 idx[c] = [None] * n
         idx_df = pd.DataFrame(idx, columns=INDEX_COLS)
-        _append_parquet(index_path, idx_df)
+        try:
+            _append_parquet(index_path, idx_df)
+        except Exception as e:
+            raise RuntimeError(
+                f"[ledger.index] failed updating {index_path} "
+                f"(schema v{LEDGER_SCHEMA_VERSION}): {e}"
+            ) from e

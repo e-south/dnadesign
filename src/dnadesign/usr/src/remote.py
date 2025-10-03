@@ -9,6 +9,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import os
 import re
 import shlex
 import subprocess
@@ -49,19 +50,16 @@ class SSHRemote:
 
     # ---- subprocess helpers ----
 
-    def _ssh_base(self) -> List[str]:
-        key = []
-        if self.cfg.ssh_key_env:
-            key_path = Path(str(Path(self.cfg.ssh_key_env)))
-            # cfg.ssh_key_env stores the NAME of the env var; resolve it:
-            key_str = Path(str(Path(key_path)))  # keep type placid; not used
-            # Actually resolve from os.environ (we just pass through in CLI string):
-        return []
-
     def _ssh_cmd(self) -> List[str]:
         cmd = ["ssh"]
         if self.cfg.ssh_key_env:
-            cmd += ["-i", str(Path((__import__("os").environ[self.cfg.ssh_key_env])))]
+            key_env = self.cfg.ssh_key_env
+            key_path = os.environ.get(key_env)
+            if not key_path:
+                raise RemoteUnavailableError(
+                    f"Environment variable '{key_env}' not set (SSH key path)."
+                )
+            cmd += ["-i", str(Path(key_path))]
         return cmd + [f"{self.cfg.user}@{self.cfg.host}"]
 
     def _rsync_cmd(self) -> List[str]:
@@ -75,10 +73,13 @@ class SSHRemote:
             "--delay-updates",
         ]
         if self.cfg.ssh_key_env:
-            cmd += [
-                "-e",
-                f"ssh -i {shlex.quote(__import__('os').environ[self.cfg.ssh_key_env])}",
-            ]
+            key_env = self.cfg.ssh_key_env
+            key_path = os.environ.get(key_env)
+            if not key_path:
+                raise RemoteUnavailableError(
+                    f"Environment variable '{key_env}' not set (SSH key path)."
+                )
+            cmd += ["-e", f"ssh -i {shlex.quote(key_path)}"]
         return cmd
 
     def _ssh_run(self, remote_cmd: str, check: bool = True) -> Tuple[int, str, str]:

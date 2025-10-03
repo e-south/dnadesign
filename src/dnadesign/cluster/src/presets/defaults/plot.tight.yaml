@@ -1,0 +1,10 @@
+
+name: "plot.tight"
+kind: "plot"
+plot:
+  dims: [10, 10]
+  alpha: 0.6
+  size: 3.0
+  legend:
+    ncol: 1
+    bbox: [1.02, 1.0]

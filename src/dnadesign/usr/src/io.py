@@ -54,14 +54,18 @@ def _prune_snapshots(snapshot_dir: Path, keep_n: int) -> None:
     snaps = sorted(snapshot_dir.glob("records-*.parquet"))
     if keep_n <= 0:
         for p in snaps:
-            try: p.unlink()
-            except Exception: pass
+            try:
+                p.unlink()
+            except Exception:
+                pass
         return
     if len(snaps) <= keep_n:
         return
     for p in snaps[:-keep_n]:
-        try: p.unlink()
-        except Exception: pass
+        try:
+            p.unlink()
+        except Exception:
+            pass
 
 
 def write_parquet_atomic(

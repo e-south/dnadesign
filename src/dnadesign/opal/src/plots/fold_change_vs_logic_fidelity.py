@@ -16,13 +16,54 @@ import pandas as pd
 
 from ..registries.plot import register_plot
 from ._events_util import load_events_with_setpoint, resolve_events_path
+from ._mpl_utils import annotate_plot_meta, scale_to_sizes, scatter_smart
+from ._param_utils import (
+    event_columns_for,
+    get_float,
+    get_str,
+    normalize_metric_field,
+)
 
 
 @register_plot("fold_change_vs_logic_fidelity")
 def render(context, params: dict) -> None:
     events_path = resolve_events_path(context)
 
-    delta = float(params.get("intensity_log2_offset_delta", 0.0))
+    delta = get_float(params, ["intensity_log2_offset_delta"], 0.0)
+    alpha = get_float(params, ["alpha"], 0.40)
+    hue_field = normalize_metric_field(
+        get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None)
+    )
+    cmap = get_str(params, ["cmap"], "viridis")
+    cbar = bool(params.get("cbar", True))
+    # Accept multiple synonyms for size
+    size_by = normalize_metric_field(
+        get_str(params, ["size_by", "size", "size_field", "point_size_by"], None)
+    )
+    # Assert: requested keys must resolve
+    if (
+        any(k in params for k in ("hue_field", "hue", "color", "color_by", "colour_by"))
+        and not hue_field
+    ):
+        raise ValueError(
+            "A hue parameter was provided but could not be parsed. "
+            "Use an obj__/pred__/sel__ column or alias (e.g., 'logic_fidelity', 'fold_change', 'score')."
+        )
+    if (
+        any(k in params for k in ("size_by", "size", "size_field", "point_size_by"))
+        and not size_by
+    ):
+        raise ValueError(
+            "A size_by parameter was provided but could not be parsed. "
+            "Use an obj__/pred__/sel__ column or alias (e.g., 'logic_fidelity', 'fold_change')."
+        )
+    s_min = get_float(params, ["size_min"], 10.0)
+    s_max = get_float(params, ["size_max"], 60.0)
+    size_clip = params.get("size_clip")  # [lo, hi]
+    # None (default) = do not rasterize; set a positive integer in YAML to enable.
+    rasterize_at = params.get("rasterize_at", None)
+    if rasterize_at is not None:
+        rasterize_at = int(rasterize_at)
 
     # Ensure setpoint is available (backfill from run_meta if needed)
     need = {
@@ -31,8 +72,11 @@ def render(context, params: dict) -> None:
         "pred__y_hat_model",
         "sel__is_selected",
         "obj__diag__setpoint",
+        "pred__y_obj_scalar",
     }
-    df = load_events_with_setpoint(events_path, need)
+    # If hue/size ask for objective/pred/sel columns, load them from predictions
+    need |= event_columns_for(hue_field, size_by)
+    df = load_events_with_setpoint(events_path, need, round_selector=context.rounds)
 
     # Round selection: single round (default latest)
     rsel = context.rounds
@@ -84,16 +128,86 @@ def render(context, params: dict) -> None:
     fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
-    ax.scatter(lf, fold_change, s=20, alpha=0.85)
+    # Point sizes (optional) — can use derived series
+    if size_by is None:
+        sizes = float(s_min)
+    else:
+        if size_by in df.columns:
+            base = df[size_by].to_numpy(dtype=float)
+        elif size_by == "logic_fidelity":
+            base = lf
+        elif size_by == "fold_change":
+            base = fold_change
+        else:
+            raise ValueError(f"Unknown size_by field: {size_by!r}")
+        sizes = scale_to_sizes(base, s_min=s_min, s_max=s_max, clip=size_clip)
+
+    rasterized = lf.size >= rasterize_at
+    # Optional hue/coloring
+    color_kw = {}
+    if hue_field:
+        if hue_field in df.columns:
+            color_kw = {"c": df[hue_field].to_numpy(dtype=float), "cmap": cmap}
+        elif hue_field == "logic_fidelity":
+            color_kw = {"c": lf, "cmap": cmap}
+        elif hue_field == "fold_change":
+            color_kw = {"c": fold_change, "cmap": cmap}
+        else:
+            raise ValueError(f"Unknown hue field: {hue_field!r}")
+
+    sc = scatter_smart(
+        ax,
+        lf,
+        fold_change,
+        s=sizes,
+        alpha=alpha,
+        **color_kw,
+        rasterize_at=rasterize_at,
+    )
+    if hue_field and cbar:
+        cb = fig.colorbar(sc, ax=ax)
+        cb.set_label(
+            hue_field.replace("obj__", "").replace("pred__", "").replace("sel__", "")
+        )
     if "sel__is_selected" in df.columns:
         sel_mask = df["sel__is_selected"].fillna(False).astype(bool)
         if sel_mask.any():
             idx = df.index[sel_mask]
-            ax.scatter(lf[idx], fold_change[idx], s=36, alpha=0.95, edgecolor="black")
+            scatter_smart(
+                ax,
+                lf[idx],
+                fold_change[idx],
+                s=max(s_min, 1.4 * s_min),
+                alpha=min(1.0, alpha + 0.25),
+                edgecolors="black",
+                rasterize_at=rasterize_at,
+            )
 
-    ax.set_xlabel("Logic fidelity (0–1)")
-    ax.set_ylabel("Fold change (max–min) in linear intensity")
+    ax.set_xlabel("Logic fidelity (0-1)")
+    ax.set_ylabel("Fold change (max-min) in linear intensity")
     ax.set_title("Trade-off: Fold Change vs Logic Fidelity")
+
+    # Log + annotate
+    from ._mpl_utils import log_kv
+
+    log_kv(
+        context.logger,
+        "fold_change_vs_logic",
+        round_sel=context.rounds,
+        hue=hue_field or "-",
+        size_by=size_by or "-",
+        alpha=float(alpha),
+        rasterize_at=(rasterize_at if rasterize_at is not None else "off"),
+        points=int(lf.size),
+    )
+    annotate_plot_meta(
+        ax,
+        hue=hue_field,
+        size_by=size_by,
+        alpha=alpha,
+        rasterized=rasterized,
+        extras={"delta": f"{delta:.3g}"},
+    )
 
     out = context.output_dir / context.filename
     fig.savefig(out, dpi=context.dpi, bbox_inches="tight")

@@ -13,9 +13,10 @@ Dunlop Lab
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Set
+from typing import Iterable, List, Optional, Set, Union
 
 import pandas as pd
+import pyarrow.compute as pc
 from pyarrow import dataset as ds
 
 
@@ -35,7 +36,9 @@ def resolve_events_path(context) -> Path:
 
 
 def load_events_with_setpoint(
-    events_path: Path, base_columns: Iterable[str]
+    events_path: Path,
+    base_columns: Iterable[str],
+    round_selector: Optional[Union[str, int, List[int]]] = None,
 ) -> pd.DataFrame:
     """
     Read the minimum columns needed for a plot **from the ledger** and join
@@ -57,12 +60,35 @@ def load_events_with_setpoint(
             f"Missing runs sink: {runs_dir}. Run a round to produce it."
         )
 
+    def _arrow_filter_for_rounds(d: ds.Dataset):
+        if round_selector is None or round_selector == "all":
+            return None
+        # Compute single-round target for 'latest'/'unspecified'
+        if round_selector in ("latest", "unspecified"):
+            # Read only the as_of_round column to find max
+            t = d.to_table(columns=["as_of_round"])
+            if t.num_rows == 0:
+                return None
+            latest = int(pd.Series(t.column("as_of_round").to_pylist()).max())
+            return pc.field("as_of_round") == latest
+        # List[int] or int
+        if isinstance(round_selector, list):
+            vals = [int(x) for x in round_selector]
+            return pc.field("as_of_round").isin(vals)
+        try:
+            r = int(round_selector)
+            return pc.field("as_of_round") == r
+        except Exception:
+            return None
+
     def _read_pred(columns: list[str]) -> tuple[pd.DataFrame, set[str]]:
         """Return (df, names) from ledger.predictions (strict; no fallbacks)."""
         d = ds.dataset(str(pred_dir))
         names = {f.name for f in d.schema}
         cols = [c for c in columns if c in names]
-        df = d.to_table(columns=cols).to_pandas()
+        filt = _arrow_filter_for_rounds(d)
+        tbl = d.to_table(columns=cols, filter=filt)
+        df = tbl.to_pandas()
         return df, names
 
     df, names = _read_pred(sorted(want))

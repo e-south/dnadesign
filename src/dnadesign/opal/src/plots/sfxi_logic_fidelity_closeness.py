@@ -17,6 +17,7 @@ from mpl_toolkits.axes_grid1 import axes_size, make_axes_locatable
 
 from ..registries.plot import register_plot
 from ._events_util import load_events_with_setpoint, resolve_events_path
+from ._mpl_utils import annotate_plot_meta
 
 
 @register_plot("sfxi_logic_fidelity_closeness")
@@ -30,14 +31,15 @@ def render(context, params: dict) -> None:
             raise ValueError("top_percentile must be in (0, 100].")
 
     cmap = str(params.get("cmap", "Greys"))
-    # Users can either give figsize or derive from per-cell geometry (square cells).
-    figsize_in = params.get("figsize_in", None)  # e.g., [12, 4.5]
-    cell_size_in = float(params.get("cell_size_in", 0.90))  # per heatmap cell (in)
-    mse_panel_w_in = float(params.get("mse_panel_width_in", 3.2))  # right column (in)
-    cbar_w_in = float(params.get("cbar_width_in", 0.30))  # colorbar width (in)
-    cbar_pad_in = float(params.get("cbar_pad_in", 0.06))  # gap heatmap↔cbar (in)
-    mse_gap_in = float(params.get("mse_gap_in", 0.40))  # gap (heatmap+cbar)↔MSE (in)
-    min_fig_h_in = float(params.get("min_fig_h_in", 3.6))  # guard for 1–2 rows
+    # Geometry: keep both main panels square (1:1). Allow explicit figsize_in to tune fonts vs. plot area.
+    panel_size_in = float(params.get("panel_size_in", 4.0))  # used if no figsize_in
+    figsize_in = params.get("figsize_in")  # optional [W,H] in inches
+    cbar_w_in = float(params.get("cbar_width_in", 0.30))
+    cbar_pad_in = float(params.get("cbar_pad_in", 0.06))
+    gap_in = float(params.get("gap_between_panels_in", 0.40))
+    use_violin = bool(params.get("violin", True))
+    violin_alpha = float(params.get("violin_alpha", 0.55))
+    violin_width = float(params.get("violin_width", 0.9))  # noqa
 
     # ---- Data (minimal columns; target setpoint from run_meta) ----
     need = {
@@ -46,7 +48,7 @@ def render(context, params: dict) -> None:
         "pred__y_hat_model",
         "obj__diag__setpoint",
     }
-    df = load_events_with_setpoint(events_path, need)  # keeps memory narrow
+    df = load_events_with_setpoint(events_path, need, round_selector=context.rounds)
 
     # Round selector
     rsel = context.rounds
@@ -104,21 +106,21 @@ def render(context, params: dict) -> None:
     if heat.shape[1] != 4:
         raise ValueError("Expected 4 logic dimensions for SFXI plots.")
 
-    # ---- Figure layout: 2 columns (heatmap+attached-cbar | MSE) ----
-    # Derive figure size from cell geometry if user didn't pass figsize explicitly.
-    if figsize_in is None:
-        left_w = cell_size_in * 4.0
-        left_h = cell_size_in * float(heat.shape[0])
-        # include cbar width and its pad in the left block width
-        left_block_w = left_w + cbar_pad_in + cbar_w_in
-        fig_w = left_block_w + mse_panel_w_in
-        # Readability guard: don't let the figure collapse to ~1" tall when rows are few.
-        fig_h = max(left_h, min_fig_h_in)
+    # ---- Figure layout: two square panels + cbar. If figsize_in provided, derive panel size from it.
+    if figsize_in is not None:
+        fig_w, fig_h = float(figsize_in[0]), float(figsize_in[1])
+        # Choose the largest square side that fits both panels + cbar + gap
+        side = min(fig_h, (fig_w - gap_in - cbar_pad_in - cbar_w_in) / 2.0)
+        side = max(0.5, side)
+        left_block_w = side + cbar_pad_in + cbar_w_in
+        right_block_w = side
         figsize = (fig_w, fig_h)
     else:
-        if not (isinstance(figsize_in, (list, tuple)) and len(figsize_in) == 2):
-            raise ValueError("figsize_in must be [width_in, height_in].")
-        figsize = (float(figsize_in[0]), float(figsize_in[1]))
+        left_block_w = panel_size_in + cbar_pad_in + cbar_w_in
+        right_block_w = panel_size_in
+        fig_w = left_block_w + gap_in + right_block_w
+        fig_h = panel_size_in
+        figsize = (fig_w, fig_h)
 
     plt.rcParams.update(
         {
@@ -129,15 +131,13 @@ def render(context, params: dict) -> None:
         }
     )
     # Build two axes (heatmap block | MSE). Attach the colorbar to heatmap with inch-precise pad.
-    fig = plt.figure(figsize=figsize)  # explicit spacing control; no constrained_layout
-    # compute relative width ratio based on inches for intuitive control
-    left_block_w = (cell_size_in * 4.0) + cbar_pad_in + cbar_w_in
-    gs = fig.add_gridspec(1, 2, width_ratios=[left_block_w, mse_panel_w_in])
+    fig = plt.figure(figsize=figsize)  # explicit spacing control
+    gs = fig.add_gridspec(1, 2, width_ratios=[left_block_w, right_block_w])
     ax_hm = fig.add_subplot(gs[0, 0])
     ax_mse = fig.add_subplot(gs[0, 1])
-    # translate desired inch gap into 'wspace' fraction (fraction of average axes width)
-    avg_ax_w_in = 0.5 * (left_block_w + mse_panel_w_in)
-    fig.subplots_adjust(wspace=mse_gap_in / max(avg_ax_w_in, 1e-6))
+    # Convert inch gap to fractional wspace
+    avg_ax_w_in = 0.5 * (left_block_w + right_block_w)
+    fig.subplots_adjust(wspace=gap_in / max(avg_ax_w_in, 1e-6))
 
     # Style: hide top/right spines
     for ax in (ax_hm, ax_mse):
@@ -147,12 +147,17 @@ def render(context, params: dict) -> None:
     # Left: grayscale heatmap, square cells, shared bottom x-axis tick labels only
     im = ax_hm.imshow(
         heat,
-        aspect="equal",  # 1:1 per scalar cell
+        aspect="equal",  # square cells
         vmin=0.0,
         vmax=1.0,
         cmap=cmap,
         interpolation="nearest",
     )
+    # Make the left axes square independent of data aspect
+    try:
+        ax_hm.set_box_aspect(1.0)
+    except Exception:
+        ax_hm.set_aspect("equal", adjustable="box")
     ax_hm.set_yticks(np.arange(heat.shape[0]))
     ax_hm.set_yticklabels(labels_y)
     ax_hm.set_xticks(np.arange(4))
@@ -170,13 +175,69 @@ def render(context, params: dict) -> None:
     cbar = fig.colorbar(im, cax=cax, orientation="vertical")
     cbar.ax.set_ylabel("logic value", rotation=90, va="center")
 
-    # Right: closeness vs setpoint (MSE)
-    ax_mse.plot(rows, mse_series, marker="o", linewidth=2.0)
-    ax_mse.set_xlabel("Round")
-    ax_mse.set_ylabel("MSE vs setpoint")
+    # Right: closeness vs setpoint distributions (violin by default; mean line if not)
+    try:
+        ax_mse.set_box_aspect(1.0)
+    except Exception:
+        ax_mse.set_aspect("equal", adjustable="box")
     title_suffix = "" if top_percentile is None else f" (top {top_percentile:.0f}%)"
-    ax_mse.set_title("Pool closeness" + title_suffix)
+    if use_violin:
+        # Build per-round arrays of MSE (respect top_percentile if requested)
+        series = []
+        for r in rows:
+            sub = df.loc[df["as_of_round"] == r, "logic_hat_4"]
+            M = np.vstack(sub.to_list())
+            mse_all = np.nanmean((M - setpoint[None, :]) ** 2, axis=1)
+            if top_percentile is not None and len(mse_all) > 0:
+                k = max(1, int(np.ceil(len(mse_all) * (top_percentile / 100.0))))
+                mse_all = np.sort(mse_all)[:k]
+            mse_all = mse_all[np.isfinite(mse_all)]
+            if mse_all.size == 0:
+                raise ValueError(f"No finite MSE values for round {r}.")
+            if (
+                float(np.nanmax(mse_all)) <= float(np.nanmin(mse_all))
+                or mse_all.size < 3
+            ):
+                raise ValueError(
+                    f"Cannot draw violin: round {r} MSE distribution is degenerate "
+                    f"(size={mse_all.size}, zero variance)."
+                )
+            series.append(mse_all)
+        parts = ax_mse.violinplot(
+            series, positions=rows, widths=0.9, showmeans=True, showextrema=False
+        )
+        for pc in parts["bodies"]:
+            pc.set_alpha(violin_alpha)
+        parts["cmeans"].set_alpha(min(1.0, violin_alpha + 0.2))
+        ax_mse.set_ylabel("MSE vs setpoint")
+        ax_mse.set_title("Pool closeness (violin)" + title_suffix)
+    else:
+        ax_mse.plot(rows, mse_series, marker="o", linewidth=2.0)
+        ax_mse.set_ylabel("MSE vs setpoint")
+        ax_mse.set_title("Pool closeness" + title_suffix)
+    ax_mse.set_xlabel("Round")
     ax_mse.set_xticks(rows)
+
+    # Annotate + log
+    sp_str = "[" + ", ".join(f"{v:.2f}" for v in list(setpoint)) + "]"
+    annotate_plot_meta(
+        ax_hm,
+        hue=None,
+        size_by=None,
+        alpha=None,
+        rasterized=False,
+        extras={
+            "setpoint": sp_str,
+            "top%": (f"{top_percentile:.0f}" if top_percentile else "all"),
+        },
+    )
+    context.logger.info(
+        "params sfxi_logic_fidelity_closeness: rounds=%s figsize=%s panel=%.2f top_percentile=%s",
+        rows,
+        (figsize if figsize_in is not None else "(auto)"),
+        (right_block_w if figsize_in is not None else panel_size_in),
+        (f"{top_percentile:.0f}" if top_percentile else "all"),
+    )
 
     # Save
     out = context.output_dir / context.filename

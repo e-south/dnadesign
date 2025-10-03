@@ -32,6 +32,7 @@ dependencies = [
   "xlrd",
   "python-levenshtein",
   "typer",
+  "rich",
   "pydantic",
   "pyarrow>=16"
 ]
@@ -40,6 +41,7 @@ dependencies = [
 usr = "dnadesign.usr.src.cli:main"
 opal = "dnadesign.opal.src.cli:main"
 infer = "dnadesign.infer.main:main"
+cluster = "dnadesign.cluster.src.cli.app:main"
 
 [project.optional-dependencies]
 viz = [

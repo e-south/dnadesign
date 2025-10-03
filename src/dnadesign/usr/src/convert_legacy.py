@@ -213,6 +213,7 @@ def convert_legacy(
     seen_ids: set[str] = set()
     skipped_bad_len = 0
     skipped_dups = 0
+    seen_casefold: set[tuple[str, str]] = set()
 
     for src, e in all_entries:
         seq_raw = str(e["sequence"])
@@ -225,12 +226,14 @@ def convert_legacy(
             continue
 
         rid = compute_id(bt, seq)
+        cf_key = (bt.lower(), seq.upper())
 
         # Skip duplicates (first seen wins)
-        if rid in seen_ids:
+        if rid in seen_ids or cf_key in seen_casefold:
             skipped_dups += 1
             continue
         seen_ids.add(rid)
+        seen_casefold.add(cf_key)
 
         rows_ess.append(
             {
@@ -446,7 +449,9 @@ def convert_legacy(
         if skipped_dups:
             skipped_str += f"; duplicates={skipped_dups}"
         note = f"Converted legacy .pt files into new dataset (rows={N}, files={len(files)}{skipped_str})."
-        ds.append_meta_note(note, f"# example\nusr convert-legacy {dataset_name} --paths ...")
+        ds.append_meta_note(
+            note, f"# example\nusr convert-legacy {dataset_name} --paths ..."
+        )
     except Exception:
         pass
 
@@ -458,7 +463,11 @@ def convert_legacy(
     print(
         f"[convert-legacy] scanned {total_entries} entry/entries from {len(files)} file(s); "
         f"kept {N}; skipped bad-length={skipped_bad_len}"
-        + (f", duplicates={skipped_dups} ({dup_pct:.1f}%)" if skipped_dups else "")
+        + (
+            f", duplicates(incl. case-insensitive)={skipped_dups} ({dup_pct:.1f}%)"
+            if skipped_dups
+            else ""
+        )
     )
 
     return ConvertStats(

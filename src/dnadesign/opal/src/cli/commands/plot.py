@@ -111,6 +111,7 @@ def cmd_plot(
     # Resolve campaign.yaml
     cfg_path = resolve_config_path(config)
     campaign_dir, campaign_cfg = _resolve_campaign_dir(cfg_path)
+    typer.echo(f"[plot] Using config: {cfg_path}")
 
     plots_cfg = campaign_cfg.get("plots") or []
     if not isinstance(plots_cfg, list):
@@ -177,13 +178,95 @@ def cmd_plot(
             fname = f"{base}.{fmt}"
         save_data = bool(out_cfg.get("save_data", False))
 
-        params = entry.get("params") or {}
+        # Accept only mappings for params; rescue common mistakes.
+        raw_params = entry.get("params", {})
+        if raw_params is None:
+            raw_params = {}
+        if not isinstance(raw_params, dict):
+            typer.echo(
+                f"[plot] WARN: plot '{pname}' has a non-mapping 'params' "
+                f"(type={type(raw_params).__name__}). Coercing to empty dict."
+            )
+            raw_params = {}
+        params = dict(raw_params)
+
+        # Optional strictness: refuse empty/non-mapping params when a 'params' block exists.
+        import os
+
+        STRICT = str(os.getenv("OPAL_PLOT_STRICT", "")).strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+        if STRICT and "params" in entry and not params:
+            raise ValueError(
+                f"[plot] plot '{pname}' has an empty or non-mapping 'params:' block in YAML."
+            )
+
+        # Convenience: if users put plotting keys at top-level, lift them into params.
+        TOPLEVEL = {
+            "hue",
+            "hue_field",
+            "color",
+            "color_by",
+            "colour_by",
+            "size",
+            "size_by",
+            "size_field",
+            "point_size_by",
+            "alpha",
+            "rank_mode",
+            "score_field",
+            "threshold",
+            "mode",
+            "delta",
+            "cmap",
+            "rasterize_at",
+            "figsize_in",
+            "size_min",
+            "size_max",
+            # swarm/violin & geometry knobs used by built-ins
+            "swarm",
+            "swarm_max_points",
+            "swarm_jitter",
+            "swarm_alpha",
+            "violin",
+            "violin_alpha",
+            "panel_size_in",
+        }
+        lifted = {k: entry[k] for k in TOPLEVEL if k in entry}
+        for k, v in lifted.items():
+            params.setdefault(k, v)
+        if lifted:
+            typer.echo(
+                f"[plot] Note: moved top-level keys {sorted(lifted)} into 'params' "
+                f"for plot '{pname}'. (Place them under 'params:' to silence this.)"
+            )
+            if str(os.getenv("OPAL_DEBUG", "")).strip().lower() in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            ):
+                raise ValueError(
+                    f"Plot '{pname}' has plotting keys at the top level. "
+                    "Move them under 'params:'."
+                )
 
         # Build context
         import logging
 
         logger = logging.getLogger(f"opal.plot.{pname}")
         logger.setLevel(logging.INFO)
+
+        # Ensure a handler so plugin logger.info lines are visible
+        if not logger.handlers:
+            h = logging.StreamHandler()
+            h.setLevel(logging.INFO)
+            h.setFormatter(logging.Formatter("[%(name)s] %(message)s"))
+            logger.addHandler(h)
+            logger.propagate = False
 
         ctx = PlotContext(
             campaign_dir=campaign_dir,
@@ -200,6 +283,11 @@ def cmd_plot(
         # Run plugin (overwrite outputs by default)
         try:
             ctx.output_dir.mkdir(parents=True, exist_ok=True)
+            typer.echo(
+                f"[plot] entry '{pname}': keys={sorted(entry.keys())} "
+                f"params_type={type(entry.get('params')).__name__} "
+                f"params_preview={ {k: entry['params'].get(k) for k in (entry.get('params') or {}).keys()} if isinstance(entry.get('params'), dict) else '(not a dict)'}"  # noqa
+            )
             get_plot(pkind)(ctx, params)
             typer.echo(f"[ok] {pname} ({pkind}) → {ctx.output_dir / ctx.filename}")
         except Exception:  # full traceback always
