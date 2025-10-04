@@ -1,17 +1,18 @@
 ## USR — Universal Sequence Record
 
-**USR** is a Parquet‑backed, single‑table store for biological sequence datasets in `dnadesign`.
+**USR** is a Parquet‑backed, single‑table store for biological sequence datasets inside the `dnadesign` monorepo.
 
 - One canonical table per dataset: `records.parquet` (atomic writes with snapshots)
-- Immutable **essential** columns; derived columns must be namespaced: `<tool>__<field>`
-- Friendly CLI (`usr …`) with pretty (Rich) output by default, and a small Python API
+- Immutable **essential** columns; derived columns are **namespaced**: `<tool>__<field>`
+- Friendly CLI (`usr …`) with pretty (Rich) output, plus a minimal Python API
 - Append‑only `.events.log` and human scratchpad `meta.md`
+- Works from anywhere in your `dnadesign` repo: pass a dataset name *or* a file path. Many commands support interactive picking when run in a directory.
 
 ---
 
 ### Layout
 
-```bash
+````
 usr/
 ├─ src/
 ├─ datasets/
@@ -21,24 +22,24 @@ usr/
 │         ├─ .events.log         # append‑only JSONL event stream
 │         └─ _snapshots/         # rolling copies of records.parquet
 └─ template_demo/                # example CSVs used in this README
-```
+````
 
 ---
 
 ### Core schema
 
-| column      | type               | notes                         |
-|-------------|--------------------|-------------------------------|
-| `id`        | string             | sha1(`bio_type` \| `sequence`)|
-| `bio_type`  | string             | `"dna"` \| `"protein"`        |
-| `sequence`  | string             | case‑preserving               |
-| `alphabet`  | string             | e.g., `"dna_4"`               |
-| `length`    | int32              | `len(sequence)`               |
-| `source`    | string             | ingest provenance             |
-| `created_at`| timestamp(us, UTC) | ingest time                   |
+| column       | type               | notes                          |
+|--------------|--------------------|--------------------------------|
+| `id`         | string             | sha1(`bio_type` \| `sequence`) |
+| `bio_type`   | string             | `"dna"` \| `"protein"`         |
+| `sequence`   | string             | case‑preserving                |
+| `alphabet`   | string             | e.g., `"dna_4"`                |
+| `length`     | int32              | `len(sequence)`                |
+| `source`     | string             | ingest provenance              |
+| `created_at` | timestamp(us, UTC) | ingest time                    |
 
-> **Contract:** one `records.parquet` per dataset directory.  
-> **Derived columns must be namespaced** as `<tool>__<field>` (e.g., `opal__score`, `infer__llr`).
+> **Contract:** exactly one `records.parquet` per dataset directory.  
+> **Derived columns must be namespaced** as `<tool>__<field>` (e.g., `mock__score`, `infer__llr`).
 
 ---
 
@@ -49,7 +50,7 @@ Add a console script so you can type `usr`:
 ```toml
 # pyproject.toml
 [project.scripts]
-usr = "dnadesign.usr.src.cli:main"       # CLI (argparse; full surface)
+usr = "dnadesign.usr.src.cli:main"   # argparse CLI (full surface)
 ````
 
 Editable install during development:
@@ -60,23 +61,20 @@ uv pip install -e .
 
 ---
 
-### Quickstart (CLI)
+## CLI quickstart (run from anywhere)
 
-We’ll use the demo CSVs in this repo:
+Demo inputs in this repo:
 
 * Sequences: `usr/demo_material/demo_sequences.csv`
 * Attachments: `usr/demo_material/demo_attachment_{one|two}.csv`
-* OPAL demo labels: `usr/demo_material/demo_y_sfxi.csv`
 
-#### Create a dataset
+**Create a dataset**
 
 ```bash
 usr init demo --source "readme quickstart" --notes "hello, world"
 ```
 
-#### Import sequences
-
-Only the essential USR columns are ingested; any extra CSV columns are ignored.
+**Import sequences** (only essential USR columns are ingested; extra CSV columns are ignored)
 
 ```bash
 usr import demo --from csv \
@@ -84,9 +82,7 @@ usr import demo --from csv \
   --bio-type dna --alphabet dna_4
 ```
 
-#### Attach namespaced metadata
-
-Attach per‑sequence metadata under your own namespace (e.g. `mock`). **Namespacing is required**.
+**Attach namespaced metadata** (namespacing required)
 
 ```bash
 usr attach demo \
@@ -98,79 +94,89 @@ usr attach demo \
   --namespace mock --id-col sequence --columns y_label
 ```
 
-Resulting columns (examples):
+Examples of resulting columns:
 
 * `mock__X_value` → float (nullable)
 * `mock__y_label` → list<float> (nullable)
 
 > Re‑attaching the same columns requires `--allow-overwrite`.
 
-#### Inspect, grep, validate
+**Inspect & validate**
 
 ```bash
-usr ls                                  # list datasets (pretty)
-usr head demo                           # first N rows (pretty by default)
-usr info demo                           # rows, columns, discovered namespaces
-usr grep demo --pattern "ATG" --limit 10
-usr cols                                # -> defaults to ./records.parquet (or you pick)
-usr head -n 5                           # -> pretty head of ./records.parquet
-usr cell --row 0 --col sequence         # -> from ./records.parquet
+usr ls                        # list datasets (pretty)
+usr info demo                 # rows, columns, namespaces
+usr head demo -n 5            # first N rows (pretty by default)
+usr grep demo --pattern ATG --limit 10
 
-usr schema demo           # Arrow schema (plain)
-usr schema demo --tree    # tree view (pretty)
+usr schema demo               # Arrow schema (plain)
+usr schema demo --tree        # pretty tree view
 
-usr validate demo         # checks schema, uniqueness, namespacing
+usr validate demo             # checks schema, uniqueness, namespacing
 usr validate demo --strict
 ```
 
-#### Export
+**Export**
 
 ```bash
 usr export demo --fmt csv   --out usr/demo_material/out.csv
 usr export demo --fmt jsonl --out usr/demo_material/out.jsonl
 ```
 
-#### Snapshots
+**Snapshots**
 
 ```bash
 usr snapshot demo   # writes records-YYYYMMDDThhmmss.parquet under _snapshots/
 ```
 
-> **Note:** If you run commands inside a dataset folder, they default to `.` (current directory). If multiple Parquet files are present, USR will list them and let you pick by number.
+---
+
+### Path‑first tools (work on files or directories anywhere)
+
+These commands accept a dataset name **or** a file/directory path. When a directory contains multiple Parquet files, USR presents an interactive picker.
+
+```bash
+usr head .                       # head of a Parquet in the current directory (picker if needed)
+usr cols                         # list columns for ./records.parquet (or the file you pick)
+usr cell --row 0 --col sequence  # print a single cell from ./records.parquet (or the file you pick)
+
+# Explicit file path examples
+usr head permuter/run42/records.parquet
+usr cols ./some/dir --glob 'events*.parquet'
+```
+
+> When you run inside `usr/datasets/<dataset>`, commands default to that dataset (no need to pass the name).
 
 ---
 
-### De‑duplication
+## De‑duplication
 
-In USR, each `id` must map back to exactly one `sequence`. If this is ever not the case, you can cleanup:
+Each `id` must map to exactly one sequence. Clean up case‑insensitive duplicates when necessary:
 
 ```bash
-# Drop duplicates that differ only by case. One row per duplicate group survives.
-usr dedupe-sequences <dataset> --policy keep-first      # or keep-last, or ask
-usr dedupe-sequences <dataset> --policy ask             # interactive picker per group
-usr dedupe-sequences <dataset> --dry-run                # shows what would change
+usr dedupe-sequences <dataset> --policy keep-first   # or keep-last, or ask (interactive)
+usr dedupe-sequences <dataset> --dry-run             # preview
 ```
 
 ---
 
 ## Merge datasets (USR ↔ USR)
 
-There are two policies to align schemas:
+Align columns and control duplicates while merging rows from a source dataset into a destination dataset.
 
-* `--require-same-columns` (strict; types and names must match exactly), or
-* `--union-columns` (default; missing columns are filled with NULL).
+* Column alignment:
 
-Duplicate rows by `id` can be handled via:
+  * `--require-same-columns` (strict; names & types must match), or
+  * `--union-columns` (default; missing columns are filled with NULLs)
+* Duplicates by `id`:
 
-* `--if-duplicate {error|skip|prefer-src|prefer-dest}` (default `skip`)
+  * `--if-duplicate {error|skip|prefer-src|prefer-dest}` (default `skip`)
+* Overlapping column type coercion:
 
-Overlapping columns with different types can be safely coerced to the destination’s type with:
+  * `--coerce-overlap to-dest` (default) or `--coerce-overlap none`
+* By default, rows with the **same letters** (ignoring case) on `(bio_type, sequence)` **are not merged** from the source. Override with `--no-avoid-casefold-dups`.
 
-* `--coerce-overlap to-dest` (default) or `--coerce-overlap none`
-
-By default, rows having the **same letters** (ignoring case) on `(bio_type, sequence)` **are not merged** from the source; override with `--no-avoid-casefold-dups`.
-
-Example:
+**Example**
 
 ```bash
 usr merge-datasets \
@@ -184,19 +190,27 @@ usr merge-datasets \
 
 ## Remote sync (SSH)
 
-Use built‑in SSH + rsync to move whole dataset folders.
+Built‑in SSH + rsync moves whole dataset folders (and can also sync single files in FILE mode). See **SYNC.md** for key setup and details.
 
 ```bash
 usr remotes add cluster --type ssh \
   --host scc1.bu.edu --user esouth \
   --base-dir /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets
 
+# Preview, then transfer
 usr diff 60bp_dual_promoter_cpxR_LexA --remote cluster
 usr pull 60bp_dual_promoter_cpxR_LexA --remote cluster -y
 usr push 60bp_dual_promoter_cpxR_LexA --remote cluster -y
 ```
 
-See **SYNC.md** for SSH key setup.
+**FILE mode** lets you diff/pull/push arbitrary files by path:
+
+```bash
+usr diff permuter/run42/records.parquet --remote cluster
+usr pull permuter/run42/records.parquet --remote cluster -y
+```
+
+See **SYNC.md** for `repo_root`, `local_repo_root`, `--repo-root`, and `--remote-path` mapping options.
 
 ---
 
@@ -224,8 +238,19 @@ ds.attach_columns(
     id_col="id",
     columns=["score", "vec"],
 )
+
 print(ds.head(3))
 ```
+
+---
+
+### Design notes & contracts
+
+* **Immutability of essentials:** `id`, `bio_type`, `sequence`, `alphabet`, `length`, `source`, `created_at` are canonical and stable.
+* **Namespacing:** All derived values must be namespaced `<tool>__<field>`. Non‑namespaced derived columns are rejected (except a small set of backwards‑compatibility fields, when present).
+* **Deterministic IDs:** `id = sha1(bio_type | normalized(sequence))` with case preserved.
+* **Safety:** Writes are atomic; snapshots are kept in `_snapshots/`; operations append to `.events.log`.
+
 
 ---
 

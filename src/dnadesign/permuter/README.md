@@ -56,7 +56,7 @@ permuter run --job src/dnadesign/permuter/jobs/nt_scan_demo.yaml --ref BL21_RNas
 
 We include an example `codon_ecoli.csv` (subset shown):
 
-````csv
+```csv
 codon,amino_acid,fraction,frequency
 AAA,K,0.73,33.2
 AAC,N,0.53,24.4

@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import SSHRemoteConfig, get_remote
-from .diff import DiffSummary, compute_diff
+from .diff import DiffSummary, compute_diff, compute_file_diff
 from .errors import VerificationError
 from .io import append_event
 from .remote import RemoteDatasetStat, SSHRemote
@@ -108,6 +108,15 @@ def plan_diff(root: Path, dataset: str, remote_name: str) -> DiffSummary:
     return compute_diff(Path(root) / dataset, rstat, dataset)
 
 
+def plan_diff_file(
+    local_file: Path, remote_name: str, *, remote_path: str
+) -> DiffSummary:
+    cfg: SSHRemoteConfig = get_remote(remote_name)
+    rmt = SSHRemote(cfg)
+    rstat = rmt.stat_file(remote_path)
+    return compute_file_diff(local_file, rstat, str(local_file))
+
+
 def execute_pull(
     root: Path, dataset: str, remote_name: str, opts: SyncOptions
 ) -> DiffSummary:
@@ -142,6 +151,40 @@ def execute_pull(
     return summary
 
 
+def execute_pull_file(
+    local_file: Path, remote_name: str, remote_path: str, opts: SyncOptions
+) -> DiffSummary:
+    cfg: SSHRemoteConfig = get_remote(remote_name)
+    rmt = SSHRemote(cfg)
+    # Prepare synthetic summary-before (for verification thresholds)
+    before = plan_diff_file(local_file, remote_name, remote_path=remote_path)
+    if not before.changes and before.primary_remote.exists:
+        return before
+    rmt.pull_file(remote_path, local_file, dry_run=opts.dry_run)
+    if not opts.dry_run:
+        # Verify by SHA/size/rows/cols if present
+        after = plan_diff_file(local_file, remote_name, remote_path=remote_path)
+        if before.primary_remote.sha256 and after.primary_local.sha256:
+            if before.primary_remote.sha256 != after.primary_local.sha256:
+                raise VerificationError("Post-transfer SHA mismatch for file.")
+        elif before.primary_remote.size and after.primary_local.size:
+            if before.primary_remote.size != after.primary_local.size:
+                raise VerificationError("Post-transfer size mismatch for file.")
+        # log
+        append_event(
+            local_file.parent / ".events.log",
+            {
+                "action": "pull_file",
+                "from": remote_name,
+                "path": str(local_file),
+                "sha": after.primary_local.sha256,
+                "rows": after.primary_local.rows,
+                "cols": after.primary_local.cols,
+            },
+        )
+    return before
+
+
 def execute_push(
     root: Path, dataset: str, remote_name: str, opts: SyncOptions
 ) -> DiffSummary:
@@ -174,3 +217,35 @@ def execute_push(
             },
         )
     return summary
+
+
+def execute_push_file(
+    local_file: Path, remote_name: str, remote_path: str, opts: SyncOptions
+) -> DiffSummary:
+    cfg: SSHRemoteConfig = get_remote(remote_name)
+    rmt = SSHRemote(cfg)
+    before = plan_diff_file(local_file, remote_name, remote_path=remote_path)
+    if not before.changes and before.primary_remote.exists:
+        return before
+    rmt.push_file(local_file, remote_path, dry_run=opts.dry_run)
+    if not opts.dry_run:
+        # Re-stat remote and verify
+        after = plan_diff_file(local_file, remote_name, remote_path=remote_path)
+        if after.primary_local.sha256 and after.primary_remote.sha256:
+            if after.primary_local.sha256 != after.primary_remote.sha256:
+                raise VerificationError("Post-push SHA mismatch for file.")
+        elif after.primary_local.size and after.primary_remote.size:
+            if after.primary_local.size != after.primary_remote.size:
+                raise VerificationError("Post-push size mismatch for file.")
+        append_event(
+            local_file.parent / ".events.log",
+            {
+                "action": "push_file",
+                "to": remote_name,
+                "path": str(local_file),
+                "sha": after.primary_local.sha256,
+                "rows": after.primary_local.rows,
+                "cols": after.primary_local.cols,
+            },
+        )
+    return before

@@ -22,6 +22,7 @@ from .config import SSHRemoteConfig, get_remote, load_all, save_remote
 from .convert_legacy import convert_legacy, profile_60bp_dual_promoter
 from .dataset import Dataset
 from .errors import DuplicateIDError, SequencesError, UserAbort
+from .io import append_event
 from .merge_datasets import (
     MergeColumnsMode,
     MergePolicy,
@@ -29,7 +30,15 @@ from .merge_datasets import (
 )
 from .mock import MockSpec, add_demo_columns, create_mock_dataset
 from .pretty import PrettyOpts, fmt_value, profile_table, render_schema_tree
-from .sync import SyncOptions, execute_pull, execute_push, plan_diff
+from .sync import (
+    SyncOptions,
+    execute_pull,
+    execute_pull_file,
+    execute_push,
+    execute_push_file,
+    plan_diff,
+    plan_diff_file,
+)
 from .ui import (
     print_df_plain,
     render_diff_rich,
@@ -132,7 +141,10 @@ def _prompt_pick_parquet(cands: list[Path], use_rich: bool) -> Path | None:
 
 
 def _select_parquet_target_interactive(
-    path_like: Path, glob: str | None, use_rich: bool
+    path_like: Path,
+    glob: str | None,
+    use_rich: bool,
+    confirm_if_inferred: bool = False,
 ) -> Path | None:
     p = Path(path_like)
     if p.is_file() and p.suffix.lower() == ".parquet":
@@ -145,6 +157,14 @@ def _select_parquet_target_interactive(
                 "Tip: cd into a dataset folder (with records.parquet) or pass a dataset name (e.g., 'usr cols demo')."
             )
             return None
+        # When the caller didn't provide an explicit path, ask before auto-picking.
+        if confirm_if_inferred and len(cands) == 1:
+            msg = f"No explicit file path provided. Found '{cands[0].name}' in {p}. Proceed? [Y/n]"
+            print(msg)
+            ans = input("> ").strip().lower()
+            if ans in {"n", "no"}:
+                print("Aborted.")
+                return None
         return _prompt_pick_parquet(cands, use_rich)
     # Not a file or directory → let caller handle dataset/other cases
     return None
@@ -794,7 +814,8 @@ def main() -> None:
 
     # ---------------- diff/status/pull/push ----------------
     def add_sync_common(p_: argparse.ArgumentParser):
-        p_.add_argument("dataset")
+        # dataset can be omitted if run inside a dataset dir under --root
+        p_.add_argument("dataset", nargs="?", default=None)
         p_.add_argument("--remote", "--from", "--to", dest="remote", required=True)
         p_.add_argument(
             "-y", "--yes", action="store_true", help="Assume yes (no prompt)"
@@ -802,6 +823,16 @@ def main() -> None:
         p_.add_argument("--dry-run", action="store_true")
         p_.add_argument("--primary-only", action="store_true")
         p_.add_argument("--skip-snapshots", action="store_true")
+        p_.add_argument(
+            "--remote-path",
+            default=None,
+            help="Override remote path (FILE mode). Absolute or relative to remote repo_root.",
+        )
+        p_.add_argument(
+            "--repo-root",
+            default=None,
+            help="Local repo root to compute remote path (FILE mode). If omitted, use remote.local_repo_root or DNADESIGN_REPO_ROOT.",  # noqa
+        )
 
     sp_diff = sp.add_parser(
         "diff",
@@ -844,7 +875,6 @@ def main() -> None:
     sp_push.set_defaults(func=cmd_push)
 
     # --------------- dispatch ----------------
-
     args = p.parse_args()
     try:
         args.func(args)
@@ -863,15 +893,10 @@ def main() -> None:
 
 
 # ---------- Rich help injection ----------
-
-
 def _add_rich_help(parser: argparse.ArgumentParser) -> None:
     """Attach a Rich-styled -h/--help action to this parser."""
     parser.add_argument(
-        "-h",
-        "--help",
-        action=_RichHelpAction,
-        help="Show this message and exit.",
+        "-h", "--help", action=_RichHelpAction, help="Show this message and exit."
     )
 
 
@@ -898,27 +923,20 @@ class _RichHelpAction(argparse.Action):
 
 def _print_help_rich(parser: argparse.ArgumentParser) -> None:
     # Try to reuse the project's Rich loader to keep a consistent error if 'rich' is missing.
-    try:
-        from .ui import _require_rich
+    from .ui import _require_rich
 
-        console = _require_rich()
-        from rich import box
-        from rich.panel import Panel
-        from rich.table import Table
-        from rich.text import Text
-    except Exception:
-        raise
+    console = _require_rich()
+    from rich import box
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.text import Text
 
     # Header
     title = f"USR v{__version__} CLI — Parquet-backed datasets; SSH remotes sync."
     usage = parser.format_usage().strip().replace("usage:", "Usage:")
 
     console.print(
-        Panel.fit(
-            Text(title, style="bold"),
-            box=box.ROUNDED,
-            border_style="cyan",
-        )
+        Panel.fit(Text(title, style="bold"), box=box.ROUNDED, border_style="cyan")
     )
     console.print(Text(usage, style="bold"))
     console.print()
@@ -970,7 +988,6 @@ def _print_help_rich(parser: argparse.ArgumentParser) -> None:
         cmd_table.add_column("Command", no_wrap=True)
         cmd_table.add_column("Summary")
         for sub in sub_actions:
-            # Prefer descriptions we set on each subparser
             for name, subparser in sorted(sub.choices.items(), key=lambda kv: kv[0]):
                 summary = getattr(subparser, "description", "") or ""
                 cmd_table.add_row(name, summary)
@@ -979,8 +996,6 @@ def _print_help_rich(parser: argparse.ArgumentParser) -> None:
 
 
 # ---------- helpers & command impls ----------
-
-
 def list_datasets(root: Path):
     root = root.resolve()
     if not root.exists():
@@ -1053,7 +1068,6 @@ def cmd_init(args):
 
 
 def cmd_import(args):
-    # import stays explicit; dataset is required at call-site
     d = Dataset(args.root, args.dataset)
     in_path = _resolve_path_anywhere(args.path)
     if args.source_format == "csv":
@@ -1101,8 +1115,6 @@ def cmd_attach(args):
 
 
 # ---------------- error formatting (actionable nudges) ----------------
-
-
 def _abbrev_id(rid: str, n: int = 8) -> str:
     return (rid[:n] + "…") if isinstance(rid, str) and len(rid) > n else rid
 
@@ -1137,7 +1149,6 @@ def _print_user_error(e: SequencesError) -> None:
             print(f"Hint: {e.hint}")
         return
 
-    # Other USR errors can attach a 'hint' attribute ad-hoc.
     hint = getattr(e, "hint", None)
     if hint:
         print(f"Hint: {hint}")
@@ -1164,7 +1175,7 @@ def cmd_schema(args):
     d = Dataset(args.root, ds_name)
     sch = d.schema()
     if args.tree:
-        if args.rich:
+        if getattr(args, "rich", False):
             lines = render_schema_tree(sch).splitlines()
             render_schema_tree_rich(lines, title=str(d.records_path))
         else:
@@ -1190,7 +1201,6 @@ def _resolve_parquet_from_dir(dir_path: Path, glob: str | None = None) -> Path:
         cands = sorted(dir_path.glob("*.parquet"))
     if not cands:
         raise FileNotFoundError(f"No Parquet files found under {dir_path}")
-    # newest by mtime (deterministic pick)
     cands.sort(key=lambda p: p.stat().st_mtime, reverse=True)
     return cands[0]
 
@@ -1205,7 +1215,6 @@ def _resolve_parquet_target(path_like: Path, glob: str | None = None) -> Path:
 
 
 def _print_df(df: pd.DataFrame) -> None:
-    # Unified plain renderer with right-stripped lines
     print_df_plain(df)
 
 
@@ -1218,7 +1227,6 @@ def _pretty_opts_from(args) -> PrettyOpts:
 
 
 def _pretty_df(df: pd.DataFrame, opts: PrettyOpts) -> pd.DataFrame:
-    # map every cell to a compact string
     def _fmt_cell(x):
         try:
             return fmt_value(x, opts)
@@ -1226,25 +1234,52 @@ def _pretty_df(df: pd.DataFrame, opts: PrettyOpts) -> pd.DataFrame:
             return str(x)
 
     return df.applymap(_fmt_cell)
-    # pandas >= 2.2 has DataFrame.map (elementwise); fall back otherwise
-    if hasattr(df, "map"):
-        return df.map(_fmt_cell)  # type: ignore[attr-defined]
-    return df.applymap(_fmt_cell)
+
+
+def _log_implicit_pick_if_dataset(pq_path: Path | None, reason: str) -> None:
+    """
+    If the selected Parquet file lives inside a USR dataset folder (has meta.md),
+    append a small event so the implicit behavior is auditable.
+    """
+    if pq_path is None:
+        return
+    try:
+        p = Path(pq_path).resolve()
+        d = p.parent
+        if (d / "meta.md").exists():
+            append_event(
+                d / ".events.log",
+                {
+                    "action": "implicit_file_pick",
+                    "path": str(p),
+                    "cwd": str(Path.cwd().resolve()),
+                    "reason": reason,
+                },
+            )
+    except Exception:
+        # Never block UX on logging failures
+        pass
 
 
 def cmd_head(args):
     # Path-first mode (file/dir), then dataset fallback.
     p = Path(args.target)
+    implicit = str(getattr(args, "target", "")) in {"", ".", "./"}
     if p.exists():
         pq_path = _select_parquet_target_interactive(
-            p, glob=None, use_rich=bool(args.rich)
+            p,
+            glob=None,
+            use_rich=bool(getattr(args, "rich", False)),
+            confirm_if_inferred=implicit,
         )
         if pq_path is None:
             return
+        if implicit:
+            _log_implicit_pick_if_dataset(pq_path, reason="head")
         tbl = pq.read_table(pq_path)
         df = tbl.to_pandas().head(int(args.n))
         caption = f"{pq_path}  rows={tbl.num_rows:,}  cols={tbl.num_columns}"
-        if args.rich:
+        if getattr(args, "rich", False):
             if not args.raw:
                 df = _pretty_df(df, _pretty_opts_from(args))
             render_table_rich(
@@ -1259,7 +1294,7 @@ def cmd_head(args):
                 df = _pretty_df(df, _pretty_opts_from(args))
             _print_df(df)
         return
-    # dataset mode (unchanged)
+    # dataset mode
     d = Dataset(args.root, args.target)
     df = d.head(args.n)
     try:
@@ -1267,7 +1302,7 @@ def cmd_head(args):
         caption = f"{d.records_path}  rows={meta.num_rows:,}  cols={meta.num_columns}"
     except Exception:
         caption = str(d.records_path)
-    if args.rich:
+    if getattr(args, "rich", False):
         if not args.raw:
             df = _pretty_df(df, _pretty_opts_from(args))
         render_table_rich(
@@ -1283,13 +1318,18 @@ def cmd_head(args):
 
 
 def cmd_cols(args):
-    # Friendly path-first behavior with interactive pick
     target = Path(getattr(args, "path", Path(".")))
+    implicit = str(getattr(args, "path", Path("."))) in {".", "./"}
     pq_path = _select_parquet_target_interactive(
-        target, glob=args.glob, use_rich=bool(getattr(args, "rich", False))
+        target,
+        glob=args.glob,
+        use_rich=bool(getattr(args, "rich", False)),
+        confirm_if_inferred=implicit,
     )
     if pq_path is None:
         return
+    if implicit:
+        _log_implicit_pick_if_dataset(pq_path, reason="cols")
     pf = pq.ParquetFile(str(pq_path))
     fields = []
     sch = pf.schema_arrow
@@ -1310,7 +1350,12 @@ def cmd_cols(args):
 
 
 def cmd_describe(args):
-    d = Dataset(args.root, args.dataset)
+    ds_name = _resolve_dataset_name_interactive(
+        args.root, getattr(args, "dataset", None), bool(getattr(args, "rich", False))
+    )
+    if not ds_name:
+        return
+    d = Dataset(args.root, ds_name)
     tbl = pq.read_table(d.records_path)
     cols = (
         [c.strip() for c in args.columns.split(",") if c.strip()]
@@ -1323,9 +1368,6 @@ def cmd_describe(args):
         precision=int(args.precision),
     )
     prof = profile_table(tbl, opts, columns=cols, sample=int(args.sample))
-    # compact tabular print
-    import pandas as pd
-
     df = pd.DataFrame(
         prof,
         columns=[
@@ -1341,11 +1383,11 @@ def cmd_describe(args):
         ],
     )
     df["null_pct"] = df["null_pct"].map(lambda x: f"{x:.1f}%")
-    if args.rich:
+    if getattr(args, "rich", False):
         caption = f"{d.records_path}  rows={tbl.num_rows:,}  cols={tbl.num_columns}"
         render_table_rich(
             df,
-            title=f"describe: {args.dataset}",
+            title=f"describe: {ds_name}",
             caption=caption,
             max_colwidth=int(args.max_colwidth),
         )
@@ -1356,15 +1398,21 @@ def cmd_describe(args):
 
 def cmd_cell(args):
     # Determine target path: --path, or positional, or dataset name
-    tgt = getattr(args, "path", None) or getattr(args, "target", None) or "."
+    path_arg = getattr(args, "path", None)
+    target_arg = getattr(args, "target", None)
+    implicit = (path_arg is None) and (target_arg is None)
+    tgt = path_arg or target_arg or "."
     p = Path(tgt)
     pq_path: Path | None = None
     if p.exists():
-        pq_path = _select_parquet_target_interactive(p, glob=args.glob, use_rich=False)
+        pq_path = _select_parquet_target_interactive(
+            p, glob=args.glob, use_rich=False, confirm_if_inferred=implicit
+        )
         if pq_path is None:
             return
+        if implicit:
+            _log_implicit_pick_if_dataset(pq_path, reason="cell")
     else:
-        # maybe it's a dataset name
         try:
             d = Dataset(args.root, str(tgt))
             pq_path = d.records_path
@@ -1378,11 +1426,9 @@ def cmd_cell(args):
         return
     col = str(args.col)
     row = int(args.row)
-    # column projection for speed
     try:
         tbl = pq.read_table(pq_path, columns=[col])
     except KeyError:
-        # Friendly column list
         pf = pq.ParquetFile(str(pq_path))
         names = ", ".join(pf.schema_arrow.names)
         print(f"Column '{col}' not found in {pq_path}.")
@@ -1392,7 +1438,6 @@ def cmd_cell(args):
         print(f"Row {row} out of range (0..{tbl.num_rows-1}).")
         return
     val = tbl.column(0)[row].as_py()
-    # print exactly one value to stdout (no decoration)
     print(val)
 
 
@@ -1403,7 +1448,7 @@ def cmd_validate(args):
     if not ds_name:
         return
     d = Dataset(args.root, ds_name)
-    d.validate(strict=args.strict)
+    d.validate(strict=bool(getattr(args, "strict", False)))
     print("OK: validation passed.")
 
 
@@ -1422,13 +1467,9 @@ def cmd_get(args):
     df = d.get(rid, columns=cols)
     if df.empty:
         print("Not found.")
-    elif args.rich:
+    elif getattr(args, "rich", False):
         df_fmt = df.applymap(lambda x: fmt_value(x, PrettyOpts()))
-        render_table_rich(
-            df_fmt,
-            title=f"record: {args.id}",
-            caption=str(d.records_path),
-        )
+        render_table_rich(df_fmt, title=f"record: {rid}", caption=str(d.records_path))
     else:
         _print_df(df)
 
@@ -1441,7 +1482,7 @@ def cmd_grep(args):
         return
     d = Dataset(args.root, ds_name)
     df = d.grep(args.pattern, args.limit)
-    if args.rich:
+    if getattr(args, "rich", False):
         df_fmt = df.applymap(lambda x: fmt_value(x, PrettyOpts()))
         render_table_rich(df_fmt, title=f"grep: {args.pattern}")
     else:
@@ -1475,7 +1516,6 @@ def cmd_snapshot(args):
 
 
 def cmd_convert_legacy(args):
-    # Resolve each provided path robustly (supports repo-relative and package-relative)
     in_paths = [_resolve_path_anywhere(p) for p in args.paths]
 
     stats = convert_legacy(
@@ -1488,10 +1528,7 @@ def cmd_convert_legacy(args):
         force=bool(args.force),
     )
 
-    msg = (
-        f"Converted {stats.rows} row(s) from {stats.files} file(s) "
-        f"into dataset '{args.dataset}'."
-    )
+    msg = f"Converted {stats.rows} row(s) from {stats.files} file(s) into dataset '{args.dataset}'."
     if stats.skipped_bad_len:
         msg += f" Skipped (length≠expected): {stats.skipped_bad_len}."
     print(msg)
@@ -1583,7 +1620,6 @@ def cmd_merge_datasets(args):
         avoid_casefold_dups=bool(getattr(args, "avoid_casefold_dups", True)),
     )
 
-    # Always print a compact summary
     action = "DRY-RUN" if args.dry_run else "MERGED"
     print(
         f"[{action}] dest='{args.dest}'  src='{args.src}'  "
@@ -1612,8 +1648,6 @@ def cmd_merge_datasets(args):
 
 
 # ---------- remotes commands ----------
-
-
 def cmd_remotes_list(args):
     remotes = load_all()
     if not remotes:
@@ -1647,8 +1681,6 @@ def cmd_remotes_add(args):
 
 
 # ---------- diff/pull/push ----------
-
-
 def _print_diff(summary, use_rich: bool | None = None):
     def fmt_sz(n):
         if n is None:
@@ -1702,11 +1734,6 @@ def _print_diff(summary, use_rich: bool | None = None):
     print("Status     :", "CHANGES" if summary.has_change else "up-to-date")
 
 
-def cmd_diff(args):
-    s = plan_diff(args.root, args.dataset, args.remote)
-    _print_diff(s, use_rich=bool(args.rich))
-
-
 def _confirm_or_abort(summary, assume_yes: bool):
     if not summary.has_change:
         print("Already up to date.")
@@ -1715,7 +1742,7 @@ def _confirm_or_abort(summary, assume_yes: bool):
         return
     print("\nChanges detected. Proceed with overwrite?")
     ans = input("[Enter = Yes / n = No] : ").strip().lower()
-    if ans == "n" or ans == "no":
+    if ans in {"n", "no"}:
         raise UserAbort("User cancelled.")
 
 
@@ -1728,29 +1755,134 @@ def _opts_from_args(args) -> SyncOptions:
     )
 
 
+def _is_file_mode_target(target: str | None) -> bool:
+    """Heuristic: treat as FILE mode only if the user passed something path-like explicitly."""
+    if not target:
+        return False
+    try:
+        p = Path(target)
+    except Exception:
+        return False
+    return ("/" in target) or target.endswith(".parquet") or p.exists()
+
+
+def cmd_diff(args):
+    target = args.dataset  # may be None
+    if _is_file_mode_target(target):
+        local_file = Path(target).resolve()
+        if local_file.is_dir():
+            raise SystemExit("FILE mode: pass a file path, not a directory.")
+        remote_path = _resolve_remote_path_for_file(local_file, args)
+        s = plan_diff_file(local_file, args.remote, remote_path=remote_path)
+    else:
+        ds_name = _resolve_dataset_name_interactive(
+            args.root,
+            getattr(args, "dataset", None),
+            bool(getattr(args, "rich", False)),
+        )
+        if not ds_name:
+            return
+        s = plan_diff(args.root, ds_name, args.remote)
+    _print_diff(s, use_rich=bool(getattr(args, "rich", False)))
+
+
 def cmd_pull(args):
-    s = plan_diff(args.root, args.dataset, args.remote)
-    _print_diff(s, use_rich=bool(args.rich))
-    _confirm_or_abort(s, assume_yes=args.yes)
-    execute_pull(args.root, args.dataset, args.remote, _opts_from_args(args))
+    target = args.dataset
+    if _is_file_mode_target(target):
+        if args.primary_only or args.skip_snapshots:
+            raise SystemExit(
+                "--primary-only/--skip-snapshots are dataset-only flags (not valid in FILE mode)."
+            )
+        local_file = Path(target).resolve()
+        if local_file.is_dir():
+            raise SystemExit("FILE mode: pass a file path, not a directory.")
+        remote_path = _resolve_remote_path_for_file(local_file, args)
+        s = plan_diff_file(local_file, args.remote, remote_path=remote_path)
+        _print_diff(s, use_rich=bool(getattr(args, "rich", False)))
+        _confirm_or_abort(s, assume_yes=bool(args.yes))
+        execute_pull_file(local_file, args.remote, remote_path, _opts_from_args(args))
+    else:
+        ds_name = _resolve_dataset_name_interactive(
+            args.root,
+            getattr(args, "dataset", None),
+            bool(getattr(args, "rich", False)),
+        )
+        if not ds_name:
+            return
+        s = plan_diff(args.root, ds_name, args.remote)
+        _print_diff(s, use_rich=bool(getattr(args, "rich", False)))
+        _confirm_or_abort(s, assume_yes=bool(args.yes))
+        execute_pull(args.root, ds_name, args.remote, _opts_from_args(args))
     if not args.dry_run:
         print("Pull complete.")
 
 
 def cmd_push(args):
-    s = plan_diff(args.root, args.dataset, args.remote)
-    _print_diff(s, use_rich=bool(args.rich))
-    _confirm_or_abort(s, assume_yes=args.yes)
-    execute_push(args.root, args.dataset, args.remote, _opts_from_args(args))
+    target = args.dataset
+    if _is_file_mode_target(target):
+        if args.primary_only or args.skip_snapshots:
+            raise SystemExit(
+                "--primary-only/--skip-snapshots are dataset-only flags (not valid in FILE mode)."
+            )
+        local_file = Path(target).resolve()
+        if local_file.is_dir():
+            raise SystemExit("FILE mode: pass a file path, not a directory.")
+        remote_path = _resolve_remote_path_for_file(local_file, args)
+        s = plan_diff_file(local_file, args.remote, remote_path=remote_path)
+        _print_diff(s, use_rich=bool(getattr(args, "rich", False)))
+        _confirm_or_abort(s, assume_yes=bool(args.yes))
+        execute_push_file(local_file, args.remote, remote_path, _opts_from_args(args))
+    else:
+        ds_name = _resolve_dataset_name_interactive(
+            args.root,
+            getattr(args, "dataset", None),
+            bool(getattr(args, "rich", False)),
+        )
+        if not ds_name:
+            return
+        s = plan_diff(args.root, ds_name, args.remote)
+        _print_diff(s, use_rich=bool(getattr(args, "rich", False)))
+        _confirm_or_abort(s, assume_yes=bool(args.yes))
+        execute_push(args.root, ds_name, args.remote, _opts_from_args(args))
     if not args.dry_run:
         print("Push complete.")
+
+
+# ---------- helpers for FILE mode ----------
+def _resolve_remote_path_for_file(local_file: Path, args) -> str:
+    if args.remote_path:
+        return args.remote_path
+    cfg = get_remote(args.remote)
+    if not cfg.repo_root:
+        raise SystemExit(
+            "FILE mode requires remote.repo_root in remotes.yaml or --remote-path."
+        )
+    import os
+
+    local_root = (
+        args.repo_root or cfg.local_repo_root or os.environ.get("DNADESIGN_REPO_ROOT")
+    )
+    if not local_root:
+        raise SystemExit(
+            "FILE mode requires a local repo root. Pass --repo-root, set DNADESIGN_REPO_ROOT, or add local_repo_root in remotes.yaml."  # noqa
+        )
+    try:
+        rel = local_file.resolve().relative_to(Path(local_root).resolve())
+    except Exception:
+        raise SystemExit(
+            f"Cannot compute path relative to local repo root: {local_file} not under {local_root}"
+        )
+    from pathlib import PurePosixPath
+
+    return str(PurePosixPath(cfg.repo_root).joinpath(rel.as_posix()))
 
 
 def cmd_dedupe_sequences(args):
     import pyarrow as pa
     import pyarrow.compute as pc
 
-    from .io import append_event, read_parquet, write_parquet_atomic
+    from .io import append_event as _append_event
+    from .io import read_parquet, write_parquet_atomic
 
     d = Dataset(args.root, args.dataset)
     tbl = read_parquet(d.records_path)
@@ -1772,11 +1904,9 @@ def cmd_dedupe_sequences(args):
     keep_ids: list[str] = []
     drop_ids: list[str] = []
 
-    # Optional Rich preview
     use_rich = bool(getattr(args, "rich", False))
 
     def _preview_group(seq_letters: str, g_sorted) -> None:
-        # Pretty preview of a group
         rows = []
         for i, r in g_sorted.reset_index(drop=True).iterrows():
             rows.append({"#": i + 1, "id": r["id"], "created_at": str(r["created_at"])})
@@ -1802,11 +1932,9 @@ def cmd_dedupe_sequences(args):
                 .lower()
             )
             if ans in {"s", "skip"}:
-                # skip: keep everything in this group (i.e., no changes)
                 keep_ids.extend(g_sorted["id"].tolist())
                 continue
             if ans in {"0", "drop-all"}:
-                # drop everything
                 drop_ids.extend(g_sorted["id"].tolist())
                 continue
             try:
@@ -1819,21 +1947,15 @@ def cmd_dedupe_sequences(args):
                     continue
             except Exception:
                 pass
-            # default if invalid: keep first, drop the rest
             keep_ids.append(g_sorted.iloc[0]["id"])
             drop_ids.extend(g_sorted.iloc[1:]["id"].tolist())
         else:
-            keep_ids.append(
-                g_sorted.iloc[0]["id"]
-                if args.policy == "keep-first"
-                else g_sorted.iloc[0]["id"]
-            )
+            keep_ids.append(g_sorted.iloc[0]["id"])
             drop_ids.extend(g_sorted.iloc[1:]["id"].tolist())
 
     print(
         f"Found {len(dup_keys)} duplicate group(s); would drop {len(drop_ids)} row(s)."
     )
-    # Show a compact preview
     for k, g in df[df["_key"].isin(dup_keys)].groupby("_key"):
         print("•", k.split("|", 1)[1])
         print(
@@ -1866,7 +1988,6 @@ def cmd_dedupe_sequences(args):
             print("Aborted.")
             return
 
-    # Correct filter: drop ONLY the duplicate rows selected for removal
     drop_set = set(drop_ids)
     if drop_set:
         drop_mask = pc.is_in(tbl.column("id"), value_set=pa.array(list(drop_set)))
@@ -1876,7 +1997,7 @@ def cmd_dedupe_sequences(args):
     write_parquet_atomic(
         new_tbl, d.records_path, d.snapshot_dir, preserve_metadata_from=tbl
     )
-    append_event(
+    _append_event(
         d.events_path,
         {
             "action": "dedupe_sequences",

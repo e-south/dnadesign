@@ -34,6 +34,8 @@ class SSHRemoteConfig:
     user: str
     base_dir: str
     ssh_key_env: Optional[str] = None
+    repo_root: Optional[str] = None
+    local_repo_root: Optional[str] = None
 
     @property
     def ssh_target(self) -> str:
@@ -93,6 +95,8 @@ def load_all(custom: Optional[Path] = None) -> Dict[str, SSHRemoteConfig]:
                 user=rec["user"],
                 base_dir=rec["base_dir"],
                 ssh_key_env=rec.get("ssh_key_env"),
+                repo_root=rec.get("repo_root"),
+                local_repo_root=rec.get("local_repo_root"),
             )
         except KeyError as ke:
             raise RemoteConfigError(
@@ -111,6 +115,8 @@ def save_remote(cfg: SSHRemoteConfig, custom: Optional[Path] = None) -> Path:
         "user": cfg.user,
         "base_dir": cfg.base_dir,
         "ssh_key_env": cfg.ssh_key_env,
+        "repo_root": cfg.repo_root,
+        "local_repo_root": cfg.local_repo_root,
     }
     _dump_yaml(path, data)
     return path

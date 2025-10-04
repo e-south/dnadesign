@@ -202,6 +202,50 @@ class SSHRemote:
             snapshot_names=snapshot_names,
         )
 
+    def stat_file(self, remote_path: str) -> RemotePrimaryStat:
+        exists, size_b, mtime = self._remote_stat_file(remote_path)
+        if not exists:
+            return RemotePrimaryStat(False, None, None, None, None, None)
+        sha = self._remote_sha256(remote_path)
+        rows = cols = None
+        if remote_path.endswith(".parquet"):
+            rows, cols = self._remote_parquet_shape(remote_path)
+        return RemotePrimaryStat(True, size_b, sha, rows, cols, mtime)
+
+    def pull_file(
+        self, remote_src: str, local_dst: Path, *, dry_run: bool = False
+    ) -> None:
+        local_dst = Path(local_dst)
+        local_dst.parent.mkdir(parents=True, exist_ok=True)
+        rsync = self._rsync_cmd()
+        cmd = (
+            rsync
+            + (["--dry-run"] if dry_run else [])
+            + [f"{self.cfg.ssh_target}:{remote_src}", str(local_dst)]
+        )
+        proc = subprocess.run(cmd)
+        if proc.returncode != 0:
+            raise TransferError(f"rsync file pull failed with code {proc.returncode}")
+
+    def push_file(
+        self, local_src: Path, remote_dst: str, *, dry_run: bool = False
+    ) -> None:
+        local_src = Path(local_src)
+        # ensure remote parent exists
+        import shlex
+
+        parent = Path(remote_dst).parent.as_posix()
+        self._ssh_run(f"mkdir -p {shlex.quote(parent)}", check=True)
+        rsync = self._rsync_cmd()
+        cmd = (
+            rsync
+            + (["--dry-run"] if dry_run else [])
+            + [str(local_src), f"{self.cfg.ssh_target}:{remote_dst}"]
+        )
+        proc = subprocess.run(cmd)
+        if proc.returncode != 0:
+            raise TransferError(f"rsync file push failed with code {proc.returncode}")
+
     def pull_to_local(
         self,
         dataset: str,

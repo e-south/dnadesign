@@ -15,11 +15,14 @@ import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 import pyarrow.parquet as pq
 
 from .remote import RemoteDatasetStat
+
+if TYPE_CHECKING:  # for static checkers only; avoids runtime coupling
+    from .remote import RemotePrimaryStat  # noqa: F401
 
 
 @dataclass
@@ -77,6 +80,69 @@ def parquet_stats(path: Path) -> FileStat:
     pf = pq.ParquetFile(str(p))
     meta = pf.metadata
     return FileStat(True, size, sha, meta.num_rows, meta.num_columns, mtime)
+
+
+def file_stats(path: Path) -> FileStat:
+    p = Path(path)
+    if not p.exists():
+        return FileStat(False, None, None, None, None, None)
+    mtime = str(int(p.stat().st_mtime))
+    size = int(p.stat().st_size)
+    sha = _sha256_file(p)
+    rows = cols = None
+    if p.suffix.lower() == ".parquet":
+        pf = pq.ParquetFile(str(p))
+        rows, cols = pf.metadata.num_rows, pf.metadata.num_columns
+    return FileStat(True, size, sha, rows, cols, mtime)
+
+
+def compute_file_diff(
+    local_file: Path,
+    remote_primary: RemoteDatasetStat | RemotePrimaryStat,
+    display: str,
+) -> DiffSummary:
+    # accept either a RemoteDatasetStat.primary or a RemotePrimaryStat
+    if isinstance(remote_primary, RemoteDatasetStat):
+        rp = remote_primary.primary
+    else:
+        rp = remote_primary
+    local = file_stats(local_file)
+    remote = FileStat(
+        exists=rp.exists,
+        size=rp.size,
+        sha256=rp.sha256,
+        rows=rp.rows,
+        cols=rp.cols,
+        mtime=rp.mtime,
+    )
+    # Only primary file diff; meta/events/snapshots are N/A for file mode
+    changes = {
+        "primary_sha_diff": (
+            (local.sha256 != remote.sha256)
+            if (local.exists and remote.exists and local.sha256 and remote.sha256)
+            else (
+                (local.size != remote.size)
+                if (local.exists and remote.exists)
+                else (local.exists != remote.exists)
+            )
+        ),
+        "meta_mtime_diff": False,
+        "events_new_remote_lines": 0,
+        "snapshots_remote_newer": 0,
+    }
+    has_change = bool(changes["primary_sha_diff"])
+    return DiffSummary(
+        dataset=display,
+        primary_local=local,
+        primary_remote=remote,
+        meta_local_mtime=None,
+        meta_remote_mtime=None,
+        events_local_lines=0,
+        events_remote_lines=0,
+        snapshots=SnapshotStat(count=0, newest_ts=None, newer_than_local=0),
+        has_change=has_change,
+        changes=changes,
+    )
 
 
 def file_mtime(path: Path) -> Optional[str]:
