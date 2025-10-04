@@ -108,10 +108,11 @@ def plot_intra_similarity(
     plt.figure(figsize=(12, 6))
     sns.boxplot(data=d, x="cluster", y="sim", order=order, showfliers=False)
     sns.stripplot(
-        data=d, x="cluster", y="sim", order=order, color="black", alpha=0.3, jitter=True
+        data=d, x="cluster", y="sim", order=order, color="0.35", alpha=0.3, jitter=True
     )
     plt.xticks(rotation=90)
     plt.tight_layout()
+    sns.despine(top=True, right=True)
     if out_path:
         plt.savefig(out_path, dpi=200)
     else:

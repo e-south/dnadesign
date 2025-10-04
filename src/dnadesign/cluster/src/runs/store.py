@@ -16,6 +16,9 @@ from pathlib import Path
 import pandas as pd
 
 DEFAULT_ENV_KEY = "DNADESIGN_CLUSTER_RUNS_DIR"
+DEFAULT_DIRNAME = "cluster_log"
+FLAT_UMAP_ENV = "DNADESIGN_CLUSTER_FLAT_UMAP_DIRS"  # "1", "true", "yes" => flat layout
+
 
 
 def _package_cluster_dir() -> Path:
@@ -31,9 +34,19 @@ def runs_root(default_base: Path | None = None) -> Path:
     if env:
         root = Path(env)
     else:
-        # Default: <package_cluster_dir>/batch_results  (sibling to cluster/src)
+        # Default: <package_cluster_dir>/cluster_log  (sibling to cluster/src)
         cluster_dir = _package_cluster_dir()
-        root = (default_base or cluster_dir) / "batch_results"
+        base = default_base or cluster_dir
+        new_root = base / DEFAULT_DIRNAME
+        old_root = base / "batch_results"
+        # One-time migration: move previous default into the new standardized name.
+        if old_root.exists() and not new_root.exists():
+            try:
+                old_root.rename(new_root)
+            except Exception:
+                # If rename fails, keep using old_root rather than duplicating.
+                new_root = old_root
+        root = new_root
     root.mkdir(parents=True, exist_ok=True)
     # Ensure index file exists
     idx = root / "index.parquet"
@@ -95,7 +108,8 @@ def write_log(run_dir: Path, event: dict) -> None:
 
 # ---------------- UMAP helpers ----------------
 def umap_dir(run_dir: Path, umap_slug: str) -> Path:
-    d = run_dir / "umap" / umap_slug
+    flat = str(os.environ.get(FLAT_UMAP_ENV, "")).strip().lower() in {"1", "true", "yes", "y", "on"}
+    d = (run_dir / umap_slug) if flat else (run_dir / "umap" / umap_slug)
     d.mkdir(parents=True, exist_ok=True)
     (d / "plots").mkdir(parents=True, exist_ok=True)
     return d

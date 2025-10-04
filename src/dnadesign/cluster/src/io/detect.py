@@ -13,6 +13,53 @@ import os
 from pathlib import Path
 
 
+def _maybe_datasets_root(root: Path, dataset: str) -> Path | None:
+    """
+    Normalize a candidate USR root to the *datasets root* accepted by our tooling.
+    Accepts either:
+      - root = /path/to/usr/datasets        -> expects /path/to/usr/datasets/<dataset>/records.parquet
+      - root = /path/to/usr                 -> expects /path/to/usr/datasets/<dataset>/records.parquet
+      - root = /path/to/datasets            -> expects /path/to/datasets/<dataset>/records.parquet
+      - root = /path/with/<dataset>         -> expects /path/with/<dataset>/records.parquet
+    Returns the datasets root (e.g., ".../usr/datasets" or ".../datasets") or None if not valid.
+    """
+    # 1) root is already a datasets root
+    p = root / dataset / "records.parquet"
+    if p.exists():
+        return root
+    # 2) root is an "usr" root (contains a datasets/ subdir)
+    p = root / "datasets" / dataset / "records.parquet"
+    if p.exists():
+        return root / "datasets"
+    # 3) root is an arbitrary repo root (contains usr/datasets/)
+    p = root / "usr" / "datasets" / dataset / "records.parquet"
+    if p.exists():
+        return root / "usr" / "datasets"
+    return None
+
+
+def _search_up_for_datasets_root(
+    dataset: str, start: Path
+) -> tuple[Path | None, list[str]]:
+    """
+    Walk upward from `start`, looking for usr/datasets/<dataset>/records.parquet
+    or datasets/<dataset>/records.parquet. Return (datasets_root, tried_paths).
+    """
+    tried: list[str] = []
+    for base in [start, *start.parents]:
+        # Try usr/datasets and plain datasets under this base
+        for sub in ("usr/datasets", "datasets"):
+            ds_dir = base / sub / dataset
+            tried.append(str(ds_dir / "records.parquet"))
+            if (ds_dir / "records.parquet").exists():
+                return ds_dir.parent, tried
+        # Also try if this base itself is a datasets root
+        tried.append(str(base / dataset / "records.parquet"))
+        if (base / dataset / "records.parquet").exists():
+            return base, tried
+    return None, tried
+
+
 def detect_context(
     dataset: str | None, file: str | Path | None, usr_root: str | None = None
 ) -> dict:
@@ -26,29 +73,43 @@ def detect_context(
     if dataset and file:
         raise ValueError("Pass either --dataset or --file, not both.")
     if dataset:
-        # 1) If caller gave an explicit usr_root, use it directly.
+        # 1) Explicit --usr-root (accept both /usr and /usr/datasets)
         if usr_root:
             root = Path(usr_root)
-            ds_dir = root / dataset
-            file_path = ds_dir / "records.parquet"
-            if not file_path.exists():
+            ds_root = _maybe_datasets_root(root, dataset)
+            if ds_root is None:
                 raise FileNotFoundError(
-                    f"USR dataset '{dataset}' not found under '{root}'. Expected {file_path}"
+                    "USR dataset '{ds}' not found under --usr-root '{rt}'. "
+                    "Tried: {cand1} and {cand2}".format(
+                        ds=dataset,
+                        rt=str(root),
+                        cand1=str(root / "datasets" / dataset / "records.parquet"),
+                        cand2=str(root / dataset / "records.parquet"),
+                    )
                 )
             return {
                 "kind": "usr",
                 "dataset": dataset,
-                "file": file_path,
-                "usr_root": root,
+                "file": ds_root / dataset / "records.parquet",
+                "usr_root": ds_root,  # datasets root
                 "cwd_inferred": False,
             }
 
-        # 2) If no usr_root, allow environment override; else start from CWD.
-        root_candidate = Path(os.environ.get("DNADESIGN_USR_ROOT", Path.cwd()))
+        # 2) Environment override (accept both /usr and /usr/datasets)
+        env = os.environ.get("DNADESIGN_USR_ROOT")
+        if env:
+            root = Path(env)
+            ds_root = _maybe_datasets_root(root, dataset)
+            if ds_root is not None:
+                return {
+                    "kind": "usr",
+                    "dataset": dataset,
+                    "file": ds_root / dataset / "records.parquet",
+                    "usr_root": ds_root,
+                    "cwd_inferred": False,
+                }
 
-        # Special case: if we're already **inside** the dataset directory
-        # (i.e., CWD contains records.parquet and its name matches `dataset`),
-        # then the USR root is the parent and the records live here.
+        # 3) If CWD is exactly the dataset dir (keep legacy fast path)
         cwd = Path.cwd()
         cwd_records = cwd / "records.parquet"
         if cwd_records.exists() and cwd.name == dataset:
@@ -56,24 +117,31 @@ def detect_context(
                 "kind": "usr",
                 "dataset": dataset,
                 "file": cwd_records,
-                "usr_root": cwd.parent,  # the datasets/ parent
+                "usr_root": cwd.parent,  # datasets root
                 "cwd_inferred": True,
             }
 
-        # 3) Otherwise assume <root_candidate>/<dataset>/records.parquet
-        root = root_candidate if root_candidate.exists() else Path.cwd()
-        ds_dir = root / dataset
-        file_path = ds_dir / "records.parquet"
-        if not file_path.exists():
+        # 4) Walk upward from CWD to find usr/datasets/<dataset>/records.parquet (robust)
+        ds_root, tried = _search_up_for_datasets_root(dataset, cwd)
+        if ds_root is None:
+            tried_msg = "\n  - " + "\n  - ".join(tried[:12])
+            more = " (…)" if len(tried) > 12 else ""
             raise FileNotFoundError(
-                f"USR dataset '{dataset}' not found under '{root}'. Expected {file_path}"
+                "Could not resolve USR dataset '{ds}'. Search strategy:\n"
+                "  1) --usr-root (not provided)\n"
+                "  2) DNADESIGN_USR_ROOT (not set or invalid)\n"
+                "  3) Walk up from CWD looking for usr/datasets/<dataset>/records.parquet or datasets/<dataset>/records.parquet\n"  # noqa
+                "Paths tried:{lst}{more}\n\n"
+                "Hint: pass --usr-root, or set DNADESIGN_USR_ROOT to either '/path/to/usr' or '/path/to/usr/datasets'.".format(  # noqa
+                    ds=dataset, lst=tried_msg, more=more
+                )
             )
         return {
             "kind": "usr",
             "dataset": dataset,
-            "file": file_path,
-            "usr_root": root,
-            "cwd_inferred": False,
+            "file": ds_root / dataset / "records.parquet",
+            "usr_root": ds_root,
+            "cwd_inferred": True,
         }
     if file:
         p = Path(file)

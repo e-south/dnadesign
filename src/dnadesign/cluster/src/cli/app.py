@@ -120,6 +120,16 @@ def _collect_existing_meta_sig(df: pd.DataFrame, name: str) -> Optional[str]:
     return None
 
 
+def _safe_merge_on(df: pd.DataFrame, right: pd.DataFrame, key_col: str) -> pd.DataFrame:
+    """
+    Merge helper that avoids pandas ambiguity when the left frame has both
+    an index level and a column named `key_col`. If the index is named `key_col`,
+    reset it (dropping the index) before merging.
+    """
+    left = df.reset_index(drop=True) if df.index.name == key_col else df
+    return left.merge(right, on=key_col, how="left")
+
+
 def _apply_preset(kind: str, preset_name: Optional[str]) -> dict:
     """Return the preset params dict ({} if not found/None)."""
     if not preset_name:
@@ -354,7 +364,7 @@ def cmd_fit(
                             "[green]Reattached[/green] labels from cache to USR dataset."
                         )
                     else:
-                        merged = df.merge(attach_cols, on=key_col, how="left")
+                        merged = _safe_merge_on(df, attach_cols, key_col)
                         write_generic(
                             ictx["file"],
                             merged,
@@ -545,7 +555,7 @@ def cmd_fit(
         )
     else:
         # merge with df
-        merged = df.merge(attach_cols, on=key_col, how="left")
+        merged = _safe_merge_on(df, attach_cols, key_col)
         write_generic(
             ictx["file"],
             merged,
@@ -607,6 +617,11 @@ def cmd_umap(
         None,
         help="Path to OPAL campaign dir or campaign name under dnadesign/opal/campaigns/",
     ),
+    opal_run: Optional[str] = typer.Option(
+        None,
+        help="OPAL run selector: 'latest', 'round:<n>', or 'run_id:<rid>' "
+        "(mutually exclusive with --opal-as-of-round).",
+    ),
     opal_as_of_round: Optional[int] = typer.Option(
         None, help="Filter OPAL predictions to this round"
     ),
@@ -643,19 +658,92 @@ def cmd_umap(
         else int(p_umap.get("random_state", 42))
     )
 
-    # ---------- Preflight hues (strict, before any heavy compute) ----------
+    # ---------- Plot preset & OPAL preflight (join before hue validation) ----------
     # Resolve presets first so --preset plot.* can inject color_by
     p_plot = _apply_plot_preset(preset)
     if "color_by" in p_plot and color_by == ["cluster"]:
         color_by = list(p_plot["color_by"])
-    # If df isn't indexed by id yet, do it now for consistent diagnostics
+    # Derive which OPAL fields are actually needed from the hue specs,
+    # and union with any explicit --opal-fields
+    opal_needed_fields: set[str] = set()
+    for spec in color_by:
+        if spec.startswith(("numeric:", "categorical:")):
+            col = spec.split(":", 1)[1]
+            if col.startswith(("obj__", "pred__", "sel__")) and col not in df.columns:
+                opal_needed_fields.add(col)
+    if opal_fields:
+        opal_needed_fields |= {c.strip() for c in opal_fields.split(",") if c.strip()}
+
+    # If OPAL columns are requested by hues and not present, join them now
+    if opal_needed_fields:
+        if not opal_campaign:
+            console.print(
+                "[red]Error[/red]: The selected hues require OPAL predictions "
+                f"(missing {', '.join(sorted(opal_needed_fields))}).\n"
+                "Provide --opal-campaign (path or known name) and *either* "
+                "--opal-run latest|round:<n>|run_id:<rid> or --opal-as-of-round <n>."
+            )
+            raise typer.Exit(code=2)
+        if opal_run and opal_as_of_round is not None:
+            raise typer.BadParameter(
+                "Use only one of --opal-run or --opal-as-of-round, not both."
+            )
+        from ..opal.join import (
+            join_fields as _opal_join,
+        )
+        from ..opal.join import (
+            list_available_fields as _opal_list,
+        )
+        from ..opal.join import (
+            resolve_campaign_dir as _resolve_campaign_dir,
+        )
+
+        # Resolve campaign directory deterministically
+        try:
+            camp = _resolve_campaign_dir(opal_campaign)
+        except FileNotFoundError as e:
+            raise typer.BadParameter(str(e))
+        # Always index by id so diagnostics stay consistent
+        if df.index.name != key_col:
+            df = df.set_index(key_col, drop=False)
+        # Join only the columns we need
+        df = _opal_join(
+            df,
+            campaign_dir=camp,
+            run_selector=(opal_run or "latest"),
+            fields=sorted(opal_needed_fields),
+            as_of_round=opal_as_of_round,
+        )
+        # Assert post-join coverage and show discoverable alternatives if something is missing
+        missing_after = [c for c in opal_needed_fields if c not in df.columns]
+        if missing_after:
+            avail = _opal_list(
+                camp, run_selector=(opal_run or "latest"), as_of_round=opal_as_of_round
+            )[:60]
+            console.print(
+                "[red]Error[/red]: OPAL join did not provide the requested column(s): "
+                + ", ".join(missing_after)
+            )
+            console.print(
+                "Available OPAL columns for this run/round include: "
+                + ", ".join(avail)
+                + (" ..." if len(avail) == 60 else "")
+            )
+            raise typer.Exit(code=2)
+
+    # ---------- Preflight hue validation (after OPAL join) ----------
     if df.index.name != "id":
         df = df.set_index(key_col, drop=False)
     try:
-        # This calls _ensure_numeric_series under the hood and will raise with detailed offenders
         from ..umap.plot import resolve_hue as _resolve_hue
 
-        _resolve_hue(df, color_specs=color_by, name=name)
+        _resolve_hue(
+            df,
+            color_specs=color_by,
+            name=name,
+            missing_policy="drop_and_log",
+            log_fn=lambda m: console.print(f"[yellow]Note[/yellow]: {m}"),
+        )
     except Exception as e:
         console.print(f"[red]Hue validation failed[/red]: {e}")
         raise typer.Exit(code=2)
@@ -713,57 +801,23 @@ def cmd_umap(
     p_font = float(p_plot.get("font_scale", 1.2))
     font_scale = float(font_scale) if font_scale is not None else p_font
     # legend from preset (defaults preserved if not provided)
-    _legend = p_plot.get("legend", {})
-    legend = {
-        "ncol": int(_legend.get("ncol", 1)),
-        "bbox": tuple(_legend.get("bbox", (1.05, 1))),
-    }
-
-    # Optional: attach OPAL metrics into df (no write-backs)
-    if opal_campaign or opal_fields:
-        from ..opal.join import join_fields as _opal_join
-
-        # resolve fields
-        fields = (
-            [f.strip() for f in opal_fields.split(",")]
-            if opal_fields
-            else ["pred__y_obj_scalar", "obj__logic_fidelity", "obj__effect_scaled"]
+    _legend = dict(p_plot.get("legend", {}))
+    # Preserve known keys and sanitize types; allow presets to fully control legend behavior
+    legend = {}
+    if "ncol" in _legend:
+        legend["ncol"] = int(_legend["ncol"])
+    if "bbox" in _legend:
+        bbox = _legend["bbox"]
+        legend["bbox"] = (
+            tuple(bbox[:2]) if isinstance(bbox, (list, tuple)) else (1.05, 1.0)
         )
-        # resolve campaign dir (path or name under dnadesign/opal/campaigns)
-        camp = Path(opal_campaign) if opal_campaign else None
-        if camp and not camp.exists():
-            guess = (
-                Path(__file__).resolve().parents[3]
-                / "opal"
-                / "campaigns"
-                / str(opal_campaign)
-            )
-            if guess.exists():
-                camp = guess
-        if not camp or not camp.exists():
-            raise typer.BadParameter(
-                "OPAL campaign directory not found. Pass --opal-campaign as a path or known name."
-            )
-        df = _opal_join(
-            df,
-            campaign_dir=camp,
-            run_selector="latest",
-            fields=fields,
-            as_of_round=opal_as_of_round,
-        )
-        # coverage warnings
-        for c in fields:
-            if c in df.columns:
-                miss = float(df[c].isna().mean())
-                if miss > 0:
-                    console.print(
-                        f"[yellow]Warning[/yellow]: joined '{c}' has {miss:.1%} missing values."
-                    )
-            else:
-                console.print(
-                    f"[red]Error[/red]: OPAL field '{c}' not present after join."
-                )
-                raise typer.Exit(code=2)
+    else:
+        legend["bbox"] = (1.05, 1.0)
+    if "max_items" in _legend:
+        legend["max_items"] = int(_legend["max_items"])
+    if "frameon" in _legend:
+        legend["frameon"] = bool(_legend["frameon"])
+
     # Decide output location (default: run store)
     root = runs_root()
     run_dir = root / (name or "unnamed")
@@ -797,6 +851,7 @@ def cmd_umap(
         legend=legend,
         out_path=out_path,
         font_scale=font_scale,
+        # scatter() defaults to 'drop_and_log'; we omit log_fn here to avoid duplicate logs
     )
     # Save coords & meta into run store
     coords_df = pd.DataFrame(
@@ -872,7 +927,7 @@ def cmd_umap(
                 raise
             console.print("[green]Attached[/green] UMAP coords to USR dataset.")
         else:
-            merged = df.merge(cols, on=key_col, how="left")
+            merged = _safe_merge_on(df, cols, "id")
             write_generic(
                 ictx["file"],
                 merged,
@@ -934,6 +989,9 @@ def cmd_analyze(
     usr_root: Optional[str] = typer.Option(None),
     cluster_col: str = typer.Option(...),
     group_by: str = typer.Option("source"),
+    preset: Optional[str] = typer.Option(
+        None, help="Preset name (kind: 'analysis') to pre-fill parameters"
+    ),
     out_dir: Optional[str] = typer.Option(
         None, help="If omitted, defaults to batch_results/<FIT>/analysis/<group_by>/"
     ),
@@ -965,73 +1023,133 @@ def cmd_analyze(
     from ..analysis.numeric_per_cluster import summarize_numeric_by_cluster
 
     ctx, df = _context_and_df(dataset, file, usr_root)
-    # Decide output directory **without** ever doing Path(None)
+    console.rule("[bold]cluster analyze[/]")
+
+    # ---------- Apply preset (if any) ----------
+    p = _apply_preset("analysis", preset)
+    # Scalars/flags from preset only fill when user didn't override
+    if p:
+        group_by_from_preset = p.get("group_by")
+        if group_by_from_preset:
+            # allow either string or list in YAML
+            group_bys = (
+                [group_by_from_preset]
+                if isinstance(group_by_from_preset, str)
+                else list(group_by_from_preset)
+            )
+        else:
+            group_bys = [group_by]
+        composition = composition or bool(p.get("composition", False))
+        diversity = diversity or bool(p.get("diversity", False))
+        difffeat = difffeat or bool(p.get("difffeat", False))
+        plots = plots or bool(p.get("plots", False))
+        # numeric can come as a list in YAML
+        if not numeric and p.get("numeric"):
+            numeric = (
+                ",".join(p["numeric"])
+                if isinstance(p["numeric"], (list, tuple))
+                else str(p["numeric"])
+            )
+        # font_scale + missing policy
+        font_scale = float(p.get("font_scale", font_scale))
+        numeric_missing_policy = str(p.get("missing_policy", "error"))
+        # OPAL knobs can be provided via preset
+        opal_campaign = opal_campaign or p.get("opal_campaign")
+        opal_as_of_round = opal_as_of_round or p.get("opal_as_of_round")
+        if not opal_fields and p.get("opal_fields"):
+            opal_fields = (
+                ",".join(p["opal_fields"])
+                if isinstance(p["opal_fields"], (list, tuple))
+                else str(p["opal_fields"])
+            )
+    else:
+        group_bys = [group_by]
+        numeric_missing_policy = "error"
+
+    # Decide *root* output directory (flattened layout; no per-group_by subdirs)
     if out_dir is None and cluster_col.startswith("cluster__"):
         fit_name = cluster_col.split("__", 1)[1]
-        out = runs_root() / fit_name / "analysis" / group_by
+        out_root = runs_root() / fit_name / "analysis"
     else:
-        out = Path(out_dir or "./analysis")
-    out.mkdir(parents=True, exist_ok=True)
+        out_root = Path(out_dir or "./analysis")
+    out_root.mkdir(parents=True, exist_ok=True)
 
-    # Optional: OPAL join before analysis (no writes)
-    if opal_campaign or opal_fields:
-        from ..opal.join import join_fields as _opal_join
+    # ---------- Optional OPAL join, driven by numeric metrics and/or explicit fields ----------
+    # If numeric metrics include obj__/pred__/sel__ columns and they are not present,
+    # auto-join them (mirrors UMAP behavior).
+    needed_from_numeric: set[str] = set()
+    if numeric:
+        for c in [x.strip() for x in numeric.split(",") if x.strip()]:
+            if c.startswith(("obj__", "pred__", "sel__")) and c not in df.columns:
+                needed_from_numeric.add(c)
+    explicit_fields = (
+        {f.strip() for f in opal_fields.split(",")} if opal_fields else set()
+    )
+    required_fields = needed_from_numeric | explicit_fields
 
-        fields = (
-            [f.strip() for f in opal_fields.split(",")]
-            if opal_fields
-            else ["pred__y_obj_scalar", "obj__logic_fidelity", "obj__effect_scaled"]
-        )
-        camp = Path(opal_campaign) if opal_campaign else None
-        if camp and not camp.exists():
-            guess = (
-                Path(__file__).resolve().parents[3]
-                / "opal"
-                / "campaigns"
-                / str(opal_campaign)
-            )
-            if guess.exists():
-                camp = guess
-        if not camp or not camp.exists():
+    if required_fields:
+        if not opal_campaign:
             raise typer.BadParameter(
-                "OPAL campaign directory not found. Pass --opal-campaign as a path or known name."
+                "Analysis requires OPAL metrics "
+                f"({', '.join(sorted(required_fields))}) but --opal-campaign is not set. "
+                "Pass --opal-campaign <name|path> and optionally --opal-as-of-round <n>."
             )
+        from ..opal.join import join_fields as _opal_join
+        from ..opal.join import resolve_campaign_dir as _resolve_campaign_dir
+
+        try:
+            camp = _resolve_campaign_dir(opal_campaign)
+        except FileNotFoundError as e:
+            raise typer.BadParameter(str(e))
         df = _opal_join(
             df,
             campaign_dir=camp,
             run_selector="latest",
-            fields=fields,
+            fields=sorted(required_fields),
             as_of_round=opal_as_of_round,
         )
-        # explicit checks + warn about missing proportions (assertive but informative)
-        for c in fields:
+        # Assert coverage + warn if any nulls remain
+        for c in required_fields:
             if c not in df.columns:
                 raise typer.BadParameter(f"Joined OPAL field '{c}' missing after join.")
             miss = float(df[c].isna().mean())
-            if miss > 0:
+            # Only warn when there are actual missings; keep logs compact
+            if miss > 0.0:
                 console.print(
                     f"[yellow]Warning[/yellow]: joined '{c}' has {miss:.1%} missing values."
                 )
+        if required_fields:
+            console.log("Joined OPAL fields: " + ", ".join(sorted(required_fields)))
 
-    if composition:
-        comp_fn(
-            df, cluster_col=cluster_col, group_by=group_by, out_dir=out, plots=plots
-        )
-    if diversity:
-        div_fn(df, cluster_col=cluster_col, group_by=group_by, out_dir=out, plots=plots)
-    if difffeat:
-        diff_fn(df, cluster_col=cluster_col, group_by=group_by, out_dir=out)
+    # Run numeric once (not per group_by) to avoid duplication
     if numeric:
         cols = [c.strip() for c in numeric.split(",") if c.strip()]
         summarize_numeric_by_cluster(
             df,
             cluster_col=cluster_col,
             numeric_cols=cols,
-            out_dir=out,
+            out_dir=out_root,
             plots=numeric_plots,
             font_scale=font_scale,
+            missing_policy=numeric_missing_policy,
+            log_fn=lambda m: console.print(f"[yellow]Note[/yellow]: {m}"),
         )
-    console.print(f"[green]Analyses complete[/green]. Outputs at {out}")
+        console.log("Numeric summaries/plots written.")
+
+    # Run group_by‑dependent analyses; write into the *same* root with filenames namespaced by __by_<group>
+    for gb in group_bys:
+        if composition:
+            comp_fn(
+                df, cluster_col=cluster_col, group_by=gb, out_dir=out_root, plots=plots
+            )
+        if diversity:
+            div_fn(
+                df, cluster_col=cluster_col, group_by=gb, out_dir=out_root, plots=plots
+            )
+        if difffeat:
+            diff_fn(df, cluster_col=cluster_col, group_by=gb, out_dir=out_root)
+        console.log(f"Completed group_by='{gb}'.")
+    console.print(f"[green]Analyses complete[/green]. Outputs at {out_root}")
 
 
 @app.command("intra-sim")

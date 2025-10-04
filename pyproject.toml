@@ -42,6 +42,8 @@ usr = "dnadesign.usr.src.cli:main"
 opal = "dnadesign.opal.src.cli:main"
 infer = "dnadesign.infer.main:main"
 cluster = "dnadesign.cluster.src.cli.app:main"
+permuter = "dnadesign.permuter.src.cli.app:main"
+mb = "dnadesign.molbench.src.cli.app:cli"
 
 [project.optional-dependencies]
 viz = [

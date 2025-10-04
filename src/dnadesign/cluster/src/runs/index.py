@@ -16,22 +16,25 @@ import pandas as pd
 from .store import runs_root
 
 
-def _index_path(root: Path) -> Path:
+def _index_path(root: Path | None) -> Path:
+    # Always resolve via runs_root() to keep a single, consistent home.
     return runs_root(root) / "index.parquet"
 
 
 def add_or_update_index(row: dict, root: Path | None = None) -> None:
-    idx_path = _index_path(root or Path.cwd())
+    idx_path = _index_path(root)
+    # Read, being explicit about "empty" to avoid pandas FutureWarning on concat
     try:
         df = pd.read_parquet(idx_path)
     except Exception:
         df = pd.DataFrame()
-    df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-    df.to_parquet(idx_path, index=False)
+    frames = ([df] if not df.empty else []) + [pd.DataFrame([row])]
+    out = pd.concat(frames, ignore_index=True)
+    out.to_parquet(idx_path, index=False)
 
 
 def list_runs(filters: dict | None = None, root: Path | None = None) -> pd.DataFrame:
-    idx_path = _index_path(root or Path.cwd())
+    idx_path = _index_path(root)
     if not idx_path.exists():
         return pd.DataFrame()
     df = pd.read_parquet(idx_path)

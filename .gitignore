@@ -123,7 +123,7 @@ archived/
 !images/*.png
 
 # -----------------------------------------------------------------------------
-# Project-specific (OPAL / USR)
+# Project-specific
 # -----------------------------------------------------------------------------
 # OPAL campaigns (private, large). Keep only curated examples.
 src/dnadesign/opal/campaigns/**
@@ -147,10 +147,12 @@ src/dnadesign/usr/datasets/**
 campaigns/
 datasets/
 prototypes/
+molbench/
 test_configs/
 batches/
 **/batch_results/
 **/results/
+**/cluster_log/
 
 # Misc project-generated YAML summaries
 **/progress_status_*.yaml

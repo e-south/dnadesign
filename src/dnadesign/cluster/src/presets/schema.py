@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field, validator
 
 class Preset(BaseModel):
     name: str
-    kind: Literal["fit", "umap", "plot"]
+    kind: Literal["fit", "umap", "plot", "analysis"]
     params: Dict[str, Any] = Field(default_factory=dict)
     plot: Dict[str, Any] = Field(default_factory=dict)
     hue: Dict[str, Any] = Field(default_factory=dict)

@@ -88,7 +88,7 @@ Compute **mean global alignment similarity** per row within each cluster (requir
 Leiden **resolution sweep** with replicate seeds; writes a Parquet summary and PNG with **suggested resolution**.
 
 #### Run store + presets
-`cluster runs list` shows all fits and umaps recorded in `cluster/batch_results/index.parquet`.  
+`cluster runs list` shows all fits and UMAPs recorded in `cluster/cluster_log/index.parquet`.
 `cluster presets list|show` surfaces built‑in, user, or project presets for **fit**, **umap**, and **plot**.
 
 ---
@@ -140,14 +140,16 @@ cluster umap \
   --dataset 60bp_dual_promoter_cpxR_LexA \
   --name ldn_v1 \
   --x-col infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean \
-  --preset plot.paper.umap \
-  --attach-coords --write
+  --preset umap.promoter_set1 \
+  --opal-campaign prom60-etoh-cipro-andgate \
+  --opal-run latest \
+  --attach-coords --write --allow-overwrite
 ```
 
 Each hue yields a file like:
 
 ```
-cluster/batch_results/<FIT_SLUG>/umap/<UMAP_SLUG>/plots/<name>.<hue>.png
+cluster/cluster_log/<FIT_SLUG>/umap/<UMAP_SLUG>/plots/<name>.<hue>.png
 ```
 
 > Hues you can use anywhere: `cluster`, `gc_content`, `seq_length`, `intra_sim`, `numeric:<col>`, `categorical:<col>`.
@@ -158,23 +160,25 @@ Attach OPAL metrics on‑the‑fly and summarize per cluster:
 cluster analyze \
   --dataset 60bp_dual_promoter_cpxR_LexA \
   --cluster-col cluster__ldn_v1 \
-  --numeric infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__ll_mean,opal__prom60-etoh-cipro-andgate__latest_pred_scalar,obj__logic_fidelity,obj__effect_scaled \
-  --numeric-plots \
-  --font-scale 1.3 \
-  --opal-campaign prom60-etoh-cipro-andgate \
-  --opal-as-of-round 0
+  --preset analysis.promoter_set1
 ```
 
 Outputs go by default to:
 
 ```
-cluster/batch_results/ldn_v1/analysis/source/
+cluster/cluster_log/ldn_v1/analysis/source/
   numeric_summary__cluster__ldn_v1.csv
   numeric_violin__cluster__ldn_v1__infer__evo2_7b__...__ll_mean.png
   numeric_violin__cluster__ldn_v1__opal__prom60-etoh-cipro-andgate__latest_pred_scalar.png
   numeric_violin__cluster__ldn_v1__obj__logic_fidelity.png
   numeric_violin__cluster__ldn_v1__obj__effect_scaled.png
 ```
+
+**Note on caching vs attached columns**
+
+* The **run store** (`cluster_log`) caches labels, coords, plots, and an index. Deleting it removes cached artifacts but **does not** remove any columns attached to your dataset.
+* The **dataset itself** (USR `records.parquet`) may have columns like `cluster__<NAME>` already attached. That’s why `cluster umap` still works even if you delete the run store: UMAP recomputes from `X`, and hues like `cluster` come from the dataset column.
+* You can relocate the run store via `DNADESIGN_CLUSTER_RUNS_DIR=/path/to/central/dir`.
 
 ---
 

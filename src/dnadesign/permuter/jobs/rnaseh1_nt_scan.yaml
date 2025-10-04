@@ -1,0 +1,30 @@
+job:
+  name: rnaseh1_nt_scan
+  bio_type: dna
+  input:
+    refs: "${JOB_DIR}/../inputs/refs.csv"
+    name_col: "ref_name"
+    seq_col: "sequence"
+
+  permute:
+    protocol: "scan_dna"
+    params:
+      regions: []          # [] = full sequence, or [[start,end), ...] (0-based)
+
+  evaluate:
+    metrics:
+      - id: llr
+        evaluator: evo2_llr
+        metric: log_likelihood_ratio
+        params:
+          model_id: evo2_7b
+          device: cuda:0
+          precision: bf16
+          alphabet: dna
+          reduction: mean
+
+  output:
+    dir: "${JOB_DIR}/../runs/rnaseh1_nt_scan"
+
+  plot:
+    which: ["position_scatter_and_heatmap","metric_by_mutation_count"]

@@ -1,0 +1,26 @@
+job:
+  name: nt_scan_demo
+  bio_type: dna
+  input:
+    refs: "${JOB_DIR}/../runs/nt_scan_demo"
+    name_col: "ref_name"
+    seq_col: "sequence"
+  permute:
+    protocol: "scan_dna"
+    params:
+      regions: []            # full
+  evaluate:
+    metrics:
+      - id: llr
+        evaluator: evo2_llr
+        metric: log_likelihood_ratio
+        params:
+          model_id: evo2_7b
+          device: cuda:0
+          precision: bf16
+          alphabet: dna
+          reduction: mean
+  output:
+    dir: "permuter/nt_scan_demo"
+  plot:
+    which: ["position_scatter_and_heatmap","metric_by_mutation_count"]

@@ -11,7 +11,7 @@ Dunlop Lab
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,7 +20,13 @@ import seaborn as sns
 from matplotlib import rc_context
 
 
-def _coerce_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+def _coerce_numeric(
+    df: pd.DataFrame,
+    cols: list[str],
+    *,
+    missing_policy: str = "error",
+    log_fn: Optional[Callable[[str], None]] = None,
+) -> pd.DataFrame:
     out = df.copy()
     for c in cols:
         if c not in out.columns:
@@ -31,10 +37,6 @@ def _coerce_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
             # Build an offender preview that includes id and sequence when available
             coerced = pd.to_numeric(out[c], errors="coerce")
             bad = coerced.isna() & out[c].notna()
-            # Prefer a proper 'id' column; otherwise row index; also include sequence if present
-            id_series = (
-                out["id"].astype(str) if "id" in out.columns else out.index.astype(str)
-            )
             cols_to_take = ["id", c]
             if "sequence" in out.columns:
                 cols_to_take.insert(1, "sequence")
@@ -58,32 +60,49 @@ def _coerce_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
         arr = out[c].to_numpy(dtype="float64", copy=False)
         nf = ~np.isfinite(arr)
         if nf.any():
-            # Count NaN / +Inf / -Inf separately for clarity
             import numpy as _np
 
             n_nan = int(_np.isnan(arr).sum())
             n_pinf = int(_np.isposinf(arr).sum())
             n_ninf = int(_np.isneginf(arr).sum())
-            cols_to_take = ["id", c]
-            if "sequence" in out.columns:
-                cols_to_take.insert(1, "sequence")
-            offenders_df = out.loc[nf, cols_to_take].head(25).copy()
-            offenders_df.insert(0, "row", offenders_df.index.astype(int))
-            offenders = []
-            for _, r in offenders_df.iterrows():
-                rec = {
-                    "row": int(r["row"]),
-                    "id": str(r.get("id", "?")),
-                    "value": r[c],
-                }
-                if "sequence" in offenders_df.columns:
-                    rec["sequence"] = r["sequence"]
-                offenders.append(rec)
-            raise ValueError(
-                f"Column '{c}' contains {int(nf.sum())} non‑finite value(s) "
-                f"(NaN={n_nan}, +Inf={n_pinf}, -Inf={n_ninf}). "
-                f"First offenders: {offenders}"
-            )
+            if missing_policy == "error":
+                cols_to_take = ["id", c]
+                if "sequence" in out.columns:
+                    cols_to_take.insert(1, "sequence")
+                offenders_df = out.loc[nf, cols_to_take].head(25).copy()
+                offenders_df.insert(0, "row", offenders_df.index.astype(int))
+                offenders = []
+                for _, r in offenders_df.iterrows():
+                    rec = {
+                        "row": int(r["row"]),
+                        "id": str(r.get("id", "?")),
+                        "value": r[c],
+                    }
+                    if "sequence" in offenders_df.columns:
+                        rec["sequence"] = r["sequence"]
+                    offenders.append(rec)
+                raise ValueError(
+                    f"Column '{c}' contains {int(nf.sum())} non‑finite value(s) "
+                    f"(NaN={n_nan}, +Inf={n_pinf}, -Inf={n_ninf}). "
+                    f"First offenders: {offenders}"
+                )
+            # missing_policy == "drop_and_log": mark non‑finite as NaN; summaries/plots skip them
+            if log_fn is not None:
+                sample_ids = (
+                    out.loc[nf, "id"].astype(str).head(6).tolist()
+                    if "id" in out.columns
+                    else []
+                )
+                msg = (
+                    f"Metric '{c}': dropping {int(nf.sum())}/{len(out)} row(s) with NaN/Inf "
+                    f"(NaN={n_nan}, +Inf={n_pinf}, -Inf={n_ninf})"
+                    + (f"; e.g., ids={sample_ids}" if sample_ids else "")
+                )
+                try:
+                    log_fn(msg)
+                except Exception:
+                    pass
+            out.loc[nf, c] = np.nan
     return out
 
 
@@ -95,10 +114,12 @@ def summarize_numeric_by_cluster(
     *,
     plots: bool = True,
     font_scale: float = 1.2,
+    missing_policy: str = "error",
+    log_fn: Optional[Callable[[str], None]] = None,
 ) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     cols = list(numeric_cols)
-    work = _coerce_numeric(df, cols)
+    work = _coerce_numeric(df, cols, missing_policy=missing_policy, log_fn=log_fn)
     if cluster_col not in work.columns:
         raise KeyError(f"Cluster column '{cluster_col}' not found.")
     g = work.groupby(cluster_col)
@@ -136,14 +157,21 @@ def summarize_numeric_by_cluster(
         ):
             for c in cols:
                 fig, ax = plt.subplots(figsize=(12, 6))
+                # lighter inner lines (quartiles) and lighter overlay (visual equiv. of lighter error bars)
                 sns.violinplot(
-                    data=work, x=cluster_col, y=c, inner="quartile", ax=ax, cut=0
+                    data=work,
+                    x=cluster_col,
+                    y=c,
+                    inner="quartile",
+                    inner_kws={"color": "0.4"},
+                    ax=ax,
+                    cut=0,
                 )
                 sns.stripplot(
                     data=work,
                     x=cluster_col,
                     y=c,
-                    color="black",
+                    color="0.35",
                     alpha=0.25,
                     ax=ax,
                     jitter=True,
@@ -152,7 +180,7 @@ def summarize_numeric_by_cluster(
                 ax.set_xlabel(cluster_col)
                 ax.set_ylabel(c)
                 plt.xticks(rotation=90)
-                sns.despine(ax=ax)
+                sns.despine(ax=ax, top=True, right=True)
                 fig.tight_layout()
                 fig.savefig(
                     out_dir / f"numeric_violin__{cluster_col}__{c}.png", dpi=300

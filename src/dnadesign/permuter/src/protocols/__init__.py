@@ -1,11 +1,13 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/permuter/__init__.py
+src/dnadesign/permuter/src/protocols/__init__.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-__all__ = ["core", "protocols", "evaluators"]
-__version__ = "0.5.0"
+
+def register(cls):
+    """No-op decorator kept for historical modules that still use @register."""
+    return cls
