@@ -39,8 +39,10 @@ app = typer.Typer(
         "  • permuter export   - optional CSV/JSONL export\n"
         "  • permuter validate - structural & integrity checks\n\n"
         "\b\nNotes:\n"
-        "  • Paths in job YAML are resolved relative to the job file.\n"
-        "  • ${JOB_DIR}, env vars, and ~ are expanded."
+        "  • --job accepts a path or PRESET NAME (we search: $PERMUTER_JOBS, CWD[/jobs], repo, package jobs/).\n"
+        "  • --data accepts a dataset directory OR a records.parquet file.\n"
+        "  • ${JOB_DIR}, env vars, and ~ are expanded; output dir auto‑falls back if the preset lives in a read‑only location.\n"
+        "    Override with $PERMUTER_OUTPUT_ROOT or --out."
     ),
 )
 console = Console()
@@ -68,8 +70,8 @@ def _root(verbose: int = typer.Option(0, "--verbose", "-v", count=True)):
     ),
 )
 def run(
-    job: Path = typer.Option(
-        ..., "--job", "-j", exists=True, readable=True, help="Job YAML path."
+    job: str = typer.Option(
+        ..., "--job", "-j", help="Job YAML path or PRESET name."
     ),
     ref: str = typer.Option(
         None,
@@ -92,7 +94,10 @@ def run(
 )
 def evaluate(
     data: Path = typer.Option(
-        ..., "--data", "-d", exists=True, readable=True, help="Path to records.parquet"
+        None,
+        "--data",
+        "-d",
+        help="Path to records.parquet OR dataset directory (optional if --job/--ref given)",
     ),
     with_spec: List[str] = typer.Option(
         None,
@@ -102,8 +107,14 @@ def evaluate(
     metric: List[str] = typer.Option(
         None, "--metric", help="Convenience: metric ids scored by placeholder evaluator"
     ),
-    job: Path = typer.Option(
-        None, "--job", "-j", help="Optional job YAML with evaluate.metrics[]"
+    job: str = typer.Option(
+        None, "--job", "-j", help="Job YAML path or PRESET name (used if --data omitted)"
+    ),
+    ref: str = typer.Option(
+        None, "--ref", help="Reference name from refs CSV (used if --data omitted)"
+    ),
+    out: Path = typer.Option(
+        None, "--out", "-o", help="Override output root when deriving dataset from --job/--ref"
     ),
 ):
     eval_cmd.evaluate(
@@ -111,6 +122,8 @@ def evaluate(
         metric_ids=list(metric or []),
         with_spec=list(with_spec or []),
         job=job,
+        ref=ref,
+        out=out,
     )
 
 
@@ -122,7 +135,7 @@ def evaluate(
 )
 def plot(
     data: Path = typer.Option(
-        ..., "--data", "-d", exists=True, readable=True, help="Path to records.parquet"
+        ..., "--data", "-d", help="Path to records.parquet OR dataset directory"
     ),
     which: List[str] = typer.Option(
         ["position_scatter_and_heatmap"], "--which", help="Plots to generate"

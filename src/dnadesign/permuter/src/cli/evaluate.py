@@ -26,6 +26,13 @@ from dnadesign.permuter.src.core.storage import (
     read_ref_fasta,
 )
 
+from dnadesign.permuter.src.core.paths import (
+    normalize_data_path,
+    resolve,
+    resolve_job_hint,
+)
+from dnadesign.permuter.src.core.config import JobInput
+
 console = Console()
 _LOG = logging.getLogger("permuter.evaluate")
 
@@ -61,6 +68,46 @@ def _parse_cli_with(args: List[str]) -> List[Dict]:
         out.append({"id": mid, "evaluator": ev, "metric": metric, "params": {}})
     return out
 
+def _pick_reference(df: pd.DataFrame, name_col: str, seq_col: str, desired: Optional[str]) -> tuple[str, str]:
+    if desired:
+        sub = df[df[name_col] == desired]
+        if sub.empty:
+            raise ValueError(f"Reference '{desired}' not found in '{name_col}'")
+        if len(sub) > 1:
+            raise ValueError(f"Reference '{desired}' not unique in CSV")
+        row = sub.iloc[0]
+        return str(row[name_col]), str(row[seq_col])
+    if len(df) == 1:
+        row = df.iloc[0]
+        return str(row[name_col]), str(row[seq_col])
+    raise ValueError("--ref is required because the refs CSV has multiple rows")
+
+def _derive_records_from_job(job_hint: str, ref: Optional[str], out: Optional[Path]) -> Path:
+    """
+    Resolve the dataset path from a job preset/path and an optional ref.
+    """
+    job_path = resolve_job_hint(job_hint)
+    data = yaml.safe_load(job_path.read_text(encoding="utf-8"))
+    cfg = JobConfig.model_validate(data)
+    # First resolve refs CSV relative to the job
+    jp0 = resolve(
+        job_yaml=job_path,
+        refs=cfg.job.input.refs,
+        output_dir=cfg.job.output.dir,
+        ref_name="__PENDING__",
+        out_override=out,
+    )
+    df_refs = pd.read_csv(jp0.refs_csv, dtype=str)
+    ref_name, ref_seq = _pick_reference(df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, ref)
+    # Now resolve the final dataset dir for that ref
+    jp = resolve(
+        job_yaml=job_path,
+        refs=cfg.job.input.refs,
+        output_dir=cfg.job.output.dir,
+        ref_name=ref_name,
+        out_override=out,
+    )
+    return jp.records_parquet
 
 def evaluate(
     data: Path,
@@ -68,7 +115,32 @@ def evaluate(
     with_spec: List[str] | None = None,
     job: Optional[Path] = None,
 ):
-    df = read_parquet(data)
+    # Resolve records path from either --data or --job/--ref
+    if data is not None:
+        records = normalize_data_path(data)
+    elif job:
+        try:
+            records = _derive_records_from_job(job, ref, out)
+        except Exception as e:
+            raise ValueError(
+                f"Unable to derive dataset from --job. {e}\n"
+                "Hint: supply --ref if your refs CSV has multiple rows."
+            ) from e
+    else:
+        raise ValueError("Provide either --data (file or dataset dir) or --job/--ref.")
+
+    if not records.exists():
+        # Primary, actionable hint
+        job_hint = f"--job {job} --ref {ref}" if job else "(your job preset)"
+        raise FileNotFoundError(
+            f"Dataset not found: {records}\n"
+            f"Generate it first with:\n"
+            f"  permuter run {job_hint}\n"
+            f"Then re-run:\n"
+            f"  permuter evaluate --data {records.parent}\n"
+        )
+
+    df = read_parquet(records)
     if "sequence" not in df.columns or "bio_type" not in df.columns:
         raise ValueError(
             "records.parquet missing USR core columns (sequence, bio_type)"
@@ -90,7 +162,7 @@ def evaluate(
         )
 
     # get reference seq, required for some evaluators (e.g. evo2_llr)
-    ref = read_ref_fasta(data.parent)
+    ref = read_ref_fasta(records.parent)
     ref_sequence = ref[1] if ref else None
 
     sequences = df["sequence"].astype(str).tolist()
@@ -104,6 +176,25 @@ def evaluate(
             ref_sequence=ref_sequence,
             ref_embedding=None,
         )
+        try:
+            scores = ev.score(
+                sequences,
+                metric=mc["metric"],
+                ref_sequence=ref_sequence,
+                ref_embedding=None,
+            )
+        except Exception as e:
+            # Friendlier guidance for common pitfalls
+            msg = str(e)
+            if "requires ref_sequence" in msg or "ref_sequence" in msg:
+                raise RuntimeError(
+                    "This evaluator requires a reference sequence (REF.fa).\n"
+                    f"Missing sidecar: {records.parent / 'REF.fa'}\n"
+                    "Generate the dataset with:\n"
+                    f"  permuter run --job {job or '<job>'} --ref {ref or '<ref>'}\n"
+                ) from e
+            raise
+
         # Normalize and write columns
         cols = _normalize_scores(scores, n=len(sequences), metric_id=mc["id"])
         for col_name, series in cols.items():
@@ -124,9 +215,10 @@ def evaluate(
             float(desc["max"]),
         )
 
-    atomic_write_parquet(df, data)
+    atomic_write_parquet(df, records)
     console.print(
-        f"[green]✔[/green] Appended metrics: {', '.join(m['id'] for m in metrics)} → {data}"
+        f"[green]✔[/green] Appended metrics: {', '.join(m['id'] for m in metrics)} → {records}"
+
     )
 
 

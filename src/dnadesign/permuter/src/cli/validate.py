@@ -15,6 +15,7 @@ from pathlib import Path
 from rich.console import Console
 
 from dnadesign.permuter.src.core.storage import read_parquet
+from dnadesign.permuter.src.core.paths import normalize_data_path
 
 console = Console()
 _CORE = ["id", "bio_type", "sequence", "alphabet", "length", "source", "created_at"]
@@ -25,7 +26,8 @@ def _sha1(bio_type: str, sequence: str) -> str:
 
 
 def validate(data: Path, strict: bool = False):
-    df = read_parquet(data)
+    records = normalize_data_path(data)
+    df = read_parquet(records)
 
     # core columns
     missing = [c for c in _CORE if c not in df.columns]

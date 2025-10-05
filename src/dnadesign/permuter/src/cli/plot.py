@@ -69,11 +69,12 @@ def plot(
     which: List[str],
     metric_id: str | None = None,
 ):
-    df_usr = read_parquet(data)
-    plots_dir = data.parent / "plots"
+    records = normalize_data_path(data)
+    df_usr = read_parquet(records)
+    plots_dir = records.parent / "plots"
     ensure_output_dir(plots_dir)
     df = _alias_usr_to_legacy(df_usr)
-    ref = read_ref_fasta(data.parent)
+    ref = read_ref_fasta(records.parent)
     ref_seq = ref[1] if ref else None
     job_name = str(df.get("permuter__job", pd.Series(["job"])).iloc[0])
 

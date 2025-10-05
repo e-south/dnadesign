@@ -22,7 +22,7 @@ from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn
 
 from dnadesign.permuter.src.core.config import JobConfig
 from dnadesign.permuter.src.core.ids import derive_seed64, variant_id
-from dnadesign.permuter.src.core.paths import resolve
+from dnadesign.permuter.src.core.paths import resolve, resolve_job_hint
 from dnadesign.permuter.src.core.registry import get_protocol
 from dnadesign.permuter.src.core.storage import (
     atomic_write_parquet,
@@ -35,12 +35,13 @@ console = Console()
 _LOG = logging.getLogger("permuter.run")
 
 
-def _load_job(path: Path) -> JobConfig:
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+def _load_job(path: str | Path) -> JobConfig:
+    job_path = resolve_job_hint(Path(path))
+    data = yaml.safe_load(job_path.read_text(encoding="utf-8"))
     try:
         return JobConfig.model_validate(data)
     except Exception as e:
-        raise ValueError(f"Invalid job YAML ({path}): {e}") from e
+        raise ValueError(f"Invalid job YAML ({job_path}): {e}") from e
 
 
 def _load_refs(cfg: JobConfig, base_dir: Path) -> pd.DataFrame:
@@ -94,12 +95,12 @@ def _variants_stream(
     )
 
 
-def run(job: Path, ref: Optional[str], out: Optional[Path]):
+def run(job: str | Path, ref: Optional[str], out: Optional[Path]):
     t0 = time.time()
     cfg = _load_job(job)
     # Resolve all paths in one place
     jp = resolve(
-        job_yaml=job,
+        job_yaml=Path(str(job)),
         refs=cfg.job.input.refs,
         output_dir=cfg.job.output.dir,
         ref_name="__PENDING__",  # set after picking ref
@@ -112,7 +113,7 @@ def run(job: Path, ref: Optional[str], out: Optional[Path]):
 
     # Re-resolve with actual ref_name for dataset dir
     jp = resolve(
-        job_yaml=job,
+        job_yaml=Path(str(job)),
         refs=cfg.job.input.refs,
         output_dir=cfg.job.output.dir,
         ref_name=ref_name,
@@ -214,3 +215,8 @@ def run(job: Path, ref: Optional[str], out: Optional[Path]):
 
     console.print(f"[green]✔[/green] Variants: {len(df)} → {jp.records_parquet}")
     console.print(f"Elapsed: {time.time()-t0:.2f}s")
+    console.print(
+        "[dim]Hint:[/dim] Use "
+        f"[bold]permuter evaluate --job {Path(str(jp.job_yaml)).name} --ref {ref_name}[/bold] "
+        "to score variants, or pass --data with the dataset directory."
+    )

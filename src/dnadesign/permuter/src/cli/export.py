@@ -12,10 +12,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from dnadesign.permuter.src.core.storage import read_parquet
+from dnadesign.permuter.src.core.paths import normalize_data_path
 
 
 def export_(data: Path, fmt: str, out: Path):
-    df = read_parquet(data)
+    records = normalize_data_path(data)
+    df = read_parquet(records)
     out.parent.mkdir(parents=True, exist_ok=True)
     fmt = fmt.lower()
     if fmt == "csv":

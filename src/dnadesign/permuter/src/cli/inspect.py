@@ -15,12 +15,14 @@ from rich.console import Console
 from rich.table import Table
 
 from dnadesign.permuter.src.core.storage import read_parquet
+from dnadesign.permuter.src.core.paths import normalize_data_path
 
 console = Console()
 
 
 def inspect_(data: Path, head: int = 5):
-    df = read_parquet(data)
+    records = normalize_data_path(data)
+    df = read_parquet(records)
     n = len(df)
     bio_types = sorted(df["bio_type"].dropna().unique().tolist())
     lengths = df["length"].describe()
