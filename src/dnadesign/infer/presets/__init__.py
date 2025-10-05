@@ -1,14 +1,14 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/infer/__main__.py
+dnadesign/infer/presets/__init__.py
 
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-from .cli import app
+# src/dnadesign/infer/presets/__init__.py
+from .registry import list_presets, load_preset
 
-if __name__ == "__main__":
-    app()
+__all__ = ["list_presets", "load_preset"]

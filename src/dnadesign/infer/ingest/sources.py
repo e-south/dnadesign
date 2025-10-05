@@ -15,13 +15,15 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 import torch
 
-from ..errors import ValidationError
 from .._logging import get_logger
+from ..errors import ValidationError
 
 _LOG = get_logger(__name__)
 
@@ -47,6 +49,22 @@ def load_records_input(inputs, field: str) -> Tuple[List[str], List[Dict]]:
     return seqs, inputs
 
 
+def load_records_jsonl_input(path: str, field: str) -> Tuple[List[str], List[Dict]]:
+    p = Path(path)
+    if not p.exists():
+        raise ValidationError(f"records_jsonl not found: {path}")
+    data: List[Dict] = []
+    with p.open() as f:
+        for i, ln in enumerate(f, start=1):
+            if not ln.strip():
+                continue
+            try:
+                data.append(json.loads(ln))
+            except Exception as e:
+                raise ValidationError(f"Invalid JSONL at line {i}: {e}")
+    return load_records_input(data, field)
+
+
 def load_pt_file_input(path: str, field: str) -> Tuple[List[str], List[Dict]]:
     data = torch.load(path, map_location="cpu")
     if not isinstance(data, list) or not all(isinstance(x, dict) for x in data):
@@ -60,14 +78,12 @@ def load_pt_file_input(path: str, field: str) -> Tuple[List[str], List[Dict]]:
 
 
 def _default_usr_root() -> Path:
-    """
-    Default to the monorepo layout:
-      <repo>/src/dnadesign/usr/datasets
-    """
+    """Default to env var DNADESIGN_USR_ROOT if set, else repo layout."""
+    env = os.environ.get("DNADESIGN_USR_ROOT")
+    if env:
+        return Path(env).expanduser().resolve()
     here = Path(__file__).resolve()
-    # .../dnadesign/infer/ingest/sources.py → parents[2] == .../dnadesign
-    root = here.parents[2] / "usr" / "datasets"
-    return root
+    return here.parents[2] / "usr" / "datasets"
 
 
 def load_usr_input(
@@ -77,17 +93,9 @@ def load_usr_input(
     root: str | Path | None = None,
     ids: List[str] | None = None,
 ):
-    """
-    Load sequences (and aligned ids) from a USR dataset (records.parquet).
-
-    Returns:
-      seqs : list[str]
-      ids  : list[str]          (same length/order as seqs)
-      ds   : dnadesign.usr.Dataset   (opened handle for write-back)
-    """
     try:
         from dnadesign.usr import Dataset  # local package, same repo
-    except Exception as e:  # pragma: no cover
+    except Exception as e:
         raise ValidationError(
             "dnadesign.usr is not importable. Is dnadesign installed in editable mode?"
         ) from e
@@ -101,15 +109,11 @@ def load_usr_input(
 
     import pyarrow.parquet as pq
 
-    # read only id + field for efficiency
     tbl = pq.read_table(rec_path, columns=["id", field])
-
-    # Arrow → Python lists
     all_ids = tbl.column("id").to_pylist()
     all_seqs = tbl.column(field).to_pylist()
 
     if ids:
-        # Subset preserving requested order (skip unknowns gracefully)
         pos = {rid: i for i, rid in enumerate(all_ids)}
         sub_ids, sub_seqs = [], []
         for rid in ids:
@@ -121,7 +125,6 @@ def load_usr_input(
     else:
         ids, seqs = all_ids, all_seqs
 
-    # Basic checks
     if not seqs:
         raise ValidationError("No sequences found for the requested USR dataset/ids.")
     bad = [i for i, s in enumerate(seqs) if not isinstance(s, str) or not s]
@@ -129,5 +132,4 @@ def load_usr_input(
         raise ValidationError(
             f"{len(bad)} empty/invalid sequences found in USR ingest."
         )
-
     return seqs, ids, ds

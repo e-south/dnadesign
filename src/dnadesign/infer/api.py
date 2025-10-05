@@ -10,11 +10,15 @@ Dunlop Lab
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 from .config import JobConfig, ModelConfig, OutputSpec
 from .engine import run_extract_job, run_generate_job
 from .errors import ConfigError
+
+ProgressFactory = Optional[
+    Callable[[str, int], Any]
+]  # returns handle with .update(n), .close()
 
 
 def run_extract(
@@ -26,6 +30,7 @@ def run_extract(
     precision: str | None = None,
     alphabet: str | None = None,
     batch_size: int | None = None,
+    progress_factory: ProgressFactory = None,
 ) -> Dict[str, List[object]]:
     if not isinstance(seqs, list) or not all(isinstance(x, str) for x in seqs):
         raise ConfigError("seqs must be list[str]")
@@ -42,7 +47,9 @@ def run_extract(
         ingest={"source": "sequences"},
         outputs=[OutputSpec(**o) for o in outputs],
     )
-    return run_extract_job(seqs, model=model, job=job)
+    return run_extract_job(
+        seqs, model=model, job=job, progress_factory=progress_factory
+    )
 
 
 def run_generate(
@@ -54,6 +61,7 @@ def run_generate(
     precision: str | None = None,
     alphabet: str | None = None,
     batch_size: int | None = None,
+    progress_factory: ProgressFactory = None,
 ) -> Dict[str, List[object]]:
     if not isinstance(prompts, list) or not all(isinstance(x, str) for x in prompts):
         raise ConfigError("prompts must be list[str]")
@@ -70,7 +78,9 @@ def run_generate(
         ingest={"source": "sequences"},
         params=params,
     )
-    return run_generate_job(prompts, model=model, job=job)
+    return run_generate_job(
+        prompts, model=model, job=job, progress_factory=progress_factory
+    )
 
 
 def run_job(
@@ -78,12 +88,17 @@ def run_job(
     *,
     model: ModelConfig | dict,
     job: JobConfig | dict,
+    progress_factory: ProgressFactory = None,
 ):
     model_cfg = model if isinstance(model, ModelConfig) else ModelConfig(**model)
     job_cfg = job if isinstance(job, JobConfig) else JobConfig(**job)
     if job_cfg.operation == "extract":
-        return run_extract_job(inputs, model=model_cfg, job=job_cfg)
+        return run_extract_job(
+            inputs, model=model_cfg, job=job_cfg, progress_factory=progress_factory
+        )
     elif job_cfg.operation == "generate":
-        return run_generate_job(inputs, model=model_cfg, job=job_cfg)
-    else:  # pragma: no cover
+        return run_generate_job(
+            inputs, model=model_cfg, job=job_cfg, progress_factory=progress_factory
+        )
+    else:
         raise ConfigError(f"Unknown operation: {job_cfg.operation}")

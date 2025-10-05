@@ -32,22 +32,6 @@ class ModelConfig(BaseModel):
 
 
 class IngestConfig(BaseModel):
-    """
-    Unified ingest config (discriminated by .source).
-
-    sources:
-      - "sequences": inputs provided directly as list[str]
-      - "records"  : in-memory list[dict]
-      - "pt_file"  : torch .pt list[dict] on disk
-      - "usr"      : load from USR dataset (Parquet) by dataset name
-
-    Fields:
-      field   : for 'records'/'pt_file'/'usr' — which key/column has the sequence (default "sequence")
-      dataset : for 'usr'                     — dataset name
-      root    : for 'usr' (optional)          — datasets root folder; defaults to repo's usr/datasets
-      ids     : for 'usr' (optional)          — subset by id list if provided
-    """
-
     source: Literal["sequences", "records", "pt_file", "usr"]
     field: Optional[str] = "sequence"
     dataset: Optional[str] = None
@@ -97,6 +81,7 @@ class JobConfig(BaseModel):
     # extract
     outputs: Optional[List[OutputSpec]] = None
     # generate
+    fn: Optional[str] = None  # NEW: optional namespaced fn for generation
     params: Optional[Dict[str, Any]] = None
     returns: Optional[List[Dict[str, str]]] = None
     # io (write-back only applies to records/pt_file/usr)

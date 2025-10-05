@@ -1,175 +1,182 @@
-## infer — model-agnostic inference
+## infer — model‑agnostic inference
 
-**infer** is a wrapper for running biological sequence models.
+**infer** runs biological sequence models and writes results back to datasets.
 
 - **Adapters:** `evo2` (implemented), `esm2` (stub)
-- **Example operations:** `evo2.logits`, `evo2.embedding`, `evo2.log_likelihood`, `evo2.generate`
-- **Ingest sources:**  
-  1) `sequences` — Python `list[str]` or a single `str`  
-  2) `records` — in-memory `list[dict]` (pick which key holds the sequence)  
-  3) `pt_file` — path to a `.pt` file containing `list[dict]`  
-  4) `usr` — load from a USR dataset (`records.parquet`) by dataset name  
-     → See **USR** docs at [usr/README.md](../usr/README.md)
+- **Ops (evo2):** `evo2.logits`, `evo2.embedding`, `evo2.log_likelihood`, `evo2.generate`
+- **Ingest sources:** sequences | records | pt_file | usr
+- **Outputs:** columnar dict; with USR attach, columns are:
 
-- **Outputs:** always columnar (`dict[str, list[Any]]`).  
-  With `ingest.source=usr` and `io.write_back=true`, outputs are attached to the dataset as **namespaced columns**:
-  ```
-  infer__<model_id>_<job_id>_<out_id>
-  ````
-
-> [Evo 2](https://github.com/ArcInstitute/evo2/tree/main) is provided by the Arc Institute. Install their package and prerequisites before using the `evo2` adapter.
+```bash
+infer__<model_id>**<job_id>**<out_id>
+````
+> Evo2 is from the Arc Institute: install [`evo2`](https://github.com/ArcInstitute/evo2) before use.
 
 ---
 
-## Use in Python
+### Install
 
-#### A. Small in-memory batch (fastest to iterate)
+Add to `pyproject.toml` (already present in this repo):
+
+```toml
+[project.scripts]
+infer = "dnadesign.infer.cli:app"
+````
+
+You can still run as a module:
+
+```bash
+python -m dnadesign.infer  # dispatches to the Typer app
+```
+
+---
+
+### Command line presets
+
+Presets are small YAML files shipped in `dnadesign.infer.presets`. They capture common jobs so you don’t have to remember flags.
+
+List & inspect:
+
+```bash
+infer presets list
+infer presets show evo2/extract_logits_ll
+````
+
+Run from a preset (extracting multiple outputs):
+
+```bash
+# From a USR dataset
+infer run --preset evo2/extract_logits_ll --usr my_dataset --field sequence --device cuda:0 --precision bf16 --write-back
+
+# Or ad-hoc (no YAML config), reading sequences from a file:
+infer extract --preset evo2/extract_logits_ll --seq-file ./seqs.txt --device cpu --dry-run
+```
+
+> The `evo2/extract_logits_ll` preset collects:
+>
+> * `logits_mean` (mean‑pooled over dim=1)
+> * `ll_mean` (reduction=mean)
+> * `ll_sum` (reduction=sum)
+
+### Python API 
+
+Run an in‑memory batch:
+
 ```python
-from dnadesign.infer import run_extract, run_generate
+from dnadesign.infer import run_extract
 
-# Run logits (mean-pooled) + length-normalized log-likelihood
 out = run_extract(
   ["ACGTACGT", "GTAC"],
   model_id="evo2_7b",
   outputs=[
-      {"id": "logits_mean", "fn": "evo2.logits",
-       "params": {"pool": {"method": "mean", "dim": 1}}, "format": "numpy"},
-      {"id": "ll_mean", "fn": "evo2.log_likelihood",
-       "params": {"method": "native", "reduction": "mean"}, "format": "float"},
-  ],
-  device="cuda:0", precision="bf16", alphabet="dna",
-)
-# out => {"logits_mean": [ndarray, ...], "ll_mean": [float, ...]}
-````
-
-#### B. Run against a USR dataset (and write outputs back)
-
-```python
-from dnadesign.infer import run_job
-
-job = {
-  "id": "evo_usr_demo",
-  "operation": "extract",
-  "ingest": {
-    "source": "usr",
-    "dataset": "my_dataset",  # under usr/datasets/
-    "field": "sequence",
-  },
-  "outputs": [
     {"id": "logits_mean", "fn": "evo2.logits",
-     "params": {"pool": {"method": "mean", "dim": 1}}, "format": "list"},
+     "params": {"pool": {"method": "mean", "dim": 1}}, "format": "numpy"},
     {"id": "ll_mean", "fn": "evo2.log_likelihood",
      "params": {"method": "native", "reduction": "mean"}, "format": "float"},
   ],
-  "io": {"write_back": True, "overwrite": False}
-}
-
-model = {"id": "evo2_7b", "device": "cuda:0", "precision": "bf16", "alphabet": "dna"}
-res = run_job(inputs=None, model=model, job=job)
-
-# Attached columns in records.parquet:
-# infer__evo2_7b__evo_usr_demo__logits_mean
-# infer__evo2_7b__evo_usr_demo__ll_mean
-```
-
-#### C. Work with `records` or `pt_file` (list\[dict] forms)
-
-```python
-# records: a list of dicts in memory
-records = [{"sequence": "ACGT"}, {"sequence": "GTAC"}]
-job = {
-  "id": "adhoc",
-  "operation": "extract",
-  "ingest": {"source": "records", "field": "sequence"},
-  "outputs": [{"id": "ll_mean", "fn": "evo2.log_likelihood",
-               "params": {"method": "native", "reduction": "mean"}, "format": "float"}],
-  "io": {"write_back": False}
-}
-model = {"id": "evo2_7b", "device": "cpu", "precision": "fp32", "alphabet": "dna"}
-res = run_job(inputs=records, model=model, job=job)
+  device="cuda:0", precision="bf16", alphabet="dna",
+)
 ```
 
 ---
 
-## Use via YAML + executable
+### CLI Quick Reference
 
-```yaml
-# config.yaml
-model:
-  id: evo2_7b
-  device: cuda:0
-  precision: bf16
-  alphabet: dna
-
-jobs:
-  - id: evo2_usr_demo
-    operation: extract
-    ingest:
-      source: usr
-      dataset: my_dataset
-      field: sequence
-    outputs:
-      - id: logits_mean
-        fn: evo2.logits
-        params: { pool: { method: mean, dim: 1 } }
-        format: list
-      - id: ll_mean
-        fn: evo2.log_likelihood
-        params: { method: native, reduction: mean }
-        format: float
-    io:
-      write_back: true
-      overwrite: false
-```
-
-Run one job:
+#### `infer run` — run jobs from YAML
 
 ```bash
-python -m dnadesign.infer --config ./config.yaml --job evo_usr_demo
+infer run --config ./config.yaml --job myjob
+infer run --dry-run
+infer run --device cuda:0 --precision bf16 --batch-size 128 --overwrite
 ```
 
-**CLI support:** the executable handles `ingest.source: usr` and `pt_file`.
-For `sequences` or `records`, prefer the Python API.
+#### `infer extract` — one output ad‑hoc (no YAML)
 
-### 3) Command-line notes
+```bash
+# From USR (attaches results if --write-back)
+infer extract --model-id evo2_7b --device cuda:0 --precision bf16 \
+  --fn evo2.log_likelihood --format float \
+  --usr my_dataset --field sequence --write-back
 
-* `--dry-run` validates your `config.yaml` without running:
+# From sequences on stdin (file)
+infer extract --model-id evo2_7b --fn evo2.logits --format list \
+  --seq-file ./seqs.txt --pool-method mean --pool-dim 1
+```
 
-  ```bash
-  python -m dnadesign.infer --config ./config.yaml --dry-run
-  ```
-* If `ingest.source: pt_file`, the CLI expects a file named `{job.id}.pt` next to `config.yaml`.
+#### `infer generate` — prompt continuation
+
+```bash
+infer generate --model-id evo2_7b --device cuda:0 --precision bf16 \
+  --prompt ACGTACGT --max-new-tokens 64 --temperature 0.8 --out gen.txt
+```
+
+#### `infer adapters` — introspection & cache
+
+```bash
+infer adapters list
+infer adapters fns
+infer adapters cache-clear
+```
+
+#### `infer validate` — config & USR checks
+
+```bash
+infer validate config --config ./config.yaml
+infer validate usr --dataset my_dataset --field sequence
+```
 
 ---
 
-### Operations (Evo2 adapter)
+### Environment variables
 
-* `evo2.logits` — forward pass output logits; optional pooling (`mean|sum|max`, `dim`)
-* `evo2.embedding` — grab an intermediate layer by name (e.g., `"blocks.28.mlp.l3"`); optional pooling
-* `evo2.log_likelihood` — native `score_sequences` method; `reduction: "sum" | "mean"`
-* `evo2.generate` — prompt continuation via `max_new_tokens`, `temperature`, `top_k`, `top_p`, `seed`
-  → returns `{"gen_seqs": List[str]}`
+* `DNADESIGN_INFER_BATCH` — fallback micro‑batch size
+* `DNADESIGN_PROGRESS` — disable/enable progress (`0`/`1`)
+* `DNADESIGN_USR_ROOT` — default USR datasets root
+* `INFER_LOG_LEVEL` — default CLI log level
+* `INFER_ALLOW_PICKLE` — allow `.pt` ingestion without `--i-know-this-is-pickle`
+* `INFER_AUTO_DERATE_OOM` — `1` (default) to auto‑reduce batch on OOM
 
-`format` can be `"tensor" | "numpy" | "list" | "float"` (use `"float"` for scalar outputs).
+---
+
+### Extending Presets
+
+Add YAMLs under `dnadesign/infer/presets/your_ns/your_preset.yaml`:
+
+```yaml
+id: yourns/extract_example
+kind: extract
+model: { id: evo2_7b, precision: bf16, alphabet: dna }
+outputs: [ ... ]
+```
+
+They will automatically show up in `infer presets list`.
+
+---
+
+## 🧱 Minimal structural tidy‑up
+
+- **Presentation/UI** (console helpers) now clearly separated in `_console.py`.
+- **Presets** live in `presets/` with a small **registry**; this is where we’ll grow preset coverage.
+- The **core** (engine/config/adapters/ingest/writers) is left in place to avoid invasive churn, but the new structure makes it easy to split into `core/` and `ui/` in a future minor release without breaking imports. The CLI and Python API retain the same public signatures.
 
 ---
 
 ### Extending to new models
 
-Add an adapter (e.g., `dnadesign/infer/adapters/your_model.py`), then register:
+Add an adapter `dnadesign/infer/adapters/your_model.py` and register:
 
 ```python
 from dnadesign.infer.registry import register_model, register_fn
 from .your_model import YourAdapter
 
-register_model("your_model_id", YourAdapter)
+register_model("yourns_foo", YourAdapter)
 register_fn("yourns.logits", "logits")
 register_fn("yourns.embedding", "embedding")
-# ...
+register_fn("yourns.log_likelihood", "log_likelihood")
+register_fn("yourns.generate", "generate")
 ```
 
-Now use `model_id="your_model_id"` and `fn: yourns.*` in Python/YAML.
+Use `model.id="yourns_foo"` and `fn: yourns.*` in YAML/CLI.
 
 ---
 
-@e-south

@@ -40,7 +40,7 @@ dependencies = [
 [project.scripts]
 usr = "dnadesign.usr.src.cli:main"
 opal = "dnadesign.opal.src.cli:main"
-infer = "dnadesign.infer.main:main"
+infer = "dnadesign.infer.cli:app"
 cluster = "dnadesign.cluster.src.cli.app:main"
 permuter = "dnadesign.permuter.src.cli.app:main"
 mb = "dnadesign.molbench.src.cli.app:cli"
