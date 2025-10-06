@@ -41,8 +41,8 @@ app = typer.Typer(
         "\b\nNotes:\n"
         "  • --job accepts a path or PRESET NAME (search: $PERMUTER_JOBS, CWD[/jobs], repo, package jobs/).\n"
         "  • --data accepts a dataset directory OR a records.parquet file.\n"
-        "  • ${JOB_DIR}, env vars, and ~ are expanded; output root defaults to 'results/'.\n"
-        "    Override with $PERMUTER_OUTPUT_ROOT or --out."
+        "  • ${JOB_DIR}, env vars, and ~ are expanded. Output root defaults to the job's configured 'results/' path.\n"
+        "    No silent fallbacks: if unwritable, use $PERMUTER_OUTPUT_ROOT or --out."
     ),
 )
 console = Console()
@@ -81,8 +81,8 @@ def run(
     ),
     overwrite: bool = typer.Option(
         False,
-        "--overwrite",
-        help="Allow overwriting an existing dataset (records.parquet).",
+        "--overwrite/--no-overwrite",
+        help="Replace existing dataset (records.parquet) if present.",
     ),
 ):
     run_cmd.run(job=job, ref=ref, out=out, overwrite=overwrite)

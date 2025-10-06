@@ -31,6 +31,8 @@ from dnadesign.permuter.src.core.storage import (
     atomic_write_parquet,
     ensure_output_dir,
     write_ref_fasta,
+    init_record_md,
+    append_record_md,
 )
 from dnadesign.permuter.src.core.usr import make_usr_row
 
@@ -38,11 +40,11 @@ console = Console()
 _LOG = logging.getLogger("permuter.run")
 
 
-def _load_job(path: str | Path) -> JobConfig:
+def _load_job(path: str | Path) -> tuple[JobConfig, Path]:
     job_path = resolve_job_hint(Path(path))
     data = yaml.safe_load(job_path.read_text(encoding="utf-8"))
     try:
-        return JobConfig.model_validate(data)
+        return JobConfig.model_validate(data), job_path
     except Exception as e:
         raise ValueError(f"Invalid job YAML ({job_path}): {e}") from e
 
@@ -110,10 +112,10 @@ def run(
 ):
     t0 = time.time()
     job_path = resolve_job_hint(Path(str(job)))
-    cfg = _load_job(job_path)
+    cfg, job_path = _load_job(job)
     # Resolve all paths in one place
     jp = resolve(
-        job_yaml=Path(str(job)),
+        job_yaml=job_path,
         refs=cfg.job.input.refs,
         output_dir=cfg.job.output.dir,
         ref_name="__PENDING__",  # set after picking ref
@@ -121,20 +123,30 @@ def run(
     )
     df_refs = pd.read_csv(jp.refs_csv, dtype=str)
     console.print(f"[cyan]Using refs CSV[/cyan]: {jp.refs_csv}")
+    # UX: announce where the reference is coming from
+    console.print(f"[dim]Reading references from[/dim] {jp.refs_csv}")
     ref_name, ref_seq = _pick_reference(
         df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, ref
     )
-    console.print(f"[cyan]Selected ref[/cyan]: {ref_name} (length={len(ref_seq)})")
+    console.print(f"[dim]Using reference[/dim] [bold]{ref_name}[/bold]")
 
     # Re-resolve with actual ref_name for dataset dir
     jp = resolve(
-        job_yaml=Path(str(job)),
+        job_yaml=job_path,
         refs=cfg.job.input.refs,
         output_dir=cfg.job.output.dir,
         ref_name=ref_name,
         out_override=out,
     )
     ensure_output_dir(jp.dataset_dir)
+    # Existence & overwrite behavior
+    if jp.records_parquet.exists():
+        if not overwrite:
+            raise FileExistsError(
+                f"Dataset already exists for ref '{ref_name}': {jp.records_parquet}\n"
+                "Refuse to overwrite. Re-run with --overwrite, or choose a different --out."
+            )
+        console.print(f"[yellow]Overwrite enabled[/yellow] → will replace {jp.records_parquet}")
     console.print(f"[cyan]Dataset dir[/cyan]: {jp.dataset_dir}")
     if jp.records_parquet.exists():
         if not overwrite:
@@ -205,6 +217,15 @@ def run(
     df = pd.DataFrame(rows)
     atomic_write_parquet(df, jp.records_parquet)
     write_ref_fasta(jp.dataset_dir, ref_name, ref_seq)
+    # Initialize RECORD.md and log the command
+    init_record_md(
+        dataset_dir=jp.dataset_dir,
+        job_yaml=job_path,
+        job_name=cfg.job.name,
+        ref_name=ref_name,
+        refs_csv=jp.refs_csv,
+    )
+    append_record_md(jp.dataset_dir, "run", " ".join(["permuter"] + sys.argv[1:]))
     append_journal(
         jp.dataset_dir,
         "RUN",
@@ -251,8 +272,5 @@ def run(
 
     console.print(f"[green]✔[/green] Variants: {len(df)} → {jp.records_parquet}")
     console.print(f"Elapsed: {time.time()-t0:.2f}s")
-    console.print(
-        "[dim]Hint:[/dim] Use "
-        f"[bold]permuter evaluate --job {Path(str(jp.job_yaml)).name} --ref {ref_name}[/bold] "
-        "to score variants, or pass --data with the dataset directory."
-    )
+    console.print(f"[dim]Record:[/dim] {jp.dataset_dir / 'RECORD.md'}")
+

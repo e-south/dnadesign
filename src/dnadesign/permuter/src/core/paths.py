@@ -130,12 +130,21 @@ def resolve_job_hint(hint: str | Path) -> Path:
                 return cand
     # Minimal message by default; detailed list only when DEBUG
     if _LOG.isEnabledFor(logging.DEBUG):
+    # concise by default; show full tried list only in debug mode or when explicitly asked
+    dirs = "\n  - ".join(str(d) for d in candidate_job_dirs())
+    show_tried = (
+        os.environ.get("PERMUTER_DEBUG_HINTS") == "1"
+        or logging.getLogger("permuter").getEffectiveLevel() <= logging.DEBUG
+    )
+    if show_tried:
         tried_str = "\n  - ".join(str(p) for p in _unique(tried))
-        raise FileNotFoundError(
-            f"Job YAML '{hint}' not found.\nSearched directories:\n  - "
-            + "\n  - ".join(str(d) for d in candidate_job_dirs())
+        msg = (
+            f"Job YAML '{hint}' not found.\nSearched directories:\n  - {dirs}"
             + (f"\nTried filenames:\n  - {tried_str}" if tried_str else "")
         )
+    else:
+        msg = f"Job YAML '{hint}' not found.\nSearched directories:\n  - {dirs}"
+    raise FileNotFoundError(msg)
     raise FileNotFoundError(
         f"Job YAML '{hint}' not found. Use -v -v for search details."
     )
@@ -172,47 +181,29 @@ def resolve(
     ref_name: str,
     out_override: Path | None,
 ) -> JobPaths:
-    job_yaml = job_yaml.resolve()
+    job_yaml = Path(job_yaml).expanduser().resolve()
     job_dir = job_yaml.parent
 
-    refs_csv = _expand(refs, job_dir=job_dir)
+    # Resolve refs CSV relative to YAML location
+    refs_csv = _expand(refs, job_dir=job_dir).resolve()
     if not refs_csv.exists():
         raise FileNotFoundError(f"Refs CSV not found: {refs_csv}")
 
-    # Default output root (expand against job_dir)
-    output_root = _expand(output_dir, job_dir=job_dir)
-    # If not writable (common for installed site-packages), choose a safer fallback.
-    if out_override is None and not _is_writable_dir(output_root):
-        override_env = os.environ.get("PERMUTER_OUTPUT_ROOT") or os.environ.get(
-            "DNADESIGN_RUNS"
+    # Determine output root (strict: no silent fallbacks)
+    output_root = (
+        Path(out_override).expanduser().resolve()
+        if out_override is not None
+        else _expand(output_dir, job_dir=job_dir).resolve()
+    )
+    if not _is_writable_dir(output_root):
+        raise PermissionError(
+            f"Output root not writable: {output_root}. "
+            "Use --out or set $PERMUTER_OUTPUT_ROOT to a writable location."
         )
-        if override_env:
-            output_root = Path(os.path.expanduser(override_env)).resolve()
-        else:
-            # Try repo runs dir, else CWD/runs
-            root = _repo_root_from(job_dir) or Path.cwd()
-            candidate = (root / "src" / "dnadesign" / "permuter" / "runs").resolve()
-    # Default output root (expand against job_dir)
-    output_root = _expand(output_dir, job_dir=job_dir)
-    # If not writable (e.g., installed package), choose a safer fallback.
-    if out_override is None and not _is_writable_dir(output_root):
-        override_env = os.environ.get("PERMUTER_OUTPUT_ROOT")
-        if override_env:
-            output_root = Path(os.path.expanduser(override_env)).resolve()
-        else:
-            # Prefer <repo>/src/dnadesign/permuter/results, else CWD/results
-            root = _repo_root_from(job_dir) or Path.cwd()
-            candidate = (root / "src" / "dnadesign" / "permuter" / "results").resolve()
-            output_root = (
-                candidate
-                if _is_writable_dir(candidate)
-                else (Path.cwd() / "results").resolve()
-            )
-    # --out overrides root directly
-    if out_override:
-        output_root = out_override.resolve()
-    dataset_dir = (output_root / ref_name).resolve()
 
+    # Dataset directory is one subdir per reference
+    ref_dir = (ref_name or "__PENDING__")
+    dataset_dir = (output_root / ref_dir).resolve()
     records_parquet = dataset_dir / "records.parquet"
     ref_fa = dataset_dir / "REF.fa"
     plots_dir = dataset_dir / "plots"
