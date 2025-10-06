@@ -129,25 +129,22 @@ def resolve_job_hint(hint: str | Path) -> Path:
             if cand.exists():
                 return cand
     # Minimal message by default; detailed list only when DEBUG
-    if _LOG.isEnabledFor(logging.DEBUG):
     # concise by default; show full tried list only in debug mode or when explicitly asked
     dirs = "\n  - ".join(str(d) for d in candidate_job_dirs())
-    show_tried = (
-        os.environ.get("PERMUTER_DEBUG_HINTS") == "1"
-        or logging.getLogger("permuter").getEffectiveLevel() <= logging.DEBUG
+    show_tried = os.environ.get("PERMUTER_DEBUG_HINTS") == "1" or _LOG.isEnabledFor(
+        logging.DEBUG
     )
     if show_tried:
         tried_str = "\n  - ".join(str(p) for p in _unique(tried))
-        msg = (
-            f"Job YAML '{hint}' not found.\nSearched directories:\n  - {dirs}"
-            + (f"\nTried filenames:\n  - {tried_str}" if tried_str else "")
+        msg = f"Job YAML '{hint}' not found.\nSearched directories:\n  - {dirs}" + (
+            f"\nTried filenames:\n  - {tried_str}" if tried_str else ""
         )
     else:
-        msg = f"Job YAML '{hint}' not found.\nSearched directories:\n  - {dirs}"
+        msg = (
+            f"Job YAML '{hint}' not found.\nSearched directories:\n  - {dirs}\n"
+            "Tip: run with -vv for search details or set PERMUTER_DEBUG_HINTS=1."
+        )
     raise FileNotFoundError(msg)
-    raise FileNotFoundError(
-        f"Job YAML '{hint}' not found. Use -v -v for search details."
-    )
 
 
 def normalize_data_path(p: Path | str) -> Path:
@@ -202,7 +199,7 @@ def resolve(
         )
 
     # Dataset directory is one subdir per reference
-    ref_dir = (ref_name or "__PENDING__")
+    ref_dir = ref_name or "__PENDING__"
     dataset_dir = (output_root / ref_dir).resolve()
     records_parquet = dataset_dir / "records.parquet"
     ref_fa = dataset_dir / "REF.fa"

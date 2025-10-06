@@ -17,7 +17,11 @@ from rich.console import Console
 from rich.table import Table
 
 from dnadesign.permuter.src.core.paths import normalize_data_path
-from dnadesign.permuter.src.core.storage import append_journal, read_parquet
+from dnadesign.permuter.src.core.storage import (
+    append_journal,
+    append_record_md,
+    read_parquet,
+)
 
 console = Console()
 
@@ -49,4 +53,5 @@ def inspect_(data: Path, head: int = 5):
         cmd = shlex.join(sys.argv)
     except Exception:
         cmd = " ".join(sys.argv)
+        append_record_md(records.parent, "inspect", cmd)
     append_journal(records.parent, "INSPECT", [f"head: {head}", f"command: {cmd}"])

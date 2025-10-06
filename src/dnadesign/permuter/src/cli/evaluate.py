@@ -29,6 +29,7 @@ from dnadesign.permuter.src.core.paths import (
 from dnadesign.permuter.src.core.registry import get_evaluator
 from dnadesign.permuter.src.core.storage import (
     append_journal,
+    append_record_md,
     atomic_write_parquet,
     read_parquet,
     read_ref_fasta,
@@ -179,6 +180,14 @@ def evaluate(
         raise ValueError(
             "No metrics specified. Use --with id:evaluator[:metric] or provide a job YAML with evaluate.metrics"
         )
+    # De-duplicate by id (last one wins, so CLI overrides job YAML)
+    uniq: Dict[str, Dict] = {}
+    for m in metrics:
+        mid = m.get("id")
+        if not mid:
+            raise ValueError("Metric entries must have an 'id'")
+        uniq[str(mid)] = m
+    metrics = list(uniq.values())
 
     # get reference seq, required for some evaluators (e.g. evo2_llr)
     ref = read_ref_fasta(records.parent)
@@ -232,6 +241,8 @@ def evaluate(
     console.print(
         f"[green]✔[/green] Appended metrics: {', '.join(m['id'] for m in metrics)} → {records}"
     )
+    append_record_md(records.parent, "evaluate", _argv())
+
     append_journal(
         records.parent,
         "EVALUATE",

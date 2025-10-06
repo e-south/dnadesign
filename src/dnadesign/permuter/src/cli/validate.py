@@ -17,7 +17,11 @@ from pathlib import Path
 from rich.console import Console
 
 from dnadesign.permuter.src.core.paths import normalize_data_path
-from dnadesign.permuter.src.core.storage import append_journal, read_parquet
+from dnadesign.permuter.src.core.storage import (
+    append_journal,
+    append_record_md,
+    read_parquet,
+)
 
 console = Console()
 _CORE = ["id", "bio_type", "sequence", "alphabet", "length", "source", "created_at"]
@@ -68,4 +72,5 @@ def validate(data: Path, strict: bool = False):
         cmd = shlex.join(sys.argv)
     except Exception:
         cmd = " ".join(sys.argv)
+        append_record_md(records.parent, "validate", cmd)
     append_journal(records.parent, "VALIDATE", [f"strict: {strict}", f"command: {cmd}"])

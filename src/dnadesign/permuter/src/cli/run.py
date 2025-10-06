@@ -28,11 +28,11 @@ from dnadesign.permuter.src.core.paths import resolve, resolve_job_hint
 from dnadesign.permuter.src.core.registry import get_protocol
 from dnadesign.permuter.src.core.storage import (
     append_journal,
+    append_record_md,
     atomic_write_parquet,
     ensure_output_dir,
-    write_ref_fasta,
     init_record_md,
-    append_record_md,
+    write_ref_fasta,
 )
 from dnadesign.permuter.src.core.usr import make_usr_row
 
@@ -123,8 +123,6 @@ def run(
     )
     df_refs = pd.read_csv(jp.refs_csv, dtype=str)
     console.print(f"[cyan]Using refs CSV[/cyan]: {jp.refs_csv}")
-    # UX: announce where the reference is coming from
-    console.print(f"[dim]Reading references from[/dim] {jp.refs_csv}")
     ref_name, ref_seq = _pick_reference(
         df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, ref
     )
@@ -146,15 +144,10 @@ def run(
                 f"Dataset already exists for ref '{ref_name}': {jp.records_parquet}\n"
                 "Refuse to overwrite. Re-run with --overwrite, or choose a different --out."
             )
-        console.print(f"[yellow]Overwrite enabled[/yellow] → will replace {jp.records_parquet}")
+        console.print(
+            f"[yellow]Overwrite enabled[/yellow] → will replace {jp.records_parquet}"
+        )
     console.print(f"[cyan]Dataset dir[/cyan]: {jp.dataset_dir}")
-    if jp.records_parquet.exists():
-        if not overwrite:
-            raise FileNotFoundError(
-                f"records.parquet already exists at {jp.records_parquet}\n"
-                "Refusing to overwrite. Re-run with --overwrite to replace."
-            )
-        console.print(f"[yellow]Overwriting existing[/yellow]: {jp.records_parquet}")
 
     # stable RNG seed derived from knobs (so hairpin protocol is reproducible)
     seed = derive_seed64(
@@ -273,4 +266,3 @@ def run(
     console.print(f"[green]✔[/green] Variants: {len(df)} → {jp.records_parquet}")
     console.print(f"Elapsed: {time.time()-t0:.2f}s")
     console.print(f"[dim]Record:[/dim] {jp.dataset_dir / 'RECORD.md'}")
-

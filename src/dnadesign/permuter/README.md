@@ -30,7 +30,7 @@ src/dnadesign/permuter/
 
 * Paths in YAML are relative to the job YAML.
 * `${JOB_DIR}`, env vars, and `~` are resolved.
-* Dataset directory (`records.parquet`, `REF.fa`, `plots/`, `JOURNAL.md`) is `<job.output.dir>/<ref_name>/` unless `--out` is given.
+* Dataset directory (`records.parquet`, `REF.fa`, `plots/`, `RECORDS.md`) is `<job.output.dir>/<ref_name>/` unless `--out` is given.
 
 ---
 
@@ -174,7 +174,7 @@ permuter validate --data src/dnadesign/permuter/results/rnaseh1_nt_scan/rnaseh1/
 results/rnaseh1_nt_scan/rnaseh1/
   records.parquet         # USR core + permuter columns + metric(s)
   REF.fa                  # the reference DNA
-  JOURNAL.md              # per-dataset command log / scratch pad
+  RECORDS.md              # per-dataset command log / scratch pad
   plots/
     position_scatter_and_heatmap.png
     metric_by_mutation_count.png

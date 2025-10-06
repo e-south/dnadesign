@@ -14,7 +14,11 @@ import sys
 from pathlib import Path
 
 from dnadesign.permuter.src.core.paths import normalize_data_path
-from dnadesign.permuter.src.core.storage import append_journal, read_parquet
+from dnadesign.permuter.src.core.storage import (
+    append_journal,
+    append_record_md,
+    read_parquet,
+)
 
 
 def export_(data: Path, fmt: str, out: Path):
@@ -34,6 +38,7 @@ def export_(data: Path, fmt: str, out: Path):
         cmd = shlex.join(sys.argv)
     except Exception:
         cmd = " ".join(sys.argv)
+        append_record_md(records.parent, "export", cmd)
     append_journal(
         records.parent, "EXPORT", [f"fmt: {fmt}", f"out: {out}", f"command: {cmd}"]
     )

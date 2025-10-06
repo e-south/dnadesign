@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from textwrap import dedent
 
 import pandas as pd
 
@@ -84,3 +85,56 @@ def append_journal(
     with journal.open("a", encoding="utf-8") as fh:
         fh.write(entry)
     return journal
+
+
+# --- per-dataset RECORD.md (human-facing command log + scratch pad) ----------
+
+
+def init_record_md(
+    *,
+    dataset_dir: Path,
+    job_yaml: Path,
+    job_name: str,
+    ref_name: str,
+    refs_csv: Path,
+) -> Path:
+    """
+    Create RECORD.md if missing. This is the human-facing, append-only
+    log of commands you run against this dataset, plus a scratch area.
+    """
+    path = dataset_dir / "RECORD.md"
+    if path.exists():
+        return path
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+    text = (
+        dedent(
+            f"""
+        # Permuter RECORD
+
+        _Dataset created {ts} (UTC). This file is a lightweight, human‑editable record._
+
+        **Job**: {job_name}
+        **Reference**: {ref_name}
+        **Job YAML**: {job_yaml}
+        **Refs CSV**: {refs_csv}
+
+        ## Commands
+        (CLI invocations will be appended below.)
+
+        ## Notes
+        (Use this area as a scratch pad for observations.)
+        """
+        ).strip()
+        + "\n"
+    )
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def append_record_md(dataset_dir: Path, section: str, command: str) -> Path:
+    path = dataset_dir / "RECORD.md"
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+    entry = f"\n### {section} · {ts}\n\n```\n{command}\n```\n"
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(entry)
+    return path

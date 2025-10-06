@@ -2,7 +2,7 @@ job:
   name: nt_scan_demo
   bio_type: dna
   input:
-    refs: "${JOB_DIR}/../runs/nt_scan_demo"
+    refs: "${JOB_DIR}/../inputs/nt_scan_demo"
     name_col: "ref_name"
     seq_col: "sequence"
   permute:
@@ -21,6 +21,6 @@ job:
           alphabet: dna
           reduction: mean
   output:
-    dir: "permuter/nt_scan_demo"
+    dir: "${JOB_DIR}/../results/nt_scan_demo"
   plot:
     which: ["position_scatter_and_heatmap","metric_by_mutation_count"]
