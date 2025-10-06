@@ -53,5 +53,5 @@ def inspect_(data: Path, head: int = 5):
         cmd = shlex.join(sys.argv)
     except Exception:
         cmd = " ".join(sys.argv)
-        append_record_md(records.parent, "inspect", cmd)
+    append_record_md(records.parent, "inspect", cmd)
     append_journal(records.parent, "INSPECT", [f"head: {head}", f"command: {cmd}"])

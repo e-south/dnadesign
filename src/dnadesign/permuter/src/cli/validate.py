@@ -72,5 +72,5 @@ def validate(data: Path, strict: bool = False):
         cmd = shlex.join(sys.argv)
     except Exception:
         cmd = " ".join(sys.argv)
-        append_record_md(records.parent, "validate", cmd)
+    append_record_md(records.parent, "validate", cmd)
     append_journal(records.parent, "VALIDATE", [f"strict: {strict}", f"command: {cmd}"])

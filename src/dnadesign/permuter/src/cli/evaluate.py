@@ -14,7 +14,7 @@ import numbers
 import shlex
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 import yaml
@@ -39,12 +39,17 @@ console = Console()
 _LOG = logging.getLogger("permuter.evaluate")
 
 
-def _load_job_metrics(job_path: Optional[Path]) -> List[Dict]:
-    if not job_path:
+def _load_job_metrics(job_hint: Optional[Union[str, Path]]) -> List[Dict]:
+    """
+    Load evaluate.metrics[] from a job YAML given either a path or a PRESET name.
+    Uses resolve_job_hint() so this works from any working directory.
+    """
+    if not job_hint:
         return []
-    data = yaml.safe_load(Path(job_path).read_text(encoding="utf-8"))
+    job_path = resolve_job_hint(job_hint)
+    data = yaml.safe_load(job_path.read_text(encoding="utf-8"))
     cfg = JobConfig.model_validate(data)
-    metrics = []
+    metrics: List[Dict] = []
     if cfg.job.evaluate and cfg.job.evaluate.metrics:
         for m in cfg.job.evaluate.metrics:
             metrics.append(

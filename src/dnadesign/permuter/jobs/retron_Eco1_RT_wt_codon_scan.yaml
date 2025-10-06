@@ -10,7 +10,7 @@ job:
   permute:
     protocol: "scan_codon"
     params:
-      codon_table: "${JOB_DIR}/../inputs/codon_ecoli.csv"
+      codon_table: "${JOB_DIR}/../codon_ecoli.csv"
       # region_codons: [0, 100]     # optional [start,end) in codon units
 
   evaluate:

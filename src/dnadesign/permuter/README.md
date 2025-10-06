@@ -149,7 +149,7 @@ permuter run --job src/dnadesign/permuter/jobs/rnaseh1_codon_scan.yaml --ref BL2
 
 ```bash
 # Generate variants (one dataset per ref)
-permuter run --job src/dnadesign/permuter/jobs/rnaseh1_nt_scan.yaml --ref rnaseh1
+permuter run --job src/dnadesign/permuter/jobs/rnaseh1_nt_scan.yaml --ref BL21_RNase_H1_wt
 
 # Evaluate (append metrics to the same Parquet)
 permuter evaluate --data src/dnadesign/permuter/results/rnaseh1_nt_scan/rnaseh1/records.parquet \

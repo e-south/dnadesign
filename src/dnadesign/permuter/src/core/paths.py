@@ -181,8 +181,15 @@ def resolve(
     job_yaml = Path(job_yaml).expanduser().resolve()
     job_dir = job_yaml.parent
 
-    # Resolve refs CSV relative to YAML location
+    # Resolve refs CSV relative to YAML location, and assert it's a file
     refs_csv = _expand(refs, job_dir=job_dir).resolve()
+    if refs_csv.is_dir():
+        example = (refs_csv / "refs.csv")
+        raise IsADirectoryError(
+            "Refs path points to a directory; a CSV file is required.\n"
+            f"Given: {refs_csv}\n"
+            f"Hint: set job.input.refs to the CSV (e.g., {example})"
+        )
     if not refs_csv.exists():
         raise FileNotFoundError(f"Refs CSV not found: {refs_csv}")
 

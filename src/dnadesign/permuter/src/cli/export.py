@@ -38,7 +38,7 @@ def export_(data: Path, fmt: str, out: Path):
         cmd = shlex.join(sys.argv)
     except Exception:
         cmd = " ".join(sys.argv)
-        append_record_md(records.parent, "export", cmd)
+    append_record_md(records.parent, "export", cmd)
     append_journal(
         records.parent, "EXPORT", [f"fmt: {fmt}", f"out: {out}", f"command: {cmd}"]
     )

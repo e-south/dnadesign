@@ -2,7 +2,7 @@ job:
   name: nt_scan_demo
   bio_type: dna
   input:
-    refs: "${JOB_DIR}/../inputs/nt_scan_demo"
+    refs: "${JOB_DIR}/../inputs/refs.csv"
     name_col: "ref_name"
     seq_col: "sequence"
   permute:

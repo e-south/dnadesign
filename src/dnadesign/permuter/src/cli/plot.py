@@ -20,6 +20,7 @@ from rich.console import Console
 
 from dnadesign.permuter.src.core.paths import normalize_data_path
 from dnadesign.permuter.src.core.storage import (
+    append_journal,
     append_record_md,
     ensure_output_dir,
     read_parquet,
@@ -123,7 +124,12 @@ def plot(
     except Exception:
         cmd = " ".join(sys.argv)
     append_record_md(records.parent, "plot", cmd)
-    try:
-        cmd = shlex.join(sys.argv)
-    except Exception:
-        cmd = " ".join(sys.argv)
+    append_journal(
+        records.parent,
+        "PLOT",
+        [
+            f"which: {', '.join(which)}",
+            f"metric_id: {metric_id or '<auto>'}",
+            f"command: {cmd}",
+        ],
+    )
