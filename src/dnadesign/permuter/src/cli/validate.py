@@ -10,12 +10,14 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import shlex
+import sys
 from pathlib import Path
 
 from rich.console import Console
 
-from dnadesign.permuter.src.core.storage import read_parquet
 from dnadesign.permuter.src.core.paths import normalize_data_path
+from dnadesign.permuter.src.core.storage import append_journal, read_parquet
 
 console = Console()
 _CORE = ["id", "bio_type", "sequence", "alphabet", "length", "source", "created_at"]
@@ -62,3 +64,8 @@ def validate(data: Path, strict: bool = False):
         raise ValueError(f"Missing required permuter columns: {miss}")
 
     console.print(f"[green]✔[/green] Validation passed for {data}")
+    try:
+        cmd = shlex.join(sys.argv)
+    except Exception:
+        cmd = " ".join(sys.argv)
+    append_journal(records.parent, "VALIDATE", [f"strict: {strict}", f"command: {cmd}"])

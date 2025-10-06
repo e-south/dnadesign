@@ -10,13 +10,17 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
+import shlex
+import sys
 from pathlib import Path
 from typing import List
 
 import pandas as pd
 from rich.console import Console
 
+from dnadesign.permuter.src.core.paths import normalize_data_path
 from dnadesign.permuter.src.core.storage import (
+    append_journal,
     ensure_output_dir,
     read_parquet,
     read_ref_fasta,
@@ -113,3 +117,17 @@ def plot(
             console.print(f"[green]✔[/green] {name} → {out}")
         else:
             raise ValueError(f"Unknown plot '{name}'")
+    # Journal once per call
+    try:
+        cmd = shlex.join(sys.argv)
+    except Exception:
+        cmd = " ".join(sys.argv)
+    append_journal(
+        records.parent,
+        "PLOT",
+        [
+            f"plots: {', '.join(which)}",
+            f"metric_id: {metric_id or '<auto>'}",
+            f"command: {cmd}",
+        ],
+    )

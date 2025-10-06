@@ -9,10 +9,12 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shlex
+import sys
 from pathlib import Path
 
-from dnadesign.permuter.src.core.storage import read_parquet
 from dnadesign.permuter.src.core.paths import normalize_data_path
+from dnadesign.permuter.src.core.storage import append_journal, read_parquet
 
 
 def export_(data: Path, fmt: str, out: Path):
@@ -28,3 +30,10 @@ def export_(data: Path, fmt: str, out: Path):
                 fh.write(r.to_json() + "\n")
     else:
         raise ValueError("Unsupported export format (csv|jsonl)")
+    try:
+        cmd = shlex.join(sys.argv)
+    except Exception:
+        cmd = " ".join(sys.argv)
+    append_journal(
+        records.parent, "EXPORT", [f"fmt: {fmt}", f"out: {out}", f"command: {cmd}"]
+    )

@@ -38,7 +38,7 @@ job:
           reduction: sum
 
   output:
-    dir: "${JOB_DIR}/../runs/retron_Eco1_RT_w_codon_scan"
+    dir: "${JOB_DIR}/../results/retron_Eco1_RT_w_codon_scan"
 
   plot:
     which: ["position_scatter_and_heatmap","metric_by_mutation_count"]

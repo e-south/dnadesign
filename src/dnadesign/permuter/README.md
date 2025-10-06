@@ -10,7 +10,7 @@ Mutate biological sequences, score them with pluggable evaluators, and export/pl
 
 ### Install
 
-Permuter lives inside the dnadesign repo.
+Permuter lives inside the [`dnadesign`](https://github.com/e-south/dnadesign) repo.
 ```bash
 # cd dnadesign/
 source .venv/bin/activate
@@ -25,12 +25,12 @@ src/dnadesign/permuter/
   src/         # source code lives here
   jobs/        # job YAMLs (define a job here)
   inputs/      # default inputs (refs.csv, tables, ...)
-  runs/        # default output root (datasets written here)
+  results/     # default output root
 ```
 
 * Paths in YAML are relative to the job YAML.
 * `${JOB_DIR}`, env vars, and `~` are resolved.
-* Dataset directory (`records.parquet`, `REF.fa`, `plots/`) is `<job.output.dir>/<ref_name>/` unless `--out` is given.
+* Dataset directory (`records.parquet`, `REF.fa`, `plots/`, `JOURNAL.md`) is `<job.output.dir>/<ref_name>/` unless `--out` is given.
 
 ---
 
@@ -45,11 +45,24 @@ Example:
  BL21_RNase_H1_wt,ACGTTG...TT     # full coding DNA sequence
 ```
 
+Establish paths to use permuter from anywhere (cluster‑friendly).
+
+Set these once in your shell profile or job script:
+
+```bash
+# Where your presets live (multiple roots allowed, ':'-separated)
+export PERMUTER_JOBS=/project/dunlop/esouth/dnadesign/src/dnadesign/permuter/jobs
+
+# Where to write datasets by default if a preset lives under site‑packages
+export PERMUTER_OUTPUT_ROOT=/project/dunlop/esouth/dnadesign/src/dnadesign/permuter/results
+```
+
+
 **A) Run a nucleotide scan (single‑base)**
 
 ```bash
 permuter run --job src/dnadesign/permuter/jobs/nt_scan_demo.yaml --ref BL21_RNase_H1_wt
-# dataset → src/dnadesign/permuter/runs/nt_scan_demo/BL21_RNase_H1_wt/
+# dataset → src/dnadesign/permuter/results/nt_scan_demo/BL21_RNase_H1_wt/
 ```
 
 **B) Run a codon scan (codon swaps)**
@@ -69,7 +82,7 @@ TAG,*,-,-
 ...
 ```
 
-How substitutions are chosen: for each scanned codon position, `permuter` ranks codons by the provided weight and, for every other amino acid, switches the wild‑type codon to that amino acid’s **most frequent codon**.
+How substitutions are chosen: for each scanned codon position, `permuter` ranks codons by their provided frequency and, for every other amino acid, switches the wild‑type codon to that amino acid’s **most frequent codon**.
 
 **Example jobs:**
 
@@ -87,7 +100,7 @@ job:
    params:
      regions: []          # []=full seq; or [[start,end), ...] 0-based
  output:
-   dir: "${JOB_DIR}/../runs/rnaseh1_nt_scan"
+   dir: "${JOB_DIR}/../results/rnaseh1_nt_scan"
  plot:
    which: ["position_scatter_and_heatmap","metric_by_mutation_count"]
 ```
@@ -118,7 +131,7 @@ job:
           alphabet: dna
           reduction: mean
   output:
-    dir: "${JOB_DIR}/../runs/rnaseh1_codon_scan"
+    dir: "${JOB_DIR}/../results/rnaseh1_codon_scan"
   plot:
     which: ["position_scatter_and_heatmap","metric_by_mutation_count"]
 ```
@@ -139,28 +152,29 @@ permuter run --job src/dnadesign/permuter/jobs/rnaseh1_codon_scan.yaml --ref BL2
 permuter run --job src/dnadesign/permuter/jobs/rnaseh1_nt_scan.yaml --ref rnaseh1
 
 # Evaluate (append metrics to the same Parquet)
-permuter evaluate --data src/dnadesign/permuter/runs/rnaseh1_nt_scan/rnaseh1/records.parquet \
+permuter evaluate --data src/dnadesign/permuter/results/rnaseh1_nt_scan/rnaseh1/records.parquet \
   --with llr:evo2_llr:log_likelihood_ratio
 
 # Make plots
-permuter plot --data src/dnadesign/permuter/runs/rnaseh1_nt_scan/rnaseh1/records.parquet \
+permuter plot --data src/dnadesign/permuter/results/rnaseh1_nt_scan/rnaseh1/records.parquet \
   --which position_scatter_and_heatmap metric_by_mutation_count \
   --metric-id llr
 
 # Optional CSV export
-permuter export --data src/dnadesign/permuter/runs/rnaseh1_nt_scan/rnaseh1/records.parquet \
-  --fmt csv --out src/dnadesign/permuter/runs/rnaseh1_nt_scan/rnaseh1/records.csv
+permuter export --data src/dnadesign/permuter/results/rnaseh1_nt_scan/rnaseh1/records.parquet \
+  --fmt csv --out src/dnadesign/permuter/results/rnaseh1_nt_scan/rnaseh1/records.csv
 
 # Validate the dataset
-permuter validate --data src/dnadesign/permuter/runs/rnaseh1_nt_scan/rnaseh1/records.parquet --strict
+permuter validate --data src/dnadesign/permuter/results/rnaseh1_nt_scan/rnaseh1/records.parquet --strict
 ```
 
 **What you get**
 
 ```
-runs/rnaseh1_nt_scan/rnaseh1/
+results/rnaseh1_nt_scan/rnaseh1/
   records.parquet         # USR core + permuter columns + metric(s)
   REF.fa                  # the reference DNA
+  JOURNAL.md              # per-dataset command log / scratch pad
   plots/
     position_scatter_and_heatmap.png
     metric_by_mutation_count.png

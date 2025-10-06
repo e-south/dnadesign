@@ -9,6 +9,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +20,7 @@ try:
     from importlib.resources import files as _pkg_files  # type: ignore[attr-defined]
 except Exception:  # pragma: no cover
     _pkg_files = None
+_LOG = logging.getLogger("permuter.paths")
 
 
 @dataclass(frozen=True)
@@ -41,6 +43,7 @@ def _expand(s: str, *, job_dir: Path) -> Path:
     p = Path(os.path.expanduser(s))
     return p if p.is_absolute() else (job_dir / p)
 
+
 def _unique(seq: Iterable[Path]) -> List[Path]:
     seen: set[str] = set()
     out: List[Path] = []
@@ -52,10 +55,9 @@ def _unique(seq: Iterable[Path]) -> List[Path]:
         out.append(p)
     return out
 
+
 def _package_jobs_dir() -> Optional[Path]:
-    """
-    Resolve the installed package's jobs/ directory, e.g. .../site-packages/dnadesign/permuter/jobs
-    """
+    """Installed package jobs dir: .../site-packages/dnadesign/permuter/jobs"""
     try:
         if _pkg_files is None:
             return None
@@ -65,10 +67,9 @@ def _package_jobs_dir() -> Optional[Path]:
     except Exception:
         return None
 
+
 def _repo_root_from(start: Path) -> Optional[Path]:
-    """
-    Walk upward to find a plausible repo root (pyproject.toml or src/dnadesign/permuter present).
-    """
+    """Walk upward to a plausible repo root (pyproject.toml or src/dnadesign/permuter present)."""
     cur = start.resolve()
     for _ in range(12):
         if (cur / "pyproject.toml").exists():
@@ -79,6 +80,7 @@ def _repo_root_from(start: Path) -> Optional[Path]:
             break
         cur = cur.parent
     return None
+
 
 def candidate_job_dirs() -> List[Path]:
     """
@@ -93,8 +95,7 @@ def candidate_job_dirs() -> List[Path]:
     for chunk in [x for x in env.split(":") if x.strip()]:
         out.append(Path(os.path.expanduser(chunk)).resolve())
     cwd = Path.cwd().resolve()
-    out.append(cwd)
-    out.append(cwd / "jobs")
+    out += [cwd, cwd / "jobs"]
     root = _repo_root_from(cwd)
     if root:
         out.append(root)
@@ -103,6 +104,7 @@ def candidate_job_dirs() -> List[Path]:
     if pkg:
         out.append(pkg)
     return [p for p in _unique(out) if p.exists()]
+
 
 def resolve_job_hint(hint: str | Path) -> Path:
     """
@@ -126,12 +128,18 @@ def resolve_job_hint(hint: str | Path) -> Path:
             tried.append(cand)
             if cand.exists():
                 return cand
-    tried_str = "\n  - ".join(str(p) for p in _unique(tried))
+    # Minimal message by default; detailed list only when DEBUG
+    if _LOG.isEnabledFor(logging.DEBUG):
+        tried_str = "\n  - ".join(str(p) for p in _unique(tried))
+        raise FileNotFoundError(
+            f"Job YAML '{hint}' not found.\nSearched directories:\n  - "
+            + "\n  - ".join(str(d) for d in candidate_job_dirs())
+            + (f"\nTried filenames:\n  - {tried_str}" if tried_str else "")
+        )
     raise FileNotFoundError(
-        f"Job YAML '{hint}' not found.\nSearched directories:\n  - "
-        + "\n  - ".join(str(d) for d in candidate_job_dirs())
-        + (f"\nTried filenames:\n  - {tried_str}" if tried_str else "")
+        f"Job YAML '{hint}' not found. Use -v -v for search details."
     )
+
 
 def normalize_data_path(p: Path | str) -> Path:
     """
@@ -143,16 +151,18 @@ def normalize_data_path(p: Path | str) -> Path:
         return (path / "records.parquet").resolve()
     return path
 
+
 def _is_writable_dir(p: Path) -> bool:
     try:
         p = p.resolve()
         p.mkdir(parents=True, exist_ok=True)
         test = p / ".permute_write_test"
         test.write_text("", encoding="utf-8")
-        test.unlink(missing_ok=True)  # py3.8+: ignore ok
+        test.unlink(missing_ok=True)
         return True
     except Exception:
         return False
+
 
 def resolve(
     job_yaml: Path,
@@ -182,9 +192,26 @@ def resolve(
             # Try repo runs dir, else CWD/runs
             root = _repo_root_from(job_dir) or Path.cwd()
             candidate = (root / "src" / "dnadesign" / "permuter" / "runs").resolve()
-            output_root = candidate if _is_writable_dir(candidate) else (Path.cwd() / "runs").resolve()
-    # If --out provided, treat it as *root*; dataset lives under <out>/<ref_name>
-    dnadesign/src/dnadesign/permuter/jobs/rnaseh1_codon_scan.yaml
+    # Default output root (expand against job_dir)
+    output_root = _expand(output_dir, job_dir=job_dir)
+    # If not writable (e.g., installed package), choose a safer fallback.
+    if out_override is None and not _is_writable_dir(output_root):
+        override_env = os.environ.get("PERMUTER_OUTPUT_ROOT")
+        if override_env:
+            output_root = Path(os.path.expanduser(override_env)).resolve()
+        else:
+            # Prefer <repo>/src/dnadesign/permuter/results, else CWD/results
+            root = _repo_root_from(job_dir) or Path.cwd()
+            candidate = (root / "src" / "dnadesign" / "permuter" / "results").resolve()
+            output_root = (
+                candidate
+                if _is_writable_dir(candidate)
+                else (Path.cwd() / "results").resolve()
+            )
+    # --out overrides root directly
+    if out_override:
+        output_root = out_override.resolve()
+    dataset_dir = (output_root / ref_name).resolve()
 
     records_parquet = dataset_dir / "records.parquet"
     ref_fa = dataset_dir / "REF.fa"

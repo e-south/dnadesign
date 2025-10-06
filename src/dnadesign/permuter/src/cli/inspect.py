@@ -9,13 +9,15 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shlex
+import sys
 from pathlib import Path
 
 from rich.console import Console
 from rich.table import Table
 
-from dnadesign.permuter.src.core.storage import read_parquet
 from dnadesign.permuter.src.core.paths import normalize_data_path
+from dnadesign.permuter.src.core.storage import append_journal, read_parquet
 
 console = Console()
 
@@ -43,3 +45,8 @@ def inspect_(data: Path, head: int = 5):
 
     console.print("[bold]Head:[/bold]")
     console.print(df.head(head))
+    try:
+        cmd = shlex.join(sys.argv)
+    except Exception:
+        cmd = " ".join(sys.argv)
+    append_journal(records.parent, "INSPECT", [f"head: {head}", f"command: {cmd}"])

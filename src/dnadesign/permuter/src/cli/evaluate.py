@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import logging
 import numbers
+import shlex
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -19,19 +21,18 @@ import yaml
 from rich.console import Console
 
 from dnadesign.permuter.src.core.config import JobConfig
-from dnadesign.permuter.src.core.registry import get_evaluator
-from dnadesign.permuter.src.core.storage import (
-    atomic_write_parquet,
-    read_parquet,
-    read_ref_fasta,
-)
-
 from dnadesign.permuter.src.core.paths import (
     normalize_data_path,
     resolve,
     resolve_job_hint,
 )
-from dnadesign.permuter.src.core.config import JobInput
+from dnadesign.permuter.src.core.registry import get_evaluator
+from dnadesign.permuter.src.core.storage import (
+    append_journal,
+    atomic_write_parquet,
+    read_parquet,
+    read_ref_fasta,
+)
 
 console = Console()
 _LOG = logging.getLogger("permuter.evaluate")
@@ -68,7 +69,10 @@ def _parse_cli_with(args: List[str]) -> List[Dict]:
         out.append({"id": mid, "evaluator": ev, "metric": metric, "params": {}})
     return out
 
-def _pick_reference(df: pd.DataFrame, name_col: str, seq_col: str, desired: Optional[str]) -> tuple[str, str]:
+
+def _pick_reference(
+    df: pd.DataFrame, name_col: str, seq_col: str, desired: Optional[str]
+) -> tuple[str, str]:
     if desired:
         sub = df[df[name_col] == desired]
         if sub.empty:
@@ -82,7 +86,10 @@ def _pick_reference(df: pd.DataFrame, name_col: str, seq_col: str, desired: Opti
         return str(row[name_col]), str(row[seq_col])
     raise ValueError("--ref is required because the refs CSV has multiple rows")
 
-def _derive_records_from_job(job_hint: str, ref: Optional[str], out: Optional[Path]) -> Path:
+
+def _derive_records_from_job(
+    job_hint: str, ref: Optional[str], out: Optional[Path]
+) -> Path:
     """
     Resolve the dataset path from a job preset/path and an optional ref.
     """
@@ -98,7 +105,9 @@ def _derive_records_from_job(job_hint: str, ref: Optional[str], out: Optional[Pa
         out_override=out,
     )
     df_refs = pd.read_csv(jp0.refs_csv, dtype=str)
-    ref_name, ref_seq = _pick_reference(df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, ref)
+    ref_name, ref_seq = _pick_reference(
+        df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, ref
+    )
     # Now resolve the final dataset dir for that ref
     jp = resolve(
         job_yaml=job_path,
@@ -109,11 +118,21 @@ def _derive_records_from_job(job_hint: str, ref: Optional[str], out: Optional[Pa
     )
     return jp.records_parquet
 
+
+def _argv() -> str:
+    try:
+        return shlex.join(sys.argv)
+    except Exception:
+        return " ".join(sys.argv)
+
+
 def evaluate(
-    data: Path,
+    data: Path | None,
     metric_ids: List[str] | None = None,
     with_spec: List[str] | None = None,
-    job: Optional[Path] = None,
+    job: Optional[str] = None,
+    ref: Optional[str] = None,
+    out: Optional[Path] = None,
 ):
     # Resolve records path from either --data or --job/--ref
     if data is not None:
@@ -170,12 +189,6 @@ def evaluate(
     for mc in metrics:
         ev_cls = get_evaluator(mc["evaluator"])
         ev = ev_cls(**(mc.get("params") or {}))
-        scores = ev.score(
-            sequences,
-            metric=mc["metric"],
-            ref_sequence=ref_sequence,
-            ref_embedding=None,
-        )
         try:
             scores = ev.score(
                 sequences,
@@ -218,7 +231,15 @@ def evaluate(
     atomic_write_parquet(df, records)
     console.print(
         f"[green]✔[/green] Appended metrics: {', '.join(m['id'] for m in metrics)} → {records}"
-
+    )
+    append_journal(
+        records.parent,
+        "EVALUATE",
+        [
+            f"metrics: {', '.join(m['id'] for m in metrics)}",
+            f"dataset: {records}",
+            f"command: {_argv()}",
+        ],
     )
 
 

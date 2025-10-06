@@ -24,7 +24,7 @@ job:
           reduction: mean
 
   output:
-    dir: "${JOB_DIR}/../runs/rnaseh1_nt_scan"
+    dir: "${JOB_DIR}/../results/rnaseh1_nt_scan"
 
   plot:
     which: ["position_scatter_and_heatmap","metric_by_mutation_count"]

@@ -10,6 +10,8 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
+import shlex
+import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
@@ -25,6 +27,7 @@ from dnadesign.permuter.src.core.ids import derive_seed64, variant_id
 from dnadesign.permuter.src.core.paths import resolve, resolve_job_hint
 from dnadesign.permuter.src.core.registry import get_protocol
 from dnadesign.permuter.src.core.storage import (
+    append_journal,
     atomic_write_parquet,
     ensure_output_dir,
     write_ref_fasta,
@@ -95,9 +98,19 @@ def _variants_stream(
     )
 
 
-def run(job: str | Path, ref: Optional[str], out: Optional[Path]):
+def _argv() -> str:
+    try:
+        return shlex.join(sys.argv)
+    except Exception:
+        return " ".join(sys.argv)
+
+
+def run(
+    job: str | Path, ref: Optional[str], out: Optional[Path], overwrite: bool = False
+):
     t0 = time.time()
-    cfg = _load_job(job)
+    job_path = resolve_job_hint(Path(str(job)))
+    cfg = _load_job(job_path)
     # Resolve all paths in one place
     jp = resolve(
         job_yaml=Path(str(job)),
@@ -107,9 +120,11 @@ def run(job: str | Path, ref: Optional[str], out: Optional[Path]):
         out_override=out,
     )
     df_refs = pd.read_csv(jp.refs_csv, dtype=str)
+    console.print(f"[cyan]Using refs CSV[/cyan]: {jp.refs_csv}")
     ref_name, ref_seq = _pick_reference(
         df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, ref
     )
+    console.print(f"[cyan]Selected ref[/cyan]: {ref_name} (length={len(ref_seq)})")
 
     # Re-resolve with actual ref_name for dataset dir
     jp = resolve(
@@ -120,6 +135,14 @@ def run(job: str | Path, ref: Optional[str], out: Optional[Path]):
         out_override=out,
     )
     ensure_output_dir(jp.dataset_dir)
+    console.print(f"[cyan]Dataset dir[/cyan]: {jp.dataset_dir}")
+    if jp.records_parquet.exists():
+        if not overwrite:
+            raise FileNotFoundError(
+                f"records.parquet already exists at {jp.records_parquet}\n"
+                "Refusing to overwrite. Re-run with --overwrite to replace."
+            )
+        console.print(f"[yellow]Overwriting existing[/yellow]: {jp.records_parquet}")
 
     # stable RNG seed derived from knobs (so hairpin protocol is reproducible)
     seed = derive_seed64(
@@ -182,6 +205,19 @@ def run(job: str | Path, ref: Optional[str], out: Optional[Path]):
     df = pd.DataFrame(rows)
     atomic_write_parquet(df, jp.records_parquet)
     write_ref_fasta(jp.dataset_dir, ref_name, ref_seq)
+    append_journal(
+        jp.dataset_dir,
+        "RUN",
+        [
+            f"job: {cfg.job.name}",
+            f"job_yaml: {job_path}",
+            f"refs_csv: {jp.refs_csv}",
+            f"ref: {ref_name}",
+            f"protocol: {cfg.job.permute.protocol}",
+            f"dataset: {jp.records_parquet}",
+            f"command: {_argv()}",
+        ],
+    )
 
     # Summaries
     n = len(df)

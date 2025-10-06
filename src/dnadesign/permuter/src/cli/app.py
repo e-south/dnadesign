@@ -39,9 +39,9 @@ app = typer.Typer(
         "  • permuter export   - optional CSV/JSONL export\n"
         "  • permuter validate - structural & integrity checks\n\n"
         "\b\nNotes:\n"
-        "  • --job accepts a path or PRESET NAME (we search: $PERMUTER_JOBS, CWD[/jobs], repo, package jobs/).\n"
+        "  • --job accepts a path or PRESET NAME (search: $PERMUTER_JOBS, CWD[/jobs], repo, package jobs/).\n"
         "  • --data accepts a dataset directory OR a records.parquet file.\n"
-        "  • ${JOB_DIR}, env vars, and ~ are expanded; output dir auto‑falls back if the preset lives in a read‑only location.\n"
+        "  • ${JOB_DIR}, env vars, and ~ are expanded; output root defaults to 'results/'.\n"
         "    Override with $PERMUTER_OUTPUT_ROOT or --out."
     ),
 )
@@ -70,9 +70,7 @@ def _root(verbose: int = typer.Option(0, "--verbose", "-v", count=True)):
     ),
 )
 def run(
-    job: str = typer.Option(
-        ..., "--job", "-j", help="Job YAML path or PRESET name."
-    ),
+    job: str = typer.Option(..., "--job", "-j", help="Job YAML path or PRESET name."),
     ref: str = typer.Option(
         None,
         "--ref",
@@ -81,8 +79,13 @@ def run(
     out: Path = typer.Option(
         None, "--out", "-o", help="Output root directory (default: job.output.dir)"
     ),
+    overwrite: bool = typer.Option(
+        False,
+        "--overwrite",
+        help="Allow overwriting an existing dataset (records.parquet).",
+    ),
 ):
-    run_cmd.run(job=job, ref=ref, out=out)
+    run_cmd.run(job=job, ref=ref, out=out, overwrite=overwrite)
 
 
 @app.command(
@@ -108,13 +111,19 @@ def evaluate(
         None, "--metric", help="Convenience: metric ids scored by placeholder evaluator"
     ),
     job: str = typer.Option(
-        None, "--job", "-j", help="Job YAML path or PRESET name (used if --data omitted)"
+        None,
+        "--job",
+        "-j",
+        help="Job YAML path or PRESET name (used if --data omitted)",
     ),
     ref: str = typer.Option(
         None, "--ref", help="Reference name from refs CSV (used if --data omitted)"
     ),
     out: Path = typer.Option(
-        None, "--out", "-o", help="Override output root when deriving dataset from --job/--ref"
+        None,
+        "--out",
+        "-o",
+        help="Override output root when deriving dataset from --job/--ref",
     ),
 ):
     eval_cmd.evaluate(
