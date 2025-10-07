@@ -114,6 +114,7 @@ class ScanCodon(Protocol):
         total = len(codons_upper)
         rc = params.get("region_codons")
         scan_ix = range(int(rc[0]), int(rc[1])) if rc else range(total)
+        region_start = int(rc[0]) if rc else 0
 
         for ci in scan_ix:
             wt_codon = codons_upper[ci]
@@ -146,8 +147,12 @@ class ScanCodon(Protocol):
                         nt_tokens.append(f"nt pos={pos_1b} wt={wt_nt} alt={new_nt}")
                         nt_changes.append((pos_1b, wt_nt, new_nt))
 
-                aa_pos_1b = ci + 1
-                aa_token = f"aa pos={aa_pos_1b} wt={wt_aa} alt={aa}"
+                # AA positions:
+                #  - aa_pos (absolute, 1-based across full protein)  → used by plots
+                #  - aa_pos_rel (relative to scan window)            → kept for convenience
+                aa_pos_abs_1b = ci + 1
+                aa_pos_rel_1b = (ci - region_start) + 1
+                aa_token = f"aa pos={aa_pos_abs_1b} wt={wt_aa} alt={aa}"
 
                 out = {
                     "sequence": new_seq,
@@ -161,7 +166,8 @@ class ScanCodon(Protocol):
                     "codon_new": new_codon,
                     "codon_aa": aa,
                     "aa_index": ci,
-                    "aa_pos": aa_pos_1b,
+                    "aa_pos": aa_pos_abs_1b,
+                    "aa_pos_rel": aa_pos_rel_1b,
                     "aa_wt": wt_aa,
                     "aa_alt": aa,
                 }

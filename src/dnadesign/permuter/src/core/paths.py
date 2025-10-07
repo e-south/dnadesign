@@ -44,6 +44,15 @@ def _expand(s: str, *, job_dir: Path) -> Path:
     return p if p.is_absolute() else (job_dir / p)
 
 
+# Public helper: expand a string path using the job directory as the base.
+def expand_for_job(value: str | Path, *, job_dir: Path) -> Path:
+    """
+    Expand ${JOB_DIR}, ~, and $ENV within 'value', and make it absolute
+    relative to 'job_dir' when not already absolute.
+    """
+    return _expand(str(value), job_dir=job_dir).resolve()
+
+
 def _unique(seq: Iterable[Path]) -> List[Path]:
     seen: set[str] = set()
     out: List[Path] = []
@@ -184,7 +193,7 @@ def resolve(
     # Resolve refs CSV relative to YAML location, and assert it's a file
     refs_csv = _expand(refs, job_dir=job_dir).resolve()
     if refs_csv.is_dir():
-        example = (refs_csv / "refs.csv")
+        example = refs_csv / "refs.csv"
         raise IsADirectoryError(
             "Refs path points to a directory; a CSV file is required.\n"
             f"Given: {refs_csv}\n"
@@ -205,9 +214,23 @@ def resolve(
             "Use --out or set $PERMUTER_OUTPUT_ROOT to a writable location."
         )
 
-    # Dataset directory is one subdir per reference
+    # Dataset directory
+    # Layouts:
+    #   nested      → <output_root>/<ref>/
+    #   flat        → <output_root>/                      (one dataset per job)
     ref_dir = ref_name or "__PENDING__"
-    dataset_dir = (output_root / ref_dir).resolve()
+    layout = os.environ.get("PERMUTER_LAYOUT", "").strip().lower()
+    if not layout:
+        if os.environ.get("PERMUTER_FLAT_RESULTS", "") in ("1", "true", "True"):
+            layout = "flat_jobref"
+
+    if layout in ("flat", "flat_job", "job"):
+        dataset_dir = output_root
+    elif layout in ("flat_jobref", "flat_ref", "jobref"):
+        base = output_root.parent
+        dataset_dir = (base / f"{output_root.name}__{ref_dir}").resolve()
+    else:  # "nested" (default) or unknown → nested
+        dataset_dir = (output_root / ref_dir).resolve()
     records_parquet = dataset_dir / "records.parquet"
     ref_fa = dataset_dir / "REF.fa"
     plots_dir = dataset_dir / "plots"

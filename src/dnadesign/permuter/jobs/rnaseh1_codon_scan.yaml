@@ -5,10 +5,12 @@ job:
     refs: "${JOB_DIR}/../inputs/refs.csv"
     name_col: "ref_name"
     seq_col: "sequence"
+    aa_col: "protein"
+  
   permute:
     protocol: "scan_codon"
     params:
-      codon_table: "${JOB_DIR}/../codon_ecoli.csv"
+      codon_table: "${JOB_DIR}/../inputs/codon_tables/codon_ecoli.csv"
       # region_codons: [0, 100]  # optional [start,end) in codon units
   evaluate:
     metrics:
@@ -24,4 +26,10 @@ job:
   output:
     dir: "${JOB_DIR}/../results/rnaseh1_codon_scan"
   plot:
-    which: ["position_scatter_and_heatmap","metric_by_mutation_count"]
+    which: ["position_scatter_and_heatmap", "metric_by_mutation_count"]
+    metric_id: llr_mean            # default metric for plotting
+    size:                          # optional, inches (width × height)
+      width: 16.0
+      height: 5.0
+    font_scale: 0.50               # multiply all fonts (0.5–3.0)
+    strip_every: 1                 # show all amino acids vs. skip some

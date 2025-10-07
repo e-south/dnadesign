@@ -59,7 +59,6 @@ class Evo2LogLikelihoodRatioEvaluator(Evaluator):
             raise RuntimeError(
                 "Evo2 backend unavailable: dnadesign.infer.run_extract is not importable. "
                 "Ensure the 'evo2' package is installed (pip install evo2) and that dnadesign is importable."
-
             )
         probe_seq = ["ACGTAC"] if self.alphabet.lower().startswith("dna") else ["ACDE"]
         outputs = [
@@ -129,4 +128,9 @@ class Evo2LogLikelihoodRatioEvaluator(Evaluator):
         self._ensure_ready()
         ll_variants = self._ll(sequences)
         ll_ref = self._ll([ref_sequence])[0]
+        # LLR := log P(variant) - log P(reference) = log [ P(variant) / P(reference) ].
+        # When `reduction="sum"` inside evo2.log_likelihood, this is the TRUE log-probability ratio
+        # over the whole sequence. When `reduction="mean"`, each term is length-normalized and
+        # the result equals (log P(variant) - log P(reference)) / L; this is a per-position average,
+        # useful for comparing across different lengths (we keep lengths identical in scans).
         return [v - ll_ref for v in ll_variants]

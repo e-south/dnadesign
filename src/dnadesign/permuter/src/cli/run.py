@@ -24,15 +24,15 @@ from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn
 
 from dnadesign.permuter.src.core.config import JobConfig
 from dnadesign.permuter.src.core.ids import derive_seed64, variant_id
-from dnadesign.permuter.src.core.paths import resolve, resolve_job_hint
+from dnadesign.permuter.src.core.paths import expand_for_job, resolve, resolve_job_hint
 from dnadesign.permuter.src.core.registry import get_protocol
 from dnadesign.permuter.src.core.storage import (
-    append_journal,
-    append_record_md,
+    append_record_event,
     atomic_write_parquet,
     ensure_output_dir,
     init_record_md,
     write_ref_fasta,
+    write_ref_protein_fasta,
 )
 from dnadesign.permuter.src.core.usr import make_usr_row
 
@@ -90,13 +90,27 @@ def _variants_stream(
     sequence: str,
     *,
     seed: int,
+    job_dir: Path,
 ) -> Iterable[Dict[str, Any]]:
     proto_cls = get_protocol(protocol_name)
     proto = proto_cls()
-    proto.validate_cfg(params=params)
+    # Resolve any job-relative file params (minimal, targeted):
+    params_resolved = dict(params or {})
+    # Common case: codon table path
+    if "codon_table" in params_resolved:
+        try:
+            params_resolved["codon_table"] = str(
+                expand_for_job(params_resolved["codon_table"], job_dir=job_dir)
+            )
+        except Exception:
+            # Leave as-is; validate_cfg will surface a precise error
+            pass
+    proto.validate_cfg(params=params_resolved)
     rng = np.random.default_rng(seed)
     yield from proto.generate(
-        ref_entry={"ref_name": ref_name, "sequence": sequence}, params=params, rng=rng
+        ref_entry={"ref_name": ref_name, "sequence": sequence},
+        params=params_resolved,
+        rng=rng,
     )
 
 
@@ -172,6 +186,7 @@ def run(
             ref_name,
             ref_seq,
             seed=seed,
+            job_dir=jp.job_dir,
         ):
             row = make_usr_row(
                 sequence=var["sequence"],
@@ -210,6 +225,13 @@ def run(
     df = pd.DataFrame(rows)
     atomic_write_parquet(df, jp.records_parquet)
     write_ref_fasta(jp.dataset_dir, ref_name, ref_seq)
+    # Optional authoritative protein sidecar from refs.csv if configured
+    aa_col = getattr(cfg.job.input, "aa_col", None)
+    if aa_col and aa_col in df_refs.columns:
+        aa_row = df_refs[df_refs[cfg.job.input.name_col] == ref_name]
+        aa_seq = str(aa_row.iloc[0][aa_col]).strip() if not aa_row.empty else ""
+        if aa_seq:
+            write_ref_protein_fasta(jp.dataset_dir, ref_name, aa_seq)
     # Initialize RECORD.md and log the command
     init_record_md(
         dataset_dir=jp.dataset_dir,
@@ -218,8 +240,7 @@ def run(
         ref_name=ref_name,
         refs_csv=jp.refs_csv,
     )
-    append_record_md(jp.dataset_dir, "run", " ".join(["permuter"] + sys.argv[1:]))
-    append_journal(
+    append_record_event(
         jp.dataset_dir,
         "RUN",
         [
@@ -229,8 +250,8 @@ def run(
             f"ref: {ref_name}",
             f"protocol: {cfg.job.permute.protocol}",
             f"dataset: {jp.records_parquet}",
-            f"command: {_argv()}",
         ],
+        command=_argv(),
     )
 
     # Summaries

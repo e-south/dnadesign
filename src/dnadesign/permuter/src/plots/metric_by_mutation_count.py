@@ -21,6 +21,7 @@ from typing import List, Optional, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from numpy import ndarray
 
 _METRIC_LABELS = {
     "ll": "log_likelihood",
@@ -38,30 +39,14 @@ def _pretty_metric(mid: str | None) -> str:
 def _series_for_metric(
     df: pd.DataFrame, metric_id: Optional[str]
 ) -> Tuple[pd.Series, str]:
-    if metric_id and "norm_metrics" in df.columns:
-        s = df["norm_metrics"].apply(lambda d: (d or {}).get(metric_id, None))
-        if not s.isna().all():
-            return s, _pretty_metric(metric_id)
-    if metric_id and "metrics" in df.columns:
-        s = df["metrics"].apply(lambda d: (d or {}).get(metric_id, None))
-        if not s.isna().all():
-            return s, _pretty_metric(metric_id)
-    if "objective_score" in df.columns:
-        return df["objective_score"], "Objective"
-    if "norm_metrics" in df.columns and not df["norm_metrics"].isna().all():
-        key = None
-        for d in df["norm_metrics"]:
-            if isinstance(d, dict) and d:
-                key = next(iter(d.keys()))
-                break
-        if key:
-            return (
-                df["norm_metrics"].apply(lambda d: (d or {}).get(key, None)),
-                f"Norm {key}",
-            )
-    if "score" in df.columns:
-        return df["score"], "Score"
-    raise RuntimeError("No objective_score, norm_metrics, or score available to plot.")
+    if not metric_id:
+        raise RuntimeError(
+            "metric_id is required (expects a column permuter__metric__<id>)"
+        )
+    col = f"permuter__metric__{metric_id}"
+    if col not in df.columns:
+        raise RuntimeError(f"Metric column not found: {col}")
+    return df[col].astype("float64"), _pretty_metric(metric_id)
 
 
 def plot(
@@ -72,19 +57,26 @@ def plot(
     ref_sequence: Optional[str] = None,  # unused
     metric_id: Optional[str] = None,
     evaluators: str = "",
+    figsize: Optional[Tuple[float, float]] = None,
+    font_scale: Optional[float] = None,
 ) -> None:
     df = all_df.copy()
     y, y_label = _series_for_metric(df, metric_id)
     df = df.assign(_y=y).dropna(subset=["_y"])
 
     def _count_mods(m: List[str] | object) -> int:
-        return len(m) if isinstance(m, list) else 0
+        # Accept list / tuple / ndarray; otherwise 0
+        if isinstance(m, (list, tuple)):
+            return len(m)
+        return (
+            int(isinstance(m, ndarray)) * int(len(m)) if isinstance(m, ndarray) else 0
+        )
 
-    df["mut_count"] = df["modifications"].apply(_count_mods)
+    df["mut_count"] = df["permuter__modifications"].apply(_count_mods)
 
-    if "round" not in df.columns:
-        raise RuntimeError(f"{job_name}: variants missing 'round' field")
-    rounds = sorted(df["round"].unique())
+    if "permuter__round" not in df.columns:
+        raise RuntimeError(f"{job_name}: variants missing 'permuter__round' field")
+    rounds = sorted(df["permuter__round"].unique())
     x_pos = {r: i + 1 for i, r in enumerate(rounds)}
 
     # slightly tighter jitter
@@ -98,14 +90,17 @@ def plot(
     round_cmap = plt.get_cmap("tab20")
     color_by_round = {r: round_cmap(i % 20) for i, r in enumerate(rounds)}
 
-    fig, ax = plt.subplots(figsize=(7.4, 4.0), constrained_layout=True)
+    fs = float(font_scale) if font_scale else 1.0
+    fig, ax = plt.subplots(
+        figsize=(figsize if figsize else (7.4, 4.0)), constrained_layout=True
+    )
 
     # grid behind points
     ax.set_axisbelow(True)
     ax.grid(axis="y", color="0.9", linestyle="-", linewidth=0.6, zorder=0)
 
     for r in rounds:
-        sub = df[df["round"] == r]
+        sub = df[df["permuter__round"] == r]
         x0 = x_pos[r]
 
         # single violin per round = population distribution
@@ -142,19 +137,30 @@ def plot(
 
     ax.set_xlim(0.5, len(rounds) + 0.5)
     ax.set_xticks([x_pos[r] for r in rounds])
-    ax.set_xticklabels([f"R{r}" for r in rounds], fontsize=11)
-    ax.set_xlabel("Round", fontsize=11)
-    ax.set_ylabel(y_label, fontsize=11)
-    ax.tick_params(axis="y", labelsize=10)
+    ax.set_xticklabels([f"R{r}" for r in rounds], fontsize=int(round(11 * fs)))
+    ax.set_xlabel("Round", fontsize=int(round(11 * fs)))
+    ax.set_ylabel(y_label, fontsize=int(round(11 * fs)))
+    ax.tick_params(axis="y", labelsize=int(round(10 * fs)))
 
     # title + subtitle kept inside figure to avoid clipping when saving
     ref_name = (
-        df["ref_name"].iloc[0] if "ref_name" in df.columns and not df.empty else ""
+        df["permuter__ref"].iloc[0]
+        if "permuter__ref" in df.columns and not df.empty
+        else ""
     )
+
     title = f"{job_name}{f' ({ref_name})' if ref_name else ''}"
-    fig.suptitle(title, fontsize=12, y=0.995)
+    fig.suptitle(title, fontsize=int(round(12 * fs)), y=0.995)
     if evaluators:
-        fig.text(0.5, 0.968, evaluators, ha="center", va="top", fontsize=9, alpha=0.50)
+        fig.text(
+            0.5,
+            0.968,
+            evaluators,
+            ha="center",
+            va="top",
+            fontsize=int(round(9 * fs)),
+            alpha=0.50,
+        )
 
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)

@@ -20,6 +20,7 @@ class JobInput(BaseModel):
     refs: str
     name_col: str = "ref_name"
     seq_col: str = "sequence"
+    aa_col: Optional[str] = None  # optional: protein sequence column
 
 
 class JobPermute(BaseModel):
@@ -43,11 +44,28 @@ class JobOutput(BaseModel):
 
 class JobPlot(BaseModel):
     which: List[str] = Field(default_factory=lambda: ["position_scatter_and_heatmap"])
+    metric_id: Optional[str] = None
+    # Draw every Nth AA in the reference strip (None → auto ≈ 200 labels total)
+    strip_every: Optional[int] = Field(default=None, ge=1, le=50)
+    emit_summaries: bool = True
+
+    # Optional figure size in inches (matplotlib figsize)
+    class PlotSize(BaseModel):
+        width: Optional[float] = Field(default=None, ge=2.0, le=64.0)
+        height: Optional[float] = Field(default=None, ge=2.0, le=64.0)
+
+    size: Optional[PlotSize] = None
+    # Multiplicative font scaling factor applied to plot text
+    font_scale: float = Field(default=1.0, ge=0.5, le=3.0)
 
     @field_validator("which")
     @classmethod
     def _allowed_plots(cls, vs: List[str]):
-        allowed = {"position_scatter_and_heatmap", "metric_by_mutation_count"}
+        allowed = {
+            "position_scatter_and_heatmap",
+            "metric_by_mutation_count",
+            "aa_category_effects",
+        }
         bad = [x for x in vs if x not in allowed]
         if bad:
             raise ValueError(f"Unknown plot(s): {bad}. Allowed: {sorted(allowed)}")

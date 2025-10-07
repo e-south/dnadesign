@@ -43,6 +43,30 @@ def write_ref_fasta(dataset_dir: Path, ref_name: str, sequence: str) -> Path:
     fasta.write_text("".join(lines), encoding="utf-8")
     return fasta
 
+def write_ref_protein_fasta(dataset_dir: Path, ref_name: str, aa_sequence: str) -> Path:
+    """Authoritative reference protein (one‑line FASTA)."""
+    fasta = dataset_dir / "REF_AA.fa"
+    seq = aa_sequence.strip()
+    lines = [f">{ref_name}\n"]
+    lines += [seq[i : i + 80] + "\n" for i in range(0, len(seq), 80)]
+    fasta.write_text("".join(lines), encoding="utf-8")
+    return fasta
+
+def read_ref_protein_fasta(dataset_dir: Path) -> tuple[str, str] | None:
+    p = dataset_dir / "REF_AA.fa"
+    if not p.exists():
+        return None
+    name, seq = "", []
+    with p.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            if line.startswith(">"):
+                name = line[1:].strip()
+            else:
+                seq.append(line.strip())
+    s = "".join(seq).strip()
+    if not s:
+        return None
+    return name, s
 
 def read_ref_fasta(dataset_dir: Path) -> tuple[str, str] | None:
     p = dataset_dir / "REF.fa"
@@ -65,29 +89,55 @@ def read_ref_fasta(dataset_dir: Path) -> tuple[str, str] | None:
 # --- per-dataset journal -----------------------------------------------------
 
 
-def append_journal(
-    dataset_dir: Path, section: str, lines: list[str] | tuple[str, ...] = ()
+def append_record_md(dataset_dir: Path, action: str, command: str) -> Path:
+    """
+    Minimal, human-friendly record entry:
+      ### <action> · <timestamp>
+      <command in a code fence>
+    """
+    path = dataset_dir / "RECORD.md"
+    if not path.exists():
+        # fall back to a minimal header if dataset was created manually
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+        path.write_text(
+            f"# Permuter RECORD\n\n_Dataset created {ts} (UTC). This file is a lightweight, human-editable record._\n",
+            encoding="utf-8",
+        )
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+    entry = f"\n### {action} · {now}\n\n```\n{command}\n```\n"
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(entry)
+    return path
+
+
+def append_record_event(
+    dataset_dir: Path,
+    section: str,
+    lines: list[str] | tuple[str, ...] = (),
+    command: str | None = None,
 ) -> Path:
     """
-    Append a structured entry to JOURNAL.md next to records.parquet.
-    Users can also freely add their own notes to this file.
+    Append a single consolidated entry to RECORD.md:
+      ## SECTION · timestamp
+      - key: value
+      ...
+      ```bash
+      <command>
+      ```
     """
-    journal = dataset_dir / "JOURNAL.md"
-    if not journal.exists():
-        header = (
-            "# Permuter Journal\n\n"
-            "_Automatic command log and scratch pad for this dataset._\n\n"
-        )
-        journal.write_text(header, encoding="utf-8")
+    path = dataset_dir / "RECORD.md"
+    if not path.exists():
+        # create a minimal header if user created dataset manually
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+        text = f"# Permuter RECORD\n\n_Dataset created {ts} (UTC)._"
+        path.write_text(text + "\n", encoding="utf-8")
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
-    sep = "\n".join(f"- {ln}" for ln in (lines or []))
-    entry = f"\n## {section} · {now}\n\n{sep}\n"
-    with journal.open("a", encoding="utf-8") as fh:
+    body = "\n".join(f"- {ln}" for ln in (lines or []))
+    cmd = f"\n\n```bash\n{command}\n```\n" if command else "\n"
+    entry = f"\n## {section} · {now}\n\n{body}{cmd}"
+    with path.open("a", encoding="utf-8") as fh:
         fh.write(entry)
-    return journal
-
-
-# --- per-dataset RECORD.md (human-facing command log + scratch pad) ----------
+    return path
 
 
 def init_record_md(
@@ -128,13 +178,4 @@ def init_record_md(
         + "\n"
     )
     path.write_text(text, encoding="utf-8")
-    return path
-
-
-def append_record_md(dataset_dir: Path, section: str, command: str) -> Path:
-    path = dataset_dir / "RECORD.md"
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
-    entry = f"\n### {section} · {ts}\n\n```\n{command}\n```\n"
-    with path.open("a", encoding="utf-8") as fh:
-        fh.write(entry)
     return path

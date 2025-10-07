@@ -67,7 +67,7 @@ permuter run --job src/dnadesign/permuter/jobs/nt_scan_demo.yaml --ref BL21_RNas
 
 **B) Run a codon scan (codon swaps)**
 
-We include an example `codon_ecoli.csv` (subset shown):
+We include an example `inputs/codon_tables/codon_ecoli.csv` (subset shown):
 
 ```csv
 codon,amino_acid,fraction,frequency
@@ -152,20 +152,16 @@ permuter run --job src/dnadesign/permuter/jobs/rnaseh1_codon_scan.yaml --ref BL2
 permuter run --job src/dnadesign/permuter/jobs/rnaseh1_nt_scan.yaml --ref BL21_RNase_H1_wt
 
 # Evaluate (append metrics to the same Parquet)
-permuter evaluate --data src/dnadesign/permuter/results/rnaseh1_nt_scan/rnaseh1/records.parquet \
-  --with llr:evo2_llr:log_likelihood_ratio
+permuter evaluate --data src/dnadesign/permuter/results/rnaseh1_nt_scan/records.parquet --with llr:evo2_llr:log_likelihood_ratio
 
 # Make plots
-permuter plot --data src/dnadesign/permuter/results/rnaseh1_nt_scan/rnaseh1/records.parquet \
-  --which position_scatter_and_heatmap metric_by_mutation_count \
-  --metric-id llr
+permuter plot --job src/dnadesign/permuter/jobs/rnaseh1_nt_scan.yaml --ref BL21_RNase_H1_wt --which position_scatter_and_heatmap --which metric_by_mutation_count --metric-id llr
 
 # Optional CSV export
-permuter export --data src/dnadesign/permuter/results/rnaseh1_nt_scan/rnaseh1/records.parquet \
-  --fmt csv --out src/dnadesign/permuter/results/rnaseh1_nt_scan/rnaseh1/records.csv
+permuter export --data src/dnadesign/permuter/results/rnaseh1_nt_scan/records.parquet --fmt csv --out src/dnadesign/permuter/results/rnaseh1_nt_scan/records.csv
 
 # Validate the dataset
-permuter validate --data src/dnadesign/permuter/results/rnaseh1_nt_scan/rnaseh1/records.parquet --strict
+permuter validate --data src/dnadesign/permuter/results/rnaseh1_nt_scan/records.parquet --strict
 ```
 
 **What you get**

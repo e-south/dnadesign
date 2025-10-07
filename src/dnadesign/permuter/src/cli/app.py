@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -46,7 +46,8 @@ app = typer.Typer(
     ),
 )
 console = Console()
-rich_tb(show_locals=False)
+# richer tracebacks with locals by default; no suppression
+rich_tb(show_locals=True)
 
 
 @app.callback()
@@ -139,23 +140,62 @@ def evaluate(
 @app.command(
     "plot",
     help=(
-        "Generate plots (PNG) from a dataset. Use --metric-id to choose which metric to visualize."
+        "Generate plots (PNG) for a dataset. "
+        "Use --metric-id (or job.plot.metric_id) to choose a metric when multiple exist. "
+        "Repeat --which to draw multiple plots."
     ),
 )
 def plot(
     data: Path = typer.Option(
-        ..., "--data", "-d", help="Path to records.parquet OR dataset directory"
+        None, "--data", "-d", help="Path to records.parquet OR dataset directory"
+    ),
+    job: str = typer.Option(
+        None,
+        "--job",
+        "-j",
+        help="Job YAML path or PRESET name (used if --data omitted)",
+    ),
+    ref: str = typer.Option(
+        None, "--ref", help="Reference name from refs CSV (used with --job)"
+    ),
+    out: Path = typer.Option(
+        None,
+        "--out",
+        "-o",
+        help="Override output root when deriving dataset from --job/--ref",
     ),
     which: List[str] = typer.Option(
-        ["position_scatter_and_heatmap"], "--which", help="Plots to generate"
+        None,
+        "--which",
+        help="Plot id to generate (repeat for multiple). "
+        "Allowed: position_scatter_and_heatmap, metric_by_mutation_count",
     ),
     metric_id: str = typer.Option(
+        None, "--metric-id", help="Metric id to plot (e.g., llr_mean, llr_sum)"
+    ),
+    width: float = typer.Option(None, "--width", help="Figure width (inches)"),
+    height: float = typer.Option(None, "--height", help="Figure height (inches)"),
+    font_scale: float = typer.Option(
+        None, "--font-scale", help="Multiply all font sizes"
+    ),
+    emit_summaries: Optional[bool] = typer.Option(
         None,
-        "--metric-id",
-        help="Metric id to plot (defaults to single metric or objective)",
+        "--emit-summaries/--no-emit-summaries",
+        help="Emit analysis summaries (e.g., AA LLR Top/Bottom CSV) during plotting (default: on).",
     ),
 ):
-    plot_cmd.plot(data=data, which=which, metric_id=metric_id)
+    plot_cmd.plot(
+        data=data,
+        job=job,
+        ref=ref,
+        out=out,
+        which=which,
+        metric_id=metric_id,
+        width=width,
+        height=height,
+        font_scale=font_scale,
+        emit_summaries=emit_summaries,
+    )
 
 
 @app.command(
@@ -193,12 +233,8 @@ def inspect(
 
 
 def main() -> int:
-    try:
-        app()
-        return 0
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        return 1
+    app()
+    return 0
 
 
 if __name__ == "__main__":

@@ -23,4 +23,9 @@ job:
   output:
     dir: "${JOB_DIR}/../results/nt_scan_demo"
   plot:
-    which: ["position_scatter_and_heatmap","metric_by_mutation_count"]
+    which: ["position_scatter_and_heatmap", "metric_by_mutation_count"]
+    metric_id: llr_mean            # default metric for plotting
+    size:                          # optional, inches (width × height)
+      width: 9.0
+      height: 5.0
+    font_scale: 1.15               # multiply all fonts (0.5–3.0)

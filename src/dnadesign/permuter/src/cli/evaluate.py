@@ -28,7 +28,6 @@ from dnadesign.permuter.src.core.paths import (
 )
 from dnadesign.permuter.src.core.registry import get_evaluator
 from dnadesign.permuter.src.core.storage import (
-    append_journal,
     append_record_md,
     atomic_write_parquet,
     read_parquet,
@@ -98,6 +97,7 @@ def _derive_records_from_job(
 ) -> Path:
     """
     Resolve the dataset path from a job preset/path and an optional ref.
+    Tries nested, flat-job, then flat-jobref.
     """
     job_path = resolve_job_hint(job_hint)
     data = yaml.safe_load(job_path.read_text(encoding="utf-8"))
@@ -110,11 +110,17 @@ def _derive_records_from_job(
         ref_name="__PENDING__",
         out_override=out,
     )
+    # 1) flat-job: <output_root>/records.parquet (preferred when it already exists)
+    flat_job = (jp0.output_root / "records.parquet").resolve()
+    if flat_job.exists():
+        return flat_job
+
+    # Need a ref name for the other layouts
     df_refs = pd.read_csv(jp0.refs_csv, dtype=str)
     ref_name, ref_seq = _pick_reference(
         df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, ref
     )
-    # Now resolve the final dataset dir for that ref
+    # 2) nested: <output_root>/<ref>/records.parquet
     jp = resolve(
         job_yaml=job_path,
         refs=cfg.job.input.refs,
@@ -122,7 +128,19 @@ def _derive_records_from_job(
         ref_name=ref_name,
         out_override=out,
     )
-    return jp.records_parquet
+    nested = jp.records_parquet
+    if nested.exists():
+        return nested
+
+    # 3) flat-jobref: <parent>/<output_root.name>__<ref>/records.parquet
+    flat_jobref = (
+        jp.output_root.parent / f"{jp.output_root.name}__{ref_name}" / "records.parquet"
+    ).resolve()
+    if flat_jobref.exists():
+        return flat_jobref
+
+    # Fall back to nested path (caller will raise a helpful error)
+    return nested
 
 
 def _argv() -> str:
@@ -247,16 +265,6 @@ def evaluate(
         f"[green]✔[/green] Appended metrics: {', '.join(m['id'] for m in metrics)} → {records}"
     )
     append_record_md(records.parent, "evaluate", _argv())
-
-    append_journal(
-        records.parent,
-        "EVALUATE",
-        [
-            f"metrics: {', '.join(m['id'] for m in metrics)}",
-            f"dataset: {records}",
-            f"command: {_argv()}",
-        ],
-    )
 
 
 def _normalize_scores(scores: Any, *, n: int, metric_id: str) -> Dict[str, pd.Series]:
