@@ -1,0 +1,66 @@
+
+input:
+  path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/60bp_dual_promoter_cpxR_LexA/records.parquet
+  format: parquet
+  columns:
+    id: id
+    sequence: sequence
+    annotations: densegen__used_tfbs_detail
+  alphabet: DNA
+  limit: 100     # set 0 to process all rows
+  sample_seed: 42
+  annotations:
+    ambiguous: drop                # explicit, deterministic choice among multiple hits
+    zero_as_unspecified: true      # treat 0 as “no offset” (matches your data)
+    offset_mode: auto              # accept either 0-based or 1-based if offset is provided
+    require_non_empty: true        # drop rows with no annotations
+    min_per_record: 1              # at least one parsed annotation
+    require_non_null_cols:         # require these columns to be present per row
+
+plugins:
+  - sigma70:
+      spacer_min: 15
+      spacer_max: 19
+      label_mode: inner   # inner → "16–18 bp" for 15..19
+      # Optionally tighten/loosen the line’s inset from boxes (in bases):
+      inner_margin_bp: 0.35
+      variants:
+        - name: sigma70_high
+          upstream: "TTGACA"
+          downstream: "TATAAT"
+        - name: sigma70_mid
+          upstream: "ACCGCG"
+          downstream: "TATAAT"
+        - name: sigma70_low
+          upstream: "GCAGGT"
+          downstream: "TATAAT"
+
+style:
+  track_spacing: 35.0      # vertical gap between annotation rows
+  baseline_spacing: 40.0   # distance between forward & reverse baselines
+  padding_y: 05.0          # top/bottom padding; increases natural frame height
+  legend_height_px: 16.0   # reserved space; prevents overlap
+  legend_pad_px: 10.0     # bottom margin below legend 
+  legend: true
+  font_size_seq: 14
+  font_size_label: 12
+  kmer:
+    height_factor: 1.10     # for example, a taller box
+    text_v_align: center    # center the white letters in the box
+    round_px: 5.0
+    pad_x_px: 1.025                  # widen k‑mer background boxes slightly
+    fill_alpha: 0.88
+  sigma_link_inner_margin_bp: 0.50  # default for all sigma links
+
+output:
+  video:
+    path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/baserender/results/CpxR_LexA/cpxR_LexA.mp4
+    fmt: mp4
+    # fps must be an integer. To get "0.5 fps" behavior,
+    # use fps: 1 and frames_per_record: 2.
+    fps: 6
+    frames_per_record: 5
+    pauses: {}
+    width_px: 1200
+    height_px: null
+    aspect: "18:4"         # letterboxed; pixels of the sequence are not stretched

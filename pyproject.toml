@@ -28,6 +28,7 @@ dependencies = [
   "pymc",
   "arviz",
   "pyyaml",
+  "pygments",
   "openpyxl",
   "xlrd",
   "python-levenshtein",
@@ -44,6 +45,7 @@ infer = "dnadesign.infer.cli:app"
 cluster = "dnadesign.cluster.src.cli.app:main"
 permuter = "dnadesign.permuter.src.cli.app:main"
 mb = "dnadesign.molbench.src.cli.app:cli"
+baserender = "dnadesign.baserender.src.cli:app"
 
 [project.optional-dependencies]
 viz = [

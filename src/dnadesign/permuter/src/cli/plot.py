@@ -220,7 +220,7 @@ def plot(
 
     for name in which:
         if name in ("position_scatter_and_heatmap", "position_scatter"):
-            out = plots_dir / f"{name}__{metric_id}.png"
+            out = plots_dir / f"{name}__{metric_id}.pdf"
             _LOG.info(
                 "plot: %s → %s (metric_id=%s, figsize=%s, font_scale=%s)",
                 name,
