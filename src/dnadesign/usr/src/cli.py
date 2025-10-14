@@ -157,14 +157,10 @@ def _select_parquet_target_interactive(
                 "Tip: cd into a dataset folder (with records.parquet) or pass a dataset name (e.g., 'usr cols demo')."
             )
             return None
-        # When the caller didn't provide an explicit path, ask before auto-picking.
-        if confirm_if_inferred and len(cands) == 1:
-            msg = f"No explicit file path provided. Found '{cands[0].name}' in {p}. Proceed? [Y/n]"
-            print(msg)
-            ans = input("> ").strip().lower()
-            if ans in {"n", "no"}:
-                print("Aborted.")
-                return None
+        # If exactly one Parquet file is present, auto-select it with no prompt.
+        # Only present an interactive picker when there are multiple viable files.
+        if len(cands) == 1:
+            return cands[0]
         return _prompt_pick_parquet(cands, use_rich)
     # Not a file or directory → let caller handle dataset/other cases
     return None

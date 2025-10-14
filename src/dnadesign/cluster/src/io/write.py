@@ -80,6 +80,63 @@ def attach_usr(
         pass
 
 
+def drop_usr_columns(usr_root: Path, dataset: str, columns: list[str]) -> None:
+    """
+    Delete namespaced columns from a USR dataset by editing records.parquet atomically.
+    ─ Only 'cluster__*' columns are allowed (defensive guard).
+    ─ Uses dnadesign.usr I/O helpers for snapshots + metadata preservation + event log.
+    """
+    if not columns:
+        return
+    # Normalize dotted leaf paths (e.g., 'cluster__ldn_v1__meta.algo') to their
+    # top‑level column ('cluster__ldn_v1__meta') and de‑duplicate.
+    columns = list(dict.fromkeys(c.split(".", 1)[0] for c in columns))
+    non_cluster = [c for c in columns if not c.startswith("cluster__")]
+    if non_cluster:
+        raise RuntimeError(
+            "Refusing to delete non-namespaced or non-cluster columns. "
+            f"Only 'cluster__*' allowed; offending: {non_cluster[:5]}..."
+        )
+    # Resolve dataset paths deterministically
+    ds_dir = (usr_root / dataset).resolve()
+    records = ds_dir / "records.parquet"
+    snapshots = ds_dir / "_snapshots"
+    events = ds_dir / ".events.log"
+    if not records.exists():
+        raise FileNotFoundError(f"USR dataset not found: {records}")
+
+    # Use USR I/O primitives so we inherit atomic write + snapshot + metadata preservation.
+    try:
+        from dnadesign.usr.src.io import (  # type: ignore
+            append_event,
+            read_parquet,
+            write_parquet_atomic,
+        )
+    except Exception as e:
+        raise RuntimeError(
+            "dnadesign.usr.src.io is required to modify USR datasets. "
+            "Please ensure the dnadesign.usr package is installed and up to date."
+        ) from e
+
+    tbl = read_parquet(records)
+    names = set(tbl.schema.names)  # top‑level Arrow names
+    drop_now = [c for c in columns if c in names]
+    if not drop_now:
+        return
+    keep = [c for c in tbl.schema.names if c not in drop_now]
+    # Build new table by selection (pyarrow Table.select keeps metadata on preserved columns)
+    new_tbl = tbl.select(keep)
+
+    # Persist atomically and snapshot
+    write_parquet_atomic(new_tbl, records, snapshots, preserve_metadata_from=tbl)
+
+    # Append a concise event
+    try:
+        append_event(events, {"action": "cluster_delete", "columns": drop_now})
+    except Exception:
+        pass
+
+
 def write_generic(
     src_file: Path,
     df: pd.DataFrame,

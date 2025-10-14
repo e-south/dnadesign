@@ -1,8 +1,0 @@
-
-name: "leiden.fine"
-kind: "fit"
-params:
-  neighbors: 30
-  resolution: 0.80
-  scale: false
-  metric: "euclidean"

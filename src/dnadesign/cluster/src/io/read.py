@@ -30,6 +30,33 @@ def load_table(ctx: dict, columns: list[str] | None = None) -> pd.DataFrame:
     raise ValueError(f"Unknown context kind: {ctx['kind']}")
 
 
+# --- append to file ---
+def peek_columns(ctx: dict) -> list[str]:
+    """
+    Return top-level column names without loading the full dataset.
+    • CSV: header-only read.
+    • Parquet (USR or generic): use PyArrow schema (top-level).
+    This is assertive — we do not silently fall back to engines that may
+    misreport nested/struct columns.
+    """
+    p: Path = ctx["file"]
+    if ctx["kind"] == "csv":
+        return list(pd.read_csv(p, nrows=0).columns)
+    # Parquet (USR or generic): require PyArrow; always return top‑level names
+    try:
+        import pyarrow.parquet as pq  # type: ignore
+    except Exception as e:
+        raise RuntimeError(
+            "PyArrow is required to inspect Parquet columns deterministically. "
+            "Install pyarrow>=8."
+        ) from e
+    try:
+        schema = pq.read_schema(p)  # Arrow schema (top‑level fields)
+    except Exception as e:
+        raise RuntimeError(f"Failed to read Parquet schema from: {p}") from e
+    return list(schema.names)
+
+
 def _parse_json_array_cell(v):
     if isinstance(v, (list, tuple, np.ndarray)):
         return np.array(v, dtype=np.float32)

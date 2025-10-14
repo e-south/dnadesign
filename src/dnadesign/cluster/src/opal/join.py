@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import pandas as pd
 
@@ -203,6 +203,15 @@ def _read_parquet_parts(
     return pd.read_parquet(d, columns=columns) if columns else pd.read_parquet(d)
 
 
+def _list_parquet_files(d: Path) -> list[Path]:
+    """Return the concrete parquet file(s) discovered at a ledger path."""
+    if not d.exists():
+        return []
+    if d.is_dir():
+        return sorted(d.glob("*.parquet"))
+    return [d]
+
+
 def select_ids(
     campaign_dir: Path,
     run_selector: str = "latest",
@@ -277,16 +286,22 @@ def join_fields(
     run_selector: str,
     fields: list[str],
     as_of_round: Optional[int] = None,
+    log_fn: Optional[Callable[[str], None]] = None,
 ) -> pd.DataFrame:
     paths = _ledger_paths(campaign_dir)
-    preds = (
-        _read_parquet_parts(paths["predictions"])
-        if Path(paths["predictions"]).exists()
-        else None
-    )
 
     if not Path(paths["predictions"]).exists():
         raise FileNotFoundError("OPAL predictions ledger not found.")
+    # Discover concrete parquet parts and log them up front (assertive observability)
+    parts = _list_parquet_files(paths["predictions"])
+    if log_fn:
+        names = ", ".join(p.name for p in parts[:12]) + (
+            " ..." if len(parts) > 12 else ""
+        )
+        log_fn(
+            f"OPAL: predictions source={paths['predictions']} "
+            f"({len(parts)} part file(s)): {names}"
+        )
     preds = _read_parquet_parts(paths["predictions"])
     preds["id"] = preds["id"].astype(str)
 
@@ -300,7 +315,12 @@ def join_fields(
         preds = preds[preds["run_id"].astype(str) == str(rid)]
         if preds.empty:
             raise FileNotFoundError(f"No predictions for run_id={rid}.")
-
+    if log_fn:
+        log_fn(
+            "OPAL: resolved slice -> "
+            f"run_selector='{run_selector}', run_id={rid}, as_of_round={ao}; "
+            f"loaded_rows={len(preds)}; join_fields={fields}"
+        )
     # Assert every requested field exists in this slice
     missing = [f for f in fields if f not in preds.columns]
     if missing:

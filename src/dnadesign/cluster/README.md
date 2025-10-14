@@ -1,139 +1,163 @@
 ## cluster
+This CLI clusters sequences, computes UMAP embeddings, renders plots for many **hues** (cluster labels, GC, numeric/categorical columns, highlights), and runs post-hoc analyses (composition, diversity, differential, numeric summaries). It records everything in a **run store** (`results/`) and lets you reuse runs.
 
-Parquet/CSV‑first **clustering + UMAP + analyses** with a run store, caching, presets, and assertive, decoupled design.
+The system is built around two *composable* concepts:
+
+- **Presets** — reusable partials by **kind** (`fit`, `umap`, `plot`, `analysis`) that capture algorithm knobs and plotting style;
+- **Jobs** — concrete, checked‑in invocations you can run repeatedly (dataset bindings, names, I/O, highlights, etc.).
 
 ---
 
-### Install
-Add to your `pyproject.toml`:
+## Install
+
+Add to `pyproject.toml`:
+
 ```toml
 [project.scripts]
 cluster = "dnadesign.cluster.src.cli.app:main"
+````
+
+---
+
+## Concepts at a glance
+
+* **Dataset vs file**: Work against a USR dataset (`--dataset`) or a CSV/Parquet (`--file`). The CLI autodetects if you run inside a `records.parquet` folder.
+* **Fit**: Run Leiden clustering on an X matrix (vector column or multi‑column).
+* **UMAP**: Compute embeddings, attach coordinates (optional), and render one PNG per **hue** (coloring).
+* **Analysis**: Composition/diversity/differential and numeric summaries/violin plots.
+* **Hues**:
+
+  * Built‑ins: `cluster`, `gc_content`, `seq_length`, `intra_sim`
+  * Your data: `numeric:<col>`, `categorical:<col>`
+  * Special: `highlight` (single or *categorical* highlight by a column in a supplied ids file)
+* **OPAL joins**: If a hue references `obj__/pred__/sel__` columns not present in your dataset, the CLI can join them from an OPAL campaign.
+* **Run store**: Repeatable outputs live under `results/<FIT>/…`, with an `index.parquet` and per‑run `records.md`.
+
+---
+
+## Folder layout
+
+```
+cluster/
+  presets/
+    fit/         # Leiden hyperparameters (neighbors, resolution, ...)
+    umap/        # UMAP hyperparameters (+ which hues to render)
+    plot/        # Visual style blocks (optional; can be referenced by umap presets)
+    analysis/    # Analysis batteries / options
+  jobs/
+    <fit_alias>/
+      fit.yaml
+      umap.yaml
+      umap_categorical.yaml   # (new) categorical highlight demonstration
+      analyze.yaml
+  results/       # run store (auto‑managed)
 ```
 
+**Presets** = reusable partials by **kind**; **Jobs** = concrete invocations you commit to your repo.
+
+|                   | Presets                                 | Jobs (checked‑in)                             |
+| ----------------- | --------------------------------------- | --------------------------------------------- |
+| Purpose           | Defaults & style (portable)             | Bind dataset/file/name & run options          |
+| Scope             | kind ∈ {fit, umap, plot, analysis}      | command ∈ {fit, umap, analyze}                |
+| May contain       | Algo knobs; hues; style (plot)          | I/O, dataset/file, run alias, highlight path  |
+| Must **not** have | dataset names, file paths, run aliases  | algorithm knobs **if** a preset is referenced |
+| Precedence        | CLI > job.plot > preset.plot > defaults |                                               |
+
+> **Design by contract:**
+> If a job references a preset and *also* specifies the same algorithm keys, the CLI errors. Move knobs into the preset or pass via CLI flags.
+
 ---
 
-### Architecture & workflow
+## Hues & highlighting
+
+You can request the following hue specs (in `umap` presets/jobs or CLI):
+
+* Built‑ins:
+
+  * `cluster` — colors by `cluster__<NAME>`
+  * `gc_content` — requires `sequence` column
+  * `seq_length` — requires `sequence` column
+  * `intra_sim` — requires `cluster__<NAME>__intra_sim` (compute via `cluster intra-sim`)
+* Your data:
+
+  * `numeric:<col>` — any numeric column (strictly validated; NaN/Inf rows dropped with a clear note)
+  * `categorical:<col>` — string/integer categories (legend capped by `legend.max_items`)
+* Special:
+
+  * `highlight` — *dedicated* highlight plot (gray background + highlighted ids)
+    and optional **overlay rings** on other hues.
+
+Put your full **set of hues** in the UMAP preset (`plot.color_by: [...]`).
+Each hue yields a file like:
+
 ```
-CLI (Typer + Rich) ─┬─ io.detect/read/write (USR | Parquet | CSV)
-                    ├─ algo.leiden (+ sweep)
-                    ├─ umap.compute/plot (hues, highlights)
-                    ├─ analysis.(composition|diversity|differential|intra_similarity)
-                    ├─ runs.(signatures|store|index|reuse)
-                    └─ presets.(loader|schema)
+results/<FIT_ALIAS>/umap/<fit>.<hue>.png
 ```
-1) **Load** the data needed (projection; float32 vectors).  
-2) **Validate** (duplicates; id↔sequence bijection; fixed‑width X; finite values).  
-3) **Fit / UMAP / Analyze** with **narrative logs** and **progress bars**.  
-4) **Attach minimally** (opt‑in extras) and **catalog runs** with signatures.  
-5) **Plot & save** under the same **run directory** with config‑encoded filenames.
+
+### Highlight modes and controls
+
+* **Single‑hue highlight** (IDs only): dedicated `highlight` plot shows *filled* points (red by default).
+* **Categorical highlight** (`--highlight-hue-col <col>`): dedicated `highlight` plot shows *filled*, color‑coded categories + legend.
+* **Overlays on other hues**: Optional **rings** around highlighted ids. Configure via:
+
+```yaml
+plot:
+  highlight:
+    overlay: true|false   # overlays rings on every non-"highlight" hue
+    size: 60.0            # size of ring overlays (not the filled highlight plot)
+    marker: "o"
+    facecolor: "none"
+    edgecolor: "red"      # or provide a 'palette' when using categorical highlight
+    legend: false
+```
+
+> If you don’t want highlight rings on other hues (e.g., `gc_content`), set `overlay: false`.
 
 ---
 
-### Path resolution
-You can provide either:
+## OPAL joins (predictions & objectives)
 
-* `--dataset <name>` (USR mode, requires `records.parquet` under `<USR_ROOT>/<name>/`)
-* `--file /path/to/table.parquet|.csv` (generic mode)
+If any requested hue refers to `obj__/pred__/sel__` columns that are *not* in your dataset, `cluster umap/analyze` will **assertively** require an OPAL campaign and run selector:
 
-If neither is given, auto‑detect:
+* `--opal-campaign` — path or campaign name (resolvable via `$DNADESIGN_OPAL_CAMPAIGNS_ROOT` or repo’s `dnadesign/opal/campaigns/`)
+* Exactly one of:
 
-* In a folder with `records.parquet`: treat as **USR** if it looks like `usr/datasets/<name>/`, otherwise **generic**.
-* USR root comes from `--usr-root` or `DNADESIGN_USR_ROOT` env var.
+  * `--opal-run latest|round:<n>|run_id:<rid>` or
+  * `--opal-as-of-round <n>`
+* `--opal-fields` — add extra OPAL fields beyond what your hues/metrics require
 
----
-
-### Column creation policy
-* `cluster__<NAME>` (`int32`)
-* `cluster__<NAME>__meta` (compact JSON; includes signature)
-* opt‑in: `cluster__<NAME>__umap_x/y`, `cluster__<NAME>__intra_sim`
+The CLI logs the exact OPAL parquet parts it used and the resolved slice.
 
 ---
 
-### Commands
-Try `cluster --help`.
+## Quick recipes (copy/paste)
 
-#### `cluster fit`
-Run Leiden clustering on a chosen **X** column(s), attach columns, and register a **fit** run:
+> The examples below use `ldn_v1` as a fit alias and a USR dataset named `60bp_dual_promoter_cpxR_LexA`.
 
-* attaches: `cluster__<NAME>` and `cluster__<NAME>__meta` (compact JSON)
-* optional: per‑row **silhouette quality** (`cluster__<NAME>__quality`) with sampling for big N  
-  Use `--silhouette` to enable. By default up to 20k points are scored; pass `--full-silhouette` to score all rows.
-* reuse: `--reuse auto|require|never|reattach` (defaults to `auto`)
-* write policy: **USR** attaches atomically; **generic** writes `--out` or `--inplace` with `.bak`
-* presets: `--preset <name>` (kind: `"fit"`) pre-fills parameters; **explicit flags always win**
+### 1) Fit
 
-#### `cluster umap`
-Compute UMAP and save **coords + plots** under the **same run**. Attach coords with `--attach-coords`.
+**CLI**
 
-* plot hues: by `cluster`, `gc_content`, `seq_length`, `intra_sim`, `numeric:<col>`, `categorical:<col>`
-* highlight by ids file or categorical values
-* all plots saved as `cluster/batch_results/<FIT_SLUG>/umap/<UMAP_SLUG>/plots/<HUE>.png`
-* presets: `--preset <name>` (kinds: `"umap"` and optionally `"plot"`) to pre-fill neighbors/min_dist/metric and plot settings (`dims`, `alpha`, `size`)
-
-#### `cluster analyze`
-Run composition, diversity, and differential enrichment on an existing `cluster__<NAME>`.
-
-* outputs CSVs and optional PNGs
-* if `--out-dir` is omitted, outputs land under `batch_results/<FIT_SLUG>/analysis/<GROUP_BY>/`
-* plot filenames encode the target, e.g. `composition_proportions__cluster__NAME__by_source.png`
-
-#### `cluster intra-sim`
-Compute **mean global alignment similarity** per row within each cluster (requires `sequence`).
-
-* attaches `cluster__<NAME>__intra_sim`
-* safeguards for huge clusters: sampling with `--max-per-cluster`, `--sample-if-larger`
-
-#### `cluster sweep`
-Leiden **resolution sweep** with replicate seeds; writes a Parquet summary and PNG with **suggested resolution**.
-
-#### Run store + presets
-`cluster runs list` shows all fits and UMAPs recorded in `cluster/cluster_log/index.parquet`.
-`cluster presets list|show` surfaces built‑in, user, or project presets for **fit**, **umap**, and **plot**.
-
----
-
-### Quick start
-Fit on a USR dataset and attach columns:
 ```bash
 cluster fit \
   --dataset 60bp_dual_promoter_cpxR_LexA \
   --x-col infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean \
+  --preset fit.leiden.fine \
   --name ldn_v1 \
-  --write
+  --write --allow-overwrite
 ```
 
-UMAP + plots + attach coords, reusing that fit:
+**Job**
+
 ```bash
-cluster umap \
-  --dataset 60bp_dual_promoter_cpxR_LexA \
-  --name ldn_v1 \
-  --x-col infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean \
-  --color-by cluster --color-by gc_content \
-  --attach-coords --write
+cluster fit --job cluster/jobs/ldn_v1/fit.yaml
 ```
 
-Analyses (defaults to run‑store output layout when `--out-dir` omitted):
-```bash
-cluster analyze \
-  --dataset 60bp_dual_promoter_cpxR_LexA \
-  --cluster-col cluster__ldn_v1 \
-  --group-by source \
-  --composition --diversity --difffeat --plots
-```
+---
 
-Resolution sweep:
-```bash
-cluster sweep \
-  --dataset 60bp_dual_promoter_cpxR_LexA \
-  --x-col infer__evo2_logits_mean_pooled \
-  --neighbors 15 \
-  --min 0.05 --max 1.0 --step 0.05 \
-  --replicates 5 --seeds 1,2,3,4,5 \
-  --out-dir cluster/batch_results/sweeps/lexA
-```
+### 2A) UMAP — single‑hue highlight (IDs only)
 
-Use the plot presets and produce one PNG per hue:
+**CLI**
 
 ```bash
 cluster umap \
@@ -141,20 +165,78 @@ cluster umap \
   --name ldn_v1 \
   --x-col infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean \
   --preset umap.promoter_set1 \
-  --opal-campaign prom60-etoh-cipro-andgate \
-  --opal-run latest \
+  --highlight /path/to/ids.parquet \
   --attach-coords --write --allow-overwrite
 ```
 
-Each hue yields a file like:
+**Job**
 
+```bash
+cluster umap --job cluster/jobs/ldn_v1/umap.yaml
 ```
-cluster/cluster_log/<FIT_SLUG>/umap/<UMAP_SLUG>/plots/<name>.<hue>.png
+
+This yields a **dedicated `highlight` plot** (gray background + filled red highlights) and, if `overlay: true`, **ring overlays** on all other hues.
+
+---
+
+### 2B) UMAP — **categorical** highlight (new)
+
+Assume `/path/to/ids_with_round.parquet` has columns:
+
+* `id`
+* `observed_round` (ints like 0,1,2,… — treated as categories)
+
+**CLI**
+
+```bash
+cluster umap \
+  --dataset 60bp_dual_promoter_cpxR_LexA \
+  --name ldn_v1 \
+  --x-col infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean \
+  --preset umap.promoter_set1 \
+  --highlight /path/to/ids_with_round.parquet \
+  --highlight-hue-col observed_round \
+  --attach-coords --write --allow-overwrite
 ```
 
-> Hues you can use anywhere: `cluster`, `gc_content`, `seq_length`, `intra_sim`, `numeric:<col>`, `categorical:<col>`.
+**Job**
 
-Attach OPAL metrics on‑the‑fly and summarize per cluster:
+```bash
+cluster umap --job cluster/jobs/ldn_v1/umap_categorical.yaml
+```
+
+The dedicated `highlight` plot shows filled, color‑coded categories with a legend titled `highlight by observed_round`. On other hues, **overlay rings** are colored per category (set `overlay: false` to disable). You can supply a palette:
+
+```yaml
+plot:
+  highlight:
+    legend: true
+    palette:
+      "0": "#1f77b4"
+      "1": "#ff7f0e"
+      "2": "#2ca02c"
+# or: palette: "tab20"
+```
+
+---
+
+### 3) (Optional) Intra‑cluster similarity → enables `intra_sim` hue
+
+```bash
+cluster intra-sim \
+  --dataset 60bp_dual_promoter_cpxR_LexA \
+  --cluster-col cluster__ldn_v1 \
+  --out-col cluster__ldn_v1__intra_sim \
+  --write --allow-overwrite
+```
+
+Re-run UMAP to render the `intra_sim` hue plot.
+
+---
+
+### 4) Analysis battery
+
+**CLI**
 
 ```bash
 cluster analyze \
@@ -163,66 +245,128 @@ cluster analyze \
   --preset analysis.promoter_set1
 ```
 
-Outputs go by default to:
+**Job**
 
-```
-cluster/cluster_log/ldn_v1/analysis/source/
-  numeric_summary__cluster__ldn_v1.csv
-  numeric_violin__cluster__ldn_v1__infer__evo2_7b__...__ll_mean.png
-  numeric_violin__cluster__ldn_v1__opal__prom60-etoh-cipro-andgate__latest_pred_scalar.png
-  numeric_violin__cluster__ldn_v1__obj__logic_fidelity.png
-  numeric_violin__cluster__ldn_v1__obj__effect_scaled.png
-```
-
-**Note on caching vs attached columns**
-
-* The **run store** (`cluster_log`) caches labels, coords, plots, and an index. Deleting it removes cached artifacts but **does not** remove any columns attached to your dataset.
-* The **dataset itself** (USR `records.parquet`) may have columns like `cluster__<NAME>` already attached. That’s why `cluster umap` still works even if you delete the run store: UMAP recomputes from `X`, and hues like `cluster` come from the dataset column.
-* You can relocate the run store via `DNADESIGN_CLUSTER_RUNS_DIR=/path/to/central/dir`.
-
----
-
-### Presets
-
-Presets reduce CLI flag bloat and keep **sensible defaults** nearby:
-
-* search order: **project** (`./cluster/presets/*.yaml`) → **user** (`~/.dnadesign/cluster/presets/*.yaml`) → **built‑ins**
-* kinds: `"fit"` (Leiden params), `"umap"` (neighbors/min_dist/metric), `"plot"` (alpha/size/legend)
-* CLI flags always **override** preset values.
-
-Fit preset example:
-```yaml
-# cluster/presets/leiden.fine.yaml
-name: "leiden.fine"
-kind: "fit"
-params: { neighbors: 20, resolution: 0.8, scale: false, metric: "euclidean" }
-```
-Then run:
 ```bash
-cluster fit --dataset <ds> --x-col <X> --preset leiden.fine --name ldn_v2 --write
+cluster analyze --job cluster/jobs/ldn_v1/analyze.yaml
 ```
 
-You can also color UMAPs by any numeric column via `numeric:<col>`, any categorical column via `categorical:<col>`, or the current cluster labels via `cluster`. Presets support multiple hue specs via `plot.color_by` (list). 
+Outputs go to `results/ldn_v1/analysis/` unless overridden.
 
-For example:
-```yaml
-# cluster/presets/plot.paper.umap.yaml
-name: "plot.paper.umap"
-kind: "plot"
-plot:
-  color_by:
-    - "cluster"
-    - "gc_content"
-    - "numeric:infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__ll_mean"
-    - "numeric:opal__prom60-etoh-cipro-andgate__latest_pred_scalar"
-    - "numeric:obj__logic_fidelity"
-    - "numeric:obj__effect_scaled"
-  alpha: 0.6     # also overridable by --alpha
-  size: 4.0
-  dims: [12, 12]
-  font_scale: 1.2
+---
+
+### 5) Resolution sweep (helper)
+
+```bash
+cluster sweep \
+  --dataset 60bp_dual_promoter_cpxR_LexA \
+  --x-col infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean \
+  --neighbors 30 --res-min 0.05 --res-max 1.0 --step 0.05 \
+  --replicates 5 --out-dir ./sweep_ldn_v1
 ```
 
 ---
 
-@e-south
+## Jobs — schema & precedence
+
+Jobs are checked‑in YAMLs with **one** command and a **params** block. Put re‑usable style into presets.
+
+**Precedence for plotting**: CLI > `job.plot` > `preset.plot` > defaults.
+
+**Schema snippets** (see concrete jobs below):
+
+```yaml
+# jobs/<fit_alias>/fit.yaml
+command: "fit"
+params:
+  dataset: "..."
+  name: "ldn_v1"
+  x-col: "..."                # or: x-cols: "col1,col2,col3"
+  preset: "fit.leiden.fine"   # do NOT duplicate algo keys here
+
+# jobs/<fit_alias>/umap.yaml
+command: "umap"
+params:
+  dataset: "..."
+  name: "ldn_v1"
+  x-col: "..."
+  preset: "umap.promoter_set1"
+  highlight: "/abs/path/to/ids.parquet"   # omit if not needed
+  attach_coords: true
+  write: true
+  allow_overwrite: true
+plot:
+  # lightweight overrides here (prefer presets for reusables)
+  dims: [14, 10]
+  size: 6.0
+  alpha: 0.6
+
+# jobs/<fit_alias>/analyze.yaml
+command: "analyze"
+params:
+  dataset: "..."
+  cluster_col: "cluster__ldn_v1"
+  preset: "analysis.promoter_set1"
+```
+
+---
+
+## Presets (fit, umap, plot, analysis)
+
+* **Fit** presets declare Leiden knobs (neighbors, resolution, metric, etc.).
+* **UMAP** presets declare UMAP knobs *and* the hue list (`plot.color_by`).
+* **Plot** presets are optional style blocks you can reference from a UMAP preset.
+* **Analysis** presets declare which batteries to run and which numeric columns to summarize.
+
+> If you reference a preset in a job, **do not** repeat those algo keys in the job.
+
+---
+
+## Run store, reuse, and cleanup
+
+* All runs live under `results/` (override via `$DNADESIGN_CLUSTER_RESULTS_DIR`).
+* `results/<FIT>/` contains `run.json`, `labels.parquet`, `umap/`, `analysis/`, and `records.md` logging effective parameters.
+* To **reuse** fit attachments without recompute, use `--reuse auto|require|reattach` (see `cluster fit --help`).
+* To remove attached `cluster__*` columns from a dataset/file:
+
+```bash
+cluster delete-columns --dataset 60bp_dual_promoter_cpxR_LexA --all --write --yes
+```
+
+---
+
+## Troubleshooting & tips
+
+* **“My red highlight points don’t get larger when I change size”**
+  Fixed: the dedicated `highlight` plot now respects `plot.highlight.size`, `marker`, and `alpha`. Previously a hidden `1.2×` multiplier was always used. See “Bug fix” below.
+* **“Highlight changes apply to other hues like `gc_content`”**
+  That’s the *overlay rings* feature. Disable overlays by setting:
+
+  ```yaml
+  plot:
+    highlight:
+      overlay: false
+  ```
+* **Hue failures**
+
+  * `gc_content`/`seq_length` require a `sequence` column and now fail clearly if missing.
+  * `intra_sim` requires `cluster__<NAME>__intra_sim` — run `cluster intra-sim` first.
+  * Numeric hues must be strictly numeric; non‑finite rows (NaN/Inf) are dropped with a concise log.
+* **OPAL columns not found**
+  If hues reference `obj__/pred__/sel__` and those columns are missing, provide `--opal-campaign` and a run selector. The CLI prints exactly which OPAL parts and slice it used.
+
+---
+
+## Environment variables
+
+* `DNADESIGN_USR_ROOT` — resolve USR datasets without `--usr-root`.
+* `DNADESIGN_OPAL_CAMPAIGNS_ROOT` — resolve campaign names for OPAL joins.
+* `DNADESIGN_CLUSTER_RESULTS_DIR` — choose a different results directory.
+
+---
+
+## Changelog (core UX relevant)
+
+* Dedicated `highlight` plot respects `plot.highlight.size`/`marker`/`alpha`.
+* Assertive `gc_content`/`seq_length` (error if `sequence` missing).
+* Clearer UMAP preset examples and job files for single & categorical highlights.

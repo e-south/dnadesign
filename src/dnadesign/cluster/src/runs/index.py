@@ -23,13 +23,15 @@ def _index_path(root: Path | None) -> Path:
 
 def add_or_update_index(row: dict, root: Path | None = None) -> None:
     idx_path = _index_path(root)
-    # Read, being explicit about "empty" to avoid pandas FutureWarning on concat
+    # Read deterministically. Exclude empty frames from concat to avoid
+    # pandas' deprecation around empty/all‑NA entries changing dtype behavior.
     try:
         df = pd.read_parquet(idx_path)
     except Exception:
         df = pd.DataFrame()
-    frames = ([df] if not df.empty else []) + [pd.DataFrame([row])]
-    out = pd.concat(frames, ignore_index=True)
+    parts = [df] if not df.empty else []
+    parts.append(pd.DataFrame([row]))
+    out = pd.concat(parts, ignore_index=True)
     out.to_parquet(idx_path, index=False)
 
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -25,8 +25,9 @@ from rich.traceback import install as rich_traceback
 from ..algo.leiden import run as leiden_run
 from ..algo.sweep import leiden_sweep
 from ..io.detect import detect_context
-from ..io.read import extract_X, load_table
-from ..io.write import attach_usr, write_generic
+from ..io.read import extract_X, load_table, peek_columns
+from ..io.write import attach_usr, drop_usr_columns, write_generic
+from ..jobs.loader import load_job_file
 from ..presets.loader import load_all as load_presets
 from ..runs.index import add_or_update_index, list_runs
 from ..runs.reuse import find_equivalent_fit
@@ -38,6 +39,7 @@ from ..runs.signatures import (
     ids_hash,
 )
 from ..runs.store import (
+    append_records_md,
     create_run_dir,
     runs_root,
     umap_dir,
@@ -61,7 +63,7 @@ from ..util.warnings import configure as configure_warnings
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="Cluster CLI — fit, UMAP, analyses, run store, presets.",
+    help="Cluster CLI — fit, UMAP, analyses, jobs, presets. Results live under ./results/",
 )
 console = Console()
 
@@ -153,6 +155,111 @@ def _apply_plot_preset(preset_name: Optional[str]) -> dict:
     return (pres.plot or {}) if pres else {}
 
 
+def _apply_job_params(job_path: Optional[str], expected_command: str) -> dict:
+    """
+    Load a job YAML and return its params dict. Assert 'command' matches the CLI command.
+    """
+    if not job_path:
+        return {}
+    job = load_job_file(job_path)
+    cmd = job.get("command", "").strip().lower()
+    if cmd and cmd != expected_command:
+        raise typer.BadParameter(
+            f"Job '{job_path}' has command='{cmd}' but this subcommand is '{expected_command}'."
+        )
+    params = job.get("params", {}) or {}
+    if not isinstance(params, dict):
+        raise typer.BadParameter(f"Job '{job_path}': 'params' must be a mapping.")
+    return params
+
+
+def _assert_no_algo_overlap_with_preset(
+    kind: str, job_params: dict, preset_name: Optional[str]
+) -> None:
+    if not preset_name:
+        return
+    # Disallow common algo keys per kind when a preset is provided.
+    fit_keys = {"neighbors", "resolution", "scale", "metric", "random_state", "algo"}
+    umap_keys = {"neighbors", "min_dist", "metric", "random_state"}
+    banned = fit_keys if kind == "fit" else (umap_keys if kind == "umap" else set())
+    overlap = sorted(k for k in job_params.keys() if k in banned)
+    if overlap:
+        import typer
+
+        raise typer.BadParameter(
+            f"Job provides {overlap} but also references a preset. "
+            f"Move algorithm knobs into the preset or pass via CLI flags."
+        )
+
+
+def _apply_job_plot(job_path: Optional[str], expected_command: str) -> dict:
+    """
+    Load a job YAML and return its *plot* mapping ({} if absent). Validates 'command'.
+    """
+    if not job_path:
+        return {}
+    job = load_job_file(job_path)
+    cmd = (job.get("command", "") or "").strip().lower()
+    if cmd and cmd != expected_command:
+        raise typer.BadParameter(
+            f"Job '{job_path}' has command='{cmd}' but this subcommand is '{expected_command}'."
+        )
+    plot = job.get("plot", {}) or {}
+    if not isinstance(plot, dict):
+        raise typer.BadParameter(f"Job '{job_path}': 'plot' must be a mapping.")
+    return plot
+
+
+def _load_highlight_ids_from_file(
+    path_str: str,
+    df: pd.DataFrame,
+    key_col: str,
+    warn_fn: Optional[Callable[[str], None]] = None,
+    groupby_col: Optional[str] = None,
+) -> dict:
+    """
+    Read a CSV/Parquet of ids for highlighting and intersect with the dataset rows.
+    Returns a dict with:
+      - "ids": List[str] present in the dataset
+      - optional "labels": Dict[id -> category string] if groupby_col is provided
+      - optional "by": the groupby column name (echoed back for legend title)
+      - optional "categories": List[str] of discovered categories (sorted)
+    This is a pure helper with no global side-effects.
+    """
+    p = Path(path_str)
+    if not p.exists():
+        raise typer.BadParameter(f"--highlight path not found: {p}")
+    tab = pd.read_parquet(p) if p.suffix.lower() == ".parquet" else pd.read_csv(p)
+    col = "id" if "id" in tab.columns else tab.columns[0]
+    raw_ids = set(map(str, tab[col].tolist()))
+    # Ensure df is indexed by id for a deterministic intersection (do not mutate caller)
+    left = df if df.index.name == key_col else df.set_index(key_col, drop=False)
+    present = raw_ids & set(map(str, left.index.astype(str).tolist()))
+    missing = raw_ids - present
+    if missing and warn_fn:
+        warn_fn(
+            f"{len(missing)} id(s) in highlight were not found in the dataset. "
+            "They will be ignored."
+        )
+    out = {"ids": list(present)}
+    if groupby_col is not None:
+        if groupby_col not in tab.columns:
+            raise typer.BadParameter(
+                f"--highlight-hue-col='{groupby_col}' not found in {p.name}."
+            )
+        # Build id -> category mapping (treat as categorical; integers become strings)
+        sub = tab[[col, groupby_col]].copy()
+        sub[col] = sub[col].astype(str)
+        sub[groupby_col] = sub[groupby_col].astype(str)
+        labels = {
+            rid: cat for rid, cat in zip(sub[col].tolist(), sub[groupby_col].tolist())
+            if rid in present
+        }
+        cats = sorted(set(labels.values()))
+        out.update({"labels": labels, "by": groupby_col, "categories": cats})
+    return out
+
+
 # ----------------------------- Commands -----------------------------
 @app.command(
     "fit",
@@ -160,6 +267,7 @@ def _apply_plot_preset(preset_name: Optional[str]) -> dict:
 )
 def cmd_fit(
     ctx: typer.Context,
+    job: Optional[str] = typer.Option(None, help="Path to a job YAML for 'fit'."),
     dataset: Optional[str] = typer.Option(None, help="USR dataset name"),
     file: Optional[str] = typer.Option(None, help="Parquet/CSV path"),
     usr_root: Optional[str] = typer.Option(None, help="USR root directory"),
@@ -224,6 +332,32 @@ def cmd_fit(
     ),
     out: Optional[str] = typer.Option(None, help="Output file path for generic files"),
 ):
+    # Apply job params first (flags still override)
+    jp = _apply_job_params(job, expected_command="fit")
+    dataset = dataset or jp.get("dataset")
+    file = file or jp.get("file")
+    usr_root = usr_root or jp.get("usr_root")
+    name = name or jp.get("name")
+    key_col = key_col or jp.get("key_col", "id")
+    x_col = x_col or jp.get("x_col")
+    x_cols = x_cols or jp.get("x_cols")
+    algo = algo or jp.get("algo", "leiden")
+    neighbors = neighbors if neighbors is not None else jp.get("neighbors")
+    resolution = resolution if resolution is not None else jp.get("resolution")
+    scale = scale if scale is not None else jp.get("scale")
+    metric = metric or jp.get("metric")
+    random_state = random_state if random_state is not None else jp.get("random_state")
+    preset = preset or jp.get("preset")
+    _assert_no_algo_overlap_with_preset("fit", jp, preset)
+    silhouette = bool(silhouette or jp.get("silhouette", False))
+    full_silhouette = bool(full_silhouette or jp.get("full_silhouette", False))
+    dedupe_policy = jp.get("dedupe_policy", dedupe_policy)
+    reuse = jp.get("reuse", reuse)
+    force = bool(force or jp.get("force", False))
+    write = bool(write or jp.get("write", False))
+    yes = bool(yes or jp.get("allow_overwrite", False))
+    inplace = bool(inplace or jp.get("inplace", False))
+    out = out or jp.get("out")
     if name:
         name = slugify(name)
     ictx, df = _context_and_df(dataset, file, usr_root)
@@ -534,7 +668,7 @@ def cmd_fit(
         console.print(
             "[yellow]Dry-run[/yellow]: computed labels but did not write to the table. Use --write to apply."
         )
-        console.print(f"Run stored under [bold]{run_dir}[/]")
+        console.print(f"Run recorded under [bold]{run_dir}[/] (results root).")
         _print_fit_summary(labels, run_alias, size_counts)
         raise typer.Exit(code=0)
     if ictx["kind"] == "usr":
@@ -565,6 +699,27 @@ def cmd_fit(
         )
         console.print("[green]Wrote[/green] updated file.")
     _print_fit_summary(labels, run_alias, size_counts)
+    # ---- Records sink (Markdown) ----
+    try:
+
+        effective = {
+            "command": "fit",
+            "job": job or None,
+            "preset": preset or None,
+            "resolved": {
+                "name": run_alias,
+                "algo": "leiden",
+                "neighbors": neighbors,
+                "resolution": resolution,
+                "scale": bool(scale),
+                "metric": metric,
+                "random_state": random_state,
+            },
+        }
+        md = f"## cluster fit — {run_alias}\n\n```json\n{json.dumps(effective, indent=2, sort_keys=True)}\n```"
+        append_records_md(run_dir, md)
+    except Exception:
+        pass
 
 
 def _print_fit_summary(labels: np.ndarray, name: str, size_counts: dict):
@@ -579,16 +734,177 @@ def _print_fit_summary(labels: np.ndarray, name: str, size_counts: dict):
 
 
 @app.command(
+    "delete-columns",
+    help="Delete cluster__*-namespaced columns from a dataset/file with a safety preview and confirmation.",
+)
+def cmd_delete_columns(
+    dataset: Optional[str] = typer.Option(None, help="USR dataset name"),
+    file: Optional[str] = typer.Option(None, help="Parquet/CSV path"),
+    usr_root: Optional[str] = typer.Option(None, help="USR root directory"),
+    # Scope selection (choose exactly one of --all, --name, --column)
+    all_: bool = typer.Option(False, "--all", help="Delete ALL cluster__* columns"),
+    name: List[str] = typer.Option(
+        [],
+        "--name",
+        help="Delete columns for this fit alias (repeatable). "
+        "Matches cluster__<name> and cluster__<name>__*",
+    ),
+    column: List[str] = typer.Option(
+        [],
+        "--column",
+        help="Delete this fully-qualified column (repeatable). Must start with cluster__",
+    ),
+    # Execution controls
+    write: bool = typer.Option(False, help="Apply changes (default is dry-run)"),
+    yes: bool = typer.Option(
+        False, "-y", "--yes", help="Skip interactive confirmation"
+    ),
+    inplace: bool = typer.Option(
+        False,
+        help="For generic files: rewrite the input file in place (backs up to .bak)",
+    ),
+    out: Optional[str] = typer.Option(
+        None, help="For generic files: write to this output path instead of --inplace"
+    ),
+):
+    # Resolve context
+    ictx, _ = _context_and_df(dataset, file, usr_root, columns=None)
+    console.rule("[bold]cluster delete-columns[/]")
+    console.log(
+        f"Input: kind={ictx['kind']} ref={ictx.get('dataset') or ictx.get('file')}"
+    )
+
+    # ---------- Build deletion set ----------
+    if sum(bool(x) for x in [all_, bool(name), bool(column)]) != 1:
+        raise typer.BadParameter(
+            "Choose exactly one: --all OR --name ... OR --column ..."
+        )
+
+    cols = peek_columns(ictx)
+    # Always work with **top‑level** names (peek_columns already returns them for Parquet).
+    # If callers pass dotted leaf paths via --column, normalize them below.
+    cluster_cols = [c for c in cols if c.startswith("cluster__")]
+
+    if all_:
+        to_delete = cluster_cols
+        reason = "all cluster__*"
+    elif name:
+        name = [slugify(n) for n in name]
+        prefixes = [f"cluster__{n}" for n in name]
+        to_delete = [
+            c
+            for c in cluster_cols
+            if any(c == p or c.startswith(p + "__") for p in prefixes)
+        ]
+        reason = "name=" + ",".join(name)
+    else:
+        # Normalize any dotted leaf paths to their top‑level parent
+        normalized_requested = [c.split(".", 1)[0] for c in column]
+        bad = [c for c in normalized_requested if not c.startswith("cluster__")]
+        if bad:
+            raise typer.BadParameter(
+                "Only 'cluster__*' columns can be deleted; offending: "
+                + ", ".join(bad[:6])
+            )
+        # Only delete columns that actually exist
+        to_delete = [c for c in normalized_requested if c in cluster_cols]
+        missing = [c for c in normalized_requested if c not in cols]
+        if missing:
+            console.print(
+                "[yellow]Note[/yellow]: the following columns were not found and will be ignored: "
+                + ", ".join(missing[:8])
+                + (" ..." if len(missing) > 8 else "")
+            )
+        reason = "explicit columns"
+
+    if not to_delete:
+        console.print(
+            "[green]Nothing to delete[/green]: no matching cluster__ columns found."
+        )
+        raise typer.Exit(code=0)
+
+    # ---------- Preview ----------
+    tbl = Table(
+        title=f"Columns to delete ({len(to_delete)}) — scope: {reason}",
+        header_style="bold cyan",
+    )
+    tbl.add_column("Column")
+    for c in sorted(to_delete):
+        tbl.add_row(c)
+    console.print(tbl)
+
+    # ---------- Confirmation ----------
+    if not yes:
+        if not typer.confirm(
+            f"Are you sure you want to permanently delete {len(to_delete)} column(s)?"
+        ):
+            console.print("Aborted by user.")
+            raise typer.Exit(code=1)
+
+    if not write:
+        console.print(
+            "[yellow]Dry-run[/yellow]: no changes applied. Re-run with --write to proceed."
+        )
+        raise typer.Exit(code=0)
+
+    # ---------- Execute ----------
+    if ictx["kind"] == "usr":
+        drop_usr_columns(ictx["usr_root"], ictx["dataset"], to_delete)
+        console.print(
+            f"[green]Removed[/green] {len(to_delete)} column(s) from USR dataset '{ictx['dataset']}'."
+        )
+    else:
+        # Generic files: load, drop, write back (with backup if --inplace)
+        df = (
+            pd.read_parquet(ictx["file"])
+            if ictx["kind"] == "parquet"
+            else pd.read_csv(ictx["file"])
+        )
+        missing_at_exec = [c for c in to_delete if c not in df.columns]
+        if missing_at_exec:
+            console.print(
+                "[yellow]Note[/yellow]: some columns disappeared during load and were skipped: "
+                + ", ".join(missing_at_exec[:8])
+                + (" ..." if len(missing_at_exec) > 8 else "")
+            )
+        kept = [c for c in to_delete if c in df.columns]
+        if kept:
+            df = df.drop(columns=kept)
+        else:
+            console.print("[green]Nothing left to delete[/green].")
+            raise typer.Exit(code=0)
+        write_generic(
+            ictx["file"],
+            df,
+            inplace=inplace,
+            out=(Path(out) if out else None),
+            backup_suffix=".bak",
+        )
+        console.print(
+            f"[green]Wrote[/green] updated file ({'inplace' if inplace else 'out=' + str(out)})."
+        )
+
+    # ---------- Recap ----------
+    recap = Table(title="Deleted columns recap", header_style="bold cyan")
+    recap.add_column("Count", justify="right")
+    recap.add_column("Preview")
+    preview = ", ".join(sorted(to_delete)[:6]) + (" ..." if len(to_delete) > 6 else "")
+    recap.add_row(str(len(to_delete)), preview)
+    console.print(recap)
+
+
+@app.command(
     "umap",
     help="Compute UMAP, save coords & plots under the fit run; optionally attach coords.",
 )
 def cmd_umap(
-    ctx: typer.Context,
+    _ctx: typer.Context,
+    job: Optional[str] = typer.Option(None, help="Path to a job YAML for 'umap'."),
     dataset: Optional[str] = typer.Option(None),
     file: Optional[str] = typer.Option(None),
     usr_root: Optional[str] = typer.Option(None),
-    name: str = typer.Option(
-        ..., help="Existing fit alias to associate UMAP with (uses same rows)."
+    name: Optional[str] = typer.Option(
+        None, help="Existing fit alias to associate UMAP with (uses same rows)."
     ),
     key_col: str = typer.Option("id"),
     x_col: Optional[str] = typer.Option(None),
@@ -602,13 +918,26 @@ def cmd_umap(
     preset: Optional[str] = typer.Option(
         None, help="Preset (kind: 'umap' and optional 'plot')"
     ),
-    color_by: List[str] = typer.Option(["cluster"], help="Hue specs (repeatable)."),
-    highlight_ids: Optional[str] = typer.Option(
-        None, help="CSV/Parquet file of ids to highlight (first column or 'id')."
+    color_by: List[str] = typer.Option(
+        ["cluster"], help="Hue specs (repeatable). Includes 'highlight'."
     ),
-    alpha: float = typer.Option(0.5),
-    size: float = typer.Option(4.0),
-    dims: str = typer.Option("12,12"),
+    highlight: Optional[str] = typer.Option(
+        None, help="CSV/Parquet with ids to highlight (first column or 'id')."
+    ),
+    highlight_hue_col: Optional[str] = typer.Option(
+        None,
+        help="Optional. If set, color highlights categorically by this column from the --highlight file "
+             "(e.g., 'observed_round'). Integers are treated as categories.",
+    ),
+    alpha: Optional[float] = typer.Option(
+        None, help="Point alpha (overrides job/preset)."
+    ),
+    size: Optional[float] = typer.Option(
+        None, help="Point size (overrides job/preset)."
+    ),
+    dims: Optional[str] = typer.Option(
+        None, help="Figure size 'W,H' (overrides job/preset)."
+    ),
     font_scale: Optional[float] = typer.Option(
         None,
         help="Scale all plot fonts (1.0 = default). Overrides preset.plot.font_scale if set.",
@@ -641,6 +970,48 @@ def cmd_umap(
     inplace: bool = typer.Option(False),
     out: Optional[str] = typer.Option(None),
 ):
+    # Job params (flags win)
+    jp = _apply_job_params(job, expected_command="umap")
+    jp_plot = _apply_job_plot(job, expected_command="umap")
+    dataset = dataset or jp.get("dataset")
+    file = file or jp.get("file")
+    usr_root = usr_root or jp.get("usr_root")
+    name = name or jp.get("name")
+    if not name:
+        raise typer.BadParameter(
+            "UMAP requires a fit alias. Provide --name or set params.name in the job YAML."
+        )
+    key_col = key_col or jp.get("key_col", "id")
+    x_col = x_col or jp.get("x_col")
+    x_cols = x_cols or jp.get("x_cols")
+    neighbors = neighbors if neighbors is not None else jp.get("neighbors")
+    min_dist = min_dist if min_dist is not None else jp.get("min_dist")
+    metric = metric or jp.get("metric")
+    random_state = random_state if random_state is not None else jp.get("random_state")
+    preset = preset or jp.get("preset")
+    _assert_no_algo_overlap_with_preset("umap", jp, preset)
+    if color_by == ["cluster"] and isinstance(jp.get("color_by"), (list, tuple)):
+        color_by = list(jp["color_by"])
+    highlight = highlight or jp.get("highlight")
+    highlight_hue_col = highlight_hue_col or jp.get("highlight_hue_col")
+    alpha = alpha if alpha is not None else jp.get("alpha")
+    size = size if size is not None else jp.get("size")
+    dims = dims if dims is not None else jp.get("dims")
+    font_scale = font_scale if font_scale is not None else jp.get("font_scale")
+    opal_campaign = opal_campaign or jp.get("opal_campaign")
+    opal_run = opal_run or jp.get("opal_run")
+    opal_as_of_round = opal_as_of_round or jp.get("opal_as_of_round")
+    opal_fields = opal_fields or (
+        ",".join(jp["opal_fields"])
+        if isinstance(jp.get("opal_fields"), (list, tuple))
+        else jp.get("opal_fields")
+    )
+    attach_coords = bool(attach_coords or jp.get("attach_coords", False))
+    out_plot = out_plot or jp.get("out_plot")
+    write = bool(write or jp.get("write", False))
+    yes = bool(yes or jp.get("allow_overwrite", False))
+    inplace = bool(inplace or jp.get("inplace", False))
+    out = out or jp.get("out")
     ictx, df = _context_and_df(dataset, file, usr_root)
     console.rule("[bold]cluster umap[/]")
     df = assert_no_duplicate_ids(df, key_col=key_col, policy="error")
@@ -663,6 +1034,64 @@ def cmd_umap(
     p_plot = _apply_plot_preset(preset)
     if "color_by" in p_plot and color_by == ["cluster"]:
         color_by = list(p_plot["color_by"])
+    # If highlight ids are provided, also produce a dedicated 'highlight' plot
+    # (overlay behavior still applies to all other hues).
+    if highlight and "highlight" not in color_by:
+        color_by = [*color_by, "highlight"]
+    # Incorporate job.plot now; precedence: preset.plot -> job.plot -> CLI flags
+    # Defaults for plotting (used if neither preset nor job nor CLI provides)
+    _plot_defaults = {
+        "alpha": 0.5,
+        "size": 4.0,
+        "dims": [12, 12],
+        "font_scale": 1.2,
+        "legend": {"ncol": 1, "bbox": (1.02, 1.0), "max_items": 40, "frameon": False},
+        # New: explicit highlight style block (tunable via preset.plot.highlight or job.plot.highlight)
+        "highlight": {
+            "overlay": True,
+            "size_multiplier": 1.6,  # used only if 'size' is not provided
+            "alpha": 0.95,
+            "facecolor": "none",
+            "edgecolor": "red",
+            "linewidth": 0.9,
+            "marker": "o",
+            "legend": False,
+        },
+    }
+    # Start with preset.plot, overlay job.plot, overlay CLI values (if provided)
+    merged_plot = {**_plot_defaults, **p_plot, **jp_plot}
+    if alpha is not None:
+        merged_plot["alpha"] = float(alpha)
+    if size is not None:
+        merged_plot["size"] = float(size)
+    if dims is not None:
+        merged_plot["dims"] = dims
+    if font_scale is not None:
+        merged_plot["font_scale"] = float(font_scale)
+    # Color-by: keep CLI unless it's the default ["cluster"]; then prefer job.plot then preset.plot
+    if color_by == ["cluster"]:
+        if isinstance(jp_plot.get("color_by"), (list, tuple)):
+            color_by = list(jp_plot["color_by"])
+        elif isinstance(p_plot.get("color_by"), (list, tuple)):
+            color_by = list(p_plot["color_by"])
+    # ---- Highlight ids: assert early and load once (used for validation and plotting) ----
+    # If a preset/job requests the 'highlight' hue but no ids are supplied, fail early.
+    if "highlight" in color_by and not highlight:
+        console.print(
+            "[red]Error[/red]: hue 'highlight' was requested (via preset/job), "
+            "but no ids file was provided. Set params.highlight in the job or "
+            "pass --highlight <file>."
+        )
+        raise typer.Exit(code=2)
+    h = None
+    if highlight:
+        h = _load_highlight_ids_from_file(
+            highlight,
+            df,
+            key_col,
+            warn_fn=lambda m: console.print(f"[yellow]Warning:[/yellow] {m}"),
+            groupby_col=highlight_hue_col,
+        )
     # Derive which OPAL fields are actually needed from the hue specs,
     # and union with any explicit --opal-fields
     opal_needed_fields: set[str] = set()
@@ -713,6 +1142,7 @@ def cmd_umap(
             run_selector=(opal_run or "latest"),
             fields=sorted(opal_needed_fields),
             as_of_round=opal_as_of_round,
+            log_fn=lambda m: console.log(m),
         )
         # Assert post-join coverage and show discoverable alternatives if something is missing
         missing_after = [c for c in opal_needed_fields if c not in df.columns]
@@ -743,6 +1173,7 @@ def cmd_umap(
             name=name,
             missing_policy="drop_and_log",
             log_fn=lambda m: console.print(f"[yellow]Note[/yellow]: {m}"),
+            highlight=h,
         )
     except Exception as e:
         console.print(f"[red]Hue validation failed[/red]: {e}")
@@ -768,40 +1199,17 @@ def cmd_umap(
         )
         prog.update(t_umap, completed=1)
     # Prepare plot
-    h = None
-    if highlight_ids:
-        p = Path(highlight_ids)
-        tab = pd.read_parquet(p) if p.suffix == ".parquet" else pd.read_csv(p)
-        col = "id" if "id" in tab.columns else tab.columns[0]
-        ids = set(map(str, tab[col].tolist()))
-        # Ensure df index is id for convenience
-        if df.index.name != "id":
-            df = df.set_index(key_col, drop=False)
-        missing = ids - set(map(str, df.index.tolist()))
-        if missing:
-            console.print(
-                f"[yellow]Warning:[/yellow] {len(missing)} ids in highlight set were not found in the table."
-            )
-        h = {"ids": list(ids & set(map(str, df.index.tolist())))}
-    # dims can be provided either via --dims "W,H" or preset.plot.dims: [W,H]
-    if (
-        "dims" in p_plot
-        and isinstance(p_plot["dims"], (list, tuple))
-        and len(p_plot["dims"]) == 2
-    ):
-        W, H = int(p_plot["dims"][0]), int(p_plot["dims"][1])
+    # Figure dims: accept "W,H" string or [W,H] list
+    _dims = merged_plot.get("dims", [12, 12])
+    if isinstance(_dims, str):
+        W, H = [int(x) for x in _dims.split(",")]
     else:
-        W, H = [int(x) for x in dims.split(",")]
-    alpha = float(p_plot.get("alpha", alpha))
-    size = float(p_plot.get("size", size))
-    # optional preset-provided color_by (only if user didn't change default)
-    if "color_by" in p_plot and color_by == ["cluster"]:
-        color_by = list(p_plot["color_by"])
-    # font scale from preset unless CLI overrides
-    p_font = float(p_plot.get("font_scale", 1.2))
-    font_scale = float(font_scale) if font_scale is not None else p_font
-    # legend from preset (defaults preserved if not provided)
-    _legend = dict(p_plot.get("legend", {}))
+        W, H = int(_dims[0]), int(_dims[1])
+    alpha = float(merged_plot["alpha"])
+    size = float(merged_plot["size"])
+    font_scale = float(merged_plot.get("font_scale", 1.2))
+    # legend (preset < job < CLI handled via merged_plot already)
+    _legend = dict(merged_plot.get("legend", {}))
     # Preserve known keys and sanitize types; allow presets to fully control legend behavior
     legend = {}
     if "ncol" in _legend:
@@ -818,6 +1226,26 @@ def cmd_umap(
     if "frameon" in _legend:
         legend["frameon"] = bool(_legend["frameon"])
 
+    # Normalize highlight style: deep-merge defaults -> preset.plot.highlight -> job.plot.highlight
+    def _deep_merge(a: dict, b: dict) -> dict:
+        out = dict(a)
+        for k, v in (b or {}).items():
+            if isinstance(v, dict) and isinstance(out.get(k), dict):
+                out[k] = _deep_merge(out[k], v)
+            else:
+                out[k] = v
+        return out
+
+    highlight_style = _deep_merge(
+        _plot_defaults.get("highlight", {}), p_plot.get("highlight", {})
+    )
+    highlight_style = _deep_merge(highlight_style, jp_plot.get("highlight", {}))
+    # If the job/preset provides a categorical palette for highlight categories, pass it through.
+    # Accepted forms: a mapping {category: color}, or a palette name (string) resolved in plotting.
+    if "palette" in (p_plot.get("highlight", {}) or {}):
+        highlight_style["palette"] = p_plot["highlight"]["palette"]
+    if "highlight" in jp_plot and "palette" in (jp_plot["highlight"] or {}):
+        highlight_style["palette"] = jp_plot["highlight"]["palette"]
     # Decide output location (default: run store)
     root = runs_root()
     run_dir = root / (name or "unnamed")
@@ -831,14 +1259,10 @@ def cmd_umap(
         },
         libs={},
     ).hash()
-    umap_slug = (
-        f"umap_n{neighbors}_md{str(min_dist).replace('.','p')}_{metric}_{umap_sig[:6]}"
-    )
-    udir = umap_dir(run_dir, umap_slug)
-    if out_plot is None:
-        out_path = udir / "plots" / f"{name}.png"  # base; function appends .<label>.png
-    else:
-        out_path = Path(out_plot)
+    udir = umap_dir(run_dir, "<flat>")
+    out_path = (
+        Path(out_plot) if out_plot else (udir / f"{name}.png")
+    )  # base; .<label>.png appended
     umap_scatter(
         coords,
         df if df.index.name == "id" else df.set_index(key_col, drop=False),
@@ -852,6 +1276,8 @@ def cmd_umap(
         out_path=out_path,
         font_scale=font_scale,
         # scatter() defaults to 'drop_and_log'; we omit log_fn here to avoid duplicate logs
+        overlay_highlight=True,
+        highlight_style=highlight_style,
     )
     # Save coords & meta into run store
     coords_df = pd.DataFrame(
@@ -865,7 +1291,6 @@ def cmd_umap(
     write_umap_meta(
         udir,
         {
-            "slug": umap_slug,
             "alias": name,
             "params": {
                 "neighbors": neighbors,
@@ -873,6 +1298,7 @@ def cmd_umap(
                 "metric": metric,
                 "random_state": random_state,
             },
+            "sig": umap_sig,
         },
     )
     add_or_update_index(
@@ -891,7 +1317,7 @@ def cmd_umap(
             "input_sig_hash": None,
             "labels_path": None,
             "status": "complete",
-            "umap_slug": umap_slug,
+            "umap_slug": "flat",
             "umap_params": {
                 "neighbors": neighbors,
                 "min_dist": min_dist,
@@ -899,7 +1325,7 @@ def cmd_umap(
                 "random_state": random_state,
             },
             "coords_path": str(udir / "coords.parquet"),
-            "plot_paths": str(udir / "plots"),
+            "plot_paths": str(udir),
         }
     )
     # Optionally attach coords
@@ -936,6 +1362,34 @@ def cmd_umap(
                 backup_suffix=".bak",
             )
             console.print("[green]Wrote[/green] updated file with UMAP coords.")
+    # ---- Records sink (Markdown) ----
+    try:
+        run_dir = runs_root() / (name or "unnamed")
+        payload = {
+            "command": "umap",
+            "job": job or None,
+            "preset": preset or None,
+            "resolved": {
+                "name": name,
+                "neighbors": neighbors,
+                "min_dist": min_dist,
+                "metric": metric,
+                "random_state": random_state,
+                "plot": {
+                    "alpha": alpha,
+                    "size": size,
+                    "dims": [W, H],
+                    "font_scale": font_scale,
+                    "legend": legend,
+                    "color_by": color_by,
+                    "highlight": highlight_style,
+                },
+            },
+        }
+        md = f"## cluster umap — {name}\n\n```json\n{json.dumps(payload, indent=2, sort_keys=True)}\n```"
+        append_records_md(run_dir, md)
+    except Exception:
+        pass
 
 
 @app.command(
@@ -957,7 +1411,7 @@ def cmd_sweep(
     seeds: str = typer.Option("1,2,3,4,5"),
     out_dir: str = typer.Option(...),
 ):
-    ctx, df = _context_and_df(dataset, file, usr_root)
+    _, df = _context_and_df(dataset, file, usr_root)
     df = assert_no_duplicate_ids(df, key_col=key_col, policy="error")
     X = extract_X(
         df,
@@ -966,7 +1420,11 @@ def cmd_sweep(
     )
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
-    s = [int(x.strip()) for x in seeds.split(",")] if seeds else []
+    # If --seeds isn't provided (empty string), derive seeds from --replicates
+    if isinstance(seeds, str) and seeds.strip():
+        s = [int(x.strip()) for x in seeds.split(",")]
+    else:
+        s = list(range(1, int(replicates) + 1))
     leiden_sweep(
         X,
         neighbors=neighbors,
@@ -987,6 +1445,7 @@ def cmd_analyze(
     dataset: Optional[str] = typer.Option(None),
     file: Optional[str] = typer.Option(None),
     usr_root: Optional[str] = typer.Option(None),
+    job: Optional[str] = typer.Option(None, help="Path to a job YAML for 'analyze'."),
     cluster_col: str = typer.Option(...),
     group_by: str = typer.Option("source"),
     preset: Optional[str] = typer.Option(
@@ -1006,7 +1465,9 @@ def cmd_analyze(
     numeric_plots: bool = typer.Option(
         True, help="Whether to render plots for --numeric"
     ),
-    font_scale: float = typer.Option(1.2, help="Font scale for analysis plots"),
+    font_scale: Optional[float] = typer.Option(
+        None, help="Font scale for analysis plots (overrides job/preset)."
+    ),
     opal_campaign: Optional[str] = typer.Option(
         None, help="Optional: OPAL campaign dir or name to join metrics"
     ),
@@ -1022,7 +1483,46 @@ def cmd_analyze(
     from ..analysis.diversity import diversity as div_fn
     from ..analysis.numeric_per_cluster import summarize_numeric_by_cluster
 
-    ctx, df = _context_and_df(dataset, file, usr_root)
+    # Job params
+    jp = _apply_job_params(job, expected_command="analyze")
+    jp_plot = _apply_job_plot(job, expected_command="analyze")
+    dataset = dataset or jp.get("dataset")
+    file = file or jp.get("file")
+    usr_root = usr_root or jp.get("usr_root")
+    cluster_col = cluster_col or jp.get("cluster_col")
+    group_by = group_by or jp.get("group_by", "source")
+    preset = preset or jp.get("preset")
+    out_dir = out_dir or jp.get("out_dir")
+    composition = bool(composition or jp.get("composition", False))
+    diversity = bool(diversity or jp.get("diversity", False))
+    difffeat = bool(difffeat or jp.get("difffeat", False))
+    plots = bool(plots or jp.get("plots", False))
+    if not numeric and jp.get("numeric"):
+        numeric = (
+            ",".join(jp["numeric"])
+            if isinstance(jp["numeric"], (list, tuple))
+            else str(jp["numeric"])
+        )
+    numeric_plots = bool(jp.get("numeric_plots", numeric_plots))
+    font_scale = (
+        float(jp.get("font_scale", font_scale))
+        if font_scale is not None
+        else (
+            float(jp_plot.get("font_scale"))
+            if jp_plot.get("font_scale") is not None
+            else None
+        )
+    )
+    opal_campaign = opal_campaign or jp.get("opal_campaign")
+    opal_as_of_round = opal_as_of_round or jp.get("opal_as_of_round")
+    if not opal_fields and jp.get("opal_fields"):
+        opal_fields = (
+            ",".join(jp["opal_fields"])
+            if isinstance(jp["opal_fields"], (list, tuple))
+            else str(jp["opal_fields"])
+        )
+
+    _, df = _context_and_df(dataset, file, usr_root)
     console.rule("[bold]cluster analyze[/]")
 
     # ---------- Apply preset (if any) ----------
@@ -1051,7 +1551,15 @@ def cmd_analyze(
                 else str(p["numeric"])
             )
         # font_scale + missing policy
-        font_scale = float(p.get("font_scale", font_scale))
+        if font_scale is None:
+            # precedence: preset.plot.font_scale -> job.plot.font_scale -> CLI
+            # jp_plot already considered above; take preset only if still None
+            font_scale = (
+                float(p.get("font_scale")) if p.get("font_scale") is not None else None
+            )
+        # If still None, use default 1.2
+        if font_scale is None:
+            font_scale = 1.2
         numeric_missing_policy = str(p.get("missing_policy", "error"))
         # OPAL knobs can be provided via preset
         opal_campaign = opal_campaign or p.get("opal_campaign")
@@ -1107,6 +1615,7 @@ def cmd_analyze(
             run_selector="latest",
             fields=sorted(required_fields),
             as_of_round=opal_as_of_round,
+            log_fn=lambda m: console.log(m),
         )
         # Assert coverage + warn if any nulls remain
         for c in required_fields:
@@ -1150,6 +1659,29 @@ def cmd_analyze(
             diff_fn(df, cluster_col=cluster_col, group_by=gb, out_dir=out_root)
         console.log(f"Completed group_by='{gb}'.")
     console.print(f"[green]Analyses complete[/green]. Outputs at {out_root}")
+    # ---- Records sink (Markdown) ----
+    try:
+        fit_name = (
+            cluster_col.split("__", 1)[1]
+            if cluster_col.startswith("cluster__")
+            else "analysis"
+        )
+        run_dir = runs_root() / fit_name
+        payload = {
+            "command": "analyze",
+            "job": job or None,
+            "preset": preset or None,
+            "resolved": {
+                "cluster_col": cluster_col,
+                "group_by": group_bys,
+                "plots": bool(plots),
+                "font_scale": float(font_scale),
+            },
+        }
+        md = f"## cluster analyze — {fit_name}\n\n```json\n{json.dumps(payload, indent=2, sort_keys=True)}\n```"
+        append_records_md(run_dir, md)
+    except Exception:
+        pass
 
 
 @app.command("intra-sim")
@@ -1263,6 +1795,9 @@ app.add_typer(presets_app, name="presets")
 @presets_app.command("list")
 def presets_list():
     pres = load_presets()
+    if not pres:
+        console.print("No presets found.")
+        return
     for k in sorted(pres.keys()):
         typer.echo(f"{k} -> kind={pres[k].kind}")
 

@@ -15,10 +15,8 @@ from pathlib import Path
 
 import pandas as pd
 
-DEFAULT_ENV_KEY = "DNADESIGN_CLUSTER_RUNS_DIR"
-DEFAULT_DIRNAME = "cluster_log"
-FLAT_UMAP_ENV = "DNADESIGN_CLUSTER_FLAT_UMAP_DIRS"  # "1", "true", "yes" => flat layout
-
+DEFAULT_ENV_KEY = "DNADESIGN_CLUSTER_RESULTS_DIR"
+DEFAULT_DIRNAME = "results"
 
 
 def _package_cluster_dir() -> Path:
@@ -34,19 +32,10 @@ def runs_root(default_base: Path | None = None) -> Path:
     if env:
         root = Path(env)
     else:
-        # Default: <package_cluster_dir>/cluster_log  (sibling to cluster/src)
+        # Default: <package_cluster_dir>/results  (sibling to cluster/src)
         cluster_dir = _package_cluster_dir()
         base = default_base or cluster_dir
-        new_root = base / DEFAULT_DIRNAME
-        old_root = base / "batch_results"
-        # One-time migration: move previous default into the new standardized name.
-        if old_root.exists() and not new_root.exists():
-            try:
-                old_root.rename(new_root)
-            except Exception:
-                # If rename fails, keep using old_root rather than duplicating.
-                new_root = old_root
-        root = new_root
+        root = base / DEFAULT_DIRNAME
     root.mkdir(parents=True, exist_ok=True)
     # Ensure index file exists
     idx = root / "index.parquet"
@@ -106,12 +95,27 @@ def write_log(run_dir: Path, event: dict) -> None:
         f.write(json.dumps(event, sort_keys=True) + "\n")
 
 
+def append_records_md(run_dir: Path, markdown: str) -> Path:
+    """
+    Append a Markdown entry describing a command invocation to <run_dir>/records.md.
+    Creates the file with a header if it doesn't exist yet.
+    """
+    p = run_dir / "records.md"
+    if not p.exists():
+        p.write_text("# Run records\n\n", encoding="utf-8")
+    # Always insert a trailing newline between entries
+    with p.open("a", encoding="utf-8") as f:
+        # normalize to avoid duplicate blank lines
+        text = markdown.rstrip() + "\n\n"
+        f.write(text)
+    return p
+
+
 # ---------------- UMAP helpers ----------------
 def umap_dir(run_dir: Path, umap_slug: str) -> Path:
-    flat = str(os.environ.get(FLAT_UMAP_ENV, "")).strip().lower() in {"1", "true", "yes", "y", "on"}
-    d = (run_dir / umap_slug) if flat else (run_dir / "umap" / umap_slug)
+    # Flat layout: all UMAP artifacts directly under <run_dir>/umap/
+    d = run_dir / "umap"
     d.mkdir(parents=True, exist_ok=True)
-    (d / "plots").mkdir(parents=True, exist_ok=True)
     return d
 
 

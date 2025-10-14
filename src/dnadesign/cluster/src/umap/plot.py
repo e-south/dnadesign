@@ -216,6 +216,7 @@ def resolve_hue(
     *,
     missing_policy: Literal["error", "drop_and_log"] = "error",
     log_fn: Optional[Callable[[str], None]] = None,
+    highlight: Optional[dict] = None,
 ) -> list[tuple[str, dict]]:
     """Return list of (label, dict with 'values' and 'is_categorical')."""
     out = []
@@ -231,11 +232,9 @@ def resolve_hue(
             )
             continue
         if spec == "gc_content":
-            vals = (
-                df.get("sequence").apply(_compute_gc)
-                if "sequence" in df.columns
-                else pd.Series([np.nan] * len(df))
-            )
+            if "sequence" not in df.columns:
+                raise KeyError("Hue 'gc_content' requires a 'sequence' column.")
+            vals = df["sequence"].astype(str).apply(_compute_gc)
             out.append(("gc_content", {"values": vals, "categorical": False}))
             continue
         if spec == "seq_length" and "sequence" in df.columns:
@@ -248,8 +247,9 @@ def resolve_hue(
                     },
                 )
             )
-
             continue
+        if spec == "seq_length" and "sequence" not in df.columns:
+            raise KeyError("Hue 'seq_length' requires a 'sequence' column.")
         if spec == "intra_sim":
             col = f"cluster__{name}__intra_sim"
             if col not in df.columns:
@@ -271,7 +271,82 @@ def resolve_hue(
             s = _ensure_categorical_series(df, col)
             out.append((col, {"values": s, "categorical": True}))
             continue
+        if spec == "highlight":
+            # Requires highlight ids; no auto-refit/projection for missing ids.
+            if not highlight or not highlight.get("ids"):
+                raise ValueError(
+                    "Hue 'highlight' requires --highlight <file> to supply ids."
+                )
+            idx_ids = (
+                df.index.astype(str) if df.index.name == "id" else df["id"].astype(str)
+            )
+            ids_set = set(map(str, highlight["ids"]))
+            # Mode A: categorical highlight if labels are provided (id -> category)
+            if (
+                isinstance(highlight.get("labels"), dict)
+                and len(highlight["labels"]) > 0
+            ):
+                labels_map = {str(k): str(v) for k, v in highlight["labels"].items()}
+                vals = np.where(
+                    idx_ids.isin(ids_set),
+                    idx_ids.map(lambda z: labels_map.get(str(z), None)),
+                    "background",
+                )
+                out.append(
+                    (
+                        "highlight",
+                        {
+                            "values": pd.Series(vals, index=df.index),
+                            "categorical": True,
+                            "highlight_categories": list(
+                                sorted(set(labels_map.values()))
+                            ),
+                            "highlight_by": str(highlight.get("by", "")),
+                        },
+                    )
+                )
+            else:
+                # Mode B: single‑hue highlight (background vs highlight)
+                vals = np.where(idx_ids.isin(ids_set), "highlight", "background")
+                out.append(
+                    (
+                        "highlight",
+                        {
+                            "values": pd.Series(vals, index=df.index),
+                            "categorical": True,
+                        },
+                    )
+                )
+            continue
         raise ValueError(f"Unknown hue spec: {spec}")
+    return out
+
+
+def _normalize_highlight_style(style: Optional[dict], base_size: float) -> dict:
+    """
+    Normalize a user-provided highlight style mapping into a concrete style dict
+    with assertive defaults. We avoid hidden fallbacks in control flow — if the user
+    specifies keys, they are taken verbatim; otherwise, we use explicit safe defaults.
+    """
+    style = dict(style or {})
+    out: dict = {}
+    # Size: choose explicit 'size' if provided, else apply a multiplier to base size
+    if "size" in style and style["size"] is not None:
+        out["size"] = float(style["size"])
+    else:
+        mul = float(style.get("size_multiplier", 1.6))
+        out["size"] = float(base_size) * mul
+    out["alpha"] = float(style.get("alpha", 0.95))
+    out["facecolor"] = style.get("facecolor", "none")
+    out["edgecolor"] = style.get("edgecolor", "red")
+    out["linewidth"] = float(style.get("linewidth", 0.9))
+    out["marker"] = style.get("marker", "o")
+    out["legend"] = bool(style.get("legend", False))
+    out["overlay"] = bool(style.get("overlay", True))
+    if "palette" in style:
+        out["palette"] = style[
+            "palette"
+        ]  # str (palette name) or dict {category: color}
     return out
 
 
@@ -290,11 +365,55 @@ def scatter(
     font_scale: float = 1.2,
     missing_policy: Literal["error", "drop_and_log"] = "drop_and_log",
     log_fn: Optional[Callable[[str], None]] = None,
+    overlay_highlight: bool = True,
+    highlight_style: Optional[dict] = None,
 ):
     sns.set_theme(style="ticks")
     x, y = coords[:, 0], coords[:, 1]
     hues = resolve_hue(
-        df, color_specs, name, missing_policy=missing_policy, log_fn=log_fn
+        df,
+        color_specs,
+        name,
+        missing_policy=missing_policy,
+        log_fn=log_fn,
+        highlight=highlight,
+    )
+    # Prepare highlight id set (string ids) once; do not alter base hues with it.
+    hi_ids: set[str] = set()
+    if highlight and highlight.get("ids"):
+        hi_ids = {str(i) for i in highlight["ids"]}
+    # If categorical mode, precompute label mapping & categories
+    hi_labels: dict[str, str] | None = None
+    hi_by: str | None = None
+    hi_categories: list[str] = []
+    if isinstance(highlight, dict) and isinstance(highlight.get("labels"), dict):
+        hi_labels = {str(k): str(v) for k, v in highlight["labels"].items()}
+        hi_categories = sorted(set(hi_labels.values()))
+        hi_by = str(highlight.get("by", "")) if highlight.get("by") else None
+
+    # Build a palette for categorical highlight if needed
+    def _resolve_hi_palette(categories: list[str]):
+        pal_spec = hstyle.get("palette")
+        if isinstance(pal_spec, dict):
+            # explicit mapping wins; fill any missing keys deterministically
+            mapped = {
+                str(k): pal_spec[k] for k in pal_spec.keys() if str(k) in categories
+            }
+            remaining = [c for c in categories if c not in mapped]
+            if remaining:
+                cols = sns.color_palette("colorblind", n_colors=len(remaining))
+                for c, col in zip(remaining, cols):
+                    mapped[c] = col
+            return mapped
+        name = pal_spec if isinstance(pal_spec, str) else "colorblind"
+        cols = sns.color_palette(name, n_colors=len(categories))
+        return {cat: cols[i] for i, cat in enumerate(categories)}
+
+    # Normalize overlay style once with the *base* size
+    hstyle = _normalize_highlight_style(highlight_style, base_size=size)
+    # Whether we will overlay highlights on non-'highlight' hues
+    do_overlay = (
+        bool(hi_ids) and bool(overlay_highlight) and bool(hstyle.get("overlay", True))
     )
     for label, obj in hues:
         with rc_context(_font_rc(font_scale)):
@@ -311,56 +430,102 @@ def scatter(
         except Exception:
             pass
 
-        # Build masks as **positions** (not label-based indexing)
-        if highlight and highlight.get("ids") is not None:
-            bg_bool = ~df.index.isin(
-                highlight["ids"]
-            )  # boolean mask aligned to df.index
-            bg_pos = np.flatnonzero(
-                bg_bool.values if hasattr(bg_bool, "values") else bg_bool
-            )
-            # If this hue has a keep-mask, apply it to background points too
-            if obj.get("mask") is not None:
-                keep = np.asarray(obj["mask"], dtype=bool)
-                bg_pos = bg_pos[keep[bg_pos]]
-            ax.scatter(
-                x[bg_pos],
-                y[bg_pos],
-                s=size * 0.5,
-                c="lightgray",
-                alpha=max(0.1, alpha * 0.3),
-                label="background",
-            )
-            mask_pos = np.flatnonzero(
-                ~bg_bool.values if hasattr(bg_bool, "values") else ~bg_bool
-            )
-            if obj.get("mask") is not None:
-                keep = np.asarray(obj["mask"], dtype=bool)
-                mask_pos = mask_pos[keep[mask_pos]]
-        else:
-            mask_pos = np.arange(len(df))
-            if obj.get("mask") is not None:
-                keep = np.asarray(obj["mask"], dtype=bool)
-                mask_pos = mask_pos[keep[mask_pos]]
+        # Base keep-mask from hue-specific constraints (e.g., numeric non-finite drops)
+        N = len(df)
+        keep_mask = np.ones(N, dtype=bool)
+        if obj.get("mask") is not None:
+            keep_mask &= np.asarray(obj["mask"], dtype=bool)
+        mask_pos = np.flatnonzero(keep_mask)
         if obj["categorical"]:
             # Always define; some branches intentionally skip legend
             leg = None
-            # select the series values aligned with our mask positions
-            vals_series = obj["values"].iloc[mask_pos].astype(str)
-            cats = pd.Categorical(vals_series)
-            palette = sns.color_palette("colorblind", n_colors=len(cats.categories))
-            for i, cat in enumerate(cats.categories):
-                # (cats == cat) already yields a boolean ndarray for Categorical
-                cat_mask = np.asarray(cats == cat, dtype=bool)
-                cat_pos = mask_pos[cat_mask]
-                ax.scatter(
-                    x[cat_pos],
-                    y[cat_pos],
-                    s=size,
-                    alpha=alpha,
-                    label=str(cat),
-                    color=palette[i % len(palette)],
-                )
+            vals_series = obj["values"].astype(str)
+            vals_kept = vals_series.iloc[mask_pos]
+            cats = pd.Categorical(vals_kept)
+            if label == "highlight":
+                # Dedicated highlight hue
+                # Background always in light gray for context
+                bg_mask = np.asarray(cats == "background", dtype=bool)
+                bg_pos = mask_pos[bg_mask]
+                if len(bg_pos) > 0:
+                    ax.scatter(
+                        x[bg_pos],
+                        y[bg_pos],
+                        s=max(1.0, size * 0.5),
+                        c="lightgray",
+                        alpha=max(0.1, alpha * 0.3),
+                        label="background",
+                    )
+                # Two modes:
+                #   1) Single‑hue (values 'highlight'/'background')
+                #   2) Categorical (values are category names + background)
+                if hi_labels and hi_categories:
+                    pal = _resolve_hi_palette(hi_categories)
+                    # draw each category
+                    for cat in hi_categories:
+                        cat_mask = np.asarray(cats == cat, dtype=bool)
+                        cat_pos = mask_pos[cat_mask]
+                        if len(cat_pos) == 0:
+                            continue
+                        ax.scatter(
+                            x[cat_pos],
+                            y[cat_pos],
+                            # Respect plot.highlight.size/marker/alpha for the dedicated highlight plot.
+                            s=hstyle["size"],
+                            alpha=min(1.0, alpha * 1.2),
+                            marker=hstyle["marker"],
+                            color=pal[cat],
+                            label=str(cat),
+                            zorder=3,
+                        )
+                    # Legend for categories (respect caps)
+                    max_items = int(legend.get("max_items", 40))
+                    ncol = int(legend.get("ncol", 1))
+                    bbox = tuple(legend.get("bbox", (1.02, 1.0)))[:2]
+                    frameon = bool(legend.get("frameon", False))
+                    cats_for_legend = [c for c in hi_categories if c != "background"]
+                    if len(cats_for_legend) <= max_items:
+                        title = f"highlight{(' by ' + hi_by) if hi_by else ''}"
+                        leg = ax.legend(
+                            title=title,
+                            bbox_to_anchor=bbox,
+                            loc="upper left",
+                            ncol=ncol,
+                            frameon=frameon,
+                            prop={"size": max(8, int(10 * float(font_scale)))},
+                        )
+                        if leg and leg.get_title():
+                            leg.get_title().set_fontsize(max(9, int(_base * 1.3)))
+                else:
+                    # single-hue highlight
+                    hi_pos = mask_pos[np.asarray(cats == "highlight", dtype=bool)]
+                    if len(hi_pos) > 0:
+                        ax.scatter(
+                            x[hi_pos],
+                            y[hi_pos],
+                            # Respect plot.highlight.size/marker/alpha; use edgecolor as the fill color by default.
+                            s=hstyle["size"],
+                            alpha=min(1.0, alpha * 1.2),
+                            marker=hstyle["marker"],
+                            color=hstyle.get("edgecolor", "red"),
+                            label="highlight",
+                            zorder=3,
+                        )
+            else:
+                palette = sns.color_palette("colorblind", n_colors=len(cats.categories))
+                for i, cat in enumerate(cats.categories):
+                    cat_mask = np.asarray(cats == cat, dtype=bool)
+                    cat_pos = mask_pos[cat_mask]
+                    if len(cat_pos) == 0:
+                        continue
+                    ax.scatter(
+                        x[cat_pos],
+                        y[cat_pos],
+                        s=size,
+                        alpha=alpha,
+                        label=str(cat),
+                        color=palette[i % len(palette)],
+                    )
             # Avoid comically long legends: allow caller to cap items
             # Normalize legend configuration once
             max_items = int(legend.get("max_items", 40))
@@ -392,6 +557,57 @@ def scatter(
             cbar = fig.colorbar(sc, ax=ax)
             cbar.set_label(label, fontsize=_base * 1.4)
             cbar.ax.tick_params(labelsize=_base * 1.2)
+
+        # Optional overlay: emphasize highlighted ids **without** changing the hue colors.
+        if do_overlay and label != "highlight":
+            # Build id mask aligned to df.index
+            idx_ids = df.index.astype(str)
+            hi_mask = idx_ids.isin(hi_ids)
+            # apply hue keep-mask
+            hi_mask &= keep_mask
+            if hi_labels and hi_categories:
+                pal = _resolve_hi_palette(hi_categories)
+                # Color‑coded rings per category
+                # Build per‑category overlay masks
+                for cat in hi_categories:
+                    cat_mask = hi_mask & idx_ids.map(
+                        lambda z: hi_labels.get(str(z), None) == cat
+                    )
+                    cat_pos = np.flatnonzero(
+                        cat_mask.values if hasattr(cat_mask, "values") else cat_mask
+                    )
+                    if len(cat_pos) == 0:
+                        continue
+                    ax.scatter(
+                        x[cat_pos],
+                        y[cat_pos],
+                        s=hstyle["size"],
+                        alpha=hstyle["alpha"],
+                        marker=hstyle["marker"],
+                        facecolors=hstyle.get("facecolor", "none"),
+                        edgecolors=pal[cat],
+                        linewidths=hstyle["linewidth"],
+                        zorder=3,
+                        label=(str(cat) if hstyle.get("legend", False) else None),
+                    )
+            else:
+                # Single‑hue overlay
+                hi_pos = np.flatnonzero(
+                    hi_mask.values if hasattr(hi_mask, "values") else hi_mask
+                )
+                if len(hi_pos) > 0:
+                    ax.scatter(
+                        x[hi_pos],
+                        y[hi_pos],
+                        s=hstyle["size"],
+                        alpha=hstyle["alpha"],
+                        marker=hstyle["marker"],
+                        facecolors=hstyle["facecolor"],
+                        edgecolors=hstyle["edgecolor"],
+                        linewidths=hstyle["linewidth"],
+                        zorder=3,
+                        label=("highlight" if hstyle.get("legend", False) else None),
+                    )
         ax.set_xlabel("UMAP1")
         ax.set_ylabel("UMAP2")
         ax.set_title(f"UMAP — {label}", fontsize=_base * 1.8, pad=8)
@@ -400,6 +616,7 @@ def scatter(
         if out_path:
             out_path.parent.mkdir(parents=True, exist_ok=True)
             base, ext = out_path.with_suffix("").as_posix(), out_path.suffix or ".png"
+            # flat: write directly under <run>/umap/<name>.<label>.png
             fig.savefig(Path(f"{base}.{label}{ext}"), dpi=300, bbox_inches="tight")
         else:
             plt.show()
