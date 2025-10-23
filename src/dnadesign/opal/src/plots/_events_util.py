@@ -22,17 +22,15 @@ from pyarrow import dataset as ds
 
 def resolve_events_path(context) -> Path:
     """
-    Deterministically resolve the canonical ledger index for plots.
-    - Prefer an explicit 'events' entry in context.data_paths
-    - Else use <campaign_dir>/outputs/ledger.index.parquet
+    Resolve a *handle* into the outputs/ root. We no longer require the thin index to exist.
+    - If the campaign YAML provides a path under 'events', use it (for legacy runs).
+    - Otherwise return <campaign_dir>/outputs/ledger.index.parquet (even if missing),
+      because callers only need its parent (outputs/) to find typed sinks.
     """
     p = context.data_paths.get("events")
     if p is None:
         p = context.campaign_dir / "outputs" / "ledger.index.parquet"
-    p = Path(p)
-    if not p.exists():
-        raise FileNotFoundError(f"Required data source 'events' not found at: {p}")
-    return p
+    return Path(p)
 
 
 def load_events_with_setpoint(
@@ -48,16 +46,16 @@ def load_events_with_setpoint(
     want: Set[str] = set(map(str, base_columns)) | {"run_id"}
     root = events_path.parent
     pred_dir = root / "ledger.predictions"
-    runs_dir = root / "ledger.runs"
+    runs_file = root / "ledger.runs.parquet"
 
     # Assert required ledger sinks exist
     if not pred_dir.exists():
         raise FileNotFoundError(
             f"Missing predictions sink: {pred_dir}. Run a round to produce it."
         )
-    if not runs_dir.exists():
+    if not runs_file.exists():
         raise FileNotFoundError(
-            f"Missing runs sink: {runs_dir}. Run a round to produce it."
+            f"Missing runs sink: {runs_file}. Run a round to produce it."
         )
 
     def _arrow_filter_for_rounds(d: ds.Dataset):
@@ -104,13 +102,9 @@ def load_events_with_setpoint(
         )
 
     # Always join setpoint from ledger.runs (canonical)
-    dm = ds.dataset(str(runs_dir))
-    nn = {f.name for f in dm.schema}
-    need = {"run_id", "objective__params"}
-    miss = sorted(need - nn)
-    if miss:
-        raise ValueError(f"ledger.runs missing columns: {miss}")
-    meta = dm.to_table(columns=list(need)).to_pandas()
+    # Read run metadata (single Parquet file)
+    need = ["run_id", "objective__params"]
+    meta = pd.read_parquet(runs_file, columns=need)
 
     def _extract_setpoint(obj):
         try:

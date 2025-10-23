@@ -32,4 +32,5 @@ __all__ = [
     "usr_adapter",
     "logging_utils",
     "outputs",
+    "plotting",
 ]

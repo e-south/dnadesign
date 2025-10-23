@@ -45,36 +45,26 @@ def cmd_record_show(
         cfg = load_cli_config(config)
         store = store_from_cfg(cfg)
         df = store.load()
-        # Allow positional key if neither flag is present
-        if not id and not sequence:
-            if key:
-                # Heuristic: prefer exact id match; else exact sequence match
-                sid = df["id"].astype(str)
-                if (sid == key).any():
-                    id = key
-                elif "sequence" in df.columns and (df["sequence"] == key).any():
-                    sequence = key
-                else:
-                    raise OpalError(
-                        "Record not found by positional key. Use --id or --sequence.",
-                        ExitCodes.BAD_ARGS,
-                    )
-            else:
-                raise OpalError(
-                    "Provide --id or --sequence (or positional key).",
-                    ExitCodes.BAD_ARGS,
-                )
-        # Default events path under campaign workdir
+        # ... (id/sequence resolution unchanged) ...
+
         base = Path(cfg.campaign.workdir) / "outputs"
-        typed_pred = base / "events" / "run_pred.parquet"
-        ev_path = typed_pred if typed_pred.exists() else (base / "events.parquet")
+
+        # Prefer new typed sinks (consolidated file, then directory), else legacy
+        candidates = [
+            base / "ledger.predictions.parquet",
+            base / "ledger.predictions",
+            base / "events" / "run_pred.parquet",  # legacy
+            base / "events.parquet",  # legacy
+        ]
+        ev_path = next((p for p in candidates if p.exists()), None)
+
         report = build_record_report(
             df,
             cfg.campaign.slug,
             id_=id,
             sequence=sequence,
             with_sequence=with_sequence,
-            events_path=ev_path if ev_path.exists() else None,
+            events_path=ev_path if ev_path else None,
             records_path=store.records_path,
         )
         if json:

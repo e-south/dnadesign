@@ -47,6 +47,16 @@ def scatter_smart(
         except Exception:
             thr = 0
         rasterized = (thr > 0) and (x.size >= thr)
+    # Respect explicit overrides without passing the same kw twice.
+    # Allow both linewidths/linewidth alias; default to 0 when unspecified.
+    lw = kw.pop("linewidths", None)
+    lw_single = kw.pop("linewidth", None)
+    if lw is None and lw_single is not None:
+        lw = lw_single
+    if lw is None:
+        lw = 0
+    # If callers mistakenly put edgecolors in **kw, let that win.
+    edgecolors = kw.pop("edgecolors", edgecolors)
     # Drop cmap if no color data provided.
     if "cmap" in kw and (("c" not in kw) or (kw.get("c") is None)):
         kw.pop("cmap", None)
@@ -55,7 +65,7 @@ def scatter_smart(
         y,
         s=s,
         alpha=alpha,
-        linewidths=0,
+        linewidths=lw,
         edgecolors=edgecolors,
         rasterized=rasterized,
         **kw,

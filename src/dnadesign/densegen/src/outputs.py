@@ -18,10 +18,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from pathlib import Path
-from typing import Dict, Iterable
+from typing import Dict, Iterable, Tuple
+
+import pandas as pd
+import pyarrow.parquet as pq
 
 from .usr_adapter import USRWriter
+
+log = logging.getLogger(__name__)
 
 
 def _sha256_id(bio_type: str, alphabet: str, sequence: str) -> str:
@@ -128,11 +134,18 @@ def build_sinks(cfg: dict) -> Iterable[SinkBase]:
       output.jsonl.path: outputs/densegen.jsonl
       usr: {dataset, root, namespace, ...}
     """
-    kind = (cfg.get("output", {}).get("kind") or "usr").lower()
+    out_cfg = cfg.get("output", {})
+    if not out_cfg:
+        raise ValueError("`output` section is required (usr | jsonl | both).")
+    kind = (out_cfg.get("kind") or "").lower()
+    if kind not in {"usr", "jsonl", "both"}:
+        raise ValueError("`output.kind` must be one of: usr | jsonl | both.")
     sinks: list[SinkBase] = []
 
     if kind in {"usr", "both"}:
-        usr_cfg = cfg.get("usr", {}) or cfg.get("output", {}).get("usr", {})
+        usr_cfg = cfg.get("usr", {}) or out_cfg.get("usr", {})
+        if not usr_cfg or "dataset" not in usr_cfg:
+            raise ValueError("USR sink requested but `usr.dataset` not provided.")
         writer = USRWriter(
             dataset=usr_cfg.get("dataset", "densegen_sequences"),
             root=Path(usr_cfg["root"]).resolve() if usr_cfg.get("root") else None,
@@ -143,21 +156,96 @@ def build_sinks(cfg: dict) -> Iterable[SinkBase]:
         sinks.append(USRSink(writer))
 
     if kind in {"jsonl", "both"}:
-        jl_cfg = cfg.get("output", {}).get("jsonl", {})
+        jl_cfg = out_cfg.get("jsonl", {})
+        if not jl_cfg or "path" not in jl_cfg:
+            raise ValueError(
+                "JSONL sink requested but `output.jsonl.path` not provided."
+            )
         path = jl_cfg.get("path", "outputs/densegen.jsonl")
         ns = (cfg.get("usr", {}) or {}).get("namespace", "densegen")
         sinks.append(JSONLSink(path=path, namespace=ns))
 
     if not sinks:
-        # default to USR if misconfigured
-        usr_cfg = cfg.get("usr", {}) or {}
-        writer = USRWriter(
-            dataset=usr_cfg.get("dataset", "densegen_sequences"),
-            root=Path(usr_cfg["root"]).resolve() if usr_cfg.get("root") else None,
-            namespace=usr_cfg.get("namespace", "densegen"),
-            chunk_size=int(usr_cfg.get("chunk_size", 128)),
-            allow_overwrite=bool(usr_cfg.get("allow_overwrite", True)),
+        raise AssertionError(
+            "No output sinks created; check `output.kind` and related settings."
         )
-        sinks.append(USRSink(writer))
 
     return sinks
+
+
+def _maybe_json_load(val):
+    if isinstance(val, str):
+        s = val.strip()
+        if (s.startswith("{") and s.endswith("}")) or (
+            s.startswith("[") and s.endswith("]")
+        ):
+            try:
+                return json.loads(s)
+            except Exception:
+                return val
+    return val
+
+
+def load_records_from_config(cfg: dict) -> Tuple[pd.DataFrame, str]:
+    """
+    Load output records from either JSONL (preferred if present) or USR dataset.
+    Returns (df, source_label), where source_label is 'jsonl:<path>' or 'usr:<dataset>'.
+    No silent fallbacks: if a configured sink is missing on disk, raises with specifics.
+    """
+    out_cfg = cfg.get("output", {})
+    kind = (out_cfg.get("kind") or "").lower()
+    if kind not in {"usr", "jsonl", "both"}:
+        raise ValueError("`output.kind` must be one of: usr | jsonl | both.")
+
+    dfs: list[pd.DataFrame] = []
+    source_label = ""
+
+    if kind in {"jsonl", "both"}:
+        jl_path = out_cfg.get("jsonl", {}).get("path")
+        if jl_path:
+            p = Path(jl_path).resolve()
+            if not p.exists():
+                raise FileNotFoundError(f"JSONL path does not exist: {p}")
+            rows = []
+            with p.open("r") as f:
+                for line in f:
+                    if line.strip():
+                        rows.append(json.loads(line))
+            if rows:
+                df = pd.DataFrame(rows)
+                # Coerce likely JSON-encoded columns back to Python objects
+                for col in list(df.columns):
+                    df[col] = df[col].map(_maybe_json_load)
+                dfs.append(df)
+                source_label = f"jsonl:{p}"
+
+    if kind in {"usr", "both"} and not dfs:
+        usr_cfg = cfg.get("usr", {}) or out_cfg.get("usr", {})
+        if not usr_cfg or "dataset" not in usr_cfg:
+            raise ValueError("USR output requested but `usr.dataset` not set.")
+        from .usr_adapter import Dataset  # type: ignore[attr-defined]
+
+        # Access underlying dataset (same logic as USRWriter)
+        ds = Dataset(
+            Path(
+                usr_cfg.get("root")
+                or Path(__file__).resolve().parents[2] / "usr" / "datasets"
+            ),
+            usr_cfg["dataset"],
+        )
+        rp = ds.records_path
+        if not rp.exists():
+            raise FileNotFoundError(f"USR records not found at: {rp}")
+        tbl = pq.read_table(rp)
+        df = tbl.to_pandas()
+        # best-effort JSON coercion for namespaced columns
+        for col in [c for c in df.columns if "__" in c]:
+            df[col] = df[col].map(_maybe_json_load)
+        dfs.append(df)
+        source_label = f"usr:{usr_cfg['dataset']}"
+
+    if not dfs:
+        raise RuntimeError(
+            "Could not load any outputs; ensure either JSONL or USR sink produced data."
+        )
+    return dfs[0], source_label

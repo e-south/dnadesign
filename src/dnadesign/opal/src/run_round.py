@@ -52,6 +52,7 @@ from .state import CampaignState, RoundEntry
 from .utils import OpalError, ensure_dir, file_sha256, now_iso
 from .writebacks import (
     SelectionEmit,
+    build_label_events,
     build_run_meta_event,
     build_run_pred_events,
 )
@@ -620,6 +621,32 @@ def run_round(
         sel_emit=sel_emit,
     )
 
+    # Snapshot the consolidated ground-truth labels actually used for training (≤ as_of_round)
+    # Build label events grouped by their original observed round.
+    label_events_frames: List[pd.DataFrame] = []
+    if not train_df.empty:
+        # map ids -> sequences for label events
+        _seq_for = lambda ids: [seq_map.get(i) for i in ids]  # noqa
+        for rr, grp in train_df.groupby("r"):
+            ids_g = grp["id"].astype(str).tolist()
+            y_g = grp["y"].tolist()
+            seq_g = _seq_for(ids_g)
+            label_events_frames.append(
+                build_label_events(
+                    ids=ids_g,
+                    sequences=seq_g,
+                    y_obs=y_g,
+                    observed_round=int(rr),
+                    src="training_snapshot",
+                    note=f"labels used in run {run_id} (as_of_round={int(req.as_of_round)})",
+                )
+            )
+    label_events_df = (
+        pd.concat(label_events_frames, ignore_index=True)
+        if label_events_frames
+        else None
+    )
+
     # Now add the standard artifacts (model, selection, round ctx, objective meta)
     artifacts_paths_and_hashes.update(
         {
@@ -658,12 +685,19 @@ def run_round(
     )
 
     ev_path = events_path(workdir)
+    # Always write typed sinks; do *not* write the deprecated thin index.
     append_events(
-        ev_path, pd.concat([run_pred_events, run_meta_event], ignore_index=True)
+        ev_path,
+        pd.concat([run_pred_events, run_meta_event], ignore_index=True),
+        write_index=False,
     )
+    if label_events_df is not None and not label_events_df.empty:
+        append_events(ev_path, label_events_df, write_index=False)
     _log(
         req.verbose,
-        f"[events] appended run_pred({len(run_pred_events)}) and run_meta(1) to {ev_path}",
+        f"[events] appended run_pred({len(run_pred_events)}), run_meta(1)"
+        + (f", labels({len(label_events_df)})" if label_events_df is not None else "")
+        + f" under {ev_path.parent}",
     )
 
     # --- records ergonomic caches ---
@@ -734,7 +768,18 @@ def run_round(
             },
             artifacts={
                 "selection_top_k_csv": str(apaths.selection_csv.resolve()),
+                # Keep legacy key for compatibility; may point to a non-existent file.
                 "events_parquet": str(ev_path.resolve()),
+                # New, explicit ledger sinks:
+                "ledger_predictions_dir": str(
+                    (ev_path.parent / "ledger.predictions").resolve()
+                ),
+                "ledger_runs_parquet": str(
+                    (ev_path.parent / "ledger.runs.parquet").resolve()
+                ),
+                "ledger_labels_parquet": str(
+                    (ev_path.parent / "ledger.labels.parquet").resolve()
+                ),
                 "round_ctx_json": str(apaths.round_ctx_json.resolve()),
                 "objective_meta_json": str(apaths.objective_meta_json.resolve()),
             },

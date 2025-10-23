@@ -14,16 +14,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from mpl_toolkits.axes_grid1 import axes_size, make_axes_locatable
+from pyarrow import compute as arrow_pc
+from pyarrow import dataset as ds
 
 from ..registries.plot import register_plot
-from ._events_util import load_events_with_setpoint, resolve_events_path
+from ._events_util import resolve_events_path
 from ._mpl_utils import annotate_plot_meta
 
 
 @register_plot("sfxi_logic_fidelity_closeness")
 def render(context, params: dict) -> None:
     # ---- Parameters (assertive, yet simple to change) ----
-    events_path = resolve_events_path(context)
+    # Source is now *observed* labels (ledger.labels) instead of predictions.
+    events_path = resolve_events_path(context)  # we only use this to locate /outputs
     top_percentile = params.get("top_percentile")
     if top_percentile is not None:
         top_percentile = float(top_percentile)
@@ -39,64 +42,158 @@ def render(context, params: dict) -> None:
     gap_in = float(params.get("gap_between_panels_in", 0.40))
     use_violin = bool(params.get("violin", True))
     violin_alpha = float(params.get("violin_alpha", 0.55))
-    violin_width = float(params.get("violin_width", 0.9))  # noqa
+    violin_width = float(params.get("violin_width", 0.9))
+    # Validation policy for violin inputs (assertive, explicit)
+    violin_min_points = int(params.get("violin_min_points", 3))
+    violin_require_nonzero_var = bool(params.get("violin_require_nonzero_var", True))
+    on_violin_invalid = (
+        str(params.get("on_violin_invalid", "line")).strip().lower()
+    )  # "error" | "line"
+    if on_violin_invalid not in {"error", "line"}:
+        raise ValueError("on_violin_invalid must be 'error' or 'line'.")
 
-    # ---- Data (minimal columns; target setpoint from run_meta) ----
-    need = {
-        "as_of_round",
-        "run_id",
-        "pred__y_hat_model",
-        "obj__diag__setpoint",
-    }
-    df = load_events_with_setpoint(events_path, need, round_selector=context.rounds)
+    # Logic extraction policy for y_obs
+    # Default: first 4 components of y_obs are logic in [0,1].
+    # Set `coerce_clip: true` to clip small out-of-range noise into [0,1].
+    coerce_clip = bool(params.get("coerce_clip", False))
+    _TOL = 1e-6
 
-    # Round selector
-    rsel = context.rounds
-    if rsel in ("unspecified", "latest"):
-        latest = int(df["as_of_round"].max())
-        df = df[df["as_of_round"] == latest]
-    elif rsel == "all":
-        pass
-    else:
-        lst = rsel if isinstance(rsel, list) else [rsel]
-        df = df[df["as_of_round"].isin(lst)]
+    # ---- Data: read ledger.labels and join a setpoint from ledger.runs ----
+    root = events_path.parent  # .../outputs
+    labels_path = root / "ledger.labels.parquet"
+    runs_path = root / "ledger.runs.parquet"
+    if not labels_path.exists():
+        raise FileNotFoundError(f"Missing labels sink: {labels_path}")
+    if not runs_path.exists():
+        raise FileNotFoundError(f"Missing runs sink (for setpoint): {runs_path}")
+
+    # Helper: filter by rounds (on 'observed_round')
+    def _round_filter(dset: ds.Dataset):
+        sel = context.rounds
+        if sel in (None, "all"):
+            return None
+        if sel in ("unspecified", "latest"):
+            t = dset.to_table(columns=["observed_round"])
+            if t.num_rows == 0:
+                return None
+            latest = int(pd.Series(t.column("observed_round").to_pylist()).max())
+            return arrow_pc.field("observed_round") == latest
+        try:
+            r = int(sel)
+            return arrow_pc.field("observed_round") == r
+        except Exception:
+            return None
+
+    # Read labels (observed Y)
+    dlab = ds.dataset(str(labels_path))
+    names = {f.name for f in dlab.schema}
+    need = {"observed_round", "y_obs"}
+    missing = sorted(need - names)
+    if missing:
+        raise ValueError(f"ledger.labels missing columns: {missing}")
+    filt = _round_filter(dlab)
+    df = dlab.to_table(columns=list(need), filter=filt).to_pandas()
     if df.empty:
-        raise ValueError("No rows matched the requested round selector.")
+        raise ValueError("ledger.labels had zero rows for the requested rounds.")
 
-    # Resolve the 4-vector setpoint
-    sp = df["obj__diag__setpoint"].dropna()
-    if sp.empty:
-        raise ValueError("obj__diag__setpoint not available in events.")
-    setpoint = np.asarray(sp.iloc[0], dtype=float).ravel()
-    if setpoint.shape[0] != 4 or not np.all(np.isfinite(setpoint)):
-        raise ValueError("obj__diag__setpoint must be a finite length-4 vector.")
+    # Resolve setpoint: override > specific round > latest
+    def _extract_setpoint(obj):
+        try:
+            return [float(x) for x in (obj or {}).get("setpoint_vector", [])]
+        except Exception:
+            return None
 
-    # Extract first 4 outputs as "logic" and aggregate means by round
-    def _first4(a):
-        arr = np.asarray(a, dtype=float).ravel()
+    # Param overrides for setpoint (optional but assertive)
+    sp_override = params.get("setpoint") or params.get("setpoint_override")
+    sp_round = params.get("setpoint_round")  # int (as_of_round in ledger.runs)
+    if sp_override is not None:
+        sp_arr = np.asarray(list(sp_override), dtype=float).ravel()
+        if sp_arr.size != 4 or not np.all(np.isfinite(sp_arr)):
+            raise ValueError("setpoint_override must be a finite length-4 vector.")
+        setpoint = sp_arr
+    else:
+        druns = ds.dataset(str(runs_path))
+        nn = {f.name for f in druns.schema}
+        need_runs = {"as_of_round", "objective__params"}
+        miss = sorted(need_runs - nn)
+        if miss:
+            raise ValueError(f"ledger.runs missing columns: {miss}")
+        if sp_round is None:
+            # Pick the latest run that has a setpoint
+            meta = druns.to_table(columns=list(need_runs)).to_pandas()
+            meta["setpoint"] = meta["objective__params"].map(_extract_setpoint)
+            meta = meta.dropna(subset=["setpoint"])
+            if meta.empty:
+                raise ValueError(
+                    "No setpoint_vector found in ledger.runs objective__params."
+                )
+            meta = meta.sort_values(["as_of_round"]).tail(1)
+            setpoint = np.asarray(list(meta["setpoint"].iloc[0]), dtype=float).ravel()
+        else:
+            try:
+                sp_round = int(sp_round)
+            except Exception as e:
+                raise ValueError("setpoint_round must be an integer.") from e
+            filt_r = arrow_pc.field("as_of_round") == sp_round
+            meta = druns.to_table(columns=list(need_runs), filter=filt_r).to_pandas()
+            meta["setpoint"] = meta["objective__params"].map(_extract_setpoint)
+            meta = meta.dropna(subset=["setpoint"])
+            if meta.empty:
+                raise ValueError(
+                    f"No setpoint_vector found in ledger.runs for as_of_round={sp_round}."
+                )
+            setpoint = np.asarray(list(meta["setpoint"].iloc[0]), dtype=float).ravel()
+
+    if setpoint.size != 4 or not np.all(np.isfinite(setpoint)):
+        raise ValueError("Resolved setpoint must be a finite length-4 vector.")
+
+    # Extract first 4 components of y_obs as 'logic' in [0,1] (assertive)
+    def _logic4_from_yobs(y):
+        arr = np.asarray(y, dtype=float).ravel()
         if arr.size < 4:
-            return np.array([np.nan, np.nan, np.nan, np.nan], dtype=float)
-        return arr[0:4]
+            raise ValueError(
+                f"y_obs must have at least 4 components; got length={arr.size}."
+            )
+        lg = arr[:4]
+        if not np.all(np.isfinite(lg)):
+            raise ValueError("y_obs logic components contain non-finite values.")
+        if coerce_clip:
+            return np.clip(lg, 0.0, 1.0)
+        lo, hi = float(np.min(lg)), float(np.max(lg))
+        if lo < -_TOL or hi > (1.0 + _TOL):
+            raise ValueError(
+                "Observed logic components must lie in [0,1]. "
+                "Found range=({:.4g},{:.4g}). "
+                "Pass coerce_clip: true to clip into [0,1].".format(lo, hi)
+            )
+        return lg
 
-    df["logic_hat_4"] = df["pred__y_hat_model"].map(_first4)
+    df["logic_obs_4"] = df["y_obs"].map(_logic4_from_yobs)
 
-    rows = sorted(df["as_of_round"].unique().astype(int).tolist())
+    rows = sorted(df["observed_round"].unique().astype(int).tolist())
     if not rows:
-        raise ValueError("No rounds available after filtering.")
+        raise ValueError("No observed rounds available after filtering.")
 
-    # Compute mean logic per round (n_rounds x 4) and MSE series
+    # Compute mean logic per observed_round (n_rounds x 4) and an MSE series
     mean_logic = []
     mse_series = []
+    # Keep per-round MSE arrays (after percentile filtering) for potential violin
+    mse_arrays_by_round: list[np.ndarray] = []
     for r in rows:
-        sub = df.loc[df["as_of_round"] == r, "logic_hat_4"]
-        M = np.vstack(sub.to_list())  # (n, 4) with NaNs possible
+        sub = df.loc[df["observed_round"] == r, "logic_obs_4"]
+        M = np.vstack(sub.to_list())  # (n, 4)
         mean_logic.append(np.nanmean(M, axis=0))
         mse_all = np.nanmean((M - setpoint[None, :]) ** 2, axis=1)
         if top_percentile is None:
-            mse_use = float(np.nanmean(mse_all))
+            sel = mse_all
+            mse_use = float(np.nanmean(sel))
         else:
             k = max(1, int(np.ceil(len(mse_all) * (top_percentile / 100.0))))
-            mse_use = float(np.sort(mse_all)[:k].mean())
+            sel = np.sort(mse_all)[:k]
+            mse_use = float(sel.mean())
+        # Store cleaned, finite arrays for violin viability checks
+        sel = sel[np.isfinite(sel)]
+        mse_arrays_by_round.append(sel)
         mse_series.append(mse_use)
     mean_logic = np.vstack(mean_logic)
 
@@ -181,41 +278,53 @@ def render(context, params: dict) -> None:
     except Exception:
         ax_mse.set_aspect("equal", adjustable="box")
     title_suffix = "" if top_percentile is None else f" (top {top_percentile:.0f}%)"
-    if use_violin:
-        # Build per-round arrays of MSE (respect top_percentile if requested)
-        series = []
-        for r in rows:
-            sub = df.loc[df["as_of_round"] == r, "logic_hat_4"]
-            M = np.vstack(sub.to_list())
-            mse_all = np.nanmean((M - setpoint[None, :]) ** 2, axis=1)
-            if top_percentile is not None and len(mse_all) > 0:
-                k = max(1, int(np.ceil(len(mse_all) * (top_percentile / 100.0))))
-                mse_all = np.sort(mse_all)[:k]
-            mse_all = mse_all[np.isfinite(mse_all)]
-            if mse_all.size == 0:
-                raise ValueError(f"No finite MSE values for round {r}.")
-            if (
-                float(np.nanmax(mse_all)) <= float(np.nanmin(mse_all))
-                or mse_all.size < 3
-            ):
-                raise ValueError(
-                    f"Cannot draw violin: round {r} MSE distribution is degenerate "
-                    f"(size={mse_all.size}, zero variance)."
-                )
-            series.append(mse_all)
+
+    # ---- Decide how to draw the right panel (assertive preflight, no hidden fallbacks)
+    def _violins_viable(series_list: list[np.ndarray]) -> tuple[bool, list[str]]:
+        problems: list[str] = []
+        for r, arr in zip(rows, series_list):
+            n = int(arr.size)
+            if n < violin_min_points:
+                problems.append(f"r{r}: n={n} < min={violin_min_points}")
+                continue
+            if violin_require_nonzero_var:
+                amax = float(np.nanmax(arr))
+                amin = float(np.nanmin(arr))
+                if not (amax > amin):
+                    problems.append(f"r{r}: zero variance (all {amin:.3g})")
+        return (len(problems) == 0, problems)
+
+    draw_violin = bool(use_violin)
+    violin_ok, issues = (
+        _violins_viable(mse_arrays_by_round) if draw_violin else (False, [])
+    )
+    if draw_violin and not violin_ok:
+        msg = "Violin disabled: " + "; ".join(issues)
+        if on_violin_invalid == "error":
+            raise ValueError("Cannot draw violin — " + "; ".join(issues))
+        # switch to line explicitly
+        draw_violin = False
+        context.logger.info("[sfxi_logic_closeness] %s", msg)
+
+    if draw_violin:
         parts = ax_mse.violinplot(
-            series, positions=rows, widths=0.9, showmeans=True, showextrema=False
+            mse_arrays_by_round,
+            positions=rows,
+            widths=violin_width,
+            showmeans=True,
+            showextrema=False,
         )
-        for pc in parts["bodies"]:
-            pc.set_alpha(violin_alpha)
+        for body in parts["bodies"]:
+            body.set_alpha(violin_alpha)
         parts["cmeans"].set_alpha(min(1.0, violin_alpha + 0.2))
         ax_mse.set_ylabel("MSE vs setpoint")
         ax_mse.set_title("Pool closeness (violin)" + title_suffix)
     else:
         ax_mse.plot(rows, mse_series, marker="o", linewidth=2.0)
         ax_mse.set_ylabel("MSE vs setpoint")
-        ax_mse.set_title("Pool closeness" + title_suffix)
-    ax_mse.set_xlabel("Round")
+        subtitle = "mean line (auto)" if use_violin else "mean line"
+        ax_mse.set_title(f"Pool closeness — {subtitle}" + title_suffix)
+    ax_mse.set_xlabel("Observed round")
     ax_mse.set_xticks(rows)
 
     # Annotate + log
@@ -229,14 +338,19 @@ def render(context, params: dict) -> None:
         extras={
             "setpoint": sp_str,
             "top%": (f"{top_percentile:.0f}" if top_percentile else "all"),
+            "source": "y_obs (ledger.labels)",
         },
     )
     context.logger.info(
-        "params sfxi_logic_fidelity_closeness: rounds=%s figsize=%s panel=%.2f top_percentile=%s",
+        "params sfxi_logic_fidelity_closeness: source=labels rounds=%s figsize=%s panel=%.2f top_percentile=%s coerce_clip=%s draw=%s violin_min_pts=%d nonzero_var=%s",  # noqa
         rows,
         (figsize if figsize_in is not None else "(auto)"),
         (right_block_w if figsize_in is not None else panel_size_in),
         (f"{top_percentile:.0f}" if top_percentile else "all"),
+        bool(coerce_clip),
+        ("violin" if draw_violin else "line"),
+        violin_min_points,
+        violin_require_nonzero_var,
     )
 
     # Save
@@ -245,5 +359,5 @@ def render(context, params: dict) -> None:
     plt.close(fig)
 
     if context.save_data:
-        tidy = pd.DataFrame({"as_of_round": rows, "mse": mse_series})
+        tidy = pd.DataFrame({"observed_round": rows, "mse": mse_series})
         context.save_df(tidy)

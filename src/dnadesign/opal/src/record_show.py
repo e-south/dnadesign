@@ -93,6 +93,7 @@ def build_record_report(
     avg_rank_comp: Optional[float] = None
 
     if events_path is not None and events_path.exists():
+        # Legacy path (a single Parquet index). Kept for backward compatibility.
         ev = pd.read_parquet(events_path)
         col = (
             "event"
@@ -144,7 +145,49 @@ def build_record_report(
             except Exception:
                 avg_rank_comp = None
     else:
-        report["runs"] = []
+        # New default: read from outputs/ledger.predictions/ (directory of parts)
+        # Derive outputs/ root from the provided path if possible, else from records_path.
+        base_outputs = None
+        if events_path is not None:
+            base_outputs = Path(events_path).parent
+        elif records_path is not None:
+            base_outputs = Path(records_path).resolve().parent / "outputs"
+        if base_outputs is not None:
+            pred_dir = base_outputs / "ledger.predictions"
+            if pred_dir.exists():
+                frames = []
+                # read only needed columns and filter by id to keep this light
+                needed_cols = [
+                    "event",
+                    "as_of_round",
+                    "run_id",
+                    "id",
+                    "sequence",
+                    "pred__y_dim",
+                    "pred__y_obj_scalar",
+                    "sel__rank_competition",
+                    "sel__is_selected",
+                ]
+                for p in sorted(pred_dir.glob("part-*.parquet")):
+                    try:
+                        sub = pd.read_parquet(p, columns=needed_cols)
+                        sub = sub[
+                            (sub.get("event") == "run_pred")
+                            & (sub["id"].astype(str) == rid)
+                        ]
+                        if not sub.empty:
+                            frames.append(sub)
+                    except Exception:
+                        continue
+                ev = (
+                    pd.concat(frames, ignore_index=True)
+                    if frames
+                    else pd.DataFrame(columns=needed_cols)
+                )
+            else:
+                ev = pd.DataFrame(columns=["event"])
+        else:
+            ev = pd.DataFrame(columns=["event"])
 
     # Attach summaries outside the branch for clarity
     report["latest_rank_competition"] = latest_rank_comp

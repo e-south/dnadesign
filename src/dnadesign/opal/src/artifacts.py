@@ -16,7 +16,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Sequence
 from uuid import uuid4
 
 import pandas as pd
@@ -78,6 +78,11 @@ def write_objective_meta(path: Path, meta: Dict[str, Any]) -> str:
 
 
 def events_path(workdir: Path) -> Path:
+    """
+    Historically pointed at outputs/ledger.index.parquet.
+    We keep this helper to compute the *outputs/* root via `.parent`,
+    but the thin index is no longer written by default.
+    """
     d = workdir / "outputs"
     d.mkdir(parents=True, exist_ok=True)
     return d / "ledger.index.parquet"
@@ -91,8 +96,6 @@ def _append_parquet(path: Path, df: pd.DataFrame) -> None:
       • else → read existing, validate schema, concat, write tmp, atomic replace
     """
     ensure_dir(path.parent)
-    import pyarrow as pa
-    import pyarrow.parquet as pq
 
     new_tbl = pa.Table.from_pandas(df, preserve_index=False)
 
@@ -117,17 +120,52 @@ def _append_parquet(path: Path, df: pd.DataFrame) -> None:
             "or run a migration step."
         )
 
-    out_tbl = pa.concat_tables([old_tbl, new_tbl], promote_options="default")
+    # NOTE: promote=True is the correct flag in recent pyarrow versions.
+    out_tbl = pa.concat_tables([old_tbl, new_tbl], promote=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     pq.write_table(out_tbl, tmp)
     tmp.replace(path)
 
 
-def append_events(index_path: Path, df: pd.DataFrame) -> str:
+def _append_parquet_dedupe(path: Path, df: pd.DataFrame, *, key: Sequence[str]) -> None:
+    """
+    Append with de-duplication on `key` and atomic replace.
+
+    This is intended for small/skinny sinks (e.g., runs=1 row per run; labels << predictions),
+    so we keep the implementation simple and assertive by materializing in pandas.
+    """
+    ensure_dir(path.parent)
+
+    if not path.exists():
+        df.to_parquet(path, index=False)
+        return
+
+    existing = pd.read_parquet(path)
+    # Align column order strictly; assert mismatches
+    if list(existing.columns) != list(df.columns):
+        raise RuntimeError(
+            "Ledger sink schema mismatch.\n"
+            f"  existing: {list(existing.columns)}\n"
+            f"  new     : {list(df.columns)}"
+        )
+    out = pd.concat([existing, df], ignore_index=True)
+    out = out.drop_duplicates(subset=list(key), keep="last")
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    out.to_parquet(tmp, index=False)
+    tmp.replace(path)
+
+
+def append_events(
+    index_path: Path, df: pd.DataFrame, *, write_index: bool = False
+) -> str:
     """
     Canonical append for the **ledger** (append-only):
-      • Typed sinks written as **part files** under outputs/ledger.* directories.
-      • Thin **index** written to outputs/ledger.index.parquet for quick scans.
+      • Typed sinks written as:
+          - run_pred → parts under outputs/ledger.predictions/  (large)
+          - run_meta → single file outputs/ledger.runs.parquet   (append + de-dup)
+          - label    → single file outputs/ledger.labels.parquet (append + de-dup)
+      • (Deprecated) Thin index:
+          - Not written by default. Enable only if `write_index=True`.
 
     Enforces per-sink allow-lists to prevent schema pollution.
     """
@@ -193,10 +231,17 @@ def append_events(index_path: Path, df: pd.DataFrame) -> str:
         },
     }
 
+    # Target locations: file vs directory per sink
     TARGET_DIR = {
         "run_pred": index_path.parent / "ledger.predictions",
-        "run_meta": index_path.parent / "ledger.runs",
-        "label": index_path.parent / "ledger.labels",
+    }
+    TARGET_FILE = {
+        "run_meta": index_path.parent / "ledger.runs.parquet",
+        "label": index_path.parent / "ledger.labels.parquet",
+    }
+    DEDUPE_KEY = {
+        "run_meta": ("run_id",),
+        "label": ("observed_round", "id"),
     }
 
     def _write_part(target_dir: Path, subdf: pd.DataFrame) -> None:
@@ -228,22 +273,28 @@ def append_events(index_path: Path, df: pd.DataFrame) -> str:
                     f"(schema version {LEDGER_SCHEMA_VERSION})."
                 )
             sub = sub[[c for c in sub.columns if c in allow]].copy()
-        _write_part(TARGET_DIR[ev_name], sub)
 
-    # ---- 2) Thin index for convenience ----
-    INDEX_COLS = [
-        "event",
-        "run_id",
-        "as_of_round",
-        "id",
-        "sequence",
-        "pred__y_dim",
-        "pred__y_obj_scalar",
-        "sel__rank_competition",
-        "sel__is_selected",
-    ]
+        if ev_name == "run_pred":
+            _write_part(TARGET_DIR[ev_name], sub)
+        elif ev_name in TARGET_FILE:
+            # Append to a single file, de-duping on the configured key
+            _append_parquet_dedupe(TARGET_FILE[ev_name], sub, key=DEDUPE_KEY[ev_name])
+        else:
+            raise ValueError(f"No sink mapping for event kind: {ev_name!r}")
 
-    if True:  # keep schema stable; fill missing with None
+    # ---- 2) (Deprecated) Thin index for convenience ----
+    if write_index:
+        INDEX_COLS = [
+            "event",
+            "run_id",
+            "as_of_round",
+            "id",
+            "sequence",
+            "pred__y_dim",
+            "pred__y_obj_scalar",
+            "sel__rank_competition",
+            "sel__is_selected",
+        ]
         idx = {}
         n = len(df)
         for c in INDEX_COLS:

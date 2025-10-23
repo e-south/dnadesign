@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 import numpy as np
-from pyarrow import dataset as ds
 
 from ..registries.plot import register_plot
 from ._events_util import load_events_with_setpoint, resolve_events_path
@@ -68,19 +67,10 @@ def render(context, params: dict) -> None:
     size_min = float(params.get("size_min", 10.0))
     size_max = float(params.get("size_max", 60.0))
     events_path = resolve_events_path(context)
-    # If hue/size needs diagnostics, load from predictions + join setpoint; else use thin index for speed
-    if hue_field or size_by:
-        need = {"as_of_round", "pred__y_obj_scalar"}
-        need |= event_columns_for(hue_field, size_by)
-        df = load_events_with_setpoint(events_path, need, round_selector=context.rounds)
-    else:
-        dset = ds.dataset(str(events_path))
-        need = {"as_of_round", "pred__y_obj_scalar"}
-        names = {f.name for f in dset.schema}
-        missing = sorted(need - names)
-        if missing:
-            raise ValueError(f"ledger.index.parquet missing columns: {missing}")
-        df = dset.to_table(columns=list(need)).to_pandas()
+    # Always read from typed sinks (predictions + runs). This works with or without the thin index.
+    need = {"as_of_round", "pred__y_obj_scalar"}
+    need |= event_columns_for(hue_field, size_by)
+    df = load_events_with_setpoint(events_path, need, round_selector=context.rounds)
     if df.empty:
         raise ValueError("ledger.index.parquet contained zero rows after projection.")
 

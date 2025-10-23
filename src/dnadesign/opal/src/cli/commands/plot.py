@@ -111,7 +111,7 @@ def cmd_plot(
     # Resolve campaign.yaml
     cfg_path = resolve_config_path(config)
     campaign_dir, campaign_cfg = _resolve_campaign_dir(cfg_path)
-    typer.echo(f"[plot] Using config: {cfg_path}")
+    typer.secho(f"[plot] Using config: {cfg_path}", fg=typer.colors.CYAN)
 
     plots_cfg = campaign_cfg.get("plots") or []
     if not isinstance(plots_cfg, list):
@@ -283,16 +283,21 @@ def cmd_plot(
         # Run plugin (overwrite outputs by default)
         try:
             ctx.output_dir.mkdir(parents=True, exist_ok=True)
-            typer.echo(
+            typer.secho(
                 f"[plot] entry '{pname}': keys={sorted(entry.keys())} "
                 f"params_type={type(entry.get('params')).__name__} "
-                f"params_preview={ {k: entry['params'].get(k) for k in (entry.get('params') or {}).keys()} if isinstance(entry.get('params'), dict) else '(not a dict)'}"  # noqa
+                f"params_preview={ {k: entry['params'].get(k) for k in (entry.get('params') or {}).keys()} if isinstance(entry.get('params'), dict) else '(not a dict)'}",  # noqa
+                fg=typer.colors.BLUE,
             )
+
             get_plot(pkind)(ctx, params)
-            typer.echo(f"[ok] {pname} ({pkind}) → {ctx.output_dir / ctx.filename}")
+            typer.secho(
+                f"[ok] {pname} ({pkind}) → {ctx.output_dir / ctx.filename}",
+                fg=typer.colors.GREEN,
+            )
         except Exception:  # full traceback always
             any_fail = True
-            typer.echo(f"[fail] {pname} ({pkind})")
+            typer.secho(f"[fail] {pname} ({pkind})", fg=typer.colors.RED)
             traceback.print_exc()
 
     raise typer.Exit(code=1 if any_fail else 0)

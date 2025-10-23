@@ -12,6 +12,7 @@ Dunlop Lab
 
 # Register built-in plot plugins
 from . import (  # noqa: F401
+    feature_importance_bars,
     fold_change_vs_logic_fidelity,
     percent_high_activity_over_rounds,
     scatter_score_vs_rank,
