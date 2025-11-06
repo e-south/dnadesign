@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/permuter/protocols/scan_codon.py
+src/dnadesign/permuter/protocols/dms/scan_codon.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

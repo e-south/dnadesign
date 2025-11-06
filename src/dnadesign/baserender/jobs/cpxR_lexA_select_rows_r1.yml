@@ -63,7 +63,7 @@ style:
   palette:
     sigma: "#969eba"        # σ⁷⁰ color
     "tf:cpxr": "#bf812e"    # quote keys with ':'
-    "tf:lexa": "##dfc27e"
+    "tf:lexa": "#dfc27e"
 
 output:
   video:

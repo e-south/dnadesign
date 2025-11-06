@@ -21,7 +21,12 @@ from matplotlib.patches import FancyBboxPatch, PathPatch
 from matplotlib.textpath import TextPath
 from matplotlib.transforms import Affine2D
 
-from .layout import assign_tracks, comp, measure_char_cell
+from .layout import (
+    assign_tracks,
+    assign_tracks_forward_with_sigma_lock,
+    comp,
+    measure_char_cell,
+)
 from .model import Guide, SeqRecord
 from .palette import Palette
 from .style import Style
@@ -69,7 +74,7 @@ def _compute_layout(
     # Track counts (honor priority via assign_tracks)
     up = [a for a in record.annotations if a.strand == "fwd"]
     dn = [a for a in record.annotations if a.strand == "rev"]
-    up_tracks = assign_tracks(up)
+    up_tracks = assign_tracks_forward_with_sigma_lock(up)
     dn_tracks = assign_tracks(dn)
     used_up = (max(up_tracks) + 1) if up_tracks else 0
     used_dn = (max(dn_tracks) + 1) if dn_tracks else 0
@@ -97,7 +102,7 @@ def _compute_layout(
     # Ensure the entire content block sits ABOVE the reserved legend space
     # [0 .. legend_space]. If bottom < legend_space, shift everything up.
     if legend_space > 0 and bottom < legend_space:
-        dy = (legend_space - bottom)
+        dy = legend_space - bottom
         y0 += dy
         y1 += dy
         top += dy

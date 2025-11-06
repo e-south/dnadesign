@@ -7,7 +7,7 @@ src/dnadesign/baserender/layout.py
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Tuple
 
 from matplotlib.font_manager import FontProperties
 from matplotlib.textpath import TextPath
@@ -75,4 +75,66 @@ def assign_tracks(annotations: List[Annotation]) -> List[int]:
         if not placed:
             track_ends.append(end)
             tracks[idx] = len(track_ends) - 1
+    return tracks
+
+
+def _is_sigma(a: Annotation) -> bool:
+    """True for any σ70 piece (plugin tag 'sigma' or dataset 'tf:sigma70_*')."""
+    tag = (a.tag or "").lower()
+    return tag == "sigma" or tag.startswith("tf:sigma70_")
+
+
+def assign_tracks_forward_with_sigma_lock(annotations: List[Annotation]) -> List[int]:
+    """
+    Forward-strand track assignment with **σ70 lock**:
+      - All σ70 annotations (−35, −10) are forced to **track 0**.
+      - Non-σ annotations are assigned greedily to **tracks ≥ 1** (never track 0).
+    This guarantees σ boxes share one plane and the spacer link can be drawn on it
+    without other TFs overlapping that horizontal line.
+    """
+    if not annotations:
+        return []
+
+    # Partition forward annotations into sigma vs non-sigma.
+    # (Render code calls this only for forward annotations.)
+    sigma_idxs: List[int] = []
+    other_idxs: List[int] = []
+    for i, a in enumerate(annotations):
+        (sigma_idxs if _is_sigma(a) else other_idxs).append(i)
+
+    # Start with everyone unassigned; then stamp σ → track 0.
+    tracks: List[int] = [-1] * len(annotations)
+    for i in sigma_idxs:
+        tracks[i] = 0
+
+    # Build intervals currently occupying each track.
+    # Track 0 has σ boxes; higher tracks will be filled greedily.
+    track_ends: List[int] = []
+    # Ensure list long enough to reference track 0.
+    track_ends.append(
+        max((annotations[i].end() for i in sigma_idxs), default=0)
+    )  # track 0 terminal end (not really used for routing others)
+
+    # Prepare non-sigma events with stable placement: priority by start, longer first.
+    events: List[Tuple[int, int, int, int]] = []
+    for i in other_idxs:
+        a = annotations[i]
+        events.append((a.start, a.end(), -(a.length), i))
+    events.sort(key=lambda t: (t[0], t[1], t[2]))  # start, end, longer first
+
+    # Greedy fit for non-σ annotations into tracks >= 1.
+    for _, start, _, idx in events:
+        placed = False
+        # Try existing tracks **from 1 upward** (track 0 is reserved).
+        for t in range(1, len(track_ends)):
+            if track_ends[t] <= start:
+                track_ends[t] = annotations[idx].end()
+                tracks[idx] = t
+                placed = True
+                break
+        if not placed:
+            # Open a new track above current highest.
+            track_ends.append(annotations[idx].end())
+            tracks[idx] = len(track_ends) - 1
+
     return tracks

@@ -19,7 +19,7 @@ input:
 # explicit selection from a CSV
 selection:
   # resolves against the baserender root
-  path: inputs/r0_preds.csv           # e.g., a file with an 'id' header
+  path: inputs/scratch.csv           # e.g., a file with an 'id' header
   match_on: id                       # id | sequence | row
   column: id                         # which column in the CSV to read
   overlay_column: details
@@ -49,17 +49,21 @@ style:
   baseline_spacing: 40.0   # distance between forward & reverse baselines
   padding_y: 05.0          # top/bottom padding; increases natural frame height
   legend_height_px: 16.0   # reserved space; prevents overlap
-  legend_pad_px: 10.0     # bottom margin below legend 
+  legend_pad_px: 10.0      # bottom margin below legend 
   legend: true
   font_size_seq: 14
   font_size_label: 12
   kmer:
-    height_factor: 1.10     # for example, a taller box
+    height_factor: 1.15     # for example, a taller box
     text_v_align: center    # center the white letters in the box
     round_px: 5.0
     pad_x_px: 1.025                  # widen k‑mer background boxes slightly
     fill_alpha: 0.88
   sigma_link_inner_margin_bp: 0.50  # default for all sigma links
+  palette:
+    sigma: "#969eba"        # σ⁷⁰ color
+    "tf:cpxr": "#bf812e"    # quote keys with ':'
+    "tf:lexa": "#dfc27e"
 
 output:
   video:

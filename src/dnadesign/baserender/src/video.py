@@ -104,46 +104,49 @@ def _letterbox(arr, W: int, H: int):
 
 def _legend_entries_for_record(r: SeqRecord) -> list[tuple[str, str]]:
     """
-    Build the legend for a *single* record.
-    - TFs: 'tf:<name>' → '<name>' (dedup, stable order)
-    - σ70: show **one** entry (σ high|medium|low). We detect it from either:
-        • plugin-added 'sigma' boxes (preferred), or
-        • pre-existing 'tf:sigma70_*' annotations in the dataset.
-      All σ70 strengths share one color via tag 'sigma'.
+    Build the legend for one record.
+    - Non‑σ TFs: 'tf:<name>' → '<name>' (dedup, stable order).
+    - σ⁷⁰: **prefer dataset‑declared strength** from 'tf:sigma70_*';
+            fall back to plugin ('sigma' tag or 'sigma_link' guide) only if needed.
     """
     entries: list[tuple[str, str]] = []
     seen_tfs: set[str] = set()
-    sigma_strength: str | None = None
+    sigma_from_dataset: str | None = None
+    sigma_from_plugin: str | None = None
 
     for a in r.annotations:
         if a.tag.startswith("tf:"):
             name = a.tag[3:]
-            # If dataset already contains sigma70_* as TFs, fold into σ legend
             low = name.lower()
             if low.startswith("sigma70_"):
-                # Names can be: sigma70_mid, sigma70_mid_upstream, sigma70_high_downstream, ...
-                # Keep only the strength token (low|mid|high); drop trailing qualifiers.
-                parts = low.split("_")
-                for tok in parts[1:]:
+                for tok in low.split("_")[1:]:
                     if tok in {"low", "mid", "high"}:
-                        if sigma_strength is None:
-                            sigma_strength = tok
+                        if sigma_from_dataset is None:
+                            sigma_from_dataset = tok
                         break
-                # do not list sigma70_* again as a plain TF
+                # don't list sigma70_* again as a plain TF
                 continue
             if name not in seen_tfs:
                 seen_tfs.add(name)
                 entries.append((a.tag, name))
         elif a.tag == "sigma":
-            try:
-                st = (a.payload or {}).get("strength")  # type: ignore[assignment]
-                if isinstance(st, str):
-                    sigma_strength = sigma_strength or st.lower()
-            except Exception:
-                pass
+            st = (a.payload or {}).get("strength")
+            if isinstance(st, str) and st.lower() in {"low", "mid", "high"}:
+                if sigma_from_plugin is None:
+                    sigma_from_plugin = st.lower()
 
-    if sigma_strength:
-        entries.append(("sigma", f"σ70 {sigma_strength}"))
+    # Last‑chance fallback: the plugin encodes strength on the sigma_link guide too
+    if sigma_from_dataset is None and sigma_from_plugin is None:
+        for g in r.guides:
+            if getattr(g, "kind", "") == "sigma_link":
+                st = (g.payload or {}).get("strength")
+                if isinstance(st, str) and st.lower() in {"low", "mid", "high"}:
+                    sigma_from_plugin = st.lower()
+                    break
+
+    strength = sigma_from_dataset or sigma_from_plugin
+    if strength:
+        entries.append(("sigma", f"σ70 {strength}"))
     return entries
 
 

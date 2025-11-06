@@ -19,8 +19,10 @@ from dnadesign.permuter.src.evaluators.base import Evaluator
 
 
 def _stable_float(seed: str) -> float:
+    # map 64-bit integer to [-1, 1)
     h = hashlib.sha256(seed.encode()).hexdigest()[:16]
-    return (int(h, 16) / 2**63) * 2 - 1
+    x = int(h, 16)
+    return (x / (2**64 - 1)) * 2.0 - 1.0
 
 
 class PlaceholderEvaluator(Evaluator):

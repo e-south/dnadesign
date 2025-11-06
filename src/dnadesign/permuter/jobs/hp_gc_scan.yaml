@@ -38,15 +38,15 @@ job:
 
   evaluate:
     metrics:
-    #   - id: ll_mean
-    #     evaluator: evo2_ll
-    #     metric: log_likelihood
-    #     params:
-    #       model_id: evo2_7b
-    #       device: cuda:0
-    #       precision: bf16
-    #       alphabet: dna
-    #       reduction: mean
+      - id: ll_mean
+        evaluator: evo2_ll
+        metric: log_likelihood
+        params:
+          model_id: evo2_7b
+          device: cuda:0
+          precision: bf16
+          alphabet: dna
+          reduction: mean
     #   - id: ll_sum
     #     evaluator: evo2_ll
     #     metric: log_likelihood
@@ -56,9 +56,9 @@ job:
     #       precision: bf16
     #       alphabet: dna
     #       reduction: sum
-      - id: fake_ll
-        evaluator: placeholder
-        metric: log_likelihood
+      # - id: fake_ll
+      #   evaluator: placeholder
+      #   metric: log_likelihood
 
   output:
     dir: "${JOB_DIR}/../results/retron_hp_swap"
