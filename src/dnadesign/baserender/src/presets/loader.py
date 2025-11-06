@@ -58,6 +58,7 @@ class SelectionCfg:
     path: Path
     match_on: str  # 'id' | 'sequence' | 'row'
     column: str  # CSV column to read
+    overlay_column: Optional[str]
     keep_order: bool
     on_missing: str  # 'skip' | 'warn' | 'error'
 
@@ -228,6 +229,8 @@ def load_job(path: Path) -> Job:
         )
         default_col = "row" if match_on == "row" else match_on
         column = str(sel_raw.get("column", default_col))
+        overlay_column = sel_raw.get("overlay_column") or sel_raw.get("details_column")
+        overlay_column = str(overlay_column) if overlay_column is not None else None
         keep_order = bool(sel_raw.get("keep_order", True))
         on_missing = str(sel_raw.get("on_missing", "warn")).lower()
         ensure(
@@ -239,6 +242,7 @@ def load_job(path: Path) -> Job:
             path=p,
             match_on=match_on,
             column=column,
+            overlay_column=overlay_column,
             keep_order=keep_order,
             on_missing=on_missing,
         )

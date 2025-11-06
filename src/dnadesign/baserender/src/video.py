@@ -121,11 +121,14 @@ def _legend_entries_for_record(r: SeqRecord) -> list[tuple[str, str]]:
             # If dataset already contains sigma70_* as TFs, fold into σ legend
             low = name.lower()
             if low.startswith("sigma70_"):
-                # derive 'high'|'medium'|'low' from tf name suffix
-                st = low.split("_", 1)[-1]
-                st = {"mid": "medium"}.get(st, st)
-                if sigma_strength is None:
-                    sigma_strength = st
+                # Names can be: sigma70_mid, sigma70_mid_upstream, sigma70_high_downstream, ...
+                # Keep only the strength token (low|mid|high); drop trailing qualifiers.
+                parts = low.split("_")
+                for tok in parts[1:]:
+                    if tok in {"low", "mid", "high"}:
+                        if sigma_strength is None:
+                            sigma_strength = tok
+                        break
                 # do not list sigma70_* again as a plain TF
                 continue
             if name not in seen_tfs:
@@ -140,8 +143,7 @@ def _legend_entries_for_record(r: SeqRecord) -> list[tuple[str, str]]:
                 pass
 
     if sigma_strength:
-        label = f"σ {sigma_strength}"
-        entries.append(("sigma", label))
+        entries.append(("sigma", f"σ70 {sigma_strength}"))
     return entries
 
 

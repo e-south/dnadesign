@@ -5,7 +5,6 @@ input:
     id: id
     sequence: sequence
     annotations: densegen__used_tfbs_detail
-    details: details
   alphabet: DNA
   limit: 100     # set 0 to process all rows
   sample_seed: 42
@@ -23,6 +22,7 @@ selection:
   path: inputs/r0_preds.csv           # e.g., a file with an 'id' header
   match_on: id                       # id | sequence | row
   column: id                         # which column in the CSV to read
+  overlay_column: details
   keep_order: true                   # video/stills follow CSV order
   on_missing: warn                   # skip|warn|error if not found
 

@@ -131,10 +131,8 @@ class Sigma70Plugin:
             # Single, unified tag for all sigma variants (one color in the plot).
             tag_base = "sigma"
             strength_raw = v.name.split("_", 1)[-1] if "_" in v.name else v.name
-            # Normalize to user-facing text
-            strength = {"mid": "medium", "high": "high", "low": "low"}.get(
-                strength_raw.lower(), strength_raw
-            )
+            # Keep 'low|mid|high' exactly as encoded by the variant name
+            strength = strength_raw.lower()
             prio = {"priority": 0, "group": tag_base, "strength": strength}
 
             # Upstream (-35) and downstream (-10), same tag (shared hue)

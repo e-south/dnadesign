@@ -10,6 +10,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import itertools
+from dataclasses import replace as _dc_replace
 from pathlib import Path
 from typing import Iterable, Optional, TypeVar
 
@@ -110,6 +111,66 @@ def _read_csv_column(path: Path, column: str) -> list[str]:
                 f"CSV '{path}' column '{column}' contains no non-blank values."
             )
         return out
+
+
+def _read_csv_keys_and_overlay(
+    path: Path,
+    key_col: str,
+    overlay_col: Optional[str],
+):
+    """
+    Read a headered CSV and return:
+      - keys: list[str]           (values from key_col, in file order, blanks skipped)
+      - overlays: list[Optional[str]]  (aligned to keys; None when blank/missing)
+      - used_overlay: Optional[str]    (the overlay column we actually used)
+      - overlay_by_key: dict[str, str] (non-blank overlay by key; last one wins)
+    If overlay_col is None, auto-detect a column literally named 'details' if present.
+    """
+    import csv
+
+    keys: list[str] = []
+    overlays: list[Optional[str]] = []
+    overlay_by_key: dict[str, str] = {}
+    used_overlay: Optional[str] = overlay_col
+    with open(path, newline="") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames is None or key_col not in reader.fieldnames:
+            raise typer.BadParameter(
+                f"CSV '{path}' must contain column '{key_col}' "
+                f"(found: {reader.fieldnames or []})"
+            )
+        # Auto-detect 'details' if overlay not specified
+        if used_overlay is None and "details" in reader.fieldnames:
+            used_overlay = "details"
+        # Warn if explicitly requested overlay is missing
+        if overlay_col and overlay_col not in reader.fieldnames:
+            console.print(
+                f"[yellow]WARN[/] selection.overlay_column='{overlay_col}' not found in CSV. "
+                f"Available columns: {reader.fieldnames}. Falling back to default behavior."
+            )
+            used_overlay = None
+        for row in reader:
+            raw_key = row.get(key_col)
+            if raw_key is None:
+                continue
+            k = str(raw_key).strip()
+            if k == "":
+                continue
+            keys.append(k)
+            text: Optional[str] = None
+            if used_overlay:
+                txt_raw = row.get(used_overlay)
+                if txt_raw is not None:
+                    s = str(txt_raw).strip()
+                    if s != "":
+                        text = s
+                        overlay_by_key[k] = s  # last non-blank wins
+            overlays.append(text)
+    if not keys:
+        raise typer.BadParameter(
+            f"CSV '{path}' column '{key_col}' contains no non-blank values."
+        )
+    return keys, overlays, used_overlay, overlay_by_key
 
 
 # ---- direct (ad-hoc) commands ------------------------------------------------
@@ -360,14 +421,23 @@ def job_run(
     if getattr(cfg, "selection", None) is not None:
         sel = cfg.selection  # type: ignore[attr-defined]
         console.log(
-            f"Selection CSV: {sel.path}  (match_on={sel.match_on}, column={sel.column})"
+            f"Selection CSV: {sel.path}  (match_on={sel.match_on}, column={sel.column}"
+            + (f", overlay_column={sel.overlay_column}" if sel.overlay_column else "")
+            + ")"
         )
         # Fast path for 'id' on parquet: use Arrow dataset filter to avoid full-table scans.
         if sel.match_on == "id" and cfg.format == "parquet" and cfg.id_col:
             from .io.parquet import read_parquet_records_by_ids, resolve_present_ids
             from .plugins.registry import load_plugins
 
-            keys = _read_csv_column(sel.path, sel.column)
+            keys, overlays, used_overlay, overlay_by_key = _read_csv_keys_and_overlay(
+                sel.path, sel.column, sel.overlay_column
+            )
+            if used_overlay:
+                console.log(
+                    f"Using overlay text from CSV column '{used_overlay}' "
+                    f"({sum(1 for x in overlays if x)} non-blank)"
+                )
             # Assert id column is provided
             if not cfg.id_col:
                 raise typer.BadParameter(
@@ -416,10 +486,30 @@ def job_run(
                 r = by_id.get(k)
                 if r is None:
                     continue  # missing or dropped-by-policy (already reported)
-                label = f"sel_row={j}  id={r.id}"
-                r = r.with_extra(
-                    guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
-                )
+                csv_label = overlays[j] if j < len(overlays) else None
+                if csv_label:
+                    # Replace any existing overlay_label to ensure CSV wins.
+                    base_guides = [
+                        g for g in r.guides if getattr(g, "kind", "") != overlay_kind
+                    ]
+                    r = _dc_replace(r, guides=tuple(base_guides)).validate()
+                    label = f"{csv_label}  id={r.id}"
+                    r = r.with_extra(
+                        guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
+                    )
+                else:
+                    # If Parquet already supplied an overlay, keep it; otherwise add the fallback.
+                    has_overlay = any(
+                        getattr(g, "kind", "") == overlay_kind and g.label
+                        for g in r.guides
+                    )
+                    if not has_overlay:
+                        label = f"sel_row={j}  id={r.id}"
+                        r = r.with_extra(
+                            guides=[
+                                Guide(kind=overlay_kind, start=0, end=0, label=label)
+                            ]
+                        )
                 recs_list.append(r)
             if not recs_list:
                 console.print(
@@ -430,7 +520,14 @@ def job_run(
             # ignore limit/sample_seed when selection is explicit
         elif sel.match_on == "row":
             # Interpret CSV values as 0-based row indices into the dataset.
-            idx_vals = _read_csv_column(sel.path, sel.column)
+            idx_vals, overlays, used_overlay, overlay_by_key = (
+                _read_csv_keys_and_overlay(sel.path, sel.column, sel.overlay_column)
+            )
+            if used_overlay:
+                console.log(
+                    f"Using overlay text from CSV column '{used_overlay}' "
+                    f"({sum(1 for x in overlays if x)} non-blank)"
+                )
             try:
                 idxs = [int(x) for x in idx_vals]
             except Exception:
@@ -457,14 +554,41 @@ def job_run(
                 r = found.get(i)
                 if r is None:
                     continue
-                label = f"row={i}  sel_row={j}"
-                r = r.with_extra(
-                    guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
+                csv_label = (
+                    overlays[j] if sel.keep_order else overlay_by_key.get(str(i))
                 )
+                if csv_label:
+                    base_guides = [
+                        g for g in r.guides if getattr(g, "kind", "") != overlay_kind
+                    ]
+                    r = _dc_replace(r, guides=tuple(base_guides)).validate()
+                    label = f"{csv_label}  id={r.id}"
+                    r = r.with_extra(
+                        guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
+                    )
+                else:
+                    has_overlay = any(
+                        getattr(g, "kind", "") == overlay_kind and g.label
+                        for g in r.guides
+                    )
+                    if not has_overlay:
+                        label = f"row={i}  sel_row={j}"
+                        r = r.with_extra(
+                            guides=[
+                                Guide(kind=overlay_kind, start=0, end=0, label=label)
+                            ]
+                        )
                 recs_list.append(r)
         else:
             # Fallback: match_on 'sequence' (or 'id' without fast path) by scanning the dataset.
-            keys = _read_csv_column(sel.path, sel.column)
+            keys, overlays, used_overlay, overlay_by_key = _read_csv_keys_and_overlay(
+                sel.path, sel.column, sel.overlay_column
+            )
+            if used_overlay:
+                console.log(
+                    f"Using overlay text from CSV column '{used_overlay}' "
+                    f"({sum(1 for x in overlays if x)} non-blank)"
+                )
             key_attr = "sequence" if sel.match_on == "sequence" else "id"
             want = set(keys) if not sel.keep_order else None
             found_map = {}
@@ -494,10 +618,28 @@ def job_run(
                 r = found_map.get(k)
                 if r is None:
                     continue
-                label = f"sel_row={j}"
-                r = r.with_extra(
-                    guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
-                )
+                csv_label = overlays[j] if sel.keep_order else overlay_by_key.get(k)
+                if csv_label:
+                    base_guides = [
+                        g for g in r.guides if getattr(g, "kind", "") != overlay_kind
+                    ]
+                    r = _dc_replace(r, guides=tuple(base_guides)).validate()
+                    label = f"{csv_label}  id={r.id}"
+                    r = r.with_extra(
+                        guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
+                    )
+                else:
+                    has_overlay = any(
+                        getattr(g, "kind", "") == overlay_kind and g.label
+                        for g in r.guides
+                    )
+                    if not has_overlay:
+                        label = f"sel_row={j}"
+                        r = r.with_extra(
+                            guides=[
+                                Guide(kind=overlay_kind, start=0, end=0, label=label)
+                            ]
+                        )
                 recs_list.append(r)
     else:
         # No explicit selection: honor limit/sample_seed and annotate with dataset row index.

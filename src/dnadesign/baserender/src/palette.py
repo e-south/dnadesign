@@ -26,9 +26,22 @@ class Palette:
     def __init__(self, overrides: Mapping[str, str] | None = None):
         self.overrides = dict(overrides or {})  # hex string overrides
 
+    @staticmethod
+    def _canonical_tag(tag: str) -> str:
+        """
+        Map semantically equivalent tags to a single color key.
+        - Consolidate σ70 pieces: tf:sigma70_* → 'sigma'
+        """
+        low = tag.lower()
+        if low.startswith("tf:sigma70_"):
+            return "sigma"
+        return tag
+
     def color_for(self, tag: str) -> Tuple[float, float, float]:
+        # Normalize to a canonical color key first
+        tag_key = self._canonical_tag(tag)
         # prefer override
-        hex_color = self.overrides.get(tag)
+        hex_color = self.overrides.get(tag_key)
         if hex_color:
             h = hex_color.lstrip("#")
             r = int(h[0:2], 16) / 255.0
@@ -37,7 +50,7 @@ class Palette:
             return (r, g, b)
 
         # derive stable pastel from hash
-        digest = hashlib.sha1(tag.encode("utf8")).hexdigest()
+        digest = hashlib.sha1(tag_key.encode("utf8")).hexdigest()
         hue = int(digest[:2], 16) / 255.0  # 0..1
         # Softer (pastel): slightly lower saturation, higher lightness
         sat = 0.38

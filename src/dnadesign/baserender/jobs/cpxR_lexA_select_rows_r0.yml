@@ -22,6 +22,7 @@ selection:
   path: inputs/pES1-12p.csv   # e.g., a file with an 'id' header
   match_on: id                       # id | sequence | row
   column: id                         # which column in the CSV to read
+  overlay_column: details
   keep_order: true                   # video/stills follow CSV order
   on_missing: warn                   # skip|warn|error if not found
 
@@ -59,6 +60,10 @@ style:
     pad_x_px: 1.025                  # widen k‑mer background boxes slightly
     fill_alpha: 0.88
   sigma_link_inner_margin_bp: 0.50  # default for all sigma links
+  palette:
+    sigma: "#969eba"        # σ⁷⁰ color
+    "tf:cpxr": "#bf812e"    # quote keys with ':'
+    "tf:lexa": "##dfc27e"
 
 output:
   video:
