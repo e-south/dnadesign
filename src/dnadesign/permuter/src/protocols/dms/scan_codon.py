@@ -16,7 +16,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
-from .base import Protocol
+from ..base import Protocol
 
 _TRIPLE = 3
 _BASE_REQUIRED = {"codon", "amino_acid"}

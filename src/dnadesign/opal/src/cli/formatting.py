@@ -4,18 +4,47 @@
 src/dnadesign/opal/src/cli/formatting.py
 
 CLI-wide human-output formatting helpers and renderers.
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Adds optional Rich markup (guarded by OPAL_CLI_MARKUP). JSON remains unstyled.
 --------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+
+# -------------
+# Markup gate
+# -------------
+_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def _markup_enabled() -> bool:
+    val = os.getenv("OPAL_CLI_MARKUP", "").strip().lower()
+    if val == "":
+        # default on; app.py sets OPAL_CLI_MARKUP alongside --color
+        return True
+    return val in _TRUTHY
+
+
+_M = _markup_enabled()
+
+
+def _b(s: str) -> str:
+    return f"[bold]{s}[/]" if _M else s
+
+
+def _t(s: str) -> str:
+    # title accent
+    return f"[bold cyan]{s}[/]" if _M else s
+
+
+def _dim(s: str) -> str:
+    return f"[dim]{s}[/]" if _M else s
+
 
 # -----------------------
 # Core formatting helpers
@@ -28,37 +57,33 @@ def _indent(s: str, n: int = 2) -> str:
 
 
 def _fmt_multiline(v: object) -> str:
-    """
-    Pretty-print values inside kv blocks. If a value spans multiple lines,
-    indent the continuation lines so nested JSON (e.g., selection.params)
-    is easy to read in human stdout.
-    """
     s = v if isinstance(v, str) else str(v)
     return ("\n" + _indent(s, 2)) if "\n" in s else s
 
 
 def kv_block(title: str, items: Mapping[str, object]) -> str:
     """
-    Render a simple key/value block. Keys are printed in the order provided
-    to make caller control of layout deterministic (avoid implicit sorting).
+    Render a simple key/value block with a styled header and aligned keys.
     """
-    lines = [str(title)]
+    lines = [_t(str(title))]
     for k in items.keys():
         v = _fmt_multiline(items[k])
-        lines.append(f"  {k:24s}: {v}")
+        key = f"{_b(str(k))}"
+        lines.append(f"  {key:24s}: {v}")
     return "\n".join(lines)
 
 
 def bullet_list(title: str, rows: Iterable[str]) -> str:
     rows = [str(r) for r in rows]
+    bullet = "•"
     if not rows:
-        return f"{title}\n  • (none)"
-    return title + "\n  • " + "\n  • ".join(rows)
+        return f"{_t(title)}\n  {bullet} {_dim('(none)')}"
+    return _t(title) + "\n  " + f"{bullet} " + f"\n  {bullet} ".join(rows)
 
 
 def short_array(a, maxlen: int = 8) -> str:
     try:
-        import numpy as np  # local import; optional
+        import numpy as np  # optional
 
         arr = np.asarray(a).ravel().tolist()
     except Exception:
@@ -81,16 +106,15 @@ def _as_dict(obj: Any) -> Dict[str, Any]:
         return asdict(obj)
     if isinstance(obj, dict):
         return obj
-    # Best-effort: reflect attribute dicts
     if hasattr(obj, "__dict__"):
         return dict(obj.__dict__)
-    # Fallback to string representation wrapped
     return {"value": str(obj)}
 
 
 def _fmt_params(params: Any) -> str:
     try:
-        return json.dumps(params, indent=2, sort_keys=True)
+        txt = json.dumps(params, indent=2, sort_keys=True)
+        return txt if not _M else f"[white]{txt}[/]"
     except Exception:
         return str(params)
 
@@ -111,7 +135,6 @@ def _sha_short(sha: str, n: int = 12) -> str:
 
 
 def render_explain_human(info: Mapping[str, Any]) -> str:
-    """Human summary for `opal explain`."""
     sel = info.get("selection", {}) or {}
     obj = sel.get("objective", {}) or {}
     yops = info.get("training_y_ops") or info.get("training_y_ops", []) or []
@@ -168,7 +191,6 @@ def render_ingest_preview_human(
     *,
     transform_name: Optional[str] = None,
 ) -> str:
-    """Human preview for `opal ingest-y` prior to confirmation."""
     p = _as_dict(preview)
     head = kv_block(
         f"[Preview] ingest-y (transform={transform_name or '(from YAML)'})",
@@ -187,7 +209,6 @@ def render_ingest_preview_human(
     if not sample_rows:
         return head
 
-    # show at most 5 compact rows
     lines: List[str] = []
     for r in sample_rows[:5]:
         seq = _truncate(r.get("sequence", ""))
@@ -259,7 +280,6 @@ def render_record_report_human(report: Mapping[str, Any]) -> str:
     if report.get("error"):
         return kv_block("record-show", {"error": report.get("error")})
 
-    # Optional sources (succinct, relative paths)
     sources = report.get("sources") or {}
     src_block = ""
     if sources:
@@ -291,7 +311,6 @@ def render_record_report_human(report: Mapping[str, Any]) -> str:
         },
     )
 
-    # compact per-run lines
     runs = report.get("runs") or []
     lines = []
     for r in runs:
@@ -299,9 +318,7 @@ def render_record_report_human(report: Mapping[str, Any]) -> str:
             f"r={r.get('as_of_round')}",
             f"run_id={_truncate(r.get('run_id',''), 18)}",
         ]
-        # Show common fields if present
         for k in ("sel__is_selected", "sel__rank_competition", "pred__y_obj_scalar"):
-
             if k in r:
                 parts.append(f"{k.split('__', 1)[-1]}={r[k]}")
         lines.append(", ".join(parts))
@@ -314,16 +331,15 @@ def render_run_summary_human(summary: dict) -> str:
     rid = summary.get("run_id", "")
     requested = summary.get("top_k_requested")
     effective = summary.get("top_k_effective")
-    # tie policy is logged in the round log; not in summary. If you prefer, plumb it through.
     tie_hint = summary.get("tie_handling") or "competition_rank"
-    sel_line = f"selection: top_k={requested} (requested) → selected={effective} (effective after ties, tie_handling={tie_hint})"  # noqa
+    sel_line = f"selection: top_k={requested} (requested) → selected={effective} (effective after ties, tie_handling={tie_hint})" # noqa
     lines = [
-        f"run_id: {rid}",
-        f"as_of_round: {summary.get('as_of_round')}",
-        f"trained_on: {summary.get('trained_on')} | scored: {summary.get('scored')}",
+        f"{_b('run_id')}: {rid}",
+        f"{_b('as_of_round')}: {summary.get('as_of_round')}",
+        f"{_b('trained_on')}:{' '}{summary.get('trained_on')} | {_b('scored')}:{' '}{summary.get('scored')}",
         sel_line,
-        f"events: {summary.get('events')}",
-        f"top_k_source: {summary.get('top_k_source')}",
+        f"{_b('events')}: {summary.get('events')}",
+        f"{_b('top_k_source')}: {summary.get('top_k_source')}",
     ]
     return "\n".join(lines)
 
@@ -343,7 +359,7 @@ def render_status_human(st: Mapping[str, Any]) -> str:
 
     latest = st.get("latest_round") or {}
     if not latest:
-        return head + "\n\n" + "No completed rounds."
+        return head + "\n\n" + _dim("No completed rounds.")
 
     latest_block = kv_block(
         "Latest round",

@@ -19,7 +19,11 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from .config import SSHRemoteConfig, get_remote, load_all, save_remote
-from .convert_legacy import convert_legacy, profile_60bp_dual_promoter
+from .convert_legacy import (
+    convert_legacy,
+    profile_60bp_dual_promoter,
+    repair_densegen_used_tfbs,
+)
 from .dataset import Dataset
 from .errors import DuplicateIDError, SequencesError, UserAbort
 from .io import append_event
@@ -138,6 +142,34 @@ def _prompt_pick_parquet(cands: list[Path], use_rich: bool) -> Path | None:
         pass
     print(f"Invalid selection. Using newest: {cands[0].name}")
     return cands[0]
+
+
+def cmd_repair_densegen(args):
+    ds_name = _resolve_dataset_name_interactive(
+        args.root, getattr(args, "dataset", None), bool(getattr(args, "rich", False))
+    )
+    if not ds_name:
+        return
+    stats = repair_densegen_used_tfbs(
+        dataset_root=args.root,
+        dataset_name=ds_name,
+        min_tfbs_len=int(getattr(args, "min_tfbs_len", 6)),
+        dry_run=bool(getattr(args, "dry_run", False)),
+        assume_yes=bool(getattr(args, "yes", False)),
+        dedupe_policy=(
+            None if getattr(args, "dedupe", "off") == "off" else getattr(args, "dedupe")
+        ),
+        drop_missing_used_tfbs=bool(getattr(args, "drop_missing_used_tfbs", False)),
+        drop_single_tf=bool(getattr(args, "drop_single_tf", False)),
+        drop_id_seq_only=bool(getattr(args, "drop_id_seq_only", False)),
+        filter_single_tf=bool(getattr(args, "filter_single_tf", False)),
+    )
+    print(
+        f"[repair-densegen] rows={stats.rows_total}  touched={stats.rows_touched}  "
+        f"changed(parts/used/detail/counts/u_list)={stats.rows_changed_tfbs_parts}/"
+        f"{stats.rows_changed_used_tfbs}/{stats.rows_changed_used_detail}/"
+        f"{stats.rows_changed_used_counts}/{stats.rows_changed_used_list}"
+    )
 
 
 def _select_parquet_target_interactive(
@@ -614,6 +646,55 @@ def main() -> None:
     sp_dedupe.add_argument("--dry-run", action="store_true")
     sp_dedupe.add_argument("-y", "--yes", action="store_true")
     sp_dedupe.set_defaults(func=cmd_dedupe_sequences)
+
+    # ---------------- repair-densegen (clean/repair an existing dataset) ----------------
+    sp_repair = sp.add_parser(
+        "repair-densegen",
+        add_help=False,
+        help="Clean/repair DenseGen fields on an existing dataset (fix cpxr:G, recompute used_tfbs/detail, add sigma70 promoter details).",  # noqa
+        description="Repair DenseGen-derived columns in-place (dry-run by default).",
+    )
+    _add_rich_help(sp_repair)
+    sp_repair.add_argument(
+        "dataset",
+        nargs="?",
+        default=None,
+        help="Dataset name (optional if run inside a dataset folder).",
+    )
+    sp_repair.add_argument(
+        "--min-tfbs-len",
+        type=int,
+        default=6,
+        help="Minimum TFBS length to keep (drops 1-nt bugs like 'cpxr:G').",
+    )
+    sp_repair.add_argument(
+        "--dry-run", action="store_true", help="Preview changes without writing."
+    )
+    sp_repair.add_argument(
+        "-y", "--yes", action="store_true", help="Apply without confirmation prompt."
+    )
+    sp_repair.add_argument(
+        "--dedupe",
+        choices=["off", "keep-first", "keep-last", "ask"],
+        default="off",
+        help="Case-insensitive sequence de-duplication to run as part of repair (default: off).",
+    )
+    sp_repair.add_argument(
+        "--drop-missing-used-tfbs",
+        action="store_true",
+        help="After recompute, drop rows whose 'densegen__used_tfbs' is empty.",
+    )
+    sp_repair.add_argument(
+        "--drop-id-seq-only",
+        action="store_true",
+        help="Find rows that only have USR essentials (id, sequence, bio_type, alphabet, length, source, created_at) and prompt to drop them.",  # noqa
+    )
+    sp_repair.add_argument(
+        "--filter-single-tf",
+        action="store_true",
+        help="Summarize and prompt to drop rows where the used TF set size is exactly 1.",
+    )
+    sp_repair.set_defaults(func=cmd_repair_densegen)
 
     # ---------------- make-mock ----------------
     sp_mock = sp.add_parser(

@@ -262,9 +262,17 @@ def cmd_plot(
 
         # Ensure a handler so plugin logger.info lines are visible
         if not logger.handlers:
-            h = logging.StreamHandler()
+            try:
+                from rich.logging import RichHandler
+
+                h = RichHandler(
+                    rich_tracebacks=False, markup=True, show_path=False, show_time=False
+                )
+            except Exception:
+                h = logging.StreamHandler()
             h.setLevel(logging.INFO)
-            h.setFormatter(logging.Formatter("[%(name)s] %(message)s"))
+            if not isinstance(h, logging.StreamHandler):  # i.e., RichHandler
+                h.setFormatter(logging.Formatter("[%(name)s] %(message)s"))
             logger.addHandler(h)
             logger.propagate = False
 

@@ -182,6 +182,7 @@ class RecordsStore:
         *,
         src: str = "ingest_y",
         fail_if_any_existing_labels: bool = True,
+        if_exists: str = "fail",  # 'fail' | 'skip' | 'replace'
     ) -> pd.DataFrame:
         """
         Append to label history with immutable semantics.
@@ -202,10 +203,18 @@ class RecordsStore:
         new_ys = labels["y"].tolist()
         for i, _id in enumerate(new_ids):
             cur = hist_map.get(_id, [])
-            # Duplicate guard
-            if any((int(e.get("r", -1)) == int(r)) for e in cur):
-                if fail_if_any_existing_labels:
+            # Duplicate guard / policy
+            exists = any((int(e.get("r", -1)) == int(r)) for e in cur)
+            if exists:
+                policy = (if_exists or "fail").strip().lower()
+                if policy == "fail" and fail_if_any_existing_labels:
                     raise OpalError(f"Label history already has (id={_id}, r={r})")
+                elif policy == "skip":
+                    continue
+                elif policy == "replace":
+                    cur = [e for e in cur if int(e.get("r", -1)) != int(r)]
+                else:
+                    pass
             entry = {
                 "r": int(r),
                 "ts": pd.Timestamp.utcnow().isoformat(),

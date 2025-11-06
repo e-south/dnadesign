@@ -9,7 +9,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import logging
 import sys
 from pathlib import Path
 from typing import List, Optional
@@ -17,6 +16,8 @@ from typing import List, Optional
 import typer
 from rich.console import Console
 from rich.traceback import install as rich_tb
+
+from dnadesign.permuter.src.core.logging_setup import configure_logging
 
 # Import sibling CLI modules via relative imports
 from . import evaluate as eval_cmd
@@ -52,15 +53,7 @@ rich_tb(show_locals=True)
 
 @app.callback()
 def _root(verbose: int = typer.Option(0, "--verbose", "-v", count=True)):
-    """
-    Global flags: -v for more logs (repeatable).
-    """
-    level = (
-        logging.WARNING
-        if verbose == 0
-        else (logging.INFO if verbose == 1 else logging.DEBUG)
-    )
-    logging.basicConfig(level=level, format="%(message)s")
+    configure_logging(verbose)
 
 
 @app.command(
@@ -168,7 +161,7 @@ def plot(
         None,
         "--which",
         help="Plot id to generate (repeat for multiple). "
-        "Allowed: position_scatter_and_heatmap, metric_by_mutation_count",
+        "Allowed: position_scatter_and_heatmap, metric_by_mutation_count, aa_category_effects, hairpin_length_vs_metric",  # noqa
     ),
     metric_id: str = typer.Option(
         None, "--metric-id", help="Metric id to plot (e.g., llr_mean, llr_sum)"

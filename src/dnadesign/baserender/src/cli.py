@@ -26,6 +26,7 @@ from rich.progress import (
 )
 
 from .api import read_records
+from .model import Guide
 from .palette import Palette
 from .presets.loader import load_job, resolve_job_path
 from .render import render_figure
@@ -83,6 +84,32 @@ def _progress() -> Progress:
         TimeElapsedColumn(),
         console=console,
     )
+
+
+def _read_csv_column(path: Path, column: str) -> list[str]:
+    """Return values from a named column in a headered CSV."""
+    import csv
+
+    with open(path, newline="") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames is None or column not in reader.fieldnames:
+            raise typer.BadParameter(
+                f"CSV '{path}' must contain column '{column}' "
+                f"(found: {reader.fieldnames or []})"
+            )
+        out: list[str] = []
+        for row in reader:
+            raw = row.get(column)
+            if raw is None:
+                continue
+            s = str(raw).strip()
+            if s != "":
+                out.append(s)
+        if not out:
+            raise typer.BadParameter(
+                f"CSV '{path}' column '{column}' contains no non-blank values."
+            )
+        return out
 
 
 # ---- direct (ad-hoc) commands ------------------------------------------------
@@ -288,6 +315,7 @@ def job_run(
             sequence_col=cfg.seq_col,
             annotations_col=cfg.ann_col,
             id_col=cfg.id_col,
+            details_col=cfg.details_col,
             alphabet=cfg.alphabet,
             plugins=tuple(cfg.plugins),
             ann_policy=cfg.ann_policy,
@@ -322,24 +350,199 @@ def job_run(
         console.print(f"[green]Wrote still to {out_file}[/]")
         return
 
-    # ---- video path
+    # ---- video + (optional) stills path
     from .video import render_video as _render_video
 
-    # Deterministic sampling by row index, without materializing the whole table.
-    if sel_limit is not None and cfg.sample_seed is not None:
-        import random
+    # Build the final list of records to render, optionally honoring explicit selection.
+    recs_list = []  # type: list
+    overlay_kind = "overlay_label"
 
-        total_rows = _parquet_row_count(cfg.input_path) if cfg.format == "parquet" else None
-        if total_rows is None:
-            # Format guard — explicit (no fallback)
-            raise typer.Exit(code=2)
-        k = min(sel_limit, total_rows)
-        rng = random.Random(int(cfg.sample_seed))
-        idxs = sorted(rng.sample(range(total_rows), k))
-        idxset = set(idxs)
-        recs = (r for i, r in enumerate(_base_records()) if i in idxset)
+    if getattr(cfg, "selection", None) is not None:
+        sel = cfg.selection  # type: ignore[attr-defined]
+        console.log(
+            f"Selection CSV: {sel.path}  (match_on={sel.match_on}, column={sel.column})"
+        )
+        # Fast path for 'id' on parquet: use Arrow dataset filter to avoid full-table scans.
+        if sel.match_on == "id" and cfg.format == "parquet" and cfg.id_col:
+            from .io.parquet import read_parquet_records_by_ids, resolve_present_ids
+            from .plugins.registry import load_plugins
+
+            keys = _read_csv_column(sel.path, sel.column)
+            # Assert id column is provided
+            if not cfg.id_col:
+                raise typer.BadParameter(
+                    "selection.match_on=id requires an 'id' column in the input.columns."
+                )
+            # Presence pass (dataset membership only; no policy/gating)
+            present = resolve_present_ids(cfg.input_path, id_col=cfg.id_col, ids=keys)
+            missing = [k for k in keys if k not in present]
+            if missing:
+                msg = f"{len(missing)} id(s) from selection CSV are not present in the dataset."
+                if sel.on_missing == "error":
+                    raise typer.BadParameter(msg + f" Examples: {missing[:5]}")
+                elif sel.on_missing == "warn":
+                    console.print(f"[yellow]WARN[/] {msg} Examples: {missing[:5]}")
+            # Load only present ids (dedup for efficiency, keep original order later)
+            key_set = set(present)
+            base_iter = read_parquet_records_by_ids(
+                cfg.input_path,
+                ids=key_set,
+                sequence_col=cfg.seq_col,
+                annotations_col=cfg.ann_col,
+                details_col=cfg.details_col,
+                id_col=cfg.id_col,
+                alphabet=cfg.alphabet,
+                ann_policy=cfg.ann_policy,
+            )
+            # Apply plugins (same as read_records)
+            plugins = load_plugins(tuple(cfg.plugins))
+
+            def _apply_plugins():
+                for rec in base_iter:
+                    for p in plugins:
+                        rec = p.apply(rec)
+                    yield rec
+
+            # Map by id for quick lookup
+            by_id = {r.id: r for r in _apply_plugins()}
+            # Policy drop accounting (present → parsed record)
+            dropped_by_policy = sorted(list(set(present) - set(by_id.keys())))
+            if dropped_by_policy:
+                console.print(
+                    f"[yellow]WARN[/] {len(dropped_by_policy)} id(s) exist in the dataset but were dropped by "
+                    f"annotation policy (e.g., require_non_empty, ambiguous=drop). Examples: {dropped_by_policy[:5]}"
+                )
+            for j, k in enumerate(keys):
+                r = by_id.get(k)
+                if r is None:
+                    continue  # missing or dropped-by-policy (already reported)
+                label = f"sel_row={j}  id={r.id}"
+                r = r.with_extra(
+                    guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
+                )
+                recs_list.append(r)
+            if not recs_list:
+                console.print(
+                    "[red]No selected records survived policy gating and/or were missing.[/] "
+                    "Check input.annotations settings (require_non_empty, min_per_record, ambiguous)."
+                )
+                raise typer.Exit(code=2)
+            # ignore limit/sample_seed when selection is explicit
+        elif sel.match_on == "row":
+            # Interpret CSV values as 0-based row indices into the dataset.
+            idx_vals = _read_csv_column(sel.path, sel.column)
+            try:
+                idxs = [int(x) for x in idx_vals]
+            except Exception:
+                raise typer.BadParameter(
+                    "Row indices in selection CSV must be integers (0-based)."
+                )
+            idxset = set(idxs)
+            found = {}
+            for i, r in enumerate(_base_records()):
+                if i in idxset:
+                    found[i] = r
+                    if len(found) == len(idxset):
+                        break
+            missing = [i for i in idxs if i not in found]
+            if missing:
+                msg = f"{len(missing)} row index/indices not present in dataset."
+                if sel.on_missing == "error":
+                    raise typer.BadParameter(msg + f" Examples: {missing[:5]}")
+                elif sel.on_missing == "warn":
+                    console.print(f"[yellow]WARN[/] {msg} Examples: {missing[:5]}")
+            # CSV order if requested
+            ordered = idxs if sel.keep_order else sorted(found.keys())
+            for j, i in enumerate(ordered):
+                r = found.get(i)
+                if r is None:
+                    continue
+                label = f"row={i}  sel_row={j}"
+                r = r.with_extra(
+                    guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
+                )
+                recs_list.append(r)
+        else:
+            # Fallback: match_on 'sequence' (or 'id' without fast path) by scanning the dataset.
+            keys = _read_csv_column(sel.path, sel.column)
+            key_attr = "sequence" if sel.match_on == "sequence" else "id"
+            want = set(keys) if not sel.keep_order else None
+            found_map = {}
+            for i, r in enumerate(_base_records()):
+                k = getattr(r, key_attr)
+                if sel.keep_order:
+                    if k in found_map:
+                        continue
+                    if k in keys:
+                        found_map[k] = r
+                        if len(found_map) == len(keys):
+                            break
+                else:
+                    if k in want:
+                        found_map[k] = r
+                        if len(found_map) == len(want):
+                            break
+            missing = [k for k in keys if k not in found_map]
+            if missing:
+                msg = f"{len(missing)} value(s) from selection CSV not found."
+                if sel.on_missing == "error":
+                    raise typer.BadParameter(msg + f" Examples: {missing[:5]}")
+                elif sel.on_missing == "warn":
+                    console.print(f"[yellow]WARN[/] {msg} Examples: {missing[:5]}")
+            ordered = keys if sel.keep_order else sorted(found_map.keys())
+            for j, k in enumerate(ordered):
+                r = found_map.get(k)
+                if r is None:
+                    continue
+                label = f"sel_row={j}"
+                r = r.with_extra(
+                    guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
+                )
+                recs_list.append(r)
     else:
-        recs = _apply_limit(_base_records(), sel_limit)
+        # No explicit selection: honor limit/sample_seed and annotate with dataset row index.
+        if sel_limit is not None and cfg.sample_seed is not None:
+            import random
+
+            total_rows = (
+                _parquet_row_count(cfg.input_path) if cfg.format == "parquet" else None
+            )
+            if total_rows is None:
+                # Format guard — explicit (no fallback)
+                raise typer.Exit(code=2)
+            k = min(sel_limit, total_rows)
+            rng = random.Random(int(cfg.sample_seed))
+            idxs = sorted(rng.sample(range(total_rows), k))
+            idxset = set(idxs)
+            for i, r in enumerate(_base_records()):
+                if i in idxset:
+                    label = f"row={i}"
+                    r = r.with_extra(
+                        guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
+                    )
+                    recs_list.append(r)
+        else:
+            # Take first N (if limited) in order
+            count = 0
+            for i, r in enumerate(_base_records()):
+                if sel_limit is not None and count >= sel_limit:
+                    break
+                label = f"row={i}"
+                r = r.with_extra(
+                    guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
+                )
+                recs_list.append(r)
+                count += 1
+
+    # Optional stills export (honor images block if present)
+    if getattr(cfg, "images", None) is not None and rec_id is None and row is None:
+        img_cfg = cfg.images  # type: ignore[attr-defined]
+        img_cfg.dir.parent.mkdir(parents=True, exist_ok=True)
+        img_cfg.dir.mkdir(parents=True, exist_ok=True)
+        console.log(f"Writing stills to {img_cfg.dir} ({img_cfg.fmt})")
+        from .api import render_images
+
+        render_images(recs_list, out_dir=img_cfg.dir, fmt=img_cfg.fmt, style=cfg.style)
 
     out_video = cfg.video.out_path
     out_video.parent.mkdir(parents=True, exist_ok=True)
@@ -369,7 +572,7 @@ def job_run(
                 console.log(f"Wrote: {payload.get('out')}")
 
         _render_video(
-            recs,
+            recs_list,
             out_path=out_video,
             fps=cfg.video.fps,
             style=style,
@@ -398,7 +601,7 @@ def job_run(
     )
 )
 def doctor(
-    job: Optional[str] = typer.Option(None, help="Optional job name/path to verify.")
+    job: Optional[str] = typer.Argument(None, help="Optional job name/path to verify.")
 ) -> None:
     ok = True
 

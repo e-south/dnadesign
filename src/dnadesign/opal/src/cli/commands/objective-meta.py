@@ -19,7 +19,7 @@ import pyarrow.compute as pc
 import typer
 from pyarrow import dataset as ds
 
-from ...utils import ExitCodes
+from ...utils import ExitCodes, print_stdout
 from ..registry import cli_command
 from ._common import (
     internal_error,
@@ -54,22 +54,37 @@ def cmd_objective_meta(
         cfg = load_cli_config(config)
         store = store_from_cfg(cfg)
         base = Path(cfg.campaign.workdir) / "outputs"
-        runs_dir = base / "ledger.runs"
+        runs_file = base / "ledger.runs.parquet"  # current sink
+        runs_dir = base / "ledger.runs"  # legacy sink (directory)
         pred_dir = base / "ledger.predictions"
-        if not runs_dir.exists() or not pred_dir.exists():
+        if not pred_dir.exists():
             raise typer.Exit(code=1)
 
-        # Load runs metadata
-        rd = ds.dataset(str(runs_dir))
-        rtab = rd.to_table(
-            columns=[
-                "run_id",
-                "as_of_round",
-                "objective__name",
-                "objective__params",
-                "objective__summary_stats",
-            ]
-        ).to_pandas()
+        # Load runs metadata (file preferred; directory fallback)
+        if runs_file.exists():
+            rtab = pd.read_parquet(
+                runs_file,
+                columns=[
+                    "run_id",
+                    "as_of_round",
+                    "objective__name",
+                    "objective__params",
+                    "objective__summary_stats",
+                ],
+            )
+        elif runs_dir.exists():
+            rd = ds.dataset(str(runs_dir))
+            rtab = rd.to_table(
+                columns=[
+                    "run_id",
+                    "as_of_round",
+                    "objective__name",
+                    "objective__params",
+                    "objective__summary_stats",
+                ]
+            ).to_pandas()
+        else:
+            raise typer.Exit(code=1)
         if rtab.empty:
             raise typer.Exit(code=1)
 
@@ -248,19 +263,19 @@ def cmd_objective_meta(
         if json:
             json_out(out)
         else:
-            typer.echo(f"Round: {out['round']}")
-            typer.echo(f"Objective: {out['objective']['name']}")
-            typer.echo(
-                "  params keys: "
+            print_stdout(f"[bold cyan]Round:[/] {out['round']}")
+            print_stdout(f"[bold cyan]Objective:[/] {out['objective']['name']}")
+            print_stdout(
+                "[bold]  params keys:[/] "
                 + (", ".join(out["objective"]["params_keys"]) or "(none)")
             )
-            typer.echo(
-                "  summary stats: "
+            print_stdout(
+                "[bold]  summary stats:[/] "
                 + (", ".join(out["objective"]["summary_stats_keys"]) or "(none)")
             )
-            typer.echo("Row-level diagnostics:")
+            print_stdout("[bold cyan]Row-level diagnostics:[/]")
             for c in out["row_level_diagnostics_columns"]:
-                typer.echo(f"  • {c}")
+                print_stdout(f"  • {c}")
 
             if profile:
                 p = out.get("profile", {}) or {}
@@ -268,21 +283,23 @@ def cmd_objective_meta(
                 rec_hue = p.get("recommendations", {}).get("hue", [])
                 rec_size = p.get("recommendations", {}).get("size", [])
                 if rec_hue:
-                    typer.echo("\nRecommended hue fields (best-first):")
+                    print_stdout("\n[bold cyan]Recommended hue fields (best-first):[/]")
                     for n in rec_hue[:8]:
-                        typer.echo(f"  • {n}")
+                        print_stdout(f"  • {n}")
                 else:
-                    typer.echo("\nRecommended hue fields: (none)")
+                    print_stdout("\n[bold cyan]Recommended hue fields:[/] (none)")
                 if rec_size:
-                    typer.echo("\nRecommended size fields (best-first):")
+                    print_stdout(
+                        "\n[bold cyan]Recommended size fields (best-first):[/]"
+                    )
                     for n in rec_size[:8]:
-                        typer.echo(f"  • {n}")
+                        print_stdout(f"  • {n}")
                 else:
-                    typer.echo("\nRecommended size fields: (none)")
+                    print_stdout("\n[bold cyan]Recommended size fields:[/] (none)")
 
                 # Compact column table (subset of stats)
                 if cols:
-                    typer.echo("\nColumn profiles (subset):")
+                    print_stdout("\n[bold cyan]Column profiles (subset):[/]")
                     for r in cols:
                         name = r["column"]
                         dtype = r["dtype"]
@@ -304,7 +321,7 @@ def cmd_objective_meta(
                             if mn is None or mx is None
                             else f"range: {mn:.4g}..{mx:.4g}; median: {md:.4g}"
                         )
-                        typer.echo(
+                        print_stdout(
                             f"  • {name:24s} dtype={dtype:8s} cov_pred={covp:6.2%} cov_ds={covd:6.2%}  {rng_str}{flag_str}"  # noqa
                         )
 

@@ -33,6 +33,7 @@ from dnadesign.permuter.src.core.storage import (
     read_ref_protein_fasta,
 )
 from dnadesign.permuter.src.plots.aa_category_effects import plot as plot_cat
+from dnadesign.permuter.src.plots.hairpin_length_vs_metric import plot as plot_hlvm
 from dnadesign.permuter.src.plots.metric_by_mutation_count import plot as plot_mmc
 from dnadesign.permuter.src.plots.mutation_summary import emit_aa_mutation_llr_summary
 from dnadesign.permuter.src.plots.position_scatter_and_heatmap import plot as plot_psh
@@ -79,8 +80,9 @@ def _derive_records_from_job(
 
     # Need ref for nested/flat_jobref
     df_refs = pd.read_csv(jp0.refs_csv, dtype=str)
+    desired = ref or getattr(cfg.job.input, "reference_sequence", None)
     ref_name, _ = _pick_reference(
-        df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, ref
+        df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, desired
     )
     # 2) nested
     jp = resolve(
@@ -171,7 +173,7 @@ def plot(
         else (yaml_emit if yaml_emit is not None else True)
     )
 
-    # Verify the requested metric exists and suggest fixes
+    # Discover present metric ids once
     metric_cols = [c for c in df.columns if c.startswith("permuter__metric__")]
     present_ids = sorted(
         {
@@ -179,20 +181,8 @@ def plot(
             for c in metric_cols
         }
     )
-    if metric_id not in present_ids:
-        hint = ""
-        if metric_id.endswith("_mean") and metric_id[:-5] in present_ids:
-            hint = (
-                f"\nHint: dataset has '{metric_id[:-5]}'. "
-                f"Either set --metric-id {metric_id[:-5]} "
-                f"or re-evaluate with --with {metric_id}:evo2_llr:log_likelihood_ratio."
-            )
-        raise ValueError(
-            f"Metric id '{metric_id}' not found in dataset.\n"
-            f"Available metric ids: {present_ids or '<none>'}.{hint}"
-        )
 
-    # If no metric-id was given, infer one when there is exactly a single metric column.
+    # If no metric-id was given, infer when there is exactly one id.
     if not metric_id:
         metric_cols = [c for c in df.columns if c.startswith("permuter__metric__")]
         ids = sorted(
@@ -205,6 +195,35 @@ def plot(
                 "Multiple metrics present; choose one with --metric-id or set job.plot.metric_id.\n"
                 f"Found: {ids or '<none>'}"
             )
+    # Verify the requested metric exists and suggest fixes
+    if metric_id not in present_ids:
+        hint = ""
+        # No metric columns at all → suggest 'evaluate'
+        if not metric_cols:
+            if cfg and job_path:
+                ref_arg = f" --ref {ref}" if ref else ""
+                hint = (
+                    f"\nHint: this dataset has no metric columns yet. "
+                    f"Append them with:\n"
+                    f"  permuter evaluate --job {job_path}{ref_arg}\n"
+                    f"or a quick smoke test:\n"
+                    f"  permuter evaluate --data {records.parent} --with ll:placeholder:log_likelihood"
+                )
+            else:
+                hint = (
+                    "\nHint: this dataset has no metric columns. Append them with:\n"
+                    "  permuter evaluate --data <dataset_dir> --with ll:placeholder:log_likelihood"
+                )
+        elif str(metric_id).endswith("_mean") and str(metric_id)[:-5] in present_ids:
+            hint = (
+                f"\nHint: dataset has '{metric_id[:-5]}'. "
+                f"Either set --metric-id {metric_id[:-5]} "
+                f"or re-evaluate with --with {metric_id}:evo2_llr:log_likelihood_ratio."
+            )
+        raise ValueError(
+            f"Metric id '{metric_id}' not found in dataset.\n"
+            f"Available metric ids: {present_ids or '<none>'}.{hint}"
+        )
 
     # Build an informative subtitle when we know the job config for this metric id.
     subtitle = ""
@@ -285,6 +304,28 @@ def plot(
                 metric_id=metric_id,
                 evaluators=subtitle,
                 figsize=None,
+                font_scale=font_scale,
+            )
+            console.print(f"[green]✔[/green] {name} → {out}")
+        elif name == "hairpin_length_vs_metric":
+            out = plots_dir / f"{name}__{metric_id}.png"
+            _LOG.info(
+                "plot: %s → %s (metric_id=%s, figsize=%s, font_scale=%s)",
+                name,
+                out,
+                metric_id or "<auto>",
+                str(figsize) if figsize else "auto",
+                str(font_scale) if font_scale else "1.0",
+            )
+            plot_hlvm(
+                elite_df=df.head(0),
+                all_df=df,
+                output_path=out,
+                job_name=job_name,
+                ref_sequence=ref_seq,
+                metric_id=metric_id,
+                evaluators=subtitle,
+                figsize=figsize,
                 font_scale=font_scale,
             )
             console.print(f"[green]✔[/green] {name} → {out}")

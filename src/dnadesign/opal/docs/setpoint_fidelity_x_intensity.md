@@ -4,7 +4,7 @@
 
 **Objective intent:** Combine a model’s predicted **logic pattern** and **absolute fluorescent intensity** into a single score that rewards sequence designs that are both **right** (match the target setpoint) and **bright** (intense in the target conditions).
 
---- 
+---
 
 ### 1. What the model predicts
 
@@ -166,7 +166,7 @@ E_{\mathrm{raw}} = \sum_{i=1}^{4} w_i \,\widehat{y}^{\mathrm{linear}}_i
 \quad\text{(equivalently } E_{\mathrm{raw}}=\tfrac{p\cdot \widehat{y}^{\mathrm{linear}}}{\max(P,\epsilon)}\text{, with } \epsilon>0 \text{ a small guard).}
 $$
 
-Raising intensity where $p_i$ is large **always** increases $E_{\mathrm{raw}}$; intensity where $p_i=0$ does **not**. 
+Raising intensity where $p_i$ is large **always** increases $E_{\mathrm{raw}}$; intensity where $p_i=0$ does **not**.
 
 If $P=0$ (an “all-OFF” setpoint), define $w=\mathbf{0}$ and set $E_{\mathrm{raw}}=0$; the score is then fully determined by the logic term.
 
@@ -279,6 +279,24 @@ Objective parameters surfaced to aid auditability without opening artifacts:
 - `E_raw = dot(w, yhat_linear)` where `yhat_linear` is recovered by **inverting** `pred__y_hat_model[4:8]` using transforms in `run_meta` (target normalizer stats + `obj__log2_offset_delta`).
 - `F_logic` from `v_hat = pred__y_hat_model[0:4]` and the setpoint in `run_meta`.
 - `D` (worst-case distance) and weights `w` derived from the setpoint in `run_meta`.
+
+---
+
+### Appendix
+
+**Why an 8-vector and not a 4-vector?**
+
+The 8‑vector is minimal and justified for the above stated objective. It cleanly separates:
+
+* **Shape (right):** ratio‑based, effect size‑invariant logic.
+* **Scale (bright):** reference‑anchored absolute intensity.
+
+To compute that, we keep 8 numbers per design:
+
+* **4 logic numbers (`v`)** — the **shape** of the response, built from the **YFP/CFP ratio** and min–max scaled across the four states. The ratio cancels extrinsic noise.
+* **4 intensity numbers (`y*`)** — the **absolute brightness** per state, anchored to a reference strain and stored in log2 for modeling stability.
+
+One cannot recover the ratio‑based logic (`v`) from YFP intensities alone. If you try to create a “logic pattern” by min–max scaling YFP across states, you keep state‑specific capacity shifts that the YFP/CFP ratio is designed to remove. Dropping to 4 intensities asks the model to infer information that isn’t in the data; it will compute a different score.
 
 ---
 

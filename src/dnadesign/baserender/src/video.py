@@ -105,9 +105,11 @@ def _letterbox(arr, W: int, H: int):
 def _legend_entries_for_record(r: SeqRecord) -> list[tuple[str, str]]:
     """
     Build the legend for a *single* record.
-    - TFs: 'tf:<name>'  → '<name>' (dedup, stable order)
-    - Sigma: if present, show exactly one entry: 'σ high' | 'σ medium' | 'σ low'
-      (color derives from tag 'sigma', same hue for all strengths).
+    - TFs: 'tf:<name>' → '<name>' (dedup, stable order)
+    - σ70: show **one** entry (σ high|medium|low). We detect it from either:
+        • plugin-added 'sigma' boxes (preferred), or
+        • pre-existing 'tf:sigma70_*' annotations in the dataset.
+      All σ70 strengths share one color via tag 'sigma'.
     """
     entries: list[tuple[str, str]] = []
     seen_tfs: set[str] = set()
@@ -116,6 +118,16 @@ def _legend_entries_for_record(r: SeqRecord) -> list[tuple[str, str]]:
     for a in r.annotations:
         if a.tag.startswith("tf:"):
             name = a.tag[3:]
+            # If dataset already contains sigma70_* as TFs, fold into σ legend
+            low = name.lower()
+            if low.startswith("sigma70_"):
+                # derive 'high'|'medium'|'low' from tf name suffix
+                st = low.split("_", 1)[-1]
+                st = {"mid": "medium"}.get(st, st)
+                if sigma_strength is None:
+                    sigma_strength = st
+                # do not list sigma70_* again as a plain TF
+                continue
             if name not in seen_tfs:
                 seen_tfs.add(name)
                 entries.append((a.tag, name))
@@ -123,7 +135,7 @@ def _legend_entries_for_record(r: SeqRecord) -> list[tuple[str, str]]:
             try:
                 st = (a.payload or {}).get("strength")  # type: ignore[assignment]
                 if isinstance(st, str):
-                    sigma_strength = st.lower()
+                    sigma_strength = sigma_strength or st.lower()
             except Exception:
                 pass
 

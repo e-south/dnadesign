@@ -1,4 +1,3 @@
-
 input:
   path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/60bp_dual_promoter_cpxR_LexA/records.parquet
   format: parquet
@@ -10,12 +9,21 @@ input:
   limit: 100     # set 0 to process all rows
   sample_seed: 42
   annotations:
-    ambiguous: drop                # explicit, deterministic choice among multiple hits
+    ambiguous: first
     zero_as_unspecified: true      # treat 0 as “no offset” (matches your data)
     offset_mode: auto              # accept either 0-based or 1-based if offset is provided
-    require_non_empty: true        # drop rows with no annotations
+    require_non_empty: false
     min_per_record: 1              # at least one parsed annotation
-    require_non_null_cols:         # require these columns to be present per row
+    require_non_null_cols:   
+
+# explicit selection from a CSV
+selection:
+  # resolves against the baserender root
+  path: inputs/pES1-12p.csv   # e.g., a file with an 'id' header
+  match_on: id                       # id | sequence | row
+  column: id                         # which column in the CSV to read
+  keep_order: true                   # video/stills follow CSV order
+  on_missing: warn                   # skip|warn|error if not found
 
 plugins:
   - sigma70:
@@ -54,7 +62,7 @@ style:
 
 output:
   video:
-    path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/baserender/results/CpxR_LexA/cpxR_LexA.mp4
+    path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/baserender/results/cpxR_lexA_select_rows_r0/video.mp4
     fmt: mp4
     # fps must be an integer. To get "0.5 fps" behavior,
     # use fps: 1 and frames_per_record: 2.
@@ -64,3 +72,8 @@ output:
     width_px: 1200
     height_px: null
     aspect: "18:4"         # letterboxed; pixels of the sequence are not stretched
+
+  images:
+    # If omitted, defaults to results/<job>/images/
+    # dir: results/CpxR_LexA_from_csv/images
+    fmt: png

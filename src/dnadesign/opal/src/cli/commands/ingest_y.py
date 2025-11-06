@@ -57,6 +57,12 @@ def cmd_ingest_y(
         None, "--params", help="JSON file with transform params"
     ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip interactive prompt"),
+    if_exists: str = typer.Option(
+        "fail",
+        "--if-exists",
+        help="Behavior if (id, round) already exists in label history: 'fail' (default), 'skip', or 'replace'.",
+        case_sensitive=False,
+    ),
     json: bool = typer.Option(
         False, "--json/--human", help="Output format (default: human)"
     ),
@@ -131,13 +137,30 @@ def cmd_ingest_y(
                 seq_to_id_full
             )
 
+        # Optional: preview duplicates at this round for better UX
+        try:
+            lh = store.label_hist_col()
+            ids_in = set(labels_df["id"].dropna().astype(str))
+            maybe = df.loc[df["id"].astype(str).isin(ids_in), [ "id", lh ]]
+            dup = 0
+            for _, cell in maybe[lh].items():
+                for e in store._normalize_hist_cell(cell):
+                    if int(e.get("r", -1)) == int(round):
+                        dup += 1
+                        break
+            if dup > 0:
+                print_stdout(f"[notice] {dup}/{len(ids_in)} incoming labels already have r={int(round)}; applying --if-exists={if_exists}.") # noqa
+        except Exception:
+            pass
+
         # 1) append to immutable label history (SSoT)
         df2 = store.append_labels_from_df(
             df,
             labels_df[["id", "y"]],  # ids are now concrete
             r=int(round),
             src="ingest_y",
-            fail_if_any_existing_labels=True,
+            fail_if_any_existing_labels=(str(if_exists).lower().strip() == "fail"),
+            if_exists=str(if_exists).lower().strip(),
         )
         # 2) mirror "current y" into configured y_column_name for convenience
         df3 = store.upsert_current_y_column(

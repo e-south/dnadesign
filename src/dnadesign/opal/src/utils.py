@@ -24,6 +24,8 @@ from typing import Any, Dict, Iterable, List, Optional
 import numpy as np
 import pandas as pd
 
+from .cli.pretty import console_err, console_out
+
 
 # -----------------------
 # Errors & Exit codes
@@ -64,11 +66,20 @@ def now_iso() -> str:
 
 
 def print_stdout(s: str) -> None:
-    print(s)
+    c = console_out()
+    if c is not None:
+        # Rich console prints with markup if enabled
+        c.print(s)
+    else:
+        print(s)
 
 
 def print_stderr(s: str) -> None:
-    print(s, file=os.sys.stderr)
+    c = console_err()
+    if c is not None:
+        c.print(s)
+    else:
+        print(s, file=os.sys.stderr)
 
 
 def read_json(path: str | Path):

@@ -107,6 +107,7 @@ def _variants_stream(
             pass
     proto.validate_cfg(params=params_resolved)
     rng = np.random.default_rng(seed)
+    params_resolved["_derived_seed"] = int(seed)
     yield from proto.generate(
         ref_entry={"ref_name": ref_name, "sequence": sequence},
         params=params_resolved,
@@ -137,8 +138,9 @@ def run(
     )
     df_refs = pd.read_csv(jp.refs_csv, dtype=str)
     console.print(f"[cyan]Using refs CSV[/cyan]: {jp.refs_csv}")
+    desired = ref or getattr(cfg.job.input, "reference_sequence", None)
     ref_name, ref_seq = _pick_reference(
-        df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, ref
+        df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, desired
     )
     console.print(f"[dim]Using reference[/dim] [bold]{ref_name}[/bold]")
 

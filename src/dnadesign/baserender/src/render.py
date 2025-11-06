@@ -88,12 +88,21 @@ def _compute_layout(
     # Compute content region independent of legend; legend is appended below.
     # Top-most extent must include *all upward tracks*; previously this was undercounted.
     top = y0 + count_up * style.track_spacing + h + label_pad_y
-    # Bottom-most extent includes all downward tracks
     bottom = y1 - (count_dn * style.track_spacing) - h - label_pad_y
     # Small safety margin so rounded corners / labels never clip the axes edge.
     margin = max(2.0, 0.5 * style.kmer.round_px)
     top += margin
     bottom -= margin
+    # --- Keep the legend area clear by lifting baselines if needed -------------
+    # Ensure the entire content block sits ABOVE the reserved legend space
+    # [0 .. legend_space]. If bottom < legend_space, shift everything up.
+    if legend_space > 0 and bottom < legend_space:
+        dy = (legend_space - bottom)
+        y0 += dy
+        y1 += dy
+        top += dy
+        bottom += dy
+
     content_height = top - bottom + style.padding_y
     height = content_height + legend_space
     width = x_left + n * cw + style.padding_x + label_pad_x
@@ -187,6 +196,7 @@ def _draw_box(
     facecolor: Tuple[float, float, float],
     style: Style,
     above: bool,
+    cw: float,
 ):
     r = style.kmer.round_px
     pad_x = float(style.kmer.pad_x_px)
@@ -212,10 +222,10 @@ def _draw_box(
     y_mid_px = ((_ag.y0 + _ag.y1) / 2.0) * px_per_pt
     cache: dict[str, TextPath] = {}
 
-    # Compute the per-column advance from the box width so we don't rely on outer scope.
-    n_cols = max(1, len(label))
-    col_w = w / n_cols
-    xx = x  # left edge of the k-mer (ignores pad_x by design)
+    # Column advance MUST equal the global character cell width so glyphs
+    # and background boxes stay on the same grid (no fractional drift).
+    col_w = cw
+    xx = x  # left edge of the k‑mer (box padding handled separately)
     for ch in label:
         tp = cache.get(ch)
         if tp is None:
@@ -472,6 +482,31 @@ def _draw_legend_centered(
             x += style.legend_gap_x
 
 
+def _draw_overlay_label(ax, layout: LayoutResult, style: Style, text: str) -> None:
+    """
+    Lightweight, non-intrusive label at the top-left corner (figure space),
+    e.g., 'row=42' or 'sel_row=7 id=...'. Does not affect layout or padding.
+    """
+    if not text:
+        return
+    # Small inset from the top edge
+    y = layout.height - 6.0
+    x = style.padding_x
+    ax.text(
+        x,
+        y,
+        text,
+        ha="left",
+        va="top",
+        fontsize=style.font_size_label,
+        family=style.font_label,
+        color="#6B7280",
+        alpha=0.95,
+        zorder=15,
+        clip_on=False,
+    )
+
+
 def render_figure(
     record: SeqRecord,
     *,
@@ -535,6 +570,7 @@ def render_figure(
             color,
             style,
             above=True,
+            cw=layout.cw,
         )
     for a, tr in zip(dn, layout.dn_tracks):
         xx = x0 + a.start * layout.cw
@@ -551,6 +587,7 @@ def render_figure(
             color,
             style,
             above=False,
+            cw=layout.cw,
         )
 
     # Guides
@@ -572,6 +609,21 @@ def render_figure(
     # Legend
     if style.legend and legend_entries:
         _draw_legend_centered(ax, legend_entries, palette, style, layout.width)
+
+    # Optional overlay label from guides (kind='overlay_label')
+    try:
+        overlay = next(
+            (
+                g.label
+                for g in record.guides
+                if getattr(g, "kind", "") == "overlay_label" and g.label
+            ),
+            None,
+        )
+        if overlay:
+            _draw_overlay_label(ax, layout, style, overlay)
+    except Exception:
+        pass
 
     if out_path:
         fig.savefig(out_path, format=fmt, bbox_inches=None, pad_inches=0.0)

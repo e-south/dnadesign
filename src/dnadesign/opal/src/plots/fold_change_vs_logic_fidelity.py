@@ -9,6 +9,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from typing import List
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -27,11 +29,42 @@ def render(context, params: dict) -> None:
     # Allow user to choose the Y axis: fold_change (default), effect_raw/scaled, or score.
     y_axis = get_str(params, ["y_axis", "y_field", "y"], "fold_change")
     alpha = get_float(params, ["alpha"], 0.40)
-    hue_field = normalize_metric_field(
-        get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None)
+    # Hue: support both continuous metrics (obj__/pred__/sel__) and *categorical* from records.parquet.
+    hue_raw = get_str(
+        params, ["hue_field", "hue", "color", "color_by", "colour_by"], None
     )
+    hue_field = normalize_metric_field(hue_raw) if hue_raw else None  # continuous path
+    # New: categorical hue via "records.<column>" or "records__<column>"
+    hue_is_categorical = False
+    cat_hue_col = None
+    # Policy for categories not covered by hue_order / palette:
+    hue_unknown_policy = (
+        (
+            get_str(
+                params,
+                ["hue_unknown_policy", "hue_unknown", "on_unknown_category"],
+                "error",
+            )
+            or "error"
+        )
+        .strip()
+        .lower()
+    )
+    if hue_unknown_policy not in {"error", "expand"}:
+        raise ValueError("hue_unknown_policy must be 'error' or 'expand'.")
+    if hue_raw:
+        s = str(hue_raw).strip()
+        if s.startswith("records.") or s.startswith("records__"):
+            hue_is_categorical = True
+            cat_hue_col = s.split(".", 1)[1] if "." in s else s.split("__", 1)[1]
+            if not cat_hue_col:
+                raise ValueError(
+                    "Categorical hue requested but no records column provided."
+                )
+    # Colormaps: keep 'cmap' for continuous; allow 'hue_cmap' for categoricals (default tab10)
     cmap = get_str(params, ["cmap"], "viridis")
-    cbar = bool(params.get("cbar", True))
+    hue_cmap = get_str(params, ["hue_cmap"], "tab10")
+    cbar = bool(params.get("cbar", True))  # ignored for categorical hue
     # Selected-point styling (shape override instead of overlay)
     selected_marker = get_str(params, ["selected_marker"], "*")
     selected_size_scale = get_float(params, ["selected_size_scale"], 1.0)
@@ -76,6 +109,7 @@ def render(context, params: dict) -> None:
     need = {
         "as_of_round",
         "run_id",
+        "id",
         "pred__y_hat_model",
         "sel__is_selected",
         "obj__diag__setpoint",
@@ -102,6 +136,64 @@ def render(context, params: dict) -> None:
         df = df[df["as_of_round"].isin(lst)]
     if df.empty:
         raise ValueError("No rows matched the requested round selector.")
+
+    # If using categorical hue from records.parquet, join the category by id.
+    if hue_is_categorical:
+        rec_path = context.data_paths.get("records")
+        if rec_path is None:
+            raise FileNotFoundError(
+                "Categorical hue requested via 'records.<column>', but no 'records' path is available in the campaign."
+            )
+        # Only read what we need; restrict to ids present in df
+        rec = pd.read_parquet(rec_path, columns=["id", cat_hue_col])
+        rec = rec.rename(columns={cat_hue_col: "__cat_hue__"})
+        df = df.merge(rec, on="id", how="left")
+        cat_series = df["__cat_hue__"].fillna("(missing)").astype(str)
+
+        # Present categories in the data (preserve first-seen order; keep '(missing)' last if present)
+        present: List[str] = pd.unique(cat_series).tolist()
+        if "(missing)" in present:
+            present = [c for c in present if c != "(missing)"] + ["(missing)"]
+
+        # Order: user-specified or derived from present values
+        user_order = params.get("hue_order")
+        if user_order is not None:
+            hue_order: List[str] = [str(x) for x in list(user_order)]
+            # Validate coverage of present categories
+            unknown = [c for c in present if c not in hue_order]
+            if unknown:
+                if hue_unknown_policy == "error":
+                    raise ValueError(
+                        "fold_change_vs_logic_fidelity: categorical hue has values not listed in params.hue_order: "
+                        f"{unknown}. Either (a) extend hue_order to include them, "
+                        f"(b) remove hue_order to auto-derive from data, or (c) set hue_unknown_policy: 'expand'."
+                    )
+                # explicit, deterministic expansion
+                hue_order = hue_order + [c for c in present if c not in hue_order]
+        else:
+            hue_order = present
+
+        # Build palette: if user supplies a partial hue_palette, fill the rest from a discrete cmap deterministically.
+        user_palette = params.get("hue_palette") or {}
+        cm = plt.cm.get_cmap(hue_cmap, max(1, len(hue_order)))
+        color_map = {c: cm(i) for i, c in enumerate(hue_order)}
+        # Ensure '(missing)' is readable, unless explicitly overridden by user
+        if "(missing)" in hue_order and "(missing)" not in user_palette:
+            color_map["(missing)"] = (0.6, 0.6, 0.6, 1.0)
+        # Overlay any explicit user palette entries
+        for k, v in user_palette.items():
+            color_map[str(k)] = v
+
+        # Map every row to a color; assert none are missing
+        mapped = cat_series.map(color_map)
+        if mapped.isna().any():
+            missing_cats = sorted(pd.unique(cat_series[mapped.isna()]).tolist())
+            raise ValueError(
+                "fold_change_vs_logic_fidelity: category-to-color mapping incomplete. "
+                f"Missing colors for: {missing_cats}. Check hue_order / hue_palette."
+            )
+        # Numpy object array plays well with boolean masks later
+        colors_all = np.array(mapped.tolist(), dtype=object)
 
     # Split logic (0:4) and intensity (4:8)
     def _split(a):
@@ -194,7 +286,7 @@ def render(context, params: dict) -> None:
     # Optional hue/coloring (build full vector + global scale for consistent colorbar)
     hue_vals_all = None
     vmin = vmax = None
-    if hue_field:
+    if (not hue_is_categorical) and hue_field:
         if hue_field in df.columns:
             hue_vals_all = df[hue_field].to_numpy(dtype=float)
         elif hue_field == "logic_fidelity":
@@ -219,7 +311,9 @@ def render(context, params: dict) -> None:
     # Draw NON-selected first (base layer)
     base_sizes = sizes if np.isscalar(sizes) else (sizes[not_sel])
     base_color_kw = {}
-    if hue_vals_all is not None:
+    if hue_is_categorical:
+        base_color_kw = {"c": colors_all[not_sel]}
+    elif hue_vals_all is not None:
         base_color_kw = {"c": hue_vals_all[not_sel], "cmap": cmap}
         if vmin is not None and vmax is not None:
             base_color_kw.update({"vmin": vmin, "vmax": vmax})
@@ -241,7 +335,9 @@ def render(context, params: dict) -> None:
             else (sizes[sel_mask] * float(selected_size_scale))
         )
         sel_color_kw = {}
-        if hue_vals_all is not None:
+        if hue_is_categorical:
+            sel_color_kw = {"c": colors_all[sel_mask]}
+        elif hue_vals_all is not None:
             sel_color_kw = {"c": hue_vals_all[sel_mask], "cmap": cmap}
             if vmin is not None and vmax is not None:
                 sel_color_kw.update({"vmin": vmin, "vmax": vmax})
@@ -258,8 +354,14 @@ def render(context, params: dict) -> None:
             **sel_color_kw,
         )
 
-    # Dedicated colorbar with stable limits across both scatters
-    if hue_vals_all is not None and cbar and (vmin is not None) and (vmax is not None):
+    # Dedicated colorbar (continuous hue only)
+    if (
+        (not hue_is_categorical)
+        and (hue_vals_all is not None)
+        and cbar
+        and (vmin is not None)
+        and (vmax is not None)
+    ):
         from matplotlib.cm import ScalarMappable
         from matplotlib.colors import Normalize
 
@@ -268,6 +370,26 @@ def render(context, params: dict) -> None:
         cb.set_label(
             hue_field.replace("obj__", "").replace("pred__", "").replace("sel__", "")
         )
+
+    # Legend for categorical hue
+    if hue_is_categorical:
+        from matplotlib.lines import Line2D
+
+        handles = [
+            Line2D(
+                [],
+                [],
+                marker="o",
+                linestyle="None",
+                color=color_map[c],
+                label=c,
+                markersize=6,
+            )
+            for c in hue_order
+        ]
+        lg = ax.legend(handles=handles, title=cat_hue_col, frameon=False, loc="best")
+        if lg and lg.get_title():
+            lg.get_title().set_fontsize(11)
 
     # Axes, labels, and enforced x-limits for logic fidelity
     ax.set_xlabel("Logic fidelity (0-1)")
@@ -285,7 +407,7 @@ def render(context, params: dict) -> None:
         context.logger,
         "fold_change_vs_logic",
         round_sel=context.rounds,
-        hue=hue_field or "-",
+        hue=(f"records.{cat_hue_col}" if hue_is_categorical else (hue_field or "-")),
         size_by=size_by or "-",
         alpha=float(alpha),
         rasterize_at=(rasterize_at if rasterize_at is not None else "off"),
@@ -293,7 +415,7 @@ def render(context, params: dict) -> None:
     )
     annotate_plot_meta(
         ax,
-        hue=hue_field,
+        hue=(f"records.{cat_hue_col}" if hue_is_categorical else hue_field),
         size_by=size_by,
         alpha=alpha,
         rasterized=rasterized,

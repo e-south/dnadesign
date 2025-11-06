@@ -44,7 +44,7 @@ def _builtins(group: str) -> dict[str, Type]:
     out: Dict[str, Type] = {}
     if group == "protocols":
         try:
-            from dnadesign.permuter.src.protocols.scan_dna import ScanDNA
+            from dnadesign.permuter.src.protocols.dms.scan_dna import ScanDNA
         except Exception as e:
             # core protocol must be present
             raise RuntimeError(
@@ -52,7 +52,7 @@ def _builtins(group: str) -> dict[str, Type]:
             ) from e
         out["scan_dna"] = ScanDNA
         try:
-            from dnadesign.permuter.src.protocols.scan_codon import ScanCodon
+            from dnadesign.permuter.src.protocols.dms.scan_codon import ScanCodon
 
             out["scan_codon"] = ScanCodon
         except Exception as e:
@@ -60,7 +60,9 @@ def _builtins(group: str) -> dict[str, Type]:
                 f"[registry] optional builtin protocol 'scan_codon' not available: {e}"
             )
         try:
-            from dnadesign.permuter.src.protocols.scan_stem_loop import ScanStemLoop
+            from dnadesign.permuter.src.protocols.hairpins.scan_stem_loop import (
+                ScanStemLoop,
+            )
 
             out["scan_stem_loop"] = ScanStemLoop
         except Exception as e:

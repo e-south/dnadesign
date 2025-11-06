@@ -13,12 +13,13 @@ from __future__ import annotations
 import dataclasses as _dc
 import json
 import os
-import traceback
 from pathlib import Path
 from pathlib import Path as _Path
 from typing import Optional
 
-from ...utils import ExitCodes, OpalError, print_stderr, print_stdout
+import typer
+
+from ...utils import ExitCodes, OpalError, print_stderr
 
 try:
     import numpy as _np
@@ -224,24 +225,30 @@ def _json_default(o):
 
 
 def json_out(obj) -> None:
-    print_stdout(json.dumps(obj, indent=2, default=_json_default))
+    typer.echo(json.dumps(obj, indent=2, default=_json_default))
 
 
 def internal_error(ctx: str, e: Exception) -> None:
     if str(os.getenv("OPAL_DEBUG", "")).strip().lower() in ("1", "true", "yes", "on"):
-        import traceback
+        import traceback as _tb
 
-        tb = traceback.format_exc()
-        print_stderr(f"Internal error during {ctx}: {e}\n{tb}")
+        tb = _tb.format_exc()
+        print_stderr(
+            f"[bold red]Internal error during [white]{ctx}[/]:[/] {e}\n[dim]{tb}[/]"
+        )
     else:
         print_stderr(
-            f"Internal error during {ctx}: {e}\n(Hint: set OPAL_DEBUG=1 for a full traceback)"
+            f"[bold red]Internal error during [white]{ctx}[/]:[/] {e}\n[dim](Hint: set OPAL_DEBUG=1 for full traceback)[/]"  # noqa
         )
 
 
 def opal_error(ctx: str, e: OpalError) -> None:
     """When OPAL_DEBUG=1, include a traceback for OpalError too."""
     if str(os.getenv("OPAL_DEBUG", "")).strip().lower() in ("1", "true", "yes", "on"):
-        print_stderr(f"OpalError during {ctx}: {e}\n{traceback.format_exc()}")
+        import traceback as _tb
+
+        print_stderr(
+            f"[bold red]OpalError during [white]{ctx}[/]:[/] {e}\n[dim]{_tb.format_exc()}[/]"
+        )
     else:
         print_stderr(str(e))

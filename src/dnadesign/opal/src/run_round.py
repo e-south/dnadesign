@@ -20,7 +20,6 @@ Dunlop Lab
 
 from __future__ import annotations
 
-import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,7 +48,7 @@ from .registries.selections import get_selection, normalize_selection_result
 from .registries.transforms_y import run_y_ops_pipeline
 from .round_context import PluginRegistryView, RoundCtx
 from .state import CampaignState, RoundEntry
-from .utils import OpalError, ensure_dir, file_sha256, now_iso
+from .utils import OpalError, ensure_dir, file_sha256, now_iso, print_stderr
 from .writebacks import (
     SelectionEmit,
     build_label_events,
@@ -82,9 +81,7 @@ class RunRoundResult:
 
 def _log(enabled: bool, msg: str) -> None:
     if enabled:
-        import sys
-
-        print(msg, file=sys.stderr)
+        print_stderr(msg)
 
 
 def run_round(
@@ -295,8 +292,10 @@ def run_round(
         if not req.verbose:
             return
         pct = (i / max(total_batches, 1)) * 100.0
-        sys.stderr.write(f"\r[predict] {i}/{total_batches} batches ~{pct:0.1f}%")
-        sys.stderr.flush()
+        import sys as _sys
+
+        _sys.stderr.write(f"\r[predict] {i}/{total_batches} batches ~{pct:0.1f}%")
+        _sys.stderr.flush()
 
     for bi, i in enumerate(range(0, total, max(1, sbatch))):
         sl = slice(i, i + sbatch)
@@ -313,7 +312,9 @@ def run_round(
             },
         )
     if req.verbose:
-        sys.stderr.write("\n")
+        import sys as _sys
+
+        _sys.stderr.write("\n")
     Y_hat_fit = (
         np.vstack(yhat_chunks) if yhat_chunks else np.zeros((0, y_dim), dtype=float)
     )
@@ -829,5 +830,5 @@ def run_round(
         scored=len(id_order_pool),
         top_k_requested=int(top_k),
         top_k_effective=int(selected_effective),
-        events_path=str(ev_path.resolve()),
+        events_path=str(ev_path.parent.resolve()),
     )

@@ -28,6 +28,7 @@ def read_records(
     sequence_col: str = "sequence",
     annotations_col: str = "densegen__used_tfbs_detail",
     id_col: Optional[str] = "id",
+    details_col: Optional[str] = "details",
     alphabet: str = "DNA",
     plugins: Sequence[PluginLike] = (),
     ann_policy: Optional[Mapping[str, object]] = None,
@@ -39,6 +40,7 @@ def read_records(
         sequence_col=sequence_col,
         annotations_col=annotations_col,
         id_col=id_col,
+        details_col=details_col,
         alphabet=alphabet,
         ann_policy=ann_policy,
     )
@@ -64,12 +66,19 @@ def render_image(
 ):
     s = Style.from_mapping(style) if isinstance(style, Mapping) else (style or Style())
     pal = Palette(s.palette)
+    # Build a legend for still images too (parity with video frames)
+    from .video import (
+        _legend_entries_for_record as _legend,
+    )  # local import avoids cycles
+
+    legend_entries = _legend(record)
     fig = render_figure(
         record,
         style=s,
         palette=pal,
         out_path=str(out_path) if out_path else None,
         fmt=fmt,
+        legend_entries=legend_entries,
     )
     return fig
 
@@ -87,8 +96,19 @@ def render_images(
     pal = Palette(s.palette)
     for i, rec in enumerate(records):
         name = rec.id if rec.id else f"record_{i}"
+        # Per-record legend
+        from .video import (
+            _legend_entries_for_record as _legend,
+        )  # local import avoids cycles
+
+        legend_entries = _legend(rec)
         render_figure(
-            rec, style=s, palette=pal, out_path=str(out_dir / f"{name}.{fmt}"), fmt=fmt
+            rec,
+            style=s,
+            palette=pal,
+            out_path=str(out_dir / f"{name}.{fmt}"),
+            fmt=fmt,
+            legend_entries=legend_entries,
         )
 
 

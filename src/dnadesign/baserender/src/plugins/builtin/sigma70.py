@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import List, Literal, Optional, Sequence, Tuple
 
 from ...contracts import PluginError
+from ...layout import assign_tracks
 from ...model import Annotation, Guide, SeqRecord
 
 
@@ -88,8 +89,9 @@ class Sigma70Plugin:
         - Select at most ONE variant per sequence (first match by declared order).
         - Annotate exactly one paired (-35, -10) occurrence (first valid pair).
         - Sigma annotations are forward-only and occupy track 0 (payload.priority=0).
-        - Provide a 'sigma_link' guide that draws the sandwiched distance line at the
-          same vertical track as the sigma boxes.
+        - Always provide a 'sigma_link' guide with the spacer label. If σ boxes are
+          already present in the dataset, the link aligns to their assigned track;
+          otherwise it defaults to track 0 (the plugin's a track).
         """
         seq = record.sequence.upper()
         matches: List[Tuple[SigmaVariant, int, int]] = (
@@ -118,6 +120,12 @@ class Sigma70Plugin:
         anns: List[Annotation] = []
         guides: List[Guide] = []
 
+        # Guard: avoid stacking the same k-mer when already present in the dataset
+        # Match on exact (strand, start, length, letters), independent of tag.
+        existing = {
+            (a.strand, a.start, a.length, a.label.upper()) for a in record.annotations
+        }
+
         if matches:
             v, s35, s10 = matches[0]
             # Single, unified tag for all sigma variants (one color in the plot).
@@ -130,26 +138,33 @@ class Sigma70Plugin:
             prio = {"priority": 0, "group": tag_base, "strength": strength}
 
             # Upstream (-35) and downstream (-10), same tag (shared hue)
-            anns.append(
-                Annotation(
-                    start=s35,
-                    length=len(v.upstream),
-                    strand="fwd",
-                    label=v.upstream,
-                    tag=tag_base,
-                    payload=prio,
+            added_any = False
+            up_key = ("fwd", s35, len(v.upstream), v.upstream.upper())
+            dn_key = ("fwd", s10, len(v.downstream), v.downstream.upper())
+            if up_key not in existing:
+                anns.append(
+                    Annotation(
+                        start=s35,
+                        length=len(v.upstream),
+                        strand="fwd",
+                        label=v.upstream,
+                        tag=tag_base,
+                        payload=prio,
+                    )
                 )
-            )
-            anns.append(
-                Annotation(
-                    start=s10,
-                    length=len(v.downstream),
-                    strand="fwd",
-                    label=v.downstream,
-                    tag=tag_base,
-                    payload=prio,
+                added_any = True
+            if dn_key not in existing:
+                anns.append(
+                    Annotation(
+                        start=s10,
+                        length=len(v.downstream),
+                        strand="fwd",
+                        label=v.downstream,
+                        tag=tag_base,
+                        payload=prio,
+                    )
                 )
-            )
+                added_any = True
 
             # Sandwiched span between boxes, same-height track; label must be 1-based range
             # Observed spacer between end(-35) and start(-10), in bases:
@@ -165,6 +180,42 @@ class Sigma70Plugin:
             else:  # "inner" (default)
                 label_str = f"{self.spacer_min + 1}-{self.spacer_max - 1} bp"
 
+            # Choose vertical track for the link:
+            #  - If we added σ boxes, use track 0 (their priority=0 will occupy track 0).
+            #  - If σ hexamers already exist only in the dataset, infer their track so the
+            #    line aligns with them.
+            link_track = 0
+            if not added_any:
+                up_anns = [a for a in record.annotations if a.strand == "fwd"]
+                # try to anchor to -35 first, else -10
+                idx35 = next(
+                    (
+                        i
+                        for i, a in enumerate(up_anns)
+                        if a.start == s35
+                        and a.length == len(v.upstream)
+                        and a.label.upper() == v.upstream.upper()
+                    ),
+                    None,
+                )
+                idx10 = next(
+                    (
+                        i
+                        for i, a in enumerate(up_anns)
+                        if a.start == s10
+                        and a.length == len(v.downstream)
+                        and a.label.upper() == v.downstream.upper()
+                    ),
+                    None,
+                )
+                anchor_idx = idx35 if idx35 is not None else idx10
+                if anchor_idx is not None and up_anns:
+                    try:
+                        tracks = assign_tracks(up_anns)
+                        link_track = int(tracks[anchor_idx]) if tracks else 0
+                    except Exception:
+                        link_track = 0
+
             guides.append(
                 Guide(
                     kind="sigma_link",
@@ -172,7 +223,7 @@ class Sigma70Plugin:
                     end=s10,  # start of -10
                     label=label_str,
                     payload={
-                        "track": 0,  # draw at same layer as sigma boxes
+                        "track": link_track,
                         "up_len": len(v.upstream),
                         # Prefer bp-based margin; renderer also supports legacy frac.
                         **(

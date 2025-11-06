@@ -50,7 +50,7 @@ mkdir -p inputs/r0/
 cp ../../../usr/demo_material/demo_y_sfxi.csv inputs/r0/
 
 # 3) Ingest round 0 labels
-opal ingest-y -c campaign.yaml --observed-round 0 --csv inputs/r0/r0_y_sfxi.csv
+opal ingest-y -c campaign.yaml --observed-round 0 --csv inputs/r0/y_sfxi_pES1-12p.csv
 
 # 4) Train, score, select for round 0
 opal run -c campaign.yaml --labels-as-of 0

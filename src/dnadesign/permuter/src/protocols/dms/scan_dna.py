@@ -13,7 +13,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
-from .base import Protocol, assert_dna
+from ..base import Protocol, assert_dna
 
 _ALPHABET = ("A", "C", "G", "T")
 

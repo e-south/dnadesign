@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # --- Job yaml schema ---------------------------------------------------------
 
@@ -20,7 +20,8 @@ class JobInput(BaseModel):
     refs: str
     name_col: str = "ref_name"
     seq_col: str = "sequence"
-    aa_col: Optional[str] = None  # optional: protein sequence column
+    aa_col: Optional[str] = None
+    reference_sequence: Optional[str] = None
 
 
 class JobPermute(BaseModel):
@@ -65,6 +66,7 @@ class JobPlot(BaseModel):
             "position_scatter_and_heatmap",
             "metric_by_mutation_count",
             "aa_category_effects",
+            "hairpin_length_vs_metric",
         }
         bad = [x for x in vs if x not in allowed]
         if bad:
@@ -81,6 +83,23 @@ class EvalMetric(BaseModel):
 
 class JobEvaluate(BaseModel):
     metrics: List[EvalMetric]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _compat_list_or_dict(cls, v):
+        """
+        Allow:
+          evaluate:
+            metrics: [ ... ]      # canonical
+        and
+          evaluate:
+            - { id: ..., ... }    # legacy convenience
+        We *normalize* the latter to the canonical form. This is an explicit
+        normalization (not a silent fallback): both shapes are valid.
+        """
+        if isinstance(v, list):
+            return {"metrics": v}
+        return v
 
     @field_validator("metrics")
     @classmethod

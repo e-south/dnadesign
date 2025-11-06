@@ -114,6 +114,19 @@ usr schema demo --tree        # pretty tree view
 
 usr validate demo             # checks schema, uniqueness, namespacing
 usr validate demo --strict
+
+
+```
+
+**Column-wise summary (types, null %, list stats)**
+```bash
+usr describe demo --sample 2048
+```
+
+**Fetch a single record by id (pretty table)**
+
+```bash
+usr get demo --id e153ebc4... --columns id,sequence,densegen__used_tfbs
 ```
 
 **Export**
@@ -121,6 +134,9 @@ usr validate demo --strict
 ```bash
 usr export demo --fmt csv   --out usr/demo_material/out.csv
 usr export demo --fmt jsonl --out usr/demo_material/out.jsonl
+
+# or if you're in the cwd of records.parquet
+usr export --fmt csv --out records.csv
 ```
 
 **Snapshots**
@@ -156,6 +172,10 @@ Each `id` must map to exactly one sequence. Clean up case‑insensitive duplicat
 ```bash
 usr dedupe-sequences <dataset> --policy keep-first   # or keep-last, or ask (interactive)
 usr dedupe-sequences <dataset> --dry-run             # preview
+usr repair-densegen --dedupe keep-first
+usr repair-densegen --dedupe ask --drop-missing-used-tfbs -y
+usr repair-densegen --filter-single-tf  # remove rows that only contain one type of TF among their TFBSs
+usr repair-densegen --drop-id-seq-only  # remove rows that only contain 'id' and 'sequence'
 ```
 
 ---

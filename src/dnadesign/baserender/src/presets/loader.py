@@ -48,6 +48,21 @@ class VideoCfg:
 
 
 @dataclass(frozen=True)
+class ImagesCfg:
+    dir: Path
+    fmt: str
+
+
+@dataclass(frozen=True)
+class SelectionCfg:
+    path: Path
+    match_on: str  # 'id' | 'sequence' | 'row'
+    column: str  # CSV column to read
+    keep_order: bool
+    on_missing: str  # 'skip' | 'warn' | 'error'
+
+
+@dataclass(frozen=True)
 class Job:
     name: str
     input_path: Path
@@ -55,6 +70,7 @@ class Job:
     seq_col: str
     ann_col: str
     id_col: Optional[str]
+    details_col: Optional[str]
     alphabet: str
     plugins: Sequence[PluginSpec]
     style: Mapping[str, object]
@@ -63,6 +79,8 @@ class Job:
     limit: Optional[int]  # None or <=0 means unlimited
     sample_seed: Optional[int]  # deterministic random subset when limit is set
     ann_policy: Mapping[str, object]  # explicit annotation parsing policy
+    selection: Optional[SelectionCfg]
+    images: Optional[ImagesCfg]
 
 
 def _parse_aspect(val: Any) -> Optional[float]:
@@ -173,6 +191,58 @@ def load_job(path: Path) -> Job:
         out_path=out_path,
     )
 
+    # Optional stills export
+    imgs_raw = output.get("images")
+    images_cfg: Optional[ImagesCfg] = None
+    if imgs_raw is not None:
+        fmt_i = str(imgs_raw.get("fmt", "png")).lower()
+        ensure(
+            fmt_i in {"png", "svg", "pdf"},
+            "images.fmt must be png|svg|pdf",
+            SchemaError,
+        )
+        dir_i = imgs_raw.get("dir")
+        if dir_i:
+            img_dir = Path(dir_i)
+            if not img_dir.is_absolute():
+                img_dir = results_dir / name / Path(dir_i)
+        else:
+            img_dir = results_dir / name / "images"
+        images_cfg = ImagesCfg(dir=img_dir, fmt=fmt_i)
+
+    # Optional explicit selection from CSV
+    sel_raw = data.get("selection")
+    selection_cfg: Optional[SelectionCfg] = None
+    if sel_raw is not None:
+        p = Path(sel_raw.get("path") or sel_raw.get("csv") or "")
+        ensure(
+            str(p) != "", "selection.path (or selection.csv) is required", SchemaError
+        )
+        if not p.is_absolute():
+            p = root / p
+        match_on = str(sel_raw.get("match_on", "id")).lower()
+        ensure(
+            match_on in {"id", "sequence", "row"},
+            "selection.match_on must be id|sequence|row",
+            SchemaError,
+        )
+        default_col = "row" if match_on == "row" else match_on
+        column = str(sel_raw.get("column", default_col))
+        keep_order = bool(sel_raw.get("keep_order", True))
+        on_missing = str(sel_raw.get("on_missing", "warn")).lower()
+        ensure(
+            on_missing in {"skip", "warn", "error"},
+            "selection.on_missing must be skip|warn|error",
+            SchemaError,
+        )
+        selection_cfg = SelectionCfg(
+            path=p,
+            match_on=match_on,
+            column=column,
+            keep_order=keep_order,
+            on_missing=on_missing,
+        )
+
     # Limit default: 500 (set 0 or negative to process all)
     raw_limit = input_.get("limit", 500)
     limit = int(raw_limit)
@@ -228,6 +298,7 @@ def load_job(path: Path) -> Job:
         seq_col=input_["columns"]["sequence"],
         ann_col=input_["columns"]["annotations"],
         id_col=input_["columns"].get("id"),
+        details_col=input_["columns"].get("details", "details"),
         alphabet=input_.get("alphabet", "DNA"),
         plugins=plugins,
         style=style,
@@ -236,4 +307,6 @@ def load_job(path: Path) -> Job:
         limit=limit,
         sample_seed=sample_seed,
         ann_policy=ann_policy,
+        selection=selection_cfg,
+        images=images_cfg,
     )

@@ -15,6 +15,7 @@ import sys
 
 import typer
 
+from .pretty import maybe_install_rich_traceback
 from .registry import discover_commands, install_registered_commands
 
 # single Typer app exposed as entrypoint in pyproject.toml
@@ -31,10 +32,25 @@ def _root_callback(
         False,
         "--debug/--no-debug",
         help="Print full tracebacks on internal errors (OPAL_DEBUG=1).",
-    )
+    ),
+    color: bool = typer.Option(
+        True,
+        "--color/--no-color",
+        help="Enable/disable styled output (Rich). JSON output is never styled.",
+    ),
 ) -> None:
-    """Root callback sets global debug behavior."""
+    """
+    Root callback sets global debug + CLI styling behavior via env flags.
+    """
     os.environ["OPAL_DEBUG"] = "1" if debug else "0"
+
+    # Rich styling is opt-in via environment; default on for TTY.
+    os.environ["OPAL_CLI_RICH"] = "1" if color else "0"
+    os.environ["OPAL_CLI_MARKUP"] = "1" if color else "0"
+
+    # Pretty tracebacks if Rich is enabled
+    if color:
+        maybe_install_rich_traceback()
 
 
 def _build() -> typer.Typer:

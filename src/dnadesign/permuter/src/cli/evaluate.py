@@ -117,8 +117,9 @@ def _derive_records_from_job(
 
     # Need a ref name for the other layouts
     df_refs = pd.read_csv(jp0.refs_csv, dtype=str)
+    desired = ref or getattr(cfg.job.input, "reference_sequence", None)
     ref_name, ref_seq = _pick_reference(
-        df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, ref
+        df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, desired
     )
     # 2) nested: <output_root>/<ref>/records.parquet
     jp = resolve(
@@ -247,11 +248,22 @@ def evaluate(
         # Log quick stats for the first column of this metric
         first_col = next(iter(cols.values()))
         desc = first_col.describe(percentiles=[0.25, 0.5, 0.75])
+        p = mc.get("params") or {}
+        red = p.get("reduction", None)
+        # evaluator-specific flavor for evo2
+        extra = ""
+        if str(mc["evaluator"]).startswith("evo2_"):
+            extra = (
+                f" model={p.get('model_id','?')} device={p.get('device','?')}"
+                f" prec={p.get('precision','?')} alpha={p.get('alphabet','?')}"
+            )
         _LOG.info(
-            "evaluate: id=%s evaluator=%s metric=%s n=%d mean=%.4f std=%.4f min=%.4f p50=%.4f max=%.4f",
+            "evaluate: id=%s eval=%s metric=%s%s%s n=%d mean=%.4f sd=%.4f min=%.4f p50=%.4f max=%.4f",
             mc["id"],
             mc["evaluator"],
             mc["metric"],
+            (f" reduction={red}" if red else ""),
+            extra,
             len(first_col),
             float(desc["mean"]),
             float(desc["std"]) if pd.notna(desc["std"]) else float("nan"),

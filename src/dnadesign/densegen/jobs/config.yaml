@@ -84,55 +84,84 @@ densegen:
     print_visual: true                 # print the ILP visual per solution (fresh line, un-clipped)
 
 plots:
-    # This path is resolved under the DenseGen tree when relative:
-    # dnadesign/densegen/outputs/plots/
-    out_dir: outputs/plots
+  out_dir: outputs/plots
 
-    # Global style: bigger fonts across the board
-    style:
-      font_size: 14        # title≈15.4, ticks≈12.6 by default
-      palette: tab10
-      seaborn_style: true
-      despine: true
-      legend_frame: false
+  # Global style applied to every plot (can be overridden per-plot)
+  style:
+    font_size: 14
+    palette: okabe_ito          # name, list of colors, or single color (per-plot overrides allowed)
+    seaborn_style: true
+    despine: true
+    legend_frame: false
+    # Optional:
+    # promoter_colors:
+    #   "-35 site": "#D55E00"
+    #   "-10 site": "#0072B2"
 
-    # Which plots to render
-    default:
-      - compression_ratio
-      - tf_usage
-      - tfbs_usage          # NEW: ranked binding-site counts
-      - plan_counts
-      - tf_coverage
-      - tfbs_length_density
-      - gap_fill_gc         # now a scatter: GC fraction vs gap bases
+  default:
+    - compression_ratio
+    - tf_usage
+    - tfbs_usage
+    - plan_counts
+    - tf_coverage
+    - tfbs_length_density
+    - gap_fill_gc
 
-    options:
-      compression_ratio:
-        dims: [6, 6]
+  options:
 
-      tf_usage:             # total counts (no top-k)
-        dims: [6, 6]
+    compression_ratio:
+      dims: [6, 6]
+      # bins: 30
 
-      tfbs_usage:
-        dims: [32, 6]
-        # max_sites: 60     # optional cap if you ever need it
+    tf_usage:
+      dims: [8, 6]
+      mode: stack_lengths        # stack_lengths | stack_tfbs | totals
+      max_segments: 20
+      top_k_tfs: null
+      # palette can be overridden here; palette_no_repeat enforces unique colors
+      # palette: tab20
+      # palette_no_repeat: true
 
-      plan_counts:
-        dims: [6, 6]
+    tfbs_usage:
+      dims: [32, 6]
+      couple_sigma_pairs: true   # unmapped/None plans are skipped (no errors)
+      exclude_tfbs: ["G"]
+      # max_sites: 60
 
-      tf_coverage:
-        dims: [16, 3]
-        normalize: false
-        fill: true
-        fill_alpha: 0.35
-        stacked: false
-        smooth_window: 3
+    plan_counts:
+      dims: [6, 6]
+      stacked_by_day: true
+      created_at_col: created_at
 
-      tfbs_length_density:
-        dims: [6, 6]
-        kde: true
-        kde_points: 256
-        fill_alpha: 0.25
+    tf_coverage:
+      dims: [16, 3]
+      top_k: 20
+      normalize: false
+      stacked: false
+      alpha: 0.35                 # bar face opacity
+      palette: seagreen           # single color, palette name, or list
+      edge_on: true               # toggle per-bin edges
+      edge_width: 1.9             # thickness (pt)
+      edge_alpha: 0.9             # opacity
+      edge_color: auto            # auto=darker(face); or a fixed color (#333, 'k', etc.)
+      edge_dark_factor: 0.80      # only used when edge_color=auto
 
-      gap_fill_gc:
-        dims: [6, 6]        # scatter: x=GC fraction, y=gap bases
+      include_promoter_sites: true
+      promoter_scan_revcomp: false
+      promoter_edge_style: solid
+      # promoter_edge_alpha: 0.95
+      # promoter_on_top: true
+      # promoter_zorder: 4.0
+
+    tfbs_length_density:
+      dims: [6, 6]
+      kde: true
+      # bins: auto               # when kde=false
+      kde_bandwidth: null
+      kde_points: 256
+      fill_alpha: 0.35
+      include_promoter_sites: false
+      promoter_scan_revcomp: false
+
+    gap_fill_gc:
+      dims: [6, 6]
