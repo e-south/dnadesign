@@ -61,7 +61,7 @@ job:
       #   metric: log_likelihood
 
   output:
-    dir: "${JOB_DIR}/../results/retron_hp_swap"
+    dir: "${JOB_DIR}/../results/retron_gc_scan"
 
   plot:
     which: ["hairpin_length_vs_metric"]

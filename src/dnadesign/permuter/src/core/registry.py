@@ -69,6 +69,13 @@ def _builtins(group: str) -> dict[str, Type]:
             _LOG.debug(
                 f"[registry] optional builtin protocol 'scan_stem_loop' not available: {e}"
             )
+        try:
+            from dnadesign.permuter.src.protocols.combine.combine_aa import CombineAA
+            out["combine_aa"] = CombineAA
+        except Exception as e:
+            _LOG.debug(
+                f"[registry] optional builtin protocol 'combine_aa' not available: {e}"
+            )
         return out
     else:
         try:

@@ -11,7 +11,7 @@ job:
       regions: []            # full
   evaluate:
     metrics:
-      - id: llr
+      - id: llr_mean
         evaluator: evo2_llr
         metric: log_likelihood_ratio
         params:

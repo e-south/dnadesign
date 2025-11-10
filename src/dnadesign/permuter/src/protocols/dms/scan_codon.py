@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/permuter/protocols/dms/scan_codon.py
+src/dnadesign/permuter/src/protocols/dms/scan_codon.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,7 +16,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
-from ..base import Protocol
+from dnadesign.permuter.src.protocols.base import Protocol
 
 _TRIPLE = 3
 _BASE_REQUIRED = {"codon", "amino_acid"}

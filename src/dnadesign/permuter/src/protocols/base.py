@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/permuter/protocols/base.py
+src/dnadesign/permuter/src/protocols/base.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/permuter/protocols/hairpins/scan_stem_loop.py
+src/dnadesign/permuter/src/protocols/hairpins/scan_stem_loop.py
 
 Stem-loop (hairpin) generator: (re)build or extend a seeded hairpin inside a
 region. GC-aware base sampling and optional mismatches (per stratum) on newly
@@ -22,8 +22,8 @@ from typing import Dict, Iterable, List, Tuple
 
 import numpy as np
 
-from .. import register
-from ..base import Protocol
+from dnadesign.permuter.src.protocols import register
+from dnadesign.permuter.src.protocols.base import Protocol
 
 _LOG = logging.getLogger("permuter.protocol.scan_stem_loop")
 

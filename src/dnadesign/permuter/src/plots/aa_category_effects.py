@@ -15,6 +15,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -34,14 +35,15 @@ AA_CAT_ORDER: list[tuple[str, list[str]]] = [
 ]
 
 
+_RE_AA_EDIT_STRUCT = re.compile(
+    r"\baa\b.*?\bpos\s*=\s*(?P<pos>\d+)\b.*?\bwt\s*=\s*(?P<wt>[A-Z\*])\b.*?\balt\s*=\s*(?P<alt>[A-Z\*])\b",
+    flags=re.IGNORECASE,
+)
+
+
 def _parse_any_aa_edit(token: str) -> Optional[tuple[int, str, str]]:
     s = str(token).strip()
-    # Strictly require the "aa" prefix to avoid matching NT tokens
-    m = __import__("re").search(
-    r"\baa\b.*?\bpos\s*=\s*(?P<pos>\d+)\b.*?\bwt\s*=\s*(?P<wt>[A-Z\*])\b.*?\balt\s*=\s*(?P<alt>[A-Z\*])\b",
-        s,
-        flags=__import__("re").IGNORECASE,
-    )
+    m = _RE_AA_EDIT_STRUCT.search(s)
     if m:
         return int(m.group("pos")), m.group("wt").upper(), m.group("alt").upper()
     # Compact AA notation (not all-nucleotide)

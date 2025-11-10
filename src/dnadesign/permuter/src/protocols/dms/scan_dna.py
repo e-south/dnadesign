@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/permuter/protocols/dms/scan_dna.py
+src/dnadesign/permuter/src/protocols/dms/scan_dna.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -13,7 +13,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
-from ..base import Protocol, assert_dna
+from dnadesign.permuter.src.protocols.base import Protocol, assert_dna
 
 _ALPHABET = ("A", "C", "G", "T")
 

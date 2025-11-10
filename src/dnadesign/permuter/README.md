@@ -202,6 +202,7 @@ permuter inspect  --data PATH [--head N]
 * `scan_dna` — single nucleotide substitutions (A↔C/G/T) over regions
 * `scan_codon` — codon substitutions (requires a codon table CSV)
 * `scan_stem_loop` — hairpin generator (seeded cap, extend/rebuild modes)
+* `combine_aa` — build multi‑mutation variants from a prior single‑mutation DMS dataset.
 
 **Evaluators**
 

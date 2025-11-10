@@ -355,9 +355,6 @@ def _has_aa_signals(df: pd.DataFrame) -> bool:
             for t in _as_token_seq(m):
                 if _parse_any_aa_edit(t):
                     return True
-            # keep scanning
-            if False:
-                return True
     return False
 
 

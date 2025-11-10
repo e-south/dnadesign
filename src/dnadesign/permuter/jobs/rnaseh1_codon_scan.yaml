@@ -14,7 +14,7 @@ job:
       # region_codons: [0, 100]  # optional [start,end) in codon units
   evaluate:
     metrics:
-      - id: llr
+      - id: llr_mean
         evaluator: evo2_llr
         metric: log_likelihood_ratio
         params:

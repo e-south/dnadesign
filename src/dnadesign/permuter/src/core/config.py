@@ -33,7 +33,7 @@ class JobPermute(BaseModel):
     @field_validator("protocol")
     @classmethod
     def _known_protocol(cls, v: str):
-        allowed = {"scan_dna", "scan_codon", "scan_stem_loop"}
+        allowed = {"scan_dna", "scan_codon", "scan_stem_loop", "combine_aa"}
         if v not in allowed:
             raise ValueError(f"Unknown protocol: {v!r}. Allowed: {sorted(allowed)}")
         return v
@@ -67,6 +67,8 @@ class JobPlot(BaseModel):
             "metric_by_mutation_count",
             "aa_category_effects",
             "hairpin_length_vs_metric",
+            "ranked_variants",
+            "synergy_scatter",
         }
         bad = [x for x in vs if x not in allowed]
         if bad:
