@@ -22,6 +22,22 @@ def _key_for_combo(events: List[Tuple[int, str, str, float]]) -> str:
     return "|".join(parts)
 
 
+def _rank_score_for(
+    picks: List[Tuple[int, str, str, float]],
+    *,
+    objective: str,
+) -> float:
+    """
+    Compute the sampler's ranking objective for a combo.
+    Implemented objectives:
+      • 'sum_of_singles'  → sum of single-event scores (current default)
+    """
+    if objective == "sum_of_singles":
+        return float(sum(x[3] for x in picks))
+    # No silent fallbacks: be explicit about unsupported objectives.
+    raise ValueError(f"combine_aa.random_sample: unknown rank_objective={objective!r}")
+
+
 def random_sample(
     elite: List[Tuple[int, str, str, float]],
     combine_cfg: Dict,
@@ -44,7 +60,9 @@ def random_sample(
         )
     if budget_total <= 0:
         raise ValueError("combine_aa: combine.budget_total must be > 0")
-    per_k = (comb.get("random", {}) or {}).get("samples_per_k", {})
+    rnd = (comb.get("random", {}) or {})
+    per_k = rnd.get("samples_per_k", {})
+    rank_objective = str(rnd.get("rank_objective", "sum_of_singles"))
     # Normalize keys to int
     per_k_int: Dict[int, int] = {
         int(k): int(v) for k, v in (per_k.items() if per_k else [])
@@ -99,15 +117,15 @@ def random_sample(
             if key in seen_keys:
                 continue
             seen_keys.add(key)
-            score = float(sum(x[3] for x in picks))
-            results.append((sorted(picks, key=lambda x: x[0]), score))
+            score = _rank_score_for(picks, objective=rank_objective)
+            results.append((sorted(picks, key=lambda x: x[0]), float(score)))
             count_k += 1
             remaining_budget -= 1
             if remaining_budget <= 0:
                 break
 
     # Stable ordering
-    results.sort(key=lambda t: (-t[1], _key_for_combo(t[0])))
+    results.sort(key=lambda t: (-float(t[1]), _key_for_combo(t[0])))
     return results
 
 

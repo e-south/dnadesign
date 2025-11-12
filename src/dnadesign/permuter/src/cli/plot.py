@@ -35,6 +35,8 @@ from dnadesign.permuter.src.core.storage import (
 from dnadesign.permuter.src.plots.aa_category_effects import plot as plot_cat
 from dnadesign.permuter.src.plots.hairpin_length_vs_metric import plot as plot_hlvm
 from dnadesign.permuter.src.plots.metric_by_mutation_count import plot as plot_mmc
+from dnadesign.permuter.src.plots.ranked_variants import plot as plot_ranked
+from dnadesign.permuter.src.plots.synergy_scatter import plot as plot_syn
 from dnadesign.permuter.src.plots.mutation_summary import emit_aa_mutation_llr_summary
 from dnadesign.permuter.src.plots.position_scatter_and_heatmap import plot as plot_psh
 
@@ -150,6 +152,11 @@ def plot(
     yaml_font = None
     yaml_strip_every = None
     yaml_emit = None
+    yaml_ranked_annot_top = None
+    yaml_ranked_summary_top_n = None
+    yaml_ranked_export_top_k = None
+    yaml_ranked_xtick_every = None
+    yaml_sizes_map = {}
     if cfg and cfg.job.plot:
         yaml_which = list(cfg.job.plot.which or [])
         yaml_metric = cfg.job.plot.metric_id
@@ -159,13 +166,18 @@ def plot(
         yaml_font = cfg.job.plot.font_scale
         yaml_strip_every = getattr(cfg.job.plot, "strip_every", None)
         yaml_emit = getattr(cfg.job.plot, "emit_summaries", True)
+        yaml_ranked_annot_top = getattr(cfg.job.plot, "ranked_annotate_top", None)
+        yaml_ranked_summary_top_n = getattr(cfg.job.plot, "ranked_summary_top_n", None)
+        yaml_ranked_export_top_k = getattr(cfg.job.plot, "ranked_export_top_k", None)
+        yaml_ranked_xtick_every = getattr(cfg.job.plot, "ranked_xtick_every", None)
+        yaml_sizes_map = dict(getattr(cfg.job.plot, "sizes", {}) or {})
 
     which = list(which or yaml_which or ["position_scatter_and_heatmap"])
     metric_id = metric_id or yaml_metric
     width = width or yaml_width
     height = height or yaml_height
     font_scale = font_scale or yaml_font
-    figsize = (width, height) if (width and height) else None
+    figsize_global = (width, height) if (width and height) else None
     strip_every = yaml_strip_every
     emit_summaries = (
         emit_summaries
@@ -238,6 +250,18 @@ def plot(
                 break
 
     for name in which:
+        # Compute figsize for this plot with explicit precedence:
+        # CLI > plot.sizes[name] > plot.size > internal default
+        if figsize_global:
+            figsize = figsize_global
+        else:
+            ps = yaml_sizes_map.get(name)
+            if ps and ps.width and ps.height:
+                figsize = (float(ps.width), float(ps.height))
+            elif yaml_width and yaml_height:
+                figsize = (float(yaml_width), float(yaml_height))
+            else:
+                figsize = None
         if name in ("position_scatter_and_heatmap", "position_scatter"):
             out = plots_dir / f"{name}__{metric_id}.pdf"
             _LOG.info(
@@ -260,6 +284,51 @@ def plot(
                 figsize=figsize,
                 font_scale=font_scale,
                 ref_strip_every=strip_every,
+            )
+            console.print(f"[green]✔[/green] {name} → {out}")
+        elif name == "ranked_variants":
+            out = plots_dir / f"{name}__{metric_id}.png"
+            _LOG.info(
+                "plot: %s → %s (metric_id=%s, figsize=%s, font_scale=%s)",
+                name, out, metric_id or "<auto>",
+                str(figsize) if figsize else "auto",
+                str(font_scale) if font_scale else "1.0",
+            )
+            plot_ranked(
+                elite_df=df.head(0),
+                all_df=df,
+                output_path=out,
+                job_name=job_name,
+                ref_sequence=ref_seq,
+                metric_id=metric_id,
+                evaluators=subtitle,
+                figsize=figsize,
+                font_scale=font_scale,
+                annotate_top_k=yaml_ranked_annot_top,
+                summary_top_n=yaml_ranked_summary_top_n,
+                xtick_every=yaml_ranked_xtick_every,
+                export_top_k=yaml_ranked_export_top_k,
+                dataset_dir=plots_dir.parent,
+            )
+            console.print(f"[green]✔[/green] {name} → {out}")
+        elif name == "synergy_scatter":
+            out = plots_dir / f"{name}__{metric_id}.png"
+            _LOG.info(
+                "plot: %s → %s (metric_id=%s, figsize=%s, font_scale=%s)",
+                name, out, metric_id or "<auto>",
+                str(figsize) if figsize else "auto",
+                str(font_scale) if font_scale else "1.0",
+            )
+            plot_syn(
+                elite_df=df.head(0),
+                all_df=df,
+                output_path=out,
+                job_name=job_name,
+                ref_sequence=ref_seq,
+                metric_id=metric_id,
+                evaluators=subtitle,
+                figsize=figsize,
+                font_scale=font_scale,
             )
             console.print(f"[green]✔[/green] {name} → {out}")
         elif name == "metric_by_mutation_count":

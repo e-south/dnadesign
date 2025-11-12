@@ -20,11 +20,16 @@ import numpy as np
 import pandas as pd
 import yaml
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn
+from rich.status import Status
 
 from dnadesign.permuter.src.core.config import JobConfig
 from dnadesign.permuter.src.core.ids import derive_seed64, variant_id
-from dnadesign.permuter.src.core.paths import expand_for_job, resolve, resolve_job_hint
+from dnadesign.permuter.src.core.paths import (
+    expand_for_job,
+    expand_param_paths,
+    resolve,
+    resolve_job_hint,
+)
 from dnadesign.permuter.src.core.registry import get_protocol
 from dnadesign.permuter.src.core.storage import (
     append_record_event,
@@ -91,20 +96,15 @@ def _variants_stream(
     *,
     seed: int,
     job_dir: Path,
+    dataset_dir: Path,
 ) -> Iterable[Dict[str, Any]]:
     proto_cls = get_protocol(protocol_name)
     proto = proto_cls()
-    # Resolve any job-relative file params (minimal, targeted):
-    params_resolved = dict(params or {})
-    # Common case: codon table path
-    if "codon_table" in params_resolved:
-        try:
-            params_resolved["codon_table"] = str(
-                expand_for_job(params_resolved["codon_table"], job_dir=job_dir)
-            )
-        except Exception:
-            # Leave as-is; validate_cfg will surface a precise error
-            pass
+    # Resolve all job-relative file params recursively.
+    params_resolved = expand_param_paths(params or {}, job_dir=job_dir)
+    # Pass job_dir for protocol-side fallback when run programmatically.
+    params_resolved["_job_dir"] = str(job_dir)
+    params_resolved["_artifact_dir"] = str(dataset_dir)
     proto.validate_cfg(params=params_resolved)
     rng = np.random.default_rng(seed)
     params_resolved["_derived_seed"] = int(seed)
@@ -174,14 +174,8 @@ def run(
     )
 
     console.rule(f"[bold]Permuter run[/bold] • job={cfg.job.name} • ref={ref_name}")
-    with Progress(
-        SpinnerColumn(),
-        *Progress.get_default_columns(),
-        TimeElapsedColumn(),
-        transient=True,
-    ) as prog:
-        t_load = prog.add_task("Generating variants", total=None)
-        rows: list[dict] = []
+    rows: list[dict] = []
+    with console.status("[bold]Generating variants[/bold] …", spinner="dots") as st:
         for var in _variants_stream(
             cfg.job.permute.protocol,
             cfg.job.permute.params or {},
@@ -189,6 +183,7 @@ def run(
             ref_seq,
             seed=seed,
             job_dir=jp.job_dir,
+            dataset_dir=jp.dataset_dir,
         ):
             row = make_usr_row(
                 sequence=var["sequence"],
@@ -218,8 +213,7 @@ def run(
                 row[f"permuter__{k}"] = v
 
             rows.append(row)
-        prog.update(t_load, description=f"Generated {len(rows)} variants")
-        prog.stop_task(t_load)
+        st.update(status=f"[bold]Generated[/bold] {len(rows)} variants")
 
     if not rows:
         raise RuntimeError("Protocol produced zero variants")

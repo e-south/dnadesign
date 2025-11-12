@@ -161,7 +161,8 @@ def plot(
         None,
         "--which",
         help="Plot id to generate (repeat for multiple). "
-        "Allowed: position_scatter_and_heatmap, metric_by_mutation_count, aa_category_effects, hairpin_length_vs_metric",  # noqa
+        "Allowed: position_scatter_and_heatmap, ranked_variants, synergy_scatter, "
+        "metric_by_mutation_count, aa_category_effects, hairpin_length_vs_metric",  # noqa
     ),
     metric_id: str = typer.Option(
         None, "--metric-id", help="Metric id to plot (e.g., llr_mean, llr_sum)"

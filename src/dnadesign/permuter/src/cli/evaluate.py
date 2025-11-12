@@ -18,6 +18,8 @@ from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 import yaml
+import numpy as np
+import os
 from rich.console import Console
 
 from dnadesign.permuter.src.core.config import JobConfig
@@ -150,6 +152,60 @@ def _argv() -> str:
     except Exception:
         return " ".join(sys.argv)
 
+def _summarize_first_column_for_log(
+    s: pd.Series,
+) -> tuple[float, float, float, float, float, Optional[int]]:
+    """
+    Robust summary for logging:
+      • If `s` is numeric → compute mean, sd, min, p50, max directly.
+      • If `s` has per-row sequences (list/ndarray/Series of numbers) → compute the
+        same statistics over each row's mean; also return a vector dimension when
+        consistent across rows (else None).
+    No silent fallbacks: non-numeric, non-sequence values become NaN in the summary.
+    """
+    # Numeric scalar column
+    if pd.api.types.is_numeric_dtype(s):
+        a = pd.to_numeric(s, errors="coerce").to_numpy(dtype=float)
+        finite = np.isfinite(a)
+        if finite.sum() == 0:
+            return (float("nan"),) * 5 + (None,)
+        mean = float(np.nanmean(a))
+        sd = float(np.nanstd(a, ddof=1)) if finite.sum() > 1 else float("nan")
+        mn = float(np.nanmin(a))
+        p50 = float(np.nanmedian(a))
+        mx = float(np.nanmax(a))
+        return mean, sd, mn, p50, mx, None
+
+    # Sequence-of-numbers per row
+    vec_lens: list[int] = []
+    row_means: list[float] = []
+    for x in s:
+        if isinstance(x, (list, tuple, np.ndarray, pd.Series)):
+            arr = np.array(list(x), dtype=float)
+            vec_lens.append(int(len(arr)))
+            if arr.size:
+                row_means.append(float(np.nanmean(arr)))
+            else:
+                row_means.append(np.nan)
+        else:
+            row_means.append(np.nan)
+    a = np.array(row_means, dtype=float)
+    finite = np.isfinite(a)
+    if finite.sum() == 0:
+        vec_dim = vec_lens[0] if vec_lens else None
+        return (float("nan"),) * 5 + (vec_dim,)
+    mean = float(np.nanmean(a))
+    sd = float(np.nanstd(a, ddof=1)) if finite.sum() > 1 else float("nan")
+    mn = float(np.nanmin(a))
+    p50 = float(np.nanmedian(a))
+    mx = float(np.nanmax(a))
+    vec_dim = None
+    if vec_lens:
+        u = set(vec_lens)
+        if len(u) == 1:
+            vec_dim = int(next(iter(u)))
+    return mean, sd, mn, p50, mx, vec_dim
+
 
 def evaluate(
     data: Path | None,
@@ -216,8 +272,13 @@ def evaluate(
     # get reference seq, required for some evaluators (e.g. evo2_llr)
     ref = read_ref_fasta(records.parent)
     ref_sequence = ref[1] if ref else None
+    if ref and ref_sequence and len(ref_sequence) > 0:
+        _LOG.info("evaluate: REF loaded for baseline • name=%s • length=%d nt/aa", ref[0], len(ref_sequence))
 
     sequences = df["sequence"].astype(str).tolist()
+
+    # Accumulate new metric columns here and add them in a single concat to avoid fragmentation
+    new_metric_frames: list[pd.DataFrame] = []
 
     for mc in metrics:
         ev_cls = get_evaluator(mc["evaluator"])
@@ -241,13 +302,13 @@ def evaluate(
                 ) from e
             raise
 
-        # Normalize and write columns
+        # Normalize → batch-append as one DataFrame to avoid repeated frame.insert
         cols = _normalize_scores(scores, n=len(sequences), metric_id=mc["id"])
-        for col_name, series in cols.items():
-            df[col_name] = series
-        # Log quick stats for the first column of this metric
-        first_col = next(iter(cols.values()))
-        desc = first_col.describe(percentiles=[0.25, 0.5, 0.75])
+        cols_df = pd.DataFrame(cols)  # aligns on RangeIndex 0..n-1
+        new_metric_frames.append(cols_df)
+        # Log quick stats for the first column (without mutating df yet)
+        first_col = cols_df.iloc[:, 0]
+        mean, sd, mn, p50, mx, vec_dim = _summarize_first_column_for_log(first_col)
         p = mc.get("params") or {}
         red = p.get("reduction", None)
         # evaluator-specific flavor for evo2
@@ -257,6 +318,8 @@ def evaluate(
                 f" model={p.get('model_id','?')} device={p.get('device','?')}"
                 f" prec={p.get('precision','?')} alpha={p.get('alphabet','?')}"
             )
+        if vec_dim is not None:
+            extra = f"{extra} vecdim={vec_dim}"
         _LOG.info(
             "evaluate: id=%s eval=%s metric=%s%s%s n=%d mean=%.4f sd=%.4f min=%.4f p50=%.4f max=%.4f",
             mc["id"],
@@ -265,12 +328,22 @@ def evaluate(
             (f" reduction={red}" if red else ""),
             extra,
             len(first_col),
-            float(desc["mean"]),
-            float(desc["std"]) if pd.notna(desc["std"]) else float("nan"),
-            float(desc["min"]),
-            float(desc["50%"]),
-            float(desc["max"]),
+            mean,
+            sd,
+            mn,
+            p50,
+            mx,
         )
+        if str(mc["evaluator"]).strip() == "evo2_llr":
+            _LOG.info(
+                "evaluate: LLR computed as log P(variant) - log P(reference) using REF.fa"
+            )
+
+    # Single concat to add all metric columns at once (zero/low-copy when possible)
+    if new_metric_frames:
+        df = pd.concat([df] + new_metric_frames, axis=1, copy=False)
+        # Defragment once so downstream ops (parquet write / slicing) stay fast
+        df = df.copy()
 
     atomic_write_parquet(df, records)
     console.print(
@@ -343,21 +416,47 @@ def _normalize_scores(scores: Any, *, n: int, metric_id: str) -> Dict[str, pd.Se
     # Fixed-length sequence of numbers case
     if isinstance(first, (list, tuple, pd.Series)) or hasattr(first, "__array__"):
         try:
-            lens = [len(x) for x in scores]
+            # normalize inner records to Python lists once
+            def _to_list(x):
+                if isinstance(x, (list, tuple, pd.Series)):
+                    return list(x)
+                tolist = getattr(x, "tolist", None)
+                return list(tolist()) if callable(tolist) else list(x)
+            seqs = [_to_list(x) for x in scores]
+            lens = [len(x) for x in seqs]
         except Exception:
             raise _err("variable records must be sized sequences of numbers")
         if len(set(lens)) != 1:
             raise _err(f"inconsistent inner lengths {sorted(set(lens))}")
+        # Decide representation:
+        #  • Keep 'logits*' metrics as a single Arrow list column (default).
+        #  • Or force globally with PERMUTER_VECTOR_AS_LIST=1.
+        keep_as_list = (
+            "logits" in str(metric_id).lower()
+            or os.environ.get("PERMUTER_VECTOR_AS_LIST", "").strip().lower() in {"1","true","yes"}
+        )
+        if keep_as_list:
+            cleaned = []
+            for i, rec in enumerate(seqs):
+                row = []
+                for j, v in enumerate(rec):
+                    if not (v is None or isinstance(v, numbers.Number)):
+                        raise _err(f"record {i}[{j}] has non-numeric value {type(v).__name__}")
+                    row.append(float(v) if v is not None else float("nan"))
+                cleaned.append(row)
+            # Pandas→PyArrow will write this as list<item: double>
+            ser = pd.Series(cleaned, dtype="object")
+            return {f"permuter__metric__{metric_id}": ser}
+
+        # Expand into __0..__K-1 scalar columns
         k = lens[0]
         out: Dict[str, pd.Series] = {}
         for j in range(k):
             col = []
-            for i, rec in enumerate(scores):
+            for i, rec in enumerate(seqs):
                 v = rec[j]
                 if not (v is None or isinstance(v, numbers.Number)):
-                    raise _err(
-                        f"record {i}[{j}] has non-numeric value {type(v).__name__}"
-                    )
+                    raise _err(f"record {i}[{j}] has non-numeric value {type(v).__name__}")
                 col.append(float(v) if v is not None else float("nan"))
             out[f"permuter__metric__{metric_id}__{j}"] = pd.Series(col, dtype="float64")
         return out

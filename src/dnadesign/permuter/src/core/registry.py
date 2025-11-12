@@ -92,16 +92,24 @@ def _builtins(group: str) -> dict[str, Type]:
             from dnadesign.permuter.src.evaluators.evo2_ll import (
                 Evo2LogLikelihoodEvaluator,
             )
-
             out["evo2_ll"] = Evo2LogLikelihoodEvaluator
+        except Exception as e:
+            _LOG.debug("[registry] optional evaluator 'evo2_ll' not available: %s", e)
+        try:
             from dnadesign.permuter.src.evaluators.evo2_llr import (
                 Evo2LogLikelihoodRatioEvaluator,
             )
-
             out["evo2_llr"] = Evo2LogLikelihoodRatioEvaluator
         except Exception as e:
+            _LOG.debug("[registry] optional evaluator 'evo2_llr' not available: %s", e)
+        try:
+            from dnadesign.permuter.src.evaluators.evo2_logits import (
+                Evo2LogitsMeanEvaluator,
+            )
+            out["evo2_logits"] = Evo2LogitsMeanEvaluator
+        except Exception as e:
             _LOG.debug(
-                f"[registry] optional builtin evaluators 'evo2_ll/llr' not available: {e}"
+                "[registry] optional evaluator 'evo2_logits' not available: %s", e
             )
         return out
 

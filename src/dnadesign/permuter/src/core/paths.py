@@ -13,7 +13,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Any, Iterable, List, Optional
 
 try:
     # Python 3.9+: importlib.resources.files gives us package install path
@@ -161,7 +161,9 @@ def normalize_data_path(p: Path | str) -> Path:
     Accept either a dataset directory or records.parquet file.
     Returns a Path to records.parquet.
     """
-    path = Path(str(p)).expanduser().resolve()
+    # Expand env vars and ~ regardless of caller's CWD.
+    raw = os.path.expandvars(str(p) or "")
+    path = Path(os.path.expanduser(raw)).resolve()
     if path.is_dir():
         return (path / "records.parquet").resolve()
     return path
@@ -245,3 +247,48 @@ def resolve(
         ref_fa=ref_fa,
         plots_dir=plots_dir,
     )
+
+def _looks_pathlike(s: str, *, key_hint: Optional[str] = None) -> bool:
+    """
+    Conservative heuristic: only treat as a path when it *looks* like one.
+    """
+    if not s:
+        return False
+    s2 = s.strip()
+    if any(tok in s2 for tok in ("/", "\\", "~", "${")):
+        return True
+    ext = s2.lower().rsplit(".", 1)[-1] if "." in s2 else ""
+    if ext in {
+        "csv", "tsv", "parquet", "pqt", "json", "jsonl", "yaml", "yml",
+        "fa", "fasta", "txt", "gz", "bz2", "xz", "zip"
+    }:
+        return True
+    if key_hint:
+        k = key_hint.lower()
+        if k.endswith(("_path", "_file", "_dir")):
+            return True
+        if k in {"from_dataset", "dataset", "codon_table", "refs"}:
+            return True
+    return False
+
+def expand_param_paths(params: dict | None, *, job_dir: Path) -> dict:
+    """
+    Deep-copy and expand any string values in a params mapping that appear to be paths.
+    Uses job_dir to resolve ${JOB_DIR}, $ENV, and ~, and to make relative paths absolute.
+    """
+    def _map(v: Any, key_hint: Optional[str] = None) -> Any:
+        if isinstance(v, str) and _looks_pathlike(v, key_hint=key_hint):
+            try:
+                p = _expand(v, job_dir=job_dir).resolve()
+                if _LOG.isEnabledFor(logging.DEBUG):
+                    _LOG.debug("expand_param_paths: %r → %s", v, p)
+                return str(p)
+            except Exception:
+                # Leave unchanged; concrete validators will raise clear errors.
+                return v
+        if isinstance(v, list):
+            return [_map(x, None) for x in v]
+        if isinstance(v, dict):
+            return {kk: _map(vv, kk) for kk, vv in v.items()}
+        return v
+    return {k: _map(v, k) for k, v in (params or {}).items()}

@@ -28,6 +28,8 @@ from dnadesign.permuter.src.protocols.combine.selection import (
     select_elite_aa_events,
 )
 
+from dnadesign.permuter.src.core.paths import expand_for_job
+
 _LOG = logging.getLogger("permuter.protocol.combine_aa")
 
 _TRIPLE = 3
@@ -69,12 +71,41 @@ class CombineAA(Protocol):
         for req in ("from_dataset", "codon_table", "singles_metric_id"):
             if not params.get(req):
                 raise ValueError(f"combine_aa: params.{req} is required")
-        p_ds = Path(str(params["from_dataset"])).expanduser().resolve()
+        # Robust resolution: allow dataset *dir* or explicit records.parquet.
+        raw_ds = str(params["from_dataset"])
+        job_dir = Path(str(params.get("_job_dir"))) if params.get("_job_dir") else None
+        def _coerce_records(p: Path) -> Path:
+            if p.is_dir():
+                return (p / "records.parquet")
+            # if no extension was given and file missing, try dir + records.parquet
+            if not p.exists() and p.suffix not in (".parquet", ".pqt"):
+                cand = (p / "records.parquet")
+                if cand.exists():
+                    return cand
+            return p
+        p_ds = Path(raw_ds).expanduser()
+        if job_dir:
+            p_ds = expand_for_job(raw_ds, job_dir=job_dir)
+        p_ds = _coerce_records(p_ds).resolve()
         if not p_ds.exists():
-            raise ValueError(f"combine_aa: from_dataset not found at {p_ds}")
-        p_ct = Path(str(params["codon_table"])).expanduser().resolve()
+            raise ValueError(
+                "combine_aa: from_dataset not found.\n"
+                f"  given: {raw_ds!r}\n"
+                f"  resolved: {p_ds}\n"
+                "Hint: use job‑relative paths (with ${JOB_DIR}) or pass the dataset directory."
+            )
+        # codon table (also allow job-relative)
+        raw_ct = str(params["codon_table"])
+        p_ct = Path(raw_ct).expanduser()
+        if job_dir:
+            p_ct = expand_for_job(raw_ct, job_dir=job_dir)
+        p_ct = p_ct.resolve()
         if not p_ct.exists():
-            raise ValueError(f"combine_aa: codon_table not found at {p_ct}")
+            raise ValueError(
+                "combine_aa: codon_table not found.\n"
+                f"  given: {raw_ct!r}\n"
+                f"  resolved: {p_ct}"
+            )
 
         # Combination builder (v0.1: random only)
         comb = params.get("combine") or {}
@@ -101,6 +132,12 @@ class CombineAA(Protocol):
 
         # Selection block sanity (optional keys validated in selection)
         _ = params.get("select", {})  # may be empty
+        sel = params.get("select", {}) or {}
+        mode = str(sel.get("mode", "global")).strip().lower()
+        if mode not in {"global", "per_position_best"}:
+            raise ValueError("combine_aa: select.mode must be 'global' or 'per_position_best'")
+        if "disallow_negative_best" in sel and sel["disallow_negative_best"] not in (True, False):
+            raise ValueError("combine_aa: select.disallow_negative_best must be boolean")
 
         # rng_seed is optional; verify int if present
         if "rng_seed" in params:
@@ -128,30 +165,33 @@ class CombineAA(Protocol):
         # Load singles dataset and validate schema
         metric_id = str(params["singles_metric_id"]).strip()
         metric_col = f"permuter__metric__{metric_id}"
-        dms = read_parquet(Path(str(params["from_dataset"])).expanduser().resolve())
+        # Accept from_dataset as dir or file (already expanded by CLI; still robust here).
+        p_ds = Path(str(params["from_dataset"])).expanduser()
+        if p_ds.is_dir():
+            p_ds = p_ds / "records.parquet"
+        dms_path = p_ds.resolve()
+        _LOG.info("[combine] singles dataset: %s", dms_path)
+        dms = read_parquet(dms_path)
 
         # Select elite single AA events (Top‑K, ruleouts)
         elite = select_elite_aa_events(dms, metric_col=metric_col, cfg=params)
 
-        if elite:
-            head = elite[: min(24, len(elite))]
-            top_tokens = [
-                f"{wt}{pos}{alt}:{score:+.3f}" for (pos, wt, alt, score) in head
-            ]
+        # Scoring semantics (LLR): make the contract explicit in stdout
+        looks_llr = ("llr" in metric_id.lower()) or ("ratio" in metric_id.lower())
+        _LOG.info(
+            "[scoring] singles metric_id=%s → expected additive := sum(singles); "
+            "observed := evaluator on combined sequence vs REF; synergy := observed − expected",
+            metric_id,
+        )
+        if not looks_llr:
             _LOG.info(
-                "[elite] top_global=%d  head=%s", len(elite), "  ".join(top_tokens)
+                "[scoring] NOTE: metric_id does not look like an LLR; ensure your evaluator "
+                "is a ratio vs reference (e.g., evo2_llr) if you expect zero baseline."
             )
 
-        # RNG: derive a reproducible base seed from outer seed + user seed.
-        user_seed = int(params.get("rng_seed", 1234))
-        derived = str(params.get("_derived_seed", user_seed))
-        base_seed = int(
-            hashlib.blake2b(
-                f"{derived}-{user_seed}".encode("utf-8"), digest_size=8
-            ).hexdigest(),
-            16,
-        )
-        rng = rng or np.random.default_rng(base_seed)
+        # RNG: honor user rng_seed (print and use exactly this for sampling).
+        user_seed = int(params.get("rng_seed", 42))
+        rng = rng or np.random.default_rng(user_seed)
         # Load codon usage table (strict)
         tbl = load_codon_table(params["codon_table"])
 
@@ -170,11 +210,11 @@ class CombineAA(Protocol):
             str(comb.get("strategy", "random")),
             budget_total,
             choice,
-            base_seed,
+            user_seed,
         )
 
         # Build combinations deterministically
-        combos = random_sample(elite, params, np.random.default_rng(base_seed + 17))
+        combos = random_sample(elite, params, np.random.default_rng(user_seed + 17))
         # Digest
         per_k: Dict[int, int] = {}
         for evs, _ in combos:
@@ -200,6 +240,12 @@ class CombineAA(Protocol):
 
         # Emit variants
         for events, proposal_score in combos:
+            # ---- expected (additive) is defined as sum of the selected single‑mutation scores ----
+            additive_expected = float(sum(float(sc) for (_, _, _, sc) in events))
+            if not np.isfinite(additive_expected):
+                raise ValueError("combine_aa: additive expected is non‑finite")
+            if not np.isfinite(proposal_score):
+                raise ValueError("combine_aa: rank/proposal score is non‑finite")
             # Validate and prepare per-event edits
             aa_tokens: List[str] = []
             nt_token_accum: List[Tuple[int, str, str]] = []
@@ -243,7 +289,12 @@ class CombineAA(Protocol):
             )
 
             # Header token + AA+NT tokens
-            header = f"combo k={len(events)} singles_score={float(proposal_score):.6f} aa=[{aa_combo_str}]"
+            header = (
+                "combo "
+                f"k={len(events)} "
+                f"additive_{metric_id}={additive_expected:.6f} "
+                f"aa=[{aa_combo_str}]"
+            )
             nt_tokens_txt = [
                 f"nt pos={pos1b} wt={wt} alt={alt}"
                 for (pos1b, wt, alt) in nt_token_accum
@@ -263,7 +314,7 @@ class CombineAA(Protocol):
                 "aa_combo_str": aa_combo_str,
                 "mut_count": len(events),
                 "proposal_score": float(proposal_score),
-                # expected additive (used by synergy plot)
-                f"expected__{metric_id}": float(proposal_score),
+                f"expected__{metric_id}": float(additive_expected),
+                "expected_kind": "additive",
             }
             yield out

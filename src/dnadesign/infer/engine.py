@@ -263,6 +263,10 @@ def run_extract_job(
             columnar[out.id] = all_vals
             continue
 
+        # Choose a starting batch size: explicit > env > safe default.
+        default_bs = int(os.environ.get("DNADESIGN_INFER_DEFAULT_BS", "64"))
+        start_bs = micro_bs if micro_bs > 0 else min(len(need_idx), default_bs)
+
         # progress handle
         if progress_factory:
             pbar = progress_factory(f"{job.id}/{out.id}", len(need_idx))
@@ -270,9 +274,9 @@ def run_extract_job(
             tqdm, _ = _get_tqdm()
             pbar = tqdm(total=len(need_idx), unit="seq", desc=f"{job.id}/{out.id}")
 
-        # dynamic derating
+        # dynamic derating (still available, but we start from a safe size).
         start = 0
-        bs = micro_bs if micro_bs and micro_bs > 0 else len(need_idx)
+        bs = start_bs
 
         while start < len(need_idx):
             take = min(bs, len(need_idx) - start)

@@ -20,15 +20,51 @@ def ensure_output_dir(path: Path):
     path.mkdir(parents=True, exist_ok=True)
 
 
-def atomic_write_parquet(df: pd.DataFrame, path: Path):
+def atomic_write_parquet(df: pd.DataFrame, path: Path) -> None:
+    """
+    Write a Parquet file atomically using the pyarrow engine.
+    No fallbacks: if pyarrow is missing or the write fails, raise with a clear message.
+    """
+    path = Path(path).expanduser().resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".parquet.tmp")
-    df.to_parquet(tmp, index=False)
-    tmp.replace(path)
+
+    try:
+        # Explicit hard requirement — see also read_parquet below.
+        import pyarrow  # type: ignore  # noqa: F401
+    except Exception as e:
+        raise RuntimeError(
+            "Permuter requires 'pyarrow' to write Parquet files. "
+            "Install it with: pip install pyarrow"
+        ) from e
+
+    try:
+        df.to_parquet(tmp, index=False, engine="pyarrow")
+        tmp.replace(path)  # atomic on POSIX; same-device rename
+    finally:
+        # If anything went wrong before replace() or after, try to clean up the tmp.
+        try:
+            if tmp.exists():
+                tmp.unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 def read_parquet(path: Path) -> pd.DataFrame:
-    return pd.read_parquet(path)
+    """
+    Read a Parquet file using the pyarrow engine (no fallbacks).
+    """
+    p = Path(path).expanduser().resolve()
+    if not p.exists():
+        raise FileNotFoundError(f"Parquet file not found: {p}")
+    try:
+        import pyarrow  # type: ignore  # noqa: F401
+    except Exception as e:
+        raise RuntimeError(
+            "Permuter requires 'pyarrow' to read Parquet files. "
+            "Install it with: pip install pyarrow"
+        ) from e
+    return pd.read_parquet(p, engine="pyarrow")
 
 
 # --- reference sequence sidecar ---------------------------------------------

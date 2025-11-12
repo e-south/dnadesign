@@ -56,8 +56,14 @@ class JobPlot(BaseModel):
         height: Optional[float] = Field(default=None, ge=2.0, le=64.0)
 
     size: Optional[PlotSize] = None
+    sizes: Dict[str, PlotSize] = Field(default_factory=dict)
     # Multiplicative font scaling factor applied to plot text
     font_scale: float = Field(default=1.0, ge=0.5, le=3.0)
+    ranked_annotate_top: int = Field(default=5, ge=0, le=500)
+    # Ranked variants extras
+    ranked_summary_top_n: int = Field(default=100, ge=1, le=1_000_000)
+    ranked_export_top_k: int = Field(default=500, ge=1, le=1_000_000)
+    ranked_xtick_every: int = Field(default=1000, ge=1, le=1_000_000)
 
     @field_validator("which")
     @classmethod
@@ -75,6 +81,21 @@ class JobPlot(BaseModel):
             raise ValueError(f"Unknown plot(s): {bad}. Allowed: {sorted(allowed)}")
         return vs
 
+    @field_validator("sizes")
+    @classmethod
+    def _sizes_keys_valid(cls, v: Dict[str, "JobPlot.PlotSize"]):
+        allowed = {
+            "position_scatter_and_heatmap",
+            "metric_by_mutation_count",
+            "aa_category_effects",
+            "hairpin_length_vs_metric",
+            "ranked_variants",
+            "synergy_scatter",
+        }
+        bad = [k for k in v.keys() if k not in allowed]
+        if bad:
+            raise ValueError(f"plot.sizes has invalid key(s): {bad}. Allowed: {sorted(allowed)}")
+        return v
 
 class EvalMetric(BaseModel):
     id: str  # column suffix → permuter__metric__<id>

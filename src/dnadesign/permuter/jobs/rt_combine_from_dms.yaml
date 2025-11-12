@@ -11,21 +11,23 @@ job:
   permute:
     protocol: "combine_aa"
     params:
-      from_dataset: "${JOB_DIR}/../results/retron_Eco1_RT_wt_codon_scan/records.parquet"
+      from_dataset: "${JOB_DIR}/../results/retron_Eco1_RT_wt_codon_scan/retron_Eco1_RT_wt/records.parquet"
       codon_table: "${JOB_DIR}/../inputs/codon_tables/codon_ecoli.csv"
       singles_metric_id: "llr_mean"
 
       select:
-        top_global: 100
-        min_delta: null
+        mode: per_position_best
+        top_global: 25
+        min_delta: 0.0
+        disallow_negative_best: true
         allowed_positions: []
         exclude_positions: []
         exclude_mutations: []
 
       combine:
         k_min: 2
-        k_max: 5
-        budget_total: 5000
+        k_max: 6
+        budget_total: 30000
         strategy: "random"
 
       codon_choice: "top"
@@ -33,10 +35,6 @@ job:
 
   evaluate:
     metrics:
-      # - id: fake_ll
-      #   evaluator: placeholder
-      #   metric: log_likelihood
-
       - id: llr_mean
         evaluator: evo2_llr
         metric: log_likelihood_ratio
@@ -46,6 +44,16 @@ job:
           precision: bf16
           alphabet: dna
           reduction: mean
+          batch_size: 128 
+      - id: logits_mean
+        evaluator: evo2_logits
+        metric: logits_mean
+        params:
+          model_id: evo2_7b
+          device: cuda:0
+          precision: bf16
+          alphabet: dna
+          batch_size: 64
 
   output:
     dir: "${JOB_DIR}/../results/rt_combine_from_dms"
@@ -56,5 +64,12 @@ job:
       - synergy_scatter
       - metric_by_mutation_count
     metric_id: llr_mean
-    size: { width: 18.0, height: 5.5 }
     font_scale: 1.0
+    ranked_annotate_top: 1
+    ranked_summary_top_n: 100
+    ranked_export_top_k: 500
+    ranked_xtick_every: 1000
+    sizes:
+      ranked_variants: { width: 12, height: 4 }   # wider & shorter
+      synergy_scatter: { width: 6, height: 6 }
+      metric_by_mutation_count: { width: 6, height: 6 }
