@@ -124,12 +124,131 @@ def _collect_existing_meta_sig(df: pd.DataFrame, name: str) -> Optional[str]:
 
 def _safe_merge_on(df: pd.DataFrame, right: pd.DataFrame, key_col: str) -> pd.DataFrame:
     """
-    Merge helper that avoids pandas ambiguity when the left frame has both
-    an index level and a column named `key_col`. If the index is named `key_col`,
-    reset it (dropping the index) before merging.
+    Read-only merge helper that normalizes BOTH sides:
+    if either dataframe has an index level named `key_col`, make it a plain column.
+    Not for write-back; use _attach_columns_schema_preserving() instead.
     """
     left = df.reset_index(drop=True) if df.index.name == key_col else df
+    if right.index.name == key_col and key_col in right.columns:
+        right = right.reset_index(drop=True)
+    elif right.index.name == key_col and key_col not in right.columns:
+        right = right.reset_index()
+    if key_col not in left.columns or key_col not in right.columns:
+        raise KeyError(f"Both sides must contain '{key_col}' for merge.")
     return left.merge(right, on=key_col, how="left")
+
+
+def _attach_columns_schema_preserving(
+    full_df: pd.DataFrame,
+    cols_df: pd.DataFrame,
+    key_col: str,
+    *,
+    allow_overwrite: bool,
+) -> pd.DataFrame:
+    """
+    Update/create columns from cols_df into full_df by aligning on `key_col` only.
+    No merges (so no _x/_y suffixes), no column loss. Assertive:
+      - duplicate ids on the right → error
+      - overwriting existing columns without permission → error
+    """
+    if key_col not in full_df.columns:
+        raise KeyError(f"Left table is missing key column '{key_col}'.")
+    left = full_df.reset_index(drop=True) if full_df.index.name == key_col else full_df
+    right = cols_df
+    if right.index.name == key_col and key_col in right.columns:
+        right = right.reset_index(drop=True)
+    elif right.index.name == key_col and key_col not in right.columns:
+        right = right.reset_index()
+    if key_col not in right.columns:
+        raise KeyError(f"Right table is missing key column '{key_col}'.")
+    if right[key_col].duplicated().any():
+        dupes = (
+            right.loc[right[key_col].duplicated(), key_col].astype(str).head(8).tolist()
+        )
+        raise RuntimeError(
+            f"Right table has duplicate '{key_col}' values (e.g., {dupes})."
+        )
+    # Try to align dtype of the join key without mutating full_df permanently
+    try:
+        right = right.copy()
+        right[key_col] = right[key_col].astype(left[key_col].dtype)
+    except Exception:
+        left = left.copy()
+        left[key_col] = left[key_col].astype(str)
+        right[key_col] = right[key_col].astype(str)
+    li = left.set_index(key_col, drop=False)
+    ri = right.set_index(key_col, drop=False)
+    to_attach = [c for c in ri.columns if c != key_col]
+    if not to_attach:
+        return left
+    existing = [c for c in to_attach if c in li.columns]
+    if existing and not allow_overwrite:
+        raise RuntimeError(
+            "Columns already exist: "
+            + ", ".join(existing[:8])
+            + (" ..." if len(existing) > 8 else "")
+            + ". Re-run with `-y/--allow-overwrite` or use a new --name."
+        )
+    for c in to_attach:
+        li[c] = ri[c].reindex(li.index).values
+    return li.reset_index(drop=True) if full_df.index.name != key_col else li
+
+
+def _normalize_for_key(df: pd.DataFrame, key_col: str) -> pd.DataFrame:
+    """
+    Ensure there is no 'label-or-level' ambiguity for `key_col`.
+    - If index is named `key_col` and a same-named column exists, drop the index name.
+    - If index is named `key_col` and the column does not exist, materialize it.
+    Always return a frame whose *index is not named key_col* and that *has* key_col column.
+    """
+    out = df
+    if out.index.name == key_col and key_col in out.columns:
+        out = out.reset_index(drop=True)
+    elif out.index.name == key_col and key_col not in out.columns:
+        out = out.reset_index()
+    if key_col not in out.columns:
+        raise KeyError(f"Left table must contain '{key_col}' column.")
+    return out
+
+
+def _attach_by_key_update(
+    left: pd.DataFrame, right: pd.DataFrame, key_col: str
+) -> pd.DataFrame:
+    """
+    Schema-preserving attach:
+      • For overlapping columns (same name in left & right, excluding key), UPDATE values aligned by key.
+      • For new columns (only in right), LEFT JOIN them.
+    Never produces _x/_y suffixes, never drops left columns, and avoids 'id'-ambiguity.
+    """
+    L = _normalize_for_key(left.copy(), key_col)
+    R = _normalize_for_key(right.copy(), key_col)
+    # Align types for the key (string is safest / most consistent in our codebase)
+    L[key_col] = L[key_col].astype(str)
+    R[key_col] = R[key_col].astype(str)
+    Li = L.set_index(key_col, drop=False)
+    Ri = R.set_index(key_col, drop=False)
+    # 1) Update overlapping columns in place
+    overlap = [c for c in Ri.columns if c != key_col and c in Li.columns]
+    if overlap:
+        Li.update(Ri[overlap])
+    # 2) Join brand‑new columns
+    new_cols = [c for c in Ri.columns if c != key_col and c not in Li.columns]
+    if new_cols:
+        Li = Li.join(Ri[new_cols], how="left")
+    # Return with a regular RangeIndex (avoid future label/level ambiguity)
+    return Li.reset_index(drop=True)
+
+
+def _assert_preserve_columns(before: list[str], after: list[str]) -> None:
+    """Assert that *no* original top‑level column would be dropped."""
+    missing = [c for c in before if c not in after]
+    if missing:
+        raise RuntimeError(
+            "Refusing to write: detected potential column drop.\n"
+            "Columns that would be lost: "
+            + ", ".join(missing[:12])
+            + (" ..." if len(missing) > 12 else "")
+        )
 
 
 def _apply_preset(kind: str, preset_name: Optional[str]) -> dict:
@@ -210,6 +329,23 @@ def _apply_job_plot(job_path: Optional[str], expected_command: str) -> dict:
     return plot
 
 
+def _resolve_color_by(cli_val, jp_params, jp_plot_cfg, preset_plot_cfg):
+    """
+    Resolve final color_by with precedence:
+    CLI > job.plot > job.params > preset.plot > ["cluster"].
+    If the user passed --color-by, respect it unless it is the bare default ["cluster"].
+    """
+    if cli_val and not (len(cli_val) == 1 and cli_val[0] == "cluster"):
+        return list(cli_val)
+    if isinstance(jp_plot_cfg.get("color_by"), (list, tuple)):
+        return list(jp_plot_cfg["color_by"])
+    if isinstance(jp_params.get("color_by"), (list, tuple)):
+        return list(jp_params["color_by"])
+    if isinstance(preset_plot_cfg.get("color_by"), (list, tuple)):
+        return list(preset_plot_cfg["color_by"])
+    return ["cluster"]
+
+
 def _load_highlight_ids_from_file(
     path_str: str,
     df: pd.DataFrame,
@@ -252,7 +388,8 @@ def _load_highlight_ids_from_file(
         sub[col] = sub[col].astype(str)
         sub[groupby_col] = sub[groupby_col].astype(str)
         labels = {
-            rid: cat for rid, cat in zip(sub[col].tolist(), sub[groupby_col].tolist())
+            rid: cat
+            for rid, cat in zip(sub[col].tolist(), sub[groupby_col].tolist())
             if rid in present
         }
         cats = sorted(set(labels.values()))
@@ -360,13 +497,13 @@ def cmd_fit(
     out = out or jp.get("out")
     if name:
         name = slugify(name)
-    ictx, df = _context_and_df(dataset, file, usr_root)
+    ictx, df_full = _context_and_df(dataset, file, usr_root)
     console.rule("[bold]cluster fit[/]")
     console.log(
         f"Input: kind={ictx['kind']} ref={ictx.get('dataset') or ictx.get('file')}"
     )
     # initial checks
-    df = _apply_dedupe(df, key_col=key_col, policy=dedupe_policy)
+    df = _apply_dedupe(df_full, key_col=key_col, policy=dedupe_policy)
     try:
         assert_id_sequence_bijection(df, id_col=key_col, seq_col="sequence")
     except ClusterError as e:
@@ -498,7 +635,13 @@ def cmd_fit(
                             "[green]Reattached[/green] labels from cache to USR dataset."
                         )
                     else:
-                        merged = _safe_merge_on(df, attach_cols, key_col)
+                        full_df = load_table(ictx)
+                        merged = _attach_columns_schema_preserving(
+                            full_df, attach_cols, key_col, allow_overwrite=yes
+                        )
+                        _assert_preserve_columns(
+                            list(full_df.columns), list(merged.columns)
+                        )
                         write_generic(
                             ictx["file"],
                             merged,
@@ -688,8 +831,9 @@ def cmd_fit(
             f"[green]Attached[/green] columns to USR dataset '{ictx['dataset']}'."
         )
     else:
-        # merge with df
-        merged = _safe_merge_on(df, attach_cols, key_col)
+        merged = _attach_columns_schema_preserving(
+            df_full, attach_cols, key_col, allow_overwrite=yes
+        )
         write_generic(
             ictx["file"],
             merged,
@@ -924,10 +1068,23 @@ def cmd_umap(
     highlight: Optional[str] = typer.Option(
         None, help="CSV/Parquet with ids to highlight (first column or 'id')."
     ),
+    highlight_topn: Optional[int] = typer.Option(
+        None,
+        help="Highlight Top-N rows from the primary table by ranking a numeric column (use with --highlight-topn-col).",
+    ),
+    highlight_topn_col: Optional[str] = typer.Option(
+        None,
+        help="Numeric column to rank for --highlight-topn (e.g., 'permuter__metric__llr_mean').",
+    ),
+    highlight_topn_asc: bool = typer.Option(
+        False,
+        "--highlight-topn-asc",
+        help="If set, select the smallest N values (ascending) instead of largest.",
+    ),
     highlight_hue_col: Optional[str] = typer.Option(
         None,
         help="Optional. If set, color highlights categorically by this column from the --highlight file "
-             "(e.g., 'observed_round'). Integers are treated as categories.",
+        "(e.g., 'observed_round'). Integers are treated as categories.",
     ),
     alpha: Optional[float] = typer.Option(
         None, help="Point alpha (overrides job/preset)."
@@ -957,6 +1114,10 @@ def cmd_umap(
     opal_fields: Optional[str] = typer.Option(
         None,
         help="Comma-separated OPAL prediction fields to join (e.g., pred__y_obj_scalar,obj__logic_fidelity,obj__effect_scaled).",  # noqa
+    ),
+    derive_ratio: List[str] = typer.Option(
+        [],
+        help="Repeatable. Define a derived ratio column: '<new_col>:<numerator_col>:<denominator_col>'.",
     ),
     attach_coords: bool = typer.Option(False),
     out_plot: Optional[str] = typer.Option(None),
@@ -994,6 +1155,12 @@ def cmd_umap(
         color_by = list(jp["color_by"])
     highlight = highlight or jp.get("highlight")
     highlight_hue_col = highlight_hue_col or jp.get("highlight_hue_col")
+    # BUGFIX: read highlight_topn knobs from job params
+    highlight_topn = (
+        highlight_topn if highlight_topn is not None else jp.get("highlight_topn")
+    )
+    highlight_topn_col = highlight_topn_col or jp.get("highlight_topn_col")
+    highlight_topn_asc = bool(highlight_topn_asc or jp.get("highlight_topn_asc", False))
     alpha = alpha if alpha is not None else jp.get("alpha")
     size = size if size is not None else jp.get("size")
     dims = dims if dims is not None else jp.get("dims")
@@ -1032,12 +1199,12 @@ def cmd_umap(
     # ---------- Plot preset & OPAL preflight (join before hue validation) ----------
     # Resolve presets first so --preset plot.* can inject color_by
     p_plot = _apply_plot_preset(preset)
-    if "color_by" in p_plot and color_by == ["cluster"]:
-        color_by = list(p_plot["color_by"])
-    # If highlight ids are provided, also produce a dedicated 'highlight' plot
-    # (overlay behavior still applies to all other hues).
-    if highlight and "highlight" not in color_by:
+
+    color_by = _resolve_color_by(color_by, jp, jp_plot, p_plot)
+    wants_highlight = bool(highlight or highlight_topn)
+    if wants_highlight and "highlight" not in color_by:
         color_by = [*color_by, "highlight"]
+
     # Incorporate job.plot now; precedence: preset.plot -> job.plot -> CLI flags
     # Defaults for plotting (used if neither preset nor job nor CLI provides)
     _plot_defaults = {
@@ -1068,22 +1235,20 @@ def cmd_umap(
         merged_plot["dims"] = dims
     if font_scale is not None:
         merged_plot["font_scale"] = float(font_scale)
-    # Color-by: keep CLI unless it's the default ["cluster"]; then prefer job.plot then preset.plot
-    if color_by == ["cluster"]:
-        if isinstance(jp_plot.get("color_by"), (list, tuple)):
-            color_by = list(jp_plot["color_by"])
-        elif isinstance(p_plot.get("color_by"), (list, tuple)):
-            color_by = list(p_plot["color_by"])
+
     # ---- Highlight ids: assert early and load once (used for validation and plotting) ----
-    # If a preset/job requests the 'highlight' hue but no ids are supplied, fail early.
-    if "highlight" in color_by and not highlight:
+    # If 'highlight' hue requested but neither mode is provided, fail fast.
+    if "highlight" in color_by and not wants_highlight:
         console.print(
             "[red]Error[/red]: hue 'highlight' was requested (via preset/job), "
-            "but no ids file was provided. Set params.highlight in the job or "
-            "pass --highlight <file>."
+            "but neither --highlight <file> nor --highlight-topn was provided."
         )
         raise typer.Exit(code=2)
     h = None
+    if highlight and highlight_topn:
+        raise typer.BadParameter(
+            "Use either --highlight (file) OR --highlight-topn, not both."
+        )
     if highlight:
         h = _load_highlight_ids_from_file(
             highlight,
@@ -1092,6 +1257,45 @@ def cmd_umap(
             warn_fn=lambda m: console.print(f"[yellow]Warning:[/yellow] {m}"),
             groupby_col=highlight_hue_col,
         )
+    elif highlight_topn is not None:
+        if not highlight_topn_col:
+            raise typer.BadParameter("--highlight-topn requires --highlight-topn-col.")
+        if highlight_hue_col:
+            console.print(
+                "[yellow]Note[/yellow]: --highlight-hue-col is ignored when using --highlight-topn."
+            )
+        if highlight_topn <= 0:
+            raise typer.BadParameter("--highlight-topn must be a positive integer.")
+        if highlight_topn_col not in df.columns:
+            raise typer.BadParameter(
+                f"--highlight-topn-col '{highlight_topn_col}' not found in the table."
+            )
+        # Strict numeric; we drop non-finite with a concise log (explicit behavior)
+        try:
+            s = pd.to_numeric(df[highlight_topn_col], errors="raise")
+        except Exception as e:
+            raise typer.BadParameter(
+                f"--highlight-topn-col '{highlight_topn_col}' is not numeric: {e}"
+            )
+        arr = s.to_numpy(dtype="float64", copy=False)
+        nonfinite = ~np.isfinite(arr)
+        if nonfinite.any():
+            n_bad = int(nonfinite.sum())
+            console.print(
+                f"[yellow]Note[/yellow]: excluding {n_bad} non-finite row(s) from Top-N selection of '{highlight_topn_col}'."  # noqa
+            )
+            s = s[~nonfinite]
+        # Rank and pick top/bottom N
+        order = s.sort_values(ascending=bool(highlight_topn_asc))
+        take = int(min(len(order), int(highlight_topn)))
+        chosen_idx = order.iloc[:take].index
+        # Map back to id strings; df is indexed by id (we enforced earlier), but keep robust:
+        ids = (
+            pd.Index(chosen_idx).astype(str).tolist()
+            if df.index.name == key_col
+            else df.loc[chosen_idx, key_col].astype(str).tolist()
+        )
+        h = {"ids": ids}
     # Derive which OPAL fields are actually needed from the hue specs,
     # and union with any explicit --opal-fields
     opal_needed_fields: set[str] = set()
@@ -1162,6 +1366,44 @@ def cmd_umap(
             raise typer.Exit(code=2)
 
     # ---------- Preflight hue validation (after OPAL join) ----------
+    # read derive_ratio from job params if not passed via CLI
+    if not derive_ratio and jp.get("derive_ratio"):
+        derive_ratio = (
+            list(jp["derive_ratio"])
+            if isinstance(jp["derive_ratio"], (list, tuple))
+            else [str(jp["derive_ratio"])]
+        )
+
+    # Optional derived ratio columns: NUM / DEN (strict checks; explicit behavior)
+    derived_cols: list[str] = []
+    if derive_ratio:
+        for spec in derive_ratio:
+            parts = [p.strip() for p in spec.split(":", 2)]
+            if len(parts) != 3 or any(not p for p in parts):
+                raise typer.BadParameter(
+                    f"--derive-ratio expects '<new_col>:<numerator_col>:<denominator_col>'; got '{spec}'."
+                )
+            new_col, num_col, den_col = parts
+            for c in (num_col, den_col):
+                if c not in df.columns:
+                    raise typer.BadParameter(f"--derive-ratio: column '{c}' not found.")
+            try:
+                num = pd.to_numeric(df[num_col], errors="raise")
+                den = pd.to_numeric(df[den_col], errors="raise")
+            except Exception as e:
+                raise typer.BadParameter(
+                    f"--derive-ratio: numeric coercion failed: {e}"
+                )
+            with np.errstate(divide="ignore", invalid="ignore"):
+                ratio = num / den
+            nf = ~np.isfinite(ratio.to_numpy(dtype="float64", copy=False))
+            if nf.any():
+                console.print(
+                    f"[yellow]Note[/yellow]: derived '{new_col}' has {int(nf.sum())} non-finite value(s) "
+                    f"(NaN/Inf). These rows will be skipped for numeric hues."
+                )
+            df[new_col] = ratio.astype(float)
+            derived_cols.append(new_col)
     if df.index.name != "id":
         df = df.set_index(key_col, drop=False)
     try:
@@ -1328,32 +1570,44 @@ def cmd_umap(
             "plot_paths": str(udir),
         }
     )
-    # Optionally attach coords
+    # Persist artifacts (coords and/or derived columns) if requested
+    to_attach = {"id": df[key_col].astype(str)}
     if attach_coords:
-        cols = pd.DataFrame(
+        to_attach.update(
             {
-                "id": df[key_col].astype(str),
                 f"cluster__{name}__umap_x": coords[:, 0],
                 f"cluster__{name}__umap_y": coords[:, 1],
             }
         )
-        if not write:
-            typer.echo("Dry-run: computed UMAP coords. Use --write to attach.")
-            raise typer.Exit(code=0)
+    if derived_cols:
+        # For generic files, attach derived columns under their plain names (e.g., 'epistasis').
+        # For USR datasets, attach under the cluster namespace to satisfy the USR API.
+        if ictx["kind"] == "usr":
+            for c in derived_cols:
+                to_attach[f"cluster__{name}__{c}"] = df[c].astype(float).to_numpy()
+        else:
+            for c in derived_cols:
+                to_attach[c] = df[c].astype(float).to_numpy()
+
+    if (attach_coords or derived_cols) and write:
+        cols = pd.DataFrame(to_attach)
         if ictx["kind"] == "usr":
             try:
                 attach_usr(ictx["usr_root"], ictx["dataset"], cols, allow_overwrite=yes)
             except Exception as e:
                 if "Columns already exist" in str(e) and not yes:
                     console.print(
-                        "[red]Columns already exist[/red] for UMAP coords. "
+                        "[red]Columns already exist[/red] for attachment. "
                         "Re-run with `-y/--allow-overwrite`."
                     )
                     raise typer.Exit(code=2)
                 raise
-            console.print("[green]Attached[/green] UMAP coords to USR dataset.")
+            console.print("[green]Attached[/green] columns to USR dataset.")
         else:
-            merged = _safe_merge_on(df, cols, "id")
+            full_df = load_table(ictx)
+            merged = _attach_columns_schema_preserving(
+                full_df, cols, "id", allow_overwrite=yes
+            )
             write_generic(
                 ictx["file"],
                 merged,
@@ -1361,7 +1615,17 @@ def cmd_umap(
                 out=(Path(out) if out else None),
                 backup_suffix=".bak",
             )
-            console.print("[green]Wrote[/green] updated file with UMAP coords.")
+            console.print("[green]Wrote[/green] updated file with attachments.")
+    elif (attach_coords or derived_cols) and not write:
+        typer.echo("Dry-run: computed artifacts. Use --write to attach.")
+        raise typer.Exit(code=0)
+
+    # Small UX: tell users where the PNGs went and how many were rendered
+    try:
+        console.print(f"[green]Saved[/green] {len(color_by)} UMAP PNG(s) to {udir}")
+    except Exception:
+        pass
+
     # ---- Records sink (Markdown) ----
     try:
         run_dir = runs_root() / (name or "unnamed")
@@ -1446,7 +1710,7 @@ def cmd_analyze(
     file: Optional[str] = typer.Option(None),
     usr_root: Optional[str] = typer.Option(None),
     job: Optional[str] = typer.Option(None, help="Path to a job YAML for 'analyze'."),
-    cluster_col: str = typer.Option(...),
+    cluster_col: Optional[str] = typer.Option(None, help="e.g., cluster__perm_v1"),
     group_by: str = typer.Option("source"),
     preset: Optional[str] = typer.Option(
         None, help="Preset name (kind: 'analysis') to pre-fill parameters"
@@ -1490,6 +1754,11 @@ def cmd_analyze(
     file = file or jp.get("file")
     usr_root = usr_root or jp.get("usr_root")
     cluster_col = cluster_col or jp.get("cluster_col")
+    if not cluster_col:
+        raise typer.BadParameter(
+            "Missing --cluster-col and job.params.cluster_col.\n"
+            "Provide --cluster-col cluster__<NAME> or set it in the job YAML."
+        )
     group_by = group_by or jp.get("group_by", "source")
     preset = preset or jp.get("preset")
     out_dir = out_dir or jp.get("out_dir")
@@ -1574,6 +1843,9 @@ def cmd_analyze(
         group_bys = [group_by]
         numeric_missing_policy = "error"
 
+    if font_scale is None:
+        font_scale = 1.2
+
     # Decide *root* output directory (flattened layout; no per-group_by subdirs)
     if out_dir is None and cluster_col.startswith("cluster__"):
         fit_name = cluster_col.split("__", 1)[1]
@@ -1633,6 +1905,11 @@ def cmd_analyze(
     # Run numeric once (not per group_by) to avoid duplication
     if numeric:
         cols = [c.strip() for c in numeric.split(",") if c.strip()]
+    else:
+        cols = []
+    # If the mut-count column exists, include it (coerced to numeric) for the violins
+    if "permuter__mut_count" in df.columns and "permuter__mut_count" not in cols:
+        cols.append("permuter__mut_count")
         summarize_numeric_by_cluster(
             df,
             cluster_col=cluster_col,
@@ -1746,7 +2023,7 @@ def cmd_intra_sim(
             raise
         console.print("[green]Attached[/green] intra-sim to USR dataset.")
     else:
-        merged = df.merge(cols, on="id", how="left")
+        merged = _attach_columns_schema_preserving(df, cols, "id", allow_overwrite=yes)
         write_generic(
             ictx["file"],
             merged,

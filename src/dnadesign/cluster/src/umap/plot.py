@@ -336,8 +336,16 @@ def _normalize_highlight_style(style: Optional[dict], base_size: float) -> dict:
     else:
         mul = float(style.get("size_multiplier", 1.6))
         out["size"] = float(base_size) * mul
+    overlay_size = style.get("overlay_size", None)
+    out["overlay_size"] = (
+        float(overlay_size) if overlay_size is not None else out["size"]
+    )
     out["alpha"] = float(style.get("alpha", 0.95))
     out["facecolor"] = style.get("facecolor", "none")
+    if "ring" in style:
+        out["facecolor"] = (
+            "none" if bool(style["ring"]) else out.get("edgecolor", "red")
+        )
     out["edgecolor"] = style.get("edgecolor", "red")
     out["linewidth"] = float(style.get("linewidth", 0.9))
     out["marker"] = style.get("marker", "o")

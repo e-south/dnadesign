@@ -12,6 +12,10 @@ from __future__ import annotations
 import logging
 from typing import List
 
+try:
+    from dnadesign.infer import run_extract
+except Exception:  # pragma: no cover
+    run_extract = None
 from dnadesign.permuter.src.evaluators.base import Evaluator
 
 
@@ -46,26 +50,16 @@ class Evo2LogLikelihoodEvaluator(Evaluator):
             self.batch_size,
         ) = (model_id, device, precision, alphabet, method, reduction, batch_size)
         self._ready = False
-        self._rex = None 
         self._log = logging.getLogger("permuter.evaluator.evo2_ll")
-
-    def _lazy_rex(self):
-        if self._rex is None:
-            try:
-                from dnadesign.infer import run_extract as _rex
-            except Exception as e:
-                raise RuntimeError(
-                    "Evo2 backend unavailable: dnadesign.infer.run_extract is not importable. "
-                    "Ensure the 'evo2' package is installed and compatible with your environment."
-                ) from e
-            self._rex = _rex
-        return self._rex
 
     def _ensure_ready(self):
         if self._ready:
             return
-        rex = self._lazy_rex()
-
+        if run_extract is None:
+            raise RuntimeError(
+                "Evo2 backend unavailable: dnadesign.infer.run_extract is not importable. "
+                "Ensure the 'evo2' package is installed (pip install evo2) and that dnadesign is importable."
+            )
         # Probe with a tiny sequence
         probe_seq = ["ACGTAC"] if self.alphabet.lower().startswith("dna") else ["ACDE"]
         outputs = [
@@ -77,7 +71,7 @@ class Evo2LogLikelihoodEvaluator(Evaluator):
             }
         ]
         try:
-            res = rex(
+            res = run_extract(
                 probe_seq,
                 model_id=self.model_id,
                 outputs=outputs,
@@ -116,8 +110,7 @@ class Evo2LogLikelihoodEvaluator(Evaluator):
                 "format": "float",
             }
         ]
-        rex = self._lazy_rex()
-        res = rex(
+        res = run_extract(
             seqs,
             model_id=self.model_id,
             outputs=outputs,

@@ -1,0 +1,35 @@
+# cluster/presets/umap/umap.permuter.yaml
+name: "umap.permuter"
+kind: "umap"
+
+# UMAP algorithm knobs
+params:
+  neighbors: 15
+  min_dist: 0.10
+  metric: "euclidean"
+
+plot:
+  dims: [6, 6]
+  alpha: 0.45
+  size: 14.0
+  font_scale: 1.2
+
+  color_by:
+    - "cluster"
+    - "categorical:permuter__mut_count"
+
+  legend:
+    ncol: 1
+    bbox: [1.02, 1.0]
+    max_items: 40
+    frameon: false
+
+  highlight:
+    overlay: true
+    size: 60.0
+    alpha: 0.95
+    facecolor: "none"
+    edgecolor: "red"
+    linewidth: 0.9
+    marker: "o"
+    legend: false
