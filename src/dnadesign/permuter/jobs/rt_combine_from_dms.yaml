@@ -26,8 +26,8 @@ job:
 
       combine:
         k_min: 2
-        k_max: 6
-        budget_total: 30000
+        k_max: 14
+        budget_total: 100000
         strategy: "random"
 
       codon_choice: "top"
