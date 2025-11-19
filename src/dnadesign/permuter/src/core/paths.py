@@ -188,6 +188,7 @@ def resolve(
     output_dir: str,
     ref_name: str,
     out_override: Path | None,
+    layout: str | None = None,
 ) -> JobPaths:
     job_yaml = Path(job_yaml).expanduser().resolve()
     job_dir = job_yaml.parent
@@ -221,7 +222,7 @@ def resolve(
     #   nested      → <output_root>/<ref>/
     #   flat        → <output_root>/                      (one dataset per job)
     ref_dir = ref_name or "__PENDING__"
-    layout = os.environ.get("PERMUTER_LAYOUT", "").strip().lower()
+    layout = (layout or os.environ.get("PERMUTER_LAYOUT", "")).strip().lower()
     if not layout:
         if os.environ.get("PERMUTER_FLAT_RESULTS", "") in ("1", "true", "True"):
             layout = "flat_jobref"
@@ -248,6 +249,7 @@ def resolve(
         plots_dir=plots_dir,
     )
 
+
 def _looks_pathlike(s: str, *, key_hint: Optional[str] = None) -> bool:
     """
     Conservative heuristic: only treat as a path when it *looks* like one.
@@ -259,8 +261,21 @@ def _looks_pathlike(s: str, *, key_hint: Optional[str] = None) -> bool:
         return True
     ext = s2.lower().rsplit(".", 1)[-1] if "." in s2 else ""
     if ext in {
-        "csv", "tsv", "parquet", "pqt", "json", "jsonl", "yaml", "yml",
-        "fa", "fasta", "txt", "gz", "bz2", "xz", "zip"
+        "csv",
+        "tsv",
+        "parquet",
+        "pqt",
+        "json",
+        "jsonl",
+        "yaml",
+        "yml",
+        "fa",
+        "fasta",
+        "txt",
+        "gz",
+        "bz2",
+        "xz",
+        "zip",
     }:
         return True
     if key_hint:
@@ -271,11 +286,13 @@ def _looks_pathlike(s: str, *, key_hint: Optional[str] = None) -> bool:
             return True
     return False
 
+
 def expand_param_paths(params: dict | None, *, job_dir: Path) -> dict:
     """
     Deep-copy and expand any string values in a params mapping that appear to be paths.
     Uses job_dir to resolve ${JOB_DIR}, $ENV, and ~, and to make relative paths absolute.
     """
+
     def _map(v: Any, key_hint: Optional[str] = None) -> Any:
         if isinstance(v, str) and _looks_pathlike(v, key_hint=key_hint):
             try:
@@ -291,4 +308,5 @@ def expand_param_paths(params: dict | None, *, job_dir: Path) -> dict:
         if isinstance(v, dict):
             return {kk: _map(vv, kk) for kk, vv in v.items()}
         return v
+
     return {k: _map(v, k) for k, v in (params or {}).items()}

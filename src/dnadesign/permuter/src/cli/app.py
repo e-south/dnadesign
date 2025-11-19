@@ -19,7 +19,6 @@ from rich.traceback import install as rich_tb
 
 from dnadesign.permuter.src.core.logging_setup import configure_logging
 
-# Import sibling CLI modules via relative imports
 from . import evaluate as eval_cmd
 from . import export as export_cmd
 from . import inspect as inspect_cmd
@@ -162,7 +161,7 @@ def plot(
         "--which",
         help="Plot id to generate (repeat for multiple). "
         "Allowed: position_scatter_and_heatmap, ranked_variants, synergy_scatter, "
-        "metric_by_mutation_count, aa_category_effects, hairpin_length_vs_metric",  # noqa
+        "metric_by_mutation_count, aa_category_effects, hairpin_length_vs_metric, window_score_mass",  # noqa
     ),
     metric_id: str = typer.Option(
         None, "--metric-id", help="Metric id to plot (e.g., llr_mean, llr_sum)"

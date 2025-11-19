@@ -3,22 +3,31 @@
 <dnadesign project>
 src/dnadesign/permuter/src/protocols/combine/combine_aa.py
 
+Takes a dataset of single-AA DMS results, selects an elite set of single AA
+events under strict rules, samples multi-AA combinations from that elite,
+converts AAs to codons (top or weighted policy) while preserving DNA letter-case,
+and emits rows with a canonical AA combo string plus an additive “expected” score
+equal to the sum of the single scores.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
+from dnadesign.permuter.src.core.paths import expand_for_job
 from dnadesign.permuter.src.core.storage import read_parquet
 from dnadesign.permuter.src.protocols.base import Protocol, assert_dna
-from dnadesign.permuter.src.protocols.combine.builders import random_sample
+from dnadesign.permuter.src.protocols.combine.builders import (
+    enumerate_all,
+    random_sample,
+)
 from dnadesign.permuter.src.protocols.combine.codon_utils import (
     aa_to_best_codon,
     aa_to_weighted_codon,
@@ -27,8 +36,6 @@ from dnadesign.permuter.src.protocols.combine.codon_utils import (
 from dnadesign.permuter.src.protocols.combine.selection import (
     select_elite_aa_events,
 )
-
-from dnadesign.permuter.src.core.paths import expand_for_job
 
 _LOG = logging.getLogger("permuter.protocol.combine_aa")
 
@@ -74,15 +81,17 @@ class CombineAA(Protocol):
         # Robust resolution: allow dataset *dir* or explicit records.parquet.
         raw_ds = str(params["from_dataset"])
         job_dir = Path(str(params.get("_job_dir"))) if params.get("_job_dir") else None
+
         def _coerce_records(p: Path) -> Path:
             if p.is_dir():
-                return (p / "records.parquet")
+                return p / "records.parquet"
             # if no extension was given and file missing, try dir + records.parquet
             if not p.exists() and p.suffix not in (".parquet", ".pqt"):
-                cand = (p / "records.parquet")
+                cand = p / "records.parquet"
                 if cand.exists():
                     return cand
             return p
+
         p_ds = Path(raw_ds).expanduser()
         if job_dir:
             p_ds = expand_for_job(raw_ds, job_dir=job_dir)
@@ -109,10 +118,12 @@ class CombineAA(Protocol):
 
         # Combination builder (v0.1: random only)
         comb = params.get("combine") or {}
-        if comb.get("strategy", "random") != "random":
+        strat = str(comb.get("strategy", "random"))
+        if strat not in {"random", "enumerate"}:
             raise ValueError(
-                "combine_aa: only strategy='random' is implemented in v0.1"
+                "combine_aa: combine.strategy must be 'random' or 'enumerate'"
             )
+        # 'random' honors budget_total; 'enumerate' ignores budget_total (caller's responsibility)
         try:
             k_min = int(comb.get("k_min", 0))
             k_max = int(comb.get("k_max", 0))
@@ -123,8 +134,14 @@ class CombineAA(Protocol):
             )
         if k_min < 1 or k_max < k_min:
             raise ValueError("combine_aa: k_min must be ≥1 and k_max ≥ k_min")
-        if budget <= 0:
-            raise ValueError("combine_aa: budget_total must be > 0")
+        if strat == "random" and budget <= 0:
+            raise ValueError(
+                "combine_aa: budget_total must be > 0 for strategy='random'"
+            )
+        if strat == "enumerate" and budget <= 0:
+            _LOG.info(
+                "[validate] combine.strategy='enumerate' → budget_total is ignored"
+            )
 
         choice = params.get("codon_choice", "top")
         if choice not in {"top", "weighted"}:
@@ -135,9 +152,16 @@ class CombineAA(Protocol):
         sel = params.get("select", {}) or {}
         mode = str(sel.get("mode", "global")).strip().lower()
         if mode not in {"global", "per_position_best"}:
-            raise ValueError("combine_aa: select.mode must be 'global' or 'per_position_best'")
-        if "disallow_negative_best" in sel and sel["disallow_negative_best"] not in (True, False):
-            raise ValueError("combine_aa: select.disallow_negative_best must be boolean")
+            raise ValueError(
+                "combine_aa: select.mode must be 'global' or 'per_position_best'"
+            )
+        if "disallow_negative_best" in sel and sel["disallow_negative_best"] not in (
+            True,
+            False,
+        ):
+            raise ValueError(
+                "combine_aa: select.disallow_negative_best must be boolean"
+            )
 
         # rng_seed is optional; verify int if present
         if "rng_seed" in params:
@@ -213,8 +237,12 @@ class CombineAA(Protocol):
             user_seed,
         )
 
-        # Build combinations deterministically
-        combos = random_sample(elite, params, np.random.default_rng(user_seed + 17))
+        # Build combinations per strategy
+        strategy = str(comb.get("strategy", "random"))
+        if strategy == "random":
+            combos = random_sample(elite, params, np.random.default_rng(user_seed + 17))
+        else:
+            combos = enumerate_all(elite, params)
         # Digest
         per_k: Dict[int, int] = {}
         for evs, _ in combos:
@@ -314,7 +342,68 @@ class CombineAA(Protocol):
                 "aa_combo_str": aa_combo_str,
                 "mut_count": len(events),
                 "proposal_score": float(proposal_score),
-                f"expected__{metric_id}": float(additive_expected),
-                "expected_kind": "additive",
+                f"permuter__expected__{metric_id}": float(additive_expected),
             }
             yield out
+
+
+def attach_epistasis(df, metric_id: str):
+    """
+    Normalize to canonical columns and attach epistasis:
+      • observed := prefer 'permuter__observed__{metric_id}', else fallback to 'permuter__metric__{metric_id}'
+      • expected := prefer 'permuter__expected__{metric_id}', else fallback to 'expected__{metric_id}'
+      • epistasis := observed - expected
+    Returns a copy with canonical columns and 'epistasis'.
+    """
+    import pandas as pd
+
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("attach_epistasis: df must be a pandas DataFrame")
+    canonical_obs = f"permuter__observed__{metric_id}"
+    canonical_exp = f"permuter__expected__{metric_id}"
+
+    obs_col = (
+        canonical_obs
+        if canonical_obs in df.columns
+        else (
+            f"permuter__metric__{metric_id}"
+            if f"permuter__metric__{metric_id}" in df.columns
+            else None
+        )
+    )
+    if obs_col is None:
+        raise ValueError(
+            f"attach_epistasis: missing observed metric: need '{canonical_obs}' "
+            f"or legacy 'permuter__metric__{metric_id}'"
+        )
+
+    exp_col = canonical_exp
+    if exp_col not in df.columns:
+        if f"expected__{metric_id}" in df.columns:
+            exp_col = f"expected__{metric_id}"
+        elif "additive" in df.columns:
+            exp_col = "additive"
+        else:
+            raise ValueError(
+                f"attach_epistasis: missing expected/additive column "
+                f"('{canonical_exp}', 'expected__{metric_id}', or 'additive')"
+            )
+
+    out = df.copy()
+    # Write canonical observed/expected
+    out[canonical_obs] = out[obs_col].astype(float)
+    out[canonical_exp] = out[exp_col].astype(float)
+    # Epistasis = observed - expected (canonical)
+    out["epistasis"] = out[canonical_obs] - out[canonical_exp]
+
+    # Drop deprecated aliases that cause confusion; keep metrics if present.
+    for legacy in (
+        f"expected__{metric_id}",
+        "additive",
+        "observed",
+        "expected_kind",
+        "permuter__expected_kind",
+    ):
+        if legacy in out.columns:
+            out = out.drop(columns=[legacy])
+    return out

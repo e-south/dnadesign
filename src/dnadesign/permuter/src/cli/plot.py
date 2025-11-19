@@ -35,10 +35,12 @@ from dnadesign.permuter.src.core.storage import (
 from dnadesign.permuter.src.plots.aa_category_effects import plot as plot_cat
 from dnadesign.permuter.src.plots.hairpin_length_vs_metric import plot as plot_hlvm
 from dnadesign.permuter.src.plots.metric_by_mutation_count import plot as plot_mmc
-from dnadesign.permuter.src.plots.ranked_variants import plot as plot_ranked
-from dnadesign.permuter.src.plots.synergy_scatter import plot as plot_syn
 from dnadesign.permuter.src.plots.mutation_summary import emit_aa_mutation_llr_summary
 from dnadesign.permuter.src.plots.position_scatter_and_heatmap import plot as plot_psh
+from dnadesign.permuter.src.plots.ranked_variants import plot as plot_ranked
+from dnadesign.permuter.src.plots.synergy_scatter import plot as plot_syn
+from dnadesign.permuter.src.plots.window_score_mass import compute_mass as mass_compute
+from dnadesign.permuter.src.plots.window_score_mass import render_mass as mass_render
 
 console = Console()
 _LOG = logging.getLogger("permuter.plot")
@@ -290,7 +292,9 @@ def plot(
             out = plots_dir / f"{name}__{metric_id}.png"
             _LOG.info(
                 "plot: %s → %s (metric_id=%s, figsize=%s, font_scale=%s)",
-                name, out, metric_id or "<auto>",
+                name,
+                out,
+                metric_id or "<auto>",
                 str(figsize) if figsize else "auto",
                 str(font_scale) if font_scale else "1.0",
             )
@@ -315,7 +319,9 @@ def plot(
             out = plots_dir / f"{name}__{metric_id}.png"
             _LOG.info(
                 "plot: %s → %s (metric_id=%s, figsize=%s, font_scale=%s)",
-                name, out, metric_id or "<auto>",
+                name,
+                out,
+                metric_id or "<auto>",
                 str(figsize) if figsize else "auto",
                 str(font_scale) if font_scale else "1.0",
             )
@@ -395,6 +401,47 @@ def plot(
                 metric_id=metric_id,
                 evaluators=subtitle,
                 figsize=figsize,
+                font_scale=font_scale,
+            )
+            console.print(f"[green]✔[/green] {name} → {out}")
+        elif name == "window_score_mass":
+            out = plots_dir / f"{name}__{metric_id or 'score_plus'}.png"
+            aa_pos_col = "permuter__aa_pos_list"
+            score_col = f"permuter__metric__{metric_id}" if metric_id else None
+            if score_col is None or score_col not in df.columns:
+                # Try the common LLR column
+                score_col = (
+                    "permuter__metric__llr_mean"
+                    if "permuter__metric__llr_mean" in df.columns
+                    else None
+                )
+            if aa_pos_col not in df.columns or score_col is None:
+                raise ValueError(
+                    "window_score_mass requires 'permuter__aa_pos_list' and a metric column (e.g., --metric-id llr_mean)."  # noqa
+                )
+            aa_lists = df[aa_pos_col].tolist()
+            if not aa_lists:
+                raise ValueError("window_score_mass: no AA position lists present.")
+            L = int(max(max(x) for x in aa_lists if isinstance(x, (list, tuple)) and x))
+            s = df[score_col].astype(float).to_numpy()
+            s_plus = (s > 0).astype(float) * s
+            df_mass = mass_compute(
+                L_total=L,
+                aa_pos_lists=aa_lists,
+                score_plus=s_plus,
+                normalize_by_k=False,
+            )
+            mass_render(
+                df_mass=df_mass,
+                windows=pd.DataFrame(
+                    columns=["start_aa", "end_aa", "rank"]
+                ),  # no shading here (standalone plot)
+                aa_letters=(
+                    list(ref_aa_seq) if ref_aa_seq and len(ref_aa_seq) == L else None
+                ),
+                out_png=out,
+                title=f"{job_name} — score⁺ density (AA axis)",
+                figsize=None,
                 font_scale=font_scale,
             )
             console.print(f"[green]✔[/green] {name} → {out}")

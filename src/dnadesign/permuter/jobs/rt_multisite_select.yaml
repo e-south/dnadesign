@@ -1,0 +1,64 @@
+job:
+  name: rt_multisite_select
+  bio_type: dna
+  input:
+    refs: "${JOB_DIR}/../inputs/refs.csv"
+    name_col: "ref_name"
+    seq_col: "sequence"
+    aa_col: "protein_seq"          # optional: to write REF_AA.fa if present
+  
+  permute:
+    protocol: "multisite_select"
+    
+    params:
+      from_dataset: "${JOB_DIR}/../results/rt_combine_from_dms/retron_Eco1_RT_wt/records.parquet"
+      select:
+        scoring:
+          normalize:
+            method: mad
+            gaussian_consistent: false
+            stratify_by_k: auto
+            winsor_mads: null
+          weights:
+            llr: 1.0
+            epi: 1.0
+        
+        embedding:
+          column: permuter__metric__logits_mean
+          l2_normalize: true
+          distance: angular
+          representative: medoid
+        
+        clusters:
+          picks_per_cluster: 1
+          seed_by: mean_composite
+          selection: farthest_first
+          filters:
+            apply_stage: pre_selection
+            min_cluster_mean_z_llr: -0.25
+            min_cluster_pos_epistasis_fraction: 0.55
+            location_stat: mean
+            trimmed_mean_frac: 0.10
+        
+        window:
+          length_aa: 100
+          stride_aa: 1
+          num_windows: 1
+          min_variants_per_window: 1
+        
+        budget:
+          total_variants: 24
+          intracluster_diversity:
+            enabled: true
+            min_angular_distance_deg: 12
+        
+        tie_breakers:
+          prefer_fewer_mutations: true
+          then_higher_delta: true
+          then_higher_proposal_score: true
+        
+        reproducibility:
+          rng_seed: 42
+  
+  output:
+    dir: "${JOB_DIR}/../results/rt_multisite_select"

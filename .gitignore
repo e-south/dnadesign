@@ -153,6 +153,7 @@ batches/
 **/batch_results/
 **/results/
 **/cluster_log/
+docs/
 
 # Misc project-generated YAML summaries
 **/progress_status_*.yaml

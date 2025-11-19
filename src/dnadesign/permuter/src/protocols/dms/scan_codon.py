@@ -50,7 +50,7 @@ def _load_codon_table(path: str | Path) -> Tuple[Dict[str, List[str]], Dict[str,
                 f"scan_codon: table must include at least one of {_WEIGHT_ALIASES}, got {fields}"
             )
         for row in reader:
-            aa = (row.get("amino_acid") or "").strip()
+            aa = (row.get("amino_acid") or "").strip().upper()
             if aa == "*":
                 continue
             codon = (row.get("codon") or "").strip().upper()

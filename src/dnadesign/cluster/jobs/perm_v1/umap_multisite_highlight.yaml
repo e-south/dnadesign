@@ -1,0 +1,43 @@
+# cluster/jobs/perm_v1/umap_multisite_highlight.yaml
+command: "umap"
+params:
+  # ---- UMAP input: combine_aa records.parquet ----
+  file: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/permuter/results/rt_combine_from_dms/retron_Eco1_RT_wt/records.parquet"
+
+  # Must match an existing fit over the same file (see jobs/perm_v1/fit.yaml)
+  name: "perm_v1"
+
+  # Vector column used for fit/umap in perm_v1
+  x-col: "permuter__metric__logits_mean"
+  preset: "umap.permuter"
+
+  # ---- Highlight: take ids directly from rt_multisite_select/records.parquet ----
+  # The loader will use the 'id' column from this parquet (if present).
+  highlight: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/permuter/results/rt_multisite_select/retron_Eco1_RT_wt/records.parquet"
+
+  # Attach UMAP coords back into the combine file (optional). Set to false if you don't want to modify the file.
+  attach_coords: false
+
+  # Write artifacts (PNGs & coords parquet in the run store). No file columns are attached unless attach_coords=true.
+  write: true
+  allow_overwrite: true
+  inplace: false
+
+plot:
+  # Keep the permuter aesthetic, add a dedicated highlight plot and overlays.
+  dims: [10, 10]
+  alpha: 0.45
+  size: 14.0
+  color_by:
+    - "cluster"
+    - "categorical:permuter__mut_count"
+    - "highlight"            # ensures a dedicated highlight-only PNG is produced
+
+  highlight:
+    overlay: true            # draw rings on non-"highlight" hues
+    size: 55.0               # size of highlighted points/rings
+    marker: "o"
+    facecolor: "none"        # keep overlays as rings
+    edgecolor: "red"
+    linewidth: 1.0
+    legend: false

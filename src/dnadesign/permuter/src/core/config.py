@@ -33,7 +33,13 @@ class JobPermute(BaseModel):
     @field_validator("protocol")
     @classmethod
     def _known_protocol(cls, v: str):
-        allowed = {"scan_dna", "scan_codon", "scan_stem_loop", "combine_aa"}
+        allowed = {
+            "scan_dna",
+            "scan_codon",
+            "scan_stem_loop",
+            "combine_aa",
+            "multisite_select",
+        }
         if v not in allowed:
             raise ValueError(f"Unknown protocol: {v!r}. Allowed: {sorted(allowed)}")
         return v
@@ -41,6 +47,7 @@ class JobPermute(BaseModel):
 
 class JobOutput(BaseModel):
     dir: str
+    layout: Optional[str] = None
 
 
 class JobPlot(BaseModel):
@@ -75,6 +82,7 @@ class JobPlot(BaseModel):
             "hairpin_length_vs_metric",
             "ranked_variants",
             "synergy_scatter",
+            "window_score_mass",
         }
         bad = [x for x in vs if x not in allowed]
         if bad:
@@ -91,11 +99,15 @@ class JobPlot(BaseModel):
             "hairpin_length_vs_metric",
             "ranked_variants",
             "synergy_scatter",
+            "window_score_mass",
         }
         bad = [k for k in v.keys() if k not in allowed]
         if bad:
-            raise ValueError(f"plot.sizes has invalid key(s): {bad}. Allowed: {sorted(allowed)}")
+            raise ValueError(
+                f"plot.sizes has invalid key(s): {bad}. Allowed: {sorted(allowed)}"
+            )
         return v
+
 
 class EvalMetric(BaseModel):
     id: str  # column suffix → permuter__metric__<id>

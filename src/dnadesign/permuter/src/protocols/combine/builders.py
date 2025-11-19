@@ -9,6 +9,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from itertools import combinations
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -44,7 +45,7 @@ def random_sample(
     rng: np.random.Generator,
 ) -> List[Tuple[List[Tuple[int, str, str, float]], float]]:
     """
-    Sample combos without position collisions, per-k caps and global budget.
+    Sample combos without position collisions, with per-k caps and a global budget.
     Returns a list of (events, proposal_score) sorted by (score desc, key asc).
     """
     comb = (combine_cfg or {}).get("combine", {})
@@ -60,7 +61,7 @@ def random_sample(
         )
     if budget_total <= 0:
         raise ValueError("combine_aa: combine.budget_total must be > 0")
-    rnd = (comb.get("random", {}) or {})
+    rnd = comb.get("random", {}) or {}
     per_k = rnd.get("samples_per_k", {})
     rank_objective = str(rnd.get("rank_objective", "sum_of_singles"))
     # Normalize keys to int
@@ -76,11 +77,6 @@ def random_sample(
             per_k_int = {
                 k: base + (1 if i < extra else 0) for i, k in enumerate(k_vals)
             }
-
-    # Build an index of events by position to prevent collisions
-    pos_to_idx: Dict[int, List[int]] = {}
-    for i, (pos, wt, alt, sc) in enumerate(elite):
-        pos_to_idx.setdefault(pos, []).append(i)
 
     results: List[Tuple[List[Tuple[int, str, str, float]], float]] = []
     seen_keys: set[str] = set()
@@ -129,5 +125,40 @@ def random_sample(
     return results
 
 
-def beam_search(*_, **__):
-    raise NotImplementedError("combine_aa: beam_search not implemented in v0.1")
+def enumerate_all(
+    elite: List[Tuple[int, str, str, float]],
+    combine_cfg: Dict,
+) -> List[Tuple[List[Tuple[int, str, str, float]], float]]:
+    """
+    Exhaustively enumerate all non-colliding combos for k in [k_min..k_max].
+    Deterministic ordering by (sum_of_singles desc, canonical key asc).
+    WARNING: combinatorial explosion — caller must keep p (positions) modest.
+    """
+    comb = (combine_cfg or {}).get("combine", {})
+    k_min = int(comb.get("k_min", 0))
+    k_max = int(comb.get("k_max", 0))
+    if k_min < 1 or k_max < k_min:
+        raise ValueError(
+            "combine_aa: combine.k_min/k_max must be positive and k_max ≥ k_min"
+        )
+    # Ranking objective parity with sampling; default to sum_of_singles
+    rnd = comb.get("random", {}) or {}
+    objective = str(rnd.get("rank_objective", "sum_of_singles"))
+
+    n = len(elite)
+    results: List[Tuple[List[Tuple[int, str, str, float]], float]] = []
+    seen_keys: set[str] = set()
+    for k in range(k_min, k_max + 1):
+        for idxs in combinations(range(n), k):
+            picks = [elite[i] for i in idxs]
+            positions = [p[0] for p in picks]
+            if len(set(positions)) != len(positions):
+                continue  # collision on a position
+            key = _key_for_combo(picks)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            score = _rank_score_for(picks, objective=objective)
+            results.append((sorted(picks, key=lambda x: x[0]), float(score)))
+    results.sort(key=lambda t: (-float(t[1]), _key_for_combo(t[0])))
+    return results

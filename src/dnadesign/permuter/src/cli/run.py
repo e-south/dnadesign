@@ -20,12 +20,10 @@ import numpy as np
 import pandas as pd
 import yaml
 from rich.console import Console
-from rich.status import Status
 
 from dnadesign.permuter.src.core.config import JobConfig
 from dnadesign.permuter.src.core.ids import derive_seed64, variant_id
 from dnadesign.permuter.src.core.paths import (
-    expand_for_job,
     expand_param_paths,
     resolve,
     resolve_job_hint,
@@ -133,8 +131,9 @@ def run(
         job_yaml=job_path,
         refs=cfg.job.input.refs,
         output_dir=cfg.job.output.dir,
-        ref_name="__PENDING__",  # set after picking ref
+        ref_name="__PENDING__",
         out_override=out,
+        layout=getattr(cfg.job.output, "layout", None),
     )
     df_refs = pd.read_csv(jp.refs_csv, dtype=str)
     console.print(f"[cyan]Using refs CSV[/cyan]: {jp.refs_csv}")
@@ -151,6 +150,7 @@ def run(
         output_dir=cfg.job.output.dir,
         ref_name=ref_name,
         out_override=out,
+        layout=getattr(cfg.job.output, "layout", None),
     )
     ensure_output_dir(jp.dataset_dir)
     # Existence & overwrite behavior

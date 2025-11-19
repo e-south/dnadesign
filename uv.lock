@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = "==3.12.*"
 
 [[package]]
@@ -271,9 +271,11 @@ dependencies = [
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "pydantic" },
+    { name = "pygments" },
     { name = "pymc" },
     { name = "python-levenshtein" },
     { name = "pyyaml" },
+    { name = "rich" },
     { name = "scanpy" },
     { name = "seaborn" },
     { name = "tqdm" },
@@ -321,11 +323,13 @@ requires-dist = [
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.7" },
     { name = "pyarrow", specifier = ">=16" },
     { name = "pydantic" },
+    { name = "pygments" },
     { name = "pymc" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.2" },
     { name = "pytest-cov", marker = "extra == 'dev'" },
     { name = "python-levenshtein" },
     { name = "pyyaml" },
+    { name = "rich" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
     { name = "scanpy", specifier = "==1.10.3" },
     { name = "seaborn" },

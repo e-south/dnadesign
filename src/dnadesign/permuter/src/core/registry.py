@@ -71,10 +71,21 @@ def _builtins(group: str) -> dict[str, Type]:
             )
         try:
             from dnadesign.permuter.src.protocols.combine.combine_aa import CombineAA
+
             out["combine_aa"] = CombineAA
         except Exception as e:
             _LOG.debug(
                 f"[registry] optional builtin protocol 'combine_aa' not available: {e}"
+            )
+        try:
+            from dnadesign.permuter.src.protocols.multisite_select.main import MSel
+
+            out["multisite_select"] = MSel
+            out["rt_select"] = MSel
+        except Exception as e:
+            _LOG.debug(
+                "[registry] optional builtin protocol 'multisite_select' not available: %s",
+                e,
             )
         return out
     else:
@@ -92,6 +103,7 @@ def _builtins(group: str) -> dict[str, Type]:
             from dnadesign.permuter.src.evaluators.evo2_ll import (
                 Evo2LogLikelihoodEvaluator,
             )
+
             out["evo2_ll"] = Evo2LogLikelihoodEvaluator
         except Exception as e:
             _LOG.debug("[registry] optional evaluator 'evo2_ll' not available: %s", e)
@@ -99,6 +111,7 @@ def _builtins(group: str) -> dict[str, Type]:
             from dnadesign.permuter.src.evaluators.evo2_llr import (
                 Evo2LogLikelihoodRatioEvaluator,
             )
+
             out["evo2_llr"] = Evo2LogLikelihoodRatioEvaluator
         except Exception as e:
             _LOG.debug("[registry] optional evaluator 'evo2_llr' not available: %s", e)
@@ -106,6 +119,7 @@ def _builtins(group: str) -> dict[str, Type]:
             from dnadesign.permuter.src.evaluators.evo2_logits import (
                 Evo2LogitsMeanEvaluator,
             )
+
             out["evo2_logits"] = Evo2LogitsMeanEvaluator
         except Exception as e:
             _LOG.debug(

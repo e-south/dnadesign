@@ -9,17 +9,47 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
+import logging
 import math
+import re
+from pathlib import Path
+from typing import Dict, List, Tuple
 
 import pandas as pd
-import logging
-from pathlib import Path
 
 _LOG = logging.getLogger("permuter.protocol.combine_aa")
 
+
 def _normalize_mut_tag(wt: str, pos: int, alt: str) -> str:
     return f"{str(wt).upper()}{int(pos)}{str(alt).upper()}"
+
+
+def _expand_pos_tokens(tokens) -> set[int]:
+    """
+    Expand a list of ints/strings into a set of positions.
+    Accepts integers or inclusive ranges like '10-25', '10..25', '10:25'.
+    """
+    out: set[int] = set()
+    if not tokens:
+        return out
+    for t in tokens:
+        if t is None:
+            continue
+        if isinstance(t, (int, float)) or (isinstance(t, str) and t.isdigit()):
+            out.add(int(t))
+            continue
+        s = str(t).strip()
+        m = re.fullmatch(r"\s*(\d+)\s*[-:.]{1,2}\s*(\d+)\s*", s)
+        if m:
+            a, b = int(m.group(1)), int(m.group(2))
+            lo, hi = (a, b) if a <= b else (b, a)
+            out.update(range(lo, hi + 1))
+            continue
+        try:
+            out.add(int(s))
+        except Exception:
+            pass
+    return out
 
 
 def select_elite_aa_events(
@@ -28,7 +58,7 @@ def select_elite_aa_events(
     """
     Select single-AA events for combination with strict ruleouts — assertively.
     Modes (cfg.select.mode):
-      • "global" (default): top_global by score across all events.
+      • "global": top_global by score across all events.
       • "per_position_best": pick the best alternative *per position*, then keep the
         best `top_global` positions by score.
 
@@ -76,25 +106,21 @@ def select_elite_aa_events(
 
     # Apply selection rules
     sel = (cfg or {}).get("select", {})
-    mode = str(sel.get("mode", "global")).strip().lower()
+    mode = str(sel.get("mode", "per_position_best")).strip().lower()
     if mode not in {"global", "per_position_best"}:
         raise ValueError(
             "combine_aa.select.mode must be 'global' or 'per_position_best'"
         )
     top_global = int(sel.get("top_global", 100))
-    min_delta = sel.get("min_delta", None)
-    allowed_positions = set(int(x) for x in sel.get("allowed_positions", []) or [])
-    exclude_positions = set(int(x) for x in sel.get("exclude_positions", []) or [])
+    min_delta = float(sel.get("min_delta", 1e-12))
+    allowed_positions = _expand_pos_tokens(sel.get("allowed_positions", []) or [])
+    exclude_positions = _expand_pos_tokens(sel.get("exclude_positions", []) or [])
     exclude_mutations = set(
         str(x).strip().upper() for x in (sel.get("exclude_mutations", []) or [])
     )
     disallow_negative = bool(sel.get("disallow_negative_best", True))
     emit_table = bool(sel.get("emit_per_position_table", True))
 
-    singles = singles.sort_values("_score", ascending=False, kind="mergesort")
-    if top_global > 0:
-        singles = singles.head(top_global)
-        
     singles = singles.sort_values("_score", ascending=False, kind="mergesort")
 
     if min_delta is not None:
@@ -120,14 +146,17 @@ def select_elite_aa_events(
 
     # ----- Mode logic -----
     if mode == "global":
+        # global: simply keep the highest scoring events overall
         chosen = singles if top_global <= 0 else singles.head(top_global)
-        msg_mode = "global(top_global)"
+        msg_mode = "global(top_global_after_filters)"
     else:
-        # pick the best alternative per position, then limit by top_global
+        # per_position_best: pick best per position, THEN apply top_global
         idx = singles.groupby("_pos")["_score"].idxmax()
-        winners = singles.loc[idx].sort_values("_score", ascending=False, kind="mergesort")
+        winners = singles.loc[idx].sort_values(
+            "_score", ascending=False, kind="mergesort"
+        )
         chosen = winners if top_global <= 0 else winners.head(top_global)
-        msg_mode = "per_position_best→top_global"
+        msg_mode = "per_position_best→top_global (after filters)"
 
     n_positions = int(singles["_pos"].nunique())
     n_chosen = int(len(chosen))
@@ -155,16 +184,16 @@ def select_elite_aa_events(
         )
 
     if emit_table:
-        # Pretty, compact “selected” table: metric-aware, 10 rows per column.
-        # Entry form: R31G  +0.017   (no redundant 'pos=' text)
         metric_id = str(metric_col).split("permuter__metric__", 1)[-1].lstrip("_")
-        lines = [f"{r['_wt']}{int(r['_pos'])}{r['_alt']}  {r['_score']:+.3f}"
-                 for _, r in chosen.iterrows()]
+        lines = [
+            f"{r['_wt']}{int(r['_pos'])}{r['_alt']}  {r['_score']:+.3f}"
+            for _, r in chosen.iterrows()
+        ]
         # 10 rows per column
         rows_per_col = 10
         n = len(lines)
         ncol = max(1, math.ceil(n / rows_per_col))
-        cols = [lines[i*rows_per_col:(i+1)*rows_per_col] for i in range(ncol)]
+        cols = [lines[i * rows_per_col : (i + 1) * rows_per_col] for i in range(ncol)]
         # pad columns to equal height
         for i in range(ncol):
             while len(cols[i]) < rows_per_col:
@@ -187,16 +216,25 @@ def select_elite_aa_events(
 
     # Persist the chosen singles as a CSV artifact when an artifact_dir is provided.
     try:
-        art_dir = (Path(str((cfg or {}).get("_artifact_dir"))).expanduser().resolve()
-                   if isinstance(cfg, dict) and "_artifact_dir" in cfg else None)
+        art_dir = (
+            Path(str((cfg or {}).get("_artifact_dir"))).expanduser().resolve()
+            if isinstance(cfg, dict) and "_artifact_dir" in cfg
+            else None
+        )
         if art_dir:
             art_dir.mkdir(parents=True, exist_ok=True)
             metric_id = str(metric_col).split("permuter__metric__", 1)[-1].lstrip("_")
             chosen_out = chosen.copy()
-            chosen_out = chosen_out.rename(columns={"_pos": "pos", "_wt": "wt", "_alt": "alt", "_score": "score"})
-            chosen_out["canon"] = chosen_out.apply(lambda r: f"{r['wt']}{int(r['pos'])}{r['alt']}", axis=1)
+            chosen_out = chosen_out.rename(
+                columns={"_pos": "pos", "_wt": "wt", "_alt": "alt", "_score": "score"}
+            )
+            chosen_out["canon"] = chosen_out.apply(
+                lambda r: f"{r['wt']}{int(r['pos'])}{r['alt']}", axis=1
+            )
             out_csv = art_dir / f"COMBINE_AA__ELITE_SELECTION__{metric_id}.csv"
-            chosen_out[["canon", "wt", "pos", "alt", "score"]].to_csv(out_csv, index=False)
+            chosen_out[["canon", "wt", "pos", "alt", "score"]].to_csv(
+                out_csv, index=False
+            )
             _LOG.info("[select] wrote selection table → %s", out_csv)
     except Exception as _e:
         _LOG.debug("selection artifact write skipped: %s", _e)
