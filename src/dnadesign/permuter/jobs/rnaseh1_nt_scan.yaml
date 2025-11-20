@@ -25,6 +25,7 @@ job:
 
   output:
     dir: "${JOB_DIR}/../results/rnaseh1_nt_scan"
+    layout: flat
 
   plot:
     which: ["position_scatter_and_heatmap", "metric_by_mutation_count"]

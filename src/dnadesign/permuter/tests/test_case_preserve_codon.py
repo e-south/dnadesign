@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
-from dnadesign.permuter.src.protocols.scan_codon import ScanCodon
+from dnadesign.permuter.src.protocols.dms.scan_codon import ScanCodon
 
 CODON_CSV = """codon,amino_acid,fraction,frequency
 AAA,K,0.73,33.2

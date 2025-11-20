@@ -29,6 +29,7 @@ job:
 
   output:
     dir: "${JOB_DIR}/../results/cpfatb1_codon_scan"
+    layout: flat
 
   plot:
     which: 

@@ -68,9 +68,10 @@ job:
 
   output:
     dir: "${JOB_DIR}/../results/retron_hp_swap"
+    layout: flat
 
   plot:
     which: ["hairpin_length_vs_metric"]
-    metric_id: fake_ll
+    metric_id: ll_mean
     size: {width: 9.5, height: 6.0}
     font_scale: 1.15

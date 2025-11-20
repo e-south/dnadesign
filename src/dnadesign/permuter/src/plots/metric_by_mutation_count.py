@@ -41,11 +41,14 @@ def _series_for_metric(
 ) -> Tuple[pd.Series, str]:
     if not metric_id:
         raise RuntimeError(
-            "metric_id is required (expects a column permuter__metric__<id>)"
+            "metric_id is required (expects a column permuter__observed__<id>)"
         )
-    col = f"permuter__metric__{metric_id}"
+    col = f"permuter__observed__{metric_id}"
     if col not in df.columns:
-        raise RuntimeError(f"Metric column not found: {col}")
+        raise RuntimeError(
+            f"Observed metric column not found: {col}. "
+            "Run `permuter evaluate` so observed metrics are present."
+        )
     return df[col].astype("float64"), _pretty_metric(metric_id)
 
 
@@ -72,7 +75,11 @@ def plot(
             int(isinstance(m, ndarray)) * int(len(m)) if isinstance(m, ndarray) else 0
         )
 
-    df["mut_count"] = df["permuter__modifications"].apply(_count_mods)
+    # Prefer protocol-emitted namespaced mut_count; fall back to token count if absent
+    if "permuter__mut_count" in df.columns:
+        df["mut_count"] = df["permuter__mut_count"].astype(int)
+    else:
+        df["mut_count"] = df["permuter__modifications"].apply(_count_mods)
 
     if "permuter__round" not in df.columns:
         raise RuntimeError(f"{job_name}: variants missing 'permuter__round' field")

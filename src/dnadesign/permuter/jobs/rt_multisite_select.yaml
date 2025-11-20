@@ -62,3 +62,4 @@ job:
   
   output:
     dir: "${JOB_DIR}/../results/rt_multisite_select"
+    layout: flat

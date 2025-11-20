@@ -13,14 +13,18 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-ART_DIR = Path(os.environ.get("PERMUTER_TEST_ART_DIR", ""))
-
+# Only treat the artifacts directory as valid if the env var is set.
+ART_DIR_STR = os.environ.get("PERMUTER_TEST_ART_DIR")
+ART_DIR = Path(ART_DIR_STR).expanduser() if ART_DIR_STR else None
 
 COMBINE_DIR = os.environ.get("PERMUTER_TEST_COMBINE_DIR", "")
 
 
 @pytest.mark.skipif(
-    not ART_DIR.exists(), reason="Set PERMUTER_TEST_ART_DIR to a finished run dir"
+    not ART_DIR
+    or not ART_DIR.exists()
+    or not (ART_DIR / "MULTISITE_VARIANTS.parquet").exists(),
+    reason="Set PERMUTER_TEST_ART_DIR to a finished combine run dir with MULTISITE_VARIANTS.parquet",
 )
 def test_multisite_variants_has_source_id_and_unique_mutsets():
     picks = pd.read_parquet(ART_DIR / "MULTISITE_VARIANTS.parquet")
@@ -45,7 +49,7 @@ def test_multisite_variants_has_source_id_and_unique_mutsets():
 
 @pytest.mark.skipif(
     not COMBINE_DIR or not Path(COMBINE_DIR).exists(),
-    reason="Set PERMUTER_TEST_COMBINE_DIR to a finished rt_combine run dir",
+    reason="Set PERMUTER_TEST_COMBINE_DIR to a finished combine run dir",
 )
 def test_rt_combine_epistasis_equals_observed_minus_expected():
     p = Path(COMBINE_DIR) / "records.parquet"

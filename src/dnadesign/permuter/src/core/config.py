@@ -66,11 +66,14 @@ class JobPlot(BaseModel):
     sizes: Dict[str, PlotSize] = Field(default_factory=dict)
     # Multiplicative font scaling factor applied to plot text
     font_scale: float = Field(default=1.0, ge=0.5, le=3.0)
-    ranked_annotate_top: int = Field(default=5, ge=0, le=500)
-    # Ranked variants extras
-    ranked_summary_top_n: int = Field(default=100, ge=1, le=1_000_000)
-    ranked_export_top_k: int = Field(default=500, ge=1, le=1_000_000)
-    ranked_xtick_every: int = Field(default=1000, ge=1, le=1_000_000)
+    ranked_jitter: Optional[float] = None
+    ranked_point_size: Optional[float] = None
+    ranked_alpha: Optional[float] = None
+    ranked_cmap: Optional[str] = None
+    ranked_annotate_top: Optional[int] = None
+    ranked_summary_top_n: Optional[int] = None
+    ranked_export_top_k: Optional[int] = None
+    ranked_xtick_every: Optional[int] = None
 
     @field_validator("which")
     @classmethod

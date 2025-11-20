@@ -86,6 +86,17 @@ class ScanCodon(Protocol):
         p = Path(str(table)).expanduser().resolve()
         if not p.exists():
             raise ValueError(f"scan_codon: codon_table not found at {p}")
+        try:
+            with p.open("r", encoding="utf-8", newline="") as fh:
+                reader = csv.DictReader(fh)
+                fields = [f.strip() for f in (reader.fieldnames or [])]
+        except Exception as e:
+            raise ValueError(f"scan_codon: failed to read codon_table {p}: {e}")
+        if not _BASE_REQUIRED.issubset(fields):
+            raise ValueError(
+                f"scan_codon: codon table must include columns {_BASE_REQUIRED}, "
+                f"got {fields}"
+            )
         rc = params.get("region_codons")
         if rc is not None:
             if not (isinstance(rc, (list, tuple)) and len(rc) == 2):

@@ -150,7 +150,7 @@ class CombineAA(Protocol):
         # Selection block sanity (optional keys validated in selection)
         _ = params.get("select", {})  # may be empty
         sel = params.get("select", {}) or {}
-        mode = str(sel.get("mode", "global")).strip().lower()
+        mode = str(sel.get("mode", "per_position_best")).strip().lower()
         if mode not in {"global", "per_position_best"}:
             raise ValueError(
                 "combine_aa: select.mode must be 'global' or 'per_position_best'"
@@ -342,19 +342,13 @@ class CombineAA(Protocol):
                 "aa_combo_str": aa_combo_str,
                 "mut_count": len(events),
                 "proposal_score": float(proposal_score),
-                f"permuter__expected__{metric_id}": float(additive_expected),
+                f"expected__{metric_id}": float(additive_expected),
             }
             yield out
 
 
 def attach_epistasis(df, metric_id: str):
-    """
-    Normalize to canonical columns and attach epistasis:
-      • observed := prefer 'permuter__observed__{metric_id}', else fallback to 'permuter__metric__{metric_id}'
-      • expected := prefer 'permuter__expected__{metric_id}', else fallback to 'expected__{metric_id}'
-      • epistasis := observed - expected
-    Returns a copy with canonical columns and 'epistasis'.
-    """
+    """Strict helper for tests: requires canonical observed/expected."""
     import pandas as pd
 
     if not isinstance(df, pd.DataFrame):
@@ -362,48 +356,15 @@ def attach_epistasis(df, metric_id: str):
     canonical_obs = f"permuter__observed__{metric_id}"
     canonical_exp = f"permuter__expected__{metric_id}"
 
-    obs_col = (
-        canonical_obs
-        if canonical_obs in df.columns
-        else (
-            f"permuter__metric__{metric_id}"
-            if f"permuter__metric__{metric_id}" in df.columns
-            else None
-        )
-    )
-    if obs_col is None:
+    missing = [c for c in (canonical_obs, canonical_exp) if c not in df.columns]
+    if missing:
         raise ValueError(
-            f"attach_epistasis: missing observed metric: need '{canonical_obs}' "
-            f"or legacy 'permuter__metric__{metric_id}'"
+            f"attach_epistasis: missing canonical column(s): {missing}. "
+            "Ensure evaluation wrote observed and the protocol emitted expected."
         )
-
-    exp_col = canonical_exp
-    if exp_col not in df.columns:
-        if f"expected__{metric_id}" in df.columns:
-            exp_col = f"expected__{metric_id}"
-        elif "additive" in df.columns:
-            exp_col = "additive"
-        else:
-            raise ValueError(
-                f"attach_epistasis: missing expected/additive column "
-                f"('{canonical_exp}', 'expected__{metric_id}', or 'additive')"
-            )
 
     out = df.copy()
-    # Write canonical observed/expected
-    out[canonical_obs] = out[obs_col].astype(float)
-    out[canonical_exp] = out[exp_col].astype(float)
-    # Epistasis = observed - expected (canonical)
-    out["epistasis"] = out[canonical_obs] - out[canonical_exp]
-
-    # Drop deprecated aliases that cause confusion; keep metrics if present.
-    for legacy in (
-        f"expected__{metric_id}",
-        "additive",
-        "observed",
-        "expected_kind",
-        "permuter__expected_kind",
-    ):
-        if legacy in out.columns:
-            out = out.drop(columns=[legacy])
+    out["epistasis"] = (
+        out[canonical_obs].astype("float64") - out[canonical_exp].astype("float64")
+    )
     return out

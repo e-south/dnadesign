@@ -18,6 +18,7 @@ from typing import List, Optional, Tuple
 import pandas as pd
 import yaml
 from rich.console import Console
+import inspect
 
 from dnadesign.permuter.src.core.config import JobConfig
 from dnadesign.permuter.src.core.paths import (
@@ -44,6 +45,59 @@ from dnadesign.permuter.src.plots.window_score_mass import render_mass as mass_r
 
 console = Console()
 _LOG = logging.getLogger("permuter.plot")
+
+
+def _call_plot(func, *, plot_name: str, **kwargs) -> None:
+    """
+    Call a plot function with only the parameters it declares.
+    Unknown kwargs that are None are dropped. Unknown kwargs that are set (not None)
+    raise a TypeError with guidance (assertive; no silent fallbacks).
+    """
+    sig = inspect.signature(func)
+    allowed = set(sig.parameters.keys())
+    accepted = {}
+    rejected = {}
+    for k, v in kwargs.items():
+        if k in allowed:
+            if v is not None:
+                accepted[k] = v
+        else:
+            if v is not None:
+                rejected[k] = v
+    if rejected:
+        bad = ", ".join(sorted(rejected))
+        allowed_list = ", ".join(sorted(allowed))
+        raise TypeError(
+            f"{plot_name}: unsupported option(s): {bad}. "
+            f"Supported parameters are: {allowed_list}"
+        )
+    return func(**accepted)
+
+
+def _normalize_for_plots(df: pd.DataFrame, metric_id: str, log=_LOG) -> pd.DataFrame:
+    """
+    Assert canonical columns exist (already produced by run→evaluate) and
+    provide only convenience aliases needed by the plots.
+    """
+    df2 = df.copy()
+    req = [
+        f"permuter__observed__{metric_id}",
+        f"permuter__expected__{metric_id}",
+        "epistasis",
+    ]
+    missing = [c for c in req if c not in df2.columns]
+    if missing:
+        raise ValueError(
+            "Dataset missing required canonical column(s) for plotting with "
+            f"metric_id={metric_id}: {missing}\n"
+            "Run 'permuter evaluate' after generation to populate observed and epistasis."
+        )
+    # Unprefixed convenience columns for plot code
+    if "mut_count" not in df2.columns and "permuter__mut_count" in df2.columns:
+        df2["mut_count"] = df2["permuter__mut_count"].astype(int)
+    if "aa_combo_str" not in df2.columns and "permuter__aa_combo_str" in df2.columns:
+        df2["aa_combo_str"] = df2["permuter__aa_combo_str"].astype(str)
+    return df2
 
 
 def _pick_reference(
@@ -188,19 +242,18 @@ def plot(
     )
 
     # Discover present metric ids once
-    metric_cols = [c for c in df.columns if c.startswith("permuter__metric__")]
+    obs_cols = [c for c in df.columns if c.startswith("permuter__observed__")]
     present_ids = sorted(
         {
-            c.split("permuter__metric__", 1)[1].lstrip("_").split("__", 1)[0]
-            for c in metric_cols
+            c.split("permuter__observed__", 1)[1].lstrip("_").split("__", 1)[0]
+            for c in obs_cols
         }
     )
 
     # If no metric-id was given, infer when there is exactly one id.
     if not metric_id:
-        metric_cols = [c for c in df.columns if c.startswith("permuter__metric__")]
         ids = sorted(
-            {c.split("permuter__metric__", 1)[1].lstrip("_") for c in metric_cols}
+            {c.split("permuter__observed__", 1)[1].lstrip("_") for c in obs_cols}
         )
         if len(ids) == 1:
             metric_id = ids[0]
@@ -213,27 +266,21 @@ def plot(
     if metric_id not in present_ids:
         hint = ""
         # No metric columns at all → suggest 'evaluate'
-        if not metric_cols:
+        if not obs_cols:
             if cfg and job_path:
                 ref_arg = f" --ref {ref}" if ref else ""
                 hint = (
-                    f"\nHint: this dataset has no metric columns yet. "
+                    f"\nHint: this dataset has no observed metric columns yet. "
                     f"Append them with:\n"
                     f"  permuter evaluate --job {job_path}{ref_arg}\n"
                     f"or a quick smoke test:\n"
-                    f"  permuter evaluate --data {records.parent} --with ll:placeholder:log_likelihood"
+                    f"  permuter evaluate --job {job_path}{ref_arg}\n"
                 )
             else:
                 hint = (
-                    "\nHint: this dataset has no metric columns. Append them with:\n"
-                    "  permuter evaluate --data <dataset_dir> --with ll:placeholder:log_likelihood"
+                    "\nHint: this dataset has no observed metric columns. Append them with:\n"
+                    "  permuter evaluate --data <dataset_dir> --with <id>:<evaluator>:<metric>"
                 )
-        elif str(metric_id).endswith("_mean") and str(metric_id)[:-5] in present_ids:
-            hint = (
-                f"\nHint: dataset has '{metric_id[:-5]}'. "
-                f"Either set --metric-id {metric_id[:-5]} "
-                f"or re-evaluate with --with {metric_id}:evo2_llr:log_likelihood_ratio."
-            )
         raise ValueError(
             f"Metric id '{metric_id}' not found in dataset.\n"
             f"Available metric ids: {present_ids or '<none>'}.{hint}"
@@ -250,6 +297,19 @@ def plot(
                     f"metric={m.id} • evaluator={m.evaluator}.{m.metric}{red_txt}"
                 )
                 break
+
+    # Prepare canonical columns for all plots (once):
+    # - writes permuter__observed__{metric_id} / permuter__expected__{metric_id}
+    # - attaches 'epistasis' (observed - expected)
+    # - provides unprefixed 'mut_count' / 'aa_combo_str' aliases for ranked plots
+    try:
+        df = _normalize_for_plots(df, metric_id)
+        _LOG.info(
+            "plot: normalized canonical columns for metric_id=%s (observed/expected/epistasis ready)",
+            metric_id,
+        )
+    except Exception as e:
+        raise ValueError(f"Unable to prepare canonical columns for plotting (metric_id={metric_id}). {e}") from e
 
     for name in which:
         # Compute figsize for this plot with explicit precedence:
@@ -298,7 +358,13 @@ def plot(
                 str(figsize) if figsize else "auto",
                 str(font_scale) if font_scale else "1.0",
             )
-            plot_ranked(
+            yaml_ranked_jitter = getattr(cfg.job.plot, "ranked_jitter", None) if cfg and cfg.job.plot else None
+            yaml_ranked_point_size = getattr(cfg.job.plot, "ranked_point_size", None) if cfg and cfg.job.plot else None
+            yaml_ranked_alpha = getattr(cfg.job.plot, "ranked_alpha", None) if cfg and cfg.job.plot else None
+            yaml_ranked_cmap = getattr(cfg.job.plot, "ranked_cmap", None) if cfg and cfg.job.plot else None
+            _call_plot(
+                plot_ranked,
+                plot_name="ranked_variants",
                 elite_df=df.head(0),
                 all_df=df,
                 output_path=out,
@@ -308,11 +374,14 @@ def plot(
                 evaluators=subtitle,
                 figsize=figsize,
                 font_scale=font_scale,
-                annotate_top_k=yaml_ranked_annot_top,
-                summary_top_n=yaml_ranked_summary_top_n,
-                xtick_every=yaml_ranked_xtick_every,
-                export_top_k=yaml_ranked_export_top_k,
-                dataset_dir=plots_dir.parent,
+                ranked_jitter=yaml_ranked_jitter,
+                ranked_point_size=yaml_ranked_point_size,
+                ranked_alpha=yaml_ranked_alpha,
+                ranked_cmap=yaml_ranked_cmap,
+                ranked_annotate_top=yaml_ranked_annot_top,
+                ranked_summary_top_n=yaml_ranked_summary_top_n,
+                ranked_export_top_k=yaml_ranked_export_top_k,
+                ranked_xtick_every=yaml_ranked_xtick_every,
             )
             console.print(f"[green]✔[/green] {name} → {out}")
         elif name == "synergy_scatter":
@@ -407,17 +476,11 @@ def plot(
         elif name == "window_score_mass":
             out = plots_dir / f"{name}__{metric_id or 'score_plus'}.png"
             aa_pos_col = "permuter__aa_pos_list"
-            score_col = f"permuter__metric__{metric_id}" if metric_id else None
-            if score_col is None or score_col not in df.columns:
-                # Try the common LLR column
-                score_col = (
-                    "permuter__metric__llr_mean"
-                    if "permuter__metric__llr_mean" in df.columns
-                    else None
-                )
-            if aa_pos_col not in df.columns or score_col is None:
+            score_col = f"permuter__observed__{metric_id}" if metric_id else None
+            if aa_pos_col not in df.columns or score_col is None or score_col not in df.columns:
                 raise ValueError(
-                    "window_score_mass requires 'permuter__aa_pos_list' and a metric column (e.g., --metric-id llr_mean)."  # noqa
+                    "window_score_mass requires 'permuter__aa_pos_list' and an observed metric column "
+                    "(e.g., --metric-id llr_mean → permuter__observed__llr_mean)."
                 )
             aa_lists = df[aa_pos_col].tolist()
             if not aa_lists:

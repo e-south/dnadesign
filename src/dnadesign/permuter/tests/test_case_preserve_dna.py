@@ -9,7 +9,7 @@ Module Author(s): Eric J. South
 
 import numpy as np
 
-from dnadesign.permuter.src.protocols.scan_dna import ScanDNA
+from dnadesign.permuter.src.protocols.dms.scan_dna import ScanDNA
 
 
 def test_scan_dna_preserves_case():

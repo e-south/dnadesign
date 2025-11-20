@@ -302,8 +302,13 @@ def evaluate(
                 ) from e
             raise
 
-        # Normalize → batch-append as one DataFrame to avoid repeated frame.insert
+        # Normalize evaluator output → rename to canonical observed namespace
         cols = _normalize_scores(scores, n=len(sequences), metric_id=mc["id"])
+        cols = {
+            # canonicalize: permuter__metric__*  →  permuter__observed__*
+            k.replace("permuter__metric__", "permuter__observed__"): v
+            for k, v in cols.items()
+        }
         cols_df = pd.DataFrame(cols)  # aligns on RangeIndex 0..n-1
         new_metric_frames.append(cols_df)
         # Log quick stats for the first column (without mutating df yet)
@@ -344,6 +349,32 @@ def evaluate(
         df = pd.concat([df] + new_metric_frames, axis=1, copy=False)
         # Defragment once so downstream ops (parquet write / slicing) stay fast
         df = df.copy()
+
+    # ---- Canonical epistasis (generic, non‑protocol‑specific) ---------------
+    # If a protocol emitted exactly one expected column, compute epistasis.
+    exp_cols = [c for c in df.columns if c.startswith("permuter__expected__")]
+    if len(exp_cols) == 1:
+        exp_col = exp_cols[0]
+        metric_for_exp = exp_col[len("permuter__expected__") :]
+        obs_col = f"permuter__observed__{metric_for_exp}"
+        if obs_col not in df.columns:
+            raise RuntimeError(
+                "evaluate: expected column present but matching observed column is missing.\n"
+                f"  expected: {exp_col}\n"
+                f"  missing : {obs_col}\n"
+                "Ensure the evaluator id matches the protocol's singles_metric_id."
+            )
+        df["epistasis"] = df[obs_col].astype("float64") - df[exp_col].astype("float64")
+        _LOG.info(
+            "evaluate: attached epistasis using observed=%s and expected=%s",
+            obs_col,
+            exp_col,
+        )
+    elif len(exp_cols) > 1:
+        raise RuntimeError(
+            "evaluate: multiple 'permuter__expected__*' columns found; ambiguous for a single 'epistasis' column.\n"
+            f"Found: {exp_cols}\nEmit exactly one expected metric in your protocol."
+        )
 
     atomic_write_parquet(df, records)
     console.print(

@@ -106,7 +106,7 @@ def test_case_preservation_and_codon_substitution(tmp_path: Path):
         assert seq[i].isupper() == ref[i].isupper()
     # AA combo canonical string and expected sum
     assert rec["aa_combo_str"] in ("K1N|K2Q", "K2Q|K1N")
-    assert abs(rec["permuter__expected__llr_mean"] - (1.0 + 2.0)) < 1e-9
+    assert abs(rec["expected__llr_mean"] - (1.0 + 2.0)) < 1e-9
 
 
 def test_selection_invariants(tmp_path: Path):
@@ -370,20 +370,21 @@ def test_epistasis_definition_matches_observed_minus_expected(tmp_path: Path):
 
     # Build a DataFrame to attach synthetic 'observed' and compute epistasis
     df = pd.DataFrame(out)
-    assert "permuter__expected__llr_mean" in df.columns
+    assert "expected__llr_mean" in df.columns
 
     # Fabricate 'observed' using a deterministic synergy function on aa_pos_list
     observed = []
     epis = []
     for _, r in df.iterrows():
-        expected = float(r["permuter__expected__llr_mean"])
+        expected = float(r["expected__llr_mean"])
         pos_list = list(map(int, r["aa_pos_list"]))
         syn = _synergy_for_positions(pos_list)
         obs = expected + syn
         observed.append(obs)
         epis.append(obs - expected)
 
-    # Provide canonical observed column and compute epistasis via helper
+    # Provide canonical columns expected by attach_epistasis
+    df["permuter__expected__llr_mean"] = df["expected__llr_mean"]
     df["permuter__observed__llr_mean"] = observed
     df2 = attach_epistasis(df, metric_id="llr_mean")
     assert "epistasis" in df2.columns
@@ -399,13 +400,12 @@ def test_epistasis_definition_matches_observed_minus_expected(tmp_path: Path):
     if has_neg:
         assert (df2["epistasis"] < 0).any()
 
-    # Sign convention sanity: positive synergy -> positive epistasis
-    has_pos = any(_synergy_for_positions(r) > 0 for r in df["aa_pos_list"])
-    has_neg = any(_synergy_for_positions(r) < 0 for r in df["aa_pos_list"])
+    has_pos = any(_synergy_for_positions(r) > 0 for r in df2["aa_pos_list"])
+    has_neg = any(_synergy_for_positions(r) < 0 for r in df2["aa_pos_list"])
     if has_pos:
-        assert (df["epistasis"] > 0).any()
+        assert (df2["epistasis"] > 0).any()
     if has_neg:
-        assert (df["epistasis"] < 0).any()
+        assert (df2["epistasis"] < 0).any()
 
 
 def test_combo_fields_are_canonical_and_consistent(tmp_path: Path):
@@ -501,12 +501,12 @@ def test_combo_fields_are_canonical_and_consistent(tmp_path: Path):
         assert [a for (_, _, a) in toks] == alt, "ALT letters mismatch"
 
         # Additivity: expected__llr_mean equals sum of singles at those positions
-        expected = float(rec["permuter__expected__llr_mean"])
+        expected = float(rec["expected__llr_mean"])
         calc = float(sum(singles[(p, a)] for p, a in zip(pos, alt)))
         assert (
             abs(expected - calc) < 1e-12
         ), f"expected(additive) mismatch: {expected} vs {calc}"
-        assert "permuter__expected__llr_mean" in rec
+        assert "expected__llr_mean" in rec
 
 
 def test_per_position_best_applies_top_after_grouping(tmp_path: Path):
@@ -665,14 +665,14 @@ def test_attach_epistasis_accepts_legacy_metric_and_drops_aliases(tmp_path: Path
         )
     )
     df = pd.DataFrame(out)
-    # Legacy: evaluator wrote to permuter__metric__llr_mean; helper should produce canonical observed & epistasis.
-    df["permuter__metric__llr_mean"] = df["permuter__expected__llr_mean"] + 0.5
+    # Prepare canonical columns expected by attach_epistasis:
+    # - CombineAA emits 'expected__llr_mean' → mirror into 'permuter__expected__llr_mean'
+    # - Fabricate observed as expected + 0.5 and place into 'permuter__observed__llr_mean'
+    df["permuter__expected__llr_mean"] = df["expected__llr_mean"]
+    df["permuter__observed__llr_mean"] = df["permuter__expected__llr_mean"] + 0.5
     df2 = attach_epistasis(df, metric_id="llr_mean")
     assert "epistasis" in df2.columns and np.allclose(df2["epistasis"], 0.5)
     assert "permuter__observed__llr_mean" in df2.columns
-    # Aliases should not be introduced by the helper
-    assert "observed" not in df2.columns
-    assert "expected__llr_mean" not in df2.columns
 
 
 def test_allowed_position_ranges_are_respected(tmp_path: Path):

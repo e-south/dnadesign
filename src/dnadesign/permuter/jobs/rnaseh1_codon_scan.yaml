@@ -25,6 +25,8 @@ job:
           reduction: mean
   output:
     dir: "${JOB_DIR}/../results/rnaseh1_codon_scan"
+    layout: flat
+
   plot:
     which: ["position_scatter_and_heatmap", "metric_by_mutation_count"]
     metric_id: llr_mean            # default metric for plotting

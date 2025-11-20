@@ -11,18 +11,18 @@ job:
   permute:
     protocol: "combine_aa"
     params:
-      from_dataset: "${JOB_DIR}/../results/retron_Eco1_RT_wt_codon_scan/retron_Eco1_RT_wt/records.parquet"
+      from_dataset: "${JOB_DIR}/../results/retron_Eco1_RT_wt_codon_scan/records.parquet"
       codon_table: "${JOB_DIR}/../inputs/codon_tables/codon_ecoli.csv"
       singles_metric_id: "llr_mean"
 
       select:
         mode: per_position_best
-        top_global: 25
-        min_delta: 1e-12             # <- strictly positive
+        min_delta: 1e-12
         disallow_negative_best: true
-        allowed_positions: []
+        allowed_positions: ["1-100"]   # first 100 AA before ranking Top-K
         exclude_positions: []
         exclude_mutations: []
+        top_global: 14
 
       combine:
         k_min: 2
@@ -57,6 +57,7 @@ job:
 
   output:
     dir: "${JOB_DIR}/../results/rt_combine_from_dms"
+    layout: flat
 
   plot:
     which:

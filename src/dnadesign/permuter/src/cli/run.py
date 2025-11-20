@@ -206,11 +206,11 @@ def run(
             row["permuter__modifications"] = mods
             row["permuter__round"] = 1  # single-pass DMS
 
-            # flatten protocol meta under permuter__*
             for k, v in var.items():
                 if k in ("sequence", "modifications"):
                     continue
-                row[f"permuter__{k}"] = v
+                key = k if str(k).startswith("permuter__") else f"permuter__{k}"
+                row[key] = v
 
             rows.append(row)
         st.update(status=f"[bold]Generated[/bold] {len(rows)} variants")

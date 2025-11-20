@@ -121,8 +121,6 @@ def select_elite_aa_events(
     disallow_negative = bool(sel.get("disallow_negative_best", True))
     emit_table = bool(sel.get("emit_per_position_table", True))
 
-    singles = singles.sort_values("_score", ascending=False, kind="mergesort")
-
     if min_delta is not None:
         singles = singles[singles["_score"] >= float(min_delta)]
 
@@ -143,6 +141,8 @@ def select_elite_aa_events(
 
     if singles.empty:
         raise RuntimeError("combine_aa: selection produced an empty elite set")
+
+    singles = singles.sort_values("_score", ascending=False, kind="mergesort")
 
     # ----- Mode logic -----
     if mode == "global":
