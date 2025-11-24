@@ -291,9 +291,17 @@ def build_mutated_aa_sequences(
     ref = list(str(ref_aa))
     L = len(ref)
     out: list[str] = []
+
     for combo in combo_strs:
+        # Start from the unmutated reference for each combo string
         seq = ref.copy()
-        s = (combo or "").strip()
+
+        # Treat None / missing as "no mutations"
+        if combo is None:
+            s = ""
+        else:
+            s = str(combo).strip()
+
         if s:
             for tok in s.split("|"):
                 t = tok.strip()
@@ -308,11 +316,16 @@ def build_mutated_aa_sequences(
                 pos = int(pos_s)
                 if not (1 <= pos <= L):
                     raise ValueError(
-                        f"build_mutated_aa_sequences: position {pos} out of range for reference length {L}"
+                        "build_mutated_aa_sequences: position "
+                        f"{pos} out of range for reference length {L}"
                     )
-                seq[pos - 1] = alt
+                # Apply the mutation (1-indexed positions)
+                seq[pos - 1] = alt.upper()
+
         out.append("".join(seq))
-    re
+
+    # Return as a NumPy array so integer-array indexing works in diagnostics
+    return np.asarray(out, dtype=str)
 
 
 @dataclass(frozen=True)

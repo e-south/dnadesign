@@ -53,7 +53,7 @@ job:
             enabled: true
             # When enabled, set this to a positive value (degrees)
             # based on pairwise angle diagnostics; 0.0 means "no constraint".
-            min_angular_distance_deg: 0.02
+            min_angular_distance_deg: 0.015
 
         tie_breakers:
           prefer_fewer_mutations: true

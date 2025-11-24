@@ -445,3 +445,69 @@ def plot_pairwise_levenshtein_selected_vs_random(
     fig.tight_layout()
     fig.savefig(out_png)
     plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
+# Mutation position value counts (selected only)
+# ---------------------------------------------------------------------------
+
+
+def plot_mutation_position_counts_selected(
+    aa_pos_lists: Sequence[Sequence[int]],
+    *,
+    out_png: str | Path,
+    title: str,
+    figsize_in: float = 8.0,
+    dpi: int = 200,
+) -> None:
+    """
+    Bar plot of mutation-position value counts among selected variants.
+
+    Parameters
+    ----------
+    aa_pos_lists:
+        Sequence of per-variant AA position collections (1-indexed).
+        Each element is an iterable of integer-like values.
+    """
+    # Flatten all positions across selected variants
+    positions: list[int] = []
+    for pos_list in aa_pos_lists:
+        if pos_list is None:
+            continue
+        for p in pos_list:
+            try:
+                positions.append(int(p))
+            except Exception:
+                # Be tolerant to any stray non-numeric entries
+                continue
+
+    if not positions:
+        return
+
+    pos_arr = np.asarray(positions, dtype=int)
+    unique, counts = np.unique(pos_arr, return_counts=True)
+
+    out_png = _ensure_path(out_png)
+
+    # Wide and short aspect ratio
+    fig_width = float(figsize_in) * 2.0
+    fig_height = max(float(figsize_in) * 0.5, 2.0)
+    fig = plt.figure(figsize=(fig_width, fig_height), dpi=dpi)
+    ax = fig.add_subplot(111)
+
+    ax.bar(unique, counts, width=0.8)
+
+    ax.set_xticks(unique)
+
+    _style_axes(
+        ax,
+        xlabel="Amino-acid position (1-indexed)",
+        ylabel="Mutation count",
+        title=title,
+        x_limits=(unique.min() - 0.5, unique.max() + 0.5),
+        y_limits=(0, counts.max() * 1.05),
+    )
+
+    fig.tight_layout()
+    fig.savefig(out_png)
+    plt.close(fig)

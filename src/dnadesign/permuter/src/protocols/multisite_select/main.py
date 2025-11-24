@@ -51,6 +51,7 @@ from dnadesign.permuter.src.core.storage import (
 )
 from dnadesign.permuter.src.plots.diagnostics import (
     hist_mut_count,
+    plot_mutation_position_counts_selected,
     plot_pairwise_delta_k_selected_vs_random,
     plot_pairwise_levenshtein_selected_vs_random,
 )
@@ -1098,6 +1099,19 @@ class MSel(Protocol):
             )
         except Exception as e:
             _LOG.warning("[diagnostics] mutation‑count histogram failed: %s", e)
+
+        # 1b) mutation-position value counts among selected variants
+        try:
+            if not picks_df.empty and "aa_pos_list" in picks_df.columns:
+                plot_mutation_position_counts_selected(
+                    picks_df["aa_pos_list"].tolist(),
+                    out_png=art_dir / "fig_mut_position_counts_selected.png",
+                    title="Mutation position counts among selected variants",
+                    figsize_in=knobs.diag_figsize_in,
+                    dpi=knobs.diag_dpi,
+                )
+        except Exception as e:
+            _LOG.warning("[diagnostics] mutation-position count plot failed: %s", e)
 
         # 2) pairwise |Δk|
         try:
