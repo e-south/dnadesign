@@ -1,13 +1,13 @@
 command: "umap"
 params:
-  file: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/permuter/results/rt_combine_from_dms/retron_Eco1_RT_wt/records.parquet"
+  file: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/permuter/results/rt_combine_from_dms/records.parquet"
   name: "perm_v1"
-  x-col: "permuter__metric__logits_mean"
+  x-col: "permuter__observed__logits_mean"
   preset: "umap.permuter"
 
   # Define epistasis = metric/expected
   derive_ratio:
-    - "epistasis:permuter__metric__llr_mean:permuter__expected__llr_mean"
+    - "epistasis:permuter__observed__llr_mean:permuter__expected__llr_mean"
 
   attach_coords: false
   write: true

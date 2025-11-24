@@ -9,8 +9,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import pytest
 import numpy as np
+import pytest
 
 from dnadesign.permuter.src.protocols.dms.scan_dna import ScanDNA
 
@@ -67,12 +67,12 @@ def test_scan_dna_regions_subset_and_counts():
 @pytest.mark.parametrize(
     "regions",
     [
-        "notalist",          # wrong type
-        [[1, 1]],            # empty interval (end must be > start)
-        [[-1, 2]],           # negative start
-        [[0, 999]],          # end beyond length
-        [[0]],               # malformed pair
-        123,                 # wrong type
+        "notalist",  # wrong type
+        [[1, 1]],  # empty interval (end must be > start)
+        [[-1, 2]],  # negative start
+        [[0, 999]],  # end beyond length
+        [[0]],  # malformed pair
+        123,  # wrong type
     ],
 )
 def test_scan_dna_rejects_bad_regions(regions):

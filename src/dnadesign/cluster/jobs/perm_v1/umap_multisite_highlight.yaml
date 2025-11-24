@@ -2,18 +2,17 @@
 command: "umap"
 params:
   # ---- UMAP input: combine_aa records.parquet ----
-  file: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/permuter/results/rt_combine_from_dms/retron_Eco1_RT_wt/records.parquet"
+  file: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/permuter/results/rt_combine_from_dms/records.parquet"
 
   # Must match an existing fit over the same file (see jobs/perm_v1/fit.yaml)
   name: "perm_v1"
 
   # Vector column used for fit/umap in perm_v1
-  x-col: "permuter__metric__logits_mean"
+  x-col: "permuter__observed__logits_mean"
   preset: "umap.permuter"
 
-  # ---- Highlight: take ids directly from rt_multisite_select/records.parquet ----
   # The loader will use the 'id' column from this parquet (if present).
-  highlight: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/permuter/results/rt_multisite_select/retron_Eco1_RT_wt/records.parquet"
+  highlight: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/permuter/results/rt_multisite_select/records.parquet"
 
   # Attach UMAP coords back into the combine file (optional). Set to false if you don't want to modify the file.
   attach_coords: false

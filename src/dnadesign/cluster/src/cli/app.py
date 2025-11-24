@@ -477,6 +477,8 @@ def cmd_fit(
     name = name or jp.get("name")
     key_col = key_col or jp.get("key_col", "id")
     x_col = x_col or jp.get("x_col")
+    if x_col:
+        x_col = str(x_col).strip()
     x_cols = x_cols or jp.get("x_cols")
     algo = algo or jp.get("algo", "leiden")
     neighbors = neighbors if neighbors is not None else jp.get("neighbors")
@@ -1144,6 +1146,8 @@ def cmd_umap(
         )
     key_col = key_col or jp.get("key_col", "id")
     x_col = x_col or jp.get("x_col")
+    if x_col:
+        x_col = str(x_col).strip()
     x_cols = x_cols or jp.get("x_cols")
     neighbors = neighbors if neighbors is not None else jp.get("neighbors")
     min_dist = min_dist if min_dist is not None else jp.get("min_dist")

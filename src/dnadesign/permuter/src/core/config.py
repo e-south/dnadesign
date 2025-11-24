@@ -85,7 +85,6 @@ class JobPlot(BaseModel):
             "hairpin_length_vs_metric",
             "ranked_variants",
             "synergy_scatter",
-            "window_score_mass",
         }
         bad = [x for x in vs if x not in allowed]
         if bad:

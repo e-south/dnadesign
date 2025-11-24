@@ -14,6 +14,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pandas.api.types as ptypes
 
 
 def load_table(ctx: dict, columns: list[str] | None = None) -> pd.DataFrame:
@@ -78,9 +79,21 @@ def extract_X(
         if x_col not in df.columns:
             raise KeyError(f"X column '{x_col}' not found in the table.")
         s = df[x_col]
-        first = s.iloc[0]
-        # Preallocate to avoid list-of-arrays blowup
-        if isinstance(first, (list, tuple, np.ndarray)):
+        # Guard: all-null is not a valid feature vector
+        if s.isna().all():
+            raise ValueError(f"X column '{x_col}' has only null values.")
+        # Use the first non-null cell to determine representation
+        first_valid_idx = s.first_valid_index()
+        first = s.loc[first_valid_idx]
+        # Mode A — scalar numeric (Nx1 matrix)
+        if ptypes.is_numeric_dtype(s):
+            X = (
+                s.to_numpy(dtype="float64", copy=False)
+                .astype(np.float32, copy=False)
+                .reshape(-1, 1)
+            )
+        # Mode B — per-row 1-D array (list/tuple/ndarray)
+        elif isinstance(first, (list, tuple, np.ndarray)):
             dim = int(len(first))
             n = int(len(s))
             X = np.empty((n, dim), dtype=np.float32)
@@ -99,6 +112,7 @@ def extract_X(
                         f"X must be fixed-length; row {i} has length {arr.shape[0]} but expected {dim}."
                     )
                 X[i, :] = arr
+        # Mode C — per-row JSON array string
         elif isinstance(first, str):
             arr0 = _parse_json_array_cell(first)
             dim = int(arr0.shape[0])
@@ -117,7 +131,8 @@ def extract_X(
         else:
             raise TypeError(
                 f"Unsupported cell type for X column '{x_col}': {type(first)}. "
-                f"Use --x-cols to pass multiple numeric columns instead."
+                f"Expected one of: numeric scalar, 1-D list/array, or JSON array string. "
+                f"For multiple columns, use --x-cols."
             )
         if not np.isfinite(X).all():
             bad = np.argwhere(~np.isfinite(X))

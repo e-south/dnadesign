@@ -9,6 +9,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import inspect
 import logging
 import shlex
 import sys
@@ -18,7 +19,6 @@ from typing import List, Optional, Tuple
 import pandas as pd
 import yaml
 from rich.console import Console
-import inspect
 
 from dnadesign.permuter.src.core.config import JobConfig
 from dnadesign.permuter.src.core.paths import (
@@ -40,8 +40,6 @@ from dnadesign.permuter.src.plots.mutation_summary import emit_aa_mutation_llr_s
 from dnadesign.permuter.src.plots.position_scatter_and_heatmap import plot as plot_psh
 from dnadesign.permuter.src.plots.ranked_variants import plot as plot_ranked
 from dnadesign.permuter.src.plots.synergy_scatter import plot as plot_syn
-from dnadesign.permuter.src.plots.window_score_mass import compute_mass as mass_compute
-from dnadesign.permuter.src.plots.window_score_mass import render_mass as mass_render
 
 console = Console()
 _LOG = logging.getLogger("permuter.plot")
@@ -309,7 +307,9 @@ def plot(
             metric_id,
         )
     except Exception as e:
-        raise ValueError(f"Unable to prepare canonical columns for plotting (metric_id={metric_id}). {e}") from e
+        raise ValueError(
+            f"Unable to prepare canonical columns for plotting (metric_id={metric_id}). {e}"
+        ) from e
 
     for name in which:
         # Compute figsize for this plot with explicit precedence:
@@ -358,10 +358,26 @@ def plot(
                 str(figsize) if figsize else "auto",
                 str(font_scale) if font_scale else "1.0",
             )
-            yaml_ranked_jitter = getattr(cfg.job.plot, "ranked_jitter", None) if cfg and cfg.job.plot else None
-            yaml_ranked_point_size = getattr(cfg.job.plot, "ranked_point_size", None) if cfg and cfg.job.plot else None
-            yaml_ranked_alpha = getattr(cfg.job.plot, "ranked_alpha", None) if cfg and cfg.job.plot else None
-            yaml_ranked_cmap = getattr(cfg.job.plot, "ranked_cmap", None) if cfg and cfg.job.plot else None
+            yaml_ranked_jitter = (
+                getattr(cfg.job.plot, "ranked_jitter", None)
+                if cfg and cfg.job.plot
+                else None
+            )
+            yaml_ranked_point_size = (
+                getattr(cfg.job.plot, "ranked_point_size", None)
+                if cfg and cfg.job.plot
+                else None
+            )
+            yaml_ranked_alpha = (
+                getattr(cfg.job.plot, "ranked_alpha", None)
+                if cfg and cfg.job.plot
+                else None
+            )
+            yaml_ranked_cmap = (
+                getattr(cfg.job.plot, "ranked_cmap", None)
+                if cfg and cfg.job.plot
+                else None
+            )
             _call_plot(
                 plot_ranked,
                 plot_name="ranked_variants",
@@ -470,41 +486,6 @@ def plot(
                 metric_id=metric_id,
                 evaluators=subtitle,
                 figsize=figsize,
-                font_scale=font_scale,
-            )
-            console.print(f"[green]✔[/green] {name} → {out}")
-        elif name == "window_score_mass":
-            out = plots_dir / f"{name}__{metric_id or 'score_plus'}.png"
-            aa_pos_col = "permuter__aa_pos_list"
-            score_col = f"permuter__observed__{metric_id}" if metric_id else None
-            if aa_pos_col not in df.columns or score_col is None or score_col not in df.columns:
-                raise ValueError(
-                    "window_score_mass requires 'permuter__aa_pos_list' and an observed metric column "
-                    "(e.g., --metric-id llr_mean → permuter__observed__llr_mean)."
-                )
-            aa_lists = df[aa_pos_col].tolist()
-            if not aa_lists:
-                raise ValueError("window_score_mass: no AA position lists present.")
-            L = int(max(max(x) for x in aa_lists if isinstance(x, (list, tuple)) and x))
-            s = df[score_col].astype(float).to_numpy()
-            s_plus = (s > 0).astype(float) * s
-            df_mass = mass_compute(
-                L_total=L,
-                aa_pos_lists=aa_lists,
-                score_plus=s_plus,
-                normalize_by_k=False,
-            )
-            mass_render(
-                df_mass=df_mass,
-                windows=pd.DataFrame(
-                    columns=["start_aa", "end_aa", "rank"]
-                ),  # no shading here (standalone plot)
-                aa_letters=(
-                    list(ref_aa_seq) if ref_aa_seq and len(ref_aa_seq) == L else None
-                ),
-                out_png=out,
-                title=f"{job_name} — score⁺ density (AA axis)",
-                figsize=None,
                 font_scale=font_scale,
             )
             console.print(f"[green]✔[/green] {name} → {out}")

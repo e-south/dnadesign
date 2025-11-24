@@ -1,65 +1,88 @@
 job:
   name: rt_multisite_select
   bio_type: dna
+
   input:
     refs: "${JOB_DIR}/../inputs/refs.csv"
     name_col: "ref_name"
     seq_col: "sequence"
-    aa_col: "protein_seq"          # optional: to write REF_AA.fa if present
-  
+    aa_col: "protein_seq"          # optional: REF_AA.fa if present
+
   permute:
     protocol: "multisite_select"
-    
+
     params:
-      from_dataset: "${JOB_DIR}/../results/rt_combine_from_dms/retron_Eco1_RT_wt/records.parquet"
+      # Source multi-mutant dataset (from combine_aa + evaluate)
+      from_dataset: "${JOB_DIR}/../results/rt_combine_from_dms/records.parquet"
+
       select:
         scoring:
           normalize:
-            method: mad
+            method: mad            # "mad" or "none"
             gaussian_consistent: false
-            stratify_by_k: auto
-            winsor_mads: null
+            winsor_mads: null      # optional winsorization in MAD units
           weights:
-            llr: 1.0
-            epi: 1.0
-        
+            llr: 0.0               # α
+            epi: 1.0               # β
+
         embedding:
-          column: permuter__metric__logits_mean
+          column: permuter__observed__logits_mean
           l2_normalize: true
-          distance: angular
-          representative: medoid
-        
+          distance: angular        # only "angular" is supported
+          representative: medoid   # medoid-based cluster reps
+
         clusters:
-          picks_per_cluster: 1
-          seed_by: mean_composite
-          selection: farthest_first
+          # Soft cap per cluster; set to null to disable caps.
+          picks_per_cluster: null
           filters:
-            apply_stage: pre_selection
-            min_cluster_mean_z_llr: -0.25
-            min_cluster_pos_epistasis_fraction: 0.55
-            location_stat: mean
-            trimmed_mean_frac: 0.10
-        
-        window:
-          length_aa: 100
-          stride_aa: 1
-          num_windows: 1
-          min_variants_per_window: 1
-        
+            # Cluster-level quality filters (optional, both disabled by default)
+            # min_cluster_mean_z_llr: -0.25
+            # min_cluster_pos_epistasis_fraction: 0.55
+            location_stat: mean       # mean | median | trimmed_mean
+            trimmed_mean_frac: 0.10   # only used for trimmed_mean
+
         budget:
-          total_variants: 24
+          total_variants: 100
+          # Score-gated high-score pool (X * total_variants)
+          pool_factor: 5.0
+
+          # Diversity is opt-in. By default we do not impose an angular
+          # separation constraint; when you enable it, you must specify
+          # an explicit threshold calibrated from diagnostics.
           intracluster_diversity:
             enabled: true
-            min_angular_distance_deg: 12
-        
+            # When enabled, set this to a positive value (degrees)
+            # based on pairwise angle diagnostics; 0.0 means "no constraint".
+            min_angular_distance_deg: 0.02
+
         tie_breakers:
           prefer_fewer_mutations: true
           then_higher_delta: true
           then_higher_proposal_score: true
-        
+
+        diagnostics:
+          figsize_in: 6
+          dpi: 200
+          random_sample_seed: 42
+          random_sample_repeats: 1
+          # random background size relative to |Selected|
+          random_sample_factor: 1.0      # 1.0 → match |Selected|
+          random_sample_cap: 2000        # safety cap on total background size
+
+        heb:
+          enabled: true
+          min_cooccur_count: 1
+          width_scale: sqrt
+          # node_avg_k → node hue encodes avg k for that token (default)
+          # edge_avg_k → edge hue encodes avg k for each edge
+          color_by: node_avg_k
+          edge_cmap: viridis
+          out_svg: true
+          figsize_in: 10
+
         reproducibility:
           rng_seed: 42
-  
+
   output:
     dir: "${JOB_DIR}/../results/rt_multisite_select"
     layout: flat

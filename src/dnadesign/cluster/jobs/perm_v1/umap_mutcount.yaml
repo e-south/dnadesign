@@ -1,9 +1,9 @@
 # cluster/jobs/perm_v1/umap_mutcount.yaml
 command: "umap"
 params:
-  file: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/permuter/results/rt_combine_from_dms/retron_Eco1_RT_wt/records.parquet"
+  file: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/permuter/results/rt_combine_from_dms/records.parquet"
   name: "perm_v1"                      # must match the fit alias
-  x-col: "permuter__metric__logits_mean"
+  x-col: " permuter__observed__logits_mean"
   preset: "umap.permuter"
 
   # Record coords and plots in the run store; also attach coords back into the parquet
