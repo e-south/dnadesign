@@ -19,14 +19,14 @@ job:
         mode: per_position_best
         min_delta: 1e-12
         disallow_negative_best: true
-        allowed_positions: ["1-100"]   # first 100 AA before ranking Top-K
+        allowed_positions: ["30-85"]   # first 100 AA before ranking Top-K
         exclude_positions: []
         exclude_mutations: []
-        top_global: 14
+        top_global: 15
 
       combine:
         k_min: 2
-        k_max: 14
+        k_max: 15
         budget_total: 100000
         strategy: enumerate
 
