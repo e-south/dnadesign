@@ -24,7 +24,7 @@ params:
 
 plot:
   # Keep the permuter aesthetic, add a dedicated highlight plot and overlays.
-  dims: [10, 10]
+  dims: [6, 6]
   alpha: 0.45
   size: 14.0
   color_by:
@@ -34,7 +34,7 @@ plot:
 
   highlight:
     overlay: true            # draw rings on non-"highlight" hues
-    size: 55.0               # size of highlighted points/rings
+    size: 25.0               # size of highlighted points/rings
     marker: "o"
     facecolor: "none"        # keep overlays as rings
     edgecolor: "red"
