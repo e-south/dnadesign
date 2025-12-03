@@ -70,6 +70,7 @@ from .utils import (
     MutationWindowSummary,
     _as_int_list,
     build_mutated_aa_sequences,
+    compute_mutation_window_indices_nt,
     extract_embedding_matrix,
     filter_valid_source_rows,
     read_source_records,
@@ -488,7 +489,7 @@ class MSel(Protocol):
         df["__delta"] = df["epistasis"].astype(float).to_numpy()
         if (df["__delta"] < 0).any():
             raise RuntimeError(
-                "multisite_select: negative epistasis survived row‑level validation; "
+                "multisite_select: negative epistasis survived row-level validation; "
                 "this should not happen."
             )
 
@@ -497,7 +498,7 @@ class MSel(Protocol):
         df = df[df["__aa_list"].apply(len) > 0].reset_index(drop=True)
         if df.empty:
             raise RuntimeError(
-                "multisite_select: no rows with non‑empty permuter__aa_pos_list after parsing"
+                "multisite_select: no rows with non-empty permuter__aa_pos_list after parsing"
             )
 
         # Embeddings (mean‑pooled logits)
@@ -683,10 +684,6 @@ class MSel(Protocol):
             _LOG.warning("[span] mutation-window summary failed: %s", e)
             mut_window_summary = None
 
-        except Exception as e:
-            _LOG.warning("[span] mutation-window summary failed: %s", e)
-            mut_window_summary = None
-
         self._append_record_select(
             art_dir=art_dir,
             df=df,
@@ -712,8 +709,14 @@ class MSel(Protocol):
             )
             aa_token = f"aa [{row['aa_combo_str']}]" if row["aa_combo_str"] else "aa []"
             mods = [head, aa_token]
+            seq_window_val = (
+                row["sequence_window"] if "sequence_window" in row.index else None
+            )
             yield {
                 "sequence": str(row["sequence"]),
+                "sequence_window": (
+                    str(seq_window_val) if seq_window_val is not None else None
+                ),
                 "modifications": mods,
                 # Flattened scalar columns — run.py will namespace with permuter__*
                 "source_id": str(row["source_id"]),
@@ -1227,19 +1230,79 @@ class MSel(Protocol):
         picks_df: pd.DataFrame,
         art_dir: Path,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Materialize MULTISITE_SELECT artifacts (Parquet/CSV) and attach
+        sequence-level decoration columns.
+
+        The emitted schema includes:
+          • sequence        - full-length DNA with mutated codons uppercased,
+          • sequence_window - contiguous nucleotide window spanning the global
+                              AA mutation span across selected variants.
+        """
         if "_row_idx" in picks_df.columns:
             picks_df_raw = picks_df.drop(columns=["_row_idx"])
         else:
             picks_df_raw = picks_df.copy()
 
         picks_df_out = picks_df_raw.copy()
-        picks_df_out["sequence"] = [
-            uppercase_mutated_codons(seq, aa_pos_list)
-            for seq, aa_pos_list in zip(
-                picks_df_out["sequence"].astype(str),
-                picks_df_out["aa_pos_list"],
+
+        # Determine a single global nucleotide window [start, end) across all
+        # selected variants based on their AA position lists.
+        nt_start_idx: int | None = None
+        nt_end_idx: int | None = None
+        if not picks_df_out.empty:
+            try:
+                seq_lengths = picks_df_out["sequence"].astype(str).str.len().to_numpy()
+                unique_lengths = np.unique(seq_lengths)
+                if unique_lengths.size != 1:
+                    raise ValueError(
+                        "multisite_select: selected sequences have inconsistent "
+                        "lengths; cannot define a single global mutation window"
+                    )
+                seq_length_nt = int(unique_lengths[0])
+                nt_start_idx, nt_end_idx = compute_mutation_window_indices_nt(
+                    aa_pos_lists=picks_df_out["aa_pos_list"].tolist(),
+                    seq_length_nt=seq_length_nt,
+                )
+            except Exception as e:
+                _LOG.warning(
+                    "[span] unable to compute sequence_window column from "
+                    "AA positions: %s",
+                    e,
+                )
+                nt_start_idx = None
+                nt_end_idx = None
+
+        mutated_sequences: List[str] = []
+        sequence_windows: List[str | None] = []
+        for seq, aa_pos_list in zip(
+            picks_df_out["sequence"].astype(str), picks_df_out["aa_pos_list"]
+        ):
+            mutated = uppercase_mutated_codons(seq, aa_pos_list)
+            mutated_sequences.append(mutated)
+            if nt_start_idx is not None and nt_end_idx is not None:
+                sequence_windows.append(mutated[nt_start_idx:nt_end_idx])
+            else:
+                sequence_windows.append(None)
+
+        picks_df_out["sequence"] = mutated_sequences
+        picks_df_out["sequence_window"] = sequence_windows
+        # Mirror sequence_window back into the raw frame so downstream callers
+        # (generate() → records.parquet) can surface it as a namespaced column.
+        picks_df_raw["sequence_window"] = sequence_windows
+
+        # Pretty, explicit value counts for the emitted mutation counts.
+        if "k" in picks_df_out.columns:
+            k_counts = (
+                picks_df_out["k"].astype(int).value_counts().sort_index().to_dict()
             )
-        ]
+            _LOG.info(
+                "[picks]\n"
+                "  rows_emitted:             %d\n"
+                "  mut_count_value_counts:   %s",
+                len(picks_df_out),
+                json.dumps(k_counts, sort_keys=True),
+            )
 
         atomic_write_parquet(picks_df_out, art_dir / "MULTISITE_SELECT.parquet")
         picks_df_out.to_csv(art_dir / "MULTISITE_SELECT.csv", index=False)

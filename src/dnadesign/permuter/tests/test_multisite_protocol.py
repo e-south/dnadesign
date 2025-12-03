@@ -248,17 +248,27 @@ def test_multisite_select_end_to_end_invariants(tmp_path):
     # ------------------------------------------------------------------
     # Mutation combination uniqueness and consistency
     # ------------------------------------------------------------------
-    if "aa_combo_str" in sel_df.columns:
-        aa_combos = sel_df["aa_combo_str"].astype(str)
-        # No duplicate multi-mutant combinations in the final selection
-        assert aa_combos.is_unique
+    assert "aa_combo_str" in sel_df.columns
+    aa_combos = sel_df["aa_combo_str"].astype(str)
+    # No duplicate multi-mutant combinations in the final selection artifacts
+    assert aa_combos.is_unique
 
-        # Positions implied by aa_combo_str must match aa_pos_list
-        for _, row in sel_df.iterrows():
-            combo_map = parse_aa_combo_to_map(row["aa_combo_str"])
-            pos_from_combo = sorted(combo_map.keys())
-            pos_from_list = sorted(int(p) for p in row["aa_pos_list"])
-            assert pos_from_combo == pos_from_list
+    aa_pos_tuples = []
+    for _, row in sel_df.iterrows():
+        combo_map = parse_aa_combo_to_map(row["aa_combo_str"])
+        pos_from_combo = sorted(combo_map.keys())
+        pos_from_list = sorted(int(p) for p in row["aa_pos_list"])
+        assert pos_from_combo == pos_from_list
+        aa_pos_tuples.append(tuple(pos_from_list))
+
+    # Enforce uniqueness of AA position lists as well.
+    assert len(aa_pos_tuples) == len(set(aa_pos_tuples))
+
+    # The emitted variant stream should mirror artifact-level uniqueness.
+    aa_combo_stream = [str(p["aa_combo_str"]) for p in picks]
+    aa_pos_stream = [tuple(int(p) for p in p["aa_pos_list"]) for p in picks]
+    assert len(aa_combo_stream) == len(set(aa_combo_stream))
+    assert len(aa_pos_stream) == len(set(aa_pos_stream))
 
     # ------------------------------------------------------------------
     # Decorated DNA sequence consistency (uppercase mutated codons)
@@ -283,6 +293,33 @@ def test_multisite_select_end_to_end_invariants(tmp_path):
             else:
                 # Unmutated codons should be entirely lowercase
                 assert codon.lower() == codon
+
+    # ------------------------------------------------------------------
+    # sequence_window: per-variant trimming of the global mutation window
+    # ------------------------------------------------------------------
+    assert "sequence_window" in sel_df.columns
+
+    # Derive the global AA window directly from selected variants.
+    all_positions = []
+    for aa_list in sel_df["aa_pos_list"]:
+        all_positions.extend(int(p) for p in aa_list)
+    assert all_positions, "Selected variants must carry at least one mutation"
+    start_aa = min(all_positions)
+    end_aa = max(all_positions)
+    expected_nt_len = 3 * (end_aa - start_aa + 1)
+    nt_start_idx = 3 * (start_aa - 1)
+    nt_end_idx = 3 * end_aa
+
+    window_lengths = sel_df["sequence_window"].astype(str).str.len().unique().tolist()
+    assert len(window_lengths) == 1
+    assert int(window_lengths[0]) == expected_nt_len
+
+    for _, row in sel_df.iterrows():
+        full = str(row["sequence"])
+        window = str(row["sequence_window"])
+        # Window must be a contiguous slice in nucleotide space, aligned
+        # to codon boundaries and shared across all selected variants.
+        assert full[nt_start_idx:nt_end_idx] == window
 
     # ------------------------------------------------------------------
     # Diversity invariants when intracluster_diversity is enabled

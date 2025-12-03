@@ -34,6 +34,7 @@ from dnadesign.permuter.src.protocols.multisite_select.utils import (
     _as_int_list,
     build_mutated_aa_sequences,
     coerce_vector1d,
+    compute_mutation_window_indices_nt,
     extract_embedding_matrix,
     filter_valid_source_rows,
     is_numeric_vector1d,
@@ -251,6 +252,29 @@ def test_extract_embedding_matrix_enforces_consistent_dimension():
 # ---------------------------------------------------------------------------
 # utils.py – row-level validation and DNA decoration
 # ---------------------------------------------------------------------------
+
+
+def test_compute_mutation_window_indices_nt_basic_and_validation():
+    # 10 codons → 30 nt; AA positions 3..7 should span a window of 5 codons.
+    aa_pos_lists = [[3], [5, 6], "['7']"]
+    nt_start, nt_end = compute_mutation_window_indices_nt(
+        aa_pos_lists, seq_length_nt=30
+    )
+    assert nt_start == 3 * (3 - 1)
+    assert nt_end == 3 * 7
+    assert nt_end - nt_start == 3 * (7 - 3 + 1)
+
+    # Non-codon-length sequence should raise
+    with pytest.raises(ValueError):
+        compute_mutation_window_indices_nt(aa_pos_lists, seq_length_nt=31)
+
+    # Positions beyond the coding region should raise
+    with pytest.raises(ValueError):
+        compute_mutation_window_indices_nt([[100]], seq_length_nt=30)
+
+    # Empty AA position lists should raise
+    with pytest.raises(ValueError):
+        compute_mutation_window_indices_nt([], seq_length_nt=30)
 
 
 def test_filter_valid_source_rows_keeps_only_rows_passing_all_checks():

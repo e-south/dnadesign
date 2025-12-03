@@ -577,6 +577,74 @@ def summarize_mutation_window(
     )
 
 
+def compute_mutation_window_indices_nt(
+    aa_pos_lists: Sequence[Any],
+    *,
+    seq_length_nt: int,
+) -> tuple[int, int]:
+    """
+    Compute 0-based nucleotide slice indices [start, end) for the global
+    mutation window implied by aa_pos_lists for a codon-aligned sequence.
+
+    This is a lightweight, reference-free companion to summarize_mutation_window
+    suitable for per-variant DNA trimming. It uses the same AA-coordinate
+    convention (1-indexed positions) and enforces basic invariants:
+
+      • seq_length_nt must be a positive multiple of 3,
+      • at least one mutated position must be present,
+      • all AA positions must lie within the implied coding region.
+
+    Parameters
+    ----------
+    aa_pos_lists:
+        Iterable of per-variant position collections. Each element is passed
+        through _as_int_list(), so both list[int] and stringified list forms
+        are accepted.
+    seq_length_nt:
+        Length of the coding nucleotide sequence (bp). Must be divisible by 3.
+    """
+    L_nt = int(seq_length_nt)
+    if L_nt <= 0:
+        raise ValueError(
+            "compute_mutation_window_indices_nt: seq_length_nt must be > 0"
+        )
+    if L_nt % 3 != 0:
+        raise ValueError(
+            "compute_mutation_window_indices_nt: seq_length_nt "
+            f"{L_nt} is not divisible by 3"
+        )
+    n_codons = L_nt // 3
+
+    all_positions: list[int] = []
+    for pos_list in aa_pos_lists:
+        ints = _as_int_list(pos_list)
+        all_positions.extend(ints)
+
+    if not all_positions:
+        raise ValueError(
+            "compute_mutation_window_indices_nt: no mutated positions found "
+            "in aa_pos_lists"
+        )
+
+    start_pos = min(all_positions)
+    end_pos = max(all_positions)
+
+    if start_pos <= 0:
+        raise ValueError(
+            f"compute_mutation_window_indices_nt: minimum position {start_pos} "
+            "must be ≥ 1"
+        )
+    if end_pos > n_codons:
+        raise ValueError(
+            "compute_mutation_window_indices_nt: maximum position "
+            f"{end_pos} exceeds number of codons {n_codons} implied by seq_length_nt"
+        )
+
+    nt_start = 3 * (start_pos - 1)
+    nt_end = 3 * end_pos
+    return nt_start, nt_end
+
+
 # ---------------------------------------------------------------------------
 # DNA codon decoration
 # ---------------------------------------------------------------------------
