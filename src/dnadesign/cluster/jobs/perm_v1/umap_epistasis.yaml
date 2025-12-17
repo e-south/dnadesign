@@ -15,9 +15,9 @@ params:
   inplace: true
 
 plot:
-  dims: [10, 10]
-  alpha: 0.45
-  size: 14.0
+  dims: [6, 6]
+  alpha: 0.15
+  size: 10.0
   # Include the derived numeric hue
   color_by:
     - "cluster"

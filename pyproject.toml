@@ -2,7 +2,7 @@
 requires = [
   "setuptools>=69",
   "wheel",
-  "setuptools_scm"
+  "setuptools_scm",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -15,59 +15,74 @@ readme          = "README.md"
 requires-python = ">=3.12,<3.13"
 
 dependencies = [
-  "numpy",
-  "pandas",
-  "matplotlib",
-  "seaborn",
-  "scanpy==1.10.3",
-  "tqdm",
-  "biopython",
-  "leidenalg",
-  "igraph",
-  "logomaker",
-  "pymc",
   "arviz",
-  "pyyaml",
-  "pygments",
+  "biopython",
+  "igraph",
+  "leidenalg",
+  "logomaker",
+  "matplotlib",
+  "numpy",
   "openpyxl",
-  "xlrd",
-  "python-levenshtein",
-  "typer",
-  "rich",
+  "pandas",
+  "pyarrow>=16",
   "pydantic",
-  "pyarrow>=16"
+  "pygments",
+  "pymc",
+  "python-levenshtein",
+  "pyyaml",
+  "rich",
+  "scanpy==1.10.3",
+  "seaborn",
+  "tqdm",
+  "typer",
+  "xlrd",
+  "torch>=2.6,<2.7; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "dense-arrays",
 ]
 
 [project.scripts]
-usr = "dnadesign.usr.src.cli:main"
-opal = "dnadesign.opal.src.cli:main"
-dense = "dnadesign.densegen.src.main:app"
-infer = "dnadesign.infer.cli:app"
-cluster = "dnadesign.cluster.src.cli.app:main"
-permuter = "dnadesign.permuter.src.cli.app:main"
-mb = "dnadesign.molbench.src.cli.app:cli"
+usr        = "dnadesign.usr.src.cli:main"
+opal       = "dnadesign.opal.src.cli:main"
+dense      = "dnadesign.densegen.src.main:app"
+infer      = "dnadesign.infer.cli:app"
+cluster    = "dnadesign.cluster.src.cli.app:main"
+permuter   = "dnadesign.permuter.src.cli.app:main"
+mb         = "dnadesign.molbench.src.cli.app:cli"
 baserender = "dnadesign.baserender.src.cli:app"
 
 [project.optional-dependencies]
-viz = [
-  "matplotlib",
-  "seaborn"
-]
+# GPU-oriented stack; explicitly Linux-only.
+# Enabling this extra on Linux x86_64 will:
+# - switch torch/vision/audio to CUDA wheels via tool.uv.sources
+# - install TE + FlashAttention + Evo2
 infer-evo2 = [
-  "evo2",                      
-]
-infer-evo2-fast = [
-  "evo2",
-  "flash-attn==2.8.0.post2",   # recommended, may be site-specific
-  "transformer-engine>=2.0.0", # required by upstream for FP8/mixed precision
+  "torch>=2.6,<2.7; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "evo2; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchvision>=0.21,<0.22; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchaudio>=2.6,<2.7; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "transformer-engine[pytorch]==2.6.0.post1; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "flash-attn==2.8.0.post2; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "ninja; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "packaging; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
-dev = [
+
+[dependency-groups]
+test = [
   "pytest>=8.2",
   "pytest-cov",
   "hypothesis>=6.100",
+]
+lint = [
   "ruff>=0.4",
   "pre-commit>=3.7",
+]
+dev = [
+  { include-group = "test" },
+  { include-group = "lint" },
+]
+notebooks = [
+  "marimo>=0.18.4",
 ]
 
 [tool.setuptools.packages.find]
@@ -76,7 +91,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 addopts = "-ra -q"
 testpaths = ["src/dnadesign"]
-norecursedirs = ["archived", "*/archived/*", ".venv", "venv", "build", "dist", "*.egg-info", "cruncher/*"]
+norecursedirs = ["*/archived/*", ".venv", "venv", "build", "dist", "*.egg-info"]
 markers = [
   "slow: sampling-heavy tests (>10 s)",
 ]
@@ -87,3 +102,50 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.uv]
+required-version = ">=0.9.18,<0.10"
+
+# Keep plain `uv sync` minimal.
+default-groups = []
+
+# Restrict lock solving space (otherwise uv tries everything).
+environments = [
+  "sys_platform == 'darwin'",
+  "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+# Prefer augmenting build deps over disabling isolation (uv recommended). 
+[tool.uv.extra-build-dependencies]
+flash-attn = [{ requirement = "torch", match-runtime = true }]
+transformer-engine = [{ requirement = "torch", match-runtime = true }]
+
+# Provide metadata so uv doesn't try to build flash-attn at lock time.
+[[tool.uv.dependency-metadata]]
+name = "flash-attn"
+version = "2.8.0.post2"
+requires-dist = ["torch", "einops"]
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[tool.uv.sources]
+dense-arrays = { git = "https://github.com/e-south/dense-arrays" }
+
+# Only use CUDA wheels when infer-evo2 is enabled AND we're on Linux x86_64.
+# This prevents breaking macOS if someone accidentally enables infer-evo2 there. 
+torch = [
+  { index = "pytorch-cu126", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+]
+torchvision = [
+  { index = "pytorch-cu126", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+]
+torchaudio = [
+  { index = "pytorch-cu126", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+]
+
+flash-attn = [
+  { git = "https://github.com/Dao-AILab/flash-attention", tag = "v2.8.0.post2", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+]

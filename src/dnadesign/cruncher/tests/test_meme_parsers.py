@@ -10,8 +10,8 @@ Dunlop Lab
 
 import numpy as np
 
-from dnadesign.cruncher.motif.parsers.meme import parse_meme
-from dnadesign.cruncher.motif.registry import Registry
+from dnadesign.cruncher.parse.parsers.meme import parse_meme
+from dnadesign.cruncher.parse.registry import Registry
 
 
 def test_registry_load_cached(tmp_path, meme_file):

@@ -31,10 +31,17 @@ _AX_TICK_FONTSIZE = 12
 _AX_TITLE_FONTSIZE = 14
 _LEGEND_FONTSIZE = 10
 
+# Fixed hues for Selected vs Random background:
+#   • Selected         → pastel red
+#   • Random background→ light gray
+_SELECTED_RGBA = (1.0, 0.35, 0.35, 1.0)  # pastel red
+_RANDOM_BG_RGBA = (0.8, 0.8, 0.8, 1.0)  # light gray
+
 _KDE_HUE_ORDER = ["Selected", "Random background"]
-_KDE_PALETTE = dict(
-    zip(_KDE_HUE_ORDER, sns.color_palette("colorblind", n_colors=len(_KDE_HUE_ORDER)))
-)
+_KDE_PALETTE = {
+    "Selected": _SELECTED_RGBA,
+    "Random background": _RANDOM_BG_RGBA,
+}
 
 
 def _darken_rgba(
@@ -51,9 +58,10 @@ def _darken_rgba(
 
 
 _SET_ORDER = ["Selected", "Random background"]
-_SET_PALETTE = dict(
-    zip(_SET_ORDER, sns.color_palette("colorblind", n_colors=len(_SET_ORDER)))
-)
+_SET_PALETTE = {
+    "Selected": _SELECTED_RGBA,
+    "Random background": _RANDOM_BG_RGBA,
+}
 
 
 def _ensure_path(p: str | Path) -> Path:

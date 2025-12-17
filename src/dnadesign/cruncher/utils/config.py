@@ -35,6 +35,9 @@ class ParseConfig(BaseModel):
     Settings needed to load and parse PWMs.
     """
 
+    motif_root: Optional[Path] = Field(
+        default=None, description="Directory containing motif/PWM files for parsing."
+    )
     formats: Dict[str, str]  # e.g. {".txt": "MEME", ".pfm": "JASPAR"}
     plot: PlotConfig
 
@@ -308,4 +311,11 @@ class CruncherConfig(BaseModel):
 
 def load_config(path: Path) -> CruncherConfig:
     raw = yaml.safe_load(path.read_text())["cruncher"]
-    return CruncherConfig.model_validate(raw)
+    cfg = CruncherConfig.model_validate(raw)
+
+    # Resolve parse.motif_root relative to the config file directory (if provided).
+    mr = cfg.parse.motif_root
+    if mr is not None and not mr.is_absolute():
+        cfg.parse.motif_root = (path.parent / mr).resolve()
+
+    return cfg

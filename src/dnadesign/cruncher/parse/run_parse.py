@@ -19,7 +19,19 @@ from dnadesign.cruncher.parse.registry import Registry
 from dnadesign.cruncher.utils.config import CruncherConfig
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-PWM_PATH = PROJECT_ROOT.parent / "dnadesign-data" / "primary_literature" / "OMalley_et_al" / "escherichia_coli_motifs"
+DEFAULT_MOTIF_ROOT = (
+    PROJECT_ROOT.parent
+    / "dnadesign-data"
+    / "primary_literature"
+    / "OMalley_et_al"
+    / "escherichia_coli_motifs"
+)
+
+
+def _motif_root(cfg: CruncherConfig) -> Path:
+    if cfg.parse.motif_root is not None:
+        return cfg.parse.motif_root
+    return DEFAULT_MOTIF_ROOT
 
 
 def run_parse(cfg: CruncherConfig, base_out: Path) -> None:
@@ -45,7 +57,7 @@ def run_parse(cfg: CruncherConfig, base_out: Path) -> None:
         we abort immediately.
     """
     # Initialize the Registry (will raise if PWM_PATH does not exist)
-    reg = Registry(PWM_PATH, cfg.parse.formats)
+    reg = Registry(_motif_root(cfg), cfg.parse.formats)
 
     # Prepare output folder
     out_base = base_out

@@ -16,12 +16,14 @@ Dunlop Lab
 
 from __future__ import annotations
 
+from importlib import import_module
 from pathlib import Path
 from typing import Callable, Dict
 
 from .model import PWM
 
 _REGISTRY: Dict[str, Callable[[Path], PWM]] = {}
+_PARSERS_IMPORTED: bool = False
 
 
 def register(fmt: str) -> Callable[[Callable[[Path], PWM]], Callable[[Path], PWM]]:
@@ -38,7 +40,23 @@ def guess_format(path: Path) -> str:
     return path.suffix.lower().lstrip(".")
 
 
+def _ensure_parsers_imported() -> None:
+    """
+    Ensure built-in parsers are imported so their @register(...) decorators run.
+
+    This makes Registry/load_pwm robust: callers do not need to remember to import
+    dnadesign.cruncher.parse (or individual parser modules) for side effects.
+    """
+    global _PARSERS_IMPORTED
+    if _PARSERS_IMPORTED:
+        return
+    # Import the parsers *package*; its __init__.py imports built-ins.
+    import_module("dnadesign.cruncher.parse.parsers")
+    _PARSERS_IMPORTED = True
+
+
 def load_pwm(path: Path, fmt: str | None = None) -> PWM:
+    _ensure_parsers_imported()
     fmt = (fmt or guess_format(path)).upper()
     try:
         return _REGISTRY[fmt](path)

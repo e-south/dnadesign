@@ -17,14 +17,7 @@ import yaml
 
 from dnadesign.cruncher.utils.config import load_config
 
-_DATA_DIR = Path(__file__).with_suffix("").parent / "data"
-
-
-# helpers
-def _load_yaml_to_dict(rel_path: Path) -> dict:
-    "Read YAML file bundled with tests and return mutable dict."
-    txt = rel_path.read_text()
-    return yaml.safe_load(txt)
+_DATA_DIR = Path(__file__).resolve().parent / "data"
 
 
 def _write_yaml(d: dict, path: Path) -> None:
@@ -35,22 +28,20 @@ def _write_yaml(d: dict, path: Path) -> None:
 @pytest.fixture
 def mini_cfg_path(tmp_path: Path) -> Path:
     """
-    Return a **Path** to a *modified* YAML ready for tests.
-
-    - Starts from repo-root configs/example.yaml
-    - Shrinks draws/chains so sampling tests finish fast
-    - Redirects out_dir into the tmp_path sandbox
+    Minimal modern cruncher config for tests, using only bundled MEME files.
     """
-    repo_cfg = Path(__file__).resolve().parents[2] / "configs" / "example.yaml"
-    cfg_dict = _load_yaml_to_dict(repo_cfg)
-
-    # Patch for speed & isolation
-    cfg = cfg_dict["cruncher"]
-    cfg["out_dir"] = str(tmp_path / "results")
-    if cfg.get("sample"):
-        gibbs = cfg["sample"]["optimiser"]["gibbs"]
-        gibbs["draws"] = 5
-        gibbs["chains"] = 1
+    cfg_dict = {
+        "cruncher": {
+            "mode": "parse",
+            "out_dir": str(tmp_path / "results"),
+            "regulator_sets": [["lexA", "oxyR"]],
+            "parse": {
+                "motif_root": str(_DATA_DIR),
+                "formats": {".txt": "MEME"},
+                "plot": {"logo": True, "bits_mode": "information", "dpi": 80},
+            },
+        }
+    }
 
     dst = tmp_path / "example_test.yaml"
     _write_yaml(cfg_dict, dst)

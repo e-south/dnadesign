@@ -14,7 +14,7 @@ params:
 
 plot:
   dims: [10, 10]
-  alpha: 0.45
+  alpha: 0.1
   size: 14.0
 
 

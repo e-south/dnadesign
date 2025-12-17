@@ -35,13 +35,19 @@ from dnadesign.cruncher.utils.config import CruncherConfig
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-PWM_PATH = (
+DEFAULT_MOTIF_ROOT = (
     PROJECT_ROOT.parent
     / "dnadesign-data"
     / "primary_literature"
     / "OMalley_et_al"
     / "escherichia_coli_motifs"
 )
+
+
+def _motif_root(cfg: CruncherConfig) -> Path:
+    return (
+        cfg.parse.motif_root if cfg.parse.motif_root is not None else DEFAULT_MOTIF_ROOT
+    )
 
 
 def _save_config(cfg: CruncherConfig, batch_dir: Path) -> None:
@@ -55,7 +61,7 @@ def _save_config(cfg: CruncherConfig, batch_dir: Path) -> None:
     cfg_path = batch_dir / "config_used.yaml"
     data = json.loads(cfg.json())
 
-    reg = Registry(PWM_PATH, cfg.parse.formats)
+    reg = Registry(_motif_root(cfg), cfg.parse.formats)
     flat_tfs = {tf for group in cfg.regulator_sets for tf in group}
     pwms_info: dict[str, dict[str, object]] = {}
 
@@ -98,8 +104,8 @@ def run_sample(cfg: CruncherConfig, out_dir: Path) -> None:
     logger.debug("Full sample config: %s", sample_cfg.json())
 
     # 1) LOAD all required PWMs
-    logger.debug("Loading PWMs from %s", PWM_PATH)
-    reg = Registry(PWM_PATH, cfg.parse.formats)
+    logger.debug("Loading PWMs from %s", _motif_root(cfg))
+    reg = Registry(_motif_root(cfg), cfg.parse.formats)
     flat_tfs = {tf for group in cfg.regulator_sets for tf in group}
     pwms: dict[str, PWM] = {}
     for tf in sorted(flat_tfs):

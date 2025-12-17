@@ -33,7 +33,7 @@ job:
 
         clusters:
           # Soft cap per cluster; set to null to disable caps.
-          picks_per_cluster: null
+          picks_per_cluster: 1    # null
           filters:
             # Cluster-level quality filters (optional, both disabled by default)
             # min_cluster_mean_z_llr: -0.25
@@ -44,7 +44,7 @@ job:
         budget:
           total_variants: 100
           # Score-gated high-score pool (X * total_variants)
-          pool_factor: 5.0
+          pool_factor: 65.0
 
           # Diversity is opt-in. By default we do not impose an angular
           # separation constraint; when you enable it, you must specify
@@ -53,7 +53,7 @@ job:
             enabled: true
             # When enabled, set this to a positive value (degrees)
             # based on pairwise angle diagnostics; 0.0 means "no constraint".
-            min_angular_distance_deg: 0.0175
+            min_angular_distance_deg: 0.01
 
         tie_breakers:
           prefer_fewer_mutations: true

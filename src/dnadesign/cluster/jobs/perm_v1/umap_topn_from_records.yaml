@@ -16,13 +16,13 @@ params:
   inplace: true
 
 plot:
-  dims: [10, 10]
-  alpha: 0.45
-  size: 14.0
+  dims: [6, 6]
+  alpha: 0.15
+  size: 10.0
   color_by:
     - "cluster"
     - "highlight"
-  size: 14.0                # base size for non-highlight points
+  size: 12.0                # base size for non-highlight points
   highlight:
     size: 45.0              # size for points in the dedicated "highlight" plot
     overlay: true           # draw rings on other hues

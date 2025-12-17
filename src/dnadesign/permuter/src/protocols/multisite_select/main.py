@@ -552,6 +552,21 @@ class MSel(Protocol):
         )
 
         df_pool = df_sorted.head(pool_size).copy()
+
+        # Mutation-count breakdown inside the score-gated candidate pool
+        if "permuter__mut_count" in df_pool.columns:
+            pool_k_counts = (
+                df_pool["permuter__mut_count"]
+                .astype(int)
+                .value_counts()
+                .sort_index()
+                .to_dict()
+            )
+            _LOG.info(
+                "[pool] mut_count_value_counts: %s",
+                json.dumps(pool_k_counts, sort_keys=True),
+            )
+
         emb_pool = emb[df_pool.index.to_numpy()]
         if knobs.l2_normalize_embeddings:
             U_pool = emb_pool
@@ -1042,43 +1057,72 @@ class MSel(Protocol):
         art_dir: Path,
         knobs: Knobs,
     ) -> None:
-        # random comparator indices
+        # random comparator indices (Selected vs Random background)
+        sel_idx = picks_df["_row_idx"].astype(int).to_numpy()
+        random_indices_samples: List[np.ndarray] = []
         try:
             rng_diag = np.random.default_rng(knobs.diag_random_seed)
             all_idx = df.index.to_numpy()
-            sel_idx = picks_df["_row_idx"].astype(int).to_numpy()
+
+            # Background pool = all valid rows minus the selected ones
             mask_bg = np.ones_like(all_idx, dtype=bool)
             mask_bg[np.searchsorted(all_idx, sel_idx)] = False
             bg_idx = all_idx[mask_bg]
+
             n_sel = len(sel_idx)
-            random_indices_samples: List[np.ndarray] = []
+            n_bg_pool = len(bg_idx)
+
             factor = float(knobs.diag_random_sample_factor)
             cap = int(knobs.diag_random_sample_cap)
-            if len(bg_idx) > 0 and n_sel > 0:
+            repeats = max(1, int(knobs.diag_random_repeats))
+
+            if n_bg_pool > 0 and n_sel > 0:
                 base = n_sel
-                target = int(max(base, math.ceil(base * factor)))
-                sample_size = min(max(1, target), cap, len(bg_idx))
-                for _ in range(max(1, knobs.diag_random_repeats)):
-                    rnd = rng_diag.choice(bg_idx, size=sample_size, replace=False)
+                requested = int(max(base, math.ceil(base * factor)))
+                per_sample = min(max(1, requested), cap, n_bg_pool)
+
+                for _ in range(repeats):
+                    rnd = rng_diag.choice(bg_idx, size=per_sample, replace=False)
                     random_indices_samples.append(np.sort(rnd))
-            effective_sample_size = (
-                int(random_indices_samples[0].shape[0]) if random_indices_samples else 0
-            )
-            _LOG.info(
-                "[diagnostics]\n"
-                "  selected:             %d\n"
-                "  background:           %d\n"
-                "  random_samples:       %d\n"
-                "  random_sample_size:   %s\n"
-                "  random_sample_factor: %.2f\n"
-                "  random_sample_cap:    %d",
-                len(sel_idx),
-                len(bg_idx),
-                len(random_indices_samples),
-                effective_sample_size,
-                factor,
-                cap,
-            )
+
+                total_bg_sampled = per_sample * repeats
+                pairs_per_sample = per_sample * (per_sample - 1) // 2
+                total_pairs = pairs_per_sample * repeats
+
+                _LOG.info(
+                    "[diagnostics]\n"
+                    "  selected:                   %d\n"
+                    "  background_pool:            %d\n"
+                    "  random_samples:             %d\n"
+                    "  requested_bg_per_sample:    %d  (base=%d * factor=%.2f)\n"
+                    "  actual_bg_per_sample:       %d  (cap=%d, pool=%d)\n"
+                    "  total_bg_sampled:           %d\n"
+                    "  random_pairs_per_sample:    %d\n"
+                    "  total_random_pairs:         %d\n"
+                    "  random_sample_cap:          %d",
+                    n_sel,
+                    n_bg_pool,
+                    repeats,
+                    requested,
+                    base,
+                    factor,
+                    per_sample,
+                    cap,
+                    n_bg_pool,
+                    total_bg_sampled,
+                    pairs_per_sample,
+                    total_pairs,
+                    cap,
+                )
+            else:
+                _LOG.info(
+                    "[diagnostics]\n"
+                    "  selected:                   %d\n"
+                    "  background_pool:            %d\n"
+                    "  random_samples:             0 (insufficient pool or picks)",
+                    n_sel,
+                    n_bg_pool,
+                )
         except Exception as e:
             _LOG.warning("[diagnostics] random comparator generation failed: %s", e)
             random_indices_samples = []

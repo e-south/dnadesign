@@ -449,3 +449,51 @@ def test_tie_breakers_respected(tmp_path):
     # In this reduced synthetic dataset, var0 has mut_count=2 and var1 has mut_count=3.
     assert picks[0]["mut_count"] == 2
     assert picks[0]["source_id"] == "var0"
+
+
+def test_multisite_select_reproducible_with_fixed_seeds(tmp_path):
+    """
+    With a fixed input dataset and fixed seeds in the configuration, the
+    multisite_select protocol should produce an identical selection when run
+    multiple times.
+
+    This exercises both:
+      • deterministic scoring / ranking / selection, and
+      • deterministic diagnostics random sampling when diag_random_seed is fixed.
+    """
+    records_path = _write_synthetic_records(tmp_path)
+
+    # Use distinct artifact directories to avoid any chance of artifacts
+    # interfering across runs.
+    art_dir_1 = tmp_path / "artifacts_repro_1"
+    art_dir_2 = tmp_path / "artifacts_repro_2"
+
+    params_1 = _build_default_params(records_path, art_dir_1)
+    params_2 = _build_default_params(records_path, art_dir_2)
+
+    proto_1 = MSel()
+    proto_1.validate_cfg(params=params_1)
+    picks_1 = list(proto_1.generate(ref_entry={"name": "REF"}, params=params_1))
+
+    proto_2 = MSel()
+    proto_2.validate_cfg(params=params_2)
+    picks_2 = list(proto_2.generate(ref_entry={"name": "REF"}, params=params_2))
+
+    # Same number of picks
+    assert len(picks_1) == len(picks_2)
+
+    def _canonical_stream(picks):
+        # Use a stable tuple of identifying fields per variant.
+        out = []
+        for p in picks:
+            out.append(
+                (
+                    p["source_id"],
+                    tuple(int(x) for x in p["aa_pos_list"]),
+                    float(p["score"]),
+                    p["cluster_id"],
+                )
+            )
+        return out
+
+    assert _canonical_stream(picks_1) == _canonical_stream(picks_2)
