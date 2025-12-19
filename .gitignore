@@ -3,7 +3,7 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# OS & Editor cruft
+# OS cruft
 # -----------------------------------------------------------------------------
 # macOS
 .DS_Store
@@ -16,20 +16,29 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
-# Linux/Unix temp
+# Linux/Unix temp + swap
 *.~lock.*
 *~
 *.swp
 *.swo
 
-# VS Code / JetBrains
+# -----------------------------------------------------------------------------
+# Editor / IDE cruft
+# -----------------------------------------------------------------------------
+# VS Code
 .vscode/
 *.code-workspace
+
+# JetBrains
 .idea/
 *.iml
+
+# Misc editor output
 out/
 
+# -----------------------------------------------------------------------------
 # Jupyter
+# -----------------------------------------------------------------------------
 .ipynb_checkpoints/
 
 # -----------------------------------------------------------------------------
@@ -38,6 +47,8 @@ out/
 __pycache__/
 *.py[cod]
 *.pyd
+
+# Packaging / builds
 *.egg
 *.egg-info/
 .eggs/
@@ -47,8 +58,8 @@ dist/
 
 # Virtual envs
 .venv/
-venv/
 env/
+venv/
 
 # Test/analysis caches
 .pytest_cache/
@@ -68,7 +79,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # -----------------------------------------------------------------------------
-# Logs, temp, archives
+# Logs, temp files
 # -----------------------------------------------------------------------------
 *.log
 *.out
@@ -80,6 +91,9 @@ yarn-error.log*
 *.rej
 temp.md
 
+# -----------------------------------------------------------------------------
+# Archives
+# -----------------------------------------------------------------------------
 archived/
 *.zip
 *.tar
@@ -153,7 +167,10 @@ batches/
 **/batch_results/
 **/results/
 **/cluster_log/
+
+# Docs policy:
 docs/
+!/docs/
 
 # Misc project-generated YAML summaries
 **/progress_status_*.yaml
@@ -165,7 +182,7 @@ meta.yaml
 *.env.*
 *.key
 
-# Stitcher utility 
+# Stitcher utility
 .stitcher.toml
 .stitcher.use
 .stitch.txt
@@ -173,3 +190,5 @@ meta.yaml
 # ADEs
 AGENTS.md
 
+# Marimo
+**/__marimo__/cache/
