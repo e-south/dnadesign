@@ -1,9 +1,5 @@
 [build-system]
-requires = [
-  "setuptools>=69",
-  "wheel",
-  "setuptools_scm",
-]
+requires = ["setuptools>=69", "wheel", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -36,7 +32,10 @@ dependencies = [
   "tqdm",
   "typer",
   "xlrd",
-  "torch>=2.6,<2.7; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+
+  # Torch 2.7 aligns with CUDA 12.8 (SCC cuda/12.8 module) and Evo2’s Python 3.12 requirement.
+  "torch>=2.7,<2.8; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+
   "dense-arrays",
 ]
 
@@ -51,39 +50,38 @@ mb         = "dnadesign.molbench.src.cli.app:cli"
 baserender = "dnadesign.baserender.src.cli:app"
 
 [project.optional-dependencies]
-# GPU-oriented stack; explicitly Linux-only.
-# Enabling this extra on Linux x86_64 will:
-# - switch torch/vision/audio to CUDA wheels via tool.uv.sources
-# - install TE + FlashAttention + Evo2
+# GPU stack (Linux x86_64 only)
 infer-evo2 = [
-  "torch>=2.6,<2.7; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "evo2; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "torchvision>=0.21,<0.22; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "torchaudio>=2.6,<2.7; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "transformer-engine[pytorch]==2.6.0.post1; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "flash-attn==2.8.0.post2; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "ninja; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "packaging; sys_platform == 'linux' and platform_machine == 'x86_64'",
-]
+  # --- torch (GPU wheels via uv sources below)
+  "torch>=2.7,<2.8; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchvision>=0.22,<0.23; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchaudio>=2.7,<2.8; sys_platform == 'linux' and platform_machine == 'x86_64'",
 
+  # --- build helpers (required because we disable build isolation for flash-attn + TE-torch)
+  "pip; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "setuptools; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "wheel; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "packaging; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "ninja; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cmake>=3.18; sys_platform == 'linux' and platform_machine == 'x86_64'",
+
+  # --- kernels
+  # flash-attn commonly requires building against the torch in the env; install it w/o build isolation.
+  "flash-attn>=2.8.0.post2,<3; sys_platform == 'linux' and platform_machine == 'x86_64'",
+
+  # Transformer Engine: let it float within major=2.
+  # (TE is a prereq for Evo2; Evo2 requires TE>=2.0.0) 
+  "transformer-engine[pytorch]>=2.0,<3; sys_platform == 'linux' and platform_machine == 'x86_64'",
+
+  # --- evo2
+  "evo2; sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
 
 [dependency-groups]
-test = [
-  "pytest>=8.2",
-  "pytest-cov",
-  "hypothesis>=6.100",
-]
-lint = [
-  "ruff>=0.4",
-  "pre-commit>=3.7",
-]
-dev = [
-  { include-group = "test" },
-  { include-group = "lint" },
-]
-notebooks = [
-  "marimo>=0.18.4",
-]
+test = ["pytest>=8.2", "pytest-cov", "hypothesis>=6.100"]
+lint = ["ruff>=0.4", "pre-commit>=3.7"]
+dev  = [{ include-group = "test" }, { include-group = "lint" }]
+notebooks = ["marimo>=0.18.4"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -92,9 +90,7 @@ where = ["src"]
 addopts = "-ra -q"
 testpaths = ["src/dnadesign"]
 norecursedirs = ["*/archived/*", ".venv", "venv", "build", "dist", "*.egg-info"]
-markers = [
-  "slow: sampling-heavy tests (>10 s)",
-]
+markers = ["slow: sampling-heavy tests (>10 s)"]
 
 [tool.ruff]
 line-length = 120
@@ -105,47 +101,36 @@ select = ["E", "F", "I"]
 
 [tool.uv]
 required-version = ">=0.9.18,<0.10"
-
-# Keep plain `uv sync` minimal.
 default-groups = []
-
-# Restrict lock solving space (otherwise uv tries everything).
 environments = [
   "sys_platform == 'darwin'",
   "sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
-# Prefer augmenting build deps over disabling isolation (uv recommended). 
-[tool.uv.extra-build-dependencies]
-flash-attn = [{ requirement = "torch", match-runtime = true }]
-transformer-engine = [{ requirement = "torch", match-runtime = true }]
+# flash-attn + TE-torch must build against the same torch as the runtime env
+# uv supports this directly and will do a two-phase install so deps (torch, pip, etc.) land first 
+no-build-isolation-package = ["flash-attn", "transformer-engine-torch"]
 
-# Provide metadata so uv doesn't try to build flash-attn at lock time.
+# Help uv resolve flash-attn without trying to build it during the resolution step. 
 [[tool.uv.dependency-metadata]]
 name = "flash-attn"
-version = "2.8.0.post2"
 requires-dist = ["torch", "einops"]
 
 [[tool.uv.index]]
-name = "pytorch-cu126"
-url = "https://download.pytorch.org/whl/cu126"
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [tool.uv.sources]
 dense-arrays = { git = "https://github.com/e-south/dense-arrays" }
 
-# Only use CUDA wheels when infer-evo2 is enabled AND we're on Linux x86_64.
-# This prevents breaking macOS if someone accidentally enables infer-evo2 there. 
+# When infer-evo2 is enabled, use CUDA 12.8 wheels for torch-family from PyTorch's CUDA index. 
 torch = [
-  { index = "pytorch-cu126", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+  { index = "pytorch-cu128", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
 ]
 torchvision = [
-  { index = "pytorch-cu126", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+  { index = "pytorch-cu128", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
 ]
 torchaudio = [
-  { index = "pytorch-cu126", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
-]
-
-flash-attn = [
-  { git = "https://github.com/Dao-AILab/flash-attention", tag = "v2.8.0.post2", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+  { index = "pytorch-cu128", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
 ]
