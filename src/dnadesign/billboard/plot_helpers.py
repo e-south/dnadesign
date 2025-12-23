@@ -120,15 +120,11 @@ def save_motif_length_histogram(motif_info, path, dpi):
             continue
 
         # seaborn will handle edge behavior gracefully
-        sns.kdeplot(
-            data=lengths, fill=False, common_norm=False, alpha=0.8, linewidth=1.5, ax=ax
-        )
+        sns.kdeplot(data=lengths, fill=False, common_norm=False, alpha=0.8, linewidth=1.5, ax=ax)
         # annotate at the median
         med = lengths.median()
         # get the curve's y-value at that x
-        y_at_med = ax.lines[-1].get_ydata()[
-            np.argmin(np.abs(ax.lines[-1].get_xdata() - med))
-        ]
+        y_at_med = ax.lines[-1].get_ydata()[np.argmin(np.abs(ax.lines[-1].get_xdata() - med))]
         ax.text(
             med,
             y_at_med * 1.02,
@@ -206,9 +202,7 @@ def save_gini_lorenz_plot(tf_freq, path, dpi):
     plt.figure(figsize=(8, 6))
     plt.plot(x, cum, marker="o", label="Lorenz Curve")
     plt.plot([0, 1], [0, 1], "--", color="gray", label="Equality")
-    inv_gini = 1 - (len(vals) + 1 - 2 * np.sum(np.cumsum(vals) / vals.sum())) / len(
-        vals
-    )
+    inv_gini = 1 - (len(vals) + 1 - 2 * np.sum(np.cumsum(vals) / vals.sum())) / len(vals)
     plt.annotate(
         f"Inverted Gini: {inv_gini:.3f}",
         xy=(0.05, 0.9),

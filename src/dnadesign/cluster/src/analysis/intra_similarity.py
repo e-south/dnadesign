@@ -30,9 +30,7 @@ def _score_pairwise(
     try:
         from dnadesign.aligner.metrics import score_pairwise
     except Exception as e:
-        raise RuntimeError(
-            "dnadesign.aligner is required for intra-cluster similarity."
-        ) from e
+        raise RuntimeError("dnadesign.aligner is required for intra-cluster similarity.") from e
     return score_pairwise(
         seq_i,
         seq_j,
@@ -90,16 +88,10 @@ def intra_cluster_similarity(
     return out
 
 
-def plot_intra_similarity(
-    df: pd.DataFrame, cluster_col: str, out_path: Path | None = None
-):
+def plot_intra_similarity(df: pd.DataFrame, cluster_col: str, out_path: Path | None = None):
     import seaborn as sns
 
-    col = (
-        f"{cluster_col}__intra_sim"
-        if not cluster_col.endswith("__intra_sim")
-        else cluster_col
-    )
+    col = f"{cluster_col}__intra_sim" if not cluster_col.endswith("__intra_sim") else cluster_col
     if col not in df.columns:
         raise KeyError(f"Column '{col}' not found.")
     d = df[[cluster_col, col]].copy()
@@ -107,9 +99,7 @@ def plot_intra_similarity(
     order = d.groupby("cluster")["sim"].mean().sort_values(ascending=False).index
     plt.figure(figsize=(12, 6))
     sns.boxplot(data=d, x="cluster", y="sim", order=order, showfliers=False)
-    sns.stripplot(
-        data=d, x="cluster", y="sim", order=order, color="0.35", alpha=0.3, jitter=True
-    )
+    sns.stripplot(data=d, x="cluster", y="sim", order=order, color="0.35", alpha=0.3, jitter=True)
     plt.xticks(rotation=90)
     plt.tight_layout()
     sns.despine(top=True, right=True)

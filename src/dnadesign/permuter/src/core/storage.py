@@ -34,8 +34,7 @@ def atomic_write_parquet(df: pd.DataFrame, path: Path) -> None:
         import pyarrow  # type: ignore  # noqa: F401
     except Exception as e:
         raise RuntimeError(
-            "Permuter requires 'pyarrow' to write Parquet files. "
-            "Install it with: pip install pyarrow"
+            "Permuter requires 'pyarrow' to write Parquet files. Install it with: pip install pyarrow"
         ) from e
 
     try:
@@ -61,8 +60,7 @@ def read_parquet(path: Path) -> pd.DataFrame:
         import pyarrow  # type: ignore  # noqa: F401
     except Exception as e:
         raise RuntimeError(
-            "Permuter requires 'pyarrow' to read Parquet files. "
-            "Install it with: pip install pyarrow"
+            "Permuter requires 'pyarrow' to read Parquet files. Install it with: pip install pyarrow"
         ) from e
     return pd.read_parquet(p, engine="pyarrow")
 
@@ -79,6 +77,7 @@ def write_ref_fasta(dataset_dir: Path, ref_name: str, sequence: str) -> Path:
     fasta.write_text("".join(lines), encoding="utf-8")
     return fasta
 
+
 def write_ref_protein_fasta(dataset_dir: Path, ref_name: str, aa_sequence: str) -> Path:
     """Authoritative reference protein (one‑line FASTA)."""
     fasta = dataset_dir / "REF_AA.fa"
@@ -87,6 +86,7 @@ def write_ref_protein_fasta(dataset_dir: Path, ref_name: str, aa_sequence: str) 
     lines += [seq[i : i + 80] + "\n" for i in range(0, len(seq), 80)]
     fasta.write_text("".join(lines), encoding="utf-8")
     return fasta
+
 
 def read_ref_protein_fasta(dataset_dir: Path) -> tuple[str, str] | None:
     p = dataset_dir / "REF_AA.fa"
@@ -103,6 +103,7 @@ def read_ref_protein_fasta(dataset_dir: Path) -> tuple[str, str] | None:
     if not s:
         return None
     return name, s
+
 
 def read_ref_fasta(dataset_dir: Path) -> tuple[str, str] | None:
     p = dataset_dir / "REF.fa"

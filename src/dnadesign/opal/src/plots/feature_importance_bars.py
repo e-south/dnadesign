@@ -62,9 +62,7 @@ def _read_fi_csv(path: Path, round_idx: int) -> pd.DataFrame:
     want = {"feature_index", "importance"}
     missing = sorted(list(want - set(df.columns)))
     if missing:
-        raise ValueError(
-            f"[feature_importance_bars] {path}: missing required columns {missing}"
-        )
+        raise ValueError(f"[feature_importance_bars] {path}: missing required columns {missing}")
 
     df = df.loc[:, ["feature_index", "importance"]].copy()
     # Coerce types and validate
@@ -72,17 +70,11 @@ def _read_fi_csv(path: Path, round_idx: int) -> pd.DataFrame:
     df["importance"] = pd.to_numeric(df["importance"], errors="raise").astype(float)
 
     if df["feature_index"].duplicated().any():
-        dups = (
-            df.loc[df["feature_index"].duplicated(), "feature_index"].unique().tolist()
-        )
-        raise ValueError(
-            f"[feature_importance_bars] {path}: duplicate feature_index values: {dups}"
-        )
+        dups = df.loc[df["feature_index"].duplicated(), "feature_index"].unique().tolist()
+        raise ValueError(f"[feature_importance_bars] {path}: duplicate feature_index values: {dups}")
     if not np.isfinite(df["importance"].to_numpy()).all():
         bad = df.loc[~np.isfinite(df["importance"]), "feature_index"].tolist()
-        raise ValueError(
-            f"[feature_importance_bars] {path}: non-finite importance values at feature_index={bad}"
-        )
+        raise ValueError(f"[feature_importance_bars] {path}: non-finite importance values at feature_index={bad}")
 
     df["as_of_round"] = int(round_idx)
     df["__order__"] = np.arange(len(df), dtype=int)  # preserve file order
@@ -94,9 +86,7 @@ def _select_rounds(available: List[int], rounds_sel) -> List[int]:
     Decide the target rounds from context.rounds, assertively.
     """
     if not available:
-        raise FileNotFoundError(
-            "No round_* folders with feature_importance.csv were found under outputs/."
-        )
+        raise FileNotFoundError("No round_* folders with feature_importance.csv were found under outputs/.")
 
     if rounds_sel in ("unspecified", "latest"):
         return [max(available)]
@@ -113,8 +103,7 @@ def _select_rounds(available: List[int], rounds_sel) -> List[int]:
     missing = [r for r in req if r not in available]
     if missing:
         raise FileNotFoundError(
-            f"Requested rounds {missing} do not have feature_importance.csv. "
-            f"Available: {available}"
+            f"Requested rounds {missing} do not have feature_importance.csv. Available: {available}"
         )
     return req
 
@@ -145,15 +134,10 @@ def _resolve_order(frames: List[pd.DataFrame], policy: str) -> List[int]:
                 msg.append(f"extra={extra}")
             if missing:
                 msg.append(f"missing={missing}")
-            raise ValueError(
-                "[feature_importance_bars] Mismatched feature sets across rounds: "
-                + "; ".join(msg)
-            )
+            raise ValueError("[feature_importance_bars] Mismatched feature sets across rounds: " + "; ".join(msg))
 
         if policy == "preserve":
-            if not np.array_equal(
-                f["feature_index"].to_numpy(), first["feature_index"].to_numpy()
-            ):
+            if not np.array_equal(f["feature_index"].to_numpy(), first["feature_index"].to_numpy()):
                 raise ValueError(
                     "[feature_importance_bars] order_policy='preserve' requires "
                     "identical feature_index order across rounds. "
@@ -262,9 +246,7 @@ def render(context, params: dict) -> None:
         # Aim for ~30 ticks max by default (assertive, deterministic)
         xtick_step = max(1, int(np.ceil(n_features / 30)))
     ax.set_xticks(x[::xtick_step])
-    ax.set_xticklabels(
-        [str(order[i]) for i in range(0, n_features, xtick_step)], rotation=0
-    )
+    ax.set_xticklabels([str(order[i]) for i in range(0, n_features, xtick_step)], rotation=0)
     ax.set_xlim(-0.5, n_features - 0.5)
     if ymax > 0:
         ax.set_ylim(0, ymax * 1.05)

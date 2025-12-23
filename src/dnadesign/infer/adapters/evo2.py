@@ -24,8 +24,8 @@ from typing import Any, Dict, List, Optional, Sequence
 
 import torch
 
-from ..errors import CapabilityError, ModelLoadError
 from .._logging import get_logger
+from ..errors import CapabilityError, ModelLoadError
 from ..utils import pool_tensor, to_format
 
 _LOG = get_logger(__name__)
@@ -110,15 +110,11 @@ class Evo2Adapter:
             except Exception as e:  # extremely defensive; shouldn't happen
                 _LOG.debug("Evo2 underlying module eval() failed: %s", e)
         else:
-            _LOG.debug(
-                "Evo2 wrapper exposes no torch module with eval(); proceeding under inference_mode()."
-            )
+            _LOG.debug("Evo2 wrapper exposes no torch module with eval(); proceeding under inference_mode().")
 
         # Basic tokenizer sanity check (README guarantees presence)
         if not hasattr(model, "tokenizer"):
-            raise ModelLoadError(
-                "Evo2 model missing tokenizer; unexpected install/runtime state."
-            )
+            raise ModelLoadError("Evo2 model missing tokenizer; unexpected install/runtime state.")
 
         self.model = model  # keep as-is; upstream handles device placement
         self._torch_module = torch_mod  # optional: might be useful for future hooks
@@ -194,9 +190,7 @@ class Evo2Adapter:
                 try:
                     logits = outputs[0]  # [B, L, V]
                 except Exception as e:
-                    raise CapabilityError(
-                        f"Evo2 forward returned unexpected structure: {e}"
-                    )
+                    raise CapabilityError(f"Evo2 forward returned unexpected structure: {e}")
 
                 if pool:
                     logits = pool_tensor(
@@ -219,9 +213,7 @@ class Evo2Adapter:
                 try:
                     lgt = outputs[0].squeeze(0)  # [L, V]
                 except Exception as e:
-                    raise CapabilityError(
-                        f"Evo2 forward returned unexpected structure: {e}"
-                    )
+                    raise CapabilityError(f"Evo2 forward returned unexpected structure: {e}")
                 if pool:
                     lgt = pool_tensor(
                         lgt,
@@ -273,13 +265,9 @@ class Evo2Adapter:
         if tokens and _all_equal_lengths(tokens):
             x = self._stack_equal_len(tokens)
             with torch.inference_mode(), self._autocast_ctx():
-                outputs, embeddings = self.model(
-                    x, return_embeddings=True, layer_names=[layer]
-                )
+                outputs, embeddings = self.model(x, return_embeddings=True, layer_names=[layer])
                 if layer not in embeddings:
-                    raise CapabilityError(
-                        f"Embedding layer '{layer}' not found in Evo2 response."
-                    )
+                    raise CapabilityError(f"Embedding layer '{layer}' not found in Evo2 response.")
                 emb = embeddings[layer]  # [B, L, D]
                 if pool:
                     emb = pool_tensor(
@@ -296,13 +284,9 @@ class Evo2Adapter:
             ids = self._tokenize(s)
             x = torch.tensor(ids, dtype=torch.int64, device=self.device).unsqueeze(0)
             with torch.inference_mode(), self._autocast_ctx():
-                outputs, embeddings = self.model(
-                    x, return_embeddings=True, layer_names=[layer]
-                )
+                outputs, embeddings = self.model(x, return_embeddings=True, layer_names=[layer])
                 if layer not in embeddings:
-                    raise CapabilityError(
-                        f"Embedding layer '{layer}' not found in Evo2 response."
-                    )
+                    raise CapabilityError(f"Embedding layer '{layer}' not found in Evo2 response.")
                 e = embeddings[layer].squeeze(0)  # [L, D]
                 if pool:
                     e = pool_tensor(
@@ -387,9 +371,7 @@ class Evo2Adapter:
             if isinstance(out, list) and all(isinstance(x, str) for x in out):
                 seqs = out
             else:
-                raise CapabilityError(
-                    "Unexpected return type from Evo2.generate: missing '.sequences' attribute."
-                )
+                raise CapabilityError("Unexpected return type from Evo2.generate: missing '.sequences' attribute.")
 
         # Defensive: normalize to plain Python list[str].
         return {"gen_seqs": [str(s) for s in list(seqs)]}

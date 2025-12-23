@@ -187,26 +187,17 @@ def _pretty_metric(mid: str | None, fallback: str) -> str:
     return _METRIC_LABELS.get(str(mid).strip(), str(mid).strip()) if mid else fallback
 
 
-def _series_for_metric(
-    df: pd.DataFrame, metric_id: Optional[str]
-) -> Tuple[pd.Series, str]:
+def _series_for_metric(df: pd.DataFrame, metric_id: Optional[str]) -> Tuple[pd.Series, str]:
     """
     Native path: a single scalar column named `permuter__metric__<id>`.
     """
     if not metric_id:
-        raise RuntimeError(
-            "metric_id must be provided to select a `permuter__metric__<id>` column"
-        )
+        raise RuntimeError("metric_id must be provided to select a `permuter__metric__<id>` column")
     col = f"permuter__metric__{metric_id}"
     if col not in df.columns:
         # User might have passed the pretty name ("llr") while column is long ("log_likelihood_ratio") or vice versa.
         # Fall back to scanning for suffix matches.
-        cand = [
-            c
-            for c in df.columns
-            if c.startswith("permuter__metric__")
-            and c.split("__", 2)[-1] == str(metric_id)
-        ]
+        cand = [c for c in df.columns if c.startswith("permuter__metric__") and c.split("__", 2)[-1] == str(metric_id)]
         if len(cand) == 1:
             col = cand[0]
         else:
@@ -299,9 +290,7 @@ def _row_to_y(idx: float, nrows: int) -> float:
     return (nrows - 1) - float(idx)
 
 
-def _robust_vmin_vmax(
-    mat: np.ndarray, baseline: Optional[float]
-) -> Tuple[float, float]:
+def _robust_vmin_vmax(mat: np.ndarray, baseline: Optional[float]) -> Tuple[float, float]:
     """
     Percentile-based clipping (no two-slope normalization).
 
@@ -417,16 +406,9 @@ def plot(
     df1 = df1[df1["position"] > 0]  # drop seeds/invalids
 
     if df1.empty:
-        raise RuntimeError(
-            f"{job_name}: no round-1 {'AA' if aa_mode else 'single-nt'} edits to plot"
-        )
+        raise RuntimeError(f"{job_name}: no round-1 {'AA' if aa_mode else 'single-nt'} edits to plot")
 
-    stats = (
-        df1.groupby("position")["_y"]
-        .agg(mean="mean", sd="std")
-        .reset_index()
-        .sort_values("position")
-    )
+    stats = df1.groupby("position")["_y"].agg(mean="mean", sd="std").reset_index().sort_values("position")
 
     y_all, _ = _series_for_metric(df_all, metric_id)
     df_all = df_all.assign(_y=y_all).dropna(subset=["_y"])
@@ -481,11 +463,7 @@ def plot(
         ),
         None,
     )
-    ref_value = (
-        float(seed_row["_y"])
-        if seed_row and pd.notna(seed_row.get("_y", np.nan))
-        else None
-    )
+    ref_value = float(seed_row["_y"]) if seed_row and pd.notna(seed_row.get("_y", np.nan)) else None
 
     # ---------- collect per-mutation records ----------
     records: List[Dict] = []
@@ -563,9 +541,9 @@ def plot(
     if aa_mode:
         residues, spans = _order_residues_aa(residues)
 
-    pivot = dfm.pivot_table(
-        index="to_res", columns="position", values="y", aggfunc="mean"
-    ).reindex(index=residues, columns=full_positions)
+    pivot = dfm.pivot_table(index="to_res", columns="position", values="y", aggfunc="mean").reindex(
+        index=residues, columns=full_positions
+    )
 
     if ref_value is not None:
         for pos in full_positions:
@@ -603,9 +581,7 @@ def plot(
     TITLE_BOOST = 1.85  # main title
     SUBTITLE_BOOST = 1.45
     TARGET_DPI = 300
-    CELL_PX = (
-        8  # width & height of each heatmap cell (adjustable; keeps files manageable)
-    )
+    CELL_PX = 8  # width & height of each heatmap cell (adjustable; keeps files manageable)
     hm_w_in = max(6.0, (ncols * CELL_PX) / TARGET_DPI)
     hm_h_in = max(1.6, (nrows * CELL_PX) / TARGET_DPI)
     top_h_in = 1.8
@@ -663,11 +639,7 @@ def plot(
         zorder=2,
     )
 
-    ref_name = (
-        df1["permuter__ref"].iloc[0]
-        if "permuter__ref" in df1.columns and not df1.empty
-        else ""
-    )
+    ref_name = df1["permuter__ref"].iloc[0] if "permuter__ref" in df1.columns and not df1.empty else ""
 
     title = f"{job_name}{f' ({ref_name})' if ref_name else ''}"
     fig.suptitle(title, fontsize=int(round(12 * fs * TITLE_BOOST)), y=0.94)
@@ -695,18 +667,14 @@ def plot(
     ax_mid.set_yticks([])
     ax_mid.margins(x=0, y=0)
     ax_mid.set_facecolor("none")
-    ax_mid.tick_params(
-        axis="x", which="both", bottom=False, top=False, labelbottom=False
-    )
+    ax_mid.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
     ax_mid.xaxis.set_major_locator(NullLocator())
     ax_mid.xaxis.set_minor_locator(NullLocator())
     for sp in ax_mid.spines.values():
         sp.set_visible(False)
 
     # To avoid a dense black band for long proteins, draw at most ~200 letters by default.
-    draw_every = (
-        int(ref_strip_every) if ref_strip_every else max(1, int(np.ceil(ncols / 200)))
-    )
+    draw_every = int(ref_strip_every) if ref_strip_every else max(1, int(np.ceil(ncols / 200)))
     fs_char_pt = max(6, min(12, int(round(8 * fs))))
     for i, ch in enumerate(ref_strip, start=1):
         if (i - 1) % draw_every != 0:
@@ -801,9 +769,7 @@ def plot(
     if aa_mode and spans:
         # thin separators between classes (mapped to display y)
         for _, _s, _e in spans[:-1]:
-            ax_bot.axhline(
-                _row_to_y(_e, nrows) - 0.5, color="0.85", linewidth=0.8, zorder=3
-            )
+            ax_bot.axhline(_row_to_y(_e, nrows) - 0.5, color="0.85", linewidth=0.8, zorder=3)
         # left-side category labels at group center (mapped)
         trans = blended_transform_factory(ax_bot.transAxes, ax_bot.transData)
         for label, s, e in spans:
@@ -854,9 +820,7 @@ def plot(
 
     cbar = fig.colorbar(im, cax=cax)
 
-    cbar.ax.set_ylabel(
-        y_label, rotation=90, va="center", fontsize=int(round(11 * fs * LABEL_BOOST))
-    )
+    cbar.ax.set_ylabel(y_label, rotation=90, va="center", fontsize=int(round(11 * fs * LABEL_BOOST)))
     cbar.ax.tick_params(labelsize=int(round(9 * fs)))
 
     # ensure titles/ticks never clip

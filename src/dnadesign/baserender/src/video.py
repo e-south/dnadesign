@@ -196,8 +196,7 @@ def render_video(
         raise ExportError("Only mp4 is supported for video export in v0.")
     if not animation.writers.is_available("ffmpeg"):
         raise ExportError(
-            "FFmpeg writer is not available to Matplotlib. "
-            "Install FFmpeg and ensure it's on your PATH (see README)."
+            "FFmpeg writer is not available to Matplotlib. Install FFmpeg and ensure it's on your PATH (see README)."
         )
     if not isinstance(fps, int) or fps < 1:
         raise ExportError("fps must be a positive integer (e.g., 1, 2, 24, 30).")
@@ -210,10 +209,7 @@ def render_video(
 
     recs = list(records)
     if not recs:
-        raise ExportError(
-            "No records to render. "
-            "Check your dataset path, filters/limits, or plugin configuration."
-        )
+        raise ExportError("No records to render. Check your dataset path, filters/limits, or plugin configuration.")
 
     # Freeze layout across frames
     global_n = max(len(r.sequence) for r in recs)
@@ -231,9 +227,7 @@ def render_video(
     # Duration budget (optional): pick frames_per_record to fit total_duration.
     if total_duration is not None:
         # Convert pauses (seconds) to frames at this fps.
-        pause_frames = {
-            r.id: max(0, int(round(float(pauses.get(r.id, 0.0)) * fps))) for r in recs
-        }
+        pause_frames = {r.id: max(0, int(round(float(pauses.get(r.id, 0.0)) * fps))) for r in recs}
         extra = sum(pause_frames.values())
         frame_budget = max(1, int(round(float(total_duration) * fps)) - extra)
         frames_per_record = max(1, frame_budget // len(recs))
@@ -256,9 +250,7 @@ def render_video(
     plt.close(first_fig)
 
     # Final frame size (letterbox if aspect requested; never stretch)
-    frame_w, frame_h = _target_size(
-        nat_w, nat_h, width_px=width_px, height_px=height_px, aspect_ratio=aspect_ratio
-    )
+    frame_w, frame_h = _target_size(nat_w, nat_h, width_px=width_px, height_px=height_px, aspect_ratio=aspect_ratio)
 
     # Progress
     def _frames_for(r: SeqRecord) -> int:
@@ -276,9 +268,7 @@ def render_video(
     )
 
     # Writer (QT/PPT-safe) with resilient extra args
-    fig, ax = plt.subplots(
-        figsize=(frame_w / style.dpi, frame_h / style.dpi), dpi=style.dpi
-    )
+    fig, ax = plt.subplots(figsize=(frame_w / style.dpi, frame_h / style.dpi), dpi=style.dpi)
     ax.set_position([0, 0, 1, 1])
     ax.set_axis_off()
     im = ax.imshow(
@@ -329,11 +319,7 @@ def render_video(
     except Exception as e:  # pragma: no cover
         msg = str(e)
         # Friendly guidance for the most common encoding pitfall.
-        if (
-            "not divisible by 2" in msg
-            or "height not divisible" in msg
-            or "width not divisible" in msg
-        ):
+        if "not divisible by 2" in msg or "height not divisible" in msg or "width not divisible" in msg:
             raise ExportError(
                 "FFmpeg/x264 requires even dimensions. This run should already "
                 "auto-correct via a scale filter. If you still encounter this, set "

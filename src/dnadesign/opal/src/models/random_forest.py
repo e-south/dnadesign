@@ -46,9 +46,7 @@ class RandomForestModel:
 
     def __init__(self, params: Dict[str, Any]) -> None:
         self.params = dict(params or {})
-        self.emit_feature_importance = bool(
-            self.params.pop("emit_feature_importance", False)
-        )
+        self.emit_feature_importance = bool(self.params.pop("emit_feature_importance", False))
         # sklearn constructor params remain in self.params
         self._est: Optional[RandomForestRegressor] = None
         self._x_dim: Optional[int] = None
@@ -98,16 +96,11 @@ class RandomForestModel:
                 imp = np.asarray(est.feature_importances_, dtype=float).ravel()
                 if imp.size != self._x_dim:
                     # assertive: dimension mismatch indicates a bug in upstream transforms
-                    raise ValueError(
-                        f"[random_forest] feature_importances_ length {imp.size} "
-                        f"!= X_dim {self._x_dim}"
-                    )
+                    raise ValueError(f"[random_forest] feature_importances_ length {imp.size} != X_dim {self._x_dim}")
                 self._feature_importance = imp
             except Exception as e:
                 # be explicit: if user asked for it, failure should surface
-                raise RuntimeError(
-                    f"[random_forest] failed to compute feature importance: {e}"
-                )
+                raise RuntimeError(f"[random_forest] failed to compute feature importance: {e}")
 
         return FitMetrics(oob_r2=oob_r2)
 

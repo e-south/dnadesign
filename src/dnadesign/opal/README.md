@@ -95,11 +95,11 @@ opal objective-meta -c campaign.yaml --round latest
   - `round_ctx.json` *(runtime audit & fitted Y-ops)*
   - `objective_meta.json` *(objective mode/params/keys)*
   - `round.log.jsonl`
-  
+
 * **Campaign-wide ledger (append-only)**
 
   * `outputs/ledger.runs/`
-    - Plugin configs, counts, objective summaries, artifact hashes, versions.  
+    - Plugin configs, counts, objective summaries, artifact hashes, versions.
   * `outputs/ledger.predictions/`
     - Ŷ vector, scalar score, selection rank/flag, and row-level diagnostics (e.g., logic fidelity/effects).
   * `outputs/ledger.labels/`
@@ -245,7 +245,7 @@ safety:
 * Models are not aware of downstream objectives (see **Runtime Carriers**)
 * Objectives derive their own round constants via `train_view` and publish them.
 * Selection can read whatever objectives produced.
-* The persisted `round_ctx.json` makes runs **auditable** alongside `events.parquet`, `model.joblib`, `selection_top_k.csv`, and `objective_meta.json`. 
+* The persisted `round_ctx.json` makes runs **auditable** alongside `events.parquet`, `model.joblib`, `selection_top_k.csv`, and `objective_meta.json`.
 
 ```bash
 # Labels

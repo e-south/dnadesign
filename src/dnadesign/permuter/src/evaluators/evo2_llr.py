@@ -88,8 +88,7 @@ class Evo2LogLikelihoodRatioEvaluator(Evaluator):
             _ = float(res["ll"][0])
         except Exception as e:
             raise RuntimeError(
-                "Evo2 probe failed. Confirm model_id/device/precision/alphabet and environment. "
-                f"Details: {e}"
+                f"Evo2 probe failed. Confirm model_id/device/precision/alphabet and environment. Details: {e}"
             ) from e
         self._ready = True
 
@@ -123,9 +122,7 @@ class Evo2LogLikelihoodRatioEvaluator(Evaluator):
         ref_embedding=None,
     ) -> List[float]:
         if metric not in ("log_likelihood_ratio", "llr"):
-            raise ValueError(
-                f"evo2_llr only supports metric='log_likelihood_ratio' (alias 'llr'), got {metric!r}"
-            )
+            raise ValueError(f"evo2_llr only supports metric='log_likelihood_ratio' (alias 'llr'), got {metric!r}")
         if not ref_sequence:
             raise ValueError("evo2_llr requires ref_sequence")
         self._ensure_ready()

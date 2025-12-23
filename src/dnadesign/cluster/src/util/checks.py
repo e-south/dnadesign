@@ -16,9 +16,7 @@ class ClusterError(RuntimeError):
     pass
 
 
-def assert_no_duplicate_ids(
-    df: pd.DataFrame, key_col: str, policy: str = "error"
-) -> pd.DataFrame:
+def assert_no_duplicate_ids(df: pd.DataFrame, key_col: str, policy: str = "error") -> pd.DataFrame:
     if key_col not in df.columns:
         raise ClusterError(f"Required key column '{key_col}' is missing.")
     dupe_mask = df.duplicated(subset=[key_col], keep=False)
@@ -45,11 +43,7 @@ def assert_id_sequence_bijection(
     # Case-insensitive comparison for sequences
     if bio_type_col and bio_type_col in df.columns:
         # Key combines bio_type (lower) + sequence (upper) to avoid false positives across types
-        upper = (
-            df[bio_type_col].astype(str).str.lower()
-            + "|"
-            + df[seq_col].astype(str).str.upper()
-        )
+        upper = df[bio_type_col].astype(str).str.lower() + "|" + df[seq_col].astype(str).str.upper()
     else:
         upper = df[seq_col].astype(str).str.upper()
     id_to_seq = df.groupby(id_col)[seq_col].nunique()

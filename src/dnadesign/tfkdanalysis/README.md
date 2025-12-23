@@ -4,12 +4,12 @@
 
 This pipeline uses data from:
 
-> **Han et al., 2023**  
-> *Genome-wide promoter responses to CRISPR perturbations of regulators reveal regulatory networks in Escherichia coli*  
-> **DOI:** [10.1038/s41467-023-41572-4](https://doi.org/10.1038/s41467-023-41572-4)  
-> - 183 TF genes knocked down  
-> - 1372 *E. coli* promoters measured  
-> - 200,000 TF-gene response profiles  
+> **Han et al., 2023**
+> *Genome-wide promoter responses to CRISPR perturbations of regulators reveal regulatory networks in Escherichia coli*
+> **DOI:** [10.1038/s41467-023-41572-4](https://doi.org/10.1038/s41467-023-41572-4)
+> - 183 TF genes knocked down
+> - 1372 *E. coli* promoters measured
+> - 200,000 TF-gene response profiles
 > - Data from **Supplementary Data 6** (PPTP-seq interactions) and **7** (known interactions)
 
 \
@@ -17,7 +17,7 @@ This pipeline uses data from:
 
 ### Usage
 
-1. **Edit the Config**  
+1. **Edit the Config**
    Configure your batch in `configs/example.yaml`, including:
    ```yaml
    tfkdanalysis:
@@ -34,7 +34,7 @@ This pipeline uses data from:
    python main.py
    ```
 
-3. **View Outputs**  
+3. **View Outputs**
    Results are saved under `batch_results/<timestamp>_<batch_name>_<regulators>/`, including:
    - **Plots/**: Volcano and scatter plots
    - **CSVs/**: Up/down-regulated genes per regulator

@@ -50,9 +50,7 @@ class ProgressTracker:
             self.status["gap_fill_used_count"] = 1
         self._save_status()
 
-    def update_batch_config(
-        self, config: Dict[str, Any], source_label: str, plan_name: str
-    ):
+    def update_batch_config(self, config: Dict[str, Any], source_label: str, plan_name: str):
         self.status["config"] = config
         self.status["source"] = source_label
         self.status["plan_name"] = plan_name

@@ -64,9 +64,7 @@ def profile_60bp_dual_promoter() -> Profile:
 
 # Arrow types for derived columns in this profile
 PA = pa
-PA_STRUCT_USED_TF_COUNTS = PA.struct(
-    [PA.field("cpxr", PA.int64()), PA.field("lexa", PA.int64())]
-)
+PA_STRUCT_USED_TF_COUNTS = PA.struct([PA.field("cpxr", PA.int64()), PA.field("lexa", PA.int64())])
 PA_LIST_STR = PA.list_(PA.string())
 PA_LIST_F64 = PA.list_(PA.float64())
 PA_LIST_STRUCT_TFBS_DETAIL = PA.list_(
@@ -95,9 +93,7 @@ def _coerce_logits(v: Any, *, want_dim: int) -> Optional[List[float]]:
         if t.ndim == 2 and t.shape[0] == 1:
             t = t.reshape(t.shape[1])
         if t.ndim != 1 or int(t.shape[0]) != want_dim:
-            raise ValidationError(
-                f"logits shape mismatch (got {tuple(t.shape)}, expected [{want_dim}])"
-            )
+            raise ValidationError(f"logits shape mismatch (got {tuple(t.shape)}, expected [{want_dim}])")
         # default to float32 then Python floats
         return t.to(dtype=torch.float32).tolist()
     # list-like path
@@ -107,9 +103,7 @@ def _coerce_logits(v: Any, *, want_dim: int) -> Optional[List[float]]:
         if len(arr) == 1 and isinstance(arr[0], (list, tuple)):
             arr = list(arr[0])
         if len(arr) != want_dim:
-            raise ValidationError(
-                f"logits length mismatch (got {len(arr)}, expected {want_dim})"
-            )
+            raise ValidationError(f"logits length mismatch (got {len(arr)}, expected {want_dim})")
         return [float(x) for x in arr]
     return None
 
@@ -265,11 +259,7 @@ def convert_legacy(
                 derived["densegen__gap_fill_bases"] = float(d["fill_gap"])
             if "fill_end" in d:
                 derived["densegen__gap_fill_end"] = str(d["fill_end"])
-            if (
-                "fill_gc_range" in d
-                and isinstance(d["fill_gc_range"], (list, tuple))
-                and len(d["fill_gc_range"]) == 2
-            ):
+            if "fill_gc_range" in d and isinstance(d["fill_gc_range"], (list, tuple)) and len(d["fill_gc_range"]) == 2:
                 gmin, gmax = d["fill_gc_range"]
                 derived["densegen__gap_fill_gc_min"] = float(gmin)
                 derived["densegen__gap_fill_gc_max"] = float(gmax)
@@ -293,9 +283,7 @@ def convert_legacy(
         if "meta_tfbs_parts" in e and isinstance(e["meta_tfbs_parts"], list):
             tfbs_parts = [str(x) for x in e["meta_tfbs_parts"]]
             derived["densegen__tfbs_parts"] = tfbs_parts
-        elif "meta_tfbs_parts_in_array" in e and isinstance(
-            e["meta_tfbs_parts_in_array"], list
-        ):
+        elif "meta_tfbs_parts_in_array" in e and isinstance(e["meta_tfbs_parts_in_array"], list):
             tfbs_parts = [str(x) for x in e["meta_tfbs_parts_in_array"]]
             derived["densegen__tfbs_parts"] = tfbs_parts
 
@@ -315,20 +303,13 @@ def convert_legacy(
                 "lexa": int(counts["lexa"]),
             }
         if isinstance(e.get("meta_tfbs_parts_in_array"), list):
-            derived["densegen__used_tfbs"] = [
-                str(x) for x in e["meta_tfbs_parts_in_array"]
-            ]
+            derived["densegen__used_tfbs"] = [str(x) for x in e["meta_tfbs_parts_in_array"]]
 
         # densegen__promoter_constraint (best-effort from fixed_elements.promoter_constraints[].name)
         try:
             fe = e.get("fixed_elements") or {}
             pcs = fe.get("promoter_constraints") or []
-            if (
-                pcs
-                and isinstance(pcs, list)
-                and isinstance(pcs[0], dict)
-                and "name" in pcs[0]
-            ):
+            if pcs and isinstance(pcs, list) and isinstance(pcs[0], dict) and "name" in pcs[0]:
                 derived["densegen__promoter_constraint"] = str(pcs[0]["name"])
         except Exception:
             pass
@@ -336,9 +317,7 @@ def convert_legacy(
         # logits → infer__...__logits_mean (list<double>[512])
         if prof.logits_key in e:
             try:
-                vec = _coerce_logits(
-                    e[prof.logits_key], want_dim=int(prof.logits_expected_dim)
-                )
+                vec = _coerce_logits(e[prof.logits_key], want_dim=int(prof.logits_expected_dim))
                 if vec is not None:
                     derived[prof.logits_dst] = vec
             except ValidationError as ve:
@@ -353,9 +332,7 @@ def convert_legacy(
     ds = Dataset(dataset_root, dataset_name)
     if ds.dir.exists():
         if not force:
-            raise ValidationError(
-                f"Dataset '{dataset_name}' already exists at {ds.dir}. Use --force to overwrite."
-            )
+            raise ValidationError(f"Dataset '{dataset_name}' already exists at {ds.dir}. Use --force to overwrite.")
         # destructive reset (only if requested)
         for p in sorted(ds.dir.glob("*")):
             if p.is_dir():
@@ -439,9 +416,7 @@ def convert_legacy(
             out = out.add_column(out.num_columns, pa.field(name, t, nullable=True), arr)
 
     write_parquet_atomic(out, ds.records_path, ds.snapshot_dir)
-    append_event(
-        ds.events_path, {"action": "convert_legacy", "dataset": ds.name, "rows": N}
-    )
+    append_event(ds.events_path, {"action": "convert_legacy", "dataset": ds.name, "rows": N})
     # Append a helpful note to the scratch pad
     try:
         skipped_str = ""
@@ -450,9 +425,7 @@ def convert_legacy(
         if skipped_dups:
             skipped_str += f"; duplicates={skipped_dups}"
         note = f"Converted legacy .pt files into new dataset (rows={N}, files={len(files)}{skipped_str})."
-        ds.append_meta_note(
-            note, f"# example\nusr convert-legacy {dataset_name} --paths ..."
-        )
+        ds.append_meta_note(note, f"# example\nusr convert-legacy {dataset_name} --paths ...")
     except Exception:
         pass
 
@@ -464,11 +437,7 @@ def convert_legacy(
     print(
         f"[convert-legacy] scanned {total_entries} entry/entries from {len(files)} file(s); "
         f"kept {N}; skipped bad-length={skipped_bad_len}"
-        + (
-            f", duplicates(incl. case-insensitive)={skipped_dups} ({dup_pct:.1f}%)"
-            if skipped_dups
-            else ""
-        )
+        + (f", duplicates(incl. case-insensitive)={skipped_dups} ({dup_pct:.1f}%)" if skipped_dups else "")
     )
 
     return ConvertStats(
@@ -510,9 +479,7 @@ def _parse_tfbs_parts(parts: Sequence[str], *, min_len: int) -> list[tuple[str, 
     return out
 
 
-def _scan_used_tfbs(
-    seq: str, tfbs_parts: list[tuple[str, str]]
-) -> tuple[list[str], list[dict], dict]:
+def _scan_used_tfbs(seq: str, tfbs_parts: list[tuple[str, str]]) -> tuple[list[str], list[dict], dict]:
     """
     From a sequence and cleaned parts [('tf','MOTIF')...], compute:
       - used_tfbs: ['tf:motif', ...] for motifs found in seq (fwd or revcmp)
@@ -538,14 +505,10 @@ def _scan_used_tfbs(
 
         if fwd >= 0 and (rev < 0 or fwd <= rev):
             used_simple.append(f"{tf}:{motif}")
-            used_detail.append(
-                {"offset": int(fwd), "orientation": "fwd", "tf": tf, "tfbs": motif}
-            )
+            used_detail.append({"offset": int(fwd), "orientation": "fwd", "tf": tf, "tfbs": motif})
         else:
             used_simple.append(f"{tf}:{motif}")
-            used_detail.append(
-                {"offset": int(rev), "orientation": "rev", "tf": tf, "tfbs": motif}
-            )
+            used_detail.append({"offset": int(rev), "orientation": "rev", "tf": tf, "tfbs": motif})
 
         if tf in counts:
             counts[tf] += 1
@@ -640,33 +603,21 @@ def repair_densegen_used_tfbs(
         groups = df.groupby("_key").agg({"id": "count"})
         dup_keys = groups[groups["id"] > 1].index.tolist()
         if not dup_keys:
-            print(
-                "[repair-densegen] dedupe: OK — no case-insensitive duplicates found."
-            )
+            print("[repair-densegen] dedupe: OK — no case-insensitive duplicates found.")
         else:
             # Decide which to keep/drop per group
             keep_ids: list[str] = []
             drop_ids: list[str] = []
             for k, g in df[df["_key"].isin(dup_keys)].groupby("_key"):
                 # deterministic order: created_at then id
-                g_sorted = g.sort_values(
-                    ["created_at", "id"], ascending=True, kind="stable"
-                )
+                g_sorted = g.sort_values(["created_at", "id"], ascending=True, kind="stable")
                 if dedupe_policy == "keep-last":
-                    g_sorted = g.sort_values(
-                        ["created_at", "id"], ascending=False, kind="stable"
-                    )
+                    g_sorted = g.sort_values(["created_at", "id"], ascending=False, kind="stable")
                 if dedupe_policy == "ask" and not dry_run:
-                    print(f"\nduplicate sequence (casefold): {k.split('|',1)[1]}")
-                    for i, r in enumerate(
-                        g_sorted.reset_index(drop=True).itertuples(index=False), start=1
-                    ):
+                    print(f"\nduplicate sequence (casefold): {k.split('|', 1)[1]}")
+                    for i, r in enumerate(g_sorted.reset_index(drop=True).itertuples(index=False), start=1):
                         print(f"  {i}: id={r.id}  created_at={r.created_at}")
-                    ans = (
-                        input("Keep which row? [1..n], 0=drop all, s=skip group: ")
-                        .strip()
-                        .lower()
-                    )
+                    ans = input("Keep which row? [1..n], 0=drop all, s=skip group: ").strip().lower()
                     if ans in {"s", "skip"}:
                         keep_ids.extend(g_sorted["id"].tolist())
                         continue
@@ -677,9 +628,7 @@ def repair_densegen_used_tfbs(
                         kidx = int(ans)
                         if 1 <= kidx <= len(g_sorted):
                             keep_ids.append(g_sorted.iloc[kidx - 1]["id"])
-                            drop_ids.extend(
-                                g_sorted.drop(g_sorted.index[kidx - 1])["id"].tolist()
-                            )
+                            drop_ids.extend(g_sorted.drop(g_sorted.index[kidx - 1])["id"].tolist())
                             continue
                     except Exception:
                         pass
@@ -690,9 +639,7 @@ def repair_densegen_used_tfbs(
                     keep_ids.append(g_sorted.iloc[0]["id"])
                     drop_ids.extend(g_sorted.iloc[1:]["id"].tolist())
 
-            print(
-                f"[repair-densegen] dedupe plan: groups={len(dup_keys)}  would_drop={len(drop_ids)}"
-            )
+            print(f"[repair-densegen] dedupe plan: groups={len(dup_keys)}  would_drop={len(drop_ids)}")
             if not dry_run and drop_ids:
                 if not assume_yes:
                     ans2 = input("Proceed with de-duplication? [y/N]: ").strip().lower()
@@ -700,36 +647,24 @@ def repair_densegen_used_tfbs(
                         print("Skipping de-duplication.")
                     else:
                         drop_set = set(drop_ids)
-                        mask = _pc.is_in(
-                            tbl.column("id"), value_set=_pa.array(list(drop_set))
-                        )
+                        mask = _pc.is_in(tbl.column("id"), value_set=_pa.array(list(drop_set)))
                         tbl = tbl.filter(_pc.invert(mask))
-                        print(
-                            f"[repair-densegen] dedupe: dropped {len(drop_set)} row(s); rows now {tbl.num_rows}."
-                        )
+                        print(f"[repair-densegen] dedupe: dropped {len(drop_set)} row(s); rows now {tbl.num_rows}.")
 
     names = set(tbl.schema.names)
     need_cols = {"id", "sequence", "densegen__plan", "densegen__tfbs_parts"}
     missing = need_cols - names
     if missing:
-        raise ValidationError(
-            f"Missing required columns for repair: {', '.join(sorted(missing))}"
-        )
+        raise ValidationError(f"Missing required columns for repair: {', '.join(sorted(missing))}")
 
     # Pull required columns into Python lists
     ids = tbl.column("id").to_pylist()
     seqs = tbl.column("sequence").to_pylist()
-    plans = (
-        tbl.column("densegen__plan").to_pylist()
-        if "densegen__plan" in names
-        else [None] * len(ids)
-    )
+    plans = tbl.column("densegen__plan").to_pylist() if "densegen__plan" in names else [None] * len(ids)
     parts_col = tbl.column("densegen__tfbs_parts").to_pylist()
 
     used_tfbs_col = (
-        tbl.column("densegen__used_tfbs").to_pylist()
-        if "densegen__used_tfbs" in names
-        else [None] * len(ids)
+        tbl.column("densegen__used_tfbs").to_pylist() if "densegen__used_tfbs" in names else [None] * len(ids)
     )
     detail_col = (
         tbl.column("densegen__used_tfbs_detail").to_pylist()
@@ -737,14 +672,10 @@ def repair_densegen_used_tfbs(
         else [None] * len(ids)
     )
     counts_col = (
-        tbl.column("densegen__used_tf_counts").to_pylist()
-        if "densegen__used_tf_counts" in names
-        else [None] * len(ids)
+        tbl.column("densegen__used_tf_counts").to_pylist() if "densegen__used_tf_counts" in names else [None] * len(ids)
     )
     used_list_col = (
-        tbl.column("densegen__used_tf_list").to_pylist()
-        if "densegen__used_tf_list" in names
-        else [None] * len(ids)
+        tbl.column("densegen__used_tf_list").to_pylist() if "densegen__used_tf_list" in names else [None] * len(ids)
     )
 
     # Scan & plan changes
@@ -782,10 +713,7 @@ def repair_densegen_used_tfbs(
         parts_clean = _parse_tfbs_parts(parts_raw, min_len=min_tfbs_len)
         rows_with_parts += 1 if parts_raw else 0
         # Bug signal: any single-base item present originally?
-        if any(
-            isinstance(p, str) and re.search(r"^[a-z]+:[ACGTacgt]$", p)
-            for p in parts_raw
-        ):
+        if any(isinstance(p, str) and re.search(r"^[a-z]+:[ACGTacgt]$", p) for p in parts_raw):
             rows_with_cpxr_g_bug += 1
 
         if _json_like(parts_clean) != _json_like(parts_raw):
@@ -797,14 +725,10 @@ def repair_densegen_used_tfbs(
 
         # promoter extras
         promo = _detect_promoter_forward(seq, plan)
-        full_detail = sorted(
-            (used_detail + promo), key=lambda d: (d["offset"], d["tf"])
-        )
+        full_detail = sorted((used_detail + promo), key=lambda d: (d["offset"], d["tf"]))
 
         # used_tf_list
-        used_tf_list = (
-            sorted({(s.split(":", 1)[0]) for s in used_simple}) if used_simple else []
-        )
+        used_tf_list = sorted({(s.split(":", 1)[0]) for s in used_simple}) if used_simple else []
 
         # Compare with existing
         old_used = used_tfbs_col[i] or []
@@ -844,9 +768,7 @@ def repair_densegen_used_tfbs(
             touched += 1
 
         # Store
-        new_parts_all.append(
-            [f"{tf}:{motif}" for tf, motif in parts_clean] if parts_clean else []
-        )
+        new_parts_all.append([f"{tf}:{motif}" for tf, motif in parts_clean] if parts_clean else [])
         new_used_all.append(used_simple if used_simple else [])
         new_detail_all.append(full_detail if full_detail else [])
         new_counts_all.append(
@@ -881,9 +803,7 @@ def repair_densegen_used_tfbs(
             if assume_yes:
                 do_drop = True
             else:
-                ans = (
-                    input("Drop rows that include only one TF? [y/N]: ").strip().lower()
-                )
+                ans = input("Drop rows that include only one TF? [y/N]: ").strip().lower()
                 do_drop = ans in {"y", "yes"}
         if do_drop and n_single > 0:
             # Filter the table and all planned arrays in lockstep
@@ -901,16 +821,12 @@ def repair_densegen_used_tfbs(
             new_counts_all = _flt(new_counts_all)
             new_used_list_all = _flt(new_used_list_all)
             rows_total = tbl.num_rows
-            print(
-                f"[repair-densegen] dropped {n_single} single-TF row(s); rows now {rows_total}."
-            )
+            print(f"[repair-densegen] dropped {n_single} single-TF row(s); rows now {rows_total}.")
 
     # ----------- (optional) Drop rows missing used_tfbs after recompute -----------
     drop_miss_count = sum(1 for u in new_used_all if not u)
     if drop_missing_used_tfbs:
-        print(
-            f"[repair-densegen] rows with empty used_tfbs after recompute: {drop_miss_count}"
-        )
+        print(f"[repair-densegen] rows with empty used_tfbs after recompute: {drop_miss_count}")
         if not dry_run and drop_miss_count > 0:
             if not assume_yes:
                 ans3 = input("Drop rows missing used_tfbs? [y/N]: ").strip().lower()
@@ -995,11 +911,7 @@ def repair_densegen_used_tfbs(
         do_drop_iso = assume_yes
         if not assume_yes:
             ans_iso = (
-                input(
-                    "Drop rows that lack any non-essential metadata (id/sequence-only)? [y/N]: "
-                )
-                .strip()
-                .lower()
+                input("Drop rows that lack any non-essential metadata (id/sequence-only)? [y/N]: ").strip().lower()
             )  # noqa
             do_drop_iso = ans_iso in {"y", "yes"}
         if do_drop_iso and not dry_run:
@@ -1015,38 +927,22 @@ def repair_densegen_used_tfbs(
             new_counts_all = _flt(new_counts_all)
             new_used_list_all = _flt(new_used_list_all)
             rows_total = tbl.num_rows
-            print(
-                f"[repair-densegen] dropped {rows_id_seq_only_count} id/sequence-only row(s); rows now {rows_total}."
-            )
+            print(f"[repair-densegen] dropped {rows_id_seq_only_count} id/sequence-only row(s); rows now {rows_total}.")
 
     # ----------- Logging (dry-run preview) -----------
     def _pct(n: int, d: int) -> str:
         d = max(1, d)
-        return f"{(100.0*n)/d:.1f}%"
+        return f"{(100.0 * n) / d:.1f}%"
 
     print("\n[repair-densegen] Preflight")
     print(f"  rows total                : {rows_total}")
-    print(
-        f"  rows with tfbs_parts      : {rows_with_parts} ({_pct(rows_with_parts, rows_total)})"
-    )
-    print(
-        f"  rows w/ single-base bug   : {rows_with_cpxr_g_bug} ({_pct(rows_with_cpxr_g_bug, rows_total)})"
-    )
-    print(
-        f"  rows missing used_tfbs    : {rows_missing_used_tfbs} ({_pct(rows_missing_used_tfbs, rows_total)})"
-    )
-    print(
-        f"  rows missing detail       : {rows_missing_detail} ({_pct(rows_missing_detail, rows_total)})"
-    )
-    rows_single_tf_after = sum(
-        1 for ulist in new_used_list_all if isinstance(ulist, list) and len(ulist) == 1
-    )
-    print(
-        f"  rows with single TF       : {rows_single_tf_after} ({_pct(rows_single_tf_after, rows_total)})"
-    )
-    print(
-        f"  rows id/sequence-only     : {rows_id_seq_only_count} ({_pct(rows_id_seq_only_count, rows_total)})"
-    )
+    print(f"  rows with tfbs_parts      : {rows_with_parts} ({_pct(rows_with_parts, rows_total)})")
+    print(f"  rows w/ single-base bug   : {rows_with_cpxr_g_bug} ({_pct(rows_with_cpxr_g_bug, rows_total)})")
+    print(f"  rows missing used_tfbs    : {rows_missing_used_tfbs} ({_pct(rows_missing_used_tfbs, rows_total)})")
+    print(f"  rows missing detail       : {rows_missing_detail} ({_pct(rows_missing_detail, rows_total)})")
+    rows_single_tf_after = sum(1 for ulist in new_used_list_all if isinstance(ulist, list) and len(ulist) == 1)
+    print(f"  rows with single TF       : {rows_single_tf_after} ({_pct(rows_single_tf_after, rows_total)})")
+    print(f"  rows id/sequence-only     : {rows_id_seq_only_count} ({_pct(rows_id_seq_only_count, rows_total)})")
     print("  planned changes:")
     print(f"    densegen__tfbs_parts      : {changed_parts}")
     print(f"    densegen__used_tfbs       : {changed_used}")
@@ -1063,30 +959,20 @@ def repair_densegen_used_tfbs(
             if shown >= 3:
                 break
             if not (
-                new_used_all[i]
-                or new_detail_all[i]
-                or new_parts_all[i]
-                or new_counts_all[i]
-                or new_used_list_all[i]
+                new_used_all[i] or new_detail_all[i] or new_parts_all[i] or new_counts_all[i] or new_used_list_all[i]
             ):
                 continue
-            if _json_like(new_used_all[i]) != _json_like(
-                used_tfbs_col[i]
-            ) or _json_like(new_detail_all[i]) != _json_like(detail_col[i]):
+            if _json_like(new_used_all[i]) != _json_like(used_tfbs_col[i]) or _json_like(
+                new_detail_all[i]
+            ) != _json_like(detail_col[i]):
                 print(f"   • id={ids[i][:8]}…")
                 print(f"     sequence: {seqs[i]}")
                 if _json_like(new_parts_all[i]) != _json_like(parts_col[i]):
-                    print(
-                        f"     tfbs_parts: OLD={parts_col[i]}  →  NEW={new_parts_all[i]}"
-                    )
+                    print(f"     tfbs_parts: OLD={parts_col[i]}  →  NEW={new_parts_all[i]}")
                 if _json_like(new_used_all[i]) != _json_like(used_tfbs_col[i]):
-                    print(
-                        f"     used_tfbs:  OLD={used_tfbs_col[i]}  →  NEW={new_used_all[i]}"
-                    )
+                    print(f"     used_tfbs:  OLD={used_tfbs_col[i]}  →  NEW={new_used_all[i]}")
                 if _json_like(new_detail_all[i]) != _json_like(detail_col[i]):
-                    print(
-                        f"     detail:     OLD={detail_col[i]}  →  NEW={new_detail_all[i]}"
-                    )
+                    print(f"     detail:     OLD={detail_col[i]}  →  NEW={new_detail_all[i]}")
                 shown += 1
         if shown == 0:
             print("   (no touched rows to preview)")
@@ -1167,9 +1053,7 @@ def repair_densegen_used_tfbs(
     _set("densegen__used_tf_counts", arr_counts, PA_STRUCT_USED_TF_COUNTS)
     _set("densegen__used_tf_list", arr_used_list, PA_LIST_STR)
 
-    write_parquet_atomic(
-        out, ds.records_path, ds.snapshot_dir, preserve_metadata_from=tbl
-    )
+    write_parquet_atomic(out, ds.records_path, ds.snapshot_dir, preserve_metadata_from=tbl)
     append_event(
         ds.events_path,
         {
@@ -1195,39 +1079,20 @@ def repair_densegen_used_tfbs(
     td = out2.column("densegen__used_tfbs_detail").to_pylist()
 
     # 1) no single-base entries remain in parts or used
-    if any(
-        any(isinstance(x, str) and re.search(r"^[a-z]+:[ACGT]$", x) for x in (p or []))
-        for p in tp
-    ):
-        raise ValidationError(
-            "Post-condition failed: single-base TFBS still present in densegen__tfbs_parts."
-        )
-    if any(
-        any(isinstance(x, str) and re.search(r"^[a-z]+:[ACGT]$", x) for x in (u or []))
-        for u in tu
-    ):
-        raise ValidationError(
-            "Post-condition failed: single-base TFBS still present in densegen__used_tfbs."
-        )
+    if any(any(isinstance(x, str) and re.search(r"^[a-z]+:[ACGT]$", x) for x in (p or [])) for p in tp):
+        raise ValidationError("Post-condition failed: single-base TFBS still present in densegen__tfbs_parts.")
+    if any(any(isinstance(x, str) and re.search(r"^[a-z]+:[ACGT]$", x) for x in (u or [])) for u in tu):
+        raise ValidationError("Post-condition failed: single-base TFBS still present in densegen__used_tfbs.")
 
     # 2) every row has well-formed detail (non-null list of dicts)
     for det in td:
         if det is None:
-            raise ValidationError(
-                "Post-condition failed: densegen__used_tfbs_detail has NULL entries."
-            )
+            raise ValidationError("Post-condition failed: densegen__used_tfbs_detail has NULL entries.")
         if not isinstance(det, list):
-            raise ValidationError(
-                "Post-condition failed: densegen__used_tfbs_detail contains non-list."
-            )
+            raise ValidationError("Post-condition failed: densegen__used_tfbs_detail contains non-list.")
         for d in det:
-            if not (
-                isinstance(d, dict)
-                and {"offset", "orientation", "tf", "tfbs"} <= set(d.keys())
-            ):
-                raise ValidationError(
-                    "Post-condition failed: malformed dict in densegen__used_tfbs_detail."
-                )
+            if not (isinstance(d, dict) and {"offset", "orientation", "tf", "tfbs"} <= set(d.keys())):
+                raise ValidationError("Post-condition failed: malformed dict in densegen__used_tfbs_detail.")
 
     print("[repair-densegen] Applied successfully.")
     return RepairStats(

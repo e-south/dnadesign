@@ -9,8 +9,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from typing import List
 import logging
+from typing import List
 
 from dnadesign.permuter.src.evaluators.base import Evaluator
 
@@ -84,8 +84,7 @@ class Evo2LogitsMeanEvaluator(Evaluator):
                 _ = float(probe)
         except Exception as e:
             raise RuntimeError(
-                "Evo2 logits probe failed. Check model_id/device/precision/alphabet and environment. "
-                f"Details: {e}"
+                f"Evo2 logits probe failed. Check model_id/device/precision/alphabet and environment. Details: {e}"
             ) from e
         self._ready = True
 

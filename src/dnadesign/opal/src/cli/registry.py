@@ -82,9 +82,7 @@ def discover_commands(package: str = "dnadesign.opal.src.cli.commands") -> None:
                         err=True,
                     )
                     typer.echo(f"{exc!r}", err=True)
-                    tb = "".join(
-                        traceback.format_exception(type(exc), exc, exc.__traceback__)
-                    )
+                    tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
                     typer.echo(tb, err=True)
                 else:
                     typer.echo(

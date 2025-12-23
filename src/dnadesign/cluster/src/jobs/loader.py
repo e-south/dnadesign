@@ -83,9 +83,7 @@ def _search_job_candidates(spec: str | Path) -> List[Path]:
     return out
 
 
-def _normalize_dict_keys(
-    d: Dict[str, Any], *, path: Tuple[str, ...] = ()
-) -> Dict[str, Any]:
+def _normalize_dict_keys(d: Dict[str, Any], *, path: Tuple[str, ...] = ()) -> Dict[str, Any]:
     """
     Recursively normalize mapping keys to snake_case by replacing '-' with '_'.
     Assertively error if both kebab- and snake-case forms coexist at the same level.
@@ -97,14 +95,7 @@ def _normalize_dict_keys(
         if isinstance(v, dict):
             v = _normalize_dict_keys(v, path=(*path, str(nk)))
         elif isinstance(v, list):
-            v = [
-                (
-                    _normalize_dict_keys(x, path=(*path, str(nk)))
-                    if isinstance(x, dict)
-                    else x
-                )
-                for x in v
-            ]
+            v = [(_normalize_dict_keys(x, path=(*path, str(nk))) if isinstance(x, dict) else x) for x in v]
         # Collision: e.g., 'x-col' and 'x_col' both present
         if nk in out and seen_src.get(str(nk)) != k:
             here = ".".join(path) if path else "<root>"
@@ -125,9 +116,7 @@ def load_job_file(path: str | Path) -> Dict[str, Any]:
         if cand.exists():
             obj = yaml.safe_load(cand.read_text())
             if not isinstance(obj, dict):
-                raise ValueError(
-                    "Job YAML must be a mapping with keys: command, params."
-                )
+                raise ValueError("Job YAML must be a mapping with keys: command, params.")
             # Normalize keys (kebab-case → snake_case) throughout the job mapping
             obj = _normalize_dict_keys(obj)
             if "params" in obj and not isinstance(obj["params"], dict):

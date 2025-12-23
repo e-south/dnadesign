@@ -28,9 +28,7 @@ def _sha1_id(bio_type: str, sequence: str) -> str:
 
 def make_usr_row(*, sequence: str, bio_type: str, source: str) -> dict:
     sequence = str(sequence)
-    bio_type = (
-        ("dna" if bio_type.lower() == "dna" else "protein") if bio_type else "dna"
-    )
+    bio_type = ("dna" if bio_type.lower() == "dna" else "protein") if bio_type else "dna"
     return {
         "id": _sha1_id(bio_type, sequence),
         "bio_type": bio_type,

@@ -93,15 +93,11 @@ class Style:
         # Basic sanity checks: proactive, fail-fast.
         ensure(self.dpi >= 72, "style.dpi must be >= 72", SchemaError)
         ensure(self.font_size_seq >= 6, "style.font_size_seq must be >= 6", SchemaError)
-        ensure(
-            self.font_size_label >= 6, "style.font_size_label must be >= 6", SchemaError
-        )
+        ensure(self.font_size_label >= 6, "style.font_size_label must be >= 6", SchemaError)
         ensure(self.padding_x >= 0, "style.padding_x must be >= 0", SchemaError)
         ensure(self.padding_y >= 0, "style.padding_y must be >= 0", SchemaError)
         ensure(self.track_spacing > 0, "style.track_spacing must be > 0", SchemaError)
-        ensure(
-            self.baseline_spacing > 0, "style.baseline_spacing must be > 0", SchemaError
-        )
+        ensure(self.baseline_spacing > 0, "style.baseline_spacing must be > 0", SchemaError)
         ensure(
             self.kmer.height_factor > 0,
             "style.kmer.height_factor must be > 0",
@@ -133,9 +129,7 @@ class Style:
             raise SchemaError("style must be a mapping/dict")
         top = dict(mapping)
         if "height_factor" in top:
-            raise SchemaError(
-                "Unknown style key 'height_factor' — use 'style.kmer.height_factor'."
-            )
+            raise SchemaError("Unknown style key 'height_factor' — use 'style.kmer.height_factor'.")
         allowed = {f.name for f in fields(cls)}
         unknown = sorted(k for k in top.keys() if k not in allowed)
         if unknown:

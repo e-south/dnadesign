@@ -48,27 +48,19 @@ class USRWriter:
     default_alphabet: str = "dna_4"
 
     # internal buffers
-    _seq_buf: List[Tuple[str, str]] = field(
-        default_factory=list
-    )  # (sequence, source_label)
-    _meta_buf: List[Dict] = field(
-        default_factory=list
-    )  # each has 'id' + free-form keys
+    _seq_buf: List[Tuple[str, str]] = field(default_factory=list)  # (sequence, source_label)
+    _meta_buf: List[Dict] = field(default_factory=list)  # each has 'id' + free-form keys
     _seen_ids: set = field(default_factory=set)
 
     def __post_init__(self):
-        self.root = (
-            Path(self.root).resolve() if self.root else _default_usr_root().resolve()
-        )
+        self.root = Path(self.root).resolve() if self.root else _default_usr_root().resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.ds = Dataset(self.root, self.dataset)
         if not self.ds.records_path.exists():
             self.ds.init(source="densegen init")
 
     def add(self, sequence: str, meta: Dict, source_label: str) -> None:
-        seq_norm = normalize_sequence(
-            sequence, self.default_bio_type, self.default_alphabet
-        )
+        seq_norm = normalize_sequence(sequence, self.default_bio_type, self.default_alphabet)
         seq_id = compute_id(self.default_bio_type, seq_norm)
         if seq_id in self._seen_ids:
             return  # de-dup within this buffer batch
@@ -104,9 +96,7 @@ class USRWriter:
         # de-dup vs existing
         existing_ids = self._load_existing_ids()
         incoming_ids = [compute_id(self.default_bio_type, r["sequence"]) for r in rows]
-        rows_new = [
-            rows[i] for i, rid in enumerate(incoming_ids) if rid not in existing_ids
-        ]
+        rows_new = [rows[i] for i, rid in enumerate(incoming_ids) if rid not in existing_ids]
 
         if rows_new:
             with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as tmp:

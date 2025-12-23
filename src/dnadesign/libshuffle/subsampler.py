@@ -50,7 +50,7 @@ class Subsampler:
             uniq = len({s.get("meta_cluster_count") for s in subset})
             out.append(
                 {
-                    "subsample_id": f"s_{count+1:04d}",
+                    "subsample_id": f"s_{count + 1:04d}",
                     "indices": idxs,
                     **stats,
                     "raw_billboard": bb,

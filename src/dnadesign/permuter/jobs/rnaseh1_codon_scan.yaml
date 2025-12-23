@@ -6,7 +6,7 @@ job:
     name_col: "ref_name"
     seq_col: "sequence"
     aa_col: "protein"
-  
+
   permute:
     protocol: "scan_codon"
     params:

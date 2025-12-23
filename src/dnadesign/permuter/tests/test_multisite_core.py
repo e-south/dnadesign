@@ -257,9 +257,7 @@ def test_extract_embedding_matrix_enforces_consistent_dimension():
 def test_compute_mutation_window_indices_nt_basic_and_validation():
     # 10 codons → 30 nt; AA positions 3..7 should span a window of 5 codons.
     aa_pos_lists = [[3], [5, 6], "['7']"]
-    nt_start, nt_end = compute_mutation_window_indices_nt(
-        aa_pos_lists, seq_length_nt=30
-    )
+    nt_start, nt_end = compute_mutation_window_indices_nt(aa_pos_lists, seq_length_nt=30)
     assert nt_start == 3 * (3 - 1)
     assert nt_end == 3 * 7
     assert nt_end - nt_start == 3 * (7 - 3 + 1)
@@ -293,9 +291,7 @@ def test_filter_valid_source_rows_keeps_only_rows_passing_all_checks():
         }
     )
 
-    filtered, info = filter_valid_source_rows(
-        df, emb_col="emb", aa_col="aa_list", llr_col="llr", epi_col="epi"
-    )
+    filtered, info = filter_valid_source_rows(df, emb_col="emb", aa_col="aa_list", llr_col="llr", epi_col="epi")
 
     assert info["n_total"] == 5
     assert info["n_kept"] == 1
@@ -323,9 +319,7 @@ def test_filter_valid_source_rows_requires_numeric_epistasis():
         }
     )
     with pytest.raises(TypeError):
-        filter_valid_source_rows(
-            df, emb_col="emb", aa_col="aa_list", llr_col="llr", epi_col="epi"
-        )
+        filter_valid_source_rows(df, emb_col="emb", aa_col="aa_list", llr_col="llr", epi_col="epi")
 
 
 def test_uppercase_mutated_codons_marks_expected_codons_and_validates_input():

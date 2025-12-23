@@ -39,29 +39,17 @@ def render(context, params: dict) -> None:
     if rasterize_at is not None:
         rasterize_at = int(rasterize_at)
     # Optional hue/size (applied to swarm points only)
-    hue_field = normalize_metric_field(
-        get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None)
-    )
+    hue_field = normalize_metric_field(get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None))
     cmap = get_str(params, ["cmap"], "viridis")
-    size_by = normalize_metric_field(
-        get_str(params, ["size_by", "size", "size_field", "point_size_by"], None)
-    )
+    size_by = normalize_metric_field(get_str(params, ["size_by", "size", "size_field", "point_size_by"], None))
     # Assert: requested keys must resolve
-    if (
-        any(k in params for k in ("hue_field", "hue", "color", "color_by", "colour_by"))
-        and not hue_field
-    ):
+    if any(k in params for k in ("hue_field", "hue", "color", "color_by", "colour_by")) and not hue_field:
         raise ValueError(
-            "A hue parameter was provided but could not be parsed. "
-            "Use an obj__/pred__/sel__ column or alias."
+            "A hue parameter was provided but could not be parsed. Use an obj__/pred__/sel__ column or alias."
         )
-    if (
-        any(k in params for k in ("size_by", "size", "size_field", "point_size_by"))
-        and not size_by
-    ):
+    if any(k in params for k in ("size_by", "size", "size_field", "point_size_by")) and not size_by:
         raise ValueError(
-            "A size_by parameter was provided but could not be parsed. "
-            "Use an obj__/pred__/sel__ column or alias."
+            "A size_by parameter was provided but could not be parsed. Use an obj__/pred__/sel__ column or alias."
         )
 
     size_min = float(params.get("size_min", 10.0))
@@ -130,9 +118,7 @@ def render(context, params: dict) -> None:
         # Assert: per-round series must be finite, have ≥3 points, and non-zero variance
         for rr, yy in zip(rounds, series):
             if yy.size < 3:
-                raise ValueError(
-                    f"Cannot draw violin: round {rr} has <3 finite points."
-                )
+                raise ValueError(f"Cannot draw violin: round {rr} has <3 finite points.")
             if float(np.nanmax(yy)) <= float(np.nanmin(yy)):
                 raise ValueError(
                     f"Cannot draw violin: round {rr} has zero variance in 'pred__y_obj_scalar' after filtering."

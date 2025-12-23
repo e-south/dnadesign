@@ -44,7 +44,7 @@ job:
           precision: bf16
           alphabet: dna
           reduction: mean
-          batch_size: 128 
+          batch_size: 128
       - id: logits_mean
         evaluator: evo2_logits
         metric: logits_mean

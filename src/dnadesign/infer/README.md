@@ -58,7 +58,7 @@ infer extract --preset evo2/extract_logits_ll --seq-file ./seqs.txt --device cpu
 > * `ll_mean` (reduction=mean)
 > * `ll_sum` (reduction=sum)
 
-### Python API 
+### Python API
 
 Run an in‑memory batch:
 
@@ -179,4 +179,3 @@ register_fn("yourns.generate", "generate")
 Use `model.id="yourns_foo"` and `fn: yourns.*` in YAML/CLI.
 
 ---
-

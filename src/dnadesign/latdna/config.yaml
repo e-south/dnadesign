@@ -16,7 +16,7 @@ latdna:
   tiling:
     step: 1
   motifs:
-    crp: 
+    crp:
       - "AACCGTGCTCCCACTCGCAGTC"
       - "ATTGGTGAGGAACTTAACAATA"
     arca: "ATGTTAATAAAATGTTAA" # DAP-seq
@@ -43,7 +43,7 @@ latdna:
   analysis_inputs:
     dense_batch: densebatch_test
     latdna_batch: latdnabatch_20250405
-    seq_batch: 
+    seq_batch:
       - seqbatch_ecocyc_28_promoters
       - densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_all_TFs_n2500
       - densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_M9_gluc_ace_top20_n2500

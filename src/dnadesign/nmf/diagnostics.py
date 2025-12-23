@@ -8,16 +8,6 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-"""
---------------------------------------------------------------------------------
-<dnadesign project>
-nmf/diagnostics.py
-
-Module Author(s): Eric J. South
-Dunlop Lab
---------------------------------------------------------------------------------
-"""
-
 import csv
 import logging
 import math
@@ -27,10 +17,9 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
-# Use Plotly for the Sankey riverplot
-import plotly.graph_objects as go
 import seaborn as sns
+from matplotlib.patches import PathPatch
+from matplotlib.path import Path
 from scipy.cluster.hierarchy import cophenet, linkage
 from scipy.spatial.distance import pdist
 from sklearn.metrics import silhouette_score
@@ -56,7 +45,11 @@ def plot_reconstruction_loss(metrics: dict, output_path: str) -> None:
 
 
 def plot_heatmaps(
-    W: np.ndarray, H: np.ndarray, output_dir: str, encoding_mode: str = "motif_occupancy", feature_names: list = None
+    W: np.ndarray,
+    H: np.ndarray,
+    output_dir: str,
+    encoding_mode: str = "motif_occupancy",
+    feature_names: list = None,
 ) -> None:
     """
     Plot heatmaps for the W and H matrices with clustering reordering.
@@ -105,19 +98,20 @@ def plot_heatmaps(
     # Reorder the labels accordingly.
     row_labels = [f"Program {i}" for i in row_order_H]
 
-    # For motif_occupancy, we need the feature names.
-    feature_names_ordered = None
+    # For motif_occupancy, optionally render feature labels when the axis isn't too dense.
+    xticklabels = False
     if encoding_mode == "motif_occupancy":
         if feature_names is None:
             raise ValueError("Feature names must be provided for motif_occupancy encoding.")
-        feature_names_ordered = [feature_names[i] for i in col_order_H]
+        if H_ordered.shape[1] <= 50:
+            xticklabels = [feature_names[i] for i in col_order_H]
 
     plt.figure(figsize=(12, 8))
     ax = sns.heatmap(
         H_ordered,
         cmap="viridis",
         cbar_kws={"label": "Contribution Weight (clipped at 3)"},
-        xticklabels=False,
+        xticklabels=xticklabels,
         yticklabels=row_labels,
     )
     ax.set_xlabel("Features (Motifs)")
@@ -154,7 +148,11 @@ def plot_motif_occurrence_heatmap(X: np.ndarray, output_path: str, max_occ: int 
 
 
 def plot_program_association_stacked_barplot(
-    H: np.ndarray, feature_names: list, output_path: str, motif2tf_map: dict = None, normalize: bool = True
+    H: np.ndarray,
+    feature_names: list,
+    output_path: str,
+    motif2tf_map: dict = None,
+    normalize: bool = True,
 ) -> None:
     """
     Plot a stacked bar plot where each row corresponds to a transcription factor (TF).
@@ -246,7 +244,14 @@ def plot_top_motifs_grid(
         else:
             tf_labels, contribs = ([], [])
         ax = axes[i]
-        sns.barplot(x=list(contribs), y=list(tf_labels), color="slategray", ax=ax, errorbar=None, dodge=False)
+        sns.barplot(
+            x=list(contribs),
+            y=list(tf_labels),
+            color="slategray",
+            ax=ax,
+            errorbar=None,
+            dodge=False,
+        )
         ax.set_title(f"Program {i}", fontsize=10)
         ax.set_xlabel("Contribution", fontsize=9)
         ax.set_ylabel("", fontsize=9)
@@ -322,7 +327,7 @@ def plot_sequence_program_composition(W: np.ndarray, output_path: str) -> None:
     logger.info(f"Saved sequence program composition heatmap to {output_path}")
 
 
-def compute_composite_diversity_score(W: np.ndarray, alpha: float) -> (float, float, float):
+def compute_composite_diversity_score(W: np.ndarray, alpha: float) -> tuple[float, float, float]:
     """
     Compute the Composite Diversity Score (CDS) for a given coefficient matrix W.
     W is of shape (n_sequences, k) and is assumed to be row-normalized.
@@ -416,7 +421,6 @@ def plot_composite_diversity_curve(batch_results_dir: str, k_range: list, alpha:
 
 
 def compute_stability_metrics(batch_results_dir: str, k_range: list) -> dict:
-
     stability = {
         "Frobenius Error": {"k": [], "values": []},
         "Coefficient Variation": {"k": [], "values": []},
@@ -513,87 +517,106 @@ def compute_program_flow(batch_results_dir: str, k_range: list, similarity_thres
 
 def plot_signature_stability_riverplot(program_flow: dict, output_path: str, k_range: list) -> None:
     """
-    Generate a left-to-right Sankey "riverplot" using Plotly.
+    Generate a left-to-right Sankey "riverplot".
     Each column represents a factorization rank (k) and each node is a signature index.
     Edges connect signatures (if cosine similarity ≥ threshold) and the edge value encodes similarity.
     """
-    flows_list = []
-    node_labels_set = set()
-    for edge in program_flow.get("edges", []):
-        (k_src, prog_src), (k_dst, prog_dst), sim = edge
-        src_label = f"k{k_src}_p{prog_src}"
-        dst_label = f"k{k_dst}_p{prog_dst}"
-        flows_list.append({"source": src_label, "target": dst_label, "value": sim})
-        node_labels_set.update([src_label, dst_label])
-    if not flows_list:
-        fig = go.Figure()
-        fig.add_annotation(
-            text="No program flow data available", xref="paper", yref="paper", showarrow=False, font_size=16
+    nodes = program_flow.get("nodes", [])
+    edges = program_flow.get("edges", [])
+
+    if not nodes or not edges:
+        fig, ax = plt.subplots(figsize=(12, 4))
+        ax.axis("off")
+        ax.text(
+            0.5,
+            0.5,
+            "No program flow data available",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+            fontsize=16,
         )
-        fig.update_layout(title_text="Signature Stability Sankey Diagram")
-        fig.write_image(output_path)
+        ax.set_title("Signature Stability Riverplot")
+        fig.savefig(output_path, bbox_inches="tight")
+        plt.close(fig)
         logger.info(f"Saved placeholder riverplot to {output_path}")
         return
 
-    def parse_label(label):
-        parts = label.split("_")
-        k_val = int(parts[0][1:])
-        p_val = int(parts[1][1:])
-        return (k_val, p_val)
-
-    all_nodes = list(node_labels_set)
-    all_nodes_sorted = sorted(all_nodes, key=parse_label)
-    label_to_index = {label: idx for idx, label in enumerate(all_nodes_sorted)}
-    sources = [label_to_index[flow["source"]] for flow in flows_list]
-    targets = [label_to_index[flow["target"]] for flow in flows_list]
-    values = [flow["value"] for flow in flows_list]
-
-    group_by_k = defaultdict(list)
-    for label in all_nodes_sorted:
-        k_val, _ = parse_label(label)
-        group_by_k[k_val].append(label)
+    group_by_k: dict = defaultdict(list)
+    for k_val, prog_idx in nodes:
+        group_by_k[k_val].append(prog_idx)
     for k_val in group_by_k:
-        group_by_k[k_val].sort(key=lambda lbl: parse_label(lbl)[1])
-    k_sorted = sorted(group_by_k.keys())
-    k_min, k_max = min(k_sorted), max(k_sorted)
-    k_range_span = max(1, (k_max - k_min))
-    node_x = [0.0] * len(all_nodes_sorted)
-    node_y = [0.0] * len(all_nodes_sorted)
-    for k_val in k_sorted:
-        labels_here = group_by_k[k_val]
-        num_labels = len(labels_here)
-        y_positions = [0.5] if num_labels <= 1 else [i / (num_labels - 1) for i in range(num_labels)]
-        x_coord = (k_val - k_min) / float(k_range_span)
-        for i, label in enumerate(labels_here):
-            idx = label_to_index[label]
-            node_x[idx] = x_coord
-            node_y[idx] = y_positions[i]
+        group_by_k[k_val] = sorted(set(group_by_k[k_val]))
 
-    fig = go.Figure(
-        go.Sankey(
-            arrangement="fixed",
-            node=dict(
-                pad=15, thickness=20, line=dict(color="black", width=0.5), label=all_nodes_sorted, x=node_x, y=node_y
-            ),
-            link=dict(source=sources, target=targets, value=values),
+    k_sorted = sorted(set(k_range)) if k_range else sorted(group_by_k.keys())
+    if not k_sorted:
+        fig, ax = plt.subplots(figsize=(12, 4))
+        ax.axis("off")
+        ax.text(
+            0.5,
+            0.5,
+            "No program flow data available",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+            fontsize=16,
         )
-    )
-    fig.update_layout(
-        title_text="Signature Stability Sankey Diagram (Riverplot Style)", font_size=10, width=1400, height=800
-    )
+        ax.set_title("Signature Stability Riverplot")
+        fig.savefig(output_path, bbox_inches="tight")
+        plt.close(fig)
+        logger.info(f"Saved placeholder riverplot to {output_path}")
+        return
+
+    k_min, k_max = min(k_sorted), max(k_sorted)
+    span = max(1, (k_max - k_min))
+
+    # Assign node positions in a normalized (x,y) canvas.
+    node_pos: dict[tuple[int, int], tuple[float, float]] = {}
     for k_val in k_sorted:
-        x_coord = (k_val - k_min) / float(k_range_span)
-        fig.add_annotation(
-            x=x_coord,
-            y=1.05,
-            xref="paper",
-            yref="paper",
-            text=f"K={k_val}",
-            showarrow=False,
-            font_size=12,
-            align="center",
+        progs = group_by_k.get(k_val, [])
+        n = len(progs)
+        if n == 0:
+            continue
+        y_positions = [0.5] if n == 1 else [i / (n - 1) for i in range(n)]
+        x = (k_val - k_min) / float(span)
+        for prog_idx, y in zip(progs, y_positions):
+            node_pos[(k_val, prog_idx)] = (x, y)
+
+    fig, ax = plt.subplots(figsize=(14, 8))
+
+    # Draw edges as cubic Bezier curves with width proportional to similarity.
+    for (src_k, src_p), (dst_k, dst_p), sim in edges:
+        src = (src_k, src_p)
+        dst = (dst_k, dst_p)
+        if src not in node_pos or dst not in node_pos:
+            continue
+        x0, y0 = node_pos[src]
+        x1, y1 = node_pos[dst]
+        cx = (x0 + x1) / 2.0
+        path = Path(
+            [(x0, y0), (cx, y0), (cx, y1), (x1, y1)],
+            [Path.MOVETO, Path.CURVE4, Path.CURVE4, Path.CURVE4],
         )
-    fig.write_image(output_path)
+        lw = 0.5 + 6.0 * float(sim)
+        ax.add_patch(PathPatch(path, fill=False, linewidth=lw, alpha=0.6))
+
+    # Draw nodes.
+    xs = [xy[0] for xy in node_pos.values()]
+    ys = [xy[1] for xy in node_pos.values()]
+    ax.scatter(xs, ys, s=30, zorder=3)
+
+    # Column labels for k.
+    for k_val in k_sorted:
+        x = (k_val - k_min) / float(span)
+        ax.text(x, 1.05, f"K={k_val}", ha="center", va="bottom")
+        ax.plot([x, x], [0.0, 1.0], linewidth=0.5, alpha=0.2, zorder=1)
+
+    ax.set_xlim(-0.05, 1.05)
+    ax.set_ylim(-0.05, 1.1)
+    ax.set_title("Signature Stability Riverplot")
+    ax.axis("off")
+    fig.savefig(output_path, bbox_inches="tight")
+    plt.close(fig)
     logger.info(f"Saved signature stability riverplot to {output_path}")
 
 

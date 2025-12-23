@@ -122,9 +122,7 @@ def build_run_pred_events(
                 else:
                     vv = v.reshape(-1)
                     out[f"obj__{k}"] = (
-                        vv.astype(float).tolist()
-                        if vv.size == n_rows
-                        else [float(np.nanmean(vv))] * n_rows
+                        vv.astype(float).tolist() if vv.size == n_rows else [float(np.nanmean(vv))] * n_rows
                     )
         return out
 
@@ -177,9 +175,7 @@ def build_run_meta_event(
 ) -> pd.DataFrame:
     # Convenience mirrors of denominator info (ergonomic, avoid round_ctx.json reads)
     denom_value = (
-        (objective_summary_stats or {}).get("denom_used")
-        if isinstance(objective_summary_stats, dict)
-        else None
+        (objective_summary_stats or {}).get("denom_used") if isinstance(objective_summary_stats, dict) else None
     )
     return pd.DataFrame(
         {
@@ -195,16 +191,10 @@ def build_run_meta_event(
             "y_ingest__params": [_none_if_empty_mapping(y_ingest_transform_params)],
             "objective__name": [objective_name],
             "objective__params": [_none_if_empty_mapping(objective_params)],
-            "objective__summary_stats": [
-                _none_if_empty_mapping(objective_summary_stats)
-            ],
+            "objective__summary_stats": [_none_if_empty_mapping(objective_summary_stats)],
             # Mirrors for easy access
-            "objective__denom_value": [
-                float(denom_value) if denom_value is not None else None
-            ],
-            "objective__denom_percentile": [
-                int((objective_params or {}).get("scaling", {}).get("percentile", 95))
-            ],
+            "objective__denom_value": [float(denom_value) if denom_value is not None else None],
+            "objective__denom_percentile": [int((objective_params or {}).get("scaling", {}).get("percentile", 95))],
             "selection__name": [selection_name],
             "selection__params": [_none_if_empty_mapping(selection_params)],
             "selection__score_field": [selection_score_field],
@@ -212,9 +202,7 @@ def build_run_meta_event(
             "selection__tie_handling": [sel_tie_handling],
             "stats__n_train": [int(stats_n_train)],
             "stats__n_scored": [int(stats_n_scored)],
-            "stats__unc_mean_sd_targets": [
-                float(np.nanmean(unc_mean_sd)) if unc_mean_sd is not None else None
-            ],
+            "stats__unc_mean_sd_targets": [float(np.nanmean(unc_mean_sd)) if unc_mean_sd is not None else None],
             "artifacts": [_none_if_empty_mapping(artifact_paths_and_hashes)],
             "pred__preview": [pred_rows_df.head(5).to_dict(orient="records")],
             "schema__version": [LEDGER_SCHEMA_VERSION],

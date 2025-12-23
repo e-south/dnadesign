@@ -15,9 +15,7 @@ from dnadesign.opal.src.record_show import build_record_report
 
 
 def test_record_show_uses_events(tmp_path):
-    rec = pd.DataFrame(
-        {"id": ["x"], "sequence": ["AC"], "bio_type": ["dna"], "alphabet": ["dna_4"]}
-    )
+    rec = pd.DataFrame({"id": ["x"], "sequence": ["AC"], "bio_type": ["dna"], "alphabet": ["dna_4"]})
     ev = pd.DataFrame(
         {
             "event": ["run_pred"],

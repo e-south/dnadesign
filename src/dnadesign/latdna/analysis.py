@@ -286,9 +286,7 @@ def run_analysis_pipeline(config: dict):
         xtic_labels = config.get("plots", {}).get("xtic_labels")
         if xtic_labels:
             if len(xtic_labels) != len(ordered_groups):
-                logging.warning(
-                    "Length of xtic_labels does not match the number of groups. " "Using default group names."
-                )
+                logging.warning("Length of xtic_labels does not match the number of groups. Using default group names.")
                 new_labels = ordered_groups
             else:
                 new_labels = xtic_labels

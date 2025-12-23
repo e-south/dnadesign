@@ -118,9 +118,7 @@ def medoid_index(U: np.ndarray) -> int:
     """
     U = np.asarray(U, dtype=float)
     if U.ndim != 2 or U.shape[0] == 0:
-        raise ValueError(
-            f"medoid_index expects non-empty 2D input, got shape={U.shape}"
-        )
+        raise ValueError(f"medoid_index expects non-empty 2D input, got shape={U.shape}")
     A = pairwise_angular(U)
     mean_per_row = A.mean(axis=1)
     return int(np.argmin(mean_per_row))

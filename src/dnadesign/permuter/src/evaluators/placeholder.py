@@ -55,8 +55,5 @@ class PlaceholderEvaluator(Evaluator):
                     raise ValueError("ref_sequence required for embedding_distance")
                 ref_embedding = self._embed(ref_sequence)
             ref_embedding = np.asarray(ref_embedding, dtype=np.float32)
-            return [
-                -float(np.linalg.norm(self._embed(s) - ref_embedding))
-                for s in sequences
-            ]
+            return [-float(np.linalg.norm(self._embed(s) - ref_embedding)) for s in sequences]
         raise ValueError(f"Unsupported metric: {metric}")

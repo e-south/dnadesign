@@ -63,11 +63,7 @@ def load_all() -> dict[str, Preset]:
     presets_dir = Path(__file__).resolve().parent
     built_in_defaults = presets_dir / "defaults"
     built_in_siblings = presets_dir
-    user = Path(
-        os.path.expanduser(
-            "~/.dnADESIGN/cluster/presets".lower().replace("dnadesign", "dnadesign")
-        )
-    )
+    user = Path(os.path.expanduser("~/.dnADESIGN/cluster/presets".lower().replace("dnadesign", "dnadesign")))
     # Assemble precedence
     out: dict[str, Preset] = {}
     out.update(_load_dir(built_in_defaults))

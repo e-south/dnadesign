@@ -48,8 +48,7 @@ def peek_columns(ctx: dict) -> list[str]:
         import pyarrow.parquet as pq  # type: ignore
     except Exception as e:
         raise RuntimeError(
-            "PyArrow is required to inspect Parquet columns deterministically. "
-            "Install pyarrow>=8."
+            "PyArrow is required to inspect Parquet columns deterministically. Install pyarrow>=8."
         ) from e
     try:
         schema = pq.read_schema(p)  # Arrow schema (top‑level fields)
@@ -70,9 +69,7 @@ def _parse_json_array_cell(v):
     raise ValueError(f"Unsupported value type for JSON array column: {type(v)}")
 
 
-def extract_X(
-    df: pd.DataFrame, x_col: str | None = None, x_cols: list[str] | None = None
-) -> np.ndarray:
+def extract_X(df: pd.DataFrame, x_col: str | None = None, x_cols: list[str] | None = None) -> np.ndarray:
     if (x_col is None) == (x_cols is None):
         raise ValueError("Provide exactly one of --x-col or --x-cols.")
     if x_col:
@@ -87,11 +84,7 @@ def extract_X(
         first = s.loc[first_valid_idx]
         # Mode A — scalar numeric (Nx1 matrix)
         if ptypes.is_numeric_dtype(s):
-            X = (
-                s.to_numpy(dtype="float64", copy=False)
-                .astype(np.float32, copy=False)
-                .reshape(-1, 1)
-            )
+            X = s.to_numpy(dtype="float64", copy=False).astype(np.float32, copy=False).reshape(-1, 1)
         # Mode B — per-row 1-D array (list/tuple/ndarray)
         elif isinstance(first, (list, tuple, np.ndarray)):
             dim = int(len(first))
@@ -102,15 +95,12 @@ def extract_X(
                     arr = np.asarray(v, dtype=np.float32)
                 except Exception as e:
                     raise TypeError(
-                        f"Row {i} in '{x_col}' cannot be coerced to float32. "
-                        f"First bad value (repr): {repr(v)[:80]}"
+                        f"Row {i} in '{x_col}' cannot be coerced to float32. First bad value (repr): {repr(v)[:80]}"
                     ) from e
                 if arr.ndim != 1:
                     raise ValueError(f"Row {i} in '{x_col}' is not 1-D.")
                 if arr.shape[0] != dim:
-                    raise ValueError(
-                        f"X must be fixed-length; row {i} has length {arr.shape[0]} but expected {dim}."
-                    )
+                    raise ValueError(f"X must be fixed-length; row {i} has length {arr.shape[0]} but expected {dim}.")
                 X[i, :] = arr
         # Mode C — per-row JSON array string
         elif isinstance(first, str):
@@ -124,9 +114,7 @@ def extract_X(
                 if arr.ndim != 1:
                     raise ValueError(f"Row {i} in '{x_col}' is not 1-D.")
                 if arr.shape[0] != dim:
-                    raise ValueError(
-                        f"X must be fixed-length; row {i} has length {arr.shape[0]} but expected {dim}."
-                    )
+                    raise ValueError(f"X must be fixed-length; row {i} has length {arr.shape[0]} but expected {dim}.")
                 X[i, :] = arr
         else:
             raise TypeError(
@@ -137,9 +125,7 @@ def extract_X(
         if not np.isfinite(X).all():
             bad = np.argwhere(~np.isfinite(X))
             i, j = int(bad[0, 0]), int(bad[0, 1])
-            raise ValueError(
-                f"X contains NaN/inf at row {i}, column {j}. Clean the source column before clustering."
-            )
+            raise ValueError(f"X contains NaN/inf at row {i}, column {j}. Clean the source column before clustering.")
         return X
     else:
         for c in x_cols:

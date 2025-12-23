@@ -18,9 +18,7 @@ import pandas as pd
 from scipy.stats import entropy
 
 
-def diversity(
-    df: pd.DataFrame, cluster_col: str, group_by: str, out_dir: Path, plots: bool
-) -> dict:
+def diversity(df: pd.DataFrame, cluster_col: str, group_by: str, out_dir: Path, plots: bool) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     if cluster_col not in df.columns:
         raise KeyError(f"Cluster column '{cluster_col}' not found.")
@@ -32,9 +30,7 @@ def diversity(
         p = counts / counts.sum()
         shannon = float(entropy(p))
         simpson = float(1 - np.sum(p.values**2))
-        rows.append(
-            {"cluster": cl, "shannon": shannon, "simpson": simpson, "n": int(len(g))}
-        )
+        rows.append({"cluster": cl, "shannon": shannon, "simpson": simpson, "n": int(len(g))})
     out = pd.DataFrame(rows).sort_values("shannon", ascending=False)
     out.to_csv(out_dir / "diversity.csv", index=False)
     if plots:

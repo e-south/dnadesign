@@ -1,3 +1,5 @@
+[![CI](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml/badge.svg)](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml)
+
 # dnadesign
 
 `dnadesign` is a collection of modular bioinformatic pipelines and helper packages related to biological sequence design.

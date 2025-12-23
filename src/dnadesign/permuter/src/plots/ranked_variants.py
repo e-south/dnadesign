@@ -67,9 +67,7 @@ def plot(
     if "permuter__round" in df.columns and (df["permuter__round"] == 2).any():
         df = df[df["permuter__round"] == 2].copy()
     obs_col = _observed_col(metric_id)
-    _require(
-        df, ["mut_count", "aa_combo_str", obs_col, "epistasis"], "k‑categorical scatter"
-    )
+    _require(df, ["mut_count", "aa_combo_str", obs_col, "epistasis"], "k‑categorical scatter")
     df = df.dropna(subset=[obs_col, "mut_count", "epistasis"]).copy()
     if df.empty:
         raise RuntimeError("ranked_variants: no rows with observed/epistasis to plot")
@@ -90,9 +88,7 @@ def plot(
     x_index: Dict[int, float] = {k: float(i) for i, k in enumerate(ks)}
     x_vals = df["mut_count"].map(x_index).astype(float).to_numpy()
     if ranked_jitter > 0:
-        x_vals = x_vals + _stable_jitter(
-            df["aa_combo_str"].astype(str).tolist(), float(ranked_jitter)
-        )
+        x_vals = x_vals + _stable_jitter(df["aa_combo_str"].astype(str).tolist(), float(ranked_jitter))
 
     # Scatter: hue = epistasis (continuous)
     sc = ax.scatter(
@@ -134,9 +130,7 @@ def plot(
         cbar.outline.set_visible(False)
     except Exception:
         pass
-    cbar.set_label(
-        "Epistasis (observed - expected)", rotation=90, fontsize=int(round(10 * fs))
-    )
+    cbar.set_label("Epistasis (observed - expected)", rotation=90, fontsize=int(round(10 * fs)))
     cbar.ax.tick_params(labelsize=int(round(9 * fs)))
 
     fig.savefig(output_path, dpi=300, bbox_inches="tight", pad_inches=0.12)

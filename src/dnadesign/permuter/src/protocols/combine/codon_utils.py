@@ -25,9 +25,7 @@ _WEIGHT_ALIASES = ("frequency", "fraction")
 class CodonTable:
     aa2codons: Dict[str, List[str]]
     codon2aa: Dict[str, str]
-    aa2weights: Dict[
-        str, List[float]
-    ]  # normalized (sum to 1.0), same order as aa2codons[aa]
+    aa2weights: Dict[str, List[float]]  # normalized (sum to 1.0), same order as aa2codons[aa]
 
 
 def _parse_float_maybe(x: Optional[str]) -> Optional[float]:
@@ -59,13 +57,9 @@ def load_codon_table(path: str | Path) -> CodonTable:
         reader = csv.DictReader(fh)
         fields = [f.strip() for f in (reader.fieldnames or [])]
         if not _BASE_REQUIRED.issubset(fields):
-            raise ValueError(
-                f"combine_aa: codon table must include columns {_BASE_REQUIRED}, got {fields}"
-            )
+            raise ValueError(f"combine_aa: codon table must include columns {_BASE_REQUIRED}, got {fields}")
         if not any(w in fields for w in _WEIGHT_ALIASES):
-            raise ValueError(
-                f"combine_aa: codon table must include at least one of {_WEIGHT_ALIASES}, got {fields}"
-            )
+            raise ValueError(f"combine_aa: codon table must include at least one of {_WEIGHT_ALIASES}, got {fields}")
         for row in reader:
             aa = (row.get("amino_acid") or "").strip().upper()
             if not aa or aa == "*":
@@ -73,9 +67,7 @@ def load_codon_table(path: str | Path) -> CodonTable:
             codon = (row.get("codon") or "").strip().upper()
             if not re.fullmatch(r"[ACGT]{3}", codon):
                 continue
-            w = _parse_float_maybe(row.get("frequency")) or _parse_float_maybe(
-                row.get("fraction")
-            )
+            w = _parse_float_maybe(row.get("frequency")) or _parse_float_maybe(row.get("fraction"))
             if w is None:
                 continue
             aa2entries.setdefault(aa, []).append((codon, float(w)))

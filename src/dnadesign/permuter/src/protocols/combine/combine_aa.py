@@ -42,9 +42,7 @@ _LOG = logging.getLogger("permuter.protocol.combine_aa")
 _TRIPLE = 3
 
 
-def _preserve_case_apply(
-    orig: str, start_0b: int, new_codon_up: str
-) -> Tuple[str, List[Tuple[int, str, str]]]:
+def _preserve_case_apply(orig: str, start_0b: int, new_codon_up: str) -> Tuple[str, List[Tuple[int, str, str]]]:
     """
     Replace 3 nt at [start_0b:start_0b+3) with new_codon_up (uppercase), preserving
     the original per-base case. Returns (new_sequence, nt_change_tokens_info)
@@ -110,38 +108,26 @@ class CombineAA(Protocol):
             p_ct = expand_for_job(raw_ct, job_dir=job_dir)
         p_ct = p_ct.resolve()
         if not p_ct.exists():
-            raise ValueError(
-                "combine_aa: codon_table not found.\n"
-                f"  given: {raw_ct!r}\n"
-                f"  resolved: {p_ct}"
-            )
+            raise ValueError(f"combine_aa: codon_table not found.\n  given: {raw_ct!r}\n  resolved: {p_ct}")
 
         # Combination builder (v0.1: random only)
         comb = params.get("combine") or {}
         strat = str(comb.get("strategy", "random"))
         if strat not in {"random", "enumerate"}:
-            raise ValueError(
-                "combine_aa: combine.strategy must be 'random' or 'enumerate'"
-            )
+            raise ValueError("combine_aa: combine.strategy must be 'random' or 'enumerate'")
         # 'random' honors budget_total; 'enumerate' ignores budget_total (caller's responsibility)
         try:
             k_min = int(comb.get("k_min", 0))
             k_max = int(comb.get("k_max", 0))
             budget = int(comb.get("budget_total", 0))
         except Exception:
-            raise ValueError(
-                "combine_aa: combine.k_min/k_max/budget_total must be integers"
-            )
+            raise ValueError("combine_aa: combine.k_min/k_max/budget_total must be integers")
         if k_min < 1 or k_max < k_min:
             raise ValueError("combine_aa: k_min must be ≥1 and k_max ≥ k_min")
         if strat == "random" and budget <= 0:
-            raise ValueError(
-                "combine_aa: budget_total must be > 0 for strategy='random'"
-            )
+            raise ValueError("combine_aa: budget_total must be > 0 for strategy='random'")
         if strat == "enumerate" and budget <= 0:
-            _LOG.info(
-                "[validate] combine.strategy='enumerate' → budget_total is ignored"
-            )
+            _LOG.info("[validate] combine.strategy='enumerate' → budget_total is ignored")
 
         choice = params.get("codon_choice", "top")
         if choice not in {"top", "weighted"}:
@@ -152,16 +138,12 @@ class CombineAA(Protocol):
         sel = params.get("select", {}) or {}
         mode = str(sel.get("mode", "per_position_best")).strip().lower()
         if mode not in {"global", "per_position_best"}:
-            raise ValueError(
-                "combine_aa: select.mode must be 'global' or 'per_position_best'"
-            )
+            raise ValueError("combine_aa: select.mode must be 'global' or 'per_position_best'")
         if "disallow_negative_best" in sel and sel["disallow_negative_best"] not in (
             True,
             False,
         ):
-            raise ValueError(
-                "combine_aa: select.disallow_negative_best must be boolean"
-            )
+            raise ValueError("combine_aa: select.disallow_negative_best must be boolean")
 
         # rng_seed is optional; verify int if present
         if "rng_seed" in params:
@@ -249,9 +231,7 @@ class CombineAA(Protocol):
             per_k[len(evs)] = per_k.get(len(evs), 0) + 1
         if per_k:
             k_counts = ", ".join(f"k={k}:{per_k[k]}" for k in sorted(per_k))
-            _LOG.info(
-                "[digest] emitted %d combination proposals (%s)", len(combos), k_counts
-            )
+            _LOG.info("[digest] emitted %d combination proposals (%s)", len(combos), k_counts)
         else:
             _LOG.info("[digest] emitted 0 combination proposals")
 
@@ -261,9 +241,7 @@ class CombineAA(Protocol):
             codon = seq_upper[idx0 : idx0 + 3]
             aa = tbl.codon2aa.get(codon)
             if aa is None:
-                raise ValueError(
-                    f"combine_aa: reference codon {codon!r} at AA pos {pos1b} is not in codon table"
-                )
+                raise ValueError(f"combine_aa: reference codon {codon!r} at AA pos {pos1b} is not in codon table")
             return aa
 
         # Emit variants
@@ -279,9 +257,7 @@ class CombineAA(Protocol):
             nt_token_accum: List[Tuple[int, str, str]] = []
             positions_sorted = sorted(e[0] for e in events)
             if any(p < 1 or p > n_codons for p in positions_sorted):
-                raise ValueError(
-                    f"combine_aa: event position out of bounds (1..{n_codons}): {positions_sorted}"
-                )
+                raise ValueError(f"combine_aa: event position out of bounds (1..{n_codons}): {positions_sorted}")
 
             # Enforce WT match vs reference and build AA tokens
             for pos, wt, alt, sc in events:
@@ -290,9 +266,7 @@ class CombineAA(Protocol):
                     raise ValueError(
                         f"combine_aa: WT mismatch at pos {pos}: dataset WT={wt}, ref codon encodes {wt_ref}"
                     )
-                aa_tokens.append(
-                    f"aa pos={int(pos)} wt={wt_ref} alt={str(alt).upper()}"
-                )
+                aa_tokens.append(f"aa pos={int(pos)} wt={wt_ref} alt={str(alt).upper()}")
 
             # Mutate DNA codons per policy (preserve per-base case)
             new_seq = orig
@@ -303,30 +277,18 @@ class CombineAA(Protocol):
                     new_codon_up = aa_to_best_codon(tbl, str(alt))
                 else:
                     new_codon_up = aa_to_weighted_codon(tbl, str(alt), rng)
-                new_seq, nt_changes = _preserve_case_apply(
-                    new_seq, start0, new_codon_up
-                )
+                new_seq, nt_changes = _preserve_case_apply(new_seq, start0, new_codon_up)
                 nt_token_accum.extend(nt_changes)
 
             # Canonical combo key + lists
             aa_pos_list = [int(p) for p in positions_sorted]
             aa_wt_list = [wt for (_, wt, _, _) in sorted(events, key=lambda x: x[0])]
             aa_alt_list = [alt for (_, _, alt, _) in sorted(events, key=lambda x: x[0])]
-            aa_combo_str = "|".join(
-                f"{w}{p}{a}" for p, w, a in zip(aa_pos_list, aa_wt_list, aa_alt_list)
-            )
+            aa_combo_str = "|".join(f"{w}{p}{a}" for p, w, a in zip(aa_pos_list, aa_wt_list, aa_alt_list))
 
             # Header token + AA+NT tokens
-            header = (
-                "combo "
-                f"k={len(events)} "
-                f"additive_{metric_id}={additive_expected:.6f} "
-                f"aa=[{aa_combo_str}]"
-            )
-            nt_tokens_txt = [
-                f"nt pos={pos1b} wt={wt} alt={alt}"
-                for (pos1b, wt, alt) in nt_token_accum
-            ]
+            header = f"combo k={len(events)} additive_{metric_id}={additive_expected:.6f} aa=[{aa_combo_str}]"
+            nt_tokens_txt = [f"nt pos={pos1b} wt={wt} alt={alt}" for (pos1b, wt, alt) in nt_token_accum]
             modifications = [header, *aa_tokens, *nt_tokens_txt]
 
             out = {
@@ -364,7 +326,5 @@ def attach_epistasis(df, metric_id: str):
         )
 
     out = df.copy()
-    out["epistasis"] = (
-        out[canonical_obs].astype("float64") - out[canonical_exp].astype("float64")
-    )
+    out["epistasis"] = out[canonical_obs].astype("float64") - out[canonical_exp].astype("float64")
     return out

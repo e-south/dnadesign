@@ -81,9 +81,7 @@ def preflight_run(
             hist = store._normalize_hist_cell(row.get(lh))
             if len(hist) == 0:
                 try:
-                    vec = [
-                        float(x) for x in np.asarray(y, dtype=float).ravel().tolist()
-                    ]
+                    vec = [float(x) for x in np.asarray(y, dtype=float).ravel().tolist()]
                 except Exception:
                     continue
                 to_attach.append((_id, vec))

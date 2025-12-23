@@ -29,9 +29,7 @@ from .cli import (
     cmd_validate,
 )
 
-app = typer.Typer(
-    add_completion=True, no_args_is_help=True, help="USR datasets CLI (Typer)"
-)
+app = typer.Typer(add_completion=True, no_args_is_help=True, help="USR datasets CLI (Typer)")
 
 
 @app.command()
@@ -54,9 +52,7 @@ def _root(
         file_okay=False,
         path_type=Path,
     ),
-    rich: bool = typer.Option(
-        True, "--rich/--no-rich", help="Use Rich formatting for supported commands"
-    ),
+    rich: bool = typer.Option(True, "--rich/--no-rich", help="Use Rich formatting for supported commands"),
 ) -> None:
     ctx.obj = {"root": root, "rich": rich}
 
@@ -133,9 +129,7 @@ def diff(
     dataset: str = typer.Argument(...),
     remote: str = typer.Argument(...),
 ) -> None:
-    args = NS(
-        root=ctx.obj["root"], dataset=dataset, remote=remote, rich=ctx.obj["rich"]
-    )
+    args = NS(root=ctx.obj["root"], dataset=dataset, remote=remote, rich=ctx.obj["rich"])
     cmd_diff(args)
 
 

@@ -40,7 +40,7 @@ style:
   baseline_spacing: 40.0   # distance between forward & reverse baselines
   padding_y: 05.0          # top/bottom padding; increases natural frame height
   legend_height_px: 16.0   # reserved space; prevents overlap
-  legend_pad_px: 10.0     # bottom margin below legend 
+  legend_pad_px: 10.0     # bottom margin below legend
   legend: true
   font_size_seq: 14
   font_size_label: 12

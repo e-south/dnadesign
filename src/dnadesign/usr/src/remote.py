@@ -56,9 +56,7 @@ class SSHRemote:
             key_env = self.cfg.ssh_key_env
             key_path = os.environ.get(key_env)
             if not key_path:
-                raise RemoteUnavailableError(
-                    f"Environment variable '{key_env}' not set (SSH key path)."
-                )
+                raise RemoteUnavailableError(f"Environment variable '{key_env}' not set (SSH key path).")
             cmd += ["-i", str(Path(key_path))]
         return cmd + [f"{self.cfg.user}@{self.cfg.host}"]
 
@@ -76,21 +74,15 @@ class SSHRemote:
             key_env = self.cfg.ssh_key_env
             key_path = os.environ.get(key_env)
             if not key_path:
-                raise RemoteUnavailableError(
-                    f"Environment variable '{key_env}' not set (SSH key path)."
-                )
+                raise RemoteUnavailableError(f"Environment variable '{key_env}' not set (SSH key path).")
             cmd += ["-e", f"ssh -i {shlex.quote(key_path)}"]
         return cmd
 
     def _ssh_run(self, remote_cmd: str, check: bool = True) -> Tuple[int, str, str]:
         full = self._ssh_cmd() + [remote_cmd]
-        proc = subprocess.run(
-            full, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
+        proc = subprocess.run(full, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if check and proc.returncode != 0:
-            raise RemoteUnavailableError(
-                f"ssh failed ({proc.returncode}): {remote_cmd}\n{proc.stderr.strip()}"
-            )
+            raise RemoteUnavailableError(f"ssh failed ({proc.returncode}): {remote_cmd}\n{proc.stderr.strip()}")
         return proc.returncode, proc.stdout, proc.stderr
 
     # ---- STAT helpers on remote ----
@@ -155,9 +147,7 @@ class SSHRemote:
 
     def _remote_list_snapshots(self, snap_dir: str) -> List[str]:
         # Names like records-YYYYMMDDThhmmss.parquet
-        rc, out, _ = self._ssh_run(
-            f"ls -1 {shlex.quote(snap_dir)} 2>/dev/null", check=False
-        )
+        rc, out, _ = self._ssh_run(f"ls -1 {shlex.quote(snap_dir)} 2>/dev/null", check=False)
         if rc != 0 or not out.strip():
             return []
         names = [ln.strip() for ln in out.splitlines() if ln.strip()]
@@ -212,24 +202,16 @@ class SSHRemote:
             rows, cols = self._remote_parquet_shape(remote_path)
         return RemotePrimaryStat(True, size_b, sha, rows, cols, mtime)
 
-    def pull_file(
-        self, remote_src: str, local_dst: Path, *, dry_run: bool = False
-    ) -> None:
+    def pull_file(self, remote_src: str, local_dst: Path, *, dry_run: bool = False) -> None:
         local_dst = Path(local_dst)
         local_dst.parent.mkdir(parents=True, exist_ok=True)
         rsync = self._rsync_cmd()
-        cmd = (
-            rsync
-            + (["--dry-run"] if dry_run else [])
-            + [f"{self.cfg.ssh_target}:{remote_src}", str(local_dst)]
-        )
+        cmd = rsync + (["--dry-run"] if dry_run else []) + [f"{self.cfg.ssh_target}:{remote_src}", str(local_dst)]
         proc = subprocess.run(cmd)
         if proc.returncode != 0:
             raise TransferError(f"rsync file pull failed with code {proc.returncode}")
 
-    def push_file(
-        self, local_src: Path, remote_dst: str, *, dry_run: bool = False
-    ) -> None:
+    def push_file(self, local_src: Path, remote_dst: str, *, dry_run: bool = False) -> None:
         local_src = Path(local_src)
         # ensure remote parent exists
         import shlex
@@ -237,11 +219,7 @@ class SSHRemote:
         parent = Path(remote_dst).parent.as_posix()
         self._ssh_run(f"mkdir -p {shlex.quote(parent)}", check=True)
         rsync = self._rsync_cmd()
-        cmd = (
-            rsync
-            + (["--dry-run"] if dry_run else [])
-            + [str(local_src), f"{self.cfg.ssh_target}:{remote_dst}"]
-        )
+        cmd = rsync + (["--dry-run"] if dry_run else []) + [str(local_src), f"{self.cfg.ssh_target}:{remote_dst}"]
         proc = subprocess.run(cmd)
         if proc.returncode != 0:
             raise TransferError(f"rsync file push failed with code {proc.returncode}")
@@ -266,12 +244,7 @@ class SSHRemote:
             if skip_snapshots:
                 include_args += ["--exclude", "_snapshots/**"]
 
-        cmd = (
-            rsync
-            + include_args
-            + (["--dry-run"] if dry_run else [])
-            + [src, str(dest_dir)]
-        )
+        cmd = rsync + include_args + (["--dry-run"] if dry_run else []) + [src, str(dest_dir)]
         proc = subprocess.run(cmd)
         if proc.returncode != 0:
             raise TransferError(f"rsync pull failed with code {proc.returncode}")
@@ -297,13 +270,9 @@ class SSHRemote:
                 include_args += ["--exclude", "_snapshots/**"]
 
         # Ensure remote dataset directory exists
-        self._ssh_run(
-            f"mkdir -p {shlex.quote(self.cfg.dataset_path(dataset))}", check=True
-        )
+        self._ssh_run(f"mkdir -p {shlex.quote(self.cfg.dataset_path(dataset))}", check=True)
 
-        cmd = (
-            rsync + include_args + (["--dry-run"] if dry_run else []) + [src + "/", dst]
-        )
+        cmd = rsync + include_args + (["--dry-run"] if dry_run else []) + [src + "/", dst]
         proc = subprocess.run(cmd)
         if proc.returncode != 0:
             raise TransferError(f"rsync push failed with code {proc.returncode}")

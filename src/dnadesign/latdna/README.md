@@ -30,11 +30,11 @@ project_root/
 ```
 
 **latdna** has two modes:
-1. **Generation Mode:** 
+1. **Generation Mode:**
 
     Create synthetic DNA sequences by tiling TF motifs into a reproducible random background with fixed sigma factor recognition site elements (i.e., the *latdna* batches).
 
-2. **Analysis Mode:** 
+2. **Analysis Mode:**
 
     Compute intra-population latent diversity metrics (cosine, Euclidean, log1p_Euclidean) and generate grouped boxplots comparing the dense array and latDNA batches.
 
@@ -54,7 +54,7 @@ All parameters are defined in a single YAML configuration file. Key configuratio
   - analysis_inputs: Specify the dense and latDNA batch subdirectory names.
   - metrics: List of metrics to compute (e.g., "cosine", "euclidean", "log1p_euclidean").
   - group_by: Either "all" (treat all latDNA entries as a single population) or "tf" (group by transcription factor).
-- **Dry Run**: 
+- **Dry Run**:
   - Set latdna.dry_run to true to validate configurations without writing any output files.
 
 

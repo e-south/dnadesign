@@ -41,9 +41,7 @@ def _ensure_pyarrow():
 
         return pa, pq
     except Exception as e:
-        raise SchemaError(
-            "Reading parquet requires 'pyarrow' to be installed and importable."
-        ) from e
+        raise SchemaError("Reading parquet requires 'pyarrow' to be installed and importable.") from e
 
 
 def _normalize_id_value(val: object) -> str:
@@ -54,15 +52,11 @@ def _normalize_id_value(val: object) -> str:
     - anything else → explicit error (assertive; no fallbacks)
     """
     if val is None:
-        raise SchemaError(
-            "id column contains null values; selection requires non-null ids."
-        )
+        raise SchemaError("id column contains null values; selection requires non-null ids.")
     if isinstance(val, (bytes, bytearray, memoryview)):
         b = bytes(val)
         if len(b) != 16:
-            raise SchemaError(
-                f"id column is binary with {len(b)} bytes; expected 16 (UUID)."
-            )
+            raise SchemaError(f"id column is binary with {len(b)} bytes; expected 16 (UUID).")
         return str(uuid.UUID(bytes=b))
     return str(val)
 
@@ -79,10 +73,7 @@ def _prepare_isin_values(id_type, raw_ids: Sequence[str]):
     if pat.is_string(id_type) or pat.is_large_string(id_type):
         return ids_clean
     if (
-        (
-            pat.is_fixed_size_binary(id_type)
-            and getattr(id_type, "byte_width", None) == 16
-        )
+        (pat.is_fixed_size_binary(id_type) and getattr(id_type, "byte_width", None) == 16)
         or pat.is_binary(id_type)
         or pat.is_large_binary(id_type)
     ):
@@ -118,9 +109,7 @@ def _parse_ann_list(
         try:
             obj = json.loads(obj)
         except Exception as e:
-            raise SchemaError(
-                "annotations column is a string but not valid JSON"
-            ) from e
+            raise SchemaError("annotations column is a string but not valid JSON") from e
     if not isinstance(obj, (list, tuple)):
         raise SchemaError("annotations column must be a list of dicts")
     seq_u = sequence.upper()
@@ -172,10 +161,7 @@ def _parse_ann_list(
             if on_missing == "skip_entry":
                 # Skip just this annotation; keep the rest of the record.
                 continue
-            raise SchemaError(
-                "Annotation not found in sequence"
-                f"{rec}: tf={tf!r}, strand={strand}, tfbs={tfbs!r}"
-            )
+            raise SchemaError(f"Annotation not found in sequence{rec}: tf={tf!r}, strand={strand}, tfbs={tfbs!r}")
 
         # If unique, that's the left-most start (forward coordinates).
         if len(hits) == 1:
@@ -195,9 +181,7 @@ def _parse_ann_list(
                     start = hits[-1]
                 elif ambiguous == "drop":
                     # New behavior: skip the entire record if any annotation is ambiguous.
-                    raise SkipRecord(
-                        "Ambiguous annotation with policy=drop — skipping record."
-                    )
+                    raise SkipRecord("Ambiguous annotation with policy=drop — skipping record.")
                 else:  # defensive (should be unreachable due to earlier validation)
                     raise SchemaError(f"Unsupported ambiguous policy: {ambiguous!r}")
             else:
@@ -222,9 +206,7 @@ def _parse_ann_list(
                         start = hits[-1]
                     elif ambiguous == "drop":
                         # New behavior: skip the entire record.
-                        raise SkipRecord(
-                            "Ambiguous annotation after offset with policy=drop — skipping record."
-                        )
+                        raise SkipRecord("Ambiguous annotation after offset with policy=drop — skipping record.")
 
         anns.append(
             Annotation(
@@ -285,11 +267,7 @@ def read_parquet_records(
         if min_per >= 1 and ann_raw is None:
             continue
         rid_raw = row.get(id_col) if id_col else None
-        rid = (
-            _normalize_id_value(rid_raw)
-            if rid_raw is not None
-            else f"row_{hash(seq) & 0xffff}"
-        )
+        rid = _normalize_id_value(rid_raw) if rid_raw is not None else f"row_{hash(seq) & 0xFFFF}"
         # Optional details overlay (top-left). Use only if present & non-blank.
         details_raw = row.get(details_col) if has_details else None
         details_text = str(details_raw).strip() if details_raw is not None else ""
@@ -388,23 +366,15 @@ def read_parquet_records_by_ids(
         if min_per >= 1 and ann_raw is None:
             continue
         rid_raw = row.get(id_col) if id_col else None
-        rid = (
-            _normalize_id_value(rid_raw)
-            if rid_raw is not None
-            else f"row_{hash(seq) & 0xffff}"
-        )
+        rid = _normalize_id_value(rid_raw) if rid_raw is not None else f"row_{hash(seq) & 0xFFFF}"
         details_raw = row.get(details_col) if has_details else None
         details_text = str(details_raw).strip() if details_raw is not None else ""
         guides: list[Guide] = []
         if details_text:
-            overlay = (
-                f"{details_text}  id={rid}" if rid_raw is not None else details_text
-            )
+            overlay = f"{details_text}  id={rid}" if rid_raw is not None else details_text
             guides.append(Guide(kind="overlay_label", start=0, end=0, label=overlay))
         try:
-            anns = _parse_ann_list(
-                ann_raw, sequence=seq, record_id=rid, policy=ann_policy
-            )
+            anns = _parse_ann_list(ann_raw, sequence=seq, record_id=rid, policy=ann_policy)
         except SkipRecord:
             continue
         if min_per > 0 and len(anns) < min_per:

@@ -106,9 +106,9 @@ class CSVTFBSDataSource(BaseDataSource):
         if not (csv_path.exists() and csv_path.is_file()):
             raise FileNotFoundError(
                 "CSV not found for 'csv_tfbs' source. Looked here:\n"
-                f"  - { (DENSEGEN_ROOT / self.path).resolve() }\n"
-                f"  - { (PROJECT_ROOT / self.path).resolve() }\n"
-                f"  - { (SRC_ROOT / self.path).resolve() }"
+                f"  - {(DENSEGEN_ROOT / self.path).resolve()}\n"
+                f"  - {(PROJECT_ROOT / self.path).resolve()}\n"
+                f"  - {(SRC_ROOT / self.path).resolve()}"
             )
 
         df = pd.read_csv(csv_path)
@@ -126,9 +126,7 @@ class CSVTFBSDataSource(BaseDataSource):
         df["tfbs"] = df["tfbs"].astype(str).str.strip()
         df = df[(df["tf"] != "") & (df["tfbs"] != "")]
         df = df.drop_duplicates(subset=["tf", "tfbs"]).reset_index(drop=True)
-        entries = list(
-            zip(df["tf"].tolist(), df["tfbs"].tolist(), [str(csv_path)] * len(df))
-        )
+        entries = list(zip(df["tf"].tolist(), df["tfbs"].tolist(), [str(csv_path)] * len(df)))
         return entries, df
 
 
@@ -145,19 +143,15 @@ class CSVSequencesDataSource(BaseDataSource):
         if not (csv_path.exists() and csv_path.is_file()):
             raise FileNotFoundError(
                 "CSV not found for 'csv_sequences' source. Looked here:\n"
-                f"  - { (DENSEGEN_ROOT / self.path).resolve() }\n"
-                f"  - { (PROJECT_ROOT / self.path).resolve() }\n"
-                f"  - { (SRC_ROOT / self.path).resolve() }"
+                f"  - {(DENSEGEN_ROOT / self.path).resolve()}\n"
+                f"  - {(PROJECT_ROOT / self.path).resolve()}\n"
+                f"  - {(SRC_ROOT / self.path).resolve()}"
             )
 
         df = pd.read_csv(csv_path)
         if self.sequence_column not in df.columns:
             raise ValueError(f"Column '{self.sequence_column}' missing in {csv_path}")
-        seqs = [
-            str(s).strip().upper()
-            for s in df[self.sequence_column].dropna().tolist()
-            if str(s).strip()
-        ]
+        seqs = [str(s).strip().upper() for s in df[self.sequence_column].dropna().tolist() if str(s).strip()]
         return seqs, None
 
 
@@ -184,11 +178,7 @@ class USRSequencesDataSource(BaseDataSource):
         import pyarrow.parquet as pq  # local import to avoid hard dep at import time
 
         tbl = pq.read_table(ds.records_path, columns=["sequence"])
-        seqs = [
-            s.upper()
-            for s in tbl.column("sequence").to_pylist()
-            if isinstance(s, str) and s.strip()
-        ]
+        seqs = [s.upper() for s in tbl.column("sequence").to_pylist() if isinstance(s, str) and s.strip()]
         if self.limit:
             seqs = seqs[: max(0, int(self.limit))]
         return seqs, None
@@ -206,13 +196,9 @@ def data_source_factory(cfg: dict) -> BaseDataSource:
     if t == "csv_sequences":
         if "path" not in cfg:
             raise ValueError("csv_sequences requires 'path'")
-        return CSVSequencesDataSource(
-            path=cfg["path"], sequence_column=cfg.get("sequence_column", "sequence")
-        )
+        return CSVSequencesDataSource(path=cfg["path"], sequence_column=cfg.get("sequence_column", "sequence"))
     if t == "usr_sequences":
         if "dataset" not in cfg:
             raise ValueError("usr_sequences requires 'dataset'")
-        return USRSequencesDataSource(
-            dataset=cfg["dataset"], root=cfg.get("root"), limit=cfg.get("limit")
-        )
+        return USRSequencesDataSource(dataset=cfg["dataset"], root=cfg.get("root"), limit=cfg.get("limit"))
     raise ValueError(f"Unsupported source type: {t}")

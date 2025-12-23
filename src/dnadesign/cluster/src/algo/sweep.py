@@ -44,11 +44,7 @@ def leiden_sweep(
                 labels = leiden_run(X, neighbors=neighbors, resolution=res, seed=seed)
                 values, counts = np.unique(labels, return_counts=True)
                 n_clusters.append(len(values))
-                cv = (
-                    float(np.std(counts) / np.mean(counts))
-                    if np.mean(counts) > 0
-                    else float("nan")
-                )
+                cv = float(np.std(counts) / np.mean(counts)) if np.mean(counts) > 0 else float("nan")
                 cvs.append(cv)
                 progress.advance(t, 1)
             rows.append(

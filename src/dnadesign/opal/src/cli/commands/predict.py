@@ -36,12 +36,8 @@ def cmd_predict(
         "-r",
         help="Round index to resolve model from state.json (default: latest)",
     ),
-    input_path: Path = typer.Option(
-        None, "--in", help="Optional input parquet/csv; defaults to records.parquet"
-    ),
-    out_path: Path = typer.Option(
-        None, "--out", help="Optional output parquet/csv; defaults to stdout CSV"
-    ),
+    input_path: Path = typer.Option(None, "--in", help="Optional input parquet/csv; defaults to records.parquet"),
+    out_path: Path = typer.Option(None, "--out", help="Optional output parquet/csv; defaults to stdout CSV"),
 ):
     try:
         cfg = load_cli_config(config)
@@ -50,17 +46,13 @@ def cmd_predict(
         if model_path is None:
             st_path = Path(cfg.campaign.workdir) / "state.json"
             if not st_path.exists():
-                raise OpalError(
-                    "Provide --model-path or run from a campaign with state.json."
-                )
+                raise OpalError("Provide --model-path or run from a campaign with state.json.")
             st = CampaignState.load(st_path)
             rounds = sorted(st.rounds, key=lambda r: int(r.round_index))
             if not rounds:
                 raise OpalError(f"No rounds found in {st_path}")
             entry = (
-                next((r for r in rounds if int(r.round_index) == int(round)), None)
-                if round is not None
-                else rounds[-1]
+                next((r for r in rounds if int(r.round_index) == int(round)), None) if round is not None else rounds[-1]
             )
             if entry is None:
                 raise OpalError(f"Round {round} not found in {st_path}")

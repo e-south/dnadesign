@@ -25,9 +25,7 @@ class JobInput(BaseModel):
 
 
 class JobPermute(BaseModel):
-    protocol: str = Field(
-        description="Protocol id (e.g., scan_dna|scan_codon|scan_stem_loop)"
-    )
+    protocol: str = Field(description="Protocol id (e.g., scan_dna|scan_codon|scan_stem_loop)")
     params: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("protocol")
@@ -105,9 +103,7 @@ class JobPlot(BaseModel):
         }
         bad = [k for k in v.keys() if k not in allowed]
         if bad:
-            raise ValueError(
-                f"plot.sizes has invalid key(s): {bad}. Allowed: {sorted(allowed)}"
-            )
+            raise ValueError(f"plot.sizes has invalid key(s): {bad}. Allowed: {sorted(allowed)}")
         return v
 
 
@@ -160,9 +156,7 @@ class InnerJob(BaseModel):
 class JobConfig(BaseModel):
     job: InnerJob
 
-    def infer_bio_type(
-        self, sequence_hint: str | None = None
-    ) -> Literal["dna", "protein"]:
+    def infer_bio_type(self, sequence_hint: str | None = None) -> Literal["dna", "protein"]:
         if self.job.bio_type in ("dna", "protein"):
             return self.job.bio_type  # explicit
         s = (sequence_hint or "").upper()

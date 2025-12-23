@@ -52,18 +52,12 @@ from dnadesign.cruncher.utils.config import CruncherConfig
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 RESULTS_DIR = PROJECT_ROOT / "src" / "dnadesign" / "cruncher" / "results"
 DEFAULT_MOTIF_ROOT = (
-    PROJECT_ROOT.parent
-    / "dnadesign-data"
-    / "primary_literature"
-    / "OMalley_et_al"
-    / "escherichia_coli_motifs"
+    PROJECT_ROOT.parent / "dnadesign-data" / "primary_literature" / "OMalley_et_al" / "escherichia_coli_motifs"
 )
 
 
 def _motif_root(cfg: CruncherConfig) -> Path:
-    return (
-        cfg.parse.motif_root if cfg.parse.motif_root is not None else DEFAULT_MOTIF_ROOT
-    )
+    return cfg.parse.motif_root if cfg.parse.motif_root is not None else DEFAULT_MOTIF_ROOT
 
 
 def run_analyse(cfg: CruncherConfig) -> None:
@@ -77,9 +71,7 @@ def run_analyse(cfg: CruncherConfig) -> None:
         sample_dir = RESULTS_DIR / batch_name
 
         if not sample_dir.is_dir():
-            print(
-                f"[analyse] Warning: batch '{batch_name}' not found under {RESULTS_DIR}"
-            )
+            print(f"[analyse] Warning: batch '{batch_name}' not found under {RESULTS_DIR}")
             continue
 
         print(f"[analyse] Analysing batch: {batch_name}")
@@ -95,9 +87,7 @@ def run_analyse(cfg: CruncherConfig) -> None:
 
         latest_pt = max(pt_candidates, key=lambda p: p.stat().st_mtime)
         elites_df = pd.DataFrame(torch.load(latest_pt))
-        print(
-            f"[analyse:{batch_name}] Loaded {len(elites_df)} elites from {latest_pt.relative_to(sample_dir)}"
-        )
+        print(f"[analyse:{batch_name}] Loaded {len(elites_df)} elites from {latest_pt.relative_to(sample_dir)}")
 
         # ── load trace & sequences for downstream plots ───────────────────────
         seq_path, trace_path = sample_dir / "sequences.csv", sample_dir / "trace.nc"
@@ -139,12 +129,8 @@ def run_analyse(cfg: CruncherConfig) -> None:
         # ── top-5 tabular summary (unchanged logic – dynamic TF names) ────────
         if not elites_df.empty:
             x_tf, y_tf = cfg.regulator_sets[0][:2]
-            elites_df[f"score_{x_tf}"] = elites_df["per_tf"].apply(
-                lambda d: d[x_tf]["scaled_score"]
-            )
-            elites_df[f"score_{y_tf}"] = elites_df["per_tf"].apply(
-                lambda d: d[y_tf]["scaled_score"]
-            )
+            elites_df[f"score_{x_tf}"] = elites_df["per_tf"].apply(lambda d: d[x_tf]["scaled_score"])
+            elites_df[f"score_{y_tf}"] = elites_df["per_tf"].apply(lambda d: d[y_tf]["scaled_score"])
 
             print(f"\n=== Top-5 Elites ({x_tf} & {y_tf}) ===")
             print(f"{'Rank':<5} {'Sequence':<30} {x_tf:>10} {y_tf:>10}")

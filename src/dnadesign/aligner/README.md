@@ -15,11 +15,11 @@ aligner/
 
 #### Features
 
-- **Global Alignment Scoring:**  
+- **Global Alignment Scoring:**
   Computes pairwise global alignment scores via Biopython's implementation of the Needleman–Wunsch algorithm.
 
 
-  - Compute normalized similarity as:  
+  - Compute normalized similarity as:
     $$
     Normalized Similarity = \frac{Alignment\ Score}{match\_score \times L}
     $$
@@ -32,13 +32,13 @@ aligner/
 
 
 
-- **Flexible Output:**  
+- **Flexible Output:**
   Supports multiple output formats:
   - **Mean:** Returns the mean pairwise score.
   - **Matrix:** Returns the full N×N score matrix.
   - **Condensed:** Returns a SciPy-style upper-triangular vector.
-  
-- **Configurable Parameters:**  
+
+- **Configurable Parameters:**
   Alignment parameters (match score, mismatch penalty, gap penalties) and normalization options are fully configurable with sensible defaults.
 
 #### Basic Alignment Scoring

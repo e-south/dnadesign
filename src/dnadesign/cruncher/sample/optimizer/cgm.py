@@ -147,7 +147,7 @@ class GibbsOptimizer(Optimizer):
             logger.info("Chain %d: starting burn‐in", c + 1)
 
             # ─── Phase 1: Burn‐in (record each state; draw_i = 0..tune−1) ───
-            for b in tqdm(range(tune), desc=f"chain{c+1} burn‐in", leave=False):
+            for b in tqdm(range(tune), desc=f"chain{c + 1} burn‐in", leave=False):
                 beta_mcmc = self.beta_of(global_iter)
                 self._perform_single_move(seq, beta_mcmc, evaluator, move_cfg, rng)
 
@@ -165,7 +165,7 @@ class GibbsOptimizer(Optimizer):
             logger.info("Chain %d: burn‐in complete. Starting sampling", c + 1)
 
             # ─── Phase 2: Sampling (record each state; draw_i = tune..tune+draws−1) ───
-            for d in tqdm(range(draws), desc=f"chain{c+1} sampling", leave=False):
+            for d in tqdm(range(draws), desc=f"chain{c + 1} sampling", leave=False):
                 beta_mcmc = self.beta_of(global_iter)
                 self._perform_single_move(seq, beta_mcmc, evaluator, move_cfg, rng)
 

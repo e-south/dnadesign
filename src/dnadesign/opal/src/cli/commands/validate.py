@@ -29,12 +29,8 @@ from ._common import (
 )
 
 
-@cli_command(
-    "validate", help="End-to-end table checks (essentials present; X column present)."
-)
-def cmd_validate(
-    config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG")
-):
+@cli_command("validate", help="End-to-end table checks (essentials present; X column present).")
+def cmd_validate(config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG")):
     try:
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(config)
@@ -71,9 +67,7 @@ def cmd_validate(
             if case_only and target not in case_only:
                 hint_lines.append(f"Case-only match found: {case_only[0]!r}")
             if fuzzy:
-                hint_lines.append(
-                    "Similar columns: " + ", ".join(repr(c) for c in fuzzy)
-                )
+                hint_lines.append("Similar columns: " + ", ".join(repr(c) for c in fuzzy))
             hint = (" " + " | ".join(hint_lines)) if hint_lines else ""
             raise OpalError(f"Missing X column: {target}.{hint}")
         # If Y exists, enforce vector length (sampled) and that labeled rows have X
@@ -110,15 +104,9 @@ def cmd_validate(
                             if "nan" in lower or "inf" in lower:
                                 return False, None, "non_finite_token"
                             inner = s[1:-1].strip()
-                            parts = (
-                                []
-                                if inner == ""
-                                else [p.strip() for p in inner.split(",")]
-                            )
+                            parts = [] if inner == "" else [p.strip() for p in inner.split(",")]
                             try:
-                                arr = _np.asarray(
-                                    [float(p) for p in parts], dtype=float
-                                )
+                                arr = _np.asarray([float(p) for p in parts], dtype=float)
                             except Exception:
                                 return False, None, "non_numeric"
                             if arr.size != exp_len:
@@ -150,16 +138,9 @@ def cmd_validate(
                         if len(bad_examples) < 3:
                             bad_examples.append(
                                 {
-                                    "id": (
-                                        str(df.at[idx, "id"])
-                                        if "id" in df.columns
-                                        else f"row_{idx}"
-                                    ),
+                                    "id": (str(df.at[idx, "id"]) if "id" in df.columns else f"row_{idx}"),
                                     "reason": reason,
-                                    "value_preview": (
-                                        str(val)[:120]
-                                        + ("…" if len(str(val)) > 120 else "")
-                                    ),
+                                    "value_preview": (str(val)[:120] + ("…" if len(str(val)) > 120 else "")),
                                 }
                             )
                 if bad_count:
@@ -175,9 +156,7 @@ def cmd_validate(
             cwd = Path.cwd().resolve()
             wd = Path(cfg.campaign.workdir).resolve()
             if wd not in cwd.parents and cwd != wd:
-                print_stdout(
-                    f"OK: validation passed. (Note: your CWD '{cwd}' is outside campaign workdir '{wd}')"
-                )
+                print_stdout(f"OK: validation passed. (Note: your CWD '{cwd}' is outside campaign workdir '{wd}')")
                 return
         except Exception:
             pass

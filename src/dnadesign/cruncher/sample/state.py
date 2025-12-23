@@ -135,7 +135,7 @@ def make_seed(cfg_init: Any, pwms: Dict[str, PWM], rng: np.random.Generator) -> 
             raise ValueError("For init.kind=='consensus', you must supply init.regulator=<PWM_name>.")
         if pwm_name not in pwms:
             raise KeyError(
-                f"PWM '{pwm_name}' not found in loaded regulator_sets. " f"Available PWMs: {sorted(pwms.keys())}"
+                f"PWM '{pwm_name}' not found in loaded regulator_sets. Available PWMs: {sorted(pwms.keys())}"
             )
         pwm = pwms[pwm_name]
         pad_with = getattr(cfg_init, "pad_with", "background")

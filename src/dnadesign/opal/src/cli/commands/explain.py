@@ -27,13 +27,9 @@ from ._common import (
 )
 
 
-@cli_command(
-    "explain", help="Dry-run planner for a round; prints counts and plan (no writes)."
-)
+@cli_command("explain", help="Dry-run planner for a round; prints counts and plan (no writes).")
 def cmd_explain(
-    config: Path = typer.Option(
-        None, "--config", "-c", envvar="OPAL_CONFIG", help="campaign.yaml"
-    ),
+    config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG", help="campaign.yaml"),
     round: int = typer.Option(..., "--round", "-r"),
     json: bool = typer.Option(
         False,

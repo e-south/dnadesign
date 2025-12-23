@@ -51,9 +51,7 @@ def _construct_mapping(loader, node, deep: bool = False):
     return mapping
 
 
-_StrictLoader.add_constructor(
-    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping
-)
+_StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
 
 
 def _expand(p: str | os.PathLike) -> Path:

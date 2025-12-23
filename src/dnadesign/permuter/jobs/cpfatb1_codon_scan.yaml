@@ -32,7 +32,7 @@ job:
     layout: flat
 
   plot:
-    which: 
+    which:
       - position_scatter_and_heatmap
       - aa_category_effects
       - metric_by_mutation_count

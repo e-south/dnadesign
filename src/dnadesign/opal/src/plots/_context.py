@@ -37,8 +37,6 @@ class PlotContext:
         Plugins SHOULD check `self.save_data` before calling this.
         """
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        target = self.output_dir / (
-            filename or (self.filename.rsplit(".", 1)[0] + ".csv")
-        )
+        target = self.output_dir / (filename or (self.filename.rsplit(".", 1)[0] + ".csv"))
         df.to_csv(target, index=False)
         return target

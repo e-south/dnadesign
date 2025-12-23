@@ -99,9 +99,7 @@ class LibShuffleConfig:
 
     evo2_metric_type: Literal["l2", "log1p_l2", "cosine"] = "cosine"
 
-    literal_filters: List[AllowedLiteral] = field(
-        default_factory=lambda: ["jaccard", "levenshtein"]
-    )
+    literal_filters: List[AllowedLiteral] = field(default_factory=lambda: ["jaccard", "levenshtein"])
     literal_min_bp_diff: int = 0
     min_tf_richness: int = 2
 
@@ -153,29 +151,21 @@ class LibShuffleConfig:
             "billboard_core_metrics": raw["billboard_core_metrics"],
             "selection": SelectionConfig(
                 method=raw["selection"]["method"],
-                latent_threshold=LatentThreshold(
-                    **raw["selection"]["latent_threshold"]
-                ),
+                latent_threshold=LatentThreshold(**raw["selection"]["latent_threshold"]),
             ),
             # optional / new
             "literal_filters": raw.get("literal_filters", default.literal_filters),
-            "literal_min_bp_diff": raw.get(
-                "literal_min_bp_diff", default.literal_min_bp_diff
-            ),
+            "literal_min_bp_diff": raw.get("literal_min_bp_diff", default.literal_min_bp_diff),
             "min_tf_richness": raw.get("min_tf_richness", default.min_tf_richness),
             # everything else (unchanged)
             "subsample_size": raw.get("subsample_size", default.subsample_size),
             "num_draws": raw.get("num_draws", default.num_draws),
             "random_seed": raw.get("random_seed", default.random_seed),
             "with_replacement": raw.get("with_replacement", default.with_replacement),
-            "max_attempts_per_draw": raw.get(
-                "max_attempts_per_draw", default.max_attempts_per_draw
-            ),
+            "max_attempts_per_draw": raw.get("max_attempts_per_draw", default.max_attempts_per_draw),
             "evo2_metric_type": raw.get("evo2_metric_type", default.evo2_metric_type),
             "save_selected": raw.get("save_selected", default.save_selected),
-            "save_sublibraries": raw.get(
-                "save_sublibraries", default.save_sublibraries
-            ),
+            "save_sublibraries": raw.get("save_sublibraries", default.save_sublibraries),
         }
 
         # selection config
@@ -224,25 +214,17 @@ class LibShuffleConfig:
 
         # kde
         kd, rk = default.plot.kde, pr.get("kde", {})
-        kde = KDEConfig(
-            figsize=rk.get("figsize", kd.figsize), dpi=rk.get("dpi", kd.dpi)
-        )
+        kde = KDEConfig(figsize=rk.get("figsize", kd.figsize), dpi=rk.get("dpi", kd.dpi))
 
         # pairplot
         pd_, rp = default.plot.pairplot, pr.get("pairplot", {})
-        pairplot = PairplotConfig(
-            figsize=rp.get("figsize", pd_.figsize), dpi=rp.get("dpi", pd_.dpi)
-        )
+        pairplot = PairplotConfig(figsize=rp.get("figsize", pd_.figsize), dpi=rp.get("dpi", pd_.dpi))
 
         # hitzone
         hz, rh = default.plot.hitzone, pr.get("hitzone", {})
-        hitzone = HitzoneConfig(
-            figsize=rh.get("figsize", hz.figsize), dpi=rh.get("dpi", hz.dpi)
-        )
+        hitzone = HitzoneConfig(figsize=rh.get("figsize", hz.figsize), dpi=rh.get("dpi", hz.dpi))
 
-        cfg["plot"] = PlotConfig(
-            scatter=scatter, kde=kde, pairplot=pairplot, hitzone=hitzone
-        )
+        cfg["plot"] = PlotConfig(scatter=scatter, kde=kde, pairplot=pairplot, hitzone=hitzone)
 
         inst = cls(**cfg)
         inst._raw = raw

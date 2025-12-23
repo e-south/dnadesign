@@ -38,7 +38,7 @@ usr/
 | `source`     | string             | ingest provenance              |
 | `created_at` | timestamp(us, UTC) | ingest time                    |
 
-> **Contract:** exactly one `records.parquet` per dataset directory.  
+> **Contract:** exactly one `records.parquet` per dataset directory.
 > **Derived columns must be namespaced** as `<tool>__<field>` (e.g., `mock__score`, `infer__llr`).
 
 ---

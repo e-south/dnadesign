@@ -44,9 +44,7 @@ def compute_mass(
                 mass[j] += s / denom
                 mutated_any[j] = True
     idx = np.arange(1, L_total + 1)
-    df = pd.DataFrame(
-        {"aa_index": idx, "mass": mass[1:], "mutated_any": mutated_any[1:]}
-    )
+    df = pd.DataFrame({"aa_index": idx, "mass": mass[1:], "mutated_any": mutated_any[1:]})
     return df
 
 
@@ -90,9 +88,7 @@ def render_mass(
         # per-residue tick granularity
         xticks = np.arange(1, L + 1, 1)
         ax.set_xticks(xticks)
-        ax.set_xticklabels(
-            [aa_letters[i - 1] for i in xticks], rotation=0, fontsize=int(round(8 * fs))
-        )
+        ax.set_xticklabels([aa_letters[i - 1] for i in xticks], rotation=0, fontsize=int(round(8 * fs)))
 
     ax.set_title(title)
     ax.spines["top"].set_visible(False)

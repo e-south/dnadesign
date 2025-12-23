@@ -42,13 +42,9 @@ def _load_codon_table(path: str | Path) -> Tuple[Dict[str, List[str]], Dict[str,
         reader = csv.DictReader(fh)
         fields = [f.strip() for f in (reader.fieldnames or [])]
         if not _BASE_REQUIRED.issubset(fields):
-            raise ValueError(
-                f"scan_codon: table must include columns {_BASE_REQUIRED}, got {fields}"
-            )
+            raise ValueError(f"scan_codon: table must include columns {_BASE_REQUIRED}, got {fields}")
         if not any(w in fields for w in _WEIGHT_ALIASES):
-            raise ValueError(
-                f"scan_codon: table must include at least one of {_WEIGHT_ALIASES}, got {fields}"
-            )
+            raise ValueError(f"scan_codon: table must include at least one of {_WEIGHT_ALIASES}, got {fields}")
         for row in reader:
             aa = (row.get("amino_acid") or "").strip().upper()
             if aa == "*":
@@ -93,16 +89,11 @@ class ScanCodon(Protocol):
         except Exception as e:
             raise ValueError(f"scan_codon: failed to read codon_table {p}: {e}")
         if not _BASE_REQUIRED.issubset(fields):
-            raise ValueError(
-                f"scan_codon: codon table must include columns {_BASE_REQUIRED}, "
-                f"got {fields}"
-            )
+            raise ValueError(f"scan_codon: codon table must include columns {_BASE_REQUIRED}, got {fields}")
         rc = params.get("region_codons")
         if rc is not None:
             if not (isinstance(rc, (list, tuple)) and len(rc) == 2):
-                raise ValueError(
-                    "scan_codon: region_codons must be [start,end] in codon units"
-                )
+                raise ValueError("scan_codon: region_codons must be [start,end] in codon units")
 
     def generate(
         self,
@@ -119,9 +110,7 @@ class ScanCodon(Protocol):
         if len(orig) % _TRIPLE != 0:
             raise ValueError("scan_codon: sequence length must be divisible by 3")
         seq_upper = orig.upper()
-        codons_upper = [
-            seq_upper[i : i + _TRIPLE] for i in range(0, len(seq_upper), _TRIPLE)
-        ]
+        codons_upper = [seq_upper[i : i + _TRIPLE] for i in range(0, len(seq_upper), _TRIPLE)]
         total = len(codons_upper)
         rc = params.get("region_codons")
         scan_ix = range(int(rc[0]), int(rc[1])) if rc else range(total)
@@ -142,9 +131,7 @@ class ScanCodon(Protocol):
                 for off in range(3):
                     orig_ch = chars[codon_start + off]
                     new_up = new_codon[off]
-                    chars[codon_start + off] = (
-                        new_up if orig_ch.isupper() else new_up.lower()
-                    )
+                    chars[codon_start + off] = new_up if orig_ch.isupper() else new_up.lower()
                 new_seq = "".join(chars)
                 codon_start_1b = ci * 3 + 1
 

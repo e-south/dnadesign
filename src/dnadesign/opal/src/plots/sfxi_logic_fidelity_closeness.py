@@ -46,9 +46,7 @@ def render(context, params: dict) -> None:
     # Validation policy for violin inputs (assertive, explicit)
     violin_min_points = int(params.get("violin_min_points", 3))
     violin_require_nonzero_var = bool(params.get("violin_require_nonzero_var", True))
-    on_violin_invalid = (
-        str(params.get("on_violin_invalid", "line")).strip().lower()
-    )  # "error" | "line"
+    on_violin_invalid = str(params.get("on_violin_invalid", "line")).strip().lower()  # "error" | "line"
     if on_violin_invalid not in {"error", "line"}:
         raise ValueError("on_violin_invalid must be 'error' or 'line'.")
 
@@ -124,9 +122,7 @@ def render(context, params: dict) -> None:
             meta["setpoint"] = meta["objective__params"].map(_extract_setpoint)
             meta = meta.dropna(subset=["setpoint"])
             if meta.empty:
-                raise ValueError(
-                    "No setpoint_vector found in ledger.runs objective__params."
-                )
+                raise ValueError("No setpoint_vector found in ledger.runs objective__params.")
             meta = meta.sort_values(["as_of_round"]).tail(1)
             setpoint = np.asarray(list(meta["setpoint"].iloc[0]), dtype=float).ravel()
         else:
@@ -139,9 +135,7 @@ def render(context, params: dict) -> None:
             meta["setpoint"] = meta["objective__params"].map(_extract_setpoint)
             meta = meta.dropna(subset=["setpoint"])
             if meta.empty:
-                raise ValueError(
-                    f"No setpoint_vector found in ledger.runs for as_of_round={sp_round}."
-                )
+                raise ValueError(f"No setpoint_vector found in ledger.runs for as_of_round={sp_round}.")
             setpoint = np.asarray(list(meta["setpoint"].iloc[0]), dtype=float).ravel()
 
     if setpoint.size != 4 or not np.all(np.isfinite(setpoint)):
@@ -151,9 +145,7 @@ def render(context, params: dict) -> None:
     def _logic4_from_yobs(y):
         arr = np.asarray(y, dtype=float).ravel()
         if arr.size < 4:
-            raise ValueError(
-                f"y_obs must have at least 4 components; got length={arr.size}."
-            )
+            raise ValueError(f"y_obs must have at least 4 components; got length={arr.size}.")
         lg = arr[:4]
         if not np.all(np.isfinite(lg)):
             raise ValueError("y_obs logic components contain non-finite values.")
@@ -295,9 +287,7 @@ def render(context, params: dict) -> None:
         return (len(problems) == 0, problems)
 
     draw_violin = bool(use_violin)
-    violin_ok, issues = (
-        _violins_viable(mse_arrays_by_round) if draw_violin else (False, [])
-    )
+    violin_ok, issues = _violins_viable(mse_arrays_by_round) if draw_violin else (False, [])
     if draw_violin and not violin_ok:
         msg = "Violin disabled: " + "; ".join(issues)
         if on_violin_invalid == "error":

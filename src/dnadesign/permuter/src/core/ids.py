@@ -14,9 +14,7 @@ import hashlib
 import json
 
 
-def variant_id(
-    *, job: str, ref: str, protocol: str, sequence: str, modifications: list[str]
-) -> str:
+def variant_id(*, job: str, ref: str, protocol: str, sequence: str, modifications: list[str]) -> str:
     payload = {
         "job": job,
         "ref": ref,

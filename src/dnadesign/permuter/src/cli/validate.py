@@ -40,9 +40,7 @@ def validate(data: Path, strict: bool = False):
         raise ValueError(f"USR core columns missing: {missing}")
 
     # id integrity
-    recomputed = df.apply(
-        lambda r: _sha1(str(r["bio_type"]), str(r["sequence"])), axis=1
-    )
+    recomputed = df.apply(lambda r: _sha1(str(r["bio_type"]), str(r["sequence"])), axis=1)
     bad = (recomputed != df["id"]).sum()
     if bad:
         raise ValueError(f"{bad} row(s) have incorrect id for (bio_type|sequence)")

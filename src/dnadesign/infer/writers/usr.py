@@ -40,9 +40,7 @@ def write_back_usr(
     N = len(ids)
     for out_id, col in columnar.items():
         if len(col) != N:
-            raise WriteBackError(
-                f"Output column '{out_id}' length={len(col)} doesn't match ids length={N}"
-            )
+            raise WriteBackError(f"Output column '{out_id}' length={len(col)} doesn't match ids length={N}")
 
     out_cols = {}
     for out_id, col in columnar.items():

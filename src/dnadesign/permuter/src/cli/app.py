@@ -69,9 +69,7 @@ def run(
         "--ref",
         help="Reference name (row in refs CSV). Required if CSV has multiple rows.",
     ),
-    out: Path = typer.Option(
-        None, "--out", "-o", help="Output root directory (default: job.output.dir)"
-    ),
+    out: Path = typer.Option(None, "--out", "-o", help="Output root directory (default: job.output.dir)"),
     overwrite: bool = typer.Option(
         False,
         "--overwrite/--no-overwrite",
@@ -100,18 +98,14 @@ def evaluate(
         "--with",
         help="Repeatable: id:evaluator[:metric] (e.g., llr:evo2_llr:log_likelihood_ratio)",
     ),
-    metric: List[str] = typer.Option(
-        None, "--metric", help="Convenience: metric ids scored by placeholder evaluator"
-    ),
+    metric: List[str] = typer.Option(None, "--metric", help="Convenience: metric ids scored by placeholder evaluator"),
     job: str = typer.Option(
         None,
         "--job",
         "-j",
         help="Job YAML path or PRESET name (used if --data omitted)",
     ),
-    ref: str = typer.Option(
-        None, "--ref", help="Reference name from refs CSV (used if --data omitted)"
-    ),
+    ref: str = typer.Option(None, "--ref", help="Reference name from refs CSV (used if --data omitted)"),
     out: Path = typer.Option(
         None,
         "--out",
@@ -138,18 +132,14 @@ def evaluate(
     ),
 )
 def plot(
-    data: Path = typer.Option(
-        None, "--data", "-d", help="Path to records.parquet OR dataset directory"
-    ),
+    data: Path = typer.Option(None, "--data", "-d", help="Path to records.parquet OR dataset directory"),
     job: str = typer.Option(
         None,
         "--job",
         "-j",
         help="Job YAML path or PRESET name (used if --data omitted)",
     ),
-    ref: str = typer.Option(
-        None, "--ref", help="Reference name from refs CSV (used with --job)"
-    ),
+    ref: str = typer.Option(None, "--ref", help="Reference name from refs CSV (used with --job)"),
     out: Path = typer.Option(
         None,
         "--out",
@@ -163,14 +153,10 @@ def plot(
         "Allowed: position_scatter_and_heatmap, ranked_variants, synergy_scatter, "
         "metric_by_mutation_count, aa_category_effects, hairpin_length_vs_metric, window_score_mass",  # noqa
     ),
-    metric_id: str = typer.Option(
-        None, "--metric-id", help="Metric id to plot (e.g., llr_mean, llr_sum)"
-    ),
+    metric_id: str = typer.Option(None, "--metric-id", help="Metric id to plot (e.g., llr_mean, llr_sum)"),
     width: float = typer.Option(None, "--width", help="Figure width (inches)"),
     height: float = typer.Option(None, "--height", help="Figure height (inches)"),
-    font_scale: float = typer.Option(
-        None, "--font-scale", help="Multiply all font sizes"
-    ),
+    font_scale: float = typer.Option(None, "--font-scale", help="Multiply all font sizes"),
     emit_summaries: Optional[bool] = typer.Option(
         None,
         "--emit-summaries/--no-emit-summaries",

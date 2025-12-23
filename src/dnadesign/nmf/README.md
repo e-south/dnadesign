@@ -34,7 +34,7 @@ At first glance, it’s natural to lean on classic “billboard” metrics when 
 - **Jaccard Dissimilarity** — how distinct the combinations of transcription factors are between sequence pairs.
 
 These metrics capture surface-level diversity, but in a **highly diverse by design** library, they offer little contrast. Because TFs and their binding sites are uniformly sampled, nearly all sequences appear equally complex, causing these metrics to flatline: they confirm diversity but fail to stratify it.
-    
+
 NMF identifies recurrent combinations of TF motifs that explain variation across the entire sequence library. These latent programs may reveal hierarchical motif groupings that shallow diversity metrics cannot detect.
 
   > Each sequence is expressed as a soft mixture over programs (`W`), and each program is defined as a weighted set of TF motifs (`H`).
@@ -43,7 +43,7 @@ NMF identifies recurrent combinations of TF motifs that explain variation across
 
 The pipeline takes as input:
 
-  - A `.pt` file with the sibling **sequences** directory, containing a list of sequence dictionaries, each with motif-level data in `meta_tfbs_parts_in_array`.  
+  - A `.pt` file with the sibling **sequences** directory, containing a list of sequence dictionaries, each with motif-level data in `meta_tfbs_parts_in_array`.
   - A YAML config specifying NMF hyperparameters, rank range, and visualization flags.
 
     ```yaml
@@ -77,7 +77,7 @@ The pipeline takes as input:
   - The pipeline constructs a feature matrix `X` where rows represent sequences in the library and columns represent individual TF motifs found in the sequence.
 
 #### Decomposing factor `X` into two non-negative matrices:
-  - `X ≈ W × H`, 
+  - `X ≈ W × H`,
   where:
   - W (sequences × programs)
     - Each row is a program composition vector, expressing how a sequence draws from the learned regulatory programs.
@@ -113,7 +113,7 @@ We compute CDS across a range of k values and select the one that maximizes it�
   <img src="images/composite_diversity_curve.png" alt="Composite Diversity Curve" width="500"/>
 
 In the above example, k = 12 achieved the highest CDS. We then reused the corresponding NMF decomposition (W, H) for all downstream analyses and subset evaluations.
-    
+
 
 ### Outputs
 - A results directory `nmf/batch_results/<batch_name>` containing:

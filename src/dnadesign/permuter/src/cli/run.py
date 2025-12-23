@@ -54,24 +54,18 @@ def _load_job(path: str | Path) -> tuple[JobConfig, Path]:
 
 def _load_refs(cfg: JobConfig, base_dir: Path) -> pd.DataFrame:
     refs_path = (
-        (base_dir / cfg.job.input.refs)
-        if not Path(cfg.job.input.refs).is_absolute()
-        else Path(cfg.job.input.refs)
+        (base_dir / cfg.job.input.refs) if not Path(cfg.job.input.refs).is_absolute() else Path(cfg.job.input.refs)
     )
     if not refs_path.exists():
         raise FileNotFoundError(f"Refs CSV not found: {refs_path}")
     df = pd.read_csv(refs_path, dtype=str)
     need = {cfg.job.input.name_col, cfg.job.input.seq_col}
     if not need.issubset(df.columns):
-        raise ValueError(
-            f"Refs CSV must contain columns {need}, got {list(df.columns)}"
-        )
+        raise ValueError(f"Refs CSV must contain columns {need}, got {list(df.columns)}")
     return df
 
 
-def _pick_reference(
-    df: pd.DataFrame, name_col: str, seq_col: str, desired: Optional[str]
-) -> tuple[str, str]:
+def _pick_reference(df: pd.DataFrame, name_col: str, seq_col: str, desired: Optional[str]) -> tuple[str, str]:
     if desired:
         sub = df[df[name_col] == desired]
         if sub.empty:
@@ -120,9 +114,7 @@ def _argv() -> str:
         return " ".join(sys.argv)
 
 
-def run(
-    job: str | Path, ref: Optional[str], out: Optional[Path], overwrite: bool = False
-):
+def run(job: str | Path, ref: Optional[str], out: Optional[Path], overwrite: bool = False):
     t0 = time.time()
     job_path = resolve_job_hint(Path(str(job)))
     cfg, job_path = _load_job(job)
@@ -138,9 +130,7 @@ def run(
     df_refs = pd.read_csv(jp.refs_csv, dtype=str)
     console.print(f"[cyan]Using refs CSV[/cyan]: {jp.refs_csv}")
     desired = ref or getattr(cfg.job.input, "reference_sequence", None)
-    ref_name, ref_seq = _pick_reference(
-        df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, desired
-    )
+    ref_name, ref_seq = _pick_reference(df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, desired)
     console.print(f"[dim]Using reference[/dim] [bold]{ref_name}[/bold]")
 
     # Re-resolve with actual ref_name for dataset dir
@@ -160,9 +150,7 @@ def run(
                 f"Dataset already exists for ref '{ref_name}': {jp.records_parquet}\n"
                 "Refuse to overwrite. Re-run with --overwrite, or choose a different --out."
             )
-        console.print(
-            f"[yellow]Overwrite enabled[/yellow] → will replace {jp.records_parquet}"
-        )
+        console.print(f"[yellow]Overwrite enabled[/yellow] → will replace {jp.records_parquet}")
     console.print(f"[cyan]Dataset dir[/cyan]: {jp.dataset_dir}")
 
     # stable RNG seed derived from knobs (so hairpin protocol is reproducible)
@@ -252,20 +240,10 @@ def run(
 
     # Summaries
     n = len(df)
-    nt_count = (
-        len(df["permuter__nt_pos"].dropna().unique())
-        if "permuter__nt_pos" in df.columns
-        else 0
-    )
-    aa_count = (
-        len(df["permuter__aa_pos"].dropna().unique())
-        if "permuter__aa_pos" in df.columns
-        else 0
-    )
+    nt_count = len(df["permuter__nt_pos"].dropna().unique()) if "permuter__nt_pos" in df.columns else 0
+    aa_count = len(df["permuter__aa_pos"].dropna().unique()) if "permuter__aa_pos" in df.columns else 0
     hp_lens = (
-        df["permuter__hp_length_paired"].describe().to_dict()
-        if "permuter__hp_length_paired" in df.columns
-        else {}
+        df["permuter__hp_length_paired"].describe().to_dict() if "permuter__hp_length_paired" in df.columns else {}
     )
     _LOG.info(
         "run: wrote %d variants (unique nt_pos=%d, aa_pos=%d) → %s",
@@ -281,5 +259,5 @@ def run(
         )
 
     console.print(f"[green]✔[/green] Variants: {len(df)} → {jp.records_parquet}")
-    console.print(f"Elapsed: {time.time()-t0:.2f}s")
+    console.print(f"Elapsed: {time.time() - t0:.2f}s")
     console.print(f"[dim]Record:[/dim] {jp.dataset_dir / 'RECORD.md'}")

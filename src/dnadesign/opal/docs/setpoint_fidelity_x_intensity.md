@@ -301,5 +301,3 @@ One cannot recover the ratio‑based logic (`v`) from YFP intensities alone. If 
 ---
 
 @e-south
-
-

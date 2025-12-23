@@ -152,9 +152,7 @@ def load_job(path: Path) -> Job:
     fpr = video_cfg.get("frames_per_record", None)
     sec = video_cfg.get("seconds_per_seq", None)
     if fpr is not None and sec is not None:
-        raise SchemaError(
-            "Provide only one of frames_per_record OR seconds_per_seq (not both)."
-        )
+        raise SchemaError("Provide only one of frames_per_record OR seconds_per_seq (not both).")
     if fpr is None and sec is None:
         frames_per_record = 1
     elif fpr is not None:
@@ -171,15 +169,9 @@ def load_job(path: Path) -> Job:
     pauses = {str(k): float(v) for (k, v) in (video_cfg.get("pauses") or {}).items()}
     width_px = video_cfg.get("width_px")
     height_px = video_cfg.get("height_px")
-    aspect_ratio = _parse_aspect(
-        video_cfg.get("aspect") or video_cfg.get("aspect_ratio")
-    )
+    aspect_ratio = _parse_aspect(video_cfg.get("aspect") or video_cfg.get("aspect_ratio"))
 
-    out_path = (
-        Path(video_cfg.get("path"))
-        if video_cfg.get("path")
-        else (results_dir / name / f"{name}.{fmt}")
-    )
+    out_path = Path(video_cfg.get("path")) if video_cfg.get("path") else (results_dir / name / f"{name}.{fmt}")
     vc = VideoCfg(
         fmt=fmt,
         fps=fps,
@@ -216,9 +208,7 @@ def load_job(path: Path) -> Job:
     selection_cfg: Optional[SelectionCfg] = None
     if sel_raw is not None:
         p = Path(sel_raw.get("path") or sel_raw.get("csv") or "")
-        ensure(
-            str(p) != "", "selection.path (or selection.csv) is required", SchemaError
-        )
+        ensure(str(p) != "", "selection.path (or selection.csv) is required", SchemaError)
         if not p.is_absolute():
             p = root / p
         match_on = str(sel_raw.get("match_on", "id")).lower()
@@ -259,15 +249,11 @@ def load_job(path: Path) -> Job:
     ann_cfg = dict(input_.get("annotations") or {})
     amb = str(ann_cfg.get("ambiguous", "error")).lower()
     if amb not in {"error", "first", "last", "drop"}:
-        raise SchemaError(
-            f"input.annotations.ambiguous must be one of "
-            f"['error','first','last','drop'], got {amb!r}"
-        )
+        raise SchemaError(f"input.annotations.ambiguous must be one of ['error','first','last','drop'], got {amb!r}")
     offset_mode = str(ann_cfg.get("offset_mode", "auto")).lower()
     if offset_mode not in {"auto", "zero_based", "one_based"}:
         raise SchemaError(
-            f"input.annotations.offset_mode must be one of "
-            f"['auto','zero_based','one_based'], got {offset_mode!r}"
+            f"input.annotations.offset_mode must be one of ['auto','zero_based','one_based'], got {offset_mode!r}"
         )
     zero_unspec = bool(ann_cfg.get("zero_as_unspecified", True))
     # --- row-level gating options ---
@@ -281,9 +267,7 @@ def load_job(path: Path) -> Job:
     elif isinstance(req_cols_raw, (list, tuple)):
         req_cols = [str(c) for c in req_cols_raw]
     else:
-        raise SchemaError(
-            "input.annotations.require_non_null_cols must be a list of column names"
-        )
+        raise SchemaError("input.annotations.require_non_null_cols must be a list of column names")
 
     ann_policy: Mapping[str, object] = {
         "ambiguous": amb,

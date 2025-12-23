@@ -219,17 +219,13 @@ def test_multisite_select_end_to_end_invariants(tmp_path):
     src_epi = src_df.set_index("id")["epistasis"]
     epi_selected_source = src_epi.loc[sel_df["source_id"]].to_numpy(dtype=float)
     assert (epi_selected_source >= 0.0).all()
-    np.testing.assert_allclose(
-        epi_selected_source, sel_df["delta"].to_numpy(dtype=float)
-    )
+    np.testing.assert_allclose(epi_selected_source, sel_df["delta"].to_numpy(dtype=float))
 
     # ------------------------------------------------------------------
     # Score invariants
     # ------------------------------------------------------------------
     weights = params["select"]["scoring"]["weights"]
-    expected_score = sel_df["z_llr"] * float(weights["llr"]) + sel_df["z_epi"] * float(
-        weights["epi"]
-    )
+    expected_score = sel_df["z_llr"] * float(weights["llr"]) + sel_df["z_epi"] * float(weights["epi"])
     np.testing.assert_allclose(expected_score.to_numpy(), sel_df["score"].to_numpy())
 
     # ------------------------------------------------------------------

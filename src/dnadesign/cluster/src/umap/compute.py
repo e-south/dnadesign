@@ -29,8 +29,6 @@ def compute(
 ) -> np.ndarray:
     sc = _imports()
     ad = sc.AnnData(X.astype(np.float32, copy=False))
-    sc.pp.neighbors(
-        ad, n_neighbors=neighbors, use_rep="X", metric=metric, random_state=seed
-    )
+    sc.pp.neighbors(ad, n_neighbors=neighbors, use_rep="X", metric=metric, random_state=seed)
     sc.tl.umap(ad, min_dist=min_dist, random_state=seed)
     return ad.obsm["X_umap"]

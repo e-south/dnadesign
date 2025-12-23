@@ -14,9 +14,7 @@ from pathlib import Path
 from .index import list_runs
 
 
-def find_equivalent_fit(
-    input_sig_hash: str, algo_sig_hash: str, root: Path | None = None
-) -> dict | None:
+def find_equivalent_fit(input_sig_hash: str, algo_sig_hash: str, root: Path | None = None) -> dict | None:
     df = list_runs(root=root)
     if df.empty:
         return None

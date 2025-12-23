@@ -20,9 +20,7 @@ def _first_present(d: Mapping[str, Any], keys: Sequence[str]) -> Optional[Any]:
     return None
 
 
-def get_str(
-    d: Mapping[str, Any], keys: Sequence[str], default: Optional[str] = None
-) -> Optional[str]:
+def get_str(d: Mapping[str, Any], keys: Sequence[str], default: Optional[str] = None) -> Optional[str]:
     """
     Return the first present key coerced to str; otherwise `default`.
     (Previous behavior incorrectly ignored `default`.)

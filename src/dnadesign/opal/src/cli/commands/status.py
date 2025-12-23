@@ -30,9 +30,7 @@ def cmd_status(
 ):
     try:
         cfg = load_cli_config(config)
-        st = build_status(
-            Path(cfg.campaign.workdir) / "state.json", round_k=round, show_all=all
-        )
+        st = build_status(Path(cfg.campaign.workdir) / "state.json", round_k=round, show_all=all)
         if json or all:
             json_out(st)
         else:

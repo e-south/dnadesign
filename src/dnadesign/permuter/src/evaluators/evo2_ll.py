@@ -97,9 +97,7 @@ class Evo2LogLikelihoodEvaluator(Evaluator):
         ref_embedding=None,
     ) -> List[float]:
         if metric not in ("log_likelihood", "ll"):
-            raise ValueError(
-                f"evo2_ll only supports metric='log_likelihood' (alias 'll'), got {metric!r}"
-            )
+            raise ValueError(f"evo2_ll only supports metric='log_likelihood' (alias 'll'), got {metric!r}")
         self._ensure_ready()
         seqs = [str(s).upper() for s in sequences]
         outputs = [

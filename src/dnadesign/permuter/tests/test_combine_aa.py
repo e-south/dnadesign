@@ -480,10 +480,7 @@ def test_combo_fields_are_canonical_and_consistent(tmp_path: Path):
         return toks
 
     # Single lookup for expected singles scores
-    singles = {
-        (r["permuter__aa_pos"], r["permuter__aa_alt"]): r["permuter__metric__llr_mean"]
-        for r in rows
-    }
+    singles = {(r["permuter__aa_pos"], r["permuter__aa_alt"]): r["permuter__metric__llr_mean"] for r in rows}
 
     for rec in out:
         k = int(rec["mut_count"])
@@ -494,18 +491,14 @@ def test_combo_fields_are_canonical_and_consistent(tmp_path: Path):
 
         # aa_combo_str canonical order (by position ascending) and matches lists
         toks = parse_combo(rec["aa_combo_str"])
-        assert [p for (p, _, _) in toks] == sorted(
-            pos
-        ), "aa_combo_str must be sorted by position"
+        assert [p for (p, _, _) in toks] == sorted(pos), "aa_combo_str must be sorted by position"
         assert [w for (_, w, _) in toks] == wt, "WT letters mismatch"
         assert [a for (_, _, a) in toks] == alt, "ALT letters mismatch"
 
         # Additivity: expected__llr_mean equals sum of singles at those positions
         expected = float(rec["expected__llr_mean"])
         calc = float(sum(singles[(p, a)] for p, a in zip(pos, alt)))
-        assert (
-            abs(expected - calc) < 1e-12
-        ), f"expected(additive) mismatch: {expected} vs {calc}"
+        assert abs(expected - calc) < 1e-12, f"expected(additive) mismatch: {expected} vs {calc}"
         assert "expected__llr_mean" in rec
 
 
@@ -732,6 +725,4 @@ def test_allowed_position_ranges_are_respected(tmp_path: Path):
     )
     assert out, "No combos generated under allowed window"
     got_positions = set(int(p) for rec in out for p in rec["aa_pos_list"])
-    assert got_positions.issubset(
-        {2, 3}
-    ), f"expected positions {{2,3}}, got {got_positions}"
+    assert got_positions.issubset({2, 3}), f"expected positions {{2,3}}, got {got_positions}"

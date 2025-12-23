@@ -18,9 +18,9 @@ params:
 plot:
   dims: [6, 6]
   alpha: 0.15
-  size: 10.0
   color_by:
     - "cluster"
+    - "categorical:permuter__mut_count"
     - "highlight"
   size: 12.0                # base size for non-highlight points
   highlight:
@@ -32,8 +32,3 @@ plot:
     edgecolor: "red"
     linewidth: 0.9
     legend: false
-
-  color_by:
-    - "cluster"
-    - "categorical:permuter__mut_count"
-    - "highlight"

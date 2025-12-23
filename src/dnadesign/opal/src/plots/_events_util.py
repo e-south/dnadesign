@@ -50,13 +50,9 @@ def load_events_with_setpoint(
 
     # Assert required ledger sinks exist
     if not pred_dir.exists():
-        raise FileNotFoundError(
-            f"Missing predictions sink: {pred_dir}. Run a round to produce it."
-        )
+        raise FileNotFoundError(f"Missing predictions sink: {pred_dir}. Run a round to produce it.")
     if not runs_file.exists():
-        raise FileNotFoundError(
-            f"Missing runs sink: {runs_file}. Run a round to produce it."
-        )
+        raise FileNotFoundError(f"Missing runs sink: {runs_file}. Run a round to produce it.")
 
     def _arrow_filter_for_rounds(d: ds.Dataset):
         if round_selector is None or round_selector == "all":
@@ -97,9 +93,7 @@ def load_events_with_setpoint(
     if missing:
         raise ValueError(f"ledger.predictions missing columns: {missing}")
     if df.empty:
-        raise ValueError(
-            f"ledger.predictions had zero rows after projecting columns: {sorted(want)}"
-        )
+        raise ValueError(f"ledger.predictions had zero rows after projecting columns: {sorted(want)}")
 
     # Always join setpoint from ledger.runs (canonical)
     # Read run metadata (single Parquet file)

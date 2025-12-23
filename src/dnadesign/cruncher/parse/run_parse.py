@@ -20,11 +20,7 @@ from dnadesign.cruncher.utils.config import CruncherConfig
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_MOTIF_ROOT = (
-    PROJECT_ROOT.parent
-    / "dnadesign-data"
-    / "primary_literature"
-    / "OMalley_et_al"
-    / "escherichia_coli_motifs"
+    PROJECT_ROOT.parent / "dnadesign-data" / "primary_literature" / "OMalley_et_al" / "escherichia_coli_motifs"
 )
 
 
@@ -88,7 +84,7 @@ def run_parse(cfg: CruncherConfig, base_out: Path) -> None:
         df_lo = pd.DataFrame(
             log_odds,
             columns=list(pwm.alphabet),
-            index=[f"pos{i+1}" for i in range(log_odds.shape[0])],
+            index=[f"pos{i + 1}" for i in range(log_odds.shape[0])],
         )
         print(f"Log-odds matrix for {tf}:")
         print(df_lo.to_string(float_format=lambda x: f"{x:.3f}"))

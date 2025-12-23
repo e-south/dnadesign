@@ -21,9 +21,7 @@ from dnadesign.libshuffle.selection import select_best_subsample
 from dnadesign.libshuffle.subsampler import Subsampler
 from dnadesign.libshuffle.visualization import Plotter
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("libshuffle")
 
 
@@ -47,9 +45,7 @@ def main():
     pt_file = pts[0]
 
     ts = datetime.datetime.now().strftime("%Y%m%d")
-    outdir = (
-        project_root / "libshuffle" / "batch_results" / f"{cfg.output_dir_prefix}_{ts}"
-    )
+    outdir = project_root / "libshuffle" / "batch_results" / f"{cfg.output_dir_prefix}_{ts}"
     outdir.mkdir(parents=True, exist_ok=True)
     logger.info(f"Writing results to {outdir.resolve()}")
 

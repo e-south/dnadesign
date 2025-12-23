@@ -87,7 +87,8 @@ def encode_with_positional_bins(sequences: List[Dict], config: dict) -> Tuple[np
             # Retrieve the TF name using the mapping.
             if motif_candidate not in motif2tf:
                 logger.error(
-                    f"Motif '{motif_candidate}' has no corresponding TF mapping in sequence {seq_dict.get('id', 'unknown')}."
+                    f"Motif '{motif_candidate}' has no corresponding TF mapping in sequence "
+                    f"{seq_dict.get('id', 'unknown')}."
                 )
                 continue
             tf_name = motif2tf[motif_candidate]

@@ -38,9 +38,7 @@ def _maybe_datasets_root(root: Path, dataset: str) -> Path | None:
     return None
 
 
-def _search_up_for_datasets_root(
-    dataset: str, start: Path
-) -> tuple[Path | None, list[str]]:
+def _search_up_for_datasets_root(dataset: str, start: Path) -> tuple[Path | None, list[str]]:
     """
     Walk upward from `start`, looking for usr/datasets/<dataset>/records.parquet
     or datasets/<dataset>/records.parquet. Return (datasets_root, tried_paths).
@@ -60,9 +58,7 @@ def _search_up_for_datasets_root(
     return None, tried
 
 
-def detect_context(
-    dataset: str | None, file: str | Path | None, usr_root: str | None = None
-) -> dict:
+def detect_context(dataset: str | None, file: str | Path | None, usr_root: str | None = None) -> dict:
     """Detect working context. Returns a dict with keys:
     kind: 'usr'|'parquet'|'csv'
     dataset: str|None
@@ -79,8 +75,7 @@ def detect_context(
             ds_root = _maybe_datasets_root(root, dataset)
             if ds_root is None:
                 raise FileNotFoundError(
-                    "USR dataset '{ds}' not found under --usr-root '{rt}'. "
-                    "Tried: {cand1} and {cand2}".format(
+                    "USR dataset '{ds}' not found under --usr-root '{rt}'. Tried: {cand1} and {cand2}".format(
                         ds=dataset,
                         rt=str(root),
                         cand1=str(root / "datasets" / dataset / "records.parquet"),

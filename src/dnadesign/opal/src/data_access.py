@@ -72,9 +72,7 @@ class RecordsStore:
     def latest_pred_scalar_col(self) -> str:
         return f"opal__{self.campaign_slug}__latest_pred_scalar"
 
-    def upsert_current_y_column(
-        self, df: pd.DataFrame, labels_resolved: pd.DataFrame, y_col_name: str
-    ) -> pd.DataFrame:
+    def upsert_current_y_column(self, df: pd.DataFrame, labels_resolved: pd.DataFrame, y_col_name: str) -> pd.DataFrame:
         """
         Ensure the configured y-column holds the latest label for the affected ids.
         'labels_resolved' must have columns ['id','y'] with concrete ids (no NaN).
@@ -229,18 +227,14 @@ class RecordsStore:
         out[lh] = hist_series
         return out
 
-    def training_labels_from_y(
-        self, df: pd.DataFrame, as_of_round: int
-    ) -> pd.DataFrame:
+    def training_labels_from_y(self, df: pd.DataFrame, as_of_round: int) -> pd.DataFrame:
         """
         Compute effective training labels at or before 'as_of_round' from label_hist cache.
         Returns a frame with columns: id, y
         """
         lh = self.label_hist_col()
         if lh not in df.columns:
-            raise OpalError(
-                f"Expected label history column '{lh}' not found in records.parquet. "
-            )
+            raise OpalError(f"Expected label history column '{lh}' not found in records.parquet. ")
         recs: List[Tuple[str, List[float]]] = []
         for _id, hist_cell in df[["id", lh]].itertuples(index=False, name=None):
             _id = str(_id)
@@ -250,9 +244,7 @@ class RecordsStore:
             for e in hist:
                 try:
                     rr = int(e.get("r", 9_999_999))
-                    if rr <= as_of_round and (
-                        best is None or rr > int(best.get("r", -1))
-                    ):
+                    if rr <= as_of_round and (best is None or rr > int(best.get("r", -1))):
                         best = e
                 except Exception:
                     continue
@@ -278,18 +270,14 @@ class RecordsStore:
                 )
         return pd.DataFrame(recs, columns=["id", "y"])
 
-    def training_labels_with_round(
-        self, df: pd.DataFrame, as_of_round: int
-    ) -> pd.DataFrame:
+    def training_labels_with_round(self, df: pd.DataFrame, as_of_round: int) -> pd.DataFrame:
         """
         Like training_labels_from_y, but also returns the observed round for the effective label.
         Returns: DataFrame columns: id, y, r
         """
         lh = self.label_hist_col()
         if lh not in df.columns:
-            raise OpalError(
-                f"Expected label history column '{lh}' not found in records.parquet. "
-            )
+            raise OpalError(f"Expected label history column '{lh}' not found in records.parquet. ")
         recs: List[Tuple[str, List[float], int]] = []
         for _id, hist_cell in df[["id", lh]].itertuples(index=False, name=None):
             _id = str(_id)
@@ -298,9 +286,7 @@ class RecordsStore:
             for e in hist:
                 try:
                     rr = int(e.get("r", 9_999_999))
-                    if rr <= as_of_round and (
-                        best is None or rr > int(best.get("r", -1))
-                    ):
+                    if rr <= as_of_round and (best is None or rr > int(best.get("r", -1))):
                         best = e
                 except Exception:
                     continue
@@ -323,9 +309,7 @@ class RecordsStore:
         cols = [c for c in cols if c in df.columns]
         return df.loc[keep, cols].copy()
 
-    def transform_matrix(
-        self, df: pd.DataFrame, ids: Iterable[str]
-    ) -> Tuple[np.ndarray, List[str]]:
+    def transform_matrix(self, df: pd.DataFrame, ids: Iterable[str]) -> Tuple[np.ndarray, List[str]]:
         """
         Build X matrix for given ids using configured transform_x plugin.
         Returns (X, id_order)
@@ -340,9 +324,7 @@ class RecordsStore:
         return np.asarray(X), subset["id"].astype(str).tolist()
 
     # --------------- ensure rows exist for ingest ---------------
-    def ensure_rows_exist(
-        self, df: pd.DataFrame, labels_df: pd.DataFrame, csv_df: pd.DataFrame
-    ) -> pd.DataFrame:
+    def ensure_rows_exist(self, df: pd.DataFrame, labels_df: pd.DataFrame, csv_df: pd.DataFrame) -> pd.DataFrame:
         """
         If labels_df contains sequences that are not in df, create new rows with essentials from csv_df.
         We do not write X here; X should arrive via normal data pipelines.
@@ -358,16 +340,9 @@ class RecordsStore:
         if not have_id_col and not have_seq_col:
             return out  # nothing to do
 
-        known_ids = (
-            set(out["id"].astype(str).tolist()) if "id" in out.columns else set()
-        )
+        known_ids = set(out["id"].astype(str).tolist()) if "id" in out.columns else set()
         seq_to_id = (
-            out[["sequence", "id"]]
-            .dropna()
-            .astype(str)
-            .drop_duplicates()
-            .set_index("sequence")["id"]
-            .to_dict()
+            out[["sequence", "id"]].dropna().astype(str).drop_duplicates().set_index("sequence")["id"].to_dict()
             if "sequence" in out.columns and "id" in out.columns
             else {}
         )
@@ -382,26 +357,18 @@ class RecordsStore:
         # a) rows WITH a real id → ensure that id exists (attach sequence if provided)
         if have_id_col:
             rows_with_id = labels_df.loc[labels_df["id"].notna()]
-            for _id, seq in rows_with_id[["id", "sequence"]].itertuples(
-                index=False, name=None
-            ):
+            for _id, seq in rows_with_id[["id", "sequence"]].itertuples(index=False, name=None):
                 _id = str(_id)
                 if _id not in known_ids:
                     rows_to_add.append(
                         {
                             "id": _id,
-                            "sequence": (
-                                None
-                                if not have_seq_col
-                                else (None if pd.isna(seq) else str(seq))
-                            ),
+                            "sequence": (None if not have_seq_col else (None if pd.isna(seq) else str(seq))),
                         }
                     )
         # b) rows WITHOUT id but WITH sequence → create or reuse by sequence
         if have_seq_col:
-            rows_no_id = (
-                labels_df.loc[~labels_df["id"].notna()] if have_id_col else labels_df
-            )
+            rows_no_id = labels_df.loc[~labels_df["id"].notna()] if have_id_col else labels_df
             for seq in rows_no_id["sequence"].dropna().astype(str).tolist():
                 if seq not in seq_to_id:
                     rows_to_add.append({"id": _gen_id(seq), "sequence": seq})
@@ -442,15 +409,10 @@ class RecordsStore:
         if non_finite.any():
             bad = incoming[non_finite]
             # preview up to 15 offenders
-            preview = [
-                {"id": str(k), "value": (None if _pd.isna(v) else float(v))}
-                for k, v in bad.head(15).items()
-            ]
+            preview = [{"id": str(k), "value": (None if _pd.isna(v) else float(v))} for k, v in bad.head(15).items()]
             raise OpalError(
                 "update_latest_cache received non‑finite values for opal__{slug}__latest_pred_scalar "
-                "({n} offender(s)). Sample: {pv}".format(
-                    slug=slug, n=int(non_finite.sum()), pv=preview
-                )
+                "({n} offender(s)). Sample: {pv}".format(slug=slug, n=int(non_finite.sum()), pv=preview)
             )
         # map assignments (all finite)
         id_series = out["id"].astype(str)

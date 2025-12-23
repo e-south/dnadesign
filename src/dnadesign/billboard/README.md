@@ -2,7 +2,7 @@
 
 **billboard** quantifies regulatory diversity in dense‑array DNA libraries by extracting TFBS content and computing a small set of scalar “diversity” metrics and diagnostic plots.
 
-> **The pipeline helps to answer:**  
+> **The pipeline helps to answer:**
 > *How broad, balanced, distinct, and spatially diffuse are the transcription‑factor binding sites across a library of sequences?*
 
 ### Quick Start
@@ -13,26 +13,26 @@ Assuming you have a **densegen**-derived `.pt` file under `sequences/` containin
 python billboard/main.py
 ```
 
-By default, outputs will be written to  
+By default, outputs will be written to
 ```
 batch_results/<output_dir_prefix>_YYYYMMDD/
 ```
 
 ### Pipeline Overview
 
-1. **Load configuration** (`configs/example.yaml`).  
-2. **Load sequences** from one or more `.pt` files.  
-3. **Parse TFBS annotations** (`meta_tfbs_parts` / `meta_tfbs_parts_in_array`).  
-4. **Build motif strings** (ordered comma‑delimited TF+strand lists).  
-5. **Compute occupancy matrices** for forward/reverse strands.  
+1. **Load configuration** (`configs/example.yaml`).
+2. **Load sequences** from one or more `.pt` files.
+3. **Parse TFBS annotations** (`meta_tfbs_parts` / `meta_tfbs_parts_in_array`).
+4. **Build motif strings** (ordered comma‑delimited TF+strand lists).
+5. **Compute occupancy matrices** for forward/reverse strands.
 6. **Compute core diversity metrics**:
-   - TF Richness  
-   - Inverted Gini Coefficient  
-   - Minimum Jaccard Dissimilarity  
-   - Minimum Positional Entropy  
-   - Minimum Motif‑String Levenshtein  
-7. **Write CSV summaries** (`diversity_summary.csv`, `tf_coverage_summary.csv`, …).  
-8. **(Optional)** Generate diagnostic plots.  
+   - TF Richness
+   - Inverted Gini Coefficient
+   - Minimum Jaccard Dissimilarity
+   - Minimum Positional Entropy
+   - Minimum Motif‑String Levenshtein
+7. **Write CSV summaries** (`diversity_summary.csv`, `tf_coverage_summary.csv`, …).
+8. **(Optional)** Generate diagnostic plots.
 
 ### Configuration
 
@@ -74,7 +74,7 @@ Each metric is a **single scalar** summarizing one aspect of library diversity. 
 #### **Richness** — *TF Compositional Breadth*
 
 Count of **unique** TFs placed across all sequences:
-  
+
   TF_Richness = | ⋃ₛ Tₛ |
 
   where Tₛ is the set of TFs in sequence s.
@@ -107,7 +107,7 @@ Measures how evenly TFs occur across all sequences.
 Find the **smallest** pairwise dissimilarity between any two sequences’ TF sets:
 
   Dᵢⱼ = 1 - |Tᵢ ∩ Tⱼ| / |Tᵢ ∪ Tⱼ|
-  
+
   min_over_i<j (Dᵢⱼ)
 
 
@@ -117,22 +117,22 @@ where Tᵢ and Tⱼ are the TF sets of sequences i and j.
 
 ---
 
-#### **Min Positional Entropy** — *TF Spatial Diffusion*  
+#### **Min Positional Entropy** — *TF Spatial Diffusion*
 Assess how “focused” the most localized TF is along the sequence.
 
-1. **Counts → Probabilities**  
+1. **Counts → Probabilities**
    - Let pₖ be the binding count of a given TF at position k (forward or reverse).
-  
+
     Normalize:
 
     p̂ₖ = pₖ / (∑_{i=1}ᴸ pᵢ)    with   ∑ₖ p̂ₖ = 1
 
-2. **Entropy & Normalization**  
+2. **Entropy & Normalization**
     H = - ∑ₖ p̂ₖ · log₂(p̂ₖ)
 
     H_norm = H / log₂(L)
 
-3. **Combine & Summarize**  
+3. **Combine & Summarize**
   - Compute H_norm for forward and reverse strands, average per TF.
   - Take the minimum across TFs.
 
@@ -143,9 +143,9 @@ Assess how “focused” the most localized TF is along the sequence.
 #### **Min Motif‑String Levenshtein** — *Sequence Architectural Diversity*
 
 1. Represent each sequence as a strand-aware, ordered token list, e.g.,
-    
+
     ["crp+", "gadX-", ...].
-  
+
 2. Compute pairwise, length‑normalized Levenshtein distance:
 
     d_norm(sᵢ, sⱼ) = Levenshtein(sᵢ, sⱼ) / max(|sᵢ|, |sⱼ|)
@@ -197,30 +197,30 @@ plots/  (if save_plots: true)
 
 ### Module Overview
 
-- **`main.py`**  
+- **`main.py`**
   Manages config loading, sequence processing, metric computation, and I/O.
 
-- **`core.py`**  
+- **`core.py`**
   Implements:
-  - Sequence loading & validation  
-  - TFBS parsing & motif‑string building  
-  - Occupancy matrix assembly  
+  - Sequence loading & validation
+  - TFBS parsing & motif‑string building
+  - Occupancy matrix assembly
   - Diversity metrics (`compute_core_metrics`)
 
-- **`summary.py`**  
+- **`summary.py`**
   Writes CSV summaries:
-  - `diversity_summary.csv`  
-  - `tf_coverage_summary.csv`  
+  - `diversity_summary.csv`
+  - `tf_coverage_summary.csv`
   - `summary_metrics.csv`
 
-- **`plot_helpers.py`**  
+- **`plot_helpers.py`**
   Optional diagnostic plots:
-  - TF frequency barplot  
-  - Occupancy heatmaps  
-  - Motif‑length density  
-  - Positional occupancy histograms  
-  - Lorenz (Gini) curves  
-  - Jaccard dissimilarity histogram  
+  - TF frequency barplot
+  - Occupancy heatmaps
+  - Motif‑length density
+  - Positional occupancy histograms
+  - Lorenz (Gini) curves
+  - Jaccard dissimilarity histogram
 
-- **`by_cluster.py`**  
+- **`by_cluster.py`**
   Computes metrics per Leiden cluster of sequences, producing a characterization scatter plot. This modules expects an input `.pt` file which has already been passed through the **clustering** pipeline, where each entry receives a cluster ID.

@@ -39,9 +39,7 @@ def _coalesce(d: Dict[str, Any], *keys, default=None):
     return default
 
 
-def build_status(
-    state_path: Path, round_k: Optional[int] = None, show_all: bool = False
-) -> Dict[str, Any]:
+def build_status(state_path: Path, round_k: Optional[int] = None, show_all: bool = False) -> Dict[str, Any]:
     if not state_path.exists():
         return {"error": f"state.json not found: {state_path}"}
 
@@ -68,16 +66,10 @@ def build_status(
     def _lite(r: Dict[str, Any]) -> _RoundLite:
         return _RoundLite(
             round_index=int(r.get("round_index", -1)),
-            number_of_training_examples_used_in_round=int(
-                r.get("number_of_training_examples_used_in_round", 0)
-            ),
-            number_of_candidates_scored_in_round=int(
-                r.get("number_of_candidates_scored_in_round", 0)
-            ),
+            number_of_training_examples_used_in_round=int(r.get("number_of_training_examples_used_in_round", 0)),
+            number_of_candidates_scored_in_round=int(r.get("number_of_candidates_scored_in_round", 0)),
             selection_top_k_requested=int(r.get("selection_top_k_requested", 0)),
-            selection_top_k_effective_after_ties=int(
-                r.get("selection_top_k_effective_after_ties", 0)
-            ),
+            selection_top_k_effective_after_ties=int(r.get("selection_top_k_effective_after_ties", 0)),
             round_dir=str(r.get("round_dir", "")),
         )
 

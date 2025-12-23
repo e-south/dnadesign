@@ -95,9 +95,7 @@ def build_edge_table(
     Returns columns: token_a, token_b, weight_count, avg_k.
     """
     if len(aa_combo_strs) != len(k_values):
-        raise ValueError(
-            "edge_bundling.build_edge_table: aa_combo_strs and k_values must have same length"
-        )
+        raise ValueError("edge_bundling.build_edge_table: aa_combo_strs and k_values must have same length")
 
     co_counts: Counter[Tuple[str, str]] = Counter()
     sum_k: Dict[Tuple[str, str], float] = defaultdict(float)
@@ -120,14 +118,10 @@ def build_edge_table(
         if cnt < int(min_cooccur_count):
             continue
         avg_k = sum_k[(a, b)] / float(cnt)
-        rows.append(
-            EdgeRecord(token_a=a, token_b=b, weight_count=int(cnt), avg_k=avg_k)
-        )
+        rows.append(EdgeRecord(token_a=a, token_b=b, weight_count=int(cnt), avg_k=avg_k))
 
     if not rows:
-        return pd.DataFrame(
-            columns=["token_a", "token_b", "weight_count", "avg_k"], dtype=float
-        )
+        return pd.DataFrame(columns=["token_a", "token_b", "weight_count", "avg_k"], dtype=float)
 
     df = pd.DataFrame([r.__dict__ for r in rows])
     return df[["token_a", "token_b", "weight_count", "avg_k"]]
@@ -257,9 +251,7 @@ def plot_edge_bundle(
         if avg_k.size:
             finite = avg_k[np.isfinite(avg_k)]
             if finite.size == 0:
-                raise ValueError(
-                    "plot_edge_bundle: 'avg_k' column has no finite values"
-                )
+                raise ValueError("plot_edge_bundle: 'avg_k' column has no finite values")
             vmin, vmax = float(finite.min()), float(finite.max())
             if vmin == vmax:
                 vmin, vmax = vmin - 0.5, vmax + 0.5
@@ -273,31 +265,20 @@ def plot_edge_bundle(
     elif color_by_norm == "node_avg_k":
         # New behavior: node hue encodes avg mut_count k for that mutation token.
         if node_avg_k is None:
-            raise ValueError(
-                "plot_edge_bundle: color_by='node_avg_k' requires node_avg_k mapping"
-            )
-        node_vals = np.array(
-            [float(node_avg_k.get(tok, np.nan)) for tok in tokens], dtype=float
-        )
+            raise ValueError("plot_edge_bundle: color_by='node_avg_k' requires node_avg_k mapping")
+        node_vals = np.array([float(node_avg_k.get(tok, np.nan)) for tok in tokens], dtype=float)
         finite = node_vals[np.isfinite(node_vals)]
         if finite.size == 0:
-            raise ValueError(
-                "plot_edge_bundle: node_avg_k mapping produced no finite values"
-            )
+            raise ValueError("plot_edge_bundle: node_avg_k mapping produced no finite values")
         vmin, vmax = float(finite.min()), float(finite.max())
         if vmin == vmax:
             vmin, vmax = vmin - 0.5, vmax + 0.5
         colorbar_norm = Normalize(vmin=vmin, vmax=vmax)
-        node_rgba = [
-            cmap(colorbar_norm(v)) if np.isfinite(v) else cmap(0.5) for v in node_vals
-        ]
+        node_rgba = [cmap(colorbar_norm(v)) if np.isfinite(v) else cmap(0.5) for v in node_vals]
         edge_rgba = None
         colorbar_label = "Node hue: avg mut_count k"
     else:
-        raise ValueError(
-            f"plot_edge_bundle: unsupported color_by={color_by!r} "
-            "(expected 'edge_avg_k' or 'node_avg_k')"
-        )
+        raise ValueError(f"plot_edge_bundle: unsupported color_by={color_by!r} (expected 'edge_avg_k' or 'node_avg_k')")
 
     # ------------------------------------------------------------------
     # Figure + layout: main chord axis on the left, legends on the right
@@ -581,9 +562,7 @@ def edge_bundle_from_combos(
         for tok in tokens:
             node_counts[tok] += 1
             node_k_sum[tok] += k_val
-    node_avg_k = {
-        tok: (node_k_sum[tok] / float(node_counts[tok])) for tok in node_counts
-    }
+    node_avg_k = {tok: (node_k_sum[tok] / float(node_counts[tok])) for tok in node_counts}
 
     plot_edge_bundle(
         edges_df,

@@ -38,9 +38,7 @@ def _sequence_tf_set(seq_dict: dict) -> set[str]:
             motif_to_tf[motif] = tf
         except ValueError:
             continue
-    return {
-        motif_to_tf[m] for m in seq_dict["meta_tfbs_parts_in_array"] if m in motif_to_tf
-    }
+    return {motif_to_tf[m] for m in seq_dict["meta_tfbs_parts_in_array"] if m in motif_to_tf}
 
 
 def _passes_tf_richness(sample: dict, sequences: Sequence[dict], k: int) -> bool:
@@ -73,12 +71,8 @@ def _passes_literal_filters(sample: dict, cfg) -> bool:
 # ───────────────────────────────────────────────────────── pipeline ──
 def select_best_subsample(subsamples, cfg, sequences):
     # 1) TF-richness screen (MOST STRINGENT) -------------------------------
-    survivors = [
-        s for s in subsamples if _passes_tf_richness(s, sequences, cfg.min_tf_richness)
-    ]
-    logger.info(
-        f"After per-sequence TF-richness ≥ {cfg.min_tf_richness}: " f"{len(survivors)}"
-    )
+    survivors = [s for s in subsamples if _passes_tf_richness(s, sequences, cfg.min_tf_richness)]
+    logger.info(f"After per-sequence TF-richness ≥ {cfg.min_tf_richness}: {len(survivors)}")
 
     if not survivors:
         raise ValueError("No subsample satisfies the TF-richness requirement.")
@@ -110,8 +104,5 @@ def select_best_subsample(subsamples, cfg, sequences):
     # 5) maximise minimum Euclidean gap ------------------------------------
     best = max(survivors, key=lambda s: s.get("min_euclidean", -np.inf))
     best["passed_selection"] = True
-    logger.info(
-        f"Winner: {best['subsample_id']} "
-        f"(min_euclidean = {best['min_euclidean']:.3e})"
-    )
+    logger.info(f"Winner: {best['subsample_id']} (min_euclidean = {best['min_euclidean']:.3e})")
     return best

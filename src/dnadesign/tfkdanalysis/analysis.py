@@ -75,8 +75,6 @@ def generate_volcano_plot(
     # Define groups.
     groupA = df[~df["significant"] & ~reg_mask]  # Not significant, not user-defined regulator.
     groupB = df[df["significant"] & ~reg_mask]  # Significant, not user-defined regulator.
-    groupC = df[~df["significant"] & reg_mask]  # Not significant, user-defined regulator.
-    groupD = df[df["significant"] & reg_mask]  # Significant, user-defined regulator.
 
     # Plot groups A and B without edges.
     if sizes is not None:
@@ -99,8 +97,22 @@ def generate_volcano_plot(
             edgecolor="none",
         )
     else:
-        plt.scatter(groupA[fc_column], groupA[logp_column], color="lightgray", alpha=0.35, marker="o", edgecolor="none")
-        plt.scatter(groupB[fc_column], groupB[logp_column], color="gray", alpha=0.35, marker="o", edgecolor="none")
+        plt.scatter(
+            groupA[fc_column],
+            groupA[logp_column],
+            color="lightgray",
+            alpha=0.35,
+            marker="o",
+            edgecolor="none",
+        )
+        plt.scatter(
+            groupB[fc_column],
+            groupB[logp_column],
+            color="gray",
+            alpha=0.35,
+            marker="o",
+            edgecolor="none",
+        )
 
     # Marker shapes to cycle through.
     markers = ["o", "s", "^"]
@@ -200,7 +212,11 @@ def generate_volcano_plot(
     plt.xlim(x_min - pad, x_max + pad)
 
     media = config.get("media", "glu")
-    plt.title("Promoter activity changes by TF Knockdown (M9-glucose)", fontsize=12)
+    media_label = "glucose" if media == "glu" else str(media)
+    plt.title(
+        f"Promoter activity changes by TF Knockdown (M9-{media_label})",
+        fontsize=12,
+    )
     plt.xlabel("log2(fold change)")
     plt.ylabel("-log10(p-value)")
 
@@ -214,7 +230,11 @@ def generate_volcano_plot(
 
 
 def export_regulator_csvs(
-    df: pd.DataFrame, regulators: list, fc_column: str, threshold: float, output_dir: Path
+    df: pd.DataFrame,
+    regulators: list,
+    fc_column: str,
+    threshold: float,
+    output_dir: Path,
 ) -> None:
     """
     For each user-defined regulator, export two CSV files containing rows (from the volcano data)
@@ -248,7 +268,12 @@ def compute_histogram_xlim(df: pd.DataFrame, fc_column: str, regulators: list) -
 
 
 def generate_regulator_scatter_plot(
-    df: pd.DataFrame, regulators: list, fc_column: str, global_xlim: tuple, config: dict, output_path: Path
+    df: pd.DataFrame,
+    regulators: list,
+    fc_column: str,
+    global_xlim: tuple,
+    config: dict,
+    output_path: Path,
 ) -> None:
     """
     Generate a scatter plot where each point represents a regulated promoter.
@@ -303,15 +328,40 @@ def generate_regulator_scatter_plot(
         sig_df = reg_df[reg_df["significant"]]
         nonsig_df = reg_df[~reg_df["significant"]]
         if not nonsig_df.empty and sig_df.empty:
-            plt.scatter(nonsig_df["fc"], nonsig_df["y"], color=light_color, alpha=0.8, marker="o", label=reg)
+            plt.scatter(
+                nonsig_df["fc"],
+                nonsig_df["y"],
+                color=light_color,
+                alpha=0.8,
+                marker="o",
+                label=reg,
+            )
         else:
-            plt.scatter(nonsig_df["fc"], nonsig_df["y"], color=light_color, alpha=0.8, marker="o")
-            plt.scatter(sig_df["fc"], sig_df["y"], color=full_color, alpha=0.9, marker="o", label=reg)
+            plt.scatter(
+                nonsig_df["fc"],
+                nonsig_df["y"],
+                color=light_color,
+                alpha=0.8,
+                marker="o",
+            )
+            plt.scatter(
+                sig_df["fc"],
+                sig_df["y"],
+                color=full_color,
+                alpha=0.9,
+                marker="o",
+                label=reg,
+            )
             if config.get("annotate_operon", True):
                 for _, point in sig_df.iterrows():
                     if point["operon"]:
                         plt.text(
-                            point["fc"] + 0.02, point["y"], str(point["operon"]), fontsize=8, ha="left", va="bottom"
+                            point["fc"] + 0.02,
+                            point["y"],
+                            str(point["operon"]),
+                            fontsize=8,
+                            ha="left",
+                            va="bottom",
                         )
 
     plt.axvline(x=fc_threshold, color="gray", linestyle="--", linewidth=1)
@@ -332,7 +382,11 @@ def generate_regulator_scatter_plot(
         plt.text(global_xlim[1], pos, f" ({count})", va="center", fontsize=9, color="black")
 
     media = config.get("media", "glu")
-    plt.title("Promoter activity changes by TF Knockdown (M9-glucose)", fontsize=12)
+    media_label = "glucose" if media == "glu" else str(media)
+    plt.title(
+        f"Promoter activity changes by TF Knockdown (M9-{media_label})",
+        fontsize=12,
+    )
     sns.despine()
     plt.tight_layout()
     plt.savefig(output_path, dpi=600)

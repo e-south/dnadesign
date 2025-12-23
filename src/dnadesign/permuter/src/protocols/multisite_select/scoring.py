@@ -94,12 +94,8 @@ def compute_scaled_scores(
     score : np.ndarray
     summary : ScalingSummary
     """
-    z_llr, med_llr, mad_llr = robust_z(
-        llr_obs, gaussian_consistent=gaussian_consistent, winsor_mads=winsor_mads
-    )
-    z_epi, med_epi, mad_epi = robust_z(
-        delta, gaussian_consistent=gaussian_consistent, winsor_mads=winsor_mads
-    )
+    z_llr, med_llr, mad_llr = robust_z(llr_obs, gaussian_consistent=gaussian_consistent, winsor_mads=winsor_mads)
+    z_epi, med_epi, mad_epi = robust_z(delta, gaussian_consistent=gaussian_consistent, winsor_mads=winsor_mads)
 
     score = np.asarray(w_llr, float) * z_llr + np.asarray(w_epi, float) * z_epi
 

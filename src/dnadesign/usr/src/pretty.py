@@ -81,10 +81,7 @@ def _fmt_list(xs: Iterable[Any], opts: PrettyOpts, depth: int) -> str:
     numeric = all(isinstance(v, (int, float)) or (v is None) for v in xs)
     shown = xs[: opts.max_list_items]
     if numeric:
-        body = ", ".join(
-            _fmt_num(v, opts.precision) if v is not None else opts.null_token
-            for v in shown
-        )
+        body = ", ".join(_fmt_num(v, opts.precision) if v is not None else opts.null_token for v in shown)
     else:
         body = ", ".join(fmt_value(v, opts, depth + 1) for v in shown)
     suffix = ", …" if n > opts.max_list_items else ""
@@ -155,9 +152,7 @@ def _render_field(f: pa.Field, indent: int = 0) -> List[str]:
     if pa.types.is_list(t) or pa.types.is_large_list(t):
         child = t.value_field
         line = f"{pad}{f.name}: list<{child.type}>{nullable}"
-        rest = _render_field(
-            pa.field("element", child.type, child.nullable), indent + 1
-        )
+        rest = _render_field(pa.field("element", child.type, child.nullable), indent + 1)
         return [line] + rest
     if pa.types.is_struct(t):
         lines = [f"{pad}{f.name}: struct{nullable}"]

@@ -33,9 +33,7 @@ _DEFAULT_VARIANTS: Sequence[SigmaVariant] = (
 @dataclass
 class Sigma70Plugin:
     name: str = "sigma70"
-    variants: Sequence[SigmaVariant] = field(
-        default_factory=lambda: list(_DEFAULT_VARIANTS)
-    )
+    variants: Sequence[SigmaVariant] = field(default_factory=lambda: list(_DEFAULT_VARIANTS))
     spacer_min: int = 16
     spacer_max: int = 18
     # How to label the spacer line:
@@ -63,12 +61,8 @@ class Sigma70Plugin:
         self.spacer_max = int(spacer_max)
         self.label_text = label_text
         lm = str(label_mode).lower().strip()
-        self.label_mode = (
-            "inner" if lm not in {"inner", "outer", "observed", "custom"} else lm
-        )  # type: ignore[assignment]
-        self.inner_margin_bp = (
-            float(inner_margin_bp) if inner_margin_bp is not None else None
-        )
+        self.label_mode = "inner" if lm not in {"inner", "outer", "observed", "custom"} else lm  # type: ignore[assignment]
+        self.inner_margin_bp = float(inner_margin_bp) if inner_margin_bp is not None else None
         if variants:
             self.variants = tuple(SigmaVariant(**v) for v in variants)
         else:
@@ -93,9 +87,7 @@ class Sigma70Plugin:
           otherwise it defaults to track 0 (the plugin's a track).
         """
         seq = record.sequence.upper()
-        matches: List[Tuple[SigmaVariant, int, int]] = (
-            []
-        )  # (variant, start_35, start_10)
+        matches: List[Tuple[SigmaVariant, int, int]] = []  # (variant, start_35, start_10)
 
         for v in self.variants:
             ups = self._find_all(v.upstream, seq)
@@ -121,9 +113,7 @@ class Sigma70Plugin:
 
         # Guard: avoid stacking the same k-mer when already present in the dataset
         # Match on exact (strand, start, length, letters), independent of tag.
-        existing = {
-            (a.strand, a.start, a.length, a.label.upper()) for a in record.annotations
-        }
+        existing = {(a.strand, a.start, a.length, a.label.upper()) for a in record.annotations}
 
         if matches:
             v, s35, s10 = matches[0]
@@ -189,9 +179,7 @@ class Sigma70Plugin:
                         "strength": strength,  # <-- expose plugin’s decision
                         # Prefer bp-based margin; renderer also supports legacy frac.
                         **(
-                            {"inner_margin_bp": float(self.inner_margin_bp)}
-                            if self.inner_margin_bp is not None
-                            else {}
+                            {"inner_margin_bp": float(self.inner_margin_bp)} if self.inner_margin_bp is not None else {}
                         ),
                     },
                 )

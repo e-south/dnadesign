@@ -91,9 +91,7 @@ def _classify_columns(
     ),
 )
 def cmd_prune_source(
-    config: Optional[Path] = typer.Option(
-        None, "--config", "-c", envvar="OPAL_CONFIG", help="Path to campaign.yaml"
-    ),
+    config: Optional[Path] = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG", help="Path to campaign.yaml"),
     scope: str = typer.Option(
         "any",
         "--scope",
@@ -145,9 +143,7 @@ def cmd_prune_source(
         )
 
         # Select which opal bucket to use based on scope
-        opal_cols = (
-            buckets["opal_any"] if scope == "any" else buckets["opal_this_campaign"]
-        )
+        opal_cols = buckets["opal_any"] if scope == "any" else buckets["opal_this_campaign"]
         y_cols = buckets["y"]
 
         # Apply explicit keep list (exact column names)
@@ -193,9 +189,7 @@ def cmd_prune_source(
                     "   • Consider keeping a backup (on by default; see --no-backup).",
                 ]
             )
-            print_stdout(
-                "\n".join([head, "", opal_list, "", y_list, "", del_list, warning])
-            )
+            print_stdout("\n".join([head, "", opal_list, "", y_list, "", del_list, warning]))
 
         if len(to_delete) == 0:
             if not json:
@@ -203,13 +197,7 @@ def cmd_prune_source(
             raise typer.Exit(code=ExitCodes.OK)
 
         if not yes and not json:
-            resp = (
-                input(
-                    "Proceed to DELETE the columns above and rewrite records.parquet? (y/N): "
-                )
-                .strip()
-                .lower()
-            )  # noqa
+            resp = input("Proceed to DELETE the columns above and rewrite records.parquet? (y/N): ").strip().lower()  # noqa
             if resp not in ("y", "yes"):
                 print_stdout("Aborted.")
                 raise typer.Exit(code=ExitCodes.BAD_ARGS)
@@ -222,19 +210,13 @@ def cmd_prune_source(
             backup_path: Optional[Path] = None
             if backup:
                 ts = __import__("datetime").datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-                backup_path = rec_path.with_name(
-                    f"{rec_path.stem}.backup.{ts}{rec_path.suffix}"
-                )
+                backup_path = rec_path.with_name(f"{rec_path.stem}.backup.{ts}{rec_path.suffix}")
                 shutil.copy2(rec_path, backup_path)
 
             # Drop requested columns and write atomically
-            df2 = df.drop(
-                columns=[c for c in to_delete if c in df.columns], errors="ignore"
-            )
+            df2 = df.drop(columns=[c for c in to_delete if c in df.columns], errors="ignore")
             # Assertive safety: USR essentials + X must remain
-            missing_post = [
-                c for c in (ESSENTIAL_COLS + [store.x_col]) if c not in df2.columns
-            ]
+            missing_post = [c for c in (ESSENTIAL_COLS + [store.x_col]) if c not in df2.columns]
             if missing_post:
                 raise OpalError(
                     "Post-prune safety check failed; protected columns are missing: "
@@ -253,9 +235,7 @@ def cmd_prune_source(
             "columns_after": int(df2.shape[1]),
             "deleted_columns": to_delete,
             "deleted_count": int(len(to_delete)),
-            "backup_path": (
-                str(backup_path.resolve()) if backup and backup_path else None
-            ),
+            "backup_path": (str(backup_path.resolve()) if backup and backup_path else None),
             "sha256_before": sha_before,
             "sha256_after": sha_after,
         }

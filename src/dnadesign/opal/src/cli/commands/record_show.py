@@ -33,9 +33,7 @@ from ._common import (
 )
 def cmd_record_show(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
-    key: str = typer.Argument(
-        None, help="ID or sequence (positional). Use --id/--sequence to disambiguate."
-    ),
+    key: str = typer.Argument(None, help="ID or sequence (positional). Use --id/--sequence to disambiguate."),
     id: str = typer.Option(None, "--id"),
     sequence: str = typer.Option(None, "--sequence"),
     with_sequence: bool = typer.Option(True, "--with-sequence/--no-sequence"),

@@ -36,40 +36,18 @@ def _verify_after_pull(local_dir: Path, summary: DiffSummary) -> None:
 
     # Prefer SHA check if remote SHA is known
     if remote.sha256 and local.sha256 and remote.sha256 != local.sha256:
-        raise VerificationError(
-            f"Post-transfer SHA mismatch: local={local.sha256} remote={remote.sha256}"
-        )
+        raise VerificationError(f"Post-transfer SHA mismatch: local={local.sha256} remote={remote.sha256}")
     # Fallback to size
-    if (
-        (remote.size is not None)
-        and (local.size is not None)
-        and remote.size != local.size
-    ):
-        raise VerificationError(
-            f"Post-transfer size mismatch: local={local.size} remote={remote.size}"
-        )
+    if (remote.size is not None) and (local.size is not None) and remote.size != local.size:
+        raise VerificationError(f"Post-transfer size mismatch: local={local.size} remote={remote.size}")
     # Optional shape check if remote provided rows/cols
-    if (
-        (remote.rows is not None)
-        and (local.rows is not None)
-        and remote.rows != local.rows
-    ):
-        raise VerificationError(
-            f"Post-transfer row count mismatch: local={local.rows} remote={remote.rows}"
-        )
-    if (
-        (remote.cols is not None)
-        and (local.cols is not None)
-        and remote.cols != local.cols
-    ):
-        raise VerificationError(
-            f"Post-transfer col count mismatch: local={local.cols} remote={remote.cols}"
-        )
+    if (remote.rows is not None) and (local.rows is not None) and remote.rows != local.rows:
+        raise VerificationError(f"Post-transfer row count mismatch: local={local.rows} remote={remote.rows}")
+    if (remote.cols is not None) and (local.cols is not None) and remote.cols != local.cols:
+        raise VerificationError(f"Post-transfer col count mismatch: local={local.cols} remote={remote.cols}")
 
 
-def _verify_after_push(
-    remote: SSHRemote, dataset: str, summary_before: DiffSummary
-) -> None:
+def _verify_after_push(remote: SSHRemote, dataset: str, summary_before: DiffSummary) -> None:
     # Probe remote again and ensure it now matches local
     after: RemoteDatasetStat = remote.stat_dataset(dataset)
     # Create a synthetic summary comparing local (previous local) to new remote
@@ -88,17 +66,9 @@ def _verify_after_push(
 
     # Verify by SHA if available
     if local.sha256 and remote_now.sha256 and local.sha256 != remote_now.sha256:
-        raise VerificationError(
-            f"Post-push SHA mismatch: local={local.sha256} remote={remote_now.sha256}"
-        )
-    if (
-        (local.size is not None)
-        and (remote_now.size is not None)
-        and local.size != remote_now.size
-    ):
-        raise VerificationError(
-            f"Post-push size mismatch: local={local.size} remote={remote_now.size}"
-        )
+        raise VerificationError(f"Post-push SHA mismatch: local={local.sha256} remote={remote_now.sha256}")
+    if (local.size is not None) and (remote_now.size is not None) and local.size != remote_now.size:
+        raise VerificationError(f"Post-push size mismatch: local={local.size} remote={remote_now.size}")
 
 
 def plan_diff(root: Path, dataset: str, remote_name: str) -> DiffSummary:
@@ -108,18 +78,14 @@ def plan_diff(root: Path, dataset: str, remote_name: str) -> DiffSummary:
     return compute_diff(Path(root) / dataset, rstat, dataset)
 
 
-def plan_diff_file(
-    local_file: Path, remote_name: str, *, remote_path: str
-) -> DiffSummary:
+def plan_diff_file(local_file: Path, remote_name: str, *, remote_path: str) -> DiffSummary:
     cfg: SSHRemoteConfig = get_remote(remote_name)
     rmt = SSHRemote(cfg)
     rstat = rmt.stat_file(remote_path)
     return compute_file_diff(local_file, rstat, str(local_file))
 
 
-def execute_pull(
-    root: Path, dataset: str, remote_name: str, opts: SyncOptions
-) -> DiffSummary:
+def execute_pull(root: Path, dataset: str, remote_name: str, opts: SyncOptions) -> DiffSummary:
     cfg: SSHRemoteConfig = get_remote(remote_name)
     rmt = SSHRemote(cfg)
 
@@ -151,9 +117,7 @@ def execute_pull(
     return summary
 
 
-def execute_pull_file(
-    local_file: Path, remote_name: str, remote_path: str, opts: SyncOptions
-) -> DiffSummary:
+def execute_pull_file(local_file: Path, remote_name: str, remote_path: str, opts: SyncOptions) -> DiffSummary:
     cfg: SSHRemoteConfig = get_remote(remote_name)
     rmt = SSHRemote(cfg)
     # Prepare synthetic summary-before (for verification thresholds)
@@ -185,9 +149,7 @@ def execute_pull_file(
     return before
 
 
-def execute_push(
-    root: Path, dataset: str, remote_name: str, opts: SyncOptions
-) -> DiffSummary:
+def execute_push(root: Path, dataset: str, remote_name: str, opts: SyncOptions) -> DiffSummary:
     cfg: SSHRemoteConfig = get_remote(remote_name)
     rmt = SSHRemote(cfg)
 
@@ -219,9 +181,7 @@ def execute_push(
     return summary
 
 
-def execute_push_file(
-    local_file: Path, remote_name: str, remote_path: str, opts: SyncOptions
-) -> DiffSummary:
+def execute_push_file(local_file: Path, remote_name: str, remote_path: str, opts: SyncOptions) -> DiffSummary:
     cfg: SSHRemoteConfig = get_remote(remote_name)
     rmt = SSHRemote(cfg)
     before = plan_diff_file(local_file, remote_name, remote_path=remote_path)

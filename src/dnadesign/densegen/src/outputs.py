@@ -47,9 +47,7 @@ def _namespace_meta(meta: Dict, namespace: str) -> Dict:
 
 
 class SinkBase:
-    def add(
-        self, sequence: str, meta: Dict, source_label: str
-    ) -> None:  # pragma: no cover - abstract
+    def add(self, sequence: str, meta: Dict, source_label: str) -> None:  # pragma: no cover - abstract
         raise NotImplementedError
 
     def flush(self) -> None:  # pragma: no cover - abstract
@@ -158,17 +156,13 @@ def build_sinks(cfg: dict) -> Iterable[SinkBase]:
     if kind in {"jsonl", "both"}:
         jl_cfg = out_cfg.get("jsonl", {})
         if not jl_cfg or "path" not in jl_cfg:
-            raise ValueError(
-                "JSONL sink requested but `output.jsonl.path` not provided."
-            )
+            raise ValueError("JSONL sink requested but `output.jsonl.path` not provided.")
         path = jl_cfg.get("path", "outputs/densegen.jsonl")
         ns = (cfg.get("usr", {}) or {}).get("namespace", "densegen")
         sinks.append(JSONLSink(path=path, namespace=ns))
 
     if not sinks:
-        raise AssertionError(
-            "No output sinks created; check `output.kind` and related settings."
-        )
+        raise AssertionError("No output sinks created; check `output.kind` and related settings.")
 
     return sinks
 
@@ -176,9 +170,7 @@ def build_sinks(cfg: dict) -> Iterable[SinkBase]:
 def _maybe_json_load(val):
     if isinstance(val, str):
         s = val.strip()
-        if (s.startswith("{") and s.endswith("}")) or (
-            s.startswith("[") and s.endswith("]")
-        ):
+        if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
             try:
                 return json.loads(s)
             except Exception:
@@ -227,10 +219,7 @@ def load_records_from_config(cfg: dict) -> Tuple[pd.DataFrame, str]:
 
         # Access underlying dataset (same logic as USRWriter)
         ds = Dataset(
-            Path(
-                usr_cfg.get("root")
-                or Path(__file__).resolve().parents[2] / "usr" / "datasets"
-            ),
+            Path(usr_cfg.get("root") or Path(__file__).resolve().parents[2] / "usr" / "datasets"),
             usr_cfg["dataset"],
         )
         rp = ds.records_path
@@ -245,7 +234,5 @@ def load_records_from_config(cfg: dict) -> Tuple[pd.DataFrame, str]:
         source_label = f"usr:{usr_cfg['dataset']}"
 
     if not dfs:
-        raise RuntimeError(
-            "Could not load any outputs; ensure either JSONL or USR sink produced data."
-        )
+        raise RuntimeError("Could not load any outputs; ensure either JSONL or USR sink produced data.")
     return dfs[0], source_label

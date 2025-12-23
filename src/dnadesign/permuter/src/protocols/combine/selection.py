@@ -52,9 +52,7 @@ def _expand_pos_tokens(tokens) -> set[int]:
     return out
 
 
-def select_elite_aa_events(
-    df: pd.DataFrame, metric_col: str, cfg: Dict
-) -> List[Tuple[int, str, str, float]]:
+def select_elite_aa_events(df: pd.DataFrame, metric_col: str, cfg: Dict) -> List[Tuple[int, str, str, float]]:
     """
     Select single-AA events for combination with strict ruleouts — assertively.
     Modes (cfg.select.mode):
@@ -77,10 +75,7 @@ def select_elite_aa_events(
     ]
     missing = [c for c in required_cols if c not in df.columns]
     if missing:
-        raise ValueError(
-            f"combine_aa: input dataset missing columns: {missing}. "
-            f"Expected singles with {required_cols}"
-        )
+        raise ValueError(f"combine_aa: input dataset missing columns: {missing}. Expected singles with {required_cols}")
 
     singles = df[df["permuter__round"] == 1].copy()
     singles = singles[
@@ -108,16 +103,12 @@ def select_elite_aa_events(
     sel = (cfg or {}).get("select", {})
     mode = str(sel.get("mode", "per_position_best")).strip().lower()
     if mode not in {"global", "per_position_best"}:
-        raise ValueError(
-            "combine_aa.select.mode must be 'global' or 'per_position_best'"
-        )
+        raise ValueError("combine_aa.select.mode must be 'global' or 'per_position_best'")
     top_global = int(sel.get("top_global", 100))
     min_delta = float(sel.get("min_delta", 1e-12))
     allowed_positions = _expand_pos_tokens(sel.get("allowed_positions", []) or [])
     exclude_positions = _expand_pos_tokens(sel.get("exclude_positions", []) or [])
-    exclude_mutations = set(
-        str(x).strip().upper() for x in (sel.get("exclude_mutations", []) or [])
-    )
+    exclude_mutations = set(str(x).strip().upper() for x in (sel.get("exclude_mutations", []) or []))
     disallow_negative = bool(sel.get("disallow_negative_best", True))
     emit_table = bool(sel.get("emit_per_position_table", True))
 
@@ -133,8 +124,7 @@ def select_elite_aa_events(
     if exclude_mutations:
         singles = singles[
             ~singles.apply(
-                lambda r: _normalize_mut_tag(r["_wt"], r["_pos"], r["_alt"])
-                in exclude_mutations,
+                lambda r: _normalize_mut_tag(r["_wt"], r["_pos"], r["_alt"]) in exclude_mutations,
                 axis=1,
             )
         ]
@@ -152,9 +142,7 @@ def select_elite_aa_events(
     else:
         # per_position_best: pick best per position, THEN apply top_global
         idx = singles.groupby("_pos")["_score"].idxmax()
-        winners = singles.loc[idx].sort_values(
-            "_score", ascending=False, kind="mergesort"
-        )
+        winners = singles.loc[idx].sort_values("_score", ascending=False, kind="mergesort")
         chosen = winners if top_global <= 0 else winners.head(top_global)
         msg_mode = "per_position_best→top_global (after filters)"
 
@@ -172,10 +160,7 @@ def select_elite_aa_events(
     if n_neg and disallow_negative:
         # Show the first few offending rows to guide the user
         bad = chosen[chosen["_score"] < 0].head(10)
-        examples = "  ".join(
-            f"{r['_wt']}{int(r['_pos'])}{r['_alt']}:{r['_score']:+.3f}"
-            for _, r in bad.iterrows()
-        )
+        examples = "  ".join(f"{r['_wt']}{int(r['_pos'])}{r['_alt']}:{r['_score']:+.3f}" for _, r in bad.iterrows())
         raise ValueError(
             "combine_aa: negative singles among selected Top-K. "
             f"Examples: {examples}\n"
@@ -185,10 +170,7 @@ def select_elite_aa_events(
 
     if emit_table:
         metric_id = str(metric_col).split("permuter__metric__", 1)[-1].lstrip("_")
-        lines = [
-            f"{r['_wt']}{int(r['_pos'])}{r['_alt']}  {r['_score']:+.3f}"
-            for _, r in chosen.iterrows()
-        ]
+        lines = [f"{r['_wt']}{int(r['_pos'])}{r['_alt']}  {r['_score']:+.3f}" for _, r in chosen.iterrows()]
         # 10 rows per column
         rows_per_col = 10
         n = len(lines)
@@ -225,22 +207,15 @@ def select_elite_aa_events(
             art_dir.mkdir(parents=True, exist_ok=True)
             metric_id = str(metric_col).split("permuter__metric__", 1)[-1].lstrip("_")
             chosen_out = chosen.copy()
-            chosen_out = chosen_out.rename(
-                columns={"_pos": "pos", "_wt": "wt", "_alt": "alt", "_score": "score"}
-            )
-            chosen_out["canon"] = chosen_out.apply(
-                lambda r: f"{r['wt']}{int(r['pos'])}{r['alt']}", axis=1
-            )
+            chosen_out = chosen_out.rename(columns={"_pos": "pos", "_wt": "wt", "_alt": "alt", "_score": "score"})
+            chosen_out["canon"] = chosen_out.apply(lambda r: f"{r['wt']}{int(r['pos'])}{r['alt']}", axis=1)
             out_csv = art_dir / f"COMBINE_AA__ELITE_SELECTION__{metric_id}.csv"
-            chosen_out[["canon", "wt", "pos", "alt", "score"]].to_csv(
-                out_csv, index=False
-            )
+            chosen_out[["canon", "wt", "pos", "alt", "score"]].to_csv(out_csv, index=False)
             _LOG.info("[select] wrote selection table → %s", out_csv)
     except Exception as _e:
         _LOG.debug("selection artifact write skipped: %s", _e)
 
     out: List[Tuple[int, str, str, float]] = [
-        (int(r["_pos"]), str(r["_wt"]), str(r["_alt"]), float(r["_score"]))
-        for _, r in chosen.iterrows()
+        (int(r["_pos"]), str(r["_wt"]), str(r["_alt"]), float(r["_score"])) for _, r in chosen.iterrows()
     ]
     return out
