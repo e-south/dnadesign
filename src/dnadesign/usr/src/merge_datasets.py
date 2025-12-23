@@ -89,9 +89,7 @@ def _casefold_keys(tbl: pa.Table) -> set[tuple[str, str]]:
     return {(b.lower(), s.upper()) for b, s in zip(bt, sq)}
 
 
-def _coerce_jsonish_to_type(
-    col: "pa.ChunkedArray | pa.Array", target_type: pa.DataType, colname: str
-) -> pa.Array:
+def _coerce_jsonish_to_type(col: "pa.ChunkedArray | pa.Array", target_type: pa.DataType, colname: str) -> pa.Array:
     """
     Best-effort coercion used during USR↔USR merge when overlapping columns disagree
     on type and the user has requested `--coerce-overlap to-dest`.
@@ -158,9 +156,7 @@ def _coerce_jsonish_to_type(
             if s in {"false", "f", "no", "n", "0"}:
                 return False
             # fallthrough: non-empty strings → True, but that’s surprising; treat as error
-            raise SchemaError(
-                f"Cannot coerce value '{v}' to bool for column '{colname}'."
-            )
+            raise SchemaError(f"Cannot coerce value '{v}' to bool for column '{colname}'.")
         if _is_nullish(v):
             return None
         return bool(v)
@@ -214,23 +210,13 @@ def _ensure_columns_same(dest: pa.Table, src: pa.Table) -> List[pa.Field]:
         missing_in_dest = sorted(set(sm.keys()) - set(dm.keys()))
         raise SchemaError(
             "Column sets differ.\n"
-            + (
-                f"  Missing in src : {', '.join(missing_in_src)}\n"
-                if missing_in_src
-                else ""
-            )
-            + (
-                f"  Missing in dest: {', '.join(missing_in_dest)}\n"
-                if missing_in_dest
-                else ""
-            )
+            + (f"  Missing in src : {', '.join(missing_in_src)}\n" if missing_in_src else "")
+            + (f"  Missing in dest: {', '.join(missing_in_dest)}\n" if missing_in_dest else "")
         )
     # types match
     for name in dm.keys():
         if dm[name].type != sm[name].type:
-            raise SchemaError(
-                f"Column type mismatch for '{name}': {dm[name].type} (dest) vs {sm[name].type} (src)"
-            )
+            raise SchemaError(f"Column type mismatch for '{name}': {dm[name].type} (dest) vs {sm[name].type} (src)")
     # use dest order
     return _ordered_fields(dest)
 
@@ -249,9 +235,7 @@ def _union_columns(dest: pa.Table, src: pa.Table) -> Tuple[List[pa.Field], int, 
     # check overlapping type equality
     for n in overlap:
         if dm[n].type != sm[n].type:
-            raise SchemaError(
-                f"Overlapping column '{n}' has different types: {dm[n].type} vs {sm[n].type}"
-            )
+            raise SchemaError(f"Overlapping column '{n}' has different types: {dm[n].type} vs {sm[n].type}")
 
     # Order: essential first (USR order), then others
     def essential_first(names: List[str]) -> List[str]:
@@ -270,9 +254,7 @@ def _union_columns(dest: pa.Table, src: pa.Table) -> Tuple[List[pa.Field], int, 
     return fields, len(ordered_names), len(overlap)
 
 
-def _restrict_to_subset(
-    fields: List[pa.Field], subset: Optional[Sequence[str]]
-) -> List[pa.Field]:
+def _restrict_to_subset(fields: List[pa.Field], subset: Optional[Sequence[str]]) -> List[pa.Field]:
     if not subset:
         return fields
     subset_set = set(subset).union(_ESSENTIAL_SET)
@@ -280,9 +262,7 @@ def _restrict_to_subset(
     # sanity: essential still present
     for e in _ESSENTIAL:
         if e not in {f.name for f in keep}:
-            raise SchemaError(
-                "Required essential columns were dropped by --columns subset."
-            )
+            raise SchemaError("Required essential columns were dropped by --columns subset.")
     return keep
 
 
@@ -346,13 +326,9 @@ def merge_usr_to_usr(
             if d_field.type.equals(s_field.type):
                 continue
             try:
-                coerced = _coerce_jsonish_to_type(
-                    src_tbl.column(name), d_field.type, name
-                )
+                coerced = _coerce_jsonish_to_type(src_tbl.column(name), d_field.type, name)
                 idx = src_tbl.schema.get_field_index(name)
-                src_tbl = src_tbl.set_column(
-                    idx, pa.field(name, d_field.type, nullable=True), coerced
-                )
+                src_tbl = src_tbl.set_column(idx, pa.field(name, d_field.type, nullable=True), coerced)
                 coercion_notes.append(f"{name}: {s_field.type} → {d_field.type}")
             except Exception as e:
                 raise SchemaError(
@@ -378,24 +354,18 @@ def merge_usr_to_usr(
         out = tbl
         for f in fields:
             if f.name not in present:
-                out = out.add_column(
-                    out.num_columns, f, pa.nulls(tbl.num_rows, type=f.type)
-                )
+                out = out.add_column(out.num_columns, f, pa.nulls(tbl.num_rows, type=f.type))
         return out.select([f.name for f in fields])
 
     d_aligned = _ensure_all_columns(d_aligned, fields)
-    s_aligned = _ensure_all_columns(
-        src_tbl.select([c for c in src_tbl.schema.names if c in names]), fields
-    )
+    s_aligned = _ensure_all_columns(src_tbl.select([c for c in src_tbl.schema.names if c in names]), fields)
 
     # -------- drop source rows whose (bio_type, upper(sequence)) already exist in dest --------
     if avoid_casefold_dups:
         dest_cf = _casefold_keys(d_aligned)
         s_bt = [str(x) for x in s_aligned.column("bio_type").to_pylist()]
         s_sq = [str(x) for x in s_aligned.column("sequence").to_pylist()]
-        keep_mask_cf = [
-            (b.lower(), s.upper()) not in dest_cf for b, s in zip(s_bt, s_sq)
-        ]
+        keep_mask_cf = [(b.lower(), s.upper()) not in dest_cf for b, s in zip(s_bt, s_sq)]
         if not all(keep_mask_cf):
             s_aligned = s_aligned.filter(pa.array(keep_mask_cf))
 
@@ -431,9 +401,7 @@ def merge_usr_to_usr(
             duplicates_replaced = duplicates_total
             # append only new rows from src
             keep_new = [rid not in dest_ids for rid in src_ids]
-            combined = pa.concat_tables(
-                [base, s_aligned.filter(pa.array(keep_new))], promote_options="default"
-            )
+            combined = pa.concat_tables([base, s_aligned.filter(pa.array(keep_new))], promote_options="default")
         else:  # prefer-dest: drop duplicates from src entirely
             s_kept = s_aligned.filter(pa.array(keep_mask))
             duplicates_skipped = duplicates_total
@@ -445,9 +413,7 @@ def merge_usr_to_usr(
     new_rows = combined.num_rows - dest_rows_before
     dest_rows_after = combined.num_rows
     columns_total = len(fields)
-    overlapping_columns = len(
-        set(dest_tbl.schema.names).intersection(set(src_tbl.schema.names))
-    )
+    overlapping_columns = len(set(dest_tbl.schema.names).intersection(set(src_tbl.schema.names)))
 
     if not dry_run:
         write_parquet_atomic(combined, ds_dest.records_path, ds_dest.snapshot_dir)

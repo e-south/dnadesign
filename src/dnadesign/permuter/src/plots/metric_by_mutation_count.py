@@ -36,18 +36,13 @@ def _pretty_metric(mid: str | None) -> str:
     return _METRIC_LABELS.get(str(mid).strip(), str(mid).strip())
 
 
-def _series_for_metric(
-    df: pd.DataFrame, metric_id: Optional[str]
-) -> Tuple[pd.Series, str]:
+def _series_for_metric(df: pd.DataFrame, metric_id: Optional[str]) -> Tuple[pd.Series, str]:
     if not metric_id:
-        raise RuntimeError(
-            "metric_id is required (expects a column permuter__observed__<id>)"
-        )
+        raise RuntimeError("metric_id is required (expects a column permuter__observed__<id>)")
     col = f"permuter__observed__{metric_id}"
     if col not in df.columns:
         raise RuntimeError(
-            f"Observed metric column not found: {col}. "
-            "Run `permuter evaluate` so observed metrics are present."
+            f"Observed metric column not found: {col}. Run `permuter evaluate` so observed metrics are present."
         )
     return df[col].astype("float64"), _pretty_metric(metric_id)
 
@@ -71,9 +66,7 @@ def plot(
         # Accept list / tuple / ndarray; otherwise 0
         if isinstance(m, (list, tuple)):
             return len(m)
-        return (
-            int(isinstance(m, ndarray)) * int(len(m)) if isinstance(m, ndarray) else 0
-        )
+        return int(isinstance(m, ndarray)) * int(len(m)) if isinstance(m, ndarray) else 0
 
     # Prefer protocol-emitted namespaced mut_count; fall back to token count if absent
     if "permuter__mut_count" in df.columns:
@@ -98,9 +91,7 @@ def plot(
     color_by_round = {r: round_cmap(i % 20) for i, r in enumerate(rounds)}
 
     fs = float(font_scale) if font_scale else 1.0
-    fig, ax = plt.subplots(
-        figsize=(figsize if figsize else (7.4, 4.0)), constrained_layout=True
-    )
+    fig, ax = plt.subplots(figsize=(figsize if figsize else (7.4, 4.0)), constrained_layout=True)
 
     # grid behind points
     ax.set_axisbelow(True)
@@ -150,11 +141,7 @@ def plot(
     ax.tick_params(axis="y", labelsize=int(round(10 * fs)))
 
     # title + subtitle kept inside figure to avoid clipping when saving
-    ref_name = (
-        df["permuter__ref"].iloc[0]
-        if "permuter__ref" in df.columns and not df.empty
-        else ""
-    )
+    ref_name = df["permuter__ref"].iloc[0] if "permuter__ref" in df.columns and not df.empty else ""
 
     title = f"{job_name}{f' ({ref_name})' if ref_name else ''}"
     fig.suptitle(title, fontsize=int(round(12 * fs)), y=0.995)

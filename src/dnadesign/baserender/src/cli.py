@@ -94,10 +94,7 @@ def _read_csv_column(path: Path, column: str) -> list[str]:
     with open(path, newline="") as f:
         reader = csv.DictReader(f)
         if reader.fieldnames is None or column not in reader.fieldnames:
-            raise typer.BadParameter(
-                f"CSV '{path}' must contain column '{column}' "
-                f"(found: {reader.fieldnames or []})"
-            )
+            raise typer.BadParameter(f"CSV '{path}' must contain column '{column}' (found: {reader.fieldnames or []})")
         out: list[str] = []
         for row in reader:
             raw = row.get(column)
@@ -107,9 +104,7 @@ def _read_csv_column(path: Path, column: str) -> list[str]:
             if s != "":
                 out.append(s)
         if not out:
-            raise typer.BadParameter(
-                f"CSV '{path}' column '{column}' contains no non-blank values."
-            )
+            raise typer.BadParameter(f"CSV '{path}' column '{column}' contains no non-blank values.")
         return out
 
 
@@ -135,10 +130,7 @@ def _read_csv_keys_and_overlay(
     with open(path, newline="") as f:
         reader = csv.DictReader(f)
         if reader.fieldnames is None or key_col not in reader.fieldnames:
-            raise typer.BadParameter(
-                f"CSV '{path}' must contain column '{key_col}' "
-                f"(found: {reader.fieldnames or []})"
-            )
+            raise typer.BadParameter(f"CSV '{path}' must contain column '{key_col}' (found: {reader.fieldnames or []})")
         # Auto-detect 'details' if overlay not specified
         if used_overlay is None and "details" in reader.fieldnames:
             used_overlay = "details"
@@ -167,9 +159,7 @@ def _read_csv_keys_and_overlay(
                         overlay_by_key[k] = s  # last non-blank wins
             overlays.append(text)
     if not keys:
-        raise typer.BadParameter(
-            f"CSV '{path}' column '{key_col}' contains no non-blank values."
-        )
+        raise typer.BadParameter(f"CSV '{path}' column '{key_col}' contains no non-blank values.")
     return keys, overlays, used_overlay, overlay_by_key
 
 
@@ -188,9 +178,7 @@ def render(
     path: Path = typer.Argument(..., help="Path to Parquet dataset."),
     in_fmt: str = typer.Option("parquet", "--format", help="Input format (parquet)."),
     seq_col: str = typer.Option("sequence", help="Sequence column name."),
-    ann_col: str = typer.Option(
-        "densegen__used_tfbs_detail", help="Annotations column name."
-    ),
+    ann_col: str = typer.Option("densegen__used_tfbs_detail", help="Annotations column name."),
     id_col: Optional[str] = typer.Option("id", help="Record ID column."),
     alphabet: str = typer.Option("DNA", help="Alphabet (DNA|RNA|PROTEIN)."),
     out_dir: Path = typer.Option(..., "--out-dir", help="Output directory for images."),
@@ -201,18 +189,12 @@ def render(
         "-p",
         help="Plugins to apply (comma/space-separated), e.g. -p 'sigma70 pkg.mod:Class'",
     ),
-    limit: int = typer.Option(
-        500, "--limit", help="Max records to process (default 500). Use 0 for all."
-    ),
+    limit: int = typer.Option(500, "--limit", help="Max records to process (default 500). Use 0 for all."),
 ) -> None:
     console.rule("[bold]Render images")
     out_dir.mkdir(parents=True, exist_ok=True)
     total_rows = _parquet_row_count(path) if in_fmt == "parquet" else None
-    n_total = (
-        min(total_rows, limit)
-        if (total_rows is not None and limit > 0)
-        else (total_rows or None)
-    )
+    n_total = min(total_rows, limit) if (total_rows is not None and limit > 0) else (total_rows or None)
     console.log(f"Dataset: {path}")
     if total_rows is not None:
         console.log(f"Rows in dataset: {total_rows}")
@@ -239,9 +221,7 @@ def render(
         for i, rec in enumerate(recs):
             name = rec.id if rec.id else f"record_{i}"
             out_path = out_dir / f"{name}.{img_fmt}"
-            render_figure(
-                rec, style=style, palette=pal, out_path=str(out_path), fmt=img_fmt
-            )
+            render_figure(rec, style=style, palette=pal, out_path=str(out_path), fmt=img_fmt)
             progress.advance(task)
     console.print(f"[green]Wrote images to {out_dir}[/]")
 
@@ -260,9 +240,7 @@ def video(
     fps: int = typer.Option(2, help="Frames per second."),
     in_fmt: str = typer.Option("parquet", "--format", help="Input format (parquet)."),
     seq_col: str = typer.Option("sequence", help="Sequence column name."),
-    ann_col: str = typer.Option(
-        "densegen__used_tfbs_detail", help="Annotations column name."
-    ),
+    ann_col: str = typer.Option("densegen__used_tfbs_detail", help="Annotations column name."),
     id_col: Optional[str] = typer.Option("id", help="Record ID column."),
     alphabet: str = typer.Option("DNA", help="Alphabet (DNA|RNA|PROTEIN)."),
     plugin: Optional[str] = typer.Option(
@@ -271,9 +249,7 @@ def video(
         "-p",
         help="Plugins to apply (comma/space-separated), e.g. -p 'sigma70 pkg.mod:Class'",
     ),
-    limit: int = typer.Option(
-        500, "--limit", help="Max records to process (default 500). Use 0 for all."
-    ),
+    limit: int = typer.Option(500, "--limit", help="Max records to process (default 500). Use 0 for all."),
 ) -> None:
     console.rule("[bold]Render video")
     console.log(f"Dataset: {path}")
@@ -306,9 +282,7 @@ def video(
                 pass
             elif event == "start":
                 progress.update(task, total=payload.get("total_frames"))
-                console.log(
-                    f"Writing MP4 {payload.get('width')}x{payload.get('height')} @ {payload.get('fps')} fps"
-                )
+                console.log(f"Writing MP4 {payload.get('width')}x{payload.get('height')} @ {payload.get('fps')} fps")
             elif event == "frame":
                 progress.advance(task)
             elif event == "finish":
@@ -337,9 +311,7 @@ def video(
 )
 def job_run(
     job: str = typer.Argument(..., help="Job name (in jobs/) or full YAML path."),
-    rec_id: Optional[str] = typer.Option(
-        None, "--rec-id", help="Render a single record by id (writes one still)."
-    ),
+    rec_id: Optional[str] = typer.Option(None, "--rec-id", help="Render a single record by id (writes one still)."),
     row: Optional[int] = typer.Option(
         None,
         "--row",
@@ -435,14 +407,11 @@ def job_run(
             )
             if used_overlay:
                 console.log(
-                    f"Using overlay text from CSV column '{used_overlay}' "
-                    f"({sum(1 for x in overlays if x)} non-blank)"
+                    f"Using overlay text from CSV column '{used_overlay}' ({sum(1 for x in overlays if x)} non-blank)"
                 )
             # Assert id column is provided
             if not cfg.id_col:
-                raise typer.BadParameter(
-                    "selection.match_on=id requires an 'id' column in the input.columns."
-                )
+                raise typer.BadParameter("selection.match_on=id requires an 'id' column in the input.columns.")
             # Presence pass (dataset membership only; no policy/gating)
             present = resolve_present_ids(cfg.input_path, id_col=cfg.id_col, ids=keys)
             missing = [k for k in keys if k not in present]
@@ -489,27 +458,16 @@ def job_run(
                 csv_label = overlays[j] if j < len(overlays) else None
                 if csv_label:
                     # Replace any existing overlay_label to ensure CSV wins.
-                    base_guides = [
-                        g for g in r.guides if getattr(g, "kind", "") != overlay_kind
-                    ]
+                    base_guides = [g for g in r.guides if getattr(g, "kind", "") != overlay_kind]
                     r = _dc_replace(r, guides=tuple(base_guides)).validate()
                     label = f"{csv_label}  id={r.id}"
-                    r = r.with_extra(
-                        guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
-                    )
+                    r = r.with_extra(guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)])
                 else:
                     # If Parquet already supplied an overlay, keep it; otherwise add the fallback.
-                    has_overlay = any(
-                        getattr(g, "kind", "") == overlay_kind and g.label
-                        for g in r.guides
-                    )
+                    has_overlay = any(getattr(g, "kind", "") == overlay_kind and g.label for g in r.guides)
                     if not has_overlay:
                         label = f"sel_row={j}  id={r.id}"
-                        r = r.with_extra(
-                            guides=[
-                                Guide(kind=overlay_kind, start=0, end=0, label=label)
-                            ]
-                        )
+                        r = r.with_extra(guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)])
                 recs_list.append(r)
             if not recs_list:
                 console.print(
@@ -520,20 +478,17 @@ def job_run(
             # ignore limit/sample_seed when selection is explicit
         elif sel.match_on == "row":
             # Interpret CSV values as 0-based row indices into the dataset.
-            idx_vals, overlays, used_overlay, overlay_by_key = (
-                _read_csv_keys_and_overlay(sel.path, sel.column, sel.overlay_column)
+            idx_vals, overlays, used_overlay, overlay_by_key = _read_csv_keys_and_overlay(
+                sel.path, sel.column, sel.overlay_column
             )
             if used_overlay:
                 console.log(
-                    f"Using overlay text from CSV column '{used_overlay}' "
-                    f"({sum(1 for x in overlays if x)} non-blank)"
+                    f"Using overlay text from CSV column '{used_overlay}' ({sum(1 for x in overlays if x)} non-blank)"
                 )
             try:
                 idxs = [int(x) for x in idx_vals]
             except Exception:
-                raise typer.BadParameter(
-                    "Row indices in selection CSV must be integers (0-based)."
-                )
+                raise typer.BadParameter("Row indices in selection CSV must be integers (0-based).")
             idxset = set(idxs)
             found = {}
             for i, r in enumerate(_base_records()):
@@ -554,30 +509,17 @@ def job_run(
                 r = found.get(i)
                 if r is None:
                     continue
-                csv_label = (
-                    overlays[j] if sel.keep_order else overlay_by_key.get(str(i))
-                )
+                csv_label = overlays[j] if sel.keep_order else overlay_by_key.get(str(i))
                 if csv_label:
-                    base_guides = [
-                        g for g in r.guides if getattr(g, "kind", "") != overlay_kind
-                    ]
+                    base_guides = [g for g in r.guides if getattr(g, "kind", "") != overlay_kind]
                     r = _dc_replace(r, guides=tuple(base_guides)).validate()
                     label = f"{csv_label}  id={r.id}"
-                    r = r.with_extra(
-                        guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
-                    )
+                    r = r.with_extra(guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)])
                 else:
-                    has_overlay = any(
-                        getattr(g, "kind", "") == overlay_kind and g.label
-                        for g in r.guides
-                    )
+                    has_overlay = any(getattr(g, "kind", "") == overlay_kind and g.label for g in r.guides)
                     if not has_overlay:
                         label = f"row={i}  sel_row={j}"
-                        r = r.with_extra(
-                            guides=[
-                                Guide(kind=overlay_kind, start=0, end=0, label=label)
-                            ]
-                        )
+                        r = r.with_extra(guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)])
                 recs_list.append(r)
         else:
             # Fallback: match_on 'sequence' (or 'id' without fast path) by scanning the dataset.
@@ -586,8 +528,7 @@ def job_run(
             )
             if used_overlay:
                 console.log(
-                    f"Using overlay text from CSV column '{used_overlay}' "
-                    f"({sum(1 for x in overlays if x)} non-blank)"
+                    f"Using overlay text from CSV column '{used_overlay}' ({sum(1 for x in overlays if x)} non-blank)"
                 )
             key_attr = "sequence" if sel.match_on == "sequence" else "id"
             want = set(keys) if not sel.keep_order else None
@@ -620,35 +561,22 @@ def job_run(
                     continue
                 csv_label = overlays[j] if sel.keep_order else overlay_by_key.get(k)
                 if csv_label:
-                    base_guides = [
-                        g for g in r.guides if getattr(g, "kind", "") != overlay_kind
-                    ]
+                    base_guides = [g for g in r.guides if getattr(g, "kind", "") != overlay_kind]
                     r = _dc_replace(r, guides=tuple(base_guides)).validate()
                     label = f"{csv_label}  id={r.id}"
-                    r = r.with_extra(
-                        guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
-                    )
+                    r = r.with_extra(guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)])
                 else:
-                    has_overlay = any(
-                        getattr(g, "kind", "") == overlay_kind and g.label
-                        for g in r.guides
-                    )
+                    has_overlay = any(getattr(g, "kind", "") == overlay_kind and g.label for g in r.guides)
                     if not has_overlay:
                         label = f"sel_row={j}"
-                        r = r.with_extra(
-                            guides=[
-                                Guide(kind=overlay_kind, start=0, end=0, label=label)
-                            ]
-                        )
+                        r = r.with_extra(guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)])
                 recs_list.append(r)
     else:
         # No explicit selection: honor limit/sample_seed and annotate with dataset row index.
         if sel_limit is not None and cfg.sample_seed is not None:
             import random
 
-            total_rows = (
-                _parquet_row_count(cfg.input_path) if cfg.format == "parquet" else None
-            )
+            total_rows = _parquet_row_count(cfg.input_path) if cfg.format == "parquet" else None
             if total_rows is None:
                 # Format guard — explicit (no fallback)
                 raise typer.Exit(code=2)
@@ -659,9 +587,7 @@ def job_run(
             for i, r in enumerate(_base_records()):
                 if i in idxset:
                     label = f"row={i}"
-                    r = r.with_extra(
-                        guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
-                    )
+                    r = r.with_extra(guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)])
                     recs_list.append(r)
         else:
             # Take first N (if limited) in order
@@ -670,9 +596,7 @@ def job_run(
                 if sel_limit is not None and count >= sel_limit:
                     break
                 label = f"row={i}"
-                r = r.with_extra(
-                    guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)]
-                )
+                r = r.with_extra(guides=[Guide(kind=overlay_kind, start=0, end=0, label=label)])
                 recs_list.append(r)
                 count += 1
 
@@ -704,9 +628,7 @@ def job_run(
                 pass
             elif event == "start":
                 progress.update(task, total=payload.get("total_frames"))
-                console.log(
-                    f"Writing MP4 {payload.get('width')}x{payload.get('height')} @ {payload.get('fps')} fps"
-                )
+                console.log(f"Writing MP4 {payload.get('width')}x{payload.get('height')} @ {payload.get('fps')} fps")
             elif event == "frame":
                 progress.advance(task)
             elif event == "finish":
@@ -742,9 +664,7 @@ def job_run(
         "job YAML readability, dataset path existence, and results directory."
     )
 )
-def doctor(
-    job: Optional[str] = typer.Argument(None, help="Optional job name/path to verify.")
-) -> None:
+def doctor(job: Optional[str] = typer.Argument(None, help="Optional job name/path to verify.")) -> None:
     ok = True
 
     def _pass(msg: str) -> None:

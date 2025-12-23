@@ -156,9 +156,7 @@ def cmd_repair_densegen(args):
         min_tfbs_len=int(getattr(args, "min_tfbs_len", 6)),
         dry_run=bool(getattr(args, "dry_run", False)),
         assume_yes=bool(getattr(args, "yes", False)),
-        dedupe_policy=(
-            None if getattr(args, "dedupe", "off") == "off" else getattr(args, "dedupe")
-        ),
+        dedupe_policy=(None if getattr(args, "dedupe", "off") == "off" else getattr(args, "dedupe")),
         drop_missing_used_tfbs=bool(getattr(args, "drop_missing_used_tfbs", False)),
         drop_single_tf=bool(getattr(args, "drop_single_tf", False)),
         drop_id_seq_only=bool(getattr(args, "drop_id_seq_only", False)),
@@ -244,9 +242,7 @@ def _prompt_pick_dataset(root: Path, names: list[str], use_rich: bool) -> str | 
     return names[0]
 
 
-def _resolve_dataset_name_interactive(
-    root: Path, dataset: str | None, use_rich: bool
-) -> str | None:
+def _resolve_dataset_name_interactive(root: Path, dataset: str | None, use_rich: bool) -> str | None:
     """
     If dataset is None, try to infer from CWD:
       - If CWD is <root>/<dataset>[/...], use that dataset
@@ -399,9 +395,7 @@ def main() -> None:
     )
     _add_rich_help(sp_imp)
     sp_imp.add_argument("dataset")
-    sp_imp.add_argument(
-        "--from", dest="source_format", choices=["csv", "jsonl"], required=True
-    )
+    sp_imp.add_argument("--from", dest="source_format", choices=["csv", "jsonl"], required=True)
     sp_imp.add_argument("--path", type=Path, required=True)
     sp_imp.add_argument("--bio-type", default="dna", choices=["dna", "protein"])
     sp_imp.add_argument("--alphabet", default="dna_4")
@@ -442,9 +436,7 @@ def main() -> None:
     )
     sp_info.set_defaults(func=cmd_info)
 
-    sp_schema = sp.add_parser(
-        "schema", add_help=False, help="Print schema", description="Print schema"
-    )
+    sp_schema = sp.add_parser("schema", add_help=False, help="Print schema", description="Print schema")
     _add_rich_help(sp_schema)
     sp_schema.add_argument(
         "dataset",
@@ -511,9 +503,7 @@ def main() -> None:
         help="Dataset name (optional if run inside a dataset folder)",
     )
     sp_desc.add_argument("--columns", default="", help="CSV list of columns to include")
-    sp_desc.add_argument(
-        "--sample", type=int, default=1024, help="Sample size for examples/stats"
-    )
+    sp_desc.add_argument("--sample", type=int, default=1024, help="Sample size for examples/stats")
     sp_desc.add_argument("--max-colwidth", type=int, default=80)
     sp_desc.add_argument("--max-list-items", type=int, default=6)
     sp_desc.add_argument("--precision", type=int, default=4)
@@ -532,9 +522,7 @@ def main() -> None:
         default=None,
         help="Dataset name OR filesystem path (defaults to '.').",
     )
-    sp_cell.add_argument(
-        "--path", type=Path, required=False, help="Alternative to positional target."
-    )
+    sp_cell.add_argument("--path", type=Path, required=False, help="Alternative to positional target.")
     sp_cell.add_argument("--row", type=int, required=True)
     sp_cell.add_argument("--col", required=True)
     sp_cell.add_argument("--glob", default=None)
@@ -667,12 +655,8 @@ def main() -> None:
         default=6,
         help="Minimum TFBS length to keep (drops 1-nt bugs like 'cpxr:G').",
     )
-    sp_repair.add_argument(
-        "--dry-run", action="store_true", help="Preview changes without writing."
-    )
-    sp_repair.add_argument(
-        "-y", "--yes", action="store_true", help="Apply without confirmation prompt."
-    )
+    sp_repair.add_argument("--dry-run", action="store_true", help="Preview changes without writing.")
+    sp_repair.add_argument("-y", "--yes", action="store_true", help="Apply without confirmation prompt.")
     sp_repair.add_argument(
         "--dedupe",
         choices=["off", "keep-first", "keep-last", "ask"],
@@ -717,9 +701,7 @@ def main() -> None:
         default=60,
         help="DNA length for RANDOM sequences (ignored with --from-csv)",
     )
-    sp_mock.add_argument(
-        "--x-dim", type=int, default=512, help="Length of demo X vector"
-    )
+    sp_mock.add_argument("--x-dim", type=int, default=512, help="Length of demo X vector")
     sp_mock.add_argument("--y-dim", type=int, default=8, help="Length of demo Y vector")
     sp_mock.add_argument("--seed", type=int, default=7, help="Random seed")
     sp_mock.add_argument(
@@ -733,9 +715,7 @@ def main() -> None:
         default=None,
         help="Use sequences from a CSV (must have 'sequence' column)",
     )
-    sp_mock.add_argument(
-        "--force", action="store_true", help="Overwrite existing dataset if present"
-    )
+    sp_mock.add_argument("--force", action="store_true", help="Overwrite existing dataset if present")
     sp_mock.set_defaults(func=cmd_make_mock)
 
     # ---------------- add-demo-cols ----------------
@@ -894,9 +874,7 @@ def main() -> None:
         # dataset can be omitted if run inside a dataset dir under --root
         p_.add_argument("dataset", nargs="?", default=None)
         p_.add_argument("--remote", "--from", "--to", dest="remote", required=True)
-        p_.add_argument(
-            "-y", "--yes", action="store_true", help="Assume yes (no prompt)"
-        )
+        p_.add_argument("-y", "--yes", action="store_true", help="Assume yes (no prompt)")
         p_.add_argument("--dry-run", action="store_true")
         p_.add_argument("--primary-only", action="store_true")
         p_.add_argument("--skip-snapshots", action="store_true")
@@ -972,9 +950,7 @@ def main() -> None:
 # ---------- Rich help injection ----------
 def _add_rich_help(parser: argparse.ArgumentParser) -> None:
     """Attach a Rich-styled -h/--help action to this parser."""
-    parser.add_argument(
-        "-h", "--help", action=_RichHelpAction, help="Show this message and exit."
-    )
+    parser.add_argument("-h", "--help", action=_RichHelpAction, help="Show this message and exit.")
 
 
 class _RichHelpAction(argparse.Action):
@@ -1012,9 +988,7 @@ def _print_help_rich(parser: argparse.ArgumentParser) -> None:
     title = f"USR v{__version__} CLI — Parquet-backed datasets; SSH remotes sync."
     usage = parser.format_usage().strip().replace("usage:", "Usage:")
 
-    console.print(
-        Panel.fit(Text(title, style="bold"), box=box.ROUNDED, border_style="cyan")
-    )
+    console.print(Panel.fit(Text(title, style="bold"), box=box.ROUNDED, border_style="cyan"))
     console.print(Text(usage, style="bold"))
     console.print()
 
@@ -1050,9 +1024,7 @@ def _print_help_rich(parser: argparse.ArgumentParser) -> None:
     console.print(opt_table)
 
     # Commands table (if any)
-    sub_actions = [
-        a for a in parser._actions if isinstance(a, argparse._SubParsersAction)
-    ]
+    sub_actions = [a for a in parser._actions if isinstance(a, argparse._SubParsersAction)]
     if sub_actions:
         cmd_table = Table(
             title="Commands",
@@ -1077,13 +1049,7 @@ def list_datasets(root: Path):
     root = root.resolve()
     if not root.exists():
         return []
-    return sorted(
-        [
-            p.name
-            for p in root.iterdir()
-            if p.is_dir() and (p / "records.parquet").exists()
-        ]
-    )
+    return sorted([p.name for p in root.iterdir() if p.is_dir() and (p / "records.parquet").exists()])
 
 
 def cmd_ls(args):
@@ -1115,9 +1081,7 @@ def cmd_ls(args):
                     "rows": pf.metadata.num_rows,
                     "cols": pf.metadata.num_columns,
                     "size": _fmt_bytes(int(st.st_size)),
-                    "updated": _dt.datetime.fromtimestamp(int(st.st_mtime)).isoformat(
-                        timespec="seconds"
-                    ),
+                    "updated": _dt.datetime.fromtimestamp(int(st.st_mtime)).isoformat(timespec="seconds"),
                 }
             )
         except Exception:
@@ -1177,16 +1141,11 @@ def cmd_attach(args):
         allow_overwrite=bool(args.allow_overwrite),
         note=args.note,
     )
-    print(
-        f"Attached {n} matched row(s) of {args.namespace} columns into {d.name} "
-        f"(input file: {in_path})"
-    )
+    print(f"Attached {n} matched row(s) of {args.namespace} columns into {d.name} (input file: {in_path})")
     try:
         cols = args.columns or "(all columns)"
         cmd = f'usr attach {args.dataset} --path {in_path} --namespace {args.namespace} --id-col {args.id_col} --columns "{cols}"'  # noqa
-        d.append_meta_note(
-            f"Attached columns under '{args.namespace}' ({n} row match)", cmd
-        )
+        d.append_meta_note(f"Attached columns under '{args.namespace}' ({n} row match)", cmd)
     except Exception:
         pass
 
@@ -1412,13 +1371,9 @@ def cmd_cols(args):
     sch = pf.schema_arrow
     for i in range(len(sch.names)):
         f = sch.field(i)
-        fields.append(
-            {"name": f.name, "type": str(f.type), "nullable": bool(f.nullable)}
-        )
+        fields.append({"name": f.name, "type": str(f.type), "nullable": bool(f.nullable)})
     df = pd.DataFrame(fields, columns=["name", "type", "nullable"])
-    caption = (
-        f"{pq_path}  rows={pf.metadata.num_rows:,}  cols={pf.metadata.num_columns}"
-    )
+    caption = f"{pq_path}  rows={pf.metadata.num_rows:,}  cols={pf.metadata.num_columns}"
     if getattr(args, "rich", False):
         render_table_rich(df, title="columns", caption=caption)
     else:
@@ -1434,11 +1389,7 @@ def cmd_describe(args):
         return
     d = Dataset(args.root, ds_name)
     tbl = pq.read_table(d.records_path)
-    cols = (
-        [c.strip() for c in args.columns.split(",") if c.strip()]
-        if args.columns
-        else None
-    )
+    cols = [c.strip() for c in args.columns.split(",") if c.strip()] if args.columns else None
     opts = PrettyOpts(
         max_colwidth=int(args.max_colwidth),
         max_list_items=int(args.max_list_items),
@@ -1482,9 +1433,7 @@ def cmd_cell(args):
     p = Path(tgt)
     pq_path: Path | None = None
     if p.exists():
-        pq_path = _select_parquet_target_interactive(
-            p, glob=args.glob, use_rich=False, confirm_if_inferred=implicit
-        )
+        pq_path = _select_parquet_target_interactive(p, glob=args.glob, use_rich=False, confirm_if_inferred=implicit)
         if pq_path is None:
             return
         if implicit:
@@ -1497,9 +1446,7 @@ def cmd_cell(args):
             pq_path = None
     if pq_path is None or not Path(pq_path).exists():
         print(f"Target not found: {tgt}")
-        print(
-            "Tip: pass a file/dir path, or a dataset name (e.g., 'usr cell demo --row 0 --col sequence')."
-        )
+        print("Tip: pass a file/dir path, or a dataset name (e.g., 'usr cell demo --row 0 --col sequence').")
         return
     col = str(args.col)
     row = int(args.row)
@@ -1512,16 +1459,14 @@ def cmd_cell(args):
         print(f"Available columns: {names}")
         return
     if row < 0 or row >= tbl.num_rows:
-        print(f"Row {row} out of range (0..{tbl.num_rows-1}).")
+        print(f"Row {row} out of range (0..{tbl.num_rows - 1}).")
         return
     val = tbl.column(0)[row].as_py()
     print(val)
 
 
 def cmd_validate(args):
-    ds_name = _resolve_dataset_name_interactive(
-        args.root, getattr(args, "dataset", None), False
-    )
+    ds_name = _resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
     if not ds_name:
         return
     d = Dataset(args.root, ds_name)
@@ -1567,9 +1512,7 @@ def cmd_grep(args):
 
 
 def cmd_export(args):
-    ds_name = _resolve_dataset_name_interactive(
-        args.root, getattr(args, "dataset", None), False
-    )
+    ds_name = _resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
     if not ds_name:
         return
     d = Dataset(args.root, ds_name)
@@ -1578,9 +1521,7 @@ def cmd_export(args):
 
 
 def cmd_snapshot(args):
-    ds_name = _resolve_dataset_name_interactive(
-        args.root, getattr(args, "dataset", None), False
-    )
+    ds_name = _resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
     if not ds_name:
         return
     d = Dataset(args.root, ds_name)
@@ -1629,11 +1570,7 @@ def cmd_make_mock(args):
         + (" (from CSV)" if args.from_csv else " (random sequences)")
     )
     try:
-        src = (
-            f"--from-csv {spec.csv_path}"
-            if spec.csv_path
-            else f"--length {spec.length}"
-        )
+        src = f"--from-csv {spec.csv_path}" if spec.csv_path else f"--length {spec.length}"
         cmd = f"usr make-mock {args.dataset} --n {spec.n} {src} --namespace {spec.namespace} --x-dim {spec.x_dim} --y-dim {spec.y_dim}"  # noqa
         Dataset(args.root, args.dataset).append_meta_note("Created mock dataset", cmd)
     except Exception:
@@ -1673,14 +1610,8 @@ def _policy_from_str(s: str) -> MergePolicy:
 
 
 def cmd_merge_datasets(args):
-    cols_subset = (
-        [c.strip() for c in args.columns.split(",") if c.strip()]
-        if args.columns
-        else None
-    )
-    mode = (
-        MergeColumnsMode.REQUIRE_SAME if args.require_same else MergeColumnsMode.UNION
-    )
+    cols_subset = [c.strip() for c in args.columns.split(",") if c.strip()] if args.columns else None
+    mode = MergeColumnsMode.REQUIRE_SAME if args.require_same else MergeColumnsMode.UNION
     policy = _policy_from_str(args.dup_policy)
 
     preview = merge_usr_to_usr(
@@ -1774,28 +1705,15 @@ def _print_diff(summary, use_rich: bool | None = None):
     pl, pr = summary.primary_local, summary.primary_remote
     print(f"Dataset: {summary.dataset}")
 
-    local_line = (
-        f"Local  : {pl.sha256 or '?'}  "
-        f"size={fmt_sz(pl.size)}  "
-        f"rows={pl.rows or '?'}  "
-        f"cols={pl.cols or '?'}"
-    )
+    local_line = f"Local  : {pl.sha256 or '?'}  size={fmt_sz(pl.size)}  rows={pl.rows or '?'}  cols={pl.cols or '?'}"
     print(local_line)
 
-    remote_line = (
-        f"Remote : {pr.sha256 or '?'}  "
-        f"size={fmt_sz(pr.size)}  "
-        f"rows={pr.rows or '?'}  "
-        f"cols={pr.cols or '?'}"
-    )
+    remote_line = f"Remote : {pr.sha256 or '?'}  size={fmt_sz(pr.size)}  rows={pr.rows or '?'}  cols={pr.cols or '?'}"
     print(remote_line)
 
     eq = "==" if (pl.sha256 and pr.sha256 and pl.sha256 == pr.sha256) else "≠"
     print(f"Primary sha: {pl.sha256 or '?'} {eq} {pr.sha256 or '?'}")
-    print(
-        "meta.md     mtime: "
-        f"{summary.meta_local_mtime or '-'}  →  {summary.meta_remote_mtime or '-'}"
-    )
+    print(f"meta.md     mtime: {summary.meta_local_mtime or '-'}  →  {summary.meta_remote_mtime or '-'}")
     delta_evt = max(0, summary.events_remote_lines - summary.events_local_lines)
     print(
         ".events.log lines: "
@@ -1803,11 +1721,7 @@ def _print_diff(summary, use_rich: bool | None = None):
         f"remote={summary.events_remote_lines}  "
         f"(+{delta_evt} on remote)"
     )
-    print(
-        "_snapshots : "
-        f"remote_count={summary.snapshots.count}  "
-        f"newer_than_local={summary.snapshots.newer_than_local}"
-    )
+    print(f"_snapshots : remote_count={summary.snapshots.count}  newer_than_local={summary.snapshots.newer_than_local}")
     print("Status     :", "CHANGES" if summary.has_change else "up-to-date")
 
 
@@ -1867,9 +1781,7 @@ def cmd_pull(args):
     target = args.dataset
     if _is_file_mode_target(target):
         if args.primary_only or args.skip_snapshots:
-            raise SystemExit(
-                "--primary-only/--skip-snapshots are dataset-only flags (not valid in FILE mode)."
-            )
+            raise SystemExit("--primary-only/--skip-snapshots are dataset-only flags (not valid in FILE mode).")
         local_file = Path(target).resolve()
         if local_file.is_dir():
             raise SystemExit("FILE mode: pass a file path, not a directory.")
@@ -1898,9 +1810,7 @@ def cmd_push(args):
     target = args.dataset
     if _is_file_mode_target(target):
         if args.primary_only or args.skip_snapshots:
-            raise SystemExit(
-                "--primary-only/--skip-snapshots are dataset-only flags (not valid in FILE mode)."
-            )
+            raise SystemExit("--primary-only/--skip-snapshots are dataset-only flags (not valid in FILE mode).")
         local_file = Path(target).resolve()
         if local_file.is_dir():
             raise SystemExit("FILE mode: pass a file path, not a directory.")
@@ -1931,14 +1841,10 @@ def _resolve_remote_path_for_file(local_file: Path, args) -> str:
         return args.remote_path
     cfg = get_remote(args.remote)
     if not cfg.repo_root:
-        raise SystemExit(
-            "FILE mode requires remote.repo_root in remotes.yaml or --remote-path."
-        )
+        raise SystemExit("FILE mode requires remote.repo_root in remotes.yaml or --remote-path.")
     import os
 
-    local_root = (
-        args.repo_root or cfg.local_repo_root or os.environ.get("DNADESIGN_REPO_ROOT")
-    )
+    local_root = args.repo_root or cfg.local_repo_root or os.environ.get("DNADESIGN_REPO_ROOT")
     if not local_root:
         raise SystemExit(
             "FILE mode requires a local repo root. Pass --repo-root, set DNADESIGN_REPO_ROOT, or add local_repo_root in remotes.yaml."  # noqa
@@ -1946,9 +1852,7 @@ def _resolve_remote_path_for_file(local_file: Path, args) -> str:
     try:
         rel = local_file.resolve().relative_to(Path(local_root).resolve())
     except Exception:
-        raise SystemExit(
-            f"Cannot compute path relative to local repo root: {local_file} not under {local_root}"
-        )
+        raise SystemExit(f"Cannot compute path relative to local repo root: {local_file} not under {local_root}")
     from pathlib import PurePosixPath
 
     return str(PurePosixPath(cfg.repo_root).joinpath(rel.as_posix()))
@@ -2003,11 +1907,7 @@ def cmd_dedupe_sequences(args):
         )
         if args.policy == "ask" and not args.dry_run:
             _preview_group(seq_letters, g_sorted)
-            ans = (
-                input("Keep which row? [1..n], 0 = drop all, s = skip group: ")
-                .strip()
-                .lower()
-            )
+            ans = input("Keep which row? [1..n], 0 = drop all, s = skip group: ").strip().lower()
             if ans in {"s", "skip"}:
                 keep_ids.extend(g_sorted["id"].tolist())
                 continue
@@ -2018,9 +1918,7 @@ def cmd_dedupe_sequences(args):
                 kidx = int(ans)
                 if 1 <= kidx <= len(g_sorted):
                     keep_ids.append(g_sorted.iloc[kidx - 1]["id"])
-                    drop_ids.extend(
-                        g_sorted.drop(g_sorted.index[kidx - 1])["id"].tolist()
-                    )
+                    drop_ids.extend(g_sorted.drop(g_sorted.index[kidx - 1])["id"].tolist())
                     continue
             except Exception:
                 pass
@@ -2030,9 +1928,7 @@ def cmd_dedupe_sequences(args):
             keep_ids.append(g_sorted.iloc[0]["id"])
             drop_ids.extend(g_sorted.iloc[1:]["id"].tolist())
 
-    print(
-        f"Found {len(dup_keys)} duplicate group(s); would drop {len(drop_ids)} row(s)."
-    )
+    print(f"Found {len(dup_keys)} duplicate group(s); would drop {len(drop_ids)} row(s).")
     for k, g in df[df["_key"].isin(dup_keys)].groupby("_key"):
         print("•", k.split("|", 1)[1])
         print(
@@ -2046,12 +1942,7 @@ def cmd_dedupe_sequences(args):
         if len(g) > 1:
             print(
                 "   drop:",
-                ", ".join(
-                    g.sort_values("created_at")
-                    .iloc[1:]["id"]
-                    .map(lambda s: s[:8] + "…")
-                    .tolist()
-                ),
+                ", ".join(g.sort_values("created_at").iloc[1:]["id"].map(lambda s: s[:8] + "…").tolist()),
             )
         if len(dup_keys) > 5:
             print("   …")
@@ -2071,9 +1962,7 @@ def cmd_dedupe_sequences(args):
         new_tbl = tbl.filter(pc.invert(drop_mask))
     else:
         new_tbl = tbl
-    write_parquet_atomic(
-        new_tbl, d.records_path, d.snapshot_dir, preserve_metadata_from=tbl
-    )
+    write_parquet_atomic(new_tbl, d.records_path, d.snapshot_dir, preserve_metadata_from=tbl)
     _append_event(
         d.events_path,
         {
@@ -2084,6 +1973,4 @@ def cmd_dedupe_sequences(args):
             "policy": args.policy,
         },
     )
-    print(
-        f"[dedupe] dropped {len(drop_ids)} row(s); dataset now has {new_tbl.num_rows} rows."
-    )
+    print(f"[dedupe] dropped {len(drop_ids)} row(s); dataset now has {new_tbl.num_rows} rows.")

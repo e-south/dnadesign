@@ -23,7 +23,7 @@ job:
   output:
     dir: "${JOB_DIR}/../results/nt_scan_demo"
     layout: flat
-  
+
   plot:
     which: ["position_scatter_and_heatmap", "metric_by_mutation_count"]
     metric_id: llr_mean            # default metric for plotting

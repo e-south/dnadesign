@@ -33,9 +33,7 @@ def load_sequences_input(inputs) -> List[str]:
         return [inputs]
     if isinstance(inputs, list) and all(isinstance(x, str) for x in inputs):
         return inputs
-    raise ValidationError(
-        "For ingest.source=sequences, inputs must be str or list[str]"
-    )
+    raise ValidationError("For ingest.source=sequences, inputs must be str or list[str]")
 
 
 def load_records_input(inputs, field: str) -> Tuple[List[str], List[Dict]]:
@@ -96,9 +94,7 @@ def load_usr_input(
     try:
         from dnadesign.usr import Dataset  # local package, same repo
     except Exception as e:
-        raise ValidationError(
-            "dnadesign.usr is not importable. Is dnadesign installed in editable mode?"
-        ) from e
+        raise ValidationError("dnadesign.usr is not importable. Is dnadesign installed in editable mode?") from e
 
     ds_root = Path(root) if root else _default_usr_root()
     ds = Dataset(ds_root, dataset_name)
@@ -129,7 +125,5 @@ def load_usr_input(
         raise ValidationError("No sequences found for the requested USR dataset/ids.")
     bad = [i for i, s in enumerate(seqs) if not isinstance(s, str) or not s]
     if bad:
-        raise ValidationError(
-            f"{len(bad)} empty/invalid sequences found in USR ingest."
-        )
+        raise ValidationError(f"{len(bad)} empty/invalid sequences found in USR ingest.")
     return seqs, ids, ds

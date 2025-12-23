@@ -34,26 +34,16 @@ def render(context, params: dict) -> None:
     rank_mode = (get_str(params, ["rank_mode"], "sequential") or "sequential").lower()
     # "sequential" | "competition"
     alpha = get_float(params, ["alpha"], 0.45)
-    hue_field = normalize_metric_field(
-        get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None)
-    )
+    hue_field = normalize_metric_field(get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None))
     cmap = get_str(params, ["cmap"], "viridis")
-    size_by = normalize_metric_field(
-        get_str(params, ["size_by", "size", "size_field", "point_size_by"], None)
-    )
+    size_by = normalize_metric_field(get_str(params, ["size_by", "size", "size_field", "point_size_by"], None))
     # Assert: if user supplied hue/size keys but normalization yielded none → misconfiguration
-    if (
-        any(k in params for k in ("hue_field", "hue", "color", "color_by", "colour_by"))
-        and not hue_field
-    ):
+    if any(k in params for k in ("hue_field", "hue", "color", "color_by", "colour_by")) and not hue_field:
         raise ValueError(
             "A hue parameter was provided but could not be parsed. "
             "Use an obj__/pred__/sel__ column or alias (e.g., 'effect_scaled', 'score')."
         )
-    if (
-        any(k in params for k in ("size_by", "size", "size_field", "point_size_by"))
-        and not size_by
-    ):
+    if any(k in params for k in ("size_by", "size", "size_field", "point_size_by")) and not size_by:
         raise ValueError(
             "A size_by parameter was provided but could not be parsed. "
             "Use an obj__/pred__/sel__ column or alias (e.g., 'logic_fidelity')."
@@ -101,9 +91,7 @@ def render(context, params: dict) -> None:
         x_field = "rank__sequential"
     else:
         if "sel__rank_competition" not in df.columns:
-            raise ValueError(
-                "sel__rank_competition not present for competition ranking."
-            )
+            raise ValueError("sel__rank_competition not present for competition ranking.")
         x_field = "sel__rank_competition"
 
     # Hue/size arrays
@@ -114,9 +102,7 @@ def render(context, params: dict) -> None:
         hue_vals = df[hue_field].to_numpy(dtype=float)
 
     if "sel__rank_competition" not in df.columns:
-        df = df.sort_values(
-            ["as_of_round", score_field], ascending=[True, False]
-        ).assign(
+        df = df.sort_values(["as_of_round", score_field], ascending=[True, False]).assign(
             sel__rank_competition=lambda x: x.groupby("as_of_round").cumcount() + 1
         )
 
@@ -143,13 +129,9 @@ def render(context, params: dict) -> None:
         # optional size mapping
         if size_by:
             if size_by not in sub.columns:
-                raise ValueError(
-                    f"size/size_by field '{size_by}' not present in dataframe."
-                )
+                raise ValueError(f"size/size_by field '{size_by}' not present in dataframe.")
 
-            sizes = scale_to_sizes(
-                sub[size_by].to_numpy(dtype=float), s_min=s_min, s_max=s_max
-            )
+            sizes = scale_to_sizes(sub[size_by].to_numpy(dtype=float), s_min=s_min, s_max=s_max)
         else:
             sizes = s_min
         # line for shape, then scatter for density
@@ -168,12 +150,7 @@ def render(context, params: dict) -> None:
             rasterize_at=rasterize_at,
         )
         if "sel__is_selected" in sub.columns:
-            sel_mask = (
-                sub["sel__is_selected"]
-                .astype("boolean")
-                .fillna(False)
-                .to_numpy(dtype=bool)
-            )
+            sel_mask = sub["sel__is_selected"].astype("boolean").fillna(False).to_numpy(dtype=bool)
             if sel_mask.any():
                 scatter_smart(
                     ax,
@@ -184,9 +161,7 @@ def render(context, params: dict) -> None:
                     edgecolors="black",
                     rasterize_at=rasterize_at,
                 )
-        ax.set_xlabel(
-            f"Rank ({'sequential' if rank_mode=='sequential' else 'competition'})"
-        )
+        ax.set_xlabel(f"Rank ({'sequential' if rank_mode == 'sequential' else 'competition'})")
         ax.set_ylabel("Objective score")
         ax.set_title(f"Score vs Rank — round {r}")
         ax.set_xlim(left=sub[x_field].max(), right=1)
@@ -240,9 +215,7 @@ def render(context, params: dict) -> None:
                 **color_kw,
             )
         ax.legend(title="round", frameon=False)
-        ax.set_xlabel(
-            f"Rank ({'sequential' if rank_mode=='sequential' else 'competition'})"
-        )
+        ax.set_xlabel(f"Rank ({'sequential' if rank_mode == 'sequential' else 'competition'})")
         ax.set_ylabel("Objective score")
         ax.set_title("Score vs Rank by Round")
         ax.set_xlim(left=df[x_field].max(), right=1)

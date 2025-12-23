@@ -16,9 +16,7 @@ from .config import JobConfig, ModelConfig, OutputSpec
 from .engine import run_extract_job, run_generate_job
 from .errors import ConfigError
 
-ProgressFactory = Optional[
-    Callable[[str, int], Any]
-]  # returns handle with .update(n), .close()
+ProgressFactory = Optional[Callable[[str, int], Any]]  # returns handle with .update(n), .close()
 
 
 def run_extract(
@@ -47,9 +45,7 @@ def run_extract(
         ingest={"source": "sequences"},
         outputs=[OutputSpec(**o) for o in outputs],
     )
-    return run_extract_job(
-        seqs, model=model, job=job, progress_factory=progress_factory
-    )
+    return run_extract_job(seqs, model=model, job=job, progress_factory=progress_factory)
 
 
 def run_generate(
@@ -78,9 +74,7 @@ def run_generate(
         ingest={"source": "sequences"},
         params=params,
     )
-    return run_generate_job(
-        prompts, model=model, job=job, progress_factory=progress_factory
-    )
+    return run_generate_job(prompts, model=model, job=job, progress_factory=progress_factory)
 
 
 def run_job(
@@ -93,12 +87,8 @@ def run_job(
     model_cfg = model if isinstance(model, ModelConfig) else ModelConfig(**model)
     job_cfg = job if isinstance(job, JobConfig) else JobConfig(**job)
     if job_cfg.operation == "extract":
-        return run_extract_job(
-            inputs, model=model_cfg, job=job_cfg, progress_factory=progress_factory
-        )
+        return run_extract_job(inputs, model=model_cfg, job=job_cfg, progress_factory=progress_factory)
     elif job_cfg.operation == "generate":
-        return run_generate_job(
-            inputs, model=model_cfg, job=job_cfg, progress_factory=progress_factory
-        )
+        return run_generate_job(inputs, model=model_cfg, job=job_cfg, progress_factory=progress_factory)
     else:
         raise ConfigError(f"Unknown operation: {job_cfg.operation}")

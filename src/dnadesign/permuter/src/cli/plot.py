@@ -65,10 +65,7 @@ def _call_plot(func, *, plot_name: str, **kwargs) -> None:
     if rejected:
         bad = ", ".join(sorted(rejected))
         allowed_list = ", ".join(sorted(allowed))
-        raise TypeError(
-            f"{plot_name}: unsupported option(s): {bad}. "
-            f"Supported parameters are: {allowed_list}"
-        )
+        raise TypeError(f"{plot_name}: unsupported option(s): {bad}. Supported parameters are: {allowed_list}")
     return func(**accepted)
 
 
@@ -98,9 +95,7 @@ def _normalize_for_plots(df: pd.DataFrame, metric_id: str, log=_LOG) -> pd.DataF
     return df2
 
 
-def _pick_reference(
-    df, name_col: str, seq_col: str, desired: Optional[str]
-) -> tuple[str, str]:
+def _pick_reference(df, name_col: str, seq_col: str, desired: Optional[str]) -> tuple[str, str]:
     if desired:
         sub = df[df[name_col] == desired]
         if sub.empty:
@@ -115,9 +110,7 @@ def _pick_reference(
     raise ValueError("--ref is required because the refs CSV has multiple rows")
 
 
-def _derive_records_from_job(
-    job_hint: str, ref: Optional[str], out: Optional[Path]
-) -> Tuple[Path, JobConfig, Path]:
+def _derive_records_from_job(job_hint: str, ref: Optional[str], out: Optional[Path]) -> Tuple[Path, JobConfig, Path]:
     job_path = resolve_job_hint(job_hint)
     data = yaml.safe_load(job_path.read_text(encoding="utf-8"))
     cfg = JobConfig.model_validate(data)
@@ -137,9 +130,7 @@ def _derive_records_from_job(
     # Need ref for nested/flat_jobref
     df_refs = pd.read_csv(jp0.refs_csv, dtype=str)
     desired = ref or getattr(cfg.job.input, "reference_sequence", None)
-    ref_name, _ = _pick_reference(
-        df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, desired
-    )
+    ref_name, _ = _pick_reference(df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, desired)
     # 2) nested
     jp = resolve(
         job_yaml=job_path,
@@ -152,9 +143,7 @@ def _derive_records_from_job(
     if nested.exists():
         return nested, cfg, job_path
     # 3) flat-jobref
-    flat_jobref = (
-        jp.output_root.parent / f"{jp.output_root.name}__{ref_name}" / "records.parquet"
-    ).resolve()
+    flat_jobref = (jp.output_root.parent / f"{jp.output_root.name}__{ref_name}" / "records.parquet").resolve()
     if flat_jobref.exists():
         return flat_jobref, cfg, job_path
     # fallback (caller will error clearly)
@@ -233,26 +222,15 @@ def plot(
     font_scale = font_scale or yaml_font
     figsize_global = (width, height) if (width and height) else None
     strip_every = yaml_strip_every
-    emit_summaries = (
-        emit_summaries
-        if emit_summaries is not None
-        else (yaml_emit if yaml_emit is not None else True)
-    )
+    emit_summaries = emit_summaries if emit_summaries is not None else (yaml_emit if yaml_emit is not None else True)
 
     # Discover present metric ids once
     obs_cols = [c for c in df.columns if c.startswith("permuter__observed__")]
-    present_ids = sorted(
-        {
-            c.split("permuter__observed__", 1)[1].lstrip("_").split("__", 1)[0]
-            for c in obs_cols
-        }
-    )
+    present_ids = sorted({c.split("permuter__observed__", 1)[1].lstrip("_").split("__", 1)[0] for c in obs_cols})
 
     # If no metric-id was given, infer when there is exactly one id.
     if not metric_id:
-        ids = sorted(
-            {c.split("permuter__observed__", 1)[1].lstrip("_") for c in obs_cols}
-        )
+        ids = sorted({c.split("permuter__observed__", 1)[1].lstrip("_") for c in obs_cols})
         if len(ids) == 1:
             metric_id = ids[0]
         else:
@@ -280,8 +258,7 @@ def plot(
                     "  permuter evaluate --data <dataset_dir> --with <id>:<evaluator>:<metric>"
                 )
         raise ValueError(
-            f"Metric id '{metric_id}' not found in dataset.\n"
-            f"Available metric ids: {present_ids or '<none>'}.{hint}"
+            f"Metric id '{metric_id}' not found in dataset.\nAvailable metric ids: {present_ids or '<none>'}.{hint}"
         )
 
     # Build an informative subtitle when we know the job config for this metric id.
@@ -291,9 +268,7 @@ def plot(
             if str(m.id) == str(metric_id):
                 red = (m.params or {}).get("reduction", None)
                 red_txt = f", reduction={red}" if red else ""
-                subtitle = (
-                    f"metric={m.id} • evaluator={m.evaluator}.{m.metric}{red_txt}"
-                )
+                subtitle = f"metric={m.id} • evaluator={m.evaluator}.{m.metric}{red_txt}"
                 break
 
     # Prepare canonical columns for all plots (once):
@@ -307,9 +282,7 @@ def plot(
             metric_id,
         )
     except Exception as e:
-        raise ValueError(
-            f"Unable to prepare canonical columns for plotting (metric_id={metric_id}). {e}"
-        ) from e
+        raise ValueError(f"Unable to prepare canonical columns for plotting (metric_id={metric_id}). {e}") from e
 
     for name in which:
         # Compute figsize for this plot with explicit precedence:
@@ -358,26 +331,10 @@ def plot(
                 str(figsize) if figsize else "auto",
                 str(font_scale) if font_scale else "1.0",
             )
-            yaml_ranked_jitter = (
-                getattr(cfg.job.plot, "ranked_jitter", None)
-                if cfg and cfg.job.plot
-                else None
-            )
-            yaml_ranked_point_size = (
-                getattr(cfg.job.plot, "ranked_point_size", None)
-                if cfg and cfg.job.plot
-                else None
-            )
-            yaml_ranked_alpha = (
-                getattr(cfg.job.plot, "ranked_alpha", None)
-                if cfg and cfg.job.plot
-                else None
-            )
-            yaml_ranked_cmap = (
-                getattr(cfg.job.plot, "ranked_cmap", None)
-                if cfg and cfg.job.plot
-                else None
-            )
+            yaml_ranked_jitter = getattr(cfg.job.plot, "ranked_jitter", None) if cfg and cfg.job.plot else None
+            yaml_ranked_point_size = getattr(cfg.job.plot, "ranked_point_size", None) if cfg and cfg.job.plot else None
+            yaml_ranked_alpha = getattr(cfg.job.plot, "ranked_alpha", None) if cfg and cfg.job.plot else None
+            yaml_ranked_cmap = getattr(cfg.job.plot, "ranked_cmap", None) if cfg and cfg.job.plot else None
             _call_plot(
                 plot_ranked,
                 plot_name="ranked_variants",

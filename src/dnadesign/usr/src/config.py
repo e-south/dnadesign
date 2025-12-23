@@ -99,9 +99,7 @@ def load_all(custom: Optional[Path] = None) -> Dict[str, SSHRemoteConfig]:
                 local_repo_root=rec.get("local_repo_root"),
             )
         except KeyError as ke:
-            raise RemoteConfigError(
-                f"Remote '{name}' missing required key: {ke}"
-            ) from None
+            raise RemoteConfigError(f"Remote '{name}' missing required key: {ke}") from None
     return remotes
 
 
@@ -125,14 +123,10 @@ def save_remote(cfg: SSHRemoteConfig, custom: Optional[Path] = None) -> Path:
 def get_remote(name: str, custom: Optional[Path] = None) -> SSHRemoteConfig:
     remotes = load_all(custom)
     if name not in remotes:
-        raise RemoteConfigError(
-            f"Unknown remote '{name}'. Define it with 'usr remotes add {name} --type ssh ...'."
-        )
+        raise RemoteConfigError(f"Unknown remote '{name}'. Define it with 'usr remotes add {name} --type ssh ...'.")
     cfg = remotes[name]
     if cfg.ssh_key_env:
         # Validate env presence early (assertive programming)
         if cfg.ssh_key_env not in os.environ:
-            raise RemoteConfigError(
-                f"Environment variable '{cfg.ssh_key_env}' not set (SSH key path)."
-            )
+            raise RemoteConfigError(f"Environment variable '{cfg.ssh_key_env}' not set (SSH key path).")
     return cfg

@@ -85,22 +85,16 @@ def _resolve_campaign_dir(config_path: Path) -> tuple[Path, dict]:
     return p.parent.resolve(), _load_campaign_yaml(p)
 
 
-@cli_command(
-    "plot", help="Generate plots defined under the campaign's top-level 'plots:' block."
-)
+@cli_command("plot", help="Generate plots defined under the campaign's top-level 'plots:' block.")
 def cmd_plot(
-    config: Optional[Path] = typer.Option(
-        None, "--config", "-c", help="Path to campaign.yaml or campaign directory."
-    ),
+    config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to campaign.yaml or campaign directory."),
     round: Optional[str] = typer.Option(
         None,
         "--round",
         "-r",
         help="Round selector: latest | all | 3 | 1,3,7 | 2-5 (omitted = unspecified).",
     ),
-    name: Optional[str] = typer.Option(
-        None, "--name", "-n", help="Run a single plot by its 'name' in the YAML."
-    ),
+    name: Optional[str] = typer.Option(None, "--name", "-n", help="Run a single plot by its 'name' in the YAML."),
 ) -> None:
     """
     Runs all plots by default (or a single plot via --name).
@@ -144,9 +138,7 @@ def cmd_plot(
             pname = entry["name"]
             pkind = entry["kind"]
         except Exception:
-            typer.echo(
-                "[plot] Each plot requires 'name' and 'kind'. Skipping invalid entry."
-            )
+            typer.echo("[plot] Each plot requires 'name' and 'kind'. Skipping invalid entry.")
             any_fail = True
             continue
 
@@ -156,9 +148,7 @@ def cmd_plot(
             n = d.get("name")
             p = d.get("path")
             if not n or not p:
-                raise ValueError(
-                    f"Invalid data entry in plot '{pname}': expected name+path"
-                )
+                raise ValueError(f"Invalid data entry in plot '{pname}': expected name+path")
             pp = Path(p)
             if not pp.is_absolute():
                 pp = (campaign_dir / pp).resolve()
@@ -169,9 +159,7 @@ def cmd_plot(
         out_dir = (campaign_dir / "outputs" / "plots").resolve()
         fmt = (out_cfg.get("format") or "png").lower()
         dpi = int(out_cfg.get("dpi", 600))
-        fname = (out_cfg.get("filename") or "{name}{round_suffix}.png").format(
-            name=pname, round_suffix=suffix
-        )
+        fname = (out_cfg.get("filename") or "{name}{round_suffix}.png").format(name=pname, round_suffix=suffix)
         # Normalize extension to chosen format
         if not fname.lower().endswith(f".{fmt}"):
             base = fname.rsplit(".", 1)[0] if "." in fname else fname
@@ -200,9 +188,7 @@ def cmd_plot(
             "on",
         )
         if STRICT and "params" in entry and not params:
-            raise ValueError(
-                f"[plot] plot '{pname}' has an empty or non-mapping 'params:' block in YAML."
-            )
+            raise ValueError(f"[plot] plot '{pname}' has an empty or non-mapping 'params:' block in YAML.")
 
         # Convenience: if users put plotting keys at top-level, lift them into params.
         TOPLEVEL = {
@@ -249,10 +235,7 @@ def cmd_plot(
                 "yes",
                 "on",
             ):
-                raise ValueError(
-                    f"Plot '{pname}' has plotting keys at the top level. "
-                    "Move them under 'params:'."
-                )
+                raise ValueError(f"Plot '{pname}' has plotting keys at the top level. Move them under 'params:'.")
 
         # Build context
         import logging
@@ -265,9 +248,7 @@ def cmd_plot(
             try:
                 from rich.logging import RichHandler
 
-                h = RichHandler(
-                    rich_tracebacks=False, markup=True, show_path=False, show_time=False
-                )
+                h = RichHandler(rich_tracebacks=False, markup=True, show_path=False, show_time=False)
             except Exception:
                 h = logging.StreamHandler()
             h.setLevel(logging.INFO)
@@ -294,7 +275,7 @@ def cmd_plot(
             typer.secho(
                 f"[plot] entry '{pname}': keys={sorted(entry.keys())} "
                 f"params_type={type(entry.get('params')).__name__} "
-                f"params_preview={ {k: entry['params'].get(k) for k in (entry.get('params') or {}).keys()} if isinstance(entry.get('params'), dict) else '(not a dict)'}",  # noqa
+                f"params_preview={ {k: entry['params'].get(k) for k in (entry.get('params') or {}).keys()} if isinstance(entry.get('params'), dict) else '(not a dict)' }",  # noqa
                 fg=typer.colors.BLUE,
             )
 

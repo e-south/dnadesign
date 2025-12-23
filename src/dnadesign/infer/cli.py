@@ -32,7 +32,7 @@ from ._console import (
     setup_console_logging,
 )
 from .api import run_job
-from .config import JobConfig, ModelConfig, OutputSpec, RootConfig
+from .config import IngestConfig, JobConfig, ModelConfig, OutputSpec, RootConfig
 from .engine import clear_adapter_cache
 from .errors import (
     CapabilityError,
@@ -80,9 +80,7 @@ def _discovery_config(provided: Optional[Path]) -> Path:
     module_cfg = Path(__file__).with_name("config.yaml")
     if module_cfg.exists():
         return module_cfg.resolve()
-    raise ConfigError(
-        "No config found. Pass --config or place config.yaml in the current directory."
-    )
+    raise ConfigError("No config found. Pass --config or place config.yaml in the current directory.")
 
 
 def _read_ids_arg(ids: Optional[str]) -> Optional[List[str]]:
@@ -129,47 +127,27 @@ def _root(
 def run(
     # config or preset
     config: Optional[Path] = typer.Option(None, "--config", help="Path to config.yaml"),
-    preset: Optional[str] = typer.Option(
-        None, "--preset", help="Run a single job from a named preset."
-    ),
-    job: List[str] = typer.Option(
-        [], "--job", help="If --config is used: one or more job ids to run."
-    ),
+    preset: Optional[str] = typer.Option(None, "--preset", help="Run a single job from a named preset."),
+    job: List[str] = typer.Option([], "--job", help="If --config is used: one or more job ids to run."),
     # common overrides
-    device: Optional[str] = typer.Option(
-        None, "--device", help="Override model.device."
-    ),
-    precision: Optional[str] = typer.Option(
-        None, "--precision", help="Override model.precision."
-    ),
-    batch_size: Optional[int] = typer.Option(
-        None, "--batch-size", help="Override model.batch_size."
-    ),
-    overwrite: Optional[bool] = typer.Option(
-        None, "--overwrite/--no-overwrite", help="Override job.io.overwrite."
-    ),
-    progress: bool = typer.Option(
-        True, "--progress/--no-progress", help="Use progress bars."
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", help="Validate and print summary, then exit."
-    ),
+    device: Optional[str] = typer.Option(None, "--device", help="Override model.device."),
+    precision: Optional[str] = typer.Option(None, "--precision", help="Override model.precision."),
+    batch_size: Optional[int] = typer.Option(None, "--batch-size", help="Override model.batch_size."),
+    overwrite: Optional[bool] = typer.Option(None, "--overwrite/--no-overwrite", help="Override job.io.overwrite."),
+    progress: bool = typer.Option(True, "--progress/--no-progress", help="Use progress bars."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate and print summary, then exit."),
     # preset ingest (USR-centric for run)
     usr: Optional[str] = typer.Option(None, "--usr", help="USR dataset (preset mode)."),
     field: str = typer.Option("sequence", "--field", help="USR field/column."),
     ids: Optional[str] = typer.Option(None, "--ids", help="CSV or file of ids (USR)."),
-    usr_root: Optional[Path] = typer.Option(
-        None, "--usr-root", help="USR datasets root."
-    ),
+    usr_root: Optional[Path] = typer.Option(None, "--usr-root", help="USR datasets root."),
     write_back: bool = typer.Option(
         False,
         "--write-back/--no-write-back",
         help="Preset mode: attach outputs to USR.",
     ),
     # safety
-    i_know_this_is_pickle: bool = typer.Option(
-        False, "--i-know-this-is-pickle", help="Needed only for pt_file."
-    ),
+    i_know_this_is_pickle: bool = typer.Option(False, "--i-know-this-is-pickle", help="Needed only for pt_file."),
 ):
     try:
         if preset:
@@ -235,9 +213,7 @@ def run(
             if p["kind"] == "extract":
                 render_outputs_summary(job_cfg, res)
             else:
-                console.print(
-                    f"[green]Generated {len(res.get('gen_seqs', []))} sequence(s).[/green]"
-                )
+                console.print(f"[green]Generated {len(res.get('gen_seqs', []))} sequence(s).[/green]")
             raise typer.Exit(code=0)
 
         # --config path
@@ -281,10 +257,10 @@ def run(
                 if j.operation == "extract":
                     render_outputs_summary(j, res)
                 else:
-                    console.print(
-                        f"[green]Generated {len(res.get('gen_seqs', []))} sequence(s).[/green]"
-                    )
+                    console.print(f"[green]Generated {len(res.get('gen_seqs', []))} sequence(s).[/green]")
 
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(code=_exit_for(e))
@@ -304,37 +280,21 @@ def extract(
     alphabet: Optional[str] = typer.Option(None, "--alphabet"),
     batch_size: Optional[int] = typer.Option(None, "--batch-size"),
     # output or preset
-    preset: Optional[str] = typer.Option(
-        None, "--preset", help="Use a named preset (extract)."
-    ),
-    fn: Optional[str] = typer.Option(
-        None, "--fn", help="namespaced fn, e.g., evo2.log_likelihood"
-    ),
-    format: Optional[str] = typer.Option(
-        None, "--format", help="float|list|numpy|tensor"
-    ),
-    out_id: str = typer.Option(
-        "out", "--out-id", help="Column id for output (ignored if --preset)."
-    ),
+    preset: Optional[str] = typer.Option(None, "--preset", help="Use a named preset (extract)."),
+    fn: Optional[str] = typer.Option(None, "--fn", help="namespaced fn, e.g., evo2.log_likelihood"),
+    format: Optional[str] = typer.Option(None, "--format", help="float|list|numpy|tensor"),
+    out_id: str = typer.Option("out", "--out-id", help="Column id for output (ignored if --preset)."),
     # source
-    seq: List[str] = typer.Option(
-        None, "--seq", help="One or more sequences.", show_default=False
-    ),
-    seq_file: Optional[Path] = typer.Option(
-        None, "--seq-file", help="Text file (one per line)."
-    ),
+    seq: List[str] = typer.Option(None, "--seq", help="One or more sequences.", show_default=False),
+    seq_file: Optional[Path] = typer.Option(None, "--seq-file", help="Text file (one per line)."),
     usr: Optional[str] = typer.Option(None, "--usr", help="USR dataset name."),
     field: str = typer.Option("sequence", "--field"),
     ids: Optional[str] = typer.Option(None, "--ids", help="Path/CSV of ids (USR)."),
     usr_root: Optional[Path] = typer.Option(None, "--usr-root"),
     pt: Optional[Path] = typer.Option(None, "--pt", help=".pt file path (pickle)."),
-    records_jsonl: Optional[Path] = typer.Option(
-        None, "--records-jsonl", help="JSONL records path."
-    ),
+    records_jsonl: Optional[Path] = typer.Option(None, "--records-jsonl", help="JSONL records path."),
     # params (single-output path)
-    pool_method: Optional[str] = typer.Option(
-        None, "--pool-method", help="mean|sum|max (for logits/embedding)"
-    ),
+    pool_method: Optional[str] = typer.Option(None, "--pool-method", help="mean|sum|max (for logits/embedding)"),
     pool_dim: Optional[int] = typer.Option(None, "--pool-dim"),
     layer: Optional[str] = typer.Option(None, "--layer", help="Layer (embedding)"),
     # IO
@@ -402,31 +362,29 @@ def extract(
             return [ln.strip() for ln in path.read_text().splitlines() if ln.strip()]
 
         if usr:
-            job.ingest = {
-                "source": "usr",
-                "dataset": usr,
-                "field": field,
-                "root": usr_root.as_posix() if usr_root else None,
-                "ids": _read_ids_arg(ids),
-            }
+            job.ingest = IngestConfig(
+                source="usr",
+                dataset=usr,
+                field=field,
+                root=(usr_root.as_posix() if usr_root else None),
+                ids=_read_ids_arg(ids),
+            )
         elif pt:
             _guard_pickle(i_know_this_is_pickle)
-            job.ingest = {"source": "pt_file", "field": field}
+            job.ingest = IngestConfig(source="pt_file", field=field)
             inputs = pt.as_posix()
         elif records_jsonl:
-            job.ingest = {"source": "records", "field": field}
+            job.ingest = IngestConfig(source="records", field=field)
             records = [json.loads(ln) for ln in _load_lines(records_jsonl)]
             inputs = records  # type: ignore[assignment]
         elif seq_file:
-            job.ingest = {"source": "sequences"}
+            job.ingest = IngestConfig(source="sequences")
             inputs = _load_lines(seq_file)
         elif seq:
-            job.ingest = {"source": "sequences"}
+            job.ingest = IngestConfig(source="sequences")
             inputs = seq
         else:
-            raise ConfigError(
-                "Provide one of --seq/--seq-file/--usr/--pt/--records-jsonl"
-            )
+            raise ConfigError("Provide one of --seq/--seq-file/--usr/--pt/--records-jsonl")
 
         if dry_run:
             render_config_summary(model, [job])
@@ -446,6 +404,8 @@ def extract(
             )
         render_outputs_summary(job, res)
 
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(code=_exit_for(e))
@@ -464,29 +424,21 @@ def generate(
     alphabet: Optional[str] = typer.Option(None, "--alphabet"),
     batch_size: Optional[int] = typer.Option(None, "--batch-size"),
     # prompts
-    prompt: List[str] = typer.Option(
-        None, "--prompt", help="One or more prompts.", show_default=False
-    ),
-    prompt_file: Optional[Path] = typer.Option(
-        None, "--prompt-file", help="Text file (one prompt per line)."
-    ),
+    prompt: List[str] = typer.Option(None, "--prompt", help="One or more prompts.", show_default=False),
+    prompt_file: Optional[Path] = typer.Option(None, "--prompt-file", help="Text file (one prompt per line)."),
     usr: Optional[str] = typer.Option(None, "--usr", help="USR dataset as prompts."),
     field: str = typer.Option("sequence", "--field"),
     ids: Optional[str] = typer.Option(None, "--ids"),
     usr_root: Optional[Path] = typer.Option(None, "--usr-root"),
     # params or preset
-    preset: Optional[str] = typer.Option(
-        None, "--preset", help="Use a named preset (generate)."
-    ),
+    preset: Optional[str] = typer.Option(None, "--preset", help="Use a named preset (generate)."),
     max_new_tokens: Optional[int] = typer.Option(None, "--max-new-tokens"),
     temperature: Optional[float] = typer.Option(None, "--temperature"),
     top_k: Optional[int] = typer.Option(None, "--top-k"),
     top_p: Optional[float] = typer.Option(None, "--top-p"),
     seed: Optional[int] = typer.Option(None, "--seed"),
     # output
-    out: Optional[Path] = typer.Option(
-        None, "--out", help="Write generated sequences (.json or .txt)."
-    ),
+    out: Optional[Path] = typer.Option(None, "--out", help="Write generated sequences (.json or .txt)."),
     progress: bool = typer.Option(True, "--progress/--no-progress"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print summary and exit."),
 ):
@@ -545,23 +497,21 @@ def generate(
             return [ln.strip() for ln in path.read_text().splitlines() if ln.strip()]
 
         if usr:
-            job.ingest = {
-                "source": "usr",
-                "dataset": usr,
-                "field": field,
-                "root": usr_root.as_posix() if usr_root else None,
-                "ids": _read_ids_arg(ids),
-            }
+            job.ingest = IngestConfig(
+                source="usr",
+                dataset=usr,
+                field=field,
+                root=(usr_root.as_posix() if usr_root else None),
+                ids=_read_ids_arg(ids),
+            )
         elif prompt_file:
-            job.ingest = {"source": "sequences"}
+            job.ingest = IngestConfig(source="sequences")
             inputs = _load_lines(prompt_file)
         elif prompt:
-            job.ingest = {"source": "sequences"}
+            job.ingest = IngestConfig(source="sequences")
             inputs = prompt
         else:
-            raise ConfigError(
-                "Provide prompts via --prompt/--prompt-file or use --usr."
-            )
+            raise ConfigError("Provide prompts via --prompt/--prompt-file or use --usr.")
 
         if dry_run:
             render_config_summary(model, [job])
@@ -590,6 +540,8 @@ def generate(
                 out.write_text("\n".join(seqs) + "\n")
             console.print(f"[accent]Wrote:[/accent] {out}")
 
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(code=_exit_for(e))
@@ -644,9 +596,7 @@ validate_app = typer.Typer(no_args_is_help=False, help="Validation utilities.")
 app.add_typer(validate_app, name="validate")
 
 
-@validate_app.command(
-    "config", help="Validate a config file (default discovery if omitted)."
-)
+@validate_app.command("config", help="Validate a config file (default discovery if omitted).")
 def validate_config(config: Optional[Path] = typer.Option(None, "--config")):
     try:
         cfg_path = _discovery_config(config)
@@ -663,9 +613,7 @@ def validate_usr(
     dataset: str = typer.Option(..., "--dataset"),
     field: str = typer.Option("sequence", "--field"),
     usr_root: Optional[Path] = typer.Option(None, "--usr-root"),
-    ids: Optional[str] = typer.Option(
-        None, "--ids", help="Path or CSV of ids to subset"
-    ),
+    ids: Optional[str] = typer.Option(None, "--ids", help="Path or CSV of ids to subset"),
 ):
     try:
         from .ingest.sources import load_usr_input
@@ -676,9 +624,7 @@ def validate_usr(
             root=(usr_root.as_posix() if usr_root else None),
             ids=_read_ids_arg(ids),
         )
-        console.print(
-            f"[green]✔ USR OK[/green]  dataset={dataset}  rows={len(seqs)}  field={field}"
-        )
+        console.print(f"[green]✔ USR OK[/green]  dataset={dataset}  rows={len(seqs)}  field={field}")
         console.print(f"[accent]records:[/accent] {ds.records_path}")
     except Exception as e:
         console.print(f"[red]{e}[/red]")

@@ -43,9 +43,7 @@ def _require_rich() -> Any:
 
         return Console()
     except Exception as e:
-        raise RuntimeError(
-            "Rich requested but not available. Install 'rich' or pass --no-rich."
-        ) from e
+        raise RuntimeError("Rich requested but not available. Install 'rich' or pass --no-rich.") from e
 
 
 def _align_for_dtype(dtype: Any) -> str:
@@ -94,9 +92,7 @@ def render_table_rich(
                 col_style = "magenta"
         except Exception:
             pass
-        table.add_column(
-            str(name), justify=align, no_wrap=True, overflow="fold", style=col_style
-        )
+        table.add_column(str(name), justify=align, no_wrap=True, overflow="fold", style=col_style)
     for _, row in df.iterrows():
         cells = []
         for v in row.tolist():
@@ -109,9 +105,7 @@ def render_table_rich(
     console.print(table)
 
 
-def render_schema_tree_rich(
-    tree_lines: Iterable[str], title: Optional[str] = None
-) -> None:
+def render_schema_tree_rich(tree_lines: Iterable[str], title: Optional[str] = None) -> None:
     console = _require_rich()
     from rich.tree import Tree
 
@@ -164,14 +158,8 @@ def render_diff_rich(s: DiffSummary) -> None:
         return f"{x:.0f}{units[i]}"
 
     pl, pr = s.primary_local, s.primary_remote
-    left = (
-        f"sha: {pl.sha256 or '?'}\n"
-        f"size: {fmt_sz(pl.size)}\nrows: {pl.rows or '?'}\ncols: {pl.cols or '?'}\n"
-    )
-    right = (
-        f"sha: {pr.sha256 or '?'}\n"
-        f"size: {fmt_sz(pr.size)}\nrows: {pr.rows or '?'}\ncols: {pr.cols or '?'}\n"
-    )
+    left = f"sha: {pl.sha256 or '?'}\nsize: {fmt_sz(pl.size)}\nrows: {pl.rows or '?'}\ncols: {pl.cols or '?'}\n"
+    right = f"sha: {pr.sha256 or '?'}\nsize: {fmt_sz(pr.size)}\nrows: {pr.rows or '?'}\ncols: {pr.cols or '?'}\n"
     status = Text("CHANGES" if s.has_change else "up-to-date")
     status.stylize("bold red" if s.has_change else "bold green")
     cols = Columns(

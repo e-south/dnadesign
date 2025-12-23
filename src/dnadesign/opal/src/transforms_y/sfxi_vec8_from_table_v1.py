@@ -45,9 +45,7 @@ def sfxi_vec8_from_table_v1(
         raise ValueError("id_column, if set, must be exactly 'id'.")
     seq_col = p.get("sequence_column", "sequence")
     logic_cols: List[str] = p.get("logic_columns", ["v00", "v10", "v01", "v11"])
-    inten_cols: List[str] = p.get(
-        "intensity_columns", ["y00_star", "y10_star", "y01_star", "y11_star"]
-    )
+    inten_cols: List[str] = p.get("intensity_columns", ["y00_star", "y10_star", "y01_star", "y11_star"])
     strict = bool(p.get("strict_bounds", True))
     eps = float(p.get("clip_bounds_eps", 1e-6))
 
@@ -59,11 +57,7 @@ def sfxi_vec8_from_table_v1(
     # Logic in [0,1]
     L = csv_df[logic_cols].to_numpy(dtype=float)
     if strict:
-        if (
-            np.any(~np.isfinite(L))
-            or np.any(L < 0.0 - 1e-12)
-            or np.any(L > 1.0 + 1e-12)
-        ):
+        if np.any(~np.isfinite(L)) or np.any(L < 0.0 - 1e-12) or np.any(L > 1.0 + 1e-12):
             raise ValueError("Logic columns must be finite and in [0,1].")
         Lc = np.clip(L, 0.0, 1.0)
     else:

@@ -23,16 +23,13 @@ def _backup_file(p: Path, backup_suffix: str = ".bak") -> Path:
     return b
 
 
-def attach_usr(
-    usr_root: Path, dataset: str, cols_df: pd.DataFrame, allow_overwrite: bool = False
-) -> None:
+def attach_usr(usr_root: Path, dataset: str, cols_df: pd.DataFrame, allow_overwrite: bool = False) -> None:
     """Attach columns to a USR dataset using its Python API. We require dnadesign.usr.Dataset."""
     try:
         from dnadesign.usr import Dataset
     except Exception as e:
         raise RuntimeError(
-            "dnadesign.usr is required to attach columns to a USR dataset. "
-            "Please install the dnadesign package."
+            "dnadesign.usr is required to attach columns to a USR dataset. Please install the dnadesign package."
         ) from e
     ds = Dataset(usr_root, dataset)
     # We assume 'cols_df' contains 'id' plus one or more *namespaced* columns

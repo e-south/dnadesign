@@ -66,9 +66,7 @@ class Plotter:
             xi, yi = x[i], y[i]
             bb = s["raw_billboard"]
             if not passed_mask[i]:
-                ax.scatter(
-                    xi, yi, color="lightgray", alpha=pc.low_alpha, edgecolor="none"
-                )
+                ax.scatter(xi, yi, color="lightgray", alpha=pc.low_alpha, edgecolor="none")
                 continue
 
             if self._is_literal(bb):
@@ -83,9 +81,7 @@ class Plotter:
             ax.axvline(thr, ls="--", c=pc.colors.get("threshold_line", "lightgray"))
 
         # annotate winner
-        win_idx = next(
-            i for i, s in enumerate(subs) if s["subsample_id"] == winner["subsample_id"]
-        )
+        win_idx = next(i for i, s in enumerate(subs) if s["subsample_id"] == winner["subsample_id"])
         ax.scatter(
             x[win_idx],
             y[win_idx],
@@ -174,11 +170,7 @@ class Plotter:
         pc, hc = self.cfg.plot.scatter, self.cfg.plot.hitzone
         x = np.asarray([s["mean_cosine"] for s in subs], dtype=float)
         thr = self.compute_threshold(x[~np.isnan(x)], pc.threshold)
-        hits = [
-            (idx, math.log1p(s["min_euclidean"]), s)
-            for idx, s in enumerate(subs)
-            if x[idx] >= thr
-        ]
+        hits = [(idx, math.log1p(s["min_euclidean"]), s) for idx, s in enumerate(subs) if x[idx] >= thr]
         hits.sort(key=lambda t: t[1])
 
         fig, ax = plt.subplots(figsize=hc.figsize)
@@ -192,17 +184,11 @@ class Plotter:
                 col = pc.colors["base"]
             ax.scatter(pos, yi, color=col, alpha=pc.high_alpha, edgecolor="none")
 
-        win_idx = next(
-            i for i, s in enumerate(subs) if s["subsample_id"] == winner["subsample_id"]
-        )
+        win_idx = next(i for i, s in enumerate(subs) if s["subsample_id"] == winner["subsample_id"])
         for pos, (idx, yi, _) in enumerate(hits):
             if idx == win_idx:
-                ax.scatter(
-                    pos, yi, marker="*", s=pc.star_size, c=pc.colors["winner"], zorder=3
-                )
-                ax.text(
-                    pos, yi, winner["subsample_id"], fontsize=8, va="bottom", ha="right"
-                )
+                ax.scatter(pos, yi, marker="*", s=pc.star_size, c=pc.colors["winner"], zorder=3)
+                ax.text(pos, yi, winner["subsample_id"], fontsize=8, va="bottom", ha="right")
                 break
 
         ax.set_title("Outlier Ranking by Minimum Euclidean Gap")
@@ -256,14 +242,10 @@ class Plotter:
             lambda x: (x - x.mean()) / x.std(ddof=1) if x.std(ddof=1) > 0 else 0
         )
         fig, ax = plt.subplots(figsize=kc.figsize)
-        sns.kdeplot(
-            data=df, x="Z", hue="Metric", common_norm=False, warn_singular=False, ax=ax
-        )
+        sns.kdeplot(data=df, x="Z", hue="Metric", common_norm=False, warn_singular=False, ax=ax)
         ax.set_title("Core Metric Distributions (Z-score)")
         sns.despine(ax=ax)
-        fig.savefig(
-            outdir / "kde_coremetrics_zscore.png", dpi=kc.dpi, bbox_inches="tight"
-        )
+        fig.savefig(outdir / "kde_coremetrics_zscore.png", dpi=kc.dpi, bbox_inches="tight")
         plt.close(fig)
 
     def plot_pairplot(self, subs, outdir):
@@ -297,14 +279,10 @@ class Plotter:
         if df_sub.shape[1] < 2:
             return
 
-        g = sns.pairplot(
-            df_sub, corner=True, diag_kind="kde", plot_kws={"alpha": 0.6, "s": 20}
-        )
+        g = sns.pairplot(df_sub, corner=True, diag_kind="kde", plot_kws={"alpha": 0.6, "s": 20})
         g.fig.suptitle("Pairwise Scatter of Core + Evo2 Metrics", y=1.02)
         for ax in g.axes.flatten():
             if ax is not None:
                 sns.despine(ax=ax)
-        g.fig.savefig(
-            outdir / "pairplot_coremetrics.png", dpi=pp.dpi, bbox_inches="tight"
-        )
+        g.fig.savefig(outdir / "pairplot_coremetrics.png", dpi=pp.dpi, bbox_inches="tight")
         plt.close(g.fig)

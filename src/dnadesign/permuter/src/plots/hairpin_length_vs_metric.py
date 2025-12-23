@@ -16,13 +16,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-def _series_for_metric(
-    df: pd.DataFrame, metric_id: Optional[str]
-) -> Tuple[pd.Series, str]:
+def _series_for_metric(df: pd.DataFrame, metric_id: Optional[str]) -> Tuple[pd.Series, str]:
     if not metric_id:
-        raise RuntimeError(
-            "metric_id is required (expects a column permuter__metric__<id>)"
-        )
+        raise RuntimeError("metric_id is required (expects a column permuter__metric__<id>)")
     col = f"permuter__metric__{metric_id}"
     if col not in df.columns:
         raise RuntimeError(f"Metric column not found: {col}")
@@ -48,9 +44,7 @@ def plot(
     cat_id_col = "permuter__hp_category_id"
     order_col = "permuter__hp_category_order"
     if len_col not in df.columns:
-        raise RuntimeError(
-            "hairpin_length_vs_metric requires 'permuter__hp_length_paired' column"
-        )
+        raise RuntimeError("hairpin_length_vs_metric requires 'permuter__hp_length_paired' column")
     if (cat_label_col not in df.columns) and (cat_id_col not in df.columns):
         raise RuntimeError(
             "hairpin_length_vs_metric requires hp category columns: "
@@ -87,9 +81,7 @@ def plot(
     # palette
     cmap = plt.get_cmap("tab10")
     colors = {c: cmap(i % 10) for i, c in enumerate(order)}
-    shapes = {
-        c: m for c, m in zip(order, ["o", "s", "^", "D", "P", "X", "v", "<", ">", "*"])
-    }
+    shapes = {c: m for c, m in zip(order, ["o", "s", "^", "D", "P", "X", "v", "<", ">", "*"])}
 
     # scatter cloud
     for c in order:
@@ -107,12 +99,7 @@ def plot(
         )
 
     # per-length means + line
-    means = (
-        df.groupby(["_cat", len_col])["_y"]
-        .mean()
-        .reset_index()
-        .sort_values(["_cat", len_col])
-    )
+    means = df.groupby(["_cat", len_col])["_y"].mean().reset_index().sort_values(["_cat", len_col])
     for c in order:
         ss = means[means["_cat"] == c]
         if ss.empty:
@@ -144,11 +131,7 @@ def plot(
     )
 
     # titles
-    ref_name = (
-        df["permuter__ref"].iloc[0]
-        if "permuter__ref" in df.columns and not df.empty
-        else ""
-    )
+    ref_name = df["permuter__ref"].iloc[0] if "permuter__ref" in df.columns and not df.empty else ""
     title = f"{job_name}{f' ({ref_name})' if ref_name else ''}"
     fig.suptitle(title, fontsize=int(round(14 * fs)), y=1.075)
     if evaluators:

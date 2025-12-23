@@ -44,9 +44,7 @@ def top_n(
 
     # Build a primary sort key so that np.lexsort can always sort ASC,
     # keeping id ASC as the tie-breaker regardless of objective.
-    primary = np.where(
-        np.isfinite(scores), -scores if maximize else scores, np.inf
-    )  # sink non-finite
+    primary = np.where(np.isfinite(scores), -scores if maximize else scores, np.inf)  # sink non-finite
 
     # lexsort uses the *last* key as primary → (ids, primary)
     order_idx = np.lexsort((ids, primary)).astype(int)

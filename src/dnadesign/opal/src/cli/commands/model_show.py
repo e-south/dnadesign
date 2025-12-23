@@ -33,20 +33,14 @@ def cmd_model_show(
     model_path: Optional[Path] = typer.Option(None, "--model-path"),
     out_dir: Optional[Path] = typer.Option(None, "--out-dir"),
     config: Optional[Path] = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
-    round: Optional[int] = typer.Option(
-        None, "--round", "-r", help="Round index; default = latest"
-    ),
-    json: bool = typer.Option(
-        False, "--json/--human", help="Output format (default: human)"
-    ),
+    round: Optional[int] = typer.Option(None, "--round", "-r", help="Round index; default = latest"),
+    json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
 ):
     try:
         # Resolve model_path if not provided
         if model_path is None:
             if not config:
-                raise OpalError(
-                    "Provide --model-path or --config to auto-resolve from state.json."
-                )
+                raise OpalError("Provide --model-path or --config to auto-resolve from state.json.")
             cfg = load_cli_config(config)
             st_path = Path(cfg.campaign.workdir) / "state.json"
             st = CampaignState.load(st_path)
@@ -54,9 +48,7 @@ def cmd_model_show(
             if not rounds:
                 raise OpalError(f"No rounds found in {st_path}")
             entry = (
-                next((r for r in rounds if int(r.round_index) == int(round)), None)
-                if round is not None
-                else rounds[-1]
+                next((r for r in rounds if int(r.round_index) == int(round)), None) if round is not None else rounds[-1]
             )
             if entry is None:
                 raise OpalError(f"Round {round} not found in {st_path}")
@@ -71,20 +63,10 @@ def cmd_model_show(
             ensure_dir(out_dir)
             imps = mdl.feature_importances()
             if imps is not None:
-                fi = pd.DataFrame(
-                    {"feature_index": np.arange(len(imps)), "feature_importance": imps}
-                )
-                fi["feature_rank"] = (
-                    fi["feature_importance"]
-                    .rank(ascending=False, method="min")
-                    .astype(int)
-                )
-                fi.sort_values("feature_rank").to_csv(
-                    out_dir / "feature_importance_full.csv", index=False
-                )
-                info["feature_importance_top20"] = fi.nlargest(
-                    20, "feature_importance"
-                ).to_dict(orient="records")
+                fi = pd.DataFrame({"feature_index": np.arange(len(imps)), "feature_importance": imps})
+                fi["feature_rank"] = fi["feature_importance"].rank(ascending=False, method="min").astype(int)
+                fi.sort_values("feature_rank").to_csv(out_dir / "feature_importance_full.csv", index=False)
+                info["feature_importance_top20"] = fi.nlargest(20, "feature_importance").to_dict(orient="records")
         if json:
             json_out(info)
         else:

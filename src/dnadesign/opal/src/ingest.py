@@ -53,9 +53,7 @@ def _vec_len(v: Any) -> int:
     return 1
 
 
-def _apply_transform_via_registry(
-    name: str, params: Dict[str, Any], csv_df: pd.DataFrame
-) -> pd.DataFrame:
+def _apply_transform_via_registry(name: str, params: Dict[str, Any], csv_df: pd.DataFrame) -> pd.DataFrame:
     """
     Call the registered Y-ingest transform. We tolerate (csv_df, params)
     or (csv_df, **params) call patterns for plugin friendliness.
@@ -67,9 +65,7 @@ def _apply_transform_via_registry(
         try:
             return fn(csv_df, **(params or {}))  # fn(df, **params)
         except TypeError as e:
-            raise OpalError(
-                f"Y transform '{name}' has an unsupported signature."
-            ) from e
+            raise OpalError(f"Y transform '{name}' has an unsupported signature.") from e
 
 
 def run_ingest(
@@ -92,12 +88,7 @@ def run_ingest(
     # 2) Try to resolve ids by sequence (existing rows only; new rows remain without id for now)
     seq2id = {}
     if "sequence" in records_df.columns and "id" in records_df.columns:
-        seq2id = (
-            records_df.drop_duplicates(subset=["sequence"])
-            .set_index("sequence")["id"]
-            .astype(str)
-            .to_dict()
-        )
+        seq2id = records_df.drop_duplicates(subset=["sequence"]).set_index("sequence")["id"].astype(str).to_dict()
     if "id" not in labels.columns:
         labels["id"] = labels["sequence"].map(seq2id)
 

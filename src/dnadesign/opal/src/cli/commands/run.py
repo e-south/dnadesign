@@ -35,24 +35,16 @@ from ._common import (
 @cli_command("run", help="Train on labels ≤ round, score, select, append events.")
 def cmd_run(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
-    round: int = typer.Option(
-        ..., "--round", "-r", "--labels-as-of", help="Labels cutoff (as_of_round)."
-    ),
-    k: Optional[int] = typer.Option(
-        None, "--k", "-k", help="Top-k (default from YAML)."
-    ),
+    round: int = typer.Option(..., "--round", "-r", "--labels-as-of", help="Labels cutoff (as_of_round)."),
+    k: Optional[int] = typer.Option(None, "--k", "-k", help="Top-k (default from YAML)."),
     resume: bool = typer.Option(
         False,
         "--resume",
         help="Allow overwrites in artifacts dir (no-op here; caller's concern).",
     ),
-    score_batch_size: Optional[int] = typer.Option(
-        None, "--score-batch-size", help="Override batch size."
-    ),
+    score_batch_size: Optional[int] = typer.Option(None, "--score-batch-size", help="Override batch size."),
     verbose: bool = typer.Option(True, "--verbose/--quiet"),
-    json: bool = typer.Option(
-        False, "--json/--human", help="Output format (default: human)"
-    ),
+    json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
 ) -> None:
     try:
         cfg = load_cli_config(config)

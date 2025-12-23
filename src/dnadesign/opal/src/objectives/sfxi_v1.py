@@ -66,9 +66,7 @@ def _recover_linear_intensity(y_star: np.ndarray, delta: float) -> np.ndarray:
     return np.maximum(0.0, np.power(2.0, y_star) - float(delta))
 
 
-def _compute_train_effect_pool(
-    train_view, setpoint: np.ndarray, delta: float, *, min_n: int
-) -> Sequence[float]:
+def _compute_train_effect_pool(train_view, setpoint: np.ndarray, delta: float, *, min_n: int) -> Sequence[float]:
     """
     Prefer *current round* labels if available; otherwise fall back to all labels ≤ as_of_round.
     """
@@ -100,9 +98,7 @@ def _compute_train_effect_pool(
     return pool_all
 
 
-def _resolve_denom_from_pool(
-    pool: Sequence[float], *, p: int, fallback_p: int, min_n: int, eps: float
-) -> float:
+def _resolve_denom_from_pool(pool: Sequence[float], *, p: int, fallback_p: int, min_n: int, eps: float) -> float:
     arr = np.asarray(pool, dtype=float)
     if arr.size >= int(min_n):
         v = float(np.percentile(arr, int(p)))
@@ -132,19 +128,13 @@ def sfxi_v1(
     train_view=None,
 ) -> ObjectiveResult:
     # assert y_pred dims
-    if not (
-        isinstance(y_pred, np.ndarray) and y_pred.ndim == 2 and y_pred.shape[1] >= 8
-    ):
-        raise ValueError(
-            f"[sfxi_v1] Expected y_pred shape (n, 8+); got {getattr(y_pred, 'shape', None)}."
-        )
+    if not (isinstance(y_pred, np.ndarray) and y_pred.ndim == 2 and y_pred.shape[1] >= 8):
+        raise ValueError(f"[sfxi_v1] Expected y_pred shape (n, 8+); got {getattr(y_pred, 'shape', None)}.")
 
     v_hat = np.clip(y_pred[:, 0:4].astype(float), 0.0, 1.0)
     y_star = y_pred[:, 4:8].astype(float)
 
-    setpoint = np.asarray(
-        params.get("setpoint_vector", [0, 0, 0, 1]), dtype=float
-    ).ravel()
+    setpoint = np.asarray(params.get("setpoint_vector", [0, 0, 0, 1]), dtype=float).ravel()
     if setpoint.size != 4:
         raise ValueError("[sfxi_v1] setpoint_vector must have length 4.")
     setpoint = np.clip(setpoint, 0.0, 1.0)
@@ -161,12 +151,8 @@ def sfxi_v1(
     # ---- compute denom from training labels (TrainView) ----
     if train_view is None:
         raise ValueError("[sfxi_v1] train_view is required")
-    effect_pool = _compute_train_effect_pool(
-        train_view, setpoint=setpoint, delta=delta, min_n=min_n
-    )
-    denom = _resolve_denom_from_pool(
-        effect_pool, p=p, fallback_p=fallback_p, min_n=min_n, eps=eps
-    )
+    effect_pool = _compute_train_effect_pool(train_view, setpoint=setpoint, delta=delta, min_n=min_n)
+    denom = _resolve_denom_from_pool(effect_pool, p=p, fallback_p=fallback_p, min_n=min_n, eps=eps)
 
     # persist into RoundCtx (strict: must be declared in produces)
     if ctx is None:

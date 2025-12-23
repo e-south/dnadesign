@@ -31,9 +31,7 @@ def get_adapter_cls(model_id: str) -> Type:
     try:
         return _MODEL_REGISTRY[model_id]
     except KeyError as e:
-        raise ConfigError(
-            f"Unknown model id '{model_id}'. Is the adapter registered?"
-        ) from e
+        raise ConfigError(f"Unknown model id '{model_id}'. Is the adapter registered?") from e
 
 
 def list_models() -> Dict[str, Type]:

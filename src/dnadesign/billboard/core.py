@@ -3,12 +3,12 @@
 <dnadesign project>
 billboard/core.py
 
-Core processing and metric‐computation routines for the billboard pipeline.
+Core processing and metric-computation routines for the billboard pipeline.
 
 This module handles:
   - Loading and validating sequence data.
   - Parsing TFBS annotations (meta_tfbs_parts).
-  - Building motif‐order strings.
+  - Building motif-order strings.
   - Computing positional occupancy matrices.
   - Calculating core diversity metrics:
       • tf_richness
@@ -16,7 +16,7 @@ This module handles:
       • min_jaccard_dissimilarity
       • min_tf_entropy
       • min_motif_string_levenshtein
-      
+
 Module Author(s): Eric J. South
 Dunlop Lab
 --------------------------------------------------------------------------------
@@ -155,7 +155,7 @@ def build_motif_string(seq_dict, cfg):
 
 def token_edit_distance(t1, t2, tf_penalty, strand_penalty, partial_penalty):
     """
-    Compute a token‐based Levenshtein distance between two motif‐token lists.
+    Compute a token‐based Levenshtein distance between two motif-token lists.
     Costs:
       - insertion/deletion: 1
       - substitution:
@@ -176,8 +176,8 @@ def token_edit_distance(t1, t2, tf_penalty, strand_penalty, partial_penalty):
             if a == b:
                 cost = 0
             else:
-                tf1, st1 = a[:-1], a[-1]
-                tf2, st2 = b[:-1], b[-1]
+                tf1 = a[:-1]
+                tf2 = b[:-1]
                 if tf1 == tf2:
                     cost = strand_penalty
                 elif any(x.startswith(tf1) for x in t2):
@@ -282,9 +282,7 @@ def process_sequences(pt_paths, cfg):
 
         per_tf_entropy.append({"tf": tf, "avg_entropy": (ent(pf) + ent(pr)) / 2})
 
-    logger.info(
-        f"Done processing: {len(seqs)} seqs | " f"{total_instances} TFBS instances | " f"{len(tf_list)} unique TFs"
-    )
+    logger.info(f"Done processing: {len(seqs)} seqs | {total_instances} TFBS instances | {len(tf_list)} unique TFs")
 
     return {
         "sequences": seqs,
@@ -371,7 +369,6 @@ def compute_min_motif_string_levenshtein(results, cfg):
     """
     Min normalized motif-string edit distance (python-Levenshtein).
     """
-    p = cfg["motif_string_levenshtein"]
     toks = [ms.split(",") for ms in results["motif_strings"] if ms]
     best = float("inf")
     N = len(toks)

@@ -11,15 +11,15 @@ from __future__ import annotations
 
 import logging
 import numbers
+import os
 import shlex
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+import numpy as np
 import pandas as pd
 import yaml
-import numpy as np
-import os
 from rich.console import Console
 
 from dnadesign.permuter.src.core.config import JobConfig
@@ -77,9 +77,7 @@ def _parse_cli_with(args: List[str]) -> List[Dict]:
     return out
 
 
-def _pick_reference(
-    df: pd.DataFrame, name_col: str, seq_col: str, desired: Optional[str]
-) -> tuple[str, str]:
+def _pick_reference(df: pd.DataFrame, name_col: str, seq_col: str, desired: Optional[str]) -> tuple[str, str]:
     if desired:
         sub = df[df[name_col] == desired]
         if sub.empty:
@@ -94,9 +92,7 @@ def _pick_reference(
     raise ValueError("--ref is required because the refs CSV has multiple rows")
 
 
-def _derive_records_from_job(
-    job_hint: str, ref: Optional[str], out: Optional[Path]
-) -> Path:
+def _derive_records_from_job(job_hint: str, ref: Optional[str], out: Optional[Path]) -> Path:
     """
     Resolve the dataset path from a job preset/path and an optional ref.
     Tries nested, flat-job, then flat-jobref.
@@ -120,9 +116,7 @@ def _derive_records_from_job(
     # Need a ref name for the other layouts
     df_refs = pd.read_csv(jp0.refs_csv, dtype=str)
     desired = ref or getattr(cfg.job.input, "reference_sequence", None)
-    ref_name, ref_seq = _pick_reference(
-        df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, desired
-    )
+    ref_name, ref_seq = _pick_reference(df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, desired)
     # 2) nested: <output_root>/<ref>/records.parquet
     jp = resolve(
         job_yaml=job_path,
@@ -136,9 +130,7 @@ def _derive_records_from_job(
         return nested
 
     # 3) flat-jobref: <parent>/<output_root.name>__<ref>/records.parquet
-    flat_jobref = (
-        jp.output_root.parent / f"{jp.output_root.name}__{ref_name}" / "records.parquet"
-    ).resolve()
+    flat_jobref = (jp.output_root.parent / f"{jp.output_root.name}__{ref_name}" / "records.parquet").resolve()
     if flat_jobref.exists():
         return flat_jobref
 
@@ -151,6 +143,7 @@ def _argv() -> str:
         return shlex.join(sys.argv)
     except Exception:
         return " ".join(sys.argv)
+
 
 def _summarize_first_column_for_log(
     s: pd.Series,
@@ -223,8 +216,7 @@ def evaluate(
             records = _derive_records_from_job(job, ref, out)
         except Exception as e:
             raise ValueError(
-                f"Unable to derive dataset from --job. {e}\n"
-                "Hint: supply --ref if your refs CSV has multiple rows."
+                f"Unable to derive dataset from --job. {e}\nHint: supply --ref if your refs CSV has multiple rows."
             ) from e
     else:
         raise ValueError("Provide either --data (file or dataset dir) or --job/--ref.")
@@ -242,9 +234,7 @@ def evaluate(
 
     df = read_parquet(records)
     if "sequence" not in df.columns or "bio_type" not in df.columns:
-        raise ValueError(
-            "records.parquet missing USR core columns (sequence, bio_type)"
-        )
+        raise ValueError("records.parquet missing USR core columns (sequence, bio_type)")
 
     # gather metrics
     metrics = _load_job_metrics(job)
@@ -253,9 +243,7 @@ def evaluate(
     if metric_ids:
         # convenience: if only ids given, assume placeholder with metric==id
         for mid in metric_ids:
-            metrics.append(
-                {"id": mid, "evaluator": "placeholder", "metric": mid, "params": {}}
-            )
+            metrics.append({"id": mid, "evaluator": "placeholder", "metric": mid, "params": {}})
     if not metrics:
         raise ValueError(
             "No metrics specified. Use --with id:evaluator[:metric] or provide a job YAML with evaluate.metrics"
@@ -320,8 +308,8 @@ def evaluate(
         extra = ""
         if str(mc["evaluator"]).startswith("evo2_"):
             extra = (
-                f" model={p.get('model_id','?')} device={p.get('device','?')}"
-                f" prec={p.get('precision','?')} alpha={p.get('alphabet','?')}"
+                f" model={p.get('model_id', '?')} device={p.get('device', '?')}"
+                f" prec={p.get('precision', '?')} alpha={p.get('alphabet', '?')}"
             )
         if vec_dim is not None:
             extra = f"{extra} vecdim={vec_dim}"
@@ -340,9 +328,7 @@ def evaluate(
             mx,
         )
         if str(mc["evaluator"]).strip() == "evo2_llr":
-            _LOG.info(
-                "evaluate: LLR computed as log P(variant) - log P(reference) using REF.fa"
-            )
+            _LOG.info("evaluate: LLR computed as log P(variant) - log P(reference) using REF.fa")
 
     # Single concat to add all metric columns at once (zero/low-copy when possible)
     if new_metric_frames:
@@ -377,9 +363,7 @@ def evaluate(
         )
 
     atomic_write_parquet(df, records)
-    console.print(
-        f"[green]✔[/green] Appended metrics: {', '.join(m['id'] for m in metrics)} → {records}"
-    )
+    console.print(f"[green]✔[/green] Appended metrics: {', '.join(m['id'] for m in metrics)} → {records}")
     append_record_md(records.parent, "evaluate", _argv())
 
 
@@ -424,21 +408,14 @@ def _normalize_scores(scores: Any, *, n: int, metric_id: str) -> Dict[str, pd.Se
             raise _err("empty dict records")
         for i, rec in enumerate(scores):
             if not isinstance(rec, dict) or set(rec.keys()) != set(keys):
-                raise _err(
-                    f"record {i} has keys {sorted(getattr(rec, 'keys', lambda: [])())}, expected {keys}"
-                )
+                raise _err(f"record {i} has keys {sorted(getattr(rec, 'keys', lambda: [])())}, expected {keys}")
             for k, v in rec.items():
                 if not (v is None or isinstance(v, numbers.Number)):
-                    raise _err(
-                        f"record {i} key '{k}' has non-numeric value {type(v).__name__}"
-                    )
+                    raise _err(f"record {i} key '{k}' has non-numeric value {type(v).__name__}")
         out: Dict[str, pd.Series] = {}
         for k in keys:
             ser = pd.Series(
-                [
-                    float(rec[k]) if rec[k] is not None else float("nan")
-                    for rec in scores
-                ],
+                [float(rec[k]) if rec[k] is not None else float("nan") for rec in scores],
                 dtype="float64",
             )
             out[f"permuter__metric__{metric_id}__{k}"] = ser
@@ -453,6 +430,7 @@ def _normalize_scores(scores: Any, *, n: int, metric_id: str) -> Dict[str, pd.Se
                     return list(x)
                 tolist = getattr(x, "tolist", None)
                 return list(tolist()) if callable(tolist) else list(x)
+
             seqs = [_to_list(x) for x in scores]
             lens = [len(x) for x in seqs]
         except Exception:
@@ -462,10 +440,9 @@ def _normalize_scores(scores: Any, *, n: int, metric_id: str) -> Dict[str, pd.Se
         # Decide representation:
         #  • Keep 'logits*' metrics as a single Arrow list column (default).
         #  • Or force globally with PERMUTER_VECTOR_AS_LIST=1.
-        keep_as_list = (
-            "logits" in str(metric_id).lower()
-            or os.environ.get("PERMUTER_VECTOR_AS_LIST", "").strip().lower() in {"1","true","yes"}
-        )
+        keep_as_list = "logits" in str(metric_id).lower() or os.environ.get(
+            "PERMUTER_VECTOR_AS_LIST", ""
+        ).strip().lower() in {"1", "true", "yes"}
         if keep_as_list:
             cleaned = []
             for i, rec in enumerate(seqs):

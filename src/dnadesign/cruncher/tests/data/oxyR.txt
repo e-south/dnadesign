@@ -30,58 +30,58 @@ TRAINING SET
 ********************************************************************************
 DATAFILE= /global/projectb/scratch/leo/multiMotifs/oxyR_B-CTCGCATT/oxyR_B-CTCGCATT_summits_combined_sorted.fasta
 ALPHABET= ACGT
-Sequence name            Weight Length  Sequence name            Weight Length  
--------------            ------ ------  -------------            ------ ------  
-Escherichia_coli_MG1655_ 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60  
-Escherichia_coli_MG1655_ 1.0000     60  Escherichia_fergusonii_A 1.0000     60  
-Klebsiella_oxytoca_M5al_ 1.0000     60  Shigella_flexneri_ATCC70 1.0000     60  
-Salmonella_enterica_LT2_ 1.0000     60  Escherichia_coli_BW25113 1.0000     60  
-Salmonella_enterica_LT2_ 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60  
-Escherichia_coli_MG1655_ 1.0000     60  Providencia_stuartii_ATC 1.0000     60  
-Providencia_stuartii_ATC 1.0000     60  Providencia_stuartii_ATC 1.0000     60  
-Enterobacter_cloacae_ATC 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60  
-Pseudomonas_aeruginosa_P 1.0000     60  Escherichia_coli_MG1655_ 1.0000     60  
-Klebsiella_psneumoniae_A 1.0000     60  Klebsiella_oxytoca_M5al_ 1.0000     60  
-Providencia_stuartii_ATC 1.0000     60  Enterobacter_cloacae_ATC 1.0000     60  
-Klebsiella_psneumoniae_A 1.0000     60  Escherichia_coli_BW25113 1.0000     60  
-Klebsiella_oxytoca_M5al_ 1.0000     60  Klebsiella_psneumoniae_A 1.0000     60  
-Aliivibrio_fischeri_ATCC 1.0000     60  Providencia_stuartii_ATC 1.0000     60  
-Klebsiella_oxytoca_M5al_ 1.0000     60  Azospirillum_brasilense_ 1.0000     60  
-Enterobacter_cloacae_ATC 1.0000     60  Providencia_stuartii_ATC 1.0000     60  
-Escherichia_coli_BW25113 1.0000     60  Escherichia_coli_MG1655_ 1.0000     60  
-Salmonella_enterica_LT2_ 1.0000     60  Citrobacter_koseri_ATCCB 1.0000     60  
-Aliivibrio_fischeri_ATCC 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60  
-Klebsiella_oxytoca_M5al_ 1.0000     60  Sphingobium_sp_GW456-12- 1.0000     60  
-Pontibacter_actiniarum_K 1.0000     60  Citrobacter_koseri_ATCCB 1.0000     60  
-Herbaspirillum_seropedic 1.0000     60  Escherichia_fergusonii_A 1.0000     60  
-Klebsiella_oxytoca_M5al_ 1.0000     60  Pseudomonas_simiae_WCS41 1.0000     60  
-Shigella_flexneri_ATCC70 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60  
-Citrobacter_koseri_ATCCB 1.0000     60  Providencia_stuartii_ATC 1.0000     60  
-Escherichia_coli_MG1655_ 1.0000     60  Sphingomonas_koreensis_J 1.0000     60  
-Shigella_flexneri_ATCC70 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60  
-Marinobacter_adhaerens_H 1.0000     60  Providencia_stuartii_ATC 1.0000     60  
-Shewanella_amazonensis_S 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60  
-Klebsiella_oxytoca_M5al_ 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60  
-Escherichia_coli_BW25113 1.0000     60  Providencia_stuartii_ATC 1.0000     60  
-Shewanella_loihica_PV-4_ 1.0000     60  Sinorhizobium_meliloti_1 1.0000     60  
-Providencia_stuartii_ATC 1.0000     60  Pontibacter_actiniarum_K 1.0000     60  
-Salmonella_enterica_LT2_ 1.0000     60  Dinoroseobacter_shibae_D 1.0000     60  
-Klebsiella_psneumoniae_A 1.0000     60  Enterobacter_cloacae_ATC 1.0000     60  
-Salmonella_enterica_LT2_ 1.0000     60  Providencia_stuartii_ATC 1.0000     60  
-Enterobacter_cloacae_ATC 1.0000     60  Citrobacter_koseri_ATCCB 1.0000     60  
-Klebsiella_psneumoniae_A 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60  
-Enterobacter_cloacae_ATC 1.0000     60  Saccharophagus_degradans 1.0000     60  
-Dyella_japonica_UNC79MFT 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60  
-Enterobacter_cloacae_ATC 1.0000     60  Sphingobacteriaceae_sp_G 1.0000     60  
-Herbaspirillum_seropedic 1.0000     60  Klebsiella_psneumoniae_A 1.0000     60  
-Providencia_stuartii_ATC 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60  
-Klebsiella_psneumoniae_A 1.0000     60  Bacillus_subtilis_168_ox 1.0000     60  
-Citrobacter_koseri_ATCCB 1.0000     60  Sphingobacteriaceae_sp_G 1.0000     60  
-Providencia_stuartii_ATC 1.0000     60  Escherichia_fergusonii_A 1.0000     60  
-Providencia_stuartii_ATC 1.0000     60  Sphingomonas_koreensis_J 1.0000     60  
-Citrobacter_koseri_ATCCB 1.0000     60  Pseudomonas_simiae_WCS41 1.0000     60  
-Providencia_stuartii_ATC 1.0000     60  Herbaspirillum_seropedic 1.0000     60  
-Shewanella_sp_ANA-3_oxyR 1.0000     60  Sphingomonas_koreensis_J 1.0000     60  
+Sequence name            Weight Length  Sequence name            Weight Length
+-------------            ------ ------  -------------            ------ ------
+Escherichia_coli_MG1655_ 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60
+Escherichia_coli_MG1655_ 1.0000     60  Escherichia_fergusonii_A 1.0000     60
+Klebsiella_oxytoca_M5al_ 1.0000     60  Shigella_flexneri_ATCC70 1.0000     60
+Salmonella_enterica_LT2_ 1.0000     60  Escherichia_coli_BW25113 1.0000     60
+Salmonella_enterica_LT2_ 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60
+Escherichia_coli_MG1655_ 1.0000     60  Providencia_stuartii_ATC 1.0000     60
+Providencia_stuartii_ATC 1.0000     60  Providencia_stuartii_ATC 1.0000     60
+Enterobacter_cloacae_ATC 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60
+Pseudomonas_aeruginosa_P 1.0000     60  Escherichia_coli_MG1655_ 1.0000     60
+Klebsiella_psneumoniae_A 1.0000     60  Klebsiella_oxytoca_M5al_ 1.0000     60
+Providencia_stuartii_ATC 1.0000     60  Enterobacter_cloacae_ATC 1.0000     60
+Klebsiella_psneumoniae_A 1.0000     60  Escherichia_coli_BW25113 1.0000     60
+Klebsiella_oxytoca_M5al_ 1.0000     60  Klebsiella_psneumoniae_A 1.0000     60
+Aliivibrio_fischeri_ATCC 1.0000     60  Providencia_stuartii_ATC 1.0000     60
+Klebsiella_oxytoca_M5al_ 1.0000     60  Azospirillum_brasilense_ 1.0000     60
+Enterobacter_cloacae_ATC 1.0000     60  Providencia_stuartii_ATC 1.0000     60
+Escherichia_coli_BW25113 1.0000     60  Escherichia_coli_MG1655_ 1.0000     60
+Salmonella_enterica_LT2_ 1.0000     60  Citrobacter_koseri_ATCCB 1.0000     60
+Aliivibrio_fischeri_ATCC 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+Klebsiella_oxytoca_M5al_ 1.0000     60  Sphingobium_sp_GW456-12- 1.0000     60
+Pontibacter_actiniarum_K 1.0000     60  Citrobacter_koseri_ATCCB 1.0000     60
+Herbaspirillum_seropedic 1.0000     60  Escherichia_fergusonii_A 1.0000     60
+Klebsiella_oxytoca_M5al_ 1.0000     60  Pseudomonas_simiae_WCS41 1.0000     60
+Shigella_flexneri_ATCC70 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60
+Citrobacter_koseri_ATCCB 1.0000     60  Providencia_stuartii_ATC 1.0000     60
+Escherichia_coli_MG1655_ 1.0000     60  Sphingomonas_koreensis_J 1.0000     60
+Shigella_flexneri_ATCC70 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+Marinobacter_adhaerens_H 1.0000     60  Providencia_stuartii_ATC 1.0000     60
+Shewanella_amazonensis_S 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60
+Klebsiella_oxytoca_M5al_ 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60
+Escherichia_coli_BW25113 1.0000     60  Providencia_stuartii_ATC 1.0000     60
+Shewanella_loihica_PV-4_ 1.0000     60  Sinorhizobium_meliloti_1 1.0000     60
+Providencia_stuartii_ATC 1.0000     60  Pontibacter_actiniarum_K 1.0000     60
+Salmonella_enterica_LT2_ 1.0000     60  Dinoroseobacter_shibae_D 1.0000     60
+Klebsiella_psneumoniae_A 1.0000     60  Enterobacter_cloacae_ATC 1.0000     60
+Salmonella_enterica_LT2_ 1.0000     60  Providencia_stuartii_ATC 1.0000     60
+Enterobacter_cloacae_ATC 1.0000     60  Citrobacter_koseri_ATCCB 1.0000     60
+Klebsiella_psneumoniae_A 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60
+Enterobacter_cloacae_ATC 1.0000     60  Saccharophagus_degradans 1.0000     60
+Dyella_japonica_UNC79MFT 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+Enterobacter_cloacae_ATC 1.0000     60  Sphingobacteriaceae_sp_G 1.0000     60
+Herbaspirillum_seropedic 1.0000     60  Klebsiella_psneumoniae_A 1.0000     60
+Providencia_stuartii_ATC 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60
+Klebsiella_psneumoniae_A 1.0000     60  Bacillus_subtilis_168_ox 1.0000     60
+Citrobacter_koseri_ATCCB 1.0000     60  Sphingobacteriaceae_sp_G 1.0000     60
+Providencia_stuartii_ATC 1.0000     60  Escherichia_fergusonii_A 1.0000     60
+Providencia_stuartii_ATC 1.0000     60  Sphingomonas_koreensis_J 1.0000     60
+Citrobacter_koseri_ATCCB 1.0000     60  Pseudomonas_simiae_WCS41 1.0000     60
+Providencia_stuartii_ATC 1.0000     60  Herbaspirillum_seropedic 1.0000     60
+Shewanella_sp_ANA-3_oxyR 1.0000     60  Sphingomonas_koreensis_J 1.0000     60
 ********************************************************************************
 
 ********************************************************************************
@@ -90,7 +90,7 @@ COMMAND LINE SUMMARY
 This information can also be useful in the event you wish to report a
 problem with the MEME software.
 
-command: meme /global/projectb/scratch/leo/multiMotifs/oxyR_B-CTCGCATT/oxyR_B-CTCGCATT_summits_combined_sorted.fasta -oc /global/projectb/scratch/leo/multiMotifs/oxyR_B-CTCGCATT_motifs_summits -dna -revcomp -mod anr -nmotifs 3 -minw 8 -maxw 32 -maxsize 1000000 
+command: meme /global/projectb/scratch/leo/multiMotifs/oxyR_B-CTCGCATT/oxyR_B-CTCGCATT_summits_combined_sorted.fasta -oc /global/projectb/scratch/leo/multiMotifs/oxyR_B-CTCGCATT_motifs_summits -dna -revcomp -mod anr -nmotifs 3 -minw 8 -maxw 32 -maxsize 1000000
 
 model:  mod=           anr    nmotifs=         3    evt=           inf
 object function=  E-value of product of p-values
@@ -105,9 +105,9 @@ data:   n=            6000    N=             100    shuffle=        -1
 strands: + -
 sample: seed=            0    ctfrac=         -1    maxwords=       -1
 Letter frequencies in dataset:
-A 0.326 C 0.174 G 0.174 T 0.326 
+A 0.326 C 0.174 G 0.174 T 0.326
 Background letter frequencies (from dataset with add-one prior applied):
-A 0.326 C 0.174 G 0.174 T 0.326 
+A 0.326 C 0.174 G 0.174 T 0.326
 ********************************************************************************
 
 
@@ -122,12 +122,12 @@ pos.-specific     C  4:::2:22112:7a:::9:
 probability       G  :3:::a41:1:2::2::13
 matrix            T  42:92:27653:1:8:a::
 
-         bits    2.5              *     
-                 2.3      *       *     
-                 2.0      *       *     
-                 1.8      *       *   * 
-Relative         1.5      *       * *** 
-Entropy          1.3   *  *      ** *** 
+         bits    2.5              *
+                 2.3      *       *
+                 2.0      *       *
+                 1.8      *       *   *
+Relative         1.5      *       * ***
+Entropy          1.3   *  *      ** ***
 (19.1 bits)      1.0   ** *      ** ****
                  0.8   ** * *   ********
                  0.5 * **** *   ********
@@ -136,14 +136,14 @@ Entropy          1.3   *  *      ** ***
 
 Multilevel           CAATAGGTTTAACCTATCA
 consensus            TG    CCAATG  G   G
-sequence             A         C        
-                                        
+sequence             A         C
+
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 	Motif oxyR MEME-1 sites sorted by position p-value
 --------------------------------------------------------------------------------
-Sequence name            Strand  Start   P-value                   Site      
+Sequence name            Strand  Start   P-value                   Site
 -------------            ------  ----- ---------            -------------------
 Aliivibrio_fischeri_ATCC     -     34  2.52e-10   AACGTTAC CAATAGGTTTTACCTATCA ATCTAAAAGG
 Klebsiella_oxytoca_M5al_     +     16  9.40e-10 AACGATCTAA CAATAGGCTAAACCTATCA CATTCCATAA
@@ -152,7 +152,7 @@ Providencia_stuartii_ATC     +     21  1.02e-08 TTACGTCACT TGATAGGTCTCACCTATCG T
 Providencia_stuartii_ATC     -     16  2.93e-08 AATAAATATT TAATAGTTATCACCTATCG AAATATGGAG
 Marinobacter_adhaerens_H     +     22  4.36e-08 GAAGAAATTA AGATAGCTCTAACCTATCA ATCATCTCAA
 Providencia_stuartii_ATC     +     12  4.97e-08 CAATAAAATT TAATAGTCTTAGCCTATCA AACAACTGCT
-Herbaspirillum_seropedic     -      8  7.23e-08 TTTATAAATT CAATTGGCAGAGCCTATCG CCGCGCT   
+Herbaspirillum_seropedic     -      8  7.23e-08 TTTATAAATT CAATTGGCAGAGCCTATCG CCGCGCT
 Escherichia_coli_BW25113     -     27  7.23e-08 AAATCCCTTG CTATCGGGTAAACCTATCG CTATGATTAG
 Escherichia_coli_MG1655_     -     24  7.23e-08 AAATCCCTTG CTATCGGGTAAACCTATCG CTATGATTAG
 Klebsiella_psneumoniae_A     -     27  8.14e-08 AAGAAACATT CGATAGCTAAAAACTATCA ACATATAATT
@@ -160,14 +160,14 @@ Escherichia_coli_BW25113     +     14  9.17e-08 AAAAGTCGAG TAAAAGGCATAACCTATCA C
 Shigella_flexneri_ATCC70     +     14  9.17e-08 AAAAGTCGAG TAAAAGGCATAACCTATCA CTGTCATAGG
 Escherichia_fergusonii_A     -     31  9.17e-08 AAAAATGAAG TAAAAGGCATAACCTATCA CTGTCATAGG
 Escherichia_coli_MG1655_     +     16  9.17e-08 AAAAGTCGAG TAAAAGGCATAACCTATCA CTGTCATAGG
-Citrobacter_koseri_ATCCB     -      9  1.03e-07 ACTAGAACAT CGATCGGTATAAACGATCA ATACATTG  
+Citrobacter_koseri_ATCCB     -      9  1.03e-07 ACTAGAACAT CGATCGGTATAAACGATCA ATACATTG
 Citrobacter_koseri_ATCCB     +     27  1.15e-07 AAATTAGTTA TGATAGATAATGCCTATCA AGTGCAAATC
 Citrobacter_koseri_ATCCB     +     25  1.29e-07 ATTTGAATTT TAATAGTTAGCGCCTATCA AAATTAACTA
 Pontibacter_actiniarum_K     -     29  1.45e-07 ATCCGTGGCA ATATAGGCAGCACCTATCA GGGCGATCAG
 Pontibacter_actiniarum_K     +     11  1.45e-07 TAAAGGTACA TAATAGGTTTAAGCTATCA AAGTATAAAA
 Klebsiella_oxytoca_M5al_     +     25  1.62e-07 ACAATCGATG AGATAGGTTTTGTCTATCA ATCGTTATTT
 Pseudomonas_simiae_WCS41     +     23  1.80e-07 CTGATGCTGA CGATTGGTTTTCCCTATCA GGAAACTGTA
-Providencia_stuartii_ATC     -      8  2.47e-07 AACAAAAATA CAATAGATTTCGACTATCA AAATTAG   
+Providencia_stuartii_ATC     -      8  2.47e-07 AACAAAAATA CAATAGATTTCGACTATCA AAATTAG
 Aliivibrio_fischeri_ATCC     +     11  2.74e-07 TAATGAACAA CGTTAGTTTTTACCTATCA ATACAATAAC
 Providencia_stuartii_ATC     +     24  2.74e-07 CCAATTTCTG TGATAGATTTTATCTATCA ATTATACTTA
 Azospirillum_brasilense_     +     17  3.03e-07 CACTGCACAA TAATCGGTTTTATCGATCA AAGCGATTGG
@@ -194,7 +194,7 @@ Aliivibrio_fischeri_ATCC     +      4  1.82e-06        CCA TCATTGATAAAACCTATCA A
 Escherichia_fergusonii_A     -     21  2.13e-06 AAATCCCTTG CTATCGAATAAACCTATCG CTAGGATTAG
 Escherichia_coli_BW25113     +     28  3.58e-06 ACTATCAATA AGATAGCCTGTGCCTATTA CCCAGATCAG
 Escherichia_coli_MG1655_     +     27  3.58e-06 ACTATCAATA AGATAGCCTGTGCCTATTA CCCAGATCAG
-Enterobacter_cloacae_ATC     +     33  5.06e-06 CCAATCCTAA CTATTGCTCATACCGATGG CAAGACTTT 
+Enterobacter_cloacae_ATC     +     33  5.06e-06 CCAATCCTAA CTATTGCTCATACCGATGG CAAGACTTT
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
@@ -257,56 +257,56 @@ Enterobacter_cloacae_ATC          5.1e-06  32_[+1]_9
 	Motif oxyR MEME-1 in BLOCKS format
 --------------------------------------------------------------------------------
 BL   MOTIF oxyR width=19 seqs=50
-Aliivibrio_fischeri_ATCC (   34) CAATAGGTTTTACCTATCA  1 
-Klebsiella_oxytoca_M5al_ (   16) CAATAGGCTAAACCTATCA  1 
-Citrobacter_koseri_ATCCB (   23) CAATAGCTAAAACCTATCA  1 
-Providencia_stuartii_ATC (   21) TGATAGGTCTCACCTATCG  1 
-Providencia_stuartii_ATC (   16) TAATAGTTATCACCTATCG  1 
-Marinobacter_adhaerens_H (   22) AGATAGCTCTAACCTATCA  1 
-Providencia_stuartii_ATC (   12) TAATAGTCTTAGCCTATCA  1 
-Herbaspirillum_seropedic (    8) CAATTGGCAGAGCCTATCG  1 
-Escherichia_coli_BW25113 (   27) CTATCGGGTAAACCTATCG  1 
-Escherichia_coli_MG1655_ (   24) CTATCGGGTAAACCTATCG  1 
-Klebsiella_psneumoniae_A (   27) CGATAGCTAAAAACTATCA  1 
-Escherichia_coli_BW25113 (   14) TAAAAGGCATAACCTATCA  1 
-Shigella_flexneri_ATCC70 (   14) TAAAAGGCATAACCTATCA  1 
-Escherichia_fergusonii_A (   31) TAAAAGGCATAACCTATCA  1 
-Escherichia_coli_MG1655_ (   16) TAAAAGGCATAACCTATCA  1 
-Citrobacter_koseri_ATCCB (    9) CGATCGGTATAAACGATCA  1 
-Citrobacter_koseri_ATCCB (   27) TGATAGATAATGCCTATCA  1 
-Citrobacter_koseri_ATCCB (   25) TAATAGTTAGCGCCTATCA  1 
-Pontibacter_actiniarum_K (   29) ATATAGGCAGCACCTATCA  1 
-Pontibacter_actiniarum_K (   11) TAATAGGTTTAAGCTATCA  1 
-Klebsiella_oxytoca_M5al_ (   25) AGATAGGTTTTGTCTATCA  1 
-Pseudomonas_simiae_WCS41 (   23) CGATTGGTTTTCCCTATCA  1 
-Providencia_stuartii_ATC (    8) CAATAGATTTCGACTATCA  1 
-Aliivibrio_fischeri_ATCC (   11) CGTTAGTTTTTACCTATCA  1 
-Providencia_stuartii_ATC (   24) TGATAGATTTTATCTATCA  1 
-Azospirillum_brasilense_ (   17) TAATCGGTTTTATCGATCA  1 
-Providencia_stuartii_ATC (   23) CAATAGCTAAATCCTATCA  1 
-Providencia_stuartii_ATC (   16) ATATAGGGTGTACCTATCA  1 
-Sphingobacteriaceae_sp_G (   29) TAATTGGTGAAACCTATCG  1 
-Klebsiella_oxytoca_M5al_ (   29) TGATTGCTTTTATCTATCA  1 
-Shigella_flexneri_ATCC70 (   25) CTATCGAGTAAACCTATCG  1 
-Aliivibrio_fischeri_ATCC (   18) CAATCGTTAAAATCTATCA  1 
-Escherichia_fergusonii_A (   15) ATATTGATATAACCTATCA  1 
-Klebsiella_oxytoca_M5al_ (   21) TGATCGTTTTAAACGATCG  1 
-Klebsiella_oxytoca_M5al_ (   25) CAATAGTTTCCACCGATGA  1 
-Aliivibrio_fischeri_ATCC (   29) CAATAGGTTTTATCCATCA  1 
-Escherichia_coli_MG1655_ (   30) CGATCGATATAAACGATCG  1 
-Klebsiella_oxytoca_M5al_ (   39) ATATAGTTTCCGCCTATCA  1 
-Enterobacter_cloacae_ATC (   26) CAATAGTTTCCACCGATGG  1 
-Providencia_stuartii_ATC (   13) TAATTGCTTTAATCGATCG  1 
-Salmonella_enterica_LT2_ (   28) AGACAGCTTTTGCCTATCG  1 
-Enterobacter_cloacae_ATC (   27) AGTTTGGTAAAACCTATCA  1 
-Providencia_stuartii_ATC (   26) CAATAACTTTCGCCGATCG  1 
-Klebsiella_oxytoca_M5al_ (   13) CAATAGGTTACGCCAATGA  1 
-Salmonella_enterica_LT2_ (   26) TGAAAGGTTCCACCGATGG  1 
-Aliivibrio_fischeri_ATCC (    4) TCATTGATAAAACCTATCA  1 
-Escherichia_fergusonii_A (   21) CTATCGAATAAACCTATCG  1 
-Escherichia_coli_BW25113 (   28) AGATAGCCTGTGCCTATTA  1 
-Escherichia_coli_MG1655_ (   27) AGATAGCCTGTGCCTATTA  1 
-Enterobacter_cloacae_ATC (   33) CTATTGCTCATACCGATGG  1 
+Aliivibrio_fischeri_ATCC (   34) CAATAGGTTTTACCTATCA  1
+Klebsiella_oxytoca_M5al_ (   16) CAATAGGCTAAACCTATCA  1
+Citrobacter_koseri_ATCCB (   23) CAATAGCTAAAACCTATCA  1
+Providencia_stuartii_ATC (   21) TGATAGGTCTCACCTATCG  1
+Providencia_stuartii_ATC (   16) TAATAGTTATCACCTATCG  1
+Marinobacter_adhaerens_H (   22) AGATAGCTCTAACCTATCA  1
+Providencia_stuartii_ATC (   12) TAATAGTCTTAGCCTATCA  1
+Herbaspirillum_seropedic (    8) CAATTGGCAGAGCCTATCG  1
+Escherichia_coli_BW25113 (   27) CTATCGGGTAAACCTATCG  1
+Escherichia_coli_MG1655_ (   24) CTATCGGGTAAACCTATCG  1
+Klebsiella_psneumoniae_A (   27) CGATAGCTAAAAACTATCA  1
+Escherichia_coli_BW25113 (   14) TAAAAGGCATAACCTATCA  1
+Shigella_flexneri_ATCC70 (   14) TAAAAGGCATAACCTATCA  1
+Escherichia_fergusonii_A (   31) TAAAAGGCATAACCTATCA  1
+Escherichia_coli_MG1655_ (   16) TAAAAGGCATAACCTATCA  1
+Citrobacter_koseri_ATCCB (    9) CGATCGGTATAAACGATCA  1
+Citrobacter_koseri_ATCCB (   27) TGATAGATAATGCCTATCA  1
+Citrobacter_koseri_ATCCB (   25) TAATAGTTAGCGCCTATCA  1
+Pontibacter_actiniarum_K (   29) ATATAGGCAGCACCTATCA  1
+Pontibacter_actiniarum_K (   11) TAATAGGTTTAAGCTATCA  1
+Klebsiella_oxytoca_M5al_ (   25) AGATAGGTTTTGTCTATCA  1
+Pseudomonas_simiae_WCS41 (   23) CGATTGGTTTTCCCTATCA  1
+Providencia_stuartii_ATC (    8) CAATAGATTTCGACTATCA  1
+Aliivibrio_fischeri_ATCC (   11) CGTTAGTTTTTACCTATCA  1
+Providencia_stuartii_ATC (   24) TGATAGATTTTATCTATCA  1
+Azospirillum_brasilense_ (   17) TAATCGGTTTTATCGATCA  1
+Providencia_stuartii_ATC (   23) CAATAGCTAAATCCTATCA  1
+Providencia_stuartii_ATC (   16) ATATAGGGTGTACCTATCA  1
+Sphingobacteriaceae_sp_G (   29) TAATTGGTGAAACCTATCG  1
+Klebsiella_oxytoca_M5al_ (   29) TGATTGCTTTTATCTATCA  1
+Shigella_flexneri_ATCC70 (   25) CTATCGAGTAAACCTATCG  1
+Aliivibrio_fischeri_ATCC (   18) CAATCGTTAAAATCTATCA  1
+Escherichia_fergusonii_A (   15) ATATTGATATAACCTATCA  1
+Klebsiella_oxytoca_M5al_ (   21) TGATCGTTTTAAACGATCG  1
+Klebsiella_oxytoca_M5al_ (   25) CAATAGTTTCCACCGATGA  1
+Aliivibrio_fischeri_ATCC (   29) CAATAGGTTTTATCCATCA  1
+Escherichia_coli_MG1655_ (   30) CGATCGATATAAACGATCG  1
+Klebsiella_oxytoca_M5al_ (   39) ATATAGTTTCCGCCTATCA  1
+Enterobacter_cloacae_ATC (   26) CAATAGTTTCCACCGATGG  1
+Providencia_stuartii_ATC (   13) TAATTGCTTTAATCGATCG  1
+Salmonella_enterica_LT2_ (   28) AGACAGCTTTTGCCTATCG  1
+Enterobacter_cloacae_ATC (   27) AGTTTGGTAAAACCTATCA  1
+Providencia_stuartii_ATC (   26) CAATAACTTTCGCCGATCG  1
+Klebsiella_oxytoca_M5al_ (   13) CAATAGGTTACGCCAATGA  1
+Salmonella_enterica_LT2_ (   26) TGAAAGGTTCCACCGATGG  1
+Aliivibrio_fischeri_ATCC (    4) TCATTGATAAAACCTATCA  1
+Escherichia_fergusonii_A (   21) CTATCGAATAAACCTATCG  1
+Escherichia_coli_BW25113 (   28) AGATAGCCTGTGCCTATTA  1
+Escherichia_coli_MG1655_ (   27) AGATAGCCTGTGCCTATTA  1
+Enterobacter_cloacae_ATC (   33) CTATTGCTCATACCGATGG  1
 //
 
 --------------------------------------------------------------------------------
@@ -314,51 +314,51 @@ Enterobacter_cloacae_ATC (   33) CTATTGCTCATACCGATGG  1
 --------------------------------------------------------------------------------
 	Motif oxyR MEME-1 position-specific scoring matrix
 --------------------------------------------------------------------------------
-log-odds matrix: alength= 4 w= 19 n= 4200 bayes= 6.37504 E= 4.0e-109 
-   -70    134  -1229     14 
-    50   -312     96    -85 
-   156  -1229  -1229   -302 
-  -170   -312  -1229    143 
-    97      5  -1229    -85 
-  -402  -1229    249  -1229 
-  -102     34    134    -85 
-  -402     20   -112    110 
-    14   -154   -312     78 
-   -12   -112    -54     62 
-    62     34  -1229    -22 
-   114   -312     46   -402 
-  -170    209   -312   -122 
- -1229    252  -1229  -1229 
-  -402   -312     20    122 
-   162  -1229  -1229  -1229 
- -1229  -1229  -1229    162 
- -1229    230    -80   -302 
-   106  -1229     88  -1229 
+log-odds matrix: alength= 4 w= 19 n= 4200 bayes= 6.37504 E= 4.0e-109
+   -70    134  -1229     14
+    50   -312     96    -85
+   156  -1229  -1229   -302
+  -170   -312  -1229    143
+    97      5  -1229    -85
+  -402  -1229    249  -1229
+  -102     34    134    -85
+  -402     20   -112    110
+    14   -154   -312     78
+   -12   -112    -54     62
+    62     34  -1229    -22
+   114   -312     46   -402
+  -170    209   -312   -122
+ -1229    252  -1229  -1229
+  -402   -312     20    122
+   162  -1229  -1229  -1229
+ -1229  -1229  -1229    162
+ -1229    230    -80   -302
+   106  -1229     88  -1229
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 	Motif oxyR MEME-1 position-specific probability matrix
 --------------------------------------------------------------------------------
-letter-probability matrix: alength= 4 w= 19 nsites= 50 E= 4.0e-109 
- 0.200000  0.440000  0.000000  0.360000 
- 0.460000  0.020000  0.340000  0.180000 
- 0.960000  0.000000  0.000000  0.040000 
- 0.100000  0.020000  0.000000  0.880000 
- 0.640000  0.180000  0.000000  0.180000 
- 0.020000  0.000000  0.980000  0.000000 
- 0.160000  0.220000  0.440000  0.180000 
- 0.020000  0.200000  0.080000  0.700000 
- 0.360000  0.060000  0.020000  0.560000 
- 0.300000  0.080000  0.120000  0.500000 
- 0.500000  0.220000  0.000000  0.280000 
- 0.720000  0.020000  0.240000  0.020000 
- 0.100000  0.740000  0.020000  0.140000 
- 0.000000  1.000000  0.000000  0.000000 
- 0.020000  0.020000  0.200000  0.760000 
- 1.000000  0.000000  0.000000  0.000000 
- 0.000000  0.000000  0.000000  1.000000 
- 0.000000  0.860000  0.100000  0.040000 
- 0.680000  0.000000  0.320000  0.000000 
+letter-probability matrix: alength= 4 w= 19 nsites= 50 E= 4.0e-109
+ 0.200000  0.440000  0.000000  0.360000
+ 0.460000  0.020000  0.340000  0.180000
+ 0.960000  0.000000  0.000000  0.040000
+ 0.100000  0.020000  0.000000  0.880000
+ 0.640000  0.180000  0.000000  0.180000
+ 0.020000  0.000000  0.980000  0.000000
+ 0.160000  0.220000  0.440000  0.180000
+ 0.020000  0.200000  0.080000  0.700000
+ 0.360000  0.060000  0.020000  0.560000
+ 0.300000  0.080000  0.120000  0.500000
+ 0.500000  0.220000  0.000000  0.280000
+ 0.720000  0.020000  0.240000  0.020000
+ 0.100000  0.740000  0.020000  0.140000
+ 0.000000  1.000000  0.000000  0.000000
+ 0.020000  0.020000  0.200000  0.760000
+ 1.000000  0.000000  0.000000  0.000000
+ 0.000000  0.000000  0.000000  1.000000
+ 0.000000  0.860000  0.100000  0.040000
+ 0.680000  0.000000  0.320000  0.000000
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
@@ -373,5 +373,3 @@ letter-probability matrix: alength= 4 w= 19 nsites= 50 E= 4.0e-109
 Time  5.18 secs.
 
 ********************************************************************************
-
-

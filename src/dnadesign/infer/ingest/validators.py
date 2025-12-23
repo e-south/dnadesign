@@ -33,9 +33,7 @@ def validate_dna(seqs: Iterable[str], *, allow_iupac: bool = False) -> None:
 def validate_protein(seqs: Iterable[str], *, allow_extended_aas: bool = False) -> None:
     for i, s in enumerate(seqs):
         if not isinstance(s, str) or not s:
-            raise ValidationError(
-                f"Invalid protein at index {i}: must be non-empty string"
-            )
+            raise ValidationError(f"Invalid protein at index {i}: must be non-empty string")
         letters = set(s)
         allowed = _AA_20 | (_AA_EXT if allow_extended_aas else set())
         if not letters.issubset(allowed):

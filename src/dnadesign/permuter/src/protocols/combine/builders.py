@@ -17,9 +17,7 @@ import numpy as np
 
 def _key_for_combo(events: List[Tuple[int, str, str, float]]) -> str:
     # Canonical AA key like "K12D|G45A|…", sorted by position ascending
-    parts = [
-        f"{wt}{pos}{alt}" for (pos, wt, alt, _) in sorted(events, key=lambda x: x[0])
-    ]
+    parts = [f"{wt}{pos}{alt}" for (pos, wt, alt, _) in sorted(events, key=lambda x: x[0])]
     return "|".join(parts)
 
 
@@ -56,27 +54,21 @@ def random_sample(
         raise ValueError("combine_aa: only strategy='random' is implemented in v0.1")
     budget_total = int(comb.get("budget_total", 0))
     if k_min < 1 or k_max < k_min:
-        raise ValueError(
-            "combine_aa: combine.k_min/k_max must be positive and k_max ≥ k_min"
-        )
+        raise ValueError("combine_aa: combine.k_min/k_max must be positive and k_max ≥ k_min")
     if budget_total <= 0:
         raise ValueError("combine_aa: combine.budget_total must be > 0")
     rnd = comb.get("random", {}) or {}
     per_k = rnd.get("samples_per_k", {})
     rank_objective = str(rnd.get("rank_objective", "sum_of_singles"))
     # Normalize keys to int
-    per_k_int: Dict[int, int] = {
-        int(k): int(v) for k, v in (per_k.items() if per_k else [])
-    }
+    per_k_int: Dict[int, int] = {int(k): int(v) for k, v in (per_k.items() if per_k else [])}
     # Fallback: even split of budget across k when per‑k targets aren’t specified
     if not per_k_int:
         k_vals = list(range(k_min, k_max + 1))
         if k_vals:
             base = max(0, budget_total // len(k_vals))
             extra = max(0, budget_total % len(k_vals))
-            per_k_int = {
-                k: base + (1 if i < extra else 0) for i, k in enumerate(k_vals)
-            }
+            per_k_int = {k: base + (1 if i < extra else 0) for i, k in enumerate(k_vals)}
 
     results: List[Tuple[List[Tuple[int, str, str, float]], float]] = []
     seen_keys: set[str] = set()
@@ -138,9 +130,7 @@ def enumerate_all(
     k_min = int(comb.get("k_min", 0))
     k_max = int(comb.get("k_max", 0))
     if k_min < 1 or k_max < k_min:
-        raise ValueError(
-            "combine_aa: combine.k_min/k_max must be positive and k_max ≥ k_min"
-        )
+        raise ValueError("combine_aa: combine.k_min/k_max must be positive and k_max ≥ k_min")
     # Ranking objective parity with sampling; default to sum_of_singles
     rnd = comb.get("random", {}) or {}
     objective = str(rnd.get("rank_objective", "sum_of_singles"))

@@ -19,16 +19,12 @@ import numpy as np
 
 def _apply_perf_rcparams() -> None:
     # Cheap wins for large point clouds
-    plt.rcParams["agg.path.chunksize"] = int(
-        os.getenv("OPAL_MPL_PATH_CHUNKSIZE", "10000")
-    )
+    plt.rcParams["agg.path.chunksize"] = int(os.getenv("OPAL_MPL_PATH_CHUNKSIZE", "10000"))
     plt.rcParams["path.simplify"] = True
     plt.rcParams["path.simplify_threshold"] = 0.0  # keep geometry intact
 
 
-def scatter_smart(
-    ax, x, y, *, s=16, alpha=0.85, rasterize_at=None, edgecolors="none", **kw
-):
+def scatter_smart(ax, x, y, *, s=16, alpha=0.85, rasterize_at=None, edgecolors="none", **kw):
     """
     Always deterministic; switches to rasterized draw above 'rasterize_at' points
     to prevent vector-graphics ballooning and crashes in backends like PDF/PS.
@@ -72,9 +68,7 @@ def scatter_smart(
     )
 
 
-def scale_to_sizes(
-    values, *, s_min: float = 10.0, s_max: float = 60.0, clip=None
-) -> np.ndarray:
+def scale_to_sizes(values, *, s_min: float = 10.0, s_max: float = 60.0, clip=None) -> np.ndarray:
     """
     Map a numeric vector to point sizes in [s_min, s_max].
     Non-finite → s_min. If the vector is (near-)constant, return s_min.
@@ -126,18 +120,14 @@ def annotate_plot_meta(
         ha=ha,
         va=va,
         fontsize=fontsize,
-        bbox=dict(
-            facecolor="white", alpha=0.7, edgecolor="none", boxstyle="round,pad=0.2"
-        ),
+        bbox=dict(facecolor="white", alpha=0.7, edgecolor="none", boxstyle="round,pad=0.2"),
     )
 
 
 def log_kv(logger, plot: str, **kwargs) -> None:
     """Uniform one-line key/value logging for plots."""
     items = {k: kwargs[k] for k in sorted(kwargs.keys())}
-    logger.info(
-        "[%s] %s", plot, _json.dumps(items, separators=(",", ":"), sort_keys=True)
-    )
+    logger.info("[%s] %s", plot, _json.dumps(items, separators=(",", ":"), sort_keys=True))
 
 
 def swarm_smart(

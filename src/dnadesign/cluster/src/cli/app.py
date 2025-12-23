@@ -71,9 +71,7 @@ console = Console()
 @app.callback(invoke_without_command=False)
 def _global_opts(
     ctx: typer.Context,
-    debug: bool = typer.Option(
-        False, "--debug", help="Show full rich tracebacks with locals."
-    ),
+    debug: bool = typer.Option(False, "--debug", help="Show full rich tracebacks with locals."),
 ):
     """Global flags & rich traceback config."""
     rich_traceback(show_locals=debug)
@@ -162,12 +160,8 @@ def _attach_columns_schema_preserving(
     if key_col not in right.columns:
         raise KeyError(f"Right table is missing key column '{key_col}'.")
     if right[key_col].duplicated().any():
-        dupes = (
-            right.loc[right[key_col].duplicated(), key_col].astype(str).head(8).tolist()
-        )
-        raise RuntimeError(
-            f"Right table has duplicate '{key_col}' values (e.g., {dupes})."
-        )
+        dupes = right.loc[right[key_col].duplicated(), key_col].astype(str).head(8).tolist()
+        raise RuntimeError(f"Right table has duplicate '{key_col}' values (e.g., {dupes}).")
     # Try to align dtype of the join key without mutating full_df permanently
     try:
         right = right.copy()
@@ -211,9 +205,7 @@ def _normalize_for_key(df: pd.DataFrame, key_col: str) -> pd.DataFrame:
     return out
 
 
-def _attach_by_key_update(
-    left: pd.DataFrame, right: pd.DataFrame, key_col: str
-) -> pd.DataFrame:
+def _attach_by_key_update(left: pd.DataFrame, right: pd.DataFrame, key_col: str) -> pd.DataFrame:
     """
     Schema-preserving attach:
       • For overlapping columns (same name in left & right, excluding key), UPDATE values aligned by key.
@@ -245,9 +237,7 @@ def _assert_preserve_columns(before: list[str], after: list[str]) -> None:
     if missing:
         raise RuntimeError(
             "Refusing to write: detected potential column drop.\n"
-            "Columns that would be lost: "
-            + ", ".join(missing[:12])
-            + (" ..." if len(missing) > 12 else "")
+            "Columns that would be lost: " + ", ".join(missing[:12]) + (" ..." if len(missing) > 12 else "")
         )
 
 
@@ -283,18 +273,14 @@ def _apply_job_params(job_path: Optional[str], expected_command: str) -> dict:
     job = load_job_file(job_path)
     cmd = job.get("command", "").strip().lower()
     if cmd and cmd != expected_command:
-        raise typer.BadParameter(
-            f"Job '{job_path}' has command='{cmd}' but this subcommand is '{expected_command}'."
-        )
+        raise typer.BadParameter(f"Job '{job_path}' has command='{cmd}' but this subcommand is '{expected_command}'.")
     params = job.get("params", {}) or {}
     if not isinstance(params, dict):
         raise typer.BadParameter(f"Job '{job_path}': 'params' must be a mapping.")
     return params
 
 
-def _assert_no_algo_overlap_with_preset(
-    kind: str, job_params: dict, preset_name: Optional[str]
-) -> None:
+def _assert_no_algo_overlap_with_preset(kind: str, job_params: dict, preset_name: Optional[str]) -> None:
     if not preset_name:
         return
     # Disallow common algo keys per kind when a preset is provided.
@@ -320,9 +306,7 @@ def _apply_job_plot(job_path: Optional[str], expected_command: str) -> dict:
     job = load_job_file(job_path)
     cmd = (job.get("command", "") or "").strip().lower()
     if cmd and cmd != expected_command:
-        raise typer.BadParameter(
-            f"Job '{job_path}' has command='{cmd}' but this subcommand is '{expected_command}'."
-        )
+        raise typer.BadParameter(f"Job '{job_path}' has command='{cmd}' but this subcommand is '{expected_command}'.")
     plot = job.get("plot", {}) or {}
     if not isinstance(plot, dict):
         raise typer.BadParameter(f"Job '{job_path}': 'plot' must be a mapping.")
@@ -373,25 +357,16 @@ def _load_highlight_ids_from_file(
     present = raw_ids & set(map(str, left.index.astype(str).tolist()))
     missing = raw_ids - present
     if missing and warn_fn:
-        warn_fn(
-            f"{len(missing)} id(s) in highlight were not found in the dataset. "
-            "They will be ignored."
-        )
+        warn_fn(f"{len(missing)} id(s) in highlight were not found in the dataset. They will be ignored.")
     out = {"ids": list(present)}
     if groupby_col is not None:
         if groupby_col not in tab.columns:
-            raise typer.BadParameter(
-                f"--highlight-hue-col='{groupby_col}' not found in {p.name}."
-            )
+            raise typer.BadParameter(f"--highlight-hue-col='{groupby_col}' not found in {p.name}.")
         # Build id -> category mapping (treat as categorical; integers become strings)
         sub = tab[[col, groupby_col]].copy()
         sub[col] = sub[col].astype(str)
         sub[groupby_col] = sub[groupby_col].astype(str)
-        labels = {
-            rid: cat
-            for rid, cat in zip(sub[col].tolist(), sub[groupby_col].tolist())
-            if rid in present
-        }
+        labels = {rid: cat for rid, cat in zip(sub[col].tolist(), sub[groupby_col].tolist()) if rid in present}
         cats = sorted(set(labels.values()))
         out.update({"labels": labels, "by": groupby_col, "categories": cats})
     return out
@@ -408,54 +383,30 @@ def cmd_fit(
     dataset: Optional[str] = typer.Option(None, help="USR dataset name"),
     file: Optional[str] = typer.Option(None, help="Parquet/CSV path"),
     usr_root: Optional[str] = typer.Option(None, help="USR root directory"),
-    name: Optional[str] = typer.Option(
-        None, help="Run alias (slug). If omitted, auto-generated."
-    ),
+    name: Optional[str] = typer.Option(None, help="Run alias (slug). If omitted, auto-generated."),
     key_col: str = typer.Option("id", help="Key column"),
-    x_col: Optional[str] = typer.Option(
-        None, help="Vector column (list<float> or JSON array string)"
-    ),
-    x_cols: Optional[str] = typer.Option(
-        None, help="Comma-separated list of numeric columns"
-    ),
+    x_col: Optional[str] = typer.Option(None, help="Vector column (list<float> or JSON array string)"),
+    x_cols: Optional[str] = typer.Option(None, help="Comma-separated list of numeric columns"),
     # allow presets to fill defaults; explicit flags still win because they’re non-None
     algo: str = typer.Option("leiden", help="Clustering algorithm", show_default=True),
-    neighbors: Optional[int] = typer.Option(
-        None, help="kNN neighbors (Leiden); falls back to preset or 15"
-    ),
-    resolution: Optional[float] = typer.Option(
-        None, help="Leiden resolution; falls back to preset or 0.30"
-    ),
-    scale: Optional[bool] = typer.Option(
-        None, help="Scale X before neighbors (Leiden); falls back to preset or False"
-    ),
+    neighbors: Optional[int] = typer.Option(None, help="kNN neighbors (Leiden); falls back to preset or 15"),
+    resolution: Optional[float] = typer.Option(None, help="Leiden resolution; falls back to preset or 0.30"),
+    scale: Optional[bool] = typer.Option(None, help="Scale X before neighbors (Leiden); falls back to preset or False"),
     metric: Optional[str] = typer.Option(
         None, help='Distance metric (Leiden/UMAP); falls back to preset or "euclidean"'
     ),
-    random_state: Optional[int] = typer.Option(
-        None, help="Random seed; falls back to preset or 42"
-    ),
-    preset: Optional[str] = typer.Option(
-        None, help="Preset name (kind: 'fit') to pre-fill parameters"
-    ),
-    silhouette: bool = typer.Option(
-        False, help="Attach per-row silhouette quality as cluster__<NAME>__quality"
-    ),
-    full_silhouette: bool = typer.Option(
-        False, help="Compute silhouette on all rows (default samples to ≤20k)"
-    ),
+    random_state: Optional[int] = typer.Option(None, help="Random seed; falls back to preset or 42"),
+    preset: Optional[str] = typer.Option(None, help="Preset name (kind: 'fit') to pre-fill parameters"),
+    silhouette: bool = typer.Option(False, help="Attach per-row silhouette quality as cluster__<NAME>__quality"),
+    full_silhouette: bool = typer.Option(False, help="Compute silhouette on all rows (default samples to ≤20k)"),
     dedupe_policy: str = typer.Option(
         "error",
         help="Duplicate id policy: error|keep-first|keep-last",
         show_default=True,
     ),
     # Reuse
-    reuse: str = typer.Option(
-        "auto", help="Reuse policy: auto|require|never|reattach", show_default=True
-    ),
-    force: bool = typer.Option(
-        False, help="Force recompute (ignore reuse cache)", show_default=True
-    ),
+    reuse: str = typer.Option("auto", help="Reuse policy: auto|require|never|reattach", show_default=True),
+    force: bool = typer.Option(False, help="Force recompute (ignore reuse cache)", show_default=True),
     # Writing
     write: bool = typer.Option(False, help="Apply changes to the table"),
     yes: bool = typer.Option(
@@ -464,9 +415,7 @@ def cmd_fit(
         "--allow-overwrite",
         help="Allow overwriting already-attached columns in USR/file writes",
     ),
-    inplace: bool = typer.Option(
-        False, help="Rewrite the input file in place (generic files only)"
-    ),
+    inplace: bool = typer.Option(False, help="Rewrite the input file in place (generic files only)"),
     out: Optional[str] = typer.Option(None, help="Output file path for generic files"),
 ):
     # Apply job params first (flags still override)
@@ -501,9 +450,7 @@ def cmd_fit(
         name = slugify(name)
     ictx, df_full = _context_and_df(dataset, file, usr_root)
     console.rule("[bold]cluster fit[/]")
-    console.log(
-        f"Input: kind={ictx['kind']} ref={ictx.get('dataset') or ictx.get('file')}"
-    )
+    console.log(f"Input: kind={ictx['kind']} ref={ictx.get('dataset') or ictx.get('file')}")
     # initial checks
     df = _apply_dedupe(df_full, key_col=key_col, policy=dedupe_policy)
     try:
@@ -522,11 +469,7 @@ def cmd_fit(
         dataset,
         file,
         usr_root,
-        columns=list(
-            dict.fromkeys(
-                cols_needed + (["sequence"] if "sequence" in df.columns else [])
-            )
-        ),
+        columns=list(dict.fromkeys(cols_needed + (["sequence"] if "sequence" in df.columns else []))),
     )
     df = _apply_dedupe(df, key_col=key_col, policy=dedupe_policy)
     with Progress(
@@ -548,14 +491,10 @@ def cmd_fit(
     # Resolve params with preset -> defaults cascade
     p = _apply_preset("fit", preset)
     neighbors = neighbors if neighbors is not None else int(p.get("neighbors", 15))
-    resolution = (
-        resolution if resolution is not None else float(p.get("resolution", 0.30))
-    )
+    resolution = resolution if resolution is not None else float(p.get("resolution", 0.30))
     scale = bool(scale) if scale is not None else bool(p.get("scale", False))
     metric = metric if metric is not None else str(p.get("metric", "euclidean"))
-    random_state = (
-        random_state if random_state is not None else int(p.get("random_state", 42))
-    )
+    random_state = random_state if random_state is not None else int(p.get("random_state", 42))
 
     # Signatures
     source_ref = ictx["dataset"] if ictx["kind"] == "usr" else str(ictx["file"])
@@ -588,13 +527,9 @@ def cmd_fit(
     if not force and reuse in ("auto", "require", "reattach"):
         hit = find_equivalent_fit(input_hash, algo_sig, root=None)
         if hit is not None:
-            existing_sig = _collect_existing_meta_sig(
-                df, name or hit.get("alias") or hit.get("run_slug")
-            )
+            existing_sig = _collect_existing_meta_sig(df, name or hit.get("alias") or hit.get("run_slug"))
             if reuse in ("auto", "require") and existing_sig == algo_sig:
-                console.print(
-                    "[green]Reuse[/green]: matching fit already attached; nothing to do."
-                )
+                console.print("[green]Reuse[/green]: matching fit already attached; nothing to do.")
                 raise typer.Exit(code=0)
             if reuse in ("auto", "reattach") and write:
                 # reattach labels from run store
@@ -606,25 +541,21 @@ def cmd_fit(
                         on="id",
                         how="left",
                     )
-                    attach_cols = attach_cols.rename(
-                        columns={"cluster_label": f"cluster__{name or hit['alias']}"}
-                    )
-                    attach_cols[f"cluster__{name or hit['alias']}__meta"] = (
-                        compact_meta(
-                            "2.0.0",
-                            "leiden",
-                            x_col or "<multi>",
-                            len(df),
-                            {
-                                "neighbors": neighbors,
-                                "resolution": resolution,
-                                "scale": scale,
-                                "metric": metric,
-                                "random_state": random_state,
-                            },
-                            _source_clause(ictx),
-                            sig_hash=algo_sig,
-                        )
+                    attach_cols = attach_cols.rename(columns={"cluster_label": f"cluster__{name or hit['alias']}"})
+                    attach_cols[f"cluster__{name or hit['alias']}__meta"] = compact_meta(
+                        "2.0.0",
+                        "leiden",
+                        x_col or "<multi>",
+                        len(df),
+                        {
+                            "neighbors": neighbors,
+                            "resolution": resolution,
+                            "scale": scale,
+                            "metric": metric,
+                            "random_state": random_state,
+                        },
+                        _source_clause(ictx),
+                        sig_hash=algo_sig,
                     )
                     if ictx["kind"] == "usr":
                         attach_usr(
@@ -633,17 +564,11 @@ def cmd_fit(
                             attach_cols,
                             allow_overwrite=yes,
                         )
-                        console.print(
-                            "[green]Reattached[/green] labels from cache to USR dataset."
-                        )
+                        console.print("[green]Reattached[/green] labels from cache to USR dataset.")
                     else:
                         full_df = load_table(ictx)
-                        merged = _attach_columns_schema_preserving(
-                            full_df, attach_cols, key_col, allow_overwrite=yes
-                        )
-                        _assert_preserve_columns(
-                            list(full_df.columns), list(merged.columns)
-                        )
+                        merged = _attach_columns_schema_preserving(full_df, attach_cols, key_col, allow_overwrite=yes)
+                        _assert_preserve_columns(list(full_df.columns), list(merged.columns))
                         write_generic(
                             ictx["file"],
                             merged,
@@ -651,15 +576,11 @@ def cmd_fit(
                             out=(Path(out) if out else None),
                             backup_suffix=".bak",
                         )
-                        console.print(
-                            "[green]Reattached[/green] labels from cache to file."
-                        )
+                        console.print("[green]Reattached[/green] labels from cache to file.")
                     raise typer.Exit(code=0)
                 except Exception as e:
                     if reuse == "require":
-                        console.print(
-                            f"[red]Reuse required but reattach failed:[/red] {e}"
-                        )
+                        console.print(f"[red]Reuse required but reattach failed:[/red] {e}")
                         raise typer.Exit(code=2)
 
     # Compute
@@ -689,9 +610,7 @@ def cmd_fit(
         try:
             from sklearn.metrics import silhouette_samples
         except Exception:
-            console.print(
-                "[yellow]Silhouette requested but scikit-learn is missing. Skipping.[/yellow]"
-            )
+            console.print("[yellow]Silhouette requested but scikit-learn is missing. Skipping.[/yellow]")
         else:
             with Progress(
                 SpinnerColumn(),
@@ -706,14 +625,10 @@ def cmd_fit(
                     rng = np.random.default_rng(random_state)
                     keep = rng.choice(np.arange(n), size=20000, replace=False)
                     svals = np.full(n, np.nan, dtype="float32")
-                    svals[keep] = silhouette_samples(
-                        X[keep], labels[keep], metric=metric
-                    ).astype("float32")
+                    svals[keep] = silhouette_samples(X[keep], labels[keep], metric=metric).astype("float32")
                     quality = svals
                 else:
-                    quality = silhouette_samples(X, labels, metric=metric).astype(
-                        "float32"
-                    )
+                    quality = silhouette_samples(X, labels, metric=metric).astype("float32")
                 prog.update(t_sil, completed=1)
     # Build attachments
     run_alias = name or auto_run_name("ldn", {"n": neighbors, "r": resolution})
@@ -774,9 +689,7 @@ def cmd_fit(
             "columns": [f"cluster__{run_alias}", f"cluster__{run_alias}__meta"],
         },
     )
-    labels_path = write_labels(
-        run_dir, pd.DataFrame({"id": df[key_col].astype(str), "cluster_label": labels})
-    )
+    labels_path = write_labels(run_dir, pd.DataFrame({"id": df[key_col].astype(str), "cluster_label": labels}))
     size_counts = pd.Series(labels).value_counts().to_dict()
     write_summary(run_dir, {"cluster_sizes": size_counts})
     add_or_update_index(
@@ -810,32 +723,23 @@ def cmd_fit(
 
     # Attach/write
     if not write:
-        console.print(
-            "[yellow]Dry-run[/yellow]: computed labels but did not write to the table. Use --write to apply."
-        )
+        console.print("[yellow]Dry-run[/yellow]: computed labels but did not write to the table. Use --write to apply.")
         console.print(f"Run recorded under [bold]{run_dir}[/] (results root).")
         _print_fit_summary(labels, run_alias, size_counts)
         raise typer.Exit(code=0)
     if ictx["kind"] == "usr":
         try:
-            attach_usr(
-                ictx["usr_root"], ictx["dataset"], attach_cols, allow_overwrite=yes
-            )
+            attach_usr(ictx["usr_root"], ictx["dataset"], attach_cols, allow_overwrite=yes)
         except Exception as e:
             if "Columns already exist" in str(e) and not yes:
                 console.print(
-                    "[red]Columns already exist[/red]. Re-run with "
-                    "`-y/--allow-overwrite` or choose a new --name."
+                    "[red]Columns already exist[/red]. Re-run with `-y/--allow-overwrite` or choose a new --name."
                 )
                 raise typer.Exit(code=2)
             raise
-        console.print(
-            f"[green]Attached[/green] columns to USR dataset '{ictx['dataset']}'."
-        )
+        console.print(f"[green]Attached[/green] columns to USR dataset '{ictx['dataset']}'.")
     else:
-        merged = _attach_columns_schema_preserving(
-            df_full, attach_cols, key_col, allow_overwrite=yes
-        )
+        merged = _attach_columns_schema_preserving(df_full, attach_cols, key_col, allow_overwrite=yes)
         write_generic(
             ictx["file"],
             merged,
@@ -847,7 +751,6 @@ def cmd_fit(
     _print_fit_summary(labels, run_alias, size_counts)
     # ---- Records sink (Markdown) ----
     try:
-
         effective = {
             "command": "fit",
             "job": job or None,
@@ -869,9 +772,7 @@ def cmd_fit(
 
 
 def _print_fit_summary(labels: np.ndarray, name: str, size_counts: dict):
-    tbl = Table(
-        title=f"Fit summary — {name}", show_lines=False, header_style="bold cyan"
-    )
+    tbl = Table(title=f"Fit summary — {name}", show_lines=False, header_style="bold cyan")
     tbl.add_column("Cluster", justify="right")
     tbl.add_column("Count", justify="right")
     for cl, ct in sorted(size_counts.items(), key=lambda kv: (-kv[1], kv[0])):
@@ -892,8 +793,7 @@ def cmd_delete_columns(
     name: List[str] = typer.Option(
         [],
         "--name",
-        help="Delete columns for this fit alias (repeatable). "
-        "Matches cluster__<name> and cluster__<name>__*",
+        help="Delete columns for this fit alias (repeatable). Matches cluster__<name> and cluster__<name>__*",
     ),
     column: List[str] = typer.Option(
         [],
@@ -902,29 +802,21 @@ def cmd_delete_columns(
     ),
     # Execution controls
     write: bool = typer.Option(False, help="Apply changes (default is dry-run)"),
-    yes: bool = typer.Option(
-        False, "-y", "--yes", help="Skip interactive confirmation"
-    ),
+    yes: bool = typer.Option(False, "-y", "--yes", help="Skip interactive confirmation"),
     inplace: bool = typer.Option(
         False,
         help="For generic files: rewrite the input file in place (backs up to .bak)",
     ),
-    out: Optional[str] = typer.Option(
-        None, help="For generic files: write to this output path instead of --inplace"
-    ),
+    out: Optional[str] = typer.Option(None, help="For generic files: write to this output path instead of --inplace"),
 ):
     # Resolve context
     ictx, _ = _context_and_df(dataset, file, usr_root, columns=None)
     console.rule("[bold]cluster delete-columns[/]")
-    console.log(
-        f"Input: kind={ictx['kind']} ref={ictx.get('dataset') or ictx.get('file')}"
-    )
+    console.log(f"Input: kind={ictx['kind']} ref={ictx.get('dataset') or ictx.get('file')}")
 
     # ---------- Build deletion set ----------
     if sum(bool(x) for x in [all_, bool(name), bool(column)]) != 1:
-        raise typer.BadParameter(
-            "Choose exactly one: --all OR --name ... OR --column ..."
-        )
+        raise typer.BadParameter("Choose exactly one: --all OR --name ... OR --column ...")
 
     cols = peek_columns(ictx)
     # Always work with **top‑level** names (peek_columns already returns them for Parquet).
@@ -937,21 +829,14 @@ def cmd_delete_columns(
     elif name:
         name = [slugify(n) for n in name]
         prefixes = [f"cluster__{n}" for n in name]
-        to_delete = [
-            c
-            for c in cluster_cols
-            if any(c == p or c.startswith(p + "__") for p in prefixes)
-        ]
+        to_delete = [c for c in cluster_cols if any(c == p or c.startswith(p + "__") for p in prefixes)]
         reason = "name=" + ",".join(name)
     else:
         # Normalize any dotted leaf paths to their top‑level parent
         normalized_requested = [c.split(".", 1)[0] for c in column]
         bad = [c for c in normalized_requested if not c.startswith("cluster__")]
         if bad:
-            raise typer.BadParameter(
-                "Only 'cluster__*' columns can be deleted; offending: "
-                + ", ".join(bad[:6])
-            )
+            raise typer.BadParameter("Only 'cluster__*' columns can be deleted; offending: " + ", ".join(bad[:6]))
         # Only delete columns that actually exist
         to_delete = [c for c in normalized_requested if c in cluster_cols]
         missing = [c for c in normalized_requested if c not in cols]
@@ -964,9 +849,7 @@ def cmd_delete_columns(
         reason = "explicit columns"
 
     if not to_delete:
-        console.print(
-            "[green]Nothing to delete[/green]: no matching cluster__ columns found."
-        )
+        console.print("[green]Nothing to delete[/green]: no matching cluster__ columns found.")
         raise typer.Exit(code=0)
 
     # ---------- Preview ----------
@@ -981,31 +864,21 @@ def cmd_delete_columns(
 
     # ---------- Confirmation ----------
     if not yes:
-        if not typer.confirm(
-            f"Are you sure you want to permanently delete {len(to_delete)} column(s)?"
-        ):
+        if not typer.confirm(f"Are you sure you want to permanently delete {len(to_delete)} column(s)?"):
             console.print("Aborted by user.")
             raise typer.Exit(code=1)
 
     if not write:
-        console.print(
-            "[yellow]Dry-run[/yellow]: no changes applied. Re-run with --write to proceed."
-        )
+        console.print("[yellow]Dry-run[/yellow]: no changes applied. Re-run with --write to proceed.")
         raise typer.Exit(code=0)
 
     # ---------- Execute ----------
     if ictx["kind"] == "usr":
         drop_usr_columns(ictx["usr_root"], ictx["dataset"], to_delete)
-        console.print(
-            f"[green]Removed[/green] {len(to_delete)} column(s) from USR dataset '{ictx['dataset']}'."
-        )
+        console.print(f"[green]Removed[/green] {len(to_delete)} column(s) from USR dataset '{ictx['dataset']}'.")
     else:
         # Generic files: load, drop, write back (with backup if --inplace)
-        df = (
-            pd.read_parquet(ictx["file"])
-            if ictx["kind"] == "parquet"
-            else pd.read_csv(ictx["file"])
-        )
+        df = pd.read_parquet(ictx["file"]) if ictx["kind"] == "parquet" else pd.read_csv(ictx["file"])
         missing_at_exec = [c for c in to_delete if c not in df.columns]
         if missing_at_exec:
             console.print(
@@ -1026,9 +899,7 @@ def cmd_delete_columns(
             out=(Path(out) if out else None),
             backup_suffix=".bak",
         )
-        console.print(
-            f"[green]Wrote[/green] updated file ({'inplace' if inplace else 'out=' + str(out)})."
-        )
+        console.print(f"[green]Wrote[/green] updated file ({'inplace' if inplace else 'out=' + str(out)}).")
 
     # ---------- Recap ----------
     recap = Table(title="Deleted columns recap", header_style="bold cyan")
@@ -1049,27 +920,17 @@ def cmd_umap(
     dataset: Optional[str] = typer.Option(None),
     file: Optional[str] = typer.Option(None),
     usr_root: Optional[str] = typer.Option(None),
-    name: Optional[str] = typer.Option(
-        None, help="Existing fit alias to associate UMAP with (uses same rows)."
-    ),
+    name: Optional[str] = typer.Option(None, help="Existing fit alias to associate UMAP with (uses same rows)."),
     key_col: str = typer.Option("id"),
     x_col: Optional[str] = typer.Option(None),
     x_cols: Optional[str] = typer.Option(None),
     neighbors: Optional[int] = typer.Option(None, help="Falls back to preset or 15"),
     min_dist: Optional[float] = typer.Option(None, help="Falls back to preset or 0.10"),
-    metric: Optional[str] = typer.Option(
-        None, help='Falls back to preset or "euclidean"'
-    ),
+    metric: Optional[str] = typer.Option(None, help='Falls back to preset or "euclidean"'),
     random_state: Optional[int] = typer.Option(None, help="Falls back to preset or 42"),
-    preset: Optional[str] = typer.Option(
-        None, help="Preset (kind: 'umap' and optional 'plot')"
-    ),
-    color_by: List[str] = typer.Option(
-        ["cluster"], help="Hue specs (repeatable). Includes 'highlight'."
-    ),
-    highlight: Optional[str] = typer.Option(
-        None, help="CSV/Parquet with ids to highlight (first column or 'id')."
-    ),
+    preset: Optional[str] = typer.Option(None, help="Preset (kind: 'umap' and optional 'plot')"),
+    color_by: List[str] = typer.Option(["cluster"], help="Hue specs (repeatable). Includes 'highlight'."),
+    highlight: Optional[str] = typer.Option(None, help="CSV/Parquet with ids to highlight (first column or 'id')."),
     highlight_topn: Optional[int] = typer.Option(
         None,
         help="Highlight Top-N rows from the primary table by ranking a numeric column (use with --highlight-topn-col).",
@@ -1088,15 +949,9 @@ def cmd_umap(
         help="Optional. If set, color highlights categorically by this column from the --highlight file "
         "(e.g., 'observed_round'). Integers are treated as categories.",
     ),
-    alpha: Optional[float] = typer.Option(
-        None, help="Point alpha (overrides job/preset)."
-    ),
-    size: Optional[float] = typer.Option(
-        None, help="Point size (overrides job/preset)."
-    ),
-    dims: Optional[str] = typer.Option(
-        None, help="Figure size 'W,H' (overrides job/preset)."
-    ),
+    alpha: Optional[float] = typer.Option(None, help="Point alpha (overrides job/preset)."),
+    size: Optional[float] = typer.Option(None, help="Point size (overrides job/preset)."),
+    dims: Optional[str] = typer.Option(None, help="Figure size 'W,H' (overrides job/preset)."),
     font_scale: Optional[float] = typer.Option(
         None,
         help="Scale all plot fonts (1.0 = default). Overrides preset.plot.font_scale if set.",
@@ -1110,9 +965,7 @@ def cmd_umap(
         help="OPAL run selector: 'latest', 'round:<n>', or 'run_id:<rid>' "
         "(mutually exclusive with --opal-as-of-round).",
     ),
-    opal_as_of_round: Optional[int] = typer.Option(
-        None, help="Filter OPAL predictions to this round"
-    ),
+    opal_as_of_round: Optional[int] = typer.Option(None, help="Filter OPAL predictions to this round"),
     opal_fields: Optional[str] = typer.Option(
         None,
         help="Comma-separated OPAL prediction fields to join (e.g., pred__y_obj_scalar,obj__logic_fidelity,obj__effect_scaled).",  # noqa
@@ -1141,9 +994,7 @@ def cmd_umap(
     usr_root = usr_root or jp.get("usr_root")
     name = name or jp.get("name")
     if not name:
-        raise typer.BadParameter(
-            "UMAP requires a fit alias. Provide --name or set params.name in the job YAML."
-        )
+        raise typer.BadParameter("UMAP requires a fit alias. Provide --name or set params.name in the job YAML.")
     key_col = key_col or jp.get("key_col", "id")
     x_col = x_col or jp.get("x_col")
     if x_col:
@@ -1160,9 +1011,7 @@ def cmd_umap(
     highlight = highlight or jp.get("highlight")
     highlight_hue_col = highlight_hue_col or jp.get("highlight_hue_col")
     # BUGFIX: read highlight_topn knobs from job params
-    highlight_topn = (
-        highlight_topn if highlight_topn is not None else jp.get("highlight_topn")
-    )
+    highlight_topn = highlight_topn if highlight_topn is not None else jp.get("highlight_topn")
     highlight_topn_col = highlight_topn_col or jp.get("highlight_topn_col")
     highlight_topn_asc = bool(highlight_topn_asc or jp.get("highlight_topn_asc", False))
     alpha = alpha if alpha is not None else jp.get("alpha")
@@ -1173,9 +1022,7 @@ def cmd_umap(
     opal_run = opal_run or jp.get("opal_run")
     opal_as_of_round = opal_as_of_round or jp.get("opal_as_of_round")
     opal_fields = opal_fields or (
-        ",".join(jp["opal_fields"])
-        if isinstance(jp.get("opal_fields"), (list, tuple))
-        else jp.get("opal_fields")
+        ",".join(jp["opal_fields"]) if isinstance(jp.get("opal_fields"), (list, tuple)) else jp.get("opal_fields")
     )
     attach_coords = bool(attach_coords or jp.get("attach_coords", False))
     out_plot = out_plot or jp.get("out_plot")
@@ -1194,11 +1041,7 @@ def cmd_umap(
     neighbors = neighbors if neighbors is not None else int(p_umap.get("neighbors", 15))
     min_dist = min_dist if min_dist is not None else float(p_umap.get("min_dist", 0.10))
     metric = metric if metric is not None else str(p_umap.get("metric", "euclidean"))
-    random_state = (
-        random_state
-        if random_state is not None
-        else int(p_umap.get("random_state", 42))
-    )
+    random_state = random_state if random_state is not None else int(p_umap.get("random_state", 42))
 
     # ---------- Plot preset & OPAL preflight (join before hue validation) ----------
     # Resolve presets first so --preset plot.* can inject color_by
@@ -1250,9 +1093,7 @@ def cmd_umap(
         raise typer.Exit(code=2)
     h = None
     if highlight and highlight_topn:
-        raise typer.BadParameter(
-            "Use either --highlight (file) OR --highlight-topn, not both."
-        )
+        raise typer.BadParameter("Use either --highlight (file) OR --highlight-topn, not both.")
     if highlight:
         h = _load_highlight_ids_from_file(
             highlight,
@@ -1265,22 +1106,16 @@ def cmd_umap(
         if not highlight_topn_col:
             raise typer.BadParameter("--highlight-topn requires --highlight-topn-col.")
         if highlight_hue_col:
-            console.print(
-                "[yellow]Note[/yellow]: --highlight-hue-col is ignored when using --highlight-topn."
-            )
+            console.print("[yellow]Note[/yellow]: --highlight-hue-col is ignored when using --highlight-topn.")
         if highlight_topn <= 0:
             raise typer.BadParameter("--highlight-topn must be a positive integer.")
         if highlight_topn_col not in df.columns:
-            raise typer.BadParameter(
-                f"--highlight-topn-col '{highlight_topn_col}' not found in the table."
-            )
+            raise typer.BadParameter(f"--highlight-topn-col '{highlight_topn_col}' not found in the table.")
         # Strict numeric; we drop non-finite with a concise log (explicit behavior)
         try:
             s = pd.to_numeric(df[highlight_topn_col], errors="raise")
         except Exception as e:
-            raise typer.BadParameter(
-                f"--highlight-topn-col '{highlight_topn_col}' is not numeric: {e}"
-            )
+            raise typer.BadParameter(f"--highlight-topn-col '{highlight_topn_col}' is not numeric: {e}")
         arr = s.to_numpy(dtype="float64", copy=False)
         nonfinite = ~np.isfinite(arr)
         if nonfinite.any():
@@ -1322,9 +1157,7 @@ def cmd_umap(
             )
             raise typer.Exit(code=2)
         if opal_run and opal_as_of_round is not None:
-            raise typer.BadParameter(
-                "Use only one of --opal-run or --opal-as-of-round, not both."
-            )
+            raise typer.BadParameter("Use only one of --opal-run or --opal-as-of-round, not both.")
         from ..opal.join import (
             join_fields as _opal_join,
         )
@@ -1355,12 +1188,9 @@ def cmd_umap(
         # Assert post-join coverage and show discoverable alternatives if something is missing
         missing_after = [c for c in opal_needed_fields if c not in df.columns]
         if missing_after:
-            avail = _opal_list(
-                camp, run_selector=(opal_run or "latest"), as_of_round=opal_as_of_round
-            )[:60]
+            avail = _opal_list(camp, run_selector=(opal_run or "latest"), as_of_round=opal_as_of_round)[:60]
             console.print(
-                "[red]Error[/red]: OPAL join did not provide the requested column(s): "
-                + ", ".join(missing_after)
+                "[red]Error[/red]: OPAL join did not provide the requested column(s): " + ", ".join(missing_after)
             )
             console.print(
                 "Available OPAL columns for this run/round include: "
@@ -1373,9 +1203,7 @@ def cmd_umap(
     # read derive_ratio from job params if not passed via CLI
     if not derive_ratio and jp.get("derive_ratio"):
         derive_ratio = (
-            list(jp["derive_ratio"])
-            if isinstance(jp["derive_ratio"], (list, tuple))
-            else [str(jp["derive_ratio"])]
+            list(jp["derive_ratio"]) if isinstance(jp["derive_ratio"], (list, tuple)) else [str(jp["derive_ratio"])]
         )
 
     # Optional derived ratio columns: NUM / DEN (strict checks; explicit behavior)
@@ -1395,9 +1223,7 @@ def cmd_umap(
                 num = pd.to_numeric(df[num_col], errors="raise")
                 den = pd.to_numeric(df[den_col], errors="raise")
             except Exception as e:
-                raise typer.BadParameter(
-                    f"--derive-ratio: numeric coercion failed: {e}"
-                )
+                raise typer.BadParameter(f"--derive-ratio: numeric coercion failed: {e}")
             with np.errstate(divide="ignore", invalid="ignore"):
                 ratio = num / den
             nf = ~np.isfinite(ratio.to_numpy(dtype="float64", copy=False))
@@ -1440,9 +1266,7 @@ def cmd_umap(
         )
         prog.update(t_build, completed=1)
         t_umap = prog.add_task("Computing UMAP...", total=None)
-        coords = umap_compute(
-            X, neighbors=neighbors, min_dist=min_dist, metric=metric, seed=random_state
-        )
+        coords = umap_compute(X, neighbors=neighbors, min_dist=min_dist, metric=metric, seed=random_state)
         prog.update(t_umap, completed=1)
     # Prepare plot
     # Figure dims: accept "W,H" string or [W,H] list
@@ -1462,9 +1286,7 @@ def cmd_umap(
         legend["ncol"] = int(_legend["ncol"])
     if "bbox" in _legend:
         bbox = _legend["bbox"]
-        legend["bbox"] = (
-            tuple(bbox[:2]) if isinstance(bbox, (list, tuple)) else (1.05, 1.0)
-        )
+        legend["bbox"] = tuple(bbox[:2]) if isinstance(bbox, (list, tuple)) else (1.05, 1.0)
     else:
         legend["bbox"] = (1.05, 1.0)
     if "max_items" in _legend:
@@ -1482,9 +1304,7 @@ def cmd_umap(
                 out[k] = v
         return out
 
-    highlight_style = _deep_merge(
-        _plot_defaults.get("highlight", {}), p_plot.get("highlight", {})
-    )
+    highlight_style = _deep_merge(_plot_defaults.get("highlight", {}), p_plot.get("highlight", {}))
     highlight_style = _deep_merge(highlight_style, jp_plot.get("highlight", {}))
     # If the job/preset provides a categorical palette for highlight categories, pass it through.
     # Accepted forms: a mapping {category: color}, or a palette name (string) resolved in plotting.
@@ -1506,9 +1326,7 @@ def cmd_umap(
         libs={},
     ).hash()
     udir = umap_dir(run_dir, "<flat>")
-    out_path = (
-        Path(out_plot) if out_plot else (udir / f"{name}.png")
-    )  # base; .<label>.png appended
+    out_path = Path(out_plot) if out_plot else (udir / f"{name}.png")  # base; .<label>.png appended
     umap_scatter(
         coords,
         df if df.index.name == "id" else df.set_index(key_col, drop=False),
@@ -1601,17 +1419,14 @@ def cmd_umap(
             except Exception as e:
                 if "Columns already exist" in str(e) and not yes:
                     console.print(
-                        "[red]Columns already exist[/red] for attachment. "
-                        "Re-run with `-y/--allow-overwrite`."
+                        "[red]Columns already exist[/red] for attachment. Re-run with `-y/--allow-overwrite`."
                     )
                     raise typer.Exit(code=2)
                 raise
             console.print("[green]Attached[/green] columns to USR dataset.")
         else:
             full_df = load_table(ictx)
-            merged = _attach_columns_schema_preserving(
-                full_df, cols, "id", allow_overwrite=yes
-            )
+            merged = _attach_columns_schema_preserving(full_df, cols, "id", allow_overwrite=yes)
             write_generic(
                 ictx["file"],
                 merged,
@@ -1716,9 +1531,7 @@ def cmd_analyze(
     job: Optional[str] = typer.Option(None, help="Path to a job YAML for 'analyze'."),
     cluster_col: Optional[str] = typer.Option(None, help="e.g., cluster__perm_v1"),
     group_by: str = typer.Option("source"),
-    preset: Optional[str] = typer.Option(
-        None, help="Preset name (kind: 'analysis') to pre-fill parameters"
-    ),
+    preset: Optional[str] = typer.Option(None, help="Preset name (kind: 'analysis') to pre-fill parameters"),
     out_dir: Optional[str] = typer.Option(
         None, help="If omitted, defaults to batch_results/<FIT>/analysis/<group_by>/"
     ),
@@ -1730,21 +1543,11 @@ def cmd_analyze(
         None,
         help="Comma-separated numeric columns to summarize/plot per cluster (e.g., infer__...__ll_mean,opal__...__latest_pred_scalar,obj__logic_fidelity)",  # noqa
     ),
-    numeric_plots: bool = typer.Option(
-        True, help="Whether to render plots for --numeric"
-    ),
-    font_scale: Optional[float] = typer.Option(
-        None, help="Font scale for analysis plots (overrides job/preset)."
-    ),
-    opal_campaign: Optional[str] = typer.Option(
-        None, help="Optional: OPAL campaign dir or name to join metrics"
-    ),
-    opal_as_of_round: Optional[int] = typer.Option(
-        None, help="Optional: round filter for OPAL join"
-    ),
-    opal_fields: Optional[str] = typer.Option(
-        None, help="If set, join these OPAL fields before analysis"
-    ),
+    numeric_plots: bool = typer.Option(True, help="Whether to render plots for --numeric"),
+    font_scale: Optional[float] = typer.Option(None, help="Font scale for analysis plots (overrides job/preset)."),
+    opal_campaign: Optional[str] = typer.Option(None, help="Optional: OPAL campaign dir or name to join metrics"),
+    opal_as_of_round: Optional[int] = typer.Option(None, help="Optional: round filter for OPAL join"),
+    opal_fields: Optional[str] = typer.Option(None, help="If set, join these OPAL fields before analysis"),
 ):
     from ..analysis.composition import composition as comp_fn
     from ..analysis.differential import differential as diff_fn
@@ -1771,28 +1574,18 @@ def cmd_analyze(
     difffeat = bool(difffeat or jp.get("difffeat", False))
     plots = bool(plots or jp.get("plots", False))
     if not numeric and jp.get("numeric"):
-        numeric = (
-            ",".join(jp["numeric"])
-            if isinstance(jp["numeric"], (list, tuple))
-            else str(jp["numeric"])
-        )
+        numeric = ",".join(jp["numeric"]) if isinstance(jp["numeric"], (list, tuple)) else str(jp["numeric"])
     numeric_plots = bool(jp.get("numeric_plots", numeric_plots))
     font_scale = (
         float(jp.get("font_scale", font_scale))
         if font_scale is not None
-        else (
-            float(jp_plot.get("font_scale"))
-            if jp_plot.get("font_scale") is not None
-            else None
-        )
+        else (float(jp_plot.get("font_scale")) if jp_plot.get("font_scale") is not None else None)
     )
     opal_campaign = opal_campaign or jp.get("opal_campaign")
     opal_as_of_round = opal_as_of_round or jp.get("opal_as_of_round")
     if not opal_fields and jp.get("opal_fields"):
         opal_fields = (
-            ",".join(jp["opal_fields"])
-            if isinstance(jp["opal_fields"], (list, tuple))
-            else str(jp["opal_fields"])
+            ",".join(jp["opal_fields"]) if isinstance(jp["opal_fields"], (list, tuple)) else str(jp["opal_fields"])
         )
 
     _, df = _context_and_df(dataset, file, usr_root)
@@ -1805,11 +1598,7 @@ def cmd_analyze(
         group_by_from_preset = p.get("group_by")
         if group_by_from_preset:
             # allow either string or list in YAML
-            group_bys = (
-                [group_by_from_preset]
-                if isinstance(group_by_from_preset, str)
-                else list(group_by_from_preset)
-            )
+            group_bys = [group_by_from_preset] if isinstance(group_by_from_preset, str) else list(group_by_from_preset)
         else:
             group_bys = [group_by]
         composition = composition or bool(p.get("composition", False))
@@ -1818,18 +1607,12 @@ def cmd_analyze(
         plots = plots or bool(p.get("plots", False))
         # numeric can come as a list in YAML
         if not numeric and p.get("numeric"):
-            numeric = (
-                ",".join(p["numeric"])
-                if isinstance(p["numeric"], (list, tuple))
-                else str(p["numeric"])
-            )
+            numeric = ",".join(p["numeric"]) if isinstance(p["numeric"], (list, tuple)) else str(p["numeric"])
         # font_scale + missing policy
         if font_scale is None:
             # precedence: preset.plot.font_scale -> job.plot.font_scale -> CLI
             # jp_plot already considered above; take preset only if still None
-            font_scale = (
-                float(p.get("font_scale")) if p.get("font_scale") is not None else None
-            )
+            font_scale = float(p.get("font_scale")) if p.get("font_scale") is not None else None
         # If still None, use default 1.2
         if font_scale is None:
             font_scale = 1.2
@@ -1839,9 +1622,7 @@ def cmd_analyze(
         opal_as_of_round = opal_as_of_round or p.get("opal_as_of_round")
         if not opal_fields and p.get("opal_fields"):
             opal_fields = (
-                ",".join(p["opal_fields"])
-                if isinstance(p["opal_fields"], (list, tuple))
-                else str(p["opal_fields"])
+                ",".join(p["opal_fields"]) if isinstance(p["opal_fields"], (list, tuple)) else str(p["opal_fields"])
             )
     else:
         group_bys = [group_by]
@@ -1866,9 +1647,7 @@ def cmd_analyze(
         for c in [x.strip() for x in numeric.split(",") if x.strip()]:
             if c.startswith(("obj__", "pred__", "sel__")) and c not in df.columns:
                 needed_from_numeric.add(c)
-    explicit_fields = (
-        {f.strip() for f in opal_fields.split(",")} if opal_fields else set()
-    )
+    explicit_fields = {f.strip() for f in opal_fields.split(",")} if opal_fields else set()
     required_fields = needed_from_numeric | explicit_fields
 
     if required_fields:
@@ -1900,9 +1679,7 @@ def cmd_analyze(
             miss = float(df[c].isna().mean())
             # Only warn when there are actual missings; keep logs compact
             if miss > 0.0:
-                console.print(
-                    f"[yellow]Warning[/yellow]: joined '{c}' has {miss:.1%} missing values."
-                )
+                console.print(f"[yellow]Warning[/yellow]: joined '{c}' has {miss:.1%} missing values.")
         if required_fields:
             console.log("Joined OPAL fields: " + ", ".join(sorted(required_fields)))
 
@@ -1929,24 +1706,16 @@ def cmd_analyze(
     # Run group_by‑dependent analyses; write into the *same* root with filenames namespaced by __by_<group>
     for gb in group_bys:
         if composition:
-            comp_fn(
-                df, cluster_col=cluster_col, group_by=gb, out_dir=out_root, plots=plots
-            )
+            comp_fn(df, cluster_col=cluster_col, group_by=gb, out_dir=out_root, plots=plots)
         if diversity:
-            div_fn(
-                df, cluster_col=cluster_col, group_by=gb, out_dir=out_root, plots=plots
-            )
+            div_fn(df, cluster_col=cluster_col, group_by=gb, out_dir=out_root, plots=plots)
         if difffeat:
             diff_fn(df, cluster_col=cluster_col, group_by=gb, out_dir=out_root)
         console.log(f"Completed group_by='{gb}'.")
     console.print(f"[green]Analyses complete[/green]. Outputs at {out_root}")
     # ---- Records sink (Markdown) ----
     try:
-        fit_name = (
-            cluster_col.split("__", 1)[1]
-            if cluster_col.startswith("cluster__")
-            else "analysis"
-        )
+        fit_name = cluster_col.split("__", 1)[1] if cluster_col.startswith("cluster__") else "analysis"
         run_dir = runs_root() / fit_name
         payload = {
             "command": "analyze",
@@ -2008,9 +1777,7 @@ def cmd_intra_sim(
         )
         prog.update(t, completed=1)
     if not write:
-        console.print(
-            "[yellow]Dry-run[/yellow]: computed intra-sim but did not write. Use --write to attach."
-        )
+        console.print("[yellow]Dry-run[/yellow]: computed intra-sim but did not write. Use --write to attach.")
 
         raise typer.Exit(code=0)
     cols = pd.DataFrame({"id": df["id"].astype(str), out_col: s})
@@ -2019,10 +1786,7 @@ def cmd_intra_sim(
             attach_usr(ictx["usr_root"], ictx["dataset"], cols, allow_overwrite=yes)
         except Exception as e:
             if "Columns already exist" in str(e) and not yes:
-                console.print(
-                    "[red]Columns already exist[/red]. Re-run with "
-                    "`-y/--allow-overwrite`."
-                )
+                console.print("[red]Columns already exist[/red]. Re-run with `-y/--allow-overwrite`.")
                 raise typer.Exit(code=2)
             raise
         console.print("[green]Attached[/green] intra-sim to USR dataset.")

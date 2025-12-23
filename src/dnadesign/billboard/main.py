@@ -38,9 +38,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     # Configure logging
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
     logger.info("Starting billboard pipeline")
 
     # Load config
@@ -95,9 +93,7 @@ def main():
 
     # Generate summaries & plots
     if dry_run:
-        logger.info(
-            "Dry run enabled: skipping plots, writing only diversity_summary.csv"
-        )
+        logger.info("Dry run enabled: skipping plots, writing only diversity_summary.csv")
         generate_entropy_summary_csv(results, csv_dir)
     else:
         logger.info("Writing CSV summaries")

@@ -54,8 +54,7 @@ def _coerce_numeric(
                     rec["sequence"] = r["sequence"]
                 offenders.append(rec)
             raise TypeError(
-                f"Column '{c}' is not numeric. Non‑numeric values={int(bad.sum())}. "
-                f"First offenders: {offenders}"
+                f"Column '{c}' is not numeric. Non‑numeric values={int(bad.sum())}. First offenders: {offenders}"
             ) from e
         arr = out[c].to_numpy(dtype="float64", copy=False)
         nf = ~np.isfinite(arr)
@@ -88,15 +87,10 @@ def _coerce_numeric(
                 )
             # missing_policy == "drop_and_log": mark non‑finite as NaN; summaries/plots skip them
             if log_fn is not None:
-                sample_ids = (
-                    out.loc[nf, "id"].astype(str).head(6).tolist()
-                    if "id" in out.columns
-                    else []
-                )
+                sample_ids = out.loc[nf, "id"].astype(str).head(6).tolist() if "id" in out.columns else []
                 msg = (
                     f"Metric '{c}': dropping {int(nf.sum())}/{len(out)} row(s) with NaN/Inf "
-                    f"(NaN={n_nan}, +Inf={n_pinf}, -Inf={n_ninf})"
-                    + (f"; e.g., ids={sample_ids}" if sample_ids else "")
+                    f"(NaN={n_nan}, +Inf={n_pinf}, -Inf={n_ninf})" + (f"; e.g., ids={sample_ids}" if sample_ids else "")
                 )
                 try:
                     log_fn(msg)
@@ -182,8 +176,6 @@ def summarize_numeric_by_cluster(
                 plt.xticks(rotation=90)
                 sns.despine(ax=ax, top=True, right=True)
                 fig.tight_layout()
-                fig.savefig(
-                    out_dir / f"numeric_violin__{cluster_col}__{c}.png", dpi=300
-                )
+                fig.savefig(out_dir / f"numeric_violin__{cluster_col}__{c}.png", dpi=300)
                 plt.close(fig)
     return out_dir / f"numeric_summary__{cluster_col}.csv"

@@ -27,9 +27,7 @@ def _compute_gc(seq: str) -> float:
     return float((s.count("G") + s.count("C")) / len(s))
 
 
-def _ensure_numeric_series(
-    df: pd.DataFrame, col: str, *, allow_non_finite: bool = False
-) -> pd.Series:
+def _ensure_numeric_series(df: pd.DataFrame, col: str, *, allow_non_finite: bool = False) -> pd.Series:
     if col not in df.columns:
         raise KeyError(f"Numeric hue column '{col}' not found.")
     s = df[col]
@@ -44,21 +42,13 @@ def _ensure_numeric_series(
         ids = (
             df.index.astype(str)
             if df.index.name == "id"
-            else (
-                df["id"].astype(str)
-                if "id" in df.columns
-                else pd.Series(["?"] * len(df))
-            )
+            else (df["id"].astype(str) if "id" in df.columns else pd.Series(["?"] * len(df)))
         )
-        offenders = pd.DataFrame(
-            {"id": ids[bad_mask], "value": s[bad_mask].astype(str)}
-        )
+        offenders = pd.DataFrame({"id": ids[bad_mask], "value": s[bad_mask].astype(str)})
         sample = offenders.head(15).to_dict(orient="records")
         raise TypeError(
             "Column '{col}' is not numeric. Found {n} non‑numeric value(s). "
-            "Sample offenders (id→value): {sample}".format(
-                col=col, n=int(bad_mask.sum()), sample=sample
-            )
+            "Sample offenders (id→value): {sample}".format(col=col, n=int(bad_mask.sum()), sample=sample)
         ) from e
     # Second: reject NaN/±Inf with detailed context
     arr = s.to_numpy(dtype="float64", copy=False)
@@ -67,11 +57,7 @@ def _ensure_numeric_series(
         ids = (
             df.index.astype(str)
             if df.index.name == "id"
-            else (
-                df["id"].astype(str)
-                if "id" in df.columns
-                else pd.Series(["?"] * len(df))
-            )
+            else (df["id"].astype(str) if "id" in df.columns else pd.Series(["?"] * len(df)))
         )
         n_bad = int(non_finite_mask.sum())
         n_nan = int(np.isnan(arr).sum())
@@ -141,11 +127,7 @@ def _prepare_numeric_hue(
         ids = (
             df.index.astype(str)
             if df.index.name == "id"
-            else (
-                df["id"].astype(str)
-                if "id" in df.columns
-                else _np.array(["?"] * len(df))
-            )
+            else (df["id"].astype(str) if "id" in df.columns else _np.array(["?"] * len(df)))
         )
         offenders = [
             {
@@ -167,17 +149,10 @@ def _prepare_numeric_hue(
         ids = (
             df.index.astype(str)
             if df.index.name == "id"
-            else (
-                df["id"].astype(str)
-                if "id" in df.columns
-                else pd.Series(["?"] * len(df))
-            )
+            else (df["id"].astype(str) if "id" in df.columns else pd.Series(["?"] * len(df)))
         )
         sample = [{"id": str(ids[i])} for i in bad_idx[:6]]
-        msg = (
-            f"Hue '{col}': dropping {int(non_finite_mask.sum())}/{len(df)} row(s) with NaN/Inf "
-            f"(e.g., {sample})."
-        )
+        msg = f"Hue '{col}': dropping {int(non_finite_mask.sum())}/{len(df)} row(s) with NaN/Inf (e.g., {sample})."
         try:
             log_fn(msg)
         except Exception:
@@ -227,9 +202,7 @@ def resolve_hue(
                 raise ValueError(
                     f"Cluster column '{col}' not found; run 'cluster fit' first or choose a different hue."
                 )
-            out.append(
-                ("cluster", {"values": df[col].astype(str), "categorical": True})
-            )
+            out.append(("cluster", {"values": df[col].astype(str), "categorical": True}))
             continue
         if spec == "gc_content":
             if "sequence" not in df.columns:
@@ -253,17 +226,13 @@ def resolve_hue(
         if spec == "intra_sim":
             col = f"cluster__{name}__intra_sim"
             if col not in df.columns:
-                raise ValueError(
-                    f"Intra-sim column '{col}' missing; run 'cluster intra-sim'."
-                )
+                raise ValueError(f"Intra-sim column '{col}' missing; run 'cluster intra-sim'.")
             out.append(("intra_sim", {"values": df[col], "categorical": False}))
             continue
         # numeric:<col> or categorical:<col>
         if spec.startswith("numeric:"):
             col = spec.split(":", 1)[1]
-            s, mask = _prepare_numeric_hue(
-                df, col, missing_policy=missing_policy, log_fn=log_fn
-            )
+            s, mask = _prepare_numeric_hue(df, col, missing_policy=missing_policy, log_fn=log_fn)
             out.append((col, {"values": s, "categorical": False, "mask": mask}))
             continue
         if spec.startswith("categorical:"):
@@ -274,18 +243,11 @@ def resolve_hue(
         if spec == "highlight":
             # Requires highlight ids; no auto-refit/projection for missing ids.
             if not highlight or not highlight.get("ids"):
-                raise ValueError(
-                    "Hue 'highlight' requires --highlight <file> to supply ids."
-                )
-            idx_ids = (
-                df.index.astype(str) if df.index.name == "id" else df["id"].astype(str)
-            )
+                raise ValueError("Hue 'highlight' requires --highlight <file> to supply ids.")
+            idx_ids = df.index.astype(str) if df.index.name == "id" else df["id"].astype(str)
             ids_set = set(map(str, highlight["ids"]))
             # Mode A: categorical highlight if labels are provided (id -> category)
-            if (
-                isinstance(highlight.get("labels"), dict)
-                and len(highlight["labels"]) > 0
-            ):
+            if isinstance(highlight.get("labels"), dict) and len(highlight["labels"]) > 0:
                 labels_map = {str(k): str(v) for k, v in highlight["labels"].items()}
                 vals = np.where(
                     idx_ids.isin(ids_set),
@@ -298,9 +260,7 @@ def resolve_hue(
                         {
                             "values": pd.Series(vals, index=df.index),
                             "categorical": True,
-                            "highlight_categories": list(
-                                sorted(set(labels_map.values()))
-                            ),
+                            "highlight_categories": list(sorted(set(labels_map.values()))),
                             "highlight_by": str(highlight.get("by", "")),
                         },
                     )
@@ -337,24 +297,18 @@ def _normalize_highlight_style(style: Optional[dict], base_size: float) -> dict:
         mul = float(style.get("size_multiplier", 1.6))
         out["size"] = float(base_size) * mul
     overlay_size = style.get("overlay_size", None)
-    out["overlay_size"] = (
-        float(overlay_size) if overlay_size is not None else out["size"]
-    )
+    out["overlay_size"] = float(overlay_size) if overlay_size is not None else out["size"]
     out["alpha"] = float(style.get("alpha", 0.95))
     out["facecolor"] = style.get("facecolor", "none")
     if "ring" in style:
-        out["facecolor"] = (
-            "none" if bool(style["ring"]) else out.get("edgecolor", "red")
-        )
+        out["facecolor"] = "none" if bool(style["ring"]) else out.get("edgecolor", "red")
     out["edgecolor"] = style.get("edgecolor", "red")
     out["linewidth"] = float(style.get("linewidth", 0.9))
     out["marker"] = style.get("marker", "o")
     out["legend"] = bool(style.get("legend", False))
     out["overlay"] = bool(style.get("overlay", True))
     if "palette" in style:
-        out["palette"] = style[
-            "palette"
-        ]  # str (palette name) or dict {category: color}
+        out["palette"] = style["palette"]  # str (palette name) or dict {category: color}
     return out
 
 
@@ -404,9 +358,7 @@ def scatter(
         pal_spec = hstyle.get("palette")
         if isinstance(pal_spec, dict):
             # explicit mapping wins; fill any missing keys deterministically
-            mapped = {
-                str(k): pal_spec[k] for k in pal_spec.keys() if str(k) in categories
-            }
+            mapped = {str(k): pal_spec[k] for k in pal_spec.keys() if str(k) in categories}
             remaining = [c for c in categories if c not in mapped]
             if remaining:
                 cols = sns.color_palette("colorblind", n_colors=len(remaining))
@@ -420,9 +372,7 @@ def scatter(
     # Normalize overlay style once with the *base* size
     hstyle = _normalize_highlight_style(highlight_style, base_size=size)
     # Whether we will overlay highlights on non-'highlight' hues
-    do_overlay = (
-        bool(hi_ids) and bool(overlay_highlight) and bool(hstyle.get("overlay", True))
-    )
+    do_overlay = bool(hi_ids) and bool(overlay_highlight) and bool(hstyle.get("overlay", True))
     for label, obj in hues:
         with rc_context(_font_rc(font_scale)):
             # Keep layout predictable: create a square-ish canvas and
@@ -559,9 +509,7 @@ def scatter(
 
         else:
             vals = np.asarray(obj["values"].iloc[mask_pos], dtype=float)
-            sc = ax.scatter(
-                x[mask_pos], y[mask_pos], c=vals, s=size, alpha=alpha, cmap="viridis"
-            )
+            sc = ax.scatter(x[mask_pos], y[mask_pos], c=vals, s=size, alpha=alpha, cmap="viridis")
             cbar = fig.colorbar(sc, ax=ax)
             cbar.set_label(label, fontsize=_base * 1.4)
             cbar.ax.tick_params(labelsize=_base * 1.2)
@@ -578,12 +526,8 @@ def scatter(
                 # Color‑coded rings per category
                 # Build per‑category overlay masks
                 for cat in hi_categories:
-                    cat_mask = hi_mask & idx_ids.map(
-                        lambda z: hi_labels.get(str(z), None) == cat
-                    )
-                    cat_pos = np.flatnonzero(
-                        cat_mask.values if hasattr(cat_mask, "values") else cat_mask
-                    )
+                    cat_mask = hi_mask & idx_ids.map(lambda z: hi_labels.get(str(z), None) == cat)
+                    cat_pos = np.flatnonzero(cat_mask.values if hasattr(cat_mask, "values") else cat_mask)
                     if len(cat_pos) == 0:
                         continue
                     ax.scatter(
@@ -600,9 +544,7 @@ def scatter(
                     )
             else:
                 # Single‑hue overlay
-                hi_pos = np.flatnonzero(
-                    hi_mask.values if hasattr(hi_mask, "values") else hi_mask
-                )
+                hi_pos = np.flatnonzero(hi_mask.values if hasattr(hi_mask, "values") else hi_mask)
                 if len(hi_pos) > 0:
                     ax.scatter(
                         x[hi_pos],

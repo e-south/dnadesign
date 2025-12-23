@@ -17,9 +17,7 @@ import pandas as pd
 import seaborn as sns
 
 
-def composition(
-    df: pd.DataFrame, cluster_col: str, group_by: str, out_dir: Path, plots: bool
-) -> dict:
+def composition(df: pd.DataFrame, cluster_col: str, group_by: str, out_dir: Path, plots: bool) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     if cluster_col not in df.columns:
         raise KeyError(f"Cluster column '{cluster_col}' not found.")

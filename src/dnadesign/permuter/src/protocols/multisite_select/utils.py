@@ -123,9 +123,7 @@ def is_numeric_vector1d(x: Any, *, min_len: int = 1) -> bool:
         return False
 
 
-def extract_embedding_matrix(
-    series: pd.Series, *, expected_dim: int | None = None
-) -> np.ndarray:
+def extract_embedding_matrix(series: pd.Series, *, expected_dim: int | None = None) -> np.ndarray:
     """
     Coerce each cell to a 1D float vector and stack into [N, D].
 
@@ -137,9 +135,7 @@ def extract_embedding_matrix(
     if expected_dim is not None:
         dims.add(int(expected_dim))
     if len(dims) != 1:
-        raise ValueError(
-            f"inconsistent embedding lengths in column '{series.name}': {sorted(dims)}"
-        )
+        raise ValueError(f"inconsistent embedding lengths in column '{series.name}': {sorted(dims)}")
     return np.stack(vecs, axis=0)
 
 
@@ -206,25 +202,17 @@ def filter_valid_source_rows(
     if llr_col not in df.columns:
         raise KeyError(f"filter_valid_source_rows: missing LLR column {llr_col!r}")
     if epi_col not in df.columns:
-        raise KeyError(
-            f"filter_valid_source_rows: missing epistasis column {epi_col!r}"
-        )
+        raise KeyError(f"filter_valid_source_rows: missing epistasis column {epi_col!r}")
     if aa_col not in df.columns:
-        raise KeyError(
-            f"filter_valid_source_rows: missing AA positions column {aa_col!r}"
-        )
+        raise KeyError(f"filter_valid_source_rows: missing AA positions column {aa_col!r}")
     if emb_col not in df.columns:
-        raise KeyError(
-            f"filter_valid_source_rows: missing embedding column {emb_col!r}"
-        )
+        raise KeyError(f"filter_valid_source_rows: missing embedding column {emb_col!r}")
 
     mask_llr = df[llr_col].notna()
     try:
         epi = df[epi_col].astype("float64")
     except Exception as e:
-        raise TypeError(
-            f"filter_valid_source_rows: epistasis column {epi_col!r} is not numeric"
-        ) from e
+        raise TypeError(f"filter_valid_source_rows: epistasis column {epi_col!r} is not numeric") from e
     mask_epi_notna = epi.notna()
     mask_epi_nonneg = epi >= 0.0
     mask_aa = df[aa_col].notna()
@@ -309,15 +297,12 @@ def build_mutated_aa_sequences(
                     continue
                 m = _MUT_RE.match(t)
                 if not m:
-                    raise ValueError(
-                        f"build_mutated_aa_sequences: malformed token {t!r}"
-                    )
+                    raise ValueError(f"build_mutated_aa_sequences: malformed token {t!r}")
                 _ref, pos_s, alt = m.groups()
                 pos = int(pos_s)
                 if not (1 <= pos <= L):
                     raise ValueError(
-                        "build_mutated_aa_sequences: position "
-                        f"{pos} out of range for reference length {L}"
+                        f"build_mutated_aa_sequences: position {pos} out of range for reference length {L}"
                     )
                 # Apply the mutation (1-indexed positions)
                 seq[pos - 1] = alt.upper()
@@ -467,22 +452,15 @@ def summarize_mutation_window(
         all_positions.extend(ints)
 
     if not all_positions:
-        raise ValueError(
-            "summarize_mutation_window: no mutated positions found in aa_pos_lists"
-        )
+        raise ValueError("summarize_mutation_window: no mutated positions found in aa_pos_lists")
 
     start_pos = min(all_positions)
     end_pos = max(all_positions)
 
     if start_pos <= 0:
-        raise ValueError(
-            f"summarize_mutation_window: minimum position {start_pos} must be ≥ 1"
-        )
+        raise ValueError(f"summarize_mutation_window: minimum position {start_pos} must be ≥ 1")
     if end_pos > L:
-        raise ValueError(
-            f"summarize_mutation_window: maximum position {end_pos} exceeds "
-            f"reference length {L}"
-        )
+        raise ValueError(f"summarize_mutation_window: maximum position {end_pos} exceeds reference length {L}")
 
     # AA-level flanks (1-indexed)
     left_start = max(1, start_pos - flank_width)
@@ -515,14 +493,9 @@ def summarize_mutation_window(
         ref_nt = str(ref_nt_seq)
         L_nt = len(ref_nt)
         if L_nt == 0:
-            raise ValueError(
-                "summarize_mutation_window: reference nucleotide sequence is empty"
-            )
+            raise ValueError("summarize_mutation_window: reference nucleotide sequence is empty")
         if L_nt % 3 != 0:
-            raise ValueError(
-                f"summarize_mutation_window: nucleotide reference length {L_nt} "
-                "is not a multiple of 3"
-            )
+            raise ValueError(f"summarize_mutation_window: nucleotide reference length {L_nt} is not a multiple of 3")
         if L_nt // 3 != L:
             raise ValueError(
                 "summarize_mutation_window: nucleotide reference length "
@@ -605,14 +578,9 @@ def compute_mutation_window_indices_nt(
     """
     L_nt = int(seq_length_nt)
     if L_nt <= 0:
-        raise ValueError(
-            "compute_mutation_window_indices_nt: seq_length_nt must be > 0"
-        )
+        raise ValueError("compute_mutation_window_indices_nt: seq_length_nt must be > 0")
     if L_nt % 3 != 0:
-        raise ValueError(
-            "compute_mutation_window_indices_nt: seq_length_nt "
-            f"{L_nt} is not divisible by 3"
-        )
+        raise ValueError(f"compute_mutation_window_indices_nt: seq_length_nt {L_nt} is not divisible by 3")
     n_codons = L_nt // 3
 
     all_positions: list[int] = []
@@ -621,19 +589,13 @@ def compute_mutation_window_indices_nt(
         all_positions.extend(ints)
 
     if not all_positions:
-        raise ValueError(
-            "compute_mutation_window_indices_nt: no mutated positions found "
-            "in aa_pos_lists"
-        )
+        raise ValueError("compute_mutation_window_indices_nt: no mutated positions found in aa_pos_lists")
 
     start_pos = min(all_positions)
     end_pos = max(all_positions)
 
     if start_pos <= 0:
-        raise ValueError(
-            f"compute_mutation_window_indices_nt: minimum position {start_pos} "
-            "must be ≥ 1"
-        )
+        raise ValueError(f"compute_mutation_window_indices_nt: minimum position {start_pos} must be ≥ 1")
     if end_pos > n_codons:
         raise ValueError(
             "compute_mutation_window_indices_nt: maximum position "
@@ -671,9 +633,7 @@ def uppercase_mutated_codons(
     if L == 0:
         return seq
     if L % 3 != 0:
-        raise ValueError(
-            f"uppercase_mutated_codons: sequence length {L} is not a multiple of 3"
-        )
+        raise ValueError(f"uppercase_mutated_codons: sequence length {L} is not a multiple of 3")
 
     bases = list(seq.lower())
     for pos in aa_positions or []:
@@ -683,9 +643,7 @@ def uppercase_mutated_codons(
         start = 3 * (i - 1)
         end = start + 3
         if end > L:
-            raise ValueError(
-                f"uppercase_mutated_codons: AA position {i} maps beyond sequence length {L}"
-            )
+            raise ValueError(f"uppercase_mutated_codons: AA position {i} maps beyond sequence length {L}")
         for j in range(start, end):
             bases[j] = bases[j].upper()
     return "".join(bases)

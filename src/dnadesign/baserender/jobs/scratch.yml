@@ -14,7 +14,7 @@ input:
     offset_mode: auto              # accept either 0-based or 1-based if offset is provided
     require_non_empty: false
     min_per_record: 1              # at least one parsed annotation
-    require_non_null_cols:   
+    require_non_null_cols:
 
 # explicit selection from a CSV
 selection:
@@ -49,7 +49,7 @@ style:
   baseline_spacing: 40.0   # distance between forward & reverse baselines
   padding_y: 05.0          # top/bottom padding; increases natural frame height
   legend_height_px: 16.0   # reserved space; prevents overlap
-  legend_pad_px: 10.0      # bottom margin below legend 
+  legend_pad_px: 10.0      # bottom margin below legend
   legend: true
   font_size_seq: 14
   font_size_label: 12

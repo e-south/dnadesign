@@ -123,10 +123,7 @@ def _infer_input_name(inputs_cfg: list[dict]) -> str:
     if not inputs_cfg:
         return "densegen"
     first = inputs_cfg[0] or {}
-    name = (
-        first.get("name")
-        or Path(first.get("path", first.get("dataset", "densegen"))).stem
-    )
+    name = first.get("name") or Path(first.get("path", first.get("dataset", "densegen"))).stem
     return _sanitize_filename(str(name))
 
 
@@ -150,16 +147,14 @@ def validate_config(cfg: dict) -> None:
     _require("backend" in solver and solver["backend"], "solver.backend is required.")
     gen = cfg.get("generation", {})
     _require("sequence_length" in gen, "generation.sequence_length is required.")
-    _require(
-        "quota" in gen, "generation.quota is required (total target across the plan)."
-    )
+    _require("quota" in gen, "generation.quota is required (total target across the plan).")
     # Plan semantics
     if "plan" in gen and gen["plan"]:
         for item in gen["plan"]:
             _require("name" in item, "Each plan item must have a name.")
             _require(
                 ("quota" in item) or ("fraction" in item),
-                f"Plan item '{item.get('name','?')}' must have quota or fraction.",
+                f"Plan item '{item.get('name', '?')}' must have quota or fraction.",
             )
     # Plot key sanity (optional)
     plots = cfg.get("plots") or cfg.get("plot")
@@ -170,9 +165,7 @@ def validate_config(cfg: dict) -> None:
                 "`plots.default` must be a list of plot names.",
             )
         if "out_dir" in plots:
-            _require(
-                isinstance(plots["out_dir"], (str, Path)), "`plots.out_dir` invalid."
-            )
+            _require(isinstance(plots["out_dir"], (str, Path)), "`plots.out_dir` invalid.")
     # Logging
     log_cfg = cfg.get("logging", {})
     _require("level" in log_cfg, "logging.level is required.")
@@ -221,13 +214,9 @@ def _build_quota_plan(dcfg: dict) -> List[dict]:
                 }
             )
         total_quota = int(gen.get("quota", 0))
-        frac_items = [
-            p for p in plan if p.get("fraction") is not None and p.get("quota") is None
-        ]
+        frac_items = [p for p in plan if p.get("fraction") is not None and p.get("quota") is None]
         if frac_items:
-            _require(
-                total_quota > 0, "Plan uses fractions but generation.quota is not set."
-            )
+            _require(total_quota > 0, "Plan uses fractions but generation.quota is not set.")
             used = sum(int(p["quota"]) for p in plan if p.get("quota") is not None)
             remain = max(0, total_quota - used)
             left = remain
@@ -300,9 +289,7 @@ def _compute_used_tf_info(sol, library_for_opt, tfbs_parts, fixed_elements):
         else:
             tf, tfbs = "", meta
         used_simple.append(meta)
-        used_detail.append(
-            {"tf": tf, "tfbs": tfbs, "orientation": orientation, "offset": int(offset)}
-        )
+        used_detail.append({"tf": tf, "tfbs": tfbs, "orientation": orientation, "offset": int(offset)})
         counts[tf] = counts.get(tf, 0) + 1
         used_tf_set.add(tf)
     return used_simple, used_detail, counts, sorted(used_tf_set)
@@ -328,9 +315,7 @@ def _derive_meta(
 ) -> dict:
     return {
         "plan": plan_name,
-        "tf_list": (
-            sorted({p.split(":", 1)[0] for p in tfbs_parts}) if tfbs_parts else []
-        ),
+        "tf_list": (sorted({p.split(":", 1)[0] for p in tfbs_parts}) if tfbs_parts else []),
         "tfbs_parts": tfbs_parts or [],
         "used_tfbs": used_tfbs,
         "used_tfbs_detail": used_tfbs_detail,
@@ -344,9 +329,7 @@ def _derive_meta(
         "diverse": bool(use_diverse),
         "library_size": len(library_for_opt),
         "sequence_length": seq_len,
-        "promoter_constraint": (
-            (fixed_elements or {}).get("promoter_constraints") or [{}]
-        )[0].get("name"),
+        "promoter_constraint": ((fixed_elements or {}).get("promoter_constraints") or [{}])[0].get("name"),
         "gap_fill_used": gap_meta.get("used", False),
         "gap_fill_bases": gap_meta.get("bases"),
         "gap_fill_end": gap_meta.get("end"),
@@ -368,10 +351,7 @@ def _process_plan_for_source(
     one_subsample_only: bool = False,
     already_generated: int = 0,
 ) -> int:
-    source_label = (
-        source_cfg.get("name")
-        or Path(source_cfg.get("path", source_cfg.get("dataset", "input"))).stem
-    )
+    source_label = source_cfg.get("name") or Path(source_cfg.get("path", source_cfg.get("dataset", "input"))).stem
     plan_name = plan_item["name"]
     quota = int(plan_item["quota"])
 
@@ -402,9 +382,7 @@ def _process_plan_for_source(
     max_dupes = int(runtime_cfg.get("max_duplicate_solutions", 3))
     max_resample_attempts = int(runtime_cfg.get("max_resample_attempts", 50))
     stall_seconds = int(runtime_cfg.get("stall_seconds_before_resample", 30))
-    stall_warn_every = int(
-        runtime_cfg.get("stall_warning_every_seconds", max(15, stall_seconds // 2))
-    )
+    stall_warn_every = int(runtime_cfg.get("stall_warning_every_seconds", max(15, stall_seconds // 2)))
 
     post = global_cfg.get("postprocess", {}) or {}
     fill_gap = bool(post.get("fill_gap", False))
@@ -439,9 +417,7 @@ def _process_plan_for_source(
     else:
         all_sequences = [s for s in data_entries]
         _require(all_sequences, f"No sequences found for source {source_label}")
-        take = min(
-            max(1, int(sampling_cfg.get("subsample_size", 16))), len(all_sequences)
-        )
+        take = min(max(1, int(sampling_cfg.get("subsample_size", 16))), len(all_sequences))
         import random as _random
 
         library_for_opt = _random.sample(all_sequences, take)
@@ -501,9 +477,7 @@ def _process_plan_for_source(
 
             for sol in generator:
                 now = time.monotonic()
-                if (now - subsample_started >= stall_seconds) and (
-                    produced_this_library == 0
-                ):
+                if (now - subsample_started >= stall_seconds) and (produced_this_library == 0):
                     log.info(
                         "[%s/%s] Stall (> %ds) with no solutions; will resample.",
                         source_label,
@@ -511,9 +485,7 @@ def _process_plan_for_source(
                         stall_seconds,
                     )
                     break
-                if (now - last_log_warn >= stall_warn_every) and (
-                    produced_this_library == 0
-                ):
+                if (now - last_log_warn >= stall_warn_every) and (produced_this_library == 0):
                     log.info(
                         "[%s/%s] Still working... %.1fs on current library.",
                         source_label,
@@ -538,23 +510,15 @@ def _process_plan_for_source(
                 consecutive_dup = 0
                 fingerprints.add(seq)
 
-                used_tfbs, used_tfbs_detail, used_tf_counts, used_tf_list = (
-                    _compute_used_tf_info(
-                        sol, library_for_opt, tfbs_parts, fixed_elements
-                    )
+                used_tfbs, used_tfbs_detail, used_tf_counts, used_tf_list = _compute_used_tf_info(
+                    sol, library_for_opt, tfbs_parts, fixed_elements
                 )
-                tf_list_from_library = (
-                    sorted({p.split(":", 1)[0] for p in tfbs_parts})
-                    if tfbs_parts
-                    else []
-                )
+                tf_list_from_library = sorted({p.split(":", 1)[0] for p in tfbs_parts}) if tfbs_parts else []
 
                 covers_all = True
                 if min_count_per_tf_required > 0 and tf_list_from_library:
                     missing = [
-                        tf
-                        for tf in tf_list_from_library
-                        if used_tf_counts.get(tf, 0) < min_count_per_tf_required
+                        tf for tf in tf_list_from_library if used_tf_counts.get(tf, 0) < min_count_per_tf_required
                     ]
                     if missing:
                         covers_all = False
@@ -574,11 +538,7 @@ def _process_plan_for_source(
                         pad_info = pad_info or {}
                     else:
                         pad, pad_info = rf, {}
-                    final_seq = (
-                        (pad + final_seq)
-                        if fill_end.lower() == "5prime"
-                        else (final_seq + pad)
-                    )
+                    final_seq = (pad + final_seq) if fill_end.lower() == "5prime" else (final_seq + pad)
                     gap_meta = {
                         "used": True,
                         "bases": gap,
@@ -726,9 +686,7 @@ app = typer.Typer(
 @app.callback()
 def _root(
     ctx: typer.Context,
-    config: Path = typer.Option(
-        _default_config_path(), "--config", "-c", help="Path to job YAML."
-    ),
+    config: Path = typer.Option(_default_config_path(), "--config", "-c", help="Path to job YAML."),
 ):
     ctx.obj = {"config_path": config}
 
@@ -760,14 +718,10 @@ def plan(ctx: typer.Context):
     console.print(table)
 
 
-@app.command(
-    help="Run generation for the job. Optionally auto-run plots declared in YAML."
-)
+@app.command(help="Run generation for the job. Optionally auto-run plots declared in YAML.")
 def run(
     ctx: typer.Context,
-    no_plot: bool = typer.Option(
-        False, help="Do not auto-run plots even if configured."
-    ),
+    no_plot: bool = typer.Option(False, help="Do not auto-run plots even if configured."),
     log_file: Optional[Path] = typer.Option(None, help="Override logfile path."),
 ):
     cfg_path = ctx.obj["config_path"]
@@ -777,9 +731,7 @@ def run(
 
     # Logging setup
     log_cfg = cfg.get("logging", {}) or {}
-    logfile = log_file or (
-        DENSEGEN_ROOT / "logs" / f"{_infer_input_name(cfg['inputs'])}.log"
-    )
+    logfile = log_file or (DENSEGEN_ROOT / "logs" / f"{_infer_input_name(cfg['inputs'])}.log")
     setup_logging(
         level=log_cfg.get("level", "INFO"),
         logfile=str(logfile),
@@ -787,18 +739,12 @@ def run(
     )
 
     # Seed
-    seed = int(
-        cfg.get("runtime", {}).get(
-            "random_seed", cfg.get("generation", {}).get("random_seed", 1337)
-        )
-    )
+    seed = int(cfg.get("runtime", {}).get("random_seed", cfg.get("generation", {}).get("random_seed", 1337)))
     random.seed(seed)
 
     # Plan & solver
     pl = _build_quota_plan(cfg)
-    console.print(
-        "[bold]Quota plan[/]: " + ", ".join(f"{p['name']}={p['quota']}" for p in pl)
-    )
+    console.print("[bold]Quota plan[/]: " + ", ".join(f"{p['name']}={p['quota']}" for p in pl))
     solver_cfg = cfg.get("solver", {}) or {}
     chosen_solver = select_solver_strict(str(solver_cfg.get("backend")))
 
@@ -812,8 +758,7 @@ def run(
         for s in inputs:
             source_cfg = copy.deepcopy(s)
             source_cfg["name"] = (
-                source_cfg.get("name")
-                or Path(source_cfg.get("path", source_cfg.get("dataset", "input"))).stem
+                source_cfg.get("name") or Path(source_cfg.get("path", source_cfg.get("dataset", "input"))).stem
             )
             for item in pl:
                 _process_plan_for_source(
@@ -833,10 +778,7 @@ def run(
             for s in inputs:
                 source_cfg = copy.deepcopy(s)
                 source_cfg["name"] = (
-                    source_cfg.get("name")
-                    or Path(
-                        source_cfg.get("path", source_cfg.get("dataset", "input"))
-                    ).stem
+                    source_cfg.get("name") or Path(source_cfg.get("path", source_cfg.get("dataset", "input"))).stem
                 )
                 for item in pl:
                     key = (source_cfg["name"], item["name"])
@@ -868,14 +810,10 @@ def run(
         console.print(":bar_chart: [bold green]Plots written.[/]")
 
 
-@app.command(
-    help="Generate plots from outputs according to YAML. Use --only to select plots."
-)
+@app.command(help="Generate plots from outputs according to YAML. Use --only to select plots.")
 def plot(
     ctx: typer.Context,
-    only: Optional[str] = typer.Option(
-        None, help="Comma-separated plot names (subset of available plots)."
-    ),
+    only: Optional[str] = typer.Option(None, help="Comma-separated plot names (subset of available plots)."),
 ):
     cfg = ConfigLoader(ctx.obj["config_path"]).config
     validate_config(cfg)

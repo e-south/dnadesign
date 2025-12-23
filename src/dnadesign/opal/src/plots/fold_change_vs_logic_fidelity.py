@@ -30,9 +30,7 @@ def render(context, params: dict) -> None:
     y_axis = get_str(params, ["y_axis", "y_field", "y"], "fold_change")
     alpha = get_float(params, ["alpha"], 0.40)
     # Hue: support both continuous metrics (obj__/pred__/sel__) and *categorical* from records.parquet.
-    hue_raw = get_str(
-        params, ["hue_field", "hue", "color", "color_by", "colour_by"], None
-    )
+    hue_raw = get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None)
     hue_field = normalize_metric_field(hue_raw) if hue_raw else None  # continuous path
     # New: categorical hue via "records.<column>" or "records__<column>"
     hue_is_categorical = False
@@ -58,9 +56,7 @@ def render(context, params: dict) -> None:
             hue_is_categorical = True
             cat_hue_col = s.split(".", 1)[1] if "." in s else s.split("__", 1)[1]
             if not cat_hue_col:
-                raise ValueError(
-                    "Categorical hue requested but no records column provided."
-                )
+                raise ValueError("Categorical hue requested but no records column provided.")
     # Colormaps: keep 'cmap' for continuous; allow 'hue_cmap' for categoricals (default tab10)
     cmap = get_str(params, ["cmap"], "viridis")
     hue_cmap = get_str(params, ["hue_cmap"], "tab10")
@@ -68,31 +64,21 @@ def render(context, params: dict) -> None:
     # Selected-point styling (shape override instead of overlay)
     selected_marker = get_str(params, ["selected_marker"], "*")
     selected_size_scale = get_float(params, ["selected_size_scale"], 1.0)
-    selected_alpha = min(
-        1.0, get_float(params, ["selected_alpha"], float(alpha) + 0.10)
-    )
+    selected_alpha = min(1.0, get_float(params, ["selected_alpha"], float(alpha) + 0.10))
     selected_edgecolor = get_str(params, ["selected_edgecolor"], "black")
     # Accept multiple synonyms for size
-    size_by = normalize_metric_field(
-        get_str(params, ["size_by", "size", "size_field", "point_size_by"], None)
-    )
+    size_by = normalize_metric_field(get_str(params, ["size_by", "size", "size_field", "point_size_by"], None))
     # Axis control: by default, snap logic-fidelity x-axis to [0, 1]
     force_xlim_01 = bool(params.get("force_xlim_01", True))
     xticks_n = int(params.get("xticks_n", 6)) if force_xlim_01 else None
 
     # Assert: requested keys must resolve
-    if (
-        any(k in params for k in ("hue_field", "hue", "color", "color_by", "colour_by"))
-        and not hue_field
-    ):
+    if any(k in params for k in ("hue_field", "hue", "color", "color_by", "colour_by")) and not hue_field:
         raise ValueError(
             "A hue parameter was provided but could not be parsed. "
             "Use an obj__/pred__/sel__ column or alias (e.g., 'logic_fidelity', 'fold_change', 'score')."
         )
-    if (
-        any(k in params for k in ("size_by", "size", "size_field", "point_size_by"))
-        and not size_by
-    ):
+    if any(k in params for k in ("size_by", "size", "size_field", "point_size_by")) and not size_by:
         raise ValueError(
             "A size_by parameter was provided but could not be parsed. "
             "Use an obj__/pred__/sel__ column or alias (e.g., 'logic_fidelity', 'fold_change')."
@@ -130,9 +116,7 @@ def render(context, params: dict) -> None:
     elif rsel != "all":
         lst = rsel if isinstance(rsel, list) else [rsel]
         if len(lst) != 1:
-            raise ValueError(
-                "Select exactly one round or use --round latest for this plot."
-            )
+            raise ValueError("Select exactly one round or use --round latest for this plot.")
         df = df[df["as_of_round"].isin(lst)]
     if df.empty:
         raise ValueError("No rows matched the requested round selector.")
@@ -228,18 +212,14 @@ def render(context, params: dict) -> None:
         tidy_col = "fold_change"
     elif _ya in ("effect_raw", "obj__effect_raw"):
         if "obj__effect_raw" not in df.columns:
-            raise ValueError(
-                "Requested y_axis=effect_raw but obj__effect_raw is missing."
-            )
+            raise ValueError("Requested y_axis=effect_raw but obj__effect_raw is missing.")
         y_plot = df["obj__effect_raw"].astype(float).to_numpy()
         y_field_label = "Objective effect (raw)"
         y_title_short = "Effect (raw)"
         tidy_col = "obj__effect_raw"
     elif _ya in ("effect_scaled", "obj__effect_scaled"):
         if "obj__effect_scaled" not in df.columns:
-            raise ValueError(
-                "Requested y_axis=effect_scaled but obj__effect_scaled is missing."
-            )
+            raise ValueError("Requested y_axis=effect_scaled but obj__effect_scaled is missing.")
         y_plot = df["obj__effect_scaled"].astype(float).to_numpy()
         y_field_label = "Objective effect (scaled)"
         y_title_short = "Effect (scaled)"
@@ -329,11 +309,7 @@ def render(context, params: dict) -> None:
 
     # Draw SELECTED as a different marker (override, not overlay)
     if sel_mask.any():
-        sel_sizes = (
-            sizes
-            if np.isscalar(sizes)
-            else (sizes[sel_mask] * float(selected_size_scale))
-        )
+        sel_sizes = sizes if np.isscalar(sizes) else (sizes[sel_mask] * float(selected_size_scale))
         sel_color_kw = {}
         if hue_is_categorical:
             sel_color_kw = {"c": colors_all[sel_mask]}
@@ -355,21 +331,13 @@ def render(context, params: dict) -> None:
         )
 
     # Dedicated colorbar (continuous hue only)
-    if (
-        (not hue_is_categorical)
-        and (hue_vals_all is not None)
-        and cbar
-        and (vmin is not None)
-        and (vmax is not None)
-    ):
+    if (not hue_is_categorical) and (hue_vals_all is not None) and cbar and (vmin is not None) and (vmax is not None):
         from matplotlib.cm import ScalarMappable
         from matplotlib.colors import Normalize
 
         mappable = ScalarMappable(norm=Normalize(vmin=vmin, vmax=vmax), cmap=cmap)
         cb = fig.colorbar(mappable, ax=ax)
-        cb.set_label(
-            hue_field.replace("obj__", "").replace("pred__", "").replace("sel__", "")
-        )
+        cb.set_label(hue_field.replace("obj__", "").replace("pred__", "").replace("sel__", ""))
 
     # Legend for categorical hue
     if hue_is_categorical:

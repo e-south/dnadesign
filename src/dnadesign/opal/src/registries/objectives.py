@@ -28,9 +28,7 @@ def _dbg(msg: str) -> None:
 
 
 class _ObjectiveFn(Protocol):
-    def __call__(
-        self, *, y_pred, params: Dict[str, Any], ctx=None, train_view=None
-    ) -> Any: ...
+    def __call__(self, *, y_pred, params: Dict[str, Any], ctx=None, train_view=None) -> Any: ...
 
 
 # Registry: name -> callable(y_pred, *, params, ctx, train_view) -> ObjectiveResult
@@ -98,9 +96,7 @@ def _ensure_plugins_loaded() -> None:
     for ep in _iter_entry_points("dnadesign.opal.objectives"):
         try:
             ep.load()
-            _dbg(
-                f"loaded plugin entry point: {getattr(ep, 'name', '?')} from {getattr(ep, 'module', '?')}"
-            )
+            _dbg(f"loaded plugin entry point: {getattr(ep, 'name', '?')} from {getattr(ep, 'module', '?')}")
         except Exception as e:
             _dbg(f"FAILED loading plugin entry point {ep!r}: {e!r}")
             continue
@@ -132,9 +128,7 @@ def _wrap_for_ctx_enforcement(name: str, fn: _ObjectiveFn) -> _ObjectiveFn:
     """
     contract = getattr(fn, "__opal_contract__", None)
 
-    def _wrapped(
-        *, y_pred, params: Dict[str, Any], ctx: PluginCtx | None = None, train_view=None
-    ):
+    def _wrapped(*, y_pred, params: Dict[str, Any], ctx: PluginCtx | None = None, train_view=None):
         if ctx is not None:
             try:
                 ctx.precheck_requires()

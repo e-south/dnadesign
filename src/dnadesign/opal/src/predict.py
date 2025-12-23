@@ -108,10 +108,6 @@ def run_predict_ephemeral(
     y_list = [list(map(float, row)) if yhat.ndim == 2 else [float(row)] for row in yhat]
     out = pd.DataFrame({"id": id_order, "y_pred_vec": [json.dumps(v) for v in y_list]})
     # add sequence
-    seq_map = (
-        df.set_index("id")["sequence"].astype(str).to_dict()
-        if "sequence" in df.columns
-        else {}
-    )
+    seq_map = df.set_index("id")["sequence"].astype(str).to_dict() if "sequence" in df.columns else {}
     out["sequence"] = [seq_map.get(i, "") for i in id_order]
     return out[["id", "sequence", "y_pred_vec"]]

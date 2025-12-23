@@ -81,9 +81,7 @@ def _wrap_for_ctx_enforcement(name: str, fn: Callable[..., Any]) -> Callable[...
     return _wrapped
 
 
-def get_selection(
-    name: str, params: Dict[str, Any] | None = None
-) -> Callable[..., Any]:
+def get_selection(name: str, params: Dict[str, Any] | None = None) -> Callable[..., Any]:
     """Return a selection callable, invoking a factory if needed, wrapped for ctx enforcement."""
     if name not in _REG_S:
         raise KeyError(f"selection '{name}' not found. Available: {sorted(_REG_S)}")
@@ -103,9 +101,7 @@ def list_selections() -> List[str]:
 # --- canonical result adapter for selection plugins --------------
 
 
-def _stable_sort_indices(
-    ids: np.ndarray, scores: np.ndarray, objective: str
-) -> np.ndarray:
+def _stable_sort_indices(ids: np.ndarray, scores: np.ndarray, objective: str) -> np.ndarray:
     """
     Stable deterministic sort:
       - maximize: (-score, id)

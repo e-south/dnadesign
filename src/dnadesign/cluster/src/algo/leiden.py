@@ -17,9 +17,7 @@ def _imports():
     try:
         import scanpy as sc
     except Exception as e:
-        raise RuntimeError(
-            "scanpy is required for Leiden clustering. Install scanpy==1.10.x"
-        ) from e
+        raise RuntimeError("scanpy is required for Leiden clustering. Install scanpy==1.10.x") from e
     return sc
 
 
@@ -37,9 +35,7 @@ def run(
     # Optional scaling
     if scale:
         sc.pp.scale(ad)
-    sc.pp.neighbors(
-        ad, n_neighbors=neighbors, use_rep="X", metric=metric, random_state=seed
-    )
+    sc.pp.neighbors(ad, n_neighbors=neighbors, use_rep="X", metric=metric, random_state=seed)
     if backend not in {"leidenalg", "igraph"}:
         raise ValueError("backend must be 'leidenalg' or 'igraph'")
     # directed=False works for both backends; n_iterations is recommended for igraph

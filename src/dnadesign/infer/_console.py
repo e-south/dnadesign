@@ -163,12 +163,8 @@ def render_outputs_spec_table(outputs: List[Dict[str, Any]]) -> None:
     t.add_column("format")
     t.add_column("params")
     for o in outputs:
-        params_str = json.dumps(
-            o.get("params", {}), separators=(",", ":"), ensure_ascii=False
-        )
-        t.add_row(
-            o["id"], o["fn"], o.get("format", "—"), Text(params_str, style="muted")
-        )
+        params_str = json.dumps(o.get("params", {}), separators=(",", ":"), ensure_ascii=False)
+        t.add_row(o["id"], o["fn"], o.get("format", "—"), Text(params_str, style="muted"))
     console.print(t)
 
 
@@ -181,9 +177,7 @@ def render_adapters_table(models: Dict[str, type]) -> None:
         caps = getattr(cls, "supports", {})
         cap_list = [k for k, v in caps.items() if v]
         caps_str = ", ".join(cap_list) if cap_list else "—"
-        t.add_row(
-            model_id, f"{cls.__module__}.{cls.__name__}", Text(caps_str, style="accent")
-        )
+        t.add_row(model_id, f"{cls.__module__}.{cls.__name__}", Text(caps_str, style="accent"))
     console.print(t)
 
 
@@ -232,9 +226,7 @@ def render_preset_detail(preset: Dict[str, Any]) -> None:
         for k, v in params.items():
             t2.add_row(
                 k,
-                Text(
-                    json.dumps(v) if not isinstance(v, str) else str(v), style="muted"
-                ),
+                Text(json.dumps(v) if not isinstance(v, str) else str(v), style="muted"),
             )
         console.print(t2)
 

@@ -125,18 +125,12 @@ def _resolve_run_slice(
     # Prefer a concise 'runs' ledger if available, otherwise fallback to predictions
     def _runs_df():
         p = paths["runs"]
-        return (
-            _read_parquet_parts(p, columns=["run_id", "as_of_round"])
-            if p.exists()
-            else None
-        )
+        return _read_parquet_parts(p, columns=["run_id", "as_of_round"]) if p.exists() else None
 
     runs = _runs_df()
 
     if sel.startswith("round:") and as_of_round is not None:
-        raise ValueError(
-            "Provide either run_selector='round:<n>' OR as_of_round, not both."
-        )
+        raise ValueError("Provide either run_selector='round:<n>' OR as_of_round, not both.")
 
     if sel.startswith("run_id:"):
         rid = sel.split(":", 1)[1]
@@ -145,16 +139,10 @@ def _resolve_run_slice(
             base = (
                 runs
                 if runs is not None
-                else _read_parquet_parts(
-                    paths["predictions"], columns=["run_id", "as_of_round"]
-                )
+                else _read_parquet_parts(paths["predictions"], columns=["run_id", "as_of_round"])
             )
             m = base[base["run_id"].astype(str) == str(rid)]
-            ao = (
-                int(m["as_of_round"].dropna().astype(int).max())
-                if not m.empty
-                else None
-            )
+            ao = int(m["as_of_round"].dropna().astype(int).max()) if not m.empty else None
         return str(rid), (int(ao) if ao is not None else None)
 
     if sel.startswith("round:"):
@@ -164,28 +152,16 @@ def _resolve_run_slice(
         return None, int(as_of_round)
 
     # latest
-    base = (
-        runs
-        if runs is not None
-        else _read_parquet_parts(
-            paths["predictions"], columns=["run_id", "as_of_round"]
-        )
-    )
+    base = runs if runs is not None else _read_parquet_parts(paths["predictions"], columns=["run_id", "as_of_round"])
     if base.empty:
         raise FileNotFoundError("No runs/predictions found to resolve 'latest'.")
     ao = int(base["as_of_round"].dropna().astype(int).max())
     cand = base[base["as_of_round"].astype(int) == ao]
-    rid = (
-        str(cand["run_id"].dropna().astype(str).max())
-        if "run_id" in cand.columns
-        else None
-    )
+    rid = str(cand["run_id"].dropna().astype(str).max()) if "run_id" in cand.columns else None
     return rid, ao
 
 
-def _read_parquet_parts(
-    d: Path, columns: list[str] | None = None, newest_only: bool = False
-) -> pd.DataFrame:
+def _read_parquet_parts(d: Path, columns: list[str] | None = None, newest_only: bool = False) -> pd.DataFrame:
     """Read a directory of parquet parts (or a single parquet). By default, concatenate all parts."""
     if not d.exists():
         raise FileNotFoundError(f"Path not found: {d}")
@@ -195,10 +171,7 @@ def _read_parquet_parts(
             raise FileNotFoundError(f"No parquet files in {d}")
         if newest_only:
             files = [max(files, key=lambda p: p.stat().st_mtime)]
-        dfs = [
-            pd.read_parquet(p, columns=columns) if columns else pd.read_parquet(p)
-            for p in files
-        ]
+        dfs = [pd.read_parquet(p, columns=columns) if columns else pd.read_parquet(p) for p in files]
         return pd.concat(dfs, ignore_index=True)
     return pd.read_parquet(d, columns=columns) if columns else pd.read_parquet(d)
 
@@ -222,11 +195,7 @@ def select_ids(
     if scope == "custom":
         if not ids_path:
             raise ValueError("--ids is required for scope=custom.")
-        df = (
-            pd.read_parquet(ids_path)
-            if str(ids_path).endswith(".parquet")
-            else pd.read_csv(ids_path)
-        )
+        df = pd.read_parquet(ids_path) if str(ids_path).endswith(".parquet") else pd.read_csv(ids_path)
         col = "id" if "id" in df.columns else df.columns[0]
         return set(map(str, df[col].tolist()))
     # For now, fallback to predictions ledger for scored_pool
@@ -251,9 +220,7 @@ def select_ids(
     if scope == "selected_top_k":
         if "selected" not in sub.columns:
             raise KeyError("'selected' column not found in predictions ledger.")
-        return set(
-            map(str, sub.loc[sub["selected"].astype(bool), "id"].unique().tolist())
-        )
+        return set(map(str, sub.loc[sub["selected"].astype(bool), "id"].unique().tolist()))
     raise ValueError(f"Unsupported ids scope: {scope}")
 
 
@@ -273,10 +240,7 @@ def _ensure_left_has_id_column_only(df: pd.DataFrame) -> pd.DataFrame:
         left = left.reset_index()
     # Case C: neither index named 'id' nor 'id' column present → this is an API misuse
     elif "id" not in left.columns:
-        raise KeyError(
-            "Left table must contain an 'id' column for OPAL joins. "
-            "Ensure your dataset provides 'id'."
-        )
+        raise KeyError("Left table must contain an 'id' column for OPAL joins. Ensure your dataset provides 'id'.")
     return left
 
 
@@ -295,13 +259,8 @@ def join_fields(
     # Discover concrete parquet parts and log them up front (assertive observability)
     parts = _list_parquet_files(paths["predictions"])
     if log_fn:
-        names = ", ".join(p.name for p in parts[:12]) + (
-            " ..." if len(parts) > 12 else ""
-        )
-        log_fn(
-            f"OPAL: predictions source={paths['predictions']} "
-            f"({len(parts)} part file(s)): {names}"
-        )
+        names = ", ".join(p.name for p in parts[:12]) + (" ..." if len(parts) > 12 else "")
+        log_fn(f"OPAL: predictions source={paths['predictions']} ({len(parts)} part file(s)): {names}")
     preds = _read_parquet_parts(paths["predictions"])
     preds["id"] = preds["id"].astype(str)
 
@@ -324,9 +283,7 @@ def join_fields(
     # Assert every requested field exists in this slice
     missing = [f for f in fields if f not in preds.columns]
     if missing:
-        avail = sorted(
-            [c for c in preds.columns if c.startswith(("obj__", "pred__", "sel__"))]
-        )
+        avail = sorted([c for c in preds.columns if c.startswith(("obj__", "pred__", "sel__"))])
         raise KeyError(
             f"Fields not present in OPAL predictions: {missing}. "
             f"Available in this slice: {avail[:50]}{' ...' if len(avail) > 50 else ''}"
@@ -355,6 +312,4 @@ def list_available_fields(
         preds = preds[preds["as_of_round"].astype(int) == int(ao)]
     if rid is not None and "run_id" in preds.columns:
         preds = preds[preds["run_id"].astype(str) == str(rid)]
-    return sorted(
-        [c for c in preds.columns if c.startswith(("obj__", "pred__", "sel__"))]
-    )
+    return sorted([c for c in preds.columns if c.startswith(("obj__", "pred__", "sel__"))])

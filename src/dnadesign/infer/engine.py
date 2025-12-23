@@ -87,9 +87,7 @@ def _get_tqdm():
         return _NoTQDM, False
 
 
-ProgressFactory = Optional[
-    Callable[[str, int], Any]
-]  # returns handle with update(n), close()
+ProgressFactory = Optional[Callable[[str, int], Any]]  # returns handle with update(n), close()
 
 
 def _validate_alphabet(alphabet: str, seqs: List[str]) -> None:
@@ -225,9 +223,7 @@ def run_extract_job(
     for out in job.outputs or []:
         ns = out.fn.split(".")[0]
         if ns != namespace:
-            raise ConfigError(
-                "All outputs in a job must share the same adapter namespace"
-            )
+            raise ConfigError("All outputs in a job must share the same adapter namespace")
 
     # micro-batch
     micro_bs = model.batch_size or int(os.environ.get("DNADESIGN_INFER_BATCH", "0"))
@@ -289,9 +285,7 @@ def run_extract_job(
                 elif method_name in {"logits", "embedding"}:
                     vals = fn(chunk, **out.params, fmt=out.format)
                 else:
-                    raise CapabilityError(
-                        f"Unsupported extract function '{out.fn}' in v1"
-                    )
+                    raise CapabilityError(f"Unsupported extract function '{out.fn}' in v1")
 
             except RuntimeError as e:
                 if _is_oom(e) and _auto_derate_enabled() and bs > 1:

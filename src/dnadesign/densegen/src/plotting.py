@@ -136,15 +136,12 @@ def _palette(style: dict, n: int, *, no_repeat: bool = False):
                 return base[:n]
             if no_repeat:
                 raise ValueError(
-                    f"Need {n} unique colors; okabe_ito has {len(base)}. "
-                    "Provide a longer palette or reduce categories."
+                    f"Need {n} unique colors; okabe_ito has {len(base)}. Provide a longer palette or reduce categories."
                 )
             return [base[i % len(base)] for i in range(n)]
         if _is_color_like(pal):  # single color
             if no_repeat and n > 1:
-                raise ValueError(
-                    f"Single color '{pal}' cannot provide {n} unique colors."
-                )
+                raise ValueError(f"Single color '{pal}' cannot provide {n} unique colors.")
             return [pal] * n
         try:  # colormap name
             cmap = plt.get_cmap(pal)
@@ -156,9 +153,7 @@ def _palette(style: dict, n: int, *, no_repeat: bool = False):
         if len(base) >= n:
             return base[:n]
         if no_repeat:
-            raise ValueError(
-                f"Need {n} unique colors; got {len(base)} in explicit list."
-            )
+            raise ValueError(f"Need {n} unique colors; got {len(base)} in explicit list.")
         return [base[i % len(base)] for i in range(n)]
     # fallback
     cmap = plt.get_cmap("tab10")
@@ -202,11 +197,7 @@ def _ensure_list_of_strs(v) -> list[str]:
 
 # promoter scanning (top-strand only)
 def _valid_dna_string(s: str) -> bool:
-    return (
-        isinstance(s, str)
-        and bool(s.strip())
-        and set(s.upper()) <= {"A", "C", "G", "T"}
-    )
+    return isinstance(s, str) and bool(s.strip()) and set(s.upper()) <= {"A", "C", "G", "T"}
 
 
 def _scan_all_occurrences(seq: str, motif: str) -> list[int]:
@@ -217,9 +208,7 @@ def _scan_all_occurrences(seq: str, motif: str) -> list[int]:
     return hits
 
 
-def _scan_motif_coverage_top_strand(
-    seqs: Iterable[str], motifs: Iterable[str], L: int
-) -> np.ndarray:
+def _scan_motif_coverage_top_strand(seqs: Iterable[str], motifs: Iterable[str], L: int) -> np.ndarray:
     arr = np.zeros(L, dtype=float)
     motifs = [m.strip().upper() for m in motifs if _valid_dna_string(m)]
     if not motifs:
@@ -272,9 +261,7 @@ def _ensure_out_dir(cfg: dict) -> Path:
 # ---------------------- Plots ----------------------
 
 
-def plot_compression_ratio(
-    df: pd.DataFrame, out_path: Path, *, bins: int = 30, style: Optional[dict] = None
-) -> None:
+def plot_compression_ratio(df: pd.DataFrame, out_path: Path, *, bins: int = 30, style: Optional[dict] = None) -> None:
     col = _dg("compression_ratio")
     vals = pd.to_numeric(df[col], errors="coerce").dropna()
     style = _style(style)
@@ -373,14 +360,8 @@ def plot_tf_usage(
         def _seq_color(i, n):
             return cmap(i / max(1, n - 1))
 
-        seq_colors = {
-            L: _seq_color(i, len(length_bins_sorted))
-            for i, L in enumerate(length_bins_sorted)
-        }
-        seg_to_color = {
-            seg: (seq_colors[int(seg)] if seg != "OTHER" else "#B0B0B0")
-            for seg in segments
-        }
+        seq_colors = {L: _seq_color(i, len(length_bins_sorted)) for i, L in enumerate(length_bins_sorted)}
+        seg_to_color = {seg: (seq_colors[int(seg)] if seg != "OTHER" else "#B0B0B0") for seg in segments}
         for seg in segments:
             heights = []
             for tf in tf_order:
@@ -452,11 +433,7 @@ def plot_tf_usage(
             heights = []
             for tf in tf_order:
                 inner = by_tf_tfbs.get(tf, {})
-                val = (
-                    sum(n for s, n in inner.items() if s in remaining)
-                    if seg == "OTHER"
-                    else int(inner.get(seg, 0))
-                )
+                val = sum(n for s, n in inner.items() if s in remaining) if seg == "OTHER" else int(inner.get(seg, 0))
                 heights.append(float(val))
             ax.bar(
                 x,
@@ -486,9 +463,7 @@ def plot_tf_usage(
     raise ValueError("tf_usage.mode must be one of: stack_lengths, stack_tfbs, totals")
 
 
-def plot_gap_fill_gc(
-    df: pd.DataFrame, out_path: Path, *, style: Optional[dict] = None
-) -> None:
+def plot_gap_fill_gc(df: pd.DataFrame, out_path: Path, *, style: Optional[dict] = None) -> None:
     used_col, gc_col, b_col = (
         _dg("gap_fill_used"),
         _dg("gap_fill_gc_actual"),
@@ -536,12 +511,7 @@ def plot_plan_counts(
         dt = pd.to_datetime(df_local[created_at_col], errors="coerce")
         df_local = df_local[dt.notna()].copy()
         df_local["_day"] = dt[dt.notna()].dt.floor("D")
-        pivot = (
-            df_local.groupby(["_plan", "_day"])
-            .size()
-            .unstack(fill_value=0)
-            .sort_index(axis=1)
-        )
+        pivot = df_local.groupby(["_plan", "_day"]).size().unstack(fill_value=0).sort_index(axis=1)
         days = list(pivot.columns)
         x = np.arange(len(pivot.index))
         bottom = np.zeros(len(x), dtype=float)
@@ -608,9 +578,7 @@ def plot_tf_coverage(
     if "length" in df.columns:
         L = int(pd.to_numeric(df["length"], errors="coerce").dropna().max())
     elif _dg("sequence_length") in df.columns:
-        L = int(
-            pd.to_numeric(df[_dg("sequence_length")], errors="coerce").dropna().max()
-        )
+        L = int(pd.to_numeric(df[_dg("sequence_length")], errors="coerce").dropna().max())
     elif "sequence" in df.columns:
         L = int(df["sequence"].astype(str).map(len).max())
     else:
@@ -641,13 +609,9 @@ def plot_tf_coverage(
         if cfg is None:
             raise ValueError("tf_coverage(include_promoter_sites=True) requires cfg.")
         if "sequence" not in df.columns:
-            raise ValueError(
-                "tf_coverage(include_promoter_sites=True) requires 'sequence'."
-            )
+            raise ValueError("tf_coverage(include_promoter_sites=True) requires 'sequence'.")
         seqs = df["sequence"].astype(str).tolist()
-        prom = _extract_promoter_site_motifs_from_cfg(
-            cfg
-        )  # {'35 site': {...}, '10 site': {...}}
+        prom = _extract_promoter_site_motifs_from_cfg(cfg)  # {'35 site': {...}, '10 site': {...}}
         for label, motif_set in prom.items():
             if motif_set:
                 arr = _scan_motif_coverage_top_strand(seqs, motif_set, L)
@@ -727,11 +691,7 @@ def plot_tf_coverage(
 
     # promoter overlays
     if prom:
-        pa = (
-            max(edge_alpha, 0.95)
-            if promoter_edge_alpha is None
-            else float(promoter_edge_alpha)
-        )
+        pa = max(edge_alpha, 0.95) if promoter_edge_alpha is None else float(promoter_edge_alpha)
         for tf, arr in prom:
             y = arr.astype(float)
             if normalize and n_seqs > 0:
@@ -763,9 +723,7 @@ def plot_tf_coverage(
     plt.close(fig)
 
 
-def _kde_gaussian(
-    x: np.ndarray, grid: np.ndarray, bandwidth: Optional[float] = None
-) -> np.ndarray:
+def _kde_gaussian(x: np.ndarray, grid: np.ndarray, bandwidth: Optional[float] = None) -> np.ndarray:
     x = np.asarray(x, dtype=float)
     x = x[np.isfinite(x)]
     n = x.size
@@ -791,9 +749,7 @@ def plot_tfbs_length_density(
     kde_points: int = 256,
     fill_alpha: float = 0.35,
     include_promoter_sites: bool = False,  # retained for forward-compat; no RC scanning here
-    promoter_site_motifs: Optional[
-        Dict[str, set[str]]
-    ] = None,  # optional explicit overlay sets
+    promoter_site_motifs: Optional[Dict[str, set[str]]] = None,  # optional explicit overlay sets
     style: Optional[dict] = None,
 ) -> None:
     det_col = _dg("used_tfbs_detail")
@@ -880,10 +836,8 @@ def plot_tfbs_usage(
     """
     style = _style(style)
     fig, ax = _fig_ax(style)
-    used_col, det_col, plan_col = _dg("used_tfbs"), _dg("used_tfbs_detail"), _dg("plan")
-    excl: set[str] = set(
-        str(x).strip().upper() for x in (exclude_tfbs or []) if str(x).strip()
-    )
+    used_col, det_col = _dg("used_tfbs"), _dg("used_tfbs_detail")
+    excl: set[str] = set(str(x).strip().upper() for x in (exclude_tfbs or []) if str(x).strip())
     if exclude_tfbs is None:
         excl.add("G")  # default drop lone 'G'
     # Always exclude promoter elements from this plot
@@ -923,12 +877,8 @@ def plot_tfbs_usage(
             ranked_tfbs = ranked_tfbs[:max_sites]
         labels = [s for s, _ in ranked_tfbs]
         values = [v for _, v in ranked_tfbs]
-        present_tfs = sorted(
-            {tf_for_tfbs.get(s, "") for s in labels if tf_for_tfbs.get(s, "")}
-        )
-        tf_colors = {
-            tf: c for tf, c in zip(present_tfs, _palette(style, len(present_tfs)))
-        }
+        present_tfs = sorted({tf_for_tfbs.get(s, "") for s in labels if tf_for_tfbs.get(s, "")})
+        tf_colors = {tf: c for tf, c in zip(present_tfs, _palette(style, len(present_tfs)))}
         colors = [tf_colors.get(tf_for_tfbs.get(s, ""), "#BBBBBB") for s in labels]
         x = np.arange(len(labels))
         ax.bar(x, values, color=colors, linewidth=0)
@@ -937,9 +887,7 @@ def plot_tfbs_usage(
         ax.tick_params(axis="x", labelrotation=90)
         if present_tfs:
             ax.legend(
-                handles=[
-                    Patch(facecolor=tf_colors[tf], label=tf) for tf in present_tfs
-                ],
+                handles=[Patch(facecolor=tf_colors[tf], label=tf) for tf in present_tfs],
                 loc="best",
                 frameon=bool(style.get("legend_frame", False)),
             )
@@ -983,9 +931,7 @@ def plot_tfbs_usage(
         ranked = ranked[:max_sites]
     labels = [k for k, _ in ranked]
     values = [v for _, v in ranked]
-    present_tfs = sorted(
-        {tf_for_tfbs.get(b, "") for b in labels if tf_for_tfbs.get(b, "")}
-    )
+    present_tfs = sorted({tf_for_tfbs.get(b, "") for b in labels if tf_for_tfbs.get(b, "")})
     tf_colors = {tf: c for tf, c in zip(present_tfs, _palette(style, len(present_tfs)))}
     bar_colors = [tf_colors.get(tf_for_tfbs.get(b, ""), "#BBBBBB") for b in labels]
     ax.bar(labels, values, color=bar_colors)
@@ -1060,8 +1006,7 @@ def _filter_kwargs(name: str, kwargs: dict) -> tuple[dict, list[str]]:
     unknown = [
         k
         for k in list(kwargs.keys())
-        if k not in allowed
-        and k not in {"dims", "palette", "palette_no_repeat", "style"}
+        if k not in allowed and k not in {"dims", "palette", "palette_no_repeat", "style"}
     ]
     for k in unknown:
         kwargs.pop(k, None)
@@ -1079,8 +1024,7 @@ def run_plots_from_config(cfg: dict, *, only: Optional[str] = None) -> None:
 
     _console.print(
         Panel.fit(
-            f"DenseGen plotting • source: {src} • rows: {len(df):,}\n"
-            f"Output: {out_dir}",
+            f"DenseGen plotting • source: {src} • rows: {len(df):,}\nOutput: {out_dir}",
             border_style="blue",
         )
     )

@@ -3,7 +3,7 @@
 cruncher:
   mode: sample                    # parse | sample | analyse
   out_dir: results/               # where all outputs land
-  regulator_sets:                 # list of regulator sets to use   
+  regulator_sets:                 # list of regulator sets to use
     - [cpxR, soxR]                # set #1: two TFs
     # - [crp, fis, ihf]           # set #2: three TFs
   motif:                          # parse-specific config
@@ -17,7 +17,7 @@ cruncher:
   sample:
     bidirectional: true           # score sequences based on both forward and reverse-complement (take max per-PWM)
     init:
-      kind: random                    # random, consensus_shortest, consensus_longest, or integer length 
+      kind: random                    # random, consensus_shortest, consensus_longest, or integer length
       pad_with: background_pwm    # background (uniform iid), background_pwm (sample i.i.d. from overall PWM base frequencies)
     optimiser:
       kind: gibbs

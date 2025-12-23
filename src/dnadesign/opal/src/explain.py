@@ -46,9 +46,7 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
         "representation_vector_dimension": rep.x_dim,
         "model": {"name": cfg.model.name, "params": cfg.model.params},
         "training_policy": cfg.training.policy,
-        "training_y_ops": [
-            {"name": p.name, "params": p.params} for p in (cfg.training.y_ops or [])
-        ],
+        "training_y_ops": [{"name": p.name, "params": p.params} for p in (cfg.training.y_ops or [])],
         "selection": {
             "strategy": cfg.selection.selection.name,
             "params": cfg.selection.selection.params,

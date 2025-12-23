@@ -110,16 +110,12 @@ def _normalize_region(region, seq_len: int) -> Tuple[int, int, bool]:
     if isinstance(region, int):
         i = int(region)
         if not (0 <= i <= seq_len):
-            raise ValueError(
-                f"region out of bounds for sequence length {seq_len}: {region}"
-            )
+            raise ValueError(f"region out of bounds for sequence length {seq_len}: {region}")
         return i, i, True
     if isinstance(region, (list, tuple)) and len(region) == 2:
         s, e = int(region[0]), int(region[1])
         if not (0 <= s <= e <= seq_len):
-            raise ValueError(
-                f"region out of bounds for sequence length {seq_len}: {region}"
-            )
+            raise ValueError(f"region out of bounds for sequence length {seq_len}: {region}")
         return s, e, False
     raise ValueError("region must be an integer or [start, end]")
 
@@ -170,9 +166,7 @@ class ScanStemLoop(Protocol):
         seed = params.get("seed") or {}
         cap = seed.get("cap")
         if not isinstance(cap, str) or not re.fullmatch(r"[ACGTacgt]+", cap or ""):
-            raise ValueError(
-                "seed.cap is required and must be DNA (A/C/G/T), case-insensitive"
-            )
+            raise ValueError("seed.cap is required and must be DNA (A/C/G/T), case-insensitive")
         if len(cap) < 3:
             raise ValueError("seed.cap length must be ≥ 3")
 
@@ -181,9 +175,7 @@ class ScanStemLoop(Protocol):
             val = seed.get(fld)
             if val is None:
                 continue
-            if not isinstance(val, str) or (
-                val and not re.fullmatch(r"[ACGTacgt]+", val)
-            ):
+            if not isinstance(val, str) or (val and not re.fullmatch(r"[ACGTacgt]+", val)):
                 raise ValueError(f"seed.{fld} must be DNA (A/C/G/T), case-insensitive")
 
         program = params.get("program") or {}
@@ -197,24 +189,16 @@ class ScanStemLoop(Protocol):
             stop = int(stem_len.get("stop"))
             step = int(stem_len.get("step"))
         except Exception as exc:  # pragma: no cover - defensive
-            raise ValueError(
-                "program.stem_len must have positive step and start ≤ stop"
-            ) from exc
+            raise ValueError("program.stem_len must have positive step and start ≤ stop") from exc
         if not (step > 0 and start <= stop):
-            raise ValueError(
-                "program.stem_len must have positive step and start ≤ stop"
-            )
+            raise ValueError("program.stem_len must have positive step and start ≤ stop")
 
         # Explicit growth direction (cap vs base). 'anchor' is deprecated.
         if "anchor" in program:
-            raise ValueError(
-                "program.anchor is deprecated. Use program.grow_from with 'cap' or 'base'."
-            )
+            raise ValueError("program.anchor is deprecated. Use program.grow_from with 'cap' or 'base'.")
         grow_from = program.get("grow_from")
         if grow_from not in {"cap", "base"}:
-            raise ValueError(
-                "program.grow_from is required and must be 'cap' or 'base'"
-            )
+            raise ValueError("program.grow_from is required and must be 'cap' or 'base'")
 
         spl = int(program.get("samples_per_length", 0))
         if spl <= 0:
@@ -242,39 +226,26 @@ class ScanStemLoop(Protocol):
         strata = program.get("strata")
         if strata is not None:
             if not isinstance(strata, list) or len(strata) == 0:
-                raise ValueError(
-                    "program.strata must be a non-empty list when provided"
-                )
+                raise ValueError("program.strata must be a non-empty list when provided")
             for s in strata:
                 if not isinstance(s, dict) or "id" not in s:
-                    raise ValueError(
-                        "each program.strata[] item must be an object with an 'id'"
-                    )
+                    raise ValueError("each program.strata[] item must be an object with an 'id'")
                 ovr = s.get("overrides", {}) or {}
                 if "gc_target" in ovr and not (0.0 <= float(ovr["gc_target"]) <= 1.0):
-                    raise ValueError(
-                        "program.strata[].overrides.gc_target must be in [0, 1]"
-                    )
+                    raise ValueError("program.strata[].overrides.gc_target must be in [0, 1]")
                 mm_s = ovr.get("mismatch_rate", None)
                 if mm_s is not None and not (0.0 <= float(mm_s) <= 1.0):
-                    raise ValueError(
-                        "program.strata[].overrides.mismatch.rate must be in [0, 1]"
-                    )
+                    raise ValueError("program.strata[].overrides.mismatch.rate must be in [0, 1]")
                 spl2 = s.get("samples_per_length")
                 if spl2 is not None and int(spl2) <= 0:
-                    raise ValueError(
-                        "program.strata[].samples_per_length must be a positive integer"
-                    )
+                    raise ValueError("program.strata[].samples_per_length must be a positive integer")
 
         # Placement: either a numeric region OR anchors (left/right), not both
         region = params.get("region", None)
         anchors = params.get("anchors", None)
         if anchors is None:
             # region is required when anchors are not provided
-            if not (
-                isinstance(region, int)
-                or (isinstance(region, (list, tuple)) and len(region) == 2)
-            ):
+            if not (isinstance(region, int) or (isinstance(region, (list, tuple)) and len(region) == 2)):
                 raise ValueError("region must be an integer or [start, end]")
         else:
             if region is not None:
@@ -287,9 +258,7 @@ class ScanStemLoop(Protocol):
                     raise ValueError(f"anchors.{key} must be DNA (A/C/G/T)")
 
     # ------------------------------ Generation ------------------------------ #
-    def generate(
-        self, *, ref_entry: Dict, params: Dict, rng: np.random.Generator
-    ) -> Iterable[Dict]:
+    def generate(self, *, ref_entry: Dict, params: Dict, rng: np.random.Generator) -> Iterable[Dict]:
         original = str(ref_entry["sequence"]).upper()
         name = ref_entry.get("ref_name", "<unknown>")
         if not re.fullmatch(r"[ACGT]+", original or ""):
@@ -312,20 +281,14 @@ class ScanStemLoop(Protocol):
             if not right_hits:
                 raise ValueError(f"[{name}] anchors.right not found in reference")
             if len(left_hits) > 1:
-                raise ValueError(
-                    f"[{name}] anchors.left is ambiguous (matches={len(left_hits)})"
-                )
+                raise ValueError(f"[{name}] anchors.left is ambiguous (matches={len(left_hits)})")
             # choose the first right that occurs after left
             L0 = left_hits[0]
             R_candidates = [r for r in right_hits if r >= L0 + len(left)]
             if not R_candidates:
-                raise ValueError(
-                    f"[{name}] anchors.right occurs before/overlaps anchors.left"
-                )
+                raise ValueError(f"[{name}] anchors.right occurs before/overlaps anchors.left")
             if len(R_candidates) > 1:
-                raise ValueError(
-                    f"[{name}] anchors.right is ambiguous after left (matches={len(R_candidates)})"
-                )
+                raise ValueError(f"[{name}] anchors.right is ambiguous after left (matches={len(R_candidates)})")
             R0 = R_candidates[0]
             s, e = L0 + len(left), R0
             is_insert = s == e
@@ -395,9 +358,7 @@ class ScanStemLoop(Protocol):
         # Seed paired length and mode guard
         paired0 = min(len(up_init), len(down_init))
         if mode == "extend" and L_start < paired0:
-            raise ValueError(
-                "program.stem_len.start must be ≥ seed paired length (extend mode)"
-            )
+            raise ValueError("program.stem_len.start must be ≥ seed paired length (extend mode)")
 
         # Inclusive schedule
         L_list: List[int] = list(range(L_start, L_stop + 1, L_step))
@@ -454,9 +415,7 @@ class ScanStemLoop(Protocol):
 
                         # Per-attempt deterministic RNG (track-aware)
                         seed_bytes = hashlib.blake2b(
-                            f"{base_seed}|{track_id}|{L}|{r}|{attempts}".encode(
-                                "utf-8"
-                            ),
+                            f"{base_seed}|{track_id}|{L}|{r}|{attempts}".encode("utf-8"),
                             digest_size=8,
                         ).digest()
                         inner_seed = int.from_bytes(seed_bytes, "big", signed=False)
@@ -489,9 +448,7 @@ class ScanStemLoop(Protocol):
                             up, down = _attach_pair(up, down, u, d, grow_from)
 
                         # Compute metrics over paired columns only
-                        paired_columns, mismatch_count, gc_count = _pair_counts(
-                            up, down
-                        )
+                        paired_columns, mismatch_count, gc_count = _pair_counts(up, down)
                         gc_frac = gc_count / max(1, paired_columns)
                         mis_frac = mismatch_count / max(1, paired_columns)
                         longest_run = _longest_match_run(up, down)
@@ -513,10 +470,7 @@ class ScanStemLoop(Protocol):
                         # Capture one representative "preview" per (track, L)
                         if found == 0:
                             # Include L so the preview clearly corresponds to a specific length.
-                            previews.append(
-                                f"[L={L}] "
-                                + _preview_line(original, s, e, up, cap, down)
-                            )
+                            previews.append(f"[L={L}] " + _preview_line(original, s, e, up, cap, down))
 
                         variant = {
                             "sequence": full,
@@ -525,7 +479,7 @@ class ScanStemLoop(Protocol):
                                     "hp "
                                     f"L={paired_columns} grow_from={grow_from} mode={mode} "
                                     f"region={s}:{e} cap={len(cap)} "
-                                    f"asym={abs(len(up)-len(down))} mm={mis_frac:.3f} gc={gc_frac:.3f} "
+                                    f"asym={abs(len(up) - len(down))} mm={mis_frac:.3f} gc={gc_frac:.3f} "
                                     f"rep={r} hash={hp_id} cat={track_id}"
                                 )
                             ],
@@ -533,15 +487,9 @@ class ScanStemLoop(Protocol):
                             "hp_region_start": s,
                             "hp_region_end": e,
                             "hp_region_is_insertion": bool(is_insert),
-                            "hp_placed_by": (
-                                "anchors" if anchors is not None else "region"
-                            ),
-                            "hp_anchor_left_len": (
-                                len(anchors["left"]) if anchors else None
-                            ),
-                            "hp_anchor_right_len": (
-                                len(anchors["right"]) if anchors else None
-                            ),
+                            "hp_placed_by": ("anchors" if anchors is not None else "region"),
+                            "hp_anchor_left_len": (len(anchors["left"]) if anchors else None),
+                            "hp_anchor_right_len": (len(anchors["right"]) if anchors else None),
                             # (left/right positions only when anchors used)
                             **(
                                 {}

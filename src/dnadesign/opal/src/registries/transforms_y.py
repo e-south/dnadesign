@@ -48,9 +48,7 @@ def list_transforms_y() -> List[str]:
 
 _Y_OPS: Dict[
     str,
-    Tuple[
-        Callable[..., Any], Callable[..., Any], Callable[..., Any], Optional[Type[Any]]
-    ],
+    Tuple[Callable[..., Any], Callable[..., Any], Callable[..., Any], Optional[Type[Any]]],
 ] = {}
 
 
@@ -70,9 +68,7 @@ def register_y_op(name: str):
             raise ValueError(f"Y-op already registered: {name!r}")
         spec = factory()
         if not (isinstance(spec, tuple) and len(spec) == 4):
-            raise ValueError(
-                "Y-op factory must return (fit, transform, inverse, ParamModel)"
-            )
+            raise ValueError("Y-op factory must return (fit, transform, inverse, ParamModel)")
         _Y_OPS[name] = spec
         return factory
 
@@ -128,17 +124,11 @@ def run_y_ops_pipeline(
     if stage == "fit_transform":
         for entry in y_ops or []:
             fit_fn, xform_fn, inv_fn, ParamT = get_y_op(entry.name)
-            params = (
-                ParamT(**(entry.params or {})).model_dump()
-                if ParamT is not None
-                else dict(entry.params or {})
-            )
+            params = ParamT(**(entry.params or {})).model_dump() if ParamT is not None else dict(entry.params or {})
             # side-effect: write fitted stats into ctx under yops/<name>/*
             fit_fn(Yt, ParamT(**params) if ParamT is not None else params, ctx=ctx)
             Yt = np.asarray(
-                xform_fn(
-                    Yt, ParamT(**params) if ParamT is not None else params, ctx=ctx
-                ),
+                xform_fn(Yt, ParamT(**params) if ParamT is not None else params, ctx=ctx),
                 dtype=float,
             )
             names.append(entry.name)

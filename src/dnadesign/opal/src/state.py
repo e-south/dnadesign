@@ -75,9 +75,7 @@ class CampaignState:
     performance: Dict[str, Any] = field(default_factory=dict)
     rounds: List[RoundEntry] = field(default_factory=list)
     backlog: Dict[str, Any] = field(
-        default_factory=lambda: {
-            "number_of_selected_but_not_yet_labeled_candidates_total": 0
-        }
+        default_factory=lambda: {"number_of_selected_but_not_yet_labeled_candidates_total": 0}
     )
 
     # ---- Back-compat aliases (old field names) ----
@@ -115,8 +113,7 @@ class CampaignState:
         missing = [k for k in required if k not in raw or raw[k] in (None, "")]
         if missing:
             raise ValueError(
-                f"state.json is missing required keys: {missing}. "
-                "Run `opal init` or regenerate the state."
+                f"state.json is missing required keys: {missing}. Run `opal init` or regenerate the state."
             )
 
         # Fill sensible defaults if absent (non-breaking for forward fields).

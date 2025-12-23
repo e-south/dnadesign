@@ -47,11 +47,7 @@ def build_record_report(
         if m.any():
             row = df_records.loc[m].head(1)
     if row is None and sequence is not None:
-        m = (
-            (df_records.get("sequence") == sequence)
-            if "sequence" in df_records.columns
-            else None
-        )
+        m = (df_records.get("sequence") == sequence) if "sequence" in df_records.columns else None
         if m is not None and m.any():
             row = df_records.loc[m].head(1)
     if row is None:
@@ -76,9 +72,7 @@ def build_record_report(
 
     lh_col = f"opal__{campaign_slug}__label_hist"
     hist = row.get(lh_col)
-    report["labels"] = (
-        RecordsStore._normalize_hist_cell(hist) if hist is not None else []
-    )
+    report["labels"] = RecordsStore._normalize_hist_cell(hist) if hist is not None else []
 
     # Sources (succinct, relative) for clarity when many parquets exist
     srcs: Dict[str, str] = {}
@@ -95,22 +89,18 @@ def build_record_report(
     if events_path is not None and events_path.exists():
         # Legacy path (a single Parquet index). Kept for backward compatibility.
         ev = pd.read_parquet(events_path)
-        col = (
-            "event"
-            if "event" in ev.columns
-            else ("kind" if "kind" in ev.columns else None)
-        )
+        col = "event" if "event" in ev.columns else ("kind" if "kind" in ev.columns else None)
         if col is None:
             report["runs"] = []
             return report
         ev = ev[(ev[col] == "run_pred") & (ev["id"].astype(str) == rid)]
         # compact per-round view
-        cols = [
-            c
-            for c in ev.columns
-            if c.startswith("pred__") or c.startswith("unc__") or c.startswith("sel__")
-        ]
+        cols = [c for c in ev.columns if c.startswith("pred__") or c.startswith("unc__") or c.startswith("sel__")]
         cols = ["as_of_round", "run_id", "sequence"] + cols
+
+        if "sequence" not in ev.columns:
+            ev = ev.copy()
+            ev["sequence"] = seq_val
 
         out = ev[cols].sort_values(["as_of_round", "run_id"])
         report["runs"] = out.to_dict(orient="records")
@@ -137,11 +127,7 @@ def build_record_report(
             except Exception:
                 latest_rank_comp = None
             try:
-                avg_rank_comp = float(
-                    pd.to_numeric(out["sel__rank_competition"], errors="coerce")
-                    .dropna()
-                    .mean()
-                )
+                avg_rank_comp = float(pd.to_numeric(out["sel__rank_competition"], errors="coerce").dropna().mean())
             except Exception:
                 avg_rank_comp = None
     else:
@@ -171,19 +157,12 @@ def build_record_report(
                 for p in sorted(pred_dir.glob("part-*.parquet")):
                     try:
                         sub = pd.read_parquet(p, columns=needed_cols)
-                        sub = sub[
-                            (sub.get("event") == "run_pred")
-                            & (sub["id"].astype(str) == rid)
-                        ]
+                        sub = sub[(sub.get("event") == "run_pred") & (sub["id"].astype(str) == rid)]
                         if not sub.empty:
                             frames.append(sub)
                     except Exception:
                         continue
-                ev = (
-                    pd.concat(frames, ignore_index=True)
-                    if frames
-                    else pd.DataFrame(columns=needed_cols)
-                )
+                ev = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=needed_cols)
             else:
                 ev = pd.DataFrame(columns=["event"])
         else:

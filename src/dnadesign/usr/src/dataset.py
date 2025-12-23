@@ -98,9 +98,7 @@ class Dataset:
         self.dir.mkdir(parents=True, exist_ok=True)
         if self.records_path.exists():
             raise SequencesError(f"Dataset already initialized: {self.records_path}")
-        empty = pa.Table.from_arrays(
-            [pa.array([], type=f.type) for f in ARROW_SCHEMA], schema=ARROW_SCHEMA
-        )
+        empty = pa.Table.from_arrays([pa.array([], type=f.type) for f in ARROW_SCHEMA], schema=ARROW_SCHEMA)
         write_parquet_atomic(empty, self.records_path, self.snapshot_dir)
         ts = now_utc()
         date = ts.split("T")[0]
@@ -114,9 +112,7 @@ class Dataset:
             f"- {ts}: initialized dataset.\n"
         )
         self.meta_path.write_text(meta_md, encoding="utf-8")
-        append_event(
-            self.events_path, {"action": "init", "dataset": self.name, "source": source}
-        )
+        append_event(self.events_path, {"action": "init", "dataset": self.name, "source": source})
 
     # --- lightweight, best-effort scratch-pad logging in meta.md ---
     def append_meta_note(self, title: str, code_block: Optional[str] = None) -> None:
@@ -148,9 +144,7 @@ class Dataset:
             {
                 c.split("__", 1)[0]
                 for c in cols
-                if c not in {k for k, _ in REQUIRED_COLUMNS}
-                and c not in LEGACY_ALLOW
-                and "__" in c
+                if c not in {k for k, _ in REQUIRED_COLUMNS} and c not in LEGACY_ALLOW and "__" in c
             }
         )
         return {
@@ -234,9 +228,7 @@ class Dataset:
         # Optional user-supplied ids must match
         if "id" in df_in.columns and strict_id_check:
             bad_idx = [
-                i
-                for i, (given, want) in enumerate(zip(df_in["id"].astype(str), ids))
-                if str(given) != str(want)
+                i for i, (given, want) in enumerate(zip(df_in["id"].astype(str), ids)) if str(given) != str(want)
             ]
             if bad_idx:
                 raise SchemaError(
@@ -296,11 +288,7 @@ class Dataset:
         casefold_map: Dict[tuple, List[int]] = defaultdict(list)
         for i, (bt, s) in enumerate(zip(bio_list, seqs), start=1):
             casefold_map[(bt.lower(), s.upper())].append(i)
-        casefold_groups_all = [
-            (key, rows_idx)
-            for key, rows_idx in casefold_map.items()
-            if len(rows_idx) > 1
-        ]
+        casefold_groups_all = [(key, rows_idx) for key, rows_idx in casefold_map.items() if len(rows_idx) > 1]
         # Only show groups that are NOT already exact dup groups
         exact_row_sets = {tuple(g.rows) for g in exact_groups}
         casefold_groups = []
@@ -335,13 +323,9 @@ class Dataset:
                 "Case-insensitive duplicate sequences detected in incoming data "
                 "(same letters, different capitalization).",
                 casefold_groups=casefold_groups[:5],
-                hint=(
-                    "Sequences that differ only by case are treated as duplicates at import time. "
-                ),
+                hint=("Sequences that differ only by case are treated as duplicates at import time. "),
             )
-        incoming = pa.Table.from_pandas(
-            out_df, schema=ARROW_SCHEMA, preserve_index=False
-        )
+        incoming = pa.Table.from_pandas(out_df, schema=ARROW_SCHEMA, preserve_index=False)
 
         # Merge with existing (append-only; reject collisions)
         if self.records_path.exists():
@@ -353,17 +337,12 @@ class Dataset:
                 existing_cf = {(bt.lower(), sq.upper()) for bt, sq in zip(ex_bt, ex_sq)}
                 conflicts = [
                     i
-                    for i, (bt, s) in enumerate(
-                        zip(bio.astype(str).tolist(), seqs), start=1
-                    )
+                    for i, (bt, s) in enumerate(zip(bio.astype(str).tolist(), seqs), start=1)
                     if (bt.lower(), s.upper()) in existing_cf
                 ]
                 if conflicts:
                     preview = [
-                        DuplicateGroup(
-                            id=ids[i - 1], count=1, rows=[i], sequence=seqs[i - 1]
-                        )
-                        for i in conflicts[:5]
+                        DuplicateGroup(id=ids[i - 1], count=1, rows=[i], sequence=seqs[i - 1]) for i in conflicts[:5]
                     ]
                     raise DuplicateIDError(
                         "Case-insensitive duplicate sequences already exist in this dataset.",
@@ -490,11 +469,7 @@ class Dataset:
             raise SchemaError(f"Missing id column '{id_col}' in incoming data.")
 
         # Choose + prefix targets
-        attach_cols = (
-            [c for c in inc.columns if c != id_col]
-            if columns is None
-            else list(columns)
-        )
+        attach_cols = [c for c in inc.columns if c != id_col] if columns is None else list(columns)
         if not attach_cols:
             return 0
 
@@ -529,17 +504,13 @@ class Dataset:
         targets = [target_name(c) for c in attach_cols]
 
         # --- Map sequence → id if requested ---
-        existing_tbl = read_parquet(
-            self.records_path, columns=["id", "sequence", "bio_type"]
-        )
+        existing_tbl = read_parquet(self.records_path, columns=["id", "sequence", "bio_type"])
         if id_col.lower() == "sequence":
             seq_to_ids: Dict[str, List[str]] = {}
             pair_to_id: Dict[tuple, str] = {}
             # build maps from current dataset
             ds_ids = existing_tbl.column("id").to_pylist()
-            ds_seqs = [
-                str(s).strip() for s in existing_tbl.column("sequence").to_pylist()
-            ]
+            ds_seqs = [str(s).strip() for s in existing_tbl.column("sequence").to_pylist()]
             ds_types = [str(bt) for bt in existing_tbl.column("bio_type").to_pylist()]
             for rid, bt, seq in zip(ds_ids, ds_types, ds_seqs):
                 pair_to_id[(bt, seq)] = rid
@@ -547,9 +518,7 @@ class Dataset:
 
             incoming_seq = work[id_col].astype(str).map(lambda s: s.strip()).tolist()
             incoming_type = (
-                inc["bio_type"].astype(str).tolist()
-                if "bio_type" in inc.columns
-                else [None] * len(incoming_seq)
+                inc["bio_type"].astype(str).tolist() if "bio_type" in inc.columns else [None] * len(incoming_seq)
             )
             resolved: List[Optional[str]] = []
             for bt, seq in zip(incoming_type, incoming_seq):
@@ -582,9 +551,7 @@ class Dataset:
         essential = {k for k, _ in REQUIRED_COLUMNS}
         clobbers = [c for c in targets if c in existing_names]
         if clobbers and not allow_overwrite:
-            raise NamespaceError(
-                f"Columns already exist: {', '.join(clobbers)}. Use --allow-overwrite to replace."
-            )
+            raise NamespaceError(f"Columns already exist: {', '.join(clobbers)}. Use --allow-overwrite to replace.")
         for t in targets:
             if t in essential:
                 raise NamespaceError(f"Refusing to write essential column: {t}")
@@ -639,9 +606,7 @@ class Dataset:
             if all(v is None for v in cleaned):
                 return pa.array(cleaned, type=pa.string())
             if any(isinstance(v, str) for v in cleaned):
-                return pa.array(
-                    [None if v is None else str(v) for v in cleaned], type=pa.string()
-                )
+                return pa.array([None if v is None else str(v) for v in cleaned], type=pa.string())
             return pa.array(cleaned)
 
         # id->value map per target (latest wins)
@@ -667,9 +632,7 @@ class Dataset:
                         base_values[idx] = v
                 arr = _to_arrow_typed(base_values, field.type)
                 col_idx = new_tbl.schema.get_field_index(col)
-                new_tbl = new_tbl.set_column(
-                    col_idx, pa.field(col, arr.type, nullable=True), arr
-                )
+                new_tbl = new_tbl.set_column(col_idx, pa.field(col, arr.type, nullable=True), arr)
             else:
                 base_values = [None] * nrows
                 for rid, v in incoming_map.items():
@@ -677,9 +640,7 @@ class Dataset:
                     if idx is not None:
                         base_values[idx] = v
                 arr = _infer_arrow(base_values)
-                new_tbl = new_tbl.add_column(
-                    new_tbl.num_columns, pa.field(col, arr.type, nullable=True), arr
-                )
+                new_tbl = new_tbl.add_column(new_tbl.num_columns, pa.field(col, arr.type, nullable=True), arr)
 
         # Atomic write
         write_parquet_atomic(new_tbl, self.records_path, self.snapshot_dir)
@@ -793,12 +754,8 @@ class Dataset:
     def grep(self, pattern: str, limit: int = 20):
         """Regex search across sequences, returning first `limit` hits."""
         self._require_exists()
-        df = read_parquet(
-            self.records_path, columns=["id", "sequence", "length"]
-        ).to_pandas()
-        hits = df[
-            df["sequence"].str.contains(pattern, case=False, regex=True, na=False)
-        ]
+        df = read_parquet(self.records_path, columns=["id", "sequence", "length"]).to_pandas()
+        hits = df[df["sequence"].str.contains(pattern, case=False, regex=True, na=False)]
         return hits.head(limit)
 
     def export(self, fmt: str, out_path: Path) -> None:

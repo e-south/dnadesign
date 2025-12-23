@@ -84,9 +84,7 @@ def _log(enabled: bool, msg: str) -> None:
         print_stderr(msg)
 
 
-def run_round(
-    store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest
-) -> RunRoundResult:
+def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> RunRoundResult:
     cfg = req.cfg
     workdir = Path(cfg.campaign.workdir)
     rdir = round_dir(workdir, req.as_of_round)
@@ -136,10 +134,7 @@ def run_round(
                     "name": cfg.selection.selection.name,
                     "params": cfg.selection.selection.params,
                 },
-                "y_ops": [
-                    {"name": p.name, "params": p.params}
-                    for p in (cfg.training.y_ops or [])
-                ],
+                "y_ops": [{"name": p.name, "params": p.params} for p in (cfg.training.y_ops or [])],
             },
         },
     )
@@ -181,9 +176,7 @@ def run_round(
     if train_df.empty:
         raise OpalError(f"No labels ≤ round {req.as_of_round} for training.")
 
-    Y_train = np.stack(
-        train_df["y"].map(lambda v: np.asarray(v, dtype=float)).to_list(), axis=0
-    )
+    Y_train = np.stack(train_df["y"].map(lambda v: np.asarray(v, dtype=float)).to_list(), axis=0)
     R_train = train_df["r"].astype(int).to_numpy()
     y_dim = int(Y_train.shape[1])
     exp_len = cfg.data.y_expected_length
@@ -258,9 +251,7 @@ def run_round(
             "ops": [p.name for p in yops_cfg],
         },
     )
-    Y_train_fit = run_y_ops_pipeline(
-        stage="fit_transform", y_ops=yops_cfg, Y=Y_train, ctx=rctx
-    )
+    Y_train_fit = run_y_ops_pipeline(stage="fit_transform", y_ops=yops_cfg, Y=Y_train, ctx=rctx)
 
     # --- Model fit ---
     tfit0 = time.perf_counter()
@@ -279,7 +270,7 @@ def run_round(
     tfit1 = time.perf_counter()
     _log(
         req.verbose,
-        f"[fit] model={cfg.model.name} | dt={tfit1 - tfit0:.3f}s | oob_r2={getattr(fit_metrics,'oob_r2',None)}",
+        f"[fit] model={cfg.model.name} | dt={tfit1 - tfit0:.3f}s | oob_r2={getattr(fit_metrics, 'oob_r2', None)}",
     )
 
     # --- Predict candidates (batched) in Y-ops space ---
@@ -315,9 +306,7 @@ def run_round(
         import sys as _sys
 
         _sys.stderr.write("\n")
-    Y_hat_fit = (
-        np.vstack(yhat_chunks) if yhat_chunks else np.zeros((0, y_dim), dtype=float)
-    )
+    Y_hat_fit = np.vstack(yhat_chunks) if yhat_chunks else np.zeros((0, y_dim), dtype=float)
 
     # --- Inverse Y-ops to objective space (decoupled) ---
     _log(
@@ -334,9 +323,7 @@ def run_round(
         },
     )
     if Y_hat.shape[1] != y_dim:
-        raise OpalError(
-            f"Predicted Y dimension mismatch: expected {y_dim}, got {Y_hat.shape[1]}"
-        )
+        raise OpalError(f"Predicted Y dimension mismatch: expected {y_dim}, got {Y_hat.shape[1]}")
 
     # --- Objective ---
     rctx.set_core("core/labels_as_of_round", int(req.as_of_round))
@@ -377,10 +364,7 @@ def run_round(
         n_ninf = int(np.isneginf(y_obj_scalar).sum())
         # We have id_order_pool already; build preview with ids (and optional sequences if available)
         bad_ids = np.array(id_order_pool)[non_finite_mask]
-        preview_pairs = [
-            f"{bad_ids[i]}={y_obj_scalar[non_finite_mask][i]:.6g}"
-            for i in range(min(20, n))
-        ]
+        preview_pairs = [f"{bad_ids[i]}={y_obj_scalar[non_finite_mask][i]:.6g}" for i in range(min(20, n))]
         raise OpalError(
             "Objective produced non-finite scores for {n}/{N} candidates "
             "(NaN={na}, +Inf={pi}, -Inf={ni}). Sample: {pv}. "
@@ -427,16 +411,10 @@ def run_round(
             "stage": "objective_done",
             "objective": obj_name,
             "score_min": float(np.nanmin(y_obj_scalar)) if y_obj_scalar.size else None,
-            "score_median": (
-                float(np.nanmedian(y_obj_scalar)) if y_obj_scalar.size else None
-            ),
+            "score_median": (float(np.nanmedian(y_obj_scalar)) if y_obj_scalar.size else None),
             "score_max": float(np.nanmax(y_obj_scalar)) if y_obj_scalar.size else None,
             "train_effect_pool_size": int(diag.get("train_effect_pool_size", 0)),
-            "denom_used": (
-                float(diag.get("denom_used", float("nan")))
-                if "denom_used" in diag
-                else None
-            ),
+            "denom_used": (float(diag.get("denom_used", float("nan"))) if "denom_used" in diag else None),
         },
     )
     # --- Selection ---
@@ -470,8 +448,7 @@ def run_round(
     missing = sorted(k for k in required_keys if k not in sel_norm)
     if missing:
         raise OpalError(
-            f"normalize_selection_result is missing required key(s): {missing}. "
-            f"Present keys: {sorted(sel_norm.keys())}"
+            f"normalize_selection_result is missing required key(s): {missing}. Present keys: {sorted(sel_norm.keys())}"
         )
 
     ranks_competition = np.asarray(sel_norm["rank_competition"]).astype(int)
@@ -513,11 +490,7 @@ def run_round(
     model.save(str(apaths.model))
 
     # Map sequences up-front for artifact emission
-    seq_map = (
-        df.set_index("id")["sequence"].astype(str).to_dict()
-        if "sequence" in df.columns
-        else {}
-    )
+    seq_map = df.set_index("id")["sequence"].astype(str).to_dict() if "sequence" in df.columns else {}
     selected_df = (
         pd.DataFrame(
             {
@@ -529,9 +502,7 @@ def run_round(
             }
         )
         .loc[lambda d: d["sel__is_selected"]]
-        .sort_values("sel__rank_competition")[
-            ["id", "sequence", "sel__rank_competition", "selection_score"]
-        ]
+        .sort_values("sel__rank_competition")[["id", "sequence", "sel__rank_competition", "selection_score"]]
     )
     sel_sha = write_selection_csv(apaths.selection_csv, selected_df)
 
@@ -541,9 +512,7 @@ def run_round(
     artifacts_paths_and_hashes: Dict[str, tuple[str, str]] = {}
 
     # ---- Optional model artifacts (e.g., RandomForest feature importance) ----
-    if hasattr(model, "model_artifacts") and callable(
-        getattr(model, "model_artifacts")
-    ):
+    if hasattr(model, "model_artifacts") and callable(getattr(model, "model_artifacts")):
         try:
             m_arts = model.model_artifacts() or {}
             if "feature_importance" in m_arts:
@@ -555,11 +524,7 @@ def run_round(
                 xdim = int(imp.shape[0])
                 nonzero = int((imp > 0).sum())
                 hhi = float(np.sum((imp / max(imp.sum(), 1e-12)) ** 2))
-                top5 = (
-                    fi_df.sort_values("importance", ascending=False)
-                    .head(5)
-                    .to_dict(orient="records")
-                )
+                top5 = fi_df.sort_values("importance", ascending=False).head(5).to_dict(orient="records")
                 _log(
                     req.verbose,
                     f"[model] feature_importance: x_dim={xdim} nonzero={nonzero} HHI={hhi:.4f}",
@@ -587,11 +552,7 @@ def run_round(
     _log(
         req.verbose,
         "[artifacts] model, selection_csv, round_ctx, objective_meta"
-        + (
-            ", feature_importance"
-            if "feature_importance.csv" in artifacts_paths_and_hashes
-            else ""
-        )
+        + (", feature_importance" if "feature_importance.csv" in artifacts_paths_and_hashes else "")
         + " written",
     )
 
@@ -642,11 +603,7 @@ def run_round(
                     note=f"labels used in run {run_id} (as_of_round={int(req.as_of_round)})",
                 )
             )
-    label_events_df = (
-        pd.concat(label_events_frames, ignore_index=True)
-        if label_events_frames
-        else None
-    )
+    label_events_df = pd.concat(label_events_frames, ignore_index=True) if label_events_frames else None
 
     # Now add the standard artifacts (model, selection, round ctx, objective meta)
     artifacts_paths_and_hashes.update(
@@ -663,9 +620,7 @@ def run_round(
         as_of_round=int(req.as_of_round),
         model_name=cfg.model.name,
         model_params=model.get_params(),
-        y_ops=[
-            {"name": p.name, "params": p.params} for p in (cfg.training.y_ops or [])
-        ],
+        y_ops=[{"name": p.name, "params": p.params} for p in (cfg.training.y_ops or [])],
         x_transform_name=cfg.data.transforms_x.name,
         x_transform_params=dict(cfg.data.transforms_x.params),
         y_ingest_transform_name=cfg.data.transforms_y.name,
@@ -726,11 +681,7 @@ def run_round(
     # If resuming on the same round, replace existing entries for this round index
     if req.allow_resume:
         try:
-            st.rounds = [
-                r
-                for r in st.rounds
-                if int(getattr(r, "round_index", -1)) != int(req.as_of_round)
-            ]
+            st.rounds = [r for r in st.rounds if int(getattr(r, "round_index", -1)) != int(req.as_of_round)]
         except Exception:
             pass
 
@@ -741,8 +692,7 @@ def run_round(
     st.y_column_name = cfg.data.y_column_name
     st.representation_vector_dimension = rep.x_dim or 0
     st.performance = {
-        "score_batch_size": req.score_batch_size_override
-        or cfg.scoring.score_batch_size,
+        "score_batch_size": req.score_batch_size_override or cfg.scoring.score_batch_size,
         "objective": obj_name,
     }
     st.add_round(
@@ -772,15 +722,9 @@ def run_round(
                 # Keep legacy key for compatibility; may point to a non-existent file.
                 "events_parquet": str(ev_path.resolve()),
                 # New, explicit ledger sinks:
-                "ledger_predictions_dir": str(
-                    (ev_path.parent / "ledger.predictions").resolve()
-                ),
-                "ledger_runs_parquet": str(
-                    (ev_path.parent / "ledger.runs.parquet").resolve()
-                ),
-                "ledger_labels_parquet": str(
-                    (ev_path.parent / "ledger.labels.parquet").resolve()
-                ),
+                "ledger_predictions_dir": str((ev_path.parent / "ledger.predictions").resolve()),
+                "ledger_runs_parquet": str((ev_path.parent / "ledger.runs.parquet").resolve()),
+                "ledger_labels_parquet": str((ev_path.parent / "ledger.labels.parquet").resolve()),
                 "round_ctx_json": str(apaths.round_ctx_json.resolve()),
                 "objective_meta_json": str(apaths.objective_meta_json.resolve()),
             },

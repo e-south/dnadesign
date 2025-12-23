@@ -12,17 +12,17 @@ See the SFXI objective details [**here**](./src/objectives/DOCS/setpoint_fidelit
 
 ### What this demo does
 
-1. **Ingest** a tidy CSV containing logic and intensity (log2*) columns → build an 8-vector label per sequence.  
-2. **Train** a Random Forest regressor on your chosen X and these 8-vector labels.  
-3. **Predict** Ŷ for the unlabeled candidate pool.  
-4. **Score** each candidate with the SFXI-derived scalar.  
+1. **Ingest** a tidy CSV containing logic and intensity (log2*) columns → build an 8-vector label per sequence.
+2. **Train** a Random Forest regressor on your chosen X and these 8-vector labels.
+3. **Predict** Ŷ for the unlabeled candidate pool.
+4. **Score** each candidate with the SFXI-derived scalar.
 5. **Rank & select** top-k by that scalar, write per-round artifacts, and append canonical events.
 
 ---
 
 ### Data used here
 
-- **USR dataset**: `usr/datasets/demo/records.parquet`  
+- **USR dataset**: `usr/datasets/demo/records.parquet`
   Contains `sequence`, `mock__X_value`, and a placeholder label column.
 - **Experimental Y labels (SFXI)**: `usr/demo_material/demo_y_sfxi.csv`
 

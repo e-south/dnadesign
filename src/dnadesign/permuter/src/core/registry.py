@@ -47,18 +47,14 @@ def _builtins(group: str) -> dict[str, Type]:
             from dnadesign.permuter.src.protocols.dms.scan_dna import ScanDNA
         except Exception as e:
             # core protocol must be present
-            raise RuntimeError(
-                f"[registry] core builtin protocol 'scan_dna' failed to import: {e}"
-            ) from e
+            raise RuntimeError(f"[registry] core builtin protocol 'scan_dna' failed to import: {e}") from e
         out["scan_dna"] = ScanDNA
         try:
             from dnadesign.permuter.src.protocols.dms.scan_codon import ScanCodon
 
             out["scan_codon"] = ScanCodon
         except Exception as e:
-            _LOG.debug(
-                f"[registry] optional builtin protocol 'scan_codon' not available: {e}"
-            )
+            _LOG.debug(f"[registry] optional builtin protocol 'scan_codon' not available: {e}")
         try:
             from dnadesign.permuter.src.protocols.hairpins.scan_stem_loop import (
                 ScanStemLoop,
@@ -66,17 +62,13 @@ def _builtins(group: str) -> dict[str, Type]:
 
             out["scan_stem_loop"] = ScanStemLoop
         except Exception as e:
-            _LOG.debug(
-                f"[registry] optional builtin protocol 'scan_stem_loop' not available: {e}"
-            )
+            _LOG.debug(f"[registry] optional builtin protocol 'scan_stem_loop' not available: {e}")
         try:
             from dnadesign.permuter.src.protocols.combine.combine_aa import CombineAA
 
             out["combine_aa"] = CombineAA
         except Exception as e:
-            _LOG.debug(
-                f"[registry] optional builtin protocol 'combine_aa' not available: {e}"
-            )
+            _LOG.debug(f"[registry] optional builtin protocol 'combine_aa' not available: {e}")
         try:
             from dnadesign.permuter.src.protocols.multisite_select.main import MSel
 
@@ -95,9 +87,7 @@ def _builtins(group: str) -> dict[str, Type]:
             )
         except Exception as e:
             # core evaluator must be present
-            raise RuntimeError(
-                f"[registry] core builtin evaluator 'placeholder' failed to import: {e}"
-            ) from e
+            raise RuntimeError(f"[registry] core builtin evaluator 'placeholder' failed to import: {e}") from e
         out["placeholder"] = PlaceholderEvaluator
         try:
             from dnadesign.permuter.src.evaluators.evo2_ll import (
@@ -122,9 +112,7 @@ def _builtins(group: str) -> dict[str, Type]:
 
             out["evo2_logits"] = Evo2LogitsMeanEvaluator
         except Exception as e:
-            _LOG.debug(
-                "[registry] optional evaluator 'evo2_logits' not available: %s", e
-            )
+            _LOG.debug("[registry] optional evaluator 'evo2_logits' not available: %s", e)
         return out
 
 

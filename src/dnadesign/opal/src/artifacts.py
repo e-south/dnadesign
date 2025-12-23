@@ -106,9 +106,7 @@ def _append_parquet(path: Path, df: pd.DataFrame) -> None:
     try:
         old_tbl = pq.read_table(path)
     except Exception as e:
-        raise RuntimeError(
-            f"[ledger.index] failed to read existing Parquet file at {path!s}"
-        ) from e
+        raise RuntimeError(f"[ledger.index] failed to read existing Parquet file at {path!s}") from e
 
     # Assert schema compatibility (strict & explicit, easy to change later)
     if list(old_tbl.schema.names) != list(new_tbl.schema.names):
@@ -144,9 +142,7 @@ def _append_parquet_dedupe(path: Path, df: pd.DataFrame, *, key: Sequence[str]) 
     # Align column order strictly; assert mismatches
     if list(existing.columns) != list(df.columns):
         raise RuntimeError(
-            "Ledger sink schema mismatch.\n"
-            f"  existing: {list(existing.columns)}\n"
-            f"  new     : {list(df.columns)}"
+            f"Ledger sink schema mismatch.\n  existing: {list(existing.columns)}\n  new     : {list(df.columns)}"
         )
     out = pd.concat([existing, df], ignore_index=True)
     out = out.drop_duplicates(subset=list(key), keep="last")
@@ -155,9 +151,7 @@ def _append_parquet_dedupe(path: Path, df: pd.DataFrame, *, key: Sequence[str]) 
     tmp.replace(path)
 
 
-def append_events(
-    index_path: Path, df: pd.DataFrame, *, write_index: bool = False
-) -> str:
+def append_events(index_path: Path, df: pd.DataFrame, *, write_index: bool = False) -> str:
     """
     Canonical append for the **ledger** (append-only):
       • Typed sinks written as:
@@ -307,6 +301,5 @@ def append_events(
             _append_parquet(index_path, idx_df)
         except Exception as e:
             raise RuntimeError(
-                f"[ledger.index] failed updating {index_path} "
-                f"(schema v{LEDGER_SCHEMA_VERSION}): {e}"
+                f"[ledger.index] failed updating {index_path} (schema v{LEDGER_SCHEMA_VERSION}): {e}"
             ) from e

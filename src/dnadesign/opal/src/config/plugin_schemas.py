@@ -63,9 +63,7 @@ class _Vec8TableParams(BaseModel):
     logic_columns: List[Literal["v00", "v10", "v01", "v11"]] = Field(
         default_factory=lambda: ["v00", "v10", "v01", "v11"]
     )
-    intensity_columns: List[str] = Field(
-        default_factory=lambda: ["y00_star", "y10_star", "y01_star", "y11_star"]
-    )
+    intensity_columns: List[str] = Field(default_factory=lambda: ["y00_star", "y10_star", "y01_star", "y11_star"])
     strict_bounds: bool = True
     clip_bounds_eps: float = 1e-6
 
@@ -89,9 +87,7 @@ class _Vec8TableParams(BaseModel):
     @classmethod
     def _intensity_len4(cls, v):
         if len(v) != 4:
-            raise ValueError(
-                "intensity_columns must have length 4 in order [00,10,01,11]"
-            )
+            raise ValueError("intensity_columns must have length 4 in order [00,10,01,11]")
         return v
 
 
@@ -134,9 +130,7 @@ class _SFXIParams(BaseModel):
     @classmethod
     def _len4(cls, v):
         if len(v) != 4:
-            raise ValueError(
-                "objective.params.setpoint_vector must have length 4 (order: 00,10,01,11)"
-            )
+            raise ValueError("objective.params.setpoint_vector must have length 4 (order: 00,10,01,11)")
         return v
 
 
@@ -144,9 +138,7 @@ class _SFXIParams(BaseModel):
 class _TopNParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
     top_k: int = 12
-    tie_handling: Literal["competition_rank", "dense_rank", "ordinal"] = (
-        "competition_rank"
-    )
+    tie_handling: Literal["competition_rank", "dense_rank", "ordinal"] = "competition_rank"
     objective_mode: Optional[Literal["maximize", "minimize"]] = None
     exclude_already_labeled: bool = True
 

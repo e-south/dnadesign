@@ -56,22 +56,13 @@ def _has_aa_signals(df: pd.DataFrame) -> bool:
     return False
 
 
-def _series_for_metric(
-    df: pd.DataFrame, metric_id: Optional[str]
-) -> Tuple[pd.Series, str]:
+def _series_for_metric(df: pd.DataFrame, metric_id: Optional[str]) -> Tuple[pd.Series, str]:
     if not metric_id:
-        raise RuntimeError(
-            "metric_id is required (expects a column permuter__metric__<id>)"
-        )
+        raise RuntimeError("metric_id is required (expects a column permuter__metric__<id>)")
     col = f"permuter__metric__{metric_id}"
     if col not in df.columns:
         # fallback: exact suffix match
-        cand = [
-            c
-            for c in df.columns
-            if c.startswith("permuter__metric__")
-            and c.split("__", 2)[-1] == str(metric_id)
-        ]
+        cand = [c for c in df.columns if c.startswith("permuter__metric__") and c.split("__", 2)[-1] == str(metric_id)]
         if len(cand) == 1:
             col = cand[0]
         else:
@@ -138,24 +129,18 @@ def _extract_aa_events(df: pd.DataFrame, ycol: str) -> pd.DataFrame:
     return pd.DataFrame(recs).drop_duplicates()
 
 
-def compute_aa_llr_summary(
-    all_df: pd.DataFrame, metric_id: str, *, top_k: int = 20
-) -> pd.DataFrame:
+def compute_aa_llr_summary(all_df: pd.DataFrame, metric_id: str, *, top_k: int = 20) -> pd.DataFrame:
     """
     Core computation (no I/O). Returns tidy DF with:
       ['direction','rank','canon','wt','pos','to_res','delta','metric_id','job','ref']
     'direction' ∈ {'top','bottom'}, rank 1..K in each direction.
     """
     if "sequence" not in all_df.columns or "permuter__round" not in all_df.columns:
-        raise RuntimeError(
-            "Dataset missing required columns: sequence / permuter__round"
-        )
+        raise RuntimeError("Dataset missing required columns: sequence / permuter__round")
 
     if not _has_aa_signals(all_df):
         # Caller decides whether to skip silently; we throw to be explicit here.
-        raise RuntimeError(
-            "No amino-acid signals present (permuter__aa_* or AA tokens)."
-        )
+        raise RuntimeError("No amino-acid signals present (permuter__aa_* or AA tokens).")
 
     y, _ = _series_for_metric(all_df, metric_id)
     df = all_df.assign(_y=y).dropna(subset=["_y"]).copy()
@@ -170,19 +155,13 @@ def compute_aa_llr_summary(
 
     # Average duplicates (same AA event in multiple rows)
     ev_mean = events.groupby(["wt", "pos", "to_res"], as_index=False)["delta"].mean()
-    ev_mean["canon"] = ev_mean.apply(
-        lambda r: f"{r['wt']}{int(r['pos'])}{r['to_res']}", axis=1
-    )
+    ev_mean["canon"] = ev_mean.apply(lambda r: f"{r['wt']}{int(r['pos'])}{r['to_res']}", axis=1)
 
     # Rank
-    ev_sorted = ev_mean.sort_values(
-        "delta", ascending=False, kind="mergesort"
-    ).reset_index(drop=True)
+    ev_sorted = ev_mean.sort_values("delta", ascending=False, kind="mergesort").reset_index(drop=True)
     k = int(min(top_k, len(ev_sorted)))
     top = ev_sorted.head(k).copy()
-    bot = (
-        ev_sorted.sort_values("delta", ascending=True, kind="mergesort").head(k).copy()
-    )
+    bot = ev_sorted.sort_values("delta", ascending=True, kind="mergesort").head(k).copy()
     top.insert(0, "direction", "top")
     bot.insert(0, "direction", "bottom")
     top.insert(1, "rank", range(1, len(top) + 1))

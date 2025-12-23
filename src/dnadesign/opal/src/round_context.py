@@ -50,9 +50,7 @@ class RoundCtxPathError(RuntimeError):
 class RoundCtxTypeError(RuntimeError):
     def __init__(self, path: str, value: Any, expected: str) -> None:
         t = type(value).__name__
-        super().__init__(
-            f"[RoundCtx] Unsupported type for '{path}': {t} (expected {expected})"
-        )
+        super().__init__(f"[RoundCtx] Unsupported type for '{path}': {t} (expected {expected})")
         self.path = path
         self.value = value
         self.expected = expected
@@ -241,9 +239,7 @@ def _to_jsonable(path: str, val: Any) -> Any:
 def _assert_path(path: str) -> Tuple[str, List[str]]:
     m = _PATH_RE.match(path)
     if not m:
-        raise RoundCtxPathError(
-            path, "must match '<root>/<seg>[/<seg>...]' and use lowercase + [_-]"
-        )
+        raise RoundCtxPathError(path, "must match '<root>/<seg>[/<seg>...]' and use lowercase + [_-]")
     root = m.group("root")
     if root not in _ALLOWED_ROOTS:
         raise RoundCtxPathError(path, f"root must be one of {sorted(_ALLOWED_ROOTS)}")
@@ -319,33 +315,19 @@ class RoundCtx:
     def set(self, path: str, value: Any, *, allow_overwrite: bool = False) -> None:
         _assert_path(path)
         normalized = _to_jsonable(path, value)
-        if (
-            not allow_overwrite
-            and path in self._store
-            and self._store[path] != normalized
-        ):
+        if not allow_overwrite and path in self._store and self._store[path] != normalized:
             raise RoundCtxPathError(path, "overwrite not allowed (value differs)")
         self._store[path] = normalized
 
     # ----- plugin view -----
-    def for_plugin(
-        self, *, category: str, name: str, plugin: Optional[Any] = None
-    ) -> "PluginCtx":
+    def for_plugin(self, *, category: str, name: str, plugin: Optional[Any] = None) -> "PluginCtx":
         if category not in _ALLOWED_ROOTS - {"core", "yops"}:
             raise ValueError(f"Unknown plugin category '{category}'")
-        contract: Optional[Contract] = (
-            getattr(plugin, "__opal_contract__", None) if plugin is not None else None
-        )
+        contract: Optional[Contract] = getattr(plugin, "__opal_contract__", None) if plugin is not None else None
         if contract is not None and contract.category != category:
-            raise RoundCtxContractError(
-                category=category, name=name, msg="decorator category/name mismatch"
-            )
-        effective = contract or Contract(
-            category=category, requires=tuple(), produces=tuple()
-        )
-        return PluginCtx(
-            round_ctx=self, category=category, name=name, contract=effective
-        )
+            raise RoundCtxContractError(category=category, name=name, msg="decorator category/name mismatch")
+        effective = contract or Contract(category=category, requires=tuple(), produces=tuple())
+        return PluginCtx(round_ctx=self, category=category, name=name, contract=effective)
 
     # ----- snapshot -----
     def snapshot(self) -> Dict[str, Any]:
@@ -369,9 +351,7 @@ class PluginCtx:
 
     def _ensure_own_namespace(self, path: str) -> None:
         if not path.startswith(f"{self.category}/{self.name}/"):
-            raise RoundCtxPathError(
-                path, f"plugin may only write under '{self.category}/{self.name}/...'"
-            )
+            raise RoundCtxPathError(path, f"plugin may only write under '{self.category}/{self.name}/...'")
 
     def get(self, path: str, default: Any = None) -> Any:
         p = self._expand(path)
@@ -402,9 +382,7 @@ class PluginCtx:
             except KeyError:
                 missing.append(p)
         if missing:
-            raise RoundCtxContractError(
-                category=self.category, name=self.name, missing_requires=missing
-            )
+            raise RoundCtxContractError(category=self.category, name=self.name, missing_requires=missing)
 
     def postcheck_produces(self) -> None:
         missing: List[str] = []
@@ -415,6 +393,4 @@ class PluginCtx:
             except KeyError:
                 missing.append(p)
         if missing:
-            raise RoundCtxContractError(
-                category=self.category, name=self.name, missing_produces=missing
-            )
+            raise RoundCtxContractError(category=self.category, name=self.name, missing_produces=missing)

@@ -86,9 +86,7 @@ def _compute_layout(
     y1 = y0 - style.baseline_spacing if style.show_reverse_complement else y0
 
     label_pad_y = style.font_size_label / 72.0 * style.dpi * 1.2
-    legend_space = (
-        (style.legend_height_px + style.legend_pad_px) if style.legend else 0.0
-    )
+    legend_space = (style.legend_height_px + style.legend_pad_px) if style.legend else 0.0
 
     # Compute content region independent of legend; legend is appended below.
     # Top-most extent must include *all upward tracks*; previously this was undercounted.
@@ -112,9 +110,7 @@ def _compute_layout(
     height = content_height + legend_space
     width = x_left + n * cw + style.padding_x + label_pad_x
 
-    return LayoutResult(
-        cw, ch, width, height, y0, y1, up_tracks, dn_tracks, count_up, count_dn, x_left
-    )
+    return LayoutResult(cw, ch, width, height, y0, y1, up_tracks, dn_tracks, count_up, count_dn, x_left)
 
 
 def _draw_sequence(
@@ -174,9 +170,7 @@ def _draw_sequence(
         if tp is None:
             tp = TextPath((0, 0), ch, prop=prop, usetex=False)
             cache[ch] = tp
-        trans = (
-            Affine2D().scale(px_per_pt).translate(x, y_center - y_mid_px) + ax.transData
-        )
+        trans = Affine2D().scale(px_per_pt).translate(x, y_center - y_mid_px) + ax.transData
         ax.add_patch(
             PathPatch(
                 tp,
@@ -240,10 +234,7 @@ def _draw_box(
         align = str(style.kmer.text_v_align).lower()
         y_text_center = yy if align == "center" else y
         y_text_center += float(style.kmer.text_v_offset_px)
-        trans = (
-            Affine2D().scale(px_per_pt).translate(xx, y_text_center - y_mid_px)
-            + ax.transData
-        )
+        trans = Affine2D().scale(px_per_pt).translate(xx, y_text_center - y_mid_px) + ax.transData
         ax.add_patch(
             PathPatch(
                 tp,
@@ -277,12 +268,8 @@ def _draw_guides(
             x1 = x0 + g.start * cw
             x2 = x0 + g.end * cw
             ax.plot([x1, x2], [legacy_y, legacy_y], color="#9CA3AF", lw=1.5, zorder=2)
-            ax.plot(
-                [x1, x1], [legacy_y, legacy_y - 6], color="#9CA3AF", lw=1.5, zorder=2
-            )
-            ax.plot(
-                [x2, x2], [legacy_y, legacy_y - 6], color="#9CA3AF", lw=1.5, zorder=2
-            )
+            ax.plot([x1, x1], [legacy_y, legacy_y - 6], color="#9CA3AF", lw=1.5, zorder=2)
+            ax.plot([x2, x2], [legacy_y, legacy_y - 6], color="#9CA3AF", lw=1.5, zorder=2)
             if g.label:
                 ax.text(
                     (x1 + x2) / 2,
@@ -397,9 +384,7 @@ def _draw_guides(
             continue
 
 
-def _draw_connectors(
-    ax, n: int, x0: float, cw: float, y_top: float, y_bottom: float, style: Style
-) -> None:
+def _draw_connectors(ax, n: int, x0: float, cw: float, y_top: float, y_bottom: float, style: Style) -> None:
     if not style.connectors or y_top <= y_bottom:
         return
     y1 = y_bottom + 0.35 * (y_top - y_bottom)
@@ -432,19 +417,12 @@ def _draw_legend_centered(
     entries: list[tuple[str, str, float]] = []
     text_total = 0.0
     for tag, label in legend:
-        w_px = _text_px_width(
-            label, style.font_label, style.legend_font_size, style.dpi
-        )
+        w_px = _text_px_width(label, style.font_label, style.legend_font_size, style.dpi)
         entries.append((tag, label, w_px))
         text_total += w_px
 
     n = len(entries)
-    total = (
-        n * style.legend_patch_w
-        + n * style.legend_gap_patch_text
-        + text_total
-        + (n - 1) * style.legend_gap_x
-    )
+    total = n * style.legend_patch_w + n * style.legend_gap_patch_text + text_total + (n - 1) * style.legend_gap_x
 
     x = (total_width - total) / 2.0 if style.legend_center else style.padding_x
     if x < style.padding_x:
@@ -525,9 +503,7 @@ def render_figure(
 ):
     record = record.validate()
     layout = _compute_layout(record, style, fixed_tracks=fixed_tracks, fixed_n=fixed_n)
-    fig = plt.figure(
-        figsize=(layout.width / style.dpi, layout.height / style.dpi), dpi=style.dpi
-    )
+    fig = plt.figure(figsize=(layout.width / style.dpi, layout.height / style.dpi), dpi=style.dpi)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_axis_off()
 
@@ -537,9 +513,7 @@ def render_figure(
     x0 = layout.x_left + (extra_cols * layout.cw) / 2.0
 
     # Baselines
-    _draw_sequence(
-        ax, record.sequence, x0, layout.y_forward, layout.cw, style, "5'", "3'"
-    )
+    _draw_sequence(ax, record.sequence, x0, layout.y_forward, layout.cw, style, "5'", "3'")
     if style.show_reverse_complement and record.alphabet == "DNA":
         _draw_sequence(
             ax,
@@ -554,9 +528,7 @@ def render_figure(
 
     # Connector dashes (one row)
     if style.show_reverse_complement:
-        _draw_connectors(
-            ax, n_this, x0, layout.cw, layout.y_forward, layout.y_reverse, style
-        )
+        _draw_connectors(ax, n_this, x0, layout.cw, layout.y_forward, layout.y_reverse, style)
 
     # Annotations
     up = [a for a in record.annotations if a.strand == "fwd"]
@@ -618,11 +590,7 @@ def render_figure(
     # Optional overlay label from guides (kind='overlay_label')
     try:
         overlay = next(
-            (
-                g.label
-                for g in record.guides
-                if getattr(g, "kind", "") == "overlay_label" and g.label
-            ),
+            (g.label for g in record.guides if getattr(g, "kind", "") == "overlay_label" and g.label),
             None,
         )
         if overlay:

@@ -140,9 +140,7 @@ def resolve_job_hint(hint: str | Path) -> Path:
     # Minimal message by default; detailed list only when DEBUG
     # concise by default; show full tried list only in debug mode or when explicitly asked
     dirs = "\n  - ".join(str(d) for d in candidate_job_dirs())
-    show_tried = os.environ.get("PERMUTER_DEBUG_HINTS") == "1" or _LOG.isEnabledFor(
-        logging.DEBUG
-    )
+    show_tried = os.environ.get("PERMUTER_DEBUG_HINTS") == "1" or _LOG.isEnabledFor(logging.DEBUG)
     if show_tried:
         tried_str = "\n  - ".join(str(p) for p in _unique(tried))
         msg = f"Job YAML '{hint}' not found.\nSearched directories:\n  - {dirs}" + (
@@ -213,8 +211,7 @@ def resolve(
     )
     if not _is_writable_dir(output_root):
         raise PermissionError(
-            f"Output root not writable: {output_root}. "
-            "Use --out or set $PERMUTER_OUTPUT_ROOT to a writable location."
+            f"Output root not writable: {output_root}. Use --out or set $PERMUTER_OUTPUT_ROOT to a writable location."
         )
 
     # Dataset directory

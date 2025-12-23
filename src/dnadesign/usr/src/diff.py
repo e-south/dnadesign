@@ -120,11 +120,7 @@ def compute_file_diff(
         "primary_sha_diff": (
             (local.sha256 != remote.sha256)
             if (local.exists and remote.exists and local.sha256 and remote.sha256)
-            else (
-                (local.size != remote.size)
-                if (local.exists and remote.exists)
-                else (local.exists != remote.exists)
-            )
+            else ((local.size != remote.size) if (local.exists and remote.exists) else (local.exists != remote.exists))
         ),
         "meta_mtime_diff": False,
         "events_new_remote_lines": 0,
@@ -201,9 +197,7 @@ def snapshots_stat(dir_path: Path, remote_names: List[str]) -> SnapshotStat:
     )
 
 
-def compute_diff(
-    dataset_dir: Path, remote: RemoteDatasetStat, dataset_name: str
-) -> DiffSummary:
+def compute_diff(dataset_dir: Path, remote: RemoteDatasetStat, dataset_name: str) -> DiffSummary:
     dataset_dir = Path(dataset_dir)
     primary_local = parquet_stats(dataset_dir / "records.parquet")
     meta_local = file_mtime(dataset_dir / "meta.md")
@@ -224,9 +218,7 @@ def compute_diff(
     changes = {
         "primary_sha_diff": (
             (primary_local.sha256 != primary_remote.sha256)
-            if (
-                primary_local.exists and primary_remote.exists and primary_remote.sha256
-            )
+            if (primary_local.exists and primary_remote.exists and primary_remote.sha256)
             else (
                 (primary_local.size != primary_remote.size)
                 if (primary_local.exists and primary_remote.exists)

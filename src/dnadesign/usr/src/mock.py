@@ -94,9 +94,7 @@ def make_mock_table(spec: MockSpec) -> pa.Table:
     source = [source_str] * n_rows
 
     # ----- Derived demo columns -----
-    x_vals = (rng.normal(loc=-20.0, scale=4.0, size=(n_rows, spec.x_dim))).astype(
-        np.float32
-    )
+    x_vals = (rng.normal(loc=-20.0, scale=4.0, size=(n_rows, spec.x_dim))).astype(np.float32)
     y_vals = rng.random(size=(n_rows, spec.y_dim), dtype=np.float32)
     x_list = [row.tolist() for row in x_vals]
     y_list = [row.tolist() for row in y_vals]
@@ -128,18 +126,14 @@ def make_mock_table(spec: MockSpec) -> pa.Table:
     return pa.Table.from_arrays(arrays, schema=schema)
 
 
-def create_mock_dataset(
-    root: Path, dataset: str, spec: MockSpec, *, force: bool = False
-) -> int:
+def create_mock_dataset(root: Path, dataset: str, spec: MockSpec, *, force: bool = False) -> int:
     ds = Dataset(root, dataset)
 
     # Initialize folder if not present
     if not ds.records_path.exists():
         ds.init(source=f"make-mock (seed={spec.seed})")
     elif ds.records_path.exists() and not force:
-        raise FileExistsError(
-            f"Dataset '{dataset}' already exists at {ds.records_path}. Use --force to overwrite."
-        )
+        raise FileExistsError(f"Dataset '{dataset}' already exists at {ds.records_path}. Use --force to overwrite.")
 
     tbl = make_mock_table(spec)
     write_parquet_atomic(tbl, ds.records_path, ds.snapshot_dir)
@@ -150,11 +144,7 @@ def create_mock_dataset(
             "action": "make_mock",
             "dataset": ds.name,
             "n": tbl.num_rows,
-            "length": (
-                int(pa.array(tbl.column("length")).to_pylist()[0])
-                if tbl.num_rows
-                else 0
-            ),
+            "length": (int(pa.array(tbl.column("length")).to_pylist()[0]) if tbl.num_rows else 0),
             "x_dim": spec.x_dim,
             "y_dim": spec.y_dim,
             "seed": spec.seed,
@@ -203,9 +193,7 @@ def add_demo_columns(
     if not allow_overwrite:
         clobbers = [c for c in (x_name, y_name) if c in existing_names]
         if clobbers:
-            raise FileExistsError(
-                f"Columns already exist: {', '.join(clobbers)}. Use --allow-overwrite to replace."
-            )
+            raise FileExistsError(f"Columns already exist: {', '.join(clobbers)}. Use --allow-overwrite to replace.")
 
     new_tbl = tbl
     # set/replace X
@@ -221,9 +209,7 @@ def add_demo_columns(
     else:
         new_tbl = new_tbl.append_column(pa.field(y_name, y_arr.type, True), y_arr)
 
-    write_parquet_atomic(
-        new_tbl, ds.records_path, ds.snapshot_dir, preserve_metadata_from=tbl
-    )
+    write_parquet_atomic(new_tbl, ds.records_path, ds.snapshot_dir, preserve_metadata_from=tbl)
 
     append_event(
         ds.events_path,

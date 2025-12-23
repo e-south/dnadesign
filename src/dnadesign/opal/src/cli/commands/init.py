@@ -28,16 +28,10 @@ from ._common import (
 )
 
 
-@cli_command(
-    "init", help="Initialize/validate the campaign workspace; write state.json."
-)
+@cli_command("init", help="Initialize/validate the campaign workspace; write state.json.")
 def cmd_init(
-    config: Path = typer.Option(
-        None, "--config", "-c", help="Path to campaign.yaml", envvar="OPAL_CONFIG"
-    ),
-    json: bool = typer.Option(
-        False, "--json/--human", help="Output format (default: human)"
-    ),
+    config: Path = typer.Option(None, "--config", "-c", help="Path to campaign.yaml", envvar="OPAL_CONFIG"),
+    json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
 ):
     try:
         cfg_path = resolve_config_path(config)
@@ -68,11 +62,7 @@ def cmd_init(
             data_location={
                 "kind": store.kind,
                 "records_path": str(store.records_path.resolve()),
-                "records_sha256": (
-                    file_sha256(store.records_path)
-                    if store.records_path.exists()
-                    else ""
-                ),
+                "records_sha256": (file_sha256(store.records_path) if store.records_path.exists() else ""),
             },
             x_column_name=cfg.data.x_column_name,
             y_column_name=cfg.data.y_column_name,

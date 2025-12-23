@@ -155,7 +155,7 @@ def compute_consensus_points(
     x_tf, y_tf = get_tf_pair(cfg)
     scatter_scale = cfg.analysis.scatter_scale.lower()
     if scatter_scale not in {"llr", "z", "p", "logp"}:
-        raise ValueError(f"Unsupported scatter_scale '{scatter_scale}' in config. " "Use 'llr', 'z', 'p', or 'logp'.")
+        raise ValueError(f"Unsupported scatter_scale '{scatter_scale}' in config. Use 'llr', 'z', 'p', or 'logp'.")
 
     # Build a Scorer for exactly the two PWMs (x_tf and y_tf)
     pair_scorer = Scorer(

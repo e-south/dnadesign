@@ -41,11 +41,7 @@ def configure_logging(verbose: int = 0) -> None:
             return not record.name.startswith("permuter.protocol")
 
     # ---- default (non‑protocol) channel → stderr ----
-    default_level = (
-        logging.WARNING
-        if verbose == 0
-        else (logging.INFO if verbose == 1 else logging.DEBUG)
-    )
+    default_level = logging.WARNING if verbose == 0 else (logging.INFO if verbose == 1 else logging.DEBUG)
     default_handler = RichHandler(
         console=Console(file=sys.stderr),
         show_time=False,
@@ -90,6 +86,4 @@ def configure_logging(verbose: int = 0) -> None:
 
     # Quiet noisy third‑party libs unless verbose
     for name in ("matplotlib", "urllib3", "asyncio"):
-        logging.getLogger(name).setLevel(
-            logging.WARNING if verbose == 0 else logging.INFO
-        )
+        logging.getLogger(name).setLevel(logging.WARNING if verbose == 0 else logging.INFO)

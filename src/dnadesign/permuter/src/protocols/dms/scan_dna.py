@@ -62,9 +62,7 @@ class ScanDNA(Protocol):
                     mutated = orig[:idx] + alt_char + orig[idx + 1 :]
                     yield {
                         "sequence": mutated,
-                        "modifications": [
-                            f"nt pos={idx+1} wt={wt_upper} alt={alt_upper}"
-                        ],  # 1-based
+                        "modifications": [f"nt pos={idx + 1} wt={wt_upper} alt={alt_upper}"],  # 1-based
                         "nt_pos": idx + 1,
                         "nt_wt": wt_upper,
                         "nt_alt": alt_upper,

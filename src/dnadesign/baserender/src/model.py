@@ -71,17 +71,13 @@ class SeqRecord:
             bad = set(ch for ch in seq if ch not in allowed)
             ensure(not bad, f"Non-DNA characters present: {sorted(bad)}", AlphabetError)
         for a in self.annotations:
-            ensure(
-                0 <= a.start < len(seq), f"Annotation {a} out of bounds", BoundsError
-            )
+            ensure(0 <= a.start < len(seq), f"Annotation {a} out of bounds", BoundsError)
             ensure(
                 a.end() <= len(seq),
                 f"Annotation {a} exceeds sequence length",
                 BoundsError,
             )
-            ensure(
-                a.strand in {"fwd", "rev"}, f"Invalid strand: {a.strand}", BoundsError
-            )
+            ensure(a.strand in {"fwd", "rev"}, f"Invalid strand: {a.strand}", BoundsError)
 
             # Fail-fast: the letters must match the correct strand at this offset.
             seg = seq[a.start : a.end()]
@@ -97,9 +93,7 @@ class SeqRecord:
             )
         return self
 
-    def with_extra(
-        self, *, annotations: Iterable[Annotation] = (), guides: Iterable[Guide] = ()
-    ) -> "SeqRecord":
+    def with_extra(self, *, annotations: Iterable[Annotation] = (), guides: Iterable[Guide] = ()) -> "SeqRecord":
         return replace(
             self,
             annotations=tuple(list(self.annotations) + list(annotations)),

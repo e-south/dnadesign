@@ -64,12 +64,8 @@ def _transform(Y: np.ndarray, params: _Params, ctx=None) -> np.ndarray:
         return Y
     if Y.shape[1] < 8:
         return Y
-    med = np.asarray(
-        (ctx.get("yops/intensity_median_iqr/center") or [0, 0, 0, 0]), dtype=float
-    )
-    iqr = np.asarray(
-        (ctx.get("yops/intensity_median_iqr/scale") or [1, 1, 1, 1]), dtype=float
-    )
+    med = np.asarray((ctx.get("yops/intensity_median_iqr/center") or [0, 0, 0, 0]), dtype=float)
+    iqr = np.asarray((ctx.get("yops/intensity_median_iqr/scale") or [1, 1, 1, 1]), dtype=float)
     eps = float(ctx.get("yops/intensity_median_iqr/eps") or params.eps)
 
     out = Y.copy()
@@ -85,12 +81,8 @@ def _inverse(Y: np.ndarray, params: _Params, ctx=None) -> np.ndarray:
         return Y
     if Y.shape[1] < 8:
         return Y
-    med = np.asarray(
-        (ctx.get("yops/intensity_median_iqr/center") or [0, 0, 0, 0]), dtype=float
-    )
-    iqr = np.asarray(
-        (ctx.get("yops/intensity_median_iqr/scale") or [1, 1, 1, 1]), dtype=float
-    )
+    med = np.asarray((ctx.get("yops/intensity_median_iqr/center") or [0, 0, 0, 0]), dtype=float)
+    iqr = np.asarray((ctx.get("yops/intensity_median_iqr/scale") or [1, 1, 1, 1]), dtype=float)
 
     out = Y.copy()
     out[:, 4:8] = out[:, 4:8] * iqr[None, :] + med[None, :]

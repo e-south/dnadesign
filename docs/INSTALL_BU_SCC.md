@@ -15,14 +15,14 @@ Evo2 FP8 support requires **Compute Capability 8.9+** (Ada/Hopper/Blackwell). On
 
 > - **densegen** workflow:
 >   - Modules: gurobi
->   - Cores: 16  
->   - GPUs: 0  
-> - **infer** workflow:  
+>   - Cores: 16
+>   - GPUs: 0
+> - **infer** workflow:
 >   - Modules: cuda
->   - Cores: 4  
->   - GPUs: 1  
->   - GPU Compute Capability: 8.9  
->   - Extra options: `-l mem_per_core=8G`  
+>   - Cores: 4
+>   - GPUs: 1
+>   - GPU Compute Capability: 8.9
+>   - Extra options: `-l mem_per_core=8G`
 
 Check cluster documentation for submission details.
 
@@ -39,7 +39,7 @@ git clone https://github.com/e-south/dnadesign.git
 cd dnadesign
 ```
 
-(Optional) if you're trying to start from scratch: 
+(Optional) if you're trying to start from scratch:
 
 - `rm -rf .venv` and then wipe uv caches with `uv cache clean` or `uv cache prune`.
 

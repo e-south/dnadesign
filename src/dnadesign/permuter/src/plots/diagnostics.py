@@ -44,9 +44,7 @@ _KDE_PALETTE = {
 }
 
 
-def _darken_rgba(
-    rgba: tuple[float, float, float, float], factor: float = 0.75
-) -> tuple[float, float, float, float]:
+def _darken_rgba(rgba: tuple[float, float, float, float], factor: float = 0.75) -> tuple[float, float, float, float]:
     """
     Return a darker version of an RGBA color by linearly interpolating towards black.
 

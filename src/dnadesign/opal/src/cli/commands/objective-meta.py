@@ -96,9 +96,7 @@ def cmd_objective_meta(
             try:
                 as_of = int(rsel)
             except ValueError as e:
-                raise typer.BadParameter(
-                    "Invalid --round: must be an integer or 'latest'"
-                ) from e
+                raise typer.BadParameter("Invalid --round: must be an integer or 'latest'") from e
         rsel = rtab[rtab["as_of_round"] == as_of]
         if rsel.empty:
             raise typer.Exit(code=1)
@@ -129,18 +127,14 @@ def cmd_objective_meta(
             run_id = str(rsel["run_id"])
             # Candidate columns: objective row-level diagnostics plus commonly useful fields
             extras = ["pred__y_obj_scalar", "sel__rank_competition", "sel__is_selected"]
-            cand_cols = sorted(
-                list(set(obj_diag_cols + [c for c in extras if c in pred_schema]))
-            )
+            cand_cols = sorted(list(set(obj_diag_cols + [c for c in extras if c in pred_schema])))
             need = ["id"] + cand_cols + ["as_of_round", "run_id"]
 
             # Read only the selected run rows
             filt = (pc.field("run_id") == run_id) & (pc.field("as_of_round") == as_of)
             dfp = pdset.to_table(columns=need, filter=filt).to_pandas()
             if dfp.empty:
-                raise RuntimeError(
-                    "No prediction rows found for selected run_id/round."
-                )
+                raise RuntimeError("No prediction rows found for selected run_id/round.")
 
             # Universe size (for coverage vs. dataset)
             df_records = store.load()
@@ -153,11 +147,7 @@ def cmd_objective_meta(
                 present_ids = dfp.loc[s.notna(), "id"].astype(str).nunique()
                 pred_ids = dfp["id"].astype(str).nunique()
                 cov_pred = (present_ids / pred_ids) if pred_ids > 0 else 0.0
-                cov_vs_records = (
-                    (present_ids / unique_ids_records)
-                    if unique_ids_records > 0
-                    else 0.0
-                )
+                cov_vs_records = (present_ids / unique_ids_records) if unique_ids_records > 0 else 0.0
                 finite = s[np.isfinite(s)]
                 stats = {
                     "count": int(s.notna().sum()),
@@ -170,26 +160,14 @@ def cmd_objective_meta(
                     "coverage_in_predictions": float(cov_pred),
                     "coverage_vs_records": float(cov_vs_records),
                     "bounded_0_1": bool(
-                        finite.size > 0
-                        and np.nanmin(finite) >= -1e-12
-                        and np.nanmax(finite) <= 1.0 + 1e-12
+                        finite.size > 0 and np.nanmin(finite) >= -1e-12 and np.nanmax(finite) <= 1.0 + 1e-12
                     ),
-                    "non_negative": bool(
-                        finite.size > 0 and np.nanmin(finite) >= 0.0 - 1e-12
-                    ),
+                    "non_negative": bool(finite.size > 0 and np.nanmin(finite) >= 0.0 - 1e-12),
                 }
                 # Suitability (assertive rules; easy to tweak)
                 variable = stats["unique"] > 1
-                hue_ok = (
-                    variable
-                    and stats["finite_count"] > 0
-                    and stats["coverage_in_predictions"] >= 0.8
-                )
-                size_ok = (
-                    variable
-                    and stats["finite_count"] > 0
-                    and stats["coverage_in_predictions"] >= 0.8
-                )
+                hue_ok = variable and stats["finite_count"] > 0 and stats["coverage_in_predictions"] >= 0.8
+                size_ok = variable and stats["finite_count"] > 0 and stats["coverage_in_predictions"] >= 0.8
                 stats["hue_ok"] = bool(hue_ok)
                 stats["size_ok"] = bool(size_ok)
                 return stats
@@ -200,22 +178,14 @@ def cmd_objective_meta(
             size_recs: List[Tuple[str, float]] = []
             for c in cand_cols:
                 dtype = str(dfp[c].dtype)
-                is_bool = dtype.startswith("bool") or (
-                    set(pd.unique(dfp[c].dropna())) <= {True, False}
-                )
-                is_num = pd.api.types.is_numeric_dtype(
-                    dfp[c]
-                ) or pd.api.types.is_bool_dtype(dfp[c])
+                is_bool = dtype.startswith("bool") or (set(pd.unique(dfp[c].dropna())) <= {True, False})
+                is_num = pd.api.types.is_numeric_dtype(dfp[c]) or pd.api.types.is_bool_dtype(dfp[c])
                 row: Dict[str, Any] = {"column": c, "dtype": dtype}
                 if is_num:
                     pr = _profile_numeric(c)
                     row.update(pr)
                     # Rank recommendations by variance proxy (range) and coverage
-                    rng = (
-                        (pr["max"] - pr["min"])
-                        if (pr["max"] is not None and pr["min"] is not None)
-                        else 0.0
-                    )
+                    rng = (pr["max"] - pr["min"]) if (pr["max"] is not None and pr["min"] is not None) else 0.0
                     score = float(rng) * pr["coverage_in_predictions"]
                     if pr.get("hue_ok") and not is_bool:
                         hue_recs.append((c, score))
@@ -237,8 +207,7 @@ def cmd_objective_meta(
                                 / max(1, dfp["id"].astype(str).nunique())
                             ),
                             "coverage_vs_records": float(
-                                dfp.loc[dfp[c].notna(), "id"].astype(str).nunique()
-                                / max(1, unique_ids_records)
+                                dfp.loc[dfp[c].notna(), "id"].astype(str).nunique() / max(1, unique_ids_records)
                             ),
                             "bounded_0_1": False,
                             "non_negative": False,
@@ -265,14 +234,8 @@ def cmd_objective_meta(
         else:
             print_stdout(f"[bold cyan]Round:[/] {out['round']}")
             print_stdout(f"[bold cyan]Objective:[/] {out['objective']['name']}")
-            print_stdout(
-                "[bold]  params keys:[/] "
-                + (", ".join(out["objective"]["params_keys"]) or "(none)")
-            )
-            print_stdout(
-                "[bold]  summary stats:[/] "
-                + (", ".join(out["objective"]["summary_stats_keys"]) or "(none)")
-            )
+            print_stdout("[bold]  params keys:[/] " + (", ".join(out["objective"]["params_keys"]) or "(none)"))
+            print_stdout("[bold]  summary stats:[/] " + (", ".join(out["objective"]["summary_stats_keys"]) or "(none)"))
             print_stdout("[bold cyan]Row-level diagnostics:[/]")
             for c in out["row_level_diagnostics_columns"]:
                 print_stdout(f"  • {c}")
@@ -289,9 +252,7 @@ def cmd_objective_meta(
                 else:
                     print_stdout("\n[bold cyan]Recommended hue fields:[/] (none)")
                 if rec_size:
-                    print_stdout(
-                        "\n[bold cyan]Recommended size fields (best-first):[/]"
-                    )
+                    print_stdout("\n[bold cyan]Recommended size fields (best-first):[/]")
                     for n in rec_size[:8]:
                         print_stdout(f"  • {n}")
                 else:
@@ -317,9 +278,7 @@ def cmd_objective_meta(
                             flags.append("size✓")
                         flag_str = (" [" + ", ".join(flags) + "]") if flags else ""
                         rng_str = (
-                            "range: n/a"
-                            if mn is None or mx is None
-                            else f"range: {mn:.4g}..{mx:.4g}; median: {md:.4g}"
+                            "range: n/a" if mn is None or mx is None else f"range: {mn:.4g}..{mx:.4g}; median: {md:.4g}"
                         )
                         print_stdout(
                             f"  • {name:24s} dtype={dtype:8s} cov_pred={covp:6.2%} cov_ds={covd:6.2%}  {rng_str}{flag_str}"  # noqa

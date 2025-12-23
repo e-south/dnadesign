@@ -93,9 +93,7 @@ def short_array(a, maxlen: int = 8) -> str:
             return str(a)
     if len(arr) <= maxlen:
         return str(arr)
-    head = ", ".join(
-        f"{x:.4g}" if isinstance(x, float) else str(x) for x in arr[:maxlen]
-    )
+    head = ", ".join(f"{x:.4g}" if isinstance(x, float) else str(x) for x in arr[:maxlen])
     return f"[{head}, …] (len={len(arr)})"
 
 
@@ -171,18 +169,14 @@ def render_explain_human(info: Mapping[str, Any]) -> str:
     counts = kv_block(
         "Counts",
         {
-            "training labels used": info.get(
-                "number_of_training_examples_used_in_round"
-            ),
+            "training labels used": info.get("number_of_training_examples_used_in_round"),
             "candidates scored": info.get("number_of_candidates_scored_in_round"),
         },
     )
 
     warnings = bullet_list("Warnings", info.get("warnings") or [])
 
-    return "\n".join(
-        [header, "", model_block, "", selection_block, "", counts, "", warnings]
-    )
+    return "\n".join([header, "", model_block, "", selection_block, "", counts, "", warnings])
 
 
 def render_ingest_preview_human(
@@ -214,11 +208,7 @@ def render_ingest_preview_human(
         seq = _truncate(r.get("sequence", ""))
         rid = r.get("id", "")
         y = r.get("y", "")
-        y_str = (
-            short_array(y, maxlen=6)
-            if isinstance(y, (list, tuple))
-            else _truncate(str(y), 64)
-        )
+        y_str = short_array(y, maxlen=6) if isinstance(y, (list, tuple)) else _truncate(str(y), 64)
         lines.append(f"id={rid}  sequence={seq}  y={y_str}")
 
     return head + "\n\n" + bullet_list("Sample (first 5)", lines)
@@ -271,9 +261,7 @@ def render_model_show_human(info: Mapping[str, Any]) -> str:
         w = row.get("feature_importance")
         rk = row.get("feature_rank")
         lines.append(f"{i:2d}. feature_index={fi}  weight={w:.6g}  rank={rk}")
-    return (
-        head + "\n\n" + bullet_list("Top-20 feature importance (if available)", lines)
-    )
+    return head + "\n\n" + bullet_list("Top-20 feature importance (if available)", lines)
 
 
 def render_record_report_human(report: Mapping[str, Any]) -> str:
@@ -295,19 +283,9 @@ def render_record_report_human(report: Mapping[str, Any]) -> str:
         "Record",
         {
             "id": report.get("id"),
-            "sequence": (
-                _truncate(report.get("sequence", ""))
-                if report.get("sequence")
-                else "(hidden)"
-            ),
+            "sequence": (_truncate(report.get("sequence", "")) if report.get("sequence") else "(hidden)"),
             "label_hist_column": report.get("label_hist_column"),
-            "n_labels": (
-                (
-                    len(report.get("labels"))
-                    if isinstance(report.get("labels"), list)
-                    else 0
-                )
-            ),
+            "n_labels": (len(report.get("labels")) if isinstance(report.get("labels"), list) else 0),
         },
     )
 
@@ -316,7 +294,7 @@ def render_record_report_human(report: Mapping[str, Any]) -> str:
     for r in runs:
         parts = [
             f"r={r.get('as_of_round')}",
-            f"run_id={_truncate(r.get('run_id',''), 18)}",
+            f"run_id={_truncate(r.get('run_id', ''), 18)}",
         ]
         for k in ("sel__is_selected", "sel__rank_competition", "pred__y_obj_scalar"):
             if k in r:
@@ -332,7 +310,7 @@ def render_run_summary_human(summary: dict) -> str:
     requested = summary.get("top_k_requested")
     effective = summary.get("top_k_effective")
     tie_hint = summary.get("tie_handling") or "competition_rank"
-    sel_line = f"selection: top_k={requested} (requested) → selected={effective} (effective after ties, tie_handling={tie_hint})" # noqa
+    sel_line = f"selection: top_k={requested} (requested) → selected={effective} (effective after ties, tie_handling={tie_hint})"  # noqa
     lines = [
         f"{_b('run_id')}: {rid}",
         f"{_b('as_of_round')}: {summary.get('as_of_round')}",

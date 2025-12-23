@@ -67,9 +67,7 @@ def _has_aa_signals(df: pd.DataFrame) -> bool:
     return False
 
 
-def _series_for_metric(
-    df: pd.DataFrame, metric_id: Optional[str]
-) -> Tuple[pd.Series, str]:
+def _series_for_metric(df: pd.DataFrame, metric_id: Optional[str]) -> Tuple[pd.Series, str]:
     if not metric_id:
         raise RuntimeError("metric_id must be provided for aa_category_effects")
     col = f"permuter__metric__{metric_id}"
@@ -94,9 +92,7 @@ def plot(
     large_delta_threshold: float = 1.0,  # absolute Δ threshold; for LLR this is in log units
 ) -> None:
     if not _has_aa_signals(all_df):
-        raise RuntimeError(
-            "aa_category_effects requires amino-acid edits (K12D or aa pos=..)."
-        )
+        raise RuntimeError("aa_category_effects requires amino-acid edits (K12D or aa pos=..).")
 
     fs = float(font_scale) if font_scale else 1.0
     LABEL_BOOST = 1.60
@@ -118,11 +114,7 @@ def plot(
         ),
         None,
     )
-    ref_value = (
-        float(seed_row["_y"])
-        if seed_row and pd.notna(seed_row.get("_y", np.nan))
-        else 0.0
-    )
+    ref_value = float(seed_row["_y"]) if seed_row and pd.notna(seed_row.get("_y", np.nan)) else 0.0
 
     # Extract AA edits (WT, POS, ALT) + Δ
     # This drives both the plot (ALT-only aggregations) and the residue-specific summary (WT+POS+ALT).
@@ -181,11 +173,7 @@ def plot(
         count="count",
     )
     # fraction of large effects by group (explicit to avoid shape pitfalls)
-    frac = (
-        dfm.assign(_big=dfm["delta"].abs() >= float(large_delta_threshold))
-        .groupby("category")["_big"]
-        .mean()
-    )
+    frac = dfm.assign(_big=dfm["delta"].abs() >= float(large_delta_threshold)).groupby("category")["_big"].mean()
     cs["frac_big"] = frac
     cs = cs.loc[cat_order]
 
@@ -201,9 +189,7 @@ def plot(
         .reset_index()
     )
     # keep class order, inner residue order as in AA_CAT_ORDER
-    ordered_letters = [
-        aa for _, grp in AA_CAT_ORDER for aa in grp if (rs["to_res"] == aa).any()
-    ]
+    ordered_letters = [aa for _, grp in AA_CAT_ORDER for aa in grp if (rs["to_res"] == aa).any()]
     rs = rs.set_index("to_res").loc[ordered_letters].reset_index()
     rs["category"] = rs["to_res"].map(lambda r: res2cat.get(r, "Other"))
 
@@ -216,16 +202,10 @@ def plot(
         fig_w, fig_h = side, side
     else:
         fig_w, fig_h = (6.0, 6.0)
-    fig, (ax1, ax2) = plt.subplots(
-        2, 1, figsize=(fig_w, fig_h), gridspec_kw=dict(height_ratios=[1.1, 1.0])
-    )
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(fig_w, fig_h), gridspec_kw=dict(height_ratios=[1.1, 1.0]))
 
     # Title & subtitle
-    ref_name = (
-        df["permuter__ref"].iloc[0]
-        if "permuter__ref" in df.columns and not df.empty
-        else ""
-    )
+    ref_name = df["permuter__ref"].iloc[0] if "permuter__ref" in df.columns and not df.empty else ""
     fig.suptitle(
         f"{job_name}{f' ({ref_name})' if ref_name else ''}",
         fontsize=int(round(12 * fs * TITLE_BOOST)),
@@ -252,7 +232,7 @@ def plot(
         ax1.text(
             i,
             m,
-            f"{f*100:.0f}%",
+            f"{f * 100:.0f}%",
             ha="center",
             va="bottom",
             fontsize=int(round(9.5 * fs)),
@@ -261,9 +241,7 @@ def plot(
 
     ax1.set_xticks(x)
     ax1.set_xticklabels(cs.index.tolist(), rotation=0, fontsize=int(round(10 * fs)))
-    ax1.set_ylabel(
-        f"Δ {y_label} (mean; whiskers=IQR)", fontsize=int(round(11 * fs * LABEL_BOOST))
-    )
+    ax1.set_ylabel(f"Δ {y_label} (mean; whiskers=IQR)", fontsize=int(round(11 * fs * LABEL_BOOST)))
     ax1.grid(axis="y", color="0.9")
 
     # Bottom: per-residue bars (grouped by class visually via light separators)
@@ -273,9 +251,7 @@ def plot(
         ax2.vlines(i, q1, q3, linewidth=2.5, color="k", alpha=0.35)
     ax2.set_xticks(x2)
     ax2.set_xticklabels(rs["to_res"], fontsize=int(round(10 * fs)))
-    ax2.set_ylabel(
-        f"Δ {y_label} (mean; whiskers=IQR)", fontsize=int(round(11 * fs * LABEL_BOOST))
-    )
+    ax2.set_ylabel(f"Δ {y_label} (mean; whiskers=IQR)", fontsize=int(round(11 * fs * LABEL_BOOST)))
     ax2.grid(axis="y", color="0.9")
 
     # vertical faint separators between classes

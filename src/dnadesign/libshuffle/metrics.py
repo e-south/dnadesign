@@ -33,11 +33,7 @@ from dnadesign.billboard.core import compute_core_metrics, process_sequences
 # ──────────────────────────────────────────────────────────────────────────────
 @contextmanager
 def _silence_billboard():
-    keys = [
-        n
-        for n in logging.root.manager.loggerDict
-        if n.startswith("dnadesign.billboard")
-    ]
+    keys = [n for n in logging.root.manager.loggerDict if n.startswith("dnadesign.billboard")]
     levels = {n: logging.getLogger(n).level for n in keys}
     try:
         for n in keys:
@@ -58,9 +54,7 @@ def _min_hamming_distance(seqs: List[str]) -> int:
         return 0
     L = len(seqs[0])
     # fast path: vectorise with NumPy
-    arr = np.frombuffer("".join(seqs).encode("ascii"), dtype="|S1").reshape(
-        len(seqs), L
-    )
+    arr = np.frombuffer("".join(seqs).encode("ascii"), dtype="|S1").reshape(len(seqs), L)
     min_hd = L  # upper bound
     for i in range(len(seqs)):
         diffs = (arr[i] != arr[i + 1 :]).sum(axis=1)
@@ -82,19 +76,12 @@ def compute_pairwise_stats(subsample: List[dict]) -> Dict[str, float]:
         emb = entry.get("evo2_logits_mean_pooled")
         if emb is None:
             raise KeyError("Missing Evo2 embedding in subsample.")
-        t = (
-            emb.flatten().float()
-            if isinstance(emb, torch.Tensor)
-            else torch.tensor(emb, dtype=torch.float32)
-        )
+        t = emb.flatten().float() if isinstance(emb, torch.Tensor) else torch.tensor(emb, dtype=torch.float32)
         vecs.append(t)
 
     M = torch.stack(vecs)
     if M.size(0) < 2:
-        return {
-            k: 0.0
-            for k in ("mean_cosine", "min_cosine", "mean_euclidean", "min_euclidean")
-        }
+        return {k: 0.0 for k in ("mean_cosine", "min_cosine", "mean_euclidean", "min_euclidean")}
 
     D_euc = torch.cdist(M, M, p=2)
     N = F.normalize(M, dim=1)
@@ -109,9 +96,7 @@ def compute_pairwise_stats(subsample: List[dict]) -> Dict[str, float]:
     }
 
 
-def compute_evo2_pairwise_matrix(
-    sequences: List[dict], indices: List[int], cfg: Any
-) -> np.ndarray:
+def compute_evo2_pairwise_matrix(sequences: List[dict], indices: List[int], cfg: Any) -> np.ndarray:
     """
     Return the full cosine-dissimilarity matrix for the given indices.
     """
@@ -120,11 +105,7 @@ def compute_evo2_pairwise_matrix(
         emb = sequences[i].get("evo2_logits_mean_pooled")
         if emb is None:
             raise KeyError(f"Missing Evo2 embedding for sequence index {i}")
-        t = (
-            emb.flatten().float()
-            if isinstance(emb, torch.Tensor)
-            else torch.tensor(emb, dtype=torch.float32)
-        )
+        t = emb.flatten().float() if isinstance(emb, torch.Tensor) else torch.tensor(emb, dtype=torch.float32)
         vecs.append(t)
 
     M = torch.stack(vecs)

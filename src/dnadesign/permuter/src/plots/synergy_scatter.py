@@ -56,9 +56,7 @@ def plot(
         keep_cols.append("aa_combo_str")
     df = df[keep_cols].dropna().copy()
     if df.empty:
-        raise RuntimeError(
-            "synergy_scatter: no rows with both observed and expected values"
-        )
+        raise RuntimeError("synergy_scatter: no rows with both observed and expected values")
 
     obs = df[obs_col].astype(float).to_numpy()
     exp = df[exp_col].astype(float).to_numpy()
@@ -97,9 +95,7 @@ def plot(
     lim_max = float(max(np.max(obs), np.max(exp)))
     if lim_min == lim_max:
         lim_min, lim_max = lim_min - 1e-6, lim_max + 1e-6
-    ax.plot(
-        [lim_min, lim_max], [lim_min, lim_max], color="0.80", linewidth=1.2, zorder=0.3
-    )
+    ax.plot([lim_min, lim_max], [lim_min, lim_max], color="0.80", linewidth=1.2, zorder=0.3)
 
     ax.set_xlim(lim_min, lim_max)
     ax.set_ylim(lim_min, lim_max)

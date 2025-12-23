@@ -82,7 +82,7 @@ Pipeline:
 * Pulls effective labels with `observed_round ≤ R`, then trains on the current Y column.
 * Predicts in batches (`scoring.score_batch_size` or `--score-batch-size`).
 * Applies your **objective** to produce a scalar **selection score**.
-* Selects with the configured strategy + tie handling.  
+* Selects with the configured strategy + tie handling.
   * If `selection.params.exclude_already_labeled: true` (default), designs already labeled at or before `--round` are **excluded from scoring/selection**.
 
 

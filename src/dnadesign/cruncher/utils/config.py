@@ -35,9 +35,7 @@ class ParseConfig(BaseModel):
     Settings needed to load and parse PWMs.
     """
 
-    motif_root: Optional[Path] = Field(
-        default=None, description="Directory containing motif/PWM files for parsing."
-    )
+    motif_root: Optional[Path] = Field(default=None, description="Directory containing motif/PWM files for parsing.")
     formats: Dict[str, str]  # e.g. {".txt": "MEME", ".pfm": "JASPAR"}
     plot: PlotConfig
 
@@ -66,9 +64,7 @@ class MoveConfig(BaseModel):
         "M": 0.20,
     }
 
-    @field_validator(
-        "block_len_range", "multi_k_range", "swap_len_range", mode="before"
-    )
+    @field_validator("block_len_range", "multi_k_range", "swap_len_range", mode="before")
     @classmethod
     def _list_to_tuple(cls, v: Any) -> Any:
         if isinstance(v, (list, tuple)):
@@ -77,9 +73,7 @@ class MoveConfig(BaseModel):
 
     @field_validator("move_probs")
     @classmethod
-    def _check_move_probs_keys_and_values(
-        cls, v: Dict[str, float]
-    ) -> Dict[Literal["S", "B", "M"], float]:
+    def _check_move_probs_keys_and_values(cls, v: Dict[str, float]) -> Dict[Literal["S", "B", "M"], float]:
         """
         Ensure that:
           • Exactly keys "S","B","M" are present
@@ -87,16 +81,12 @@ class MoveConfig(BaseModel):
           • The three values sum to (approximately) 1.0
         """
         if not isinstance(v, dict):
-            raise ValueError(
-                "move_probs must be a mapping {S: float, B: float, M: float}"
-            )
+            raise ValueError("move_probs must be a mapping {S: float, B: float, M: float}")
 
         expected_keys = {"S", "B", "M"}
         got_keys = set(v.keys())
         if got_keys != expected_keys:
-            raise ValueError(
-                f"move_probs keys must be exactly {expected_keys}, but got {got_keys}"
-            )
+            raise ValueError(f"move_probs keys must be exactly {expected_keys}, but got {got_keys}")
 
         # Validate non-negativity and coerce to float
         out: Dict[Literal["S", "B", "M"], float] = {}  # type: ignore[assignment]
@@ -143,9 +133,7 @@ class CoolingLinear(BaseModel):
     @classmethod
     def _two_positive(cls, v: Tuple[float, float]) -> Tuple[float, float]:
         if len(v) != 2:
-            raise ValueError(
-                "Linear cooling.beta must be length-2 [beta_start, beta_end]"
-            )
+            raise ValueError("Linear cooling.beta must be length-2 [beta_start, beta_end]")
         if v[0] <= 0 or v[1] <= 0:
             raise ValueError("Both β_start and β_end must be > 0")
         return v
@@ -163,9 +151,7 @@ class CoolingGeometric(BaseModel):
     @classmethod
     def _check_list_positive(cls, v: List[float]) -> List[float]:
         if not isinstance(v, list) or len(v) < 2:
-            raise ValueError(
-                "Geometric cooling.beta must be a list of at least two positive floats"
-            )
+            raise ValueError("Geometric cooling.beta must be a list of at least two positive floats")
         if any(x <= 0 for x in v):
             raise ValueError("All entries in geometric β list must be > 0")
         return v
@@ -195,9 +181,7 @@ class OptimiserConfig(BaseModel):
     def _check_pt_needs_softmax(self) -> "OptimiserConfig":
         if self.kind == "pt":
             if self.softmax_beta is None:
-                raise ValueError(
-                    "softmax_beta must be supplied when optimiser.kind == 'pt'"
-                )
+                raise ValueError("softmax_beta must be supplied when optimiser.kind == 'pt'")
             if self.softmax_beta <= 0:
                 raise ValueError("softmax_beta must be > 0")
         return self
@@ -223,9 +207,7 @@ class InitConfig(BaseModel):
     @model_validator(mode="after")
     def _check_fields_for_modes(self) -> "InitConfig":
         if self.kind == "consensus" and not self.regulator:
-            raise ValueError(
-                "When init.kind=='consensus', you must supply init.regulator=<PWM_name>"
-            )
+            raise ValueError("When init.kind=='consensus', you must supply init.regulator=<PWM_name>")
         return self
 
 
@@ -282,9 +264,7 @@ class AnalysisConfig(BaseModel):
     @classmethod
     def _check_positive_epsilon(cls, v: float) -> float:
         if not isinstance(v, (int, float)) or v <= 0.0:
-            raise ValueError(
-                "subsampling_epsilon must be a positive number (float or int)"
-            )
+            raise ValueError("subsampling_epsilon must be a positive number (float or int)")
         return float(v)
 
 
@@ -294,8 +274,8 @@ class CruncherConfig(BaseModel):
     regulator_sets: List[List[str]]
 
     parse: ParseConfig
-    sample: Optional[SampleConfig]
-    analysis: Optional[AnalysisConfig]
+    sample: Optional[SampleConfig] = None
+    analysis: Optional[AnalysisConfig] = None
 
     @model_validator(mode="after")
     def _check_mode_sections(self) -> "CruncherConfig":
@@ -306,6 +286,8 @@ class CruncherConfig(BaseModel):
             raise ValueError("When mode='sample', a [sample:] section is required.")
         if self.mode in ("analyse", "analyze") and not has_analysis:
             raise ValueError("When mode='analyse', an [analysis:] section is required.")
+        if self.mode == "sample-analyse" and (not has_sample or not has_analysis):
+            raise ValueError("When mode='sample-analyse', both [sample:] and [analysis:] sections are required.")
         return self
 
 

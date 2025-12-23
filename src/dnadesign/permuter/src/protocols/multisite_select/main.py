@@ -312,8 +312,7 @@ class MSel(Protocol):
             raise ValueError("multisite_select: params must be a mapping")
         if not params.get("from_dataset"):
             raise ValueError(
-                "multisite_select: params.from_dataset is required "
-                "(dataset directory or records.parquet path)"
+                "multisite_select: params.from_dataset is required (dataset directory or records.parquet path)"
             )
 
         sel = params.get("select") or {}
@@ -321,33 +320,24 @@ class MSel(Protocol):
         normalize = scoring.get("normalize") or {}
         method = str(normalize.get("method", "mad")).lower()
         if method not in {"mad", "none"}:
-            raise ValueError(
-                "multisite_select: select.scoring.normalize.method must be 'mad' or 'none'"
-            )
+            raise ValueError("multisite_select: select.scoring.normalize.method must be 'mad' or 'none'")
 
         emb_cfg = sel.get("embedding") or {}
         if emb_cfg.get("distance", "angular") != "angular":
             raise ValueError(
-                "multisite_select: only angular distance is supported "
-                "(select.embedding.distance must be 'angular')"
+                "multisite_select: only angular distance is supported (select.embedding.distance must be 'angular')"
             )
         if emb_cfg.get("representative", "medoid") != "medoid":
-            raise ValueError(
-                "multisite_select: only representative='medoid' is implemented"
-            )
+            raise ValueError("multisite_select: only representative='medoid' is implemented")
 
         budget = sel.get("budget") or {}
         tot = int(budget.get("total_variants") or 0)
         if tot <= 0:
-            raise ValueError(
-                "multisite_select: select.budget.total_variants must be > 0"
-            )
+            raise ValueError("multisite_select: select.budget.total_variants must be > 0")
 
         pool_factor = float(budget.get("pool_factor", 3.0))
         if pool_factor < 1.0:
-            raise ValueError(
-                "multisite_select: select.budget.pool_factor must be ≥ 1.0"
-            )
+            raise ValueError("multisite_select: select.budget.pool_factor must be ≥ 1.0")
 
         intra_cfg = budget.get("intracluster_diversity") or {}
         if intra_cfg.get("enabled", False):
@@ -366,8 +356,7 @@ class MSel(Protocol):
                 ) from e
             if min_ang < 0.0:
                 raise ValueError(
-                    "multisite_select: select.budget.intracluster_diversity."
-                    "min_angular_distance_deg must be ≥ 0"
+                    "multisite_select: select.budget.intracluster_diversity.min_angular_distance_deg must be ≥ 0"
                 )
 
         cl_cfg = sel.get("clusters") or {}
@@ -376,15 +365,11 @@ class MSel(Protocol):
             k = int(picks_per_cluster)
             if k <= 0:
                 raise ValueError(
-                    "multisite_select: select.clusters.picks_per_cluster must be ≥ 1 "
-                    "or omitted/Null to disable caps"
+                    "multisite_select: select.clusters.picks_per_cluster must be ≥ 1 or omitted/Null to disable caps"
                 )
 
         if not params.get("_artifact_dir"):
-            raise ValueError(
-                "multisite_select: _artifact_dir missing (internal); "
-                "invoke via 'permuter run'"
-            )
+            raise ValueError("multisite_select: _artifact_dir missing (internal); invoke via 'permuter run'")
 
     # -------------------------- Generation ---------------------------------
 
@@ -454,9 +439,7 @@ class MSel(Protocol):
         ]
         missing = [c for c in required_cols if c not in src.columns]
         if missing:
-            raise ValueError(
-                f"multisite_select: source dataset missing columns: {missing}"
-            )
+            raise ValueError(f"multisite_select: source dataset missing columns: {missing}")
 
         df_raw, finfo = filter_valid_source_rows(
             src,
@@ -467,18 +450,14 @@ class MSel(Protocol):
         )
         drops_pretty = json.dumps(finfo["drops_by_cause"], sort_keys=True, indent=2)
         _LOG.info(
-            "[data] validation\n"
-            "  input_rows: %d\n"
-            "  valid_rows: %d\n"
-            "  drops_by_cause: %s",
+            "[data] validation\n  input_rows: %d\n  valid_rows: %d\n  drops_by_cause: %s",
             finfo["n_total"],
             finfo["n_kept"],
             drops_pretty,
         )
         if df_raw.empty:
             raise RuntimeError(
-                "multisite_select: no usable rows after validation — "
-                f"drops={json.dumps(finfo['drops_by_cause'])}."
+                f"multisite_select: no usable rows after validation — drops={json.dumps(finfo['drops_by_cause'])}."
             )
 
         df = df_raw.copy()
@@ -489,17 +468,14 @@ class MSel(Protocol):
         df["__delta"] = df["epistasis"].astype(float).to_numpy()
         if (df["__delta"] < 0).any():
             raise RuntimeError(
-                "multisite_select: negative epistasis survived row-level validation; "
-                "this should not happen."
+                "multisite_select: negative epistasis survived row-level validation; this should not happen."
             )
 
         # Parse AA positions
         df["__aa_list"] = df["permuter__aa_pos_list"].apply(_as_int_list)
         df = df[df["__aa_list"].apply(len) > 0].reset_index(drop=True)
         if df.empty:
-            raise RuntimeError(
-                "multisite_select: no rows with non-empty permuter__aa_pos_list after parsing"
-            )
+            raise RuntimeError("multisite_select: no rows with non-empty permuter__aa_pos_list after parsing")
 
         # Embeddings (mean‑pooled logits)
         emb = extract_embedding_matrix(df[knobs.embedding_col])
@@ -521,9 +497,7 @@ class MSel(Protocol):
 
         if summary is not None:
             _LOG.info(
-                "[scaling]\n"
-                "  LLR: median=%.3f MAD=%.3f\n"
-                "  epi: median=%.3f MAD=%.3f",
+                "[scaling]\n  LLR: median=%.3f MAD=%.3f\n  epi: median=%.3f MAD=%.3f",
                 summary.median_llr,
                 summary.mad_llr,
                 summary.median_epi,
@@ -531,7 +505,7 @@ class MSel(Protocol):
             )
 
         _LOG.info(
-            "[scoring]\n" "  weights: α(llr)=%.3f β(epi)=%.3f",
+            "[scoring]\n  weights: α(llr)=%.3f β(epi)=%.3f",
             knobs.w_llr,
             knobs.w_epi,
         )
@@ -555,13 +529,7 @@ class MSel(Protocol):
 
         # Mutation-count breakdown inside the score-gated candidate pool
         if "permuter__mut_count" in df_pool.columns:
-            pool_k_counts = (
-                df_pool["permuter__mut_count"]
-                .astype(int)
-                .value_counts()
-                .sort_index()
-                .to_dict()
-            )
+            pool_k_counts = df_pool["permuter__mut_count"].astype(int).value_counts().sort_index().to_dict()
             _LOG.info(
                 "[pool] mut_count_value_counts: %s",
                 json.dumps(pool_k_counts, sort_keys=True),
@@ -576,9 +544,7 @@ class MSel(Protocol):
         # --- 4. Cluster summarization & filters -----------------------------
         clust_df = self._summarize_clusters(df_pool, emb, knobs)
         if clust_df.empty:
-            raise RuntimeError(
-                "multisite_select: no clusters with valid statistics in df_pool"
-            )
+            raise RuntimeError("multisite_select: no clusters with valid statistics in df_pool")
 
         # cluster‑level filters (optional)
         kept_cluster_ids = self._apply_cluster_filters(clust_df, knobs)
@@ -593,9 +559,7 @@ class MSel(Protocol):
                 len(df_pool),
             )
             if df_pool.empty:
-                raise RuntimeError(
-                    "multisite_select: all candidates rejected by cluster filters"
-                )
+                raise RuntimeError("multisite_select: all candidates rejected by cluster filters")
 
         # --- 5. Diversity‑aware selection within df_pool --------------------
         selected_row_indices = _greedy_select_with_diversity(df_pool, U_pool, knobs)
@@ -654,11 +618,7 @@ class MSel(Protocol):
                 m = mut_window_summary
 
                 # Compute codon count defensively (falls back to AA window length)
-                codons = (
-                    m.window_length_nt // 3
-                    if m.window_length_nt is not None
-                    else m.window_length
-                )
+                codons = m.window_length_nt // 3 if m.window_length_nt is not None else m.window_length
 
                 _LOG.info(
                     "[span]\n"
@@ -677,11 +637,7 @@ class MSel(Protocol):
                     m.start_pos,
                     m.end_pos,
                     m.window_length,
-                    (
-                        f" ({m.window_length_nt} nt; {codons} codons)"
-                        if m.window_length_nt is not None
-                        else ""
-                    ),
+                    (f" ({m.window_length_nt} nt; {codons} codons)" if m.window_length_nt is not None else ""),
                     m.left_flank,
                     m.window_seq,
                     m.right_flank,
@@ -691,8 +647,7 @@ class MSel(Protocol):
                 )
             else:
                 _LOG.info(
-                    "[span] REF_AA.fa missing in %s; skipping mutation-window "
-                    "summary for selected variants",
+                    "[span] REF_AA.fa missing in %s; skipping mutation-window summary for selected variants",
                     src_dir,
                 )
         except Exception as e:
@@ -724,14 +679,10 @@ class MSel(Protocol):
             )
             aa_token = f"aa [{row['aa_combo_str']}]" if row["aa_combo_str"] else "aa []"
             mods = [head, aa_token]
-            seq_window_val = (
-                row["sequence_window"] if "sequence_window" in row.index else None
-            )
+            seq_window_val = row["sequence_window"] if "sequence_window" in row.index else None
             yield {
                 "sequence": str(row["sequence"]),
-                "sequence_window": (
-                    str(seq_window_val) if seq_window_val is not None else None
-                ),
+                "sequence_window": (str(seq_window_val) if seq_window_val is not None else None),
                 "modifications": mods,
                 # Flattened scalar columns — run.py will namespace with permuter__*
                 "source_id": str(row["source_id"]),
@@ -745,11 +696,7 @@ class MSel(Protocol):
                 "aa_combo_str": str(row["aa_combo_str"]),
                 "mut_count": int(row["k"]),
                 "cluster_id": row["cluster_id"],
-                "proposal_score": (
-                    float(row["proposal_score"])
-                    if np.isfinite(row["proposal_score"])
-                    else None
-                ),
+                "proposal_score": (float(row["proposal_score"]) if np.isfinite(row["proposal_score"]) else None),
                 "source_var_id": str(row["source_var_id"]),
                 "angle_to_cluster_medoid_deg": (
                     float(row["angle_to_cluster_medoid_deg"])
@@ -798,9 +745,7 @@ class MSel(Protocol):
         intracluster_diversity = budget.get("intracluster_diversity") or {}
         # Diversity is opt-in; default is disabled and threshold 0.0 (no constraint).
         intra_enabled = bool(intracluster_diversity.get("enabled", False))
-        intra_min_angle_deg = float(
-            intracluster_diversity.get("min_angular_distance_deg", 0.0)
-        )
+        intra_min_angle_deg = float(intracluster_diversity.get("min_angular_distance_deg", 0.0))
 
         picks_per_cluster = cl.get("picks_per_cluster", None)
         if picks_per_cluster is not None:
@@ -825,9 +770,7 @@ class MSel(Protocol):
             min_angular_distance_deg=intra_min_angle_deg,
             prefer_fewer_mutations=bool(tie.get("prefer_fewer_mutations", True)),
             then_higher_delta=bool(tie.get("then_higher_delta", False)),
-            then_higher_proposal_score=bool(
-                tie.get("then_higher_proposal_score", False)
-            ),
+            then_higher_proposal_score=bool(tie.get("then_higher_proposal_score", False)),
             diag_figsize_in=float(diag.get("figsize_in", 8.0)),
             diag_dpi=int(diag.get("dpi", 200)),
             diag_random_seed=int(diag.get("random_sample_seed", 20251113)),
@@ -863,9 +806,7 @@ class MSel(Protocol):
     ) -> pd.DataFrame:
         groups = list(df_pool.groupby("cluster__perm_v1", sort=False))
         if not groups:
-            raise RuntimeError(
-                "multisite_select: no clusters present in 'cluster__perm_v1'"
-            )
+            raise RuntimeError("multisite_select: no clusters present in 'cluster__perm_v1'")
 
         cluster_meta: List[Dict] = []
         for lab, sub in groups:
@@ -952,9 +893,7 @@ class MSel(Protocol):
         clust_df: pd.DataFrame,
         selected_row_indices: List[int],
     ) -> Tuple[pd.DataFrame, List]:
-        med_row_by_cid = {
-            row["cluster_id"]: int(row["medoid_row"]) for _, row in clust_df.iterrows()
-        }
+        med_row_by_cid = {row["cluster_id"]: int(row["medoid_row"]) for _, row in clust_df.iterrows()}
 
         sel_rows: List[Dict] = []
         for idx in selected_row_indices:
@@ -966,9 +905,7 @@ class MSel(Protocol):
             med_row = med_row_by_cid.get(cid, None)
             if med_row is not None:
                 try:
-                    angle_deg = float(
-                        math.degrees(angular_distance(emb[idx], emb[int(med_row)]))
-                    )
+                    angle_deg = float(math.degrees(angular_distance(emb[idx], emb[int(med_row)])))
                 except Exception:
                     angle_deg = None
 
@@ -994,17 +931,13 @@ class MSel(Protocol):
             )
 
         picks_df = pd.DataFrame(sel_rows)
-        chosen_cluster_ids = sorted(
-            picks_df["cluster_id"].astype(object).unique().tolist()
-        )
+        chosen_cluster_ids = sorted(picks_df["cluster_id"].astype(object).unique().tolist())
 
         # angle to nearest selected cluster medoid (across chosen clusters)
         if not picks_df.empty and chosen_cluster_ids:
             sel_c = clust_df[clust_df["cluster_id"].isin(chosen_cluster_ids)].copy()
             sel_c = sel_c.set_index("cluster_id").loc[chosen_cluster_ids].reset_index()
-            med_arr_sel = l2_normalize_rows(
-                emb[sel_c["medoid_row"].astype(int).tolist()]
-            )
+            med_arr_sel = l2_normalize_rows(emb[sel_c["medoid_row"].astype(int).tolist()])
             V = l2_normalize_rows(emb[picks_df["_row_idx"].astype(int).to_numpy()])
             ang_nearest = []
             for vec in V:
@@ -1022,14 +955,10 @@ class MSel(Protocol):
         chosen_cluster_ids: List,
     ) -> pd.DataFrame:
         clust_df_summary = clust_df.copy()
-        clust_df_summary["is_selected"] = clust_df_summary["cluster_id"].isin(
-            set(chosen_cluster_ids)
-        )
+        clust_df_summary["is_selected"] = clust_df_summary["cluster_id"].isin(set(chosen_cluster_ids))
 
         if len(chosen_cluster_ids) >= 2:
-            sel_c = clust_df_summary[
-                clust_df_summary["cluster_id"].isin(chosen_cluster_ids)
-            ].copy()
+            sel_c = clust_df_summary[clust_df_summary["cluster_id"].isin(chosen_cluster_ids)].copy()
             sel_c = sel_c.set_index("cluster_id").loc[chosen_cluster_ids].reset_index()
             med_arr = l2_normalize_rows(emb[sel_c["medoid_row"].astype(int).tolist()])
             A = pairwise_angular(med_arr)
@@ -1163,9 +1092,7 @@ class MSel(Protocol):
         # 2) pairwise |Δk|
         try:
             if len(k_selected) >= 2:
-                k_random_samples = [
-                    k_all[idx] for idx in random_indices_samples if idx.size >= 2
-                ]
+                k_random_samples = [k_all[idx] for idx in random_indices_samples if idx.size >= 2]
                 plot_pairwise_delta_k_selected_vs_random(
                     k_selected,
                     k_random_samples,
@@ -1193,16 +1120,14 @@ class MSel(Protocol):
                     plot_pairwise_levenshtein_selected_vs_random(
                         seq_sel,
                         seq_random_samples,
-                        out_png=art_dir
-                        / "fig_pairwise_levenshtein_selected_vs_random.png",
+                        out_png=art_dir / "fig_pairwise_levenshtein_selected_vs_random.png",
                         title="Pairwise Levenshtein distance (AA; selected vs random)",
                         figsize_in=knobs.diag_figsize_in,
                         dpi=knobs.diag_dpi,
                     )
             else:
                 _LOG.info(
-                    "[diagnostics] REF_AA.fa missing in %s; "
-                    "skipping Levenshtein AA plot",
+                    "[diagnostics] REF_AA.fa missing in %s; skipping Levenshtein AA plot",
                     src_dir,
                 )
         except Exception as e:
@@ -1217,20 +1142,14 @@ class MSel(Protocol):
                     min_cooccur_count=knobs.heb_min_cooccur_count,
                     width_scale=knobs.heb_width_scale,
                     out_png=art_dir / "fig_edge_bundling_selected.png",
-                    out_pdf=(
-                        art_dir / "fig_edge_bundling_selected.pdf"
-                        if knobs.heb_out_svg
-                        else None
-                    ),
+                    out_pdf=(art_dir / "fig_edge_bundling_selected.pdf" if knobs.heb_out_svg else None),
                     figsize_in=knobs.heb_figsize_in,
                     dpi=knobs.diag_dpi,
                     edge_cmap=knobs.heb_edge_cmap,
                     color_by=knobs.heb_color_by,
                 )
                 if edges_df is not None and not edges_df.empty:
-                    atomic_write_parquet(
-                        edges_df, art_dir / "EDGE_BUNDLE_TABLE.parquet"
-                    )
+                    atomic_write_parquet(edges_df, art_dir / "EDGE_BUNDLE_TABLE.parquet")
                     _LOG.info(
                         "[heb]\n"
                         "  nodes:  %d\n"
@@ -1261,8 +1180,7 @@ class MSel(Protocol):
                         mins.append(float(np.rad2deg(np.min(other))))
                 if mins:
                     _LOG.info(
-                        "[picks] global minimum pairwise angle among picks: "
-                        "%.2f deg",
+                        "[picks] global minimum pairwise angle among picks: %.2f deg",
                         float(np.min(mins)),
                     )
         except Exception:
@@ -1310,8 +1228,7 @@ class MSel(Protocol):
                 )
             except Exception as e:
                 _LOG.warning(
-                    "[span] unable to compute sequence_window column from "
-                    "AA positions: %s",
+                    "[span] unable to compute sequence_window column from AA positions: %s",
                     e,
                 )
                 nt_start_idx = None
@@ -1319,9 +1236,7 @@ class MSel(Protocol):
 
         mutated_sequences: List[str] = []
         sequence_windows: List[str | None] = []
-        for seq, aa_pos_list in zip(
-            picks_df_out["sequence"].astype(str), picks_df_out["aa_pos_list"]
-        ):
+        for seq, aa_pos_list in zip(picks_df_out["sequence"].astype(str), picks_df_out["aa_pos_list"]):
             mutated = uppercase_mutated_codons(seq, aa_pos_list)
             mutated_sequences.append(mutated)
             if nt_start_idx is not None and nt_end_idx is not None:
@@ -1337,13 +1252,9 @@ class MSel(Protocol):
 
         # Pretty, explicit value counts for the emitted mutation counts.
         if "k" in picks_df_out.columns:
-            k_counts = (
-                picks_df_out["k"].astype(int).value_counts().sort_index().to_dict()
-            )
+            k_counts = picks_df_out["k"].astype(int).value_counts().sort_index().to_dict()
             _LOG.info(
-                "[picks]\n"
-                "  rows_emitted:             %d\n"
-                "  mut_count_value_counts:   %s",
+                "[picks]\n  rows_emitted:             %d\n  mut_count_value_counts:   %s",
                 len(picks_df_out),
                 json.dumps(k_counts, sort_keys=True),
             )
@@ -1372,27 +1283,15 @@ class MSel(Protocol):
                 f"winsor_mads={knobs.winsor_mads}"
             ),
             f"weights: llr={knobs.w_llr} epi={knobs.w_epi}",
-            (
-                "embedding: "
-                f"col={knobs.embedding_col} "
-                f"l2={knobs.l2_normalize_embeddings} "
-                f"dist=angular repr=medoid"
-            ),
-            (
-                "clusters: "
-                f"unique_clusters={len(chosen_cluster_ids)} "
-                f"picks_per_cluster={knobs.picks_per_cluster}"
-            ),
-            (
-                "budget: total_variants="
-                f"{knobs.total_variants} pool_factor={knobs.pool_factor:.2f}"
-            ),
+            (f"embedding: col={knobs.embedding_col} l2={knobs.l2_normalize_embeddings} dist=angular repr=medoid"),
+            (f"clusters: unique_clusters={len(chosen_cluster_ids)} picks_per_cluster={knobs.picks_per_cluster}"),
+            (f"budget: total_variants={knobs.total_variants} pool_factor={knobs.pool_factor:.2f}"),
             (
                 "diversity: "
                 f"enabled={knobs.intracluster_diversity_enabled} "
                 f"min_angular_distance_deg={knobs.min_angular_distance_deg:.2f}"
             ),
-            ("tie_breakers: " f"prefer_fewer_mutations={knobs.prefer_fewer_mutations}"),
+            (f"tie_breakers: prefer_fewer_mutations={knobs.prefer_fewer_mutations}"),
             "diagnostics: "
             f"figsize_in={knobs.diag_figsize_in} dpi={knobs.diag_dpi} "
             f"random_sample_seed={knobs.diag_random_seed} "
@@ -1444,13 +1343,8 @@ class MSel(Protocol):
 
             if m.ref_length_nt is not None and m.window_length_nt is not None:
                 codons = m.window_length_nt // 3
-                lines.append(
-                    f"- reference length: {m.ref_length} aa " f"({m.ref_length_nt} nt)"
-                )
-                lines.append(
-                    f"- window (AA): positions {m.start_pos}-{m.end_pos} "
-                    f"(length {m.window_length} aa)"
-                )
+                lines.append(f"- reference length: {m.ref_length} aa ({m.ref_length_nt} nt)")
+                lines.append(f"- window (AA): positions {m.start_pos}-{m.end_pos} (length {m.window_length} aa)")
                 lines.append(
                     f"- window (NT): positions {m.nt_start}-{m.nt_end} "
                     f"(length {m.window_length_nt} nt; {codons} codons)"
@@ -1458,10 +1352,7 @@ class MSel(Protocol):
             else:
                 # Fallback: AA-only summary
                 lines.append(f"- reference length: {m.ref_length} aa")
-                lines.append(
-                    f"- window: positions {m.start_pos}-{m.end_pos} "
-                    f"(length {m.window_length} aa)"
-                )
+                lines.append(f"- window: positions {m.start_pos}-{m.end_pos} (length {m.window_length} aa)")
 
             lines.append("- amino-acid context:")
             lines.append(f"  - left flank : `{m.left_flank}`")
@@ -1485,9 +1376,7 @@ class MSel(Protocol):
             lines.append("## Per‑cluster picks\n")
             for cid, r in grp.sort_values("best_score", ascending=False).iterrows():
                 lines.append(
-                    f"- cluster {cid}: n={int(r['n'])} "
-                    f"best={r['best_score']:+.3f} "
-                    f"mean={r['mean_score']:+.3f}"
+                    f"- cluster {cid}: n={int(r['n'])} best={r['best_score']:+.3f} mean={r['mean_score']:+.3f}"
                 )
 
         if not clust_df.empty:

@@ -70,7 +70,7 @@ infer-evo2 = [
   "flash-attn>=2.8.0.post2,<3; sys_platform == 'linux' and platform_machine == 'x86_64'",
 
   # Transformer Engine: let it float within major=2.
-  # (TE is a prereq for Evo2; Evo2 requires TE>=2.0.0) 
+  # (TE is a prereq for Evo2; Evo2 requires TE>=2.0.0)
   "transformer-engine[pytorch]>=2.0,<3; sys_platform == 'linux' and platform_machine == 'x86_64'",
 
   # --- evo2
@@ -108,10 +108,10 @@ environments = [
 ]
 
 # flash-attn + TE-torch must build against the same torch as the runtime env
-# uv supports this directly and will do a two-phase install so deps (torch, pip, etc.) land first 
+# uv supports this directly and will do a two-phase install so deps (torch, pip, etc.) land first
 no-build-isolation-package = ["flash-attn", "transformer-engine-torch"]
 
-# Help uv resolve flash-attn without trying to build it during the resolution step. 
+# Help uv resolve flash-attn without trying to build it during the resolution step.
 [[tool.uv.dependency-metadata]]
 name = "flash-attn"
 requires-dist = ["torch", "einops"]
@@ -124,7 +124,7 @@ explicit = true
 [tool.uv.sources]
 dense-arrays = { git = "https://github.com/e-south/dense-arrays" }
 
-# When infer-evo2 is enabled, use CUDA 12.8 wheels for torch-family from PyTorch's CUDA index. 
+# When infer-evo2 is enabled, use CUDA 12.8 wheels for torch-family from PyTorch's CUDA index.
 torch = [
   { index = "pytorch-cu128", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
 ]

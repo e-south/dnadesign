@@ -92,9 +92,7 @@ def _ensure_plugins_loaded() -> None:
     for ep in _iter_entry_points("dnadesign.opal.models"):
         try:
             ep.load()
-            _dbg(
-                f"loaded plugin entry point: {getattr(ep, 'name', '?')} from {getattr(ep, 'module', '?')}"
-            )
+            _dbg(f"loaded plugin entry point: {getattr(ep, 'name', '?')} from {getattr(ep, 'module', '?')}")
         except Exception as e:
             _dbg(f"FAILED loading plugin entry point {ep!r}: {e!r}")
             continue

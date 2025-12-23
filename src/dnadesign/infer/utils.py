@@ -15,12 +15,7 @@ import torch
 
 
 def to_device(t: torch.Tensor, device: str) -> torch.Tensor:
-    return (
-        t.to(device)
-        if t.device.type != torch.device(device).type
-        or t.device != torch.device(device)
-        else t
-    )
+    return t.to(device) if t.device.type != torch.device(device).type or t.device != torch.device(device) else t
 
 
 def to_format(obj, fmt: str):

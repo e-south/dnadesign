@@ -31,21 +31,14 @@ from ...data_access import RecordsStore
 
 
 def resolve_config_path(opt: Optional[Path]) -> Path:
-
-    CAND_NAMES = tuple(
-        (
-            os.getenv("OPAL_CONFIG_NAMES")
-            or "campaign.yaml,campaign.yml,opal.yaml,opal.yml"
-        ).split(",")
-    )
+    CAND_NAMES = tuple((os.getenv("OPAL_CONFIG_NAMES") or "campaign.yaml,campaign.yml,opal.yaml,opal.yml").split(","))
     if opt:
         p = Path(opt).expanduser()
         p = p if p.is_absolute() else (Path.cwd() / p)
         p = p.resolve()
         if not p.exists():
             raise OpalError(
-                f"Config path not found: {p}. "
-                "Tip: from a campaign folder run `opal <cmd>` or pass `-c campaign.yaml`.",
+                f"Config path not found: {p}. Tip: from a campaign folder run `opal <cmd>` or pass `-c campaign.yaml`.",
                 ExitCodes.BAD_ARGS,
             )
         return p
@@ -128,21 +121,13 @@ def _format_validation_error(e, cfg_path: Path) -> str:
         # Assertive, context-specific hint: extra key under model.params for RF
         if typ == "extra_forbidden" and loc_str.startswith("model.params."):
             bad_key = loc[-1] if loc else "<?>"
-            lines.append(
-                "    hint: Remove this key; it is not a valid RandomForest parameter."
-            )
-            lines.append(
-                "          Typical params include: n_estimators, criterion, bootstrap,"
-            )
-            lines.append(
-                "          oob_score, random_state, n_jobs, max_depth, min_samples_split,"
-            )
+            lines.append("    hint: Remove this key; it is not a valid RandomForest parameter.")
+            lines.append("          Typical params include: n_estimators, criterion, bootstrap,")
+            lines.append("          oob_score, random_state, n_jobs, max_depth, min_samples_split,")
             lines.append("          min_samples_leaf, max_features, max_leaf_nodes,")
             lines.append("          min_impurity_decrease, ccp_alpha, warm_start.")
             if str(bad_key) == "emit_feature_importance":
-                lines.append(
-                    "          To export importances, run: opal model-show --out-dir <dir>"
-                )
+                lines.append("          To export importances, run: opal model-show --out-dir <dir>")
 
     return "\n".join(lines)
 
@@ -163,15 +148,9 @@ def load_cli_config(config_opt: Optional[Path]) -> RootConfig:
             from pydantic import ValidationError  # type: ignore
 
             cause = getattr(e, "__cause__", None)
-            ve = (
-                cause
-                if isinstance(cause, ValidationError)
-                else (e if isinstance(e, ValidationError) else None)
-            )
+            ve = cause if isinstance(cause, ValidationError) else (e if isinstance(e, ValidationError) else None)
             if ve is not None:
-                raise OpalError(
-                    _format_validation_error(ve, cfg_path), ExitCodes.BAD_ARGS
-                )
+                raise OpalError(_format_validation_error(ve, cfg_path), ExitCodes.BAD_ARGS)
         except Exception:
             pass
         # Otherwise, preserve the original exception semantics
@@ -233,9 +212,7 @@ def internal_error(ctx: str, e: Exception) -> None:
         import traceback as _tb
 
         tb = _tb.format_exc()
-        print_stderr(
-            f"[bold red]Internal error during [white]{ctx}[/]:[/] {e}\n[dim]{tb}[/]"
-        )
+        print_stderr(f"[bold red]Internal error during [white]{ctx}[/]:[/] {e}\n[dim]{tb}[/]")
     else:
         print_stderr(
             f"[bold red]Internal error during [white]{ctx}[/]:[/] {e}\n[dim](Hint: set OPAL_DEBUG=1 for full traceback)[/]"  # noqa
@@ -247,8 +224,6 @@ def opal_error(ctx: str, e: OpalError) -> None:
     if str(os.getenv("OPAL_DEBUG", "")).strip().lower() in ("1", "true", "yes", "on"):
         import traceback as _tb
 
-        print_stderr(
-            f"[bold red]OpalError during [white]{ctx}[/]:[/] {e}\n[dim]{_tb.format_exc()}[/]"
-        )
+        print_stderr(f"[bold red]OpalError during [white]{ctx}[/]:[/] {e}\n[dim]{_tb.format_exc()}[/]")
     else:
         print_stderr(str(e))

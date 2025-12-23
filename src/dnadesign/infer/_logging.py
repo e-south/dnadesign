@@ -49,9 +49,7 @@ def setup_console_logging(level: str = "INFO", json_logs: bool = False) -> None:
         return
 
     if RichHandler is not None:
-        handler = RichHandler(
-            show_time=True, show_level=True, markup=True, rich_tracebacks=False
-        )
+        handler = RichHandler(show_time=True, show_level=True, markup=True, rich_tracebacks=False)
         handler.setLevel(level.upper())
         root.addHandler(handler)
     else:

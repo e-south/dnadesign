@@ -119,9 +119,7 @@ def plot_scatter(
     df_sub = subsample_df(df_per_pwm, max_n=2000, sort_by="draw")
 
     # 6) Random baseline
-    df_random = generate_random_baseline(
-        pwms, cfg, length=seq_len, n_samples=len(df_sub)
-    )
+    df_random = generate_random_baseline(pwms, cfg, length=seq_len, n_samples=len(df_sub))
 
     # 7) Consensus points
     consensus_pts = compute_consensus_points(pwms, cfg, length=seq_len)
@@ -142,9 +140,7 @@ def plot_scatter(
             seq_ints = _TRANS[ascii_arr].astype(np.int8)
             per_tf = pair_scorer.compute_all_per_pwm(seq_ints, seq_len)
             # 'rank' may be absent; default to a large number so outline order is deterministic
-            rank_val = (
-                int(row["rank"]) if "rank" in row and pd.notna(row["rank"]) else 10**9
-            )
+            rank_val = int(row["rank"]) if "rank" in row and pd.notna(row["rank"]) else 10**9
             elite_coords.append((float(per_tf[x_tf]), float(per_tf[y_tf]), rank_val))
 
     # 9) PWM widths for subtitle
@@ -281,15 +277,8 @@ def _draw_scatter_figure(
         cons_y = raw_scorer._cache[y_tf].consensus_llr
 
         # sanity-check anchors
-        if (
-            not np.isfinite(cons_x)
-            or not np.isfinite(cons_y)
-            or cons_x <= 0
-            or cons_y <= 0
-        ):
-            raise ValueError(
-                f"Consensus LLR must be positive and finite; got {cons_x:.3f} / {cons_y:.3f}"
-            )
+        if not np.isfinite(cons_x) or not np.isfinite(cons_y) or cons_x <= 0 or cons_y <= 0:
+            raise ValueError(f"Consensus LLR must be positive and finite; got {cons_x:.3f} / {cons_y:.3f}")
 
         # (ii) normalise every sample; discard any invalid rows
         x_norm = (df_samples[f"score_{x_tf}"] / cons_x).to_numpy(dtype=float)
@@ -376,8 +365,7 @@ def _draw_scatter_figure(
     ax.set_xlabel(xl, fontsize=12)
     ax.set_ylabel(yl, fontsize=12)
     ax.set_title(
-        f"MCMC vs. Random for {x_tf}/{y_tf}\n"
-        f"Seq length={seq_len}, PWM widths: {x_tf}={width_x}, {y_tf}={width_y}",
+        f"MCMC vs. Random for {x_tf}/{y_tf}\nSeq length={seq_len}, PWM widths: {x_tf}={width_x}, {y_tf}={width_y}",
         fontsize=10,
     )
 
