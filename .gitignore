@@ -187,3 +187,5 @@ AGENTS.md
 
 # Marimo
 **/__marimo__/cache/
+**/__marimo__/
+src/dnadesign/opal/notebooks/temp.py
