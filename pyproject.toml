@@ -32,11 +32,10 @@ dependencies = [
   "tqdm",
   "typer",
   "xlrd",
-
   # Torch 2.7 aligns with CUDA 12.8 (SCC cuda/12.8 module) and Evo2’s Python 3.12 requirement.
   "torch>=2.7,<2.8; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
-
   "dense-arrays",
+  "polars>=1.36.1",
 ]
 
 [project.scripts]
