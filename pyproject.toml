@@ -36,6 +36,9 @@ dependencies = [
   "torch>=2.7,<2.8; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
   "dense-arrays",
   "polars>=1.36.1",
+  "altair>=6.0.0",
+  "vegafusion>=2.0.3",
+  "vl-convert-python>=1.9.0",
 ]
 
 [project.scripts]
@@ -80,7 +83,10 @@ infer-evo2 = [
 test = ["pytest>=8.2", "pytest-cov", "hypothesis>=6.100"]
 lint = ["ruff>=0.4", "pre-commit>=3.7"]
 dev  = [{ include-group = "test" }, { include-group = "lint" }]
-notebooks = ["marimo>=0.18.4"]
+notebooks = [
+    "marimo>=0.18.4",
+    "openai>=2.14.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
