@@ -17,6 +17,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from .utils import OpalError
+
 
 @dataclass
 class _RoundLite:
@@ -117,8 +119,8 @@ def build_status(
                         "objective__summary_stats",
                     ]
                 )
-            except Exception:
-                return None
+            except Exception as e:
+                raise OpalError("Ledger sinks not found. Run `opal run` to create ledger outputs.") from e
             if runs.empty:
                 return None
             rsel = runs[runs["as_of_round"] == int(as_of_round)]
