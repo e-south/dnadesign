@@ -85,7 +85,9 @@ class RandomForestModel:
         y_dim = int(Y.shape[1])
 
         est = RandomForestRegressor(**self.params)
-        y_fit = Y.ravel() if y_dim == 1 else Y
+        # sklearn expects 1D targets for single-output regression.
+        # np.asarray avoids matrix subclasses keeping 2D shape after ravel().
+        y_fit = np.asarray(Y).reshape(-1) if y_dim == 1 else Y
         est.fit(X, y_fit)
         self._est = est
         self._x_dim = int(X.shape[1])
