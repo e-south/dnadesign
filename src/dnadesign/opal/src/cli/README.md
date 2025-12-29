@@ -143,7 +143,6 @@ opal record-show \
   --config <yaml> \
   [<ID-or-SEQ> | --id <ID> | --sequence <SEQ>] \
   [--with-sequence] \
-  [--legacy] \
   [--json]
 ```
 
@@ -166,11 +165,20 @@ opal model-show \
 List objective metadata and diagnostic keys for a round.
 
 ```
-opal objective-meta --config <yaml> --round <k|latest> [--legacy]
+opal objective-meta --config <yaml> --round <k|latest>
 ```
 
 * Reads from `outputs/ledger.runs.parquet` and `outputs/ledger.predictions/`.
-* `--legacy` allows older sinks (deprecated).
+
+### `ctx`
+
+Inspect `round_ctx.json` carriers.
+
+```
+opal ctx show  --config <yaml> --round <k|latest> [--keys <prefix> ...] [--json]
+opal ctx audit --config <yaml> --round <k|latest> [--json]
+opal ctx diff  --config <yaml> --round-a <k|latest> --round-b <k|latest> [--keys <prefix> ...] [--json]
+```
 
 ### `explain`
 

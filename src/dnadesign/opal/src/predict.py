@@ -30,26 +30,10 @@ import pandas as pd
 
 from .data_access import RecordsStore
 from .registries.models import load_model
+from .registries.transforms_x import get_transform_x
 from .registries.transforms_y import run_y_ops_pipeline
+from .round_context import PluginRegistryView, RoundCtx
 from .utils import ExitCodes, OpalError
-
-
-class _CtxShim:
-    """Tiny adapter so Y-op inverse() can ctx.get(...) from saved round_ctx.json."""
-
-    def __init__(self, store: Dict[str, Any]):
-        self._s = store
-
-    def get(self, path: str, default: Any = None) -> Any:
-        if path in self._s:
-            return self._s[path]
-        if default is not None:
-            return default
-        raise KeyError(path)
-
-    # inverse() never writes, but be defensive
-    def set(self, *args, **kwargs):  # noqa: D401 (no-op)
-        raise RuntimeError("ctx.set is not supported in prediction shim")
 
 
 def _inverse_yops_if_present(yhat: np.ndarray, model_path: Path) -> np.ndarray:
@@ -63,8 +47,8 @@ def _inverse_yops_if_present(yhat: np.ndarray, model_path: Path) -> np.ndarray:
         Y = np.asarray(yhat, dtype=float)
         if Y.ndim == 1:
             Y = Y.reshape(-1, 1)
-        shim = _CtxShim(ctx_data)
-        return run_y_ops_pipeline(stage="inverse", y_ops=[], Y=Y, ctx=shim)
+        rctx = RoundCtx.from_snapshot(ctx_data)
+        return run_y_ops_pipeline(stage="inverse", y_ops=[], Y=Y, ctx=rctx)
     except Exception as e:
         raise OpalError(f"Failed to invert Y-ops from {ctx_path}: {e}") from e
 
@@ -110,7 +94,27 @@ def run_predict_ephemeral(
 
     if ids is None:
         ids = df_work["id"].astype(str).tolist()
-    X, id_order = store.transform_matrix(df_work, ids)
+    reg = PluginRegistryView(
+        model=str(model_name),
+        objective="unknown",
+        selection="unknown",
+        transform_x=store.x_transform_name,
+        transform_y="unknown",
+    )
+    rctx = RoundCtx(
+        core={
+            "core/run_id": "predict-ephemeral",
+            "core/round_index": -1,
+            "core/campaign_slug": store.campaign_slug,
+            "core/labels_as_of_round": -1,
+            "core/plugins/transforms_x/name": store.x_transform_name,
+            "core/plugins/model/name": str(model_name),
+        },
+        registry=reg,
+    )
+    tx = get_transform_x(store.x_transform_name, store.x_transform_params)
+    tctx = rctx.for_plugin(category="transform_x", name=store.x_transform_name, plugin=tx)
+    X, id_order = store.transform_matrix(df_work, ids, ctx=tctx)
     if X.shape[0] != len(id_order):
         raise OpalError(
             "Mismatch between inputs and transformed matrix count.",

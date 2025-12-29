@@ -1,6 +1,6 @@
 ## OPAL vNext Migration Notes
 
-This release makes **strict, breaking** changes to ledger handling and label history validation.
+This release makes **strict, breaking** changes to runtime carriers, plugin contracts, and ledger handling.
 
 ### Required updates
 
@@ -11,22 +11,28 @@ This release makes **strict, breaking** changes to ledger handling and label his
        duplicate_policy: "error"  # or keep_first | keep_last
      ```
 2. **Ledger usage**
-   - `ledger.index.parquet` is deprecated and no longer written.
-   - Tools now read **typed sinks**:
+   - `ledger.index.parquet` and `events.parquet` are removed.
+   - Tools now read **typed sinks** only:
      - `outputs/ledger.predictions/`
      - `outputs/ledger.runs.parquet`
      - `outputs/ledger.labels.parquet`
-3. **Label history**
+3. **Runtime carriers**
+   - Contracts are enforced for model/selection/objective/transform_x/y‑ops.
+   - Inspect with `opal ctx show|audit|diff`.
+4. **Label history**
    - `label_hist` is strictly validated on `run`/`explain`.
    - If you have legacy/malformed entries, run:
      ```bash
      opal label-hist repair --config <campaign.yaml> --apply
      ```
+5. **Plugin signatures (breaking)**
+   - `transform_x` factories must accept `params: dict`, and callables must accept `ctx`.
+   - `transform_y` functions must accept `(df_tidy, params, ctx)`.
+   - `model` factories must accept `params: dict` (no fallback call patterns).
 
-### Legacy fallbacks (explicit only)
+### Legacy fallbacks removed
 
-- `opal record-show` and `opal objective-meta` no longer auto-fallback to `events.parquet`.
-- Use `--legacy` to read legacy sinks when needed.
+- `opal record-show` and `opal objective-meta` no longer accept `--legacy`.
 
 ### Troubleshooting
 

@@ -38,13 +38,14 @@ from .artifacts import (
     write_round_ctx,
     write_selection_csv,
 )
-from .config.types import RootConfig
+from .config.types import LocationLocal, LocationUSR, RootConfig
 from .data_access import RecordsStore
 from .ledger import LedgerWriter
 from .preflight import preflight_run
 from .registries.models import get_model
 from .registries.objectives import get_objective
 from .registries.selections import get_selection, normalize_selection_result
+from .registries.transforms_x import get_transform_x
 from .registries.transforms_y import run_y_ops_pipeline
 from .round_context import PluginRegistryView, RoundCtx
 from .round_plan import plan_round
@@ -78,7 +79,7 @@ class RunRoundResult:
     scored: int
     top_k_requested: int
     top_k_effective: int
-    events_path: str
+    ledger_path: str
 
 
 def _log(enabled: bool, msg: str) -> None:
@@ -203,53 +204,6 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         f"dedup={plan.training_dedup_policy})",
     )
 
-    # --- X matrices & candidate universe ---
-    if len(train_ids) != len(set(train_ids)):
-        if str(plan.training_dedup_policy).strip().lower() != "all_rounds":
-            raise OpalError(
-                "Duplicate ids detected in training labels. "
-                "Set training.policy.label_cross_round_deduplication_policy='all_rounds' to allow."
-            )
-        # Build X on unique ids, then expand to match training order
-        seen = set()
-        unique_ids = []
-        for _id in train_ids:
-            if _id not in seen:
-                unique_ids.append(_id)
-                seen.add(_id)
-        X_unique, id_order_unique = store.transform_matrix(df, unique_ids)
-        x_map = {i: X_unique[j] for j, i in enumerate(id_order_unique)}
-        X_train = np.vstack([x_map[i] for i in train_ids])
-        id_order_train = train_ids
-    else:
-        X_train, id_order_train = store.transform_matrix(df, train_ids)
-    cand_df = plan.candidate_df
-
-    sel_name = cfg.selection.selection.name
-    sel_params = dict(cfg.selection.selection.params)
-    if plan.selection_excludes_labeled and plan.candidate_filtered_out:
-        _log(
-            req.verbose,
-            f"[candidates] pool={plan.candidate_total_before_filter} → {len(cand_df)} after excluding already-labeled "
-            f"(policy allow_resuggesting_candidates_until_labeled={plan.allow_resuggest})",
-        )
-
-    X_pool, id_order_pool = store.transform_matrix(df, cand_df["id"])
-    if X_pool.shape[0] == 0:
-        raise OpalError("Candidate pool is empty after filtering; nothing to score.")
-    if X_train.shape[0] != Y_train.shape[0]:
-        raise OpalError(f"Training X/Y row mismatch: X_train={X_train.shape[0]} Y_train={Y_train.shape[0]}.")
-    if not cfg.safety.accept_x_mismatch and X_train.shape[1] != X_pool.shape[1]:
-        raise OpalError(
-            f"X dimension mismatch between training and pool (train={X_train.shape[1]}, pool={X_pool.shape[1]}). "
-            "Set safety.accept_x_mismatch=true to override."
-        )
-    _log(
-        req.verbose,
-        f"[transform] X_train: {X_train.shape} for {len(id_order_train)} ids | "
-        f"X_pool: {X_pool.shape} for {len(id_order_pool)} ids",
-    )
-
     # --- RoundCtx baseline (registry-aware) ---
     run_id = f"r{int(req.as_of_round)}-{now_iso()}"
     reg = PluginRegistryView(
@@ -270,8 +224,65 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
             "core/plugins/model/name": reg.model,
             "core/plugins/objective/name": reg.objective,
             "core/plugins/selection/name": reg.selection,
+            "core/data/y_dim": int(y_dim),
+            "core/data/n_train": int(len(train_ids)),
         },
         registry=reg,
+    )
+
+    # Transform X plugin context (used for training + pool transforms)
+    tx = get_transform_x(cfg.data.transforms_x.name, cfg.data.transforms_x.params)
+    tctx = rctx.for_plugin(category="transform_x", name=cfg.data.transforms_x.name, plugin=tx)
+
+    # --- X matrices & candidate universe ---
+    if len(train_ids) != len(set(train_ids)):
+        if str(plan.training_dedup_policy).strip().lower() != "all_rounds":
+            raise OpalError(
+                "Duplicate ids detected in training labels. "
+                "Set training.policy.label_cross_round_deduplication_policy='all_rounds' to allow."
+            )
+        # Build X on unique ids, then expand to match training order
+        seen = set()
+        unique_ids = []
+        for _id in train_ids:
+            if _id not in seen:
+                unique_ids.append(_id)
+                seen.add(_id)
+        X_unique, id_order_unique = store.transform_matrix(df, unique_ids, ctx=tctx)
+        x_map = {i: X_unique[j] for j, i in enumerate(id_order_unique)}
+        X_train = np.vstack([x_map[i] for i in train_ids])
+        id_order_train = train_ids
+    else:
+        X_train, id_order_train = store.transform_matrix(df, train_ids, ctx=tctx)
+    cand_df = plan.candidate_df
+
+    sel_name = cfg.selection.selection.name
+    sel_params = dict(cfg.selection.selection.params)
+    if plan.selection_excludes_labeled and plan.candidate_filtered_out:
+        _log(
+            req.verbose,
+            f"[candidates] pool={plan.candidate_total_before_filter} → {len(cand_df)} after excluding already-labeled "
+            f"(policy allow_resuggesting_candidates_until_labeled={plan.allow_resuggest})",
+        )
+
+    X_pool, id_order_pool = store.transform_matrix(df, cand_df["id"], ctx=tctx)
+    if X_pool.shape[0] == 0:
+        raise OpalError("Candidate pool is empty after filtering; nothing to score.")
+    rctx.set_core("core/data/x_dim", int(X_train.shape[1]))
+    rctx.set_core("core/data/n_scored", int(len(id_order_pool)))
+    rctx.set_core("core/data/candidate_pool_total", int(plan.candidate_total_before_filter))
+    rctx.set_core("core/data/candidate_pool_filtered_out", int(plan.candidate_filtered_out))
+    if X_train.shape[0] != Y_train.shape[0]:
+        raise OpalError(f"Training X/Y row mismatch: X_train={X_train.shape[0]} Y_train={Y_train.shape[0]}.")
+    if not cfg.safety.accept_x_mismatch and X_train.shape[1] != X_pool.shape[1]:
+        raise OpalError(
+            f"X dimension mismatch between training and pool (train={X_train.shape[1]}, pool={X_pool.shape[1]}). "
+            "Set safety.accept_x_mismatch=true to override."
+        )
+    _log(
+        req.verbose,
+        f"[transform] X_train: {X_train.shape} for {len(id_order_train)} ids | "
+        f"X_pool: {X_pool.shape} for {len(id_order_pool)} ids",
     )
 
     # --- Y-ops (fit/transform) via registry (decoupled) ---
@@ -516,6 +527,10 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
             "effective_after_ties": int(selected_effective),
         },
     )
+    rctx.set_core("core/selection/top_k_requested", int(top_k))
+    rctx.set_core("core/selection/top_k_effective", int(selected_effective))
+    rctx.set_core("core/selection/objective_mode", str(mode))
+    rctx.set_core("core/selection/tie_handling", str(tie_handling))
     # --- Artifacts ---
     apaths = ArtifactPaths(
         model=rdir / "model.joblib",
@@ -719,9 +734,28 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     st.campaign_slug = cfg.campaign.slug
     st.campaign_name = cfg.campaign.name
     st.workdir = str(ws.workdir.resolve())
+    loc = cfg.data.location
+    if isinstance(loc, LocationUSR):
+        st.data_location = {
+            "kind": "usr",
+            "dataset": loc.dataset,
+            "path": str(Path(loc.path).resolve()),
+            "records_path": str(store.records_path.resolve()),
+        }
+    elif isinstance(loc, LocationLocal):
+        st.data_location = {
+            "kind": "local",
+            "path": str(Path(loc.path).resolve()),
+            "records_path": str(store.records_path.resolve()),
+        }
     st.x_column_name = cfg.data.x_column_name
     st.y_column_name = cfg.data.y_column_name
     st.representation_vector_dimension = rep.x_dim or 0
+    st.representation_transform = {
+        "name": cfg.data.transforms_x.name,
+        "params": cfg.data.transforms_x.params,
+    }
+    st.training_policy = dict(cfg.training.policy or {})
     st.performance = {
         "score_batch_size": req.score_batch_size_override or cfg.scoring.score_batch_size,
         "objective": obj_name,
@@ -806,5 +840,5 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         scored=len(id_order_pool),
         top_k_requested=int(top_k),
         top_k_effective=int(selected_effective),
-        events_path=str(ws.ledger_dir.resolve()),
+        ledger_path=str(ws.ledger_dir.resolve()),
     )

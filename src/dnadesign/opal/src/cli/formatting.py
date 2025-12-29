@@ -280,7 +280,8 @@ def render_record_report_human(report: Mapping[str, Any]) -> str:
             "Sources",
             {
                 "records": sources.get("records", ""),
-                "events": sources.get("events", ""),
+                "ledger_predictions": sources.get("ledger_predictions_dir", ""),
+                "ledger_runs": sources.get("ledger_runs_path", ""),
             },
         )
 
@@ -321,7 +322,7 @@ def render_run_summary_human(summary: dict) -> str:
         f"{_b('as_of_round')}: {summary.get('as_of_round')}",
         f"{_b('trained_on')}:{' '}{summary.get('trained_on')} | {_b('scored')}:{' '}{summary.get('scored')}",
         sel_line,
-        f"{_b('events')}: {summary.get('events')}",
+        f"{_b('ledger')}: {summary.get('ledger')}",
         f"{_b('top_k_source')}: {summary.get('top_k_source')}",
     ]
     return "\n".join(lines)

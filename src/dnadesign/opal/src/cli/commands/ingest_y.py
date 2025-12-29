@@ -24,7 +24,9 @@ from ...data_access import RecordsStore
 from ...ingest import run_ingest
 from ...ledger import LedgerWriter
 from ...locks import CampaignLock
-from ...utils import ExitCodes, OpalError, print_stdout
+from ...registries.transforms_y import get_transform_y
+from ...round_context import PluginRegistryView, RoundCtx
+from ...utils import ExitCodes, OpalError, now_iso, print_stdout
 from ...workspace import CampaignWorkspace
 from ...writebacks import build_label_events
 from ..formatting import render_ingest_commit_human, render_ingest_preview_human
@@ -85,6 +87,25 @@ def cmd_ingest_y(
 
             t_params = _json.loads(Path(params).read_text())
 
+        reg = PluginRegistryView(
+            model=cfg.model.name,
+            objective=cfg.objective.objective.name,
+            selection=cfg.selection.selection.name,
+            transform_x=cfg.data.transforms_x.name,
+            transform_y=t_name,
+        )
+        rctx = RoundCtx(
+            core={
+                "core/run_id": f"ingest-{now_iso()}",
+                "core/round_index": int(round),
+                "core/campaign_slug": cfg.campaign.slug,
+                "core/labels_as_of_round": int(round),
+                "core/plugins/transforms_y/name": t_name,
+            },
+            registry=reg,
+        )
+        tctx = rctx.for_plugin(category="transform_y", name=t_name, plugin=get_transform_y(t_name))
+
         labels_df, preview = run_ingest(
             df,
             csv_df,
@@ -93,6 +114,7 @@ def cmd_ingest_y(
             y_expected_length=cfg.data.y_expected_length,
             y_column_name=cfg.data.y_column_name,
             duplicate_policy=cfg.ingest.duplicate_policy,
+            ctx=tctx,
         )
 
         # Preview

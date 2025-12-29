@@ -18,7 +18,7 @@ from pyarrow import compute as arrow_pc
 from pyarrow import dataset as ds
 
 from ..registries.plot import register_plot
-from ._events_util import resolve_events_path
+from ._events_util import resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta
 
 
@@ -26,7 +26,7 @@ from ._mpl_utils import annotate_plot_meta
 def render(context, params: dict) -> None:
     # ---- Parameters (assertive, yet simple to change) ----
     # Source is now *observed* labels (ledger.labels) instead of predictions.
-    events_path = resolve_events_path(context)  # we only use this to locate /outputs
+    outputs_dir = resolve_outputs_dir(context)  # ledger sinks live here
     top_percentile = params.get("top_percentile")
     if top_percentile is not None:
         top_percentile = float(top_percentile)
@@ -57,7 +57,7 @@ def render(context, params: dict) -> None:
     _TOL = 1e-6
 
     # ---- Data: read ledger.labels and join a setpoint from ledger.runs ----
-    root = events_path.parent  # .../outputs
+    root = outputs_dir
     labels_path = root / "ledger.labels.parquet"
     runs_path = root / "ledger.runs.parquet"
     if not labels_path.exists():

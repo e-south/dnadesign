@@ -16,16 +16,19 @@ import numpy as np
 import pandas as pd
 
 from ..registries.transforms_y import register_transform_y
+from ..round_context import roundctx_contract
 
 
 def _clip01(x: np.ndarray, eps: float) -> np.ndarray:
     return np.clip(x, 0.0 + eps, 1.0 - eps)
 
 
+@roundctx_contract(category="transform_y", requires=[], produces=[])
 @register_transform_y("sfxi_vec8_from_table_v1")
 def sfxi_vec8_from_table_v1(
     csv_df: pd.DataFrame,
     params: Dict,
+    ctx=None,
 ) -> pd.DataFrame:
     """
     Input columns:

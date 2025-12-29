@@ -29,6 +29,7 @@ from joblib import load as joblib_load
 from sklearn.ensemble import RandomForestRegressor
 
 from ..registries.models import register_model
+from ..round_context import roundctx_contract
 
 
 @dataclass
@@ -36,6 +37,15 @@ class FitMetrics:
     oob_r2: Optional[float] = None
 
 
+@roundctx_contract(
+    category="model",
+    requires=[],
+    produces=[
+        "model/<self>/x_dim",
+        "model/<self>/y_dim",
+        "model/<self>/fit_metrics",
+    ],
+)
 @register_model("random_forest")
 class RandomForestModel:
     """
@@ -72,9 +82,11 @@ class RandomForestModel:
             raise ValueError("[random_forest] X must be a 2D numpy array.")
         if not (isinstance(Y, np.ndarray) and Y.ndim == 2):
             raise ValueError("[random_forest] Y must be a 2D numpy array.")
+        y_dim = int(Y.shape[1])
 
         est = RandomForestRegressor(**self.params)
-        est.fit(X, Y)
+        y_fit = Y.ravel() if y_dim == 1 else Y
+        est.fit(X, y_fit)
         self._est = est
         self._x_dim = int(X.shape[1])
 
@@ -102,12 +114,21 @@ class RandomForestModel:
                 # be explicit: if user asked for it, failure should surface
                 raise RuntimeError(f"[random_forest] failed to compute feature importance: {e}")
 
+        # Emit RoundCtx metadata for auditability
+        if ctx is not None:
+            ctx.set("model/<self>/x_dim", int(X.shape[1]))
+            ctx.set("model/<self>/y_dim", int(y_dim))
+            ctx.set("model/<self>/fit_metrics", {"oob_r2": oob_r2})
+
         return FitMetrics(oob_r2=oob_r2)
 
     def predict(self, X: np.ndarray, *, ctx=None) -> np.ndarray:
         if self._est is None:
             raise RuntimeError("[random_forest] predict() before fit().")
-        return np.asarray(self._est.predict(X), dtype=float)
+        y = np.asarray(self._est.predict(X), dtype=float)
+        if y.ndim == 1:
+            y = y.reshape(-1, 1)
+        return y
 
     def predict_per_tree(self, X: np.ndarray) -> Optional[np.ndarray]:
         """

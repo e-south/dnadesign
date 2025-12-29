@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from ..registries.plot import register_plot
-from ._events_util import load_events_with_setpoint, resolve_events_path
+from ._events_util import load_events_with_setpoint, resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta, scale_to_sizes, swarm_smart
 from ._param_utils import event_columns_for, get_str, normalize_metric_field
 
@@ -54,13 +54,13 @@ def render(context, params: dict) -> None:
 
     size_min = float(params.get("size_min", 10.0))
     size_max = float(params.get("size_max", 60.0))
-    events_path = resolve_events_path(context)
-    # Always read from typed sinks (predictions + runs). This works with or without the thin index.
+    outputs_dir = resolve_outputs_dir(context)
+    # Always read from typed sinks (predictions + runs).
     need = {"as_of_round", "pred__y_obj_scalar"}
     need |= event_columns_for(hue_field, size_by)
-    df = load_events_with_setpoint(events_path, need, round_selector=context.rounds)
+    df = load_events_with_setpoint(outputs_dir, need, round_selector=context.rounds)
     if df.empty:
-        raise ValueError("ledger.index.parquet contained zero rows after projection.")
+        raise ValueError("Ledger predictions contained zero rows after projection.")
 
     rsel = context.rounds
     if rsel == "unspecified":

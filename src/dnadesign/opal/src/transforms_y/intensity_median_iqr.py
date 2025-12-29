@@ -38,6 +38,9 @@ def _fit(Y: np.ndarray, params: _Params, ctx=None) -> None:
         # mark as no-op
         if ctx is not None:
             ctx.set("yops/intensity_median_iqr/enabled", False)
+            ctx.set("yops/intensity_median_iqr/center", [0.0, 0.0, 0.0, 0.0])
+            ctx.set("yops/intensity_median_iqr/scale", [1.0, 1.0, 1.0, 1.0])
+            ctx.set("yops/intensity_median_iqr/eps", float(params.eps))
         return
     if d < 8:
         raise ValueError("intensity_median_iqr expects y-dim >= 8")
@@ -89,6 +92,14 @@ def _inverse(Y: np.ndarray, params: _Params, ctx=None) -> np.ndarray:
     return out
 
 
-@register_y_op("intensity_median_iqr")
+@register_y_op(
+    "intensity_median_iqr",
+    produces=[
+        "yops/<self>/enabled",
+        "yops/<self>/center",
+        "yops/<self>/scale",
+        "yops/<self>/eps",
+    ],
+)
 def _entry():
     return _fit, _transform, _inverse, _Params

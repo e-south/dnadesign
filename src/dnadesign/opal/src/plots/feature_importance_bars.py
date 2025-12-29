@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 
 from ..registries.plot import register_plot
-from ._events_util import resolve_events_path
+from ._events_util import resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta, log_kv
 
 # -----------------------------
@@ -189,7 +189,7 @@ def render(context, params: dict) -> None:
     order_policy = str(params.get("order_policy", "preserve")).strip().lower()
 
     # ---- Discover files from round_* directories (decoupled from runs parquet)
-    outputs_dir = resolve_events_path(context).parent  # .../outputs
+    outputs_dir = resolve_outputs_dir(context)
     fi_map = _discover_round_fi_files(outputs_dir)  # {round: path}
     available_rounds = sorted(fi_map.keys())
     target_rounds = _select_rounds(available_rounds, context.rounds)

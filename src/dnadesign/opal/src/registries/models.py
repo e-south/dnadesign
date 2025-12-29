@@ -117,14 +117,43 @@ def register_model(name: str):
     return _wrap
 
 
+def _wrap_model_for_ctx(name: str, model: Any) -> Any:
+    """
+    Wrap model.fit/predict to enforce RoundCtx contracts when a PluginCtx is provided.
+    """
+    contract = getattr(model, "__opal_contract__", None)
+    if contract is None:
+        return model
+
+    if getattr(model, "__opal_ctx_wrapped__", False):
+        return model
+
+    def _wrap_method(method_name: str) -> None:
+        orig = getattr(model, method_name, None)
+        if not callable(orig):
+            return
+
+        def _wrapped(*args, **kwargs):
+            ctx = kwargs.get("ctx")
+            if ctx is not None:
+                ctx.precheck_requires()
+            out = orig(*args, **kwargs)
+            if ctx is not None:
+                ctx.postcheck_produces()
+            return out
+
+        setattr(model, method_name, _wrapped)
+
+    _wrap_method("fit")
+    _wrap_method("predict")
+    setattr(model, "__opal_ctx_wrapped__", True)
+    return model
+
+
 def get_model(name: str, params: dict):
     """
     Instantiate a model via its registered factory.
-
-    We try tolerant call patterns:
-      • factory(params=params)
-      • class with .from_params(params)        (if factory provides it)
-      • factory(params)                        (positional)
+    Required signature: factory(params: dict) -> model_instance.
     """
     _ensure_all_loaded()
     if name not in _REG_M:
@@ -140,26 +169,11 @@ def get_model(name: str, params: dict):
         raise KeyError(f"model '{name}' not found. Available: [{avail}].{hint}")
 
     factory: Any = _REG_M[name]
-
-    # try kwargs
     try:
-        return factory(params=params)
-    except TypeError:
-        pass
-
-    # try classmethod from_params
-    fp = getattr(factory, "from_params", None)
-    if callable(fp):
-        try:
-            return fp(params)
-        except TypeError:
-            pass
-
-    # try positional
-    try:
-        return factory(params)
-    except Exception as e:
-        raise TypeError(f"cannot construct model '{name}': {e}") from e
+        model = factory(params)
+    except TypeError as e:
+        raise TypeError(f"model factory '{name}' must accept a params dict.") from e
+    return _wrap_model_for_ctx(name, model)
 
 
 def list_models() -> List[str]:
@@ -181,4 +195,5 @@ def load_model(name: str, path: str, params: dict | None = None):
     loader = getattr(factory, "load", None)
     if not callable(loader):
         raise TypeError(f"model '{name}' does not implement required load(path, params=None) interface.")
-    return loader(path, params=params)
+    model = loader(path, params=params)
+    return _wrap_model_for_ctx(name, model)

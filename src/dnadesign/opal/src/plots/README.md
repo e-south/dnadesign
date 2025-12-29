@@ -19,7 +19,7 @@ plots:
   - name: score_vs_rank_latest        # unique instance label
     kind: scatter_score_vs_rank       # plugin id registered in plots registry
 
-    # Optional extra sources (built-ins auto-injected: events, records, artifacts)
+    # Optional extra sources (built-ins auto-injected: records, artifacts)
     data:
       - name: extra_csv
         path: ./extras/scores.csv
@@ -41,9 +41,10 @@ plots:
 
 **Built-ins injected** (resolved from the campaign config):
 
-* `events` → `<campaign>/outputs/ledger.index.parquet` (handle to typed ledger sinks; index may be absent)
 * `records` → resolved from `data.location` in `campaign.yaml`
 * `artifacts` → `<campaign>/artifacts/`
+
+Ledger sinks always live under `context.workspace.outputs_dir` (e.g., `outputs/ledger.*`).
 
 
 ### Writing a new plot
@@ -55,8 +56,9 @@ from ..registries.plots import register_plot
 
 @register_plot("my_cool_plot")
 def render(context, params):
-    # context: campaign_dir, rounds, data_paths, output_dir, filename, dpi, format, logger, save_data
-    # - Read from context.data_paths (e.g., "events", "records", your custom sources)
+    # context: campaign_dir, workspace, rounds, data_paths, output_dir, filename, dpi, format, logger, save_data
+    # - Read from context.data_paths (e.g., "records", your custom sources)
+    # - Ledger sinks live under context.workspace.outputs_dir
     # - Build tidy DataFrame(s)
     # - Plot with matplotlib/seaborn (your call)
     # - Save to context.output_dir / context.filename

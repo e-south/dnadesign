@@ -32,8 +32,8 @@ The **registry** maps a model name → factory. A factory must return an object 
 
 ```python
 class Model:
-    def fit(self, X: np.ndarray, Y: np.ndarray) -> Any: ...
-    def predict(self, X: np.ndarray) -> np.ndarray: ...
+    def fit(self, X: np.ndarray, Y: np.ndarray, *, ctx: PluginCtx | None = None) -> Any: ...
+    def predict(self, X: np.ndarray, *, ctx: PluginCtx | None = None) -> np.ndarray: ...
     def save(self, path: str | Path) -> None: ...
     def load(path: str | Path) -> "Model": ...
 ```
@@ -41,7 +41,7 @@ class Model:
 **Registry helpers**
 
 * `register_model(name: str)` — decorator to register a factory under `name`
-* `get_model(name, *factory_args, **factory_kwargs)` — build by name
+* `get_model(name, params: dict)` — build by name (factory must accept a params dict)
 * `list_models() -> list[str]` — enumerate available entries
 
 **Paths**
@@ -101,3 +101,9 @@ models:
 
 * Scaling is a training‑time aid only; all reported predictions are in original units.
 * `std_vec` is tree dispersion (not calibrated probability).
+
+#### Runtime carrier contracts
+
+Models may declare `@roundctx_contract(category="model", ...)` to enforce and audit
+runtime keys in `round_ctx.json`. If a contract is declared, OPAL enforces it on
+`fit` and `predict` when a `ctx` is provided.

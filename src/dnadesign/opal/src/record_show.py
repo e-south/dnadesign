@@ -38,7 +38,6 @@ def build_record_report(
     sequence: Optional[str] = None,
     with_sequence: bool = True,
     ledger_reader: Optional[LedgerReader] = None,
-    legacy_events_path: Optional[Path] = None,
     records_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     if id_ is None and sequence is None:
@@ -83,43 +82,27 @@ def build_record_report(
     if ledger_reader is not None:
         srcs["ledger_predictions_dir"] = _relpath(Path(ledger_reader.paths.predictions_dir))
         srcs["ledger_runs_path"] = _relpath(Path(ledger_reader.paths.runs_path))
-    if legacy_events_path is not None:
-        srcs["legacy_events"] = _relpath(Path(legacy_events_path))
     if srcs:
         report["sources"] = srcs
 
     latest_rank_comp: Optional[int] = None
     avg_rank_comp: Optional[float] = None
 
-    if ledger_reader is not None:
-        needed_cols = [
-            "event",
-            "as_of_round",
-            "run_id",
-            "id",
-            "sequence",
-            "pred__y_dim",
-            "pred__y_obj_scalar",
-            "sel__rank_competition",
-            "sel__is_selected",
-        ]
-        out = ledger_reader.read_predictions(columns=needed_cols, id_value=rid)
-        out = out[out.get("event") == "run_pred"] if not out.empty else out
-    elif legacy_events_path is not None:
-        # Legacy path (a single Parquet index). Kept for backward compatibility.
-        ev = pd.read_parquet(legacy_events_path)
-        col = "event" if "event" in ev.columns else ("kind" if "kind" in ev.columns else None)
-        if col is None:
-            raise ValueError("Legacy events parquet missing 'event' column.")
-        ev = ev[(ev[col] == "run_pred") & (ev["id"].astype(str) == rid)]
-        cols = [c for c in ev.columns if c.startswith("pred__") or c.startswith("unc__") or c.startswith("sel__")]
-        cols = ["as_of_round", "run_id", "sequence"] + cols
-        if "sequence" not in ev.columns:
-            ev = ev.copy()
-            ev["sequence"] = seq_val
-        out = ev[cols].sort_values(["as_of_round", "run_id"])
-    else:
-        raise ValueError("No ledger reader or legacy events path provided.")
+    if ledger_reader is None:
+        raise ValueError("Ledger reader is required for record_show (legacy sinks are no longer supported).")
+    needed_cols = [
+        "event",
+        "as_of_round",
+        "run_id",
+        "id",
+        "sequence",
+        "pred__y_dim",
+        "pred__y_obj_scalar",
+        "sel__rank_competition",
+        "sel__is_selected",
+    ]
+    out = ledger_reader.read_predictions(columns=needed_cols, id_value=rid)
+    out = out[out.get("event") == "run_pred"] if not out.empty else out
 
     report["runs"] = out.to_dict(orient="records")
 

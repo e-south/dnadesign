@@ -190,6 +190,14 @@ class LedgerWriter:
     def append_run_pred(self, df: pd.DataFrame) -> None:
         _ensure_event_value(df, "run_pred")
         _validate_columns(df, "run_pred")
+        if "run_id" in df.columns:
+            run_ids = df["run_id"].astype(str).unique().tolist()
+            if len(run_ids) != 1:
+                raise LedgerError(f"[ledger:run_pred] expected single run_id, found {run_ids}")
+        if {"run_id", "id"}.issubset(set(df.columns)):
+            dup = df.duplicated(subset=["run_id", "id"]).any()
+            if dup:
+                raise LedgerError("[ledger:run_pred] duplicate (run_id, id) rows are not allowed.")
         ensure_dir(self._paths.predictions_dir)
         tbl = pa.Table.from_pandas(df, preserve_index=False)
         out = self._paths.predictions_dir / f"part-{uuid4().hex}.parquet"

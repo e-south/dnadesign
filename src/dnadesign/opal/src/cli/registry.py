@@ -23,7 +23,8 @@ import typer
 class CommandSpec:
     name: str
     help: str
-    callback: Callable[..., None]
+    callback: Callable[..., None] | typer.Typer
+    is_group: bool = False
 
 
 _CLI_REGISTRY: Dict[str, CommandSpec] = {}
@@ -33,15 +34,28 @@ def cli_command(name: str, help: str):
     def _wrap(func: Callable[..., None]) -> Callable[..., None]:
         if name in _CLI_REGISTRY:
             raise RuntimeError(f"CLI command '{name}' already registered")
-        _CLI_REGISTRY[name] = CommandSpec(name=name, help=help, callback=func)
+        _CLI_REGISTRY[name] = CommandSpec(name=name, help=help, callback=func, is_group=False)
         return func
+
+    return _wrap
+
+
+def cli_group(name: str, help: str):
+    def _wrap(app: typer.Typer) -> typer.Typer:
+        if name in _CLI_REGISTRY:
+            raise RuntimeError(f"CLI command '{name}' already registered")
+        _CLI_REGISTRY[name] = CommandSpec(name=name, help=help, callback=app, is_group=True)
+        return app
 
     return _wrap
 
 
 def install_registered_commands(app: typer.Typer) -> None:
     for spec in _CLI_REGISTRY.values():
-        app.command(name=spec.name, help=spec.help)(spec.callback)
+        if spec.is_group:
+            app.add_typer(spec.callback, name=spec.name, help=spec.help)
+        else:
+            app.command(name=spec.name, help=spec.help)(spec.callback)
 
 
 def discover_commands(package: str = "dnadesign.opal.src.cli.commands") -> None:

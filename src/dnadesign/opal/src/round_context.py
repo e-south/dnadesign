@@ -113,7 +113,7 @@ def roundctx_contract(
     requires: Optional[List[str]] = None,
     produces: Optional[List[str]] = None,
 ):
-    if category not in _ALLOWED_ROOTS - {"core", "yops"}:
+    if category not in _ALLOWED_ROOTS - {"core"}:
         raise ValueError(f"roundctx_contract: invalid category={category!r}")
     req = tuple(requires or ())
     prod = tuple(produces or ())
@@ -292,6 +292,37 @@ class RoundCtx:
         for k, v in core.items():
             self.set_core(k, v)
 
+    @classmethod
+    def from_snapshot(
+        cls,
+        snapshot: Mapping[str, Any],
+        *,
+        registry: Optional[PluginRegistryView] = None,
+    ) -> "RoundCtx":
+        """
+        Rehydrate a RoundCtx from a persisted snapshot (round_ctx.json).
+        Useful for inspection or for passing into y-ops inversion in predict.
+        """
+        snap = dict(snapshot or {})
+        if registry is None:
+
+            def _get(name: str) -> str:
+                v = snap.get(name)
+                return str(v) if v is not None else "unknown"
+
+            registry = PluginRegistryView(
+                model=_get("core/plugins/model/name"),
+                objective=_get("core/plugins/objective/name"),
+                selection=_get("core/plugins/selection/name"),
+                transform_x=_get("core/plugins/transforms_x/name"),
+                transform_y=_get("core/plugins/transforms_y/name"),
+            )
+
+        ctx = cls(core={}, registry=registry)
+        for k, v in snap.items():
+            ctx.set(k, v, allow_overwrite=False)
+        return ctx
+
     # ----- core -----
     def set_core(self, key: str, value: Any) -> None:
         if not key.startswith("core/"):
@@ -320,13 +351,22 @@ class RoundCtx:
         self._store[path] = normalized
 
     # ----- plugin view -----
-    def for_plugin(self, *, category: str, name: str, plugin: Optional[Any] = None) -> "PluginCtx":
-        if category not in _ALLOWED_ROOTS - {"core", "yops"}:
+    def for_plugin(
+        self,
+        *,
+        category: str,
+        name: str,
+        plugin: Optional[Any] = None,
+        contract: Optional[Contract] = None,
+    ) -> "PluginCtx":
+        if category not in _ALLOWED_ROOTS - {"core"}:
             raise ValueError(f"Unknown plugin category '{category}'")
-        contract: Optional[Contract] = getattr(plugin, "__opal_contract__", None) if plugin is not None else None
-        if contract is not None and contract.category != category:
+        effective_contract: Optional[Contract] = contract
+        if effective_contract is None and plugin is not None:
+            effective_contract = getattr(plugin, "__opal_contract__", None)
+        if effective_contract is not None and effective_contract.category != category:
             raise RoundCtxContractError(category=category, name=name, msg="decorator category/name mismatch")
-        effective = contract or Contract(category=category, requires=tuple(), produces=tuple())
+        effective = effective_contract or Contract(category=category, requires=tuple(), produces=tuple())
         return PluginCtx(round_ctx=self, category=category, name=name, contract=effective)
 
     # ----- snapshot -----
