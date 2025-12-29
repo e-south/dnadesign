@@ -4,8 +4,8 @@
 src/dnadesign/opal/src/record_show.py
 
 Record-centric report: gathers label history from records.parquet AND all
-run_pred entries for the record from outputs/events.parquet, respecting
-each event's as_of_round.
+run_pred entries for the record from ledger sinks under outputs/,
+respecting each event's as_of_round.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -86,87 +86,72 @@ def build_record_report(
     latest_rank_comp: Optional[int] = None
     avg_rank_comp: Optional[float] = None
 
-    if events_path is not None and events_path.exists():
+    if events_path is None:
+        raise ValueError("events_path is required to build record report.")
+
+    if events_path.exists() and events_path.is_dir():
+        pred_dir = events_path if events_path.name == "ledger.predictions" else (events_path / "ledger.predictions")
+        if not pred_dir.exists():
+            raise ValueError(f"Missing ledger.predictions directory: {pred_dir}")
+        frames = []
+        needed_cols = [
+            "event",
+            "as_of_round",
+            "run_id",
+            "id",
+            "sequence",
+            "pred__y_dim",
+            "pred__y_obj_scalar",
+            "sel__rank_competition",
+            "sel__is_selected",
+        ]
+        for p in sorted(pred_dir.glob("part-*.parquet")):
+            sub = pd.read_parquet(p, columns=needed_cols)
+            sub = sub[(sub.get("event") == "run_pred") & (sub["id"].astype(str) == rid)]
+            if not sub.empty:
+                frames.append(sub)
+        out = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=needed_cols)
+    elif events_path.exists():
         # Legacy path (a single Parquet index). Kept for backward compatibility.
         ev = pd.read_parquet(events_path)
         col = "event" if "event" in ev.columns else ("kind" if "kind" in ev.columns else None)
         if col is None:
-            report["runs"] = []
-            return report
+            raise ValueError("Legacy events parquet missing 'event' column.")
         ev = ev[(ev[col] == "run_pred") & (ev["id"].astype(str) == rid)]
-        # compact per-round view
         cols = [c for c in ev.columns if c.startswith("pred__") or c.startswith("unc__") or c.startswith("sel__")]
         cols = ["as_of_round", "run_id", "sequence"] + cols
-
         if "sequence" not in ev.columns:
             ev = ev.copy()
             ev["sequence"] = seq_val
-
         out = ev[cols].sort_values(["as_of_round", "run_id"])
-        report["runs"] = out.to_dict(orient="records")
-
-        # If we didn't have a sequence in records, adopt first non-null from events.
-        if with_sequence and report.get("sequence") is None:
-            try:
-                nonnull = out["sequence"].dropna()
-                if not nonnull.empty:
-                    report["sequence"] = str(nonnull.iloc[0])
-            except Exception:
-                pass
-
-        # Rank summaries (competition rank). Robust to missing col.
-        if "sel__rank_competition" in out.columns and not out.empty:
-            try:
-                # latest round = max as_of_round; within that, prefer the max run_id (most recent)
-                lr = int(out["as_of_round"].max())
-                latest = out[out["as_of_round"] == lr]
-                # pick the last lexicographic run_id (they include ISO timestamp) → most recent
-                latest = latest.sort_values(["run_id"]).tail(1)
-                v = latest["sel__rank_competition"].iloc[0]
-                latest_rank_comp = int(v) if pd.notna(v) else None
-            except Exception:
-                latest_rank_comp = None
-            try:
-                avg_rank_comp = float(pd.to_numeric(out["sel__rank_competition"], errors="coerce").dropna().mean())
-            except Exception:
-                avg_rank_comp = None
     else:
-        # New default: read from outputs/ledger.predictions/ (directory of parts)
-        # Derive outputs/ root from the provided path if possible, else from records_path.
-        base_outputs = None
-        if events_path is not None:
-            base_outputs = Path(events_path).parent
-        elif records_path is not None:
-            base_outputs = Path(records_path).resolve().parent / "outputs"
-        if base_outputs is not None:
-            pred_dir = base_outputs / "ledger.predictions"
-            if pred_dir.exists():
-                frames = []
-                # read only needed columns and filter by id to keep this light
-                needed_cols = [
-                    "event",
-                    "as_of_round",
-                    "run_id",
-                    "id",
-                    "sequence",
-                    "pred__y_dim",
-                    "pred__y_obj_scalar",
-                    "sel__rank_competition",
-                    "sel__is_selected",
-                ]
-                for p in sorted(pred_dir.glob("part-*.parquet")):
-                    try:
-                        sub = pd.read_parquet(p, columns=needed_cols)
-                        sub = sub[(sub.get("event") == "run_pred") & (sub["id"].astype(str) == rid)]
-                        if not sub.empty:
-                            frames.append(sub)
-                    except Exception:
-                        continue
-                ev = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=needed_cols)
-            else:
-                ev = pd.DataFrame(columns=["event"])
-        else:
-            ev = pd.DataFrame(columns=["event"])
+        raise ValueError(f"events_path not found: {events_path}")
+
+    report["runs"] = out.to_dict(orient="records")
+
+    # If we didn't have a sequence in records, adopt first non-null from events.
+    if with_sequence and report.get("sequence") is None:
+        try:
+            nonnull = out.get("sequence", pd.Series([], dtype=object)).dropna()
+            if not nonnull.empty:
+                report["sequence"] = str(nonnull.iloc[0])
+        except Exception:
+            pass
+
+    # Rank summaries (competition rank). Robust to missing col.
+    if "sel__rank_competition" in out.columns and not out.empty:
+        try:
+            lr = int(out["as_of_round"].max())
+            latest = out[out["as_of_round"] == lr]
+            latest = latest.sort_values(["run_id"]).tail(1)
+            v = latest["sel__rank_competition"].iloc[0]
+            latest_rank_comp = int(v) if pd.notna(v) else None
+        except Exception:
+            latest_rank_comp = None
+        try:
+            avg_rank_comp = float(pd.to_numeric(out["sel__rank_competition"], errors="coerce").dropna().mean())
+        except Exception:
+            avg_rank_comp = None
 
     # Attach summaries outside the branch for clarity
     report["latest_rank_competition"] = latest_rank_comp

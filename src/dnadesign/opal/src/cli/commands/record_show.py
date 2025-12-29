@@ -43,18 +43,33 @@ def cmd_record_show(
         cfg = load_cli_config(config)
         store = store_from_cfg(cfg)
         df = store.load()
-        # ... (id/sequence resolution unchanged) ...
+        if id and sequence:
+            raise OpalError("Provide only one of --id or --sequence (not both).")
+        if id is None and sequence is None:
+            if not key:
+                raise OpalError("Provide a record id or sequence.")
+            # Try id match first, then sequence
+            id_match = df["id"].astype(str) == str(key)
+            seq_match = df["sequence"].astype(str) == str(key) if "sequence" in df.columns else None
+            if id_match.any() and seq_match is not None and seq_match.any():
+                raise OpalError("Key matches both an id and a sequence; use --id or --sequence.")
+            if id_match.any():
+                id = str(key)
+            elif seq_match is not None and seq_match.any():
+                sequence = str(key)
+            else:
+                raise OpalError("Record not found for key; use --id or --sequence explicitly.")
 
         base = Path(cfg.campaign.workdir) / "outputs"
 
-        # Prefer new typed sinks (consolidated file, then directory), else legacy
+        # Prefer typed ledger sinks; fall back to legacy only if explicitly present
         candidates = [
-            base / "ledger.predictions.parquet",
-            base / "ledger.predictions",
-            base / "events" / "run_pred.parquet",  # legacy
-            base / "events.parquet",  # legacy
+            base / "ledger.predictions",  # directory of parts
+            base / "events.parquet",  # legacy index
         ]
         ev_path = next((p for p in candidates if p.exists()), None)
+        if ev_path is None:
+            raise OpalError(f"No ledger predictions found under {base}. Run a round first.")
 
         report = build_record_report(
             df,

@@ -62,6 +62,15 @@ class RecordsStore:
         df.to_parquet(tmp, index=False)
         tmp.replace(self.records_path)
 
+    def assert_unique_ids(self, df: pd.DataFrame) -> None:
+        if "id" not in df.columns:
+            raise OpalError("records.parquet is missing required column 'id'.")
+        ids = df["id"].astype(str)
+        if ids.duplicated().any():
+            dup = ids[ids.duplicated()].unique().tolist()
+            preview = dup[:10]
+            raise OpalError(f"records.parquet contains duplicate ids (sample={preview}).")
+
     # --------------- cache column names ---------------
     def label_hist_col(self) -> str:
         return f"opal__{self.campaign_slug}__label_hist"
@@ -232,45 +241,22 @@ class RecordsStore:
         Compute effective training labels at or before 'as_of_round' from label_hist cache.
         Returns a frame with columns: id, y
         """
-        lh = self.label_hist_col()
-        if lh not in df.columns:
-            raise OpalError(f"Expected label history column '{lh}' not found in records.parquet. ")
-        recs: List[Tuple[str, List[float]]] = []
-        for _id, hist_cell in df[["id", lh]].itertuples(index=False, name=None):
-            _id = str(_id)
-            hist = self._normalize_hist_cell(hist_cell)
-            # choose latest entry with r <= as_of_round
-            best = None
-            for e in hist:
-                try:
-                    rr = int(e.get("r", 9_999_999))
-                    if rr <= as_of_round and (best is None or rr > int(best.get("r", -1))):
-                        best = e
-                except Exception:
-                    continue
-            if best is not None:
-                recs.append((_id, [float(v) for v in best.get("y", [])]))
-        import os
-        import sys
+        out = self.training_labels_with_round(
+            df,
+            as_of_round,
+            cumulative_training=True,
+            dedup_policy="latest_only",
+        )
+        return out[["id", "y"]]
 
-        if not recs and os.getenv("OPAL_DEBUG_LABELS", "").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-        ):
-            non_empty = df[lh].dropna()
-            print(
-                f"[opal.debug] label_hist={lh} non_empty_rows={len(non_empty)} as_of_round={as_of_round}",
-                file=sys.stderr,
-            )
-            for i, (_, cell) in enumerate(non_empty.iloc[:3].items()):
-                print(
-                    f"[opal.debug] sample_cell_{i} type={type(cell)} preview={str(cell)[:160]}",
-                    file=sys.stderr,
-                )
-        return pd.DataFrame(recs, columns=["id", "y"])
-
-    def training_labels_with_round(self, df: pd.DataFrame, as_of_round: int) -> pd.DataFrame:
+    def training_labels_with_round(
+        self,
+        df: pd.DataFrame,
+        as_of_round: int,
+        *,
+        cumulative_training: bool,
+        dedup_policy: str,
+    ) -> pd.DataFrame:
         """
         Like training_labels_from_y, but also returns the observed round for the effective label.
         Returns: DataFrame columns: id, y, r
@@ -278,22 +264,54 @@ class RecordsStore:
         lh = self.label_hist_col()
         if lh not in df.columns:
             raise OpalError(f"Expected label history column '{lh}' not found in records.parquet. ")
+        policy = str(dedup_policy or "").strip().lower()
+        if policy not in {"latest_only", "all_rounds", "error_on_duplicate"}:
+            raise OpalError(
+                f"Unknown label_cross_round_deduplication_policy: {dedup_policy!r} "
+                "(expected: latest_only | all_rounds | error_on_duplicate)."
+            )
+        use_all = bool(cumulative_training)
         recs: List[Tuple[str, List[float], int]] = []
         for _id, hist_cell in df[["id", lh]].itertuples(index=False, name=None):
             _id = str(_id)
             hist = self._normalize_hist_cell(hist_cell)
-            best = None
+            entries = []
             for e in hist:
                 try:
                     rr = int(e.get("r", 9_999_999))
-                    if rr <= as_of_round and (best is None or rr > int(best.get("r", -1))):
-                        best = e
                 except Exception:
                     continue
-            if best is not None:
+                if use_all:
+                    if rr <= as_of_round:
+                        entries.append(e)
+                else:
+                    if rr == as_of_round:
+                        entries.append(e)
+
+            if not entries:
+                continue
+
+            if policy == "latest_only":
+                best = max(entries, key=lambda x: int(x.get("r", -1)))
                 y = [float(v) for v in (best.get("y", []) or [])]
                 r = int(best.get("r", as_of_round))
                 recs.append((_id, y, r))
+            elif policy == "all_rounds":
+                for e in entries:
+                    y = [float(v) for v in (e.get("y", []) or [])]
+                    r = int(e.get("r", as_of_round))
+                    recs.append((_id, y, r))
+            else:  # error_on_duplicate
+                if len(entries) > 1:
+                    raise OpalError(
+                        f"Duplicate labels for id={_id} within training scope "
+                        f"(policy=error_on_duplicate, as_of_round={as_of_round})."
+                    )
+                e = entries[0]
+                y = [float(v) for v in (e.get("y", []) or [])]
+                r = int(e.get("r", as_of_round))
+                recs.append((_id, y, r))
+
         return pd.DataFrame(recs, columns=["id", "y", "r"])
 
     # --------------- candidate universe & transforms ---------------
@@ -314,26 +332,80 @@ class RecordsStore:
         Build X matrix for given ids using configured transform_x plugin.
         Returns (X, id_order)
         """
-        id_set = set(map(str, ids))
-        cols = ["id", self.x_col]
-        subset = df.loc[df["id"].astype(str).isin(id_set), cols].copy()
-        subset = subset.dropna(subset=[self.x_col])
-        subset = subset.sort_values("id")
+        id_list = [str(i) for i in ids]
+        if len(id_list) != len(set(id_list)):
+            raise OpalError("transform_matrix received duplicate ids.")
+        if "id" not in df.columns:
+            raise OpalError("records.parquet is missing required column 'id'.")
+        if self.x_col not in df.columns:
+            raise OpalError(f"Missing X column '{self.x_col}'.")
+        self.assert_unique_ids(df)
+
+        df_idx = df.copy()
+        df_idx["id"] = df_idx["id"].astype(str)
+        df_idx = df_idx.set_index("id", drop=False)
+
+        missing = [i for i in id_list if i not in df_idx.index]
+        if missing:
+            preview = missing[:10]
+            raise OpalError(f"Missing ids in records.parquet for transform_matrix (sample={preview}).")
+
+        series = df_idx.loc[id_list, self.x_col]
+        null_mask = series.isna()
+        if null_mask.any():
+            bad_ids = series[null_mask].index.tolist()[:10]
+            raise OpalError(f"X column '{self.x_col}' is null for ids (sample={bad_ids}).")
+
         tx = get_transform_x(self.x_transform_name, self.x_transform_params)
-        X = tx(subset[self.x_col])
-        return np.asarray(X), subset["id"].astype(str).tolist()
+        X = tx(series)
+        if X.shape[0] != len(id_list):
+            raise OpalError(f"transform_x[{self.x_transform_name}] returned {X.shape[0]} rows for {len(id_list)} ids.")
+        return np.asarray(X), id_list
 
     # --------------- ensure rows exist for ingest ---------------
-    def ensure_rows_exist(self, df: pd.DataFrame, labels_df: pd.DataFrame, csv_df: pd.DataFrame) -> pd.DataFrame:
+    def ensure_rows_exist(
+        self,
+        df: pd.DataFrame,
+        labels_df: pd.DataFrame,
+        csv_df: pd.DataFrame,
+        *,
+        required_cols: List[str],
+        conflict_policy: str,
+    ) -> pd.DataFrame:
         """
         If labels_df contains sequences that are not in df, create new rows with essentials from csv_df.
-        We do not write X here; X should arrive via normal data pipelines.
+        When new rows are created, required columns are copied from the CSV (strict).
         """
         out = df.copy()
+        self.assert_unique_ids(out)
+
+        policy = str(conflict_policy or "").strip().lower()
+        if policy not in {"error", "skip", "replace"}:
+            raise OpalError(
+                f"Unknown conflict_policy_on_duplicate_ids: {conflict_policy!r} (expected: error | skip | replace)."
+            )
+
+        # Require essentials to exist in records if safety says so
         need_cols = set(ESSENTIAL_COLS + ["id"])
-        for c in need_cols:
-            if c not in out.columns:
-                out[c] = None
+        missing = [c for c in need_cols if c not in out.columns]
+        if missing:
+            raise OpalError(f"records.parquet missing required columns: {missing}")
+
+        # Required columns to materialize new rows from CSV
+        required_cols = [str(c) for c in (required_cols or [])]
+        # Build CSV lookup by sequence and/or id (must be unique)
+        csv_by_seq = {}
+        csv_by_id = {}
+        if "sequence" in csv_df.columns:
+            if csv_df["sequence"].duplicated().any():
+                dup = csv_df["sequence"][csv_df["sequence"].duplicated()].unique().tolist()[:10]
+                raise OpalError(f"CSV contains duplicate sequences (sample={dup}).")
+            csv_by_seq = csv_df.set_index("sequence").to_dict(orient="index")
+        if "id" in csv_df.columns:
+            if csv_df["id"].duplicated().any():
+                dup = csv_df["id"][csv_df["id"].duplicated()].unique().tolist()[:10]
+                raise OpalError(f"CSV contains duplicate ids (sample={dup}).")
+            csv_by_id = csv_df.set_index("id").to_dict(orient="index")
 
         have_id_col = "id" in labels_df.columns
         have_seq_col = "sequence" in labels_df.columns
@@ -341,11 +413,7 @@ class RecordsStore:
             return out  # nothing to do
 
         known_ids = set(out["id"].astype(str).tolist()) if "id" in out.columns else set()
-        seq_to_id = (
-            out[["sequence", "id"]].dropna().astype(str).drop_duplicates().set_index("sequence")["id"].to_dict()
-            if "sequence" in out.columns and "id" in out.columns
-            else {}
-        )
+        seq_to_id = out[["sequence", "id"]].dropna().astype(str).drop_duplicates().set_index("sequence")["id"].to_dict()
 
         def _gen_id(seq: str) -> str:
             # simple deterministic hash-based id for reproducibility when creating by sequence
@@ -354,24 +422,65 @@ class RecordsStore:
             return "s" + hashlib.sha1(seq.encode("utf-8")).hexdigest()[:16]
 
         rows_to_add: List[Dict[str, Any]] = []
+
+        def _csv_row_for(id_val: str | None, seq_val: str | None) -> Dict[str, Any]:
+            if id_val is not None and id_val in csv_by_id:
+                return csv_by_id[id_val]
+            if seq_val is not None and seq_val in csv_by_seq:
+                return csv_by_seq[seq_val]
+            raise OpalError(
+                f"CSV missing required row for id={id_val!r} sequence={seq_val!r} needed to create new records."
+            )
+
+        def _check_conflict(existing_row: pd.Series, csv_row: Dict[str, Any]) -> Dict[str, Any]:
+            mismatches = {}
+            for c in ("sequence", "bio_type", "alphabet"):
+                if c in csv_row and c in existing_row:
+                    v_existing = existing_row[c]
+                    v_csv = csv_row[c]
+                    if pd.notna(v_csv) and pd.notna(v_existing) and str(v_csv) != str(v_existing):
+                        mismatches[c] = (v_existing, v_csv)
+            if mismatches:
+                if policy == "error":
+                    raise OpalError(f"Duplicate id conflict for {existing_row['id']}: {mismatches}")
+            return mismatches
+
         # a) rows WITH a real id → ensure that id exists (attach sequence if provided)
         if have_id_col:
             rows_with_id = labels_df.loc[labels_df["id"].notna()]
             for _id, seq in rows_with_id[["id", "sequence"]].itertuples(index=False, name=None):
                 _id = str(_id)
-                if _id not in known_ids:
-                    rows_to_add.append(
-                        {
-                            "id": _id,
-                            "sequence": (None if not have_seq_col else (None if pd.isna(seq) else str(seq))),
-                        }
-                    )
+                seq_val = None if not have_seq_col else (None if pd.isna(seq) else str(seq))
+                if _id in known_ids:
+                    row = out.loc[out["id"].astype(str) == _id].iloc[0]
+                    csv_row = _csv_row_for(_id, seq_val) if (csv_by_id or csv_by_seq) else {}
+                    mismatches = _check_conflict(row, csv_row)
+                    if mismatches and policy == "replace":
+                        for col, (_, newv) in mismatches.items():
+                            out.loc[out["id"].astype(str) == _id, col] = newv
+                    continue
+                # new id → require sequence + essentials
+                if seq_val is None:
+                    raise OpalError(f"Cannot create new id={_id} without sequence.")
+                csv_row = _csv_row_for(_id, seq_val)
+                new_row = {"id": _id, "sequence": seq_val}
+                for c in required_cols:
+                    if c not in csv_row:
+                        raise OpalError(f"CSV missing required column '{c}' for new id={_id}.")
+                    new_row[c] = csv_row[c]
+                rows_to_add.append(new_row)
         # b) rows WITHOUT id but WITH sequence → create or reuse by sequence
         if have_seq_col:
             rows_no_id = labels_df.loc[~labels_df["id"].notna()] if have_id_col else labels_df
             for seq in rows_no_id["sequence"].dropna().astype(str).tolist():
                 if seq not in seq_to_id:
-                    rows_to_add.append({"id": _gen_id(seq), "sequence": seq})
+                    csv_row = _csv_row_for(None, seq)
+                    new_row = {"id": _gen_id(seq), "sequence": seq}
+                    for c in required_cols:
+                        if c not in csv_row:
+                            raise OpalError(f"CSV missing required column '{c}' for new sequence={seq}.")
+                        new_row[c] = csv_row[c]
+                    rows_to_add.append(new_row)
 
         if rows_to_add:
             new_df = pd.DataFrame(rows_to_add)
@@ -390,16 +499,20 @@ class RecordsStore:
         slug: str,
         latest_as_of_round: int,
         latest_scalar_by_id: Dict[str, float],
+        require_columns_present: bool,
     ) -> pd.DataFrame:
         out = df.copy()
         col_r = self.latest_as_of_round_col()
         col_s = self.latest_pred_scalar_col()
-        if col_r not in out.columns:
-            out[col_r] = None
-        if col_s not in out.columns:
-            out[col_s] = None
-
-        out[col_r] = int(latest_as_of_round)
+        if require_columns_present:
+            missing = [c for c in (col_r, col_s) if c not in out.columns]
+            if missing:
+                raise OpalError(f"Required cache columns missing: {missing}")
+        else:
+            if col_r not in out.columns:
+                out[col_r] = None
+            if col_s not in out.columns:
+                out[col_s] = None
         # Validate incoming values are finite — fail fast with context
         import numpy as _np
         import pandas as _pd
@@ -419,6 +532,7 @@ class RecordsStore:
         mapped = id_series.map(incoming.to_dict())
         mask_new = mapped.notna()
         out.loc[mask_new, col_s] = mapped[mask_new]
+        out.loc[mask_new, col_r] = int(latest_as_of_round)
         return out
 
     # --------------- labeled ids ≤ round ---------------
@@ -436,4 +550,17 @@ class RecordsStore:
                         break
                 except Exception:
                     continue
+        return s
+
+    def labeled_id_set_any_round(self, df: pd.DataFrame) -> set[str]:
+        lh = self.label_hist_col()
+        s: set[str] = set()
+        if lh not in df.columns:
+            return s
+        for _id, hist_cell in df[["id", lh]].itertuples(index=False, name=None):
+            _id = str(_id)
+            for e in self._normalize_hist_cell(hist_cell):
+                if e.get("r", None) is not None:
+                    s.add(_id)
+                    break
         return s

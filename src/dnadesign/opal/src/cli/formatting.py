@@ -219,7 +219,6 @@ def render_ingest_commit_human(
     round_index: int,
     labels_appended: int,
     y_column_updated: str,
-    events_sha256: str,
 ) -> str:
     return kv_block(
         "[Committed] ingest-y",
@@ -227,7 +226,7 @@ def render_ingest_commit_human(
             "round": round_index,
             "labels appended": labels_appended,
             "y column updated": y_column_updated,
-            "events sha256": _sha_short(events_sha256),
+            "ledger labels appended": "yes",
         },
     )
 

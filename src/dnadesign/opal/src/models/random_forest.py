@@ -145,9 +145,11 @@ class RandomForestModel:
         # Parameters are recoverable from the estimator itself at load-time
 
     @classmethod
-    def load(cls, path: str) -> "RandomForestModel":
+    def load(cls, path: str, params: Optional[Dict[str, Any]] = None) -> "RandomForestModel":
         est = joblib_load(path)
-        m = cls(params=getattr(est, "get_params", lambda **_: {})())
+        # If params are provided, prefer them; otherwise use estimator params.
+        resolved = params if params is not None else getattr(est, "get_params", lambda **_: {})()
+        m = cls(params=resolved)
         m._est = est
         return m
 

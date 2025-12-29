@@ -30,6 +30,16 @@ def cmd_predict(
         "--model-path",
         help="Path to model.joblib (or omit with --round/--config)",
     ),
+    model_name: str = typer.Option(
+        None,
+        "--model-name",
+        help="Explicit model registry name (required if model_meta.json is missing).",
+    ),
+    model_params: Path = typer.Option(
+        None,
+        "--model-params",
+        help="Optional JSON file with model params (used with --model-name).",
+    ),
     round: int = typer.Option(
         None,
         "--round",
@@ -71,7 +81,20 @@ def cmd_predict(
         )
         if cfg.data.x_column_name not in df.columns:
             raise OpalError(f"Input missing X column: {cfg.data.x_column_name}")
-        preds = run_predict_ephemeral(store, df, model_path)
+        params_obj = None
+        if model_params:
+            import json as _json
+
+            params_obj = _json.loads(model_params.read_text())
+            if not model_name:
+                raise OpalError("Use --model-name with --model-params.")
+        preds = run_predict_ephemeral(
+            store,
+            df,
+            model_path,
+            model_name=model_name,
+            model_params=params_obj,
+        )
         if out_path:
             if out_path.suffix.lower() == ".csv":
                 preds.to_csv(out_path, index=False)

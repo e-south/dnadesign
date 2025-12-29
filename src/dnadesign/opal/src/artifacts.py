@@ -77,6 +77,18 @@ def write_objective_meta(path: Path, meta: Dict[str, Any]) -> str:
     return file_sha256(path)
 
 
+def write_model_meta(path: Path, meta: Dict[str, Any]) -> str:
+    ensure_dir(path.parent)
+    Path(path).write_text(json.dumps(meta, indent=2))
+    return file_sha256(path)
+
+
+def write_labels_used_parquet(path: Path, df: pd.DataFrame) -> str:
+    ensure_dir(path.parent)
+    df.to_parquet(path, index=False)
+    return file_sha256(path)
+
+
 def events_path(workdir: Path) -> Path:
     """
     Historically pointed at outputs/ledger.index.parquet.

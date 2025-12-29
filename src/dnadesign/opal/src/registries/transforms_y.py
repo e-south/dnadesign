@@ -142,10 +142,10 @@ def run_y_ops_pipeline(
     names = ctx.get("yops/pipeline/names", default=[])
     params_used = ctx.get("yops/pipeline/params", default=[])
     if len(names) != len(params_used):
-        # nothing to do or malformed ctx; be conservative no-op
-        return Yt
+        raise ValueError("Malformed Y-ops pipeline: names/params length mismatch.")
 
-    for name, params in zip(names, params_used):
+    # Invert in reverse order of fit/transform
+    for name, params in zip(reversed(names), reversed(params_used)):
         fit_fn, xform_fn, inv_fn, ParamT = get_y_op(name)
         Yt = np.asarray(
             inv_fn(Yt, ParamT(**params) if ParamT is not None else params, ctx=ctx),

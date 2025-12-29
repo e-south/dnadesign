@@ -55,6 +55,16 @@ def cmd_init(
         (marker_dir / "config").write_text(str(rel))
 
         store = store_from_cfg(cfg)
+        if cfg.safety.require_biotype_and_alphabet_on_init:
+            df = store.load()
+            store.assert_unique_ids(df)
+            missing = [c for c in ("bio_type", "alphabet") if c not in df.columns]
+            if missing:
+                raise OpalError(f"records.parquet missing required columns: {missing}")
+            for col in ("bio_type", "alphabet"):
+                if df[col].isna().any():
+                    bad = df.loc[df[col].isna(), "id"].astype(str).tolist()[:10]
+                    raise OpalError(f"Missing values in '{col}' (sample ids={bad}).")
         st = CampaignState(
             campaign_slug=cfg.campaign.slug,
             campaign_name=cfg.campaign.name,

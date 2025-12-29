@@ -36,7 +36,15 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
         auto_backfill=False,
     )
     # Derive counts the same way 'run' does
-    train_df = store.training_labels_from_y(df, round_k)
+    policy = cfg.training.policy or {}
+    cumulative_training = bool(policy.get("cumulative_training", True))
+    dedup_policy = str(policy.get("label_cross_round_deduplication_policy", "latest_only"))
+    train_df = store.training_labels_with_round(
+        df,
+        round_k,
+        cumulative_training=cumulative_training,
+        dedup_policy=dedup_policy,
+    )
     cand_df = store.candidate_universe(df, round_k)
 
     info = {
@@ -46,6 +54,7 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
         "representation_vector_dimension": rep.x_dim,
         "model": {"name": cfg.model.name, "params": cfg.model.params},
         "training_policy": cfg.training.policy,
+        "training_label_dedup_policy": dedup_policy,
         "training_y_ops": [{"name": p.name, "params": p.params} for p in (cfg.training.y_ops or [])],
         "selection": {
             "strategy": cfg.selection.selection.name,
