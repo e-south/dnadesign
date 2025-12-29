@@ -35,6 +35,8 @@ from .artifacts import (
     events_path,
     round_dir,
     write_feature_importance_csv,
+    write_labels_used_parquet,
+    write_model_meta,
     write_objective_meta,
     write_round_ctx,
     write_selection_csv,
@@ -51,7 +53,6 @@ from .state import CampaignState, RoundEntry
 from .utils import OpalError, ensure_dir, file_sha256, now_iso, print_stderr
 from .writebacks import (
     SelectionEmit,
-    build_label_events,
     build_run_meta_event,
     build_run_pred_events,
 )
@@ -89,6 +90,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     workdir = Path(cfg.campaign.workdir)
     rdir = round_dir(workdir, req.as_of_round)
     ensure_dir(rdir)
+    store.assert_unique_ids(df)
 
     # Guard against accidental double-runs unless explicitly allowed
     if not req.allow_resume:
@@ -172,10 +174,21 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         df = store.load()
 
     # --- Labels (≤ round) ---
-    train_df = store.training_labels_with_round(df, int(req.as_of_round))
+    policy = cfg.training.policy or {}
+    cumulative_training = bool(policy.get("cumulative_training", True))
+    dedup_policy = str(policy.get("label_cross_round_deduplication_policy", "latest_only"))
+    allow_resuggest = bool(policy.get("allow_resuggesting_candidates_until_labeled", True))
+
+    train_df = store.training_labels_with_round(
+        df,
+        int(req.as_of_round),
+        cumulative_training=cumulative_training,
+        dedup_policy=dedup_policy,
+    )
     if train_df.empty:
         raise OpalError(f"No labels ≤ round {req.as_of_round} for training.")
 
+    train_ids = train_df["id"].astype(str).tolist()
     Y_train = np.stack(train_df["y"].map(lambda v: np.asarray(v, dtype=float)).to_list(), axis=0)
     R_train = train_df["r"].astype(int).to_numpy()
     y_dim = int(Y_train.shape[1])
@@ -185,28 +198,61 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
 
     _log(
         req.verbose,
-        f"[labels] as_of_round={int(req.as_of_round)} | n_train={len(train_df)} | y_dim={y_dim}",
+        f"[labels] as_of_round={int(req.as_of_round)} | n_train={len(train_df)} | y_dim={y_dim} | "
+        f"policy(cumulative={cumulative_training}, dedup={dedup_policy})",
     )
 
     # --- X matrices & candidate universe ---
-    X_train, id_order_train = store.transform_matrix(df, train_df["id"])
+    if len(train_ids) != len(set(train_ids)):
+        if str(dedup_policy).strip().lower() != "all_rounds":
+            raise OpalError(
+                "Duplicate ids detected in training labels. "
+                "Set training.policy.label_cross_round_deduplication_policy='all_rounds' to allow."
+            )
+        # Build X on unique ids, then expand to match training order
+        seen = set()
+        unique_ids = []
+        for _id in train_ids:
+            if _id not in seen:
+                unique_ids.append(_id)
+                seen.add(_id)
+        X_unique, id_order_unique = store.transform_matrix(df, unique_ids)
+        x_map = {i: X_unique[j] for j, i in enumerate(id_order_unique)}
+        X_train = np.vstack([x_map[i] for i in train_ids])
+        id_order_train = train_ids
+    else:
+        X_train, id_order_train = store.transform_matrix(df, train_ids)
     cand_df = store.candidate_universe(df, int(req.as_of_round))
 
     # Optional: exclude already-labeled candidates (policy lives under selection.params)
     sel_name = cfg.selection.selection.name
     sel_params = dict(cfg.selection.selection.params)
     if bool(sel_params.get("exclude_already_labeled", True)):
-        labeled_ids = store.labeled_id_set_leq_round(df, int(req.as_of_round))
+        labeled_ids = (
+            store.labeled_id_set_leq_round(df, int(req.as_of_round))
+            if allow_resuggest
+            else store.labeled_id_set_any_round(df)
+        )
         before = len(cand_df)
         if labeled_ids:
             mask = ~cand_df["id"].astype(str).isin(labeled_ids)
             cand_df = cand_df.loc[mask].copy()
         _log(
             req.verbose,
-            f"[candidates] pool={before} → {len(cand_df)} after excluding already-labeled",
+            f"[candidates] pool={before} → {len(cand_df)} after excluding already-labeled "
+            f"(policy allow_resuggesting_candidates_until_labeled={allow_resuggest})",
         )
 
     X_pool, id_order_pool = store.transform_matrix(df, cand_df["id"])
+    if X_pool.shape[0] == 0:
+        raise OpalError("Candidate pool is empty after filtering; nothing to score.")
+    if X_train.shape[0] != Y_train.shape[0]:
+        raise OpalError(f"Training X/Y row mismatch: X_train={X_train.shape[0]} Y_train={Y_train.shape[0]}.")
+    if not cfg.safety.accept_x_mismatch and X_train.shape[1] != X_pool.shape[1]:
+        raise OpalError(
+            f"X dimension mismatch between training and pool (train={X_train.shape[1]}, pool={X_pool.shape[1]}). "
+            "Set safety.accept_x_mismatch=true to override."
+        )
     _log(
         req.verbose,
         f"[transform] X_train: {X_train.shape} for {len(id_order_train)} ids | "
@@ -488,9 +534,32 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         objective_meta_json=rdir / "objective_meta.json",
     )
     model.save(str(apaths.model))
+    model_meta = {
+        "model__name": cfg.model.name,
+        "model__params": model.get_params(),
+        "x_dim": int(X_train.shape[1]),
+        "y_dim": int(y_dim),
+    }
+    model_meta_sha = write_model_meta(rdir / "model_meta.json", model_meta)
 
     # Map sequences up-front for artifact emission
     seq_map = df.set_index("id")["sequence"].astype(str).to_dict() if "sequence" in df.columns else {}
+
+    # Training snapshot (artifact only; not appended to ledger)
+    labels_used_df = None
+    if not train_df.empty:
+        labels_used_df = pd.DataFrame(
+            {
+                "run_id": [run_id] * len(train_df),
+                "as_of_round": [int(req.as_of_round)] * len(train_df),
+                "observed_round": train_df["r"].astype(int).tolist(),
+                "id": train_df["id"].astype(str).tolist(),
+                "sequence": [seq_map.get(i) for i in train_df["id"].astype(str).tolist()],
+                "y_obs": train_df["y"].tolist(),
+                "src": ["training_snapshot"] * len(train_df),
+                "note": [f"labels used in run {run_id} (as_of_round={int(req.as_of_round)})"] * len(train_df),
+            }
+        )
     selected_df = (
         pd.DataFrame(
             {
@@ -507,6 +576,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     sel_sha = write_selection_csv(apaths.selection_csv, selected_df)
 
     ctx_sha = write_round_ctx(apaths.round_ctx_json, rctx.snapshot())
+    labels_used_sha = write_labels_used_parquet(rdir / "labels_used.parquet", labels_used_df)
 
     # Collect artifact paths and hashes here so optional model artifacts can append to it.
     artifacts_paths_and_hashes: Dict[str, tuple[str, str]] = {}
@@ -583,28 +653,6 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         sel_emit=sel_emit,
     )
 
-    # Snapshot the consolidated ground-truth labels actually used for training (≤ as_of_round)
-    # Build label events grouped by their original observed round.
-    label_events_frames: List[pd.DataFrame] = []
-    if not train_df.empty:
-        # map ids -> sequences for label events
-        _seq_for = lambda ids: [seq_map.get(i) for i in ids]  # noqa
-        for rr, grp in train_df.groupby("r"):
-            ids_g = grp["id"].astype(str).tolist()
-            y_g = grp["y"].tolist()
-            seq_g = _seq_for(ids_g)
-            label_events_frames.append(
-                build_label_events(
-                    ids=ids_g,
-                    sequences=seq_g,
-                    y_obs=y_g,
-                    observed_round=int(rr),
-                    src="training_snapshot",
-                    note=f"labels used in run {run_id} (as_of_round={int(req.as_of_round)})",
-                )
-            )
-    label_events_df = pd.concat(label_events_frames, ignore_index=True) if label_events_frames else None
-
     # Now add the standard artifacts (model, selection, round ctx, objective meta)
     artifacts_paths_and_hashes.update(
         {
@@ -612,7 +660,12 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
             "selection_top_k.csv": (sel_sha, str(apaths.selection_csv.resolve())),
             "round_ctx.json": (ctx_sha, str(apaths.round_ctx_json.resolve())),
             "objective_meta.json": (obj_sha, str(apaths.objective_meta_json.resolve())),
+            "model_meta.json": (model_meta_sha, str((rdir / "model_meta.json").resolve())),
         }
+    )
+    artifacts_paths_and_hashes["labels_used.parquet"] = (
+        labels_used_sha,
+        str((rdir / "labels_used.parquet").resolve()),
     )
 
     run_meta_event = build_run_meta_event(
@@ -647,13 +700,9 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         pd.concat([run_pred_events, run_meta_event], ignore_index=True),
         write_index=False,
     )
-    if label_events_df is not None and not label_events_df.empty:
-        append_events(ev_path, label_events_df, write_index=False)
     _log(
         req.verbose,
-        f"[events] appended run_pred({len(run_pred_events)}), run_meta(1)"
-        + (f", labels({len(label_events_df)})" if label_events_df is not None else "")
-        + f" under {ev_path.parent}",
+        f"[events] appended run_pred({len(run_pred_events)}), run_meta(1) under {ev_path.parent}",
     )
 
     # --- records ergonomic caches ---
@@ -663,6 +712,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         slug=cfg.campaign.slug,
         latest_as_of_round=int(req.as_of_round),
         latest_scalar_by_id=latest_scalar,
+        require_columns_present=cfg.safety.write_back_requires_columns_present,
     )
     store.save_atomic(df2)
     _log(
@@ -695,12 +745,13 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         "score_batch_size": req.score_batch_size_override or cfg.scoring.score_batch_size,
         "objective": obj_name,
     }
+    labels_used_rounds = sorted(set(train_df["r"].astype(int).tolist()))
     st.add_round(
         RoundEntry(
             round_index=int(req.as_of_round),
             round_name=f"round_{int(req.as_of_round)}",
             round_dir=str(rdir.resolve()),
-            labels_used_rounds=list(range(0, int(req.as_of_round) + 1)),
+            labels_used_rounds=labels_used_rounds,
             number_of_training_examples_used_in_round=len(id_order_train),
             number_of_candidates_scored_in_round=len(id_order_pool),
             selection_top_k_requested=int(top_k),
@@ -727,6 +778,8 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
                 "ledger_labels_parquet": str((ev_path.parent / "ledger.labels.parquet").resolve()),
                 "round_ctx_json": str(apaths.round_ctx_json.resolve()),
                 "objective_meta_json": str(apaths.objective_meta_json.resolve()),
+                "model_meta_json": str((rdir / "model_meta.json").resolve()),
+                "labels_used_parquet": str((rdir / "labels_used.parquet").resolve()),
             },
             writebacks={
                 "records_caches_updated": [

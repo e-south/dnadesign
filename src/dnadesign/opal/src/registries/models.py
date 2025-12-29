@@ -165,3 +165,20 @@ def get_model(name: str, params: dict):
 def list_models() -> List[str]:
     _ensure_all_loaded()
     return sorted(_REG_M)
+
+
+def load_model(name: str, path: str, params: dict | None = None):
+    """
+    Load a persisted model by name.
+    Required interface: model class must implement `load(path: str, params: dict | None = None)`.
+    """
+    _ensure_all_loaded()
+    if name not in _REG_M:
+        avail_list = sorted(_REG_M)
+        avail = ", ".join(avail_list)
+        raise KeyError(f"model '{name}' not found. Available: [{avail}].")
+    factory: Any = _REG_M[name]
+    loader = getattr(factory, "load", None)
+    if not callable(loader):
+        raise TypeError(f"model '{name}' does not implement required load(path, params=None) interface.")
+    return loader(path, params=params)

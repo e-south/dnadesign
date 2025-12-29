@@ -85,6 +85,14 @@ def run_ingest(
     # 1) Transform tidy -> (sequence, y)
     labels = _apply_transform_via_registry(transform_name, transform_params, csv_df)
 
+    # 1b) Validate Y vectors strictly (no fallbacks)
+    for i, v in enumerate(labels["y"].tolist()):
+        arr = np.asarray(v, dtype=float).ravel()
+        if y_expected_length is not None and arr.size != int(y_expected_length):
+            raise OpalError(f"Y length mismatch at row {i}: expected {int(y_expected_length)}, got {int(arr.size)}")
+        if not np.all(np.isfinite(arr)):
+            raise OpalError(f"Y contains non-finite values at row {i}.")
+
     # 2) Try to resolve ids by sequence (existing rows only; new rows remain without id for now)
     seq2id = {}
     if "sequence" in records_df.columns and "id" in records_df.columns:
@@ -100,11 +108,11 @@ def run_ingest(
     resolved = int(labels["id"].notna().sum())
     unknown = int((~labels["id"].notna()).sum())
 
-    # vector length checks (best-effort)
+    # vector length checks (full, already validated above)
     y_len_ok = 0
     y_len_bad = 0
     if y_expected_length:
-        for v in labels["y"].head(200).tolist():  # sample
+        for v in labels["y"].tolist():
             if _vec_len(v) == y_expected_length:
                 y_len_ok += 1
             else:

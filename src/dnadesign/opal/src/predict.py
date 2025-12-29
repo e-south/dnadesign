@@ -10,9 +10,9 @@ Validates that the configured representation column is present and coercible
 to a fixed-width matrix. Never writes back; intended for quick scoring or
 downstream analysis.
 
-If a 'round_ctx.json' is present next to the model, any recorded training-time
-Y-ops pipeline is inverted on Ŷ before returning (so outputs match objective
-space used downstream).
+Requires `model_meta.json` next to the model, unless an explicit model name is
+provided. If a `round_ctx.json` is present, the recorded Y-ops pipeline is
+strictly inverted on Ŷ before returning (so outputs match objective space).
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -23,25 +23,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
 
 from .data_access import RecordsStore
-from .models.random_forest import RandomForestModel
-from .registries.transforms_y import get_y_op
+from .registries.models import load_model
+from .registries.transforms_y import run_y_ops_pipeline
 from .utils import ExitCodes, OpalError
-
-
-def _load_yops_pipeline_from_ctx(ctx: Dict[str, Any]) -> List[Tuple[str, dict]]:
-    names = ctx.get("yops/pipeline/names") or []
-    params = ctx.get("yops/pipeline/params") or []
-    out: List[Tuple[str, dict]] = []
-    for i, n in enumerate(names):
-        p = params[i] if i < len(params) else {}
-        out.append((str(n), dict(p or {})))
-    return out
 
 
 class _CtxShim:
@@ -68,21 +58,15 @@ def _inverse_yops_if_present(yhat: np.ndarray, model_path: Path) -> np.ndarray:
         return yhat
     try:
         ctx_data: Dict[str, Any] = json.loads(ctx_path.read_text())
-        pipeline = _load_yops_pipeline_from_ctx(ctx_data)
-        if not pipeline:
-            return yhat
+        if "yops/pipeline/names" not in ctx_data or "yops/pipeline/params" not in ctx_data:
+            raise OpalError(f"round_ctx.json missing Y-ops pipeline keys: {ctx_path}")
         Y = np.asarray(yhat, dtype=float)
         if Y.ndim == 1:
             Y = Y.reshape(-1, 1)
         shim = _CtxShim(ctx_data)
-        for name, param_dict in reversed(pipeline):
-            _, _, inv_fn, ParamT = get_y_op(name)
-            params = ParamT(**param_dict) if ParamT is not None else param_dict
-            Y = inv_fn(Y, params, ctx=shim)
-        return Y
-    except Exception:
-        # best-effort: leave yhat as-is if anything goes wrong
-        return yhat
+        return run_y_ops_pipeline(stage="inverse", y_ops=[], Y=Y, ctx=shim)
+    except Exception as e:
+        raise OpalError(f"Failed to invert Y-ops from {ctx_path}: {e}") from e
 
 
 def run_predict_ephemeral(
@@ -90,8 +74,23 @@ def run_predict_ephemeral(
     df: pd.DataFrame,
     model_path: Path,
     ids: List[str] | None = None,
+    *,
+    model_name: str | None = None,
+    model_params: Dict[str, Any] | None = None,
 ) -> pd.DataFrame:
-    mdl = RandomForestModel.load(str(model_path))
+    meta_path = model_path.parent / "model_meta.json"
+    if model_name is None:
+        if not meta_path.exists():
+            raise OpalError(
+                f"model_meta.json not found next to {model_path}. "
+                "Provide --model-name/--model-params or re-run a round."
+            )
+        meta = json.loads(meta_path.read_text())
+        model_name = meta.get("model__name")
+        model_params = meta.get("model__params")
+        if not model_name:
+            raise OpalError(f"model_meta.json missing model__name: {meta_path}")
+    mdl = load_model(str(model_name), str(model_path), params=model_params)
     if ids is None:
         ids = df["id"].astype(str).tolist()
     X, id_order = store.transform_matrix(df, ids)

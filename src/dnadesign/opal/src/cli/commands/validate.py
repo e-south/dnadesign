@@ -57,6 +57,17 @@ def cmd_validate(config: Path = typer.Option(None, "--config", "-c", envvar="OPA
         missing = [c for c in ESSENTIAL_COLS if c not in df.columns]
         if missing:
             raise OpalError(f"Missing essential columns: {missing}")
+        # Enforce unique ids
+        ids = df["id"].astype(str)
+        if ids.duplicated().any():
+            dup = ids[ids.duplicated()].unique().tolist()[:10]
+            raise OpalError(f"Duplicate ids detected in records.parquet (sample={dup}).")
+
+        if cfg.safety.require_biotype_and_alphabet_on_init:
+            for col in ("bio_type", "alphabet"):
+                if df[col].isna().any():
+                    bad = df.loc[df[col].isna(), "id"].astype(str).tolist()[:10]
+                    raise OpalError(f"Missing values in '{col}' (sample ids={bad}).")
         if cfg.data.x_column_name not in df.columns:
             # Helpful hints: case-only match and fuzzy suggestions
             target = cfg.data.x_column_name

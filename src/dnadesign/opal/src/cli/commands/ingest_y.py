@@ -4,7 +4,7 @@
 src/dnadesign/opal/src/cli/commands/ingest_y.py
 
 Ingest tidy CSV → Y (transform_y), preview, confirm, write to records caches,
-AND emit canonical label events (kind="label") to outputs/events.parquet.
+AND emit canonical label events (kind="label") to outputs/ledger.labels.parquet.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -23,6 +23,7 @@ import typer
 from ...artifacts import append_events, events_path
 from ...data_access import RecordsStore
 from ...ingest import run_ingest
+from ...locks import CampaignLock
 from ...utils import ExitCodes, OpalError, print_stdout
 from ...writebacks import build_label_events
 from ..formatting import render_ingest_commit_human, render_ingest_preview_human
@@ -106,18 +107,11 @@ def cmd_ingest_y(
                 return
 
         # Ensure rows exist; append to label_hist
-        df = store.ensure_rows_exist(df, labels_df, csv_df)
-
-        # Resolve ids for any rows that were missing id at transform time (new sequences)
-        if labels_df["id"].isna().any():
-            seq_to_id_full = (
-                df.set_index("sequence")["id"].astype(str).to_dict()
-                if "sequence" in df.columns and "id" in df.columns
-                else {}
-            )
-            labels_df = labels_df.copy()
-            miss = labels_df["id"].isna()
-            labels_df.loc[miss, "id"] = labels_df.loc[miss, "sequence"].map(seq_to_id_full)
+        required_cols = ["bio_type", "alphabet"]
+        if cfg.safety.write_back_requires_columns_present:
+            if cfg.data.x_column_name not in df.columns:
+                raise OpalError(f"records.parquet missing required X column '{cfg.data.x_column_name}'.")
+            required_cols.append(cfg.data.x_column_name)
 
         # Optional: preview duplicates at this round for better UX
         try:
@@ -138,36 +132,57 @@ def cmd_ingest_y(
         except Exception:
             pass
 
-        # 1) append to immutable label history (SSoT)
-        df2 = store.append_labels_from_df(
-            df,
-            labels_df[["id", "y"]],  # ids are now concrete
-            r=int(round),
-            src="ingest_y",
-            fail_if_any_existing_labels=(str(if_exists).lower().strip() == "fail"),
-            if_exists=str(if_exists).lower().strip(),
-        )
-        # 2) mirror "current y" into configured y_column_name for convenience
-        df3 = store.upsert_current_y_column(df2, labels_df[["id", "y"]], cfg.data.y_column_name)
-        store.save_atomic(df3)
+        with CampaignLock(Path(cfg.campaign.workdir)):
+            df = store.ensure_rows_exist(
+                df,
+                labels_df,
+                csv_df,
+                required_cols=required_cols,
+                conflict_policy=cfg.safety.conflict_policy_on_duplicate_ids,
+            )
 
-        # Emit label events (canonical SSoT)
-        seq_map = df2.set_index("id")["sequence"].to_dict() if "sequence" in df2.columns else {}
-        events = build_label_events(
-            ids=labels_df["id"].astype(str).tolist(),
-            sequences=[seq_map.get(str(_id)) for _id in labels_df["id"].astype(str).tolist()],
-            y_obs=labels_df["y"].tolist(),
-            observed_round=int(round),
-            src="ingest_y",
-            note=None,
-        )
-        ev_sha = append_events(events_path(Path(cfg.campaign.workdir)), events)
+            # Resolve ids for any rows that were missing id at transform time (new sequences)
+            if labels_df["id"].isna().any():
+                seq_to_id_full = (
+                    df.set_index("sequence")["id"].astype(str).to_dict()
+                    if "sequence" in df.columns and "id" in df.columns
+                    else {}
+                )
+                labels_df = labels_df.copy()
+                miss = labels_df["id"].isna()
+                labels_df.loc[miss, "id"] = labels_df.loc[miss, "sequence"].map(seq_to_id_full)
+                if labels_df["id"].isna().any():
+                    raise OpalError("Failed to resolve ids for some labels; provide id or ensure sequences exist.")
+
+            # 1) append to immutable label history (SSoT)
+            df2 = store.append_labels_from_df(
+                df,
+                labels_df[["id", "y"]],  # ids are now concrete
+                r=int(round),
+                src="ingest_y",
+                fail_if_any_existing_labels=(str(if_exists).lower().strip() == "fail"),
+                if_exists=str(if_exists).lower().strip(),
+            )
+            # 2) mirror "current y" into configured y_column_name for convenience
+            df3 = store.upsert_current_y_column(df2, labels_df[["id", "y"]], cfg.data.y_column_name)
+            store.save_atomic(df3)
+
+            # Emit label events (canonical SSoT)
+            seq_map = df2.set_index("id")["sequence"].to_dict() if "sequence" in df2.columns else {}
+            events = build_label_events(
+                ids=labels_df["id"].astype(str).tolist(),
+                sequences=[seq_map.get(str(_id)) for _id in labels_df["id"].astype(str).tolist()],
+                y_obs=labels_df["y"].tolist(),
+                observed_round=int(round),
+                src="ingest_y",
+                note=None,
+            )
+            append_events(events_path(Path(cfg.campaign.workdir)), events)
 
         out = {
             "ok": True,
             "round": int(round),
             "labels_appended": int(len(labels_df)),
-            "events_sha256": ev_sha,
             "y_column_updated": cfg.data.y_column_name,
         }
 
@@ -179,7 +194,6 @@ def cmd_ingest_y(
                     round_index=out["round"],
                     labels_appended=out["labels_appended"],
                     y_column_updated=out["y_column_updated"],
-                    events_sha256=out["events_sha256"],
                 )
             )
     except OpalError as e:
