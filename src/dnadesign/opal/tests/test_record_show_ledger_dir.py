@@ -10,7 +10,9 @@ Dunlop Lab
 
 import pandas as pd
 
+from dnadesign.opal.src.ledger import LedgerReader
 from dnadesign.opal.src.record_show import build_record_report
+from dnadesign.opal.src.workspace import CampaignWorkspace
 
 
 def test_record_show_reads_ledger_predictions_dir(tmp_path):
@@ -24,7 +26,8 @@ def test_record_show_reads_ledger_predictions_dir(tmp_path):
         }
     )
 
-    pred_dir = tmp_path / "ledger.predictions"
+    workdir = tmp_path
+    pred_dir = workdir / "outputs" / "ledger.predictions"
     pred_dir.mkdir(parents=True, exist_ok=True)
     ev = pd.DataFrame(
         {
@@ -41,6 +44,8 @@ def test_record_show_reads_ledger_predictions_dir(tmp_path):
     )
     ev.to_parquet(pred_dir / "part-000.parquet", index=False)
 
-    report = build_record_report(rec, "demo", id_="x", events_path=pred_dir)
+    ws = CampaignWorkspace(config_path=workdir / "campaign.yaml", workdir=workdir)
+    reader = LedgerReader(ws)
+    report = build_record_report(rec, "demo", id_="x", ledger_reader=reader)
     assert report["runs"] and report["runs"][0]["sel__is_selected"] is True
     assert report["latest_rank_competition"] == 1

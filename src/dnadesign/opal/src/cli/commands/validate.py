@@ -159,6 +159,11 @@ def cmd_validate(config: Path = typer.Option(None, "--config", "-c", envvar="OPA
                         f"Y validation failed: require length={exp_len} with all finite numbers per labeled row; "
                         f"violations={bad_count}/{len(sample_series)}. Examples: {_json.dumps(bad_examples, ensure_ascii=False)}"  # noqa
                     )
+        # Validate label_hist when present (strict)
+        try:
+            store.validate_label_hist(df, require=False)
+        except OpalError as e:
+            raise OpalError(f"label_hist validation failed: {e}")
 
         print_stdout("OK: validation passed.")
 

@@ -31,5 +31,5 @@ def test_record_show_uses_events(tmp_path):
     )
     ep = tmp_path / "events.parquet"
     ev.to_parquet(ep, index=False)
-    rep = build_record_report(rec, "demo", id_="x", events_path=ep)
+    rep = build_record_report(rec, "demo", id_="x", legacy_events_path=ep)
     assert rep["runs"] and rep["runs"][0]["sel__is_selected"] is True

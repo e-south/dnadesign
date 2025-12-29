@@ -19,12 +19,15 @@ import pyarrow.compute as pc
 import typer
 from pyarrow import dataset as ds
 
-from ...utils import ExitCodes, print_stdout
+from ...ledger import LedgerReader
+from ...utils import ExitCodes, OpalError, print_stdout
+from ...workspace import CampaignWorkspace
 from ..registry import cli_command
 from ._common import (
     internal_error,
     json_out,
     load_cli_config,
+    resolve_config_path,
     store_from_cfg,
 )
 
@@ -43,6 +46,11 @@ def cmd_objective_meta(
         "-r",
         help="Round selector: integer or 'latest' (default: latest)",
     ),
+    legacy: bool = typer.Option(
+        False,
+        "--legacy",
+        help="Use legacy ledger.runs directory or events.parquet if present (deprecated).",
+    ),
     json: bool = typer.Option(False, "--json/--human", help="Output as JSON"),
     profile: bool = typer.Option(
         True,
@@ -51,30 +59,17 @@ def cmd_objective_meta(
     ),
 ) -> None:
     try:
+        cfg_path = resolve_config_path(config)
         cfg = load_cli_config(config)
         store = store_from_cfg(cfg)
+        ws = CampaignWorkspace.from_config(cfg, cfg_path)
         base = Path(cfg.campaign.workdir) / "outputs"
-        runs_file = base / "ledger.runs.parquet"  # current sink
-        runs_dir = base / "ledger.runs"  # legacy sink (directory)
         pred_dir = base / "ledger.predictions"
-        if not pred_dir.exists():
-            raise typer.Exit(code=1)
 
-        # Load runs metadata (file preferred; directory fallback)
-        if runs_file.exists():
-            rtab = pd.read_parquet(
-                runs_file,
-                columns=[
-                    "run_id",
-                    "as_of_round",
-                    "objective__name",
-                    "objective__params",
-                    "objective__summary_stats",
-                ],
-            )
-        elif runs_dir.exists():
-            rd = ds.dataset(str(runs_dir))
-            rtab = rd.to_table(
+        # Load runs metadata (strict by default; legacy opt-in)
+        if not legacy:
+            reader = LedgerReader(ws)
+            rtab = reader.read_runs(
                 columns=[
                     "run_id",
                     "as_of_round",
@@ -82,9 +77,34 @@ def cmd_objective_meta(
                     "objective__params",
                     "objective__summary_stats",
                 ]
-            ).to_pandas()
+            )
         else:
-            raise typer.Exit(code=1)
+            runs_file = base / "ledger.runs.parquet"
+            runs_dir = base / "ledger.runs"
+            if runs_file.exists():
+                rtab = pd.read_parquet(
+                    runs_file,
+                    columns=[
+                        "run_id",
+                        "as_of_round",
+                        "objective__name",
+                        "objective__params",
+                        "objective__summary_stats",
+                    ],
+                )
+            elif runs_dir.exists():
+                rd = ds.dataset(str(runs_dir))
+                rtab = rd.to_table(
+                    columns=[
+                        "run_id",
+                        "as_of_round",
+                        "objective__name",
+                        "objective__params",
+                        "objective__summary_stats",
+                    ]
+                ).to_pandas()
+            else:
+                raise OpalError("No ledger.runs sink found for objective-meta.")
         if rtab.empty:
             raise typer.Exit(code=1)
 
@@ -104,8 +124,21 @@ def cmd_objective_meta(
         rsel = rsel.sort_values(["run_id"]).tail(1).iloc[0]
 
         # Row-level diagnostic schema from predictions
-        pdset = ds.dataset(str(pred_dir))
-        pred_schema = [f.name for f in pdset.schema]
+        pred_source = None
+        pred_df_legacy = None
+        if pred_dir.exists():
+            pdset = ds.dataset(str(pred_dir))
+            pred_schema = [f.name for f in pdset.schema]
+            pred_source = "ledger"
+        elif legacy:
+            ev_path = base / "events.parquet"
+            if not ev_path.exists():
+                raise OpalError("No ledger.predictions or legacy events.parquet found.")
+            pred_df_legacy = pd.read_parquet(ev_path)
+            pred_schema = list(pred_df_legacy.columns)
+            pred_source = "legacy"
+        else:
+            raise OpalError("Missing ledger.predictions sink. Run a round to produce it.")
         obj_diag_cols = sorted([c for c in pred_schema if c.startswith("obj__")])
 
         out: Dict[str, Any] = {
@@ -132,7 +165,19 @@ def cmd_objective_meta(
 
             # Read only the selected run rows
             filt = (pc.field("run_id") == run_id) & (pc.field("as_of_round") == as_of)
-            dfp = pdset.to_table(columns=need, filter=filt).to_pandas()
+            if pred_source == "ledger":
+                dfp = pdset.to_table(columns=need, filter=filt).to_pandas()
+            else:
+                # legacy events.parquet path
+                dfp = pred_df_legacy
+                if dfp is None:
+                    raise RuntimeError("Legacy predictions dataframe not available.")
+                dfp = dfp.loc[(dfp["run_id"].astype(str) == run_id) & (dfp["as_of_round"] == as_of)]
+                if "event" in dfp.columns:
+                    dfp = dfp.loc[dfp["event"] == "run_pred"]
+                # Keep only needed columns if present
+                cols = [c for c in need if c in dfp.columns]
+                dfp = dfp[cols]
             if dfp.empty:
                 raise RuntimeError("No prediction rows found for selected run_id/round.")
 

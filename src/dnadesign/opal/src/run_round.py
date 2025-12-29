@@ -30,10 +30,7 @@ import pandas as pd
 
 from .artifacts import (
     ArtifactPaths,
-    append_events,
     append_round_log_event,
-    events_path,
-    round_dir,
     write_feature_importance_csv,
     write_labels_used_parquet,
     write_model_meta,
@@ -43,14 +40,17 @@ from .artifacts import (
 )
 from .config.types import RootConfig
 from .data_access import RecordsStore
+from .ledger import LedgerWriter
 from .preflight import preflight_run
 from .registries.models import get_model
 from .registries.objectives import get_objective
 from .registries.selections import get_selection, normalize_selection_result
 from .registries.transforms_y import run_y_ops_pipeline
 from .round_context import PluginRegistryView, RoundCtx
+from .round_plan import plan_round
 from .state import CampaignState, RoundEntry
 from .utils import OpalError, ensure_dir, file_sha256, now_iso, print_stderr
+from .workspace import CampaignWorkspace
 from .writebacks import (
     SelectionEmit,
     build_run_meta_event,
@@ -62,6 +62,7 @@ from .writebacks import (
 class RunRoundRequest:
     cfg: RootConfig
     as_of_round: int
+    config_path: Optional[Path] = None
     k_override: Optional[int] = None
     score_batch_size_override: Optional[int] = None
     verbose: bool = True
@@ -87,8 +88,13 @@ def _log(enabled: bool, msg: str) -> None:
 
 def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> RunRoundResult:
     cfg = req.cfg
-    workdir = Path(cfg.campaign.workdir)
-    rdir = round_dir(workdir, req.as_of_round)
+    cfg_path = req.config_path or (Path(cfg.campaign.workdir) / "campaign.yaml")
+    ws = CampaignWorkspace.from_config(cfg, cfg_path)
+    # Be strict: require opal init to have created state.json before any heavy work
+    if not ws.state_path.exists():
+        raise OpalError(f"state.json not found at {ws.state_path}. Run `opal init -c {ws.config_path}` first.")
+
+    rdir = ws.round_dir(req.as_of_round)
     ensure_dir(rdir)
     store.assert_unique_ids(df)
 
@@ -168,23 +174,17 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         cfg.safety.fail_on_mixed_biotype_or_alphabet,
         auto_backfill=False,
     )
-    wrote = bool(getattr(rep, "manual_attach_count", 0))
-    if wrote:
-        _log(req.verbose, "[preflight] reloading records after preflight writes...")
-        df = store.load()
+    if getattr(rep, "manual_attach_count", 0):
+        raise OpalError(
+            f"Detected {rep.manual_attach_count} labels in '{store.y_col}' without label_hist. "
+            "Run `opal ingest-y` or `opal label-hist repair` before running a round."
+        )
+    # Strict label history validation (SSoT)
+    store.validate_label_hist(df, require=True)
 
-    # --- Labels (≤ round) ---
-    policy = cfg.training.policy or {}
-    cumulative_training = bool(policy.get("cumulative_training", True))
-    dedup_policy = str(policy.get("label_cross_round_deduplication_policy", "latest_only"))
-    allow_resuggest = bool(policy.get("allow_resuggesting_candidates_until_labeled", True))
-
-    train_df = store.training_labels_with_round(
-        df,
-        int(req.as_of_round),
-        cumulative_training=cumulative_training,
-        dedup_policy=dedup_policy,
-    )
+    # --- Round plan (shared with explain) ---
+    plan = plan_round(store, df, cfg, int(req.as_of_round), warnings=list(rep.warnings or []))
+    train_df = plan.training_df
     if train_df.empty:
         raise OpalError(f"No labels ≤ round {req.as_of_round} for training.")
 
@@ -199,12 +199,13 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     _log(
         req.verbose,
         f"[labels] as_of_round={int(req.as_of_round)} | n_train={len(train_df)} | y_dim={y_dim} | "
-        f"policy(cumulative={cumulative_training}, dedup={dedup_policy})",
+        f"policy(cumulative={bool(plan.training_policy.get('cumulative_training', True))}, "
+        f"dedup={plan.training_dedup_policy})",
     )
 
     # --- X matrices & candidate universe ---
     if len(train_ids) != len(set(train_ids)):
-        if str(dedup_policy).strip().lower() != "all_rounds":
+        if str(plan.training_dedup_policy).strip().lower() != "all_rounds":
             raise OpalError(
                 "Duplicate ids detected in training labels. "
                 "Set training.policy.label_cross_round_deduplication_policy='all_rounds' to allow."
@@ -222,25 +223,15 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         id_order_train = train_ids
     else:
         X_train, id_order_train = store.transform_matrix(df, train_ids)
-    cand_df = store.candidate_universe(df, int(req.as_of_round))
+    cand_df = plan.candidate_df
 
-    # Optional: exclude already-labeled candidates (policy lives under selection.params)
     sel_name = cfg.selection.selection.name
     sel_params = dict(cfg.selection.selection.params)
-    if bool(sel_params.get("exclude_already_labeled", True)):
-        labeled_ids = (
-            store.labeled_id_set_leq_round(df, int(req.as_of_round))
-            if allow_resuggest
-            else store.labeled_id_set_any_round(df)
-        )
-        before = len(cand_df)
-        if labeled_ids:
-            mask = ~cand_df["id"].astype(str).isin(labeled_ids)
-            cand_df = cand_df.loc[mask].copy()
+    if plan.selection_excludes_labeled and plan.candidate_filtered_out:
         _log(
             req.verbose,
-            f"[candidates] pool={before} → {len(cand_df)} after excluding already-labeled "
-            f"(policy allow_resuggesting_candidates_until_labeled={allow_resuggest})",
+            f"[candidates] pool={plan.candidate_total_before_filter} → {len(cand_df)} after excluding already-labeled "
+            f"(policy allow_resuggesting_candidates_until_labeled={plan.allow_resuggest})",
         )
 
     X_pool, id_order_pool = store.transform_matrix(df, cand_df["id"])
@@ -693,16 +684,12 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         objective_summary_stats=ss,
     )
 
-    ev_path = events_path(workdir)
-    # Always write typed sinks; do *not* write the deprecated thin index.
-    append_events(
-        ev_path,
-        pd.concat([run_pred_events, run_meta_event], ignore_index=True),
-        write_index=False,
-    )
+    ledger = LedgerWriter(ws)
+    ledger.append_run_pred(run_pred_events)
+    ledger.append_run_meta(run_meta_event)
     _log(
         req.verbose,
-        f"[events] appended run_pred({len(run_pred_events)}), run_meta(1) under {ev_path.parent}",
+        f"[ledger] appended run_pred({len(run_pred_events)}), run_meta(1) under {ws.ledger_dir}",
     )
 
     # --- records ergonomic caches ---
@@ -721,13 +708,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     )
 
     # --- state.json summary ---
-    st_path = Path(cfg.campaign.workdir) / "state.json"
-    # Be strict: require `opal init` to have created state.json
-    if not st_path.exists():
-        raise OpalError(
-            f"state.json not found at {st_path}. Run `opal init -c {Path(cfg.campaign.workdir) / 'campaign.yaml'}` first."  # noqa
-        )
-    st = CampaignState.load(st_path)
+    st = CampaignState.load(ws.state_path)
     # If resuming on the same round, replace existing entries for this round index
     if req.allow_resume:
         try:
@@ -737,7 +718,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
 
     st.campaign_slug = cfg.campaign.slug
     st.campaign_name = cfg.campaign.name
-    st.workdir = str(workdir.resolve())
+    st.workdir = str(ws.workdir.resolve())
     st.x_column_name = cfg.data.x_column_name
     st.y_column_name = cfg.data.y_column_name
     st.representation_vector_dimension = rep.x_dim or 0
@@ -770,12 +751,10 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
             },
             artifacts={
                 "selection_top_k_csv": str(apaths.selection_csv.resolve()),
-                # Keep legacy key for compatibility; may point to a non-existent file.
-                "events_parquet": str(ev_path.resolve()),
                 # New, explicit ledger sinks:
-                "ledger_predictions_dir": str((ev_path.parent / "ledger.predictions").resolve()),
-                "ledger_runs_parquet": str((ev_path.parent / "ledger.runs.parquet").resolve()),
-                "ledger_labels_parquet": str((ev_path.parent / "ledger.labels.parquet").resolve()),
+                "ledger_predictions_dir": str(ws.ledger_predictions_dir.resolve()),
+                "ledger_runs_parquet": str(ws.ledger_runs_path.resolve()),
+                "ledger_labels_parquet": str(ws.ledger_labels_path.resolve()),
                 "round_ctx_json": str(apaths.round_ctx_json.resolve()),
                 "objective_meta_json": str(apaths.objective_meta_json.resolve()),
                 "model_meta_json": str((rdir / "model_meta.json").resolve()),
@@ -793,7 +772,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     t1 = time.perf_counter()
     # Dataclass field update (not dict-style)
     st.rounds[-1].durations_sec = {"total": t1 - t0, "fit": tfit1 - tfit0}
-    st.save(st_path)
+    st.save(ws.state_path)
 
     append_round_log_event(
         rdir / "round.log.jsonl",
@@ -827,5 +806,5 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         scored=len(id_order_pool),
         top_k_requested=int(top_k),
         top_k_effective=int(selected_effective),
-        events_path=str(ev_path.parent.resolve()),
+        events_path=str(ws.ledger_dir.resolve()),
     )

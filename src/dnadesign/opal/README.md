@@ -196,6 +196,7 @@ OPAL reads a configuration YAML, `campaign.yaml`.
 * `objective`: `{ name, params }`
 * `selection`: `{ name, params }` *(strategy, tie handling, objective mode)*
 * `training`: `policy`
+* `ingest`: duplicate handling for label CSVs
 * `scoring`: batch sizing
 * `safety`: preflight/data guards
 * `metadata`: optional notes
@@ -213,6 +214,9 @@ data:
   x_column_name: "my_x_column"
   y_column_name: "my_y_column"
   y_expected_length: 4   # enforce Y length on validate/run
+
+ingest:
+  duplicate_policy: "error"
 
 transforms_x: { name: my_x_preprocessing_prior_to_model, params: {} }
 transforms_y: { name: my_y_preprocessing_prior_to_model, params: {} }
@@ -303,6 +307,16 @@ def my_objective_plugin(..., ctx=None, train_view=None): ...
 4. Runner checks **`produces`**; on success, writes `round_ctx.json`.
 
 ---
+
+### Safety & validation
+
+OPAL is **assertive by default**: it will fail fast on inconsistent inputs rather than guessing.
+
+* `opal validate` checks essentials + X presence; if Y exists it must be finite and the expected length.
+* `label_hist` is the **single source of truth** for labels. `run`/`explain` require it to be valid.
+* Labels present in the Y column but **missing from `label_hist` are rejected** (use `opal ingest-y` or `opal label-hist repair`).
+* Ledger writes are strict: unknown columns are **errors** (override only with `OPAL_LEDGER_ALLOW_EXTRA=1`).
+* Duplicate handling on ingest is explicit via `ingest.duplicate_policy` (error|keep_first|keep_last).
 
 ### Data contracts
 

@@ -60,6 +60,7 @@ Behavior & checks:
 * Uses `transforms_y` from YAML (overridable via flags).
 * **Strict preflights**: schema checks, completeness.
 * **Preview is printed** (counts + sample) before any write.
+* Duplicate handling is controlled by `ingest.duplicate_policy` (error|keep_first|keep_last).
 * **New IDs** allowed if your CSV includes essentials: `sequence`, `bio_type`, `alphabet`, and the configured X column.
 * Appends to `opal__<slug>__label_hist` and writes the current Y column.
 * Emits `label` events into `outputs/ledger.labels.parquet`.
@@ -122,13 +123,16 @@ opal predict \
   [--model-path outputs/round_<r>/model.joblib | --round <r>] \
   [--model-name <registry_name> --model-params <params.json>] \
   [--in <csv|parquet>] \
+  [--id-col <name> --sequence-col <name>] \
+  [--generate-id-from-sequence] \
   [--out <csv|parquet>]
 ```
 
 * Scores your input table (defaults to `records.parquet`).
-* Writes to stdout as CSV by default; or to `--out`.
+* Writes to stdout as CSV by default; or to `--out` (Parquet keeps vectors as list<float>).
 * Validates the X column exists.
 * Requires `model_meta.json` next to the model; use `--model-name/--model-params` if missing.
+* If your input lacks an id column, use `--generate-id-from-sequence` (requires a sequence column).
 
 ### `record-show`
 
@@ -139,6 +143,7 @@ opal record-show \
   --config <yaml> \
   [<ID-or-SEQ> | --id <ID> | --sequence <SEQ>] \
   [--with-sequence] \
+  [--legacy] \
   [--json]
 ```
 
@@ -155,6 +160,17 @@ opal model-show \
 
 * Always prints model type and params.
 * If `--out-dir` is passed, writes full `feature_importance_full.csv` and prints top-20 in JSON.
+
+### `objective-meta`
+
+List objective metadata and diagnostic keys for a round.
+
+```
+opal objective-meta --config <yaml> --round <k|latest> [--legacy]
+```
+
+* Reads from `outputs/ledger.runs.parquet` and `outputs/ledger.predictions/`.
+* `--legacy` allows older sinks (deprecated).
 
 ### `explain`
 
@@ -189,6 +205,17 @@ opal validate --config <yaml>
 * Verifies **USR essentials** exist in `records.parquet`.
 * Verifies the configured **X** column exists.
 * If Y is present, validates vector length & numeric/finite cells.
+
+### `label-hist`
+
+Validate or repair the label history column (explicit, no silent fixes).
+
+```
+opal label-hist validate --config <yaml>
+opal label-hist repair --config <yaml> [--apply]
+```
+
+* `repair` is **dry-run** by default; use `--apply` to write.
 
 ### `plot`
 
@@ -288,8 +315,9 @@ You can often omit `--config` thanks to **auto-discovery**. The CLI tries, in or
 
 1. **Explicit flag** (`--config`)
 2. **Environment variable** `OPAL_CONFIG`
-3. **Nearest campaign.yaml** in current or parent folders
-4. **Single fallback** under `src/dnadesign/opal/campaigns/`
+3. **Workspace marker** `.opal/config` in current or parent folders
+4. **Nearest campaign.yaml** in current or parent folders
+5. **Single fallback** under `src/dnadesign/opal/campaigns/`
 
 Shell completions:
 
@@ -342,9 +370,11 @@ opal/src/cli/
     explain.py
     predict.py
     model_show.py
+    objective-meta.py
     record_show.py
     status.py
     validate.py
+    label_hist.py
     plot.py
 ```
 

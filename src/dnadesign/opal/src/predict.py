@@ -77,6 +77,9 @@ def run_predict_ephemeral(
     *,
     model_name: str | None = None,
     model_params: Dict[str, Any] | None = None,
+    id_column: str = "id",
+    sequence_column: str = "sequence",
+    generate_id_from_sequence: bool = False,
 ) -> pd.DataFrame:
     meta_path = model_path.parent / "model_meta.json"
     if model_name is None:
@@ -91,9 +94,23 @@ def run_predict_ephemeral(
         if not model_name:
             raise OpalError(f"model_meta.json missing model__name: {meta_path}")
     mdl = load_model(str(model_name), str(model_path), params=model_params)
+    df_work = df.copy()
+    if id_column not in df_work.columns:
+        if generate_id_from_sequence:
+            if sequence_column not in df_work.columns:
+                raise OpalError("Cannot generate ids: sequence column missing.")
+            df_work["id"] = df_work[sequence_column].map(store.deterministic_id_from_sequence)
+        else:
+            raise OpalError(f"Input missing id column '{id_column}'. Use --generate-id-from-sequence if needed.")
+    else:
+        if id_column != "id":
+            df_work["id"] = df_work[id_column].astype(str)
+        else:
+            df_work["id"] = df_work["id"].astype(str)
+
     if ids is None:
-        ids = df["id"].astype(str).tolist()
-    X, id_order = store.transform_matrix(df, ids)
+        ids = df_work["id"].astype(str).tolist()
+    X, id_order = store.transform_matrix(df_work, ids)
     if X.shape[0] != len(id_order):
         raise OpalError(
             "Mismatch between inputs and transformed matrix count.",
@@ -103,10 +120,12 @@ def run_predict_ephemeral(
     yhat = mdl.predict(X)
     yhat = _inverse_yops_if_present(yhat, Path(model_path))
 
-    # normalize to list for dataframe export
+    # normalize to list for dataframe export (list[float], parquet-friendly)
     y_list = [list(map(float, row)) if yhat.ndim == 2 else [float(row)] for row in yhat]
-    out = pd.DataFrame({"id": id_order, "y_pred_vec": [json.dumps(v) for v in y_list]})
+    out = pd.DataFrame({"id": id_order, "y_pred_vec": y_list})
     # add sequence
-    seq_map = df.set_index("id")["sequence"].astype(str).to_dict() if "sequence" in df.columns else {}
+    seq_map = (
+        df_work.set_index("id")[sequence_column].astype(str).to_dict() if sequence_column in df_work.columns else {}
+    )
     out["sequence"] = [seq_map.get(i, "") for i in id_order]
     return out[["id", "sequence", "y_pred_vec"]]

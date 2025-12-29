@@ -31,7 +31,7 @@ import yaml
 from ...plots._context import PlotContext
 from ...registries.plot import get_plot
 from ..registry import cli_command
-from ._common import resolve_config_path
+from ._common import load_cli_config, resolve_config_path, store_from_cfg
 
 
 def _parse_round_selector(sel: Optional[str]) -> Union[str, list[int]]:
@@ -70,7 +70,7 @@ def _load_campaign_yaml(path: Path) -> dict:
     return cfg
 
 
-def _resolve_campaign_dir(config_path: Path) -> tuple[Path, dict]:
+def _resolve_campaign_dir(config_path: Path) -> tuple[Path, dict, Path]:
     """
     Accept a YAML path or a directory. If directory, find a campaign YAML inside.
     """
@@ -79,10 +79,10 @@ def _resolve_campaign_dir(config_path: Path) -> tuple[Path, dict]:
         for cand in ("campaign.yaml", "campaign.yml", "opal.yaml", "opal.yml"):
             c = p / cand
             if c.exists():
-                return p.resolve(), _load_campaign_yaml(c)
+                return p.resolve(), _load_campaign_yaml(c), c.resolve()
         raise ValueError(f"No campaign YAML found in directory: {p}")
     # YAML file
-    return p.parent.resolve(), _load_campaign_yaml(p)
+    return p.parent.resolve(), _load_campaign_yaml(p), p.resolve()
 
 
 @cli_command("plot", help="Generate plots defined under the campaign's top-level 'plots:' block.")
@@ -104,7 +104,9 @@ def cmd_plot(
     """
     # Resolve campaign.yaml
     cfg_path = resolve_config_path(config)
-    campaign_dir, campaign_cfg = _resolve_campaign_dir(cfg_path)
+    campaign_dir, campaign_cfg, campaign_yaml = _resolve_campaign_dir(cfg_path)
+    cfg = load_cli_config(campaign_yaml)
+    store = store_from_cfg(cfg)
     typer.secho(f"[plot] Using config: {cfg_path}", fg=typer.colors.CYAN)
 
     plots_cfg = campaign_cfg.get("plots") or []
@@ -123,10 +125,10 @@ def cmd_plot(
 
     # Built-in data sources (auto-injected if present)
     builtins = {
-        # Canonical ledger thin index (SoT for plots):
+        # Handle into ledger sinks under outputs/ (index may not exist).
         "events": campaign_dir / "outputs" / "ledger.index.parquet",
-        # Optional convenience if a local records cache is colocated with campaign:
-        "records": campaign_dir / "records.parquet",
+        # Records path resolved from campaign data location
+        "records": Path(store.records_path),
         "artifacts": campaign_dir / "artifacts",
     }
     builtin_resolved = {k: p for k, p in builtins.items() if p.exists()}

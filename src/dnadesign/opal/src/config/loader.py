@@ -18,11 +18,12 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from typing_extensions import Literal
 
-from ..utils import OpalError
+from ..utils import ConfigError
 from .plugin_schemas import validate_params
 from .types import (
     CampaignBlock,
     DataBlock,
+    IngestBlock,
     LocationLocal,
     LocationUSR,
     MetadataBlock,
@@ -124,6 +125,11 @@ class PScoring(BaseModel):
     score_batch_size: int = 10_000
 
 
+class PIngest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    duplicate_policy: Literal["error", "keep_first", "keep_last"] = "error"
+
+
 class PSafety(BaseModel):
     model_config = ConfigDict(extra="forbid")
     fail_on_mixed_biotype_or_alphabet: bool = True
@@ -148,6 +154,7 @@ class PRoot(BaseModel):
     objective: PPluginRef
     selection: PPluginRef
     training: PTraining = Field(default_factory=PTraining)
+    ingest: PIngest = Field(default_factory=PIngest)
     scoring: PScoring = Field(default_factory=PScoring)
     safety: PSafety = Field(default_factory=PSafety)
     metadata: PMetadata = Field(default_factory=PMetadata)
@@ -163,7 +170,7 @@ def load_config(path: Path | str) -> RootConfig:
         pyd = PRoot.model_validate(raw)
 
     except ValidationError as e:
-        raise OpalError(f"Invalid campaign.yaml: {e}")
+        raise ConfigError(f"Invalid campaign.yaml: {e}")
 
     # Validate params with schemas
     tx = pyd.transforms_x
@@ -206,6 +213,7 @@ def load_config(path: Path | str) -> RootConfig:
         policy=pyd.training.policy or {},
         y_ops=[PluginRef(t.name, t.params) for t in pyd.training.y_ops],
     )
+    ingest_dc = IngestBlock(duplicate_policy=pyd.ingest.duplicate_policy)
     scoring_dc = ScoringBlock(score_batch_size=int(pyd.scoring.score_batch_size))
     safety_dc = SafetyBlock(
         fail_on_mixed_biotype_or_alphabet=pyd.safety.fail_on_mixed_biotype_or_alphabet,
@@ -226,6 +234,7 @@ def load_config(path: Path | str) -> RootConfig:
         selection=selection_dc,
         objective=objective_dc,
         training=training_dc,
+        ingest=ingest_dc,
         scoring=scoring_dc,
         safety=safety_dc,
         metadata=MetadataBlock(notes=pyd.metadata.notes),

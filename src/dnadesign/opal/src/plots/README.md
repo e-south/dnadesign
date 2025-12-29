@@ -39,11 +39,11 @@ plots:
       save_data: false                # save tidy CSV next to the image
 ```
 
-**Built-ins injected** if present in the campaign directory:
+**Built-ins injected** (resolved from the campaign config):
 
-* `events` → `./outputs/ledger.index.parquet` (handle to ledger sinks under `outputs/`)
-* `records` → `./records.parquet`
-* `artifacts` → `./artifacts/`
+* `events` → `<campaign>/outputs/ledger.index.parquet` (handle to typed ledger sinks; index may be absent)
+* `records` → resolved from `data.location` in `campaign.yaml`
+* `artifacts` → `<campaign>/artifacts/`
 
 
 ### Writing a new plot

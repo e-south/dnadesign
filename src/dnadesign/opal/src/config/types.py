@@ -69,6 +69,11 @@ class TrainingBlock:
 
 
 @dataclass
+class IngestBlock:
+    duplicate_policy: str = "error"  # error | keep_first | keep_last
+
+
+@dataclass
 class ScoringBlock:
     score_batch_size: int = 10_000
 
@@ -102,6 +107,7 @@ class RootConfig:
     selection: SelectionBlock
     objective: ObjectiveBlock
     training: TrainingBlock
+    ingest: IngestBlock
     scoring: ScoringBlock
     safety: SafetyBlock
     metadata: MetadataBlock

@@ -28,6 +28,7 @@ from ._common import (
     json_out,
     load_cli_config,
     opal_error,
+    resolve_config_path,
     store_from_cfg,
 )
 
@@ -47,6 +48,7 @@ def cmd_run(
     json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
 ) -> None:
     try:
+        cfg_path = resolve_config_path(config)
         cfg = load_cli_config(config)
         store = store_from_cfg(cfg)
         df = store.load()
@@ -76,6 +78,7 @@ def cmd_run(
         req = RunRoundRequest(
             cfg=cfg,
             as_of_round=int(round),
+            config_path=cfg_path,
             k_override=k,
             score_batch_size_override=score_batch_size,
             verbose=verbose,

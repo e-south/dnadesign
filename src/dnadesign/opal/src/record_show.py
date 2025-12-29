@@ -20,6 +20,7 @@ from typing import Any, Dict, Optional
 import pandas as pd
 
 from .data_access import RecordsStore
+from .ledger import LedgerReader
 
 
 def _relpath(p: Path) -> str:
@@ -36,7 +37,8 @@ def build_record_report(
     id_: Optional[str] = None,
     sequence: Optional[str] = None,
     with_sequence: bool = True,
-    events_path: Optional[Path] = None,
+    ledger_reader: Optional[LedgerReader] = None,
+    legacy_events_path: Optional[Path] = None,
     records_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     if id_ is None and sequence is None:
@@ -78,22 +80,18 @@ def build_record_report(
     srcs: Dict[str, str] = {}
     if records_path is not None:
         srcs["records"] = _relpath(Path(records_path))
-    if events_path is not None:
-        srcs["events"] = _relpath(Path(events_path))
+    if ledger_reader is not None:
+        srcs["ledger_predictions_dir"] = _relpath(Path(ledger_reader.paths.predictions_dir))
+        srcs["ledger_runs_path"] = _relpath(Path(ledger_reader.paths.runs_path))
+    if legacy_events_path is not None:
+        srcs["legacy_events"] = _relpath(Path(legacy_events_path))
     if srcs:
         report["sources"] = srcs
 
     latest_rank_comp: Optional[int] = None
     avg_rank_comp: Optional[float] = None
 
-    if events_path is None:
-        raise ValueError("events_path is required to build record report.")
-
-    if events_path.exists() and events_path.is_dir():
-        pred_dir = events_path if events_path.name == "ledger.predictions" else (events_path / "ledger.predictions")
-        if not pred_dir.exists():
-            raise ValueError(f"Missing ledger.predictions directory: {pred_dir}")
-        frames = []
+    if ledger_reader is not None:
         needed_cols = [
             "event",
             "as_of_round",
@@ -105,15 +103,11 @@ def build_record_report(
             "sel__rank_competition",
             "sel__is_selected",
         ]
-        for p in sorted(pred_dir.glob("part-*.parquet")):
-            sub = pd.read_parquet(p, columns=needed_cols)
-            sub = sub[(sub.get("event") == "run_pred") & (sub["id"].astype(str) == rid)]
-            if not sub.empty:
-                frames.append(sub)
-        out = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=needed_cols)
-    elif events_path.exists():
+        out = ledger_reader.read_predictions(columns=needed_cols, id_value=rid)
+        out = out[out.get("event") == "run_pred"] if not out.empty else out
+    elif legacy_events_path is not None:
         # Legacy path (a single Parquet index). Kept for backward compatibility.
-        ev = pd.read_parquet(events_path)
+        ev = pd.read_parquet(legacy_events_path)
         col = "event" if "event" in ev.columns else ("kind" if "kind" in ev.columns else None)
         if col is None:
             raise ValueError("Legacy events parquet missing 'event' column.")
@@ -125,7 +119,7 @@ def build_record_report(
             ev["sequence"] = seq_val
         out = ev[cols].sort_values(["as_of_round", "run_id"])
     else:
-        raise ValueError(f"events_path not found: {events_path}")
+        raise ValueError("No ledger reader or legacy events path provided.")
 
     report["runs"] = out.to_dict(orient="records")
 

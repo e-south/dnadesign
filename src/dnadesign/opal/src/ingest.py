@@ -40,6 +40,10 @@ class IngestPreview:
 
     # What we will write
     y_column_name: str
+    duplicate_policy: str
+    duplicate_key: str
+    duplicates_found: int
+    duplicates_dropped: int
 
     # Notes/warnings
     warnings: List[str]
@@ -76,6 +80,7 @@ def run_ingest(
     transform_params: Dict[str, Any],
     y_expected_length: Optional[int],
     y_column_name: str,
+    duplicate_policy: str,
 ) -> Tuple[pd.DataFrame, IngestPreview]:
     """
     Returns:
@@ -100,7 +105,35 @@ def run_ingest(
     if "id" not in labels.columns:
         labels["id"] = labels["sequence"].map(seq2id)
 
-    # 3) Preview stats
+    # 3) Duplicate handling (assertive, policy-driven)
+    policy = str(duplicate_policy or "error").strip().lower()
+    if policy not in {"error", "keep_first", "keep_last"}:
+        raise OpalError(
+            f"Unknown ingest.duplicate_policy={duplicate_policy!r} (expected: error | keep_first | keep_last)."
+        )
+    # Build a stable key (prefer id if present; else sequence)
+    if "id" in labels.columns and labels["id"].notna().any():
+        key = labels["id"].astype("string")
+        key = key.fillna(labels["sequence"].astype("string"))
+        key_name = "id"
+    else:
+        key = labels["sequence"].astype("string")
+        key_name = "sequence"
+    if key.isna().any():
+        raise OpalError("Ingest requires id or sequence for every row (found missing values).")
+    dup_mask = key.duplicated(keep=False)
+    dup_count = int(dup_mask.sum())
+    dropped = 0
+    if dup_count > 0:
+        dup_keys = key[dup_mask].astype(str).unique().tolist()[:10]
+        if policy == "error":
+            raise OpalError(f"Duplicate {key_name} values found (sample={dup_keys}).")
+        keep = "first" if policy == "keep_first" else "last"
+        before = len(labels)
+        labels = labels.loc[~key.duplicated(keep=keep)].copy()
+        dropped = before - len(labels)
+
+    # 4) Preview stats
     total = int(len(csv_df))
     rows_with_id = int("id" in csv_df.columns)
     rows_with_seq = int("sequence" in csv_df.columns)
@@ -137,9 +170,13 @@ def run_ingest(
         y_length_ok=y_len_ok,
         y_length_bad=y_len_bad,
         y_column_name=y_column_name,
+        duplicate_policy=policy,
+        duplicate_key=key_name,
+        duplicates_found=dup_count,
+        duplicates_dropped=dropped,
         warnings=warnings,
     )
 
-    # 4) Return labels (sequence, id?, y) and the preview
+    # 5) Return labels (sequence, id?, y) and the preview
     cols = ["sequence", "id", "y"] if "id" in labels.columns else ["sequence", "y"]
     return labels[cols], preview

@@ -43,6 +43,22 @@ class OpalError(RuntimeError):
         self.exit_code = exit_code
 
 
+class ConfigError(OpalError):
+    pass
+
+
+class DataError(OpalError):
+    pass
+
+
+class LedgerError(OpalError):
+    pass
+
+
+class RunError(OpalError):
+    pass
+
+
 # -----------------------
 # IO helpers
 # -----------------------
