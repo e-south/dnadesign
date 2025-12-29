@@ -30,6 +30,16 @@ This release makes **strict, breaking** changes to runtime carriers, plugin cont
    - `transform_y` functions must accept `(df_tidy, params, ctx)`.
    - `model` factories must accept `params: dict` (no fallback call patterns).
 
+6. **Predict requires RoundCtx when Y‑ops were used**
+   - If a model was trained with `training.y_ops`, `opal predict` now requires
+     `round_ctx.json` next to the model to invert Y‑ops.
+   - If you do not have it, you must pass `--assume-no-yops` explicitly.
+
+7. **State schema updates**
+   - `state.json` round entries now include `run_id` and `round_log_jsonl`.
+   - New states write `version: 2`. Existing states remain readable but will
+     not have `run_id` for historical rounds.
+
 ### Legacy fallbacks removed
 
 - `opal record-show` and `opal objective-meta` no longer accept `--legacy`.

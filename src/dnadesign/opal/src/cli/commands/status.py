@@ -18,7 +18,7 @@ from ...status import build_status
 from ...utils import ExitCodes, OpalError, print_stdout
 from ..formatting import render_status_human
 from ..registry import cli_command
-from ._common import internal_error, json_out, load_cli_config, opal_error
+from ._common import internal_error, json_out, load_cli_config, opal_error, resolve_config_path
 
 
 @cli_command("status", help="Dashboard from state.json (latest round by default).")
@@ -26,11 +26,26 @@ def cmd_status(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
     round: int = typer.Option(None, "--round"),
     all: bool = typer.Option(False, "--all"),
+    with_ledger: bool = typer.Option(False, "--with-ledger", help="Include ledger summaries in output."),
     json: bool = typer.Option(False, "--json"),
 ):
     try:
-        cfg = load_cli_config(config)
-        st = build_status(Path(cfg.campaign.workdir) / "state.json", round_k=round, show_all=all)
+        cfg_path = resolve_config_path(config)
+        cfg = load_cli_config(cfg_path)
+        ledger_reader = None
+        if with_ledger:
+            from ...ledger import LedgerReader
+            from ...workspace import CampaignWorkspace
+
+            ws = CampaignWorkspace.from_config(cfg, cfg_path)
+            ledger_reader = LedgerReader(ws)
+        st = build_status(
+            Path(cfg.campaign.workdir) / "state.json",
+            round_k=round,
+            show_all=all,
+            ledger_reader=ledger_reader,
+            include_ledger=with_ledger,
+        )
         if json or all:
             json_out(st)
         else:

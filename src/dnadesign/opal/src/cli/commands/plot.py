@@ -8,7 +8,7 @@ OPAL CLI — plot
 A lean driver that:
 - resolves campaign.yaml (or campaign directory),
 - builds a minimal PlotContext,
-- auto-injects built-in data sources if present (records, artifacts),
+- auto-injects built-in data sources if present (records, outputs, ledger sinks),
 - dispatches to plot plugins via the registry,
 - writes outputs (overwrite by default),
 - continues on errors and prints full tracebacks,
@@ -61,6 +61,34 @@ def _round_suffix(rounds: Union[str, list[int]]) -> str:
     if isinstance(rounds, list):
         return f"_r{','.join(map(str, rounds))}"
     return ""
+
+
+def _resolve_output_dir(
+    out_cfg: dict,
+    *,
+    campaign_dir: Path,
+    workspace: CampaignWorkspace,
+    plot_name: str,
+    plot_kind: str,
+    round_suffix: str,
+) -> Path:
+    out_dir_tpl = out_cfg.get("dir")
+    if out_dir_tpl:
+        out_dir_str = str(out_dir_tpl).format(
+            campaign=str(campaign_dir),
+            workdir=str(workspace.workdir),
+            name=plot_name,
+            kind=plot_kind,
+            round_suffix=round_suffix,
+        )
+        out_dir = Path(out_dir_str)
+        if not out_dir.is_absolute():
+            out_dir = (campaign_dir / out_dir).resolve()
+        else:
+            out_dir = out_dir.resolve()
+    else:
+        out_dir = (campaign_dir / "outputs" / "plots").resolve()
+    return out_dir
 
 
 def _load_campaign_yaml(path: Path) -> dict:
@@ -129,7 +157,11 @@ def cmd_plot(
     builtins = {
         # Records path resolved from campaign data location
         "records": Path(store.records_path),
-        "artifacts": campaign_dir / "artifacts",
+        # Workspace outputs and ledger sinks (always under outputs/)
+        "outputs": ws.outputs_dir,
+        "ledger_predictions_dir": ws.ledger_predictions_dir,
+        "ledger_runs_parquet": ws.ledger_runs_path,
+        "ledger_labels_parquet": ws.ledger_labels_path,
     }
     builtin_resolved = {k: p for k, p in builtins.items() if p.exists()}
 
@@ -157,8 +189,15 @@ def cmd_plot(
             data_paths[n] = pp
 
         out_cfg = entry.get("output") or {}
-        # Force a flat output directory for all plots
-        out_dir = (campaign_dir / "outputs" / "plots").resolve()
+        # Resolve output directory (default: outputs/plots)
+        out_dir = _resolve_output_dir(
+            out_cfg,
+            campaign_dir=campaign_dir,
+            workspace=ws,
+            plot_name=pname,
+            plot_kind=pkind,
+            round_suffix=suffix,
+        )
         fmt = (out_cfg.get("format") or "png").lower()
         dpi = int(out_cfg.get("dpi", 600))
         fname = (out_cfg.get("filename") or "{name}{round_suffix}.png").format(name=pname, round_suffix=suffix)

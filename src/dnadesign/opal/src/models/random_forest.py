@@ -35,6 +35,7 @@ from ..round_context import roundctx_contract
 @dataclass
 class FitMetrics:
     oob_r2: Optional[float] = None
+    oob_mse: Optional[float] = None
 
 
 @roundctx_contract(
@@ -92,17 +93,32 @@ class RandomForestModel:
         self._est = est
         self._x_dim = int(X.shape[1])
 
-        # OOB R^2 if enabled
+        # OOB diagnostics if enabled
         oob_r2 = None
+        oob_mse = None
         if bool(self.params.get("oob_score", False)):
             try:
                 oob_r2 = float(getattr(est, "oob_score_", None))
             except Exception:
                 oob_r2 = None
 
+            try:
+                oob_pred = np.asarray(getattr(est, "oob_prediction_", None), dtype=float)
+                if oob_pred.size:
+                    if y_dim == 1:
+                        y_true = np.asarray(Y, dtype=float).reshape(-1)
+                        oob_pred = oob_pred.reshape(-1)
+                    else:
+                        y_true = np.asarray(Y, dtype=float)
+                    if oob_pred.shape == y_true.shape:
+                        diff = oob_pred - y_true
+                        oob_mse = float(np.nanmean(np.square(diff)))
+            except Exception:
+                oob_mse = None
         else:
             # sklearn only computes oob_score_ when enabled; keep None otherwise
             oob_r2 = None
+            oob_mse = None
 
         # Optional: capture feature importance as an artifact
         if self.emit_feature_importance:
@@ -122,7 +138,7 @@ class RandomForestModel:
             ctx.set("model/<self>/y_dim", int(y_dim))
             ctx.set("model/<self>/fit_metrics", {"oob_r2": oob_r2})
 
-        return FitMetrics(oob_r2=oob_r2)
+        return FitMetrics(oob_r2=oob_r2, oob_mse=oob_mse)
 
     def predict(self, X: np.ndarray, *, ctx=None) -> np.ndarray:
         if self._est is None:

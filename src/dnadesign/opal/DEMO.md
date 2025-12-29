@@ -84,6 +84,9 @@ Inspect:
 
 ```bash
 opal status
+opal status --with-ledger
+opal runs list
+opal log --round latest
 opal record-show -c campaign.yaml --sequence ACCTG...
 opal explain     -c campaign.yaml --round 1
 ```

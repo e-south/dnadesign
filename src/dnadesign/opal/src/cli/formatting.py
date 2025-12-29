@@ -345,15 +345,106 @@ def render_status_human(st: Mapping[str, Any]) -> str:
     if not latest:
         return head + "\n\n" + _dim("No completed rounds.")
 
-    latest_block = kv_block(
-        "Latest round",
+    def _round_block(label: str, round_info: Mapping[str, Any], ledger_info: Mapping[str, Any]) -> list[str]:
+        run_id = round_info.get("run_id") or ledger_info.get("run_id")
+        main = kv_block(
+            label,
+            {
+                "r": round_info.get("round_index"),
+                "run_id": run_id,
+                "n_train": round_info.get("number_of_training_examples_used_in_round"),
+                "n_scored": round_info.get("number_of_candidates_scored_in_round"),
+                "top_k requested": round_info.get("selection_top_k_requested"),
+                "top_k effective": round_info.get("selection_top_k_effective_after_ties"),
+                "round_dir": round_info.get("round_dir"),
+            },
+        )
+        blocks = [main]
+        if ledger_info:
+            summary = ledger_info.get("objective_summary_stats") or {}
+            kv = {
+                "model": ledger_info.get("model"),
+                "objective": ledger_info.get("objective"),
+                "selection": ledger_info.get("selection"),
+                "y_ops": ", ".join([p.get("name") for p in (ledger_info.get("y_ops") or [])]) or "(none)",
+                "score_min": summary.get("score_min"),
+                "score_median": summary.get("score_median"),
+                "score_max": summary.get("score_max"),
+            }
+            blocks.append(kv_block(f"{label} (ledger)", kv))
+        return blocks
+
+    parts = [head]
+    # Latest round block
+    latest_blocks = _round_block("Latest round", latest, st.get("latest_round_ledger") or {})
+    for b in latest_blocks:
+        parts.extend(["", b])
+
+    # Selected round (if specified and distinct)
+    selected = st.get("selected_round") or {}
+    if selected and int(selected.get("round_index", -1)) != int(latest.get("round_index", -1)):
+        sel_blocks = _round_block("Selected round", selected, st.get("selected_round_ledger") or {})
+        for b in sel_blocks:
+            parts.extend(["", b])
+
+    return "\n".join(parts)
+
+
+def render_runs_list_human(rows: Sequence[Mapping[str, Any]]) -> str:
+    if not rows:
+        return _dim("No runs found.")
+    lines = []
+    for r in rows:
+        parts = [
+            f"r={r.get('as_of_round')}",
+            f"run_id={_truncate(r.get('run_id', ''), 18)}",
+            f"model={r.get('model')}",
+            f"objective={r.get('objective')}",
+            f"selection={r.get('selection')}",
+            f"n_train={r.get('stats_n_train')}",
+            f"n_scored={r.get('stats_n_scored')}",
+        ]
+        lines.append(", ".join(parts))
+    return bullet_list("Runs", lines)
+
+
+def render_run_meta_human(row: Mapping[str, Any]) -> str:
+    y_ops = row.get("training__y_ops") or []
+    y_ops_str = ", ".join([p.get("name") for p in y_ops]) if y_ops else "(none)"
+    head = kv_block(
+        "Run",
         {
-            "r": latest.get("round_index"),
-            "n_train": latest.get("number_of_training_examples_used_in_round"),
-            "n_scored": latest.get("number_of_candidates_scored_in_round"),
-            "top_k requested": latest.get("selection_top_k_requested"),
-            "top_k effective": latest.get("selection_top_k_effective_after_ties"),
-            "round_dir": latest.get("round_dir"),
+            "run_id": row.get("run_id"),
+            "as_of_round": row.get("as_of_round"),
+            "model": row.get("model__name"),
+            "objective": row.get("objective__name"),
+            "selection": row.get("selection__name"),
+            "y_ops": y_ops_str,
+            "n_train": row.get("stats__n_train"),
+            "n_scored": row.get("stats__n_scored"),
         },
     )
-    return "\n".join([head, "", latest_block])
+    obj_stats = row.get("objective__summary_stats") or {}
+    stats_block = kv_block("Objective summary", obj_stats) if obj_stats else _dim("No objective summary stats.")
+    artifacts = row.get("artifacts") or {}
+    artifacts_block = kv_block("Artifacts", artifacts) if artifacts else _dim("No artifacts recorded.")
+    return "\n".join([head, "", stats_block, "", artifacts_block])
+
+
+def render_round_log_summary_human(summary: Mapping[str, Any]) -> str:
+    head = kv_block(
+        "Round log",
+        {
+            "round": summary.get("round_index"),
+            "path": summary.get("path"),
+            "events": summary.get("events"),
+            "predict_batches": summary.get("predict_batches"),
+            "predict_rows": summary.get("predict_rows"),
+            "duration_total_s": summary.get("duration_sec_total"),
+            "duration_fit_s": summary.get("duration_sec_fit"),
+        },
+    )
+    stages = summary.get("stage_counts") or {}
+    stage_lines = [f"{k}: {v}" for k, v in sorted(stages.items())] if stages else []
+    stages_block = bullet_list("Stages", stage_lines)
+    return "\n".join([head, "", stages_block])

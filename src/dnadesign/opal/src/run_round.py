@@ -543,6 +543,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     model_meta = {
         "model__name": cfg.model.name,
         "model__params": model.get_params(),
+        "training__y_ops": [{"name": p.name, "params": p.params} for p in (cfg.training.y_ops or [])],
         "x_dim": int(X_train.shape[1]),
         "y_dim": int(y_dim),
     }
@@ -764,6 +765,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     st.add_round(
         RoundEntry(
             round_index=int(req.as_of_round),
+            run_id=str(run_id),
             round_name=f"round_{int(req.as_of_round)}",
             round_dir=str(rdir.resolve()),
             labels_used_rounds=labels_used_rounds,
@@ -793,6 +795,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
                 "objective_meta_json": str(apaths.objective_meta_json.resolve()),
                 "model_meta_json": str((rdir / "model_meta.json").resolve()),
                 "labels_used_parquet": str((rdir / "labels_used.parquet").resolve()),
+                "round_log_jsonl": str((rdir / "round.log.jsonl").resolve()),
             },
             writebacks={
                 "records_caches_updated": [
