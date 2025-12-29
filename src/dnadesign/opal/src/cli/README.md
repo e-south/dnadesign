@@ -62,7 +62,7 @@ Behavior & checks:
 * **Preview is printed** (counts + sample) before any write.
 * **New IDs** allowed if your CSV includes essentials: `sequence`, `bio_type`, `alphabet`, and the configured X column.
 * Appends to `opal__<slug>__label_hist` and writes the current Y column.
-* Emits `label` events into `outputs/events.parquet`.
+* Emits `label` events into `outputs/ledger.labels.parquet`.
 
 ### `run`
 
@@ -79,25 +79,27 @@ opal run \
 
 Pipeline:
 
-* Pulls effective labels with `observed_round ≤ R`, then trains on the current Y column.
+* Pulls effective labels per `training.policy` (cumulative vs current round, dedup policy).
 * Predicts in batches (`scoring.score_batch_size` or `--score-batch-size`).
 * Applies your **objective** to produce a scalar **selection score**.
 * Selects with the configured strategy + tie handling.
-  * If `selection.params.exclude_already_labeled: true` (default), designs already labeled at or before `--round` are **excluded from scoring/selection**.
+  * If `selection.params.exclude_already_labeled: true` (default), designs already labeled are **excluded**; scope is controlled by `training.policy.allow_resuggesting_candidates_until_labeled`.
 
 
 **Artifacts written** (`outputs/round_<r>/`):
 
 * `model.joblib`
+* `model_meta.json`
 * `selection_top_k.csv`
+* `labels_used.parquet` (training snapshot for this run)
 * `round_ctx.json`
 * `objective_meta.json`
 * `round.log.jsonl` — compact JSONL with stage events and prediction batch progress
 
-**Events appended** to **`outputs/events.parquet`**:
+**Events appended** to **ledger sinks** under `outputs/`:
 
-* `run_pred` — one row per candidate with **`pred__y_hat_model`** and **`pred__y_obj_scalar`**, selection rank/flag, and diagnostics.
-* `run_meta` — one row per run with model/config/selection snapshot and artifact checksums.
+* `run_pred` → `outputs/ledger.predictions/` (one row per candidate with **`pred__y_hat_model`** and **`pred__y_obj_scalar`**, selection rank/flag, and diagnostics).
+* `run_meta` → `outputs/ledger.runs.parquet` (one row per run with model/config/selection snapshot and artifact checksums).
 
 **Write-backs to `records.parquet` (caches only):**
 
@@ -118,6 +120,7 @@ Run **ephemeral** predictions from a frozen model. No writes to `records.parquet
 opal predict \
   --config <yaml> \
   [--model-path outputs/round_<r>/model.joblib | --round <r>] \
+  [--model-name <registry_name> --model-params <params.json>] \
   [--in <csv|parquet>] \
   [--out <csv|parquet>]
 ```
@@ -125,6 +128,7 @@ opal predict \
 * Scores your input table (defaults to `records.parquet`).
 * Writes to stdout as CSV by default; or to `--out`.
 * Validates the X column exists.
+* Requires `model_meta.json` next to the model; use `--model-name/--model-params` if missing.
 
 ### `record-show`
 
@@ -133,7 +137,7 @@ Per-record history report (ground truth + per-round predictions/rank/selected).
 ```
 opal record-show \
   --config <yaml> \
-  (--id <ID> | --sequence <SEQ>) \
+  [<ID-or-SEQ> | --id <ID> | --sequence <SEQ>] \
   [--with-sequence] \
   [--json]
 ```
@@ -145,6 +149,7 @@ Inspect a saved model; optionally dump full feature importances.
 ```
 opal model-show \
   --model-path outputs/round_<r>/model.joblib \
+  [--model-name <registry_name> --model-params <params.json>] \
   [--out-dir <dir>]
 ```
 
@@ -215,7 +220,7 @@ plots:
 ```
 
 **Data sources**
-Plot plugins typically read from the campaign’s **`outputs/events.parquet`** and/or **`records.parquet`**. You may add extra sources per plot entry via:
+Plot plugins typically read from the campaign’s **ledger sinks** under `outputs/` and/or **`records.parquet`**. You may add extra sources per plot entry via:
 
 ```yaml
 data:

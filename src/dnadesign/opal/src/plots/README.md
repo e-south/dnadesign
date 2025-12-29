@@ -41,7 +41,7 @@ plots:
 
 **Built-ins injected** if present in the campaign directory:
 
-* `events` → `./events.parquet`
+* `events` → `./outputs/ledger.index.parquet` (handle to ledger sinks under `outputs/`)
 * `records` → `./records.parquet`
 * `artifacts` → `./artifacts/`
 
