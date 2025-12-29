@@ -3,6 +3,8 @@
 
 The OPAL CLI is a thin layer over OPAL’s application modules. It lets you initialize a campaign, ingest labeled samples, train/score/select for a round, inspect records and models, validate your dataset, and generate plots.
 
+Commands are **registry-driven** and plugin‑agnostic: they operate on the configured plugin names and enforce only declared contracts.
+
 This document is **CLI-focused**:
 
 - [Quick start](#quick-start)
@@ -58,6 +60,7 @@ opal ingest-y \
 Behavior & checks:
 
 * Uses `transforms_y` from YAML (overridable via flags).
+* `--observed-round` stamps labels into label history at that round.
 * **Strict preflights**: schema checks, completeness.
 * **Preview is printed** (counts + sample) before any write.
 * Duplicate handling is controlled by `ingest.duplicate_policy` (error|keep_first|keep_last).
@@ -81,6 +84,7 @@ opal run \
 
 Pipeline:
 
+* `--labels-as-of` is the **training cutoff**: use labels with `observed_round ≤ r`.
 * Pulls effective labels per `training.policy` (cumulative vs current round, dedup policy).
 * Predicts in batches (`scoring.score_batch_size` or `--score-batch-size`).
 * Applies your **objective** to produce a scalar **selection score**.
@@ -102,6 +106,8 @@ Pipeline:
 
 * `run_pred` → `outputs/ledger.predictions/` (one row per candidate with **`pred__y_hat_model`** and **`pred__y_obj_scalar`**, selection rank/flag, and diagnostics).
 * `run_meta` → `outputs/ledger.runs.parquet` (one row per run with model/config/selection snapshot and artifact checksums).
+
+`pred__y_hat_model` is **objective-space** (after any Y‑ops inversion), so downstream logic is plugin‑agnostic.
 
 **Write-backs to `records.parquet` (caches only):**
 
@@ -195,6 +201,7 @@ opal explain --config <yaml> --round <k>
 ```
 
 Prints: number of training labels, candidate universe size, transforms/models/selection used, vector dimension, and any preflight warnings.
+`--labels-as-of` is accepted as an alias for `--round`.
 
 ### `status`
 
@@ -249,6 +256,14 @@ opal label-hist repair --config <yaml> [--apply]
 
 * `repair` is **dry-run** by default; use `--apply` to write.
 
+### Records cache columns
+
+OPAL manages a few derived columns in `records.parquet`:
+
+* `opal__<slug>__label_hist` — append-only label history (SSoT)
+* `opal__<slug>__latest_as_of_round` — last scored round for each record
+* `opal__<slug>__latest_pred_scalar` — latest objective scalar cache
+
 ### `plot`
 
 Generate plots declared in the campaign’s `plots:` block. Plots are plugin-driven and campaign-scoped.
@@ -257,6 +272,7 @@ Generate plots declared in the campaign’s `plots:` block. Plots are plugin-dri
 opal plot --config <yaml-or-dir> [--round <selector>] [--name <plot-name>]
 ```
 
+* `--config` accepts either a campaign YAML or a campaign directory (only `plot` supports directories).
 * `--round <selector>`: `latest | all | 3 | 1,3,7 | 2-5` (plugin may define defaults).
 * `--name <plot-name>`: run a single plot by name; omit to run **all**.
 * Overwrites files by default; continues on error; exit code **1** if any plot failed.
@@ -306,6 +322,7 @@ opal prune-source --config <yaml> [--scope any|campaign] [--keep <col> ...] [--y
 ```
 
 * Backup is **enabled by default**; disable with `--no-backup`.
+* Designed as a **start fresh** option before re-running round 0.
 
 ---
 
@@ -370,6 +387,10 @@ You can often omit `--config` thanks to **auto-discovery**. The CLI tries, in or
 3. **Workspace marker** `.opal/config` in current or parent folders
 4. **Nearest campaign.yaml** in current or parent folders
 5. **Single fallback** under `src/dnadesign/opal/campaigns/`
+
+If `$OPAL_CONFIG` or `.opal/config` is set but invalid, OPAL exits with an error (no silent fallback).
+Marker paths are resolved **relative to the campaign workdir**.
+Passing a **directory** to `--config` is only supported for `opal plot`; other commands require a YAML file.
 
 Shell completions:
 

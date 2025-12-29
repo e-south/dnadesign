@@ -23,6 +23,8 @@ from ._common import (
     json_out,
     load_cli_config,
     opal_error,
+    print_config_context,
+    resolve_config_path,
     store_from_cfg,
 )
 
@@ -30,7 +32,13 @@ from ._common import (
 @cli_command("explain", help="Dry-run planner for a round; prints counts and plan (no writes).")
 def cmd_explain(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG", help="campaign.yaml"),
-    round: int = typer.Option(..., "--round", "-r"),
+    round: int = typer.Option(
+        ...,
+        "--round",
+        "-r",
+        "--labels-as-of",
+        help="Labels cutoff (same as run --labels-as-of).",
+    ),
     json: bool = typer.Option(
         False,
         "--json/--human",
@@ -38,16 +46,18 @@ def cmd_explain(
     ),
 ):
     try:
-        cfg = load_cli_config(config)
+        cfg_path = resolve_config_path(config)
+        cfg = load_cli_config(cfg_path)
         store = store_from_cfg(cfg)
         df = store.load()
         info = explain_round(store, df, cfg, round)
         if json:
             json_out(info)
         else:
+            print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
             print_stdout(render_explain_human(info))
     except OpalError as e:
-        opal_error("run", e)
+        opal_error("explain", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("explain", e)

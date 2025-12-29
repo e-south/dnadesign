@@ -59,6 +59,15 @@ opal run -c campaign.yaml --labels-as-of 0
 opal objective-meta -c campaign.yaml --round latest
 ````
 
+Tip: when you are **inside** the campaign folder, you can omit `-c campaign.yaml`
+(OPAL auto-discovers the config). From elsewhere, pass `--config`.
+
+Optional reset (start fresh):
+
+```bash
+opal prune-source -c campaign.yaml --scope campaign --yes
+```
+
 Artifacts appear in `outputs/round_0/`:
 
 * `model.joblib`

@@ -28,6 +28,7 @@ from ._common import (
     json_out,
     load_cli_config,
     opal_error,
+    print_config_context,
     resolve_config_path,
     store_from_cfg,
 )
@@ -36,7 +37,13 @@ from ._common import (
 @cli_command("run", help="Train on labels ≤ round, score, select, append events.")
 def cmd_run(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
-    round: int = typer.Option(..., "--round", "-r", "--labels-as-of", help="Labels cutoff (as_of_round)."),
+    round: int = typer.Option(
+        ...,
+        "--round",
+        "-r",
+        "--labels-as-of",
+        help="Labels cutoff for training (use labels with observed_round ≤ this value).",
+    ),
     k: Optional[int] = typer.Option(None, "--k", "-k", help="Top-k (default from YAML)."),
     resume: bool = typer.Option(
         False,
@@ -49,9 +56,11 @@ def cmd_run(
 ) -> None:
     try:
         cfg_path = resolve_config_path(config)
-        cfg = load_cli_config(config)
+        cfg = load_cli_config(cfg_path)
         store = store_from_cfg(cfg)
         df = store.load()
+        if not json:
+            print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
 
         # Guard: if this round already exists in state.json, prompt unless --resume
         st_path = Path(cfg.campaign.workdir) / "state.json"

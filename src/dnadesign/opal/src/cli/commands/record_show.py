@@ -25,6 +25,7 @@ from ._common import (
     json_out,
     load_cli_config,
     opal_error,
+    print_config_context,
     resolve_config_path,
     store_from_cfg,
 )
@@ -44,9 +45,11 @@ def cmd_record_show(
 ):
     try:
         cfg_path = resolve_config_path(config)
-        cfg = load_cli_config(config)
+        cfg = load_cli_config(cfg_path)
         store = store_from_cfg(cfg)
         df = store.load()
+        if not json:
+            print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
         if id and sequence:
             raise OpalError("Provide only one of --id or --sequence (not both).")
         if id is None and sequence is None:
@@ -81,7 +84,7 @@ def cmd_record_show(
         else:
             print_stdout(render_record_report_human(report))
     except OpalError as e:
-        opal_error("run", e)
+        opal_error("record-show", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("record-show", e)

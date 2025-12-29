@@ -23,6 +23,7 @@ from ._common import (
     internal_error,
     json_out,
     opal_error,
+    print_config_context,
     resolve_config_path,
     store_from_cfg,
 )
@@ -36,6 +37,8 @@ def cmd_init(
     try:
         cfg_path = resolve_config_path(config)
         cfg = load_config(cfg_path)
+        if not json:
+            print_config_context(cfg_path, cfg=cfg)
         workdir = Path(cfg.campaign.workdir)
         ensure_dir(workdir / "outputs")
         ensure_dir(workdir / "inputs")
@@ -95,7 +98,7 @@ def cmd_init(
         else:
             print_stdout(render_init_human(workdir=Path(out["workdir"])))
     except OpalError as e:
-        opal_error("run", e)
+        opal_error("init", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("init", e)

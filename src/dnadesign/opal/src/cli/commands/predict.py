@@ -20,7 +20,7 @@ from ...predict import run_predict_ephemeral
 from ...state import CampaignState
 from ...utils import ExitCodes, OpalError, print_stdout
 from ..registry import cli_command
-from ._common import internal_error, load_cli_config, opal_error, store_from_cfg
+from ._common import internal_error, load_cli_config, opal_error, resolve_config_path, store_from_cfg
 
 
 @cli_command("predict", help="Ephemeral inference with a frozen model; no write-backs.")
@@ -63,7 +63,7 @@ def cmd_predict(
     ),
 ):
     try:
-        cfg = load_cli_config(config)
+        cfg = load_cli_config(resolve_config_path(config))
         store = store_from_cfg(cfg)
         # Resolve model_path if not provided
         if model_path is None:
@@ -123,7 +123,7 @@ def cmd_predict(
             df_out["y_pred_vec"] = df_out["y_pred_vec"].map(lambda v: _json.dumps(v))
             print_stdout(df_out.to_csv(index=False))
     except OpalError as e:
-        opal_error("run", e)
+        opal_error("predict", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("predict", e)

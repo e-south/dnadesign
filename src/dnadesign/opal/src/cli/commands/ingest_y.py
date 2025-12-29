@@ -36,6 +36,7 @@ from ._common import (
     json_out,
     load_cli_config,
     opal_error,
+    print_config_context,
     resolve_config_path,
     store_from_cfg,
 )
@@ -52,7 +53,7 @@ def cmd_ingest_y(
         "--round",
         "-r",
         "--observed-round",
-        help="Observed round to stamp on these labels (alias: --observed-round)",
+        help="Observed round stamp for these labels (writes to label history).",
     ),
     csv: Path = typer.Option(..., "--csv", "--in", help="CSV/Parquet with raw reads"),
     transform: str = typer.Option(None, "--transform", help="Override YAML transform name"),
@@ -68,9 +69,11 @@ def cmd_ingest_y(
 ):
     try:
         cfg_path = resolve_config_path(config)
-        cfg = load_cli_config(config)
+        cfg = load_cli_config(cfg_path)
         store: RecordsStore = store_from_cfg(cfg)
         df = store.load()
+        if not json:
+            print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
 
         # Resolve and read input file
         csv_path = Path(csv)
@@ -224,7 +227,7 @@ def cmd_ingest_y(
                 )
             )
     except OpalError as e:
-        opal_error("run", e)
+        opal_error("ingest-y", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("ingest-y", e)

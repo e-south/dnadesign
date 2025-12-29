@@ -19,7 +19,7 @@ from typing import Optional
 
 import typer
 
-from ...utils import ExitCodes, OpalError, print_stderr
+from ...utils import ExitCodes, OpalError, print_stderr, print_stdout
 
 try:
     import numpy as _np
@@ -30,24 +30,42 @@ from ...config import LocationLocal, LocationUSR, RootConfig
 from ...data_access import RecordsStore
 
 
-def resolve_config_path(opt: Optional[Path]) -> Path:
+def resolve_config_path(opt: Optional[Path], *, allow_dir: bool = False) -> Path:
     CAND_NAMES = tuple((os.getenv("OPAL_CONFIG_NAMES") or "campaign.yaml,campaign.yml,opal.yaml,opal.yml").split(","))
+    env = os.getenv("OPAL_CONFIG")
+    env_path: Optional[Path] = None
+    if env:
+        env_path = Path(env).expanduser()
+        env_path = env_path if env_path.is_absolute() else (Path.cwd() / env_path)
+        env_path = env_path.resolve()
+
     if opt:
         p = Path(opt).expanduser()
         p = p if p.is_absolute() else (Path.cwd() / p)
         p = p.resolve()
         if not p.exists():
+            if env_path is not None and env_path == p:
+                raise OpalError(f"$OPAL_CONFIG points to a missing path: {p}", ExitCodes.BAD_ARGS)
             raise OpalError(
                 f"Config path not found: {p}. Tip: from a campaign folder run `opal <cmd>` or pass `-c campaign.yaml`.",
                 ExitCodes.BAD_ARGS,
             )
+        if p.is_dir() and not allow_dir:
+            if env_path is not None and env_path == p:
+                raise OpalError(f"$OPAL_CONFIG points to a directory (expected campaign YAML): {p}", ExitCodes.BAD_ARGS)
+            raise OpalError(
+                f"Config path is a directory: {p}. Expected a campaign YAML (e.g., campaign.yaml).",
+                ExitCodes.BAD_ARGS,
+            )
         return p
 
-    env = os.getenv("OPAL_CONFIG")
     if env:
-        p = Path(env).expanduser()
-        if p.exists():
-            return p.resolve()
+        p = env_path or Path(env).expanduser().resolve()
+        if not p.exists():
+            raise OpalError(f"$OPAL_CONFIG points to a missing path: {p}", ExitCodes.BAD_ARGS)
+        if p.is_dir():
+            raise OpalError(f"$OPAL_CONFIG points to a directory (expected campaign YAML): {p}", ExitCodes.BAD_ARGS)
+        return p
 
     cur = Path.cwd()
     # 2a) Prefer marker: .opal/config
@@ -55,11 +73,20 @@ def resolve_config_path(opt: Optional[Path]) -> Path:
         marker = base / ".opal" / "config"
         if marker.exists():
             txt = marker.read_text().strip()
+            if not txt:
+                raise OpalError(f"Marker file is empty: {marker}", ExitCodes.BAD_ARGS)
             p = Path(txt)
             if not p.is_absolute():
-                p = (marker.parent / p).resolve()
-            if p.exists():
-                return p
+                # Marker paths are defined relative to the campaign workdir
+                p = (marker.parent.parent / p).resolve()
+            if not p.exists():
+                raise OpalError(
+                    f"Marker points to missing config: {p} (from {marker}).",
+                    ExitCodes.BAD_ARGS,
+                )
+            if p.is_dir():
+                raise OpalError(f"Marker points to a directory (expected campaign YAML): {p}", ExitCodes.BAD_ARGS)
+            return p
     # 2b) Otherwise look for common YAML names, nearest first
     for base in (cur, *cur.parents):
         for name in CAND_NAMES:
@@ -118,16 +145,12 @@ def _format_validation_error(e, cfg_path: Path) -> str:
         lines.append(f"    type: {typ}")
         lines.append(f"    detail: {msg}")
 
-        # Assertive, context-specific hint: extra key under model.params for RF
+        # Assertive, plugin-agnostic hint for unknown model params
         if typ == "extra_forbidden" and loc_str.startswith("model.params."):
-            bad_key = loc[-1] if loc else "<?>"
-            lines.append("    hint: Remove this key; it is not a valid RandomForest parameter.")
-            lines.append("          Typical params include: n_estimators, criterion, bootstrap,")
-            lines.append("          oob_score, random_state, n_jobs, max_depth, min_samples_split,")
-            lines.append("          min_samples_leaf, max_features, max_leaf_nodes,")
-            lines.append("          min_impurity_decrease, ccp_alpha, warm_start.")
-            if str(bad_key) == "emit_feature_importance":
-                lines.append("          To export importances, run: opal model-show --out-dir <dir>")
+            lines.append(
+                "    hint: Unknown model parameter. Check the configured model plugin schema "
+                "(see config/plugin_schemas.py or the model's README) and remove or rename this key."
+            )
 
     return "\n".join(lines)
 
@@ -186,6 +209,19 @@ def store_from_cfg(cfg: RootConfig) -> RecordsStore:
         x_transform_name=cfg.data.transforms_x.name,
         x_transform_params=cfg.data.transforms_x.params,
     )
+
+
+def print_config_context(cfg_path: Path, *, cfg: RootConfig | None = None, records_path: Path | None = None) -> None:
+    """
+    Human output helper: echo resolved config + workdir (and records path if known).
+    Avoid in JSON output to keep streams machine-readable.
+    """
+    parts = [f"Config: {Path(cfg_path).resolve()}"]
+    if cfg is not None:
+        parts.append(f"Workdir: {Path(cfg.campaign.workdir).resolve()}")
+    if records_path is not None:
+        parts.append(f"Records: {Path(records_path).resolve()}")
+    print_stdout(" | ".join(parts))
 
 
 def _json_default(o):

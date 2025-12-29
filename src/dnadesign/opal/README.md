@@ -92,6 +92,11 @@ opal prune-source -c path/to/campaign.yaml --scope campaign
 
 ```
 
+**Round terminology**
+
+- **observed_round**: the round stamp recorded when labels are ingested (`opal ingest-y`).
+- **labels-as-of**: the training cutoff used by `opal run`/`opal explain` (uses labels with `observed_round ≤ R`).
+
 ### What gets saved
 
 * **Per-round**
@@ -110,6 +115,7 @@ opal prune-source -c path/to/campaign.yaml --scope campaign
     - Plugin configs, counts, objective summaries, artifact hashes, versions.
   * `outputs/ledger.predictions/`
     - Ŷ vector, scalar score, selection rank/flag, and row-level diagnostics (e.g., logic fidelity/effects).
+    - `pred__y_hat_model` is **objective-space** (after any Y-ops inversion), so downstream logic is plugin-agnostic.
   * `outputs/ledger.labels.parquet`
     - 1 row per label event (observed round, id, y).
 
@@ -164,6 +170,9 @@ Common commands (details in the **[CLI Manual](./src/cli/README.md)**):
 * `opal log` — summarize `round.log.jsonl` for a round
 * `opal prune-source` — remove OPAL-derived columns from records.parquet (start fresh)
 
+All commands are **registry-driven** and plugin-agnostic: they operate on your configured
+plugin names and enforce only declared contracts (transforms/models/objectives/selections).
+
 ---
 
 ### Campaign layout
@@ -191,6 +200,7 @@ Common commands (details in the **[CLI Manual](./src/cli/README.md)**):
 
 > **Note:** sequences usually live in USR datasets under
 > `src/dnadesign/usr/datasets/<dataset>/records.parquet` and are not copied into campaigns.
+> **Note:** `state.json` is a run artifact; do not hand‑edit it.
 
 ---
 
@@ -357,6 +367,17 @@ OPAL is **assertive by default**: it will fail fast on inconsistent inputs rathe
 **Y (labels):** Arrow `list<float>`; label history is append-only JSON in `opal__<campaign>__label_hist`.
 
 Naming: secondary columns follow `<tool>__<field>`.
+
+**Records cache columns (OPAL‑managed)**
+
+| column                              | type                    | purpose                                  |
+| ----------------------------------- | ----------------------- | ---------------------------------------- |
+| `opal__<slug>__label_hist`          | list<struct{r,ts,src,y}> | append‑only label history (SSoT)         |
+| `opal__<slug>__latest_as_of_round`  | int                     | last scored round for each record         |
+| `opal__<slug>__latest_pred_scalar`  | double                  | latest objective scalar cache             |
+
+These caches are **derived** and can be recomputed; canonical records live in ledger sinks.
+Use `opal prune-source` to remove OPAL‑derived columns (including the Y column) when you need to start fresh.
 
 ---
 

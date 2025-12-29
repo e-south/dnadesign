@@ -24,6 +24,7 @@ from ._common import (
     json_out,
     load_cli_config,
     opal_error,
+    print_config_context,
     resolve_config_path,
     store_from_cfg,
 )
@@ -40,10 +41,12 @@ def cmd_label_hist(
     json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)."),
 ) -> None:
     try:
-        _ = resolve_config_path(config)
-        cfg = load_cli_config(config)
+        cfg_path = resolve_config_path(config)
+        cfg = load_cli_config(cfg_path)
         store = store_from_cfg(cfg)
         df = store.load()
+        if not json:
+            print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
 
         action = str(action).strip().lower()
         if action in ("validate", "check"):
@@ -72,7 +75,7 @@ def cmd_label_hist(
         else:
             print_stdout(kv_block("label-hist", out))
     except OpalError as e:
-        opal_error("run", e)
+        opal_error("label-hist", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("label-hist", e)
