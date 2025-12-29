@@ -31,6 +31,7 @@ class PreflightReport:
     manual_attach_ids: List[str] = None
     manual_attach_count: int = 0
     backfill: Dict[str, int] | None = None
+    warnings: List[str] | None = None
 
 
 def _vector_len(v) -> Optional[int]:
@@ -52,6 +53,7 @@ def preflight_run(
         manual_attach_ids=[],
         manual_attach_count=0,
         backfill={"checked": 0, "backfilled": 0},
+        warnings=[],
     )
     # essentials present
     missing = [c for c in ESSENTIAL_COLS if c not in df.columns]
@@ -102,6 +104,10 @@ def preflight_run(
             rep.backfill["backfilled"] = len(to_attach)
             rep.manual_attach_ids = ids
             rep.manual_attach_count = len(ids)
+        elif to_attach and not auto_backfill:
+            rep.manual_attach_ids = [t[0] for t in to_attach]
+            rep.manual_attach_count = len(to_attach)
+            rep.warnings.append("manual_labels_present_without_label_hist")
 
     # Optional consistency check
     if fail_on_mixed_biotype_or_alphabet:

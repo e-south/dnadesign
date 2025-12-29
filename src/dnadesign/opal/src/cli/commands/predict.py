@@ -10,6 +10,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import json as _json
 from pathlib import Path
 
 import pandas as pd
@@ -48,6 +49,13 @@ def cmd_predict(
     ),
     input_path: Path = typer.Option(None, "--in", help="Optional input parquet/csv; defaults to records.parquet"),
     out_path: Path = typer.Option(None, "--out", help="Optional output parquet/csv; defaults to stdout CSV"),
+    id_col: str = typer.Option("id", "--id-col", help="ID column name in input table."),
+    sequence_col: str = typer.Option("sequence", "--sequence-col", help="Sequence column name in input table."),
+    generate_id_from_sequence: bool = typer.Option(
+        False,
+        "--generate-id-from-sequence",
+        help="Generate deterministic ids from sequence when id column is missing.",
+    ),
 ):
     try:
         cfg = load_cli_config(config)
@@ -83,8 +91,6 @@ def cmd_predict(
             raise OpalError(f"Input missing X column: {cfg.data.x_column_name}")
         params_obj = None
         if model_params:
-            import json as _json
-
             params_obj = _json.loads(model_params.read_text())
             if not model_name:
                 raise OpalError("Use --model-name with --model-params.")
@@ -94,15 +100,22 @@ def cmd_predict(
             model_path,
             model_name=model_name,
             model_params=params_obj,
+            id_column=id_col,
+            sequence_column=sequence_col,
+            generate_id_from_sequence=generate_id_from_sequence,
         )
         if out_path:
             if out_path.suffix.lower() == ".csv":
-                preds.to_csv(out_path, index=False)
+                df_out = preds.copy()
+                df_out["y_pred_vec"] = df_out["y_pred_vec"].map(lambda v: _json.dumps(v))
+                df_out.to_csv(out_path, index=False)
             else:
                 preds.to_parquet(out_path, index=False)
             print_stdout(f"Wrote predictions: {out_path}")
         else:
-            print_stdout(preds.to_csv(index=False))
+            df_out = preds.copy()
+            df_out["y_pred_vec"] = df_out["y_pred_vec"].map(lambda v: _json.dumps(v))
+            print_stdout(df_out.to_csv(index=False))
     except OpalError as e:
         opal_error("run", e)
         raise typer.Exit(code=e.exit_code)

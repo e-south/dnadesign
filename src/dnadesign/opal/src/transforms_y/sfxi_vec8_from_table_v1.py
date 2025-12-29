@@ -74,12 +74,6 @@ def sfxi_vec8_from_table_v1(
     if id_col and id_col in csv_df.columns:
         out["id"] = csv_df[id_col].astype(str)
 
-    # Deduplicate by (id) or sequence — keep the first occurrence
-    if "id" in out.columns:
-        out = out.drop_duplicates(subset=["id"], keep="first")
-    else:
-        out = out.drop_duplicates(subset=["sequence"], keep="first")
-
-    # Reorder columns for downstream convenience
+    # Reorder columns for downstream convenience (dedup is handled by ingest policy)
     cols = ["id", "sequence", "y"] if "id" in out.columns else ["sequence", "y"]
     return out[cols]

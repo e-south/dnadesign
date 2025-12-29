@@ -171,6 +171,8 @@ def render_explain_human(info: Mapping[str, Any]) -> str:
         {
             "training labels used": info.get("number_of_training_examples_used_in_round"),
             "candidates scored": info.get("number_of_candidates_scored_in_round"),
+            "candidate pool total": info.get("candidate_pool_total"),
+            "candidate pool filtered out": info.get("candidate_pool_filtered_out"),
         },
     )
 
@@ -197,6 +199,10 @@ def render_ingest_preview_human(
             "y_expected_length": p.get("y_expected_length"),
             "y_length_ok (sampled)": p.get("y_length_ok"),
             "y_length_bad (sampled)": p.get("y_length_bad"),
+            "duplicate policy": p.get("duplicate_policy"),
+            "duplicate key": p.get("duplicate_key"),
+            "duplicates found": p.get("duplicates_found"),
+            "duplicates dropped": p.get("duplicates_dropped"),
             "warnings": ", ".join(p.get("warnings") or []) or "(none)",
         },
     )

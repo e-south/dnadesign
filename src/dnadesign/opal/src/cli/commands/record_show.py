@@ -14,8 +14,10 @@ from pathlib import Path
 
 import typer
 
+from ...ledger import LedgerReader
 from ...record_show import build_record_report
 from ...utils import ExitCodes, OpalError, print_stdout
+from ...workspace import CampaignWorkspace
 from ..formatting import render_record_report_human
 from ..registry import cli_command
 from ._common import (
@@ -23,6 +25,7 @@ from ._common import (
     json_out,
     load_cli_config,
     opal_error,
+    resolve_config_path,
     store_from_cfg,
 )
 
@@ -37,9 +40,11 @@ def cmd_record_show(
     id: str = typer.Option(None, "--id"),
     sequence: str = typer.Option(None, "--sequence"),
     with_sequence: bool = typer.Option(True, "--with-sequence/--no-sequence"),
+    legacy: bool = typer.Option(False, "--legacy", help="Read from legacy events.parquet (deprecated)."),
     json: bool = typer.Option(False, "--json"),
 ):
     try:
+        cfg_path = resolve_config_path(config)
         cfg = load_cli_config(config)
         store = store_from_cfg(cfg)
         df = store.load()
@@ -60,16 +65,15 @@ def cmd_record_show(
             else:
                 raise OpalError("Record not found for key; use --id or --sequence explicitly.")
 
-        base = Path(cfg.campaign.workdir) / "outputs"
-
-        # Prefer typed ledger sinks; fall back to legacy only if explicitly present
-        candidates = [
-            base / "ledger.predictions",  # directory of parts
-            base / "events.parquet",  # legacy index
-        ]
-        ev_path = next((p for p in candidates if p.exists()), None)
-        if ev_path is None:
-            raise OpalError(f"No ledger predictions found under {base}. Run a round first.")
+        ws = CampaignWorkspace.from_config(cfg, cfg_path)
+        ledger_reader = None
+        legacy_path = None
+        if legacy:
+            legacy_path = ws.outputs_dir / "events.parquet"
+            if not legacy_path.exists():
+                raise OpalError(f"Legacy events.parquet not found at {legacy_path}.")
+        else:
+            ledger_reader = LedgerReader(ws)
 
         report = build_record_report(
             df,
@@ -77,7 +81,8 @@ def cmd_record_show(
             id_=id,
             sequence=sequence,
             with_sequence=with_sequence,
-            events_path=ev_path if ev_path else None,
+            ledger_reader=ledger_reader,
+            legacy_events_path=legacy_path,
             records_path=store.records_path,
         )
         if json:

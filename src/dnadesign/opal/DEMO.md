@@ -50,7 +50,7 @@ mkdir -p inputs/r0/
 cp ../../../usr/demo_material/demo_y_sfxi.csv inputs/r0/
 
 # 3) Ingest round 0 labels
-opal ingest-y -c campaign.yaml --observed-round 0 --csv inputs/r0/y_sfxi_pES1-12p.csv
+opal ingest-y -c campaign.yaml --observed-round 0 --csv inputs/r0/demo_y_sfxi.csv
 
 # 4) Train, score, select for round 0
 opal run -c campaign.yaml --labels-as-of 0
@@ -95,7 +95,7 @@ opal explain     -c campaign.yaml --round 1
 If the label CSV has **no** `id`, OPAL will:
 
 1. Match by `sequence` to existing rows and append a new round label.
-2. **Fail fast** if that sequence already has labels for this campaign (immutability).
+2. If the **same round** already exists, behavior follows `--if-exists` (default: fail).
 3. Create a new row (essentials + generated `id`) if the sequence is new.
 
 ---
@@ -108,7 +108,7 @@ If the label CSV has **no** `id`, OPAL will:
 campaign:
   name: "Demo (vec8)"
   slug: "demo"
-  workdir: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/opal/campaigns/demo"
+  workdir: "."
 
 data:
   # Use the "demo" usr records.parquet file included in the repo.
@@ -116,6 +116,9 @@ data:
   x_column_name: "mock__X_value"
   y_column_name: "mock__y_label"
   y_expected_length: 8
+
+ingest:
+  duplicate_policy: "error"
 
 metadata:
   notes: "Demo campaign for OPAL using SFXI (vec8) and identity X."

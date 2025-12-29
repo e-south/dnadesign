@@ -20,11 +20,12 @@ from typing import Optional
 import pandas as pd
 import typer
 
-from ...artifacts import append_events, events_path
 from ...data_access import RecordsStore
 from ...ingest import run_ingest
+from ...ledger import LedgerWriter
 from ...locks import CampaignLock
 from ...utils import ExitCodes, OpalError, print_stdout
+from ...workspace import CampaignWorkspace
 from ...writebacks import build_label_events
 from ..formatting import render_ingest_commit_human, render_ingest_preview_human
 from ..registry import cli_command
@@ -33,6 +34,7 @@ from ._common import (
     json_out,
     load_cli_config,
     opal_error,
+    resolve_config_path,
     store_from_cfg,
 )
 
@@ -63,6 +65,7 @@ def cmd_ingest_y(
     json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
 ):
     try:
+        cfg_path = resolve_config_path(config)
         cfg = load_cli_config(config)
         store: RecordsStore = store_from_cfg(cfg)
         df = store.load()
@@ -89,6 +92,7 @@ def cmd_ingest_y(
             transform_params=t_params,
             y_expected_length=cfg.data.y_expected_length,
             y_column_name=cfg.data.y_column_name,
+            duplicate_policy=cfg.ingest.duplicate_policy,
         )
 
         # Preview
@@ -177,7 +181,8 @@ def cmd_ingest_y(
                 src="ingest_y",
                 note=None,
             )
-            append_events(events_path(Path(cfg.campaign.workdir)), events)
+            ws = CampaignWorkspace.from_config(cfg, cfg_path)
+            LedgerWriter(ws).append_label(events)
 
         out = {
             "ok": True,

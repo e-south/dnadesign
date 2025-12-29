@@ -24,6 +24,8 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from .preflight import preflight_run
+from .round_plan import plan_round
+from .utils import OpalError
 
 
 def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
@@ -35,17 +37,15 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
         cfg.safety.fail_on_mixed_biotype_or_alphabet,
         auto_backfill=False,
     )
+    if rep.manual_attach_count:
+        raise OpalError(
+            f"Detected {rep.manual_attach_count} labels in '{store.y_col}' without label_hist. "
+            "Run `opal ingest-y` or `opal label-hist repair` before explaining a round."
+        )
+    store.validate_label_hist(df, require=True)
+
     # Derive counts the same way 'run' does
-    policy = cfg.training.policy or {}
-    cumulative_training = bool(policy.get("cumulative_training", True))
-    dedup_policy = str(policy.get("label_cross_round_deduplication_policy", "latest_only"))
-    train_df = store.training_labels_with_round(
-        df,
-        round_k,
-        cumulative_training=cumulative_training,
-        dedup_policy=dedup_policy,
-    )
-    cand_df = store.candidate_universe(df, round_k)
+    plan = plan_round(store, df, cfg, round_k, warnings=list(rep.warnings or []))
 
     info = {
         "round_index": round_k,
@@ -54,7 +54,7 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
         "representation_vector_dimension": rep.x_dim,
         "model": {"name": cfg.model.name, "params": cfg.model.params},
         "training_policy": cfg.training.policy,
-        "training_label_dedup_policy": dedup_policy,
+        "training_label_dedup_policy": plan.training_dedup_policy,
         "training_y_ops": [{"name": p.name, "params": p.params} for p in (cfg.training.y_ops or [])],
         "selection": {
             "strategy": cfg.selection.selection.name,
@@ -64,8 +64,10 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
                 "params": cfg.objective.objective.params,
             },
         },
-        "number_of_training_examples_used_in_round": int(len(train_df)),
-        "number_of_candidates_scored_in_round": int(len(cand_df)),
-        "warnings": getattr(rep, "warnings", []),
+        "number_of_training_examples_used_in_round": int(len(plan.training_df)),
+        "number_of_candidates_scored_in_round": int(len(plan.candidate_df)),
+        "candidate_pool_total": int(plan.candidate_total_before_filter),
+        "candidate_pool_filtered_out": int(plan.candidate_filtered_out),
+        "warnings": list(plan.warnings or []),
     }
     return info
