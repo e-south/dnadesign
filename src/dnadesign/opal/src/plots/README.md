@@ -19,7 +19,7 @@ plots:
   - name: score_vs_rank_latest        # unique instance label
     kind: scatter_score_vs_rank       # plugin id registered in plots registry
 
-    # Optional extra sources (built-ins auto-injected: records, artifacts)
+    # Optional extra sources (built-ins auto-injected: records, outputs)
     data:
       - name: extra_csv
         path: ./extras/scores.csv
@@ -32,7 +32,7 @@ plots:
 
     # Optional output tuning
     output:
-      dir: "{campaign}/plots/{kind}/{name}"
+      dir: "{campaign}/plots/{kind}/{name}"  # {campaign|workdir|kind|name|round_suffix}
       filename: "{name}{round_suffix}.png"
       dpi: 600
       format: "png"                   # png|svg|pdf (png default)
@@ -42,7 +42,10 @@ plots:
 **Built-ins injected** (resolved from the campaign config):
 
 * `records` → resolved from `data.location` in `campaign.yaml`
-* `artifacts` → `<campaign>/artifacts/`
+* `outputs` → campaign `outputs/` directory
+* `ledger_predictions_dir` → `outputs/ledger.predictions/`
+* `ledger_runs_parquet` → `outputs/ledger.runs.parquet`
+* `ledger_labels_parquet` → `outputs/ledger.labels.parquet`
 
 Ledger sinks always live under `context.workspace.outputs_dir` (e.g., `outputs/ledger.*`).
 

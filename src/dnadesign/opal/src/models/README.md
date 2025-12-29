@@ -101,6 +101,7 @@ models:
 
 * Scaling is a training‑time aid only; all reported predictions are in original units.
 * `std_vec` is tree dispersion (not calibrated probability).
+* `model_meta.json` now records `training__y_ops` so prediction can enforce Y‑ops inversion.
 
 #### Runtime carrier contracts
 

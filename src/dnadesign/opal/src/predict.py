@@ -36,9 +36,31 @@ from .round_context import PluginRegistryView, RoundCtx
 from .utils import ExitCodes, OpalError
 
 
-def _inverse_yops_if_present(yhat: np.ndarray, model_path: Path) -> np.ndarray:
+def _model_meta_has_y_ops(meta_path: Path) -> bool:
+    if not meta_path.exists():
+        return False
+    try:
+        meta = json.loads(meta_path.read_text())
+    except Exception:
+        return False
+    yops = meta.get("training__y_ops") or meta.get("y_ops") or []
+    return bool(yops)
+
+
+def _inverse_yops_if_present(
+    yhat: np.ndarray,
+    model_path: Path,
+    *,
+    require_ctx_if_yops: bool,
+    y_ops_declared: bool,
+) -> np.ndarray:
     ctx_path = model_path.parent / "round_ctx.json"
     if not ctx_path.exists():
+        if require_ctx_if_yops and y_ops_declared:
+            raise OpalError(
+                "round_ctx.json is missing next to the model, but training used Y-ops. "
+                "Provide --assume-no-yops to bypass inversion or copy the round_ctx.json alongside the model."
+            )
         return yhat
     try:
         ctx_data: Dict[str, Any] = json.loads(ctx_path.read_text())
@@ -64,6 +86,7 @@ def run_predict_ephemeral(
     id_column: str = "id",
     sequence_column: str = "sequence",
     generate_id_from_sequence: bool = False,
+    assume_no_yops: bool = False,
 ) -> pd.DataFrame:
     meta_path = model_path.parent / "model_meta.json"
     if model_name is None:
@@ -122,7 +145,13 @@ def run_predict_ephemeral(
         )
 
     yhat = mdl.predict(X)
-    yhat = _inverse_yops_if_present(yhat, Path(model_path))
+    y_ops_declared = _model_meta_has_y_ops(meta_path)
+    yhat = _inverse_yops_if_present(
+        yhat,
+        Path(model_path),
+        require_ctx_if_yops=not assume_no_yops,
+        y_ops_declared=y_ops_declared,
+    )
 
     # normalize to list for dataframe export (list[float], parquet-friendly)
     y_list = [list(map(float, row)) if yhat.ndim == 2 else [float(row)] for row in yhat]

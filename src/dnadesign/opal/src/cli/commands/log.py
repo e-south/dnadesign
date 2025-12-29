@@ -1,0 +1,67 @@
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/cli/commands/log.py
+
+Summarize round.log.jsonl for a given round.
+
+Module Author(s): Eric J. South
+Dunlop Lab
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Optional
+
+import typer
+
+from ...state import CampaignState
+from ...summary import load_round_log, summarize_round_log
+from ...utils import ExitCodes, OpalError, print_stdout
+from ...workspace import CampaignWorkspace
+from ..formatting import render_round_log_summary_human
+from ..registry import cli_command
+from ._common import internal_error, json_out, load_cli_config, opal_error, resolve_config_path
+
+
+def _resolve_round_index(ws: CampaignWorkspace, round_sel: Optional[str]) -> int:
+    sel = (round_sel or "latest").strip().lower()
+    if sel in ("latest", "unspecified"):
+        st = CampaignState.load(ws.state_path)
+        if not st.rounds:
+            raise OpalError("state.json has no recorded rounds.")
+        return int(max(r.round_index for r in st.rounds))
+    try:
+        return int(sel)
+    except Exception as e:
+        raise OpalError("Invalid --round: must be an integer or 'latest'.") from e
+
+
+@cli_command("log", help="Summarize round.log.jsonl for a given round.")
+def cmd_log(
+    config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
+    round: Optional[str] = typer.Option("latest", "--round", "-r"),
+    json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)."),
+) -> None:
+    try:
+        cfg_path = resolve_config_path(config)
+        cfg = load_cli_config(cfg_path)
+        ws = CampaignWorkspace.from_config(cfg, cfg_path)
+        r = _resolve_round_index(ws, round)
+        path = ws.round_dir(r) / "round.log.jsonl"
+        events = load_round_log(path)
+        summary = summarize_round_log(events)
+        summary["round_index"] = int(r)
+        summary["path"] = str(path.resolve())
+        if json:
+            json_out(summary)
+        else:
+            print_stdout(render_round_log_summary_human(summary))
+    except OpalError as e:
+        opal_error("log", e)
+        raise typer.Exit(code=e.exit_code)
+    except Exception as e:
+        internal_error("log", e)
+        raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)

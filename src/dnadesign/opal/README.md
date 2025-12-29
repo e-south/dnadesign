@@ -78,11 +78,17 @@ opal run -c path/to/campaign.yaml --round 0
 
 # 5) Inspect progress
 opal status -c path/to/campaign.yaml
+opal status -c path/to/campaign.yaml --with-ledger
+opal runs list -c path/to/campaign.yaml
+opal log -c path/to/campaign.yaml --round latest
 opal record-show -c path/to/campaign.yaml --id <some_id>
 opal explain -c path/to/campaign.yaml --round 1
 opal plot -c path/to/campaign.yaml
-opal predict -c path/to/campaign.yaml --round latest  # or --model-path
+opal predict -c path/to/campaign.yaml               # uses latest round
 opal objective-meta -c campaign.yaml --round latest
+
+# (Optional) Start fresh: remove OPAL-derived columns from records.parquet
+opal prune-source -c path/to/campaign.yaml --scope campaign
 
 ```
 
@@ -123,7 +129,7 @@ src/dnadesign/opal/src/
 ├─ cli/                     # CLI app + command registry
 │  ├─ app.py                # Typer entrypoint
 │  ├─ registry.py           # auto-discovers and mounts commands
-│  └─ commands/             # run, ingest_y, predict, explain, record_show, status, validate, init, plot
+│  └─ commands/             # run, ingest_y, predict, explain, record_show, status, runs, log, validate, init, plot, prune-source
 ├─ config/                  # YAML loader + plugin param schemas (Pydantic)
 ├─ registries/              # transforms_x, transforms_y, models, objectives, selections, plot
 ├─ transforms_x/            # X transforms (import = register)
@@ -152,6 +158,9 @@ Common commands (details in the **[CLI Manual](./src/cli/README.md)**):
 * `opal validate` — table checks (essentials + X present; Y sane if present)
 * `opal plot` — run campaign-declared plots
 * `opal ctx` — inspect `round_ctx.json` carriers (show/audit/diff)
+* `opal runs` — list or show ledger run_meta entries
+* `opal log` — summarize `round.log.jsonl` for a round
+* `opal prune-source` — remove OPAL-derived columns from records.parquet (start fresh)
 
 ---
 
@@ -308,6 +317,7 @@ def my_objective_plugin(..., ctx=None, train_view=None): ...
 4. Runner checks **`produces`**; on success, writes `round_ctx.json`.
 
 Use `opal ctx show|audit|diff` to inspect these carriers directly.
+Use `opal log --round <k|latest>` to summarize `round.log.jsonl`.
 
 ---
 

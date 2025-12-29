@@ -125,14 +125,18 @@ opal predict \
   [--in <csv|parquet>] \
   [--id-col <name> --sequence-col <name>] \
   [--generate-id-from-sequence] \
+  [--assume-no-yops] \
   [--out <csv|parquet>]
 ```
 
 * Scores your input table (defaults to `records.parquet`).
+* Omit `--round` to use the latest completed round.
 * Writes to stdout as CSV by default; or to `--out` (Parquet keeps vectors as list<float>).
 * Validates the X column exists.
 * Requires `model_meta.json` next to the model; use `--model-name/--model-params` if missing.
 * If your input lacks an id column, use `--generate-id-from-sequence` (requires a sequence column).
+* If training used **Y‑ops**, `round_ctx.json` must be present next to the model to invert them.
+  Use `--assume-no-yops` only if you are sure no Y‑ops should be applied.
 
 ### `record-show`
 
@@ -201,6 +205,24 @@ opal status --config <yaml> [--round <k> | --all] [--json]
 * Default: latest round summary.
 * `--round k`: specific round details.
 * `--all`: dump every round (JSON-friendly).
+* `--with-ledger`: include ledger run_meta summaries in output.
+
+### `runs`
+
+List or inspect `run_meta` entries from `outputs/ledger.runs.parquet`.
+
+```
+opal runs list --config <yaml> [--round <k|latest>] [--json]
+opal runs show --config <yaml> [--round <k|latest> | --run-id <rid>] [--json]
+```
+
+### `log`
+
+Summarize `round.log.jsonl` for a round.
+
+```
+opal log --config <yaml> [--round <k|latest>] [--json]
+```
 
 ### `validate`
 
@@ -236,6 +258,7 @@ opal plot --config <yaml-or-dir> [--round <selector>] [--name <plot-name>]
 * `--round <selector>`: `latest | all | 3 | 1,3,7 | 2-5` (plugin may define defaults).
 * `--name <plot-name>`: run a single plot by name; omit to run **all**.
 * Overwrites files by default; continues on error; exit code **1** if any plot failed.
+* Output directory defaults to `outputs/plots`, or honor `output.dir` if provided.
 
 **Campaign YAML (example)**
 
@@ -250,7 +273,7 @@ plots:
     output:
       format: "png"                       # png/svg/pdf
       dpi: 600
-      dir: "{campaign}/plots/{kind}/{name}"
+      dir: "{campaign}/plots/{kind}/{name}"  # {campaign|workdir|kind|name|round_suffix}
       filename: "{name}{round_suffix}.png"
 ```
 
@@ -261,6 +284,14 @@ Plot plugins typically read from the campaign’s **ledger sinks** under `output
 data:
   - name: extra_csv
     path: ./extras/scores.csv
+```
+
+### `prune-source`
+
+Remove OPAL-derived columns (`opal__*`) and the configured Y column from `records.parquet`.
+
+```
+opal prune-source --config <yaml> [--scope any|campaign] [--keep <col> ...] [--yes] [--no-backup]
 ```
 
 ---
@@ -374,7 +405,9 @@ opal/src/cli/
     _common.py      # resolve_config_path, store_from_cfg, json_out, internal_error
     init.py
     ingest_y.py
+    log.py
     run.py
+    runs.py
     explain.py
     predict.py
     model_show.py
@@ -384,6 +417,7 @@ opal/src/cli/
     validate.py
     label_hist.py
     plot.py
+    prune-source.py
 ```
 
 *One command = one job.* Business logic stays in application modules.

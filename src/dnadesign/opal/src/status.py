@@ -21,6 +21,7 @@ from typing import Any, Dict, Optional
 @dataclass
 class _RoundLite:
     round_index: int
+    run_id: str
     number_of_training_examples_used_in_round: int
     number_of_candidates_scored_in_round: int
     selection_top_k_requested: int
@@ -39,7 +40,14 @@ def _coalesce(d: Dict[str, Any], *keys, default=None):
     return default
 
 
-def build_status(state_path: Path, round_k: Optional[int] = None, show_all: bool = False) -> Dict[str, Any]:
+def build_status(
+    state_path: Path,
+    round_k: Optional[int] = None,
+    show_all: bool = False,
+    *,
+    ledger_reader=None,
+    include_ledger: bool = False,
+) -> Dict[str, Any]:
     if not state_path.exists():
         return {"error": f"state.json not found: {state_path}"}
 
@@ -66,6 +74,7 @@ def build_status(state_path: Path, round_k: Optional[int] = None, show_all: bool
     def _lite(r: Dict[str, Any]) -> _RoundLite:
         return _RoundLite(
             round_index=int(r.get("round_index", -1)),
+            run_id=str(r.get("run_id", "")),
             number_of_training_examples_used_in_round=int(r.get("number_of_training_examples_used_in_round", 0)),
             number_of_candidates_scored_in_round=int(r.get("number_of_candidates_scored_in_round", 0)),
             selection_top_k_requested=int(r.get("selection_top_k_requested", 0)),
@@ -88,5 +97,53 @@ def build_status(state_path: Path, round_k: Optional[int] = None, show_all: bool
 
     if show_all:
         out["rounds"] = [asdict(_lite(r)) for r in rounds_sorted]
+
+    if include_ledger:
+        if ledger_reader is None:
+            raise ValueError("include_ledger=True requires a ledger_reader")
+
+        def _ledger_summary_for_round(as_of_round: int) -> Optional[Dict[str, Any]]:
+            try:
+                runs = ledger_reader.read_runs(
+                    columns=[
+                        "run_id",
+                        "as_of_round",
+                        "model__name",
+                        "objective__name",
+                        "selection__name",
+                        "training__y_ops",
+                        "stats__n_train",
+                        "stats__n_scored",
+                        "objective__summary_stats",
+                    ]
+                )
+            except Exception:
+                return None
+            if runs.empty:
+                return None
+            rsel = runs[runs["as_of_round"] == int(as_of_round)]
+            if rsel.empty:
+                return None
+            row = rsel.sort_values(["run_id"]).tail(1).iloc[0]
+            return {
+                "run_id": str(row.get("run_id", "")),
+                "model": row.get("model__name"),
+                "objective": row.get("objective__name"),
+                "selection": row.get("selection__name"),
+                "y_ops": row.get("training__y_ops") or [],
+                "stats_n_train": int(row.get("stats__n_train", 0)),
+                "stats_n_scored": int(row.get("stats__n_scored", 0)),
+                "objective_summary_stats": row.get("objective__summary_stats") or {},
+            }
+
+        if latest:
+            out["latest_round_ledger"] = _ledger_summary_for_round(int(latest.get("round_index", -1)))
+        if selected is not None:
+            out["selected_round_ledger"] = (
+                _ledger_summary_for_round(int(selected.get("round_index", -1))) if selected else None
+            )
+        if show_all:
+            for rr in out.get("rounds", []):
+                rr["ledger"] = _ledger_summary_for_round(int(rr.get("round_index", -1)))
 
     return out

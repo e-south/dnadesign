@@ -34,6 +34,7 @@ from .utils import now_iso, read_json, write_json
 class RoundEntry:
     # ------- non-defaults first -------
     round_index: int
+    run_id: str
     round_name: str
     round_dir: str
     labels_used_rounds: list[int]
@@ -66,7 +67,7 @@ class CampaignState:
     y_column_name: str
 
     # ------- defaults after -------
-    version: int = 1
+    version: int = 2
     created_at: str = field(default_factory=now_iso)
     updated_at: str = field(default_factory=now_iso)
     representation_vector_dimension: int = 0
@@ -117,7 +118,7 @@ class CampaignState:
             )
 
         # Fill sensible defaults if absent (non-breaking for forward fields).
-        raw.setdefault("version", 1)
+        raw.setdefault("version", 2)
         raw.setdefault("created_at", now_iso())
         raw.setdefault("updated_at", now_iso())
         raw.setdefault("representation_vector_dimension", 0)
@@ -144,7 +145,30 @@ class CampaignState:
             representation_transform=raw["representation_transform"],
             training_policy=raw["training_policy"],
             performance=raw["performance"],
-            rounds=[RoundEntry(**r) for r in raw.get("rounds", [])],
+            rounds=[
+                RoundEntry(
+                    run_id=str(r.get("run_id", "")),
+                    round_index=int(r.get("round_index", -1)),
+                    round_name=str(r.get("round_name", "")),
+                    round_dir=str(r.get("round_dir", "")),
+                    labels_used_rounds=list(r.get("labels_used_rounds", [])),
+                    number_of_training_examples_used_in_round=int(
+                        r.get("number_of_training_examples_used_in_round", 0)
+                    ),
+                    number_of_candidates_scored_in_round=int(r.get("number_of_candidates_scored_in_round", 0)),
+                    selection_top_k_requested=int(r.get("selection_top_k_requested", 0)),
+                    selection_top_k_effective_after_ties=int(r.get("selection_top_k_effective_after_ties", 0)),
+                    model=dict(r.get("model", {})),
+                    metrics=dict(r.get("metrics", {})),
+                    durations_sec=dict(r.get("durations_sec", {})),
+                    seeds=dict(r.get("seeds", {})),
+                    artifacts=dict(r.get("artifacts", {})),
+                    writebacks=dict(r.get("writebacks", {})),
+                    warnings=list(r.get("warnings", [])),
+                    status=str(r.get("status", "completed")),
+                )
+                for r in raw.get("rounds", [])
+            ],
             backlog=raw["backlog"],
         )
         return st

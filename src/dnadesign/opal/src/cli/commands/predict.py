@@ -56,6 +56,11 @@ def cmd_predict(
         "--generate-id-from-sequence",
         help="Generate deterministic ids from sequence when id column is missing.",
     ),
+    assume_no_yops: bool = typer.Option(
+        False,
+        "--assume-no-yops",
+        help="Skip Y-ops inversion even if training used Y-ops (use only if round_ctx.json is unavailable).",
+    ),
 ):
     try:
         cfg = load_cli_config(config)
@@ -103,6 +108,7 @@ def cmd_predict(
             id_column=id_col,
             sequence_column=sequence_col,
             generate_id_from_sequence=generate_id_from_sequence,
+            assume_no_yops=assume_no_yops,
         )
         if out_path:
             if out_path.suffix.lower() == ".csv":
