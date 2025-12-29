@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import re
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -209,7 +210,7 @@ def cmd_prune_source(
             # Optional backup (exact byte copy)
             backup_path: Optional[Path] = None
             if backup:
-                ts = __import__("datetime").datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+                ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
                 backup_path = rec_path.with_name(f"{rec_path.stem}.backup.{ts}{rec_path.suffix}")
                 shutil.copy2(rec_path, backup_path)
 
@@ -258,6 +259,8 @@ def cmd_prune_source(
             )
             print_stdout("\n" + body)
 
+    except typer.Exit:
+        raise
     except OpalError as e:
         opal_error("prune-source", e)
         raise typer.Exit(code=e.exit_code)

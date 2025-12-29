@@ -286,6 +286,14 @@ data:
     path: ./extras/scores.csv
 ```
 
+Built-ins injected for plots:
+
+* `records`
+* `outputs`
+* `ledger_predictions_dir`
+* `ledger_runs_parquet`
+* `ledger_labels_parquet`
+
 ### `prune-source`
 
 Remove OPAL-derived columns (`opal__*`) and the configured Y column from `records.parquet`.
@@ -293,6 +301,8 @@ Remove OPAL-derived columns (`opal__*`) and the configured Y column from `record
 ```
 opal prune-source --config <yaml> [--scope any|campaign] [--keep <col> ...] [--yes] [--no-backup]
 ```
+
+* Backup is **enabled by default**; disable with `--no-backup`.
 
 ---
 

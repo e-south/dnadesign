@@ -97,7 +97,7 @@ opal prune-source -c path/to/campaign.yaml --scope campaign
 * **Per-round**
   - `outputs/round_<k>/`
   - `model.joblib`
-  - `model_meta.json`
+  - `model_meta.json` *(includes training__y_ops when configured)*
   - `selection_top_k.csv`
   - `labels_used.parquet`
   - `round_ctx.json` *(runtime audit & fitted Y-ops)*
@@ -115,6 +115,8 @@ opal prune-source -c path/to/campaign.yaml --scope campaign
 
 Schemas are **append-only**; keys are unique:
   `run_id` (runs), `(run_id,id)` (predictions), `(observed_round,id)` (labels).
+
+**state.json** tracks campaign state per round, including `run_id` and `round_log_jsonl` paths for auditability.
 
 ---
 
@@ -206,6 +208,7 @@ OPAL reads a configuration YAML, `campaign.yaml`.
 * `objective`: `{ name, params }`
 * `selection`: `{ name, params }` *(strategy, tie handling, objective mode)*
 * `training`: `policy`
+* `training.y_ops`: list of `{ name, params }` (fit/transform/inverse applied at train time and inverted at predict time)
 * `ingest`: duplicate handling for label CSVs
 * `scoring`: batch sizing
 * `safety`: preflight/data guards
