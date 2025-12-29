@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/palette.py
+src/dnadesign/baserender/src/palette.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

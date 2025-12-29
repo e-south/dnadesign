@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/presets/loader.py
+src/dnadesign/baserender/src/presets/loader.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,6 +17,7 @@ import yaml
 
 from ..contracts import SchemaError, ensure
 from ..plugins.registry import PluginSpec
+from .style_presets import resolve_style_preset_path
 
 
 def _baserender_root() -> Path:
@@ -74,6 +75,7 @@ class Job:
     details_col: Optional[str]
     alphabet: str
     plugins: Sequence[PluginSpec]
+    style_preset: Optional[Path]
     style: Mapping[str, object]
     results_dir: Path
     video: VideoCfg
@@ -117,6 +119,16 @@ def _parse_plugins(raw: Any) -> Sequence[PluginSpec]:
     return out
 
 
+def _resolve_output_path(path: Path, *, root: Path, job_name: str) -> Path:
+    results_root = root / "results"
+    job_dir = results_root / job_name
+    if path.is_absolute():
+        return path
+    if path.parts and path.parts[0] == "results":
+        return root / path
+    return job_dir / path
+
+
 def load_job(path: Path) -> Job:
     path = Path(path)
     data = yaml.safe_load(path.read_text())
@@ -128,11 +140,25 @@ def load_job(path: Path) -> Job:
 
     input_ = data["input"]
     output = data["output"]
-    style = data.get("style", {})
+    style = data.get("style", {}) or {}
     plugins = _parse_plugins(data.get("plugins", []))
+    raw_style_preset = data.get("style_preset", None)
+    style_preset: Optional[Path] = None
+    if raw_style_preset is not None:
+        sp = str(raw_style_preset).strip()
+        ensure(sp != "", "style_preset must be a non-empty string/path", SchemaError)
+        style_preset = resolve_style_preset_path(sp)
     name = path.stem
     root = _baserender_root()
     results_dir = root / "results"
+    job_dir = results_dir / name
+
+    raw_input_path = Path(input_["path"])
+    if raw_input_path.is_absolute():
+        input_path = raw_input_path
+    else:
+        job_rel = path.parent / raw_input_path
+        input_path = job_rel if job_rel.exists() else (root / raw_input_path)
 
     video_cfg = output.get("video", {})
     fmt = str(video_cfg.get("fmt", "mp4"))
@@ -171,7 +197,12 @@ def load_job(path: Path) -> Job:
     height_px = video_cfg.get("height_px")
     aspect_ratio = _parse_aspect(video_cfg.get("aspect") or video_cfg.get("aspect_ratio"))
 
-    out_path = Path(video_cfg.get("path")) if video_cfg.get("path") else (results_dir / name / f"{name}.{fmt}")
+    raw_video_path = video_cfg.get("path")
+    out_path = (
+        _resolve_output_path(Path(raw_video_path), root=root, job_name=name)
+        if raw_video_path
+        else (job_dir / f"{name}.{fmt}")
+    )
     vc = VideoCfg(
         fmt=fmt,
         fps=fps,
@@ -196,11 +227,9 @@ def load_job(path: Path) -> Job:
         )
         dir_i = imgs_raw.get("dir")
         if dir_i:
-            img_dir = Path(dir_i)
-            if not img_dir.is_absolute():
-                img_dir = results_dir / name / Path(dir_i)
+            img_dir = _resolve_output_path(Path(dir_i), root=root, job_name=name)
         else:
-            img_dir = results_dir / name / "images"
+            img_dir = job_dir / "images"
         images_cfg = ImagesCfg(dir=img_dir, fmt=fmt_i)
 
     # Optional explicit selection from CSV
@@ -210,7 +239,8 @@ def load_job(path: Path) -> Job:
         p = Path(sel_raw.get("path") or sel_raw.get("csv") or "")
         ensure(str(p) != "", "selection.path (or selection.csv) is required", SchemaError)
         if not p.is_absolute():
-            p = root / p
+            job_rel = path.parent / p
+            p = job_rel if job_rel.exists() else (root / p)
         match_on = str(sel_raw.get("match_on", "id")).lower()
         ensure(
             match_on in {"id", "sequence", "row"},
@@ -281,7 +311,7 @@ def load_job(path: Path) -> Job:
 
     return Job(
         name=name,
-        input_path=Path(input_["path"]),
+        input_path=input_path,
         format=input_.get("format", "parquet"),
         seq_col=input_["columns"]["sequence"],
         ann_col=input_["columns"]["annotations"],
@@ -289,6 +319,7 @@ def load_job(path: Path) -> Job:
         details_col=input_["columns"].get("details", "details"),
         alphabet=input_.get("alphabet", "DNA"),
         plugins=plugins,
+        style_preset=style_preset,
         style=style,
         results_dir=results_dir,
         video=vc,

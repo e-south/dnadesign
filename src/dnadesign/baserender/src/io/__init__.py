@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/io/__init__.py
+src/dnadesign/baserender/src/io/__init__.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

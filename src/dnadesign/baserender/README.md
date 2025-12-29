@@ -7,15 +7,17 @@ Minimal rendering of biological sequences with annotations.
 src/dnadesign/baserender/
 ├─ src/       # package
 ├─ jobs/      # YAML presets (call by name)
+├─ styles/    # YAML style presets
 └─ results/   # outputs per job
-````
+```
 
 ### Install
 `pyproject.toml`:
+
 ```toml
 [project.scripts]
 baserender = "dnadesign.baserender.src.cli:app"
-````
+```
 
 ### System dependencies
 
@@ -40,18 +42,12 @@ baserender = "dnadesign.baserender.src.cli:app"
 baserender --help
 ```
 
-#### Run a preset job (uses `jobs/` and writes into `results/`)
+#### Run a Job (uses `jobs/` and writes into `results/`)
 
 ```bash
-baserender job CpxR_LexA
-```
-
-#### Render a single still from a job
-
-```bash
-baserender job CpxR_LexA --rec-id <record-id> --fmt pdf
-# or
-baserender job CpxR_LexA --row 0 --fmt png
+baserender job run jobs/foo.yml
+# or by name (looked up in jobs/):
+baserender job run foo
 ```
 
 #### Direct (dataset → images), with progress and plugin(s)
@@ -69,13 +65,43 @@ baserender render /path/to/records.parquet \
 * `densegen__used_tfbs_detail` (list of dicts: `{"offset": int, "orientation": "fwd"|"rev", "tf": str, "tfbs": str}`)
 * optional `id` (str)
 
+### Selection (CSV-driven)
+
+Jobs can optionally select specific records via a CSV:
+
+```yaml
+selection:
+  path: selections.csv
+  match_on: id              # id | sequence | row
+  column: id                # CSV column to read
+  overlay_column: details   # optional text overlay column (must exist if set)
+  keep_order: true
+  on_missing: warn          # skip | warn | error
+```
+
+Row selection uses **Parquet row index (0‑based)** from the dataset.
+
+### Style presets
+
+Style presets live in `styles/`. The default is `presentation_default.yml`.
+Use `baserender style list` to see available presets and `baserender style show` to inspect the effective mapping.
+
+### Output path resolution
+
+Output paths are resolved relative to `results_dir/<job_name>/`:
+
+* Absolute paths are used as‑is.
+* Relative paths resolve under `results_dir/<job_name>/...`.
+
 ### Preset example
 
 `src/dnadesign/baserender/jobs/cpxR_LexA.yml`
 
 ```yaml
+version: 2
 input:
-  path: /Users/.../records.parquet
+  # Relative paths resolve from the repo root when the job is under jobs/.
+  path: inputs/records.parquet
   format: parquet
   columns:
     id: id
@@ -85,25 +111,27 @@ input:
   # Limit how many sequences to process (default 500). Set 0 to process all.
   limit: 500
 
-plugins:
-  - sigma70
+pipeline:
+  plugins:
+    - sigma70
 
-style: {}   # optional overrides (dpi, fonts, palette, etc.)
+style:
+  preset: presentation_default
+  overrides: {}
 
 output:
   video:
     # If omitted, defaults to results/<job>/<job>.mp4
-    path: /Users/.../results/CpxR_LexA/cpxR_LexA.mp4
+    path: results/CpxR_LexA/cpxR_LexA.mp4
     fmt: mp4
     fps: 2
-    seconds_per_seq: 1.0
-    # Pause longer on selected records (additive seconds)
+    frames_per_record: 1
     pauses: {}
-    # Frame size (px); if omitted, uses first frame (size auto)
     width_px: 1400
     height_px: null
-    # Optionally constrain total video length (seconds)
-    # total_duration: 120
+  images:
+    dir: results/CpxR_LexA/images
+    fmt: png
 ```
 
 ---

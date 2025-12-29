@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/presets/__init__.py
+src/dnadesign/baserender/src/presets/__init__.py
 
 Minimal biological sequence rendering.
 

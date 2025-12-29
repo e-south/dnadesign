@@ -1,13 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/__init__.py
-
-Minimal biological sequence rendering.
-
-Public API:
-- SeqRecord, Annotation
-- read_records, render_image, render_images, render_video
+src/dnadesign/baserender/src/__init__.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
