@@ -86,6 +86,9 @@ def cmd_run(
         )
         with CampaignLock(Path(cfg.campaign.workdir)):
             res = run_round(store, df, req)
+        sel_params = dict(cfg.selection.selection.params or {})
+        tie_handling = str(sel_params.get("tie_handling", "competition_rank"))
+        objective_mode = str((sel_params.get("objective_mode") or "maximize")).strip().lower()
         summary = {
             "ok": res.ok,
             "run_id": res.run_id,
@@ -96,6 +99,8 @@ def cmd_run(
             "top_k_effective": res.top_k_effective,
             "ledger": res.ledger_path,
             "top_k_source": "cli_override" if k is not None else "yaml_default",
+            "tie_handling": tie_handling,
+            "objective_mode": objective_mode,
         }
         if json:
             json_out(summary)

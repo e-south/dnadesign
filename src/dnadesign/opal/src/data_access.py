@@ -309,7 +309,8 @@ class RecordsStore:
             cleaned = self._normalize_hist_cell(cell)
             after = len(cleaned)
             dropped_total += max(0, before - after)
-            if before != after or cleaned != cell:
+            # Avoid direct equality checks against numpy/array-like cells.
+            if before != after or not isinstance(cell, list):
                 changed_rows += 1
             out.at[idx, lh] = cleaned
 

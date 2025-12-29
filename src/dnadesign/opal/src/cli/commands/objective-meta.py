@@ -48,7 +48,7 @@ def cmd_objective_meta(
     ),
     json: bool = typer.Option(False, "--json/--human", help="Output as JSON"),
     profile: bool = typer.Option(
-        True,
+        False,
         "--profile/--no-profile",
         help="Profile candidate hue/size fields (dtype, coverage, range, suitability).",
     ),

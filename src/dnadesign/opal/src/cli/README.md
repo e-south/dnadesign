@@ -22,7 +22,7 @@ See all available commands and flags:
 
 ```bash
 opal --help
-````
+```
 
 ---
 
@@ -61,6 +61,7 @@ Behavior & checks:
 * **Strict preflights**: schema checks, completeness.
 * **Preview is printed** (counts + sample) before any write.
 * Duplicate handling is controlled by `ingest.duplicate_policy` (error|keep_first|keep_last).
+* `--if-exists` controls what happens when a `(id, round)` already exists in label history: `fail` (default), `skip`, or `replace`.
 * **New IDs** allowed if your CSV includes essentials: `sequence`, `bio_type`, `alphabet`, and the configured X column.
 * Appends to `opal__<slug>__label_hist` and writes the current Y column.
 * Emits `label` events into `outputs/ledger.labels.parquet`.
@@ -173,6 +174,7 @@ opal objective-meta --config <yaml> --round <k|latest>
 ```
 
 * Reads from `outputs/ledger.runs.parquet` and `outputs/ledger.predictions/`.
+* Use `--profile` to compute hue/size suitability stats (default: off).
 
 ### `ctx`
 
@@ -259,6 +261,7 @@ opal plot --config <yaml-or-dir> [--round <selector>] [--name <plot-name>]
 * `--name <plot-name>`: run a single plot by name; omit to run **all**.
 * Overwrites files by default; continues on error; exit code **1** if any plot failed.
 * Output directory defaults to `outputs/plots`, or honor `output.dir` if provided.
+* Plot-specific knobs **must** live under `params:`; top-level plotting keys are errors.
 
 **Campaign YAML (example)**
 
@@ -413,6 +416,7 @@ opal/src/cli/
   registry.py       # @cli_command; discovery; install into app
   commands/
     _common.py      # resolve_config_path, store_from_cfg, json_out, internal_error
+    ctx.py
     init.py
     ingest_y.py
     log.py

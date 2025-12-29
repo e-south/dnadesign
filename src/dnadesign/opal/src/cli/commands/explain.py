@@ -36,21 +36,13 @@ def cmd_explain(
         "--json/--human",
         help="Output as JSON (default: human).",
     ),
-    format: str = typer.Option(  # deprecated alias
-        None,
-        "--format",
-        "-f",
-        help="(deprecated) Use --json/--human instead. Allowed: 'json' or 'human'.",
-        case_sensitive=False,
-    ),
 ):
     try:
         cfg = load_cli_config(config)
         store = store_from_cfg(cfg)
         df = store.load()
         info = explain_round(store, df, cfg, round)
-        fmt = str(format).lower() if format else None
-        if json or fmt == "json":
+        if json:
             json_out(info)
         else:
             print_stdout(render_explain_human(info))

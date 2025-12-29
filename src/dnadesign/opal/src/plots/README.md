@@ -24,7 +24,7 @@ plots:
       - name: extra_csv
         path: ./extras/scores.csv
 
-    # Opaque, plugin-specific params
+    # Opaque, plugin-specific params (required for plot knobs)
     params:
       score_field: "score_sfxi"       # required by the starter plugin
       hue: null                       # or "round"
@@ -38,6 +38,8 @@ plots:
       format: "png"                   # png|svg|pdf (png default)
       save_data: false                # save tidy CSV next to the image
 ```
+
+**Note:** plotting knobs must live under `params:`. Top‑level plotting keys are rejected.
 
 **Built-ins injected** (resolved from the campaign config):
 
@@ -55,7 +57,7 @@ Ledger sinks always live under `context.workspace.outputs_dir` (e.g., `outputs/l
 1. Create a module in `dnadesign/opal/src/plots/` and register it:
 
 ```python
-from ..registries.plots import register_plot
+from ..registries.plot import register_plot
 
 @register_plot("my_cool_plot")
 def render(context, params):

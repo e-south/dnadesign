@@ -316,7 +316,12 @@ def render_run_summary_human(summary: dict) -> str:
     requested = summary.get("top_k_requested")
     effective = summary.get("top_k_effective")
     tie_hint = summary.get("tie_handling") or "competition_rank"
-    sel_line = f"selection: top_k={requested} (requested) → selected={effective} (effective after ties, tie_handling={tie_hint})"  # noqa
+    obj_mode = summary.get("objective_mode") or "maximize"
+    sel_line = (
+        "selection: "
+        f"objective={obj_mode} tie={tie_hint} | "
+        f"top_k={requested} (requested) → selected={effective} (effective after ties)"
+    )
     lines = [
         f"{_b('run_id')}: {rid}",
         f"{_b('as_of_round')}: {summary.get('as_of_round')}",
