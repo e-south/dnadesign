@@ -21,6 +21,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import os
 import traceback
 from pathlib import Path
 from typing import Optional, Union
@@ -32,7 +33,7 @@ from ...plots._context import PlotContext
 from ...registries.plot import get_plot
 from ...workspace import CampaignWorkspace
 from ..registry import cli_command
-from ._common import load_cli_config, resolve_config_path, store_from_cfg
+from ._common import load_cli_config, print_config_context, resolve_config_path, store_from_cfg
 
 
 def _parse_round_selector(sel: Optional[str]) -> Union[str, list[int]]:
@@ -132,12 +133,12 @@ def cmd_plot(
     Exit code 1 if any plot failed.
     """
     # Resolve campaign.yaml
-    cfg_path = resolve_config_path(config)
+    cfg_path = resolve_config_path(config, allow_dir=True)
     campaign_dir, campaign_cfg, campaign_yaml = _resolve_campaign_dir(cfg_path)
     cfg = load_cli_config(campaign_yaml)
     store = store_from_cfg(cfg)
-    ws = CampaignWorkspace.from_config(cfg, cfg_path)
-    typer.secho(f"[plot] Using config: {cfg_path}", fg=typer.colors.CYAN)
+    ws = CampaignWorkspace.from_config(cfg, campaign_yaml)
+    print_config_context(campaign_yaml, cfg=cfg, records_path=store.records_path)
 
     plots_cfg = campaign_cfg.get("plots") or []
     if not isinstance(plots_cfg, list):
@@ -292,12 +293,14 @@ def cmd_plot(
         # Run plugin (overwrite outputs by default)
         try:
             ctx.output_dir.mkdir(parents=True, exist_ok=True)
-            typer.secho(
-                f"[plot] entry '{pname}': keys={sorted(entry.keys())} "
-                f"params_type={type(entry.get('params')).__name__} "
-                f"params_preview={ {k: entry['params'].get(k) for k in (entry.get('params') or {}).keys()} if isinstance(entry.get('params'), dict) else '(not a dict)' }",  # noqa
-                fg=typer.colors.BLUE,
-            )
+            debug = str(os.getenv("OPAL_DEBUG", "")).strip().lower() in ("1", "true", "yes", "on")
+            if debug:
+                typer.secho(
+                    f"[plot] entry '{pname}': keys={sorted(entry.keys())} "
+                    f"params_type={type(entry.get('params')).__name__} "
+                    f"params_preview={ {k: entry['params'].get(k) for k in (entry.get('params') or {}).keys()} if isinstance(entry.get('params'), dict) else '(not a dict)' }",  # noqa
+                    fg=typer.colors.BLUE,
+                )
 
             get_plot(pkind)(ctx, params)
             typer.secho(

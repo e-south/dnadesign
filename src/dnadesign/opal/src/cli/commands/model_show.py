@@ -23,7 +23,7 @@ from ...state import CampaignState
 from ...utils import ExitCodes, OpalError, ensure_dir, print_stdout
 from ..formatting import render_model_show_human
 from ..registry import cli_command
-from ._common import internal_error, json_out, load_cli_config, opal_error
+from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path
 
 
 @cli_command(
@@ -52,7 +52,10 @@ def cmd_model_show(
         if model_path is None:
             if not config:
                 raise OpalError("Provide --model-path or --config to auto-resolve from state.json.")
-            cfg = load_cli_config(config)
+            cfg_path = resolve_config_path(config)
+            cfg = load_cli_config(cfg_path)
+            if not json:
+                print_config_context(cfg_path, cfg=cfg)
             st_path = Path(cfg.campaign.workdir) / "state.json"
             st = CampaignState.load(st_path)
             rounds = sorted(st.rounds, key=lambda r: int(r.round_index))
@@ -107,7 +110,7 @@ def cmd_model_show(
         else:
             print_stdout(render_model_show_human(info))
     except OpalError as e:
-        opal_error("run", e)
+        opal_error("model-show", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("model-show", e)

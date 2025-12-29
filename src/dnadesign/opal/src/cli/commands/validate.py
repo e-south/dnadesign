@@ -33,7 +33,7 @@ from ._common import (
 def cmd_validate(config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG")):
     try:
         cfg_path = resolve_config_path(config)
-        cfg = load_cli_config(config)
+        cfg = load_cli_config(cfg_path)
         store = store_from_cfg(cfg)
         df = store.load()
 
@@ -178,7 +178,7 @@ def cmd_validate(config: Path = typer.Option(None, "--config", "-c", envvar="OPA
             pass
 
     except OpalError as e:
-        opal_error("run", e)
+        opal_error("validate", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("validate", e)

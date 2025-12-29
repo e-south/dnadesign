@@ -22,7 +22,7 @@ from ...state import CampaignState
 from ...utils import ExitCodes, OpalError, print_stdout
 from ...workspace import CampaignWorkspace
 from ..registry import cli_group
-from ._common import internal_error, json_out, load_cli_config, opal_error, resolve_config_path
+from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path
 
 ctx_app = typer.Typer(no_args_is_help=True, help="Inspect runtime carriers (round_ctx.json).")
 
@@ -96,6 +96,7 @@ def ctx_show(
         if json_out_flag:
             json_out(snap)
         else:
+            print_config_context(cfg_path, cfg=cfg)
             for k in sorted(snap.keys()):
                 print_stdout(f"{k}: {snap[k]}")
     except OpalError as e:
@@ -121,6 +122,7 @@ def ctx_audit(
         if json_out_flag:
             json_out(audit)
         else:
+            print_config_context(cfg_path, cfg=cfg)
             for category in sorted(audit.keys()):
                 print_stdout(f"[{category}]")
                 for plugin in sorted(audit[category].keys()):
@@ -164,6 +166,7 @@ def ctx_diff(
         if json_out_flag:
             json_out(out)
         else:
+            print_config_context(cfg_path, cfg=cfg)
             print_stdout(f"added={len(added)} removed={len(removed)} changed={len(changed)}")
             if added:
                 print_stdout(f"added keys: {sorted(added.keys())}")

@@ -38,6 +38,7 @@ from ._common import (
     json_out,
     load_cli_config,
     opal_error,
+    resolve_config_path,
     store_from_cfg,
 )
 
@@ -124,7 +125,8 @@ def cmd_prune_source(
         raise typer.BadParameter("--scope must be 'any' or 'campaign'")
 
     try:
-        cfg = load_cli_config(config)
+        cfg_path = resolve_config_path(config)
+        cfg = load_cli_config(cfg_path)
         store = store_from_cfg(cfg)
         rec_path = store.records_path
 
@@ -152,6 +154,8 @@ def cmd_prune_source(
         to_delete = [c for c in sorted(set(opal_cols + y_cols)) if c not in keep_set]
 
         preview_info = {
+            "config_path": str(cfg_path.resolve()),
+            "workdir": str(Path(cfg.campaign.workdir).resolve()),
             "records_path": str(rec_path.resolve()),
             "table_shape_before": f"{df.shape[0]} rows × {df.shape[1]} cols",
             "campaign_slug": cfg.campaign.slug,

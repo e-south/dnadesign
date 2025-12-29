@@ -27,6 +27,7 @@ from ._common import (
     internal_error,
     json_out,
     load_cli_config,
+    print_config_context,
     resolve_config_path,
     store_from_cfg,
 )
@@ -55,8 +56,10 @@ def cmd_objective_meta(
 ) -> None:
     try:
         cfg_path = resolve_config_path(config)
-        cfg = load_cli_config(config)
+        cfg = load_cli_config(cfg_path)
         store = store_from_cfg(cfg)
+        if not json:
+            print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
         ws = CampaignWorkspace.from_config(cfg, cfg_path)
         base = ws.outputs_dir
         pred_dir = base / "ledger.predictions"

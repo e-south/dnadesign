@@ -18,7 +18,14 @@ from ...status import build_status
 from ...utils import ExitCodes, OpalError, print_stdout
 from ..formatting import render_status_human
 from ..registry import cli_command
-from ._common import internal_error, json_out, load_cli_config, opal_error, resolve_config_path
+from ._common import (
+    internal_error,
+    json_out,
+    load_cli_config,
+    opal_error,
+    print_config_context,
+    resolve_config_path,
+)
 
 
 @cli_command("status", help="Dashboard from state.json (latest round by default).")
@@ -32,6 +39,8 @@ def cmd_status(
     try:
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)
+        if not json:
+            print_config_context(cfg_path, cfg=cfg)
         ledger_reader = None
         if with_ledger:
             from ...ledger import LedgerReader
@@ -51,7 +60,7 @@ def cmd_status(
         else:
             print_stdout(render_status_human(st))
     except OpalError as e:
-        opal_error("run", e)
+        opal_error("status", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
         internal_error("status", e)

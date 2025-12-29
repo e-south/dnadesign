@@ -23,7 +23,7 @@ from ...utils import ExitCodes, OpalError, print_stdout
 from ...workspace import CampaignWorkspace
 from ..formatting import render_round_log_summary_human
 from ..registry import cli_command
-from ._common import internal_error, json_out, load_cli_config, opal_error, resolve_config_path
+from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path
 
 
 def _resolve_round_index(ws: CampaignWorkspace, round_sel: Optional[str]) -> int:
@@ -58,6 +58,7 @@ def cmd_log(
         if json:
             json_out(summary)
         else:
+            print_config_context(cfg_path, cfg=cfg)
             print_stdout(render_round_log_summary_human(summary))
     except OpalError as e:
         opal_error("log", e)

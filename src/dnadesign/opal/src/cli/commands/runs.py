@@ -23,7 +23,7 @@ from ...utils import ExitCodes, OpalError, print_stdout
 from ...workspace import CampaignWorkspace
 from ..formatting import render_run_meta_human, render_runs_list_human
 from ..registry import cli_group
-from ._common import internal_error, json_out, load_cli_config, opal_error, resolve_config_path
+from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path
 
 runs_app = typer.Typer(no_args_is_help=True, help="Inspect ledger run_meta entries.")
 cli_group("runs", help="Inspect ledger run_meta entries.")(runs_app)
@@ -61,6 +61,7 @@ def runs_list(
         if json:
             json_out(runs_df.to_dict(orient="records"))
         else:
+            print_config_context(cfg_path, cfg=cfg)
             summary_rows = [summarize_run_meta(r) for _, r in runs_df.iterrows()]
             print_stdout(render_runs_list_human(summary_rows))
     except OpalError as e:
@@ -91,6 +92,7 @@ def runs_show(
         if json:
             json_out(row.to_dict())
         else:
+            print_config_context(cfg_path, cfg=cfg)
             print_stdout(render_run_meta_human(row.to_dict()))
     except OpalError as e:
         opal_error("runs show", e)
