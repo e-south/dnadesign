@@ -6,7 +6,7 @@ This demo runs the full OPAL pipeline on mock **X** and **Y** values while exerc
 - Objective: `sfxi_v1` (setpoint fidelity × intensity)
 - Model: Random Forest
 
-See the SFXI objective details [**here**](./src/objectives/DOCS/setpoint_fidelity_x_intensity.md) (optional).
+See the SFXI objective details [**here**](./docs/setpoint_fidelity_x_intensity.md) (optional).
 
 ---
 
@@ -36,10 +36,10 @@ Y = [v00, v10, v01, v11, y00*, y10*, y01*, y11*]
 
 ### Run the demo
 
-From the demo workdir:
+From the repo root:
 
 ```bash
-cd ../campaigns/demo/
+cd src/dnadesign/opal/campaigns/demo/
 
 # 1) Initialize & validate
 opal init     -c campaign.yaml

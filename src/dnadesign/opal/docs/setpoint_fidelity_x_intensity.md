@@ -246,39 +246,44 @@ Only proximity of $\widehat{v}$ to $p$ (being OFF everywhere) is rewarded.
 
 ### 9. Emissions
 
-All outputs are namespaced in `events.parquet`.
+All outputs are written to **ledger sinks** under `outputs/`:
 
-**Per-ID predictions (`kind="run_pred"`)**
+- `outputs/ledger.predictions/` → per‑ID `run_pred` rows (one per candidate)
+- `outputs/ledger.runs.parquet` → per‑run `run_meta` row (one per run)
+- `outputs/ledger.labels.parquet` → per‑label `label` rows (one per ingest event)
 
-- `pred__y_obj_scalar: double`                    ← the SFXI score used for ranking
-- `pred__y_hat_model: list<float>`                ← model-space vector
-- `obj__logic_fidelity_l2_norm01: float ∈ [0,1]`  ← \(F_\text{logic}\)
-- `obj__effect_scaled: float ∈ [0,1]`             ← \(E_\text{scaled}\)
+**Per‑ID predictions (`run_pred` rows)**
 
-**Per-run metadata (`kind="run_meta"`)**
+- `pred__y_obj_scalar: double` — the SFXI score used for ranking
+- `pred__y_hat_model: list<float>` — **objective‑space** vector (after Y‑ops inversion)
+- `obj__logic_fidelity: float ∈ [0,1]` — \(F_\text{logic}\)
+- `obj__effect_raw: float` — weighted intensity before scaling
+- `obj__effect_scaled: float ∈ [0,1]` — \(E_\text{scaled}\)
+- `obj__clip_lo_mask`, `obj__clip_hi_mask` — clipping flags for \(E_\text{scaled}\)
+- `sel__rank_competition`, `sel__is_selected` — ranking + selection flags
 
-- `obj__name="sfxi_v1"`
-* `obj__params_hash`
-- `sel__score_field="pred__y_obj_scalar"`  ← selection ranks on this field
+**Per‑run metadata (`run_meta` row)**
 
-Objective parameters surfaced to aid auditability without opening artifacts:
+- `objective__name = "sfxi_v1"`
+- `objective__params` — includes setpoint, exponents, scaling config, log2 delta
+- `objective__summary_stats` — includes `denom_used`, score min/median/max, clip fractions
+- `objective__denom_value`, `objective__denom_percentile` — convenience mirrors
+- `selection__score_field = "pred__y_obj_scalar"` — selection ranks on this field
+- `selection__objective`, `selection__tie_handling`
+- `training__y_ops` — Y‑ops applied at fit time (inverted before objective)
 
-  - `obj__logic_exponent_beta: double`
-  - `obj__intensity_exponent_gamma: double`
-  - `obj__log2_offset_delta: double` (the delta used to invert log2)
-  - `obj__setpoint_vec4: list<double>[4]`
-  - `obj__scale_percentile_p: int` (e.g., 95)
-  - `obj__scale_fallback_p: int`
-  - `obj__scale_min_n: int`
-  - `obj__scale_eps: double`
-  - `obj__scale_denom_value: double`
+`round_ctx.json` also records:
 
+- `objective/sfxi_v1/denom_value`
+- `objective/sfxi_v1/denom_percentile`
+- full plugin contract audit trail under `core/contracts/...`
 
-**Recomputable at runtime (not persisted per-ID)**
+**Recomputable at runtime (not persisted per‑ID)**
 
-- `E_raw = dot(w, yhat_linear)` where `yhat_linear` is recovered by **inverting** `pred__y_hat_model[4:8]` using transforms in `run_meta` (target normalizer stats + `obj__log2_offset_delta`).
-- `F_logic` from `v_hat = pred__y_hat_model[0:4]` and the setpoint in `run_meta`.
-- `D` (worst-case distance) and weights `w` derived from the setpoint in `run_meta`.
+- \(E_{\text{raw}}\) from `pred__y_hat_model[4:8]` using the setpoint‑derived weights
+- \(F_{\text{logic}}\) from `pred__y_hat_model[0:4]` and the setpoint
+- \(D\) (worst‑case distance) from the setpoint
+- \(E_{\text{scaled}}\) via `objective__denom_value` (from `run_meta` or `round_ctx.json`)
 
 ---
 

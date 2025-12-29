@@ -207,31 +207,18 @@ def cmd_plot(
             fname = f"{base}.{fmt}"
         save_data = bool(out_cfg.get("save_data", False))
 
-        # Accept only mappings for params; rescue common mistakes.
-        raw_params = entry.get("params", {})
+        # Accept only mappings for params; fail fast on ambiguous configs.
+        raw_params = entry.get("params", None)
         if raw_params is None:
-            raw_params = {}
-        if not isinstance(raw_params, dict):
-            typer.echo(
-                f"[plot] WARN: plot '{pname}' has a non-mapping 'params' "
-                f"(type={type(raw_params).__name__}). Coercing to empty dict."
-            )
-            raw_params = {}
-        params = dict(raw_params)
+            if "params" in entry:
+                raise ValueError(f"[plot] plot '{pname}' has an empty 'params:' block. Use {{}} or remove it.")
+            params = {}
+        elif not isinstance(raw_params, dict):
+            raise ValueError(f"[plot] plot '{pname}' has a non-mapping 'params' (type={type(raw_params).__name__}).")
+        else:
+            params = dict(raw_params)
 
-        # Optional strictness: refuse empty/non-mapping params when a 'params' block exists.
-        import os
-
-        STRICT = str(os.getenv("OPAL_PLOT_STRICT", "")).strip().lower() in (
-            "1",
-            "true",
-            "yes",
-            "on",
-        )
-        if STRICT and "params" in entry and not params:
-            raise ValueError(f"[plot] plot '{pname}' has an empty or non-mapping 'params:' block in YAML.")
-
-        # Convenience: if users put plotting keys at top-level, lift them into params.
+        # Disallow plotting knobs at top-level; require them under 'params:'.
         TOPLEVEL = {
             "hue",
             "hue_field",
@@ -263,20 +250,11 @@ def cmd_plot(
             "panel_size_in",
         }
         lifted = {k: entry[k] for k in TOPLEVEL if k in entry}
-        for k, v in lifted.items():
-            params.setdefault(k, v)
         if lifted:
-            typer.echo(
-                f"[plot] Note: moved top-level keys {sorted(lifted)} into 'params' "
-                f"for plot '{pname}'. (Place them under 'params:' to silence this.)"
+            raise ValueError(
+                f"[plot] plot '{pname}' has plotting keys at the top level: {sorted(lifted)}. "
+                "Move them under 'params:'."
             )
-            if str(os.getenv("OPAL_DEBUG", "")).strip().lower() in (
-                "1",
-                "true",
-                "yes",
-                "on",
-            ):
-                raise ValueError(f"Plot '{pname}' has plotting keys at the top level. Move them under 'params:'.")
 
         # Build context
         import logging

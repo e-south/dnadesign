@@ -20,7 +20,7 @@ Dashboard of current entries (see details below):
 Quick check:
 
 ```python
-from dnadesign.opal.registries.models import list_models
+from dnadesign.opal.src.registries.models import list_models
 print(list_models())  # e.g., ["random_forest", ...]
 ```
 
@@ -57,7 +57,7 @@ Implementations: `src/dnadesign/opal/src/models/`
 
 ```python
 # src/dnadesign/opal/src/models/my_model.py
-from dnadesign.opal.registries.models import register_model
+from dnadesign.opal.src.registries.models import register_model
 
 @register_model("my_model")
 def _factory(params: dict, *args, **kwargs):
@@ -68,7 +68,7 @@ def _factory(params: dict, *args, **kwargs):
 from . import my_model  # noqa: F401
 ```
 ```yaml
-models:
+model:
   name: "<model_name>"
   params:
     # model‑specific parameters go here
