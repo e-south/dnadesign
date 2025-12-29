@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/plugins/registry.py
+src/dnadesign/baserender/src/plugins/registry.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -22,12 +22,6 @@ class DerivedAnnotationPlugin(Protocol):
     name: str
 
     def apply(self, record: SeqRecord) -> SeqRecord: ...
-
-
-class PalettePlugin(Protocol):
-    name: str
-
-    def color_for(self, tag: str): ...
 
 
 @dataclass(frozen=True)
@@ -79,17 +73,26 @@ def load_plugins(requested: Sequence[PluginLike]) -> Sequence[DerivedAnnotationP
         if name == "sigma70":
             from .builtin.sigma70 import Sigma70Plugin
 
-            plugins.append(Sigma70Plugin(**params))
+            try:
+                plugins.append(Sigma70Plugin(**params))
+            except TypeError as e:
+                raise PluginError(f"Invalid parameters for plugin '{name}': {e}") from e
         elif ":" in name:
             cls = _load_by_module(name)
-            plugins.append(cls(**params))
+            try:
+                plugins.append(cls(**params))
+            except TypeError as e:
+                raise PluginError(f"Invalid parameters for plugin '{name}': {e}") from e
         else:
             eps = entry_points(group="baserender.plugins")
             found = False
             for ep in eps:
                 if ep.name == name:
                     cls = ep.load()
-                    plugins.append(cls(**params))
+                    try:
+                        plugins.append(cls(**params))
+                    except TypeError as e:
+                        raise PluginError(f"Invalid parameters for plugin '{name}': {e}") from e
                     found = True
                     break
             if not found:

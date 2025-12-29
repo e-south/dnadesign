@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/render.py
+src/dnadesign/baserender/src/render.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -22,8 +22,8 @@ from matplotlib.textpath import TextPath
 from matplotlib.transforms import Affine2D
 
 from .layout import (
-    assign_tracks,
-    assign_tracks_forward_with_sigma_lock,
+    assign_tracks_forward,
+    assign_tracks_generic,
     comp,
     measure_char_cell,
 )
@@ -60,6 +60,7 @@ def _compute_layout(
     *,
     fixed_tracks: tuple[int, int] | None = None,
     fixed_n: Optional[int] = None,
+    show_two_strands: bool,
 ) -> LayoutResult:
     size = measure_char_cell(style.font_mono, style.font_size_seq, style.dpi)
     cw, ch = size.width, size.height
@@ -71,11 +72,11 @@ def _compute_layout(
     label_pad_x = style.font_size_label / 72.0 * style.dpi * 1.6
     x_left = style.padding_x + label_pad_x
 
-    # Track counts (honor priority via assign_tracks)
+    # Track counts (honor priority via assign_tracks_generic)
     up = [a for a in record.annotations if a.strand == "fwd"]
     dn = [a for a in record.annotations if a.strand == "rev"]
-    up_tracks = assign_tracks_forward_with_sigma_lock(up)
-    dn_tracks = assign_tracks(dn)
+    up_tracks = assign_tracks_forward(up)
+    dn_tracks = assign_tracks_generic(dn)
     used_up = (max(up_tracks) + 1) if up_tracks else 0
     used_dn = (max(dn_tracks) + 1) if dn_tracks else 0
     count_up = fixed_tracks[0] if fixed_tracks else used_up
@@ -83,7 +84,7 @@ def _compute_layout(
 
     # Vertical extents (baselines)
     y0 = style.padding_y + count_up * style.track_spacing + ch
-    y1 = y0 - style.baseline_spacing if style.show_reverse_complement else y0
+    y1 = y0 - style.baseline_spacing if show_two_strands else y0
 
     label_pad_y = style.font_size_label / 72.0 * style.dpi * 1.2
     legend_space = (style.legend_height_px + style.legend_pad_px) if style.legend else 0.0
@@ -502,7 +503,14 @@ def render_figure(
     legend_entries: Optional[Sequence[tuple[str, str]]] = None,
 ):
     record = record.validate()
-    layout = _compute_layout(record, style, fixed_tracks=fixed_tracks, fixed_n=fixed_n)
+    show_two_strands = bool(style.show_reverse_complement and record.alphabet == "DNA")
+    layout = _compute_layout(
+        record,
+        style,
+        fixed_tracks=fixed_tracks,
+        fixed_n=fixed_n,
+        show_two_strands=show_two_strands,
+    )
     fig = plt.figure(figsize=(layout.width / style.dpi, layout.height / style.dpi), dpi=style.dpi)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_axis_off()
@@ -514,7 +522,7 @@ def render_figure(
 
     # Baselines
     _draw_sequence(ax, record.sequence, x0, layout.y_forward, layout.cw, style, "5'", "3'")
-    if style.show_reverse_complement and record.alphabet == "DNA":
+    if show_two_strands:
         _draw_sequence(
             ax,
             comp(record.sequence),
@@ -527,7 +535,7 @@ def render_figure(
         )
 
     # Connector dashes (one row)
-    if style.show_reverse_complement:
+    if show_two_strands:
         _draw_connectors(ax, n_this, x0, layout.cw, layout.y_forward, layout.y_reverse, style)
 
     # Annotations

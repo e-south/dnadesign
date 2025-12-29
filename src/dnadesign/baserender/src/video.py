@@ -1,24 +1,10 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/video.py
+src/dnadesign/baserender/src/video.py
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
-
-Improvements in this version:
-- Guarantees even video dimensions for H.264 (yuv420p) by applying an FFmpeg
-  scale filter:  scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1
-  This prevents failures like:
-    [libx264] height not divisible by 2 (1518x505)
-
-- Adds fail-fast checks and clearer ExportError messages with practical nudges:
-  * no records → "No records to render."
-  * invalid fps / frames_per_record
-  * ffmpeg writer missing
-  * target canvas smaller than first frame (letterbox guard)
-  * if FFmpeg still fails, we surface likely cause and how to fix (width_px,
-    height_px, aspect).
-
-- Keeps start/frame/finish progress callbacks intact.
 """
 
 from __future__ import annotations
@@ -32,10 +18,12 @@ matplotlib.use("Agg")
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 
-from .contracts import ExportError
-from .layout import assign_tracks
+from .contracts import AlphabetError, ExportError
+from .layout import assign_tracks_forward, assign_tracks_generic
+from .legend import legend_entries_for_record
 from .model import SeqRecord
 from .palette import Palette
+from .presets.style_presets import resolve_style
 from .render import render_figure
 from .style import Style
 
@@ -102,54 +90,6 @@ def _letterbox(arr, W: int, H: int):
     return out
 
 
-def _legend_entries_for_record(r: SeqRecord) -> list[tuple[str, str]]:
-    """
-    Build the legend for one record.
-    - Non‑σ TFs: 'tf:<name>' → '<name>' (dedup, stable order).
-    - σ⁷⁰: **prefer dataset‑declared strength** from 'tf:sigma70_*';
-            fall back to plugin ('sigma' tag or 'sigma_link' guide) only if needed.
-    """
-    entries: list[tuple[str, str]] = []
-    seen_tfs: set[str] = set()
-    sigma_from_dataset: str | None = None
-    sigma_from_plugin: str | None = None
-
-    for a in r.annotations:
-        if a.tag.startswith("tf:"):
-            name = a.tag[3:]
-            low = name.lower()
-            if low.startswith("sigma70_"):
-                for tok in low.split("_")[1:]:
-                    if tok in {"low", "mid", "high"}:
-                        if sigma_from_dataset is None:
-                            sigma_from_dataset = tok
-                        break
-                # don't list sigma70_* again as a plain TF
-                continue
-            if name not in seen_tfs:
-                seen_tfs.add(name)
-                entries.append((a.tag, name))
-        elif a.tag == "sigma":
-            st = (a.payload or {}).get("strength")
-            if isinstance(st, str) and st.lower() in {"low", "mid", "high"}:
-                if sigma_from_plugin is None:
-                    sigma_from_plugin = st.lower()
-
-    # Last‑chance fallback: the plugin encodes strength on the sigma_link guide too
-    if sigma_from_dataset is None and sigma_from_plugin is None:
-        for g in r.guides:
-            if getattr(g, "kind", "") == "sigma_link":
-                st = (g.payload or {}).get("strength")
-                if isinstance(st, str) and st.lower() in {"low", "mid", "high"}:
-                    sigma_from_plugin = st.lower()
-                    break
-
-    strength = sigma_from_dataset or sigma_from_plugin
-    if strength:
-        entries.append(("sigma", f"σ70 {strength}"))
-    return entries
-
-
 def _ffmpeg_extra_args() -> list[str]:
     """
     Output options for FFmpeg that make the produced MP4 broadly compatible and resilient:
@@ -187,10 +127,18 @@ def render_video(
     total_duration: Optional[float] = None,
     report: Optional[ReportFn] = None,
 ) -> None:
-    style = style or Style()
+    style = style if style is not None else resolve_style()
     palette = palette or Palette(style.palette)
     out_path = Path(out_path)
-    emit = (lambda *_: None) if report is None else (lambda ev, **kw: report(ev, kw))
+    if report is None:
+
+        def emit(_event: str, **_payload: object) -> None:
+            return None
+
+    else:
+
+        def emit(event: str, **payload: object) -> None:
+            report(event, payload)
 
     if fmt != "mp4":
         raise ExportError("Only mp4 is supported for video export in v0.")
@@ -210,6 +158,8 @@ def render_video(
     recs = list(records)
     if not recs:
         raise ExportError("No records to render. Check your dataset path, filters/limits, or plugin configuration.")
+    if style.show_reverse_complement and any(r.alphabet != "DNA" for r in recs):
+        raise AlphabetError("Two-strand display is only supported for DNA alphabet records.")
 
     # Freeze layout across frames
     global_n = max(len(r.sequence) for r in recs)
@@ -218,8 +168,8 @@ def render_video(
     for r in recs:
         up = [a for a in r.annotations if a.strand == "fwd"]
         dn = [a for a in r.annotations if a.strand == "rev"]
-        up_tracks = assign_tracks(up)
-        dn_tracks = assign_tracks(dn)
+        up_tracks = assign_tracks_forward(up)
+        dn_tracks = assign_tracks_generic(dn)
         max_up = max(max_up, (max(up_tracks) + 1) if up_tracks else 0)
         max_dn = max(max_dn, (max(dn_tracks) + 1) if dn_tracks else 0)
     fixed_tracks = (max_up, max_dn)
@@ -240,7 +190,7 @@ def render_video(
         out_path=None,
         fixed_tracks=fixed_tracks,
         fixed_n=global_n,
-        legend_entries=_legend_entries_for_record(recs[0]),
+        legend_entries=legend_entries_for_record(recs[0]),
     )
     first_fig.canvas.draw()
     import numpy as np
@@ -297,7 +247,7 @@ def render_video(
                     out_path=None,
                     fixed_tracks=fixed_tracks,
                     fixed_n=global_n,
-                    legend_entries=_legend_entries_for_record(rec),
+                    legend_entries=legend_entries_for_record(rec),
                 )
                 f.canvas.draw()
                 arr = np.asarray(f.canvas.buffer_rgba())

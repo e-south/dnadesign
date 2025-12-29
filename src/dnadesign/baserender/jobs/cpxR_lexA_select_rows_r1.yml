@@ -1,83 +1,76 @@
+version: 2
 input:
   path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr/datasets/60bp_dual_promoter_cpxR_LexA/records.parquet
   format: parquet
   columns:
-    id: id
     sequence: sequence
     annotations: densegen__used_tfbs_detail
+    id: id
   alphabet: DNA
-  limit: 100     # set 0 to process all rows
-  sample_seed: 42
+  sample:
+    mode: random_rows
+    n: 100
+    seed: 42
   annotations:
     ambiguous: first
-    zero_as_unspecified: true      # treat 0 as “no offset” (matches your data)
-    offset_mode: auto              # accept either 0-based or 1-based if offset is provided
+    zero_as_unspecified: true
+    offset_mode: auto
     require_non_empty: false
-    min_per_record: 1              # at least one parsed annotation
-    require_non_null_cols:
-
-# explicit selection from a CSV
-selection:
-  # resolves against the baserender root
-  path: inputs/r0_preds.csv           # e.g., a file with an 'id' header
-  match_on: id                       # id | sequence | row
-  column: id                         # which column in the CSV to read
-  overlay_column: details
-  keep_order: true                   # video/stills follow CSV order
-  on_missing: warn                   # skip|warn|error if not found
-
-plugins:
+    min_per_record: 1
+    require_non_null_cols: null
+pipeline:
+  plugins:
   - sigma70:
       spacer_min: 15
       spacer_max: 19
-      label_mode: inner   # inner → "16–18 bp" for 15..19
-      # Optionally tighten/loosen the line’s inset from boxes (in bases):
+      label_mode: inner
       inner_margin_bp: 0.35
       variants:
-        - name: sigma70_high
-          upstream: "TTGACA"
-          downstream: "TATAAT"
-        - name: sigma70_mid
-          upstream: "ACCGCG"
-          downstream: "TATAAT"
-        - name: sigma70_low
-          upstream: "GCAGGT"
-          downstream: "TATAAT"
-
+      - name: sigma70_high
+        upstream: TTGACA
+        downstream: TATAAT
+      - name: sigma70_mid
+        upstream: ACCGCG
+        downstream: TATAAT
+      - name: sigma70_low
+        upstream: GCAGGT
+        downstream: TATAAT
+selection:
+  path: inputs/r0_preds.csv
+  match_on: id
+  column: id
+  overlay_column: details
+  keep_order: true
+  on_missing: warn
 style:
-  track_spacing: 35.0      # vertical gap between annotation rows
-  baseline_spacing: 40.0   # distance between forward & reverse baselines
-  padding_y: 05.0          # top/bottom padding; increases natural frame height
-  legend_height_px: 16.0   # reserved space; prevents overlap
-  legend_pad_px: 10.0     # bottom margin below legend
-  legend: true
-  font_size_seq: 14
-  font_size_label: 12
-  kmer:
-    height_factor: 1.10     # for example, a taller box
-    text_v_align: center    # center the white letters in the box
-    round_px: 5.0
-    pad_x_px: 1.025                  # widen k‑mer background boxes slightly
-    fill_alpha: 0.88
-  sigma_link_inner_margin_bp: 0.50  # default for all sigma links
-  palette:
-    sigma: "#969eba"        # σ⁷⁰ color
-    "tf:cpxr": "#bf812e"    # quote keys with ':'
-    "tf:lexa": "#dfc27e"
-
+  overrides:
+    track_spacing: 35.0
+    baseline_spacing: 40.0
+    padding_y: 5.0
+    legend_height_px: 16.0
+    legend_pad_px: 10.0
+    legend: true
+    font_size_seq: 14
+    font_size_label: 12
+    kmer:
+      height_factor: 1.1
+      text_v_align: center
+      round_px: 5.0
+      pad_x_px: 1.025
+      fill_alpha: 0.88
+    sigma_link_inner_margin_bp: 0.5
+    palette:
+      sigma: '#969eba'
+      tf:cpxr: '#bf812e'
+      tf:lexa: '#dfc27e'
 output:
   video:
     fmt: mp4
-    # fps must be an integer. To get "0.5 fps" behavior,
-    # use fps: 1 and frames_per_record: 2.
     fps: 6
     frames_per_record: 5
     pauses: {}
     width_px: 1200
     height_px: null
-    aspect: "18:4"         # letterboxed; pixels of the sequence are not stretched
-
+    aspect: '18:4'
   images:
-    # If omitted, defaults to results/<job>/images/
-    # dir: results/CpxR_LexA_from_csv/images
     fmt: png

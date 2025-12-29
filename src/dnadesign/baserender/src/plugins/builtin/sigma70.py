@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/plugins/builtin/sigma70.py
+src/dnadesign/baserender/src/plugins/builtin/sigma70.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -45,6 +45,7 @@ class Sigma70Plugin:
     label_text: Optional[str] = None
     # Default inner margin between the link and boxes (in bases). Can be overridden per-guide.
     inner_margin_bp: Optional[float] = None
+    on_multiple_matches: Literal["error", "first"] = "error"
 
     def __init__(
         self,
@@ -54,14 +55,23 @@ class Sigma70Plugin:
         label_mode: str = "inner",
         label_text: Optional[str] = None,
         inner_margin_bp: Optional[float] = None,
-        **_: object,
+        on_multiple_matches: str = "error",
+        **kwargs: object,
     ):
+        if kwargs:
+            raise PluginError(f"Unknown sigma70 plugin parameter(s): {sorted(kwargs.keys())}")
         self.name = "sigma70"
         self.spacer_min = int(spacer_min)
         self.spacer_max = int(spacer_max)
         self.label_text = label_text
         lm = str(label_mode).lower().strip()
-        self.label_mode = "inner" if lm not in {"inner", "outer", "observed", "custom"} else lm  # type: ignore[assignment]
+        if lm not in {"inner", "outer", "observed", "custom"}:
+            raise PluginError("sigma70.label_mode must be one of inner|outer|observed|custom")
+        self.label_mode = lm  # type: ignore[assignment]
+        om = str(on_multiple_matches).lower().strip()
+        if om not in {"error", "first"}:
+            raise PluginError("sigma70.on_multiple_matches must be error|first")
+        self.on_multiple_matches = om  # type: ignore[assignment]
         self.inner_margin_bp = float(inner_margin_bp) if inner_margin_bp is not None else None
         if variants:
             self.variants = tuple(SigmaVariant(**v) for v in variants)
@@ -98,14 +108,12 @@ class Sigma70Plugin:
                     if s10 in dns:
                         matches.append((v, s35, s10))
                         break
-                if any(m[0] is v for m in matches):
-                    break
 
-        distinct_variants = {m[0].name for m in matches}
-        if len(distinct_variants) > 1:
+        if len(matches) > 1 and self.on_multiple_matches == "error":
+            variants = sorted({m[0].name for m in matches})
             raise PluginError(
-                f"Multiple sigma70 variants matched in sequence '{record.id}': "
-                f"{sorted(distinct_variants)}. Expected at most one."
+                f"Multiple sigma70 matches found in sequence '{record.id}': {variants}. "
+                "Set on_multiple_matches: first to allow the earliest match."
             )
 
         anns: List[Annotation] = []
@@ -116,7 +124,10 @@ class Sigma70Plugin:
         existing = {(a.strand, a.start, a.length, a.label.upper()) for a in record.annotations}
 
         if matches:
-            v, s35, s10 = matches[0]
+            if len(matches) > 1 and self.on_multiple_matches == "first":
+                v, s35, s10 = min(matches, key=lambda m: (m[1], m[2]))
+            else:
+                v, s35, s10 = matches[0]
             # Single, unified tag for all sigma variants (one color in the plot).
             tag_base = "sigma"
             strength_raw = v.name.split("_", 1)[-1] if "_" in v.name else v.name

@@ -4,6 +4,5 @@
 src/dnadesign/baserender/__init__.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """

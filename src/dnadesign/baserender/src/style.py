@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/style.py
+src/dnadesign/baserender/src/style.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -19,8 +19,6 @@ from .contracts import SchemaError, ensure
 class GlyphStyle:
     # Rounded rectangle radius (px) for k‑mer boxes.
     round_px: float = 4.0
-    # Internal padding inside the rounded box (px).
-    pad_px: float = 2.0
     # Outline width (px). 0.0 = facecolor only.
     edge_width: float = 0.0
     # Box fill opacity (1.0 = opaque).

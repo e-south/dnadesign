@@ -1,12 +1,15 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/src/plugins/__init__.py
+src/dnadesign/baserender/src/config/__init__.py
+
+Configuration loaders for baserender.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
+
 """
 
-from .registry import DerivedAnnotationPlugin, load_plugins
+from .job_v2 import JobV2, load_job_v2
 
-__all__ = ["load_plugins", "DerivedAnnotationPlugin"]
+__all__ = ["JobV2", "load_job_v2"]

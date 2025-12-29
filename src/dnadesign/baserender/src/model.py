@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/model.py
+src/dnadesign/baserender/src/model.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -57,6 +57,7 @@ class SeqRecord:
     sequence: str
     annotations: Sequence[Annotation] = field(default_factory=tuple)
     guides: Sequence[Guide] = field(default_factory=tuple)
+    row_index: int | None = None
 
     def validate(self) -> "SeqRecord":
         seq = self.sequence
@@ -65,6 +66,13 @@ class SeqRecord:
             f"Unsupported alphabet: {self.alphabet}",
             AlphabetError,
         )
+        if self.alphabet != "DNA":
+            has_rev = any(a.strand == "rev" for a in self.annotations)
+            ensure(
+                not has_rev,
+                "Reverse-strand annotations are only supported for DNA alphabet records.",
+                AlphabetError,
+            )
         if self.alphabet == "DNA":
             # allow ACGTN only, case-insensitive
             allowed = set("ACGTNacgtn")

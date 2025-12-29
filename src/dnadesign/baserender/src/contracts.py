@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/contracts.py
+src/dnadesign/baserender/src/contracts.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
