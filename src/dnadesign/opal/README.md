@@ -6,7 +6,7 @@
 - **Score** every candidate sample with **X** present.
 - **Reduce** each prediction Ŷ to a **single scalar** via your configured **objective** → `pred__y_obj_scalar`.
 - **Rank** candidates by that score and **select top-k**.
-- **Append** canonical events to **`outputs/events.parquet`** (per-round predictions + run metadata).
+- **Append** canonical events to **ledger sinks** under **`outputs/`** (per-round predictions + run metadata).
 - **Persist** artifacts per round (model, selection CSV, round context, objective meta, logs) for auditability.
 
 The pipeline is plugin-driven: swap **transforms** (X/Y), **models**, **objectives**, and **selection** strategies in `campaign.yaml` without touching core code.
@@ -91,21 +91,21 @@ opal objective-meta -c campaign.yaml --round latest
 * **Per-round**
   - `outputs/round_<k>/`
   - `model.joblib`
+  - `model_meta.json`
   - `selection_top_k.csv`
+  - `labels_used.parquet`
   - `round_ctx.json` *(runtime audit & fitted Y-ops)*
   - `objective_meta.json` *(objective mode/params/keys)*
   - `round.log.jsonl`
 
 * **Campaign-wide ledger (append-only)**
 
-  * `outputs/ledger.runs/`
+  * `outputs/ledger.runs.parquet`
     - Plugin configs, counts, objective summaries, artifact hashes, versions.
   * `outputs/ledger.predictions/`
     - Ŷ vector, scalar score, selection rank/flag, and row-level diagnostics (e.g., logic fidelity/effects).
-  * `outputs/ledger.labels/`
+  * `outputs/ledger.labels.parquet`
     - 1 row per label event (observed round, id, y).
-  * `outputs/ledger.index.parquet`
-    - small convenience subset for fast scans (run/id/round, scalar score, selection fields).
 
 Schemas are **append-only**; keys are unique:
   `run_id` (runs), `(run_id,id)` (predictions), `(observed_round,id)` (labels).
@@ -131,7 +131,7 @@ src/dnadesign/opal/src/
 ├─ models/                  # model wrappers (e.g., RandomForest)
 ├─ objectives/              # objective fns (Ŷ → scalar score + diagnostics)
 ├─ selection/               # selection strategies (scores → ranks/selected)
-├─ artifacts.py             # round artifacts IO (ctx/meta/log/selection CSV, events parquet)
+├─ artifacts.py             # round artifacts IO (ctx/meta/log/selection CSV, ledger sinks)
 ├─ writebacks.py            # canonical event builders + cache writers
 ├─ data_access.py           # RecordsStore (IO, label history, fixed-width X)
 ├─ round_context.py         # RoundCtx (runtime carrier)
@@ -144,7 +144,7 @@ Common commands (details in the **[CLI Manual](./src/cli/README.md)**):
 
 * `opal init` — scaffold & register the campaign workspace; write `state.json`
 * `opal ingest-y` — transform and append labels to `records.parquet`
-* `opal run` — train/score/select for a round; write artifacts + `outputs/events.parquet`
+* `opal run` — train/score/select for a round; write artifacts + ledger sinks under `outputs/`
 * `opal predict` — score a table from a frozen model (no write-backs)
 * `opal record-show` — per-record history view
 * `opal status` — dashboard summary from `state.json`
@@ -164,10 +164,14 @@ Common commands (details in the **[CLI Manual](./src/cli/README.md)**):
 ├─ state.json
 ├─ inputs/                       # drop experimental label files here
 └─ outputs/
-   ├─ events.parquet             # append-only canonical events table
+   ├─ ledger.predictions/        # append-only run_pred parts
+   ├─ ledger.runs.parquet         # run_meta (deduped)
+   ├─ ledger.labels.parquet       # label events (ingest-only)
    └─ round_<k>/
       ├─ model.joblib
+      ├─ model_meta.json
       ├─ selection_top_k.csv
+      ├─ labels_used.parquet
       ├─ round_ctx.json
       ├─ objective_meta.json
       └─ round.log.jsonl
@@ -245,7 +249,7 @@ safety:
 * Models are not aware of downstream objectives (see **Runtime Carriers**)
 * Objectives derive their own round constants via `train_view` and publish them.
 * Selection can read whatever objectives produced.
-* The persisted `round_ctx.json` makes runs **auditable** alongside `events.parquet`, `model.joblib`, `selection_top_k.csv`, and `objective_meta.json`.
+* The persisted `round_ctx.json` makes runs **auditable** alongside ledger sinks, `model.joblib`, `model_meta.json`, `selection_top_k.csv`, and `objective_meta.json`.
 
 ```bash
 # Labels
@@ -258,8 +262,8 @@ records.parquet [X] -> transforms_x -> X (fixed width)
 # Train & score
 X + labels -> model.fit -> predict Ŷ -> objective -> pred__y_obj_scalar -> selection (top-k)
 
-# Canonical events sink
-outputs/events.parquet: { label | run_pred | run_meta }
+# Canonical ledger sinks
+outputs/ledger.*: { label | run_pred | run_meta }
 ```
 
 ---

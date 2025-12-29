@@ -62,16 +62,18 @@ opal objective-meta -c campaign.yaml --round latest
 Artifacts appear in `outputs/round_0/`:
 
 * `model.joblib`
+* `model_meta.json`
 * `selection_top_k.csv`
+* `labels_used.parquet`
 * `round_ctx.json`
 * `objective_meta.json`
 * `round.log.jsonl`
 
-Canonical events are appended to **`outputs/events.parquet`**:
+Canonical events are appended to **ledger sinks** under `outputs/`:
 
-* `label` — rows emitted by `ingest-y`
-* `run_pred` — one per candidate scored
-* `run_meta` — one per run with config and artifact checksums
+* `label` → `outputs/ledger.labels.parquet` (rows emitted by `ingest-y`)
+* `run_pred` → `outputs/ledger.predictions/` (one per candidate scored)
+* `run_meta` → `outputs/ledger.runs.parquet` (one per run with config and artifact checksums)
 
 **Ergonomic caches** written to `records.parquet`:
 
