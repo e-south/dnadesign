@@ -40,7 +40,6 @@ def cmd_record_show(
     id: str = typer.Option(None, "--id"),
     sequence: str = typer.Option(None, "--sequence"),
     with_sequence: bool = typer.Option(True, "--with-sequence/--no-sequence"),
-    legacy: bool = typer.Option(False, "--legacy", help="Read from legacy events.parquet (deprecated)."),
     json: bool = typer.Option(False, "--json"),
 ):
     try:
@@ -66,14 +65,7 @@ def cmd_record_show(
                 raise OpalError("Record not found for key; use --id or --sequence explicitly.")
 
         ws = CampaignWorkspace.from_config(cfg, cfg_path)
-        ledger_reader = None
-        legacy_path = None
-        if legacy:
-            legacy_path = ws.outputs_dir / "events.parquet"
-            if not legacy_path.exists():
-                raise OpalError(f"Legacy events.parquet not found at {legacy_path}.")
-        else:
-            ledger_reader = LedgerReader(ws)
+        ledger_reader = LedgerReader(ws)
 
         report = build_record_report(
             df,
@@ -82,7 +74,6 @@ def cmd_record_show(
             sequence=sequence,
             with_sequence=with_sequence,
             ledger_reader=ledger_reader,
-            legacy_events_path=legacy_path,
             records_path=store.records_path,
         )
         if json:

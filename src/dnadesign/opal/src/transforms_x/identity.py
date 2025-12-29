@@ -22,8 +22,14 @@ import numpy as np
 import pandas as pd
 
 from ..registries.transforms_x import register_transform_x
+from ..round_context import PluginCtx, roundctx_contract
 
 
+@roundctx_contract(
+    category="transform_x",
+    requires=[],
+    produces=["transform_x/<self>/x_dim"],
+)
 @register_transform_x("identity")
 def _factory(params: Optional[Dict[str, Any]] = None):
     """
@@ -62,12 +68,14 @@ def _factory(params: Optional[Dict[str, Any]] = None):
         # numeric scalar
         return np.asarray([float(v)], dtype=float)
 
-    def _transform(series: pd.Series) -> np.ndarray:
+    def _transform(series: pd.Series, ctx: Optional[PluginCtx] = None) -> np.ndarray:
         rows = [_parse_cell(v) for v in series.tolist()]
         lengths = {int(r.size) for r in rows}
         if len(lengths) != 1:
             raise ValueError(f"identity transform requires consistent vector length; saw lengths={sorted(lengths)}")
         width = lengths.pop()
+        if ctx is not None:
+            ctx.set("transform_x/<self>/x_dim", int(width))
         X = np.vstack([r.reshape(1, width) for r in rows])
         if expected_len is not None and width != expected_len:
             raise ValueError(f"identity transform expected_length={expected_len} but got {width}")

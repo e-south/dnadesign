@@ -20,31 +20,27 @@ import pyarrow.compute as pc
 from pyarrow import dataset as ds
 
 
-def resolve_events_path(context) -> Path:
+def resolve_outputs_dir(context) -> Path:
     """
-    Resolve a *handle* into the outputs/ root. We no longer require the thin index to exist.
-    - If the campaign YAML provides a path under 'events', use it (for legacy runs).
-    - Otherwise return <campaign_dir>/outputs/ledger.index.parquet (even if missing),
-      because callers only need its parent (outputs/) to find typed sinks.
+    Resolve the campaign outputs/ directory (ledger sinks live here).
     """
-    p = context.data_paths.get("events")
-    if p is None:
-        p = context.campaign_dir / "outputs" / "ledger.index.parquet"
-    return Path(p)
+    if hasattr(context, "workspace"):
+        return Path(context.workspace.outputs_dir)
+    return Path(context.campaign_dir) / "outputs"
 
 
 def load_events_with_setpoint(
-    events_path: Path,
+    outputs_dir: Path,
     base_columns: Iterable[str],
     round_selector: Optional[Union[str, int, List[int]]] = None,
 ) -> pd.DataFrame:
     """
     Read the minimum columns needed for a plot **from the ledger** and join
     the setpoint from `ledger.runs` via `objective__params.setpoint_vector`.
-    `events_path` should point to outputs/ledger.index.parquet (thin index).
+    `outputs_dir` should point to the campaign's outputs/ directory.
     """
     want: Set[str] = set(map(str, base_columns)) | {"run_id"}
-    root = events_path.parent
+    root = outputs_dir
     pred_dir = root / "ledger.predictions"
     runs_file = root / "ledger.runs.parquet"
 

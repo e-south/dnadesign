@@ -94,7 +94,7 @@ def cmd_run(
             "scored": res.scored,
             "top_k_requested": res.top_k_requested,
             "top_k_effective": res.top_k_effective,
-            "events": res.events_path,
+            "ledger": res.ledger_path,
             "top_k_source": "cli_override" if k is not None else "yaml_default",
         }
         if json:

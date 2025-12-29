@@ -23,3 +23,6 @@ def test_intensity_median_iqr_round_trip():
     Yt = run_y_ops_pipeline(stage="fit_transform", y_ops=ops, Y=Y, ctx=rctx)
     Yr = run_y_ops_pipeline(stage="inverse", y_ops=ops, Y=Yt, ctx=rctx)
     assert np.allclose(Y, Yr)
+    snap = rctx.snapshot()
+    produced = snap.get("core/contracts/yops/intensity_median_iqr/produced", [])
+    assert "yops/intensity_median_iqr/center" in produced

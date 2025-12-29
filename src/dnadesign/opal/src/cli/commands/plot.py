@@ -8,7 +8,7 @@ OPAL CLI — plot
 A lean driver that:
 - resolves campaign.yaml (or campaign directory),
 - builds a minimal PlotContext,
-- auto-injects built-in data sources if present (events, records, artifacts),
+- auto-injects built-in data sources if present (records, artifacts),
 - dispatches to plot plugins via the registry,
 - writes outputs (overwrite by default),
 - continues on errors and prints full tracebacks,
@@ -30,6 +30,7 @@ import yaml
 
 from ...plots._context import PlotContext
 from ...registries.plot import get_plot
+from ...workspace import CampaignWorkspace
 from ..registry import cli_command
 from ._common import load_cli_config, resolve_config_path, store_from_cfg
 
@@ -107,6 +108,7 @@ def cmd_plot(
     campaign_dir, campaign_cfg, campaign_yaml = _resolve_campaign_dir(cfg_path)
     cfg = load_cli_config(campaign_yaml)
     store = store_from_cfg(cfg)
+    ws = CampaignWorkspace.from_config(cfg, cfg_path)
     typer.secho(f"[plot] Using config: {cfg_path}", fg=typer.colors.CYAN)
 
     plots_cfg = campaign_cfg.get("plots") or []
@@ -125,8 +127,6 @@ def cmd_plot(
 
     # Built-in data sources (auto-injected if present)
     builtins = {
-        # Handle into ledger sinks under outputs/ (index may not exist).
-        "events": campaign_dir / "outputs" / "ledger.index.parquet",
         # Records path resolved from campaign data location
         "records": Path(store.records_path),
         "artifacts": campaign_dir / "artifacts",
@@ -261,6 +261,7 @@ def cmd_plot(
 
         ctx = PlotContext(
             campaign_dir=campaign_dir,
+            workspace=ws,
             rounds=rounds_sel,
             data_paths=data_paths,
             output_dir=Path(out_dir),

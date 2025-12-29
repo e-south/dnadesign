@@ -12,6 +12,8 @@ import pandas as pd
 import pytest
 
 from dnadesign.opal.src.data_access import RecordsStore
+from dnadesign.opal.src.registries.transforms_x import get_transform_x
+from dnadesign.opal.src.round_context import PluginRegistryView, RoundCtx
 from dnadesign.opal.src.transforms_x import identity  # noqa: F401 (registers identity)
 from dnadesign.opal.src.utils import OpalError
 
@@ -39,7 +41,11 @@ def test_transform_matrix_preserves_order(tmp_path):
         }
     )
     store = _store(tmp_path)
-    X, order = store.transform_matrix(df, ["b", "a"])
+    reg = PluginRegistryView("model", "objective", "selection", "identity", "transform_y")
+    rctx = RoundCtx(core={"core/round_index": 0}, registry=reg)
+    tx = get_transform_x("identity", {})
+    tctx = rctx.for_plugin(category="transform_x", name="identity", plugin=tx)
+    X, order = store.transform_matrix(df, ["b", "a"], ctx=tctx)
     assert order == ["b", "a"]
     assert X.tolist() == [[2.0], [1.0]]
 
@@ -56,4 +62,8 @@ def test_transform_matrix_rejects_duplicate_ids(tmp_path):
     )
     store = _store(tmp_path)
     with pytest.raises(OpalError):
-        store.transform_matrix(df, ["a", "a"])
+        reg = PluginRegistryView("model", "objective", "selection", "identity", "transform_y")
+        rctx = RoundCtx(core={"core/round_index": 0}, registry=reg)
+        tx = get_transform_x("identity", {})
+        tctx = rctx.for_plugin(category="transform_x", name="identity", plugin=tx)
+        store.transform_matrix(df, ["a", "a"], ctx=tctx)

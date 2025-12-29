@@ -15,7 +15,7 @@ from typing import List
 import matplotlib.pyplot as plt
 
 from ..registries.plot import register_plot
-from ._events_util import load_events_with_setpoint, resolve_events_path
+from ._events_util import load_events_with_setpoint, resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta, scale_to_sizes, scatter_smart
 from ._param_utils import (
     event_columns_for,
@@ -27,7 +27,7 @@ from ._param_utils import (
 
 @register_plot("scatter_score_vs_rank")
 def render(context, params: dict) -> None:
-    events_path = resolve_events_path(context)
+    outputs_dir = resolve_outputs_dir(context)
 
     score_field = get_str(params, ["score_field"], "pred__y_obj_scalar")
     score_field = normalize_metric_field(score_field) or "pred__y_obj_scalar"
@@ -66,7 +66,7 @@ def render(context, params: dict) -> None:
     }
     # Ensure optional hue/size columns are loaded if they refer to ledger columns
     need |= event_columns_for(hue_field, size_by)
-    df = load_events_with_setpoint(events_path, need, round_selector=context.rounds)
+    df = load_events_with_setpoint(outputs_dir, need, round_selector=context.rounds)
     if df.empty:
         raise ValueError("ledger.predictions had zero rows for requested columns.")
 

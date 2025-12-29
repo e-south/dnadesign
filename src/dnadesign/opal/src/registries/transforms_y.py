@@ -14,9 +14,12 @@ Dunlop Lab
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import numpy as np
+
+from ..round_context import Contract, PluginCtx, RoundCtx
 
 # ---- Ingest transforms ----
 
@@ -33,11 +36,33 @@ def register_transform_y(name: str):
     return _wrap
 
 
+def _wrap_for_ctx_enforcement(name: str, fn: Callable[..., Any]) -> Callable[..., Any]:
+    """
+    Enforce PluginCtx contract pre/post checks if ctx is provided.
+    """
+    contract = getattr(fn, "__opal_contract__", None)
+
+    def _wrapped(df_tidy, params, *, ctx: PluginCtx | None = None):
+        if contract is not None and ctx is None:
+            raise ValueError(f"transform_y[{name}] requires ctx for contract enforcement.")
+        if ctx is not None:
+            ctx.precheck_requires()
+        out = fn(df_tidy, params, ctx=ctx)
+        if ctx is not None:
+            ctx.postcheck_produces()
+        return out
+
+    if contract is not None:
+        setattr(_wrapped, "__opal_contract__", contract)
+    return _wrapped
+
+
 def get_transform_y(name: str) -> Callable[..., Any]:
     try:
-        return _TRANSFORM_Y[name]
+        fn = _TRANSFORM_Y[name]
     except KeyError as e:
         raise ValueError(f"Unknown Y transform: {name!r}") from e
+    return _wrap_for_ctx_enforcement(name, fn)
 
 
 def list_transforms_y() -> List[str]:
@@ -46,13 +71,26 @@ def list_transforms_y() -> List[str]:
 
 # ---- Y-ops (runtime) ----
 
-_Y_OPS: Dict[
-    str,
-    Tuple[Callable[..., Any], Callable[..., Any], Callable[..., Any], Optional[Type[Any]]],
-] = {}
+
+@dataclass(frozen=True)
+class YOpSpec:
+    fit_fn: Callable[..., Any]
+    transform_fn: Callable[..., Any]
+    inverse_fn: Callable[..., Any]
+    ParamModel: Optional[Type[Any]]
+    requires: Tuple[str, ...]
+    produces: Tuple[str, ...]
 
 
-def register_y_op(name: str):
+_Y_OPS: Dict[str, YOpSpec] = {}
+
+
+def register_y_op(
+    name: str,
+    *,
+    requires: Optional[List[str]] = None,
+    produces: Optional[List[str]] = None,
+):
     """
     Register a Y-op. The factory should return (fit_fn, transform_fn, inverse_fn, ParamModel|None)
     where:
@@ -69,7 +107,15 @@ def register_y_op(name: str):
         spec = factory()
         if not (isinstance(spec, tuple) and len(spec) == 4):
             raise ValueError("Y-op factory must return (fit, transform, inverse, ParamModel)")
-        _Y_OPS[name] = spec
+        fit_fn, transform_fn, inverse_fn, ParamT = spec
+        _Y_OPS[name] = YOpSpec(
+            fit_fn=fit_fn,
+            transform_fn=transform_fn,
+            inverse_fn=inverse_fn,
+            ParamModel=ParamT,
+            requires=tuple(requires or ()),
+            produces=tuple(produces or ()),
+        )
         return factory
 
     return _wrap
@@ -94,7 +140,7 @@ def run_y_ops_pipeline(
     stage: str,  # "fit_transform" | "inverse"
     y_ops: List[Any],  # list of config.PluginRef (has .name and .params)
     Y: np.ndarray,
-    ctx,  # RoundCtx (or compatible) with .get(key, default), .set(key, val)
+    ctx: RoundCtx,
 ) -> np.ndarray:
     """
     Apply Y-ops according to the configured pipeline.
@@ -123,14 +169,23 @@ def run_y_ops_pipeline(
 
     if stage == "fit_transform":
         for entry in y_ops or []:
-            fit_fn, xform_fn, inv_fn, ParamT = get_y_op(entry.name)
+            spec = get_y_op(entry.name)
+            ParamT = spec.ParamModel
             params = ParamT(**(entry.params or {})).model_dump() if ParamT is not None else dict(entry.params or {})
-            # side-effect: write fitted stats into ctx under yops/<name>/*
-            fit_fn(Yt, ParamT(**params) if ParamT is not None else params, ctx=ctx)
-            Yt = np.asarray(
-                xform_fn(Yt, ParamT(**params) if ParamT is not None else params, ctx=ctx),
-                dtype=float,
+            params_obj = ParamT(**params) if ParamT is not None else params
+            # Contract: enforce requires before fit; enforce produces after transform.
+            fit_contract = Contract(
+                category="yops",
+                requires=spec.requires,
+                produces=spec.produces,
             )
+            fit_ctx = ctx.for_plugin(category="yops", name=entry.name, contract=fit_contract)
+            fit_ctx.precheck_requires()
+            # side-effect: write fitted stats into ctx under yops/<name>/*
+            spec.fit_fn(Yt, params_obj, ctx=fit_ctx)
+            Yt = np.asarray(spec.transform_fn(Yt, params_obj, ctx=fit_ctx), dtype=float)
+            fit_ctx.postcheck_produces()
+
             names.append(entry.name)
             params_used.append(dict(params))
 
@@ -146,9 +201,15 @@ def run_y_ops_pipeline(
 
     # Invert in reverse order of fit/transform
     for name, params in zip(reversed(names), reversed(params_used)):
-        fit_fn, xform_fn, inv_fn, ParamT = get_y_op(name)
-        Yt = np.asarray(
-            inv_fn(Yt, ParamT(**params) if ParamT is not None else params, ctx=ctx),
-            dtype=float,
+        spec = get_y_op(name)
+        ParamT = spec.ParamModel
+        params_obj = ParamT(**params) if ParamT is not None else params
+        inv_contract = Contract(
+            category="yops",
+            requires=spec.requires + spec.produces,
+            produces=tuple(),
         )
+        inv_ctx = ctx.for_plugin(category="yops", name=name, contract=inv_contract)
+        inv_ctx.precheck_requires()
+        Yt = np.asarray(spec.inverse_fn(Yt, params_obj, ctx=inv_ctx), dtype=float)
     return Yt

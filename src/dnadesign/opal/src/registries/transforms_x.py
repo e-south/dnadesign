@@ -17,6 +17,8 @@ from typing import Any, Callable, Dict, Optional
 import numpy as np
 import pandas as pd
 
+from ..round_context import Contract, PluginCtx
+
 _REGISTRY: Dict[str, Callable[..., Callable[[pd.Series], np.ndarray]]] = {}
 
 
@@ -36,11 +38,19 @@ def list_transforms_x() -> list[str]:
     return sorted(_REGISTRY.keys())
 
 
-def _assert_and_wrap(name: str, fn: Callable[[pd.Series], Any]) -> Callable[[pd.Series], np.ndarray]:
+def _assert_and_wrap(
+    name: str,
+    fn: Callable[[pd.Series, Optional[PluginCtx]], Any],
+    contract: Optional[Contract],
+) -> Callable[[pd.Series, Optional[PluginCtx]], np.ndarray]:
     """Wrap returned callable to enforce ndarray[float] with shape (N,F)."""
 
-    def _wrapped(series: pd.Series) -> np.ndarray:
-        X = fn(series)
+    def _wrapped(series: pd.Series, *, ctx: Optional[PluginCtx] = None) -> np.ndarray:
+        if contract is not None and ctx is None:
+            raise ValueError(f"transform_x[{name}] requires ctx for contract enforcement.")
+        if contract is not None and ctx is not None:
+            ctx.precheck_requires()
+        X = fn(series, ctx=ctx)
         X = np.asarray(X, dtype=float)
         if X.ndim == 1:
             X = X.reshape(-1, 1)
@@ -48,12 +58,17 @@ def _assert_and_wrap(name: str, fn: Callable[[pd.Series], Any]) -> Callable[[pd.
             raise ValueError(f"transform_x[{name}] returned shape {tuple(X.shape)} for input length {len(series)}")
         if not np.all(np.isfinite(X)):
             raise ValueError(f"transform_x[{name}] produced non-finite values.")
+        if contract is not None and ctx is not None:
+            ctx.postcheck_produces()
         return X
 
     return _wrapped
 
 
-def get_transform_x(name: str, params: Optional[Dict[str, Any]] = None) -> Callable[[pd.Series], np.ndarray]:
+def get_transform_x(
+    name: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Callable[[pd.Series, Optional[PluginCtx]], np.ndarray]:
     """
     Build a configured transform by name. `params` is optional for back-compat.
     Returns a callable that accepts a pandas Series and returns ndarray (N,F).
@@ -64,6 +79,10 @@ def get_transform_x(name: str, params: Optional[Dict[str, Any]] = None) -> Calla
     factory = _REGISTRY[name]
     try:
         fn = factory(params or {})
-    except TypeError:
-        fn = factory()  # type: ignore[misc]
-    return _assert_and_wrap(name, fn)
+    except TypeError as e:
+        raise ValueError(f"transform_x factory '{name}' must accept a params dict.") from e
+    contract = getattr(factory, "__opal_contract__", None)
+    wrapped = _assert_and_wrap(name, fn, contract)
+    if contract is not None:
+        setattr(wrapped, "__opal_contract__", contract)
+    return wrapped

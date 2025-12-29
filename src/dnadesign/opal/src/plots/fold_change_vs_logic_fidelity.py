@@ -16,14 +16,14 @@ import numpy as np
 import pandas as pd
 
 from ..registries.plot import register_plot
-from ._events_util import load_events_with_setpoint, resolve_events_path
+from ._events_util import load_events_with_setpoint, resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta, scale_to_sizes, scatter_smart
 from ._param_utils import event_columns_for, get_float, get_str, normalize_metric_field
 
 
 @register_plot("fold_change_vs_logic_fidelity")
 def render(context, params: dict) -> None:
-    events_path = resolve_events_path(context)
+    outputs_dir = resolve_outputs_dir(context)
 
     delta = get_float(params, ["intensity_log2_offset_delta"], 0.0)
     # Allow user to choose the Y axis: fold_change (default), effect_raw/scaled, or score.
@@ -106,7 +106,7 @@ def render(context, params: dict) -> None:
     # If hue/size/y ask for objective/pred/sel columns, load them from predictions
     # (fold_change is derived locally and won't be added here)
     need |= event_columns_for(hue_field, size_by, y_axis)
-    df = load_events_with_setpoint(events_path, need, round_selector=context.rounds)
+    df = load_events_with_setpoint(outputs_dir, need, round_selector=context.rounds)
 
     # Round selection: single round (default latest)
     rsel = context.rounds

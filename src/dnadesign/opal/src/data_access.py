@@ -31,6 +31,7 @@ import numpy as np
 import pandas as pd
 
 from .registries.transforms_x import get_transform_x
+from .round_context import PluginCtx
 from .utils import OpalError
 
 ESSENTIAL_COLS = [
@@ -461,11 +462,13 @@ class RecordsStore:
         cols = [c for c in cols if c in df.columns]
         return df.loc[keep, cols].copy()
 
-    def transform_matrix(self, df: pd.DataFrame, ids: Iterable[str]) -> Tuple[np.ndarray, List[str]]:
+    def transform_matrix(self, df: pd.DataFrame, ids: Iterable[str], *, ctx: PluginCtx) -> Tuple[np.ndarray, List[str]]:
         """
         Build X matrix for given ids using configured transform_x plugin.
         Returns (X, id_order)
         """
+        if ctx is None:
+            raise OpalError("transform_matrix requires a PluginCtx for transform_x.")
         id_list = [str(i) for i in ids]
         if len(id_list) != len(set(id_list)):
             raise OpalError("transform_matrix received duplicate ids.")
@@ -491,7 +494,7 @@ class RecordsStore:
             raise OpalError(f"X column '{self.x_col}' is null for ids (sample={bad_ids}).")
 
         tx = get_transform_x(self.x_transform_name, self.x_transform_params)
-        X = tx(series)
+        X = tx(series, ctx=ctx)
         if X.shape[0] != len(id_list):
             raise OpalError(f"transform_x[{self.x_transform_name}] returned {X.shape[0]} rows for {len(id_list)} ids.")
         return np.asarray(X), id_list

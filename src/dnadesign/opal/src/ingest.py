@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 from .registries.transforms_y import get_transform_y
+from .round_context import PluginCtx
 from .utils import OpalError
 
 
@@ -57,19 +58,24 @@ def _vec_len(v: Any) -> int:
     return 1
 
 
-def _apply_transform_via_registry(name: str, params: Dict[str, Any], csv_df: pd.DataFrame) -> pd.DataFrame:
+def _apply_transform_via_registry(
+    name: str,
+    params: Dict[str, Any],
+    csv_df: pd.DataFrame,
+    *,
+    ctx: PluginCtx,
+) -> pd.DataFrame:
     """
     Call the registered Y-ingest transform. We tolerate (csv_df, params)
     or (csv_df, **params) call patterns for plugin friendliness.
     """
     fn = get_transform_y(name)
     try:
-        return fn(csv_df, params)  # fn(df, params)
-    except TypeError:
-        try:
-            return fn(csv_df, **(params or {}))  # fn(df, **params)
-        except TypeError as e:
-            raise OpalError(f"Y transform '{name}' has an unsupported signature.") from e
+        return fn(csv_df, params, ctx=ctx)  # required signature
+    except TypeError as e:
+        raise OpalError(
+            f"Y transform '{name}' has an unsupported signature. Expected: fn(df_tidy, params: dict, ctx=PluginCtx)."
+        ) from e
 
 
 def run_ingest(
@@ -81,14 +87,18 @@ def run_ingest(
     y_expected_length: Optional[int],
     y_column_name: str,
     duplicate_policy: str,
+    ctx: PluginCtx,
 ) -> Tuple[pd.DataFrame, IngestPreview]:
     """
     Returns:
       labels_df: DataFrame with at least ['sequence','y'] and, where resolvable, 'id'
       preview:   IngestPreview
     """
+    if ctx is None:
+        raise OpalError("run_ingest requires a PluginCtx for transform_y.")
+
     # 1) Transform tidy -> (sequence, y)
-    labels = _apply_transform_via_registry(transform_name, transform_params, csv_df)
+    labels = _apply_transform_via_registry(transform_name, transform_params, csv_df, ctx=ctx)
 
     # 1b) Validate Y vectors strictly (no fallbacks)
     for i, v in enumerate(labels["y"].tolist()):

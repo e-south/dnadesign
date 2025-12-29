@@ -18,10 +18,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from ..workspace import CampaignWorkspace
+
 
 @dataclass
 class PlotContext:
     campaign_dir: Path
+    workspace: CampaignWorkspace
     rounds: str | list[int]  # "unspecified" | "latest" | "all" | [ints]
     data_paths: dict[str, Path]  # built-ins + YAML data entries (resolved)
     output_dir: Path

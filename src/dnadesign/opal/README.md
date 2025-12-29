@@ -151,6 +151,7 @@ Common commands (details in the **[CLI Manual](./src/cli/README.md)**):
 * `opal explain` — dry-run planner (no writes)
 * `opal validate` — table checks (essentials + X present; Y sane if present)
 * `opal plot` — run campaign-declared plots
+* `opal ctx` — inspect `round_ctx.json` carriers (show/audit/diff)
 
 ---
 
@@ -301,10 +302,12 @@ def my_objective_plugin(..., ctx=None, train_view=None): ...
 #### Validation lifecycle
 
 1. Runner builds `RoundCtx` with **core keys** and **plugin names**.
-2. It creates **plugin-scoped contexts** and checks **`requires`**.
+2. It creates **plugin-scoped contexts** (model, objective, selection, transform_x, y-ops) and checks **`requires`**.
 3. Plugins run, using `ctx.get(...)` / `ctx.set(...)`.
    Reads/writes are **audited** into `core/contracts/...`.
 4. Runner checks **`produces`**; on success, writes `round_ctx.json`.
+
+Use `opal ctx show|audit|diff` to inspect these carriers directly.
 
 ---
 
