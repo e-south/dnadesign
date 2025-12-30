@@ -20,7 +20,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -68,7 +68,7 @@ def _recover_linear_intensity(y_star: np.ndarray, delta: float) -> np.ndarray:
 
 def _compute_train_effect_pool(train_view, setpoint: np.ndarray, delta: float, *, min_n: int) -> Sequence[float]:
     """
-    Prefer *current round* labels if available; otherwise fall back to all labels ≤ as_of_round.
+    Use *current round* labels only for round-calibrated scaling.
     """
     w = _weights_from_setpoint(setpoint)
 
@@ -79,36 +79,72 @@ def _compute_train_effect_pool(train_view, setpoint: np.ndarray, delta: float, *
         ylin = _recover_linear_intensity(y[4:8], delta)
         return float(np.dot(w, ylin))
 
-    # Try current-round-only (duck-type)
-    pool_cur: list[float] = []
-    if hasattr(train_view, "iter_labels_y_current_round"):
-        for y in train_view.iter_labels_y_current_round():
-            v = _dot_effect(y)
-            if v is not None:
-                pool_cur.append(v)
-        if len(pool_cur) >= int(min_n):
-            return pool_cur
+    if not hasattr(train_view, "iter_labels_y_current_round"):
+        raise ValueError("[sfxi_v1] train_view must expose iter_labels_y_current_round() for round-calibrated scaling.")
 
-    # Fallback: all labels
-    pool_all: list[float] = []
-    for y in train_view.iter_labels_y():
+    pool_cur: list[float] = []
+    for y in train_view.iter_labels_y_current_round():
         v = _dot_effect(y)
         if v is not None:
-            pool_all.append(v)
-    return pool_all
+            pool_cur.append(v)
+
+    if len(pool_cur) < int(min_n):
+        raise ValueError(
+            f"[sfxi_v1] Need at least min_n={int(min_n)} labels in current round to scale intensity; "
+            f"got {len(pool_cur)}. Add labels or lower scaling.min_n."
+        )
+    return pool_cur
 
 
-def _resolve_denom_from_pool(pool: Sequence[float], *, p: int, fallback_p: int, min_n: int, eps: float) -> float:
+def _resolve_denom_from_pool(pool: Sequence[float], *, p: int, min_n: int, eps: float) -> float:
     arr = np.asarray(pool, dtype=float)
-    if arr.size >= int(min_n):
-        v = float(np.percentile(arr, int(p)))
-    elif arr.size > 0:
-        v = float(np.percentile(arr, int(fallback_p)))
-    else:
-        v = float("nan")
-    if not np.isfinite(v) or v <= 0.0:
-        v = float(eps)
+    if arr.size < int(min_n):
+        raise ValueError(
+            f"[sfxi_v1] Need at least min_n={int(min_n)} labels in current round to compute denom; got {arr.size}."
+        )
+    v = float(np.percentile(arr, int(p)))
+    if not np.isfinite(v):
+        raise ValueError(f"[sfxi_v1] Invalid denom computed (value={v}). Check labels and scaling config.")
+    if v < 0.0:
+        raise ValueError(f"[sfxi_v1] Denom percentile is negative (value={v}). Check labels and scaling config.")
+    if not np.isfinite(eps) or eps <= 0.0:
+        raise ValueError(f"[sfxi_v1] eps must be positive and finite; got {eps}.")
+    v = max(v, float(eps))
     return v
+
+
+def _parse_scaling_cfg(raw: Any) -> Tuple[int, int, float]:
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise ValueError("[sfxi_v1] scaling must be a mapping.")
+    allowed = {"percentile", "min_n", "eps"}
+    extra = sorted(set(raw.keys()) - allowed)
+    if extra:
+        raise ValueError(f"[sfxi_v1] Unknown scaling keys: {extra}. Allowed: {sorted(allowed)}")
+
+    p = int(raw.get("percentile", 95))
+    min_n = int(raw.get("min_n", 5))
+    eps = float(raw.get("eps", 1e-8))
+
+    if not (1 <= p <= 100):
+        raise ValueError(f"[sfxi_v1] scaling.percentile must be in [1, 100]; got {p}.")
+    if min_n <= 0:
+        raise ValueError(f"[sfxi_v1] scaling.min_n must be >= 1; got {min_n}.")
+    if not np.isfinite(eps) or eps <= 0.0:
+        raise ValueError(f"[sfxi_v1] scaling.eps must be positive and finite; got {eps}.")
+    return p, min_n, eps
+
+
+def _parse_setpoint(params: Dict[str, Any]) -> np.ndarray:
+    setpoint = np.asarray(params.get("setpoint_vector", [0, 0, 0, 1]), dtype=float).ravel()
+    if setpoint.size != 4:
+        raise ValueError("[sfxi_v1] setpoint_vector must have length 4.")
+    if not np.all(np.isfinite(setpoint)):
+        raise ValueError("[sfxi_v1] setpoint_vector must be finite.")
+    if np.any(setpoint < 0.0) or np.any(setpoint > 1.0):
+        raise ValueError("[sfxi_v1] setpoint_vector entries must be in [0, 1].")
+    return setpoint
 
 
 @roundctx_contract(
@@ -134,25 +170,26 @@ def sfxi_v1(
     v_hat = np.clip(y_pred[:, 0:4].astype(float), 0.0, 1.0)
     y_star = y_pred[:, 4:8].astype(float)
 
-    setpoint = np.asarray(params.get("setpoint_vector", [0, 0, 0, 1]), dtype=float).ravel()
-    if setpoint.size != 4:
-        raise ValueError("[sfxi_v1] setpoint_vector must have length 4.")
-    setpoint = np.clip(setpoint, 0.0, 1.0)
+    setpoint = _parse_setpoint(params)
 
     beta = float(params.get("logic_exponent_beta", 1.0))
     gamma = float(params.get("intensity_exponent_gamma", 1.0))
     delta = float(params.get("intensity_log2_offset_delta", 0.0))
+    if not np.isfinite(beta) or beta < 0.0:
+        raise ValueError(f"[sfxi_v1] logic_exponent_beta must be >= 0; got {beta}.")
+    if not np.isfinite(gamma) or gamma < 0.0:
+        raise ValueError(f"[sfxi_v1] intensity_exponent_gamma must be >= 0; got {gamma}.")
+    if not np.isfinite(delta) or delta < 0.0:
+        raise ValueError(f"[sfxi_v1] intensity_log2_offset_delta must be >= 0; got {delta}.")
+
     scaling_cfg = dict(params.get("scaling", {}) or {})
-    p = int(scaling_cfg.get("percentile", 95))
-    fallback_p = int(scaling_cfg.get("fallback_p", 75))
-    min_n = int(scaling_cfg.get("min_n", 5))
-    eps = float(scaling_cfg.get("eps", 1e-8))
+    p, min_n, eps = _parse_scaling_cfg(scaling_cfg)
 
     # ---- compute denom from training labels (TrainView) ----
     if train_view is None:
         raise ValueError("[sfxi_v1] train_view is required")
     effect_pool = _compute_train_effect_pool(train_view, setpoint=setpoint, delta=delta, min_n=min_n)
-    denom = _resolve_denom_from_pool(effect_pool, p=p, fallback_p=fallback_p, min_n=min_n, eps=eps)
+    denom = _resolve_denom_from_pool(effect_pool, p=p, min_n=min_n, eps=eps)
 
     # persist into RoundCtx (strict: must be declared in produces)
     if ctx is None:

@@ -75,7 +75,12 @@ def test_run_round_writes_round_ctx_and_ledger(tmp_path):
         ),
         model=PluginRef(name="random_forest", params={"n_estimators": 5, "random_state": 0}),
         selection=SelectionBlock(selection=PluginRef(name="top_n", params={"top_k": 1})),
-        objective=ObjectiveBlock(objective=PluginRef(name="sfxi_v1", params={})),
+        objective=ObjectiveBlock(
+            objective=PluginRef(
+                name="sfxi_v1",
+                params={"scaling": {"min_n": 1}},
+            )
+        ),
         training=TrainingBlock(policy={"cumulative_training": True}),
         ingest=IngestBlock(duplicate_policy="error"),
         scoring=ScoringBlock(score_batch_size=1000),
