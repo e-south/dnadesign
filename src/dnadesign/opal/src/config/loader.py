@@ -158,6 +158,9 @@ class PRoot(BaseModel):
     scoring: PScoring = Field(default_factory=PScoring)
     safety: PSafety = Field(default_factory=PSafety)
     metadata: PMetadata = Field(default_factory=PMetadata)
+    plot_config: Optional[str] = None
+    plot_defaults: Dict[str, Any] = Field(default_factory=dict)
+    plot_presets: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     # Non-core, optional block used by the `opal plot` CLI.
     plots: List[Dict[str, Any]] = Field(default_factory=list)
 
@@ -238,5 +241,6 @@ def load_config(path: Path | str) -> RootConfig:
         scoring=scoring_dc,
         safety=safety_dc,
         metadata=MetadataBlock(notes=pyd.metadata.notes),
+        plot_config=(_abs(pyd.plot_config) if pyd.plot_config else None),
     )
     return root

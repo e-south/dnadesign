@@ -1,15 +1,15 @@
 ## OPAL — Optimization with Active Learning
 
-**OPAL** is an [EVOLVEpro-style](https://www.science.org/doi/10.1126/science.adr6006) active-learning engine for DNA/protein sequence design.
+**OPAL** is an [EVOLVEpro-style](https://www.science.org/doi/10.1126/science.adr6006) active-learning engine for biological sequence design.
 
 - **Train** a top-layer regressor on your chosen representation **X** and label **Y**.
 - **Score** every candidate sample with **X** present.
-- **Reduce** each prediction Ŷ to a **single scalar** via your configured **objective** → `pred__y_obj_scalar`.
+- **Reduce** each prediction Ŷ to a scalar **score** via your configured **objective** → `pred__y_obj_scalar`.
 - **Rank** candidates by that score and **select top-k**.
-- **Append** canonical events to **ledger sinks** under **`outputs/`** (per-round predictions + run metadata).
+- **Append** runtime events to **ledger sinks** under **`outputs/`** (per-round predictions + run metadata).
 - **Persist** artifacts per round (model, selection CSV, round context, objective meta, logs) for auditability.
 
-The pipeline is plugin-driven: swap **transforms** (X/Y), **models**, **objectives**, and **selection** strategies in `campaign.yaml` without touching core code.
+The pipeline is plugin-driven: swap **data transforms** (X/Y), **models**, **objectives**, and **selection** strategies in `campaign.yaml` without touching core code.
 
 > Using OPAL day-to-day? See the **[CLI Manual](./src/cli/README.md)**
 
@@ -17,7 +17,6 @@ The pipeline is plugin-driven: swap **transforms** (X/Y), **models**, **objectiv
 
 ### Contents
 
-* [Quick install](#quick-install)
 * [Quick start](#quick-start)
 * [How OPAL is wired](#how-opal-is-wired)
 
@@ -36,12 +35,14 @@ The pipeline is plugin-driven: swap **transforms** (X/Y), **models**, **objectiv
 * [Safety & validation](#safety--validation)
 * [Data contracts](#data-contracts)
 
-  * [Records schema (required vs recommended)](#records-schema-required-vs-recommended)
+  * [Records schema](#records-schema)
+  * [Ledger output schema](#ledger-output-schema-append-only)
 * [Demo campaign](#demo-campaign)
+
 
 ---
 
-### Quick install
+### Quick start
 
 OPAL lives inside the `dnadesign` repo. The CLI entrypoint is defined in `pyproject.toml`:
 
@@ -50,30 +51,17 @@ OPAL lives inside the `dnadesign` repo. The CLI entrypoint is defined in `pyproj
 opal = "dnadesign.opal.src.cli.app:main"
 ```
 
-Install in editable mode (from the repo root):
-
-```bash
-uv pip install -e .
-# or: pip install -e .
-```
-
----
-
-### Quick start
-
 ```bash
 # 1) Initialize a campaign workspace (creates inputs/, outputs/, state.json, and .opal/config marker)
 opal init -c path/to/campaign.yaml
 
-# 2) Validate essentials + X + (if present) Y shape/finite values
+# 2) Validate essentials + X + (if present) Y shape/values
 opal validate -c path/to/campaign.yaml
 
-# 3) Ingest experimental labels (CSV/Parquet → Y), preview, then write
-#    --round is the observed round stamp (alias: --observed-round)
+# 3) Ingest experimental labels (CSV/Parquet → Y), preview, then write new columns to X dataset
 opal ingest-y -c path/to/campaign.yaml --round 0 --csv path/to/my_labels.csv
 
 # 4) Train on labels with observed_round ≤ R, score the pool, select top-k, persist artifacts & events
-#    --round is the labels-as-of cutoff (alias: --labels-as-of)
 opal run -c path/to/campaign.yaml --round 0
 
 # 5) Inspect progress
@@ -115,7 +103,7 @@ opal prune-source -c path/to/campaign.yaml --scope campaign
     - Plugin configs, counts, objective summaries, artifact hashes, versions.
   * `outputs/ledger.predictions/`
     - Ŷ vector, scalar score, selection rank/flag, and row-level diagnostics (e.g., logic fidelity/effects).
-    - `pred__y_hat_model` is **objective-space** (after any Y-ops inversion), so downstream logic is plugin-agnostic.
+    - `pred__y_hat_model` is in objective-space.
   * `outputs/ledger.labels.parquet`
     - 1 row per label event (observed round, id, y).
 
@@ -182,12 +170,15 @@ plugin names and enforce only declared contracts (transforms/models/objectives/s
 ```
 <repo>/src/dnadesign/opal/campaigns/<my_campaign>/
 ├─ campaign.yaml
+├─ plots.yaml                  # optional plot config (recommended)
+├─ .opal/
+│  └─ config                    # auto-discovery marker (path to campaign.yaml)
 ├─ state.json
 ├─ inputs/                       # drop experimental label files here
 └─ outputs/
    ├─ ledger.predictions/        # append-only run_pred parts
-   ├─ ledger.runs.parquet         # run_meta (deduped)
-   ├─ ledger.labels.parquet       # label events (ingest-only)
+   ├─ ledger.runs.parquet        # run_meta (deduped)
+   ├─ ledger.labels.parquet      # label events (ingest-only)
    └─ round_<k>/
       ├─ model.joblib
       ├─ model_meta.json
@@ -198,8 +189,12 @@ plugin names and enforce only declared contracts (transforms/models/objectives/s
       └─ round.log.jsonl
 ```
 
-> **Note:** sequences usually live in USR datasets under
+> **Note:** sequences may live in USR datasets under
 > `src/dnadesign/usr/datasets/<dataset>/records.parquet` and are not copied into campaigns.
+
+> **Note:** `.opal/` is created by `opal init` to help CLI auto-discover the config.
+> It is safe to delete and will be regenerated.
+
 > **Note:** `state.json` is a run artifact; do not hand‑edit it.
 
 ---
@@ -218,13 +213,28 @@ OPAL reads a configuration YAML, `campaign.yaml`.
 * `objective`: `{ name, params }`
 * `selection`: `{ name, params }` *(strategy, tie handling, objective mode)*
 * `training`: `policy`
-* `training.y_ops`: list of `{ name, params }` (fit/transform/inverse applied at train time and inverted at predict time)
+* `training.y_ops`: list of `{ name, params }` (bespoke transforms applied at train and/or predict time)
 * `ingest`: duplicate handling for label CSVs
 * `scoring`: batch sizing
 * `safety`: preflight/data guards
 * `metadata`: optional notes
+* `plot_config`: optional path to a separate plots YAML (recommended)
 
-### Minimal example
+#### Defaults
+
+If a block is omitted, OPAL supplies conservative defaults:
+
+* `ingest.duplicate_policy`: `error`
+* `scoring.score_batch_size`: `10000`
+* `training.policy`: `{}` and `training.y_ops`: `[]`
+* `safety`: fail_on_mixed_biotype_or_alphabet=true, require_biotype_and_alphabet_on_init=true,
+  conflict_policy_on_duplicate_ids=error, write_back_requires_columns_present=true, accept_x_mismatch=false
+* `metadata.notes`: `""`
+* `plots`: `[]` (no plotting unless declared)
+
+Plugin `params` default to `{}`, but **plugin names are required**.
+
+#### Minimal example
 
 ```yaml
 campaign:
@@ -271,17 +281,30 @@ safety:
 
 ---
 
-### Architecture and data flow
+#### Notes on precedence & wiring
 
-* Models are not aware of downstream objectives (see **Runtime Carriers**)
+* Paths in `campaign.yaml` resolve **relative to the YAML file** (including `campaign.workdir`);
+  prefer `workdir: "."` for portability.
+* CLI flags override YAML **for that invocation**:
+  `run --k` overrides `selection.params.top_k`, `run --score-batch-size` overrides `scoring.score_batch_size`,
+  and `ingest-y --transform/--params` overrides `transforms_y`.
+* `--round` is the canonical flag; `--labels-as-of` and `--observed-round` are aliases.
+* `transforms_y` is used for **ingest only**; model training/prediction uses `transforms_x` plus optional `training.y_ops`.
+* `state.json` records the resolved config per round; ledger sinks are the long‑term source of truth.
+* `plot_config` paths resolve **relative to the campaign.yaml** that declares them.
+
+---
+
+### Architecture & data flow
+
+* Models are not aware of downstream objectives (see **RunCarrier (RoundCtx)**)
 * Objectives derive their own round constants via `train_view` and publish them.
 * Selection can read whatever objectives produced.
 * The persisted `round_ctx.json` makes runs **auditable** alongside ledger sinks, `model.joblib`, `model_meta.json`, `selection_top_k.csv`, and `objective_meta.json`.
 
 ```bash
 # Labels
-my_experimental_data.csv -> transforms_y -> labels [id, y(list<float>)]
-  -> appends event: label
+my_experimental_data.csv -> transforms_y -> labels [id, y(list<float>)] -> appends event: label
 
 # Features
 records.parquet [X] -> transforms_x -> X (fixed width)
@@ -295,7 +318,7 @@ outputs/ledger.*: { label | run_pred | run_meta }
 
 ---
 
-### Runtime Carriers
+#### RunCarrier (RoundCtx)
 
 **RunCarrier** is a runtime companion to `campaign.yaml`: the YAML picks which plugins to run; the carrier records what the run computed that others depend on. The runner persists a compact **`round.log.jsonl`** with stage events (preflight, y‑ops fit/transform, fit start/done, predict batches, y‑ops inverse, objective, selection) and a full **`round_ctx.json`** snapshot for audit.
 
@@ -342,9 +365,11 @@ OPAL is **assertive by default**: it will fail fast on inconsistent inputs rathe
 * `label_hist` is the **single source of truth** for labels. `run`/`explain` require it to be valid.
 * Labels present in the Y column but **missing from `label_hist` are rejected** (use `opal ingest-y` or `opal label-hist repair`).
 * Ledger writes are strict: unknown columns are **errors** (override only with `OPAL_LEDGER_ALLOW_EXTRA=1`).
-* Duplicate handling on ingest is explicit via `ingest.duplicate_policy` (error|keep_first|keep_last).
+* Duplicate handling on ingest is explicit via `ingest.duplicate_policy` (error | keep_first | keep_last).
 
 ### Data contracts
+
+#### Records schema
 
 **Required columns** in `records.parquet`:
 
@@ -378,6 +403,38 @@ Naming: secondary columns follow `<tool>__<field>`.
 
 These caches are **derived** and can be recomputed; canonical records live in ledger sinks.
 Use `opal prune-source` to remove OPAL‑derived columns (including the Y column) when you need to start fresh.
+
+#### Ledger output schema (append-only)
+
+Ledger sinks are the **canonical, append-only** record of what happened in a campaign. They are designed
+for long-term inspection and downstream analysis; avoid treating `records.parquet` caches as the source of truth.
+
+**labels (`outputs/ledger.labels.parquet`)**
+
+* `event`: `"label"`
+* `observed_round`, `id`, `sequence` (if available)
+* `y_obs`: list<float> (canonical Y vector)
+* `src`, `note`
+
+**run_pred (`outputs/ledger.predictions/`)**
+
+* `event`: `"run_pred"`, plus `run_id`, `as_of_round`, `id`, `sequence`
+* `pred__y_dim`, `pred__y_hat_model` (list<float>, objective-space), `pred__y_obj_scalar`
+* `sel__rank_competition`, `sel__is_selected`
+* Optional row diagnostics under `obj__*` (e.g., `obj__logic_fidelity`, `obj__effect_raw`, `obj__effect_scaled`)
+
+**run_meta (`outputs/ledger.runs.parquet`)**
+
+* `event`: `"run_meta"`, plus `run_id`, `as_of_round`
+* Config snapshot: `model__*`, `x_transform__*`, `y_ingest__*`, `objective__*`, `selection__*`, `training__y_ops`
+* Counts + summaries: `stats__*`, `objective__summary_stats`, `objective__denom_*`
+* Provenance: `artifacts` (paths + hashes), `schema__version`, `opal__version`
+
+**Design notes (pragmatic)**
+
+* Keep **row-level diagnostics** in `run_pred`, and **run-level summaries** in `run_meta` for clarity.
+* Prefer **adding new columns** over changing semantics; prefixes (`pred__`, `obj__`, `sel__`, `model__`, `objective__`, `selection__`, `stats__`) keep intent explicit.
+* Treat `schema__version` as the compatibility guardrail when evolving outputs.
 
 ---
 

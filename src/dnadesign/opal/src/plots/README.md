@@ -5,19 +5,44 @@ bespoke by design: each plugin owns its data loading, joins, and styling.
 
 ### How it works
 
-- Add plots to your campaign YAML under a top-level `plots:` list.
-- Run them with:
+- Prefer a separate plots config file (e.g., `plots.yaml`) and reference it from `campaign.yaml` via `plot_config`.
+- Run plots with:
 
 ```bash
-opal plot --config /path/to/campaign.yaml [--round latest|all|3|1,3,7|2-5] [--name my_plot]
+opal plot --config /path/to/campaign.yaml \
+  [--plot-config /path/to/plots.yaml] \
+  [--round latest|all|3|1,3,7|2-5] \
+  [--name my_plot] \
+  [--tag quick]
 ```
 
-### Minimal YAML schema
+### Minimal YAML schema (recommended)
+
+**campaign.yaml**
 
 ```yaml
+plot_config: plots.yaml
+```
+
+**plots.yaml**
+
+```yaml
+plot_defaults:
+  output:
+    format: "png"
+    dpi: 600
+
+plot_presets:
+  fold_change_base:
+    kind: fold_change_vs_logic_fidelity
+    params:
+      intensity_log2_offset_delta: 0.0
+      y_axis: score
+
 plots:
   - name: score_vs_rank_latest        # unique instance label
     kind: scatter_score_vs_rank       # plugin id registered in plots registry
+    tags: [quick]
 
     # Optional extra sources (built-ins auto-injected: records, outputs)
     data:
@@ -37,9 +62,20 @@ plots:
       dpi: 600
       format: "png"                   # png|svg|pdf (png default)
       save_data: false                # save tidy CSV next to the image
+
+  - name: fold_change_numeric
+    preset: fold_change_base
+    params:
+      hue: pred__y_obj_scalar
+      cbar: true
 ```
 
-**Note:** plotting knobs must live under `params:`. Top‑level plotting keys are rejected.
+**Notes:**
+- Plotting knobs must live under `params:`. Top‑level plotting keys are rejected.
+- Use `enabled: false` to keep a plot entry without running it.
+- Presets merge into each plot entry; entry values override preset values.
+- Inline `plots:` in campaign.yaml is still supported, but `plot_config` keeps runtime config lean.
+- `data:` paths are resolved relative to the plots YAML that declares them.
 
 **Built-ins injected** (resolved from the campaign config):
 

@@ -94,7 +94,7 @@ temp.md
 # -----------------------------------------------------------------------------
 # Archives
 # -----------------------------------------------------------------------------
-archived/
+/archived/
 *.zip
 *.tar
 *.tar.gz
@@ -113,15 +113,6 @@ archived/
 *.pkl
 *.pt
 
-# Allow curated demo assets (tracked for the tutorial)
-!src/dnadesign/opal/campaigns/demo/**/*.parquet
-!src/dnadesign/opal/campaigns/demo/**/*.parq
-!src/dnadesign/opal/campaigns/demo/**/*.pq
-!src/dnadesign/opal/campaigns/demo/**/*.feather
-!src/dnadesign/opal/campaigns/demo/**/*.joblib
-!src/dnadesign/opal/campaigns/demo/**/*.pkl
-!src/dnadesign/opal/campaigns/demo/**/*.pt
-
 # -----------------------------------------------------------------------------
 # Images: ignore by default; allow curated exceptions
 # -----------------------------------------------------------------------------
@@ -139,38 +130,42 @@ archived/
 # -----------------------------------------------------------------------------
 # Project-specific
 # -----------------------------------------------------------------------------
-# OPAL campaigns (private, large). Keep only curated examples.
+# Internal archives/prototypes
+src/dnadesign/archived/
+src/dnadesign/prototypes/
+src/dnadesign/usr/archived/
+
+# OPAL campaigns: keep configs tracked, ignore artifacts/data.
 src/dnadesign/opal/campaigns/**
-# Keep the demo campaign (self-contained tutorial)
-!src/dnadesign/opal/campaigns/demo/
-!src/dnadesign/opal/campaigns/demo/**
-# Keep skeleton/template if present
-!src/dnadesign/opal/campaigns/.template/
-!src/dnadesign/opal/campaigns/.template/**
+!src/dnadesign/opal/campaigns/**/
+!src/dnadesign/opal/campaigns/**/campaign.yaml
+!src/dnadesign/opal/campaigns/**/campaign.yml
+!src/dnadesign/opal/campaigns/**/opal.yaml
+!src/dnadesign/opal/campaigns/**/opal.yml
+!src/dnadesign/opal/campaigns/**/plots.yaml
+!src/dnadesign/opal/campaigns/**/plots.yml
+src/dnadesign/opal/campaigns/**/inputs/
 
 # OPAL per-run products anywhere
 **/outputs/
 **/campaign.log.jsonl
 **/round.log.jsonl
 **/state.json
+**/.opal/
 
 # USR datasets (large, not for git)
 src/dnadesign/usr/datasets/**
 
-# Common local project dirs (optional; keep private)
-campaigns/
-datasets/
-prototypes/
-molbench/
-test_configs/
-batches/
+# Common local project dirs
+/campaigns/
+/datasets/
+/prototypes/
+/molbench/
+/test_configs/
+/batches/
 **/batch_results/
 **/results/
 **/cluster_log/
-
-# Docs policy:
-docs/
-!/docs/
 
 # Misc project-generated YAML summaries
 **/progress_status_*.yaml
