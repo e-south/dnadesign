@@ -60,7 +60,7 @@ objective:
     logic_exponent_beta: 1.0
     intensity_exponent_gamma: 1.0
     intensity_log2_offset_delta: 0.0
-    scaling: { percentile: 95, min_n: 5, fallback_p: 75, eps: 1.0e-8 }
+    scaling: { percentile: 95, min_n: 5, eps: 1.0e-8 }
 
 selection:
   name: "top_n"

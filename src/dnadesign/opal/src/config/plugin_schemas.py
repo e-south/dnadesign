@@ -110,6 +110,34 @@ class _RFParams(BaseModel):
     n_jobs: int = -1
 
 
+class _SFXIScaling(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    percentile: int = 95
+    min_n: int = 5
+    eps: float = 1e-8
+
+    @field_validator("percentile")
+    @classmethod
+    def _percentile_range(cls, v):
+        if v < 1 or v > 100:
+            raise ValueError("objective.params.scaling.percentile must be in [1, 100]")
+        return v
+
+    @field_validator("min_n")
+    @classmethod
+    def _min_n_range(cls, v):
+        if v <= 0:
+            raise ValueError("objective.params.scaling.min_n must be >= 1")
+        return v
+
+    @field_validator("eps")
+    @classmethod
+    def _eps_range(cls, v):
+        if v <= 0:
+            raise ValueError("objective.params.scaling.eps must be > 0")
+        return v
+
+
 @register_param_schema("objective", "sfxi_v1")
 class _SFXIParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -117,20 +145,15 @@ class _SFXIParams(BaseModel):
     logic_exponent_beta: float = 1.0
     intensity_exponent_gamma: float = 1.0
     intensity_log2_offset_delta: float = 0.0
-    scaling: Dict[str, Any] = Field(
-        default_factory=lambda: {
-            "percentile": 95,
-            "min_n": 5,
-            "fallback_p": 75,
-            "eps": 1e-8,
-        }
-    )
+    scaling: _SFXIScaling = Field(default_factory=_SFXIScaling)
 
     @field_validator("setpoint_vector")
     @classmethod
     def _len4(cls, v):
         if len(v) != 4:
             raise ValueError("objective.params.setpoint_vector must have length 4 (order: 00,10,01,11)")
+        if any((x < 0.0 or x > 1.0) for x in v):
+            raise ValueError("objective.params.setpoint_vector entries must be in [0, 1]")
         return v
 
 
