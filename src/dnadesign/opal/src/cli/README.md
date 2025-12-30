@@ -39,13 +39,12 @@ Initialize/validate a campaign workspace and write `state.json`.
 **Usage**
 
 ```bash
-opal init --config <yaml> [--json|--human]
+opal init --config <yaml>
 ```
 
 **Flags**
 
 * `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
-* `--json/--human`: Output format (default: human).
 
 **Notes**
 
@@ -61,7 +60,7 @@ Transform a tidy CSV/Parquet to model-ready **Y**, preview, confirm, and append 
 ```bash
 opal ingest-y --config <yaml> --round <r> --csv <path> \
   [--transform <name>] [--params <transform_params.json>] \
-  [--if-exists fail|skip|replace] [--yes] [--json|--human]
+  [--if-exists fail|skip|replace] [--yes]
 ```
 
 **Flags**
@@ -73,7 +72,6 @@ opal ingest-y --config <yaml> --round <r> --csv <path> \
 * `--params`: JSON file with transform params (overrides YAML `transforms_y.params`).
 * `--if-exists`: Behavior if `(id, round)` already exists in label history (`fail`/`skip`/`replace`).
 * `--yes, -y`: Skip interactive prompt.
-* `--json/--human`: Output format (default: human).
 
 **Behavior & checks**
 
@@ -94,7 +92,7 @@ apply the objective, select top-k, write artifacts, append canonical events, and
 
 ```bash
 opal run --config <yaml> --round <r> \
-  [--k <n>] [--resume] [--score-batch-size <n>] [--verbose|--quiet] [--json|--human]
+  [--k <n>] [--resume] [--score-batch-size <n>] [--verbose|--quiet]
 ```
 
 **Flags**
@@ -105,7 +103,6 @@ opal run --config <yaml> --round <r> \
 * `--score-batch-size`: Override `scoring.score_batch_size` for this run.
 * `--resume`: Allow overwriting existing per-round artifacts.
 * `--verbose/--quiet`: Control log verbosity (default: verbose).
-* `--json/--human`: Output format (default: human).
 
 **Pipeline**
 
@@ -202,7 +199,7 @@ Inspect a saved model; optionally dump full feature importances.
 opal model-show \
   [--model-path <path> | --config <yaml> --round <r>] \
   [--model-name <registry_name> --model-params <params.json>] \
-  [--out-dir <dir>] [--json|--human]
+  [--out-dir <dir>]
 ```
 
 **Flags**
@@ -212,7 +209,6 @@ opal model-show \
 * `--round, -r`: Round index to resolve model (default: latest).
 * `--model-name` / `--model-params`: Required if `model_meta.json` is missing.
 * `--out-dir`: Write `feature_importance_full.csv` and print top-20 in JSON.
-* `--json/--human`: Output format (default: human).
 
 #### `objective-meta`
 
@@ -221,7 +217,7 @@ List objective metadata and diagnostic keys for a round.
 **Usage**
 
 ```bash
-opal objective-meta --config <yaml> [--round <k|latest>] [--profile|--no-profile] [--json|--human]
+opal objective-meta --config <yaml> [--round <k|latest>] [--profile|--no-profile]
 ```
 
 **Flags**
@@ -229,7 +225,6 @@ opal objective-meta --config <yaml> [--round <k|latest>] [--profile|--no-profile
 * `--config, -c`: Path to `campaign.yaml` (directories are only supported for `opal plot`).
 * `--round, -r`: Round selector (integer or `latest`).
 * `--profile/--no-profile`: Compute hue/size suitability stats (default: off).
-* `--json/--human`: Output format (default: human).
 
 **Notes**
 
@@ -242,9 +237,9 @@ Inspect `round_ctx.json` carriers.
 **Usage**
 
 ```bash
-opal ctx show  --config <yaml> [--round <k|latest>] [--keys <prefix> ...] [--json|--human]
-opal ctx audit --config <yaml> [--round <k|latest>] [--json|--human]
-opal ctx diff  --config <yaml> --round-a <k|latest> --round-b <k|latest> [--keys <prefix> ...] [--json|--human]
+opal ctx show  --config <yaml> [--round <k|latest>] [--keys <prefix> ...]
+opal ctx audit --config <yaml> [--round <k|latest>]
+opal ctx diff  --config <yaml> --round-a <k|latest> --round-b <k|latest> [--keys <prefix> ...]
 ```
 
 **Flags**
@@ -253,7 +248,6 @@ opal ctx diff  --config <yaml> --round-a <k|latest> --round-b <k|latest> [--keys
 * `--round, -r`: Round selector for `show`/`audit`.
 * `--round-a`, `--round-b`: Round selectors for `diff`.
 * `--keys`: Filter by key prefix (repeatable; applies to `show`/`diff`).
-* `--json/--human`: Output format (default: human).
 
 #### `explain`
 
@@ -262,14 +256,13 @@ Dry-run planner for a round: counts, plan, warnings. **No writes.**
 **Usage**
 
 ```bash
-opal explain --config <yaml> --round <k> [--json|--human]
+opal explain --config <yaml> --round <k>
 ```
 
 **Flags**
 
 * `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
 * `--round, -r, --labels-as-of`: Training cutoff (alias of `--round`).
-* `--json/--human`: Output format (default: human).
 
 Prints: number of training labels, candidate universe size, transforms/models/selection used,
 vector dimension, and any preflight warnings.
@@ -299,8 +292,8 @@ List or inspect `run_meta` entries from `outputs/ledger.runs.parquet`.
 **Usage**
 
 ```bash
-opal runs list --config <yaml> [--round <k|latest>] [--json|--human]
-opal runs show --config <yaml> [--round <k|latest> | --run-id <rid>] [--json|--human]
+opal runs list --config <yaml> [--round <k|latest>]
+opal runs show --config <yaml> [--round <k|latest> | --run-id <rid>]
 ```
 
 **Flags**
@@ -308,7 +301,6 @@ opal runs show --config <yaml> [--round <k|latest> | --run-id <rid>] [--json|--h
 * `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
 * `--round, -r`: Round selector (integer or `latest`).
 * `--run-id`: Explicit run_id to display (show only).
-* `--json/--human`: Output format (default: human).
 
 #### `log`
 
@@ -317,14 +309,13 @@ Summarize `round.log.jsonl` for a round.
 **Usage**
 
 ```bash
-opal log --config <yaml> [--round <k|latest>] [--json|--human]
+opal log --config <yaml> [--round <k|latest>]
 ```
 
 **Flags**
 
 * `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
 * `--round, -r`: Round selector (integer or `latest`).
-* `--json/--human`: Output format (default: human).
 
 #### `validate`
 
@@ -353,7 +344,7 @@ Validate or repair the label history column (explicit, no silent fixes).
 **Usage**
 
 ```bash
-opal label-hist <validate|repair> --config <yaml> [--apply] [--json|--human]
+opal label-hist <validate|repair> --config <yaml> [--apply]
 ```
 
 **Flags**
@@ -361,7 +352,6 @@ opal label-hist <validate|repair> --config <yaml> [--apply] [--json|--human]
 * `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
 * `<validate|repair>`: Action (alias: `check` = `validate`).
 * `--apply`: Apply changes for `repair` (default: dry-run).
-* `--json/--human`: Output format (default: human).
 
 #### Records cache columns
 
@@ -452,7 +442,7 @@ Remove OPAL-derived columns (`opal__*`) and the configured Y column from `record
 
 ```bash
 opal prune-source --config <yaml> [--scope any|campaign] [--keep <col> ...] \
-  [--yes] [--backup|--no-backup] [--json|--human]
+  [--yes] [--backup|--no-backup]
 ```
 
 **Flags**
@@ -462,7 +452,6 @@ opal prune-source --config <yaml> [--scope any|campaign] [--keep <col> ...] \
 * `--keep, -k`: Column name(s) to keep even if matched for deletion (repeatable).
 * `--yes, -y`: Skip interactive prompt.
 * `--backup/--no-backup`: Backup original file before pruning (default: on).
-* `--json/--human`: Output format (default: human).
 
 **Notes**
 
