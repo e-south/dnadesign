@@ -111,3 +111,4 @@ class RootConfig:
     scoring: ScoringBlock
     safety: SafetyBlock
     metadata: MetadataBlock
+    plot_config: Optional[str] = None

@@ -1,0 +1,58 @@
+plot_defaults:
+  output:
+    format: "png"
+    dpi: 600
+    save_data: false
+
+plots:
+  - name: score_vs_rank_latest
+    kind: scatter_score_vs_rank
+    tags: [quick]
+    params:
+      rank_mode: competition    # "sequential" | "competition"
+      hue: effect_scaled        # alias -> obj__effect_scaled
+      cmap: viridis
+      size_by: logic_fidelity   # alias -> obj__logic_fidelity
+      size_min: 12
+      size_max: 48
+      alpha: 0.45
+      rasterize_at: 20000
+      figsize_in: [9, 5]
+    output:
+      save_data: true
+
+  - name: percent_high_activity
+    kind: percent_high_activity_over_rounds
+    tags: [quick]
+    params:
+      threshold: 0.85
+      mode: both                    # violin+swarm on left axis, % line on right axis
+      swarm: true
+      swarm_max_points: 2500
+      swarm_jitter: 0.07
+      swarm_alpha: 0.3
+      rasterize_at: 20000
+      figsize_in: [10, 5]
+
+  - name: sfxi_logic_closeness
+    kind: sfxi_logic_fidelity_closeness
+    tags: [diagnostic]
+    params:
+      figsize_in: [15, 10]     # overall figure size; both panels remain 1:1
+      top_percentile: 25      # optional: show closeness for top 25% nearest-to-setpoint
+      cbar_width_in: 0.25
+      cbar_pad_in: 0.05
+      gap_between_panels_in: 0.35
+
+  - name: fold_change_vs_logic
+    kind: fold_change_vs_logic_fidelity
+    tags: [analysis]
+    params:
+      intensity_log2_offset_delta: 0.0
+      hue: logic_fidelity        # derived
+      size_by: obj__effect_raw   # or "obj__effect_scaled" | "logic_fidelity" | "fold_change"
+      size_min: 10
+      size_max: 60
+      alpha: 0.4
+      rasterize_at: 20000
+      figsize_in: [10, 8]

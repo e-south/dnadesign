@@ -50,10 +50,10 @@ mkdir -p inputs/r0/
 cp ../../../usr/demo_material/demo_y_sfxi.csv inputs/r0/
 
 # 3) Ingest round 0 labels
-opal ingest-y -c campaign.yaml --observed-round 0 --csv inputs/r0/demo_y_sfxi.csv
+opal ingest-y -c campaign.yaml --round 0 --csv inputs/r0/demo_y_sfxi.csv
 
 # 4) Train, score, select for round 0
-opal run -c campaign.yaml --labels-as-of 0
+opal run -c campaign.yaml --round 0
 
 # 5) Lists objective‑level info per round for row‑level diagnostics
 opal objective-meta -c campaign.yaml --round latest
@@ -61,6 +61,7 @@ opal objective-meta -c campaign.yaml --round latest
 
 Tip: when you are **inside** the campaign folder, you can omit `-c campaign.yaml`
 (OPAL auto-discovers the config). From elsewhere, pass `--config`.
+Aliases: `--observed-round` (ingest) and `--labels-as-of` (run) are accepted.
 
 Optional reset (start fresh):
 
@@ -83,6 +84,9 @@ Canonical events are appended to **ledger sinks** under `outputs/`:
 * `label` → `outputs/ledger.labels.parquet` (rows emitted by `ingest-y`)
 * `run_pred` → `outputs/ledger.predictions/` (one per candidate scored)
 * `run_meta` → `outputs/ledger.runs.parquet` (one per run with config and artifact checksums)
+
+Schema note: `run_pred` uses `pred__`, `obj__`, and `sel__` prefixes; `run_meta` uses
+`model__`, `objective__`, `selection__`, `stats__`, plus `schema__version` / `opal__version`.
 
 **Ergonomic caches** written to `records.parquet`:
 
@@ -120,7 +124,7 @@ If the label CSV has **no** `id`, OPAL will:
 campaign:
   name: "Demo (vec8)"
   slug: "demo"
-  workdir: "."
+  workdir: "."  # resolved relative to this file
 
 data:
   # Use the "demo" usr records.parquet file included in the repo.
@@ -132,15 +136,19 @@ data:
 ingest:
   duplicate_policy: "error"
 
-metadata:
-  notes: "Demo campaign for OPAL using SFXI (vec8) and identity X."
-
-safety:
-  fail_on_mixed_biotype_or_alphabet: true
-  require_biotype_and_alphabet_on_init: true
-  conflict_policy_on_duplicate_ids: "error"
-  write_back_requires_columns_present: true
-  accept_x_mismatch: false
+training:
+  policy:
+    cumulative_training: true
+    label_cross_round_deduplication_policy: "latest_only"
+    allow_resuggesting_candidates_until_labeled: true
+  # Ephemeral Y-ops used at fit-time and inverted at predict-time
+  y_ops:
+    - name: intensity_median_iqr     # scales indices 4:8 only; no log2 changes here
+      params:
+        min_labels: 5
+        center: median
+        scale: iqr
+        eps: 1e-8
 
 # --------------------------
 # Plugin blocks (registry-first)
@@ -166,20 +174,7 @@ model:
     oob_score: true
     random_state: 7
     n_jobs: -1
-
-training:
-  policy:
-    cumulative_training: true
-    label_cross_round_deduplication_policy: "latest_only"
-    allow_resuggesting_candidates_until_labeled: true
-  # Ephemeral Y-ops used at fit-time and inverted at predict-time
-  y_ops:
-    - name: intensity_median_iqr     # scales indices 4:8 only; no log2 changes here
-      params:
-        min_labels: 5
-        center: median
-        scale: iqr
-        eps: 1e-8
+    emit_feature_importance: true
 
 objective:
   name: "sfxi_v1"
@@ -195,10 +190,22 @@ selection:
   params:
     top_k: 5
     tie_handling: "competition_rank"
-    objective_mode: "maximize"
+    objective_mode: "maximize"   # minimize|maximize
 
 scoring:
   score_batch_size: 1000
+
+safety:
+  fail_on_mixed_biotype_or_alphabet: true
+  require_biotype_and_alphabet_on_init: true
+  conflict_policy_on_duplicate_ids: "error"
+  write_back_requires_columns_present: true
+  accept_x_mismatch: false
+
+metadata:
+  notes: "Demo campaign for OPAL using SFXI (vec8) and identity X."
+
+plot_config: plots.yaml
 ```
 
 > Next: read about command surface in the **[CLI Manual](./src/cli/README.md)**, or jump back to the **[Top-level README](./README.md)**.
