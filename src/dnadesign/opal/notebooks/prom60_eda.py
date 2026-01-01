@@ -8,16 +8,13 @@ app = marimo.App(width="columns")
 def _():
     import math
     import os
-    from dataclasses import dataclass
     from pathlib import Path
     from textwrap import dedent
-    from typing import Sequence
 
     import altair as alt
     import marimo as mo
     import numpy as np
     import polars as pl
-    import yaml
 
     from dnadesign.opal.src.models.random_forest import RandomForestModel
 
@@ -85,9 +82,7 @@ def _():
     return (
         Path,
         RandomForestModel,
-        Sequence,
         alt,
-        dataclass,
         dedent,
         math,
         mo,
@@ -95,553 +90,78 @@ def _():
         os,
         pl,
         with_title,
-        yaml,
     )
 
 
 @app.cell(hide_code=True)
-def _(Path, Sequence, dataclass, math, np, pl, yaml):
+def _():
     # Notebook polish summary:
     # - Performance: fast list->numpy conversion for vector columns.
     # - Legends: theme-level legend/title colors for visibility on white.
     # - Plots: consistent titles/subtitles and RF/cluster UX improvements.
     # - Clusters: stable numeric ordering for distribution views.
-    @dataclass(frozen=True)
-    class NumericRule:
-        enabled: bool
-        column: str | None
-        op: str
-        value: float | None = None
+    from dnadesign.opal.src import promoter_eda_utils as eda_utils
 
-    SUPPORTED_NUMERIC_OPS = {">=", "<=", "is null", "is not null"}
-
-    def find_repo_root(start: Path) -> Path | None:
-        start = Path(start).resolve()
-        if start.is_file():
-            start = start.parent
-        for candidate in (start, *start.parents):
-            if (candidate / "pyproject.toml").is_file():
-                return candidate
-        return None
-
-    def resolve_usr_root(repo_root: Path | None, env_override: str | None) -> Path:
-        if env_override:
-            override_path = Path(env_override).expanduser().resolve()
-            if not override_path.exists():
-                raise ValueError(f"DNADESIGN_USR_ROOT does not exist: {override_path}")
-            return override_path
-        if repo_root is None:
-            raise ValueError("Could not find repo root (pyproject.toml). Provide an absolute path.")
-        return repo_root / "src" / "dnadesign" / "usr" / "datasets"
-
-    def list_usr_datasets(usr_root: Path) -> list[str]:
-        if not usr_root.exists():
-            return []
-        datasets: list[str] = []
-        for child in usr_root.iterdir():
-            if not child.is_dir():
-                continue
-            if (child / "records.parquet").is_file():
-                datasets.append(child.name)
-        return sorted(datasets)
-
-    def resolve_dataset_path(
-        *,
-        repo_root: Path | None,
-        usr_root: Path | None,
-        dataset_name: str | None,
-        custom_path: str | None,
-    ) -> tuple[Path, str]:
-        custom = (custom_path or "").strip()
-        if custom:
-            custom_path_obj = Path(custom).expanduser()
-            if custom_path_obj.is_absolute():
-                return custom_path_obj, "custom"
-            if repo_root is None:
-                raise ValueError("Relative custom paths require a repo root.")
-            return (repo_root / custom_path_obj).resolve(), "custom"
-        if usr_root is None:
-            raise ValueError("USR root is unavailable; provide a custom path.")
-        if not dataset_name:
-            raise ValueError("Select a dataset or provide a custom path.")
-        return (usr_root / dataset_name / "records.parquet").resolve(), "usr"
-
-    def namespace_summary(columns: Sequence[str], max_examples: int = 3) -> pl.DataFrame:
-        buckets: dict[str, list[str]] = {}
-        for name in columns:
-            if "__" in name:
-                namespace = name.split("__", 1)[0]
-            else:
-                namespace = "core"
-            buckets.setdefault(namespace, []).append(name)
-        rows = []
-        for namespace, cols in sorted(buckets.items()):
-            cols_sorted = sorted(cols)
-            examples = ", ".join(cols_sorted[:max_examples])
-            rows.append({"namespace": namespace, "count": len(cols), "examples": examples})
-        if not rows:
-            return pl.DataFrame({"namespace": [], "count": [], "examples": []})
-        return pl.DataFrame(rows)
-
-    def missingness_summary(df: pl.DataFrame) -> pl.DataFrame:
-        if df.is_empty():
-            return pl.DataFrame({"column": [], "null_pct": [], "non_null_count": []})
-        total = df.height
-        null_counts = df.null_count()
-        null_long = null_counts.transpose(
-            include_header=True,
-            header_name="column",
-            column_names=["null_count"],
-        )
-        return (
-            null_long.with_columns(
-                (pl.col("null_count") / total * 100).alias("null_pct"),
-                (pl.lit(total) - pl.col("null_count")).alias("non_null_count"),
-            )
-            .select(["column", "null_pct", "non_null_count"])
-            .sort("null_pct", descending=True)
-        )
-
-    def opal_label_hist_columns(columns: Sequence[str]) -> list[str]:
-        out = [c for c in columns if c.startswith("opal__") and c.endswith("__label_hist")]
-        return sorted(out)
-
-    def opal_labeled_mask(df: pl.DataFrame, label_hist_cols: Sequence[str]) -> pl.Series:
-        if not label_hist_cols:
-            return pl.Series([False] * df.height)
-        exprs = [(pl.col(col).is_not_null()) & (pl.col(col).list.len().fill_null(0) > 0) for col in label_hist_cols]
-        return df.select(pl.any_horizontal(exprs).alias("opal_labeled"))["opal_labeled"]
-
-    def build_numeric_rule_exprs(rules: Sequence[NumericRule]) -> list[pl.Expr]:
-        exprs: list[pl.Expr] = []
-        for rule in rules:
-            if not rule.enabled:
-                continue
-            if not rule.column:
-                continue
-            if rule.op not in SUPPORTED_NUMERIC_OPS:
-                raise ValueError(f"Unsupported operator: {rule.op}")
-            if rule.op == ">=":
-                if rule.value is None:
-                    continue
-                exprs.append(pl.col(rule.column) >= float(rule.value))
-            elif rule.op == "<=":
-                if rule.value is None:
-                    continue
-                exprs.append(pl.col(rule.column) <= float(rule.value))
-            elif rule.op == "is null":
-                exprs.append(pl.col(rule.column).is_null())
-            elif rule.op == "is not null":
-                exprs.append(pl.col(rule.column).is_not_null())
-        return exprs
-
-    def apply_numeric_rules(df: pl.DataFrame, rules: Sequence[NumericRule]) -> pl.DataFrame:
-        exprs = build_numeric_rule_exprs(rules)
-        if not exprs:
-            return df
-        return df.filter(pl.all_horizontal(exprs))
-
-    @dataclass(frozen=True)
-    class CampaignInfo:
-        label: str
-        path: Path
-        slug: str
-        x_column: str
-        y_column: str
-        y_expected_length: int | None
-        model_name: str
-        model_params: dict
-        objective_name: str
-        objective_params: dict
-        selection_params: dict
-        training_policy: dict
-        y_ops: list[dict]
-
-    def list_campaign_paths(repo_root: Path | None) -> list[Path]:
-        if repo_root is None:
-            return []
-        campaigns_root = repo_root / "src" / "dnadesign" / "opal" / "campaigns"
-        if not campaigns_root.exists():
-            return []
-        return sorted(campaigns_root.rglob("campaign.yaml"))
-
-    def campaign_label_from_path(path: Path, repo_root: Path | None) -> str:
-        if repo_root is None:
-            return str(path)
-        try:
-            return str(path.relative_to(repo_root))
-        except ValueError:
-            return str(path)
-
-    def load_campaign_yaml(path: Path) -> dict:
-        if not path.exists():
-            raise ValueError(f"Campaign config not found: {path}")
-        raw = yaml.safe_load(path.read_text())
-        if not isinstance(raw, dict):
-            raise ValueError("Campaign YAML must be a mapping.")
-        return raw
-
-    def parse_campaign_info(*, raw: dict, path: Path, label: str) -> CampaignInfo:
-        campaign = raw.get("campaign") or {}
-        slug = campaign.get("slug")
-        if not slug:
-            raise ValueError("Campaign YAML missing campaign.slug.")
-        data = raw.get("data") or {}
-        x_column = data.get("x_column_name")
-        y_column = data.get("y_column_name")
-        if not x_column or not y_column:
-            raise ValueError("Campaign YAML missing data.x_column_name or data.y_column_name.")
-        y_expected_length = data.get("y_expected_length")
-
-        model_block = raw.get("model") or {}
-        model_name = model_block.get("name") or "random_forest"
-        model_params = dict(model_block.get("params") or {})
-
-        objective_block = raw.get("objective") or {}
-        objective_name = objective_block.get("name") or "sfxi_v1"
-        objective_params = dict(objective_block.get("params") or {})
-
-        selection_block = raw.get("selection") or {}
-        selection_params = dict(selection_block.get("params") or {})
-
-        training_block = raw.get("training") or {}
-        training_policy = dict(training_block.get("policy") or {})
-        y_ops = list(training_block.get("y_ops") or [])
-
-        return CampaignInfo(
-            label=label,
-            path=path,
-            slug=str(slug),
-            x_column=str(x_column),
-            y_column=str(y_column),
-            y_expected_length=int(y_expected_length) if y_expected_length is not None else None,
-            model_name=str(model_name),
-            model_params=model_params,
-            objective_name=str(objective_name),
-            objective_params=objective_params,
-            selection_params=selection_params,
-            training_policy=training_policy,
-            y_ops=y_ops,
-        )
-
-    def build_label_events(
-        *,
-        df: pl.DataFrame,
-        label_hist_col: str,
-        y_col_name: str,
-    ) -> pl.DataFrame:
-        if label_hist_col not in df.columns:
-            return df.head(0)
-        df_events = df.explode(label_hist_col).drop_nulls(label_hist_col)
-        if df_events.is_empty():
-            return df_events
-        df_events = df_events.with_columns(
-            [
-                pl.col(label_hist_col).struct.field("r").alias("observed_round"),
-                pl.col(label_hist_col).struct.field("src").alias("label_src"),
-                pl.col(label_hist_col).struct.field("ts").alias("label_ts"),
-                pl.col(label_hist_col).struct.field("y").alias(y_col_name),
-            ]
-        ).drop(label_hist_col)
-        return df_events
-
-    def dedup_latest_labels(df: pl.DataFrame, *, id_col: str, round_col: str) -> pl.DataFrame:
-        if df.is_empty():
-            return df
-        if round_col not in df.columns:
-            return df
-        return df.sort(round_col).unique(subset=[id_col], keep="last")
-
-    def safe_is_numeric(dtype: pl.DataType) -> bool:
-        if dtype in (pl.Null, pl.Object):
-            return False
-        unknown = getattr(pl, "Unknown", None)
-        if unknown is not None and dtype == unknown:
-            return False
-        try:
-            return bool(dtype.is_numeric())
-        except Exception:
-            return False
-
-    _COLOR_DENYLIST = {
-        "__row_id",
-        "densegen__gap_fill_basis",
-        "densegen__gap_fill_end",
-        "densegen__gap_fill_gc_actual",
-        "densegen__gap_fill_gc_max",
-        "densegen__gap_fill_gc_min",
-        "densegen__gap_fill_relaxed",
-        "densegen__gap_fill_used",
-        "densegen__library_size",
-        "densegen__visual",
-        "densegen__used_tfbs_detail",
-    }
-    _COLOR_DENY_PREFIXES = ("densegen__gap_fill_",)
-
-    def build_color_dropdown_options(
-        df: pl.DataFrame,
-        *,
-        extra: Sequence[str] | None = None,
-        include_none: bool = False,
-    ) -> list[str]:
-        options: list[str] = []
-        for name, dtype in df.schema.items():
-            if name in _COLOR_DENYLIST:
-                continue
-            if any(name.startswith(prefix) for prefix in _COLOR_DENY_PREFIXES):
-                continue
-            _is_nested = False
-            try:
-                _is_nested = bool(getattr(dtype, "is_nested")())
-            except Exception:
-                _is_nested = False
-            if _is_nested:
-                continue
-            if safe_is_numeric(dtype) or dtype in (
-                pl.Boolean,
-                pl.String,
-                pl.Categorical,
-                pl.Enum,
-                pl.Date,
-                pl.Datetime,
-            ):
-                options.append(name)
-        if extra:
-            for name in extra:
-                if name not in options:
-                    options.append(name)
-        if include_none:
-            return ["(none)"] + options
-        return options
-
-    def list_series_to_numpy(series: pl.Series, *, expected_len: int | None = None):
-        if series.is_empty():
-            return None
-        series_name = series.name or "values"
-        try:
-            df_wide = series.to_frame(series_name).select(pl.col(series_name).list.to_struct()).unnest(series_name)
-            if expected_len is not None and df_wide.width != expected_len:
-                return None
-            if df_wide.null_count().to_numpy().sum() > 0:
-                return None
-            arr = df_wide.to_numpy()
-            if arr.ndim != 2:
-                return None
-            return arr.astype(float, copy=False)
-        except Exception:
-            pass
-
-        values = series.to_list()
-        if not values:
-            return None
-        rows = []
-        for v in values:
-            if v is None:
-                return None
-            arr = np.asarray(v, dtype=float)
-            if arr.ndim != 1:
-                return None
-            if expected_len is not None and arr.size != expected_len:
-                return None
-            rows.append(arr)
-        return np.vstack(rows) if rows else None
-
-    def fit_intensity_median_iqr(y, *, min_labels: int, eps: float):
-        if y.ndim != 2 or y.shape[1] < 8:
-            raise ValueError("intensity_median_iqr expects y with shape (n, 8+).")
-        if y.shape[0] < int(min_labels):
-            return np.zeros(4, dtype=float), np.ones(4, dtype=float), False
-        block = y[:, 4:8]
-        med = np.median(block, axis=0)
-        q75 = np.percentile(block, 75, axis=0)
-        q25 = np.percentile(block, 25, axis=0)
-        iqr = q75 - q25
-        iqr = np.where(iqr <= 0, float(eps), iqr)
-        return med, iqr, True
-
-    def apply_intensity_median_iqr(y, med, iqr, *, eps: float, enabled: bool):
-        if not enabled:
-            return y
-        out = y.copy()
-        out[:, 4:8] = (out[:, 4:8] - med[None, :]) / np.maximum(iqr[None, :], float(eps))
-        return out
-
-    def invert_intensity_median_iqr(y, med, iqr, *, enabled: bool):
-        if not enabled:
-            return y
-        out = y.copy()
-        out[:, 4:8] = out[:, 4:8] * iqr[None, :] + med[None, :]
-        return out
-
-    @dataclass(frozen=True)
-    class SFXIParams:
-        setpoint: tuple[float, float, float, float]
-        weights: tuple[float, float, float, float]
-        d: float
-        beta: float
-        gamma: float
-        delta: float
-        p: float
-        fallback_p: float
-        min_n: int
-        eps: float
-
-    @dataclass(frozen=True)
-    class SFXIResult:
-        df: pl.DataFrame
-        denom: float
-        weights: tuple[float, float, float, float]
-        d: float
-        pool_size: int
-        denom_source: str
-
-    def compute_sfxi_params(
-        *,
-        setpoint: Sequence[float],
-        beta: float,
-        gamma: float,
-        delta: float,
-        p: float,
-        fallback_p: float,
-        min_n: int,
-        eps: float,
-    ) -> SFXIParams:
-        if len(setpoint) != 4:
-            raise ValueError("setpoint must have length 4")
-        p0, p1, p2, p3 = (float(x) for x in setpoint)
-        total = p0 + p1 + p2 + p3
-        if total <= eps:
-            weights = (0.0, 0.0, 0.0, 0.0)
-        else:
-            weights = (p0 / total, p1 / total, p2 / total, p3 / total)
-        d = math.sqrt(sum(max(v * v, (1.0 - v) * (1.0 - v)) for v in (p0, p1, p2, p3)))
-        if d <= 0:
-            d = eps
-        return SFXIParams(
-            setpoint=(p0, p1, p2, p3),
-            weights=weights,
-            d=d,
-            beta=float(beta),
-            gamma=float(gamma),
-            delta=float(delta),
-            p=float(p),
-            fallback_p=float(fallback_p),
-            min_n=int(min_n),
-            eps=float(eps),
-        )
-
-    def valid_vec8_mask_expr(vec_col: str) -> pl.Expr:
-        vec = pl.col(vec_col)
-        len_ok = vec.list.len() == 8
-        finite_ok = vec.list.eval(pl.element().is_finite()).list.all()
-        return vec.is_not_null() & len_ok & finite_ok
-
-    def _effect_raw_expr(vec_col: str, weights: Sequence[float], delta: float) -> pl.Expr:
-        y0 = pl.col(vec_col).list.get(4)
-        y1 = pl.col(vec_col).list.get(5)
-        y2 = pl.col(vec_col).list.get(6)
-        y3 = pl.col(vec_col).list.get(7)
-        y0_lin = pl.max_horizontal(pl.lit(0.0), (pl.lit(2.0) ** y0) - delta)
-        y1_lin = pl.max_horizontal(pl.lit(0.0), (pl.lit(2.0) ** y1) - delta)
-        y2_lin = pl.max_horizontal(pl.lit(0.0), (pl.lit(2.0) ** y2) - delta)
-        y3_lin = pl.max_horizontal(pl.lit(0.0), (pl.lit(2.0) ** y3) - delta)
-        return weights[0] * y0_lin + weights[1] * y1_lin + weights[2] * y2_lin + weights[3] * y3_lin
-
-    def compute_sfxi_metrics(
-        *,
-        df: pl.DataFrame,
-        vec_col: str,
-        params: SFXIParams,
-        denom_pool_df: pl.DataFrame,
-    ) -> SFXIResult:
-        if vec_col not in df.columns:
-            return SFXIResult(
-                df=df.head(0),
-                denom=params.eps,
-                weights=params.weights,
-                d=params.d,
-                pool_size=0,
-                denom_source="empty",
-            )
-        valid_mask = valid_vec8_mask_expr(vec_col)
-        df_valid = df.filter(valid_mask)
-
-        p0, p1, p2, p3 = params.setpoint
-        v0 = pl.col(vec_col).list.get(0)
-        v1 = pl.col(vec_col).list.get(1)
-        v2 = pl.col(vec_col).list.get(2)
-        v3 = pl.col(vec_col).list.get(3)
-        dist = ((v0 - p0) ** 2 + (v1 - p1) ** 2 + (v2 - p2) ** 2 + (v3 - p3) ** 2) ** 0.5
-        logic_fidelity = (1.0 - dist / params.d).clip(0.0, 1.0)
-
-        effect_raw_expr = _effect_raw_expr(vec_col, params.weights, params.delta)
-
-        pool_size = 0
-        denom_source = "empty"
-        denom = params.eps
-        if vec_col in denom_pool_df.columns and not denom_pool_df.is_empty():
-            pool_dtype = denom_pool_df.schema.get(vec_col, pl.Null)
-            if pool_dtype != pl.Null:
-                pool_valid = denom_pool_df.filter(valid_vec8_mask_expr(vec_col))
-                pool_effect = pool_valid.select(effect_raw_expr.alias("effect_raw"))
-                pool_size = pool_effect.height
-                if pool_size >= params.min_n:
-                    denom = float(pool_effect["effect_raw"].quantile(params.p / 100.0, interpolation="nearest"))
-                    denom_source = "p"
-                elif pool_size > 0:
-                    denom = float(
-                        pool_effect["effect_raw"].quantile(params.fallback_p / 100.0, interpolation="nearest")
-                    )
-                    denom_source = "fallback_p"
-
-        if not math.isfinite(denom) or denom <= 0:
-            denom = params.eps
-        denom = max(denom, params.eps)
-
-        df_sfxi = (
-            df_valid.with_columns(
-                [
-                    logic_fidelity.alias("logic_fidelity"),
-                    effect_raw_expr.alias("effect_raw"),
-                ]
-            )
-            .with_columns(((pl.col("effect_raw") / pl.lit(denom)).clip(0.0, 1.0).alias("effect_scaled")))
-            .with_columns(
-                ((pl.col("logic_fidelity") ** params.beta) * (pl.col("effect_scaled") ** params.gamma)).alias("score")
-            )
-        )
-
-        return SFXIResult(
-            df=df_sfxi,
-            denom=denom,
-            weights=params.weights,
-            d=params.d,
-            pool_size=pool_size,
-            denom_source=denom_source,
-        )
-
+    apply_intensity_median_iqr = eda_utils.apply_intensity_median_iqr
+    build_color_dropdown_options = eda_utils.build_color_dropdown_options
+    build_label_events = eda_utils.build_label_events
+    campaign_label_from_path = eda_utils.campaign_label_from_path
+    compute_sfxi_metrics = eda_utils.compute_sfxi_metrics
+    compute_sfxi_params = eda_utils.compute_sfxi_params
+    coerce_selection_dataframe = eda_utils.coerce_selection_dataframe
+    dedupe_columns = eda_utils.dedupe_columns
+    dedupe_exprs = eda_utils.dedupe_exprs
+    dedup_latest_labels = eda_utils.dedup_latest_labels
+    find_latest_model_artifact = eda_utils.find_latest_model_artifact
+    find_repo_root = eda_utils.find_repo_root
+    fit_intensity_median_iqr = eda_utils.fit_intensity_median_iqr
+    get_feature_importances = eda_utils.get_feature_importances
+    invert_intensity_median_iqr = eda_utils.invert_intensity_median_iqr
+    is_altair_undefined = eda_utils.is_altair_undefined
+    list_campaign_paths = eda_utils.list_campaign_paths
+    list_series_to_numpy = eda_utils.list_series_to_numpy
+    list_usr_datasets = eda_utils.list_usr_datasets
+    load_campaign_yaml = eda_utils.load_campaign_yaml
+    load_intensity_params_from_round_ctx = eda_utils.load_intensity_params_from_round_ctx
+    load_model_artifact = eda_utils.load_model_artifact
+    missingness_summary = eda_utils.missingness_summary
+    namespace_summary = eda_utils.namespace_summary
+    parse_campaign_info = eda_utils.parse_campaign_info
+    resolve_dataset_path = eda_utils.resolve_dataset_path
+    resolve_usr_root = eda_utils.resolve_usr_root
+    safe_is_numeric = eda_utils.safe_is_numeric
+    unwrap_artifact_model = eda_utils.unwrap_artifact_model
+    valid_vec8_mask_expr = eda_utils.valid_vec8_mask_expr
     return (
         apply_intensity_median_iqr,
         build_color_dropdown_options,
         build_label_events,
         campaign_label_from_path,
+        coerce_selection_dataframe,
         compute_sfxi_metrics,
         compute_sfxi_params,
         dedup_latest_labels,
+        dedupe_columns,
+        dedupe_exprs,
+        find_latest_model_artifact,
         find_repo_root,
         fit_intensity_median_iqr,
+        get_feature_importances,
         invert_intensity_median_iqr,
+        is_altair_undefined,
         list_campaign_paths,
         list_series_to_numpy,
         list_usr_datasets,
         load_campaign_yaml,
+        load_intensity_params_from_round_ctx,
+        load_model_artifact,
         missingness_summary,
         namespace_summary,
-        opal_labeled_mask,
         parse_campaign_info,
         resolve_dataset_path,
         resolve_usr_root,
         safe_is_numeric,
+        unwrap_artifact_model,
         valid_vec8_mask_expr,
     )
 
@@ -651,24 +171,33 @@ def _(dedent, mo):
     mo.md(
         dedent(
             """
-    ## Promoter Record Explorer (prom60)
-    `records.parquet` is the consolidated record store for DenseGen-generated 60 bp promoter designs,
-    including TFBS annotations, model embeddings, and OPAL artifacts. This dashboard helps you
-    explore and validate those records end-to-end without writing one-off scripts.
+    ## Promoter Dashboard for Exploratory Data Analysis
 
-    The major tools contribute complementary views: DenseGen provides design generation + TFBS
-    annotations + `densegen__visual`; Infer / Evo2 provides sequence embeddings for neighborhood
-    exploration in UMAP space; Cluster provides Leiden labels + UMAP coordinates; OPAL manages
-    active learning, labels, and per-round artifacts/ledger; and SFXI defines the objective that
-    balances logic fidelity × intensity.
+    `records.parquet` is the record store for `DenseGen`-generated promoter designs,
+    including TFBS annotations, Evo2-derived logits, `OPAL` artifacts, etc. This dashboard helps you
+    explore and validate those records, defaulting to a dataset of 50K 60 bp bacterial promoters containing
+    binding sites for CpxR and LexA.
+
+    Given a collection of transcription factor binding sites, `DenseGen` generates dense arrays + TFBS
+    annotations + `densegen__visual`. `Infer` then generates sequence logits (which come from passing the dense
+    arrays through the 7B-param genomic language model Evo2). After pooling these logits in the sequence
+    dimension (resulting in a [1,512] vector per sequence), we can calculate Leiden clusters on them with
+    `Cluster` + generate UMAP coordinates.
+
+    #### Open question
+
+    Among all these dense array-derived promoters, which ones (when cloned into *E. coli*) exhibit a targeted
+    condition-dependent expression specification? I.e., if we define that we want an AND/OR gate based on the
+    presence of either EtOH or ciprofloxacin, can we navigate this sequence space to find hits? This is where
+    active learning, the `SFXI` metric, and `OPAL` come in.
 
     Suggested workflow
-    1. Pick a dataset (`records.parquet`) and confirm the schema/missingness.
-    2. Skim EDA and build quick plots to spot obvious structure.
-    3. Inspect a record to sanity-check sequences and TFBS placement.
-    4. Explore UMAP neighborhoods and brush a working subset.
-    5. Review OPAL labels + SFXI scoring for the campaign.
-    6. Export a tabular subset for downstream analysis.
+    1. Pick a dataset (`records.parquet`) and explore the schema/missingness.
+    2. Peruse the dataset or do some exploratory data analysis to learn its structure.
+    3. Inspect a record: view its sequence and TFBS placement.
+    4. Explore UMAP neighborhoods and brush select a working subset.
+    5. Look at the SFXI metric; tweak the setpoint and watch sequence scores change.
+    6. (Optional) Export a tabular subset for downstream analysis.
     """
         )
     )
@@ -742,11 +271,17 @@ def _(
     _repo_root_error_md = mo.md(repo_root_error) if repo_root_error is not None else mo.md("")
     mo.stop(repo_root_error is not None, _repo_root_error_md)
 
+    _dataset_choice = dataset_dropdown.value if dataset_dropdown is not None else None
+    if _dataset_choice in {"(none found)", "(none)"}:
+        _dataset_choice = None
+    if not custom_path_text and not _dataset_choice:
+        mo.stop(True, mo.md("No datasets found. Provide a custom path or set `DNADESIGN_USR_ROOT`."))
+
     try:
         dataset_path, dataset_mode = resolve_dataset_path(
             repo_root=repo_root,
             usr_root=usr_root,
-            dataset_name=dataset_dropdown.value,
+            dataset_name=_dataset_choice,
             custom_path=custom_path_input.value,
         )
     except ValueError as exc:
@@ -932,6 +467,7 @@ def _(
         "opal__transient__logic_fidelity",
         "opal__transient__effect_scaled",
         "opal__transient__rank",
+        "opal__transient__observed_event",
         "opal__transient__top_k",
     ]
     _df_explorer_source = df_umap_overlay if df_umap_overlay is not None else df_prelim
@@ -962,6 +498,7 @@ def _(
     bins_slider,
     dataset_explorer_color_dropdown,
     dataset_name,
+    dedupe_exprs,
     df_prelim,
     df_umap_overlay,
     mo,
@@ -980,7 +517,6 @@ def _(
         alt._DNAD_PLOT_SIZE = 420
     _plot_size = alt._DNAD_PLOT_SIZE
     _df_explorer_source = df_umap_overlay if df_umap_overlay is not None else df_prelim
-    _max_plot_rows = min(_df_explorer_source.height, 50_000)
 
     _dataset_label = dataset_name or "dataset"
     _color_value = dataset_explorer_color_dropdown.value
@@ -1001,7 +537,14 @@ def _(
     if plot_type == "scatter":
         if x_col not in _df_explorer_source.columns or y_col not in _df_explorer_source.columns:
             _note_lines.append("Select numeric X and Y columns for scatter.")
-            df_plot = pl.DataFrame({"__row_id": [], "id": [], "x": [], "y": []})
+            df_plot = pl.DataFrame(
+                schema={
+                    "__row_id": pl.Int64,
+                    "id": pl.Utf8,
+                    "x": pl.Float64,
+                    "y": pl.Float64,
+                }
+            )
             chart = (
                 alt.Chart(df_plot)
                 .mark_circle(opacity=0.7, stroke=None, strokeWidth=0)
@@ -1035,7 +578,7 @@ def _(
                 and _color_value not in {x_col, y_col}
             ):
                 _select_exprs.append(pl.col(_color_value))
-            df_plot = _df_explorer_source.select(_select_exprs).head(_max_plot_rows)
+            df_plot = _df_explorer_source.select(dedupe_exprs(_select_exprs))
             if _color_value and _color_value != "(none)":
                 if _color_value not in df_plot.columns:
                     _note_lines.append(f"Color `{_color_value}` unavailable; rendering without color.")
@@ -1052,6 +595,25 @@ def _(
                         _note_lines.append(f"Color `{_color_value}` has no non-null values; rendering without color.")
                     elif _is_nested:
                         _note_lines.append(f"Color `{_color_value}` is nested; rendering without color.")
+                    elif _color_value == "opal__transient__observed_event":
+                        _label_col = f"{_color_value}__label"
+                        df_plot = df_plot.with_columns(
+                            pl.when(pl.col(_color_value))
+                            .then(pl.lit("Observed"))
+                            .otherwise(pl.lit("Not observed"))
+                            .alias(_label_col)
+                        )
+                        _color_title = "Observed events (ingest_y)"
+                        _color_tooltip = _label_col
+                        _color_encoding = alt.Color(
+                            f"{_label_col}:N",
+                            title=_color_title,
+                            scale=alt.Scale(
+                                domain=["Observed", "Not observed"],
+                                range=[_okabe_ito[2], "#B0B0B0"],
+                            ),
+                            legend=alt.Legend(title=_color_title),
+                        )
                     elif _color_value == "opal__transient__top_k":
                         _label_col = f"{_color_value}__label"
                         df_plot = df_plot.with_columns(
@@ -1112,10 +674,16 @@ def _(
     else:
         if x_col not in _df_explorer_source.columns:
             _note_lines.append("Select a numeric column for the histogram.")
-            df_plot = pl.DataFrame({"__row_id": [], "id": [], "x": []})
+            df_plot = pl.DataFrame(
+                schema={
+                    "__row_id": pl.Int64,
+                    "id": pl.Utf8,
+                    "x": pl.Float64,
+                }
+            )
             chart = alt.Chart(df_plot).mark_bar().encode(x=alt.X("x", bin=alt.Bin(maxbins=10)), y=alt.Y("count()"))
         else:
-            df_plot = _df_explorer_source.select([pl.col("__row_id"), pl.col("id"), pl.col(x_col)]).head(_max_plot_rows)
+            df_plot = _df_explorer_source.select(dedupe_exprs([pl.col("__row_id"), pl.col("id"), pl.col(x_col)]))
             chart = (
                 alt.Chart(df_plot)
                 .mark_bar()
@@ -1154,9 +722,11 @@ def _(
 
 @app.cell
 def _(
+    coerce_selection_dataframe,
     dataset_explorer_chart_ui,
     df_prelim,
     df_umap_overlay,
+    is_altair_undefined,
     mo,
     pl,
     x_dropdown,
@@ -1166,22 +736,11 @@ def _(
     _df_explorer_source = df_umap_overlay if df_umap_overlay is not None else df_prelim
     _selected_raw = dataset_explorer_chart_ui.value
 
-    _is_undefined = (
-        _selected_raw is not None
-        and getattr(_selected_raw, "__class__", None) is not None
-        and _selected_raw.__class__.__name__ == "UndefinedType"
-    )
-    if _selected_raw is None or _is_undefined:
+    if _selected_raw is None or is_altair_undefined(_selected_raw):
         df_explorer_selected = _df_explorer_source.head(0)
         explorer_selection_note_md = mo.md("No points selected.")
     else:
-        if isinstance(_selected_raw, pl.DataFrame):
-            _selected_df = _selected_raw
-        else:
-            try:
-                _selected_df = pl.from_pandas(_selected_raw)
-            except TypeError:
-                _selected_df = None
+        _selected_df = coerce_selection_dataframe(_selected_raw)
 
         if _selected_df is None or "__row_id" not in _selected_df.columns:
             df_explorer_selected = _df_explorer_source.head(0)
@@ -1212,13 +771,16 @@ def _(df_active, mo):
 
 
 @app.cell
-def _(df_active, mo, opal_campaign_info, safe_is_numeric):
-    metric_cols = [name for name, dtype in df_active.schema.items() if safe_is_numeric(dtype)]
+def _(df_active, mo, opal_campaign_info, pl, safe_is_numeric):
+    metric_cols = [name for name, dtype in df_active.schema.items() if safe_is_numeric(dtype) and dtype != pl.Boolean]
     slug = opal_campaign_info.slug if opal_campaign_info is not None else None
     preferred_cols = []
     if slug:
         preferred_cols.append(f"opal__{slug}__latest_pred_scalar")
     preferred_cols.append("opal__transient__score")
+    preferred_cols.append("opal__transient__logic_fidelity")
+    preferred_cols.append("opal__transient__effect_scaled")
+    preferred_cols.append("opal__transient__rank")
     for _col in preferred_cols:
         if _col not in metric_cols:
             metric_cols.append(_col)
@@ -1235,7 +797,33 @@ def _(df_active, mo, opal_campaign_info, safe_is_numeric):
         label="Cluster plot metric",
         full_width=True,
     )
-    return (transient_cluster_metric_dropdown,)
+    hue_options = [
+        "(none)",
+        "Leiden cluster",
+        "opal__transient__top_k",
+        "opal__transient__observed_event",
+        "opal__transient__sfxi_scored_label",
+    ]
+    transient_cluster_hue_dropdown = mo.ui.dropdown(
+        options=hue_options,
+        value="Leiden cluster",
+        label="Color by (hue)",
+        full_width=True,
+    )
+    return transient_cluster_hue_dropdown, transient_cluster_metric_dropdown
+
+
+@app.cell
+def _(mo):
+    rf_model_source = mo.ui.radio(
+        options=[
+            "Ephemeral (refit in notebook)",
+            "OPAL artifact (model.joblib)",
+        ],
+        value="Ephemeral (refit in notebook)",
+        label="RF model source",
+    )
+    return (rf_model_source,)
 
 
 @app.cell(column=1)
@@ -1275,7 +863,7 @@ def _(missingness_table, mo, namespace_table, schema_table):
             missingness_table,
             mo.md(
                 "**Schema & dtypes**  \n"
-                "Dtypes matter for plots and filters. Confirm which fields are numeric, categorical, or nested."
+                "Dtypes matter for plots and filters. (e.g., which fields are numeric, categorical, or nested)."
             ),
             schema_table,
         ]
@@ -1314,6 +902,7 @@ def _(build_color_dropdown_options, df_active, mo):
         "opal__transient__score",
         "opal__transient__logic_fidelity",
         "opal__transient__effect_scaled",
+        "opal__transient__observed_event",
         "opal__transient__top_k",
     ]
     umap_color_cols = build_color_dropdown_options(
@@ -1351,6 +940,7 @@ def _(alt, pl):
 def _(
     alt,
     dataset_name,
+    dedupe_columns,
     df_active,
     df_umap_overlay,
     mo,
@@ -1412,7 +1002,14 @@ def _(
 
     df_umap_plot = df_umap_source
     if not umap_valid:
-        df_umap_chart = pl.DataFrame({"__row_id": [], "id": [], _x_name: [], _y_name: []})
+        df_umap_chart = pl.DataFrame(
+            schema={
+                "__row_id": pl.Int64,
+                "id": pl.Utf8,
+                _x_name: pl.Float64,
+                _y_name: pl.Float64,
+            }
+        )
         _chart = (
             alt.Chart(df_umap_chart)
             .mark_circle(stroke=None, strokeWidth=0)
@@ -1432,7 +1029,7 @@ def _(
         _color_field = None
         _color_title = None
         _color_tooltip = None
-        plot_cols = [col for col in ["__row_id", "id", _x_col, _y_col] if col in df_umap_source.columns]
+        plot_cols = dedupe_columns([col for col in ["__row_id", "id", _x_col, _y_col] if col in df_umap_source.columns])
         if _color_value and _color_value != "(none)" and _color_value in df_umap_source.columns:
             if _color_value not in plot_cols:
                 plot_cols.append(_color_value)
@@ -1453,6 +1050,27 @@ def _(
                 _color_title = None
                 _color_tooltip = None
                 _color_encoding = alt.Undefined
+            elif _color_value == "opal__transient__observed_event":
+                _label_col = f"{_color_value}__label"
+                df_umap_chart = df_umap_chart.with_columns(
+                    pl.when(pl.col(_color_value))
+                    .then(pl.lit("Observed"))
+                    .otherwise(pl.lit("Not observed"))
+                    .alias(_label_col)
+                )
+                _color_field = _label_col
+                _color_title = "Observed events (ingest_y)"
+                _color_tooltip = _label_col
+                _color_scale = alt.Scale(
+                    domain=["Observed", "Not observed"],
+                    range=[_okabe_ito[2], "#B0B0B0"],
+                )
+                _color_encoding = alt.Color(
+                    f"{_color_field}:N",
+                    title=_color_title,
+                    scale=_color_scale,
+                    legend=alt.Legend(title=_color_title),
+                )
             elif _color_value == "opal__transient__top_k":
                 _label_col = f"{_color_value}__label"
                 df_umap_chart = df_umap_chart.with_columns(
@@ -1541,7 +1159,9 @@ def _(
 
 @app.cell
 def _(
+    coerce_selection_dataframe,
     df_umap_plot,
+    is_altair_undefined,
     mo,
     pl,
     umap_chart_ui,
@@ -1556,22 +1176,11 @@ def _(
         df_umap_selected = df_umap_plot.head(0)
         umap_selection_note_md = mo.md("UMAP missing; selection disabled.")
     else:
-        _is_undefined = (
-            _selected_raw is not None
-            and getattr(_selected_raw, "__class__", None) is not None
-            and _selected_raw.__class__.__name__ == "UndefinedType"
-        )
-        if _selected_raw is None or _is_undefined:
+        if _selected_raw is None or is_altair_undefined(_selected_raw):
             df_umap_selected = df_umap_plot.head(0)
             umap_selection_note_md = mo.md("No points selected.")
         else:
-            if isinstance(_selected_raw, pl.DataFrame):
-                _selected_df = _selected_raw
-            else:
-                try:
-                    _selected_df = pl.from_pandas(_selected_raw)
-                except TypeError:
-                    _selected_df = None
+            _selected_df = coerce_selection_dataframe(_selected_raw)
 
             if _selected_df is None or "__row_id" not in _selected_df.columns:
                 df_umap_selected = df_umap_plot.head(0)
@@ -1599,14 +1208,7 @@ def _(
 ):
     _export_label = export_source_dropdown.value
     export_note_md = mo.md(
-        "## Optional export (dataframe only)\n"
-        "Exports tabular data only (no plots). Choose the source below:\n"
-        "- **Full dataset (all rows)**: the loaded `records.parquet` table.\n"
-        "- **UMAP brush selection**: rows selected in the UMAP explorer.\n"
-        "- **SFXI scored labels (current view)**: rows scored by the current SFXI view.\n"
-        "- **Current inspected record (single row)**: the active record in the inspector.\n"
-        f"\nSelected source: `{_export_label}` • Format: `{export_format_dropdown.value}`\n"
-        "Destination: `src/dnadesign/opal/notebooks/_outputs/promoter_eda_export.<format>`"
+        "## Export a dataframe\nDestination: `src/dnadesign/opal/notebooks/_outputs/promoter_eda_export.<format>`"
     )
     mo.vstack(
         [
@@ -1634,11 +1236,15 @@ def _(
     preview_mode = None
     preview_path = None
 
+    _dataset_choice = dataset_dropdown.value if dataset_dropdown is not None else None
+    if _dataset_choice in {"(none found)", "(none)"}:
+        _dataset_choice = None
+
     try:
         preview_path, preview_mode = resolve_dataset_path(
             repo_root=repo_root,
             usr_root=usr_root,
-            dataset_name=dataset_dropdown.value,
+            dataset_name=_dataset_choice,
             custom_path=custom_path_input.value,
         )
         preview_exists = preview_path.exists()
@@ -1664,20 +1270,25 @@ def _(
     compute_sfxi_metrics,
     compute_sfxi_params,
     dataset_name,
+    dedupe_columns,
     df_active,
+    find_latest_model_artifact,
     fit_intensity_median_iqr,
+    get_feature_importances,
     invert_intensity_median_iqr,
     list_series_to_numpy,
+    load_intensity_params_from_round_ctx,
+    load_model_artifact,
     math,
     mo,
     np,
     opal_campaign_info,
-    opal_label_view_dropdown,
     opal_labels_asof_df,
     opal_labels_current_df,
     opal_labels_view_df,
     opal_selected_round,
     pl,
+    rf_model_source,
     sfxi_beta_input,
     sfxi_fixed_params,
     sfxi_gamma_input,
@@ -1685,16 +1296,17 @@ def _(
     sfxi_p01_slider,
     sfxi_p10_slider,
     sfxi_p11_slider,
+    unwrap_artifact_model,
     valid_vec8_mask_expr,
     with_title,
 ):
     df_sfxi = df_active.head(0)
     df_umap_overlay = df_active
     sfxi_meta_md = mo.md("")
-    sfxi_debug_md = mo.md("")
     sfxi_notice_md = mo.md("")
     transient_lines = []
     transient_feature_chart = None
+    rf_model_source_note_md = mo.md("Ephemeral RF (session-scoped) · refit on UI changes.")
 
     labels_ready = True
     if opal_campaign_info is None:
@@ -1707,6 +1319,33 @@ def _(
         sfxi_notice_md = mo.md("SFXI expects 8-length label vectors; campaign uses a different length.")
         labels_ready = False
 
+    _rf_source_value = rf_model_source.value if rf_model_source is not None else "Ephemeral (refit in notebook)"
+    _use_artifact = _rf_source_value == "OPAL artifact (model.joblib)"
+    _artifact_model = None
+    _artifact_model_path = None
+    _artifact_round_dir = None
+    if _use_artifact and opal_campaign_info is None:
+        _use_artifact = False
+        rf_model_source_note_md = mo.md("No campaign selected; using ephemeral RF.")
+    elif _use_artifact:
+        try:
+            _artifact_model_path, _artifact_round_dir = find_latest_model_artifact(opal_campaign_info)
+        except Exception as exc:
+            _use_artifact = False
+            rf_model_source_note_md = mo.md(f"Artifact lookup failed: {exc}; using ephemeral RF.")
+        else:
+            if _artifact_model_path is None:
+                _use_artifact = False
+                rf_model_source_note_md = mo.md("No model.joblib found for this campaign; using ephemeral RF.")
+            else:
+                _artifact_obj, _artifact_err = load_model_artifact(_artifact_model_path)
+                _artifact_model = unwrap_artifact_model(_artifact_obj)
+                if _artifact_model is None:
+                    _use_artifact = False
+                    _err_msg = _artifact_err or "Unsupported artifact format"
+                    rf_model_source_note_md = mo.md(f"Artifact load failed: {_err_msg}; using ephemeral RF.")
+                else:
+                    rf_model_source_note_md = mo.md(f"Loaded artifact: `{_artifact_model_path}`")
     _y_col = opal_campaign_info.y_column if opal_campaign_info is not None else None
     _x_col = opal_campaign_info.x_column if opal_campaign_info is not None else None
 
@@ -1732,10 +1371,6 @@ def _(
         eps=eps,
     )
 
-    view_label = (
-        opal_label_view_dropdown.value if opal_label_view_dropdown is not None else "as_of_round (dedup latest per id)"
-    )
-
     if labels_ready:
         if opal_selected_round is None:
             sfxi_notice_md = mo.md("No label rounds available for the selected campaign.")
@@ -1751,17 +1386,6 @@ def _(
                 denom_pool_df=opal_labels_current_df,
             )
             df_sfxi = sfxi_result.df
-            meta_lines = [
-                f"Label view: `{view_label}`",
-                f"Selected round: `{opal_selected_round}`",
-                f"Labels shown: `{opal_labels_view_df.height}`",
-                f"Labels as-of round: `{opal_labels_asof_df.height}`",
-                f"Labels in round: `{opal_labels_current_df.height}`",
-                f"Denom: {sfxi_result.denom:.4g}",
-                f"Pool size: {sfxi_result.pool_size}",
-                f"Denom source: `{sfxi_result.denom_source}`",
-            ]
-            sfxi_debug_md = mo.md("\n".join(meta_lines))
             if sfxi_result.pool_size < params.min_n:
                 sfxi_notice_md = mo.md(
                     f"Insufficient labels in current round for scaling; denom source: `{sfxi_result.denom_source}`."
@@ -1867,43 +1491,71 @@ def _(
                     y_med = np.zeros(4, dtype=float)
                     y_iqr = np.ones(4, dtype=float)
                     y_scale_enabled = False
-                    if intensity_params is not None:
-                        y_iqr_eps = float(intensity_params.get("eps", eps))
-                        _min_labels = int(intensity_params.get("min_labels", min_n))
-                        try:
-                            y_med, y_iqr, y_scale_enabled = fit_intensity_median_iqr(
-                                y_train,
-                                min_labels=_min_labels,
-                                eps=y_iqr_eps,
-                            )
-                            y_train_scaled = apply_intensity_median_iqr(
-                                y_train,
-                                y_med,
-                                y_iqr,
-                                eps=y_iqr_eps,
-                                enabled=y_scale_enabled,
-                            )
-                        except Exception as exc:
-                            transient_lines.append(f"Y-op intensity_median_iqr failed: {exc}")
-                            y_train_scaled = y_train
-                            y_scale_enabled = False
-
-                    transient_lines.append(
-                        f"Transient RF: training started (n_labels={df_train.height}, x_dim={x_train.shape[1]})"
-                    )
-                    model = RandomForestModel(params=opal_campaign_info.model_params)
-                    try:
-                        fit_metrics = model.fit(x_train, y_train_scaled)
-                    except Exception as exc:
-                        transient_lines.append(f"Model fit failed: {exc}")
+                    if _use_artifact and _artifact_model is not None:
+                        _loaded_params = None
+                        if _artifact_round_dir is not None:
+                            _loaded_params = load_intensity_params_from_round_ctx(_artifact_round_dir, eps_default=eps)
+                        if _loaded_params is not None:
+                            y_med, y_iqr, y_scale_enabled, y_iqr_eps = _loaded_params
+                        elif intensity_params is not None:
+                            y_iqr_eps = float(intensity_params.get("eps", eps))
+                            _min_labels = int(intensity_params.get("min_labels", min_n))
+                            try:
+                                y_med, y_iqr, y_scale_enabled = fit_intensity_median_iqr(
+                                    y_train,
+                                    min_labels=_min_labels,
+                                    eps=y_iqr_eps,
+                                )
+                            except Exception as exc:
+                                transient_lines.append(f"Y-op intensity_median_iqr failed: {exc}")
+                                y_scale_enabled = False
+                        model = _artifact_model
+                        model_ready = model is not None
+                        if model_ready:
+                            transient_lines.append("Using OPAL artifact model for predictions.")
                     else:
-                        if fit_metrics is not None:
-                            transient_lines.append(
-                                f"Transient RF fit metrics: oob_r2={fit_metrics.oob_r2}, oob_mse={fit_metrics.oob_mse}"
-                            )
-                        _feature_importances = model.feature_importances()
-                        if _feature_importances is not None and _feature_importances.size:
-                            _feature_count = int(_feature_importances.size)
+                        if intensity_params is not None:
+                            y_iqr_eps = float(intensity_params.get("eps", eps))
+                            _min_labels = int(intensity_params.get("min_labels", min_n))
+                            try:
+                                y_med, y_iqr, y_scale_enabled = fit_intensity_median_iqr(
+                                    y_train,
+                                    min_labels=_min_labels,
+                                    eps=y_iqr_eps,
+                                )
+                                y_train_scaled = apply_intensity_median_iqr(
+                                    y_train,
+                                    y_med,
+                                    y_iqr,
+                                    eps=y_iqr_eps,
+                                    enabled=y_scale_enabled,
+                                )
+                            except Exception as exc:
+                                transient_lines.append(f"Y-op intensity_median_iqr failed: {exc}")
+                                y_train_scaled = y_train
+                                y_scale_enabled = False
+
+                        transient_lines.append(
+                            f"Transient RF: training started (n_labels={df_train.height}, x_dim={x_train.shape[1]})"
+                        )
+                        model = RandomForestModel(params=opal_campaign_info.model_params)
+                        model_ready = False
+                        try:
+                            fit_metrics = model.fit(x_train, y_train_scaled)
+                        except Exception as exc:
+                            transient_lines.append(f"Model fit failed: {exc}")
+                        else:
+                            model_ready = True
+                            if fit_metrics is not None:
+                                transient_lines.append(
+                                    "Transient RF fit metrics: "
+                                    f"oob_r2={fit_metrics.oob_r2}, oob_mse={fit_metrics.oob_mse}"
+                                )
+
+                    if model_ready:
+                        _feature_importances = get_feature_importances(model)
+                        if _feature_importances is not None and np.size(_feature_importances):
+                            _feature_count = int(np.size(_feature_importances))
                             df_importance = pl.DataFrame(
                                 {
                                     "feature_idx": list(range(_feature_count)),
@@ -1956,7 +1608,7 @@ def _(
                                 transient_feature_chart = mo.ui.altair_chart(_imp_chart)
 
                         transient_lines.append("Transient RF: predicting over full pool ...")
-                        df_x_all = df_active.select(["__row_id", "id", _x_col])
+                        df_x_all = df_active.select(dedupe_columns(["__row_id", "id", _x_col]))
                         df_x_valid = df_x_all.filter(
                             pl.col(_x_col).is_not_null() & (pl.col(_x_col).list.len() == x_dim)
                         )
@@ -1975,7 +1627,12 @@ def _(
                                 if x_chunk is None:
                                     failed_chunk = True
                                     break
-                                pred_chunks.append(model.predict(x_chunk))
+                                try:
+                                    pred_chunks.append(model.predict(x_chunk))
+                                except Exception as exc:
+                                    transient_lines.append(f"Model predict failed: {exc}")
+                                    failed_chunk = True
+                                    break
                             if failed_chunk or not pred_chunks:
                                 transient_lines.append("Unable to build feature matrix for full pool.")
                             else:
@@ -2005,7 +1662,11 @@ def _(
                                         .cast(pl.Float64),
                                         pl.col("score").alias("opal__transient__score").cast(pl.Float64),
                                     )
-                                    top_k = int(opal_campaign_info.selection_params.get("top_k", 10))
+                                    try:
+                                        top_k = int(opal_campaign_info.selection_params.get("top_k", 10))
+                                    except Exception:
+                                        top_k = 10
+                                        transient_lines.append("Invalid top_k in campaign config; using 10.")
                                     df_pred_scored = df_pred_scored.with_columns(
                                         pl.col("opal__transient__score")
                                         .rank(method="dense", descending=True)
@@ -2033,60 +1694,184 @@ def _(
                                         f"predicted `{df_pred_scored.height}` candidates."
                                     )
 
-                                    _hist_source = df_pred_scored.filter(pl.col("opal__transient__score").is_not_null())
-                                    if _hist_source.is_empty():
-                                        empty_hist = pl.DataFrame({"opal__transient__score": []})
+                                    _hist_source = df_pred_scored
+                                    if "__row_id" in _hist_source.columns and "__row_id" in df_train.columns:
+                                        _hist_source = _hist_source.join(
+                                            df_train.select("__row_id"),
+                                            on="__row_id",
+                                            how="anti",
+                                        )
+                                    elif "id" in _hist_source.columns and "id" in df_train.columns:
+                                        _hist_source = _hist_source.join(
+                                            df_train.select("id"),
+                                            on="id",
+                                            how="anti",
+                                        )
+                                    _hist_pred = _hist_source.filter(
+                                        pl.col("opal__transient__score").is_not_null()
+                                    ).select(pl.col("opal__transient__score"))
+                                    _obs_scores = pl.DataFrame({"opal__transient__score": []})
+                                    if "score" in df_sfxi.columns:
+                                        _obs_scores = df_sfxi.filter(pl.col("score").is_not_null()).select(
+                                            pl.col("score").alias("opal__transient__score")
+                                        )
+                                    _obs_n = int(_obs_scores.height)
+                                    _obs_cap = 200
+                                    if _obs_n > _obs_cap:
+                                        _obs_plot = _obs_scores.sample(n=_obs_cap, seed=1)
+                                        _obs_note = f"observed labels: n={_obs_n} (showing {_obs_cap})"
+                                    elif _obs_n > 0:
+                                        _obs_plot = _obs_scores
+                                        _obs_note = f"observed labels: n={_obs_n}"
+                                    else:
+                                        _obs_plot = _obs_scores
+                                        _obs_note = "observed labels: n=0"
+                                    if _obs_plot.height:
+                                        _obs_plot = _obs_plot.with_columns(pl.lit(0).alias("__baseline"))
+                                    if _hist_pred.is_empty():
+                                        hist_df = pl.DataFrame(
+                                            schema={
+                                                "bin_start": pl.Float64,
+                                                "bin_end": pl.Float64,
+                                                "count": pl.Int64,
+                                            }
+                                        )
                                         _hist_chart = (
-                                            alt.Chart(empty_hist)
+                                            alt.Chart(hist_df)
                                             .mark_bar()
                                             .encode(
                                                 x=alt.X(
-                                                    "opal__transient__score:Q",
-                                                    bin=alt.Bin(maxbins=30),
-                                                    title="Transient score",
+                                                    "bin_start:Q",
+                                                    bin=alt.Bin(binned=True),
+                                                    title="Predicted scalar score",
+                                                    scale=alt.Scale(nice=True),
                                                 ),
-                                                y=alt.Y("count()", title="count"),
+                                                x2="bin_end:Q",
+                                                y=alt.Y(
+                                                    "count:Q",
+                                                    title="Count",
+                                                    scale=alt.Scale(domainMin=0),
+                                                ),
                                             )
                                         )
                                         _hist_chart = (
                                             with_title(
                                                 _hist_chart,
-                                                "Transient RF score distribution",
-                                                f"{dataset_name or 'dataset'} · n=0",
+                                                "Predicted scalar score distribution",
+                                                f"{dataset_name or 'dataset'} · n=0 · {_obs_note}",
                                             )
                                             .properties(width="container", height=240)
                                             .configure_view(stroke=None)
                                         )
                                         transient_hist_chart = mo.vstack(
-                                            [
-                                                mo.ui.altair_chart(_hist_chart),
-                                                mo.md("No transient predictions available."),
-                                            ]
+                                            [_hist_chart, mo.md("No transient predictions available.")]
                                         )
                                     else:
+                                        _score_min = _hist_pred.select(pl.col("opal__transient__score").min()).item()
+                                        _score_max = _hist_pred.select(pl.col("opal__transient__score").max()).item()
+                                        if _obs_plot.height:
+                                            _obs_min = _obs_plot.select(pl.col("opal__transient__score").min()).item()
+                                            _obs_max = _obs_plot.select(pl.col("opal__transient__score").max()).item()
+                                            if _obs_min is not None:
+                                                _score_min = min(_score_min, _obs_min)
+                                            if _obs_max is not None:
+                                                _score_max = max(_score_max, _obs_max)
+                                        _score_span = (_score_max - _score_min) if _score_max is not None else 0.0
+                                        _pad = max(_score_span * 0.02, 1e-6)
+                                        _x_scale = alt.Scale(
+                                            domain=[_score_min - _pad, _score_max + _pad],
+                                            nice=True,
+                                        )
+                                        _hist_values = _hist_pred.select(pl.col("opal__transient__score")).to_numpy()
+                                        if _score_min is None or _score_max is None:
+                                            _score_min = 0.0
+                                            _score_max = 1.0
+                                        if _score_min == _score_max:
+                                            _score_min -= 1e-3
+                                            _score_max += 1e-3
+                                        _hist_counts, _hist_edges = np.histogram(
+                                            _hist_values, bins=30, range=(_score_min, _score_max)
+                                        )
+                                        hist_df = pl.DataFrame(
+                                            {
+                                                "bin_start": _hist_edges[:-1],
+                                                "bin_end": _hist_edges[1:],
+                                                "count": _hist_counts,
+                                            }
+                                        )
                                         _hist_chart = (
-                                            alt.Chart(_hist_source)
-                                            .mark_bar()
+                                            alt.Chart(hist_df)
+                                            .mark_bar(opacity=0.7)
                                             .encode(
                                                 x=alt.X(
-                                                    "opal__transient__score:Q",
-                                                    bin=alt.Bin(maxbins=30),
-                                                    title="Transient score",
+                                                    "bin_start:Q",
+                                                    bin=alt.Bin(binned=True),
+                                                    title="Predicted scalar score",
+                                                    scale=_x_scale,
+                                                    axis=alt.Axis(tickCount=7),
                                                 ),
-                                                y=alt.Y("count()", title="count"),
-                                                tooltip=["count()"],
+                                                x2="bin_end:Q",
+                                                y=alt.Y(
+                                                    "count:Q",
+                                                    title="Count",
+                                                    scale=alt.Scale(domainMin=0),
+                                                ),
+                                                tooltip=[
+                                                    alt.Tooltip("bin_start:Q", title="bin start"),
+                                                    alt.Tooltip("bin_end:Q", title="bin end"),
+                                                    alt.Tooltip("count:Q", title="count"),
+                                                ],
                                             )
                                         )
+                                        if _obs_plot.height:
+                                            _obs_rules = (
+                                                alt.Chart(_obs_plot)
+                                                .mark_rule(opacity=0.25, strokeDash=[4, 4])
+                                                .encode(
+                                                    x=alt.X(
+                                                        "opal__transient__score:Q",
+                                                        scale=_x_scale,
+                                                    )
+                                                )
+                                            )
+                                            _obs_lollipops = (
+                                                alt.Chart(_obs_plot)
+                                                .mark_point(filled=True, opacity=0.35, size=20)
+                                                .encode(
+                                                    x=alt.X(
+                                                        "opal__transient__score:Q",
+                                                        scale=_x_scale,
+                                                    ),
+                                                    y=alt.Y("__baseline:Q", axis=None),
+                                                )
+                                            )
+                                            _obs_note_chart = (
+                                                alt.Chart(pl.DataFrame({"note": [_obs_note]}))
+                                                .mark_text(
+                                                    align="left",
+                                                    baseline="top",
+                                                    dx=0,
+                                                    dy=6,
+                                                    fontSize=11,
+                                                    color="#666666",
+                                                )
+                                                .encode(
+                                                    text="note:N",
+                                                    x=alt.value(110),
+                                                    y=alt.value(0),
+                                                )
+                                            )
+                                            _hist_chart = _hist_chart + _obs_rules + _obs_lollipops + _obs_note_chart
                                         _hist_chart = (
                                             with_title(
                                                 _hist_chart,
-                                                "Transient RF score distribution",
-                                                f"{dataset_name or 'dataset'} · n={_hist_source.height}",
+                                                "Predicted scalar score distribution",
+                                                f"{dataset_name or 'dataset'} · n={_hist_pred.height} · {_obs_note}",
                                             )
                                             .properties(width="container", height=240)
                                             .configure_view(stroke=None)
                                         )
-                                        transient_hist_chart = mo.ui.altair_chart(_hist_chart)
+                                        transient_hist_chart = _hist_chart
 
     missing_transient_cols = [c for c in transient_cols if c not in df_umap_overlay.columns]
     if missing_transient_cols:
@@ -2099,6 +1884,31 @@ def _(
             else:
                 fill_exprs.append(pl.lit(None, dtype=pl.Float64).alias(col))
         df_umap_overlay = df_umap_overlay.with_columns(fill_exprs)
+
+    _observed_col = "opal__transient__observed_event"
+    _label_hist_col = None
+    if opal_campaign_info is not None:
+        _label_hist_col = f"opal__{opal_campaign_info.slug}__label_hist"
+    if _label_hist_col and _label_hist_col in df_umap_overlay.columns:
+        try:
+            df_umap_overlay = df_umap_overlay.with_columns(
+                pl.col(_label_hist_col)
+                .list.eval(pl.element().struct.field("src") == "ingest_y")
+                .list.any()
+                .fill_null(False)
+                .alias(_observed_col)
+            )
+        except Exception:
+            df_umap_overlay = df_umap_overlay.with_columns(pl.lit(False).alias(_observed_col))
+    elif _observed_col not in df_umap_overlay.columns:
+        df_umap_overlay = df_umap_overlay.with_columns(pl.lit(False).alias(_observed_col))
+
+    _sfxi_scored_col = "opal__transient__sfxi_scored_label"
+    if "__row_id" in df_umap_overlay.columns and "__row_id" in df_sfxi.columns and not df_sfxi.is_empty():
+        _sfxi_ids = df_sfxi.select(pl.col("__row_id").drop_nulls().unique()).to_series().to_list()
+        df_umap_overlay = df_umap_overlay.with_columns(pl.col("__row_id").is_in(_sfxi_ids).alias(_sfxi_scored_col))
+    elif _sfxi_scored_col not in df_umap_overlay.columns:
+        df_umap_overlay = df_umap_overlay.with_columns(pl.lit(False).alias(_sfxi_scored_col))
 
     transient_md = mo.md("\n".join(transient_lines)) if transient_lines else None
 
@@ -2150,7 +1960,9 @@ def _(
             _score_chart_title = "UMAP colored by transient RF score"
 
         if _score_col is not None:
-            df_umap_score = df_umap_overlay.select(_base_cols + [_score_col]).filter(pl.col(_score_col).is_not_null())
+            df_umap_score = df_umap_overlay.select(dedupe_columns(_base_cols + [_score_col])).filter(
+                pl.col(_score_col).is_not_null()
+            )
             if not df_umap_score.is_empty():
                 _score_chart = (
                     alt.Chart(df_umap_score)
@@ -2176,7 +1988,7 @@ def _(
     return (
         df_sfxi,
         df_umap_overlay,
-        sfxi_debug_md,
+        rf_model_source_note_md,
         sfxi_meta_md,
         sfxi_notice_md,
         transient_feature_chart,
@@ -2189,16 +2001,20 @@ def _(
 def _(
     alt,
     dataset_name,
+    dedupe_columns,
     df_umap_overlay,
     mo,
     pl,
+    safe_is_numeric,
+    transient_cluster_hue_dropdown,
     transient_cluster_metric_dropdown,
     with_title,
 ):
     _transient_cluster_chart = None
     _metric_col = transient_cluster_metric_dropdown.value
+    _hue_value = transient_cluster_hue_dropdown.value
     if _metric_col and "cluster__ldn_v1" in df_umap_overlay.columns and _metric_col in df_umap_overlay.columns:
-        _cluster_cols = ["cluster__ldn_v1", _metric_col]
+        _cluster_cols = dedupe_columns(["cluster__ldn_v1", _metric_col])
         if "id" in df_umap_overlay.columns:
             _cluster_cols.append("id")
         df_cluster_points = (
@@ -2225,6 +2041,42 @@ def _(
                 "#CC79A7",
                 "#000000",
             ]
+            _metric_plot_col = _metric_col
+            _metric_title = _metric_col
+            _metric_type = "Q"
+            _metric_dtype = df_umap_overlay.schema.get(_metric_col)
+            if _metric_dtype is None or not safe_is_numeric(_metric_dtype):
+                _metric_type = "N"
+            _hue_label = _hue_value if _hue_value else "(none)"
+            _color_encoding = alt.Undefined
+            _color_tooltip = None
+            _label_map = {
+                "opal__transient__top_k": ("Top-K", "Not Top-K", "Transient Top-K"),
+                "opal__transient__observed_event": ("Observed", "Not observed", "Observed events (ingest_y)"),
+                "opal__transient__sfxi_scored_label": ("SFXI label", "Not label", "SFXI scored label"),
+            }
+            if _hue_value == "Leiden cluster":
+                _hue_label = "Leiden cluster"
+                _color_tooltip = "cluster__ldn_v1"
+                _color_encoding = alt.Color(
+                    "cluster__ldn_v1:N",
+                    title="Leiden cluster",
+                    scale=alt.Scale(range=_okabe_ito),
+                    legend=alt.Legend(title="Leiden cluster"),
+                )
+            elif _hue_value in _label_map and _hue_value in df_cluster_points.columns:
+                _label_col = f"{_hue_value}__label"
+                _yes_label, _no_label, _hue_label = _label_map[_hue_value]
+                df_cluster_points = df_cluster_points.with_columns(
+                    pl.when(pl.col(_hue_value)).then(pl.lit(_yes_label)).otherwise(pl.lit(_no_label)).alias(_label_col)
+                )
+                _color_tooltip = _label_col
+                _color_encoding = alt.Color(
+                    f"{_label_col}:N",
+                    title=_hue_label,
+                    scale=alt.Scale(domain=[_yes_label, _no_label], range=[_okabe_ito[2], "#B0B0B0"]),
+                    legend=alt.Legend(title=_hue_label),
+                )
             points = (
                 alt.Chart(df_cluster_points)
                 .transform_calculate(jitter="(random() - 0.5) * 0.6")
@@ -2237,21 +2089,22 @@ def _(
                         axis=alt.Axis(labelAngle=90, labelFontSize=8),
                     ),
                     xOffset="jitter:Q",
-                    y=alt.Y(f"{_metric_col}:Q", title=_metric_col),
-                    color=alt.Color(
-                        "cluster__ldn_v1:N",
-                        title="Leiden cluster",
-                        scale=alt.Scale(range=_okabe_ito),
-                        legend=alt.Legend(title="Leiden cluster"),
-                    ),
-                    tooltip=[c for c in ["cluster__ldn_v1", _metric_col, "id"] if c in _cluster_cols],
+                    y=alt.Y(f"{_metric_plot_col}:{_metric_type}", title=_metric_title),
+                    color=_color_encoding,
+                    tooltip=[
+                        c
+                        for c in ["cluster__ldn_v1", _metric_plot_col, _metric_col, "id", _color_tooltip]
+                        if c in df_cluster_points.columns
+                    ],
                 )
             )
+            if _color_encoding is alt.Undefined:
+                points = points.encode(color=alt.value(_okabe_ito[4]))
             _cluster_chart = (
                 with_title(
                     points,
                     "Transient score by Leiden cluster",
-                    f"{dataset_name or 'dataset'} · y={_metric_col} · n={df_cluster_points.height}",
+                    f"{dataset_name or 'dataset'} · y={_metric_col} · hue={_hue_label} · n={df_cluster_points.height}",
                 )
                 .properties(width="container", height=plot_height)
                 .configure_view(stroke=None)
@@ -2263,11 +2116,8 @@ def _(
 
 
 @app.cell
-def _(mo, opal_panel_hist_chart_ui, transient_cluster_chart):
-    _opal_hist_panel = opal_panel_hist_chart_ui
-    _transient_panel = transient_cluster_chart
-    if _opal_hist_panel is None:
-        _opal_hist_panel = mo.md("")
+def _():
+    _noop = None
     return
 
 
@@ -2283,18 +2133,16 @@ def _(
 ):
     mo.vstack(
         [
-            mo.md("## Dataset overview & EDA"),
+            mo.md("## Exploratory data analysis"),
             mo.md(
-                "Start broad: inspect the raw table, then pivot into targeted plots. Use this view to "
-                "filter/sort by DenseGen metadata, Evo2 outputs, or OPAL caches. Selections here "
+                "Inspect the table, then pivot into targeted plots. Selections here "
                 "propagate to other panels as a shared record pool."
             ),
             dataset_status_md,
-            mo.md("Full dataset view (Polars table) for quick inspection of raw records and columns."),
             dataset_table,
-            mo.md("### Ad-hoc exploratory data analysis using a Polars-backed chart explorer."),
+            mo.md("### Ad-hoc plotting using a Polars-backed chart explorer."),
             dataset_explorer,
-            mo.md("### Selected rows (from explorer brush)"),
+            mo.md("#### Selected rows (from explorer brush)"),
             explorer_selection_note_md,
             explorer_selected_table,
             df_active_note_md,
@@ -2309,37 +2157,28 @@ def _(
     id_dropdown,
     id_nav_buttons,
     id_override_input,
-    id_selector_note_md,
     inspect_pool_dropdown,
     inspect_view_mode_dropdown,
     mo,
-    record_metadata_md,
     render_element,
     save_pdf_button,
     save_pdf_path_input,
     save_pdf_status_md,
     save_pdf_target_md,
     sequence_md,
-    show_metadata_checkbox,
     summary_md,
     tfbs_note_md,
     tfbs_table_ui,
 ):
     mo.vstack(
         [
-            mo.md("## Inspect a sequence"),
-            mo.md(
-                "Observe one record at a time: view the sequence, densegen visual, and TFBS "
-                "placements/orientations. Use the pool selector to constrain which IDs are available."
-            ),
+            mo.md("## Inspect a dense array-derived promoter"),
+            mo.md("View TFBS placements/orientations. Use the pool selectors to constrain which IDs are available."),
             inspect_pool_dropdown,
             id_dropdown,
             id_override_input,
-            id_selector_note_md,
             summary_md,
             sequence_md,
-            show_metadata_checkbox,
-            record_metadata_md,
             inspect_view_mode_dropdown,
             id_nav_buttons,
             baserender_error_md,
@@ -2442,12 +2281,11 @@ def _(
 ):
     mo.vstack(
         [
-            mo.md("## UMAP explorer (Evo2 embedding)"),
+            mo.md("## UMAP explorer (Evo2 logits mean-pooled in the sequence dimension)"),
             mo.md(
-                "Project high-dimensional sequence representations into 2D. Evo2 outputs are pooled "
-                "across sequence length into a fixed-width vector, and UMAP embeds those vectors for "
-                "neighborhood exploration. Color by metadata or model outputs and brush to define a "
-                "working subset."
+                "Evo2 outputs are pooled across sequence length into a fixed-width vector [1,512]. Running a UMAP then "
+                "projects these high-dimensional sequence representations into 2D. Color by metadata or "
+                "model outputs and brush to define a working subset."
             ),
             mo.md("See `src/dnadesign/infer/README.md`."),
             mo.hstack([umap_x_input, umap_y_input]),
@@ -2485,13 +2323,8 @@ def _(campaign_label_from_path, df_active, list_campaign_paths, mo, repo_root):
         full_width=True,
     )
     opal_panel_prefix_default = default_label
-    if campaign_path_map:
-        opal_panel_note_md = mo.md("")
-    else:
-        opal_panel_note_md = mo.md("No campaign YAMLs found.")
     return (
         campaign_path_map,
-        opal_panel_note_md,
         opal_panel_prefix_default,
         opal_panel_prefix_dropdown,
     )
@@ -2499,40 +2332,26 @@ def _(campaign_label_from_path, df_active, list_campaign_paths, mo, repo_root):
 
 @app.cell
 def _(
-    alt,
     build_label_events,
     campaign_path_map,
-    dataset_name,
     df_active,
     load_campaign_yaml,
     mo,
-    opal_labeled_mask,
     opal_panel_prefix_default,
     opal_panel_prefix_dropdown,
     parse_campaign_info,
     pl,
-    with_title,
 ):
-    campaign_error = None
     opal_campaign_info = None
     opal_label_events_df = df_active.head(0)
     opal_round_dropdown = None
     opal_round_value_map = {}
     opal_label_hist_col = None
-    opal_latest_pred_col = None
-    opal_latest_round_col = None
-    opal_panel_summary_md = mo.md("")
-    opal_panel_hist_chart_ui = None
-    opal_panel_content = None
 
-    if opal_panel_prefix_dropdown is None:
-        campaign_error = "Campaign selector unavailable."
-    else:
+    if opal_panel_prefix_dropdown is not None:
         campaign_label = opal_panel_prefix_dropdown.value or opal_panel_prefix_default
         campaign_path = campaign_path_map.get(campaign_label) if campaign_label else None
-        if campaign_path is None or campaign_label.startswith("(no campaigns"):
-            campaign_error = "No campaign selected."
-        else:
+        if campaign_path is not None and not campaign_label.startswith("(no campaigns"):
             try:
                 raw_cfg = load_campaign_yaml(campaign_path)
                 opal_campaign_info = parse_campaign_info(
@@ -2540,19 +2359,11 @@ def _(
                     path=campaign_path,
                     label=campaign_label,
                 )
-            except Exception as exc:
-                campaign_error = str(exc)
+            except Exception:
+                opal_campaign_info = None
 
-    if opal_campaign_info is None:
-        lines = ["Campaign config unavailable."]
-        if campaign_error:
-            lines.append(f"Error: {campaign_error}")
-        opal_panel_summary_md = mo.md("\n".join(lines))
-        opal_panel_hist_chart_ui = mo.md("No OPAL cached scalar available.")
-    else:
+    if opal_campaign_info is not None:
         opal_label_hist_col = f"opal__{opal_campaign_info.slug}__label_hist"
-        opal_latest_pred_col = f"opal__{opal_campaign_info.slug}__latest_pred_scalar"
-        opal_latest_round_col = f"opal__{opal_campaign_info.slug}__latest_as_of_round"
         opal_label_events_df = build_label_events(
             df=df_active,
             label_hist_col=opal_label_hist_col,
@@ -2581,90 +2392,9 @@ def _(
             label="Labels as of round",
             full_width=True,
         )
-
-        warnings = []
-        if opal_label_hist_col not in df_active.columns:
-            warnings.append(f"Missing label history column `{opal_label_hist_col}`.")
-        if opal_campaign_info.x_column not in df_active.columns:
-            warnings.append(f"Missing X column `{opal_campaign_info.x_column}`.")
-
-        summary_lines = []
-        if warnings:
-            summary_lines.append("Warnings: " + "; ".join(warnings))
-        opal_panel_summary_md = mo.md("\n".join(summary_lines)) if summary_lines else mo.md("")
-
-        available_cols = [
-            c for c in [opal_label_hist_col, opal_latest_pred_col, opal_latest_round_col] if c in df_active.columns
-        ]
-
-        charts = []
-        if not hasattr(alt, "_DNAD_PLOT_SIZE"):
-            alt._DNAD_PLOT_SIZE = 420
-        _plot_size = alt._DNAD_PLOT_SIZE
-        if opal_latest_pred_col in df_active.columns:
-            label_hist_cols = [opal_label_hist_col] if opal_label_hist_col in df_active.columns else []
-            labeled_series = (
-                opal_labeled_mask(df_active, label_hist_cols)
-                if label_hist_cols
-                else pl.Series([False] * df_active.height)
-            )
-            df_opal_pred = df_active.select([opal_latest_pred_col]).with_columns(labeled_series.alias("opal_labeled"))
-            df_opal_pred = df_opal_pred.with_columns(
-                pl.when(pl.col("opal_labeled"))
-                .then(pl.lit("observed (has label_hist)"))
-                .otherwise(pl.lit("unlabeled (no labels)"))
-                .alias("label_status")
-            )
-            _chart = (
-                alt.Chart(df_opal_pred)
-                .mark_bar()
-                .encode(
-                    x=alt.X(opal_latest_pred_col, bin=alt.Bin(maxbins=30), title=opal_latest_pred_col),
-                    y=alt.Y("count()", title="count"),
-                    color=alt.Color(
-                        "label_status:N",
-                        title="Label status",
-                        legend=alt.Legend(title="Label status"),
-                    ),
-                    tooltip=["label_status", "count()"],
-                )
-            )
-            _chart = with_title(
-                _chart,
-                "Cached OPAL SFXI score distribution",
-                f"{dataset_name or 'dataset'} · {opal_campaign_info.slug} · {opal_latest_pred_col}",
-            ).properties(width=820, height=220)
-            charts.append(_chart)
-
-        if charts:
-            if len(charts) == 1:
-                opal_panel_hist_chart_ui = mo.ui.altair_chart(charts[0])
-            else:
-                opal_panel_hist_chart_ui = mo.hstack([mo.ui.altair_chart(c) for c in charts])
-        else:
-            opal_panel_hist_chart_ui = mo.md("No OPAL cached scalar available for this campaign.")
-
-        debug_lines = [
-            f"Campaign: `{opal_campaign_info.label}`",
-            f"Slug: `{opal_campaign_info.slug}`",
-            f"X column: `{opal_campaign_info.x_column}`",
-            f"Y column: `{opal_campaign_info.y_column}`",
-            f"Model: `{opal_campaign_info.model_name}`",
-            f"Objective: `{opal_campaign_info.objective_name}`",
-            f"Y-ops: {[op.get('name') for op in opal_campaign_info.y_ops] or 'none'}",
-            f"Available OPAL cols: {available_cols}",
-        ]
-        if warnings:
-            debug_lines.append("Warnings:")
-            debug_lines.extend([f"- {w}" for w in warnings])
-        debug_block = mo.md("\n".join(debug_lines))
-        opal_panel_content = mo.vstack([debug_block])
     return (
         opal_campaign_info,
         opal_label_events_df,
-        opal_panel_content,
-        opal_panel_hist_chart_ui,
-        opal_panel_summary_md,
         opal_round_dropdown,
         opal_round_value_map,
     )
@@ -2705,25 +2435,21 @@ def _(
     opal_labels_view_df = opal_label_events_df.head(0)
     opal_labels_current_df = opal_label_events_df.head(0)
     opal_labels_asof_df = opal_label_events_df.head(0)
-    opal_labels_note_md = mo.md("")
     opal_labels_table_ui = mo.ui.table(opal_labels_view_df, page_size=5)
 
     if opal_campaign_info is None:
-        opal_labels_note_md = mo.md("Campaign config unavailable; no labels to display.")
+        pass
     elif opal_label_events_df.is_empty():
-        opal_labels_note_md = mo.md("No label events available for this campaign.")
+        pass
     else:
         df_labels = opal_label_events_df
-        ingest_filter_applied = False
-        ingest_missing = False
         if "label_src" in df_labels.columns:
             if df_labels.filter(pl.col("label_src") == "ingest_y").height > 0:
                 df_labels = df_labels.filter(pl.col("label_src") == "ingest_y")
-                ingest_filter_applied = True
             else:
-                ingest_missing = True
+                pass
         else:
-            ingest_missing = True
+            pass
 
         df_round_scope = df_labels
         if opal_selected_round is not None and "observed_round" in df_labels.columns:
@@ -2785,24 +2511,9 @@ def _(
             )
         else:
             opal_labels_table_ui = mo.ui.table(opal_labels_view_df, page_size=5)
-
-        note_lines = [f"Label view: `{view_choice}`"]
-        if opal_selected_round is not None:
-            note_lines.append(f"Selected round: `{opal_selected_round}`")
-        if ingest_filter_applied:
-            note_lines.append("Label source: `ingest_y`")
-        elif ingest_missing:
-            note_lines.append("No `ingest_y` labels found; showing all label sources.")
-        note_lines.append(f"Events shown: `{opal_labels_view_df.height}`")
-        if not opal_labels_current_df.is_empty():
-            note_lines.append(f"Events in round: `{opal_labels_current_df.height}`")
-        if not opal_labels_asof_df.is_empty():
-            note_lines.append(f"Events as-of round: `{opal_labels_asof_df.height}`")
-        opal_labels_note_md = mo.md("\n".join(note_lines))
     return (
         opal_labels_asof_df,
         opal_labels_current_df,
-        opal_labels_note_md,
         opal_labels_table_ui,
         opal_labels_view_df,
         opal_selected_round,
@@ -2841,11 +2552,9 @@ def _(mo, opal_campaign_info):
         "min_n": min_n_default,
         "eps": eps_default,
     }
-    sfxi_fixed_params_md = None
     return (
         sfxi_beta_input,
         sfxi_fixed_params,
-        sfxi_fixed_params_md,
         sfxi_gamma_input,
         sfxi_p00_slider,
         sfxi_p01_slider,
@@ -2870,8 +2579,7 @@ def _(
     _p11 = float(sfxi_p11_slider.value)
     _setpoint_text = ", ".join([f"{v:.3f}" for v in (_p00, _p10, _p01, _p11)])
     sfxi_setpoint_md = mo.md(f"Current setpoint vector (state order: 00, 10, 01, 11): `p = [{_setpoint_text}]`")
-    sfxi_setpoint_table = mo.md("")
-    return sfxi_setpoint_md, sfxi_setpoint_table
+    return (sfxi_setpoint_md,)
 
 
 @app.cell
@@ -2959,7 +2667,15 @@ def _(
     ]
     _fallback_scheme = "tableau20"
     if df_sfxi.is_empty():
-        empty_df = pl.DataFrame({"__row_id": [], "id": [], "logic_fidelity": [], "effect_scaled": [], "score": []})
+        empty_df = pl.DataFrame(
+            schema={
+                "__row_id": pl.Int64,
+                "id": pl.Utf8,
+                "logic_fidelity": pl.Float64,
+                "effect_scaled": pl.Float64,
+                "score": pl.Float64,
+            }
+        )
         tooltip_cols = [
             c
             for c in [
@@ -3120,31 +2836,23 @@ def _(
 
 
 @app.cell
-def _(df_sfxi, mo, opal_campaign_info, pl, sfxi_chart_ui):
+def _(df_sfxi, opal_campaign_info, pl, sfxi_chart_ui):
     _unused = (opal_campaign_info, pl, sfxi_chart_ui)
     df_sfxi_selected = df_sfxi
-    sfxi_selected_note_md = mo.md("")
-    sfxi_selected_explorer = mo.md("")
-    return df_sfxi_selected, sfxi_selected_explorer, sfxi_selected_note_md
+    return (df_sfxi_selected,)
 
 
 @app.cell(column=5)
 def _(
     mo,
     opal_label_view_dropdown,
-    opal_labels_note_md,
     opal_labels_table_ui,
-    opal_panel_content,
-    opal_panel_note_md,
     opal_panel_prefix_dropdown,
-    opal_panel_summary_md,
     opal_round_dropdown,
     sfxi_beta_input,
     sfxi_chart_note_md,
     sfxi_chart_ui,
     sfxi_color_dropdown,
-    sfxi_debug_md,
-    sfxi_fixed_params_md,
     sfxi_gamma_input,
     sfxi_meta_md,
     sfxi_notice_md,
@@ -3152,22 +2860,8 @@ def _(
     sfxi_p01_slider,
     sfxi_p10_slider,
     sfxi_p11_slider,
-    sfxi_selected_explorer,
-    sfxi_selected_note_md,
     sfxi_setpoint_md,
-    sfxi_setpoint_table,
 ):
-    _unused = (
-        opal_panel_content,
-        opal_panel_note_md,
-        opal_panel_summary_md,
-        opal_labels_note_md,
-        sfxi_debug_md,
-        sfxi_fixed_params_md,
-        sfxi_selected_explorer,
-        sfxi_selected_note_md,
-        sfxi_setpoint_table,
-    )
     _opal_references_md = mo.Html(
         """
         <div>References (local files):</div>
@@ -3175,7 +2869,6 @@ def _(
           <li><code>src/dnadesign/opal/README.md</code></li>
           <li><code>src/dnadesign/opal/src/cli/README.md</code></li>
           <li><code>src/dnadesign/opal/docs/setpoint_fidelity_x_intensity.md</code></li>
-          <li><code>src/dnadesign/opal/src/objectives/sfxi_v1.py</code></li>
         </ul>
         """
     )
@@ -3201,7 +2894,7 @@ def _(
             mo.md(
                 "SFXI (setpoint fidelity x intensity) compresses a 2-factor logic response into a single "
                 "scalar that balances logic correctness and brightness. OPAL is the active-learning harness "
-                "that predicts an 8-vector response and reduces it via an objective to rank candidates."
+                "that tries to predict an 8-vector response and reduces it via an objective to rank candidates."
             ),
             _opal_references_md,
             *opal_controls,
@@ -3236,7 +2929,10 @@ def _(
 @app.cell(column=6)
 def _(
     mo,
+    rf_model_source,
+    rf_model_source_note_md,
     transient_cluster_chart,
+    transient_cluster_hue_dropdown,
     transient_cluster_metric_dropdown,
     transient_feature_chart,
     transient_hist_chart,
@@ -3255,14 +2951,16 @@ def _(
         else mo.md("Leiden cluster score plot unavailable.")
     )
     rf_blocks = [
-        mo.md("## Random Forest"),
+        mo.md("## Reactive, session‑scoped (ephemeral) Random Forest surrogate"),
+        rf_model_source,
+        rf_model_source_note_md,
         mo.md(
-            "This is a transient Random Forest fit that uses hyperparameters from the selected campaign YAML. "
-            "It trains on labels-as-of-round in real time for exploration, and its predictions are not persisted. "
-            "OPAL normally persists per-round artifacts and ledger outputs when running a campaign; this view is for "
-            "quick iteration and hypothesis checks. "
-            "The transient pipeline fits on 8‑vectors every time the setpoint/exponent widgets change, then "
-            "recomputes SFXI metrics on those predictions."
+            "**OPAL runs** produce round-scoped, versioned model artifacts (e.g., `model.joblib`) "
+            "and write an append-only ledger for auditability and reproducibility "
+            "(e.g., `outputs/round_<k>/...` and `outputs/ledger.*`).\n"
+            "In contrast, this notebook view uses a reactive, session-scoped (ephemeral) surrogate model "
+            "that is refit in memory on each UI-driven change and is not persisted as an artifact. "
+            "Notebook predictions are exploratory overlays; ledger-backed outputs require running OPAL."
         ),
         feature_panel,
         mo.md(
@@ -3272,6 +2970,7 @@ def _(
         hist_panel,
         mo.md("The histogram shows the distribution of predicted SFXI scores across the full candidate pool."),
         transient_cluster_metric_dropdown,
+        transient_cluster_hue_dropdown,
         cluster_panel,
         mo.md("The cluster plot compares predicted scores across Leiden clusters, ordered numerically for stability."),
     ]
@@ -3280,11 +2979,20 @@ def _(
 
 
 @app.cell
+def _(df_umap_overlay, pl):
+    df_transient_top_k_pool = df_umap_overlay.head(0)
+    if "opal__transient__top_k" in df_umap_overlay.columns:
+        df_transient_top_k_pool = df_umap_overlay.filter(pl.col("opal__transient__top_k").fill_null(False))
+    return (df_transient_top_k_pool,)
+
+
+@app.cell
 def _(mo):
     inspect_pool_label_map = {
         "Full dataset (all rows)": "df_active",
         "UMAP brush selection": "df_umap_selected",
         "SFXI scored labels (current view)": "df_sfxi_selected",
+        "Transient surrogate Top-K": "df_transient_top_k_pool",
     }
     inspect_pool_dropdown = mo.ui.dropdown(
         options=list(inspect_pool_label_map.keys()),
@@ -3299,6 +3007,7 @@ def _(mo):
 def _(
     df_active,
     df_sfxi_selected,
+    df_transient_top_k_pool,
     df_umap_selected,
     inspect_pool_dropdown,
     inspect_pool_label_map,
@@ -3308,6 +3017,8 @@ def _(
         df_pool = df_umap_selected
     elif pool_choice == "df_sfxi_selected":
         df_pool = df_sfxi_selected
+    elif pool_choice == "df_transient_top_k_pool":
+        df_pool = df_transient_top_k_pool
     else:
         df_pool = df_active
     return (df_pool,)
@@ -3345,6 +3056,9 @@ def _(active_id_state, df_pool, mo):
     _default_id = _active_id_value if _active_id_value in _id_values else None
     if _default_id is None and _id_values:
         _default_id = _id_values[0]
+    if not _id_values:
+        _id_values = ["(no ids)"]
+        _default_id = "(no ids)"
 
     id_dropdown = mo.ui.dropdown(
         options=_id_values,
@@ -3352,12 +3066,10 @@ def _(active_id_state, df_pool, mo):
         label="Record id",
         full_width=True,
     )
-    id_selector_note_md = mo.md(f"ID list truncated to {_max_ids}." if _truncated else "")
     return (
         id_dropdown,
         id_nav_buttons,
         id_override_input,
-        id_selector_note_md,
         next_button,
         prev_button,
     )
@@ -3387,6 +3099,8 @@ def _(
     _prev_clicked = bool(prev_button.value)
     _next_clicked = bool(next_button.value)
     _selected_id = id_dropdown.value if id_dropdown is not None else None
+    if _selected_id == "(no ids)":
+        _selected_id = None
     _active_id_value = active_id_state()
 
     _candidate_id = None
@@ -3432,10 +3146,10 @@ def _(
 
 @app.cell
 def _(active_record, active_record_id, mo, show_metadata_checkbox):
+    _unused = show_metadata_checkbox
     if active_record is None or active_record.is_empty():
         summary_md = mo.md("No active record to display.")
         sequence_md = mo.md("")
-        record_metadata_md = mo.md("")
     else:
         summary_md = mo.md(
             "\n".join(
@@ -3449,15 +3163,7 @@ def _(active_record, active_record_id, mo, show_metadata_checkbox):
         if "sequence" in active_record.columns:
             seq_text = active_record["sequence"][0]
         sequence_md = mo.md(f"Sequence: `{seq_text}`" if seq_text else "Sequence column missing.")
-        if show_metadata_checkbox.value:
-            details = []
-            for field in ["densegen__plan", "cluster__ldn_v1", "bio_type", "created_at"]:
-                if field in active_record.columns:
-                    details.append(f"{field.replace('_', ' ')}: `{active_record[field][0]}`")
-            record_metadata_md = mo.md("\n".join(details)) if details else mo.md("No extra metadata available.")
-        else:
-            record_metadata_md = mo.md("")
-    return record_metadata_md, sequence_md, summary_md
+    return sequence_md, summary_md
 
 
 @app.cell

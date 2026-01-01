@@ -235,3 +235,29 @@ def test_integration_smoke(tmp_path: Path) -> None:
 
     chart = alt.Chart(loaded).mark_point().encode(x="cluster__ldn_v1__umap_x", y="cluster__ldn_v1__umap_y")
     assert isinstance(chart, alt.Chart)
+
+
+def test_dedupe_helpers() -> None:
+    assert utils.dedupe_columns(["a", "b", "a", "c", "b"]) == ["a", "b", "c"]
+
+    exprs = utils.dedupe_exprs([pl.col("a"), pl.col("a"), pl.col("b")])
+    names = [expr.meta.output_name() for expr in exprs]
+    assert names == ["a", "b"]
+
+
+def test_selection_coercion() -> None:
+    class UndefinedType:
+        pass
+
+    assert utils.is_altair_undefined(UndefinedType())
+    assert utils.coerce_selection_dataframe(None) is None
+    df = pl.DataFrame({"a": [1]})
+    assert utils.coerce_selection_dataframe(df) is df
+
+
+def test_list_series_to_numpy() -> None:
+    series = pl.Series("x", [[1.0, 2.0], [3.0, 4.0]])
+    arr = utils.list_series_to_numpy(series, expected_len=2)
+    assert arr is not None
+    assert arr.shape == (2, 2)
+    assert utils.list_series_to_numpy(series, expected_len=3) is None
