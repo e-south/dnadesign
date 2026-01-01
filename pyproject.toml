@@ -39,6 +39,9 @@ dependencies = [
   "altair>=6.0.0",
   "vegafusion>=2.0.3",
   "vl-convert-python>=1.9.0",
+  "pysam>=0.23.3",
+  "netcdf4>=1.7.3",
+  "certifi>=2025.11.12",
 ]
 
 [project.scripts]
@@ -50,6 +53,7 @@ cluster    = "dnadesign.cluster.src.cli.app:main"
 permuter   = "dnadesign.permuter.src.cli.app:main"
 mb         = "dnadesign.molbench.src.cli.app:cli"
 baserender = "dnadesign.baserender.src.cli:app"
+cruncher   = "dnadesign.cruncher.cli.app:app"
 
 [project.optional-dependencies]
 # GPU stack (Linux x86_64 only)
