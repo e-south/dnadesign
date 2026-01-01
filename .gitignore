@@ -130,6 +130,22 @@ temp.md
 # -----------------------------------------------------------------------------
 # Project-specific
 # -----------------------------------------------------------------------------
+# Cruncher: local cache + run outputs + experiment artifacts (keep demos/templates)
+.cruncher/
+src/dnadesign/cruncher/.cruncher/
+src/dnadesign/cruncher/results/
+src/dnadesign/cruncher/experiments/
+src/dnadesign/cruncher/**/run_manifest.json
+src/dnadesign/cruncher/**/run_status.json
+src/dnadesign/cruncher/**/config_used.yaml
+src/dnadesign/cruncher/**/sequences.csv
+src/dnadesign/cruncher/**/sequences.parquet
+src/dnadesign/cruncher/**/elites.*
+src/dnadesign/cruncher/**/trace.nc
+src/dnadesign/cruncher/**/report.json
+src/dnadesign/cruncher/**/report.md
+src/dnadesign/cruncher/**/gathered_per_pwm_*.csv
+
 # Internal archives/prototypes
 src/dnadesign/archived/
 src/dnadesign/prototypes/

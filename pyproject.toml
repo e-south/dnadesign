@@ -32,11 +32,12 @@ dependencies = [
   "tqdm",
   "typer",
   "xlrd",
-
   # Torch 2.7 aligns with CUDA 12.8 (SCC cuda/12.8 module) and Evo2’s Python 3.12 requirement.
   "torch>=2.7,<2.8; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
-
   "dense-arrays",
+  "pysam>=0.23.3",
+  "netcdf4>=1.7.3",
+  "certifi>=2025.11.12",
 ]
 
 [project.scripts]
@@ -48,6 +49,7 @@ cluster    = "dnadesign.cluster.src.cli.app:main"
 permuter   = "dnadesign.permuter.src.cli.app:main"
 mb         = "dnadesign.molbench.src.cli.app:cli"
 baserender = "dnadesign.baserender.src.cli:app"
+cruncher   = "dnadesign.cruncher.cli.app:app"
 
 [project.optional-dependencies]
 # GPU stack (Linux x86_64 only)

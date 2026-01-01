@@ -20,4 +20,9 @@ def save_trace(idata: InferenceData, path: Path) -> None:
     Ensures the parent directory exists before writing.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    idata.to_netcdf(path)
+    try:
+        idata.to_netcdf(path)
+    except Exception as exc:  # pragma: no cover - backend availability varies by env
+        raise RuntimeError(
+            "NetCDF backend missing; install netCDF4 or h5netcdf, or set sample.save_trace=false in the config."
+        ) from exc

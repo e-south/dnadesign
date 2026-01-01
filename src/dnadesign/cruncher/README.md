@@ -3,7 +3,7 @@
 **cruncher** is a pipeline that automates the design of short DNA sequences embedding strong matches for all user-supplied transcription-factor PWMs:
 
 1. **Parse**
-   Read one or many PWMs (MEME, JASPAR, …) and generate sequence-logo plots.
+   Read cached PWMs (or build them from cached TFBS) and generate sequence-logo plots.
 
 2. **Sample**
    Initialize a DNA sequence and run a **simulated-annealing MCMC** optimizer to discover sequences whose best motif matches are jointly maximized.
@@ -17,18 +17,76 @@
 
 ### Quick Start
 
+Lockfiles are mandatory for parse/sample/analyze/report (no implicit TF resolution).
+
 ```bash
-# 1. Preview motifs
-cruncher parse   cruncher/config.yaml
+# 1. Populate catalog (RegulonDB)
+cruncher fetch sites  --tf lexA --tf cpxR src/dnadesign/cruncher/config.yaml
+cruncher fetch motifs --tf lexA --dry-run src/dnadesign/cruncher/config.yaml
+cruncher catalog list src/dnadesign/cruncher/config.yaml
 
-# 2. Run optimizer
-cruncher sample  cruncher/config.yaml
+# Offline verification (no network)
+cruncher fetch motifs --tf lexA --offline src/dnadesign/cruncher/config.yaml
 
-# 3. View diagnostics
-open results/batch_<timestamp>/plots/score_kde.png
+# 2. Lock TF names
+cruncher lock src/dnadesign/cruncher/config.yaml
+
+# 3. Check targets + preview motifs
+cruncher targets status src/dnadesign/cruncher/config.yaml
+cruncher targets stats src/dnadesign/cruncher/config.yaml
+cruncher targets candidates src/dnadesign/cruncher/config.yaml
+cruncher catalog search src/dnadesign/cruncher/config.yaml lex --fuzzy
+cruncher parse src/dnadesign/cruncher/config.yaml
+
+# 4. Run optimizer
+cruncher sample  src/dnadesign/cruncher/config.yaml
+
+# 5. Analyze + report
+cruncher analyze src/dnadesign/cruncher/config.yaml
+cruncher report  src/dnadesign/cruncher/config.yaml sample_<tfset>_<timestamp>
+
+# 6. Inspect past runs
+cruncher runs list src/dnadesign/cruncher/config.yaml
+cruncher runs watch src/dnadesign/cruncher/config.yaml <run_name>
+# If the run index is missing or stale:
+cruncher runs rebuild-index src/dnadesign/cruncher/config.yaml
+```
+
+Source-specific details (RegulonDB TLS, HT hydration, windowing rules) live in
+`docs/ingestion.md` and `docs/troubleshooting.md`. The short version:
+
+- `motif_store.pwm_source: sites` builds PWMs from cached binding sites.
+- Coordinate-only HT data is hydrated via NCBI (default) or `--genome-fasta`.
+- Variable-length sites require `motif_store.site_window_lengths`.
+- If NetCDF backends are missing, set `sample.save_trace: false` (analyze/report require trace.nc).
+
+To inspect available optimizers:
+
+```bash
+cruncher optimizers list
+```
+
+To inspect config settings before sampling:
+
+```bash
+cruncher config summary cruncher/config.yaml
+```
+
+To verify cache integrity (no missing motif/site files):
+
+```bash
+cruncher cache verify cruncher/config.yaml
 ```
 
 ---
+
+### Developer docs
+
+- `docs/spec.md` — end-to-end architecture + requirements
+- `docs/architecture.md` — component boundaries and run artifacts
+- `docs/config.md` — config schema and examples
+- `docs/cli.md` — full CLI command list
+- `docs/demo.md` — end-to-end RegulonDB workflow (LexA + CpxR)
 
 ### Project Layout
 
@@ -37,13 +95,16 @@ dnadesign/
 └─ cruncher/
    ├─ README.md         # Overview and usage
    ├─ config.yaml       # Runtime settings
-   ├─ main.py           # CLI entry point (“parse”, “sample”, “analyse”)
-   ├─ parse/            # PWM parsing and null-distribution setup
-   ├─ sample/           # SequenceState, Scorer/Evaluator, and optimizers
-   ├─ analyse/          # Post-sampling transforms and plotting
-   ├─ utils/            # Shared helpers (config loading, trace I/O, etc.)
+   ├─ cli/              # Typer CLI entry point
+   ├─ core/             # PWM/scoring/state/optimizers
+   ├─ ingest/           # Source adapters + normalization
+   ├─ store/            # catalog cache access + lockfiles
+   ├─ services/         # fetch/lock/catalog/targets services
+   ├─ workflows/        # parse/sample/analyze/report orchestration
+   ├─ io/               # parsers + plots
+   ├─ config/           # v2 config schema + loader
    ├─ results/          # Generated batch folders (CSV, plots, trace files)
-   └─ tests/            # Unit tests for each component
+   └─ tests/            # Unit tests for each component (to be rebuilt)
 ```
 
 ---
@@ -85,16 +146,23 @@ dnadesign/
 
   * **Tune (burn-in):** chains explore broadly without saving to output.
   * **Draw (sampling):** every accepted sequence is recorded, along with its per-PWM p-values and overall fitness.
+  * **record_tune:** when false, burn-in states are not stored in `sequences.parquet`.
 * **Output Files**
 
-  * **config\_used.yaml:** exact runtime settings plus each PWM’s matrix and consensus.
+  * **config\_used.yaml:** exact runtime settings plus each PWM’s matrix and consensus. Includes `active_regulator_set`.
   * **trace.nc** (if enabled): an ArviZ-format record of every sampled fitness.
-  * **sequences.csv:** one row per saved draw, with columns
+  * **sequences.parquet:** one row per saved draw, with columns
     `chain, iteration, phase (tune/draw), sequence, score_<TF1>, score_<TF2>, …`.
-  * **elites.json:** the top K sequences by fitness across all chains. Each elite entry includes:
+  * **cruncher_elites_*/<name>.parquet:** machine-friendly elites table (plus a JSON copy for readability).
+  * **cruncher_elites_*/<name>.json:** the top K sequences by fitness across all chains. Each elite entry includes:
 
     * rank, chain, iteration, and DNA string
     * for each PWM: raw LLR, best match position (offset), strand, a simple “motif\_diagram” (e.g. `15_[+1]_8`), and the scaled score.
+  * **run_manifest.json:** resolved TFs, hashes, and optimizer stats for reproducibility.
+  * **report.json / report.md:** generated by `cruncher report`.
+
+If multiple `regulator_sets` are configured, Cruncher runs **one parse/sample/analyze per set** and
+creates separate run directories (e.g., `sample_set2_lexA-oxyR_20250101_120000`).
 
 ---
 
@@ -103,16 +171,12 @@ dnadesign/
 # dnadesign/cruncher/config.yaml
 cruncher:
   # GLOBAL SETTINGS
-  mode: sample-analyse                      # “parse” | “sample” | “analyse” | “sample-analyse”
   out_dir: results/                         # relative path under cruncher/ where batches go
-  regulator_sets:                           # each entry is a list of TF names
+  regulator_sets:                           # each entry is a list of TF names (each set is sampled separately)
     - [cpxR, soxR]
 
-  # PARSE MODE (sanity‐check PWMs, draw logos, print log‐odds)
+  # PARSE MODE (draw logos, print log‐odds from cached PWMs)
   parse:
-    formats:                                # map file‐extension → parser name (MEME, JASPAR, …)
-      .txt: MEME
-      .pfm: JASPAR
     plot:
       logo: true                            # whether to generate a logo (PNG) per PWM
       bits_mode: information                # “information” (bits) vs “probability” mode
@@ -121,12 +185,14 @@ cruncher:
   # SAMPLE MODE (MCMC‐based sequence search)
   sample:
     bidirectional: true                     # scan both strands (forward + reverse)
+    seed: 42                                # RNG seed for reproducibility
+    record_tune: false                      # whether to store burn-in states
 
     init:
       kind: random                          # “random” | “consensus” | “consensus_mix”
       length: 30                            # overall length of the output sequence (must be ≥ 1)
       pad_with: background                  # “background” (uniform-random pad) or “A”|“C”|“G”|“T”
-      regulator: soxR                       # If kind == “consensus”, supply a regulator name that exists in regulator_sets
+      regulator: soxR                       # If kind == “consensus”, supply a regulator name within the active set
 
     draws: 20000                            # number of MCMC draws (after tune)
     tune: 10000                             # number of burn‐in sweeps
@@ -162,9 +228,8 @@ cruncher:
       #   beta: [0.02, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 6.0]
 
       swap_prob: 0.10                       # intra‐chain block‐swap probability (Gibbs); inter‐chain exchange prob (PT)
-      # softmax_beta: 0.20                  # only used by PT (must be a positive float)
 
-    save_sequences: true                    # whether to write sequences.csv for downstream analysis
+    save_sequences: true                    # whether to write sequences.parquet for downstream analysis
 
   # ANALYSIS MODE
   analysis:
@@ -176,14 +241,35 @@ cruncher:
       convergence: true                     # convergence diagnostics
       scatter_pwm: true                     # PWM‐score scatter (requires gathered_per_pwm.csv)
     scatter_scale: llr
-    gather_nth_iteration_for_scaling: 10    # how many draws to skip between per‐PWM scoring
+    subsampling_epsilon: 10.0              # minimum per-TF distance to keep a draw
+
+  motif_store:
+    catalog_root: .cruncher
+    source_preference: [regulondb]
+    allow_ambiguous: false
+    pwm_source: matrix                        # matrix | sites
+    min_sites_for_pwm: 2
+
+  ingest:
+    genome_source: ncbi
+    genome_fasta: null
+    genome_cache: .cruncher/genomes
+    genome_assembly: null
+    contig_aliases: {}
+    ncbi_email: null
+    ncbi_tool: cruncher
+    ncbi_api_key: null
+    ncbi_timeout_seconds: 30
+    regulondb:
+      base_url: https://regulondb.ccg.unam.mx/graphql
+      verify_ssl: true
+      ca_bundle: null                        # optional CA bundle (loaded alongside certifi)
+      timeout_seconds: 30
+      motif_matrix_source: alignment         # alignment | sites
+      alignment_matrix_semantics: probabilities
+      curated_sites: true
+      ht_sites: false
+      ht_dataset_sources: null
+      ht_dataset_type: TFBINDING
+      uppercase_binding_site_only: true
 ```
-
-e-south
-
-
-
-###### Notes
-
-not all PWMs are created equal in terms of realtive information, how can this be controlled for?
-hamming constraints to isolate multiple "diverse" hits
