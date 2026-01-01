@@ -25,6 +25,7 @@ from dnadesign.cruncher.config.schema_v2 import CruncherConfig
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
 from dnadesign.cruncher.utils.manifest import load_manifest
+from dnadesign.cruncher.utils.parquet import read_parquet
 from dnadesign.cruncher.workflows.analyze.plots.scatter_utils import (
     _TRANS,
     compute_consensus_points,
@@ -62,7 +63,7 @@ def plot_scatter(
     if not parquet_files:
         raise FileNotFoundError(f"plot_scatter: no elites parquet in {run_dir}")
     latest = max(parquet_files, key=lambda p: p.stat().st_mtime)
-    df_elites = pd.read_parquet(latest)
+    df_elites = read_parquet(latest)
 
     # 3) Get sequence length from manifest (explicit)
     manifest = load_manifest(run_dir)

@@ -9,6 +9,7 @@ import ssl
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from importlib import resources
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Set
 from urllib.error import HTTPError, URLError
@@ -31,8 +32,30 @@ from dnadesign.cruncher.ingest.models import (
 from dnadesign.cruncher.ingest.normalize import build_motif_record, compute_pwm_from_sites, normalize_site_sequence
 
 _REGULONDB_URL = "https://regulondb.ccg.unam.mx/graphql"
+_REGULONDB_INTERMEDIATE_PEM = "globalsign_rsa_ov_ssl_ca_2018.pem"
 _FLOAT_RE = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$")
 logger = logging.getLogger(__name__)
+
+
+def _load_regulondb_intermediate() -> str:
+    try:
+        pem_path = resources.files("dnadesign.cruncher.ingest.certs").joinpath(_REGULONDB_INTERMEDIATE_PEM)
+        return pem_path.read_text(encoding="utf-8")
+    except (FileNotFoundError, ModuleNotFoundError) as exc:
+        raise RuntimeError(
+            "RegulonDB intermediate CA bundle is missing from package data; reinstall cruncher."
+        ) from exc
+
+
+def _build_ssl_context(config: "RegulonDBAdapterConfig") -> ssl.SSLContext:
+    if not config.verify_ssl:
+        return ssl._create_unverified_context()
+    context = ssl.create_default_context(cafile=certifi.where())
+    if config.ca_bundle:
+        context.load_verify_locations(cafile=str(config.ca_bundle))
+        return context
+    context.load_verify_locations(cadata=_load_regulondb_intermediate())
+    return context
 
 
 @dataclass(frozen=True, slots=True)
@@ -307,12 +330,7 @@ class RegulonDBAdapter:
 
     def _post_graphql(self, query: str, variables: Dict[str, object]) -> dict:
         data = json.dumps({"query": query, "variables": variables}).encode()
-        if not self._config.verify_ssl:
-            context = ssl._create_unverified_context()
-        else:
-            context = ssl.create_default_context(cafile=certifi.where())
-            if self._config.ca_bundle:
-                context.load_verify_locations(cafile=str(self._config.ca_bundle))
+        context = _build_ssl_context(self._config)
         try:
             payload = request_json(
                 self._config.base_url,
@@ -326,7 +344,11 @@ class RegulonDBAdapter:
             body = exc.read().decode("utf-8")
             raise RuntimeError(f"RegulonDB HTTP error {exc.code}: {body}") from exc
         except URLError as exc:
-            hint = "Set ingest.regulondb.ca_bundle to a valid CA bundle (or verify_ssl=false as a last resort)."
+            hint = (
+                "RegulonDB TLS chain is incomplete; cruncher ships the current intermediate CA. "
+                "If this persists, set ingest.regulondb.ca_bundle to an updated CA bundle "
+                "(or verify_ssl=false as a last resort)."
+            )
             raise RuntimeError(f"RegulonDB connection error: {exc}. {hint}") from exc
         if "errors" in payload:
             raise RuntimeError(f"RegulonDB GraphQL error: {payload['errors']}")
@@ -734,18 +756,27 @@ class RegulonDBAdapter:
             tags["matrix_source"] = matrix_source
         elif self._config.motif_matrix_source == "sites":
             sites = self._binding_sites_from_regulon(item)
-            sequences = [
-                normalize_site_sequence(site.get("sequence"), self._config.uppercase_binding_site_only)
-                for site in sites
-            ]
+            sequences = []
+            for site in sites:
+                raw_seq = site.get("sequence")
+                if raw_seq is None or not str(raw_seq).strip():
+                    continue
+                sequences.append(normalize_site_sequence(raw_seq, self._config.uppercase_binding_site_only))
             if not sequences:
                 raise ValueError(f"No curated binding sites available for {name}")
-            matrix, site_count = compute_pwm_from_sites(
-                sequences,
-                min_sites=self._config.min_sites_for_pwm,
-                strict_min_sites=not self._config.allow_low_sites,
-                return_count=True,
-            )
+            try:
+                matrix, site_count = compute_pwm_from_sites(
+                    sequences,
+                    min_sites=self._config.min_sites_for_pwm,
+                    strict_min_sites=not self._config.allow_low_sites,
+                    return_count=True,
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    f"Unable to build PWM from curated sites for {name}: {exc}. "
+                    "Use `cruncher fetch sites` and let motif_store.site_window_lengths "
+                    "window variable-length sites during parse/sample."
+                ) from exc
             matrix_source = "sites"
             tags["matrix_source"] = matrix_source
             tags["site_count"] = str(site_count)

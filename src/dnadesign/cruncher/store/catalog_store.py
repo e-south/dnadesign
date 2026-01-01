@@ -92,7 +92,10 @@ class CatalogMotifStore(MotifStore):
                         window_lengths=self.site_window_lengths,
                     )
                     if self.site_window_center == "summit":
-                        raise ValueError("summit-centered windows are not supported for RegulonDB records.")
+                        raise ValueError(
+                            "summit-centered windows require per-site summit metadata; "
+                            "use site_window_center='midpoint' or supply summit-aware sequences."
+                        )
                     lengths: set[int] = set()
                     with sites_path.open() as fh:
                         for line in fh:

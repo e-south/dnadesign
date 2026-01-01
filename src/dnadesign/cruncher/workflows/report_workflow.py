@@ -7,18 +7,20 @@ import logging
 from pathlib import Path
 from typing import Any, Dict
 
-import arviz as az
-import pandas as pd
-
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig
 from dnadesign.cruncher.services.run_service import update_run_index_from_manifest
 from dnadesign.cruncher.utils.hashing import sha256_path
 from dnadesign.cruncher.utils.manifest import load_manifest, write_manifest
+from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
+from dnadesign.cruncher.utils.parquet import read_parquet
 
 logger = logging.getLogger(__name__)
 
 
 def run_report(cfg: CruncherConfig, config_path: Path, batch_name: str) -> None:
+    ensure_mpl_cache(config_path.parent / cfg.motif_store.catalog_root)
+    import arviz as az
+
     base_out = config_path.parent / cfg.out_dir
     run_dir = base_out / batch_name
     if not run_dir.is_dir():
@@ -54,8 +56,8 @@ def run_report(cfg: CruncherConfig, config_path: Path, batch_name: str) -> None:
         raise FileNotFoundError(f"Missing elites parquet in {run_dir}")
     elite_path = max(elite_files, key=lambda p: p.stat().st_mtime)
 
-    seq_df = pd.read_parquet(seq_path)
-    elites_df = pd.read_parquet(elite_path)
+    seq_df = read_parquet(seq_path)
+    elites_df = read_parquet(elite_path)
 
     idata = az.from_netcdf(trace_path)
     rhat = az.rhat(idata, var_names=["score"])["score"].item()

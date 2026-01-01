@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
+from urllib.error import HTTPError, URLError
 
 import typer
 from rich.console import Console
@@ -161,7 +162,7 @@ def motifs(
             update=update,
             offline=offline,
         )
-    except (ValueError, FileNotFoundError) as exc:
+    except (ValueError, FileNotFoundError, HTTPError, URLError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         typer.echo("Hint: run cruncher fetch motifs --help for examples.", err=True)
         raise typer.Exit(code=1)
@@ -303,7 +304,7 @@ def sites(
                 offline=offline,
                 sequence_provider=provider,
             )
-    except (ValueError, FileNotFoundError) as exc:
+    except (ValueError, FileNotFoundError, HTTPError, URLError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         typer.echo("Hint: run cruncher fetch sites --help for examples.", err=True)
         raise typer.Exit(code=1)

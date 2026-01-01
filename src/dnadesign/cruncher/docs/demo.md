@@ -17,9 +17,6 @@ It’s tuned for fast local runs. Increase `draws/tune` for real experiments.
 cruncher fetch motifs --tf lexA --tf cpxR --dry-run docs/examples/regulondb_ecoli.yaml
 ```
 
-If you see SSL errors, set `ingest.regulondb.ca_bundle` to a known CA bundle
-(loaded alongside certifi). Only disable `verify_ssl` as a last resort.
-
 ## 2) Fetch curated binding sites (PWM built from sites)
 
 ```bash

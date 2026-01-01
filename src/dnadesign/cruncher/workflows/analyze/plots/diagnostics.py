@@ -20,6 +20,7 @@ import seaborn as sns
 import xarray as xr
 
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig
+from dnadesign.cruncher.utils.parquet import read_parquet
 
 
 #  Generic helpers
@@ -231,11 +232,9 @@ def make_pair_idata(sample_dir: Path, cfg: CruncherConfig, tf_names: list[str]) 
     Build an ArviZ InferenceData with two DataArrays: score_<TF1>, score_<TF2>.
     The TFs are taken from the provided tf_names list.
     """
-    import pandas as pd
-
     x_tf, y_tf = _tf_pair(tf_names)
 
-    df = pd.read_parquet(sample_dir / "sequences.parquet")
+    df = read_parquet(sample_dir / "sequences.parquet")
     if "phase" in df.columns:
         df = df[df["phase"] == "draw"].copy()
 
