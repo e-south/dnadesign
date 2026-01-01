@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional
+from urllib.error import HTTPError, URLError
 
 import typer
 from rich.console import Console
@@ -37,7 +38,7 @@ def info(
     registry = default_registry()
     try:
         adapter = registry.create(source, cfg.ingest)
-    except ValueError as exc:
+    except (ValueError, HTTPError, URLError) as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1)
     caps = ", ".join(sorted(adapter.capabilities()))
@@ -57,7 +58,7 @@ def datasets(
     registry = default_registry()
     try:
         adapter = registry.create(source, cfg.ingest)
-    except ValueError as exc:
+    except (ValueError, HTTPError, URLError) as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1)
     if not hasattr(adapter, "list_datasets"):
@@ -67,6 +68,14 @@ def datasets(
     if not datasets:
         console.print("No datasets found.")
         raise typer.Exit(code=1)
+    seen: set[str] = set()
+    unique = []
+    for ds in datasets:
+        if ds.dataset_id in seen:
+            continue
+        seen.add(ds.dataset_id)
+        unique.append(ds)
+    datasets = unique
     table = Table(title=f"{source} datasets", header_style="bold")
     table.add_column("Dataset ID")
     table.add_column("Source")

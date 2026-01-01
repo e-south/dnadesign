@@ -15,16 +15,15 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import yaml
 
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig
 from dnadesign.cruncher.core.evaluator import SequenceEvaluator
-from dnadesign.cruncher.core.optimizers.registry import get_optimizer
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
 from dnadesign.cruncher.core.state import SequenceState
@@ -39,6 +38,7 @@ from dnadesign.cruncher.store.lockfile import read_lockfile, validate_lockfile, 
 from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.labels import build_run_name, format_regulator_slug, regulator_sets
 from dnadesign.cruncher.utils.manifest import build_run_manifest, write_manifest
+from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
 from dnadesign.cruncher.utils.run_status import RunStatusWriter
 
 logger = logging.getLogger(__name__)
@@ -129,6 +129,39 @@ def _save_config(
     with cfg_path.open("w") as fh:
         yaml.safe_dump({"cruncher": data}, fh, sort_keys=False, default_flow_style=False)
     logger.info("Wrote config_used.yaml to %s", cfg_path.relative_to(batch_dir.parent))
+
+
+def _write_parquet_rows(
+    path: Path,
+    rows: Iterable[dict[str, object]],
+    *,
+    chunk_size: int = 10000,
+) -> int:
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    writer: pq.ParquetWriter | None = None
+    buffer: list[dict[str, object]] = []
+    count = 0
+    for row in rows:
+        buffer.append(row)
+        if len(buffer) < chunk_size:
+            continue
+        table = pa.Table.from_pylist(buffer)
+        if writer is None:
+            writer = pq.ParquetWriter(str(path), table.schema)
+        writer.write_table(table)
+        count += len(buffer)
+        buffer.clear()
+    if buffer:
+        table = pa.Table.from_pylist(buffer)
+        if writer is None:
+            writer = pq.ParquetWriter(str(path), table.schema)
+        writer.write_table(table)
+        count += len(buffer)
+    if writer is not None:
+        writer.close()
+    return count
 
 
 def _run_sample_for_set(
@@ -264,6 +297,8 @@ def _run_sample_for_set(
     logger.debug("Optimizer config flattened: %s", opt_cfg)
 
     # 4) INSTANTIATE OPTIMIZER (Gibbs or PT), passing in init_cfg and pwms
+    from dnadesign.cruncher.core.optimizers.registry import get_optimizer
+
     optimizer_factory = get_optimizer(sample_cfg.optimiser.kind)
     logger.info("Instantiating optimizer: %s", sample_cfg.optimiser.kind)
     rng = np.random.default_rng(sample_cfg.seed + set_index - 1)
@@ -311,27 +346,30 @@ def _run_sample_for_set(
         and hasattr(optimizer, "all_scores")
     ):
         seq_parquet = out_dir / "sequences.parquet"
-        rows: list[dict[str, object]] = []
-        for (chain_id, draw_i), seq_arr, per_tf_map in zip(
-            optimizer.all_meta, optimizer.all_samples, optimizer.all_scores
-        ):
-            if draw_i < sample_cfg.tune:
-                phase = "tune"
-                draw_i_to_write = draw_i
-            else:
-                phase = "draw"
-                draw_i_to_write = draw_i
-            seq_str = SequenceState(seq_arr).to_string()
-            row: dict[str, object] = {
-                "chain": int(chain_id),
-                "draw": int(draw_i_to_write),
-                "phase": phase,
-                "sequence": seq_str,
-            }
-            for tf in sorted(tfs):
-                row[f"score_{tf}"] = float(per_tf_map[tf])
-            rows.append(row)
-        pd.DataFrame(rows).to_parquet(seq_parquet, index=False)
+        tf_order = sorted(tfs)
+
+        def _sequence_rows() -> Iterable[dict[str, object]]:
+            for (chain_id, draw_i), seq_arr, per_tf_map in zip(
+                optimizer.all_meta, optimizer.all_samples, optimizer.all_scores
+            ):
+                if draw_i < sample_cfg.tune:
+                    phase = "tune"
+                    draw_i_to_write = draw_i
+                else:
+                    phase = "draw"
+                    draw_i_to_write = draw_i
+                seq_str = SequenceState(seq_arr).to_string()
+                row: dict[str, object] = {
+                    "chain": int(chain_id),
+                    "draw": int(draw_i_to_write),
+                    "phase": phase,
+                    "sequence": seq_str,
+                }
+                for tf in tf_order:
+                    row[f"score_{tf}"] = float(per_tf_map[tf])
+                yield row
+
+        _write_parquet_rows(seq_parquet, _sequence_rows())
         artifacts.append("sequences.parquet")
         logger.info(
             "Saved all sequences with per-TF scores → %s",
@@ -478,16 +516,18 @@ def _run_sample_for_set(
 
     # 1)  parquet payload ----------------------------------------------------
     parquet_path = save_dir / f"{base_name}.parquet"
-    parquet_rows: list[dict[str, object]] = []
-    for entry in elites:
-        row = dict(entry)
-        per_tf = row.pop("per_tf", None)
-        if per_tf is not None:
-            row["per_tf_json"] = json.dumps(per_tf, sort_keys=True)
-            for tf_name, details in per_tf.items():
-                row[f"score_{tf_name}"] = details.get("scaled_score")
-        parquet_rows.append(row)
-    pd.DataFrame(parquet_rows).to_parquet(parquet_path, index=False)
+
+    def _elite_rows() -> Iterable[dict[str, object]]:
+        for entry in elites:
+            row = dict(entry)
+            per_tf = row.pop("per_tf", None)
+            if per_tf is not None:
+                row["per_tf_json"] = json.dumps(per_tf, sort_keys=True)
+                for tf_name, details in per_tf.items():
+                    row[f"score_{tf_name}"] = details.get("scaled_score")
+            yield row
+
+    _write_parquet_rows(parquet_path, _elite_rows(), chunk_size=2000)
     logger.info("Saved elites Parquet → %s", parquet_path.relative_to(out_dir.parent))
 
     json_path = save_dir / f"{base_name}.json"
@@ -563,6 +603,7 @@ def run_sample(cfg: CruncherConfig, config_path: Path) -> None:
     """
     if cfg.sample is None:
         raise ValueError("sample section is required for sample")
+    ensure_mpl_cache(config_path.parent / cfg.motif_store.catalog_root)
     lockmap = _lockmap_for(cfg, config_path)
     statuses = target_statuses(cfg=cfg, config_path=config_path)
     for set_index, group in enumerate(regulator_sets(cfg.regulator_sets), start=1):

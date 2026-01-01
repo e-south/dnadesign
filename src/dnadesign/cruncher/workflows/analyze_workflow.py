@@ -30,32 +30,20 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import arviz as az
-import numpy as np
-import pandas as pd
-import yaml
-
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.services.run_service import list_runs
 from dnadesign.cruncher.utils.manifest import load_manifest
-from dnadesign.cruncher.workflows.analyze.per_pwm import gather_per_pwm_scores
-from dnadesign.cruncher.workflows.analyze.plots.diagnostics import (
-    make_pair_idata,
-    plot_autocorr,
-    plot_ess,
-    plot_pair_pwm_scores,
-    plot_parallel_pwm_scores,
-    plot_rank_diagnostic,
-    plot_trace,
-    report_convergence,
-)
-from dnadesign.cruncher.workflows.analyze.plots.scatter import plot_scatter
+from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
+from dnadesign.cruncher.utils.parquet import read_parquet
 
 logger = logging.getLogger(__name__)
 
 
 def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
+    import numpy as np
+    import yaml
+
     config_path = run_dir / "config_used.yaml"
     if not config_path.exists():
         raise FileNotFoundError(f"Missing config_used.yaml in {run_dir}")
@@ -82,6 +70,23 @@ def run_analyze(cfg: CruncherConfig, config_path: Path) -> None:
         raise ValueError("analysis section is required for analyze")
     if cfg.sample is None:
         raise ValueError("sample section is required for analyze")
+
+    ensure_mpl_cache(config_path.parent / cfg.motif_store.catalog_root)
+    import arviz as az
+
+    from dnadesign.cruncher.workflows.analyze.per_pwm import gather_per_pwm_scores
+    from dnadesign.cruncher.workflows.analyze.plots.diagnostics import (
+        make_pair_idata,
+        plot_autocorr,
+        plot_ess,
+        plot_pair_pwm_scores,
+        plot_parallel_pwm_scores,
+        plot_rank_diagnostic,
+        plot_trace,
+        report_convergence,
+    )
+    from dnadesign.cruncher.workflows.analyze.plots.scatter import plot_scatter
+
     results_dir = config_path.parent / Path(cfg.out_dir)
     runs = cfg.analysis.runs or []
     if not runs:
@@ -114,7 +119,7 @@ def run_analyze(cfg: CruncherConfig, config_path: Path) -> None:
         if not parquet_candidates:
             raise FileNotFoundError(f"No elites parquet found in {sample_dir}")
         latest_parquet = max(parquet_candidates, key=lambda p: p.stat().st_mtime)
-        elites_df = pd.read_parquet(latest_parquet)
+        elites_df = read_parquet(latest_parquet)
         logger.info("Loaded %d elites from %s", len(elites_df), latest_parquet.relative_to(sample_dir))
 
         # ── load trace & sequences for downstream plots ───────────────────────
@@ -127,7 +132,6 @@ def run_analyze(cfg: CruncherConfig, config_path: Path) -> None:
             raise FileNotFoundError(
                 f"Missing trace.nc in {sample_dir}. Re-run `cruncher sample` with sample.save_trace=true."
             )
-        _ = pd.read_parquet(seq_path)
         trace_idata = az.from_netcdf(trace_path)
 
         # gather per-PWM scores (for scatter etc.)

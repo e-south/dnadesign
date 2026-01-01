@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from dnadesign.cruncher.core.scoring import Scorer
+from dnadesign.cruncher.utils.parquet import read_parquet
 from dnadesign.cruncher.workflows.analyze.plots.scatter_utils import _TRANS
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ def gather_per_pwm_scores(
     if not seq_path.exists():
         raise FileNotFoundError(f"[gather] sequences.parquet not found in '{run_dir}'")
 
-    df_all = pd.read_parquet(seq_path)
+    df_all = read_parquet(seq_path)
     if "draw" not in df_all.columns or "sequence" not in df_all.columns:
         raise ValueError("gather_per_pwm_scores: sequences.parquet must have 'draw' and 'sequence' columns")
 

@@ -1,6 +1,6 @@
 # Troubleshooting
 
-- Missing lockfile: run `cruncher lock <config>` before `cruncher parse/sample/analyze`.
+- Missing lockfile: run `cruncher lock <config>` before `cruncher parse/sample`.
 - Target readiness: run `cruncher targets status <config>` to see missing matrices or sites.
 - Target file missing: `targets status` reports `missing-matrix-file` / `missing-sites-file` if catalog points to missing cache files. Run `cruncher fetch ...` or `cruncher cache verify`.
 - Lockfile/config mismatch: if `pwm_source` or TFs change, re-run `cruncher lock <config>`.
@@ -19,10 +19,8 @@
 - Analyze/report fail on missing sequences: ensure `sample.save_sequences=true`.
 - Missing trace.nc: ensure `sample.save_trace=true` and install `netCDF4` or `h5netcdf`.
 - RegulonDB errors: check connectivity; GraphQL schema changes can break adapters.
-- SSL verification failures: set `ingest.regulondb.ca_bundle` to a known CA bundle (loaded alongside certifi).
+- SSL verification failures: cruncher ships the current RegulonDB intermediate CA by default.
+  If the server rotates its chain, upgrade cruncher or set `ingest.regulondb.ca_bundle` to the new intermediate.
   Disable `verify_ssl` only as a last resort.
-- As of January 1, 2026, RegulonDB has occasionally served an incomplete chain (missing intermediate).
-  Supplying the intermediate via `ca_bundle` keeps verification secure and repeatable in CI.
-- To find the issuer URL: `openssl s_client -connect regulondb.ccg.unam.mx:443 -showcerts </dev/null | openssl x509 -noout -text | rg "CA Issuers"`.
 - Alignment matrix missing: set `ingest.regulondb.motif_matrix_source: sites` to build PWMs from curated binding sites.
 - PWM from sites failure: increase TFBS count or set `motif_store.allow_low_sites: true` only if you accept weak PWMs.

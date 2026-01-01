@@ -10,7 +10,8 @@ Key blocks:
 - `sample`: optimizer settings
 - `analysis`: diagnostics for existing runs
 
-Lockfiles: `.cruncher/locks/<config>.lock.json` (required for parse/sample/analyze/report).
+Lockfiles: `.cruncher/locks/<config>.lock.json` (required for parse/sample).
+Analyze/report operate on run artifacts and validate the lockfile captured in the run manifest.
 
 Regulator sets: each entry in `regulator_sets` is sampled independently (separate run folders). Run outputs include
 `active_regulator_set` in `config_used.yaml` and `regulator_set` in `run_manifest.json`.
@@ -72,7 +73,7 @@ ingest:
   regulondb:
     base_url: https://regulondb.ccg.unam.mx/graphql
     verify_ssl: true
-    ca_bundle: null                # optional CA bundle (loaded alongside certifi)
+    ca_bundle: null                # optional override CA bundle
     timeout_seconds: 30
     motif_matrix_source: alignment   # alignment | sites
     alignment_matrix_semantics: probabilities  # probabilities | counts
@@ -91,9 +92,9 @@ Notes:
 - `motif_matrix_source=alignment` is the default and **fails** if no alignment payload is available.
 - `motif_matrix_source=sites` computes a PWM from curated binding-site sequences and requires equal-length sites.
 - `min_sites_for_pwm` and `allow_low_sites` control PWM creation during ingestion (independent of motif_store).
-- `ca_bundle` adds an extra CA bundle for SSL verification (certifi remains the default trust store).
-  As of January 1, 2026, RegulonDB sometimes omits the intermediate certificate; use `ca_bundle`
-  to supply it without disabling verification.
+- `ca_bundle` overrides the built-in RegulonDB intermediate bundle (certifi remains the default trust store).
+  Cruncher ships the current intermediate by default so SSL works out of the box; set `ca_bundle`
+  only if RegulonDB rotates the chain and you need to pin a newer intermediate.
 - `ht_sites=true` enables HT dataset retrieval (`TFBINDING` and/or peaks depending on `ht_binding_mode`).
 - `ht_binding_mode` is explicit: choose `tfbinding` for curated sites or `peaks` for peak-only HT data.
 - `genome_source=ncbi` uses NCBI E-utilities to fetch RefSeq/GenBank FASTA by accession (default).

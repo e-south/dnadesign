@@ -27,6 +27,9 @@ Cruncher queries the RegulonDB Datamarts GraphQL endpoint:
 https://regulondb.ccg.unam.mx/graphql
 ```
 
+Cruncher ships the current RegulonDB intermediate CA bundle so SSL verification works out of the box.
+Override with `ingest.regulondb.ca_bundle` only if the server rotates certificates.
+
 ### Curated regulon TFBS
 
 We use the **regulon** datamart to retrieve curated binding sites:

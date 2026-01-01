@@ -27,6 +27,7 @@ from dnadesign.cruncher.config.schema_v2 import CruncherConfig
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
 from dnadesign.cruncher.core.state import SequenceState
+from dnadesign.cruncher.utils.parquet import read_parquet
 
 # Build a lookup table for A/C/G/T → 0..3
 _TRANS = np.full(256, -1, dtype=np.int8)
@@ -70,7 +71,7 @@ def load_elites(sample_dir: Path) -> pd.DataFrame:
     if not candidates:
         raise FileNotFoundError(f"load_elites: no elites parquet found in '{sample_dir}'")
     path = max(candidates, key=lambda p: p.stat().st_mtime)
-    data = pd.read_parquet(path)
+    data = read_parquet(path)
     if "sequence" not in data.columns:
         raise ValueError("load_elites: missing 'sequence' column in elites parquet")
     return data

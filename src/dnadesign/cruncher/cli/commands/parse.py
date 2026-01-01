@@ -8,7 +8,6 @@ import typer
 from rich.console import Console
 
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.workflows.parse_workflow import run_parse
 
 app = typer.Typer(no_args_is_help=True, help="Load cached motifs and render PWM logos.")
 console = Console()
@@ -18,6 +17,8 @@ console = Console()
 def main(config: Path = typer.Argument(..., help="Path to cruncher config.yaml.", metavar="CONFIG")) -> None:
     cfg = load_config(config)
     try:
+        from dnadesign.cruncher.workflows.parse_workflow import run_parse
+
         run_parse(cfg, config)
     except (ValueError, FileNotFoundError) as exc:
         console.print(f"Error: {exc}")

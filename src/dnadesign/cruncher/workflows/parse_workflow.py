@@ -16,7 +16,6 @@ from pathlib import Path
 import pandas as pd
 
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig
-from dnadesign.cruncher.io.plots.pssm import plot_pwm
 from dnadesign.cruncher.services.run_service import (
     update_run_index_from_manifest,
     update_run_index_from_status,
@@ -27,6 +26,7 @@ from dnadesign.cruncher.store.lockfile import read_lockfile, validate_lockfile, 
 from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.labels import build_run_name, regulator_sets
 from dnadesign.cruncher.utils.manifest import build_run_manifest, write_manifest
+from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
 from dnadesign.cruncher.utils.run_status import RunStatusWriter
 
 logger = logging.getLogger(__name__)
@@ -85,6 +85,10 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
     Error behavior:
       - If the motif store cannot resolve a PWM, we allow that exception to propagate.
     """
+    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    ensure_mpl_cache(catalog_root)
+    from dnadesign.cruncher.io.plots.pssm import plot_pwm
+
     store = _store(cfg, config_path)
 
     # Prepare output folder
@@ -92,7 +96,6 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
     out_base.mkdir(parents=True, exist_ok=True)
 
     lockmap = _lockmap_for(cfg, config_path)
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
     catalog = CatalogIndex.load(catalog_root)
     lock_root = catalog_root / "locks"
     lock_path = lock_root / f"{config_path.stem}.lock.json"

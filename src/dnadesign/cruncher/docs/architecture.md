@@ -17,7 +17,8 @@ Run registry: `.cruncher/run_index.json` (used by `cruncher runs list/show`).
 Source adapters are registered via a registry (plug-in style). Workflows only consume
 catalog-backed PWMs and **never** reach out to the network directly.
 
-Lockfiles are mandatory for parse/sample/analyze/report to keep TF resolution reproducible.
+Lockfiles are mandatory for parse/sample to keep TF resolution reproducible. Analyze/report consume
+run artifacts and validate the lockfile recorded in the run manifest.
 
 ## Run lifecycle
 

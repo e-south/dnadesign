@@ -74,10 +74,9 @@ Lockfiles pin TF names to exact source IDs and checksums. Lockfiles are **requir
 
 - parse
 - sample
-- analyze
-- report
 
 If a TF cannot be uniquely resolved, Cruncher errors immediately.
+Analyze/report operate on run artifacts and validate the lockfile recorded in the run manifest.
 
 ## 7) PWM creation strategy
 
@@ -156,7 +155,7 @@ Errors are explicit and actionable:
 - Missing artifacts for analyze/report → error
 - Invalid PWM / invalid sites → error
 - Ambiguous TF resolution → error
-- PWM-from-sites with low site count → warning (not silent)
+- PWM-from-sites with low site count → error unless `allow_low_sites=true`
 
 ## 12) Testing plan (minimum)
 

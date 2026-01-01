@@ -8,7 +8,6 @@ import typer
 from rich.console import Console
 
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.workflows.report_workflow import run_report
 
 app = typer.Typer(no_args_is_help=True, help="Summarize a sample run into report.json and report.md.")
 console = Console()
@@ -21,6 +20,8 @@ def main(
 ) -> None:
     cfg = load_config(config)
     try:
+        from dnadesign.cruncher.workflows.report_workflow import run_report
+
         run_report(cfg, config, batch)
     except (ValueError, FileNotFoundError) as exc:
         console.print(f"Error: {exc}")
