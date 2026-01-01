@@ -135,6 +135,9 @@ src/dnadesign/archived/
 src/dnadesign/prototypes/
 src/dnadesign/usr/archived/
 
+# Permuter docs (local only for now)
+src/dnadesign/permuter/docs/
+
 # OPAL campaigns: keep configs tracked, ignore artifacts/data.
 src/dnadesign/opal/campaigns/**
 !src/dnadesign/opal/campaigns/**/
