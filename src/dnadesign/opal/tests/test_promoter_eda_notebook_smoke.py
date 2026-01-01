@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 import polars as pl
+import pytest
 
 NOTEBOOK_PATH = Path("src/dnadesign/opal/notebooks/prom60_eda.py")
 
@@ -19,6 +20,8 @@ def _load_notebook_module() -> object:
 
 
 def test_prom60_eda_headless(tmp_path: Path) -> None:
+    if importlib.util.find_spec("marimo") is None:
+        pytest.skip("marimo is not installed in this environment")
     usr_root = tmp_path / "usr"
     dataset_dir = usr_root / "demo"
     dataset_dir.mkdir(parents=True)
