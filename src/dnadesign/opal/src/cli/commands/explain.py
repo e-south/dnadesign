@@ -14,8 +14,8 @@ from pathlib import Path
 
 import typer
 
-from ...explain import explain_round
-from ...utils import ExitCodes, OpalError, print_stdout
+from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...runtime.explain import explain_round
 from ..formatting import render_explain_human
 from ..registry import cli_command
 from ._common import (

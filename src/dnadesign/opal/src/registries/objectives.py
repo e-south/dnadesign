@@ -19,7 +19,7 @@ import pkgutil
 import sys
 from typing import Any, Dict, List, Protocol
 
-from ..round_context import PluginCtx
+from ..core.round_context import PluginCtx
 
 
 def _dbg(msg: str) -> None:

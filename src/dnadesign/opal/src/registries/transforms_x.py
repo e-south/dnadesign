@@ -12,14 +12,51 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import importlib
+import os
+import pkgutil
+import sys
 from typing import Any, Callable, Dict, Optional
 
 import numpy as np
 import pandas as pd
 
-from ..round_context import Contract, PluginCtx
+from ..core.round_context import Contract, PluginCtx
 
 _REGISTRY: Dict[str, Callable[..., Callable[[pd.Series], np.ndarray]]] = {}
+_BUILTINS_LOADED = False
+
+
+def _dbg(msg: str) -> None:
+    if str(os.getenv("OPAL_DEBUG", "")).strip().lower() in ("1", "true", "yes", "on"):
+        print(f"[opal.debug.transforms_x] {msg}", file=sys.stderr)
+
+
+def _ensure_builtins_loaded() -> None:
+    """Import package-shipped transforms_x modules that self-register via @register_transform_x."""
+    global _BUILTINS_LOADED
+    if _BUILTINS_LOADED:
+        return
+    try:
+        pkg = importlib.import_module("dnadesign.opal.src.transforms_x")
+        _dbg(f"imported package: {pkg.__name__} ({getattr(pkg, '__file__', '?')})")
+        try:
+            pkg_path = pkg.__path__  # type: ignore[attr-defined]
+        except Exception:
+            pkg_path = []
+        for mod in pkgutil.iter_modules(pkg_path):
+            if mod.name.startswith("_"):
+                continue
+            fq = f"{pkg.__name__}.{mod.name}"
+            try:
+                importlib.import_module(fq)
+                _dbg(f"imported built-in transform_x module: {fq}")
+            except Exception as e:
+                _dbg(f"FAILED importing {fq}: {e!r}")
+                continue
+    except Exception as e:
+        _dbg(f"FAILED importing package dnadesign.opal.src.transforms_x: {e!r}")
+    _BUILTINS_LOADED = True
 
 
 def register_transform_x(name: str):
@@ -35,6 +72,7 @@ def register_transform_x(name: str):
 
 
 def list_transforms_x() -> list[str]:
+    _ensure_builtins_loaded()
     return sorted(_REGISTRY.keys())
 
 
@@ -73,6 +111,7 @@ def get_transform_x(
     Build a configured transform by name. `params` is optional for back-compat.
     Returns a callable that accepts a pandas Series and returns ndarray (N,F).
     """
+    _ensure_builtins_loaded()
     if name not in _REGISTRY:
         available = ", ".join(list_transforms_x()) or "<none registered>"
         raise ValueError(f"Unknown transform_x: {name!r}. Available: {available}")

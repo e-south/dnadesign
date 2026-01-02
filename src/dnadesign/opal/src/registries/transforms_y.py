@@ -14,16 +14,53 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import importlib
+import os
+import pkgutil
+import sys
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 
-from ..round_context import Contract, PluginCtx, RoundCtx
+from ..core.round_context import Contract, PluginCtx, RoundCtx
 
 # ---- Ingest transforms ----
 
 _TRANSFORM_Y: Dict[str, Callable[..., Any]] = {}
+_BUILTINS_LOADED = False
+
+
+def _dbg(msg: str) -> None:
+    if str(os.getenv("OPAL_DEBUG", "")).strip().lower() in ("1", "true", "yes", "on"):
+        print(f"[opal.debug.transforms_y] {msg}", file=sys.stderr)
+
+
+def _ensure_builtins_loaded() -> None:
+    """Import package-shipped transforms_y modules that self-register via registry decorators."""
+    global _BUILTINS_LOADED
+    if _BUILTINS_LOADED:
+        return
+    try:
+        pkg = importlib.import_module("dnadesign.opal.src.transforms_y")
+        _dbg(f"imported package: {pkg.__name__} ({getattr(pkg, '__file__', '?')})")
+        try:
+            pkg_path = pkg.__path__  # type: ignore[attr-defined]
+        except Exception:
+            pkg_path = []
+        for mod in pkgutil.iter_modules(pkg_path):
+            if mod.name.startswith("_"):
+                continue
+            fq = f"{pkg.__name__}.{mod.name}"
+            try:
+                importlib.import_module(fq)
+                _dbg(f"imported built-in transform_y module: {fq}")
+            except Exception as e:
+                _dbg(f"FAILED importing {fq}: {e!r}")
+                continue
+    except Exception as e:
+        _dbg(f"FAILED importing package dnadesign.opal.src.transforms_y: {e!r}")
+    _BUILTINS_LOADED = True
 
 
 def register_transform_y(name: str):
@@ -58,6 +95,7 @@ def _wrap_for_ctx_enforcement(name: str, fn: Callable[..., Any]) -> Callable[...
 
 
 def get_transform_y(name: str) -> Callable[..., Any]:
+    _ensure_builtins_loaded()
     try:
         fn = _TRANSFORM_Y[name]
     except KeyError as e:
@@ -66,6 +104,7 @@ def get_transform_y(name: str) -> Callable[..., Any]:
 
 
 def list_transforms_y() -> List[str]:
+    _ensure_builtins_loaded()
     return sorted(_TRANSFORM_Y.keys())
 
 
@@ -122,6 +161,7 @@ def register_y_op(
 
 
 def get_y_op(name: str):
+    _ensure_builtins_loaded()
     try:
         return _Y_OPS[name]
     except KeyError as e:
@@ -129,6 +169,7 @@ def get_y_op(name: str):
 
 
 def list_y_ops() -> List[str]:
+    _ensure_builtins_loaded()
     return sorted(_Y_OPS.keys())
 
 
@@ -159,6 +200,7 @@ def run_y_ops_pipeline(
 
     Returns the transformed Y array.
     """
+    _ensure_builtins_loaded()
     Yt = np.asarray(Y, dtype=float)
 
     if stage not in ("fit_transform", "inverse"):

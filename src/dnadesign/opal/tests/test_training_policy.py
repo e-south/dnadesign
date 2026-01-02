@@ -11,9 +11,9 @@ Dunlop Lab
 import pandas as pd
 import pytest
 
-from dnadesign.opal.src.data_access import RecordsStore
+from dnadesign.opal.src.core.utils import OpalError
+from dnadesign.opal.src.storage.data_access import RecordsStore
 from dnadesign.opal.src.transforms_x import identity  # noqa: F401
-from dnadesign.opal.src.utils import OpalError
 
 
 def _store(tmp_path):

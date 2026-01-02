@@ -15,10 +15,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import pandas as pd
+from ..storage.workspace import CampaignWorkspace
 
-from ..workspace import CampaignWorkspace
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 @dataclass
@@ -34,7 +36,7 @@ class PlotContext:
     logger: logging.Logger
     save_data: bool  # if true, plugins should save tidy data
 
-    def save_df(self, df: pd.DataFrame, filename: str | None = None) -> Path:
+    def save_df(self, df: "pd.DataFrame", filename: str | None = None) -> Path:
         """
         Save a CSV next to the plot (same basename by default).
         Plugins SHOULD check `self.save_data` before calling this.

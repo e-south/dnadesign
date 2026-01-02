@@ -13,8 +13,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dnadesign.opal.src.state import CampaignState
-from dnadesign.opal.src.status import build_status
+from dnadesign.opal.src.reporting.status import build_status
+from dnadesign.opal.src.storage.state import CampaignState
 
 
 def test_state_v1_loads_without_run_id(tmp_path):

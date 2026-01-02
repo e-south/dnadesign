@@ -17,10 +17,10 @@ from typing import Optional
 
 import typer
 
-from ...state import CampaignState
-from ...summary import load_round_log, summarize_round_log
-from ...utils import ExitCodes, OpalError, print_stdout
-from ...workspace import CampaignWorkspace
+from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...reporting.summary import load_round_log, summarize_round_log
+from ...storage.state import CampaignState
+from ...storage.workspace import CampaignWorkspace
 from ..formatting import render_round_log_summary_human
 from ..registry import cli_command
 from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path

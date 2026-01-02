@@ -8,7 +8,7 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-from dnadesign.opal.src.summary import summarize_round_log
+from dnadesign.opal.src.reporting.summary import summarize_round_log
 
 
 def test_round_log_summary_counts():

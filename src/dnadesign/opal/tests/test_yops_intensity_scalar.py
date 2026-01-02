@@ -11,8 +11,8 @@ Dunlop Lab
 import numpy as np
 
 from dnadesign.opal.src.config.types import PluginRef
+from dnadesign.opal.src.core.round_context import PluginRegistryView, RoundCtx
 from dnadesign.opal.src.registries.transforms_y import run_y_ops_pipeline
-from dnadesign.opal.src.round_context import PluginRegistryView, RoundCtx
 
 
 def test_intensity_median_iqr_round_trip():

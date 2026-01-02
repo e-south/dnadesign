@@ -91,6 +91,23 @@ class _Vec8TableParams(BaseModel):
         return v
 
 
+@register_param_schema("transform_y", "scalar_from_table_v1")
+class _ScalarTableParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id_column: Optional[str] = None  # must be exactly "id" if provided
+    sequence_column: str = "sequence"
+    y_column: str = "y"
+
+    @field_validator("id_column")
+    @classmethod
+    def _id_col_must_be_lit_id(cls, v):
+        if v is None:
+            return v
+        if v != "id":
+            raise ValueError("id_column, if set, must be exactly 'id' (no aliases).")
+        return v
+
+
 @register_param_schema("model", "random_forest")
 class _RFParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -155,6 +172,11 @@ class _SFXIParams(BaseModel):
         if any((x < 0.0 or x > 1.0) for x in v):
             raise ValueError("objective.params.setpoint_vector entries must be in [0, 1]")
         return v
+
+
+@register_param_schema("objective", "scalar_identity_v1")
+class _ScalarIdentityParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
 
 @register_param_schema("selection", "top_n")

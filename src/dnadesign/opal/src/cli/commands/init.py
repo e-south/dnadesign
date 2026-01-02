@@ -15,8 +15,8 @@ from pathlib import Path
 import typer
 
 from ...config import load_config
-from ...state import CampaignState
-from ...utils import ExitCodes, OpalError, ensure_dir, file_sha256, print_stdout
+from ...core.utils import ExitCodes, OpalError, ensure_dir, file_sha256, print_stdout
+from ...storage.state import CampaignState
 from ..formatting import render_init_human
 from ..registry import cli_command
 from ._common import (
@@ -58,9 +58,9 @@ def cmd_init(
         (marker_dir / "config").write_text(str(rel))
 
         store = store_from_cfg(cfg)
+        df = store.load()
+        store.assert_unique_ids(df)
         if cfg.safety.require_biotype_and_alphabet_on_init:
-            df = store.load()
-            store.assert_unique_ids(df)
             missing = [c for c in ("bio_type", "alphabet") if c not in df.columns]
             if missing:
                 raise OpalError(f"records.parquet missing required columns: {missing}")
@@ -68,6 +68,9 @@ def cmd_init(
                 if df[col].isna().any():
                     bad = df.loc[df[col].isna(), "id"].astype(str).tolist()[:10]
                     raise OpalError(f"Missing values in '{col}' (sample ids={bad}).")
+        df2, added = store.ensure_cache_columns(df, include_label_hist=True)
+        if added:
+            store.save_atomic(df2)
         st = CampaignState(
             campaign_slug=cfg.campaign.slug,
             campaign_name=cfg.campaign.name,

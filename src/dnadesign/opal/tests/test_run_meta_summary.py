@@ -10,7 +10,7 @@ Dunlop Lab
 
 import pandas as pd
 
-from dnadesign.opal.src.summary import select_run_meta, summarize_run_meta
+from dnadesign.opal.src.reporting.summary import select_run_meta, summarize_run_meta
 
 
 def test_select_run_meta_latest_round():

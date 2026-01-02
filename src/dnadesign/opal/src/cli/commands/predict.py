@@ -13,12 +13,11 @@ from __future__ import annotations
 import json as _json
 from pathlib import Path
 
-import pandas as pd
 import typer
 
-from ...predict import run_predict_ephemeral
-from ...state import CampaignState
-from ...utils import ExitCodes, OpalError, print_stdout
+from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...runtime.predict import run_predict_ephemeral
+from ...storage.state import CampaignState
 from ..registry import cli_command
 from ._common import internal_error, load_cli_config, opal_error, resolve_config_path, store_from_cfg
 
@@ -41,11 +40,11 @@ def cmd_predict(
         "--model-params",
         help="Optional JSON file with model params (used with --model-name).",
     ),
-    round: int = typer.Option(
+    round: str = typer.Option(
         None,
         "--round",
         "-r",
-        help="Round index to resolve model from state.json (default: latest)",
+        help="Round index to resolve model from state.json (default: latest). Accepts 'latest'.",
     ),
     input_path: Path = typer.Option(None, "--in", help="Optional input parquet/csv; defaults to records.parquet"),
     out_path: Path = typer.Option(None, "--out", help="Optional output parquet/csv; defaults to stdout CSV"),
@@ -63,9 +62,22 @@ def cmd_predict(
     ),
 ):
     try:
+        import pandas as pd
+
         cfg = load_cli_config(resolve_config_path(config))
         store = store_from_cfg(cfg)
+
         # Resolve model_path if not provided
+        def _parse_round_sel(val: str | None) -> int | None:
+            if val is None:
+                return None
+            if isinstance(val, str) and val.strip().lower() in ("latest", "unspecified"):
+                return None
+            try:
+                return int(val)
+            except Exception as exc:
+                raise OpalError("Invalid --round selector. Use an integer or 'latest'.") from exc
+
         if model_path is None:
             st_path = Path(cfg.campaign.workdir) / "state.json"
             if not st_path.exists():
@@ -74,8 +86,11 @@ def cmd_predict(
             rounds = sorted(st.rounds, key=lambda r: int(r.round_index))
             if not rounds:
                 raise OpalError(f"No rounds found in {st_path}")
+            round_sel = _parse_round_sel(round)
             entry = (
-                next((r for r in rounds if int(r.round_index) == int(round)), None) if round is not None else rounds[-1]
+                next((r for r in rounds if int(r.round_index) == int(round_sel)), None)
+                if round_sel is not None
+                else rounds[-1]
             )
             if entry is None:
                 raise OpalError(f"Round {round} not found in {st_path}")

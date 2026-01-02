@@ -15,8 +15,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from dnadesign.opal.src.core.round_context import PluginRegistryView, RoundCtx
 from dnadesign.opal.src.objectives.sfxi_v1 import sfxi_v1
-from dnadesign.opal.src.round_context import PluginRegistryView, RoundCtx
 
 
 class _TrainView:

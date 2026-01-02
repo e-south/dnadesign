@@ -31,7 +31,7 @@ The pipeline is plugin-driven: swap **data transforms** (X/Y), **models**, **obj
   * [Notes on precedence & wiring](#notes-on-precedence--wiring)
 * [Architecture & data flow](#architecture--data-flow)
 
-  * [RunCarrier (RoundCtx)](#runcarrier-roundctx)
+  * [RoundCtx (runtime carrier)](#roundctx-runtime-carrier)
 * [Safety & validation](#safety--validation)
 * [Data contracts](#data-contracts)
 
@@ -48,7 +48,7 @@ OPAL lives inside the `dnadesign` repo. The CLI entrypoint is defined in `pyproj
 
 ```toml
 [project.scripts]
-opal = "dnadesign.opal.src.cli.app:main"
+opal = "dnadesign.opal.src.cli:main"
 ```
 
 ```bash
@@ -71,9 +71,12 @@ opal runs list -c path/to/campaign.yaml
 opal log -c path/to/campaign.yaml --round latest
 opal record-show -c path/to/campaign.yaml --id <some_id>
 opal explain -c path/to/campaign.yaml --round 1
+opal plot --list                              # list available plot kinds
 opal plot -c path/to/campaign.yaml
+opal plot -c path/to/campaign.yaml --quick    # run default plots without plots.yaml
 opal predict -c path/to/campaign.yaml               # uses latest round
 opal objective-meta -c campaign.yaml --round latest
+opal notebook generate -c path/to/campaign.yaml     # create a marimo analysis notebook
 
 # (Optional) Start fresh: remove OPAL-derived columns from records.parquet
 opal prune-source -c path/to/campaign.yaml --scope campaign
@@ -125,18 +128,20 @@ src/dnadesign/opal/src/
 ├─ cli/                     # CLI app + command registry
 │  ├─ app.py                # Typer entrypoint
 │  ├─ registry.py           # auto-discovers and mounts commands
-│  └─ commands/             # run, ingest_y, predict, explain, record_show, status, runs, log, validate, init, plot, prune-source
+│  └─ commands/             # run, ingest_y, predict, explain, record_show, status, runs, log, validate, init, plot, prune_source
 ├─ config/                  # YAML loader + plugin param schemas (Pydantic)
-├─ registries/              # transforms_x, transforms_y, models, objectives, selections, plot
+├─ registries/              # transforms_x, transforms_y, models, objectives, selection, plots
 ├─ transforms_x/            # X transforms (import = register)
 ├─ transforms_y/            # Y ingests (import = register)
 ├─ models/                  # model wrappers (e.g., RandomForest)
 ├─ objectives/              # objective fns (Ŷ → scalar score + diagnostics)
 ├─ selection/               # selection strategies (scores → ranks/selected)
-├─ artifacts.py             # round artifacts IO (ctx/meta/log/selection CSV, ledger sinks)
-├─ writebacks.py            # canonical event builders + cache writers
-├─ data_access.py           # RecordsStore (IO, label history, fixed-width X)
-├─ round_context.py         # RoundCtx (runtime carrier)
+├─ plots/                   # plot plugins
+├─ core/                    # RoundCtx, console helpers, core utils/errors
+├─ runtime/                 # run_round, ingest, predict, explain, preflight, round_plan
+├─ storage/                 # data_access, ledger, artifacts, writebacks, workspace, state, locks
+├─ reporting/               # status, summary, record_show
+├─ analysis/                # analysis utilities (e.g., promoter_eda_utils)
 └─ …
 ```
 
@@ -144,7 +149,7 @@ src/dnadesign/opal/src/
 
 Common commands (details in the **[CLI Manual](./src/cli/README.md)**):
 
-* `opal init` — scaffold & register the campaign workspace; write `state.json`
+* `opal init` — scaffold & register the campaign workspace; write `state.json` and ensure cache columns exist
 * `opal ingest-y` — transform and append labels to `records.parquet`
 * `opal run` — train/score/select for a round; write artifacts + ledger sinks under `outputs/`
 * `opal predict` — score a table from a frozen model (no write-backs)
@@ -159,13 +164,19 @@ Common commands (details in the **[CLI Manual](./src/cli/README.md)**):
 * `opal prune-source` — remove OPAL-derived columns from records.parquet (start fresh)
 
 All commands are **registry-driven** and plugin-agnostic: they operate on your configured
-plugin names and enforce only declared contracts (transforms/models/objectives/selections).
+plugin names and enforce only declared contracts (transforms/models/objectives/selection).
+
+Human CLI output uses Rich tables and progress bars when stdout/stderr are TTYs.
+Disable styling with `--no-color` or disable the TUI with `OPAL_CLI_TUI=0`.
+On macOS, OPAL suppresses noisy PyArrow `sysctlbyname` warnings by default
+(`OPAL_SUPPRESS_PYARROW_SYSCTL=0` to show them).
 
 ---
 
 ### Campaign layout
 
-`opal init` scaffolds a campaign folder. Edit `campaign.yaml` to define behavior.
+`opal init` scaffolds a campaign folder and ensures OPAL cache columns exist in `records.parquet`. Edit
+`campaign.yaml` to define behavior.
 
 ```
 <repo>/src/dnadesign/opal/campaigns/<my_campaign>/
@@ -297,7 +308,7 @@ safety:
 
 ### Architecture & data flow
 
-* Models are not aware of downstream objectives (see **RunCarrier (RoundCtx)**)
+* Models are not aware of downstream objectives (see **RoundCtx (runtime carrier)**)
 * Objectives derive their own round constants via `train_view` and publish them.
 * Selection can read whatever objectives produced.
 * The persisted `round_ctx.json` makes runs **auditable** alongside ledger sinks, `model.joblib`, `model_meta.json`, `selection_top_k.csv`, and `objective_meta.json`.
@@ -318,16 +329,16 @@ outputs/ledger.*: { label | run_pred | run_meta }
 
 ---
 
-#### RunCarrier (RoundCtx)
+#### RoundCtx (runtime carrier)
 
-**RunCarrier** is a runtime companion to `campaign.yaml`: the YAML picks which plugins to run; the carrier records what the run computed that others depend on. The runner persists a compact **`round.log.jsonl`** with stage events (preflight, y‑ops fit/transform, fit start/done, predict batches, y‑ops inverse, objective, selection) and a full **`round_ctx.json`** snapshot for audit.
+**RoundCtx** is a runtime companion to `campaign.yaml`: the YAML picks which plugins to run; the carrier records what the run computed that others depend on. The runner persists a compact **`round.log.jsonl`** with stage events (preflight, y‑ops fit/transform, fit start/done, predict batches, y‑ops inverse, objective, selection) and a full **`round_ctx.json`** snapshot for audit.
 
 #### How plugins use `RoundCtx`
 
 The runner injects a **plugin-scoped context** (`ctx`) that auto-expands `"<self>"` to your plugin’s registered name and enforces your contract. Declare what your plugin **requires** (must exist before you run) and what it will **produce** (must exist after you run):
 
 ```python
-from dnadesign.opal.src.round_context import roundctx_contract
+from dnadesign.opal.src.core.round_context import roundctx_contract
 
 @roundctx_contract(
   category="objective",  # 'model' | 'objective' | 'selection' | 'transform_x' | 'transform_y'
@@ -363,7 +374,7 @@ OPAL is **assertive by default**: it will fail fast on inconsistent inputs rathe
 
 * `opal validate` checks essentials + X presence; if Y exists it must be finite and the expected length.
 * `label_hist` is the **single source of truth** for labels. `run`/`explain` require it to be valid.
-* Labels present in the Y column but **missing from `label_hist` are rejected** (use `opal ingest-y` or `opal label-hist repair`).
+* Labels present in the Y column but **missing from `label_hist` are rejected** (use `opal ingest-y` or `opal label-hist attach-from-y` for legacy Y columns).
 * Ledger writes are strict: unknown columns are **errors** (override only with `OPAL_LEDGER_ALLOW_EXTRA=1`).
 * Duplicate handling on ingest is explicit via `ingest.duplicate_policy` (error | keep_first | keep_last).
 
@@ -402,6 +413,7 @@ Naming: secondary columns follow `<tool>__<field>`.
 | `opal__<slug>__latest_pred_scalar`  | double                  | latest objective scalar cache             |
 
 These caches are **derived** and can be recomputed; canonical records live in ledger sinks.
+`opal init` will add these cache columns to `records.parquet` if they are missing.
 Use `opal prune-source` to remove OPAL‑derived columns (including the Y column) when you need to start fresh.
 
 #### Ledger output schema (append-only)

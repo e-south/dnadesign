@@ -28,8 +28,8 @@ from joblib import dump
 from joblib import load as joblib_load
 from sklearn.ensemble import RandomForestRegressor
 
+from ..core.round_context import roundctx_contract
 from ..registries.models import register_model
-from ..round_context import roundctx_contract
 
 
 @dataclass

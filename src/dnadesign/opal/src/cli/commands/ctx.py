@@ -18,9 +18,9 @@ from typing import Any, Dict, List, Optional
 
 import typer
 
-from ...state import CampaignState
-from ...utils import ExitCodes, OpalError, print_stdout
-from ...workspace import CampaignWorkspace
+from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...storage.state import CampaignState
+from ...storage.workspace import CampaignWorkspace
 from ..registry import cli_group
 from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path
 

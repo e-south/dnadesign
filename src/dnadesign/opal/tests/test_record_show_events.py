@@ -11,7 +11,7 @@ Dunlop Lab
 import pandas as pd
 import pytest
 
-from dnadesign.opal.src.record_show import build_record_report
+from dnadesign.opal.src.reporting.record_show import build_record_report
 
 
 def test_record_show_requires_ledger_reader():

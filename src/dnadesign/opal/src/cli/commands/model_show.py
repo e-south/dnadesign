@@ -14,13 +14,11 @@ import json as _json
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
-import pandas as pd
 import typer
 
+from ...core.utils import ExitCodes, OpalError, ensure_dir, print_stdout
 from ...registries.models import load_model
-from ...state import CampaignState
-from ...utils import ExitCodes, OpalError, ensure_dir, print_stdout
+from ...storage.state import CampaignState
 from ..formatting import render_model_show_human
 from ..registry import cli_command
 from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path
@@ -48,6 +46,9 @@ def cmd_model_show(
     json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
 ):
     try:
+        import numpy as np
+        import pandas as pd
+
         # Resolve model_path if not provided
         if model_path is None:
             if not config:

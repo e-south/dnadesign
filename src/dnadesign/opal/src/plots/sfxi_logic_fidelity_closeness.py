@@ -14,16 +14,37 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from mpl_toolkits.axes_grid1 import axes_size, make_axes_locatable
-from pyarrow import compute as arrow_pc
-from pyarrow import dataset as ds
 
-from ..registries.plot import register_plot
+from ..core.stderr_filter import maybe_install_pyarrow_sysctl_filter
+from ..core.utils import ExitCodes, OpalError
+from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta
 
 
-@register_plot("sfxi_logic_fidelity_closeness")
+def _import_pyarrow():
+    maybe_install_pyarrow_sysctl_filter()
+    from pyarrow import compute as arrow_pc
+    from pyarrow import dataset as ds
+
+    return arrow_pc, ds
+
+
+@register_plot(
+    "sfxi_logic_fidelity_closeness",
+    meta=PlotMeta(
+        summary="Logic fidelity vs closeness to setpoint (observed labels).",
+        params={
+            "top_percentile": "Optional percentile cutoff for highlighting.",
+            "violin": "Show violin distributions (default true).",
+            "setpoint_override": "Override setpoint vector (length-4).",
+        },
+        requires=["observed_round", "y_obs", "objective__params"],
+        notes=["Reads ledger.labels + ledger.runs for setpoint."],
+    ),
+)
 def render(context, params: dict) -> None:
+    arrow_pc, ds = _import_pyarrow()
     # ---- Parameters (assertive, yet simple to change) ----
     # Source is now *observed* labels (ledger.labels) instead of predictions.
     outputs_dir = resolve_outputs_dir(context)  # ledger sinks live here
@@ -61,9 +82,15 @@ def render(context, params: dict) -> None:
     labels_path = root / "ledger.labels.parquet"
     runs_path = root / "ledger.runs.parquet"
     if not labels_path.exists():
-        raise FileNotFoundError(f"Missing labels sink: {labels_path}")
+        raise OpalError(
+            f"Missing labels sink: {labels_path}. Run `opal ingest-y -c <campaign.yaml> --round <k>` first.",
+            ExitCodes.BAD_ARGS,
+        )
     if not runs_path.exists():
-        raise FileNotFoundError(f"Missing runs sink (for setpoint): {runs_path}")
+        raise OpalError(
+            f"Missing runs sink (for setpoint): {runs_path}. Run `opal run -c <campaign.yaml> --round <k>` first.",
+            ExitCodes.BAD_ARGS,
+        )
 
     # Helper: filter by rounds (on 'observed_round')
     def _round_filter(dset: ds.Dataset):

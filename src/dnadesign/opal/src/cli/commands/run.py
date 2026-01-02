@@ -17,18 +17,20 @@ from typing import Optional
 
 import typer
 
-from ...locks import CampaignLock
-from ...run_round import RunRoundRequest, run_round
-from ...state import CampaignState
-from ...utils import ExitCodes, OpalError, print_stdout
+from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...runtime.run_round import RunRoundRequest, run_round
+from ...storage.locks import CampaignLock
+from ...storage.state import CampaignState
 from ..formatting import render_run_summary_human
 from ..registry import cli_command
+from ..tui import progress_factory as tui_progress_factory
 from ._common import (
     internal_error,
     json_out,
     load_cli_config,
     opal_error,
     print_config_context,
+    prompt_confirm,
     resolve_config_path,
     store_from_cfg,
 )
@@ -71,15 +73,11 @@ def cmd_run(
             except Exception:
                 exists = False
             if exists and not resume:
-                resp = (
-                    input(
-                        f"[guard] Round r={int(round)} already recorded in {st_path.name}. "
-                        "Overwrite this round entry and artifacts? (y/N): "
-                    )
-                    .strip()
-                    .lower()
-                )
-                if resp not in ("y", "yes"):
+                if not prompt_confirm(
+                    f"[guard] Round r={int(round)} already recorded in {st_path.name}. "
+                    "Overwrite this round entry and artifacts? (y/N): ",
+                    non_interactive_hint="No TTY available. Re-run with --resume to overwrite this round.",
+                ):
                     print_stdout("Aborted.")
                     raise typer.Exit(code=ExitCodes.BAD_ARGS)
                 resume = True
@@ -92,6 +90,7 @@ def cmd_run(
             score_batch_size_override=score_batch_size,
             verbose=verbose,
             allow_resume=bool(resume),
+            progress_factory=(tui_progress_factory() if verbose and not json else None),
         )
         with CampaignLock(Path(cfg.campaign.workdir)):
             res = run_round(store, df, req)

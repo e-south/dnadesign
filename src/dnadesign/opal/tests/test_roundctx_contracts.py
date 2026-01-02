@@ -17,10 +17,10 @@ import pytest
 from pydantic import BaseModel
 
 from dnadesign.opal.src.config.types import PluginRef
+from dnadesign.opal.src.core.round_context import PluginRegistryView, RoundCtx, RoundCtxContractError, roundctx_contract
 from dnadesign.opal.src.registries.objectives import get_objective, list_objectives, register_objective
-from dnadesign.opal.src.registries.selections import get_selection, list_selections, register_selection
+from dnadesign.opal.src.registries.selection import get_selection, list_selections, register_selection
 from dnadesign.opal.src.registries.transforms_y import list_y_ops, register_y_op, run_y_ops_pipeline
-from dnadesign.opal.src.round_context import PluginRegistryView, RoundCtx, RoundCtxContractError, roundctx_contract
 
 
 class _ObjResult:

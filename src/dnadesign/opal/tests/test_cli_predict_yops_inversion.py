@@ -21,7 +21,7 @@ from typer.testing import CliRunner
 from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.src.models.random_forest import RandomForestModel
 
-from ._cli_helpers import write_campaign_yaml, write_records
+from ._cli_helpers import write_campaign_yaml, write_records, write_state
 
 
 def _train_model(model_path: Path) -> dict:
@@ -58,5 +58,28 @@ def test_predict_requires_round_ctx_when_yops_present(tmp_path: Path) -> None:
         app,
         ["--no-color", "predict", "-c", str(campaign), "--model-path", str(model_path), "--assume-no-yops"],
     )
+    assert res.exit_code == 0, res.output
+    assert "y_pred_vec" in res.output
+
+
+def test_predict_accepts_latest_round_selector(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(campaign, workdir=workdir, records_path=records)
+
+    round_dir = workdir / "outputs" / "round_0"
+    round_dir.mkdir(parents=True, exist_ok=True)
+    model_path = round_dir / "model.joblib"
+    meta = _train_model(model_path)
+    (round_dir / "model_meta.json").write_text(json.dumps(meta))
+
+    write_state(workdir, records_path=records, run_id="run-0", round_index=0)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "predict", "-c", str(campaign), "--round", "latest"])
     assert res.exit_code == 0, res.output
     assert "y_pred_vec" in res.output

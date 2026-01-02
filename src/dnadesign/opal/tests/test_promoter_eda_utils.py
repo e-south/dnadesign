@@ -6,7 +6,7 @@ import altair as alt
 import polars as pl
 import pytest
 
-from dnadesign.opal.src import promoter_eda_utils as utils
+from dnadesign.opal.src.analysis import promoter_eda_utils as utils
 
 
 def test_find_repo_root(tmp_path: Path) -> None:

@@ -22,10 +22,10 @@ import yaml
 
 from dnadesign.opal.src import LEDGER_SCHEMA_VERSION
 from dnadesign.opal.src import __version__ as OPAL_VERSION
-from dnadesign.opal.src.ledger import LedgerWriter
-from dnadesign.opal.src.state import CampaignState, RoundEntry
-from dnadesign.opal.src.workspace import CampaignWorkspace
-from dnadesign.opal.src.writebacks import SelectionEmit, build_run_meta_event, build_run_pred_events
+from dnadesign.opal.src.storage.ledger import LedgerWriter
+from dnadesign.opal.src.storage.state import CampaignState, RoundEntry
+from dnadesign.opal.src.storage.workspace import CampaignWorkspace
+from dnadesign.opal.src.storage.writebacks import SelectionEmit, build_run_meta_event, build_run_pred_events
 
 
 def write_records(
@@ -58,23 +58,41 @@ def write_campaign_yaml(
     workdir: Path,
     records_path: Path,
     plots: Optional[List[Dict[str, Any]]] = None,
+    transforms_y_name: str = "sfxi_vec8_from_table_v1",
+    transforms_y_params: Optional[Dict[str, Any]] = None,
+    objective_name: str = "sfxi_v1",
+    objective_params: Optional[Dict[str, Any]] = None,
+    y_expected_length: int = 8,
+    model_params: Optional[Dict[str, Any]] = None,
+    selection_params: Optional[Dict[str, Any]] = None,
+    safety: Optional[Dict[str, Any]] = None,
 ) -> None:
+    if transforms_y_params is None:
+        transforms_y_params = {}
+    if objective_params is None:
+        objective_params = {"setpoint_vector": [0, 0, 0, 1]}
+    if model_params is None:
+        model_params = {"n_estimators": 5, "random_state": 0, "oob_score": False}
+    if selection_params is None:
+        selection_params = {"top_k": 1}
     cfg: Dict[str, Any] = {
         "campaign": {"name": "Demo", "slug": "demo", "workdir": str(workdir)},
         "data": {
             "location": {"kind": "local", "path": str(records_path)},
             "x_column_name": "X",
             "y_column_name": "Y",
-            "y_expected_length": 8,
+            "y_expected_length": int(y_expected_length),
         },
         "transforms_x": {"name": "identity", "params": {}},
-        "transforms_y": {"name": "sfxi_vec8_from_table_v1", "params": {}},
-        "model": {"name": "random_forest", "params": {"n_estimators": 5, "random_state": 0, "oob_score": False}},
-        "objective": {"name": "sfxi_v1", "params": {"setpoint_vector": [0, 0, 0, 1]}},
-        "selection": {"name": "top_n", "params": {"top_k": 1}},
+        "transforms_y": {"name": transforms_y_name, "params": transforms_y_params},
+        "model": {"name": "random_forest", "params": model_params},
+        "objective": {"name": objective_name, "params": objective_params},
+        "selection": {"name": "top_n", "params": selection_params},
     }
     if plots is not None:
         cfg["plots"] = plots
+    if safety is not None:
+        cfg["safety"] = safety
     path.write_text(yaml.safe_dump(cfg, sort_keys=False))
 
 

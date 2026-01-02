@@ -16,8 +16,8 @@ from pathlib import Path
 
 import typer
 
-from ...data_access import ESSENTIAL_COLS
-from ...utils import ExitCodes, OpalError, print_stdout
+from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...storage.data_access import ESSENTIAL_COLS
 from ..formatting import kv_block
 from ..registry import cli_command
 from ._common import (

@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from ..registries.plot import register_plot
+from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta, log_kv
 
@@ -155,7 +155,19 @@ def _resolve_order(frames: List[pd.DataFrame], policy: str) -> List[int]:
 # -----------------------------
 
 
-@register_plot("feature_importance_bars")
+@register_plot(
+    "feature_importance_bars",
+    meta=PlotMeta(
+        summary="Overlayed feature-importance bars across rounds.",
+        params={
+            "order_policy": "preserve|sort_index (default preserve).",
+            "alpha": "Bar transparency (default 0.45).",
+            "figsize_in": "Figure size in inches (default [12, 5]).",
+        },
+        requires=["outputs/round_<k>/feature_importance.csv"],
+        notes=["Reads per-round outputs, not ledger."],
+    ),
+)
 def render(context, params: dict) -> None:
     """
     Params (all optional, assertively validated):

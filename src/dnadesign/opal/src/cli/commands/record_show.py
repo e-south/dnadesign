@@ -14,10 +14,10 @@ from pathlib import Path
 
 import typer
 
-from ...ledger import LedgerReader
-from ...record_show import build_record_report
-from ...utils import ExitCodes, OpalError, print_stdout
-from ...workspace import CampaignWorkspace
+from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...reporting.record_show import build_record_report
+from ...storage.ledger import LedgerReader
+from ...storage.workspace import CampaignWorkspace
 from ..formatting import render_record_report_human
 from ..registry import cli_command
 from ._common import (

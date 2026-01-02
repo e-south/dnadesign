@@ -9,7 +9,7 @@ Dunlop Lab
 """
 
 from dnadesign.opal.src.cli.commands.plot import _resolve_output_dir
-from dnadesign.opal.src.workspace import CampaignWorkspace
+from dnadesign.opal.src.storage.workspace import CampaignWorkspace
 
 
 def test_plot_output_dir_template(tmp_path):

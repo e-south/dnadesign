@@ -24,11 +24,18 @@ def transform_fn(df_tidy: pd.DataFrame, params: dict, ctx: PluginCtx | None) -> 
 - `id` (design_id), optional; when absent, OPAL resolves by `sequence`.
 - `y` (list[float]) — the canonical label for this campaign (vector).
 
-Transforms must fail fast (raise `OpalError`) on schema or invariant violations
+Transforms must fail fast on schema or invariant violations
 (duplicate timepoints, missing states/channels, NaNs/Inf, wrong lengths).
+Raising `OpalError` is preferred; other exceptions are normalized to `OpalError`
+by the ingest pipeline with a friendly hint.
 
 #### Y‑ops (training-time transforms)
 
 Y‑ops are registered via `register_y_op(...)` and must provide
 `fit/transform/inverse` functions. OPAL enforces contracts and records their
 outputs under `yops/<name>/...` in `round_ctx.json`.
+
+#### Built-in Y transforms
+
+* `sfxi_vec8_from_table_v1` — 8‑vector (logic + intensity) from tidy SFXI table.
+* `scalar_from_table_v1` — scalar Y from a single column (`y` by default).

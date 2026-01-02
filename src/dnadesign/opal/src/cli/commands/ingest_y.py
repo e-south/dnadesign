@@ -17,19 +17,19 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
-import pandas as pd
+import numpy as np
 import typer
 
-from ...data_access import RecordsStore
-from ...ingest import run_ingest
-from ...ledger import LedgerWriter
-from ...locks import CampaignLock
+from ...core.round_context import PluginRegistryView, RoundCtx
+from ...core.utils import ExitCodes, OpalError, now_iso, print_stdout
 from ...registries.transforms_y import get_transform_y
-from ...round_context import PluginRegistryView, RoundCtx
-from ...utils import ExitCodes, OpalError, now_iso, print_stdout
-from ...workspace import CampaignWorkspace
-from ...writebacks import build_label_events
-from ..formatting import render_ingest_commit_human, render_ingest_preview_human
+from ...runtime.ingest import run_ingest
+from ...storage.data_access import RecordsStore
+from ...storage.ledger import LedgerWriter
+from ...storage.locks import CampaignLock
+from ...storage.workspace import CampaignWorkspace
+from ...storage.writebacks import build_label_events
+from ..formatting import bullet_list, render_ingest_commit_human, render_ingest_preview_human
 from ..registry import cli_command
 from ._common import (
     internal_error,
@@ -37,6 +37,7 @@ from ._common import (
     load_cli_config,
     opal_error,
     print_config_context,
+    prompt_confirm,
     resolve_config_path,
     store_from_cfg,
 )
@@ -68,6 +69,8 @@ def cmd_ingest_y(
     json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
 ):
     try:
+        import pandas as pd
+
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)
         store: RecordsStore = store_from_cfg(cfg)
@@ -127,40 +130,55 @@ def cmd_ingest_y(
         else:
             print_stdout(render_ingest_preview_human(preview, sample, transform_name=t_name))
 
-        if not yes:
-            resp = (
-                input(f"Proceed to append {len(labels_df)} labels at observed_round={round}? (y/N): ").strip().lower()
-            )
-            if resp not in ("y", "yes"):
-                print_stdout("Aborted.")
-                return
-
-        # Ensure rows exist; append to label_hist
+        # Required columns for new rows (used for nudges + strict checks below)
         required_cols = ["bio_type", "alphabet"]
         if cfg.safety.write_back_requires_columns_present:
             if cfg.data.x_column_name not in df.columns:
                 raise OpalError(f"records.parquet missing required X column '{cfg.data.x_column_name}'.")
             required_cols.append(cfg.data.x_column_name)
 
-        # Optional: preview duplicates at this round for better UX
-        try:
-            lh = store.label_hist_col()
-            ids_in = set(labels_df["id"].dropna().astype(str))
-            maybe = df.loc[df["id"].astype(str).isin(ids_in), ["id", lh]]
-            dup = 0
-            for _, cell in maybe[lh].items():
-                for e in store._normalize_hist_cell(cell):
-                    if int(e.get("r", -1)) == int(round):
-                        dup += 1
-                        break
-            if dup > 0:
-                print_stdout(
-                    f"[notice] {dup}/{len(ids_in)} incoming labels already have r={int(round)};"
-                    f"applying --if-exists={if_exists}."
-                )  # noqa
-        except Exception:
-            pass
+        # Assertive check: list-valued X columns must arrive as lists (Parquet recommended).
+        def _is_listlike(val: object) -> bool:
+            return isinstance(val, (list, tuple, np.ndarray))
 
+        def _col_is_listlike(series: pd.Series) -> bool:
+            for v in series.head(20).tolist():
+                if v is None or (isinstance(v, float) and np.isnan(v)):
+                    continue
+                return _is_listlike(v)
+            return False
+
+        def _col_has_str(series: pd.Series) -> bool:
+            return any(isinstance(v, str) for v in series.head(20).tolist())
+
+        if preview.unknown_sequences and cfg.data.x_column_name in required_cols:
+            x_col = cfg.data.x_column_name
+            if x_col in df.columns and x_col in csv_df.columns:
+                if _col_is_listlike(df[x_col]) and _col_has_str(csv_df[x_col]):
+                    raise OpalError(
+                        f"Column '{x_col}' appears list-valued in records.parquet, but CSV values are strings. "
+                        "Use Parquet input (or a true list column) when adding new sequences with X."
+                    )
+
+        # Human-friendly nudges (non-fatal)
+        if not json:
+            nudges = list(preview.warnings or [])
+            if preview.unknown_sequences and required_cols:
+                nudges.append(
+                    "New sequences will be created; required columns for new rows: " + ", ".join(required_cols) + "."
+                )
+            if nudges:
+                print_stdout(bullet_list("Nudges", nudges))
+
+        if not yes:
+            if not prompt_confirm(
+                f"Proceed to append {len(labels_df)} labels at observed_round={round}? (y/N): ",
+                non_interactive_hint="No TTY available. Re-run with --yes to confirm ingest-y.",
+            ):
+                print_stdout("Aborted.")
+                return
+
+        # Ensure rows exist; append to label_hist
         with CampaignLock(Path(cfg.campaign.workdir)):
             df = store.ensure_rows_exist(
                 df,
@@ -183,36 +201,66 @@ def cmd_ingest_y(
                 if labels_df["id"].isna().any():
                     raise OpalError("Failed to resolve ids for some labels; provide id or ensure sequences exist.")
 
+            # Optional: preview duplicates at this round for better UX
+            existing_ids: set[str] = set()
+            try:
+                lh = store.label_hist_col()
+                ids_in = set(labels_df["id"].dropna().astype(str))
+                if ids_in:
+                    maybe = df.loc[df["id"].astype(str).isin(ids_in), ["id", lh]]
+                    dup = 0
+                    for _id, cell in maybe.itertuples(index=False, name=None):
+                        for e in store._normalize_hist_cell(cell):
+                            if int(e.get("r", -1)) == int(round):
+                                dup += 1
+                                existing_ids.add(str(_id))
+                                break
+                    if dup > 0:
+                        print_stdout(
+                            f"[notice] {dup}/{len(ids_in)} incoming labels already have r={int(round)};"
+                            f"applying --if-exists={if_exists}."
+                        )  # noqa
+            except Exception:
+                pass
+
+            # Apply skip policy by filtering labels before writes/events.
+            if str(if_exists).lower().strip() == "skip" and existing_ids:
+                labels_effective = labels_df.loc[~labels_df["id"].astype(str).isin(existing_ids)].copy()
+            else:
+                labels_effective = labels_df
+
             # 1) append to immutable label history (SSoT)
             df2 = store.append_labels_from_df(
                 df,
-                labels_df[["id", "y"]],  # ids are now concrete
+                labels_effective[["id", "y"]],  # ids are now concrete
                 r=int(round),
                 src="ingest_y",
                 fail_if_any_existing_labels=(str(if_exists).lower().strip() == "fail"),
                 if_exists=str(if_exists).lower().strip(),
             )
             # 2) mirror "current y" into configured y_column_name for convenience
-            df3 = store.upsert_current_y_column(df2, labels_df[["id", "y"]], cfg.data.y_column_name)
+            df3 = store.upsert_current_y_column(df2, labels_effective[["id", "y"]], cfg.data.y_column_name)
             store.save_atomic(df3)
 
             # Emit label events (canonical SSoT)
             seq_map = df2.set_index("id")["sequence"].to_dict() if "sequence" in df2.columns else {}
-            events = build_label_events(
-                ids=labels_df["id"].astype(str).tolist(),
-                sequences=[seq_map.get(str(_id)) for _id in labels_df["id"].astype(str).tolist()],
-                y_obs=labels_df["y"].tolist(),
-                observed_round=int(round),
-                src="ingest_y",
-                note=None,
-            )
-            ws = CampaignWorkspace.from_config(cfg, cfg_path)
-            LedgerWriter(ws).append_label(events)
+            if not labels_effective.empty:
+                events = build_label_events(
+                    ids=labels_effective["id"].astype(str).tolist(),
+                    sequences=[seq_map.get(str(_id)) for _id in labels_effective["id"].astype(str).tolist()],
+                    y_obs=labels_effective["y"].tolist(),
+                    observed_round=int(round),
+                    src="ingest_y",
+                    note=None,
+                )
+                ws = CampaignWorkspace.from_config(cfg, cfg_path)
+                LedgerWriter(ws).append_label(events)
 
         out = {
             "ok": True,
             "round": int(round),
-            "labels_appended": int(len(labels_df)),
+            "labels_appended": int(len(labels_effective)),
+            "labels_skipped": int(len(labels_df) - len(labels_effective)),
             "y_column_updated": cfg.data.y_column_name,
         }
 
@@ -223,6 +271,7 @@ def cmd_ingest_y(
                 render_ingest_commit_human(
                     round_index=out["round"],
                     labels_appended=out["labels_appended"],
+                    labels_skipped=out["labels_skipped"],
                     y_column_updated=out["y_column_updated"],
                 )
             )

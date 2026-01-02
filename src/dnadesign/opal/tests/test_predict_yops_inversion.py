@@ -16,10 +16,10 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel
 
-from dnadesign.opal.src.data_access import RecordsStore
 from dnadesign.opal.src.models.random_forest import RandomForestModel  # noqa: F401
-from dnadesign.opal.src.predict import run_predict_ephemeral
 from dnadesign.opal.src.registries.transforms_y import list_y_ops, register_y_op
+from dnadesign.opal.src.runtime.predict import run_predict_ephemeral
+from dnadesign.opal.src.storage.data_access import RecordsStore
 from dnadesign.opal.src.transforms_x import identity  # noqa: F401 (registers)
 
 

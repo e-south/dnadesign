@@ -18,7 +18,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from typing_extensions import Literal
 
-from ..utils import ConfigError
+from ..core.utils import ConfigError
 from .plugin_schemas import validate_params
 from .types import (
     CampaignBlock,

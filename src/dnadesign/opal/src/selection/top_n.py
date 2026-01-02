@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..registries.selections import register_selection
-from ..round_context import roundctx_contract
+from ..core.round_context import roundctx_contract
+from ..registries.selection import register_selection
 
 
 @roundctx_contract(category="selection", requires=[], produces=[])

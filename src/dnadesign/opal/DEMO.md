@@ -63,11 +63,23 @@ Tip: when you are **inside** the campaign folder, you can omit `-c campaign.yaml
 (OPAL auto-discovers the config). From elsewhere, pass `--config`.
 Aliases: `--observed-round` (ingest) and `--labels-as-of` (run) are accepted.
 
+If `opal run` reports labels without `label_hist` (e.g., legacy datasets that
+pre-fill the Y column), explicitly attach them:
+
+```bash
+opal label-hist attach-from-y -c campaign.yaml --round 0 --apply
+```
+
 Optional reset (start fresh):
 
 ```bash
 opal prune-source -c campaign.yaml --scope campaign --yes
 ```
+
+Note: If `outputs/` already exists from an older OPAL version (for example a
+`ledger.runs/` directory or `ledger.index.parquet`), remove `outputs/` and
+`state.json`, then re-run `opal init` and `opal run`. Legacy layouts are not
+supported.
 
 Artifacts appear in `outputs/round_0/`:
 

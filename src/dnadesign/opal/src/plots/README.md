@@ -16,6 +16,15 @@ opal plot --config /path/to/campaign.yaml \
   [--tag quick]
 ```
 
+- Discover available plot kinds:
+
+```bash
+opal plot --list
+opal plot --list-config --config /path/to/campaign.yaml
+opal plot --describe scatter_score_vs_rank
+opal plot --config /path/to/campaign.yaml --quick
+```
+
 ### Minimal YAML schema (recommended)
 
 **campaign.yaml**
@@ -93,7 +102,7 @@ Ledger sinks always live under `context.workspace.outputs_dir` (e.g., `outputs/l
 1. Create a module in `dnadesign/opal/src/plots/` and register it:
 
 ```python
-from ..registries.plot import register_plot
+from ..registries.plots import register_plot
 
 @register_plot("my_cool_plot")
 def render(context, params):

@@ -13,13 +13,26 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ..registries.plot import register_plot
+from ..registries.plots import PlotMeta, register_plot
 from ._events_util import load_events_with_setpoint, resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta, scale_to_sizes, swarm_smart
 from ._param_utils import event_columns_for, get_str, normalize_metric_field
 
 
-@register_plot("percent_high_activity_over_rounds")
+@register_plot(
+    "percent_high_activity_over_rounds",
+    meta=PlotMeta(
+        summary="Percent of candidates above a score threshold across rounds.",
+        params={
+            "threshold": "Scalar cutoff for 'high' (default 0.8).",
+            "mode": "line|violin|both (default both).",
+            "hue_field": "Optional obj__/pred__/sel__ field for swarm color.",
+            "size_by": "Optional obj__/pred__/sel__ field for swarm size.",
+        },
+        requires=["as_of_round", "pred__y_obj_scalar"],
+        notes=["Reads ledger.predictions + ledger.runs (setpoint join)."],
+    ),
+)
 def render(context, params: dict) -> None:
     threshold = float(params.get("threshold", 0.8))
     mode = str(params.get("mode", "both")).lower()  # "line" | "violin" | "both"
@@ -169,7 +182,7 @@ def render(context, params: dict) -> None:
 
     # Log + annotate
     total_points = int(sum(len(s) for s in series))
-    raster = total_points >= rasterize_at
+    raster = False if rasterize_at is None else total_points >= rasterize_at
     context.logger.info(
         "params percent_high_activity: mode=%s threshold=%.3f rounds=%s swarm=%s swarm_max=%d points=%d",
         mode,

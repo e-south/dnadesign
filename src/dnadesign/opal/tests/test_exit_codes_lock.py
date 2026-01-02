@@ -8,7 +8,7 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-from dnadesign.opal.src.utils import ExitCodes
+from dnadesign.opal.src.core.utils import ExitCodes
 
 
 def test_exit_codes_has_contract_violation():

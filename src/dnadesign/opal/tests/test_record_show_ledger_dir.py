@@ -10,9 +10,9 @@ Dunlop Lab
 
 import pandas as pd
 
-from dnadesign.opal.src.ledger import LedgerReader
-from dnadesign.opal.src.record_show import build_record_report
-from dnadesign.opal.src.workspace import CampaignWorkspace
+from dnadesign.opal.src.reporting.record_show import build_record_report
+from dnadesign.opal.src.storage.ledger import LedgerReader
+from dnadesign.opal.src.storage.workspace import CampaignWorkspace
 
 
 def test_record_show_reads_ledger_predictions_dir(tmp_path):

@@ -24,8 +24,8 @@ from typing import Any, Dict, Optional, Sequence, Tuple
 
 import numpy as np
 
+from ..core.round_context import PluginCtx, roundctx_contract
 from ..registries.objectives import register_objective
-from ..round_context import PluginCtx, roundctx_contract
 
 
 class ObjectiveResult:

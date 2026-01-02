@@ -29,9 +29,9 @@ from dnadesign.opal.src.config.types import (
     SelectionBlock,
     TrainingBlock,
 )
-from dnadesign.opal.src.data_access import RecordsStore
-from dnadesign.opal.src.run_round import RunRoundRequest, run_round
-from dnadesign.opal.src.state import CampaignState
+from dnadesign.opal.src.runtime.run_round import RunRoundRequest, run_round
+from dnadesign.opal.src.storage.data_access import RecordsStore
+from dnadesign.opal.src.storage.state import CampaignState
 from dnadesign.opal.src.transforms_x import identity  # noqa: F401 (registers identity)
 
 
@@ -120,8 +120,42 @@ def test_run_round_writes_round_ctx_and_ledger(tmp_path):
         x_transform_params={},
     )
 
-    res = run_round(store, store.load(), RunRoundRequest(cfg=cfg, as_of_round=0, config_path=workdir / "campaign.yaml"))
+    tracker = {}
+
+    class _CountingProgress:
+        def __init__(self, total: int):
+            self.total = int(total)
+            self.advanced = 0
+
+        def __enter__(self):
+            return self
+
+        def advance(self, n: int = 1) -> None:
+            self.advanced += int(n)
+
+        def close(self) -> None:
+            return None
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            self.close()
+
+    def _progress_factory(desc: str, total: int):
+        tracker["progress"] = _CountingProgress(total)
+        return tracker["progress"]
+
+    res = run_round(
+        store,
+        store.load(),
+        RunRoundRequest(
+            cfg=cfg,
+            as_of_round=0,
+            config_path=workdir / "campaign.yaml",
+            progress_factory=_progress_factory,
+        ),
+    )
     assert res.ok is True
+    assert tracker["progress"].total == res.scored
+    assert tracker["progress"].advanced == res.scored
 
     ctx_path = workdir / "outputs" / "round_0" / "round_ctx.json"
     assert ctx_path.exists()

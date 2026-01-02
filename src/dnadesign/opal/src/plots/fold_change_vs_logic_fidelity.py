@@ -15,13 +15,32 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from ..registries.plot import register_plot
+from ..registries.plots import PlotMeta, register_plot
 from ._events_util import load_events_with_setpoint, resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta, scale_to_sizes, scatter_smart
 from ._param_utils import event_columns_for, get_float, get_str, normalize_metric_field
 
 
-@register_plot("fold_change_vs_logic_fidelity")
+@register_plot(
+    "fold_change_vs_logic_fidelity",
+    meta=PlotMeta(
+        summary="Logic fidelity vs fold-change/effect diagnostics (SFXI).",
+        params={
+            "y_axis": "fold_change|effect_raw|effect_scaled|score (default fold_change).",
+            "hue_field": "Optional obj__/pred__/sel__ or records.<col> for color.",
+            "size_by": "Optional obj__/pred__/sel__ field for size.",
+            "alpha": "Point alpha (default 0.40).",
+        },
+        requires=[
+            "as_of_round",
+            "run_id",
+            "pred__y_hat_model",
+            "pred__y_obj_scalar",
+            "obj__diag__setpoint",
+        ],
+        notes=["Reads ledger.predictions + ledger.runs (setpoint join)."],
+    ),
+)
 def render(context, params: dict) -> None:
     outputs_dir = resolve_outputs_dir(context)
 

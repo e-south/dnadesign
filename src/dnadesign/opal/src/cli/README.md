@@ -26,6 +26,12 @@ See all available commands and flags:
 opal --help
 ```
 
+### Output and TUI
+
+Human output uses Rich tables and progress bars when stdout/stderr are TTYs.
+Disable styling with `--no-color` or disable the TUI with `OPAL_CLI_TUI=0`.
+JSON output is always plain and unstyled.
+
 ---
 
 ### Command overview
@@ -49,6 +55,7 @@ opal init --config <yaml>
 **Notes**
 
 * Ensures the campaign `workdir` has `outputs/` and `inputs/`.
+* Ensures OPAL cache columns exist in `records.parquet` (adds `label_hist` + cache columns if missing).
 * Writes/updates `state.json` with campaign identity, data location, and settings.
 
 #### `ingest-y`
@@ -80,6 +87,8 @@ opal ingest-y --config <yaml> --round <r> --csv <path> \
 * **Preview is printed** (counts + sample) before any write.
 * Duplicate handling is controlled by `ingest.duplicate_policy` (error | keep_first | keep_last).
 * **New IDs** allowed if your CSV includes essentials: `sequence`, `bio_type`, `alphabet`, and the configured X column.
+* If adding **new sequences** and X is list-valued, prefer **Parquet** input so the X column remains list-typed
+  (CSV will coerce lists to strings).
 * Appends to `opal__<slug>__label_hist` and writes the current Y column.
 * Emits `label` events into `outputs/ledger.labels.parquet`.
 
@@ -156,7 +165,7 @@ opal predict --config <yaml> \
 
 * `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
 * `--model-path`: Path to `model.joblib` (overrides `--round`).
-* `--round, -r`: Round index to resolve model from `state.json` (default: latest).
+* `--round, -r`: Round index to resolve model from `state.json` (default: latest). Accepts `latest`.
 * `--model-name` / `--model-params`: Required if `model_meta.json` is missing.
 * `--in`: Optional input CSV/Parquet (defaults to `records.parquet`).
 * `--out`: Optional output CSV/Parquet (defaults to stdout CSV).
@@ -339,19 +348,26 @@ opal validate --config <yaml>
 
 #### `label-hist`
 
-Validate or repair the label history column (explicit, no silent fixes).
+Validate, repair, or explicitly attach-from-y into the label history column (no silent fixes).
 
 **Usage**
 
 ```bash
-opal label-hist <validate|repair> --config <yaml> [--apply]
+opal label-hist <validate|repair|attach-from-y> --config <yaml> [--apply] [--round <int>]
 ```
 
 **Flags**
 
 * `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
-* `<validate|repair>`: Action (alias: `check` = `validate`).
-* `--apply`: Apply changes for `repair` (default: dry-run).
+* `<validate|repair|attach-from-y>`: Action (alias: `check` = `validate`).
+* `--apply`: Apply changes for `repair` or `attach-from-y` (default: dry-run).
+* `--round, -r`: Required for `attach-from-y`; round stamp to attach.
+* `--src`: Optional label_hist source tag for `attach-from-y` (default: `manual_attach`).
+
+**Notes**
+
+* `attach-from-y` is a **manual** fix for datasets with a populated Y column but empty label history.
+  It only attaches entries for rows where `label_hist` is empty and Y is finite.
 
 #### Records cache columns
 
@@ -360,6 +376,8 @@ OPAL manages a few derived columns in `records.parquet`:
 * `opal__<slug>__label_hist` — append-only label history (SSoT)
 * `opal__<slug>__latest_as_of_round` — last scored round for each record
 * `opal__<slug>__latest_pred_scalar` — latest objective scalar cache
+
+`opal init` will add these cache columns if they are missing.
 
 #### `plot`
 
@@ -370,12 +388,20 @@ Generate plots declared in the campaign’s `plots:` block. Plots are plugin-dri
 ```bash
 opal plot --config <yaml-or-dir> [--plot-config <plots.yaml>] \
   [--round <selector>] [--name <plot-name>] [--tag <tag> ...]
+opal plot --list
+opal plot --list-config --config <yaml-or-dir>
+opal plot --describe <plot-kind>
+opal plot --config <yaml-or-dir> --quick
 ```
 
 **Flags**
 
 * `--config, -c`: Campaign YAML or campaign directory (**only** `plot` supports directories).
 * `--plot-config`: Path to a plots YAML (overrides `plot_config` in campaign.yaml).
+* `--list`: List registered plot kinds and exit (does not require config).
+* `--list-config`: List plots configured in YAML and exit (requires `--config`).
+* `--describe`: Show parameters + required fields for a plot kind.
+* `--quick`: Run built-in default plots without plots.yaml (explicit).
 * `--round, -r`: `latest | all | 3 | 1,3,7 | 2-5` (plugin may define defaults).
 * `--name, -n`: Run a single plot by name; omit to run **all**.
 * `--tag`: Run plots with the given tag (repeatable).
@@ -386,8 +412,25 @@ opal plot --config <yaml-or-dir> [--plot-config <plots.yaml>] \
 * Output directory defaults to `outputs/plots`, or honors `output.dir` if provided.
 * Plot-specific knobs **must** live under `params:`; top-level plotting keys are errors.
 * Prefer `plot_config: plots.yaml` in campaign.yaml to keep runtime config lean.
+* `--quick` is assertive: it does **not** auto-run unless explicitly requested.
 * `plot_defaults` and `plot_presets` reduce redundancy; `preset: <name>` merges into each plot entry.
 * Set `enabled: false` on any plot entry to keep it in the YAML without running it.
+
+#### `notebook`
+
+Generate or run a campaign-tied marimo notebook for interactive analysis.
+
+**Usage**
+
+```bash
+opal notebook generate --config <yaml-or-dir> [--round <latest|k>] [--out <path>] [--force]
+opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
+```
+
+**Notes**
+
+* `generate` writes a marimo notebook that loads ledger artifacts (runs/predictions/labels).
+* `run` launches `marimo edit` if marimo is installed; otherwise it prints install guidance.
 
 **Campaign YAML (example)**
 
@@ -543,6 +586,12 @@ Debug tip:
 export OPAL_DEBUG=1  # full tracebacks on internal errors
 ```
 
+macOS tip (PyArrow noise):
+
+```bash
+export OPAL_SUPPRESS_PYARROW_SYSCTL=0  # show sysctlbyname warnings (default: suppressed)
+```
+
 ---
 
 ### Extending the CLI
@@ -572,6 +621,7 @@ Guidelines:
 ```bash
 opal/src/cli/
   app.py            # builds Typer app; root callback & Ctrl-C handling
+  formatting.py     # human-readable output formatting helpers
   registry.py       # @cli_command; discovery; install into app
   commands/
     _common.py      # resolve_config_path, store_from_cfg, json_out, internal_error
@@ -584,13 +634,13 @@ opal/src/cli/
     explain.py
     predict.py
     model_show.py
-    objective-meta.py
+    objective_meta.py
     record_show.py
     status.py
     validate.py
     label_hist.py
     plot.py
-    prune-source.py
+    prune_source.py
 ```
 
 *One command = one job.* Business logic stays in application modules.

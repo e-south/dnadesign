@@ -14,7 +14,7 @@ from typing import List
 
 import matplotlib.pyplot as plt
 
-from ..registries.plot import register_plot
+from ..registries.plots import PlotMeta, register_plot
 from ._events_util import load_events_with_setpoint, resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta, scale_to_sizes, scatter_smart
 from ._param_utils import (
@@ -25,7 +25,27 @@ from ._param_utils import (
 )
 
 
-@register_plot("scatter_score_vs_rank")
+@register_plot(
+    "scatter_score_vs_rank",
+    meta=PlotMeta(
+        summary="Scatter objective score vs rank; optional hue/size by diagnostics.",
+        params={
+            "score_field": "Ledger field for y-axis (default pred__y_obj_scalar).",
+            "rank_mode": "sequential|competition (default sequential).",
+            "hue_field": "Optional obj__/pred__/sel__ field for color.",
+            "size_by": "Optional obj__/pred__/sel__ field for size.",
+            "alpha": "Point alpha (default 0.45).",
+        },
+        requires=[
+            "as_of_round",
+            "run_id",
+            "pred__y_obj_scalar",
+            "sel__rank_competition",
+            "sel__is_selected",
+        ],
+        notes=["Reads ledger.predictions + ledger.runs (setpoint join)."],
+    ),
+)
 def render(context, params: dict) -> None:
     outputs_dir = resolve_outputs_dir(context)
 
@@ -54,6 +74,7 @@ def render(context, params: dict) -> None:
     rasterize_at = params.get("rasterize_at", None)
     if rasterize_at is not None:
         rasterize_at = int(rasterize_at)
+    rasterize_at_log = int(rasterize_at) if rasterize_at is not None else 0
 
     # Pull from predictions (full schema) and always join setpoint
     need = {
@@ -139,7 +160,7 @@ def render(context, params: dict) -> None:
         color_kw = {}
         if hue_vals is not None:
             color_kw = {"c": sub[hue_field].to_numpy(dtype=float), "cmap": cmap}
-        rasterized = x.size >= rasterize_at
+        rasterized = False if rasterize_at is None else x.size >= rasterize_at
         scatter_smart(
             ax,
             x,
@@ -173,7 +194,7 @@ def render(context, params: dict) -> None:
             hue_field or "—",
             size_by or "—",
             alpha,
-            rasterize_at,
+            rasterize_at_log,
             int(x.size),
         )
         annotate_plot_meta(

@@ -24,45 +24,20 @@ from __future__ import annotations
 import os
 import traceback
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import typer
 import yaml
 
+from ...analysis.facade import CampaignAnalysis, parse_round_selector, round_suffix
 from ...config.loader import resolve_path_like
+from ...core.utils import print_stdout
 from ...plots._context import PlotContext
-from ...registries.plot import get_plot
-from ...workspace import CampaignWorkspace
+from ...registries.plots import get_plot, get_plot_meta, list_plots
+from ...storage.workspace import CampaignWorkspace
+from ..formatting import bullet_list
 from ..registry import cli_command
-from ._common import load_cli_config, print_config_context, resolve_config_path, store_from_cfg
-
-
-def _parse_round_selector(sel: Optional[str]) -> Union[str, list[int]]:
-    if not sel:
-        return "unspecified"
-    sel = sel.strip().lower()
-    if sel in {"latest", "all"}:
-        return sel
-    if "-" in sel:
-        a, b = sel.split("-", 1)
-        return list(range(int(a), int(b) + 1))
-    if "," in sel:
-        return [int(x) for x in sel.split(",") if x]
-    return [int(sel)]
-
-
-def _round_suffix(rounds: Union[str, list[int]]) -> str:
-    if rounds == "unspecified":
-        return ""
-    if rounds == "latest":
-        return "_rlatest"
-    if rounds == "all":
-        return "_rall"
-    if isinstance(rounds, list) and len(rounds) == 1:
-        return f"_r{rounds[0]}"
-    if isinstance(rounds, list):
-        return f"_r{','.join(map(str, rounds))}"
-    return ""
+from ._common import print_config_context
 
 
 def _resolve_output_dir(
@@ -101,21 +76,6 @@ def _load_campaign_yaml(path: Path) -> dict:
     return cfg
 
 
-def _resolve_campaign_dir(config_path: Path) -> tuple[Path, dict, Path]:
-    """
-    Accept a YAML path or a directory. If directory, find a campaign YAML inside.
-    """
-    p = config_path
-    if p.is_dir():
-        for cand in ("campaign.yaml", "campaign.yml", "opal.yaml", "opal.yml"):
-            c = p / cand
-            if c.exists():
-                return p.resolve(), _load_campaign_yaml(c), c.resolve()
-        raise ValueError(f"No campaign YAML found in directory: {p}")
-    # YAML file
-    return p.parent.resolve(), _load_campaign_yaml(p), p.resolve()
-
-
 ALLOWED_PLOT_KEYS = {
     "name",
     "kind",
@@ -136,6 +96,42 @@ ALLOWED_PRESET_KEYS = {
 }
 ALLOWED_PLOT_DEFAULT_KEYS = {"output", "data", "params"}
 ALLOWED_PLOT_CONFIG_KEYS = {"plots", "plot_defaults", "plot_presets"}
+
+
+def _has_feature_importance(outputs_dir: Path) -> bool:
+    if not outputs_dir.exists():
+        return False
+    for child in outputs_dir.iterdir():
+        if not child.is_dir():
+            continue
+        if child.name.startswith("round_") and (child / "feature_importance.csv").exists():
+            return True
+    return False
+
+
+def _build_quick_plots(cfg, *, outputs_dir: Path) -> List[Dict[str, Any]]:
+    """
+    Default plots for quick mode (no plots.yaml). Keep conservative and robust.
+    """
+    plots: List[Dict[str, Any]] = [
+        {"name": "quick_score_vs_rank", "kind": "scatter_score_vs_rank", "params": {}},
+        {
+            "name": "quick_percent_high",
+            "kind": "percent_high_activity_over_rounds",
+            "params": {"mode": "line", "swarm": False},
+        },
+    ]
+    obj_name = str(getattr(cfg.objective, "name", "") or "").lower()
+    if obj_name.startswith("sfxi"):
+        plots.extend(
+            [
+                {"name": "quick_sfxi_logic_fidelity", "kind": "sfxi_logic_fidelity_closeness", "params": {}},
+                {"name": "quick_fold_change_vs_logic_fidelity", "kind": "fold_change_vs_logic_fidelity", "params": {}},
+            ]
+        )
+    if _has_feature_importance(outputs_dir):
+        plots.append({"name": "quick_feature_importance", "kind": "feature_importance_bars", "params": {}})
+    return plots
 
 
 def _ensure_mapping(val: Any, *, ctx: str) -> Dict[str, Any]:
@@ -304,6 +300,26 @@ def cmd_plot(
         "--plot-config",
         help="Path to plots YAML (overrides campaign.plot_config).",
     ),
+    list_registry: bool = typer.Option(
+        False,
+        "--list",
+        help="List registered plot kinds and exit.",
+    ),
+    list_config: bool = typer.Option(
+        False,
+        "--list-config",
+        help="List plots configured in YAML and exit (requires --config).",
+    ),
+    describe: Optional[str] = typer.Option(
+        None,
+        "--describe",
+        help="Describe a plot kind (params + required fields) and exit.",
+    ),
+    quick: bool = typer.Option(
+        False,
+        "--quick/--no-quick",
+        help="Run default plots without plots.yaml (explicit; no fallbacks).",
+    ),
     round: Optional[str] = typer.Option(
         None,
         "--round",
@@ -323,25 +339,119 @@ def cmd_plot(
     Continues on error, printing full tracebacks.
     Exit code 1 if any plot failed.
     """
+    if describe:
+        try:
+            meta = get_plot_meta(describe)
+        except KeyError as e:
+            raise ValueError(str(e)) from e
+        print_stdout(f"Plot: {describe}")
+        if meta is None:
+            print_stdout("No metadata available for this plot.")
+        else:
+            print_stdout(f"Summary: {meta.summary}")
+            if meta.requires:
+                print_stdout(bullet_list("Required fields", meta.requires))
+            if meta.params:
+                rows = [f"{k}: {v}" for k, v in meta.params.items()]
+                print_stdout(bullet_list("Params", rows))
+            if meta.notes:
+                print_stdout(bullet_list("Notes", meta.notes))
+        return
+
+    if list_registry and not list_config and config is None and not quick:
+        rows = []
+        for name in list_plots():
+            meta = get_plot_meta(name)
+            rows.append(f"{name} - {meta.summary}" if meta and meta.summary else name)
+        print_stdout(bullet_list("Registered plots", rows))
+        return
+
     # Resolve campaign.yaml
-    cfg_path = resolve_config_path(config, allow_dir=True)
-    campaign_dir, campaign_cfg, campaign_yaml = _resolve_campaign_dir(cfg_path)
-    cfg = load_cli_config(campaign_yaml)
-    store = store_from_cfg(cfg)
-    ws = CampaignWorkspace.from_config(cfg, campaign_yaml)
+    analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
+    cfg_path = analysis.config_path
+    campaign_yaml = cfg_path
+    campaign_dir = analysis.workspace.workdir
+    campaign_cfg = _load_campaign_yaml(campaign_yaml)
+    cfg = analysis.config
+    store = analysis.records_store()
+    ws = analysis.workspace
     print_config_context(campaign_yaml, cfg=cfg, records_path=store.records_path)
 
-    plot_cfg, plot_cfg_path, plot_cfg_dir, plot_src = _resolve_plot_config_source(
-        campaign_cfg=campaign_cfg,
-        campaign_yaml=campaign_yaml,
-        campaign_dir=campaign_dir,
-        plot_config_opt=plot_config,
-    )
+    if quick and plot_config:
+        raise ValueError("[plot] Do not combine --quick with --plot-config.")
+
+    if quick:
+        plot_cfg = {
+            "plots": _build_quick_plots(cfg, outputs_dir=ws.outputs_dir),
+            "plot_defaults": {},
+            "plot_presets": {},
+        }
+        plot_cfg_path = campaign_yaml
+        plot_cfg_dir = campaign_dir
+        plot_src = "--quick"
+    else:
+        try:
+            plot_cfg, plot_cfg_path, plot_cfg_dir, plot_src = _resolve_plot_config_source(
+                campaign_cfg=campaign_cfg,
+                campaign_yaml=campaign_yaml,
+                campaign_dir=campaign_dir,
+                plot_config_opt=plot_config,
+            )
+        except ValueError as e:
+            msg = str(e)
+            if "No plots found" in msg:
+                raise ValueError("[plot] No plots found. Add plots.yaml or re-run with --quick.") from e
+            raise
     plots_cfg = plot_cfg.get("plots")
     if not isinstance(plots_cfg, list):
         raise ValueError(f"[plot] plots must be a list in {plot_cfg_path}.")
     plot_defaults = _parse_plot_defaults(plot_cfg.get("plot_defaults"), ctx=str(plot_cfg_path))
     plot_presets = _parse_plot_presets(plot_cfg.get("plot_presets"), ctx=str(plot_cfg_path))
+
+    if list_registry or list_config:
+        if list_registry:
+            rows = []
+            for name in list_plots():
+                meta = get_plot_meta(name)
+                rows.append(f"{name} - {meta.summary}" if meta and meta.summary else name)
+            print_stdout(bullet_list("Registered plots", rows))
+        if list_config:
+            rows: List[str] = []
+            for entry in plots_cfg:
+                if not isinstance(entry, dict):
+                    raise ValueError(f"[plot] Each plot entry must be a mapping (got {type(entry).__name__}).")
+                _validate_keys(entry, allowed=ALLOWED_PLOT_KEYS, ctx="plot entry")
+
+                preset: Dict[str, Any] = {}
+                preset_name = entry.get("preset")
+                if preset_name is not None:
+                    if not isinstance(preset_name, str):
+                        raise ValueError(
+                            f"[plot] plot preset name must be a string (got {type(preset_name).__name__})."
+                        )
+                    if preset_name not in plot_presets:
+                        raise ValueError(f"[plot] Unknown plot preset: {preset_name!r}")
+                    preset = plot_presets.get(preset_name) or {}
+
+                pname = entry.get("name")
+                if not pname or not isinstance(pname, str):
+                    raise ValueError("[plot] Each plot requires a string 'name'.")
+                pkind = entry.get("kind") or preset.get("kind")
+                if not pkind or not isinstance(pkind, str):
+                    raise ValueError(f"[plot] Plot '{pname}' is missing 'kind' (or preset kind).")
+
+                enabled = _parse_enabled(
+                    entry.get("enabled") if "enabled" in entry else preset.get("enabled"),
+                    ctx=pname,
+                )
+                tags = _parse_tags(preset.get("tags"), ctx=f"preset:{preset_name}") + _parse_tags(
+                    entry.get("tags"), ctx=f"plot:{pname}"
+                )
+                status = "disabled" if not enabled else "enabled"
+                tag_str = f" tags={tags}" if tags else ""
+                rows.append(f"{pname}: {pkind} ({status}){tag_str}")
+            print_stdout(bullet_list("Configured plots", rows))
+        return
 
     if name:
         filtered = [p for p in plots_cfg if isinstance(p, dict) and p.get("name") == name]
@@ -351,8 +461,8 @@ def cmd_plot(
 
     tag_filters = [str(t) for t in (tag or [])]
 
-    rounds_sel = _parse_round_selector(round)
-    suffix = _round_suffix(rounds_sel)
+    rounds_sel = parse_round_selector(round)
+    suffix = round_suffix(rounds_sel)
 
     # Built-in data sources (auto-injected if present)
     builtins = {
