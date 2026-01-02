@@ -30,7 +30,6 @@ from dnadesign.cruncher.workflows.analyze.plots.scatter_utils import (
     _TRANS,
     compute_consensus_points,
     generate_random_baseline,
-    get_tf_pair,
     load_per_pwm,
     subsample_df,
 )
@@ -47,16 +46,18 @@ def plot_scatter(
     run_dir: Path,
     pwms: Dict[str, PWM],
     cfg: CruncherConfig,
-    tf_names: list[str],
+    tf_pair: tuple[str, str],
+    per_pwm_path: Path,
+    out_dir: Path,
     *,
     bidirectional: bool,
 ) -> None:
     """
-    Orchestrator for <run_dir>/scatter_pwm.png.
+    Orchestrator for scatter_pwm.{png,pdf} under the analysis plots directory.
     Robust to the case where there are zero elites.
     """
     # 1) Load per‐PWM scores
-    df_per_pwm = load_per_pwm(run_dir)
+    df_per_pwm = load_per_pwm(per_pwm_path)
 
     # 2) Load elites parquet (may be empty)
     parquet_files = list(run_dir.glob("cruncher_elites_*/*.parquet"))
@@ -72,7 +73,7 @@ def plot_scatter(
         raise ValueError("plot_scatter: sequence_length missing from run_manifest.json")
 
     # 4) Pick TF pair
-    x_tf, y_tf = get_tf_pair(tf_names)
+    x_tf, y_tf = tf_pair
 
     # 5) Subsample up to 2000 mcmc points
     df_sub = subsample_df(df_per_pwm, max_n=2000, sort_by="draw")
@@ -115,7 +116,8 @@ def plot_scatter(
         raise AttributeError("plot_scatter: cannot find PWM.length attributes")
 
     # 10) Draw
-    out_pdf = run_dir / "scatter_pwm.pdf"
+    out_pdf = out_dir / "scatter_pwm.pdf"
+    out_png = out_dir / "scatter_pwm.png"
     out_pdf.parent.mkdir(exist_ok=True, parents=True)
 
     _draw_scatter_figure(
@@ -131,6 +133,20 @@ def plot_scatter(
         pwms=pwms,
         cfg=cfg,
         out_path=out_pdf,
+    )
+    _draw_scatter_figure(
+        df_samples=df_sub,
+        df_random=df_random,
+        consensus_pts=consensus_pts,
+        elite_coords=elite_coords,
+        x_tf=x_tf,
+        y_tf=y_tf,
+        seq_len=seq_len,
+        width_x=width_x,
+        width_y=width_y,
+        pwms=pwms,
+        cfg=cfg,
+        out_path=out_png,
     )
 
 

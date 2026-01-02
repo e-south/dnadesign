@@ -9,11 +9,17 @@ import typer
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.services.lock_service import resolve_lock
 
-app = typer.Typer(no_args_is_help=True, help="Resolve TF names to exact motif IDs and write lockfile.")
 
-
-@app.callback(invoke_without_command=True)
-def main(config: Path = typer.Argument(..., help="Path to cruncher config.yaml.", metavar="CONFIG")) -> None:
+def lock(
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (required).",
+        metavar="CONFIG",
+    ),
+) -> None:
+    if config is None:
+        typer.echo("Missing CONFIG. Example: cruncher lock path/to/config.yaml", err=True)
+        raise typer.Exit(code=1)
     cfg = load_config(config)
     catalog_root = config.parent / cfg.motif_store.catalog_root
     lock_path = catalog_root / "locks" / f"{config.stem}.lock.json"

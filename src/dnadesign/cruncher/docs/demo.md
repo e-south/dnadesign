@@ -1,5 +1,7 @@
 # Demo: RegulonDB LexA + CpxR (end-to-end)
 
+See `docs/README.md` for the docs map and reading order.
+
 This walk-through shows how to discover, fetch, lock, parse, sample, and inspect
 Cruncher outputs using **LexA** and **CpxR** from RegulonDB.
 
@@ -69,8 +71,15 @@ Sample run directories include the regulator set index (e.g., `sample_set1_lexA-
 ## 7) Analyze + report
 
 ```bash
-cruncher analyze docs/examples/regulondb_ecoli.yaml
+cruncher analyze --latest docs/examples/regulondb_ecoli.yaml
 cruncher report docs/examples/regulondb_ecoli.yaml <sample_run_name>
+```
+
+Each analyze run is written under `analysis/<analysis_id>/` inside the sample run folder.
+To explore interactively (optional):
+
+```bash
+cruncher notebook --latest <path/to/sample_run>
 ```
 
 ## 8) Optional: use alignment matrices (if available)

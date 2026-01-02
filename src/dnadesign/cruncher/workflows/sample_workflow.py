@@ -36,6 +36,7 @@ from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.store.lockfile import read_lockfile, validate_lockfile, verify_lockfile_hashes
 from dnadesign.cruncher.store.motif_store import MotifRef
+from dnadesign.cruncher.utils.artifacts import artifact_entry
 from dnadesign.cruncher.utils.labels import build_run_name, format_regulator_slug, regulator_sets
 from dnadesign.cruncher.utils.manifest import build_run_manifest, write_manifest
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
@@ -326,14 +327,24 @@ def _run_sample_for_set(
     # 6) SAVE enriched config
     _save_config(cfg, out_dir, config_path, tfs=tfs, set_index=set_index)
 
-    artifacts: list[str] = ["config_used.yaml"]
+    artifacts: list[dict[str, object]] = [
+        artifact_entry(
+            out_dir / "config_used.yaml",
+            out_dir,
+            kind="config",
+            label="Resolved config (config_used.yaml)",
+            stage="sample",
+        )
+    ]
 
     # 7) SAVE trace.nc
     if sample_cfg.save_trace and hasattr(optimizer, "trace_idata") and optimizer.trace_idata is not None:
         from dnadesign.cruncher.utils.traces import save_trace
 
         save_trace(optimizer.trace_idata, out_dir / "trace.nc")
-        artifacts.append("trace.nc")
+        artifacts.append(
+            artifact_entry(out_dir / "trace.nc", out_dir, kind="trace", label="Trace (NetCDF)", stage="sample")
+        )
         logger.info("Saved MCMC trace → %s", (out_dir / "trace.nc").relative_to(out_dir.parent))
     elif not sample_cfg.save_trace:
         logger.info("Skipping trace.nc (sample.save_trace=false)")
@@ -370,7 +381,15 @@ def _run_sample_for_set(
                 yield row
 
         _write_parquet_rows(seq_parquet, _sequence_rows())
-        artifacts.append("sequences.parquet")
+        artifacts.append(
+            artifact_entry(
+                seq_parquet,
+                out_dir,
+                kind="table",
+                label="Sequences with per-TF scores (Parquet)",
+                stage="sample",
+            )
+        )
         logger.info(
             "Saved all sequences with per-TF scores → %s",
             seq_parquet.relative_to(out_dir.parent),
@@ -553,9 +572,9 @@ def _run_sample_for_set(
 
     artifacts.extend(
         [
-            str(parquet_path.relative_to(out_dir)),
-            str(json_path.relative_to(out_dir)),
-            str(yaml_path.relative_to(out_dir)),
+            artifact_entry(parquet_path, out_dir, kind="table", label="Elite sequences (Parquet)", stage="sample"),
+            artifact_entry(json_path, out_dir, kind="json", label="Elite sequences (JSON)", stage="sample"),
+            artifact_entry(yaml_path, out_dir, kind="metadata", label="Elite metadata (YAML)", stage="sample"),
         ]
     )
 

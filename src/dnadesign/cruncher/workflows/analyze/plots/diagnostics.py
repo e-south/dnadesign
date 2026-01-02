@@ -10,6 +10,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Tuple
 
@@ -24,10 +25,10 @@ from dnadesign.cruncher.utils.parquet import read_parquet
 
 
 #  Generic helpers
-def _tf_pair(tf_names: list[str]) -> Tuple[str, str]:
-    if len(tf_names) < 2:
-        raise ValueError("Need ≥2 regulators for pairwise plots")
-    return tuple(tf_names[:2])  # (x_tf, y_tf)
+def _tf_pair(tf_pair: tuple[str, str]) -> Tuple[str, str]:
+    if len(tf_pair) != 2:
+        raise ValueError("Need exactly two TFs for pairwise plots")
+    return tuple(tf_pair)
 
 
 def _flatten_axes(obj: object) -> list[plt.Axes]:
@@ -104,6 +105,16 @@ def plot_autocorr(idata: az.InferenceData, out_dir: Path, max_lag: int = 100) ->
     """
     out = out_dir / "autocorr_score.png"
     out_dir.mkdir(exist_ok=True, parents=True)
+
+    score = idata.posterior.get("score")
+    if score is None:
+        logger.warning("Skipping autocorr plot: 'score' not found in trace.")
+        return
+    n_draws = score.sizes.get("draw", score.shape[-1])
+    if n_draws < 2:
+        logger.warning("Skipping autocorr plot: need at least 2 draws (found %d).", n_draws)
+        return
+    max_lag = min(max_lag, max(1, n_draws - 1))
 
     sns.set_style("ticks", {"axes.grid": False})
     sns.set_palette("colorblind")
@@ -227,12 +238,12 @@ def plot_ess_local_and_quantile(idata: az.InferenceData, out_dir: Path) -> None:
         plt.close(fig2)
 
 
-def make_pair_idata(sample_dir: Path, cfg: CruncherConfig, tf_names: list[str]) -> az.InferenceData:
+def make_pair_idata(sample_dir: Path, cfg: CruncherConfig, tf_pair: tuple[str, str]) -> az.InferenceData:
     """
     Build an ArviZ InferenceData with two DataArrays: score_<TF1>, score_<TF2>.
     The TFs are taken from the provided tf_names list.
     """
-    x_tf, y_tf = _tf_pair(tf_names)
+    x_tf, y_tf = _tf_pair(tf_pair)
 
     df = read_parquet(sample_dir / "sequences.parquet")
     if "phase" in df.columns:
@@ -260,12 +271,12 @@ def plot_pair_pwm_scores(
     idata_pair: az.InferenceData,
     out_dir: Path,
     cfg: CruncherConfig,
-    tf_names: list[str],
+    tf_pair: tuple[str, str],
 ) -> None:
     """
     2-D KDE + marginals for the selected TF pair.
     """
-    x_tf, y_tf = _tf_pair(tf_names)
+    x_tf, y_tf = _tf_pair(tf_pair)
     out = out_dir / "pair_pwm_scores.png"
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -289,13 +300,13 @@ def plot_parallel_pwm_scores(
     idata_pair: az.InferenceData,
     out_dir: Path,
     cfg: CruncherConfig,
-    tf_names: list[str],
+    tf_pair: tuple[str, str],
 ) -> None:
     """
     Parallel-coordinates line plot for the selected TF pair.
     """
 
-    x_tf, y_tf = _tf_pair(tf_names)
+    x_tf, y_tf = _tf_pair(tf_pair)
     out = out_dir / "parallel_pwm_scores.png"
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -318,3 +329,6 @@ def plot_parallel_pwm_scores(
 
     fig.savefig(out, dpi=300, bbox_inches="tight")
     plt.close()
+
+
+logger = logging.getLogger(__name__)

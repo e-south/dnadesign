@@ -31,9 +31,12 @@ def list_sources() -> None:
 
 @app.command("info", help="Show capabilities for a specific source.")
 def info(
-    source: str = typer.Argument(..., help="Source adapter name.", metavar="SOURCE"),
-    config: Path = typer.Argument(..., help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    source: str | None = typer.Argument(None, help="Source adapter name.", metavar="SOURCE"),
+    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml (required).", metavar="CONFIG"),
 ) -> None:
+    if source is None or config is None:
+        console.print("Missing SOURCE/CONFIG. Example: cruncher sources info regulondb path/to/config.yaml")
+        raise typer.Exit(code=1)
     cfg = load_config(config)
     registry = default_registry()
     try:
@@ -47,13 +50,16 @@ def info(
 
 @app.command("datasets", help="List available HT datasets for a source (if supported).")
 def datasets(
-    source: str = typer.Argument(..., help="Source adapter name.", metavar="SOURCE"),
-    config: Path = typer.Argument(..., help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    source: str | None = typer.Argument(None, help="Source adapter name.", metavar="SOURCE"),
+    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml (required).", metavar="CONFIG"),
     tf: Optional[str] = typer.Option(None, "--tf", help="Filter datasets to a TF name."),
     dataset_source: Optional[str] = typer.Option(None, "--dataset-source", help="Filter by dataset source."),
     dataset_type: Optional[str] = typer.Option(None, "--dataset-type", help="Filter by dataset type/method."),
     limit: int = typer.Option(50, "--limit", help="Limit number of datasets displayed."),
 ) -> None:
+    if source is None or config is None:
+        console.print("Missing SOURCE/CONFIG. Example: cruncher sources datasets regulondb path/to/config.yaml")
+        raise typer.Exit(code=1)
     cfg = load_config(config)
     registry = default_registry()
     try:

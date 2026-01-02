@@ -1,5 +1,7 @@
 # Cruncher config (v2)
 
+See `docs/README.md` for the docs map and reading order.
+
 `cruncher.mode` is removed. Commands define the action.
 
 Key blocks:
@@ -96,6 +98,7 @@ Notes:
   Cruncher ships the current intermediate by default so SSL works out of the box; set `ca_bundle`
   only if RegulonDB rotates the chain and you need to pin a newer intermediate.
 - `ht_sites=true` enables HT dataset retrieval (`TFBINDING` and/or peaks depending on `ht_binding_mode`).
+- `fetch sites --dataset-id <id>` enables HT for that request even if `ht_sites=false` (explicit override).
 - `ht_binding_mode` is explicit: choose `tfbinding` for curated sites or `peaks` for peak-only HT data.
 - `genome_source=ncbi` uses NCBI E-utilities to fetch RefSeq/GenBank FASTA by accession (default).
 - `genome_source=fasta` uses `ingest.genome_fasta` and (optionally) `ingest.genome_assembly` for validation.
@@ -127,7 +130,7 @@ Notes:
 - `record_tune=false` reduces memory and output size by skipping burn-in states.
 - `save_sequences=true` is required for `analyze` and `report` (no fallback).
 - `progress_every=0` disables periodic progress logging.
-- `save_trace=false` skips NetCDF output (analyze/report require trace.nc).
+- `save_trace=false` skips NetCDF output. `cruncher report` always requires `trace.nc`; `cruncher analyze` only requires it when trace/autocorr/convergence plots are enabled.
 - If `init.kind=consensus`, `init.regulator` must be a TF in the active regulator set.
 
 ## Optimizer settings
@@ -150,11 +153,20 @@ Notes:
 
 ```
 analysis:
+  runs:
+    - sample_lexA-cpxR_20250101_120000
+  tf_pair: [lexA, cpxR]   # optional: enable 2D plots for a chosen pair
   plots:
     trace: true
     autocorr: true
     convergence: true
     scatter_pwm: true
+    pair_pwm: true         # requires tf_pair
+    parallel_pwm: true     # requires tf_pair
+    score_hist: true
+    score_box: false
+    correlation_heatmap: true
+    parallel_coords: true
   scatter_scale: llr
   scatter_style: edges # edges | thresholds
   subsampling_epsilon: 10.0
@@ -162,7 +174,11 @@ analysis:
 
 Notes:
 
-- `scatter_style=edges` draws pairwise KDE contours; `thresholds` draws percentile cutoffs.
+- `analysis.runs` must list sample run directory names (no implicit fallback). You can override with
+  `cruncher analyze --run <name>` or `--latest`.
+- `tf_pair` is required for pairwise plots (scatter, pair_pwm, parallel_pwm).
+- `scatter_style=edges` draws chain edges; `thresholds` draws percentile cutoffs.
+- Each analysis run is written under `analysis/<analysis_id>/` inside the sample run directory.
 
 ## Scoring scales
 

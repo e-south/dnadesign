@@ -27,6 +27,7 @@ def gather_per_pwm_scores(
     pwms: dict[str, object],
     bidirectional: bool,
     scale: str,
+    out_path: Path,
 ) -> None:
     """
     Replace “first N + every_n” subsampling with “keep when per-PWM score changes by ≥ ε.”
@@ -122,6 +123,5 @@ def gather_per_pwm_scores(
     # Sort by chain then draw so the output is nicely ordered
     out_df = out_df.sort_values(["chain", "draw"]).reset_index(drop=True)
 
-    out_path = run_dir / "gathered_per_pwm_everyN.csv"
     out_df.to_csv(out_path, index=False)
-    logger.info("Wrote change-threshold per-PWM scores → %s", out_path.name)
+    logger.info("Wrote change-threshold per-PWM scores → %s", out_path)
