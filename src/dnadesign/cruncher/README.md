@@ -24,14 +24,24 @@ cruncher lock src/dnadesign/cruncher/config.yaml
 
 # 3) Preview targets + motifs, then parse
 cruncher targets status src/dnadesign/cruncher/config.yaml
+cruncher status src/dnadesign/cruncher/config.yaml
 cruncher parse src/dnadesign/cruncher/config.yaml
 
 # 4) Run optimizer
 cruncher sample src/dnadesign/cruncher/config.yaml
 
 # 5) Analyze + report
-cruncher analyze src/dnadesign/cruncher/config.yaml
+cruncher analyze --latest src/dnadesign/cruncher/config.yaml
 cruncher report  src/dnadesign/cruncher/config.yaml sample_<tfset>_<timestamp>
+
+# Optional: interactive notebook
+cruncher notebook --latest path/to/sample_run
+```
+
+Install the optional notebook dependency with:
+
+```bash
+uv add --group notebooks marimo
 ```
 
 Source‑specific details (RegulonDB TLS, HT hydration, windowing rules) live in
@@ -41,6 +51,7 @@ Source‑specific details (RegulonDB TLS, HT hydration, windowing rules) live in
 
 ### What to read next
 
+- `docs/README.md` — docs map and recommended reading order (start here)
 - `docs/demo.md` — end‑to‑end workflow (LexA + CpxR)
 - `docs/cli.md` — concise command reference + examples
 - `docs/config.md` — config schema + examples
@@ -59,6 +70,7 @@ Each run directory contains:
 - `sequences.parquet` — per‑draw sequences + per‑TF scores (if enabled)
 - `trace.nc` — ArviZ trace (if enabled)
 - `cruncher_elites_*/` — elite sequences (Parquet + JSON + YAML)
+- `analysis/<analysis_id>/` — analysis artifacts (plots/tables/summary/notebooks)
 - `report.json` / `report.md` — generated summary (report stage)
 
 ---

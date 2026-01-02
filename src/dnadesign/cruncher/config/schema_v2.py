@@ -184,12 +184,26 @@ class SampleConfig(BaseModel):
         return v
 
 
+class AnalysisPlotConfig(BaseModel):
+    trace: bool = False
+    autocorr: bool = False
+    convergence: bool = False
+    scatter_pwm: bool = False
+    pair_pwm: bool = False
+    parallel_pwm: bool = False
+    score_hist: bool = False
+    score_box: bool = False
+    correlation_heatmap: bool = False
+    parallel_coords: bool = False
+
+
 class AnalysisConfig(BaseModel):
     runs: Optional[List[str]]
-    plots: Dict[Literal["trace", "autocorr", "convergence", "scatter_pwm"], bool]
+    plots: AnalysisPlotConfig = AnalysisPlotConfig()
     scatter_scale: Literal["llr", "z", "logp", "consensus-neglop-sum"]
     subsampling_epsilon: float
     scatter_style: Literal["edges", "thresholds"] = "edges"
+    tf_pair: Optional[List[str]] = None
 
     @field_validator("subsampling_epsilon")
     @classmethod
@@ -197,6 +211,15 @@ class AnalysisConfig(BaseModel):
         if not isinstance(v, (int, float)) or v <= 0.0:
             raise ValueError("subsampling_epsilon must be a positive number (float or int)")
         return float(v)
+
+    @field_validator("tf_pair")
+    @classmethod
+    def _check_tf_pair(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is None:
+            return None
+        if len(v) != 2:
+            raise ValueError("analysis.tf_pair must contain exactly two TF names.")
+        return v
 
 
 class MotifStoreConfig(BaseModel):

@@ -1,5 +1,7 @@
 # Ingestion
 
+See `docs/README.md` for the docs map and reading order.
+
 Adapters normalize source payloads into `MotifRecord` and `SiteInstance`.
 
 ## Local catalog cache

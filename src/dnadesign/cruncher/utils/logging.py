@@ -24,3 +24,5 @@ def configure_logging(level: str = "INFO") -> None:
         datefmt="%H:%M:%S",
         handlers=[RichHandler(rich_tracebacks=True, show_time=True, show_level=True, show_path=False)],
     )
+    for noisy_logger in ("arviz", "arviz_base", "arviz_stats", "arviz_plots"):
+        logging.getLogger(noisy_logger).setLevel(logging.WARNING)

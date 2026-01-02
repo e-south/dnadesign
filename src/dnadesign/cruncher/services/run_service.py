@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig
+from dnadesign.cruncher.utils.artifacts import normalize_artifacts
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,7 @@ class RunInfo:
     status: Optional[str]
     motif_count: int
     pwm_source: Optional[str]
-    artifacts: list[str]
+    artifacts: list[dict]
     regulator_set: Optional[dict]
 
     @classmethod
@@ -34,7 +35,7 @@ class RunInfo:
             status=payload.get("status"),
             motif_count=int(payload.get("motif_count", 0)),
             pwm_source=payload.get("pwm_source"),
-            artifacts=list(payload.get("artifacts", [])),
+            artifacts=normalize_artifacts(payload.get("artifacts", [])),
             regulator_set=payload.get("regulator_set"),
         )
 
@@ -168,7 +169,7 @@ def list_runs(cfg: CruncherConfig, config_path: Path, *, stage: Optional[str] = 
                 status=status_payload.get("status") if status_payload else None,
                 motif_count=len(payload.get("motifs", [])),
                 pwm_source=(payload.get("motif_store") or {}).get("pwm_source"),
-                artifacts=list(payload.get("artifacts", [])),
+                artifacts=normalize_artifacts(payload.get("artifacts", [])),
                 regulator_set=payload.get("regulator_set"),
             )
         )
@@ -195,7 +196,7 @@ def get_run(cfg: CruncherConfig, config_path: Path, run_name: str) -> RunInfo:
         status=status_payload.get("status") if status_payload else None,
         motif_count=len(payload.get("motifs", [])),
         pwm_source=(payload.get("motif_store") or {}).get("pwm_source"),
-        artifacts=list(payload.get("artifacts", [])),
+        artifacts=normalize_artifacts(payload.get("artifacts", [])),
         regulator_set=payload.get("regulator_set"),
     )
 

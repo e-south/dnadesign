@@ -9,12 +9,19 @@ from rich.console import Console
 
 from dnadesign.cruncher.config.load import load_config
 
-app = typer.Typer(no_args_is_help=True, help="Run MCMC optimization to design candidate sequences.")
 console = Console()
 
 
-@app.callback(invoke_without_command=True)
-def main(config: Path = typer.Argument(..., help="Path to cruncher config.yaml.", metavar="CONFIG")) -> None:
+def sample(
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (required).",
+        metavar="CONFIG",
+    ),
+) -> None:
+    if config is None:
+        console.print("Missing CONFIG. Example: cruncher sample path/to/config.yaml")
+        raise typer.Exit(code=1)
     cfg = load_config(config)
     try:
         from dnadesign.cruncher.workflows.sample_workflow import run_sample

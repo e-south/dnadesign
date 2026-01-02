@@ -4,34 +4,25 @@ from __future__ import annotations
 
 import typer
 
-from dnadesign.cruncher.cli.commands.analyze import app as analyze_app
+from dnadesign.cruncher.cli.commands.analyze import analyze as analyze_cmd
 from dnadesign.cruncher.cli.commands.cache import app as cache_app
 from dnadesign.cruncher.cli.commands.catalog import app as catalog_app
 from dnadesign.cruncher.cli.commands.config import app as config_app
 from dnadesign.cruncher.cli.commands.fetch import app as fetch_app
-from dnadesign.cruncher.cli.commands.lock import app as lock_app
+from dnadesign.cruncher.cli.commands.lock import lock as lock_cmd
+from dnadesign.cruncher.cli.commands.notebook import app as notebook_app
 from dnadesign.cruncher.cli.commands.optimizers import app as optimizers_app
-from dnadesign.cruncher.cli.commands.parse import app as parse_app
-from dnadesign.cruncher.cli.commands.report import app as report_app
+from dnadesign.cruncher.cli.commands.parse import parse as parse_cmd
+from dnadesign.cruncher.cli.commands.report import report as report_cmd
 from dnadesign.cruncher.cli.commands.runs import app as runs_app
-from dnadesign.cruncher.cli.commands.sample import app as sample_app
+from dnadesign.cruncher.cli.commands.sample import sample as sample_cmd
 from dnadesign.cruncher.cli.commands.sources import app as sources_app
+from dnadesign.cruncher.cli.commands.status import status as status_cmd
 from dnadesign.cruncher.cli.commands.targets import app as targets_app
 from dnadesign.cruncher.utils.logging import configure_logging
 
 app = typer.Typer(no_args_is_help=True, help="Design short DNA sequences that score highly across TF motifs.")
-app.info.epilog = (
-    "Command summary:\n"
-    "  fetch      Fetch motifs or binding sites into the local cache.\n"
-    "  lock       Resolve TF names to exact cached motif IDs.\n"
-    "  parse      Validate cached motifs and render PWM logos.\n"
-    "  sample     Run MCMC optimization to design sequences.\n"
-    "  analyze    Generate diagnostics and plots from runs.\n"
-    "  report     Summarize a completed run.\n"
-    "  catalog    Inspect cached motifs and sites.\n"
-    "  targets    Check TF target readiness.\n"
-    "  runs       List, inspect, or watch run artifacts.\n"
-)
+app.info.epilog = "Tip: run `cruncher <command> --help` for examples and details."
 
 
 @app.callback()
@@ -47,29 +38,29 @@ def main(
     configure_logging(log_level)
 
 
-app.add_typer(
-    parse_app,
-    name="parse",
-    help="Validate cached motifs and render PWM logos.",
-    short_help="Validate motifs + render logos.",
+app.command("parse", help="Validate cached motifs and render PWM logos.", short_help="Validate motifs + render logos.")(
+    parse_cmd
 )
-app.add_typer(
-    sample_app,
-    name="sample",
+app.command(
+    "sample",
     help="Run MCMC optimization to design high-scoring sequences.",
     short_help="Run MCMC sequence optimization.",
-)
-app.add_typer(
-    analyze_app,
-    name="analyze",
+)(sample_cmd)
+app.command(
+    "analyze",
     help="Generate diagnostics and plots from previous runs.",
     short_help="Plot diagnostics for a run.",
-)
-app.add_typer(
-    report_app,
-    name="report",
+)(analyze_cmd)
+app.command(
+    "report",
     help="Summarize a completed sample run into report.json/md.",
     short_help="Summarize a run.",
+)(report_cmd)
+app.add_typer(
+    notebook_app,
+    name="notebook",
+    help="Generate an optional marimo notebook for analysis.",
+    short_help="Generate a marimo notebook.",
 )
 app.add_typer(
     fetch_app,
@@ -83,12 +74,7 @@ app.add_typer(
     help="Inspect what motifs and sites are cached locally.",
     short_help="Inspect cached motifs/sites.",
 )
-app.add_typer(
-    lock_app,
-    name="lock",
-    help="Resolve TF names to exact cached motif IDs.",
-    short_help="Resolve TFs to lockfile.",
-)
+app.command("lock", help="Resolve TF names to exact cached motif IDs.", short_help="Resolve TFs to lockfile.")(lock_cmd)
 app.add_typer(
     cache_app,
     name="cache",
@@ -107,6 +93,11 @@ app.add_typer(
     help="List or inspect ingestion sources and capabilities.",
     short_help="List ingestion sources.",
 )
+app.command(
+    "status",
+    help="Show a bird's-eye view of cache, targets, and runs.",
+    short_help="Show a status dashboard.",
+)(status_cmd)
 app.add_typer(
     targets_app,
     name="targets",

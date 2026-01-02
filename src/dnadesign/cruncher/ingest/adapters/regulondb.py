@@ -424,7 +424,11 @@ class RegulonDBAdapter:
             sequences = _parse_alignment_sequences(alignment_payload)
             matrix = _compute_pwm_from_alignment(sequences)
         else:
-            raise ValueError("alignment matrix is missing for regulon")
+            raise ValueError(
+                "alignment matrix is missing for regulon. "
+                "Hint: set ingest.regulondb.motif_matrix_source=sites and "
+                "use `cruncher fetch sites` to build PWMs from binding sites."
+            )
         if self._config.alignment_matrix_semantics == "counts":
             normalized = []
             for row in matrix:
@@ -523,6 +527,7 @@ class RegulonDBAdapter:
 
     def list_datasets(self, query: DatasetQuery) -> list[DatasetDescriptor]:
         datasets: list[DatasetDescriptor] = []
+        seen: set[str] = set()
         for source in self._list_ht_sources():
             if query.dataset_source and query.dataset_source != source:
                 continue
@@ -530,6 +535,8 @@ class RegulonDBAdapter:
             for dataset in raw:
                 dataset_id = dataset.get("_id")
                 if not dataset_id:
+                    continue
+                if dataset_id in seen:
                     continue
                 collection = dataset.get("collectionData") or {}
                 dataset_type = collection.get("type") or dataset.get("datasetType")
@@ -552,6 +559,7 @@ class RegulonDBAdapter:
                     reference_genome=dataset.get("referenceGenome") or dataset.get("assemblyGenomeId"),
                 )
                 datasets.append(descriptor)
+                seen.add(dataset_id)
         return datasets
 
     def _match_tf_name(self, tf_name: str, obj: dict) -> bool:

@@ -17,7 +17,7 @@ Dunlop Lab
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Sequence, Tuple
+from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -38,22 +38,12 @@ for i, b in enumerate(b"ACGT"):
 _ALPH = np.array(["A", "C", "G", "T"], dtype="<U1")
 
 
-def get_tf_pair(tf_names: Sequence[str]) -> Tuple[str, str]:
+def load_per_pwm(path: Path) -> pd.DataFrame:
     """
-    Select the first two TF names for pairwise diagnostics.
-    """
-    if len(tf_names) < 2:
-        raise ValueError("get_tf_pair: need at least two TF names")
-    return tuple(tf_names[:2])
-
-
-def load_per_pwm(sample_dir: Path) -> pd.DataFrame:
-    """
-    Read <sample_dir>/gathered_per_pwm_everyN.csv into a DataFrame.
+    Read gathered_per_pwm_everyN.csv into a DataFrame.
     Raises FileNotFoundError if missing.
     Expects columns: 'chain', 'draw', 'score_<TF>' for each TF.
     """
-    path = sample_dir / "gathered_per_pwm_everyN.csv"
     if not path.exists():
         raise FileNotFoundError(f"load_per_pwm: '{path}' not found")
     df = pd.read_csv(path)

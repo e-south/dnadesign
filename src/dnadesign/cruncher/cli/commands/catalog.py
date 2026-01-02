@@ -210,9 +210,20 @@ def resolve_tf(
 
 @app.command("show", help="Show metadata for a cached motif reference.")
 def show(
-    config: Path = typer.Argument(..., help="Path to cruncher config.yaml.", metavar="CONFIG"),
-    ref: str = typer.Argument(..., help="Catalog reference (<source>:<motif_id>).", metavar="REF"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (required).",
+        metavar="CONFIG",
+    ),
+    ref: str | None = typer.Argument(
+        None,
+        help="Catalog reference (<source>:<motif_id>).",
+        metavar="REF",
+    ),
 ) -> None:
+    if config is None or ref is None:
+        console.print("Missing CONFIG/REF. Example: cruncher catalog show <config> regulondb:RBM000123")
+        raise typer.Exit(code=1)
     cfg = load_config(config)
     if ":" not in ref:
         raise typer.BadParameter(

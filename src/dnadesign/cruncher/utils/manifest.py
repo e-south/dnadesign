@@ -45,7 +45,7 @@ def build_run_manifest(
     lockmap: Dict[str, LockedMotif],
     catalog: CatalogIndex,
     run_dir: Path,
-    artifacts: Optional[Iterable[str]] = None,
+    artifacts: Optional[Iterable[object]] = None,
     extra: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     motifs: List[Dict[str, Any]] = []

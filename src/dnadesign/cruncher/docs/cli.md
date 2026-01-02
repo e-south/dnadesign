@@ -1,5 +1,7 @@
 # Cruncher CLI
 
+See `docs/README.md` for the docs map and reading order.
+
 Cruncher is structured around an explicit lifecycle: **fetch → lock → parse/sample → analyze/report**.
 Each command has one job and never performs hidden network access.
 
@@ -9,12 +11,14 @@ Each command has one job and never performs hidden network access.
 - `sample` — run MCMC optimization to design candidate sequences.
 - `analyze` — generate diagnostics and plots for completed runs.
 - `report` — summarize a sample run into report artifacts.
+- `notebook` — generate an optional marimo notebook for analysis.
 - `fetch` — fetch motifs or binding sites into the local cache.
 - `catalog` — inspect cached motifs and binding sites.
 - `lock` — resolve TF names to exact cached motif IDs.
 - `cache` — inspect or verify cache integrity.
 - `config` — summarize effective configuration settings.
 - `sources` — list ingestion sources and capabilities.
+- `status` — show a bird's-eye view of cache, targets, and runs.
 - `targets` — check target readiness and catalog candidates.
 - `optimizers` — list available optimizer kernels.
 - `runs` — list, inspect, or watch past run artifacts.
@@ -36,11 +40,12 @@ Each command has one job and never performs hidden network access.
 - `cruncher fetch sites --motif-id <id> --source regulondb <config>`
 - `cruncher fetch sites --tf <name> --dry-run <config>` (preview HT datasets)
 - `cruncher fetch sites --tf <name> --genome-fasta path/to/genome.fna <config>` (hydrate sequences from coordinates)
-- `cruncher fetch sites --tf <name> --dataset-id <id> <config>` (limit HT dataset)
+- `cruncher fetch sites --tf <name> --dataset-id <id> <config>` (limit HT dataset; enables HT for this request)
 - `cruncher fetch sites --tf <name> --hydrate <config>` (hydrate cached sites without refetching)
 - `cruncher fetch sites --tf <name> --offline <config>`
 - `cruncher fetch sites --tf <name> --update <config>`
 - `cruncher lock <config>`
+- `cruncher status <config>` (overview of cache, targets, and recent runs)
 - `cruncher targets list <config>` (show configured TF sets)
 - `cruncher targets status <config> [--pwm-source sites] [--site-kind curated]`
 - `cruncher targets candidates <config>` (show catalog candidates per TF)
@@ -48,10 +53,17 @@ Each command has one job and never performs hidden network access.
 - `cruncher targets stats <config>` (site-length stats + PWM lengths for each target)
 - `cruncher parse <config>`
 - `cruncher sample <config>`
-- `cruncher analyze <config>` (uses `analysis.runs` or the latest sample run if empty)
-- `cruncher report <config> <batch_name>` (write `report.json` + `report.md`)
+- `cruncher analyze <config>` (requires `analysis.runs`; use `--run` or `--latest` to override)
+- `cruncher analyze --run <sample_run> <config>` (repeat `--run` for multiple)
+- `cruncher analyze --latest <config>` (explicitly analyze latest sample run)
+- `cruncher analyze --tf-pair lexA,cpxR <config>` (override pairwise plots)
+- `cruncher analyze --list-plots <config>` (preview which plots will run)
+- `cruncher report <config> <run_name>` (write `report.json` + `report.md`)
+- `cruncher notebook [--analysis-id <id>|--latest] <run_dir>` (generate a marimo notebook)
 - `cruncher runs list <config> [--stage sample]`
-- `cruncher runs show <config> <run_name>`
+- `cruncher runs list <config> [--stage sample] [--full] [--json]`
+- `cruncher runs show <config> <run_name> [--json]`
+- `cruncher runs latest <config> [--stage sample] [--json]`
 - `cruncher runs watch <config> <run_name>`
 - `cruncher runs rebuild-index <config>`
 
@@ -64,6 +76,10 @@ Notes:
 - `--genome-fasta` overrides `ingest.genome_source` and `ingest.genome_fasta` when provided.
 - Use `cruncher targets stats` to inspect site lengths (curated or HT) and set `motif_store.site_window_lengths`.
 - When multiple `regulator_sets` are configured, Cruncher runs each set independently and creates separate run folders.
+- Each `cruncher analyze` call creates a new `analysis/<analysis_id>/` folder under the sample run directory.
+- `cruncher runs show` prints the artifact registry plus analysis IDs, counts, and notebook path (when available).
+- `cruncher notebook` requires the optional `marimo` dependency (install via `uv add --group notebooks marimo`).
+- Pairwise plots only render when `analysis.tf_pair` is explicitly set.
 
 ## Catalog inspection
 

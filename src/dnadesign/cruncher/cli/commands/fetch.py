@@ -166,6 +166,8 @@ def motifs(
         typer.echo(f"Error: {exc}", err=True)
         typer.echo("Hint: run cruncher fetch motifs --help for examples.", err=True)
         raise typer.Exit(code=1)
+    if not written:
+        console.print("No new motifs cached (all matches already present). Use --update to refresh.")
     if summary and written:
         _render_motif_summary(catalog_root, written)
     if paths or not summary:
@@ -183,7 +185,7 @@ def sites(
     dataset_id: Optional[str] = typer.Option(
         None,
         "--dataset-id",
-        help="Limit HT site retrieval to a specific dataset ID.",
+        help="Limit HT site retrieval to a specific dataset ID (enables HT for this request).",
     ),
     genome_fasta: Optional[Path] = typer.Option(
         None,
@@ -221,7 +223,12 @@ def sites(
     provider: Optional[SequenceProvider] = None
     try:
         registry = default_registry()
-        adapter = registry.create(source, cfg.ingest)
+        ingest_cfg = cfg.ingest
+        if dataset_id and source == "regulondb" and not cfg.ingest.regulondb.ht_sites:
+            ingest_cfg = cfg.ingest.model_copy(deep=True)
+            ingest_cfg.regulondb.ht_sites = True
+            console.print("Note: enabling HT dataset access for this request (--dataset-id).")
+        adapter = registry.create(source, ingest_cfg)
         catalog_root = config.parent / cfg.motif_store.catalog_root
         if dry_run:
             if not tf:
@@ -229,6 +236,7 @@ def sites(
             if not hasattr(adapter, "list_datasets"):
                 raise typer.BadParameter(f"Source '{source}' does not support dataset discovery.")
             rows: list[tuple[str, str, str, str, str]] = []
+            seen: set[tuple[str, str]] = set()
             for name in tf:
                 datasets = adapter.list_datasets(DatasetQuery(tf_name=name))
                 if dataset_id:
@@ -236,6 +244,10 @@ def sites(
                 if not datasets:
                     raise ValueError(f"No HT datasets found for TF {name}")
                 for ds in datasets:
+                    key = (name, ds.dataset_id)
+                    if key in seen:
+                        continue
+                    seen.add(key)
                     method = ds.method or "-"
                     genome = ds.reference_genome or "-"
                     rows.append((name, ds.dataset_id, ds.dataset_source or "-", method, genome))
@@ -311,6 +323,8 @@ def sites(
     finally:
         if provider is not None:
             provider.close()
+    if not written:
+        console.print("No new sites cached (all matches already present). Use --update to refresh.")
     if summary and written:
         _render_sites_summary(catalog_root, written)
     if paths or not summary:

@@ -551,6 +551,8 @@ def fetch_sites(
             continue
         if not update:
             cached = catalog.list(tf_name=name, include_synonyms=True)
+            if dataset_id:
+                cached = [entry for entry in cached if entry.dataset_id == dataset_id]
             if any(entry.has_sites and _sites_path(root, entry.source, entry.motif_id).exists() for entry in cached):
                 logger.info("Skipping TF '%s' (cached sites exist). Use --update to refresh.", name)
                 continue

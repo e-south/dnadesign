@@ -91,10 +91,17 @@ cruncher:
   analysis:
     runs:
       - sample_lexA-oxyR_20250603
+    tf_pair: [lexA, oxyR]
     plots:
       trace: true
       autocorr: true
       convergence: true
       scatter_pwm: true
+      pair_pwm: true
+      parallel_pwm: true
+      score_hist: true
+      score_box: false
+      correlation_heatmap: true
+      parallel_coords: true
     scatter_scale: llr
     subsampling_epsilon: 10.0

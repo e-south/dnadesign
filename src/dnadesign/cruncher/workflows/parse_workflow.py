@@ -24,6 +24,7 @@ from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.store.lockfile import read_lockfile, validate_lockfile, verify_lockfile_hashes
 from dnadesign.cruncher.store.motif_store import MotifRef
+from dnadesign.cruncher.utils.artifacts import artifact_entry
 from dnadesign.cruncher.utils.labels import build_run_name, regulator_sets
 from dnadesign.cruncher.utils.manifest import build_run_manifest, write_manifest
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
@@ -120,7 +121,7 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
         )
         update_run_index_from_status(config_path, run_dir, status_writer.payload)
 
-        artifacts: list[str] = []
+        artifacts: list[dict[str, object]] = []
         for tf in sorted(tfs):
             entry = lockmap.get(tf)
             if entry is None:
@@ -134,7 +135,15 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
                 out=run_dir / f"{tf}_logo.png",
                 dpi=cfg.parse.plot.dpi,
             )
-            artifacts.append(f"{tf}_logo.png")
+            artifacts.append(
+                artifact_entry(
+                    run_dir / f"{tf}_logo.png",
+                    run_dir,
+                    kind="plot",
+                    label=f"{tf} PWM logo",
+                    stage="parse",
+                )
+            )
 
             length = pwm.length
             bits = pwm.information_bits()

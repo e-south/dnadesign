@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -17,15 +18,47 @@ from dnadesign.cruncher.services.run_service import (
     load_run_status,
     rebuild_run_index,
 )
+from dnadesign.cruncher.utils.artifacts import normalize_artifacts
 
 app = typer.Typer(no_args_is_help=True, help="List, inspect, or watch past run artifacts.")
 console = Console()
+
+
+def _analysis_ids_from_artifacts(artifacts: list[dict]) -> list[str]:
+    ids: set[str] = set()
+    for item in artifacts:
+        path = str(item.get("path") or "")
+        parts = path.split("/")
+        if len(parts) >= 2 and parts[0] == "analysis":
+            ids.add(parts[1])
+    return sorted(ids)
+
+
+def _latest_analysis_id(run_dir: Path) -> str | None:
+    latest_path = run_dir / "analysis" / "latest.txt"
+    if not latest_path.exists():
+        return None
+    value = latest_path.read_text().strip()
+    return value or None
+
+
+def _artifact_counts(artifacts: list[dict]) -> list[dict[str, str | int]]:
+    counts: dict[tuple[str, str], int] = {}
+    for item in artifacts:
+        stage = str(item.get("stage") or "unknown")
+        kind = str(item.get("type") or "unknown")
+        key = (stage, kind)
+        counts[key] = counts.get(key, 0) + 1
+    payload = [{"stage": stage, "type": kind, "count": count} for (stage, kind), count in sorted(counts.items())]
+    return payload
 
 
 @app.command("list", help="List run artifacts found in the results directory.")
 def list_runs_cmd(
     config: Path = typer.Argument(..., help="Path to cruncher config.yaml.", metavar="CONFIG"),
     stage: str | None = typer.Option(None, "--stage", help="Filter by stage (parse, sample, analyze, report)."),
+    full: bool = typer.Option(False, "--full", help="Show full run names without truncation."),
+    json_output: bool = typer.Option(False, "--json", help="Emit run metadata as JSON."),
 ) -> None:
     cfg = load_config(config)
     runs = list_runs(cfg, config, stage=stage)
@@ -33,8 +66,25 @@ def list_runs_cmd(
         console.print("No runs found.")
         console.print("Hint: run cruncher sample <config> or cruncher parse <config> to create a run.")
         raise typer.Exit(code=1)
+    if json_output:
+        payload = [
+            {
+                "name": run.name,
+                "stage": run.stage,
+                "status": run.status,
+                "created_at": run.created_at,
+                "motif_count": run.motif_count,
+                "pwm_source": run.pwm_source,
+                "regulator_set": run.regulator_set,
+                "run_dir": str(run.run_dir),
+                "artifacts": run.artifacts,
+            }
+            for run in runs
+        ]
+        typer.echo(json.dumps(payload, indent=2))
+        return
     table = Table(title="Runs", header_style="bold")
-    table.add_column("Name")
+    table.add_column("Name", overflow="fold" if full else "ellipsis")
     table.add_column("Stage")
     table.add_column("Status")
     table.add_column("Created")
@@ -61,9 +111,21 @@ def list_runs_cmd(
 
 @app.command("show", help="Show metadata and artifacts for a specific run.")
 def show_run_cmd(
-    config: Path = typer.Argument(..., help="Path to cruncher config.yaml.", metavar="CONFIG"),
-    run_name: str = typer.Argument(..., help="Run directory name (see `cruncher runs list`).", metavar="RUN"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (required).",
+        metavar="CONFIG",
+    ),
+    run_name: str | None = typer.Argument(
+        None,
+        help="Run directory name (see `cruncher runs list`).",
+        metavar="RUN",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit run metadata as JSON."),
 ) -> None:
+    if config is None or run_name is None:
+        console.print("Missing CONFIG/RUN. Example: cruncher runs show path/to/config.yaml sample_run")
+        raise typer.Exit(code=1)
     cfg = load_config(config)
     try:
         run = get_run(cfg, config, run_name)
@@ -71,19 +133,115 @@ def show_run_cmd(
         console.print(f"Error: {exc}")
         console.print("Hint: use cruncher runs list <config> to see available runs.")
         raise typer.Exit(code=1)
+    if json_output:
+        artifacts = normalize_artifacts(run.artifacts)
+        analysis_ids = _analysis_ids_from_artifacts(artifacts)
+        latest_analysis = _latest_analysis_id(run.run_dir)
+        artifact_counts = _artifact_counts(artifacts)
+        typer.echo(
+            json.dumps(
+                {
+                    "name": run.name,
+                    "stage": run.stage,
+                    "status": run.status,
+                    "created_at": run.created_at,
+                    "motif_count": run.motif_count,
+                    "pwm_source": run.pwm_source,
+                    "regulator_set": run.regulator_set,
+                    "run_dir": str(run.run_dir),
+                    "artifacts": run.artifacts,
+                    "analysis_ids": analysis_ids,
+                    "latest_analysis": latest_analysis,
+                    "artifact_counts": artifact_counts,
+                },
+                indent=2,
+            )
+        )
+        return
     console.print(f"run: {run.name}")
     console.print(f"stage: {run.stage}")
-    console.print(f"status: {run.status}")
-    console.print(f"created_at: {run.created_at}")
+    console.print(f"status: {run.status or '-'}")
+    console.print(f"created_at: {run.created_at or '-'}")
     console.print(f"motif_count: {run.motif_count}")
     if run.regulator_set:
         console.print(f"regulator_set: {run.regulator_set}")
-    console.print(f"pwm_source: {run.pwm_source}")
+    console.print(f"pwm_source: {run.pwm_source or '-'}")
     console.print(f"run_dir: {run.run_dir}")
-    if run.artifacts:
+    artifacts = normalize_artifacts(run.artifacts)
+    analysis_ids = _analysis_ids_from_artifacts(artifacts)
+    latest_analysis = _latest_analysis_id(run.run_dir)
+    if analysis_ids:
+        console.print(f"analysis_ids: {', '.join(analysis_ids)}")
+    if latest_analysis:
+        console.print(f"latest_analysis: {latest_analysis}")
+        notebook_path = run.run_dir / "analysis" / latest_analysis / "notebooks" / "run_overview.py"
+        if notebook_path.exists():
+            console.print(f"notebook: {notebook_path}")
+    if artifacts:
         console.print("artifacts:")
-        for item in run.artifacts:
-            console.print(f"  - {item}")
+        table = Table(header_style="bold")
+        table.add_column("Stage")
+        table.add_column("Type")
+        table.add_column("Label")
+        table.add_column("Path")
+        for item in artifacts:
+            table.add_row(
+                str(item.get("stage") or "-"),
+                str(item.get("type") or "-"),
+                str(item.get("label") or "-"),
+                str(item.get("path") or "-"),
+            )
+        console.print(table)
+        counts = _artifact_counts(artifacts)
+        if counts:
+            count_table = Table(title="Artifact counts", header_style="bold")
+            count_table.add_column("Stage")
+            count_table.add_column("Type")
+            count_table.add_column("Count")
+            for item in counts:
+                count_table.add_row(str(item["stage"]), str(item["type"]), str(item["count"]))
+            console.print(count_table)
+
+
+@app.command("latest", help="Print the most recent run name (optionally filtered by stage).")
+def latest_run_cmd(
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (required).",
+        metavar="CONFIG",
+    ),
+    stage: str | None = typer.Option(None, "--stage", help="Filter by stage (parse, sample, analyze, report)."),
+    json_output: bool = typer.Option(False, "--json", help="Emit run metadata as JSON."),
+) -> None:
+    if config is None:
+        console.print("Missing CONFIG. Example: cruncher runs latest path/to/config.yaml")
+        raise typer.Exit(code=1)
+    cfg = load_config(config)
+    runs = list_runs(cfg, config, stage=stage)
+    if not runs:
+        console.print("No runs found.")
+        console.print("Hint: run cruncher sample <config> or cruncher parse <config> to create a run.")
+        raise typer.Exit(code=1)
+    run = runs[0]
+    if json_output:
+        typer.echo(
+            json.dumps(
+                {
+                    "name": run.name,
+                    "stage": run.stage,
+                    "status": run.status,
+                    "created_at": run.created_at,
+                    "motif_count": run.motif_count,
+                    "pwm_source": run.pwm_source,
+                    "regulator_set": run.regulator_set,
+                    "run_dir": str(run.run_dir),
+                    "artifacts": run.artifacts,
+                },
+                indent=2,
+            )
+        )
+        return
+    console.print(run.name)
 
 
 @app.command("rebuild-index", help="Rebuild the run index from run_manifest.json files.")
@@ -97,10 +255,21 @@ def rebuild_index_cmd(
 
 @app.command("watch", help="Tail run_status.json for a live progress snapshot.")
 def watch_run_cmd(
-    config: Path = typer.Argument(..., help="Path to cruncher config.yaml.", metavar="CONFIG"),
-    run_name: str = typer.Argument(..., help="Run directory name (see `cruncher runs list`).", metavar="RUN"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (required).",
+        metavar="CONFIG",
+    ),
+    run_name: str | None = typer.Argument(
+        None,
+        help="Run directory name (see `cruncher runs list`).",
+        metavar="RUN",
+    ),
     interval: float = typer.Option(1.0, "--interval", help="Polling interval in seconds."),
 ) -> None:
+    if config is None or run_name is None:
+        console.print("Missing CONFIG/RUN. Example: cruncher runs watch path/to/config.yaml sample_run")
+        raise typer.Exit(code=1)
     cfg = load_config(config)
     try:
         run = get_run(cfg, config, run_name)

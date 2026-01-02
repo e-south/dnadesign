@@ -99,9 +99,10 @@ def summarize_config(cfg: CruncherConfig) -> Dict[str, Any]:
     else:
         summary["analysis"] = {
             "runs": cfg.analysis.runs,
-            "plots": cfg.analysis.plots,
+            "plots": cfg.analysis.plots.model_dump(),
             "scatter_scale": cfg.analysis.scatter_scale,
             "subsampling_epsilon": cfg.analysis.subsampling_epsilon,
             "scatter_style": cfg.analysis.scatter_style,
+            "tf_pair": cfg.analysis.tf_pair,
         }
     return summary

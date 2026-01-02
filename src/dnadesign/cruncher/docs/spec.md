@@ -1,5 +1,7 @@
 # Cruncher Refactor Spec (Developer-Ready)
 
+See `docs/README.md` for the docs map and reading order.
+
 This document defines the end-to-end requirements and architecture for Cruncher after the refactor.
 It is intended as a build and review guide for engineers working on ingestion, optimization, and UX.
 
@@ -107,6 +109,9 @@ Each run directory contains:
 - `sequences.parquet` — per-draw sequences + per-TF scores
 - `cruncher_elites_*/<name>.parquet` — elite sequences (parquet)
 - `cruncher_elites_*/<name>.json` — elite sequences (JSON, human-readable)
+- `analysis/<analysis_id>/` — analysis runs (plots/tables/notebooks)
+- `analysis/<analysis_id>/summary.json` — analysis provenance and artifacts
+- `analysis/<analysis_id>/analysis_used.yaml` — analysis settings used
 - `run_manifest.json` — provenance, hashes, optimizer stats
 - `run_status.json` — live progress updates (written during parse and sampling)
 - `report.json` + `report.md` — summary (from `cruncher report`)
@@ -127,11 +132,15 @@ Core lifecycle:
 - `cruncher targets candidates <config>`
 - `cruncher parse <config>`
 - `cruncher sample <config>`
-- `cruncher analyze <config>`
-- `cruncher report <config> <batch_name>`
+- `cruncher analyze --run <sample_run> <config>`
+- `cruncher analyze --latest <config>`
+- `cruncher report <config> <run_name>`
 - `cruncher runs list <config> [--stage sample]`
 - `cruncher runs show <config> <run_name>`
 - `cruncher runs rebuild-index <config>`
+- `cruncher notebook [--analysis-id <id>|--latest] <run_dir>`
+
+Pairwise plots only run when `analysis.tf_pair` is set; there is no implicit pairwise sweep.
 
 No command performs hidden network access. Fetching is explicit.
 
