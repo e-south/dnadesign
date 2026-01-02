@@ -1269,6 +1269,8 @@ def _pretty_df(df: pd.DataFrame, opts: PrettyOpts) -> pd.DataFrame:
         except Exception:
             return str(x)
 
+    if hasattr(df, "map"):
+        return df.map(_fmt_cell)
     return df.applymap(_fmt_cell)
 
 

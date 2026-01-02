@@ -39,7 +39,7 @@ app = typer.Typer(
         "  • permuter export   - optional CSV/JSONL export\n"
         "  • permuter validate - structural & integrity checks\n\n"
         "\b\nNotes:\n"
-        "  • --job accepts a path or PRESET NAME (search: $PERMUTER_JOBS, CWD[/jobs], repo, package jobs/).\n"
+        "  • --job accepts a path or PRESET NAME (search: $PERMUTER_JOBS, CWD/jobs, repo, package jobs/).\n"
         "  • --data accepts a dataset directory OR a records.parquet file.\n"
         "  • ${JOB_DIR}, env vars, and ~ are expanded. Output root defaults to the job's configured 'results/' path.\n"
         "    No silent fallbacks: if unwritable, use $PERMUTER_OUTPUT_ROOT or --out."
