@@ -11,10 +11,6 @@ from __future__ import annotations
 
 from typing import List
 
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import load_events_with_setpoint, resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta, scale_to_sizes, scatter_smart
@@ -42,6 +38,10 @@ from ._param_utils import event_columns_for, get_float, get_str, normalize_metri
     ),
 )
 def render(context, params: dict) -> None:
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+
     outputs_dir = resolve_outputs_dir(context)
 
     delta = get_float(params, ["intensity_log2_offset_delta"], 0.0)

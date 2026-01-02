@@ -60,6 +60,19 @@ def test_plot_cli_list_registry(tmp_path):
     assert "test_plot_cli_minimal" in res.stdout
 
 
+def test_plot_cli_list_registry_ignores_config(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    campaign = workdir / "campaign.yaml"
+    campaign.write_text("[]\n")  # invalid campaign yaml (not a mapping)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "--list", "-c", str(campaign)])
+    assert res.exit_code == 0, res.stdout
+    assert "Registered plots" in res.stdout
+
+
 def test_plot_cli_describe(tmp_path):
     app = _build()
     runner = CliRunner()
@@ -146,6 +159,28 @@ def test_plot_cli_quick_mode(tmp_path):
 
     out_path = Path(workdir) / "outputs" / "plots" / "quick_score_vs_rank.png"
     assert out_path.exists()
+
+
+def test_plot_cli_rejects_bad_round_selector(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+    )
+    from ._cli_helpers import write_ledger
+
+    write_ledger(workdir, run_id="r0", round_index=0)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "--quick", "-c", str(campaign), "--round", "bad"])
+    assert res.exit_code != 0, res.stdout
+    assert "Invalid round selector" in res.output
 
 
 def test_plot_cli_rejects_top_level_plot_keys(tmp_path):

@@ -83,3 +83,61 @@ def test_predict_accepts_latest_round_selector(tmp_path: Path) -> None:
     res = runner.invoke(app, ["--no-color", "predict", "-c", str(campaign), "--round", "latest"])
     assert res.exit_code == 0, res.output
     assert "y_pred_vec" in res.output
+
+
+def test_predict_rejects_round_and_model_path(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(campaign, workdir=workdir, records_path=records)
+
+    model_path = workdir / "outputs" / "round_0" / "model.joblib"
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    _train_model(model_path)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "predict",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--model-path",
+            str(model_path),
+        ],
+    )
+    assert res.exit_code != 0, res.output
+    assert "mutually exclusive" in res.output.lower()
+
+
+def test_predict_errors_on_missing_model_path(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(campaign, workdir=workdir, records_path=records)
+
+    missing_path = workdir / "outputs" / "round_0" / "missing.joblib"
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "predict",
+            "-c",
+            str(campaign),
+            "--model-path",
+            str(missing_path),
+        ],
+    )
+    assert res.exit_code != 0, res.output
+    assert "--model-path not found" in res.output

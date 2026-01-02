@@ -17,6 +17,7 @@ from typing import Optional
 
 import typer
 
+from ...core.rounds import resolve_round_index_from_runs
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...reporting.summary import list_runs, select_run_meta, summarize_run_meta
 from ...storage.ledger import LedgerReader
@@ -27,20 +28,6 @@ from ._common import internal_error, json_out, load_cli_config, opal_error, prin
 
 runs_app = typer.Typer(no_args_is_help=True, help="Inspect ledger run_meta entries.")
 cli_group("runs", help="Inspect ledger run_meta entries.")(runs_app)
-
-
-def _parse_round_sel(round_sel: Optional[str], runs_df) -> Optional[int]:
-    if round_sel is None:
-        return None
-    sel = str(round_sel).strip().lower()
-    if sel in ("latest", "unspecified"):
-        if runs_df.empty:
-            raise OpalError("No runs found in ledger.runs.parquet.")
-        return int(runs_df["as_of_round"].max())
-    try:
-        return int(sel)
-    except Exception as e:
-        raise OpalError("Invalid --round: must be an integer or 'latest'.") from e
 
 
 @runs_app.command("list", help="List run_meta entries (optionally filtered by round).")
@@ -55,7 +42,7 @@ def runs_list(
         ws = CampaignWorkspace.from_config(cfg, cfg_path)
         reader = LedgerReader(ws)
         runs_df = list_runs(reader)
-        round_sel = _parse_round_sel(round, runs_df)
+        round_sel = resolve_round_index_from_runs(runs_df, round, allow_none=True)
         if round_sel is not None:
             runs_df = runs_df[runs_df["as_of_round"] == int(round_sel)]
         if json:
@@ -87,7 +74,7 @@ def runs_show(
         ws = CampaignWorkspace.from_config(cfg, cfg_path)
         reader = LedgerReader(ws)
         runs_df = reader.read_runs()
-        round_sel = _parse_round_sel(round, runs_df) if run_id is None else None
+        round_sel = resolve_round_index_from_runs(runs_df, round) if run_id is None else None
         row = select_run_meta(runs_df, round_sel=round_sel, run_id=run_id)
         if json:
             json_out(row.to_dict())

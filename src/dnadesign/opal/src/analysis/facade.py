@@ -37,10 +37,33 @@ def parse_round_selector(sel: Optional[str]) -> RoundSelector:
         return s
     if "-" in s:
         a, b = s.split("-", 1)
-        return list(range(int(a), int(b) + 1))
+        if not a or not b:
+            raise OpalError(
+                f"Invalid round selector '{sel}'. Use 'latest', 'all', '3', '1,3', or '2-5'.",
+                ExitCodes.BAD_ARGS,
+            )
+        try:
+            return list(range(int(a), int(b) + 1))
+        except Exception as exc:
+            raise OpalError(
+                f"Invalid round selector '{sel}'. Use 'latest', 'all', '3', '1,3', or '2-5'.",
+                ExitCodes.BAD_ARGS,
+            ) from exc
     if "," in s:
-        return [int(x) for x in s.split(",") if x]
-    return [int(s)]
+        try:
+            return [int(x) for x in s.split(",") if x]
+        except Exception as exc:
+            raise OpalError(
+                f"Invalid round selector '{sel}'. Use 'latest', 'all', '3', '1,3', or '2-5'.",
+                ExitCodes.BAD_ARGS,
+            ) from exc
+    try:
+        return [int(s)]
+    except Exception as exc:
+        raise OpalError(
+            f"Invalid round selector '{sel}'. Use 'latest', 'all', '3', '1,3', or '2-5'.",
+            ExitCodes.BAD_ARGS,
+        ) from exc
 
 
 def round_suffix(rounds: RoundSelector) -> str:
@@ -129,6 +152,18 @@ def read_runs(runs_path: Path) -> pl.DataFrame:
 def read_labels(labels_path: Path) -> pl.DataFrame:
     _ensure_labels_path(labels_path)
     return pl.read_parquet(labels_path)
+
+
+def ensure_predictions_dir(pred_dir: Path) -> None:
+    _ensure_predictions_dir(pred_dir)
+
+
+def ensure_runs_path(runs_path: Path) -> None:
+    _ensure_runs_path(runs_path)
+
+
+def ensure_labels_path(labels_path: Path) -> None:
+    _ensure_labels_path(labels_path)
 
 
 def _apply_round_filter(

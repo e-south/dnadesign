@@ -13,14 +13,13 @@ Dunlop Lab
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, List, Optional, Set, Union
-
-import pandas as pd
+from typing import TYPE_CHECKING, Iterable, List, Optional, Set, Union
 
 from ..analysis.facade import load_predictions_with_setpoint
 from ..core.stderr_filter import maybe_install_pyarrow_sysctl_filter
 
-maybe_install_pyarrow_sysctl_filter()
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 def resolve_outputs_dir(context) -> Path:
@@ -42,6 +41,7 @@ def load_events_with_setpoint(
     the setpoint from `ledger.runs` via `objective__params.setpoint_vector`.
     `outputs_dir` should point to the campaign's outputs/ directory.
     """
+    maybe_install_pyarrow_sysctl_filter()
     want: Set[str] = set(map(str, base_columns)) | {"run_id"}
     df = load_predictions_with_setpoint(outputs_dir, want, round_selector=round_selector)
     return df.to_pandas()

@@ -60,6 +60,16 @@ def test_status_with_ledger_json(tmp_path):
     assert out["latest_round_ledger"]["run_id"] == run_id
 
 
+def test_status_rejects_round_and_all(tmp_path):
+    _, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "status", "-c", str(campaign), "--round", "0", "--all"])
+    assert res.exit_code != 0, res.stdout
+    assert "only one of --all or --round" in res.output.lower()
+
+
 def test_log_json_summary(tmp_path):
     _, campaign, _ = _setup_workspace(tmp_path)
     app = _build()

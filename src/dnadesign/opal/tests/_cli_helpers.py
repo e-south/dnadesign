@@ -209,3 +209,18 @@ def write_ledger(workdir: Path, *, run_id: str, round_index: int = 0) -> None:
 
     writer.append_run_pred(run_pred)
     writer.append_run_meta(run_meta)
+
+
+def write_ledger_labels(workdir: Path, *, round_index: int = 0) -> None:
+    ws = CampaignWorkspace(config_path=workdir / "campaign.yaml", workdir=workdir)
+    writer = LedgerWriter(ws)
+    labels = pd.DataFrame(
+        {
+            "event": ["label"],
+            "observed_round": [int(round_index)],
+            "id": ["a"],
+            "y_obs": [[0.1]],
+            "src": ["test"],
+        }
+    )
+    writer.append_label(labels)

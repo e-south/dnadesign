@@ -18,8 +18,8 @@ from typing import Any, Dict, List, Optional
 
 import typer
 
+from ...core.rounds import resolve_round_index_from_state
 from ...core.utils import ExitCodes, OpalError, print_stdout
-from ...storage.state import CampaignState
 from ...storage.workspace import CampaignWorkspace
 from ..registry import cli_group
 from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path
@@ -27,21 +27,8 @@ from ._common import internal_error, json_out, load_cli_config, opal_error, prin
 ctx_app = typer.Typer(no_args_is_help=True, help="Inspect runtime carriers (round_ctx.json).")
 
 
-def _resolve_round_index(ws: CampaignWorkspace, round_sel: Optional[str]) -> int:
-    sel = (round_sel or "latest").strip().lower()
-    if sel in ("latest", "unspecified"):
-        st = CampaignState.load(ws.state_path)
-        if not st.rounds:
-            raise OpalError("state.json has no recorded rounds.")
-        return int(max(r.round_index for r in st.rounds))
-    try:
-        return int(sel)
-    except Exception as e:
-        raise OpalError("Invalid --round: must be an integer or 'latest'.") from e
-
-
 def _load_round_ctx(ws: CampaignWorkspace, round_sel: Optional[str]) -> Dict[str, Any]:
-    r = _resolve_round_index(ws, round_sel)
+    r = resolve_round_index_from_state(ws.state_path, round_sel)
     path = ws.round_dir(r) / "round_ctx.json"
     if not path.exists():
         raise OpalError(f"round_ctx.json not found for round {r} at {path}")

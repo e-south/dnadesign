@@ -10,11 +10,6 @@ Dunlop Lab
 
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-from mpl_toolkits.axes_grid1 import axes_size, make_axes_locatable
-
 from ..core.stderr_filter import maybe_install_pyarrow_sysctl_filter
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
@@ -44,6 +39,11 @@ def _import_pyarrow():
     ),
 )
 def render(context, params: dict) -> None:
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    from mpl_toolkits.axes_grid1 import axes_size, make_axes_locatable
+
     arrow_pc, ds = _import_pyarrow()
     # ---- Parameters (assertive, yet simple to change) ----
     # Source is now *observed* labels (ledger.labels) instead of predictions.

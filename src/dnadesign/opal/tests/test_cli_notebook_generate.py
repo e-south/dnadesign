@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
 
-from ._cli_helpers import write_campaign_yaml, write_records
+from ._cli_helpers import write_campaign_yaml, write_ledger, write_ledger_labels, write_records
 
 
 def test_notebook_generate_smoke(tmp_path: Path) -> None:
@@ -35,6 +35,7 @@ def test_notebook_generate_smoke(tmp_path: Path) -> None:
             str(campaign),
             "--out",
             str(out_path),
+            "--no-validate",
         ],
     )
     assert res.exit_code == 0, res.stdout
@@ -52,3 +53,63 @@ def test_notebook_generate_smoke(tmp_path: Path) -> None:
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         assert hasattr(module, "app")
+
+
+def test_notebook_generate_requires_ledger_by_default(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+    )
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "notebook",
+            "generate",
+            "-c",
+            str(campaign),
+        ],
+    )
+    assert res.exit_code != 0, res.output
+    assert "Missing runs sink" in res.output
+
+
+def test_notebook_generate_rejects_unknown_round(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+    )
+    write_ledger(workdir, run_id="run-0", round_index=0)
+    write_ledger_labels(workdir, round_index=0)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "notebook",
+            "generate",
+            "-c",
+            str(campaign),
+            "--round",
+            "7",
+        ],
+    )
+    assert res.exit_code != 0, res.output
+    assert "Available rounds" in res.output

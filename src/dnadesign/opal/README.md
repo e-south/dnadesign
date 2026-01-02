@@ -77,6 +77,7 @@ opal plot -c path/to/campaign.yaml --quick    # run default plots without plots.
 opal predict -c path/to/campaign.yaml               # uses latest round
 opal objective-meta -c campaign.yaml --round latest
 opal notebook generate -c path/to/campaign.yaml     # create a marimo analysis notebook
+opal notebook generate -c path/to/campaign.yaml --no-validate  # scaffold before any runs
 
 # (Optional) Start fresh: remove OPAL-derived columns from records.parquet
 opal prune-source -c path/to/campaign.yaml --scope campaign

@@ -12,8 +12,6 @@ from __future__ import annotations
 
 from typing import List
 
-import matplotlib.pyplot as plt
-
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import load_events_with_setpoint, resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta, scale_to_sizes, scatter_smart
@@ -47,6 +45,8 @@ from ._param_utils import (
     ),
 )
 def render(context, params: dict) -> None:
+    import matplotlib.pyplot as plt
+
     outputs_dir = resolve_outputs_dir(context)
 
     score_field = get_str(params, ["score_field"], "pred__y_obj_scalar")

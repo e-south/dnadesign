@@ -16,6 +16,7 @@ from typing import Optional
 
 import typer
 
+from ...core.rounds import resolve_round_index_from_state
 from ...core.utils import ExitCodes, OpalError, ensure_dir, print_stdout
 from ...registries.models import load_model
 from ...storage.state import CampaignState
@@ -32,7 +33,7 @@ def cmd_model_show(
     model_path: Optional[Path] = typer.Option(None, "--model-path"),
     out_dir: Optional[Path] = typer.Option(None, "--out-dir"),
     config: Optional[Path] = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
-    round: Optional[int] = typer.Option(None, "--round", "-r", help="Round index; default = latest"),
+    round: Optional[str] = typer.Option(None, "--round", "-r", help="Round selector: int or 'latest'."),
     model_name: Optional[str] = typer.Option(
         None,
         "--model-name",
@@ -62,11 +63,10 @@ def cmd_model_show(
             rounds = sorted(st.rounds, key=lambda r: int(r.round_index))
             if not rounds:
                 raise OpalError(f"No rounds found in {st_path}")
-            entry = (
-                next((r for r in rounds if int(r.round_index) == int(round)), None) if round is not None else rounds[-1]
-            )
+            round_sel = resolve_round_index_from_state(st_path, round)
+            entry = next((r for r in rounds if int(r.round_index) == int(round_sel)), None)
             if entry is None:
-                raise OpalError(f"Round {round} not found in {st_path}")
+                raise OpalError(f"Round {round_sel} not found in {st_path}")
             # Prefer recorded artifact path; fallback to conventional path
             mp = Path(entry.model.get("artifact_path", "")) if entry.model else None
             if not mp or not mp.exists():

@@ -17,26 +17,13 @@ from typing import Optional
 
 import typer
 
+from ...core.rounds import resolve_round_index_from_state
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...reporting.summary import load_round_log, summarize_round_log
-from ...storage.state import CampaignState
 from ...storage.workspace import CampaignWorkspace
 from ..formatting import render_round_log_summary_human
 from ..registry import cli_command
 from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path
-
-
-def _resolve_round_index(ws: CampaignWorkspace, round_sel: Optional[str]) -> int:
-    sel = (round_sel or "latest").strip().lower()
-    if sel in ("latest", "unspecified"):
-        st = CampaignState.load(ws.state_path)
-        if not st.rounds:
-            raise OpalError("state.json has no recorded rounds.")
-        return int(max(r.round_index for r in st.rounds))
-    try:
-        return int(sel)
-    except Exception as e:
-        raise OpalError("Invalid --round: must be an integer or 'latest'.") from e
 
 
 @cli_command("log", help="Summarize round.log.jsonl for a given round.")
@@ -49,7 +36,7 @@ def cmd_log(
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)
         ws = CampaignWorkspace.from_config(cfg, cfg_path)
-        r = _resolve_round_index(ws, round)
+        r = resolve_round_index_from_state(ws.state_path, round)
         path = ws.round_dir(r) / "round.log.jsonl"
         events = load_round_log(path)
         summary = summarize_round_log(events)

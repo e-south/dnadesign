@@ -14,7 +14,6 @@ from pathlib import Path
 
 import typer
 
-from ...config import load_config
 from ...core.utils import ExitCodes, OpalError, ensure_dir, file_sha256, print_stdout
 from ...storage.state import CampaignState
 from ..formatting import render_init_human
@@ -22,6 +21,7 @@ from ..registry import cli_command
 from ._common import (
     internal_error,
     json_out,
+    load_cli_config,
     opal_error,
     print_config_context,
     resolve_config_path,
@@ -36,7 +36,7 @@ def cmd_init(
 ):
     try:
         cfg_path = resolve_config_path(config)
-        cfg = load_config(cfg_path)
+        cfg = load_cli_config(cfg_path)
         if not json:
             print_config_context(cfg_path, cfg=cfg)
         workdir = Path(cfg.campaign.workdir)

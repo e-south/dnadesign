@@ -15,6 +15,7 @@ from typing import Optional
 
 import typer
 
+from ...core.rounds import resolve_round_index_from_state
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...reporting.status import build_status
 from ..formatting import render_status_human
@@ -42,28 +43,26 @@ def cmd_status(
         cfg = load_cli_config(cfg_path)
         if not json:
             print_config_context(cfg_path, cfg=cfg)
+        if all and round is not None:
+            raise OpalError("Provide only one of --all or --round.")
         ledger_reader = None
+        from ...storage.workspace import CampaignWorkspace
+
+        ws = CampaignWorkspace.from_config(cfg, cfg_path)
         if with_ledger:
             from ...storage.ledger import LedgerReader
-            from ...storage.workspace import CampaignWorkspace
 
-            ws = CampaignWorkspace.from_config(cfg, cfg_path)
             ledger_reader = LedgerReader(ws)
-        round_sel = None if round is None else str(round).strip().lower()
-        if round_sel in (None, "", "latest", "unspecified"):
-            round_k = None
-        else:
-            try:
-                round_k = int(round_sel)
-            except Exception as e:
-                raise OpalError("Invalid --round: must be an integer or 'latest'.") from e
+        round_k = resolve_round_index_from_state(ws.state_path, round) if round is not None else None
         st = build_status(
-            Path(cfg.campaign.workdir) / "state.json",
+            ws.state_path,
             round_k=round_k,
             show_all=all,
             ledger_reader=ledger_reader,
             include_ledger=with_ledger,
         )
+        if "error" in st:
+            raise OpalError(str(st["error"]))
         if json or all:
             json_out(st)
         else:

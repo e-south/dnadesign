@@ -175,6 +175,7 @@ opal predict --config <yaml> \
 
 **Notes**
 
+* `--model-path` and `--round` are mutually exclusive; passing both is an error.
 * Defaults to `records.parquet` when `--in` is omitted.
 * Writes CSV to stdout by default; use `--out` for CSV/Parquet files (Parquet keeps vectors as list<float>).
 
@@ -206,7 +207,7 @@ Inspect a saved model; optionally dump full feature importances.
 
 ```bash
 opal model-show \
-  [--model-path <path> | --config <yaml> --round <r>] \
+  [--model-path <path> | --config <yaml> --round <k|latest>] \
   [--model-name <registry_name> --model-params <params.json>] \
   [--out-dir <dir>]
 ```
@@ -215,7 +216,7 @@ opal model-show \
 
 * `--model-path`: Path to `model.joblib` (overrides `--config/--round`).
 * `--config, -c`: Path to `campaign.yaml` (required if resolving from `state.json`).
-* `--round, -r`: Round index to resolve model (default: latest).
+* `--round, -r`: Round selector (integer or `latest`) to resolve model.
 * `--model-name` / `--model-params`: Required if `model_meta.json` is missing.
 * `--out-dir`: Write `feature_importance_full.csv` and print top-20 in JSON.
 
@@ -226,12 +227,12 @@ List objective metadata and diagnostic keys for a round.
 **Usage**
 
 ```bash
-opal objective-meta --config <yaml> [--round <k|latest>] [--profile|--no-profile]
+opal objective-meta --config <yaml-or-dir> [--round <k|latest>] [--profile|--no-profile]
 ```
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (directories are only supported for `opal plot`).
+* `--config, -c`: Path to `campaign.yaml` (directories supported for `opal plot`, `opal notebook`, `opal objective-meta`).
 * `--round, -r`: Round selector (integer or `latest`).
 * `--profile/--no-profile`: Compute hue/size suitability stats (default: off).
 
@@ -396,7 +397,7 @@ opal plot --config <yaml-or-dir> --quick
 
 **Flags**
 
-* `--config, -c`: Campaign YAML or campaign directory (**only** `plot` supports directories).
+* `--config, -c`: Campaign YAML or campaign directory.
 * `--plot-config`: Path to a plots YAML (overrides `plot_config` in campaign.yaml).
 * `--list`: List registered plot kinds and exit (does not require config).
 * `--list-config`: List plots configured in YAML and exit (requires `--config`).
@@ -423,13 +424,15 @@ Generate or run a campaign-tied marimo notebook for interactive analysis.
 **Usage**
 
 ```bash
-opal notebook generate --config <yaml-or-dir> [--round <latest|k>] [--out <path>] [--force]
+opal notebook generate --config <yaml-or-dir> [--round <latest|k>] [--out <path>] [--force] [--validate/--no-validate]
 opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
 ```
 
 **Notes**
 
 * `generate` writes a marimo notebook that loads ledger artifacts (runs/predictions/labels).
+* By default, `generate` validates ledger artifacts exist. Use `--no-validate` to scaffold a notebook before any runs.
+* When `--validate` is on, `--round` must exist in ledger runs (otherwise use `--no-validate`).
 * `run` launches `marimo edit` if marimo is installed; otherwise it prints install guidance.
 
 **Campaign YAML (example)**
@@ -568,7 +571,8 @@ You can often omit `--config` thanks to **auto-discovery**. The CLI tries, in or
 
 If `$OPAL_CONFIG` or `.opal/config` is set but invalid, OPAL exits with an error (no silent fallback).
 Marker paths are resolved **relative to the campaign workdir**.
-Passing a **directory** to `--config` is only supported for `opal plot`; other commands require a YAML file.
+Passing a **directory** to `--config` is supported for `opal plot`, `opal notebook`, and
+`opal objective-meta`; other commands require a YAML file.
 The `.opal/` folder is a lightweight marker created by `opal init` and contains a single `config` file
 pointing to `campaign.yaml`. It is safe to delete and will be regenerated.
 `plot_config` paths are resolved **relative to the campaign.yaml** that declares them.

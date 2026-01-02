@@ -15,6 +15,7 @@ from pathlib import Path
 
 import typer
 
+from ...core.rounds import resolve_round_index
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...runtime.predict import run_predict_ephemeral
 from ...storage.state import CampaignState
@@ -64,40 +65,53 @@ def cmd_predict(
     try:
         import pandas as pd
 
-        cfg = load_cli_config(resolve_config_path(config))
+        cfg_path = resolve_config_path(config)
+        cfg = load_cli_config(cfg_path)
         store = store_from_cfg(cfg)
 
-        # Resolve model_path if not provided
-        def _parse_round_sel(val: str | None) -> int | None:
-            if val is None:
-                return None
-            if isinstance(val, str) and val.strip().lower() in ("latest", "unspecified"):
-                return None
-            try:
-                return int(val)
-            except Exception as exc:
-                raise OpalError("Invalid --round selector. Use an integer or 'latest'.") from exc
+        if model_path is not None and round is not None:
+            raise OpalError("Use only one of --model-path or --round (they are mutually exclusive).")
 
+        if model_path is not None:
+            model_path = Path(model_path)
+            if not model_path.exists():
+                raise OpalError(f"--model-path not found: {model_path}")
+            if model_path.is_dir():
+                raise OpalError(f"--model-path must be a file, got directory: {model_path}")
+
+        if input_path is not None:
+            input_path = Path(input_path)
+            if not input_path.exists():
+                raise OpalError(f"--in not found: {input_path}")
+            if input_path.is_dir():
+                raise OpalError(f"--in must be a file, got directory: {input_path}")
+
+        # Resolve model_path if not provided
         if model_path is None:
             st_path = Path(cfg.campaign.workdir) / "state.json"
             if not st_path.exists():
                 raise OpalError("Provide --model-path or run from a campaign with state.json.")
             st = CampaignState.load(st_path)
             rounds = sorted(st.rounds, key=lambda r: int(r.round_index))
-            if not rounds:
-                raise OpalError(f"No rounds found in {st_path}")
-            round_sel = _parse_round_sel(round)
-            entry = (
-                next((r for r in rounds if int(r.round_index) == int(round_sel)), None)
-                if round_sel is not None
-                else rounds[-1]
+            round_values = [int(r.round_index) for r in rounds]
+            round_sel = resolve_round_index(
+                round,
+                rounds=round_values,
+                allow_none=False,
+                empty_message=f"No rounds found in {st_path}",
+                param_label="--round",
             )
+            entry = next((r for r in rounds if int(r.round_index) == int(round_sel)), None)
             if entry is None:
                 raise OpalError(f"Round {round} not found in {st_path}")
             mp = Path(entry.model.get("artifact_path", "")) if entry.model else None
             if not mp or not mp.exists():
                 mp = Path(entry.round_dir) / "model.joblib"
             model_path = mp
+        if model_path is None or not Path(model_path).exists():
+            raise OpalError(f"Resolved model path not found: {model_path}")
+        if Path(model_path).is_dir():
+            raise OpalError(f"Resolved model path must be a file, got directory: {model_path}")
         df = (
             store.load()
             if input_path is None

@@ -12,13 +12,16 @@ from __future__ import annotations
 
 import json as _json
 import os
+from typing import TYPE_CHECKING
 
-import matplotlib.pyplot as plt
-import numpy as np
+if TYPE_CHECKING:
+    import numpy as np
 
 
 def _apply_perf_rcparams() -> None:
     # Cheap wins for large point clouds
+    import matplotlib.pyplot as plt
+
     plt.rcParams["agg.path.chunksize"] = int(os.getenv("OPAL_MPL_PATH_CHUNKSIZE", "10000"))
     plt.rcParams["path.simplify"] = True
     plt.rcParams["path.simplify_threshold"] = 0.0  # keep geometry intact
@@ -31,6 +34,8 @@ def scatter_smart(ax, x, y, *, s=16, alpha=0.85, rasterize_at=None, edgecolors="
 
     No downsampling here (no fallbacks); just a drawing-mode choice.
     """
+    import numpy as np
+
     _apply_perf_rcparams()
     x = np.asarray(x, dtype=np.float32)  # halves memory vs float64
     y = np.asarray(y, dtype=np.float32)
@@ -73,6 +78,8 @@ def scale_to_sizes(values, *, s_min: float = 10.0, s_max: float = 60.0, clip=Non
     Map a numeric vector to point sizes in [s_min, s_max].
     Non-finite → s_min. If the vector is (near-)constant, return s_min.
     """
+    import numpy as np
+
     v = np.asarray(values, dtype=np.float32).ravel()
     mask = np.isfinite(v)
     v = v.copy()
@@ -149,6 +156,8 @@ def swarm_smart(
     Memory-conscious jittered swarm. Deterministically subsamples per group and
     draws with rasterization when large.
     """
+    import numpy as np
+
     rng = np.random.default_rng(int(seed))
     total = 0
     for gi, (xi, yy) in enumerate(zip(list(x_positions), list(y_by_group))):

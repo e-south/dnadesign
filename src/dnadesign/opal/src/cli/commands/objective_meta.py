@@ -15,6 +15,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import typer
 
+from ...core.config_resolve import resolve_campaign_config_path
+from ...core.rounds import resolve_round_index_from_runs
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...storage.ledger import LedgerReader
 from ...storage.workspace import CampaignWorkspace
@@ -23,8 +25,8 @@ from ._common import (
     internal_error,
     json_out,
     load_cli_config,
+    opal_error,
     print_config_context,
-    resolve_config_path,
     store_from_cfg,
 )
 
@@ -60,7 +62,7 @@ def cmd_objective_meta(
         import pyarrow.compute as pc
         from pyarrow import dataset as ds
 
-        cfg_path = resolve_config_path(config)
+        cfg_path = resolve_campaign_config_path(config, allow_dir=True)
         cfg = load_cli_config(cfg_path)
         store = store_from_cfg(cfg)
         if not json:
@@ -81,20 +83,13 @@ def cmd_objective_meta(
             ]
         )
         if rtab.empty:
-            raise typer.Exit(code=1)
+            raise OpalError("No runs found in ledger.runs.parquet. Run `opal run ...` first.")
 
         # Pick round (supports 'latest' or an integer)
-        rsel = None if round is None else str(round).strip().lower()
-        if rsel in (None, "", "latest"):
-            as_of = int(rtab["as_of_round"].max())
-        else:
-            try:
-                as_of = int(rsel)
-            except ValueError as e:
-                raise typer.BadParameter("Invalid --round: must be an integer or 'latest'") from e
-        rsel = rtab[rtab["as_of_round"] == as_of]
+        as_of = resolve_round_index_from_runs(rtab, round)
+        rsel = rtab[rtab["as_of_round"] == int(as_of)]
         if rsel.empty:
-            raise typer.Exit(code=1)
+            raise OpalError(f"No runs found for as_of_round={int(as_of)}.")
         # Use last (most recent) run_id at that round
         rsel = rsel.sort_values(["run_id"]).tail(1).iloc[0]
 
@@ -281,6 +276,9 @@ def cmd_objective_meta(
                             f"  • {name:24s} dtype={dtype:8s} cov_pred={covp:6.2%} cov_ds={covd:6.2%}  {rng_str}{flag_str}"  # noqa
                         )
 
+    except OpalError as e:
+        opal_error("objective-meta", e)
+        raise typer.Exit(code=e.exit_code)
     except typer.Exit:
         raise
     except Exception as e:

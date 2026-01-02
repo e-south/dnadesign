@@ -165,17 +165,16 @@ def cmd_validate(config: Path = typer.Option(None, "--config", "-c", envvar="OPA
         except OpalError as e:
             raise OpalError(f"label_hist validation failed: {e}")
 
-        print_stdout("OK: validation passed.")
-
-        # Hint when the user is not inside the campaign workspace
+        # Emit a single, clear success line (with a note if CWD is outside workdir).
+        msg = "OK: validation passed."
         try:
             cwd = Path.cwd().resolve()
             wd = Path(cfg.campaign.workdir).resolve()
             if wd not in cwd.parents and cwd != wd:
-                print_stdout(f"OK: validation passed. (Note: your CWD '{cwd}' is outside campaign workdir '{wd}')")
-                return
+                msg = f"{msg} (Note: your CWD '{cwd}' is outside campaign workdir '{wd}')"
         except Exception:
             pass
+        print_stdout(msg)
 
     except OpalError as e:
         opal_error("validate", e)

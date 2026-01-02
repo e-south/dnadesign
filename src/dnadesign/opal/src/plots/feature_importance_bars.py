@@ -17,15 +17,15 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple
-
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
+from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta, log_kv
+
+if TYPE_CHECKING:
+    import numpy as np
+    import pandas as pd
 
 # -----------------------------
 # Helpers (pure, testable)
@@ -58,6 +58,9 @@ def _read_fi_csv(path: Path, round_idx: int) -> pd.DataFrame:
     Strict CSV loader: requires columns {'feature_index','importance'}, no NaNs,
     and unique feature_index. Adds 'as_of_round' and '__order__' columns.
     """
+    import numpy as np
+    import pandas as pd
+
     df = pd.read_csv(path)
     want = {"feature_index", "importance"}
     missing = sorted(list(want - set(df.columns)))
@@ -116,6 +119,8 @@ def _resolve_order(frames: List[pd.DataFrame], policy: str) -> List[int]:
       - "preserve"   : require identical order across rounds; use order of first frame
       - "sort_index" : require identical feature sets; order by ascending feature_index
     """
+    import numpy as np
+
     policy = str(policy or "preserve").strip().lower()
     if policy not in {"preserve", "sort_index"}:
         raise ValueError("order_policy must be 'preserve' or 'sort_index'.")
@@ -180,6 +185,10 @@ def render(context, params: dict) -> None:
       - ylabel: str
       - order_policy: "preserve" | "sort_index"  (default "preserve")
     """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+
     # ---- Parameters
     alpha = float(params.get("alpha", 0.45))
     if not (0.0 < alpha <= 1.0):

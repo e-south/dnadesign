@@ -31,7 +31,7 @@ import yaml
 
 from ...analysis.facade import CampaignAnalysis, parse_round_selector, round_suffix
 from ...config.loader import resolve_path_like
-from ...core.utils import print_stdout
+from ...core.utils import OpalError, print_stdout
 from ...plots._context import PlotContext
 from ...registries.plots import get_plot, get_plot_meta, list_plots
 from ...storage.workspace import CampaignWorkspace
@@ -358,7 +358,7 @@ def cmd_plot(
                 print_stdout(bullet_list("Notes", meta.notes))
         return
 
-    if list_registry and not list_config and config is None and not quick:
+    if list_registry and not list_config:
         rows = []
         for name in list_plots():
             meta = get_plot_meta(name)
@@ -461,7 +461,10 @@ def cmd_plot(
 
     tag_filters = [str(t) for t in (tag or [])]
 
-    rounds_sel = parse_round_selector(round)
+    try:
+        rounds_sel = parse_round_selector(round)
+    except OpalError as e:
+        raise typer.BadParameter(str(e), param_hint="--round") from e
     suffix = round_suffix(rounds_sel)
 
     # Built-in data sources (auto-injected if present)

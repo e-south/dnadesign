@@ -10,9 +10,6 @@ Dunlop Lab
 
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
-import numpy as np
-
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import load_events_with_setpoint, resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta, scale_to_sizes, swarm_smart
@@ -34,6 +31,9 @@ from ._param_utils import event_columns_for, get_str, normalize_metric_field
     ),
 )
 def render(context, params: dict) -> None:
+    import matplotlib.pyplot as plt
+    import numpy as np
+
     threshold = float(params.get("threshold", 0.8))
     mode = str(params.get("mode", "both")).lower()  # "line" | "violin" | "both"
     violin_alpha = float(params.get("violin_alpha", 0.5))

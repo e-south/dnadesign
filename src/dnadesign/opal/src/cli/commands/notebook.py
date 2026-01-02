@@ -19,8 +19,9 @@ from typing import Optional
 
 import typer
 
-from ...analysis.facade import CampaignAnalysis
+from ...analysis.facade import CampaignAnalysis, ensure_labels_path, ensure_predictions_dir, ensure_runs_path
 from ...analysis.notebook_template import render_campaign_notebook
+from ...core.rounds import resolve_round_index_from_runs
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ..registry import cli_group
 from ._common import internal_error, opal_error, print_config_context
@@ -46,20 +47,34 @@ def cmd_notebook_generate(
         help="Output notebook path (default: <workdir>/notebooks/opal_<slug>_analysis.py).",
     ),
     force: bool = typer.Option(False, "--force", help="Overwrite if the notebook already exists."),
+    validate: bool = typer.Option(
+        True,
+        "--validate/--no-validate",
+        help="Validate ledger artifacts exist before generating the notebook.",
+    ),
 ) -> None:
     try:
         analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
         cfg = analysis.config
         ws = analysis.workspace
 
-        round_sel = (round or "latest").strip().lower()
-        if round_sel not in ("latest", ""):
+        round_sel_raw = (round or "latest").strip().lower()
+        if round_sel_raw in ("", "latest"):
+            round_sel = "latest"
+        else:
             try:
-                int(round_sel)
+                round_val = int(round_sel_raw)
             except Exception as e:
                 raise OpalError("Invalid --round: must be an integer or 'latest'.") from e
-        if round_sel == "":
-            round_sel = "latest"
+            round_sel = str(round_val)
+
+        if validate:
+            ensure_runs_path(ws.ledger_runs_path)
+            ensure_predictions_dir(ws.ledger_predictions_dir)
+            ensure_labels_path(ws.ledger_labels_path)
+            runs_df = analysis.read_runs()
+            # Validate requested round exists (or at least that runs are available for "latest").
+            resolve_round_index_from_runs(runs_df, round_sel)
 
         default_out = ws.workdir / "notebooks" / f"opal_{cfg.campaign.slug}_analysis.py"
         out_path = Path(out) if out is not None else default_out
