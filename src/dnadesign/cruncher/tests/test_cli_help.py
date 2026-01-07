@@ -7,6 +7,7 @@ Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -26,12 +27,18 @@ from dnadesign.cruncher.cli.config_resolver import (
 )
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mK]")
 runner = CliRunner()
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "workspaces" / "demo" / "config.yaml"
 
 
 def invoke_cli(args: list[str], env: dict[str, str] | None = None):
     return runner.invoke(app, args, env=env, color=False)
+
+
+def combined_output(result) -> str:
+    stderr = getattr(result, "stderr", "")
+    return ANSI_RE.sub("", f"{result.output}{stderr}")
 
 
 def invoke_isolated(args: list[str], env: dict[str, str] | None = None):
@@ -71,13 +78,13 @@ def test_workspaces_list_includes_demo() -> None:
 def test_fetch_motifs_requires_tf_or_motif_id() -> None:
     result = invoke_cli(["fetch", "motifs", str(CONFIG_PATH)])
     assert result.exit_code != 0
-    assert "Provide at least one --tf or --motif-id" in result.output
+    assert "Provide at least one --tf or --motif-id" in combined_output(result)
 
 
 def test_catalog_show_requires_source_ref() -> None:
     result = invoke_cli(["catalog", "show", str(CONFIG_PATH), "badref"])
     assert result.exit_code != 0
-    assert "Expected <source>:<motif_id>" in result.output
+    assert "Expected <source>:<motif_id>" in combined_output(result)
 
 
 def test_status_requires_config_with_hint() -> None:
