@@ -11,7 +11,8 @@ and easy to extend.
 - plots (quick + configured)
 - where artifacts and ledgers live
 
-> Prefer a self-contained demo without USR datasets? Use `campaigns/audit_demo/`.
+This demo is **self-contained**: it ships with a local `records.parquet` and
+label CSVs under `inputs/`, so no USR setup is required.
 
 ---
 
@@ -28,7 +29,7 @@ uv run opal validate -c campaign.yaml
 
 # 2) Ingest round-0 labels
 uv run opal ingest-y -c campaign.yaml --round 0 \
-  --csv ../../../usr/demo_material/demo_y_sfxi.csv
+  --csv inputs/r0/demo_y_sfxi.csv
 
 # 3) Train, score, select (round 0)
 uv run opal run -c campaign.yaml --round 0
@@ -54,9 +55,9 @@ MPLCONFIGDIR=$PWD/.tmp/mpl OPAL_SUPPRESS_PYARROW_SYSCTL=1 \
 
 ### Data used here (demo)
 
-- **USR dataset**: `usr/datasets/demo/records.parquet`
+- **Local dataset**: `src/dnadesign/opal/campaigns/demo/records.parquet`
   - contains `sequence`, `mock__X_value`, and a placeholder label column.
-- **Experimental labels**: `usr/demo_material/demo_y_sfxi.csv`
+- **Experimental labels**: `src/dnadesign/opal/campaigns/demo/inputs/r0/demo_y_sfxi.csv`
   - includes `intensity_log2_offset_delta` (strict delta match).
 
 **8-vector label convention**
@@ -67,6 +68,20 @@ Y = [v00, v10, v01, v11, y00*, y10*, y01*, y11*]
 
 The demo CSV includes **`intensity_log2_offset_delta`** (constant) so the
 `SFXI` transform can enforce a strict match between data and objective params.
+
+---
+
+### Optional: swap to a USR dataset
+
+If you want to exercise the same workflow against a USR dataset later, update
+`campaign.yaml`:
+
+```yaml
+data:
+  location: { kind: usr, path: ../../../usr/datasets, dataset: demo }
+```
+
+The rest of the demo stays the same.
 
 ---
 
@@ -197,22 +212,6 @@ interactive filtering and plots for the selected run.
 
 ---
 
-### Optional: audit_demo (self-contained)
-
-`campaigns/audit_demo/` ships with a local `records.parquet` and labels under
-`inputs/`. It's ideal if you don't want to use USR datasets.
-
-```bash
-cd src/dnadesign/opal/campaigns/audit_demo/
-uv run opal init -c campaign.yaml
-uv run opal validate -c campaign.yaml
-uv run opal ingest-y -c campaign.yaml --round 0 --csv inputs/r0/demo_y_sfxi.csv
-uv run opal run -c campaign.yaml --round 0
-uv run opal plot -c campaign.yaml
-```
-
----
-
 ### Demo `campaign.yaml` (current, canonical)
 
 ```yaml
@@ -224,7 +223,7 @@ campaign:
   workdir: "."  # resolved relative to this file
 
 data:
-  location: { kind: usr, path: ../../../usr/datasets, dataset: demo }
+  location: { kind: local, path: records.parquet }
   x_column_name: "mock__X_value"
   y_column_name: "mock__y_label"
   y_expected_length: 8

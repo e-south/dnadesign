@@ -6,7 +6,7 @@ campaign:
   workdir: "."  # resolved relative to this file
 
 data:
-  location: { kind: usr, path: ../../../usr/datasets, dataset: demo }
+  location: { kind: local, path: records.parquet }
   x_column_name: "mock__X_value"
   y_column_name: "mock__y_label"
   y_expected_length: 8
