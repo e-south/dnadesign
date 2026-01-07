@@ -16,7 +16,7 @@ Demo columns (namespaced):
 Usage (CLI):
   usr make-mock <dataset> [--n 100] [--length 60] [--x-dim 512] [--y-dim 8]
                      [--seed 7] [--namespace demo]
-                     [--from-csv template_demo/template_sequences.csv]
+                     [--from-csv demo_material/demo_sequences.csv]
   usr add-demo-cols <dataset> [--x-dim 512] [--y-dim 8] [--seed 7]
                         [--namespace demo] [--allow-overwrite]
 
@@ -72,7 +72,7 @@ def make_mock_table(spec: MockSpec) -> pa.Table:
 
     # ----- Essential columns -----
     if spec.csv_path is not None:
-        # Harmonize with template_demo: use exact sequences from CSV
+        # Harmonize with demo_material: use exact sequences from CSV
         seqs_raw = _load_sequences_from_csv(Path(spec.csv_path))
         # If user passed --n, honor it by truncating; otherwise use all
         n_rows = spec.n if spec.n and spec.n <= len(seqs_raw) else len(seqs_raw)

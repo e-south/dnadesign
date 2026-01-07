@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -140,8 +141,8 @@ def _prompt_pick_parquet(cands: list[Path], use_rich: bool) -> Path | None:
             return cands[k - 1]
     except Exception:
         pass
-    print(f"Invalid selection. Using newest: {cands[0].name}")
-    return cands[0]
+    print("Invalid selection. Aborted.")
+    return None
 
 
 def cmd_repair_densegen(args):
@@ -238,8 +239,8 @@ def _prompt_pick_dataset(root: Path, names: list[str], use_rich: bool) -> str | 
             return names[k - 1]
     except Exception:
         pass
-    print(f"Invalid selection. Using: {names[0]}")
-    return names[0]
+    print("Invalid selection. Aborted.")
+    return None
 
 
 def _resolve_dataset_name_interactive(root: Path, dataset: str | None, use_rich: bool) -> str | None:
@@ -339,7 +340,38 @@ def _resolve_path_anywhere(p: Path) -> Path:
     return p
 
 
+def _hoist_global_args(argv: list[str]) -> list[str]:
+    """
+    Allow global flags (--root/--rich/--no-rich) anywhere in argv by hoisting them
+    ahead of subcommands. This preserves argparse's subparser behavior.
+    """
+    hoisted: list[str] = []
+    rest: list[str] = []
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg.startswith("--root="):
+            hoisted.append(arg)
+            i += 1
+            continue
+        if arg == "--root":
+            if i + 1 < len(argv):
+                hoisted.extend([arg, argv[i + 1]])
+                i += 2
+                continue
+        if arg in {"--rich", "--no-rich"}:
+            hoisted.append(arg)
+            i += 1
+            continue
+        rest.append(arg)
+        i += 1
+    return hoisted + rest
+
+
 def main() -> None:
+    from .stderr_filter import maybe_install_pyarrow_sysctl_filter
+
+    maybe_install_pyarrow_sysctl_filter()
     # --- argparse with Rich-styled --help everywhere ---
     p = argparse.ArgumentParser(
         prog="usr",
@@ -418,6 +450,18 @@ def main() -> None:
     )
     sp_att.add_argument("--columns", default="")
     sp_att.add_argument("--allow-overwrite", action="store_true")
+    sp_att.add_argument(
+        "--allow-missing",
+        action="store_true",
+        help="Skip rows that cannot be matched to dataset ids (explicitly allow partial matches).",
+    )
+    sp_att.add_argument(
+        "--parse-json",
+        dest="parse_json",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Parse JSON-like strings in incoming values (default: on).",
+    )
     sp_att.add_argument("--note", default="")
     sp_att.set_defaults(func=cmd_attach)
 
@@ -508,6 +552,36 @@ def main() -> None:
     sp_desc.add_argument("--max-list-items", type=int, default=6)
     sp_desc.add_argument("--precision", type=int, default=4)
     sp_desc.set_defaults(func=cmd_describe)
+
+    sp_plot = sp.add_parser(
+        "plot",
+        add_help=False,
+        help="Generate basic analysis plots",
+        description="Generate basic analysis plots",
+    )
+    _add_rich_help(sp_plot)
+    sp_plot.add_argument(
+        "dataset",
+        nargs="?",
+        default=None,
+        help="Dataset name (optional if run inside a dataset folder)",
+    )
+    sp_plot.add_argument(
+        "--out",
+        type=Path,
+        required=False,
+        help="Output directory for plots (required unless --list)",
+    )
+    sp_plot.add_argument(
+        "--which",
+        action="append",
+        default=[],
+        help="Plot name to run (repeatable). Use --list to see options.",
+    )
+    sp_plot.add_argument("--list", action="store_true", help="List available plots and exit")
+    sp_plot.add_argument("--sample", type=int, default=5000, help="Max rows to sample for plotting (0 = all)")
+    sp_plot.add_argument("--seed", type=int, default=7, help="Random seed for sampling")
+    sp_plot.set_defaults(func=cmd_plot)
 
     sp_cell = sp.add_parser(
         "cell",
@@ -930,7 +1004,8 @@ def main() -> None:
     sp_push.set_defaults(func=cmd_push)
 
     # --------------- dispatch ----------------
-    args = p.parse_args()
+    argv = _hoist_global_args(sys.argv[1:])
+    args = p.parse_args(argv)
     try:
         args.func(args)
     except UserAbort:
@@ -1125,8 +1200,8 @@ def cmd_import(args):
     try:
         cmd = f"usr import {args.dataset} --from {args.source_format} --path {in_path} --bio-type {args.bio_type} --alphabet {args.alphabet}"  # noqa
         d.append_meta_note(f"Imported {n} records from {in_path}", cmd)
-    except Exception:
-        pass
+    except Exception as e:
+        _warn_meta_note_failure("import", e)
 
 
 def cmd_attach(args):
@@ -1139,15 +1214,29 @@ def cmd_attach(args):
         id_col=args.id_col,
         columns=cols,
         allow_overwrite=bool(args.allow_overwrite),
+        allow_missing=bool(args.allow_missing),
+        parse_json=bool(args.parse_json),
         note=args.note,
     )
-    print(f"Attached {n} matched row(s) of {args.namespace} columns into {d.name} (input file: {in_path})")
+    msg = f"Attached {n} matched row(s) of {args.namespace} columns into {d.name} (input file: {in_path})"
+    if args.allow_missing:
+        msg += " (unmatched rows skipped; see .events.log for counts)"
+    print(msg)
     try:
         cols = args.columns or "(all columns)"
-        cmd = f'usr attach {args.dataset} --path {in_path} --namespace {args.namespace} --id-col {args.id_col} --columns "{cols}"'  # noqa
+        cmd = (
+            f"usr attach {args.dataset} --path {in_path} --namespace {args.namespace} "
+            f'--id-col {args.id_col} --columns "{cols}"'
+        )
+        if args.allow_overwrite:
+            cmd += " --allow-overwrite"
+        if args.allow_missing:
+            cmd += " --allow-missing"
+        if not args.parse_json:
+            cmd += " --no-parse-json"
         d.append_meta_note(f"Attached columns under '{args.namespace}' ({n} row match)", cmd)
-    except Exception:
-        pass
+    except Exception as e:
+        _warn_meta_note_failure("attach", e)
 
 
 # ---------------- error formatting (actionable nudges) ----------------
@@ -1188,6 +1277,10 @@ def _print_user_error(e: SequencesError) -> None:
     hint = getattr(e, "hint", None)
     if hint:
         print(f"Hint: {hint}")
+
+
+def _warn_meta_note_failure(action: str, err: Exception) -> None:
+    print(f"WARNING: failed to append meta.md note for {action}: {err}", file=sys.stderr)
 
 
 def cmd_info(args):
@@ -1426,6 +1519,42 @@ def cmd_describe(args):
         _print_df(df)
 
 
+def cmd_plot(args):
+    from .analysis import get_plot, list_plots
+
+    if bool(getattr(args, "list", False)):
+        for spec in sorted(list_plots(), key=lambda s: s.name):
+            print(f"{spec.name}: {spec.description}")
+        return
+
+    ds_name = _resolve_dataset_name_interactive(
+        args.root, getattr(args, "dataset", None), bool(getattr(args, "rich", False))
+    )
+    if not ds_name:
+        return
+    d = Dataset(args.root, ds_name)
+    tbl = pq.read_table(d.records_path)
+    df = tbl.to_pandas()
+
+    sample_n = int(getattr(args, "sample", 0) or 0)
+    if sample_n > 0 and len(df) > sample_n:
+        df = df.sample(n=sample_n, random_state=int(getattr(args, "seed", 7)))
+
+    if args.out is None:
+        raise SequencesError("Missing --out. Provide an output directory for plots (or use --list).")
+
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    requested = [s.strip() for s in (args.which or []) if s.strip()]
+    names = requested or [s.name for s in list_plots()]
+    for name in names:
+        spec = get_plot(name)
+        out_path = out_dir / f"{spec.name}.png"
+        spec.plot_fn(df, out_path)
+        print(f"[ok] {spec.name} -> {out_path}")
+
+
 def cmd_cell(args):
     # Determine target path: --path, or positional, or dataset name
     path_arg = getattr(args, "path", None)
@@ -1531,8 +1660,8 @@ def cmd_snapshot(args):
     print(f"Snapshot saved under {d.snapshot_dir}")
     try:
         d.append_meta_note("Snapshot saved", f"usr snapshot {ds_name}")
-    except Exception:
-        pass
+    except Exception as e:
+        _warn_meta_note_failure("snapshot", e)
 
 
 def cmd_convert_legacy(args):
@@ -1575,8 +1704,8 @@ def cmd_make_mock(args):
         src = f"--from-csv {spec.csv_path}" if spec.csv_path else f"--length {spec.length}"
         cmd = f"usr make-mock {args.dataset} --n {spec.n} {src} --namespace {spec.namespace} --x-dim {spec.x_dim} --y-dim {spec.y_dim}"  # noqa
         Dataset(args.root, args.dataset).append_meta_note("Created mock dataset", cmd)
-    except Exception:
-        pass
+    except Exception as e:
+        _warn_meta_note_failure("make-mock", e)
 
 
 # ---------- add-demo-cols ----------
@@ -1597,8 +1726,8 @@ def cmd_add_demo(args):
     try:
         cmd = f"usr add-demo-cols {args.dataset} --x-dim {args.x_dim} --y-dim {args.y_dim} --namespace {args.namespace}"
         Dataset(args.root, args.dataset).append_meta_note("Added demo columns", cmd)
-    except Exception:
-        pass
+    except Exception as e:
+        _warn_meta_note_failure("add-demo-cols", e)
 
 
 # ---------- MERGE DATASETS ----------

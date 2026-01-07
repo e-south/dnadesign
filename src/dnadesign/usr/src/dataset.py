@@ -331,27 +331,23 @@ class Dataset:
         if self.records_path.exists():
             existing = read_parquet(self.records_path)
             # -------- case-insensitive duplicate check vs existing on disk --------
-            try:
-                ex_bt = [str(x) for x in existing.column("bio_type").to_pylist()]
-                ex_sq = [str(x) for x in existing.column("sequence").to_pylist()]
-                existing_cf = {(bt.lower(), sq.upper()) for bt, sq in zip(ex_bt, ex_sq)}
-                conflicts = [
-                    i
-                    for i, (bt, s) in enumerate(zip(bio.astype(str).tolist(), seqs), start=1)
-                    if (bt.lower(), s.upper()) in existing_cf
+            ex_bt = [str(x) for x in existing.column("bio_type").to_pylist()]
+            ex_sq = [str(x) for x in existing.column("sequence").to_pylist()]
+            existing_cf = {(bt.lower(), sq.upper()) for bt, sq in zip(ex_bt, ex_sq)}
+            conflicts = [
+                i
+                for i, (bt, s) in enumerate(zip(bio.astype(str).tolist(), seqs), start=1)
+                if (bt.lower(), s.upper()) in existing_cf
+            ]
+            if conflicts:
+                preview = [
+                    DuplicateGroup(id=ids[i - 1], count=1, rows=[i], sequence=seqs[i - 1]) for i in conflicts[:5]
                 ]
-                if conflicts:
-                    preview = [
-                        DuplicateGroup(id=ids[i - 1], count=1, rows=[i], sequence=seqs[i - 1]) for i in conflicts[:5]
-                    ]
-                    raise DuplicateIDError(
-                        "Case-insensitive duplicate sequences already exist in this dataset.",
-                        casefold_groups=preview,
-                        hint="Run 'usr dedupe-sequences <dataset>' or remove duplicates from the import file.",
-                    )
-            except Exception:
-                # Don’t mask unrelated errors; limit to pretty-preview failure only.
-                pass
+                raise DuplicateIDError(
+                    "Case-insensitive duplicate sequences already exist in this dataset.",
+                    casefold_groups=preview,
+                    hint="Run 'usr dedupe-sequences <dataset>' or remove duplicates from the import file.",
+                )
             existing_ids = set(existing.column("id").to_pylist())
             inter = existing_ids.intersection(set(out_df["id"].tolist()))
             if inter:
@@ -436,6 +432,8 @@ class Dataset:
         id_col: str = "id",
         columns: Optional[Iterable[str]] = None,
         allow_overwrite: bool = False,
+        allow_missing: bool = False,
+        parse_json: bool = True,
         note: str = "",
     ) -> int:
         """
@@ -445,8 +443,8 @@ class Dataset:
         - `namespace` must match `^[a-z][a-z0-9_]*$`
         - Essential columns are immutable
         - Overwriting existing columns requires `allow_overwrite=True`
-        - Values align by `id`; unknown ids are ignored; missing values become NULL
-        - Strings that look like JSON arrays are parsed (generic vector support)
+        - Values align by `id`; missing/ambiguous ids raise unless `allow_missing=True`
+        - Strings that look like JSON arrays/objects are parsed when `parse_json=True`
 
         Supported input formats: .parquet, .csv, .jsonl
         """
@@ -468,40 +466,62 @@ class Dataset:
         if id_col not in inc.columns:
             raise SchemaError(f"Missing id column '{id_col}' in incoming data.")
 
+        rows_incoming = int(len(inc))
+
         # Choose + prefix targets
         attach_cols = [c for c in inc.columns if c != id_col] if columns is None else list(columns)
         if not attach_cols:
             return 0
 
-        # Parse JSON arrays/objects if given as strings (robust to whitespace and single quotes)
-        def _maybe_parse_json_str(x):
-            if not isinstance(x, str):
-                return x
-            s = x.strip()
+        work = inc[[id_col] + attach_cols].copy()
+
+        def _normalize_optional_str(x: object) -> Optional[str]:
+            if x is None:
+                return None
+            s = str(x).strip()
             if not s:
-                return x
-            # Fast path: JSON array/object
+                return None
+            if s.lower() in {"nan", "none"}:
+                return None
+            return s
+
+        def _parse_jsonish(v: object, col: str, row_idx: int) -> object:
+            if not parse_json:
+                return v
+            if not isinstance(v, str):
+                return v
+            s = v.strip()
+            if not s:
+                return v
             if s.startswith("[") or s.startswith("{"):
                 try:
                     return json.loads(s)
                 except Exception:
-                    # try a very small fix for single-quoted CSV-y lists
+                    # try a small fix for single-quoted CSV-y lists
                     if s.startswith("[") and ("'" in s) and ('"' not in s):
                         try:
                             return json.loads(s.replace("'", '"'))
                         except Exception:
-                            return x
-                    return x
-            return x
+                            pass
+                    raise SchemaError(
+                        f"Column '{col}' row {row_idx}: invalid JSON-like value. "
+                        "Provide valid JSON or pass --no-parse-json."
+                    )
+            return v
 
-        work = inc[[id_col] + attach_cols].copy()
-        for c in attach_cols:
-            work[c] = work[c].map(_maybe_parse_json_str)
+        if parse_json:
+            for col in attach_cols:
+                vals = work[col].tolist()
+                parsed = [_parse_jsonish(v, col, i) for i, v in enumerate(vals, start=1)]
+                work[col] = parsed
 
         def target_name(c: str) -> str:
             return c if c.startswith(namespace + "__") else f"{namespace}__{c}"
 
         targets = [target_name(c) for c in attach_cols]
+
+        rows_missing = 0
+        rows_ambiguous = 0
 
         # --- Map sequence → id if requested ---
         existing_tbl = read_parquet(self.records_path, columns=["id", "sequence", "bio_type"])
@@ -516,28 +536,60 @@ class Dataset:
                 pair_to_id[(bt, seq)] = rid
                 seq_to_ids.setdefault(seq, []).append(rid)
 
-            incoming_seq = work[id_col].astype(str).map(lambda s: s.strip()).tolist()
+            incoming_seq = [_normalize_optional_str(s) for s in work[id_col].tolist()]
             incoming_type = (
-                inc["bio_type"].astype(str).tolist() if "bio_type" in inc.columns else [None] * len(incoming_seq)
+                [_normalize_optional_str(bt) for bt in inc["bio_type"].tolist()]
+                if "bio_type" in inc.columns
+                else [None] * len(incoming_seq)
             )
             resolved: List[Optional[str]] = []
-            for bt, seq in zip(incoming_type, incoming_seq):
-                rid: Optional[str] = None
-                if bt is not None and (bt, seq) in pair_to_id:
-                    rid = pair_to_id[(bt, seq)]
-                else:
-                    ids = seq_to_ids.get(seq, [])
-                    if len(ids) == 1:
-                        rid = ids[0]
+            missing_rows: List[int] = []
+            ambiguous_rows: List[int] = []
+            for idx, (bt, seq) in enumerate(zip(incoming_type, incoming_seq), start=1):
+                if seq is None:
+                    missing_rows.append(idx)
+                    resolved.append(None)
+                    continue
+                if bt is not None:
+                    rid = pair_to_id.get((bt, seq))
+                    if rid is None:
+                        missing_rows.append(idx)
+                        resolved.append(None)
                     else:
-                        # ambiguous or missing → leave None (row will be dropped)
-                        rid = None
-                resolved.append(rid)
+                        resolved.append(rid)
+                    continue
+                ids = seq_to_ids.get(seq, [])
+                if len(ids) == 1:
+                    resolved.append(ids[0])
+                elif len(ids) == 0:
+                    missing_rows.append(idx)
+                    resolved.append(None)
+                else:
+                    ambiguous_rows.append(idx)
+                    resolved.append(None)
+
+            if ambiguous_rows:
+                sample = ", ".join(str(i) for i in ambiguous_rows[:5])
+                raise SchemaError(
+                    f"Ambiguous sequence→id mapping for {len(ambiguous_rows)} row(s) (rows: {sample}). "
+                    f"Run 'usr dedupe-sequences {self.name}' or supply a bio_type column."
+                )
+            if missing_rows and not allow_missing:
+                sample = ", ".join(str(i) for i in missing_rows[:5])
+                raise SchemaError(
+                    f"{len(missing_rows)} row(s) could not be matched by sequence (rows: {sample}). "
+                    "Provide a valid bio_type or pass --allow-missing to skip unmatched rows."
+                )
+
+            rows_missing = len(missing_rows)
+            rows_ambiguous = len(ambiguous_rows)
+            if missing_rows:
+                keep_mask = [rid is not None for rid in resolved]
+                work = work[keep_mask].reset_index(drop=True)
+                resolved = [rid for rid in resolved if rid is not None]
 
             work.insert(0, "id", resolved)
             work = work.drop(columns=[id_col])  # remove 'sequence' identifier column
-            # Drop rows that couldn't be matched to an existing id
-            work = work[work["id"].notna()].reset_index(drop=True)
             # Rename incoming columns to namespaced targets (mirror the --id-col 'id' path)
             work.columns = ["id"] + targets
         else:
@@ -562,6 +614,22 @@ class Dataset:
         id_existing = existing_tbl.column("id").to_pylist()
         nrows = len(id_existing)
         pos = {rid: i for i, rid in enumerate(id_existing)}
+
+        id_series_raw = [str(r) for r in work["id"].tolist()]
+        missing_mask = [rid not in pos for rid in id_series_raw]
+        missing_ids = [rid for rid, missing in zip(id_series_raw, missing_mask) if missing]
+        if missing_ids:
+            if not allow_missing:
+                sample = ", ".join(missing_ids[:5])
+                raise SchemaError(
+                    f"{len(missing_ids)} row(s) reference ids not present in the dataset (sample: {sample}). "
+                    "Fix the input file or pass --allow-missing to skip unmatched rows."
+                )
+            rows_missing += len(missing_ids)
+            work = work[[not m for m in missing_mask]].reset_index(drop=True)
+            id_series = [rid for rid, missing in zip(id_series_raw, missing_mask) if not missing]
+        else:
+            id_series = id_series_raw
 
         # ---------- robust null/typing helpers ----------
 
@@ -610,7 +678,6 @@ class Dataset:
             return pa.array(cleaned)
 
         # id->value map per target (latest wins)
-        id_series = [str(r) for r in work["id"].tolist()]
         maps: Dict[str, Dict[str, object]] = {}
         for col in targets:
             colvals = work[col].tolist()
@@ -645,7 +712,7 @@ class Dataset:
         # Atomic write
         write_parquet_atomic(new_tbl, self.records_path, self.snapshot_dir)
 
-        n_attached = int(work.shape[0])
+        rows_matched = int(work.shape[0])
         append_event(
             self.events_path,
             {
@@ -655,11 +722,15 @@ class Dataset:
                 "namespace": namespace,
                 "columns": targets,
                 "allow_overwrite": allow_overwrite,
-                "rows_seen": n_attached,
+                "rows_incoming": rows_incoming,
+                "rows_matched": rows_matched,
+                "rows_missing": rows_missing,
+                "rows_ambiguous": rows_ambiguous,
+                "rows_seen": rows_matched,  # legacy alias
                 "note": note,
             },
         )
-        return n_attached
+        return rows_matched
 
     # Friendly alias for didactic API name in README/examples
     def attach_columns(
@@ -670,6 +741,8 @@ class Dataset:
         id_col: str = "id",
         columns: Optional[Iterable[str]] = None,
         allow_overwrite: bool = False,
+        allow_missing: bool = False,
+        parse_json: bool = True,
         note: str = "",
     ) -> int:
         return self.attach(
@@ -678,6 +751,8 @@ class Dataset:
             id_col=id_col,
             columns=columns,
             allow_overwrite=allow_overwrite,
+            allow_missing=allow_missing,
+            parse_json=parse_json,
             note=note,
         )
 

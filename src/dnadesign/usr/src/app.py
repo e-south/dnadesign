@@ -134,6 +134,9 @@ def diff(
 
 
 def main() -> None:
+    from .stderr_filter import maybe_install_pyarrow_sysctl_filter
+
+    maybe_install_pyarrow_sysctl_filter()
     try:
         app()
     except KeyboardInterrupt:

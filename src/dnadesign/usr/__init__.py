@@ -15,9 +15,9 @@ Default layout (editable install):
       ├─ datasets/          # <-- dataset root used by the CLI by default
       │    └─ <dataset_name>/
       │         ├─ records.parquet
-      │         ├─ meta.yaml
+      │         ├─ meta.md
       │         └─ _snapshots/
-      └─ template_demo/     # example CSVs for README walkthrough
+      └─ demo_material/     # example CSVs for README walkthrough
 
 You can override the root on the CLI via --root, or when using the Python API:
     from pathlib import Path
@@ -25,8 +25,8 @@ You can override the root on the CLI via --root, or when using the Python API:
     ds = Dataset(root, "mock_dataset")
     ds.init(source="example")
 
-See README.md for a CLI walkthrough and notes on the optional console-script
-aliases ("usr" and "USR") defined in pyproject.toml.
+See README.md for a CLI walkthrough and the console script entrypoint ("usr")
+defined in pyproject.toml.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

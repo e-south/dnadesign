@@ -21,7 +21,7 @@ usr/
 │         ├─ meta.md             # human notes + command snippets
 │         ├─ .events.log         # append‑only JSONL event stream
 │         └─ _snapshots/         # rolling copies of records.parquet
-└─ template_demo/                # example CSVs used in this README
+└─ demo_material/                # example CSVs used in this README
 ````
 
 ---
@@ -69,6 +69,8 @@ Demo inputs in this repo:
 * Attachments: `usr/demo_material/demo_attachment_{one|two}.csv`
 * OPAL labels (SFXI vec8): `usr/demo_material/demo_y_sfxi.csv` (includes `intensity_log2_offset_delta`)
 
+**macOS note:** set `USR_SUPPRESS_PYARROW_SYSCTL=1` to silence PyArrow `sysctlbyname` warnings.
+
 **Create a dataset**
 
 ```bash
@@ -101,6 +103,8 @@ Examples of resulting columns:
 * `mock__y_label` → list<float> (nullable)
 
 > Re‑attaching the same columns requires `--allow-overwrite`.
+> By default, unmatched ids/sequences raise an error; use `--allow-missing` to skip unmatched rows.
+> JSON‑like strings are parsed by default; pass `--no-parse-json` to keep raw strings.
 
 **Inspect & validate**
 
@@ -123,6 +127,27 @@ usr validate demo --strict
 ```bash
 usr describe demo --sample 2048
 ```
+
+## Analysis & plots
+
+Generate quick diagnostic plots (PNG). Plots are explicit and extensible; run
+`usr plot --list` to see available plot names.
+
+> If you see Matplotlib cache warnings, set `MPLCONFIGDIR` to a writable
+> directory (e.g., `export MPLCONFIGDIR="$PWD/.cache/matplotlib"`).
+
+```bash
+usr plot --list
+usr plot demo --out usr/datasets/demo/plots --which length_hist --which gc_hist
+```
+
+Outputs include:
+
+* `length_hist.png`
+* `gc_hist.png`
+* `gc_vs_length.png`
+* `nulls_by_column.png`
+* `namespace_coverage.png`
 
 **Fetch a single record by id (pretty table)**
 
@@ -147,6 +172,17 @@ usr snapshot demo   # writes records-YYYYMMDDThhmmss.parquet under _snapshots/
 ```
 
 ---
+
+## Interactive notebook (marimo)
+
+There is a marimo notebook for interactive exploration (filters + plots):
+
+```bash
+uv sync --locked --group notebooks
+uv run marimo edit --sandbox --watch src/dnadesign/usr/notebooks/usr_explorer.py
+```
+
+Use the widgets to choose a dataset, sample size, and plot panels.
 
 ### Path‑first tools (work on files or directories anywhere)
 

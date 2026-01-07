@@ -86,8 +86,9 @@ def load_all(custom: Optional[Path] = None) -> Dict[str, SSHRemoteConfig]:
     remotes = {}
     for name, rec in (data.get("remotes") or {}).items():
         if (rec or {}).get("type", "ssh") != "ssh":
-            # We only support SSH for now (explicitly)
-            continue
+            raise RemoteConfigError(
+                f"Remote '{name}' has unsupported type '{rec.get('type')}'. Only 'ssh' is supported."
+            )
         try:
             remotes[name] = SSHRemoteConfig(
                 name=name,
