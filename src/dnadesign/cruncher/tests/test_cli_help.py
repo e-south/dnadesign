@@ -30,12 +30,16 @@ runner = CliRunner()
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "workspaces" / "demo" / "config.yaml"
 
 
+def invoke_cli(args: list[str], env: dict[str, str] | None = None):
+    return runner.invoke(app, args, env=env, color=False)
+
+
 def invoke_isolated(args: list[str], env: dict[str, str] | None = None):
     merged_env = {NONINTERACTIVE_ENV_VAR: "1"}
     if env:
         merged_env.update(env)
     with runner.isolated_filesystem():
-        return runner.invoke(app, args, env=merged_env)
+        return invoke_cli(args, env=merged_env)
 
 
 @pytest.fixture(autouse=True)
@@ -50,7 +54,7 @@ def _clear_workspace_env(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_root_help_includes_command_descriptions() -> None:
-    result = runner.invoke(app, ["--help"])
+    result = invoke_cli(["--help"])
     assert result.exit_code == 0
     assert "fetch" in result.output
     assert "Fetch motifs/sites" in result.output
@@ -59,19 +63,19 @@ def test_root_help_includes_command_descriptions() -> None:
 
 
 def test_workspaces_list_includes_demo() -> None:
-    result = runner.invoke(app, ["workspaces", "list"])
+    result = invoke_cli(["workspaces", "list"])
     assert result.exit_code == 0
     assert "demo" in result.output
 
 
 def test_fetch_motifs_requires_tf_or_motif_id() -> None:
-    result = runner.invoke(app, ["fetch", "motifs", str(CONFIG_PATH)])
+    result = invoke_cli(["fetch", "motifs", str(CONFIG_PATH)])
     assert result.exit_code != 0
     assert "Provide at least one --tf or --motif-id" in result.output
 
 
 def test_catalog_show_requires_source_ref() -> None:
-    result = runner.invoke(app, ["catalog", "show", str(CONFIG_PATH), "badref"])
+    result = invoke_cli(["catalog", "show", str(CONFIG_PATH), "badref"])
     assert result.exit_code != 0
     assert "Expected <source>:<motif_id>" in result.output
 
@@ -83,13 +87,13 @@ def test_status_requires_config_with_hint() -> None:
 
 
 def test_sources_info_requires_args_with_hint() -> None:
-    result = runner.invoke(app, ["sources", "info"])
+    result = invoke_cli(["sources", "info"])
     assert result.exit_code != 0
     assert "Missing SOURCE" in result.output
 
 
 def test_sources_datasets_requires_args_with_hint() -> None:
-    result = runner.invoke(app, ["sources", "datasets"])
+    result = invoke_cli(["sources", "datasets"])
     assert result.exit_code != 0
     assert "Missing SOURCE" in result.output
 
@@ -116,7 +120,7 @@ def test_sources_list_auto_detects_config_in_cwd(tmp_path, monkeypatch) -> None:
     config_path.write_text(yaml.safe_dump(config))
     monkeypatch.chdir(tmp_path)
 
-    result = runner.invoke(app, ["sources", "list"])
+    result = invoke_cli(["sources", "list"])
     assert result.exit_code == 0
     assert "demo_local" in result.output
 
@@ -128,7 +132,7 @@ def test_config_requires_config_with_hint() -> None:
 
 
 def test_config_defaults_to_summary() -> None:
-    result = runner.invoke(app, ["config", str(CONFIG_PATH)])
+    result = invoke_cli(["config", str(CONFIG_PATH)])
     assert result.exit_code == 0
     assert "Cruncher config summary" in result.output
 
@@ -139,7 +143,7 @@ def test_analyze_hint_not_duplicated(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(analyze_workflow, "run_analyze", _boom)
 
-    result = runner.invoke(app, ["analyze", str(CONFIG_PATH)])
+    result = invoke_cli(["analyze", str(CONFIG_PATH)])
     assert result.exit_code != 0
     assert "No analysis runs configured" in result.output
     assert "Hint: set analysis.runs" not in result.output
@@ -171,10 +175,7 @@ def test_sources_summary_remote_error_is_user_friendly(tmp_path, monkeypatch) ->
 
     monkeypatch.setattr(sources_module, "summarize_remote", _boom)
 
-    result = runner.invoke(
-        app,
-        ["sources", "summary", "--scope", "remote", str(config_path)],
-    )
+    result = invoke_cli(["sources", "summary", "--scope", "remote", str(config_path)])
     assert result.exit_code != 0
     assert "Error: boom" in result.output
 
@@ -214,10 +215,7 @@ def test_sources_summary_cache_filters_source_and_titles(tmp_path) -> None:
     )
     index.save(tmp_path / ".cruncher")
 
-    result = runner.invoke(
-        app,
-        ["sources", "summary", "--scope", "cache", "--source", "regulondb", str(config_path)],
-    )
+    result = invoke_cli(["sources", "summary", "--scope", "cache", "--source", "regulondb", str(config_path)])
     assert result.exit_code == 0
     assert "Cache overview" in result.output
     assert "Cache regulators" in result.output
@@ -253,10 +251,7 @@ def test_sources_summary_requires_remote_limit_when_no_iter(tmp_path, monkeypatc
 
     monkeypatch.setattr(sources_module, "default_registry", lambda *args, **kwargs: StubRegistry())
 
-    result = runner.invoke(
-        app,
-        ["sources", "summary", "--scope", "remote", str(config_path)],
-    )
+    result = invoke_cli(["sources", "summary", "--scope", "remote", str(config_path)])
     assert result.exit_code != 0
     assert "--remote-limit" in result.output
     assert "stub" in result.output
@@ -287,19 +282,19 @@ def test_analyze_requires_config_with_hint() -> None:
 
 
 def test_catalog_show_requires_args_with_hint() -> None:
-    result = runner.invoke(app, ["catalog", "show"])
+    result = invoke_cli(["catalog", "show"])
     assert result.exit_code != 0
     assert "Missing REF" in result.output
 
 
 def test_report_requires_args_with_hint() -> None:
-    result = runner.invoke(app, ["report"])
+    result = invoke_cli(["report"])
     assert result.exit_code != 0
     assert "Missing RUN" in result.output
 
 
 def test_runs_show_requires_args_with_hint() -> None:
-    result = runner.invoke(app, ["runs", "show"])
+    result = invoke_cli(["runs", "show"])
     assert result.exit_code != 0
     assert "Missing RUN" in result.output
 
@@ -311,13 +306,13 @@ def test_runs_latest_requires_config_with_hint() -> None:
 
 
 def test_runs_watch_requires_args_with_hint() -> None:
-    result = runner.invoke(app, ["runs", "watch"])
+    result = invoke_cli(["runs", "watch"])
     assert result.exit_code != 0
     assert "Missing RUN" in result.output
 
 
 def test_analyze_list_plots_succeeds() -> None:
-    result = runner.invoke(app, ["analyze", "--list-plots", str(CONFIG_PATH)])
+    result = invoke_cli(["analyze", "--list-plots", str(CONFIG_PATH)])
     assert result.exit_code == 0
     assert "Analysis plot plan" in result.output
 
