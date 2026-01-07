@@ -11,7 +11,7 @@
 
 The pipeline is plugin-driven: swap **data transforms** (X/Y), **models**, **objectives**, and **selection** strategies in `campaign.yaml` without touching core code.
 
-> Using OPAL day-to-day? See the **[CLI Manual](./src/cli/README.md)**
+> Using OPAL day-to-day? See the **[CLI Manual](./docs/cli.md)**
 
 ---
 
@@ -37,6 +37,7 @@ The pipeline is plugin-driven: swap **data transforms** (X/Y), **models**, **obj
 
   * [Records schema](#records-schema)
   * [Ledger output schema](#ledger-output-schema-append-only)
+* [More documentation](#more-documentation)
 * [Demo campaign](#demo-campaign)
 
 
@@ -148,7 +149,7 @@ src/dnadesign/opal/src/
 
 ### CLI overview
 
-Common commands (details in the **[CLI Manual](./src/cli/README.md)**):
+Common commands (details in the **[CLI Manual](./docs/cli.md)**):
 
 * `opal init` — scaffold & register the campaign workspace; write `state.json` and ensure cache columns exist
 * `opal ingest-y` — transform and append labels to `records.parquet`
@@ -451,6 +452,19 @@ for long-term inspection and downstream analysis; avoid treating `records.parque
 * Treat `schema__version` as the compatibility guardrail when evolving outputs.
 
 ---
+
+## More documentation
+
+Centralized OPAL docs live in `docs/`:
+
+* [CLI manual](./docs/cli.md)
+* [Plots](./docs/plots.md)
+* [Models registry](./docs/models.md)
+* [Selection strategies](./docs/selection.md)
+* [X transforms](./docs/transforms-x.md)
+* [Y transforms](./docs/transforms-y.md)
+* [Setpoint fidelity x intensity](./docs/setpoint_fidelity_x_intensity.md)
+* [sponging_percent_of_positive (spop)](./docs/spop.md)
 
 ## Demo campaign
 
