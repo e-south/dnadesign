@@ -39,7 +39,7 @@ from ._param_utils import event_columns_for, get_float, get_str, normalize_metri
     ),
 )
 def render(context, params: dict) -> None:
-    ensure_mpl_config_dir(workdir=context.workspace.workdir)
+    ensure_mpl_config_dir(workdir=getattr(context.workspace, "workdir", None))
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd

@@ -179,7 +179,7 @@ def render(context, params: dict) -> None:
       - ylabel: str
       - order_policy: "preserve" | "sort_index"  (default "preserve")
     """
-    ensure_mpl_config_dir(workdir=context.workspace.workdir)
+    ensure_mpl_config_dir(workdir=getattr(context.workspace, "workdir", None))
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd

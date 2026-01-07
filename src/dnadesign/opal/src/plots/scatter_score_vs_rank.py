@@ -44,7 +44,7 @@ from ._param_utils import (
     ),
 )
 def render(context, params: dict) -> None:
-    ensure_mpl_config_dir(workdir=context.workspace.workdir)
+    ensure_mpl_config_dir(workdir=getattr(context.workspace, "workdir", None))
     import matplotlib.pyplot as plt
 
     outputs_dir = resolve_outputs_dir(context)

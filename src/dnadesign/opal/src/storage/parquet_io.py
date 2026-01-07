@@ -94,8 +94,24 @@ def write_parquet_df(
         raise OpalError("pandas.to_parquet with engine='pyarrow' failed.") from exc
 
 
+def _format_type(dtype) -> str:
+    pa = _pyarrow()[0]
+    if pa.types.is_list(dtype):
+        return f"list<{_format_type(dtype.value_type)}>"
+    if pa.types.is_large_list(dtype):
+        return f"large_list<{_format_type(dtype.value_type)}>"
+    if pa.types.is_fixed_size_list(dtype):
+        return f"fixed_size_list[{dtype.list_size}]<{_format_type(dtype.value_type)}>"
+    if pa.types.is_struct(dtype):
+        fields = ", ".join(f"{field.name}: {_format_type(field.type)}" for field in dtype)
+        return f"struct<{fields}>"
+    if pa.types.is_dictionary(dtype):
+        return f"dictionary<{_format_type(dtype.index_type)}, {_format_type(dtype.value_type)}>"
+    return str(dtype)
+
+
 def schema_signature(schema) -> list[tuple[str, str]]:
     """
     Stable, human-readable schema signature for error messages/comparisons.
     """
-    return [(field.name, str(field.type)) for field in schema]
+    return [(field.name, _format_type(field.type)) for field in schema]

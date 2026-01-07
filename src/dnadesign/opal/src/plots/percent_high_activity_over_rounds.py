@@ -30,7 +30,7 @@ from ._param_utils import event_columns_for, get_str, normalize_metric_field
     ),
 )
 def render(context, params: dict) -> None:
-    ensure_mpl_config_dir(workdir=context.workspace.workdir)
+    ensure_mpl_config_dir(workdir=getattr(context.workspace, "workdir", None))
     import matplotlib.pyplot as plt
     import numpy as np
 
