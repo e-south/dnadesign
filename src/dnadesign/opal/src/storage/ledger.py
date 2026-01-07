@@ -18,22 +18,17 @@ from uuid import uuid4
 import pandas as pd
 
 from .. import LEDGER_SCHEMA_VERSION
-from ..core.stderr_filter import maybe_install_pyarrow_sysctl_filter
 from ..core.utils import LedgerError, ensure_dir
+from .parquet_io import (
+    dataset_from_dir,
+    pyarrow_compute,
+    read_parquet_df,
+    schema_signature,
+    table_from_pandas,
+    write_parquet_df,
+    write_parquet_table,
+)
 from .workspace import CampaignWorkspace
-
-
-def _import_pyarrow():
-    maybe_install_pyarrow_sysctl_filter()
-    import pyarrow as pa
-    import pyarrow.compute as pc
-    import pyarrow.parquet as pq
-    from pyarrow import dataset as ds
-
-    return pa, pc, pq, ds
-
-
-pa, pc, pq, ds = _import_pyarrow()
 
 # ---- schema allow-lists (Ledger v1.1) ----
 ALLOW: dict[str, set[str]] = {
@@ -138,6 +133,13 @@ def _allow_extra_columns() -> bool:
     )
 
 
+def _assert_schema_match(existing_schema, new_schema, *, ctx: str) -> None:
+    if schema_signature(existing_schema) != schema_signature(new_schema):
+        existing_sig = schema_signature(existing_schema)
+        new_sig = schema_signature(new_schema)
+        raise LedgerError(f"{ctx} schema mismatch.\n  existing: {existing_sig}\n  new     : {new_sig}")
+
+
 def _validate_columns(df: pd.DataFrame, kind: str) -> None:
     allow = ALLOW.get(kind)
     required = REQUIRED.get(kind, set())
@@ -157,9 +159,9 @@ def _validate_columns(df: pd.DataFrame, kind: str) -> None:
 def _append_parquet_dedupe(path: Path, df: pd.DataFrame, *, key: Sequence[str]) -> None:
     ensure_dir(path.parent)
     if not path.exists():
-        df.to_parquet(path, index=False)
+        write_parquet_df(path, df, index=False)
         return
-    existing = pd.read_parquet(path)
+    existing = read_parquet_df(path)
     if list(existing.columns) != list(df.columns):
         raise LedgerError(
             f"Ledger sink schema mismatch.\n  existing: {list(existing.columns)}\n  new     : {list(df.columns)}"
@@ -167,7 +169,7 @@ def _append_parquet_dedupe(path: Path, df: pd.DataFrame, *, key: Sequence[str]) 
     out = pd.concat([existing, df], ignore_index=True)
     out = out.drop_duplicates(subset=list(key), keep="last")
     tmp = path.with_suffix(path.suffix + ".tmp")
-    out.to_parquet(tmp, index=False)
+    write_parquet_df(tmp, out, index=False)
     tmp.replace(path)
 
 
@@ -211,9 +213,12 @@ class LedgerWriter:
             if dup:
                 raise LedgerError("[ledger:run_pred] duplicate (run_id, id) rows are not allowed.")
         ensure_dir(self._paths.predictions_dir)
-        tbl = pa.Table.from_pandas(df, preserve_index=False)
+        tbl = table_from_pandas(df)
+        if any(self._paths.predictions_dir.glob("*.parquet")):
+            dset = dataset_from_dir(self._paths.predictions_dir)
+            _assert_schema_match(dset.schema, tbl.schema, ctx="[ledger:run_pred]")
         out = self._paths.predictions_dir / f"part-{uuid4().hex}.parquet"
-        pq.write_table(tbl, out)
+        write_parquet_table(out, tbl)
 
     def append_run_meta(self, df: pd.DataFrame) -> None:
         _ensure_event_value(df, "run_meta")
@@ -242,7 +247,7 @@ class LedgerReader:
     def predictions_schema_columns(self) -> list[str]:
         if not self._paths.predictions_dir.exists():
             raise LedgerError(f"Missing predictions sink: {self._paths.predictions_dir}")
-        dset = ds.dataset(str(self._paths.predictions_dir))
+        dset = dataset_from_dir(self._paths.predictions_dir)
         return [f.name for f in dset.schema]
 
     def read_predictions(
@@ -255,11 +260,12 @@ class LedgerReader:
     ) -> pd.DataFrame:
         if not self._paths.predictions_dir.exists():
             raise LedgerError(f"Missing predictions sink: {self._paths.predictions_dir}")
-        dset = ds.dataset(str(self._paths.predictions_dir))
+        dset = dataset_from_dir(self._paths.predictions_dir)
         cols = list(columns) if columns is not None else None
 
         filt = None
         if round_selector is not None:
+            pc = pyarrow_compute()
             if round_selector == "all":
                 filt = None
             elif round_selector in ("latest", "unspecified"):
@@ -273,9 +279,11 @@ class LedgerReader:
             else:
                 filt = pc.field("as_of_round") == int(round_selector)
         if run_id is not None:
+            pc = pyarrow_compute()
             cond = pc.field("run_id") == str(run_id)
             filt = cond if filt is None else (filt & cond)
         if id_value is not None:
+            pc = pyarrow_compute()
             cond = pc.field("id") == str(id_value)
             filt = cond if filt is None else (filt & cond)
 
@@ -285,9 +293,9 @@ class LedgerReader:
     def read_runs(self, *, columns: Optional[Iterable[str]] = None) -> pd.DataFrame:
         if not self._paths.runs_path.exists():
             raise LedgerError(f"Missing runs sink: {self._paths.runs_path}")
-        return pd.read_parquet(self._paths.runs_path, columns=list(columns) if columns else None)
+        return read_parquet_df(self._paths.runs_path, columns=list(columns) if columns else None)
 
     def read_labels(self, *, columns: Optional[Iterable[str]] = None) -> pd.DataFrame:
         if not self._paths.labels_path.exists():
             raise LedgerError(f"Missing labels sink: {self._paths.labels_path}")
-        return pd.read_parquet(self._paths.labels_path, columns=list(columns) if columns else None)
+        return read_parquet_df(self._paths.labels_path, columns=list(columns) if columns else None)

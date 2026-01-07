@@ -15,7 +15,7 @@ from ..core.stderr_filter import maybe_install_pyarrow_sysctl_filter
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
-from ._mpl_utils import annotate_plot_meta
+from ._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir
 
 if TYPE_CHECKING:
     import numpy as np
@@ -45,6 +45,7 @@ def _import_pyarrow():
     ),
 )
 def render(context, params: dict) -> None:
+    ensure_mpl_config_dir(workdir=context.workspace.workdir)
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd

@@ -12,8 +12,9 @@ from __future__ import annotations
 from typing import List
 
 from ..registries.plots import PlotMeta, register_plot
+from ..storage.parquet_io import read_parquet_df
 from ._events_util import load_events_with_setpoint, resolve_outputs_dir
-from ._mpl_utils import annotate_plot_meta, scale_to_sizes, scatter_smart
+from ._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir, scale_to_sizes, scatter_smart
 from ._param_utils import event_columns_for, get_float, get_str, normalize_metric_field
 
 
@@ -38,6 +39,7 @@ from ._param_utils import event_columns_for, get_float, get_str, normalize_metri
     ),
 )
 def render(context, params: dict) -> None:
+    ensure_mpl_config_dir(workdir=context.workspace.workdir)
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd
@@ -147,7 +149,7 @@ def render(context, params: dict) -> None:
                 "Categorical hue requested via 'records.<column>', but no 'records' path is available in the campaign."
             )
         # Only read what we need; restrict to ids present in df
-        rec = pd.read_parquet(rec_path, columns=["id", cat_hue_col])
+        rec = read_parquet_df(rec_path, columns=["id", cat_hue_col])
         rec = rec.rename(columns={cat_hue_col: "__cat_hue__"})
         df = df.merge(rec, on="id", how="left")
         cat_series = df["__cat_hue__"].fillna("(missing)").astype(str)

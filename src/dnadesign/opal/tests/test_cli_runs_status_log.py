@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_runs_status_log.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -39,7 +39,19 @@ def test_runs_list_and_show_json(tmp_path):
     runs = json.loads(res.stdout)
     assert any(r.get("run_id") == run_id for r in runs)
 
-    res = runner.invoke(app, ["--no-color", "runs", "show", "-c", str(campaign), "--run-id", run_id, "--json"])
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "runs",
+            "show",
+            "-c",
+            str(campaign),
+            "--run-id",
+            run_id,
+            "--json",
+        ],
+    )
     assert res.exit_code == 0, res.stdout
     row = json.loads(res.stdout)
     assert row["run_id"] == run_id

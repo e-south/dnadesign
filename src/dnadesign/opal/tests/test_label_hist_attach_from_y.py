@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_label_hist_attach_from_y.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -65,7 +65,16 @@ def test_label_hist_attach_from_y(tmp_path: Path) -> None:
 
     res = runner.invoke(
         app,
-        ["--no-color", "label-hist", "attach-from-y", "-c", str(campaign), "--round", "0", "--apply"],
+        [
+            "--no-color",
+            "label-hist",
+            "attach-from-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--apply",
+        ],
     )
     assert res.exit_code == 0, res.stdout
 

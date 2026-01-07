@@ -101,7 +101,17 @@ def load_round_log(path: Path) -> List[Dict[str, Any]]:
 def summarize_round_log(events: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     events = list(events)
     if not events:
-        return {"events": 0}
+        return {"events": 0, "events_total": 0, "run_count": 0}
+
+    run_count = sum(1 for e in events if e.get("stage") == "start")
+    events_total = len(events)
+    if run_count > 1:
+        last_start_idx = None
+        for i, e in enumerate(events):
+            if e.get("stage") == "start":
+                last_start_idx = i
+        if last_start_idx is not None:
+            events = events[last_start_idx:]
 
     stages: Dict[str, int] = {}
     ts_list: List[datetime] = []
@@ -137,6 +147,8 @@ def summarize_round_log(events: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
 
     return {
         "events": len(events),
+        "events_total": events_total,
+        "run_count": run_count,
         "stage_counts": stages,
         "predict_batches": predict_batches,
         "predict_rows": predict_rows,

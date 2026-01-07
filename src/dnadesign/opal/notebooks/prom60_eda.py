@@ -3355,6 +3355,9 @@ def _(
                     pad_inches=0.0,
                     facecolor="white",
                 )
+                from dnadesign.opal.src.plots._mpl_utils import ensure_mpl_config_dir
+
+                ensure_mpl_config_dir()
                 import matplotlib.pyplot as plt
 
                 plt.close(_fig)

@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_predict_yops_inversion.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -24,10 +24,22 @@ from ._cli_helpers import write_campaign_yaml, write_records, write_state
 def _train_model(model_path: Path) -> dict:
     X_train = np.array([[0.1, 0.2], [0.2, 0.3]])
     Y_train = np.array([[1.0], [2.0]])
-    model = RandomForestModel(params={"n_estimators": 5, "random_state": 1, "bootstrap": True, "oob_score": False})
+    model = RandomForestModel(
+        params={
+            "n_estimators": 5,
+            "random_state": 1,
+            "bootstrap": True,
+            "oob_score": False,
+        }
+    )
     model.fit(X_train, Y_train)
     model.save(str(model_path))
-    return {"model__name": "random_forest", "model__params": model.get_params(), "x_dim": 2, "y_dim": 1}
+    return {
+        "model__name": "random_forest",
+        "model__params": model.get_params(),
+        "x_dim": 2,
+        "y_dim": 1,
+    }
 
 
 def test_predict_requires_round_ctx_when_yops_present(tmp_path: Path) -> None:
@@ -47,13 +59,24 @@ def test_predict_requires_round_ctx_when_yops_present(tmp_path: Path) -> None:
 
     app = _build()
     runner = CliRunner()
-    res = runner.invoke(app, ["--no-color", "predict", "-c", str(campaign), "--model-path", str(model_path)])
+    res = runner.invoke(
+        app,
+        ["--no-color", "predict", "-c", str(campaign), "--model-path", str(model_path)],
+    )
     assert res.exit_code != 0
     assert "round_ctx.json is missing" in res.output
 
     res = runner.invoke(
         app,
-        ["--no-color", "predict", "-c", str(campaign), "--model-path", str(model_path), "--assume-no-yops"],
+        [
+            "--no-color",
+            "predict",
+            "-c",
+            str(campaign),
+            "--model-path",
+            str(model_path),
+            "--assume-no-yops",
+        ],
     )
     assert res.exit_code == 0, res.output
     assert "y_pred_vec" in res.output
@@ -162,7 +185,16 @@ def test_predict_rejects_unsupported_out_extension(tmp_path: Path) -> None:
     runner = CliRunner()
     res = runner.invoke(
         app,
-        ["--no-color", "predict", "-c", str(campaign), "--round", "latest", "--out", str(out_path)],
+        [
+            "--no-color",
+            "predict",
+            "-c",
+            str(campaign),
+            "--round",
+            "latest",
+            "--out",
+            str(out_path),
+        ],
     )
     assert res.exit_code != 0, res.output
     assert "must be a CSV or Parquet file" in res.output

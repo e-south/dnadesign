@@ -22,7 +22,11 @@ from dnadesign.opal.src import __version__ as OPAL_VERSION
 from dnadesign.opal.src.storage.ledger import LedgerWriter
 from dnadesign.opal.src.storage.state import CampaignState, RoundEntry
 from dnadesign.opal.src.storage.workspace import CampaignWorkspace
-from dnadesign.opal.src.storage.writebacks import SelectionEmit, build_run_meta_event, build_run_pred_events
+from dnadesign.opal.src.storage.writebacks import (
+    SelectionEmit,
+    build_run_meta_event,
+    build_run_pred_events,
+)
 
 
 def write_records(
@@ -140,7 +144,11 @@ def write_state(
             number_of_candidates_scored_in_round=2,
             selection_top_k_requested=1,
             selection_top_k_effective_after_ties=1,
-            model={"type": "random_forest", "params": {}, "artifact_path": str(round_dir / "model.joblib")},
+            model={
+                "type": "random_forest",
+                "params": {},
+                "artifact_path": str(round_dir / "model.joblib"),
+            },
             metrics={},
             durations_sec={},
             seeds={},
@@ -198,7 +206,11 @@ def write_ledger(workdir: Path, *, run_id: str, round_index: int = 0) -> None:
         unc_mean_sd=None,
         pred_rows_df=run_pred,
         artifact_paths_and_hashes={},
-        objective_summary_stats={"score_min": 0.1, "score_median": 0.2, "score_max": 0.3},
+        objective_summary_stats={
+            "score_min": 0.1,
+            "score_median": 0.2,
+            "score_max": 0.3,
+        },
     )
     # Ensure required schema/version fields are present (build_run_meta_event already includes them)
     run_meta["schema__version"] = LEDGER_SCHEMA_VERSION

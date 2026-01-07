@@ -107,7 +107,7 @@ opal run --config <yaml> --round <r> \
 * `--round, -r, --labels-as-of`: Training cutoff (use labels with `observed_round ≤ r`).
 * `--k, -k`: Override `selection.params.top_k`.
 * `--score-batch-size`: Override `scoring.score_batch_size` for this run.
-* `--resume`: Allow overwriting existing per-round artifacts.
+* `--resume`: Allow overwriting existing per-round artifacts (required if `outputs/round_<r>/` already exists).
 * `--verbose/--quiet`: Control log verbosity (default: verbose).
 
 **Pipeline**
@@ -137,6 +137,12 @@ opal run --config <yaml> --round <r> \
   and artifact checksums).
 
 `pred__y_hat_model` is **objective-space** (after any Y‑ops inversion), so downstream logic is plugin‑agnostic.
+
+**Reruns & non-interactive mode**
+
+If you rerun a round that already exists in `state.json`, OPAL will prompt before overwriting. In non‑TTY
+contexts (e.g., CI), the prompt cannot be shown and the command will exit with a message instructing you to
+re‑run with `--resume`.
 
 **Write-backs to `records.parquet` (caches only)**
 
@@ -335,6 +341,10 @@ opal log --config <yaml> [--round <k|latest>]
 
 * `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
 * `--round, -r`: Round selector (integer or `latest`).
+
+**Notes**
+
+* If a round has been re-run (multiple `start` events in the same log), the summary focuses on the **latest run**.
 
 #### `validate`
 
@@ -607,11 +617,17 @@ Debug tip:
 export OPAL_DEBUG=1  # full tracebacks on internal errors
 ```
 
+Optional overrides:
+
+```bash
+export OPAL_TMPDIR=/path/to/writable/dir  # override OPAL tmp/cache dir (optional)
+```
+
 macOS tip (PyArrow noise):
 
 ```bash
-export OPAL_SUPPRESS_PYARROW_SYSCTL=1  # force suppression even when stderr is not a TTY
-export OPAL_SUPPRESS_PYARROW_SYSCTL=0  # show sysctlbyname warnings (disable suppression)
+# OPAL suppresses these warnings by default. To see raw warnings for debugging:
+export OPAL_SUPPRESS_PYARROW_SYSCTL=0
 ```
 
 ---

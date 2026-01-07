@@ -9,6 +9,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import atexit
 import os
 import sys
 import threading
@@ -68,26 +69,47 @@ def _install_stderr_filter(needles: Iterable[str]) -> None:
 
     t = threading.Thread(target=_reader, daemon=True, name="opal-stderr-filter")
     t.start()
+
+    def _cleanup() -> None:
+        if getattr(sys, "_opal_stderr_filter_cleaned", False):
+            return
+        setattr(sys, "_opal_stderr_filter_cleaned", True)
+        # Restore stderr to the original FD, which also closes the pipe writer.
+        try:
+            os.dup2(orig_fd, 2)
+        except Exception:
+            pass
+        # Give the reader a brief chance to flush remaining buffered lines.
+        try:
+            t.join(timeout=0.2)
+        except Exception:
+            pass
+        try:
+            os.close(orig_fd)
+        except Exception:
+            pass
+
+    atexit.register(_cleanup)
+    setattr(sys, "_opal_stderr_filter_cleanup", _cleanup)
     setattr(sys, "_opal_stderr_filter_installed", True)
 
 
 def maybe_install_pyarrow_sysctl_filter() -> None:
     """
     Suppress noisy PyArrow sysctlbyname warnings on macOS.
-    Default behavior: only when stderr is a TTY.
-    Override with OPAL_SUPPRESS_PYARROW_SYSCTL=1 to force suppression in non-TTY contexts,
-    or OPAL_SUPPRESS_PYARROW_SYSCTL=0 to disable suppression entirely.
+    Default behavior: suppress in both TTY and non-TTY contexts.
+    Override with OPAL_SUPPRESS_PYARROW_SYSCTL=0 to disable suppression (show raw warnings).
     """
     if sys.platform != "darwin":
         return
-    flag_raw = os.getenv("OPAL_SUPPRESS_PYARROW_SYSCTL")
-    flag = flag_raw.strip().lower() if flag_raw is not None else ""
-    if flag_raw is None or flag == "":
-        try:
-            if not sys.stderr.isatty():
-                return
-        except Exception:
-            return
-    elif flag in {"0", "false", "no"}:
+    flag_raw = os.getenv("OPAL_SUPPRESS_PYARROW_SYSCTL", "")
+    flag = flag_raw.strip().lower()
+    if flag in {"0", "false", "no", "off", "raw", "show"}:
         return
+    if flag not in {"", "1", "true", "yes", "on"}:
+        # Invalid override → be explicit but keep default (suppress).
+        print(
+            "Invalid OPAL_SUPPRESS_PYARROW_SYSCTL value. Expected 0/1/true/false/on/off/show/raw.",
+            file=sys.stderr,
+        )
     _install_stderr_filter(_PYARROW_SYSCTL_MATCH)

@@ -17,6 +17,7 @@ from typing import Any, Dict
 import pandas as pd
 
 from ..core.utils import ensure_dir, file_sha256
+from .parquet_io import write_parquet_df
 
 
 @dataclass
@@ -71,5 +72,5 @@ def write_model_meta(path: Path, meta: Dict[str, Any]) -> str:
 
 def write_labels_used_parquet(path: Path, df: pd.DataFrame) -> str:
     ensure_dir(path.parent)
-    df.to_parquet(path, index=False)
+    write_parquet_df(path, df, index=False)
     return file_sha256(path)

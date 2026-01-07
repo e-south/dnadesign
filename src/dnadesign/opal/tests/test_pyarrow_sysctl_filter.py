@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_pyarrow_sysctl_filter.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -58,7 +58,7 @@ def test_pyarrow_sysctl_filter_respects_opt_out(monkeypatch) -> None:
     assert calls["count"] == 0
 
 
-def test_pyarrow_sysctl_filter_skips_when_not_tty_and_env_unset(monkeypatch) -> None:
+def test_pyarrow_sysctl_filter_default_installs_when_env_unset(monkeypatch) -> None:
     from dnadesign.opal.src.core import stderr_filter as sf
 
     calls = {"count": 0}
@@ -78,7 +78,7 @@ def test_pyarrow_sysctl_filter_skips_when_not_tty_and_env_unset(monkeypatch) -> 
         delattr(sys, "_opal_stderr_filter_installed")
 
     sf.maybe_install_pyarrow_sysctl_filter()
-    assert calls["count"] == 0
+    assert calls["count"] == 1
 
 
 def test_pyarrow_sysctl_filter_forces_when_not_tty(monkeypatch) -> None:
@@ -102,3 +102,25 @@ def test_pyarrow_sysctl_filter_forces_when_not_tty(monkeypatch) -> None:
 
     sf.maybe_install_pyarrow_sysctl_filter()
     assert calls["count"] == 1
+
+
+def test_pyarrow_sysctl_filter_flushes_non_matching_lines(capfd) -> None:
+    from dnadesign.opal.src.core import stderr_filter as sf
+
+    if hasattr(sys, "_opal_stderr_filter_installed"):
+        delattr(sys, "_opal_stderr_filter_installed")
+    if hasattr(sys, "_opal_stderr_filter_cleanup"):
+        delattr(sys, "_opal_stderr_filter_cleanup")
+    if hasattr(sys, "_opal_stderr_filter_cleaned"):
+        delattr(sys, "_opal_stderr_filter_cleaned")
+
+    sf._install_stderr_filter(("arrow/util/cpu_info.cc", "sysctlbyname failed for"))
+    print("opal stderr passthrough", file=sys.stderr)
+    sys.stderr.flush()
+
+    cleanup = getattr(sys, "_opal_stderr_filter_cleanup", None)
+    assert cleanup is not None
+    cleanup()
+
+    captured = capfd.readouterr()
+    assert "opal stderr passthrough" in captured.err

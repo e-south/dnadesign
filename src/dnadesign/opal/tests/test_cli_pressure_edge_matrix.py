@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_pressure_edge_matrix.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -85,7 +85,17 @@ def test_cli_pressure_unknown_sequences_create_rows(tmp_path: Path) -> None:
     _write_labels_with_extras(labels, seqs=["AAA", "EEE"], ys=[0.2, 0.9], as_parquet=True)
     res = runner.invoke(
         app,
-        ["--no-color", "ingest-y", "-c", str(campaign), "--round", "0", "--csv", str(labels), "--yes"],
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(labels),
+            "--yes",
+        ],
     )
     assert res.exit_code == 0, res.stdout
     assert "unknown sequences" in res.stdout.lower() or "new sequences will be created" in res.stdout.lower()
@@ -139,7 +149,17 @@ def test_cli_pressure_if_exists_skip_keeps_history(tmp_path: Path) -> None:
     _write_labels_with_extras(labels0, seqs=["AAA"], ys=[0.2])
     res = runner.invoke(
         app,
-        ["--no-color", "ingest-y", "-c", str(campaign), "--round", "0", "--csv", str(labels0), "--yes"],
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(labels0),
+            "--yes",
+        ],
     )
     assert res.exit_code == 0, res.stdout
 

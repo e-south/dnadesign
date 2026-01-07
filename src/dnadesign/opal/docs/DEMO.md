@@ -8,20 +8,16 @@ This demo walks a **complete OPAL loop** on a small dataset with the SFXI ingest
 - plots (quick + configured)
 - where artifacts and ledgers live
 
-This demo is **self-contained**: it ships with a local `records.parquet` and
-label CSVs under `inputs/`, so no USR setup is required.
+This demo is **self-contained**: it ships with a local `records.parquet` and label CSVs under `inputs/`, so no USR setup is required.
 
 ---
 
-### TL;DR (happy path)
+### TL;DR
 
 From the repo root:
 
 ```bash
 cd src/dnadesign/opal/campaigns/demo/
-
-# (Optional) suppress PyArrow sysctl warnings in non-TTY contexts
-export OPAL_SUPPRESS_PYARROW_SYSCTL=1
 
 # 1) Initialize & validate
 uv run opal init     -c campaign.yaml
@@ -32,7 +28,7 @@ uv run opal ingest-y -c campaign.yaml --round 0 \
   --csv inputs/r0/demo_y_sfxi.csv
 
 # 3) Train, score, select (round 0)
-uv run opal run -c campaign.yaml --round 0
+uv run opal run -c campaign.yaml --round 0 --resume
 
 # 4) Inspect
 uv run opal status -c campaign.yaml
@@ -40,19 +36,18 @@ uv run opal runs list -c campaign.yaml
 uv run opal log -c campaign.yaml --round latest
 
 # 5) Plot
-MPLCONFIGDIR=$PWD/.tmp/mpl OPAL_SUPPRESS_PYARROW_SYSCTL=1 \
-  uv run opal plot -c campaign.yaml --quick
-MPLCONFIGDIR=$PWD/.tmp/mpl OPAL_SUPPRESS_PYARROW_SYSCTL=1 \
-  uv run opal plot -c campaign.yaml
+uv run opal plot -c campaign.yaml --quick
+uv run opal plot -c campaign.yaml
 ```
 
 **Notes:**
 - Use `uv run opal ...` to ensure the correct environment.
-- `MPLCONFIGDIR` avoids Matplotlib cache warnings and speeds imports.
+- If `outputs/round_0/` already exists (this repo ships with demo outputs), `opal run` will refuse to overwrite
+  unless you pass `--resume` or delete the existing artifacts first.
 
 ---
 
-### Data used here (demo)
+### Data used here
 
 - **Local dataset**: `src/dnadesign/opal/campaigns/demo/records.parquet`
   - contains `sequence`, `mock__X_value`, and a placeholder label column.
@@ -99,9 +94,9 @@ Campaign
 
 Latest round
   r              : 0
-  run_id         : r0-2026-01-02T18:48:11+00:00
-  n_train        : 9
-  n_scored       : 15
+  run_id         : r0-<timestamp>
+  n_train        : 6
+  n_scored       : 9
   top_k requested: 5
   top_k effective: 5
   round_dir      : <repo>/src/dnadesign/opal/campaigns/demo/outputs/round_0
@@ -111,10 +106,9 @@ Latest round
 
 ```
 Runs
-  - r=0, run_id=r0-2026-01-01T23:..., model=random_forest, objective=sfxi_v1,
-    selection=top_n, n_train=9, n_scored=15
-  - r=0, run_id=r0-2026-01-02T18:..., model=random_forest, objective=sfxi_v1,
-    selection=top_n, n_train=9, n_scored=15
+  - r=0, run_id=r0-<timestamp>, model=random_forest, objective=sfxi_v1,
+    selection=top_n, n_train=6, n_scored=9
+  - (more runs appear here if you re-run with --resume)
 ```
 
 #### `opal log --round latest`
@@ -123,11 +117,11 @@ Runs
 Round log
   round            : 0
   path             : <repo>/.../outputs/round_0/round.log.jsonl
-  events           : 25
-  predict_batches  : 2
-  predict_rows     : 30
-  duration_total_s : 68998.0
-  duration_fit_s   : 68684.0
+  events           : <count>
+  predict_batches  : <count>
+  predict_rows     : <count>
+  duration_total_s : <seconds>
+  duration_fit_s   : <seconds>
 
 Stages
   - done
@@ -136,25 +130,6 @@ Stages
   - selection
   - yops_fit_transform
   - yops_inverse_done
-```
-
-#### `opal plot --quick`
-
-```
-[ok] quick_score_vs_rank (scatter_score_vs_rank) -> .../outputs/plots/quick_score_vs_rank.png
-[ok] quick_percent_high (percent_high_activity_over_rounds) -> .../outputs/plots/quick_percent_high.png
-[ok] quick_sfxi_logic_fidelity (sfxi_logic_fidelity_closeness) -> .../outputs/plots/quick_sfxi_logic_fidelity.png
-[ok] quick_fold_change_vs_logic_fidelity (fold_change_vs_logic_fidelity) -> .../outputs/plots/quick_fold_change_vs_logic_fidelity.png
-[ok] quick_feature_importance (feature_importance_bars) -> .../outputs/plots/quick_feature_importance.png
-```
-
-#### `opal plot` (full config)
-
-```
-[ok] score_vs_rank_latest (scatter_score_vs_rank) -> .../outputs/plots/score_vs_rank_latest.png
-[ok] percent_high_activity (percent_high_activity_over_rounds) -> .../outputs/plots/percent_high_activity.png
-[ok] sfxi_logic_closeness (sfxi_logic_fidelity_closeness) -> .../outputs/plots/sfxi_logic_closeness.png
-[ok] fold_change_vs_logic (fold_change_vs_logic_fidelity) -> .../outputs/plots/fold_change_vs_logic.png
 ```
 
 ---
@@ -292,7 +267,9 @@ plot_config: plots.yaml
   - Ensure `intensity_log2_offset_delta` in the CSV equals
     `objective.params.intensity_log2_offset_delta` in `campaign.yaml`.
 - **Matplotlib cache warning**:
-  - Set `MPLCONFIGDIR=$PWD/.tmp/mpl`.
+  - OPAL sets a writable Matplotlib cache dir automatically during `opal plot`.
+    If you explicitly set `MPLCONFIGDIR` and it points to an unwritable path,
+    unset it or point it at a writable directory.
 - **Old outputs layout**:
   - Remove `outputs/` and `state.json`, then re-run `opal init`.
 

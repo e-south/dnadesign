@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_pressure_scalar_y.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -76,7 +76,17 @@ def test_cli_pressure_scalar_multi_round(tmp_path: Path) -> None:
     _write_labels(labels0, seqs=["AAA", "BBB"], ys=[0.2, 0.8])
     res = runner.invoke(
         app,
-        ["--no-color", "ingest-y", "-c", str(campaign), "--round", "0", "--csv", str(labels0), "--yes"],
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(labels0),
+            "--yes",
+        ],
     )
     assert res.exit_code == 0, res.stdout
 
@@ -88,7 +98,17 @@ def test_cli_pressure_scalar_multi_round(tmp_path: Path) -> None:
     _write_labels(labels1, seqs=["CCC"], ys=[0.5])
     res = runner.invoke(
         app,
-        ["--no-color", "ingest-y", "-c", str(campaign), "--round", "1", "--csv", str(labels1), "--yes"],
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "1",
+            "--csv",
+            str(labels1),
+            "--yes",
+        ],
     )
     assert res.exit_code == 0, res.stdout
 

@@ -23,6 +23,7 @@ from ...runtime.ingest import run_ingest
 from ...storage.data_access import RecordsStore
 from ...storage.ledger import LedgerWriter
 from ...storage.locks import CampaignLock
+from ...storage.parquet_io import read_parquet_df
 from ...storage.workspace import CampaignWorkspace
 from ...storage.writebacks import build_label_events
 from ..formatting import (
@@ -82,7 +83,7 @@ def cmd_ingest_y(
 
         # Resolve and read input file
         csv_path = resolve_table_path(csv, label="--csv", must_exist=True)
-        csv_df = pd.read_parquet(csv_path) if csv_path.suffix.lower() in (".pq", ".parquet") else pd.read_csv(csv_path)
+        csv_df = read_parquet_df(csv_path) if csv_path.suffix.lower() in (".pq", ".parquet") else pd.read_csv(csv_path)
 
         t_name = (transform or cfg.data.transforms_y.name).strip()
         t_params = cfg.data.transforms_y.params

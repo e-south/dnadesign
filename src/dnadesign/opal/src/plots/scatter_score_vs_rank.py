@@ -13,7 +13,7 @@ from typing import List
 
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import load_events, resolve_outputs_dir
-from ._mpl_utils import annotate_plot_meta, scale_to_sizes, scatter_smart
+from ._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir, scale_to_sizes, scatter_smart
 from ._param_utils import (
     event_columns_for,
     get_float,
@@ -44,6 +44,7 @@ from ._param_utils import (
     ),
 )
 def render(context, params: dict) -> None:
+    ensure_mpl_config_dir(workdir=context.workspace.workdir)
     import matplotlib.pyplot as plt
 
     outputs_dir = resolve_outputs_dir(context)

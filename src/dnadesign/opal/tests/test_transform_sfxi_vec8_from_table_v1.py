@@ -5,11 +5,6 @@ src/dnadesign/opal/tests/test_transform_sfxi_vec8_from_table_v1.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/opal/tests/test_transform_sfxi_vec8_from_table_v1.py
---------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -18,7 +13,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from dnadesign.opal.src.transforms_y.sfxi_vec8_from_table_v1 import sfxi_vec8_from_table_v1
+from dnadesign.opal.src.transforms_y.sfxi_vec8_from_table_v1 import (
+    sfxi_vec8_from_table_v1,
+)
 
 
 def _vec8_cols(n: int) -> dict[str, list[float]]:

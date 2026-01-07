@@ -33,7 +33,16 @@ from dnadesign.opal.src.transforms_x import identity  # noqa: F401 (registers id
 
 
 def _label_vec(v_logic=1.0, inten=1.0) -> list[float]:
-    return [0.0, 0.0, 0.0, float(v_logic), float(inten), float(inten), float(inten), float(inten)]
+    return [
+        0.0,
+        0.0,
+        0.0,
+        float(v_logic),
+        float(inten),
+        float(inten),
+        float(inten),
+        float(inten),
+    ]
 
 
 def test_run_round_writes_round_ctx_and_ledger(tmp_path):

@@ -12,7 +12,11 @@ from pydantic import BaseModel
 
 from dnadesign.opal.src.config.types import PluginRef
 from dnadesign.opal.src.core.round_context import PluginRegistryView, RoundCtx
-from dnadesign.opal.src.registries.transforms_y import list_y_ops, register_y_op, run_y_ops_pipeline
+from dnadesign.opal.src.registries.transforms_y import (
+    list_y_ops,
+    register_y_op,
+    run_y_ops_pipeline,
+)
 
 
 class _Params(BaseModel):

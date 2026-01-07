@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
-from ._mpl_utils import annotate_plot_meta, log_kv
+from ._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir, log_kv
 
 if TYPE_CHECKING:
     import numpy as np
@@ -179,6 +179,7 @@ def render(context, params: dict) -> None:
       - ylabel: str
       - order_policy: "preserve" | "sort_index"  (default "preserve")
     """
+    ensure_mpl_config_dir(workdir=context.workspace.workdir)
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd

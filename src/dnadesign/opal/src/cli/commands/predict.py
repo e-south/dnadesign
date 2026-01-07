@@ -17,6 +17,7 @@ import typer
 from ...core.rounds import resolve_round_index
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...runtime.predict import run_predict_ephemeral
+from ...storage.parquet_io import read_parquet_df, write_parquet_df
 from ...storage.state import CampaignState
 from ..registry import cli_command
 from ._common import (
@@ -124,7 +125,7 @@ def cmd_predict(
             store.load()
             if input_path is None
             else (
-                pd.read_parquet(input_path)
+                read_parquet_df(input_path)
                 if input_path.suffix.lower() in (".parquet", ".pq")
                 else pd.read_csv(input_path)
             )
@@ -153,7 +154,7 @@ def cmd_predict(
                 df_out["y_pred_vec"] = df_out["y_pred_vec"].map(lambda v: _json.dumps(v))
                 df_out.to_csv(out_path, index=False)
             else:
-                preds.to_parquet(out_path, index=False)
+                write_parquet_df(out_path, preds, index=False)
             print_stdout(f"Wrote predictions: {out_path}")
         else:
             df_out = preds.copy()

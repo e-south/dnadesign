@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_pressure_sfxi_roundtrip.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -81,7 +81,17 @@ def test_cli_pressure_sfxi_multi_round(tmp_path: Path) -> None:
     _write_sfxi_labels(labels0, seqs=["AAA", "BBB"])
     res = runner.invoke(
         app,
-        ["--no-color", "ingest-y", "-c", str(campaign), "--round", "0", "--csv", str(labels0), "--yes"],
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(labels0),
+            "--yes",
+        ],
     )
     assert res.exit_code == 0, res.stdout
 
@@ -93,7 +103,17 @@ def test_cli_pressure_sfxi_multi_round(tmp_path: Path) -> None:
     _write_sfxi_labels(labels1, seqs=["CCC"])
     res = runner.invoke(
         app,
-        ["--no-color", "ingest-y", "-c", str(campaign), "--round", "1", "--csv", str(labels1), "--yes"],
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "1",
+            "--csv",
+            str(labels1),
+            "--yes",
+        ],
     )
     assert res.exit_code == 0, res.stdout
 

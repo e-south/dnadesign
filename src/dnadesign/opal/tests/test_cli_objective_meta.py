@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_objective_meta.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -29,7 +29,16 @@ def test_objective_meta_json_contains_diagnostics(tmp_path):
     runner = CliRunner()
     res = runner.invoke(
         app,
-        ["--no-color", "objective-meta", "-c", str(campaign), "--round", "latest", "--no-profile", "--json"],
+        [
+            "--no-color",
+            "objective-meta",
+            "-c",
+            str(campaign),
+            "--round",
+            "latest",
+            "--no-profile",
+            "--json",
+        ],
     )
     assert res.exit_code == 0, res.stdout
     out = json.loads(res.stdout)
@@ -49,7 +58,16 @@ def test_objective_meta_accepts_directory_config(tmp_path):
     runner = CliRunner()
     res = runner.invoke(
         app,
-        ["--no-color", "objective-meta", "-c", str(workdir), "--round", "latest", "--no-profile", "--json"],
+        [
+            "--no-color",
+            "objective-meta",
+            "-c",
+            str(workdir),
+            "--round",
+            "latest",
+            "--no-profile",
+            "--json",
+        ],
     )
     assert res.exit_code == 0, res.stdout
     out = json.loads(res.stdout)

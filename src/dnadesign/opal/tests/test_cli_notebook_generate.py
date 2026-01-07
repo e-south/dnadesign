@@ -16,7 +16,12 @@ from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
 
-from ._cli_helpers import write_campaign_yaml, write_ledger, write_ledger_labels, write_records
+from ._cli_helpers import (
+    write_campaign_yaml,
+    write_ledger,
+    write_ledger_labels,
+    write_records,
+)
 
 
 def test_notebook_generate_smoke(tmp_path: Path) -> None:

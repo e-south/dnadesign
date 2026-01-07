@@ -20,6 +20,7 @@ import typer
 from ...core.utils import ExitCodes, OpalError, file_sha256, print_stdout
 from ...storage.data_access import ESSENTIAL_COLS
 from ...storage.locks import CampaignLock
+from ...storage.parquet_io import read_parquet_df
 from ..formatting import bullet_list, kv_block
 from ..registry import cli_command
 from ._common import (
@@ -123,9 +124,7 @@ def cmd_prune_source(
         if not rec_path.exists():
             raise OpalError(f"records.parquet not found: {rec_path}")
 
-        import pandas as pd
-
-        df = pd.read_parquet(rec_path)
+        df = read_parquet_df(rec_path)
 
         buckets = _classify_columns(
             columns=list(map(str, df.columns)),

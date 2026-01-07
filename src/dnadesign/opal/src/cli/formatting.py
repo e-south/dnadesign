@@ -706,17 +706,21 @@ def render_round_log_summary_human(summary: Mapping[str, Any]) -> str:
     if tui_enabled():
         from rich.console import Group
 
+        head_rows = {
+            "round": summary.get("round_index"),
+            "path": summary.get("path"),
+            "events": summary.get("events"),
+            "predict_batches": summary.get("predict_batches"),
+            "predict_rows": summary.get("predict_rows"),
+            "duration_total_s": summary.get("duration_sec_total"),
+            "duration_fit_s": summary.get("duration_sec_fit"),
+        }
+        if (summary.get("run_count") or 0) > 1:
+            head_rows["runs_in_log"] = summary.get("run_count")
+            head_rows["events_total"] = summary.get("events_total")
         head = kv_table(
             "Round log",
-            {
-                "round": summary.get("round_index"),
-                "path": summary.get("path"),
-                "events": summary.get("events"),
-                "predict_batches": summary.get("predict_batches"),
-                "predict_rows": summary.get("predict_rows"),
-                "duration_total_s": summary.get("duration_sec_total"),
-                "duration_fit_s": summary.get("duration_sec_fit"),
-            },
+            head_rows,
         )
         stages = summary.get("stage_counts") or {}
         stage_lines = [f"{k}: {v}" for k, v in sorted(stages.items())] if stages else []
@@ -725,18 +729,19 @@ def render_round_log_summary_human(summary: Mapping[str, Any]) -> str:
         if stage_block is not None:
             blocks.append(stage_block)
         return Group(*blocks)
-    head = kv_block(
-        "Round log",
-        {
-            "round": summary.get("round_index"),
-            "path": summary.get("path"),
-            "events": summary.get("events"),
-            "predict_batches": summary.get("predict_batches"),
-            "predict_rows": summary.get("predict_rows"),
-            "duration_total_s": summary.get("duration_sec_total"),
-            "duration_fit_s": summary.get("duration_sec_fit"),
-        },
-    )
+    head_rows = {
+        "round": summary.get("round_index"),
+        "path": summary.get("path"),
+        "events": summary.get("events"),
+        "predict_batches": summary.get("predict_batches"),
+        "predict_rows": summary.get("predict_rows"),
+        "duration_total_s": summary.get("duration_sec_total"),
+        "duration_fit_s": summary.get("duration_sec_fit"),
+    }
+    if (summary.get("run_count") or 0) > 1:
+        head_rows["runs_in_log"] = summary.get("run_count")
+        head_rows["events_total"] = summary.get("events_total")
+    head = kv_block("Round log", head_rows)
     stages = summary.get("stage_counts") or {}
     stage_lines = [f"{k}: {v}" for k, v in sorted(stages.items())] if stages else []
     stages_block = bullet_list("Stages", stage_lines)

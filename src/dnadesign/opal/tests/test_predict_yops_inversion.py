@@ -58,7 +58,14 @@ def test_predict_inverts_yops_when_round_ctx_present(tmp_path):
 
     X_train = np.array([[0.1, 0.2], [0.2, 0.3]])
     Y_train = np.array([[1.0], [2.0]])
-    model = RandomForestModel(params={"n_estimators": 5, "random_state": 1, "bootstrap": True, "oob_score": False})
+    model = RandomForestModel(
+        params={
+            "n_estimators": 5,
+            "random_state": 1,
+            "bootstrap": True,
+            "oob_score": False,
+        }
+    )
     model.fit(X_train, Y_train)
     model_path = tmp_path / "model.joblib"
     model.save(str(model_path))

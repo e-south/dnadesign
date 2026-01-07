@@ -21,6 +21,7 @@ from ...analysis.facade import CampaignAnalysis, parse_round_selector, round_suf
 from ...config.loader import resolve_path_like
 from ...core.utils import OpalError, print_stdout
 from ...plots._context import PlotContext
+from ...plots._mpl_utils import ensure_mpl_config_dir
 from ...registries.plots import get_plot, get_plot_meta, list_plots
 from ...storage.workspace import CampaignWorkspace
 from ..formatting import bullet_list
@@ -483,6 +484,9 @@ def cmd_plot(
     except OpalError as e:
         raise typer.BadParameter(str(e), param_hint="--round") from e
     suffix = round_suffix(rounds_sel)
+
+    # Ensure Matplotlib cache/config dir is writable before any plot imports.
+    ensure_mpl_config_dir(workdir=ws.workdir)
 
     # Built-in data sources (auto-injected if present)
     builtins = {

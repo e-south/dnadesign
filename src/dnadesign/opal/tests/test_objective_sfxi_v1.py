@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_objective_sfxi_v1.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

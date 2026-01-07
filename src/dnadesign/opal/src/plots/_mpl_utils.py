@@ -11,14 +11,41 @@ from __future__ import annotations
 
 import json as _json
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
+
+from ..core.tmpdir import resolve_opal_tmpdir
+from ..core.utils import OpalError
 
 if TYPE_CHECKING:
     import numpy as np
 
 
+def ensure_mpl_config_dir(*, workdir: Path | None = None) -> Path:
+    """
+    Ensure Matplotlib has a writable config/cache directory.
+    Only called by plotting workflows and must run before importing matplotlib.
+    """
+    env_val = os.getenv("MPLCONFIGDIR", "").strip()
+    if env_val:
+        path = Path(env_val).expanduser()
+    else:
+        path = resolve_opal_tmpdir(workdir=workdir) / "mpl"
+        os.environ["MPLCONFIGDIR"] = str(path)
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except Exception as exc:
+        raise OpalError(f"Matplotlib config dir is not writable: {path}") from exc
+    if not path.is_dir():
+        raise OpalError(f"Matplotlib config dir is not a directory: {path}")
+    if not os.access(path, os.W_OK):
+        raise OpalError(f"Matplotlib config dir is not writable: {path}")
+    return path
+
+
 def _apply_perf_rcparams() -> None:
     # Cheap wins for large point clouds
+    ensure_mpl_config_dir()
     import matplotlib.pyplot as plt
 
     plt.rcParams["agg.path.chunksize"] = int(os.getenv("OPAL_MPL_PATH_CHUNKSIZE", "10000"))

@@ -5,11 +5,6 @@ src/dnadesign/opal/tests/test_plot_fold_change_vs_logic_fidelity.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/opal/tests/test_plot_fold_change_vs_logic_fidelity.py
---------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_model_show.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -15,7 +15,11 @@ from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.src.registries.models import get_model
-from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records, write_state
+from dnadesign.opal.tests._cli_helpers import (
+    write_campaign_yaml,
+    write_records,
+    write_state,
+)
 
 
 def test_model_show_with_model_meta(tmp_path):
@@ -29,7 +33,10 @@ def test_model_show_with_model_meta(tmp_path):
     model.fit(X, Y)
     model.save(str(model_path))
 
-    meta = {"model__name": "random_forest", "model__params": {"n_estimators": 5, "random_state": 0}}
+    meta = {
+        "model__name": "random_forest",
+        "model__params": {"n_estimators": 5, "random_state": 0},
+    }
     (round_dir / "model_meta.json").write_text(json.dumps(meta))
 
     app = _build()
@@ -61,7 +68,10 @@ def test_model_show_round_latest(tmp_path: Path) -> None:
     Y = np.array([[0.4], [0.6]])
     model.fit(X, Y)
     model.save(str(model_path))
-    meta = {"model__name": "random_forest", "model__params": {"n_estimators": 5, "random_state": 0}}
+    meta = {
+        "model__name": "random_forest",
+        "model__params": {"n_estimators": 5, "random_state": 0},
+    }
     (round_dir / "model_meta.json").write_text(json.dumps(meta))
     write_state(workdir, records_path=records, run_id="r0-test", round_index=0)
 

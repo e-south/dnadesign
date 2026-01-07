@@ -47,7 +47,7 @@ def cmd_run(
     resume: bool = typer.Option(
         False,
         "--resume",
-        help="Allow overwrites in artifacts dir (no-op here; caller's concern).",
+        help="Allow overwriting existing round artifacts (required when rerunning a round).",
     ),
     score_batch_size: Optional[int] = typer.Option(None, "--score-batch-size", help="Override batch size."),
     verbose: bool = typer.Option(True, "--verbose/--quiet"),

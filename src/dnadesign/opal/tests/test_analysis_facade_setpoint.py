@@ -20,7 +20,11 @@ from dnadesign.opal.src.analysis.facade import load_predictions_with_setpoint
 from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.storage.ledger import LedgerWriter
 from dnadesign.opal.src.storage.workspace import CampaignWorkspace
-from dnadesign.opal.src.storage.writebacks import SelectionEmit, build_run_meta_event, build_run_pred_events
+from dnadesign.opal.src.storage.writebacks import (
+    SelectionEmit,
+    build_run_meta_event,
+    build_run_pred_events,
+)
 
 from ._cli_helpers import write_campaign_yaml, write_records
 
@@ -77,7 +81,11 @@ def test_load_predictions_with_setpoint_requires_setpoint(tmp_path: Path) -> Non
         unc_mean_sd=None,
         pred_rows_df=run_pred_ok,
         artifact_paths_and_hashes={},
-        objective_summary_stats={"score_min": 0.1, "score_median": 0.2, "score_max": 0.3},
+        objective_summary_stats={
+            "score_min": 0.1,
+            "score_median": 0.2,
+            "score_max": 0.3,
+        },
     )
     run_meta_ok["schema__version"] = LEDGER_SCHEMA_VERSION
     run_meta_ok["opal__version"] = OPAL_VERSION
@@ -117,7 +125,11 @@ def test_load_predictions_with_setpoint_requires_setpoint(tmp_path: Path) -> Non
         unc_mean_sd=None,
         pred_rows_df=run_pred_missing,
         artifact_paths_and_hashes={},
-        objective_summary_stats={"score_min": 0.1, "score_median": 0.2, "score_max": 0.3},
+        objective_summary_stats={
+            "score_min": 0.1,
+            "score_median": 0.2,
+            "score_max": 0.3,
+        },
     )
     run_meta_missing["schema__version"] = LEDGER_SCHEMA_VERSION
     run_meta_missing["opal__version"] = OPAL_VERSION

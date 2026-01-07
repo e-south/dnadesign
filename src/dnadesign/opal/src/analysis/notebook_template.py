@@ -28,8 +28,10 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
         def _():
             import marimo as mo
             import polars as pl
-            import matplotlib.pyplot as plt
             from pathlib import Path
+            from dnadesign.opal.src.plots._mpl_utils import ensure_mpl_config_dir
+            ensure_mpl_config_dir(workdir=Path(__CONFIG_PATH__).parent)
+            import matplotlib.pyplot as plt
             from dnadesign.opal.src.analysis.facade import (
                 CampaignAnalysis,
                 available_rounds,
