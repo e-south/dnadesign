@@ -28,7 +28,11 @@ A typical workflow looks like:
 
 ```bash
 # Initialize a workspace or jump into the demo
+# Option A: cd into the workspace
 cd src/dnadesign/cruncher/workspaces/demo
+
+# Option B: run from anywhere
+cruncher --workspace demo sources list
 
 # Quick sanity check: list sources
 cruncher sources list
@@ -51,18 +55,6 @@ cruncher analyze --latest
 # Report (JSON + Markdown) for a specific run name
 cruncher runs list
 cruncher report <run_name>
-```
-
-Example output (sources list):
-
-```bash
-                            Sources
-┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Source          ┃ Description                                ┃
-┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ demo_local_meme │ Demo MEME motifs (local files)             │
-│ regulondb       │ RegulonDB datamarts GraphQL (curated + HT) │
-└─────────────────┴────────────────────────────────────────────┘
 ```
 
 ---

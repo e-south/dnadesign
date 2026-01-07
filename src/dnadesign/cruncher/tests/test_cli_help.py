@@ -11,15 +11,41 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
 import dnadesign.cruncher.cli.commands.sources as sources_module
 from dnadesign.cruncher.cli.app import app
+from dnadesign.cruncher.cli.config_resolver import (
+    DEFAULT_WORKSPACE_ENV_VAR,
+    NONINTERACTIVE_ENV_VAR,
+    WORKSPACE_ENV_VAR,
+    WORKSPACE_ROOTS_ENV_VAR,
+)
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 
 runner = CliRunner()
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "workspaces" / "demo" / "config.yaml"
+
+
+def invoke_isolated(args: list[str], env: dict[str, str] | None = None):
+    merged_env = {NONINTERACTIVE_ENV_VAR: "1"}
+    if env:
+        merged_env.update(env)
+    with runner.isolated_filesystem():
+        return runner.invoke(app, args, env=merged_env)
+
+
+@pytest.fixture(autouse=True)
+def _clear_workspace_env(monkeypatch: pytest.MonkeyPatch):
+    for var in (
+        WORKSPACE_ENV_VAR,
+        DEFAULT_WORKSPACE_ENV_VAR,
+        WORKSPACE_ROOTS_ENV_VAR,
+        NONINTERACTIVE_ENV_VAR,
+    ):
+        monkeypatch.delenv(var, raising=False)
 
 
 def test_root_help_includes_command_descriptions() -> None:
@@ -28,6 +54,13 @@ def test_root_help_includes_command_descriptions() -> None:
     assert "fetch" in result.output
     assert "Fetch motifs/sites" in result.output
     assert "status" in result.output
+    assert "workspaces" in result.output
+
+
+def test_workspaces_list_includes_demo() -> None:
+    result = runner.invoke(app, ["workspaces", "list"])
+    assert result.exit_code == 0
+    assert "demo" in result.output
 
 
 def test_fetch_motifs_requires_tf_or_motif_id() -> None:
@@ -43,7 +76,7 @@ def test_catalog_show_requires_source_ref() -> None:
 
 
 def test_status_requires_config_with_hint() -> None:
-    result = runner.invoke(app, ["status"])
+    result = invoke_isolated(["status"])
     assert result.exit_code != 0
     assert "No config argument provided" in result.output
 
@@ -88,7 +121,7 @@ def test_sources_list_auto_detects_config_in_cwd(tmp_path, monkeypatch) -> None:
 
 
 def test_config_requires_config_with_hint() -> None:
-    result = runner.invoke(app, ["config"])
+    result = invoke_isolated(["config"])
     assert result.exit_code != 0
     assert "No config argument provided" in result.output
 
@@ -217,25 +250,25 @@ def test_sources_summary_requires_remote_limit_when_no_iter(tmp_path, monkeypatc
 
 
 def test_lock_requires_config_with_hint() -> None:
-    result = runner.invoke(app, ["lock"])
+    result = invoke_isolated(["lock"])
     assert result.exit_code != 0
     assert "No config argument provided" in result.output
 
 
 def test_parse_requires_config_with_hint() -> None:
-    result = runner.invoke(app, ["parse"])
+    result = invoke_isolated(["parse"])
     assert result.exit_code != 0
     assert "No config argument provided" in result.output
 
 
 def test_sample_requires_config_with_hint() -> None:
-    result = runner.invoke(app, ["sample"])
+    result = invoke_isolated(["sample"])
     assert result.exit_code != 0
     assert "No config argument provided" in result.output
 
 
 def test_analyze_requires_config_with_hint() -> None:
-    result = runner.invoke(app, ["analyze"])
+    result = invoke_isolated(["analyze"])
     assert result.exit_code != 0
     assert "No config argument provided" in result.output
 
@@ -259,7 +292,7 @@ def test_runs_show_requires_args_with_hint() -> None:
 
 
 def test_runs_latest_requires_config_with_hint() -> None:
-    result = runner.invoke(app, ["runs", "latest"])
+    result = invoke_isolated(["runs", "latest"])
     assert result.exit_code != 0
     assert "No config argument provided" in result.output
 
@@ -277,6 +310,6 @@ def test_analyze_list_plots_succeeds() -> None:
 
 
 def test_analyze_list_plots_without_config_succeeds() -> None:
-    result = runner.invoke(app, ["analyze", "--list-plots"])
+    result = invoke_isolated(["analyze", "--list-plots"])
     assert result.exit_code != 0
     assert "No config argument provided" in result.output

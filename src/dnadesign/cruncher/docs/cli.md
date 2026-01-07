@@ -2,6 +2,31 @@
 
 Most commands operate relative to a `config.yaml` file. For an end-to-end walkthrough, see the [demo](demo.md).
 
+### Workspace discovery & config resolution
+
+Cruncher resolves the config path in this order:
+
+1. `--config/-c` or positional `CONFIG` (explicit config path)
+2. `--workspace/-w` (workspace name, index from `workspaces list`, or a path to a workspace dir/config)
+   * also accepts `CRUNCHER_WORKSPACE=<name|index|path>`
+3. `config.yaml` / `cruncher.yaml` in the current directory
+4. walk up parent directories looking for a config
+5. workspace discovery in known roots:
+   * git root: `workspaces/*/config.yaml` (and `workspace/*/config.yaml`)
+   * git root: `src/dnadesign/cruncher/workspaces/*/config.yaml` (bundled demo)
+   * any roots in `CRUNCHER_WORKSPACE_ROOTS` (colon-separated)
+
+If exactly one workspace is discovered, Cruncher auto-selects it and logs a one-line note.
+If multiple are found, Cruncher prints a numbered list and shows how to select one via `--workspace` or `--config`.
+Interactive selection is only offered on TTYs and can be disabled with `CRUNCHER_NONINTERACTIVE=1`.
+Set `CRUNCHER_DEFAULT_WORKSPACE=<name>` to auto-select when multiple workspaces exist.
+
+To see what is available (with stable indices), run:
+
+```
+cruncher workspaces list
+```
+
 ### Contents
 
 1. [Core lifecycle commands](#core-lifecycle-commands)
@@ -190,6 +215,16 @@ Notes:
 ---
 
 ### Discovery and inspection
+
+#### `cruncher workspaces`
+
+List discoverable workspaces and their config paths.
+
+Example:
+
+* `cruncher workspaces list`
+
+---
 
 #### `cruncher catalog`
 

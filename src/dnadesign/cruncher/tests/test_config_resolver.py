@@ -14,10 +14,25 @@ import pytest
 
 from dnadesign.cruncher.cli.config_resolver import (
     CANDIDATE_CONFIG_FILENAMES,
+    DEFAULT_WORKSPACE_ENV_VAR,
+    NONINTERACTIVE_ENV_VAR,
+    WORKSPACE_ENV_VAR,
+    WORKSPACE_ROOTS_ENV_VAR,
     ConfigResolutionError,
     parse_config_and_value,
     resolve_config_path,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_workspace_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for var in (
+        WORKSPACE_ENV_VAR,
+        DEFAULT_WORKSPACE_ENV_VAR,
+        WORKSPACE_ROOTS_ENV_VAR,
+        NONINTERACTIVE_ENV_VAR,
+    ):
+        monkeypatch.delenv(var, raising=False)
 
 
 def test_resolve_config_from_cwd_single(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
@@ -91,3 +106,104 @@ def test_parse_config_and_value_single_value_uses_cwd_config(tmp_path: Path) -> 
 
     assert resolved_config == config_path.resolve()
     assert value == "sample_run_1"
+
+
+def _make_workspace(root: Path, name: str) -> Path:
+    workspace_dir = root / name
+    workspace_dir.mkdir(parents=True)
+    config_path = workspace_dir / "config.yaml"
+    config_path.write_text("cruncher: {}\n")
+    return config_path
+
+
+def test_resolve_config_from_parent_dir(tmp_path: Path) -> None:
+    parent = tmp_path / "parent"
+    child = parent / "child"
+    child.mkdir(parents=True)
+    config_path = parent / "config.yaml"
+    config_path.write_text("cruncher: {}\n")
+
+    resolved = resolve_config_path(None, cwd=child, log=False)
+
+    assert resolved == config_path.resolve()
+
+
+def test_resolve_config_single_workspace_auto_select(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "workspaces"
+    root.mkdir()
+    config_path = _make_workspace(root, "demo")
+    monkeypatch.setenv(WORKSPACE_ROOTS_ENV_VAR, str(root))
+    monkeypatch.setenv(NONINTERACTIVE_ENV_VAR, "1")
+
+    resolved = resolve_config_path(None, cwd=tmp_path, log=False)
+
+    assert resolved == config_path.resolve()
+
+
+def test_resolve_config_multiple_workspaces_error_list(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "workspaces"
+    root.mkdir()
+    _make_workspace(root, "alpha")
+    _make_workspace(root, "beta")
+    monkeypatch.setenv(WORKSPACE_ROOTS_ENV_VAR, str(root))
+    monkeypatch.setenv(NONINTERACTIVE_ENV_VAR, "1")
+
+    with pytest.raises(ConfigResolutionError) as excinfo:
+        resolve_config_path(None, cwd=tmp_path, log=False)
+    message = str(excinfo.value)
+    assert "Discovered 2 workspace configs" in message
+    assert "[1]" in message
+    assert "[2]" in message
+
+
+def test_resolve_config_workspace_selector_by_name(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "workspaces"
+    root.mkdir()
+    config_path = _make_workspace(root, "demo")
+    monkeypatch.setenv(WORKSPACE_ROOTS_ENV_VAR, str(root))
+    monkeypatch.setenv(WORKSPACE_ENV_VAR, "demo")
+
+    resolved = resolve_config_path(None, cwd=tmp_path, log=False)
+
+    assert resolved == config_path.resolve()
+
+
+def test_resolve_config_workspace_selector_by_index(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "workspaces"
+    root.mkdir()
+    _make_workspace(root, "alpha")
+    config_path = _make_workspace(root, "beta")
+    monkeypatch.setenv(WORKSPACE_ROOTS_ENV_VAR, str(root))
+    monkeypatch.setenv(WORKSPACE_ENV_VAR, "2")
+
+    resolved = resolve_config_path(None, cwd=tmp_path, log=False)
+
+    assert resolved == config_path.resolve()
+
+
+def test_default_workspace_selection(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "workspaces"
+    root.mkdir()
+    config_path = _make_workspace(root, "demo")
+    _make_workspace(root, "other")
+    monkeypatch.setenv(WORKSPACE_ROOTS_ENV_VAR, str(root))
+    monkeypatch.setenv(DEFAULT_WORKSPACE_ENV_VAR, "demo")
+    monkeypatch.setenv(NONINTERACTIVE_ENV_VAR, "1")
+
+    resolved = resolve_config_path(None, cwd=tmp_path, log=False)
+
+    assert resolved == config_path.resolve()
+
+
+def test_noninteractive_does_not_prompt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "workspaces"
+    root.mkdir()
+    _make_workspace(root, "alpha")
+    _make_workspace(root, "beta")
+    monkeypatch.setenv(WORKSPACE_ROOTS_ENV_VAR, str(root))
+    monkeypatch.setenv(NONINTERACTIVE_ENV_VAR, "1")
+
+    with pytest.raises(ConfigResolutionError) as excinfo:
+        resolve_config_path(None, cwd=tmp_path, log=False)
+    message = str(excinfo.value)
+    assert "Choose one" in message

@@ -137,6 +137,7 @@ temp.md
 src/dnadesign/cruncher/.cruncher/
 src/dnadesign/cruncher/results/
 src/dnadesign/cruncher/experiments/
+src/dnadesign/cruncher/workspaces/demo/runs/
 src/dnadesign/cruncher/**/run_manifest.json
 src/dnadesign/cruncher/**/run_status.json
 src/dnadesign/cruncher/**/config_used.yaml

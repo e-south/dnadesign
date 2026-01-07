@@ -14,3 +14,5 @@ src/dnadesign/cruncher/workspaces/
 ```
 
 Tip: `cd` into a workspace and run cruncher commands without passing `--config`.
+You can also run from anywhere with `--workspace <name>` or inspect what is
+available via `cruncher workspaces list`.

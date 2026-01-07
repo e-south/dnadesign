@@ -9,6 +9,8 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
+import os
+
 import typer
 
 from dnadesign.cruncher.cli.commands.analyze import analyze as analyze_cmd
@@ -26,6 +28,8 @@ from dnadesign.cruncher.cli.commands.sample import sample as sample_cmd
 from dnadesign.cruncher.cli.commands.sources import app as sources_app
 from dnadesign.cruncher.cli.commands.status import status as status_cmd
 from dnadesign.cruncher.cli.commands.targets import app as targets_app
+from dnadesign.cruncher.cli.commands.workspaces import app as workspaces_app
+from dnadesign.cruncher.cli.config_resolver import WORKSPACE_ENV_VAR
 from dnadesign.cruncher.utils.logging import configure_logging
 
 app = typer.Typer(no_args_is_help=True, help="Design short DNA sequences that score highly across TF motifs.")
@@ -40,9 +44,18 @@ def main(
         envvar="CRUNCHER_LOG_LEVEL",
         help="Logging level (e.g., DEBUG, INFO, WARNING).",
     ),
+    workspace: str | None = typer.Option(
+        None,
+        "--workspace",
+        "-w",
+        envvar=WORKSPACE_ENV_VAR,
+        help="Select a workspace by name, index, or path.",
+    ),
 ) -> None:
     """Design short DNA sequences that score highly across multiple TF motifs."""
     configure_logging(log_level)
+    if workspace:
+        os.environ[WORKSPACE_ENV_VAR] = workspace
 
 
 app.command("parse", help="Validate cached motifs and render PWM logos.", short_help="Validate motifs + render logos.")(
@@ -121,6 +134,12 @@ app.add_typer(
     name="runs",
     help="List, inspect, or watch past run artifacts.",
     short_help="Inspect previous runs.",
+)
+app.add_typer(
+    workspaces_app,
+    name="workspaces",
+    help="List discoverable workspaces.",
+    short_help="List workspaces.",
 )
 
 if __name__ == "__main__":

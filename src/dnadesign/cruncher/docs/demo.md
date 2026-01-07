@@ -14,17 +14,24 @@ The demo workspace lives here:
 
 - `src/dnadesign/cruncher/workspaces/demo/`
 
-```bash
-cd src/dnadesign/cruncher/workspaces/demo
-```
+You can either `cd` into the workspace (auto-detects `config.yaml`), or run from
+anywhere using the workspace-aware flags:
 
-Cruncher will auto-detect `config.yaml` in the current directory. If you prefer
-to run from elsewhere, pass `--config path/to/config.yaml`.
+```bash
+# Option A: cd into the workspace
+cd src/dnadesign/cruncher/workspaces/demo
+
+# Option B: run from anywhere
+cruncher --workspace demo sources list
+cruncher --config src/dnadesign/cruncher/workspaces/demo/config.yaml sources list
+```
 
 The demo config is tuned for fast local runs. Increase `draws` and `tune` for
 real experiments.
 
-Local demo motifs live at `workspaces/demo/data/local_motifs/` (two small MEME files).
+Local demo motifs live at `data/local_motifs/` relative to the workspace root
+(two small MEME files). From the repo root, the full path is
+`src/dnadesign/cruncher/workspaces/demo/data/local_motifs/`.
 To point to a real dataset, update `ingest.local_sources[].root` in the config.
 
 ## Preview what is available (optional)
@@ -271,9 +278,9 @@ $ cruncher status
 ┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ Setting      ┃ Value                                                     ┃
 ┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ config       │ /path/to/cruncher/workspaces/demo/config.yaml             │
-│ catalog_root │ /path/to/cruncher/workspaces/demo/.cruncher               │
-│ out_dir      │ /path/to/cruncher/workspaces/demo/runs                    │
+│ config       │ /path/to/repo/src/dnadesign/cruncher/workspaces/demo/config.yaml             │
+│ catalog_root │ /path/to/repo/src/dnadesign/cruncher/workspaces/demo/.cruncher               │
+│ out_dir      │ /path/to/repo/src/dnadesign/cruncher/workspaces/demo/runs                    │
 │ pwm_source   │ sites                                                     │
 │ sources      │ regulondb                                                 │
 │ lockfile     │ present                                                   │
