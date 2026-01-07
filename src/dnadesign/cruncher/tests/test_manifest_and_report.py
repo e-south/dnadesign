@@ -128,8 +128,6 @@ def test_build_manifest_and_report(tmp_path: Path) -> None:
         ]
     ).to_parquet(run_dir / "sequences.parquet", index=False)
 
-    elite_dir = run_dir / "cruncher_elites_test"
-    elite_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(
         [
             {
@@ -139,9 +137,14 @@ def test_build_manifest_and_report(tmp_path: Path) -> None:
                 "per_tf_json": json.dumps({"lexA": {"scaled_score": 1.0}}),
             }
         ]
-    ).to_parquet(elite_dir / "cruncher_elites_test.parquet", index=False)
+    ).to_parquet(run_dir / "elites.parquet", index=False)
 
     run_report(cfg, config_path, "sample_test")
 
     assert (run_dir / "report.json").exists()
     assert (run_dir / "report.md").exists()
+
+    report = json.loads((run_dir / "report.json").read_text())
+    assert report["rhat"] is None
+    assert report["ess"] is None
+    assert report.get("diagnostics_warnings")

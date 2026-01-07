@@ -1,110 +1,355 @@
-# Cruncher CLI
+## cruncher CLI
 
-See `docs/README.md` for the docs map and reading order.
+Most commands operate relative to a `config.yaml` file. For an end-to-end walkthrough, see the [demo](demo.md).
 
-Cruncher is structured around an explicit lifecycle: **fetch → lock → parse/sample → analyze/report**.
-Each command has one job and never performs hidden network access.
+### Contents
 
-## Command groups
+1. [Core lifecycle commands](#core-lifecycle-commands)
+2. [Discovery and inspection](#discovery-and-inspection)
 
-- `parse` — validate cached motifs and render PWM logos.
-- `sample` — run MCMC optimization to design candidate sequences.
-- `analyze` — generate diagnostics and plots for completed runs.
-- `report` — summarize a sample run into report artifacts.
-- `notebook` — generate an optional marimo notebook for analysis.
-- `fetch` — fetch motifs or binding sites into the local cache.
-- `catalog` — inspect cached motifs and binding sites.
-- `lock` — resolve TF names to exact cached motif IDs.
-- `cache` — inspect or verify cache integrity.
-- `config` — summarize effective configuration settings.
-- `sources` — list ingestion sources and capabilities.
-- `status` — show a bird's-eye view of cache, targets, and runs.
-- `targets` — check target readiness and catalog candidates.
-- `optimizers` — list available optimizer kernels.
-- `runs` — list, inspect, or watch past run artifacts.
+---
 
-## Help and hints
+### Core lifecycle commands
 
-- Every command supports `--help` (for example: `cruncher fetch motifs --help`).
-- When a command fails due to missing inputs or ambiguous targets, Cruncher prints a short hint with the next recommended command.
+#### `cruncher fetch motifs`
 
-## Core lifecycle
+Caches motif matrices into `<catalog_root>/normalized/motifs/...`.
 
-- `cruncher fetch motifs --tf <name> --tf <name> --source regulondb <config>`
-- `cruncher fetch motifs --motif-id <id> --source regulondb <config>`
-- `cruncher fetch motifs --tf <name> --all <config>` (fetch all candidates)
-- `cruncher fetch motifs --tf <name> --dry-run <config>` (preview remote matches)
-- `cruncher fetch motifs --tf <name> --offline <config>` (verify cached only)
-- `cruncher fetch motifs --tf <name> --update <config>` (force refresh)
-- `cruncher fetch sites --tf <name> --source regulondb <config>`
-- `cruncher fetch sites --motif-id <id> --source regulondb <config>`
-- `cruncher fetch sites --tf <name> --dry-run <config>` (preview HT datasets)
-- `cruncher fetch sites --tf <name> --genome-fasta path/to/genome.fna <config>` (hydrate sequences from coordinates)
-- `cruncher fetch sites --tf <name> --dataset-id <id> <config>` (limit HT dataset; enables HT for this request)
-- `cruncher fetch sites --tf <name> --hydrate <config>` (hydrate cached sites without refetching)
-- `cruncher fetch sites --tf <name> --offline <config>`
-- `cruncher fetch sites --tf <name> --update <config>`
-- `cruncher lock <config>`
-- `cruncher status <config>` (overview of cache, targets, and recent runs)
-- `cruncher targets list <config>` (show configured TF sets)
-- `cruncher targets status <config> [--pwm-source sites] [--site-kind curated]`
-- `cruncher targets candidates <config>` (show catalog candidates per TF)
-- `cruncher targets candidates --fuzzy [--min-score 0.6] [--limit 10] <config>`
-- `cruncher targets stats <config>` (site-length stats + PWM lengths for each target)
-- `cruncher parse <config>`
-- `cruncher sample <config>`
-- `cruncher analyze <config>` (requires `analysis.runs`; use `--run` or `--latest` to override)
-- `cruncher analyze --run <sample_run> <config>` (repeat `--run` for multiple)
-- `cruncher analyze --latest <config>` (explicitly analyze latest sample run)
-- `cruncher analyze --tf-pair lexA,cpxR <config>` (override pairwise plots)
-- `cruncher analyze --list-plots <config>` (preview which plots will run)
-- `cruncher report <config> <run_name>` (write `report.json` + `report.md`)
-- `cruncher notebook [--analysis-id <id>|--latest] <run_dir>` (generate a marimo notebook)
-- `cruncher runs list <config> [--stage sample]`
-- `cruncher runs list <config> [--stage sample] [--full] [--json]`
-- `cruncher runs show <config> <run_name> [--json]`
-- `cruncher runs latest <config> [--stage sample] [--json]`
-- `cruncher runs watch <config> <run_name>`
-- `cruncher runs rebuild-index <config>`
+When to use:
+
+* you want `cruncher.motif_store.pwm_source: matrix`
+* you want to reuse alignment/matrix payloads across runs
+
+Examples:
+
+* `cruncher fetch motifs --tf lexA --tf cpxR <config>`
+* `cruncher fetch motifs --motif-id RDBECOLITFC00214 <config>`
+* `cruncher fetch motifs --source omalley_ecoli_meme --tf lexA <config>`
+* `cruncher fetch motifs --dry-run --tf lexA <config>`
+
+Common options:
+
+* `--tf`, `--motif-id`, `--source`
+* `--dry-run`, `--all`, `--offline`, `--update`
+* `--summary/--no-summary`, `--paths`
+
+---
+
+#### `cruncher fetch sites`
+
+Caches binding-site instances into `<catalog_root>/normalized/sites/...`.
+
+When to use:
+
+* you want `cruncher.motif_store.pwm_source: sites`
+* you want curated or HT site sets cached locally
+* you need hydration for coordinate-only peaks
+
+Examples:
+
+* `cruncher fetch sites --tf lexA --tf cpxR <config>`
+* `cruncher fetch sites --dry-run --tf lexA <config>`
+* `cruncher fetch sites --dataset-id <id> --tf lexA <config>`
+* `cruncher fetch sites --genome-fasta genome.fna <config>`
+
+Common options:
+
+* `--tf`, `--motif-id`, `--dataset-id`, `--limit`
+* `--hydrate` (hydrates missing sequences)
+* `--offline`, `--update`
+* `--genome-fasta`
+* `--summary/--no-summary`, `--paths`
+
+Note:
+
+* `--hydrate` with no `--tf/--motif-id` hydrates all cached site sets by default.
+
+---
+
+#### `cruncher lock`
+
+Resolves TF names in `cruncher.regulator_sets` to exact cached artifacts (IDs + hashes).
+Writes `<catalog_root>/locks/<config>.lock.json`.
+
+When to use:
+
+* before `parse` and `sample`
+* whenever you change anything affecting TF resolution (PWM source, site kinds, dataset selection, etc.)
+
+Example:
+
+* `cruncher lock <config>`
+
+---
+
+#### `cruncher parse`
+
+Validates cached PWMs (matrix- or site-derived) and renders logos/QC artifacts.
+
+Example:
+
+* `cruncher parse <config>`
+
+Precondition:
+
+* lockfile exists (`cruncher lock <config>`)
 
 Notes:
 
-- Offline fetch is strict: if multiple cached motifs match a TF, use `--all` (motifs) or `--motif-id` to disambiguate.
-- `fetch motifs` and `fetch sites` render a summary table by default; use `--paths` to print raw cache paths.
-- If HT sites only provide coordinates, Cruncher hydrates sequences via NCBI by default (`ingest.genome_source=ncbi`).
-- Use `--genome-fasta` to override and hydrate against a local FASTA (offline runs).
-- `--genome-fasta` overrides `ingest.genome_source` and `ingest.genome_fasta` when provided.
-- Use `cruncher targets stats` to inspect site lengths (curated or HT) and set `motif_store.site_window_lengths`.
-- When multiple `regulator_sets` are configured, Cruncher runs each set independently and creates separate run folders.
-- Each `cruncher analyze` call creates a new `analysis/<analysis_id>/` folder under the sample run directory.
-- `cruncher runs show` prints the artifact registry plus analysis IDs, counts, and notebook path (when available).
-- `cruncher notebook` requires the optional `marimo` dependency (install via `uv add --group notebooks marimo`).
-- Pairwise plots only render when `analysis.tf_pair` is explicitly set.
+* `parse.plot.logo=false` skips logo rendering (still validates PWMs + writes a run manifest).
+* When `motif_store.pwm_source=sites`, logos include a subtitle describing site provenance
+  (curated, high-throughput, or combined).
 
-## Catalog inspection
+---
 
-- `cruncher catalog list <config> [--tf <name>] [--source <source>] [--organism <name>]`
-- `cruncher catalog list <config> [--tf <name>] [--include-synonyms]`
-- `cruncher catalog search <config> <query> [--source <source>] [--organism <name>] [--regex] [--case-sensitive] [--fuzzy] [--min-score 0.6] [--limit 25]`
-- `cruncher catalog resolve <config> <tf> [--source <source>] [--organism <name>] [--include-synonyms]`
-- `cruncher catalog show <config> <source>:<motif_id>`
-- `cruncher cache stats <config>`
-- `cruncher cache verify <config>`
+#### `cruncher sample`
 
-## Source adapters
+Runs MCMC optimization to design sequences scoring well across TFs.
 
-- `cruncher sources list`
-- `cruncher sources info regulondb <config>`
-- `cruncher sources datasets regulondb <config> [--tf <name>]`
+Example:
 
-## Optimizers
+* `cruncher sample <config>`
 
-- `cruncher optimizers list`
+Precondition:
 
-## Config
+* lockfile exists (`cruncher lock <config>`)
 
-- `cruncher config summary <config>`
+Notes:
 
-## Global options
+* `cruncher.sample.save_sequences: true` is required for later analysis/reporting.
+* `cruncher.sample.save_trace: true` enables trace-based diagnostics.
 
-- `--log-level INFO|DEBUG` (or set `CRUNCHER_LOG_LEVEL`)
+---
+
+#### `cruncher analyze`
+
+Generates diagnostics and plots for one or more sample runs.
+
+Examples:
+
+* `cruncher analyze --latest <config>`
+* `cruncher analyze --run <run_name> <config>`
+* `cruncher analyze --tf-pair lexA,cpxR <config>`
+* `cruncher analyze --plots trace --plots score_hist <config>`
+* `cruncher analyze --list-plots`
+
+Preconditions:
+
+* provide runs via `analysis.runs`, `--run`, or `--latest`
+* trace-dependent plots require `trace.nc`
+
+---
+
+#### `cruncher report`
+
+Writes `report.json` and `report.md` for a sample run.
+
+Example:
+
+* `cruncher report <config> <run_name>`
+
+Preconditions:
+
+* required artifacts must exist in the run directory (commonly `sequences.parquet`, `elites.parquet`, and often `trace.nc`)
+* if required artifacts are missing, reporting should fail fast rather than silently omitting sections
+
+Diagnostics note:
+
+* R-hat requires at least 2 chains.
+* ESS is not meaningful with too few draws.
+  When metrics cannot be computed, reports should record diagnostics warnings.
+
+Tip: if you are in a workspace with `config.yaml`, you can run `cruncher report <run_name>`
+directly (or pass `--config` when running elsewhere).
+
+---
+
+#### `cruncher notebook`
+
+Generates a marimo notebook for interactive exploration.
+
+Example:
+
+* `cruncher notebook <path/to/sample_run> --latest`
+
+Notes:
+
+* requires `marimo` to be installed (for example: `uv add --group notebooks marimo`)
+* useful when you want interactive slicing/filtering beyond static plots
+* strict by default: requires `summary.json` + `plot_manifest.json` to exist and parse
+* pass `--lenient` to generate anyway (warnings appear in the Overview tab)
+* when `summary.json` is missing, lenient mode falls back to `analysis/` as an unindexed entry
+* plot output status is refreshed from disk so missing files are shown accurately
+* if running in lenient mode and `summary.json` lacks `tf_names`, scatter controls are disabled with an inline warning
+* the notebook includes:
+  * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
+  * Tables tab with a Top-K slider and a per-PWM data explorer
+  * Plots tab with TF dropdowns, chain/draw range controls, and inline plot previews
+
+---
+
+### Discovery and inspection
+
+#### `cruncher catalog`
+
+Inspect cached motifs and site sets.
+
+Subcommands:
+
+* `catalog list` — list cached motifs and site sets
+* `catalog search` — search by TF name or motif ID
+* `catalog resolve` — resolve a TF name to cached candidates
+* `catalog show` — show metadata for a cached `<source>:<motif_id>`
+
+Examples:
+
+* `cruncher catalog list <config>`
+* `cruncher catalog search <config> lexA --fuzzy`
+* `cruncher catalog show <config> regulondb:RDBECOLITFC00214`
+
+---
+
+#### `cruncher targets`
+
+Check readiness for the configured `regulator_sets`.
+
+Subcommands:
+
+* `targets list`
+* `targets status`
+* `targets candidates`
+* `targets stats`
+
+Examples:
+
+* `cruncher targets status <config>`
+* `cruncher targets candidates --fuzzy <config>`
+
+---
+
+#### `cruncher sources`
+
+List or inspect ingestion sources.
+
+Subcommands:
+
+* `sources list [config]` — list registered sources (auto-detects config in CWD to include local sources; pass CONFIG when elsewhere)
+* `sources info <source> [config]`
+* `sources datasets <source> [config]` — list HT datasets (if supported)
+* `sources summary [config]` — summarize cache + remote inventory (supports JSON output, combined view)
+
+Example:
+
+* `cruncher sources list config.yaml`
+* `cruncher sources datasets regulondb config.yaml --tf lexA`
+* `cruncher sources summary config.yaml`
+* `cruncher sources summary --view combined config.yaml`
+* `cruncher sources summary --scope remote --format json config.yaml`
+* `cruncher sources summary --json-out summary.json config.yaml`
+
+Regulator inventory for a single source:
+
+* `cruncher sources summary --source regulondb --scope cache config.yaml`
+* `cruncher sources summary --source regulondb --scope remote --remote-limit 200 config.yaml`
+* `cruncher sources summary --source regulondb --view combined config.yaml`
+
+Note:
+
+* Some sources do not expose full remote inventories; use `--remote-limit` (partial counts)
+  or `--scope cache` if you only need cached regulators.
+
+Example output (cache, abridged; captured with `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200`):
+
+```bash
+        Cache overview
+      (source=regulondb)
+┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
+┃ Metric            ┃ Value   ┃
+┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
+│ entries           │ 2       │
+│ sources           │ 1       │
+│ TFs               │ 2       │
+│ motifs            │ 0       │
+│ site sets         │ 2       │
+│ sites (seq/total) │ 203/203 │
+│ datasets          │ 0       │
+└───────────────────┴─────────┘
+                  Cache regulators (source=regulondb)
+┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ TF   ┃ Sources   ┃ Motifs ┃ Site sets ┃ Sites (seq/total) ┃ Datasets ┃
+┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ cpxR │ regulondb │      0 │         1 │ 154/154           │        0 │
+│ lexA │ regulondb │      0 │         1 │ 49/49             │        0 │
+└──────┴───────────┴────────┴───────────┴───────────────────┴──────────┘
+```
+
+---
+
+#### `cruncher cache`
+
+Inspect cache integrity.
+
+* `cache stats <config>` — counts of cached motifs and site sets
+* `cache verify <config>` — verify cache paths exist on disk
+
+---
+
+#### `cruncher status`
+
+Bird’s-eye view of cache, targets, and recent runs.
+
+Example:
+
+* `cruncher status <config>`
+
+---
+
+#### `cruncher runs`
+
+Inspect past run artifacts.
+
+* `runs list <config>` — list run folders (optionally filter by stage)
+* `runs show <config> <run>` — show manifest + artifacts
+* `runs latest <config>` — print most recent run
+* `runs watch <config> <run>` — live progress snapshot
+* `runs rebuild-index <config>` — rebuild `<catalog_root>/run_index.json`
+
+Tip: inside a workspace you can drop the config argument entirely (for example,
+`cruncher runs show <run>` or `cruncher runs list`).
+
+---
+
+#### `cruncher config`
+
+Summarize effective configuration settings.
+
+Examples:
+
+* `cruncher config <config>`
+* `cruncher config <config> summary`
+
+Note:
+
+* you can pass `--config/-c` before or after the subcommand; if omitted, Cruncher
+  resolves the config from the current directory.
+
+---
+
+#### `cruncher optimizers`
+
+List available optimizer kernels.
+
+Example:
+
+* `cruncher optimizers list`
+
+---
+
+### Global options
+
+* `--log-level INFO|DEBUG|WARNING` (or set `CRUNCHER_LOG_LEVEL`)
+
+
+---
+
+@e-south

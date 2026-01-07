@@ -1,70 +1,92 @@
-# Cruncher config (v2)
+## cruncher config
 
-See `docs/README.md` for the docs map and reading order.
+This page explains the `config.yaml` and how each block maps to the **cruncher** lifecycle. The YAML root key is `cruncher`, the CLI chooses *what* runs (fetch, lock, sample, analyze), the config defines *how* each stage behaves.
 
-`cruncher.mode` is removed. Commands define the action.
+### Contents
 
-Key blocks:
+1. [Root settings](#root-settings)
+2. [IO](#io)
+3. [Motif store](#motif_store)
+4. [Ingest](#ingest)
+5. [Parse](#parse)
+6. [Sample](#sample)
+7. [Analysis](#analysis)
 
-- `motif_store`: local catalog/cache settings
-- `ingest`: source adapters and RegulonDB options
-- `parse`: plots for cached PWMs
-- `sample`: optimizer settings
-- `analysis`: diagnostics for existing runs
+---
 
-Lockfiles: `.cruncher/locks/<config>.lock.json` (required for parse/sample).
-Analyze/report operate on run artifacts and validate the lockfile captured in the run manifest.
+### Root settings
 
-Regulator sets: each entry in `regulator_sets` is sampled independently (separate run folders). Run outputs include
-`active_regulator_set` in `config_used.yaml` and `regulator_set` in `run_manifest.json`.
-
-## Catalog settings
-
+```yaml
+cruncher:
+  out_dir: runs/
+  regulator_sets:
+    - [lexA, cpxR]
 ```
+
+Notes:
+- `out_dir` is resolved relative to the config file.
+- Each regulator set creates its own `parse_...` and `sample_...` run folders.
+- `runs/` is the recommended workspace-local runs directory (keeps outputs alongside the config).
+
+### io
+
+Optional parser extension hooks.
+
+```yaml
+io:
+  parsers:
+    extra_modules: []
+```
+
+Notes:
+- `extra_modules` is a list of importable Python modules that register parsers via
+  `@register("FMT")` decorators in `dnadesign.cruncher.io.parsers.backend`.
+- Use this for custom formats without modifying cruncher core code.
+- Import errors fail fast with explicit messages.
+
+### motif_store
+
+Controls how **cruncher** uses the local catalog and how PWMs are chosen.
+
+```yaml
 motif_store:
   catalog_root: .cruncher
   source_preference: [regulondb]
   allow_ambiguous: false
   pwm_source: matrix   # matrix | sites
   site_kinds: null     # optional filter: ["curated"], ["ht_tfbinding"], ["ht_peak"]
-  combine_sites: false # true combines multiple site sets for a TF (opt-in only)
-  dataset_preference: [] # optional dataset IDs (first match wins)
-  dataset_map: {}        # optional TF -> dataset_id mapping
-  site_window_lengths: {}  # map TF name or dataset:<id> -> fixed window length (bp) for HT sites
-  site_window_center: midpoint # midpoint | summit (summit requires summit metadata)
+  combine_sites: false
+  dataset_preference: []  # HT dataset ranking
+  dataset_map: {}         # TF -> dataset ID
+  site_window_lengths: {} # TF or dataset:<id> -> length (bp)
+  site_window_center: midpoint # midpoint | summit
   min_sites_for_pwm: 2
   allow_low_sites: false
 ```
 
 Notes:
-
-- `pwm_source=matrix` uses stored motif matrices (default).
+- `pwm_source=matrix` uses cached motif matrices (default).
 - `pwm_source=sites` builds PWMs from cached binding-site sequences at runtime.
-- `site_kinds` narrows which site sets are eligible when `pwm_source=sites` (useful when curated + HT are cached).
-- `combine_sites=true` concatenates site sets for a TF before PWM creation (explicit opt-in; default is no combining).
-- `dataset_preference` lets you prefer specific HT datasets when multiple exist for a TF.
-- `dataset_map` locks a TF to a specific HT dataset ID (stronger than preference; avoids ambiguity).
-- `min_sites_for_pwm` sets the minimum number of binding-site sequences required to build a PWM.
-- `allow_low_sites=false` enforces `min_sites_for_pwm` as a hard minimum (sampling will fail if below).
-- Lockfile resolution filters candidates based on `pwm_source` (matrix vs sites).
-- `catalog_root` is project-local; Cruncher resolves it relative to the config file.
-- `cruncher targets status <config>` reports readiness based on these settings.
-- `cruncher config summary <config>` prints the effective sampling settings before you run `sample`.
-- `site_window_lengths` has **no default**; if binding-site lengths vary, set a per‑TF or per‑dataset window length.
-- `site_window_center=midpoint` slices windows symmetrically; `summit` is reserved for sources that expose summits.
+- Local motif sources provide matrices only; when `pwm_source=sites`, they are ignored by lock/parse.
+- If site lengths vary, set `site_window_lengths` per TF or dataset.
+- `combine_sites=false` avoids mixing curated and HT sites unless you opt in.
+- When `combine_sites=true`, lockfiles hash all matching site sets for the TF (respecting `site_kinds`); adding/removing site sets requires re-locking.
+- `site_window_center=summit` requires per-site summit metadata; use `midpoint` unless your source provides summits.
 
-## RegulonDB adapter configuration
+### ingest
 
-```
+Controls source adapters, genome hydration, and HTTP retries.
+
+```yaml
 ingest:
-  genome_source: ncbi              # ncbi | fasta | none
-  genome_fasta: null               # optional FASTA for hydrating coordinate-only sites
-  genome_cache: .cruncher/genomes  # cache for downloaded genomes
-  genome_assembly: null            # optional assembly/contig accession for local FASTA validation
-  contig_aliases: {}               # optional mapping for contig aliases (e.g., chr -> U00096.3)
-  ncbi_email: null                 # recommended for NCBI E-utilities
-  ncbi_tool: cruncher              # NCBI tool identifier
-  ncbi_api_key: null               # optional NCBI API key
+  genome_source: ncbi       # ncbi | fasta | none
+  genome_fasta: null        # local FASTA (optional)
+  genome_cache: .cruncher/genomes
+  genome_assembly: null
+  contig_aliases: {}
+  ncbi_email: null
+  ncbi_tool: cruncher
+  ncbi_api_key: null
   ncbi_timeout_seconds: 30
   http:
     retries: 3
@@ -75,7 +97,7 @@ ingest:
   regulondb:
     base_url: https://regulondb.ccg.unam.mx/graphql
     verify_ssl: true
-    ca_bundle: null                # optional override CA bundle
+    ca_bundle: null
     timeout_seconds: 30
     motif_matrix_source: alignment   # alignment | sites
     alignment_matrix_semantics: probabilities  # probabilities | counts
@@ -83,107 +105,223 @@ ingest:
     allow_low_sites: false
     curated_sites: true
     ht_sites: false
-    ht_dataset_sources: null         # list of HT sources to scan, or null for all
+    ht_dataset_sources: null
     ht_dataset_type: TFBINDING
     ht_binding_mode: tfbinding       # tfbinding | peaks
     uppercase_binding_site_only: true
+  local_sources:
+    - source_id: omalley_ecoli_meme
+      description: O'Malley et al. E. coli MEME motifs (Supplementary Data 2)
+      root: /path/to/dnadesign-data/primary_literature/OMalley_et_al/escherichia_coli_motifs
+      patterns: ["*.txt"]
+      recursive: false
+      format_map: {".txt": "MEME"}
+      default_format: null
+      tf_name_strategy: stem
+      matrix_semantics: probabilities
+      organism:
+        name: Escherichia coli
+      citation: "O'Malley et al. 2021 (DOI: 10.1038/s41592-021-01312-2)"
+      source_url: https://github.com/e-south/dnadesign-data
+      tags:
+        doi: 10.1038/s41592-021-01312-2
+        title: "Persistence and plasticity in bacterial gene regulation"
+        association: "TF-gene interactions"
+        comments: "DAP-seq (DNA affinity purification sequencing) motifs across 354 TFs in 48 bacteria (~17,000 binding maps)."
 ```
 
 Notes:
+- `genome_source=ncbi` hydrates coordinate-only sites using NCBI (default).
+- `genome_source=fasta` uses `genome_fasta` and optional `genome_assembly`.
+- `ca_bundle` overrides the default trust store plus bundled intermediate.
+- `motif_matrix_source=alignment` fails if no alignment payload exists.
+- `local_sources` adds local motif directories as first-class sources.
+  Roots are resolved relative to the config path if they are not absolute.
+- Each local source must set `format_map` and/or `default_format` so `.txt` (or other)
+  files can be parsed. Missing mappings fail fast.
+- Local sources provide motif matrices only (no binding-site records).
+- For DAP-seq local datasets (DNA affinity purification sequencing), see the
+  `dnadesign-data` repository and cite O'Malley et al. "Persistence and plasticity in
+  bacterial gene regulation" (DOI: 10.1038/s41592-021-01312-2). The E. coli motifs are
+  provided in MEME format (Supplementary Data 2).
 
-- `motif_matrix_source=alignment` is the default and **fails** if no alignment payload is available.
-- `motif_matrix_source=sites` computes a PWM from curated binding-site sequences and requires equal-length sites.
-- `min_sites_for_pwm` and `allow_low_sites` control PWM creation during ingestion (independent of motif_store).
-- `ca_bundle` overrides the built-in RegulonDB intermediate bundle (certifi remains the default trust store).
-  Cruncher ships the current intermediate by default so SSL works out of the box; set `ca_bundle`
-  only if RegulonDB rotates the chain and you need to pin a newer intermediate.
-- `ht_sites=true` enables HT dataset retrieval (`TFBINDING` and/or peaks depending on `ht_binding_mode`).
-- `fetch sites --dataset-id <id>` enables HT for that request even if `ht_sites=false` (explicit override).
-- `ht_binding_mode` is explicit: choose `tfbinding` for curated sites or `peaks` for peak-only HT data.
-- `genome_source=ncbi` uses NCBI E-utilities to fetch RefSeq/GenBank FASTA by accession (default).
-- `genome_source=fasta` uses `ingest.genome_fasta` and (optionally) `ingest.genome_assembly` for validation.
-- `genome_cache` is project-local; downloads are cached by accession and reused across runs.
-- `contig_aliases` lets you map adapter contig labels to FASTA contig names explicitly.
-- `ingest.genome_fasta` and `genome_cache` paths are resolved relative to the config file.
-- `ncbi_email` is recommended for polite use of NCBI E-utilities (and helps with throttling).
-- `ncbi_api_key` (optional) raises NCBI request limits for large HT datasets.
+### parse
 
-## Sampling settings
+Logo rendering settings for cached PWMs.
 
-Two additional runtime controls are provided for reproducibility and performance:
-
+```yaml
+parse:
+  plot:
+    logo: true
+    bits_mode: information
+    dpi: 150
 ```
+
+Notes:
+- `logo: false` skips logo rendering but still validates cached PWMs and writes a run manifest.
+- When `motif_store.pwm_source=sites`, logo subtitles indicate site provenance
+  (curated, high-throughput, or combined).
+
+### sample
+
+Sampling and optimizer settings.
+
+```yaml
 sample:
-  seed: 42          # deterministic RNG seed
-  record_tune: false  # store burn-in states in sequences.parquet
-  progress_bar: true  # show progress bars
-  progress_every: 1000 # log progress summary every N steps
-  save_trace: true    # write trace.nc (requires netCDF backend)
-  save_sequences: true  # required for analyze/report
-  pwm_sum_threshold: 0.0 # filter elites by sum of per-TF scaled scores
-  include_consensus_in_elites: false # add PWM consensus to elites metadata
+  bidirectional: true
+  seed: 42
+  record_tune: false
+  progress_bar: true
+  progress_every: 1000
+  save_trace: true
+  save_sequences: true
+  init:
+    kind: random
+    length: 30
+    pad_with: background
+  draws: 500
+  tune: 200
+  chains: 2
+  min_dist: 1
+  top_k: 5
+  moves:
+    block_len_range: [2, 6]
+    multi_k_range: [2, 6]
+    slide_max_shift: 4
+    swap_len_range: [2, 8]
+    move_probs:
+      S: 0.80
+      B: 0.10
+      M: 0.10
+  optimiser:
+    kind: gibbs        # gibbs | pt
+    scorer_scale: llr  # llr | z | logp | consensus-neglop-sum
+    cooling:
+      kind: linear
+      beta: [0.0001, 0.001]
+    swap_prob: 0.10
+  pwm_sum_threshold: 0.0
+  include_consensus_in_elites: false
 ```
 
 Notes:
+- `save_sequences=true` is required for `analyze` and `report`.
+- `save_trace=true` is required for trace-based plots and `report`.
+- `bidirectional=true` scores both strands (reverse complement) when scanning PWMs.
+- `min_dist` is the Hamming-distance filter for elite sequences (0 disables).
+- `top_k` controls how many top sequences per chain are retained before elite filtering.
+- `pwm_sum_threshold` filters elites by summed normalized scores (0 keeps all).
+- `include_consensus_in_elites` adds per-TF PWM consensus strings to elites metadata.
+- R-hat needs ≥2 chains and ESS needs ≥4 draws; otherwise `report` shows `n/a` and records diagnostics warnings.
 
-- `seed` drives all RNG used by MCMC initialisation and move proposals.
-- `record_tune=false` reduces memory and output size by skipping burn-in states.
-- `save_sequences=true` is required for `analyze` and `report` (no fallback).
-- `progress_every=0` disables periodic progress logging.
-- `save_trace=false` skips NetCDF output. `cruncher report` always requires `trace.nc`; `cruncher analyze` only requires it when trace/autocorr/convergence plots are enabled.
-- If `init.kind=consensus`, `init.regulator` must be a TF in the active regulator set.
+### analysis
 
-## Optimizer settings
+Diagnostics and plotting settings for existing sample runs.
 
-```
-optimiser:
-  kind: gibbs
-  scorer_scale: llr
-  cooling:
-    kind: linear
-    beta: [0.0001, 0.001]
-  swap_prob: 0.10
-```
-
-Notes:
-
-- `swap_prob` controls swap attempts for the PT optimizer (ignored by single-chain Gibbs).
-
-## Analysis settings
-
-```
+```yaml
 analysis:
-  runs:
-    - sample_lexA-cpxR_20250101_120000
-  tf_pair: [lexA, cpxR]   # optional: enable 2D plots for a chosen pair
+  runs: []
+  tf_pair: [lexA, cpxR]
+  archive: false
   plots:
     trace: true
     autocorr: true
     convergence: true
     scatter_pwm: true
-    pair_pwm: true         # requires tf_pair
-    parallel_pwm: true     # requires tf_pair
+    pair_pwm: true
+    parallel_pwm: true
     score_hist: true
     score_box: false
     correlation_heatmap: true
     parallel_coords: true
   scatter_scale: llr
-  scatter_style: edges # edges | thresholds
+  scatter_style: edges
   subsampling_epsilon: 10.0
 ```
 
 Notes:
+- `analysis.runs` lists sample run directory names. If empty, use `--run` or
+  `--latest` when calling `cruncher analyze`.
+- `tf_pair` is required for pairwise plots.
+- `archive=true` moves the previous analysis into `analysis/_archive/<analysis_id>/`
+  before writing the new one.
+- `scatter_scale` supports `llr`, `z`, `logp`, or `consensus-neglop-sum`.
+- `scatter_style` toggles scatter styling (`edges` or `thresholds`).
+- `scatter_style=thresholds` requires `scatter_scale=llr` and uses `sample.pwm_sum_threshold` for the x+y cutoff.
+- `subsampling_epsilon` controls how per-PWM draws are subsampled for scatter plots; it is the minimum Euclidean change in per-TF score space required to keep a draw (must be > 0).
+- `cruncher analyze --list-plots` shows the registry and required inputs.
 
-- `analysis.runs` must list sample run directory names (no implicit fallback). You can override with
-  `cruncher analyze --run <name>` or `--latest`.
-- `tf_pair` is required for pairwise plots (scatter, pair_pwm, parallel_pwm).
-- `scatter_style=edges` draws chain edges; `thresholds` draws percentile cutoffs.
-- Each analysis run is written under `analysis/<analysis_id>/` inside the sample run directory.
+### Inspect resolved config
 
-## Scoring scales
+`cruncher config` prints the resolved settings that will be used by the CLI.
 
-`optimiser.scorer_scale` and `analysis.scatter_scale` must be one of:
+Example output (captured with `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200`):
 
+```bash
+                                                                                        Cruncher config summary
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Key                              ┃ Value                                                                                                                                                             ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ out_dir                          │ runs                                                                                                                                                              │
+│ regulator_sets                   │ [['lexA', 'cpxR']]                                                                                                                                                │
+│ regulators_flat                  │ lexA, cpxR                                                                                                                                                        │
+│ pwm_source                       │ sites                                                                                                                                                             │
+│ site_kinds                       │ None                                                                                                                                                              │
+│ combine_sites                    │ False                                                                                                                                                             │
+│ dataset_preference               │ []                                                                                                                                                                │
+│ dataset_map                      │ {}                                                                                                                                                                │
+│ site_window_lengths              │ {'lexA': 15, 'cpxR': 11}                                                                                                                                          │
+│ site_window_center               │ midpoint                                                                                                                                                          │
+│ min_sites_for_pwm                │ 2                                                                                                                                                                 │
+│ source_preference                │ ['regulondb']                                                                                                                                                     │
+│ allow_ambiguous                  │ False                                                                                                                                                             │
+│ ingest.genome_source             │ ncbi                                                                                                                                                              │
+│ ingest.genome_fasta              │ -                                                                                                                                                                 │
+│ ingest.genome_cache              │ .cruncher/genomes                                                                                                                                                 │
+│ ingest.genome_assembly           │ -                                                                                                                                                                 │
+│ ingest.contig_aliases            │ {}                                                                                                                                                                │
+│ ingest.ncbi_email                │ -                                                                                                                                                                 │
+│ ingest.ncbi_tool                 │ cruncher                                                                                                                                                          │
+│ ingest.ncbi_timeout              │ 30                                                                                                                                                                │
+│ ingest.http.retries              │ 3                                                                                                                                                                 │
+│ ingest.http.backoff_seconds      │ 0.5                                                                                                                                                               │
+│ ingest.http.max_backoff_seconds  │ 8.0                                                                                                                                                               │
+│ ingest.regulondb.curated_sites   │ True                                                                                                                                                              │
+│ ingest.regulondb.ht_sites        │ False                                                                                                                                                             │
+│ ingest.regulondb.ht_dataset_type │ TFBINDING                                                                                                                                                         │
+│ ingest.regulondb.ht_binding_mode │ tfbinding                                                                                                                                                         │
+│ init.kind                        │ random                                                                                                                                                            │
+│ init.length                      │ 30                                                                                                                                                                │
+│ init.regulator                   │ None                                                                                                                                                              │
+│ draws                            │ 500                                                                                                                                                               │
+│ tune                             │ 200                                                                                                                                                               │
+│ chains                           │ 2                                                                                                                                                                 │
+│ top_k                            │ 5                                                                                                                                                                 │
+│ min_dist                         │ 1                                                                                                                                                                 │
+│ seed                             │ 42                                                                                                                                                                │
+│ record_tune                      │ False                                                                                                                                                             │
+│ progress_bar                     │ True                                                                                                                                                              │
+│ progress_every                   │ 200                                                                                                                                                               │
+│ save_trace                       │ True                                                                                                                                                              │
+│ save_sequences                   │ True                                                                                                                                                              │
+│ bidirectional                    │ True                                                                                                                                                              │
+│ pwm_sum_threshold                │ 0.0                                                                                                                                                               │
+│ include_consensus_in_elites      │ False                                                                                                                                                             │
+│ optimizer.kind                   │ gibbs                                                                                                                                                             │
+│ scorer_scale                     │ llr                                                                                                                                                               │
+│ cooling                          │ {'kind': 'linear', 'beta': (0.0001, 0.001)}                                                                                                                       │
+│ swap_prob                        │ 0.1                                                                                                                                                               │
+│ analysis.runs                    │ []                                                                                                                                                                │
+│ analysis.plots                   │ {'trace': True, 'autocorr': True, 'convergence': True, 'scatter_pwm': True, 'pair_pwm': True, 'parallel_pwm': True, 'score_hist': True, 'score_box': False,       │
+│                                  │ 'correlation_heatmap': True, 'parallel_coords': True}                                                                                                             │
+│ analysis.scatter_scale           │ llr                                                                                                                                                               │
+│ analysis.subsampling_epsilon     │ 10.0                                                                                                                                                              │
+│ analysis.scatter_style           │ edges                                                                                                                                                             │
+│ analysis.tf_pair                 │ ['lexA', 'cpxR']                                                                                                                                                  │
+│ analysis.archive                 │ False                                                                                                                                                             │
+└──────────────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
-llr | z | logp | consensus-neglop-sum
-```
+
+---
+
+@e-south

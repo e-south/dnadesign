@@ -25,6 +25,7 @@ def _config(
     pwm_source: str = "sites",
     min_sites: int = 2,
     allow_low_sites: bool = False,
+    combine_sites: bool = False,
     regulator_sets: list[list[str]] | None = None,
 ) -> CruncherConfig:
     regulator_sets = regulator_sets or [["lexA", "oxyR"]]
@@ -36,6 +37,7 @@ def _config(
             pwm_source=pwm_source,
             min_sites_for_pwm=min_sites,
             allow_low_sites=allow_low_sites,
+            combine_sites=combine_sites,
         ),
         ingest=IngestConfig(),
         parse=ParseConfig(plot=PlotConfig(logo=False, bits_mode="information", dpi=100)),
@@ -86,6 +88,35 @@ def test_target_status_warning_and_ready(tmp_path: Path) -> None:
     assert status_map["lexA"] == "warning"
     assert status_map["oxyR"] == "ready"
     assert has_blocking_target_errors(statuses) is False
+
+
+def test_target_status_missing_sequences_blocks(tmp_path: Path) -> None:
+    cfg = _config(tmp_path, pwm_source="sites", min_sites=1, allow_low_sites=True, regulator_sets=[["lexA"]])
+    lock_payload = {
+        "pwm_source": "sites",
+        "resolved": {"lexA": {"source": "regulondb", "motif_id": "RBM1", "sha256": "aaa"}},
+    }
+    _write_lock(tmp_path, json.dumps(lock_payload))
+    catalog = CatalogIndex(
+        entries={
+            "regulondb:RBM1": CatalogEntry(
+                source="regulondb",
+                motif_id="RBM1",
+                tf_name="lexA",
+                kind="PFM",
+                has_sites=True,
+                site_count=1,
+                site_total=2,
+            )
+        }
+    )
+    catalog.save(tmp_path / ".cruncher")
+    sites_dir = tmp_path / ".cruncher" / "normalized" / "sites" / "regulondb"
+    sites_dir.mkdir(parents=True, exist_ok=True)
+    (sites_dir / "RBM1.jsonl").write_text(json.dumps({"sequence": "ACGT"}) + "\n")
+    statuses = target_statuses(cfg=cfg, config_path=tmp_path / "config.yaml")
+    assert statuses[0].status == "missing-sequences"
+    assert has_blocking_target_errors(statuses) is True
 
 
 def test_target_status_missing_catalog(tmp_path: Path) -> None:
@@ -228,3 +259,106 @@ def test_target_candidates_fuzzy(tmp_path: Path) -> None:
     candidates = target_candidates_fuzzy(cfg=cfg, config_path=tmp_path / "config.yaml", min_score=0.5, limit=5)
     assert candidates[0].tf_name == "lex"
     assert len(candidates[0].candidates) == 1
+
+
+def test_target_status_combine_sites_needs_window(tmp_path: Path) -> None:
+    cfg = _config(
+        tmp_path,
+        pwm_source="sites",
+        min_sites=1,
+        allow_low_sites=True,
+        combine_sites=True,
+        regulator_sets=[["lexA"]],
+    )
+    lock_payload = {
+        "pwm_source": "sites",
+        "combine_sites": True,
+        "resolved": {"lexA": {"source": "regulondb", "motif_id": "DATASET1", "sha256": "aaa"}},
+    }
+    _write_lock(tmp_path, json.dumps(lock_payload))
+    catalog = CatalogIndex(
+        entries={
+            "regulondb:DATASET1": CatalogEntry(
+                source="regulondb",
+                motif_id="DATASET1",
+                tf_name="lexA",
+                kind="PFM",
+                has_sites=True,
+                site_count=3,
+                site_total=3,
+                site_length_min=10,
+                site_length_max=10,
+            ),
+            "regulondb:DATASET2": CatalogEntry(
+                source="regulondb",
+                motif_id="DATASET2",
+                tf_name="lexA",
+                kind="PFM",
+                has_sites=True,
+                site_count=2,
+                site_total=2,
+                site_length_min=12,
+                site_length_max=12,
+            ),
+        }
+    )
+    catalog.save(tmp_path / ".cruncher")
+    sites_dir = tmp_path / ".cruncher" / "normalized" / "sites" / "regulondb"
+    sites_dir.mkdir(parents=True, exist_ok=True)
+    (sites_dir / "DATASET1.jsonl").write_text(json.dumps({"sequence": "ACGTACGTAA"}) + "\n")
+    (sites_dir / "DATASET2.jsonl").write_text(json.dumps({"sequence": "ACGTACGTACGT"}) + "\n")
+
+    statuses = target_statuses(cfg=cfg, config_path=tmp_path / "config.yaml")
+    assert statuses[0].status == "needs-window"
+
+
+def test_target_status_combine_sites_aggregates_counts(tmp_path: Path) -> None:
+    cfg = _config(
+        tmp_path,
+        pwm_source="sites",
+        min_sites=5,
+        allow_low_sites=False,
+        combine_sites=True,
+        regulator_sets=[["lexA"]],
+    )
+    lock_payload = {
+        "pwm_source": "sites",
+        "combine_sites": True,
+        "resolved": {"lexA": {"source": "regulondb", "motif_id": "RDB1", "sha256": "aaa"}},
+    }
+    _write_lock(tmp_path, json.dumps(lock_payload))
+    catalog = CatalogIndex(
+        entries={
+            "regulondb:RDB1": CatalogEntry(
+                source="regulondb",
+                motif_id="RDB1",
+                tf_name="lexA",
+                kind="PFM",
+                has_sites=True,
+                site_count=3,
+                site_total=3,
+                site_length_min=10,
+                site_length_max=10,
+            ),
+            "regulondb:RDB2": CatalogEntry(
+                source="regulondb",
+                motif_id="RDB2",
+                tf_name="lexA",
+                kind="PFM",
+                has_sites=True,
+                site_count=4,
+                site_total=4,
+                site_length_min=10,
+                site_length_max=10,
+            ),
+        }
+    )
+    catalog.save(tmp_path / ".cruncher")
+    sites_dir = tmp_path / ".cruncher" / "normalized" / "sites" / "regulondb"
+    sites_dir.mkdir(parents=True, exist_ok=True)
+    (sites_dir / "RDB1.jsonl").write_text(json.dumps({"sequence": "ACGTACGTAA"}) + "\n")
+    (sites_dir / "RDB2.jsonl").write_text(json.dumps({"sequence": "ACGTACGTAA"}) + "\n")
+
+    statuses = target_statuses(cfg=cfg, config_path=tmp_path / "config.yaml")
+    assert statuses[0].status == "ready"
+    assert statuses[0].site_count == 7

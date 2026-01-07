@@ -5,9 +5,10 @@ from pathlib import Path
 
 import pytest
 
+from dnadesign.cruncher.services.lock_service import resolve_lock
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
-from dnadesign.cruncher.store.lockfile import LockedMotif, Lockfile, verify_lockfile_hashes
-from dnadesign.cruncher.utils.hashing import sha256_path
+from dnadesign.cruncher.store.lockfile import LockedMotif, Lockfile, read_lockfile, verify_lockfile_hashes
+from dnadesign.cruncher.utils.hashing import sha256_lines, sha256_path
 
 
 def _write_motif(path: Path, *, source: str, motif_id: str, tf_name: str) -> None:
@@ -82,3 +83,50 @@ def test_verify_lockfile_hashes_sites_dataset_mismatch(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError):
         verify_lockfile_hashes(lockfile=lockfile, catalog_root=catalog_root, expected_pwm_source="sites")
+
+
+def test_resolve_lock_combines_site_hashes(tmp_path: Path) -> None:
+    catalog_root = tmp_path
+    entries = {
+        "regulondb:RBM1": CatalogEntry(
+            source="regulondb",
+            motif_id="RBM1",
+            tf_name="lexA",
+            kind="PFM",
+            has_sites=True,
+        ),
+        "regulondb:RBM2": CatalogEntry(
+            source="regulondb",
+            motif_id="RBM2",
+            tf_name="lexA",
+            kind="PFM",
+            has_sites=True,
+        ),
+    }
+    CatalogIndex(entries=entries).save(catalog_root)
+
+    sites_dir = catalog_root / "normalized" / "sites" / "regulondb"
+    sites_dir.mkdir(parents=True, exist_ok=True)
+    (sites_dir / "RBM1.jsonl").write_text(json.dumps({"sequence": "ACGT"}) + "\n")
+    (sites_dir / "RBM2.jsonl").write_text(json.dumps({"sequence": "TGCA"}) + "\n")
+
+    lock_path = catalog_root / "locks" / "config.lock.json"
+    resolve_lock(
+        names=["lexA"],
+        catalog_root=catalog_root,
+        pwm_source="sites",
+        combine_sites=True,
+        lock_path=lock_path,
+    )
+
+    payload = json.loads(lock_path.read_text())
+    resolved = payload["resolved"]["lexA"]
+    lines = []
+    for motif_id in ("RBM1", "RBM2"):
+        path = sites_dir / f"{motif_id}.jsonl"
+        lines.append(f"regulondb:{motif_id}:{sha256_path(path)}")
+    expected = sha256_lines(lines)
+    assert resolved["sha256"] == expected
+
+    lockfile = read_lockfile(lock_path)
+    verify_lockfile_hashes(lockfile=lockfile, catalog_root=catalog_root, expected_pwm_source="sites")

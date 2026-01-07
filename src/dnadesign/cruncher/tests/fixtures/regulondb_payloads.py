@@ -142,6 +142,7 @@ REGULON_DETAIL = {
 }
 
 HT_SOURCES = {"listAllHTSources": ["BAUMGART"]}
+HT_DATASET_TYPES = {"listAllDatasetTypes": ["TFBINDING"]}
 
 HT_DATASETS = {
     "BAUMGART": {

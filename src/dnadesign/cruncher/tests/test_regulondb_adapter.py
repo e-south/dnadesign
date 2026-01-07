@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import pytest
+
+from dnadesign.cruncher.ingest.adapters import regulondb as regulondb_module
 from dnadesign.cruncher.ingest.adapters.regulondb import RegulonDBAdapter, RegulonDBAdapterConfig
 from dnadesign.cruncher.ingest.models import DatasetQuery, MotifQuery, SiteQuery
 from dnadesign.cruncher.tests.fixtures.regulondb_payloads import (
     CPXR_ID,
+    HT_DATASET_TYPES,
     HT_DATASETS,
     HT_PEAKS,
     HT_SOURCES,
@@ -11,6 +15,7 @@ from dnadesign.cruncher.tests.fixtures.regulondb_payloads import (
     LEXA_DATASET_ID,
     LEXA_ID,
     REGULON_DETAIL,
+    REGULON_LIST,
     regulon_list_for_search,
 )
 
@@ -18,6 +23,8 @@ from dnadesign.cruncher.tests.fixtures.regulondb_payloads import (
 def _fixture_transport(query: str, variables: dict) -> dict:
     if "listAllHTSources" in query:
         return HT_SOURCES
+    if "listAllDatasetTypes" in query:
+        return HT_DATASET_TYPES
     if "getDatasetsWithMetadata" in query:
         source = variables.get("source")
         return HT_DATASETS.get(source, {"getDatasetsWithMetadata": {"datasets": []}})
@@ -33,6 +40,8 @@ def _fixture_transport(query: str, variables: dict) -> dict:
         if page:
             return {"getAllPeaksOfDataset": []}
         return HT_PEAKS.get(dataset_id, {"getAllPeaksOfDataset": []})
+    if "getAllRegulon" in query:
+        return {"getAllRegulon": {"data": REGULON_LIST["getRegulonBy"]["data"]}}
     if "regulatoryInteractions" in query:
         search = (variables.get("search") or "").lower()
         if search in {LEXA_ID.lower(), "lexa"}:
@@ -103,6 +112,19 @@ def test_list_datasets_for_tf() -> None:
     assert any(ds.dataset_id == LEXA_DATASET_ID for ds in datasets)
 
 
+def test_list_datasets_invalid_type_raises() -> None:
+    adapter = RegulonDBAdapter(
+        RegulonDBAdapterConfig(curated_sites=False, ht_sites=True, ht_dataset_type="BADTYPE"),
+        transport=_fixture_transport,
+    )
+    try:
+        adapter.list_datasets(DatasetQuery())
+    except ValueError as exc:
+        assert "Unknown RegulonDB dataset type" in str(exc)
+    else:
+        raise AssertionError("Expected invalid dataset type to raise ValueError.")
+
+
 def test_list_sites_ht_peaks() -> None:
     adapter = RegulonDBAdapter(
         RegulonDBAdapterConfig(curated_sites=False, ht_sites=True, ht_binding_mode="peaks"),
@@ -115,3 +137,26 @@ def test_list_sites_ht_peaks() -> None:
     assert sites[0].coordinate.contig == "U00096.3"
     assert sites[0].coordinate.assembly == "U00096.3"
     assert sites[0].provenance.tags.get("record_kind") == "ht_peak"
+
+
+def test_list_motifs_requires_inventory_shape() -> None:
+    def transport(query: str, variables: dict) -> dict:
+        if "getAllRegulon" in query:
+            return {"getAllRegulon": {"data": None}}
+        return {"getRegulonBy": {"data": []}}
+
+    adapter = RegulonDBAdapter(transport=transport)
+    with pytest.raises(RuntimeError) as excinfo:
+        adapter.list_motifs(MotifQuery(tf_name=None))
+    assert "getAllRegulon" in str(excinfo.value)
+
+
+def test_graphql_length_error_includes_hint(monkeypatch) -> None:
+    def fake_request_json(*_args, **_kwargs):
+        return {"errors": [{"message": "Cannot read properties of undefined (reading 'length')"}]}
+
+    monkeypatch.setattr(regulondb_module, "request_json", fake_request_json)
+    adapter = RegulonDBAdapter(RegulonDBAdapterConfig())
+    with pytest.raises(RuntimeError) as excinfo:
+        adapter._post_graphql("query { getAllRegulon(limit: 1, page: 0) { data { _id } } }", {})
+    assert "Remote inventory may be unavailable" in str(excinfo.value)

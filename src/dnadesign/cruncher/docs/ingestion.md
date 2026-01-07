@@ -1,152 +1,243 @@
-# Ingestion
+## cruncher ingestion
 
-See `docs/README.md` for the docs map and reading order.
+Ingestion is how **cruncher** discovers and caches motif matrices and binding sites from external sources.
 
-Adapters normalize source payloads into `MotifRecord` and `SiteInstance`.
+### Contents
 
-## Local catalog cache
+1. [How ingestion works](#how-ingestion-works)
+2. [Cache layout](#cache-layout)
+3. [General normalization rules](#general-normalization-rules)
+4. [RegulonDB](#regulondb)
+5. [Local motif directories](#local-motif-directories)
+6. [Curated TF binding sites](#curated-tf-binding-sites)
+7. [High-throughput datasets](#high-throughput-datasets)
+8. [Hydration](#hydration)
+9. [Fetching data](#fetching-data)
+10. [PWM creation strategy](#pwm-creation-strategy)
+11. [Common issues](#common-issues)
 
-Cruncher writes a project-local cache under `.cruncher/` (configurable via `motif_store.catalog_root`):
+---
 
-- `normalized/motifs/<source>/<motif_id>.json` (motif matrix + provenance)
-- `normalized/sites/<source>/<motif_id>.jsonl` (binding-site instances)
-- `catalog.json` (index of what’s cached: TFs, matrices, site counts)
+### How ingestion works
 
-This index is how Cruncher lists “what we have in-house” without touching the network.
+1. **Fetch** raw payloads from a source adapter (for example RegulonDB).
+2. **Normalize** into `MotifRecord` and `SiteInstance`.
+3. **Cache** normalized records under the project-local `.cruncher/` directory.
+4. **Index** everything in `catalog.json` so **cruncher** can answer "what do we have?"
 
-`cruncher catalog list` renders one line per cached motif and includes:
+---
 
-- matrix availability (`matrix` vs `no-matrix`)
-- site availability (`sites:<n>` vs `no-sites`)
-- matrix provenance tags (e.g., `matrix:alignment` vs `matrix:sites`)
-- organism metadata when provided by the source
+### Cache layout
 
-## RegulonDB (GraphQL)
+```
+.cruncher/
+  catalog.json
+  locks/
+    <config>.lock.json
+  normalized/
+    motifs/<source>/<motif_id>.json
+    sites/<source>/<motif_id>.jsonl
+```
 
-Cruncher queries the RegulonDB Datamarts GraphQL endpoint:
+`catalog.json` is the local source of truth for cached motifs and sites.
+
+---
+
+### General normalization rules
+
+- **Sequences** must be A/C/G/T only (invalid sequences are rejected).
+- **Coordinates** are stored as 0-based, half-open intervals.
+- **Hydration** is required when HT peaks have coordinates but no sequences.
+- **Site length variability**: if site lengths vary, set
+  `motif_store.site_window_lengths` per TF or dataset before building PWMs.
+
+---
+
+### RegulonDB
+
+**cruncher** queries the RegulonDB Datamarts GraphQL endpoint:
 
 ```
 https://regulondb.ccg.unam.mx/graphql
 ```
 
-Cruncher ships the current RegulonDB intermediate CA bundle so SSL verification works out of the box.
-Override with `ingest.regulondb.ca_bundle` only if the server rotates certificates.
+NOTE: **cruncher** uses the default trust store plus a bundled RegulonDB intermediate
+certificate. If the server rotates its chain, set `ingest.regulondb.ca_bundle`.
+Inventory listing uses `getAllRegulon`; `getRegulonBy` expects a non-empty search
+string and will error if the search is blank.
+If the RegulonDB GraphQL service returns internal errors (for example,
+`Cannot read properties of undefined (reading 'length')`), **cruncher** fails fast
+with guidance. In that case, rerun later or scope to cached inventory only
+(`cruncher sources summary --scope cache`) until the upstream issue is resolved.
 
-### Curated regulon TFBS
+---
 
-We use the **regulon** datamart to retrieve curated binding sites:
+### Local motif directories
 
+Local motif sources let you ingest directories of MEME (or other) motif files as
+first-class sources. Each file becomes a cached motif entry, with TF names derived
+from the filename stem by default.
+
+Key behaviors:
+
+- **Root validation**: missing roots or empty matches fail fast.
+- **Explicit parsing**: you must provide `format_map` and/or `default_format`.
+- **TF naming**: default is file stem (preserves case), configurable via `tf_name_strategy`.
+- **Provenance**: dataset metadata (DOI, comments) lives in config tags/citation, not code.
+- **Path resolution**: relative roots are resolved from the config file location.
+- **Motifs only**: local sources do not provide binding-site records.
+
+Example config (O'Malley et al. MEME files):
+
+```yaml
+ingest:
+  local_sources:
+    - source_id: omalley_ecoli_meme
+      description: O'Malley et al. E. coli MEME motifs (Supplementary Data 2)
+      root: /path/to/dnadesign-data/primary_literature/OMalley_et_al/escherichia_coli_motifs
+      patterns: ["*.txt"]
+      recursive: false
+      format_map: {".txt": "MEME"}
+      tf_name_strategy: stem
+      matrix_semantics: probabilities
+      citation: "O'Malley et al. 2021 (DOI: 10.1038/s41592-021-01312-2)"
+      source_url: https://github.com/e-south/dnadesign-data
+      tags:
+        doi: 10.1038/s41592-021-01312-2
+        title: "Persistence and plasticity in bacterial gene regulation"
+        association: "TF-gene interactions"
+        comments: "DAP-seq (DNA affinity purification sequencing) motifs across 354 TFs in 48 bacteria (~17,000 binding maps)."
 ```
-getRegulonBy(search) → RegulonDatamart
-  regulator { name, abbreviatedName }
-  regulatoryInteractions { regulatoryBindingSites { _id, leftEndPosition, rightEndPosition, strand, sequence } }
-  aligmentMatrix { matrix, aligment, consensus }
+
+Example CLI flow:
+
+- `cruncher sources list <config>` (should include `omalley_ecoli_meme`)
+- `cruncher fetch motifs --source omalley_ecoli_meme --tf lexA <config>`
+- `cruncher lock <config>`
+- `cruncher parse <config>`
+
+If you need custom parsing, register your parser module via
+`io.parsers.extra_modules` and map extensions to your format.
+
+Data note: the `dnadesign-data` repository contains a curated local copy of the
+O'Malley et al. DAP-seq dataset (DNA affinity purification sequencing).
+This high-throughput study reports TF-gene interactions across 354 TFs in
+48 bacteria and generates ~17,000 genome-wide binding maps. The E. coli TF
+DNA-binding motifs are provided in MEME format (Supplementary Data 2). Use the
+`source_url` field to point to the repository and keep provenance in `tags`.
+
+---
+
+### Curated TF binding sites
+
+Curated binding sites are fetched from the regulon datamart and cached as
+`SiteInstance` records. If you set `ingest.regulondb.motif_matrix_source: alignment`,
+**cruncher** uses the alignment payload when present; otherwise it fails fast.
+
+---
+
+### High-throughput datasets
+
+HT datasets (ChIP-seq, ChIP-exo, DAP-seq, gSELEX) are discovered and fetched via
+dedicated dataset queries. Use these tools to inspect them:
+
+- `cruncher sources datasets regulondb <config> [--tf <TF>]`
+- `cruncher fetch sites --dry-run --tf <TF> <config>`
+
+Example output (datasets, captured with `CRUNCHER_LOG_LEVEL=WARNING`):
+
+```bash
+                                                 regulondb datasets
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Dataset ID       ┃ Source   ┃ Method    ┃ TFs                                                          ┃ Genome   ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ RHTECOLIBSD02444 │ BAUMGART │ TFBINDING │ DNA-binding transcriptional repressor LexA, ExrA, LexA, Spr… │ U00096.3 │
+│ RHTECOLIBSD03022 │ GALAGAN  │ TFBINDING │ DNA-binding transcriptional repressor LexA, ExrA, LexA, Spr… │ -        │
+└──────────────────┴──────────┴───────────┴──────────────────────────────────────────────────────────────┴──────────┘
 ```
 
-Important schema notes:
+Example output (`fetch sites --dry-run`, captured with `CRUNCHER_LOG_LEVEL=WARNING`):
 
-- `regulatoryBindingSites` is a **single object** per interaction (not a list).
-- Binding-site `sequence` sometimes contains uppercase motif letters embedded in lowercase flanks.
-- `aligmentMatrix` may contain either a precomputed matrix (`matrix`) or aligned sequences (`aligment`).
-
-### High-throughput TF-binding datasets
-
-RegulonDB provides HT datasets (ChIP-seq/ChIP-exo/DAP/gSELEX), which are accessed through:
-
-```
-listAllHTSources → ["BAUMGART", "PALSSON", "ISHIHAMA", ...]
-getDatasetsWithMetadata(datasetType: "TFBINDING", source: <HT_SOURCE>)
-  datasets { _id, objectsTested { name, abbreviatedName, synonyms } }
-getAllTFBindingOfDataset(datasetId, limit, page)
-  → DatasetTFBinding { _id, chromosome, chrLeftPosition, chrRightPosition, strand, sequence, score, peakId }
-getAllPeaksOfDataset(datasetId, limit, page)
-  → Peaks { _id, chromosome, peakLeftPosition, peakRightPosition, score, siteIds }
+```bash
+                         HT datasets
+┏━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ TF   ┃ Dataset ID       ┃ Source   ┃ Method    ┃ Genome   ┃
+┡━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━┩
+│ lexA │ RHTECOLIBSD02444 │ BAUMGART │ TFBINDING │ U00096.3 │
+│ lexA │ RHTECOLIBSD03022 │ GALAGAN  │ TFBINDING │ -        │
+│ cpxR │ RHTECOLIBSD02736 │ PALSSON  │ TFBINDING │ U00096.3 │
+│ cpxR │ RHTECOLIBSD02409 │ BAUMGART │ TFBINDING │ U00096.3 │
+│ cpxR │ RHTECOLIBSD02988 │ GALAGAN  │ TFBINDING │ -        │
+└──────┴──────────────────┴──────────┴───────────┴──────────┘
 ```
 
-This path is used because it deterministically enumerates HT datasets without relying on
-the advancedSearch syntax.
+When multiple HT datasets exist for a TF, pin selection with:
 
-When multiple HT datasets exist for the same TF, use:
+- `motif_store.dataset_map` (TF -> dataset ID, strongest)
+- `motif_store.dataset_preference` (ordered preference list)
 
-- `cruncher sources datasets regulondb --tf <TF>` to inspect dataset IDs/methods,
-- `motif_store.dataset_map` to pin a TF to a specific dataset,
-- `motif_store.dataset_preference` to rank preferred datasets (first match wins).
+Lockfiles record the chosen dataset ID for reproducibility.
 
-Lockfiles store the chosen dataset ID for reproducibility.
+`ingest.regulondb.ht_dataset_type` is validated against the remote
+`listAllDatasetTypes` response and fails fast if the value is unknown.
 
-Pragmatic note: some HT datasets return peaks only (coordinates, no sequences).
-Cruncher resolves the dataset’s `referenceGenome` / `assemblyGenomeId` and hydrates
-sequences from NCBI by accession (default). The genome FASTA is cached under
-`.cruncher/genomes/<accession>/` and reused across runs. Hydration is strict:
+---
 
-- the HT coordinate must include an assembly/contig accession,
-- the contig must exist in the fetched FASTA,
-- coordinates must be in-bounds.
+### Hydration
 
-If any of these are missing, Cruncher fails fast with a remediation hint. You can
-override hydration with a local FASTA by setting `genome_source=fasta` and providing
-`ingest.genome_fasta`. Hydration uses `pysam`’s FASTA indexer (no bespoke parsing).
-If you request HT sites and no TFBinding **or** peaks exist, Cruncher fails fast.
+Some HT datasets return coordinates without sequences. **cruncher** hydrates those
+coordinates using a reference genome.
 
-When RegulonDB reports `chromosome` as a generic label (e.g., `chr`), Cruncher uses
-the dataset’s `referenceGenome` accession as the contig name to ensure NCBI hydration
-is deterministic and verifiable.
-If you need to override contig labels, set `ingest.contig_aliases` in the config.
+Defaults:
+- `ingest.genome_source=ncbi` (NCBI E-utilities)
+- cached FASTA stored under `.cruncher/genomes/<accession>/`
 
-## Normalization rules
+Offline:
+- set `ingest.genome_source=fasta` and provide `ingest.genome_fasta`
+- or pass `--genome-fasta` to `cruncher fetch sites`
 
-- **Binding-site sequence**:
-  - If mixed case, keep uppercase letters only (motif letters).
-  - Otherwise, take the full sequence.
-  - All sequences must be A/C/G/T only; invalid sequences are rejected.
-- Coordinate-only HT peaks must be hydrated into sequences before PWM creation.
-- HT site sets can contain variable-length sequences; use `cruncher targets stats` to inspect
-  length distributions and set `motif_store.site_window_lengths` per TF or dataset.
-- Hydration tags each site with `sequence_source` and `reference_genome` (when available).
-- **Alignment matrix**:
-  - Accepts JSON matrices, base-labeled rows, or 4-column row matrices.
-  - If only an alignment payload is available, PWM is computed directly from aligned sequences.
-- **Coordinates**:
-  - RegulonDB positions are treated as **1-based inclusive** and converted to 0-based half-open.
-  - The original convention is recorded in provenance tags.
+Hydration is strict:
+- contig names must exist in the FASTA
+- coordinates must be in bounds
+- assembly/accession must be known or provided
 
-## Configuration knobs
+Use `ingest.contig_aliases` if contig labels differ.
 
-See `docs/config.md` for the `ingest.regulondb` block. The important toggles are:
+PWM generation from sites is also strict: cached site records must include sequences.
+If any cached site lacks a sequence, `parse`/`sample` will error until you hydrate
+those sites (for example via `cruncher fetch sites --hydrate <config>`).
 
-- `motif_matrix_source`: `alignment` (default) or `sites`
-- `alignment_matrix_semantics`: `probabilities` or `counts`
-- `curated_sites` / `ht_sites`: enable curated and/or HT TFBS retrieval
-- `ht_binding_mode`: `tfbinding` (strict) or `peaks` (peaks only)
+---
 
-`motif_store.site_window_lengths` and `motif_store.site_window_center` live in the
-catalog config block, not the source adapter, so other HT sources can reuse the same
-windowing contract.
+### Fetching data
 
-## Fetching data
+- `cruncher fetch motifs --tf <TF> <config>` -> caches matrices.
+- `cruncher fetch sites --tf <TF> <config>` -> caches site sets.
+- `cruncher fetch sites --hydrate <config>` -> hydrate missing sequences only (all cached site sets by default).
+- `cruncher fetch sites --dataset-id <id> <config>` -> pin a specific HT dataset
+  (also enables HT access for this request).
+- `--offline` validates cache without network.
+- `--update` forces refresh of cached artifacts.
 
-- `cruncher fetch motifs --tf <TF> <config>` stores motif matrices under `normalized/motifs/`.
-- `cruncher fetch sites --tf <TF> <config>` stores binding-site instances under `normalized/sites/`.
-- `cruncher fetch sites --dry-run --tf <TF> <config>` lists HT datasets without caching.
-- By default, coordinate-only HT peaks are hydrated via NCBI (see `ingest.genome_source`).
-- Use `--genome-fasta` to hydrate against a local reference genome (offline runs).
-- Use `--hydrate` to fill missing sequences in cached site sets without refetching.
-- Add `--offline` to verify cache only (no network).
-- Add `--update` to refresh cached artifacts (including any downloaded genome FASTA).
+---
 
-## PWM creation strategy
+### PWM creation strategy
 
-- `motif_store.pwm_source=matrix` uses cached motif matrices (default).
-- `motif_store.pwm_source=sites` builds PWMs from cached binding-site sequences at runtime.
-- If fewer than `min_sites_for_pwm` sequences are available, Cruncher fails unless `motif_store.allow_low_sites=true`.
-- PWM construction from sites streams counts to avoid loading all sequences into memory.
+- `motif_store.pwm_source=matrix` uses cached matrices (default).
+- `motif_store.pwm_source=sites` builds PWMs from cached binding sites.
+- `min_sites_for_pwm` is enforced unless `allow_low_sites=true`.
 
-## Adding a new source adapter (checklist)
+---
 
-1. Implement a `SourceAdapter` in `ingest/adapters/` with:
-   - `list_motifs`, `get_motif`, `list_sites`, `get_sites_for_motif`
-   - Optional `list_datasets` if the source exposes HT datasets
-2. Normalize payloads into `MotifRecord` / `SiteInstance` with clear provenance tags.
-3. Add adapter registration to `ingest/registry.py`.
-4. Provide fixture-backed tests under `tests/fixtures/<source>/` (no live network in CI).
-5. Update `docs/ingestion.md` with source capabilities and caveats.
+### Common issues
+
+- Missing lockfile: run `cruncher lock <config>` before parse/sample.
+- Target readiness: `cruncher targets status <config>`.
+- Missing cache files: `cruncher cache verify <config>`.
+- HT sites without sequences: set `ingest.genome_source` or use `--genome-fasta`.
+- Variable site lengths: use `cruncher targets stats` and set
+  `motif_store.site_window_lengths`.
+
+---
+
+@e-south

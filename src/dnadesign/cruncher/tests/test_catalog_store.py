@@ -130,3 +130,33 @@ def test_pwm_from_ht_sites_applies_window_length(tmp_path):
     )
     pwm = store.get_pwm(MotifRef(source="regulondb", motif_id="DATASET2"))
     assert pwm.length == 8
+
+
+def test_pwm_from_sites_requires_sequences(tmp_path):
+    sites_dir = tmp_path / "normalized" / "sites" / "regulondb"
+    sites_dir.mkdir(parents=True)
+    site_path = sites_dir / "RDB0004.jsonl"
+    site_path.write_text(json.dumps({"site_id": "s1"}) + "\n")
+
+    catalog = CatalogIndex(
+        entries={
+            "regulondb:RDB0004": CatalogEntry(
+                source="regulondb",
+                motif_id="RDB0004",
+                tf_name="lexA",
+                kind="PFM",
+                has_sites=True,
+                site_count=0,
+                site_total=1,
+            )
+        }
+    )
+    catalog.save(tmp_path)
+
+    store = CatalogMotifStore(tmp_path, pwm_source="sites", min_sites_for_pwm=1, allow_low_sites=False)
+    try:
+        store.get_pwm(MotifRef(source="regulondb", motif_id="RDB0004"))
+    except ValueError as exc:
+        assert "missing a sequence" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for missing site sequences")

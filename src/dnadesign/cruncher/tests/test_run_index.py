@@ -16,7 +16,7 @@ def test_run_index_rebuild(tmp_path: Path) -> None:
             "out_dir": "results",
             "regulator_sets": [["lexA"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": "cache_root",
                 "source_preference": ["regulondb"],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
@@ -78,6 +78,7 @@ def test_run_index_rebuild(tmp_path: Path) -> None:
     )
 
     index_path = rebuild_run_index(cfg, config_path)
+    assert index_path == tmp_path / "cache_root" / "run_index.json"
     payload = json.loads(index_path.read_text())
     assert run_name in payload
 

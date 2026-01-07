@@ -1,94 +1,81 @@
 ## cruncher
 
-**cruncher** designs short DNA sequences that score highly against a set of
-transcription‑factor motifs (PWMs). It keeps data ingestion, optimization logic,
-and reporting decoupled so sources and optimizers can evolve independently.
+**cruncher** is a nucleic acid sequence optimization tool for designing short DNA
+sequences that score highly against multiple user-defined transcription factor
+motifs. Motifs can be represented as [position weight matrices (PWMs)](https://en.wikipedia.org/wiki/Position_weight_matrix).
 
-**Workflow:** fetch → lock → parse → sample → analyze → report.
+
+### Contents
+
+1. [Overview](#overview)
+2. [Quickstart](#quickstart)
+3. [More documentation](#more-documentation)
 
 ---
 
-### Quick start (RegulonDB example)
+### Overview
 
-Lockfiles are mandatory for parse/sample (no implicit TF resolution). Analyze/report operate on
-existing run artifacts and validate the lockfile captured in the run manifest.
+A typical workflow looks like:
+
+1. Fetch motif matrices and/or binding sites from a source (e.g., [RegulonDB](https://regulondb.ccg.unam.mx/), [JASPAR](https://jaspar.elixir.no/)).
+2. Lock TF names to exact cached artifacts (motif IDs + hashes) for reproducibility.
+3. Sample sequences (e.g., [MCMC](https://en.wikipedia.org/wiki/Markov_chain_Monte_Carlo)) using the locked motifs.
+4. Analyze / visualize / report from run artifacts.
+
+---
+
+### Quickstart
 
 ```bash
-# 1) Populate local catalog
-cruncher fetch sites  --tf lexA --tf cpxR src/dnadesign/cruncher/config.yaml
-cruncher fetch motifs --tf lexA --dry-run src/dnadesign/cruncher/config.yaml
-cruncher catalog list src/dnadesign/cruncher/config.yaml
+# Initialize a workspace or jump into the demo
+cd src/dnadesign/cruncher/workspaces/demo
 
-# 2) Lock TF names
-cruncher lock src/dnadesign/cruncher/config.yaml
+# Quick sanity check: list sources
+cruncher sources list
 
-# 3) Preview targets + motifs, then parse
-cruncher targets status src/dnadesign/cruncher/config.yaml
-cruncher status src/dnadesign/cruncher/config.yaml
-cruncher parse src/dnadesign/cruncher/config.yaml
+# Network access (explicit)
+cruncher fetch sites --tf lexA --tf cpxR
 
-# 4) Run optimizer
-cruncher sample src/dnadesign/cruncher/config.yaml
+# Reproducibility pinning
+cruncher lock
 
-# 5) Analyze + report
-cruncher analyze --latest src/dnadesign/cruncher/config.yaml
-cruncher report  src/dnadesign/cruncher/config.yaml sample_<tfset>_<timestamp>
+# Optional: validate + render logos
+cruncher parse
 
-# Optional: interactive notebook
-cruncher notebook --latest path/to/sample_run
+# Optimization
+cruncher sample
+
+# Diagnostics + plots
+cruncher analyze --latest
+
+# Report (JSON + Markdown) for a specific run name
+cruncher runs list
+cruncher report <run_name>
 ```
 
-Install the optional notebook dependency with:
+Example output (sources list):
 
 ```bash
-uv add --group notebooks marimo
+                            Sources
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Source          ┃ Description                                ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ demo_local_meme │ Demo MEME motifs (local files)             │
+│ regulondb       │ RegulonDB datamarts GraphQL (curated + HT) │
+└─────────────────┴────────────────────────────────────────────┘
 ```
-
-Source‑specific details (RegulonDB TLS, HT hydration, windowing rules) live in
-`docs/ingestion.md` and `docs/troubleshooting.md`.
 
 ---
 
-### What to read next
+### More documentation
 
-- `docs/README.md` — docs map and recommended reading order (start here)
-- `docs/demo.md` — end‑to‑end workflow (LexA + CpxR)
-- `docs/cli.md` — concise command reference + examples
-- `docs/config.md` — config schema + examples
-- `docs/architecture.md` — component boundaries + run artifacts
-- `docs/spec.md` — full requirements and design rationale
-
----
-
-### Outputs at a glance
-
-Each run directory contains:
-
-- `config_used.yaml` — resolved runtime config + PWM summaries
-- `run_manifest.json` — provenance, hashes, optimizer stats
-- `run_status.json` — live progress (parse/sample)
-- `sequences.parquet` — per‑draw sequences + per‑TF scores (if enabled)
-- `trace.nc` — ArviZ trace (if enabled)
-- `cruncher_elites_*/` — elite sequences (Parquet + JSON + YAML)
-- `analysis/<analysis_id>/` — analysis artifacts (plots/tables/summary/notebooks)
-- `report.json` / `report.md` — generated summary (report stage)
+1. [CLI reference](docs/cli.md)
+2. [End-to-end demo](docs/demo.md)
+3. [Configuring a project](docs/config.md)
+4. [Ingesting and caching external data](docs/ingestion.md)
+5. [Architecture and artifacts](docs/architecture.md)
+6. [Package specification for developers](docs/spec.md)
 
 ---
 
-### Project layout
-
-```
-dnadesign/
-└─ cruncher/
-   ├─ cli/        # Typer CLI entry point
-   ├─ core/       # PWM/scoring/state/optimizers
-   ├─ ingest/     # Source adapters + normalization
-   ├─ store/      # Catalog cache + lockfiles
-   ├─ services/   # fetch/lock/catalog/targets services
-   ├─ workflows/  # parse/sample/analyze/report orchestration
-   ├─ io/         # parsers + plots
-   ├─ config/     # v2 config schema + loader
-   ├─ docs/       # user and developer docs
-   └─ tests/      # unit + integration tests
-```
-```
+@e-south

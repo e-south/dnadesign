@@ -1,11 +1,27 @@
-# Cruncher Refactor Spec (Developer-Ready)
+## cruncher for developers
 
-See `docs/README.md` for the docs map and reading order.
+This document defines the end-to-end requirements and architecture for **cruncher**
+after the refactor. It is intended as a build and review guide for engineers
+working on ingestion, optimization, and UX. It is not required for end users.
 
-This document defines the end-to-end requirements and architecture for Cruncher after the refactor.
-It is intended as a build and review guide for engineers working on ingestion, optimization, and UX.
+### Contents
 
-## 1) Goals (non-negotiable)
+1. [Goals](#goals)ens
+2. [Architecture](#architecture)
+3. [Registries](#registries)
+4. [Data model](#data-model)
+5. [Cache layout](#cache-layout)
+6. [Lockfiles](#lockfiles)
+6. [PWM creation strategy](#pwm-creation-strategy)
+6. [MCMC optimization spec](#mcmc-optimization-spec)
+6. [Outputs and reporting](#outputs-and-reporting)
+6. [CLI contract](#cli-contract)
+6. [Error handling](#error-handling)
+6. [Testing plan](#testing-plan)
+
+---
+
+### Goals
 
 - Decoupled: core optimization is source-agnostic and runs offline.
 - Assertive: explicit errors for missing inputs, ambiguous TFs, invalid matrices.
@@ -14,15 +30,11 @@ It is intended as a build and review guide for engineers working on ingestion, o
 - Operational UX: clear CLI commands, deterministic cache, readable reports, crisp docs.
 - No fallbacks: no implicit legacy modes, no silent fallbacks, no hidden network access.
 
-## 2) Non-goals (v1)
+---
 
-- Full derivation of motifs from raw sequencing reads.
-- Genome coordinate liftover or orthology mapping.
-- Hosted service or server-backed catalog.
+### Architecture
 
-## 3) Architecture
-
-### Layers (ports & adapters)
+#### Layers (ports & adapters)
 
 - **core/** — PWM, scoring, evaluator, state, optimizers; no I/O.
 - **ingest/** — source adapters (RegulonDB first), normalization, validation.
@@ -30,23 +42,26 @@ It is intended as a build and review guide for engineers working on ingestion, o
 - **workflows/** — parse/sample/analyze/report orchestration.
 - **cli/** — Typer CLI, no business logic.
 
-### Registries
+#### Registries
 
-- **Source registry**: adapters are registered once, resolved by ID.
+- **Source registry**: adapters are registered once, resolved by ID (including config-defined local sources).
+- **Parser registry**: PWM parsers register via `io/parsers/` or `io.parsers.extra_modules`.
 - **Optimizer registry**: kernels are registered once, resolved by name.
 
-## 4) Data model (canonical)
+---
 
-### MotifRecord (normalized)
+### Data model
+
+#### MotifRecord (normalized)
 
 - descriptor: source, motif_id, tf_name, organism, length, kind, tags
 - tags.synonyms: optional semicolon-separated alias list for fuzzy discovery
 - matrix: list[list[float]] (L x 4, probabilities)
-- matrix_semantics: "probabilities" (v1 only)
+- matrix_semantics: "probabilities" or "counts"
 - provenance: source_url, version, license, citation, retrieved_at
 - checksums: sha256_raw, sha256_norm
 
-### SiteInstance (normalized)
+#### SiteInstance (normalized)
 
 - source, site_id, motif_ref (source:motif_id)
 - coordinate: 0-based half-open interval (optional)
@@ -54,10 +69,12 @@ It is intended as a build and review guide for engineers working on ingestion, o
 - strand: "+" | "-" | None
 - provenance: retrieval metadata
 
-## 5) Cache layout (project-local)
+---
+
+### Cache layout
 
 ```
-.cruncher/
+<catalog_root>/
   catalog.json
   run_index.json
   locks/
@@ -70,27 +87,34 @@ It is intended as a build and review guide for engineers working on ingestion, o
 `catalog.json` is the single source of truth for “what we have in-house”.
 It tracks matrix availability, site counts, and provenance tags.
 
-## 6) Lockfiles
+---
+
+### Lockfiles
 
 Lockfiles pin TF names to exact source IDs and checksums. Lockfiles are **required** for:
 
 - parse
 - sample
 
-If a TF cannot be uniquely resolved, Cruncher errors immediately.
+If a TF cannot be uniquely resolved, **cruncher** errors immediately.
 Analyze/report operate on run artifacts and validate the lockfile recorded in the run manifest.
 
-## 7) PWM creation strategy
+---
+
+### PWM creation strategy
 
 - Default: use cached matrices (`motif_store.pwm_source=matrix`).
 - Optional: build PWM from cached sites (`motif_store.pwm_source=sites`).
 - `motif_store.site_kinds` can restrict which site sets are eligible (e.g., curated vs HT).
 - `motif_store.combine_sites=true` concatenates site sets for a TF before PWM creation (explicit opt‑in).
+- When `combine_sites=true`, lockfiles hash the full set of site files used for that TF, so cache changes require re-locking.
 - HT site sets with variable lengths require per‑TF/per‑dataset window lengths via `motif_store.site_window_lengths`.
 - Fail if fewer than `min_sites_for_pwm` binding sites are available (unless `allow_low_sites=true`).
 - All PWMs are validated (shape Lx4, rows sum to 1, non-negative).
 
-## 8) MCMC optimization spec
+---
+
+### MCMC optimization spec
 
 - Deterministic RNG via `sample.seed`.
 - Burn-in storage is optional via `sample.record_tune` (default: false).
@@ -100,27 +124,39 @@ Analyze/report operate on run artifacts and validate the lockfile recorded in th
   - acceptance ratios for B/M moves
   - PT swap acceptance rates
 
-## 9) Outputs & reporting
+---
+
+### Outputs and reporting
 
 Each run directory contains:
 
 - `config_used.yaml` — resolved config + PWM summaries
 - `trace.nc` — canonical ArviZ trace
 - `sequences.parquet` — per-draw sequences + per-TF scores
-- `cruncher_elites_*/<name>.parquet` — elite sequences (parquet)
-- `cruncher_elites_*/<name>.json` — elite sequences (JSON, human-readable)
-- `analysis/<analysis_id>/` — analysis runs (plots/tables/notebooks)
-- `analysis/<analysis_id>/summary.json` — analysis provenance and artifacts
-- `analysis/<analysis_id>/analysis_used.yaml` — analysis settings used
+- `elites.parquet` — elite sequences (parquet)
+- `elites.json` — elite sequences (JSON, human-readable)
+- `elites.yaml` — elite metadata (YAML)
+- `analysis/` — latest analysis (plots/tables/notebooks)
+- `analysis/summary.json` — analysis provenance and artifacts
+- `analysis/analysis_used.yaml` — analysis settings used
+- `analysis/plot_manifest.json` — plot registry and generated outputs
+- `analysis/table_manifest.json` — table registry and generated outputs
+- `analysis/_archive/<analysis_id>/` — optional archived analyses (when enabled)
 - `run_manifest.json` — provenance, hashes, optimizer stats
 - `run_status.json` — live progress updates (written during parse and sampling)
 - `report.json` + `report.md` — summary (from `cruncher report`)
 
 `cruncher report` **fails** if required artifacts are missing.
 
-## 10) CLI contract
+---
+
+### CLI contract
 
 Core lifecycle:
+
+Most commands accept an explicit config (`--config` or legacy positional). If omitted,
+**cruncher** searches the current directory for `cruncher.yaml`, `cruncher.yml`,
+`config.yaml`, or `config.yml`.
 
 - `cruncher fetch motifs ...`
 - `cruncher fetch sites ...`
@@ -155,7 +191,9 @@ Inspection:
 - `cruncher cache verify <config>`
 - `cruncher runs watch <config> <run_name>`
 
-## 11) Error handling (assertive)
+---
+
+### Error handling
 
 Errors are explicit and actionable:
 
@@ -166,7 +204,9 @@ Errors are explicit and actionable:
 - Ambiguous TF resolution → error
 - PWM-from-sites with low site count → error unless `allow_low_sites=true`
 
-## 12) Testing plan (minimum)
+---
+
+### Testing plan
 
 Unit tests:
 
@@ -186,3 +226,7 @@ End-to-end:
 
 - LocalDir ingestion (offline)
 - sample + analyze + report with small draws
+
+---
+
+@e-south

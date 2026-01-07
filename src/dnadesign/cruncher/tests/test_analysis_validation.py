@@ -1,0 +1,372 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+import yaml
+
+from dnadesign.cruncher.config.load import load_config
+from dnadesign.cruncher.core.pwm import PWM
+from dnadesign.cruncher.utils.hashing import sha256_path
+from dnadesign.cruncher.workflows.analyze.per_pwm import gather_per_pwm_scores
+from dnadesign.cruncher.workflows.analyze.plots.diagnostics import make_pair_idata
+from dnadesign.cruncher.workflows.analyze.plots.scatter import plot_scatter
+from dnadesign.cruncher.workflows.analyze.plots.summary import write_elite_topk
+from dnadesign.cruncher.workflows.analyze_workflow import _get_git_commit, run_analyze
+
+
+def test_gather_per_pwm_scores_rejects_invalid_sequence(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    df = pd.DataFrame(
+        {
+            "chain": [0],
+            "draw": [0],
+            "phase": ["draw"],
+            "sequence": ["ACGTN"],
+        }
+    )
+    df.to_parquet(run_dir / "sequences.parquet", engine="fastparquet")
+
+    pwm_matrix = np.full((4, 4), 0.25)
+    pwms = {"lexA": PWM(name="lexA", matrix=pwm_matrix)}
+
+    with pytest.raises(ValueError, match="invalid base"):
+        gather_per_pwm_scores(
+            run_dir,
+            change_threshold=0.1,
+            pwms=pwms,
+            bidirectional=False,
+            scale="llr",
+            out_path=run_dir / "out.csv",
+        )
+
+
+def test_gather_per_pwm_scores_rejects_non_positive_threshold(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    df = pd.DataFrame(
+        {
+            "chain": [0],
+            "draw": [0],
+            "phase": ["draw"],
+            "sequence": ["ACGT"],
+        }
+    )
+    df.to_parquet(run_dir / "sequences.parquet", engine="fastparquet")
+
+    pwm_matrix = np.full((4, 4), 0.25)
+    pwms = {"lexA": PWM(name="lexA", matrix=pwm_matrix)}
+
+    with pytest.raises(ValueError, match="change_threshold must be > 0"):
+        gather_per_pwm_scores(
+            run_dir,
+            change_threshold=0.0,
+            pwms=pwms,
+            bidirectional=False,
+            scale="llr",
+            out_path=run_dir / "out.csv",
+        )
+
+
+def test_gather_per_pwm_scores_single_draw_not_duplicated(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    df = pd.DataFrame(
+        {
+            "chain": [0],
+            "draw": [0],
+            "phase": ["draw"],
+            "sequence": ["ACGTACGT"],
+        }
+    )
+    df.to_parquet(run_dir / "sequences.parquet", engine="fastparquet")
+
+    pwm_matrix = np.full((4, 4), 0.25)
+    pwms = {"lexA": PWM(name="lexA", matrix=pwm_matrix)}
+
+    out_path = run_dir / "out.csv"
+    gather_per_pwm_scores(
+        run_dir,
+        change_threshold=0.1,
+        pwms=pwms,
+        bidirectional=False,
+        scale="llr",
+        out_path=out_path,
+    )
+
+    out_df = pd.read_csv(out_path)
+    assert len(out_df) == 1
+    assert out_df.loc[0, "chain"] == 0
+    assert out_df.loc[0, "draw"] == 0
+
+
+def test_make_pair_idata_requires_consistent_draws(tmp_path: Path) -> None:
+    sample_dir = tmp_path / "sample"
+    sample_dir.mkdir()
+    df = pd.DataFrame(
+        {
+            "chain": [0, 0, 1],
+            "draw": [0, 1, 0],
+            "phase": ["draw", "draw", "draw"],
+            "score_lexA": [1.0, 1.1, 0.9],
+            "score_cpxR": [0.8, 0.85, 0.75],
+        }
+    )
+    df.to_parquet(sample_dir / "sequences.parquet", engine="fastparquet")
+
+    with pytest.raises(ValueError, match="Inconsistent draws"):
+        make_pair_idata(sample_dir, ("lexA", "cpxR"))
+
+
+def test_get_git_commit_handles_gitdir_file(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    nested = repo / "nested" / "dir"
+    nested.mkdir(parents=True)
+
+    git_dir = tmp_path / "actual_git"
+    (git_dir / "refs" / "heads").mkdir(parents=True)
+    (git_dir / "HEAD").write_text("ref: refs/heads/main\n")
+    (git_dir / "refs" / "heads" / "main").write_text("abc123deadbeef\n")
+
+    (repo / ".git").write_text(f"gitdir: {git_dir}\n")
+
+    assert _get_git_commit(nested) == "abc123deadbeef"
+
+
+def test_write_elite_topk_requires_sequence(tmp_path: Path) -> None:
+    df = pd.DataFrame(
+        {
+            "rank": [1],
+            "score_lexA": [1.0],
+        }
+    )
+    out_path = tmp_path / "topk.csv"
+    with pytest.raises(ValueError, match="sequence"):
+        write_elite_topk(df, ["lexA"], out_path, top_k=1)
+
+
+def test_scatter_thresholds_requires_llr(tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "out_dir": "results",
+            "regulator_sets": [["lexA", "cpxR"]],
+            "motif_store": {
+                "catalog_root": ".cruncher",
+                "source_preference": [],
+                "allow_ambiguous": False,
+                "pwm_source": "matrix",
+            },
+            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "sample": {
+                "bidirectional": True,
+                "seed": 7,
+                "record_tune": False,
+                "progress_bar": False,
+                "progress_every": 0,
+                "save_trace": False,
+                "init": {"kind": "random", "length": 12, "pad_with": "background"},
+                "draws": 2,
+                "tune": 1,
+                "chains": 1,
+                "min_dist": 0,
+                "top_k": 1,
+                "moves": {
+                    "block_len_range": [2, 2],
+                    "multi_k_range": [2, 2],
+                    "slide_max_shift": 1,
+                    "swap_len_range": [2, 2],
+                    "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
+                },
+                "optimiser": {
+                    "kind": "gibbs",
+                    "scorer_scale": "llr",
+                    "cooling": {"kind": "fixed", "beta": 1.0},
+                    "swap_prob": 0.1,
+                },
+                "save_sequences": True,
+                "pwm_sum_threshold": 0.0,
+            },
+            "analysis": {
+                "runs": ["sample_thresholds"],
+                "tf_pair": ["lexA", "cpxR"],
+                "plots": {
+                    "trace": False,
+                    "autocorr": False,
+                    "convergence": False,
+                    "scatter_pwm": True,
+                    "pair_pwm": False,
+                    "parallel_pwm": False,
+                    "score_hist": False,
+                    "score_box": False,
+                    "correlation_heatmap": False,
+                    "parallel_coords": False,
+                },
+                "scatter_scale": "z",
+                "scatter_style": "thresholds",
+                "subsampling_epsilon": 10.0,
+            },
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = tmp_path / "results" / "sample_thresholds"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    lock_dir = tmp_path / ".cruncher" / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / "config.lock.json"
+    lock_path.write_text("{}")
+    lock_sha = sha256_path(lock_path)
+
+    pwm_matrix = [[0.25, 0.25, 0.25, 0.25] for _ in range(4)]
+    config_used = {
+        "cruncher": {
+            "sample": config["cruncher"]["sample"],
+            "analysis": config["cruncher"]["analysis"],
+            "pwms_info": {"lexA": {"pwm_matrix": pwm_matrix}, "cpxR": {"pwm_matrix": pwm_matrix}},
+        }
+    }
+    (run_dir / "config_used.yaml").write_text(yaml.safe_dump(config_used))
+
+    seq_df = pd.DataFrame(
+        {
+            "chain": [0, 0],
+            "draw": [0, 1],
+            "phase": ["draw", "draw"],
+            "sequence": ["ACGTACGTACGT", "TGCATGCATGCA"],
+            "score_lexA": [1.0, 1.2],
+            "score_cpxR": [0.8, 0.9],
+        }
+    )
+    seq_df.to_parquet(run_dir / "sequences.parquet", engine="fastparquet")
+
+    elites_df = pd.DataFrame(
+        {
+            "sequence": ["ACGTACGTACGT"],
+            "rank": [1],
+            "norm_sum": [2.0],
+            "score_lexA": [1.0],
+            "score_cpxR": [0.8],
+        }
+    )
+    elites_df.to_parquet(run_dir / "elites.parquet", engine="fastparquet")
+
+    (run_dir / "run_manifest.json").write_text(
+        f"""{{
+  \"stage\": \"sample\",
+  \"run_dir\": \"sample_thresholds\",
+  \"config_path\": \"{config_path}\",
+  \"lockfile_path\": \"{lock_path.resolve()}\",
+  \"lockfile_sha256\": \"{lock_sha}\",
+  \"sequence_length\": 12,
+  \"artifacts\": []
+}}"""
+    )
+    cfg = load_config(config_path)
+    with pytest.raises(ValueError, match="scatter_style='thresholds' requires scatter_scale='llr'"):
+        run_analyze(cfg, config_path)
+
+
+def test_plot_scatter_requires_score_columns(tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "out_dir": "results",
+            "regulator_sets": [["lexA", "cpxR"]],
+            "motif_store": {
+                "catalog_root": ".cruncher",
+                "source_preference": [],
+                "allow_ambiguous": False,
+                "pwm_source": "matrix",
+            },
+            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "sample": {
+                "bidirectional": True,
+                "seed": 7,
+                "record_tune": False,
+                "progress_bar": False,
+                "progress_every": 0,
+                "save_trace": False,
+                "init": {"kind": "random", "length": 12, "pad_with": "background"},
+                "draws": 2,
+                "tune": 1,
+                "chains": 1,
+                "min_dist": 0,
+                "top_k": 1,
+                "moves": {
+                    "block_len_range": [2, 2],
+                    "multi_k_range": [2, 2],
+                    "slide_max_shift": 1,
+                    "swap_len_range": [2, 2],
+                    "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
+                },
+                "optimiser": {
+                    "kind": "gibbs",
+                    "scorer_scale": "llr",
+                    "cooling": {"kind": "fixed", "beta": 1.0},
+                    "swap_prob": 0.1,
+                },
+                "save_sequences": True,
+                "pwm_sum_threshold": 0.0,
+            },
+            "analysis": {
+                "runs": [],
+                "tf_pair": ["lexA", "cpxR"],
+                "plots": {
+                    "trace": False,
+                    "autocorr": False,
+                    "convergence": False,
+                    "scatter_pwm": True,
+                    "pair_pwm": False,
+                    "parallel_pwm": False,
+                    "score_hist": False,
+                    "score_box": False,
+                    "correlation_heatmap": False,
+                    "parallel_coords": False,
+                },
+                "scatter_scale": "llr",
+                "scatter_style": "edges",
+                "subsampling_epsilon": 10.0,
+            },
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+    cfg = load_config(config_path)
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir(parents=True)
+    (run_dir / "run_manifest.json").write_text(json.dumps({"sequence_length": 12}))
+
+    elites_df = pd.DataFrame(
+        {
+            "sequence": ["ACGTACGTACGT"],
+            "rank": [1],
+            "score_lexA": [1.0],
+            "score_cpxR": [0.8],
+        }
+    )
+    elites_df.to_parquet(run_dir / "elites.parquet", engine="fastparquet")
+
+    per_pwm_path = run_dir / "per_pwm.csv"
+    pd.DataFrame({"chain": [0], "draw": [0]}).to_csv(per_pwm_path, index=False)
+
+    pwm_matrix = np.full((4, 4), 0.25)
+    pwms = {"lexA": PWM(name="lexA", matrix=pwm_matrix), "cpxR": PWM(name="cpxR", matrix=pwm_matrix)}
+
+    with pytest.raises(ValueError, match="per-PWM table missing required score columns"):
+        plot_scatter(
+            run_dir,
+            pwms,
+            cfg,
+            tf_pair=("lexA", "cpxR"),
+            per_pwm_path=per_pwm_path,
+            out_dir=run_dir / "plots",
+            bidirectional=True,
+            pwm_sum_threshold=0.0,
+            annotation="",
+        )
