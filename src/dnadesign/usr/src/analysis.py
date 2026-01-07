@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/usr/src/analysis.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -104,7 +104,14 @@ def plot_gc_vs_length(df: pd.DataFrame, out_path: Path) -> Path:
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.scatter(df["length"], df["gc_content"], s=18, alpha=0.6, color="#C44E52", edgecolor="none")
+    ax.scatter(
+        df["length"],
+        df["gc_content"],
+        s=18,
+        alpha=0.6,
+        color="#C44E52",
+        edgecolor="none",
+    )
     ax.set_title("GC content vs length")
     ax.set_xlabel("Length (nt)")
     ax.set_ylabel("GC fraction")

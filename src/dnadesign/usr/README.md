@@ -85,6 +85,8 @@ usr import demo --from csv \
   --bio-type dna --alphabet dna_4
 ```
 
+> Sequences must be non-empty. If you include `bio_type` or `alphabet` columns in your file, all rows must be filled; missing values are treated as errors.
+
 **Attach namespaced metadata** (namespacing required)
 
 ```bash
@@ -105,6 +107,7 @@ Examples of resulting columns:
 > Re‑attaching the same columns requires `--allow-overwrite`.
 > By default, unmatched ids/sequences raise an error; use `--allow-missing` to skip unmatched rows.
 > JSON‑like strings are parsed by default; pass `--no-parse-json` to keep raw strings.
+> Attachment files must have unique ids (or sequences); duplicates are rejected.
 
 **Inspect & validate**
 

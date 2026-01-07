@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/usr/src/stderr_filter.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

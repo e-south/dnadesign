@@ -577,7 +577,12 @@ def main() -> None:
         help="Plot name to run (repeatable). Use --list to see options.",
     )
     sp_plot.add_argument("--list", action="store_true", help="List available plots and exit")
-    sp_plot.add_argument("--sample", type=int, default=5000, help="Max rows to sample for plotting (0 = all)")
+    sp_plot.add_argument(
+        "--sample",
+        type=int,
+        default=5000,
+        help="Max rows to sample for plotting (0 = all)",
+    )
     sp_plot.add_argument("--seed", type=int, default=7, help="Random seed for sampling")
     sp_plot.set_defaults(func=cmd_plot)
 
