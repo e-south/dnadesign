@@ -3,19 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/runtime/predict.py
 
-Ephemeral prediction helper.
-
-Loads a frozen model and produces Ŷ for a set of ids (or all rows).
-Validates that the configured representation column is present and coercible
-to a fixed-width matrix. Never writes back; intended for quick scoring or
-downstream analysis.
-
-Requires `model_meta.json` next to the model, unless an explicit model name is
-provided. If a `round_ctx.json` is present, the recorded Y-ops pipeline is
-strictly inverted on Ŷ before returning (so outputs match objective space).
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/core/config_resolve.py
 
-Shared campaign config resolution for CLI + analysis code.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

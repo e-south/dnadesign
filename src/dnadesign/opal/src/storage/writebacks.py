@@ -3,15 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/storage/writebacks.py
 
-Canonical event builders for the ledger sinks under outputs/.
-
-We record three kinds of events:
-  - run_pred: one row per (candidate, round)
-  - run_meta: one row per run (config/artifacts snapshot)
-  - label:    one row per label append (id, round)
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

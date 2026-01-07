@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/runtime/ingest.py
 
-Transform tidy inputs -> model-ready labels with a structured preview.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,9 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/diff.py
-
-Local parquet/file stats + compact diff summary formatting.
+src/dnadesign/usr/src/diff.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

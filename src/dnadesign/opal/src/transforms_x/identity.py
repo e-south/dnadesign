@@ -3,13 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/transforms_x/identity.py
 
-A permissive identity transform:
-- Accepts scalar, 1-D, or nested 2-D-with-single-row inputs per record.
-- Coerces to a 1-D list[float] with all finite values.
-- Rejects non-numeric/empty inputs with an informative ValueError.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

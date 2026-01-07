@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/config/types.py
 
-Dataclasses exposed to app/CLI layers. These are constructed by loader.py.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

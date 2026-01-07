@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_objective_sfxi_v1.py
 
-Unit tests for the sfxi_v1 objective.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

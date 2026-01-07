@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/config/plugin_schemas.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

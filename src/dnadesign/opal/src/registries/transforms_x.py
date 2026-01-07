@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/registries/transforms_x.py
 
-X-transform registry.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

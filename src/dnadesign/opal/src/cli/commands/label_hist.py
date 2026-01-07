@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/label_hist.py
 
-Label history utilities (validate/repair).
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

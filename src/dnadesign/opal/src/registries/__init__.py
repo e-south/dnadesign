@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/registries/__init__.py
 
-Public registry APIs.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

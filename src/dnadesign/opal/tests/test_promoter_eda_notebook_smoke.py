@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/tests/test_promoter_eda_notebook_smoke.py
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import importlib.util

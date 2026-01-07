@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/core/rounds.py
 
-Round selector helpers shared across CLI and analysis layers.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -4,7 +4,6 @@
 src/dnadesign/opal/tests/test_predict_yops_inversion.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

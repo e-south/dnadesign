@@ -3,11 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/ingest_y.py
 
-Ingest tidy CSV → Y (transform_y), preview, confirm, write to records caches,
-AND emit canonical label events (kind="label") to outputs/ledger.labels.parquet.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

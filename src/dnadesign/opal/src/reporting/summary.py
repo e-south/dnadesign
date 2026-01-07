@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/reporting/summary.py
 
-Helpers to summarize ledger run_meta entries and round.log.jsonl events.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

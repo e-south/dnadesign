@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/registries/models.py
 
-Model registry.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

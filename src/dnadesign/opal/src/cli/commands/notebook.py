@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/notebook.py
 
-Generate/run campaign-tied marimo notebooks.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,17 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/dataset.py
-
-Parquet-backed dataset with fail-fast schema checks, atomic writes, snapshots,
-and an append-only event log. Datasets have immutable essential columns and are
-extended by namespaced derived columns via `Dataset.attach(...)`.
-
-Key ideas:
-- One `records.parquet` per dataset directory (single source of truth)
-- Case-preserving sequences; `id = sha1(bio_type|sequence)` on trimmed text
-- Strict namespacing: derived columns must look like `<tool>__<field>`
-- Pragmatic safety: atomic writes + timestamped snapshots + event log
+src/dnadesign/usr/src/dataset.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -205,28 +195,77 @@ class Dataset:
         if "sequence" not in df_in.columns:
             raise SchemaError("Missing required column: 'sequence'.")
 
-        # Default columns
-        bio = (
-            df_in["bio_type"].astype(str)
-            if "bio_type" in df_in.columns
-            else pd.Series([default_bio_type] * len(df_in), dtype="string")
-        )
-        alph = (
-            df_in["alphabet"].astype(str)
-            if "alphabet" in df_in.columns
-            else pd.Series([default_alphabet] * len(df_in), dtype="string")
-        )
+        def _is_missing_scalar(x: object) -> bool:
+            if x is None:
+                return True
+            if isinstance(x, (list, tuple, dict, np.ndarray)):
+                return False
+            try:
+                res = pd.isna(x)
+            except Exception:
+                return False
+            if isinstance(res, (list, tuple, np.ndarray)):
+                return False
+            return bool(res)
+
+        seq_raw = df_in["sequence"].tolist()
+        bad_seq = [i for i, s in enumerate(seq_raw, start=1) if _is_missing_scalar(s) or str(s).strip() == ""]
+        if bad_seq:
+            sample = ", ".join(str(i) for i in bad_seq[:5])
+            raise SchemaError(
+                f"{len(bad_seq)} row(s) have missing/empty 'sequence' (rows: {sample}). "
+                "Provide a non-empty sequence string."
+            )
+
+        # Default columns (fail fast on missing/empty values if provided)
+        if "bio_type" in df_in.columns:
+            bio_raw = df_in["bio_type"].tolist()
+            bad_bt = [i for i, v in enumerate(bio_raw, start=1) if _is_missing_scalar(v) or str(v).strip() == ""]
+            if bad_bt:
+                sample = ", ".join(str(i) for i in bad_bt[:5])
+                raise SchemaError(
+                    f"{len(bad_bt)} row(s) have missing/empty 'bio_type' (rows: {sample}). "
+                    "Either provide values or omit the column to use the default."
+                )
+            bio_vals = [str(v).strip() for v in bio_raw]
+        else:
+            bio_vals = [default_bio_type] * len(df_in)
+
+        if "alphabet" in df_in.columns:
+            alph_raw = df_in["alphabet"].tolist()
+            bad_ab = [i for i, v in enumerate(alph_raw, start=1) if _is_missing_scalar(v) or str(v).strip() == ""]
+            if bad_ab:
+                sample = ", ".join(str(i) for i in bad_ab[:5])
+                raise SchemaError(
+                    f"{len(bad_ab)} row(s) have missing/empty 'alphabet' (rows: {sample}). "
+                    "Either provide values or omit the column to use the default."
+                )
+            alph_vals = [str(v).strip() for v in alph_raw]
+        else:
+            alph_vals = [default_alphabet] * len(df_in)
 
         # Compute normalized sequences + ids + lengths
         ids, seqs, lens = [], [], []
-        for s, bt, ab in zip(df_in["sequence"], bio, alph):
-            s_norm = normalize_sequence(str(s), str(bt), str(ab))
+        for i, (s, bt, ab) in enumerate(zip(seq_raw, bio_vals, alph_vals), start=1):
+            try:
+                s_norm = normalize_sequence(str(s), str(bt), str(ab))
+            except ValueError as e:
+                raise AlphabetError(f"Row {i}: {e}") from e
             seqs.append(s_norm)
             ids.append(compute_id(str(bt), s_norm))
             lens.append(len(s_norm))
 
         # Optional user-supplied ids must match
         if "id" in df_in.columns and strict_id_check:
+            bad_id = [
+                i for i, v in enumerate(df_in["id"].tolist(), start=1) if _is_missing_scalar(v) or str(v).strip() == ""
+            ]
+            if bad_id:
+                sample = ", ".join(str(i) for i in bad_id[:5])
+                raise SchemaError(
+                    f"{len(bad_id)} row(s) have missing/empty 'id' (rows: {sample}). "
+                    "Drop the column or provide valid ids."
+                )
             bad_idx = [
                 i for i, (given, want) in enumerate(zip(df_in["id"].astype(str), ids)) if str(given) != str(want)
             ]
@@ -254,9 +293,9 @@ class Dataset:
         out_df = pd.DataFrame(
             {
                 "id": ids,
-                "bio_type": bio.astype(str).tolist(),
+                "bio_type": bio_vals,
                 "sequence": seqs,
-                "alphabet": alph.astype(str).tolist(),
+                "alphabet": alph_vals,
                 "length": lens,
                 "source": src_vals,
                 "created_at": created,
@@ -284,7 +323,7 @@ class Dataset:
         # Treat sequences that are the same *ignoring case* as duplicates too
         # (helps catch accidental duplicates when case encodes no biology).
         # Key: (bio_type_lower, uppercase(sequence))
-        bio_list = bio.astype(str).tolist()
+        bio_list = [str(v) for v in bio_vals]
         casefold_map: Dict[tuple, List[int]] = defaultdict(list)
         for i, (bt, s) in enumerate(zip(bio_list, seqs), start=1):
             casefold_map[(bt.lower(), s.upper())].append(i)
@@ -336,8 +375,8 @@ class Dataset:
             existing_cf = {(bt.lower(), sq.upper()) for bt, sq in zip(ex_bt, ex_sq)}
             conflicts = [
                 i
-                for i, (bt, s) in enumerate(zip(bio.astype(str).tolist(), seqs), start=1)
-                if (bt.lower(), s.upper()) in existing_cf
+                for i, (bt, s) in enumerate(zip(bio_vals, seqs), start=1)
+                if (str(bt).lower(), s.upper()) in existing_cf
             ]
             if conflicts:
                 preview = [
@@ -467,6 +506,7 @@ class Dataset:
             raise SchemaError(f"Missing id column '{id_col}' in incoming data.")
 
         rows_incoming = int(len(inc))
+        row_nums = list(range(1, rows_incoming + 1))
 
         # Choose + prefix targets
         attach_cols = [c for c in inc.columns if c != id_col] if columns is None else list(columns)
@@ -585,6 +625,7 @@ class Dataset:
             rows_ambiguous = len(ambiguous_rows)
             if missing_rows:
                 keep_mask = [rid is not None for rid in resolved]
+                row_nums = [rn for rn, keep in zip(row_nums, keep_mask) if keep]
                 work = work[keep_mask].reset_index(drop=True)
                 resolved = [rid for rid in resolved if rid is not None]
 
@@ -626,10 +667,28 @@ class Dataset:
                     "Fix the input file or pass --allow-missing to skip unmatched rows."
                 )
             rows_missing += len(missing_ids)
-            work = work[[not m for m in missing_mask]].reset_index(drop=True)
+            keep_mask = [not m for m in missing_mask]
+            row_nums = [rn for rn, keep in zip(row_nums, keep_mask) if keep]
+            work = work[keep_mask].reset_index(drop=True)
             id_series = [rid for rid, missing in zip(id_series_raw, missing_mask) if not missing]
         else:
             id_series = id_series_raw
+
+        # Reject duplicate ids in attachment input (avoid silent last-write wins)
+        dup_map: Dict[str, List[int]] = defaultdict(list)
+        for rid, row_num in zip(id_series, row_nums):
+            dup_map[str(rid)].append(row_num)
+        dup = {rid: rows for rid, rows in dup_map.items() if len(rows) > 1}
+        if dup:
+            preview = []
+            for rid, rows in list(dup.items())[:3]:
+                rows_str = ",".join(str(r) for r in rows[:5])
+                preview.append(f"{rid} (rows {rows_str})")
+            sample = "; ".join(preview)
+            raise SchemaError(
+                f"Duplicate ids in attachment input: {len(dup)} id(s) repeated. Sample: {sample}. "
+                "Ensure each id appears once per attachment file."
+            )
 
         # ---------- robust null/typing helpers ----------
 

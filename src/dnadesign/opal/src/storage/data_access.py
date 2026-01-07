@@ -3,20 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/storage/data_access.py
 
-RecordsStore abstracts reading/writing the records Parquet (USR or local),
-schema validation, label history caches, candidate universe, and the single
-representation (X) transform path.
-
-This file implements the caches:
-  - opal__<slug>__label_hist: list<struct{ r:int, ts:str, y:list<double>, src:str }>
-  - opal__<slug>__latest_as_of_round: int
-  - opal__<slug>__latest_pred_scalar: double
-
-No predictions are stored here otherwise; canonical predictions live in the
-ledger under outputs/ledger.* (predictions/runs/labels).
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,24 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/mock.py
-
-Mock dataset helpers for USR.
-
-Two entry points:
-- make-mock: create records.parquet with essential columns and demo vectors
-- add-demo-cols: add/overwrite demo vector/label columns on an existing dataset
-
-Demo columns (namespaced):
-- <ns>__x_representation : list<float32>[x_dim] per row (default 512)
-- <ns>__label_vec8       : list<float32>[y_dim] per row (default 8)
-
-Usage (CLI):
-  usr make-mock <dataset> [--n 100] [--length 60] [--x-dim 512] [--y-dim 8]
-                     [--seed 7] [--namespace demo]
-                     [--from-csv demo_material/demo_sequences.csv]
-  usr add-demo-cols <dataset> [--x-dim 512] [--y-dim 8] [--seed 7]
-                        [--namespace demo] [--allow-overwrite]
+src/dnadesign/usr/src/mock.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

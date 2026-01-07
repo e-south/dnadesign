@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/storage/label_history.py
 
-Label history helpers for records.parquet.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

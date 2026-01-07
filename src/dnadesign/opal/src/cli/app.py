@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/cli/app.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

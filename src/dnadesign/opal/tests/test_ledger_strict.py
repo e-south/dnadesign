@@ -4,7 +4,6 @@
 src/dnadesign/opal/tests/test_ledger_strict.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

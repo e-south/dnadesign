@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/storage/ledger.py
 
-Canonical ledger sinks (read/write) for OPAL.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

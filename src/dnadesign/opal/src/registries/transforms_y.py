@@ -3,12 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/registries/transforms_y.py
 
-Registry for:
-  1) Y ingest transforms: CSV/Parquet rows -> DataFrame(['sequence'(, 'id'), 'y'])
-  2) Y-ops (runtime): (fit, transform, inverse, ParamModel) applied during training & prediction
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

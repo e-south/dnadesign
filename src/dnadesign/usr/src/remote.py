@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/remote.py
+src/dnadesign/usr/src/remote.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

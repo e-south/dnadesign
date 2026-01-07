@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/cli/commands/_common.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

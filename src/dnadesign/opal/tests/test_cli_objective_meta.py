@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_objective_meta.py
 
-CLI integration tests for objective-meta.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

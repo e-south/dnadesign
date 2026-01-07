@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/objectives/scalar_identity_v1.py
 
-Identity objective for scalar Y. Produces score = y_pred[:, 0].
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

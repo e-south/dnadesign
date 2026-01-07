@@ -1,12 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/schema.py
-
-Arrow schema for USR v1 required columns. These fields are immutable and
-present in every dataset table.
-
-Derived data must be attached under namespaced columns (`<tool>__<field>`).
+src/dnadesign/usr/src/schema.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

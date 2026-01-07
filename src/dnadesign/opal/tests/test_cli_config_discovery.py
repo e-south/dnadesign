@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_config_discovery.py
 
-CLI integration tests for config auto-discovery behavior.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

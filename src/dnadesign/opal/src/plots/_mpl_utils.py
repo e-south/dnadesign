@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/plots/_mpl_utils.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -40,14 +39,15 @@ def scatter_smart(ax, x, y, *, s=16, alpha=0.85, rasterize_at=None, edgecolors="
     x = np.asarray(x, dtype=np.float32)  # halves memory vs float64
     y = np.asarray(y, dtype=np.float32)
     # Opt-in rasterization: None/0/negative → never rasterize.
-    if rasterize_at is None:
-        rasterized = False
-    else:
+    thr = None
+    if rasterize_at is not None:
         try:
             thr = int(rasterize_at)
-        except Exception:
-            thr = 0
-        rasterized = (thr > 0) and (x.size >= thr)
+        except Exception as exc:
+            raise ValueError("rasterize_at must be an int or None.") from exc
+        if thr < 0:
+            raise ValueError("rasterize_at must be >= 0.")
+    rasterized = (thr is not None) and (thr > 0) and (x.size >= thr)
     # Respect explicit overrides without passing the same kw twice.
     # Allow both linewidths/linewidth alias; default to 0 when unspecified.
     lw = kw.pop("linewidths", None)

@@ -3,18 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/runtime/run_round.py
 
-Application logic for a full OPAL round:
-- preflights
-- assemble training labels ≤ as_of_round
-- (optional) orchestrate Y-ops (transforms prior to training)
-- model fit/predict
-- objective (any Y-ops are reverted before ranking)
-- selection
-- persist artifacts + append canonical events
-- update ergonomic caches + state.json
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -3,6 +3,13 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_formatting_markup.py
 
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/tests/test_cli_formatting_markup.py
+
 Ensures markup helpers respect OPAL_CLI_MARKUP at call time.
 --------------------------------------------------------------------------------
 """

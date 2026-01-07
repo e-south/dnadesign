@@ -4,7 +4,6 @@
 src/dnadesign/opal/tests/test_record_show_ledger_dir.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,10 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/analysis.py
-
-Lightweight analysis + plotting helpers for USR datasets.
-Plots are intentionally small, explicit, and easy to extend.
+src/dnadesign/usr/src/analysis.py
 
 Module Author(s): Eric J. South (extended by Codex)
 --------------------------------------------------------------------------------

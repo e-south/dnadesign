@@ -3,13 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/runtime/preflight.py
 
-Strict preflight for `opal run`:
-- schema checks / X presence
-- manual-attach detection (labels present in Y but missing in label_hist)
-- optional biotype/alphabet consistency check
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

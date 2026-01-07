@@ -1,11 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/__main__.py
-
-Entrypoint for `python -m dnadesign.usr`.
-
-It forwards to the primary argparse CLI defined in `dnadesign.usr.src.cli:main`.
+src/dnadesign/usr/__main__.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

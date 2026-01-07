@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/storage/locks.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

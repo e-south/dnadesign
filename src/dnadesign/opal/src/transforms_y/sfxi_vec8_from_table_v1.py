@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/transforms_y/sfxi_vec8_from_table_v1.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

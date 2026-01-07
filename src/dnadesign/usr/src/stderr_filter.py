@@ -1,9 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/stderr_filter.py
-
-Best-effort stderr filtering for noisy third-party warnings.
+src/dnadesign/usr/src/stderr_filter.py
 
 Module Author(s): Eric J. South (extended by Codex)
 --------------------------------------------------------------------------------

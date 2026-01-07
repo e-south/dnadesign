@@ -3,12 +3,6 @@
 <dnadesign project>
 src/dnadesign/opal/src/plots/feature_importance_bars.py
 
-Bar plot of model feature importances (per round), overlayed with transparency.
-- Source of truth: outputs/round_<r>/feature_importance.csv
-- Preserves feature order from CSV by default ("preserve" policy).
-- Assertive: requires identical feature sets across selected rounds; no silent unions.
-- Decoupled from ledger.runs.parquet.
-
 Module Author(s): You / Dunlop Lab
 --------------------------------------------------------------------------------
 """

@@ -85,6 +85,8 @@ plots:
 - Presets merge into each plot entry; entry values override preset values.
 - Inline `plots:` in campaign.yaml is still supported, but `plot_config` keeps runtime config lean.
 - `data:` paths are resolved relative to the plots YAML that declares them.
+- `sfxi_logic_fidelity_closeness` is strict by default (`on_violin_invalid: error`); set
+  `params.on_violin_invalid: line` or `params.violin: false` explicitly for small sample sizes.
 
 **Built-ins injected** (resolved from the campaign config):
 

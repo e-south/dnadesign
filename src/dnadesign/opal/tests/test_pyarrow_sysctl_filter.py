@@ -3,11 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_pyarrow_sysctl_filter.py
 
-Regression guard: ensure the macOS PyArrow sysctlbyname filter is installable
-and respects the opt-out flag.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

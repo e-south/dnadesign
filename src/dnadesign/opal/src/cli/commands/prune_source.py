@@ -3,18 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/prune_source.py
 
-Prune records.parquet of any OPAL namespace columns (opal__*), plus the configured
-Y column. Designed to "reset" a campaign's source table prior to (re)starting
-round 0, avoiding stray caches or edge cases.
-
-Robust, assertive semantics (no silent fallbacks):
-  • Shows an explicit preview of columns to be deleted.
-  • Protects essential USR columns and the configured X column.
-  • Requires explicit confirmation unless --yes is provided.
-  • Writes atomically; optional backup of original file.
-
 Module Author(s): Eric J. South (drafted per user request)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

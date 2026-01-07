@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/objective_meta.py
 
-List objective metadata/diagnostics present for a campaign/round.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

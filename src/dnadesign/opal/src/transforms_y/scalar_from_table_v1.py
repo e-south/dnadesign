@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/transforms_y/scalar_from_table_v1.py
 
-Simple scalar Y ingest from a tidy table.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/log.py
 
-Summarize round.log.jsonl for a given round.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

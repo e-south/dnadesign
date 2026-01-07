@@ -3,18 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/objectives/sfxi_v1.py
 
-SFXI objective (setpoint fidelity x intensity) for 8-vector targets.
-
-- Splits Ŷ into v_hat[0:4] (logic ∈ [0,1]^4) and y_star[4:8] (log2 intensity).
-- Computes logic fidelity vs setpoint with D(p) normalization.
-- Recovers linear intensities with delta and computes E_raw via setpoint weights.
-- Denominator is computed from TrainView labels and stored into RoundCtx as:
-    objective/sfxi_v1/denom_percentile
-    objective/sfxi_v1/denom_value
-- Final score = (F_logic^beta) * (E_scaled^gamma).
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

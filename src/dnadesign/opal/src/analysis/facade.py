@@ -3,16 +3,13 @@
 <dnadesign project>
 src/dnadesign/opal/src/analysis/facade.py
 
-Analysis facade: shared campaign resolution + ledger access for CLI, notebooks,
-and reporting. Polars-first where practical.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence, Union
@@ -239,11 +236,18 @@ def load_predictions_with_setpoint(
         raise OpalError("ledger.predictions had zero rows after projection.", ExitCodes.BAD_ARGS)
 
     def _extract_setpoint(obj) -> Optional[List[float]]:
+        vec = (obj or {}).get("setpoint_vector")
+        if vec is None:
+            return None
         try:
-            vec = (obj or {}).get("setpoint_vector", [])
-            return [float(x) for x in vec]
+            vals = [float(x) for x in vec]
         except Exception:
             return None
+        if not vals:
+            return None
+        if not all(math.isfinite(v) for v in vals):
+            return None
+        return vals
 
     if "objective__params" not in runs_df.columns:
         raise OpalError("ledger.runs is missing objective__params (cannot resolve setpoints).", ExitCodes.BAD_ARGS)
@@ -258,6 +262,21 @@ def load_predictions_with_setpoint(
         raise OpalError(
             "Could not resolve setpoint for any rows: run_meta lacks objective__params.setpoint_vector.",
             ExitCodes.BAD_ARGS,
+        )
+    missing = (
+        out.filter(pl.col("obj__diag__setpoint").is_null()).select(pl.col("run_id").unique()).to_series().to_list()
+    )
+    if missing:
+        raise OpalError(
+            f"Missing objective__params.setpoint_vector for run_id(s): {sorted(missing)}.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    setpoints = [tuple(sp) for sp in out["obj__diag__setpoint"].drop_nulls().to_list()]
+    unique = {sp for sp in setpoints}
+    if len(unique) > 1:
+        raise OpalError(
+            f"Multiple setpoint vectors found for selected rows: {sorted(unique)}.",
+            ExitCodes.CONTRACT_VIOLATION,
         )
     return out
 

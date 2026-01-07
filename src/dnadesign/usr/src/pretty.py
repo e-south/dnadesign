@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/pretty.py
+src/dnadesign/usr/src/pretty.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

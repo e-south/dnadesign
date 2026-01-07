@@ -1,22 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/convert_legacy.py
-
-Single-purpose converter: legacy .pt (list[dict]) -> fresh USR dataset.
-
-- Fail-fast validation of .pt structure and required keys
-- Computes canonical USR id from (bio_type, normalized sequence)
-- Fills essentials then adds a small set of namespaced columns
-- Honors typed columns for the 60bp_dual_promoter_cpxR_LexA profile
-- Writes snapshots + logs via Dataset & write_parquet_atomic
-- De-duplicates by canonical id across all provided inputs (first occurrence wins)
-
-Usage (via CLI):
-    usr convert-legacy 60bp_dual_promoter_cpxR_LexA \
-        --paths archived/densebatch_*/densegenbatch_*.pt \
-        --expected-length 60 \
-        --plan sigma70_mid
+src/dnadesign/usr/src/convert_legacy.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -4,7 +4,6 @@
 src/dnadesign/opal/tests/test_state_v1_compat.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

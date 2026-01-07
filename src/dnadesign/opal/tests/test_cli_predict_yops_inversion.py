@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_predict_yops_inversion.py
 
-CLI integration tests for predict Y-ops inversion behavior.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

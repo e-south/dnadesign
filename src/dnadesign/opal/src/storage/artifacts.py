@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/storage/artifacts.py
 
-Round artifacts helpers and canonical events append.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

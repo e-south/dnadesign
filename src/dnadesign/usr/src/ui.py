@@ -1,14 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/ui.py
-
-Lightweight rendering helpers. Centralizes all human-facing formatting so that
-CLI surfaces (argparse or Typer) stay thin and logic stays decoupled.
-
-Features:
-- Plain printing with right-stripped lines (no trailing whitespace)
-- Optional Rich output (tables, trees, compact diff)
+src/dnadesign/usr/src/ui.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

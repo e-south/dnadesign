@@ -1,12 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/normalize.py
-
-Case-preserving normalization and deterministic ID computation.
-
-- `normalize_sequence`: trims whitespace; preserves case; enforces dna_4 alphabet
-- `compute_id`: sha1(bio_type|sequence_norm) on the **trimmed, original** string
+src/dnadesign/usr/src/normalize.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

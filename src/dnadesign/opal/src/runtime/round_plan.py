@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/runtime/round_plan.py
 
-Shared round planning logic for explain/run (keeps counts aligned).
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

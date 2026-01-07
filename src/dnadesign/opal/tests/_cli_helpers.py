@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/_cli_helpers.py
 
-Shared helpers for CLI tests.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

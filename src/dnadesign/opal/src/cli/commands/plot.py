@@ -3,19 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/plot.py
 
-OPAL CLI — plot
-
-A lean driver that:
-- resolves campaign.yaml (or campaign directory),
-- builds a minimal PlotContext,
-- auto-injects built-in data sources if present (records, outputs, ledger sinks),
-- dispatches to plot plugins via the registry,
-- writes outputs (overwrite by default),
-- continues on errors and prints full tracebacks,
-- exits with code 1 if any plot failed.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -121,11 +109,25 @@ def _build_quick_plots(cfg, *, outputs_dir: Path) -> List[Dict[str, Any]]:
             "params": {"mode": "line", "swarm": False},
         },
     ]
-    obj_name = str(getattr(cfg.objective, "name", "") or "").lower()
+    obj_name = ""
+    try:
+        obj_block = getattr(cfg, "objective", None)
+        if obj_block is not None:
+            if hasattr(obj_block, "objective"):
+                obj_name = str(getattr(obj_block.objective, "name", "") or "")
+            else:
+                obj_name = str(getattr(obj_block, "name", "") or "")
+    except Exception:
+        obj_name = ""
+    obj_name = obj_name.lower()
     if obj_name.startswith("sfxi"):
         plots.extend(
             [
-                {"name": "quick_sfxi_logic_fidelity", "kind": "sfxi_logic_fidelity_closeness", "params": {}},
+                {
+                    "name": "quick_sfxi_logic_fidelity",
+                    "kind": "sfxi_logic_fidelity_closeness",
+                    "params": {"violin": False},
+                },
                 {"name": "quick_fold_change_vs_logic_fidelity", "kind": "fold_change_vs_logic_fidelity", "params": {}},
             ]
         )

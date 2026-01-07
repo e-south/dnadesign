@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/plots/percent_high_activity_over_rounds.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

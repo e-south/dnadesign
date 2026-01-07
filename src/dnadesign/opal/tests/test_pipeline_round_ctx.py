@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_pipeline_round_ctx.py
 
-End-to-end smoke test: run_round produces ledger + round_ctx.json with contracts.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

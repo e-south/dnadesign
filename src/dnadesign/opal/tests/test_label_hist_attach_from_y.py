@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_label_hist_attach_from_y.py
 
-Pressure test: attach-from-y for pre-populated Y column.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

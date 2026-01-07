@@ -3,11 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/core/utils.py
 
-General utilities: hashing, I/O, logging, QC flag helpers, errors & exits.
-This module intentionally has no dependency on campaign-local code.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

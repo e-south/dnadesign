@@ -4,7 +4,6 @@
 src/dnadesign/opal/tests/test_exit_codes_lock.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

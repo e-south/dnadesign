@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/run.py
 
-Thin CLI wrapper: parse flags -> load cfg/store -> call app.run_round
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

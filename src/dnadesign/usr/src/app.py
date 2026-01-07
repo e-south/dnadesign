@@ -1,12 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/app.py
-
-Typer-based CLI surface for USR. Wraps existing argparse command implementations
-in dnadesign.usr.src.cli to keep logic centralized and decoupled.
-
-Key commands gain a --rich/--no-rich toggle (default: rich on).
+src/dnadesign/usr/src/app.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

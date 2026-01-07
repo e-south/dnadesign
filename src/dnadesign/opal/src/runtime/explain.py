@@ -3,19 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/runtime/explain.py
 
-Dry-run planner for a round.
-
-Aggregates what would happen in run --round k without mutating anything:
-- effective training set counts (after dedup policy),
-- candidate universe size,
-- model and selection configs,
-- representation info and vector dimension,
-- any preflight warnings.
-
-Emits a JSON-ready dict for CLI or programmatic use.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -3,11 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/storage/workspace.py
 
-CampaignWorkspace centralizes all campaign paths to keep IO consistent and
-decoupled from CLI or application logic.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

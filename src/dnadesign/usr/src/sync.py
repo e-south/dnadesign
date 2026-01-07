@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/sync.py
+src/dnadesign/usr/src/sync.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

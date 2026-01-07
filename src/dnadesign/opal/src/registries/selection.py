@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/registries/selection.py
 
-Selection registry with RoundCtx contract enforcement.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

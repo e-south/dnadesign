@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_pressure_scalar_y.py
 
-CLI pressure test: scalar Y ingest + multi-round run lifecycle.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/plots/scatter_score_vs_rank.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

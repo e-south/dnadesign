@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/plots/sfxi_logic_fidelity_closeness.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -32,6 +31,7 @@ def _import_pyarrow():
         params={
             "top_percentile": "Optional percentile cutoff for highlighting.",
             "violin": "Show violin distributions (default true).",
+            "on_violin_invalid": "error|line (default error).",
             "setpoint_override": "Override setpoint vector (length-4).",
         },
         requires=["observed_round", "y_obs", "objective__params"],
@@ -67,7 +67,7 @@ def render(context, params: dict) -> None:
     # Validation policy for violin inputs (assertive, explicit)
     violin_min_points = int(params.get("violin_min_points", 3))
     violin_require_nonzero_var = bool(params.get("violin_require_nonzero_var", True))
-    on_violin_invalid = str(params.get("on_violin_invalid", "line")).strip().lower()  # "error" | "line"
+    on_violin_invalid = str(params.get("on_violin_invalid", "error")).strip().lower()  # "error" | "line"
     if on_violin_invalid not in {"error", "line"}:
         raise ValueError("on_violin_invalid must be 'error' or 'line'.")
 

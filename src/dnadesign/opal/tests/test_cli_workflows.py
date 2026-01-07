@@ -3,14 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_workflows.py
 
-CLI integration tests for core workflows:
-  - init / validate / explain
-  - label-hist validate/repair
-  - ctx show/audit/diff
-  - ingest-y
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

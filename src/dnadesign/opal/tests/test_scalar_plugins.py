@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_scalar_plugins.py
 
-Unit tests for scalar Y ingest transform + objective.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

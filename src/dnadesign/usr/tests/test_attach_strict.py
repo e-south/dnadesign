@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/usr/tests/test_attach_strict.py
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from pathlib import Path
 
 import pandas as pd
@@ -59,3 +68,14 @@ def test_attach_invalid_json_is_error_by_default(tmp_path: Path) -> None:
 
     n = ds.attach_columns(path, namespace="mock", id_col="id", columns=["vec"], parse_json=False)
     assert n == 1
+
+
+def test_attach_duplicate_ids_is_error(tmp_path: Path) -> None:
+    ds = _make_dataset(tmp_path)
+    existing_id = ds.head(1)["id"].iloc[0]
+    df = pd.DataFrame({"id": [existing_id, existing_id], "score": [1.0, 2.0]})
+    path = tmp_path / "attach_dup.csv"
+    df.to_csv(path, index=False)
+
+    with pytest.raises(SchemaError):
+        ds.attach_columns(path, namespace="mock", id_col="id", columns=["score"])

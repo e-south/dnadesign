@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_prune_source.py
 
-CLI integration tests for prune-source.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

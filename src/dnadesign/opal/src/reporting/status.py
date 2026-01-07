@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/reporting/status.py
 
-Builds a JSON-able status dict from state.json.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

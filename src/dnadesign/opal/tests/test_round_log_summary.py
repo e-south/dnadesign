@@ -4,7 +4,6 @@
 src/dnadesign/opal/tests/test_round_log_summary.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

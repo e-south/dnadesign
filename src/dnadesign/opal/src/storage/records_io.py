@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/storage/records_io.py
 
-Thin IO wrapper for records.parquet.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

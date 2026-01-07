@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/storage/store_factory.py
 
-Shared RecordsStore construction from a validated RootConfig.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -4,7 +4,6 @@
 src/dnadesign/opal/tests/test_run_meta_summary.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

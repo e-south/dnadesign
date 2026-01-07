@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_pressure_sfxi_roundtrip.py
 
-CLI pressure test: vector Y (sfxi) ingest + multi-round run lifecycle.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

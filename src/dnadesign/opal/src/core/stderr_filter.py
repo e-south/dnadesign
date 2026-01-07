@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/core/stderr_filter.py
 
-Best-effort stderr filtering for noisy third-party warnings.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

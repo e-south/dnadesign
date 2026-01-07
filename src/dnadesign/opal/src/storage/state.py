@@ -3,18 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/storage/state.py
 
-Campaign state and per-round registry.
-
-This module defines:
-  • RoundEntry — append-only snapshot for a completed round
-  • CampaignState — campaign identity + config surfaces + round history
-
-Required keys:
-  - campaign_slug, campaign_name, workdir, data_location
-  - x_column_name, y_column_name
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

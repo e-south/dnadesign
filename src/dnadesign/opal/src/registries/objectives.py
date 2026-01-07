@@ -3,11 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/registries/objectives.py
 
-Objective registry with auto-import of built-ins, plugin EPs, and
-RoundCtx contract enforcement at call time.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

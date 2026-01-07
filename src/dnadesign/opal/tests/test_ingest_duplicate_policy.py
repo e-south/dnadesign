@@ -4,7 +4,6 @@
 src/dnadesign/opal/tests/test_ingest_duplicate_policy.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

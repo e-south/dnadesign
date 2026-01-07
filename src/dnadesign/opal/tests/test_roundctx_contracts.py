@@ -4,7 +4,6 @@
 src/dnadesign/opal/tests/test_roundctx_contracts.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

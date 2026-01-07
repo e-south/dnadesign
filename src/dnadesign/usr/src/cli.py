@@ -1,9 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/cli.py
-
-USR CLI: thin wrapper around the Dataset API.
+src/dnadesign/usr/src/cli.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/analysis/notebook_template.py
 
-Generate campaign-tied marimo notebooks for OPAL analysis.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -197,17 +194,16 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
         @app.cell
         def _(mo, pred_df):
-            max_rank = int(pred_df["sel__rank_competition"].max())
+            ranks = pred_df.get_column("sel__rank_competition").drop_nulls()
+            if len(ranks) == 0:
+                raise ValueError("sel__rank_competition has no non-null values.")
+            max_rank = int(ranks.max())
+            if max_rank < 1:
+                raise ValueError("sel__rank_competition must be >= 1.")
             default_max = min(max_rank, 2000)
             show_selected_ui = mo.ui.checkbox(label="Selected only", value=False)
             max_rank_ui = mo.ui.slider(1, max_rank, value=default_max, label="Max rank")
             return max_rank_ui, show_selected_ui
-
-
-        @app.cell
-        def _(mo, max_rank_ui, show_selected_ui):
-            mo.vstack([show_selected_ui, max_rank_ui])
-            return
 
 
         @app.cell
@@ -244,9 +240,22 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
+        def _(mo, max_rank_ui, score_field_ui, show_selected_ui):
+            mo.vstack([score_field_ui, show_selected_ui, max_rank_ui])
+            return
+
+
+        @app.cell
         def _(pl, filtered_df, score_field_ui):
-            score_field = score_field_ui.value
-            scores = filtered_df.get_column(score_field).cast(pl.Float64, strict=False)
+            score_field = str(score_field_ui.value)
+            try:
+                scores = filtered_df.get_column(score_field).cast(pl.Float64)
+            except Exception as exc:
+                raise ValueError(f"Score field '{score_field}' could not be cast to float.") from exc
+            finite_mask = scores.is_finite().fill_null(False)
+            scores = scores.filter(finite_mask)
+            if len(scores) == 0:
+                raise ValueError(f"Score field '{score_field}' has no finite values after filtering.")
             return score_field, scores
 
 
@@ -272,14 +281,23 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                 fig, ax = plt.subplots(figsize=(6.5, 4.0), constrained_layout=True)
                 df = filtered_df.select(
                     ["sel__rank_competition", score_field, "sel__is_selected"]
+                ).with_columns(
+                    pl.col("sel__rank_competition").cast(pl.Int64),
+                    pl.col(score_field).cast(pl.Float64),
                 )
+                df = df.filter(
+                    pl.col("sel__rank_competition").is_not_null()
+                    & pl.col(score_field).is_finite()
+                )
+                if df.is_empty():
+                    raise ValueError("No finite rank/score pairs after filtering.")
                 x = df["sel__rank_competition"].to_list()
-                y = df[score_field].cast(pl.Float64, strict=False).to_list()
+                y = df[score_field].to_list()
                 ax.scatter(x, y, s=18, alpha=0.5)
                 ax.set_title("Score vs rank")
                 ax.set_xlabel("Rank (competition)")
                 ax.set_ylabel(score_field)
-                ax.set_xlim(max(x) if x else 1, 1)
+                ax.set_xlim(max(x), 1)
                 return fig
 
             score_scatter_fig = _make_scatter()

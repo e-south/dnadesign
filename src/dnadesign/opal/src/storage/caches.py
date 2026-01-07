@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/storage/caches.py
 
-Cache column helpers for records.parquet.
-
 Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

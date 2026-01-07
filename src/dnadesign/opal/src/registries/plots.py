@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/registries/plots.py
 
-OPAL — Plot Registry (auto-discovers built-ins and plugin entry points)
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

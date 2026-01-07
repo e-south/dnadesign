@@ -3,12 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/reporting/record_show.py
 
-Record-centric report: gathers label history from records.parquet AND all
-run_pred entries for the record from ledger sinks under outputs/,
-respecting each event's as_of_round.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

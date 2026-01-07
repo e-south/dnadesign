@@ -4,7 +4,6 @@
 src/dnadesign/opal/tests/test_selection_exclusion.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

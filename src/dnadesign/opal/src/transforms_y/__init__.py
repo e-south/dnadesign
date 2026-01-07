@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/transforms_y/__init__.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

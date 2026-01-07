@@ -23,6 +23,9 @@ From the repo root:
 ```bash
 cd src/dnadesign/opal/campaigns/demo/
 
+# (Optional) suppress PyArrow sysctl warnings in non-TTY contexts
+export OPAL_SUPPRESS_PYARROW_SYSCTL=1
+
 # 1) Initialize & validate
 uv run opal init     -c campaign.yaml
 uv run opal validate -c campaign.yaml
@@ -48,7 +51,7 @@ MPLCONFIGDIR=$PWD/.tmp/mpl OPAL_SUPPRESS_PYARROW_SYSCTL=1 \
 
 **Notes:**
 - Use `uv run opal ...` to ensure the correct environment.
-- On macOS, `OPAL_SUPPRESS_PYARROW_SYSCTL=1` suppresses PyArrow sysctl warnings.
+- On macOS, `OPAL_SUPPRESS_PYARROW_SYSCTL=1` suppresses PyArrow sysctl warnings (helpful in CI/non-TTY runs).
 - `MPLCONFIGDIR` avoids Matplotlib cache warnings and speeds imports.
 
 ---
@@ -144,6 +147,8 @@ Stages
 ```
 [ok] quick_score_vs_rank (scatter_score_vs_rank) -> .../outputs/plots/quick_score_vs_rank.png
 [ok] quick_percent_high (percent_high_activity_over_rounds) -> .../outputs/plots/quick_percent_high.png
+[ok] quick_sfxi_logic_fidelity (sfxi_logic_fidelity_closeness) -> .../outputs/plots/quick_sfxi_logic_fidelity.png
+[ok] quick_fold_change_vs_logic_fidelity (fold_change_vs_logic_fidelity) -> .../outputs/plots/quick_fold_change_vs_logic_fidelity.png
 [ok] quick_feature_importance (feature_importance_bars) -> .../outputs/plots/quick_feature_importance.png
 ```
 
@@ -167,9 +172,10 @@ we **explicitly** set:
 on_violin_invalid: line
 ```
 
-This makes the fallback intentional: for small sample sizes, the plot uses a
-mean-line summary instead of failing. If you want strict behavior, set
-`on_violin_invalid: error`.
+This makes the fallback intentional for the demo: for small sample sizes, the
+plot uses a mean-line summary instead of failing. The **default** behavior is
+now strict (`on_violin_invalid: error`), so production configs should choose
+explicitly.
 
 ---
 

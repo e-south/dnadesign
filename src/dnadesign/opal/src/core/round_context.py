@@ -3,17 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/core/round_context.py
 
-OPAL Round Context (runtime carrier) + plugin contract DSL.
-
-Design goals (pragmatic & assertive):
-- JSON-centric: accept any JSON-serializable value (nested dicts/lists).
-- Normalize common scientific types (NumPy/Pandas/Path/dataclasses) to plain Python.
-- Reject non-finite numbers and non-deterministic/opaque types (sets, bytes, callables).
-- Keep contracts strict: plugins may only write under their own namespace and to
-  keys they declared in 'produces'.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

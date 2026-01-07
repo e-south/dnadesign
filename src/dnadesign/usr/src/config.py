@@ -1,9 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/config.py
-
-Load/save remote configuration (remotes.yaml). SSH only for v0.1.
+src/dnadesign/usr/src/config.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/plots/_events_util.py
 
-Utilities for reading the **ledger** sinks and resolving setpoints for plots.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

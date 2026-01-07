@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/plots/_context.py
 
-PlotContext — context object passed to plot plugins.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -41,6 +38,8 @@ class PlotContext:
         Save a CSV next to the plot (same basename by default).
         Plugins SHOULD check `self.save_data` before calling this.
         """
+        if not self.save_data:
+            raise ValueError("save_df called but save_data is False. Set output.save_data: true to enable.")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         target = self.output_dir / (filename or (self.filename.rsplit(".", 1)[0] + ".csv"))
         df.to_csv(target, index=False)

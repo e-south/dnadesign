@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/selection/__init__.py
 
-Importing this package triggers registration side-effects for built-in selections.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

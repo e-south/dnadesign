@@ -3,6 +3,13 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/formatting.py
 
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/cli/formatting.py
+
 CLI-wide human-output formatting helpers and renderers.
 Adds optional Rich markup (guarded by OPAL_CLI_MARKUP). JSON remains unstyled.
 --------------------------------------------------------------------------------

@@ -4,7 +4,6 @@
 src/dnadesign/opal/tests/test_plot_output_dir.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

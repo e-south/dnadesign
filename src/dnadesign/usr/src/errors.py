@@ -1,11 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/errors.py
-
-Narrow, typed exceptions used across the USR package. This keeps try/except
-blocks readable and allows callers to distinguish data/validation issues from
-I/O or operational failures.
+src/dnadesign/usr/src/errors.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
