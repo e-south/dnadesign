@@ -1,12 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/cruncher/io/parsers/meme.py
+<cruncher project>
+src/dnadesign/cruncher/src/io/parsers/meme.py
 
-MEME-suite motif file → PWM.
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

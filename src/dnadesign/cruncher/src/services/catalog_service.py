@@ -1,4 +1,11 @@
-"""Catalog service for local cache inspection."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/services/catalog_service.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

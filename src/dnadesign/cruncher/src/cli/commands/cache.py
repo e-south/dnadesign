@@ -1,4 +1,11 @@
-"""Cache command."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/cli/commands/cache.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

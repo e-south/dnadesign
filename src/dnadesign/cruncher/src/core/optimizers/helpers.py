@@ -1,16 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/cruncher/core/optimizers/helpers.py
+<cruncher project>
+src/dnadesign/cruncher/src/core/optimizers/helpers.py
 
-Low-level, Numba-accelerated routines shared by both Gibbs and PT optimizers:
-  - best_score_pwm: compute best log-odds of a PWM over a sequence
-  - slide_window: reserved for sliding-window moves
-  - swap_block: reserved for block-swap moves
-  - _replace_block: replace a block in-place (used by Gibbs “B” move)
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -1,4 +1,11 @@
-"""Helpers for resolving cruncher config paths from CLI inputs."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/cli/config_resolver.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

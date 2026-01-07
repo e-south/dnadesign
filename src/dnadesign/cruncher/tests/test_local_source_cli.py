@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/test_local_source_cli.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from pathlib import Path
 
 import yaml

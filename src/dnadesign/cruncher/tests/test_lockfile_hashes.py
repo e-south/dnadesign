@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/test_lockfile_hashes.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import json

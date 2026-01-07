@@ -1,4 +1,11 @@
-"""Label helpers for regulator sets and run directories."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/utils/labels.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

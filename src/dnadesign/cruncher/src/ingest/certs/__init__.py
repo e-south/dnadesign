@@ -1,1 +1,8 @@
-"""Packaged CA intermediates for source adapters."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/ingest/certs/__init__.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""

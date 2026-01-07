@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/test_regulondb_ssl.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from dnadesign.cruncher.ingest.adapters.regulondb import RegulonDBAdapterConfig, _build_ssl_context

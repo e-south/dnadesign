@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/test_optimizer_registry.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 import pytest
 
 from dnadesign.cruncher.core.optimizers.registry import get_optimizer, list_optimizer_specs, list_optimizers

@@ -1,4 +1,11 @@
-"""Sequence hydration helpers for coordinate-only binding sites."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/ingest/sequence_provider.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

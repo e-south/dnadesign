@@ -1,4 +1,11 @@
-"""HTTP helpers with retry/backoff for ingestion adapters."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/ingest/http_client.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

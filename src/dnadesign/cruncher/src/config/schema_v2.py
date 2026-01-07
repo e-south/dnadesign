@@ -1,4 +1,11 @@
-"""Pydantic config schema for Cruncher v2 (no mode)."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/config/schema_v2.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -256,6 +263,12 @@ class AnalysisConfig(BaseModel):
         if len(v) != 2:
             raise ValueError("analysis.tf_pair must contain exactly two TF names.")
         return v
+
+    @model_validator(mode="after")
+    def _check_scatter_style(self) -> "AnalysisConfig":
+        if self.scatter_style == "thresholds" and self.scatter_scale != "llr":
+            raise ValueError("scatter_style='thresholds' requires scatter_scale='llr'")
+        return self
 
 
 class MotifStoreConfig(BaseModel):

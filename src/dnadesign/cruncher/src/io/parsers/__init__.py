@@ -1,15 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/cruncher/io/parsers/__init__.py
+<cruncher project>
+src/dnadesign/cruncher/src/io/parsers/__init__.py
 
-Built-in PWM parsers.
-
-Importing this package registers built-in parsers via side effects
-(@register decorators in each parser module).
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

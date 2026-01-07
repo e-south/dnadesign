@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-cruncher/utils/traces.py
+<cruncher project>
+src/dnadesign/cruncher/src/utils/traces.py
 
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -1,12 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/cruncher/workflows/sample_workflow.py
+<cruncher project>
+src/dnadesign/cruncher/src/workflows/sample_workflow.py
 
-Run the MCMC-based sequence optimization, save enriched config, trace.nc, and parquet/JSON elites.
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

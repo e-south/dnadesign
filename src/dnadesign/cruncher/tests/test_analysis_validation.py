@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/test_analysis_validation.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import json
@@ -7,15 +16,15 @@ import numpy as np
 import pandas as pd
 import pytest
 import yaml
+from pydantic import ValidationError
 
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.core.pwm import PWM
-from dnadesign.cruncher.utils.hashing import sha256_path
 from dnadesign.cruncher.workflows.analyze.per_pwm import gather_per_pwm_scores
 from dnadesign.cruncher.workflows.analyze.plots.diagnostics import make_pair_idata
 from dnadesign.cruncher.workflows.analyze.plots.scatter import plot_scatter
 from dnadesign.cruncher.workflows.analyze.plots.summary import write_elite_topk
-from dnadesign.cruncher.workflows.analyze_workflow import _get_git_commit, run_analyze
+from dnadesign.cruncher.workflows.analyze_workflow import _get_git_commit
 
 
 def test_gather_per_pwm_scores_rejects_invalid_sequence(tmp_path: Path) -> None:
@@ -213,63 +222,8 @@ def test_scatter_thresholds_requires_llr(tmp_path: Path) -> None:
     }
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump(config))
-
-    run_dir = tmp_path / "results" / "sample_thresholds"
-    run_dir.mkdir(parents=True, exist_ok=True)
-
-    lock_dir = tmp_path / ".cruncher" / "locks"
-    lock_dir.mkdir(parents=True, exist_ok=True)
-    lock_path = lock_dir / "config.lock.json"
-    lock_path.write_text("{}")
-    lock_sha = sha256_path(lock_path)
-
-    pwm_matrix = [[0.25, 0.25, 0.25, 0.25] for _ in range(4)]
-    config_used = {
-        "cruncher": {
-            "sample": config["cruncher"]["sample"],
-            "analysis": config["cruncher"]["analysis"],
-            "pwms_info": {"lexA": {"pwm_matrix": pwm_matrix}, "cpxR": {"pwm_matrix": pwm_matrix}},
-        }
-    }
-    (run_dir / "config_used.yaml").write_text(yaml.safe_dump(config_used))
-
-    seq_df = pd.DataFrame(
-        {
-            "chain": [0, 0],
-            "draw": [0, 1],
-            "phase": ["draw", "draw"],
-            "sequence": ["ACGTACGTACGT", "TGCATGCATGCA"],
-            "score_lexA": [1.0, 1.2],
-            "score_cpxR": [0.8, 0.9],
-        }
-    )
-    seq_df.to_parquet(run_dir / "sequences.parquet", engine="fastparquet")
-
-    elites_df = pd.DataFrame(
-        {
-            "sequence": ["ACGTACGTACGT"],
-            "rank": [1],
-            "norm_sum": [2.0],
-            "score_lexA": [1.0],
-            "score_cpxR": [0.8],
-        }
-    )
-    elites_df.to_parquet(run_dir / "elites.parquet", engine="fastparquet")
-
-    (run_dir / "run_manifest.json").write_text(
-        f"""{{
-  \"stage\": \"sample\",
-  \"run_dir\": \"sample_thresholds\",
-  \"config_path\": \"{config_path}\",
-  \"lockfile_path\": \"{lock_path.resolve()}\",
-  \"lockfile_sha256\": \"{lock_sha}\",
-  \"sequence_length\": 12,
-  \"artifacts\": []
-}}"""
-    )
-    cfg = load_config(config_path)
-    with pytest.raises(ValueError, match="scatter_style='thresholds' requires scatter_scale='llr'"):
-        run_analyze(cfg, config_path)
+    with pytest.raises(ValidationError, match="scatter_style='thresholds' requires scatter_scale='llr'"):
+        load_config(config_path)
 
 
 def test_plot_scatter_requires_score_columns(tmp_path: Path) -> None:

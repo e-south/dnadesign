@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/test_config_resolver.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 import logging
 from pathlib import Path
 

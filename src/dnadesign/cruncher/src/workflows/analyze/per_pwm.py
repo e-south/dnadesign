@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/cruncher/workflows/analyze/per_pwm.py
+<cruncher project>
+src/dnadesign/cruncher/src/workflows/analyze/per_pwm.py
 
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/test_notebook_service.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 import json
 
 import pytest
@@ -23,6 +32,7 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     assert "plot_options" in content
     assert "Missing JSON at" in content
     assert "scatter controls disabled" in content
+    assert "Text output" in content
     assert "mo.ui.pyplot" not in content
 
 

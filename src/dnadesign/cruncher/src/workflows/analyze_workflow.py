@@ -1,21 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/cruncher/workflows/analyze_workflow.py
+<cruncher project>
+src/dnadesign/cruncher/src/workflows/analyze_workflow.py
 
-When run_analyze is called, it iterates through cfg.analysis.runs (a list of
-existing “sample” run names), and for each run:
-  1) It looks under the configured output folder for that sample's directory.
-  2) Writes the *latest* analysis directly into:
-       <sample_run>/analysis/{plots,tables,notebooks}
-     If analysis.archive=true, the previous analysis is moved to:
-       <sample_run>/analysis/_archive/<analysis_id>/
-  3) Writes analysis_used.yaml + summary.json, then produces plots/tables
-     according to cfg.analysis.plots. Pairwise plots are only generated when
-     analysis.tf_pair is explicitly provided.
-  4) Appends analysis artifacts to run_manifest.json for CLI discovery.
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-cruncher/io/plots/pssm.py
+<cruncher project>
+src/dnadesign/cruncher/src/io/plots/pssm.py
 
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

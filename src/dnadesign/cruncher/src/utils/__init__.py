@@ -1,1 +1,8 @@
-"""Shared utilities for cruncher."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/utils/__init__.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""

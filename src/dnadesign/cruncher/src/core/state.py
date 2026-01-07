@@ -1,13 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/cruncher/core/state.py
+<cruncher project>
+src/dnadesign/cruncher/src/core/state.py
 
-SequenceState: represents one candidate DNA sequence in integer form (0=A,1=C,2=G,3=T).
-This module also provides a simple “consensus” seeding factory.
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

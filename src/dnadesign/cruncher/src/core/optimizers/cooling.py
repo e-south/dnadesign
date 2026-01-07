@@ -1,14 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/cruncher/core/optimizers/cooling.py
+<cruncher project>
+src/dnadesign/cruncher/src/core/optimizers/cooling.py
 
-All cooling-schedule factories used by optimizers:
-    - make_beta_scheduler()   → for single-chain (fixed|linear|piecewise)
-    - make_beta_ladder()      → for parallel-tempering (“geometric” or singleton)
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

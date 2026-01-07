@@ -1,4 +1,11 @@
-"""Notebook helpers for analysis runs."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/services/notebook_service.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -361,17 +368,23 @@ def _(analysis_dir, pd, plot_manifest):
                     "exists": bool(full_path and full_path.exists()),
                 }}
             )
+        enabled = bool(entry.get("enabled"))
+        missing = [o["path"] for o in outputs if enabled and not o["exists"] and o.get("path")]
+        generated = bool(enabled and any(o["exists"] for o in outputs))
         rows.append(
             dict(
                 key=entry.get("key"),
                 label=entry.get("label"),
                 group=entry.get("group"),
                 enabled=entry.get("enabled"),
-                generated=entry.get("generated"),
+                generated=generated,
+                missing_outputs="; ".join(missing),
                 outputs="; ".join([o.get("path", "") for o in outputs if o.get("path")]),
             )
         )
         entry["outputs"] = outputs
+        entry["missing_outputs"] = missing
+        entry["generated"] = generated
     plot_df = pd.DataFrame(rows) if rows else pd.DataFrame()
     plot_options = (
         dict((f"{{e.get('label')}} ({{e.get('key')}})", e.get("key")) for e in plot_entries)
@@ -425,6 +438,23 @@ def _(analysis_dir, mo, plot_entries, plot_picker):
         full_path = analysis_dir / path
         if full_path.exists() and full_path.suffix.lower() in {".png", ".jpg", ".jpeg"}:
             blocks.append(mo.image(full_path))
+            continue
+        if full_path.exists() and full_path.suffix.lower() in {".txt", ".log"}:
+            try:
+                text = full_path.read_text()
+            except Exception as exc:
+                blocks.append(mo.md(f"Failed to read {{path}}: {{exc}}"))
+            else:
+                max_chars = 4000
+                preview = text
+                truncated = False
+                if len(preview) > max_chars:
+                    preview = preview[:max_chars]
+                    truncated = True
+                blocks.append(mo.md(f"**Text output:** {{path}}"))
+                if truncated:
+                    blocks.append(mo.md("_preview truncated_"))
+                blocks.append(mo.md("```\\n" + preview + "\\n```"))
     plot_preview = mo.vstack(blocks)
     return selected, plot_preview
 

@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/test_cli_help.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace

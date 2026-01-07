@@ -1,1 +1,8 @@
-"""Service layer for cruncher."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/services/__init__.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""

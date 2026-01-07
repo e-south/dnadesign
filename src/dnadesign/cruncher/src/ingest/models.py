@@ -1,5 +1,10 @@
 """
-Domain models used by ingestion adapters and stores.
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/ingest/models.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

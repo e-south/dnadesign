@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/cruncher/workflows/parse_workflow.py
+<cruncher project>
+src/dnadesign/cruncher/src/workflows/parse_workflow.py
 
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

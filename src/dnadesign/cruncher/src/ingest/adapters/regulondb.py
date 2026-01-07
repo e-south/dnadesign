@@ -1,4 +1,11 @@
-"""RegulonDB GraphQL adapter (curated regulons + HT TF-binding datasets)."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/ingest/adapters/regulondb.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

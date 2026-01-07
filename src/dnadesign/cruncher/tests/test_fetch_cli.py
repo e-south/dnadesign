@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/test_fetch_cli.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from pathlib import Path
 
 from dnadesign.cruncher.cli.commands.fetch import _render_sites_summary

@@ -1,18 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/cruncher/core/optimizers/gibbs.py
+<cruncher project>
+src/dnadesign/cruncher/src/core/optimizers/gibbs.py
 
-Gibbs/Metropolis sampler with linear or piecewise cooling.
-
-Supported move types:
-  - S: single-nucleotide flip (Gibbs)
-  - B: contiguous block replacement (Gibbs)
-  - M: k disjoint flips (Gibbs)
-Reserved moves: SL (slide), SW (swap).
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/cruncher/workflows/analyze/plots/diagnostics.py
+<cruncher project>
+src/dnadesign/cruncher/src/workflows/analyze/plots/diagnostics.py
 
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

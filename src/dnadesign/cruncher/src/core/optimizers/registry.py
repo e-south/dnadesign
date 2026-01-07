@@ -1,4 +1,11 @@
-"""Optimizer registry for pluggable MCMC kernels."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/core/optimizers/registry.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

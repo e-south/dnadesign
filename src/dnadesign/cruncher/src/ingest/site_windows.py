@@ -1,4 +1,11 @@
-"""Helpers for selecting fixed-length windows from binding-site sequences."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/ingest/site_windows.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

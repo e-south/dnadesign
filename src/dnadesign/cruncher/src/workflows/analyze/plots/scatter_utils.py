@@ -1,16 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/cruncher/workflows/analyze/plots/scatter_utils.py
+<cruncher project>
+src/dnadesign/cruncher/src/workflows/analyze/plots/scatter_utils.py
 
-A collection of small helper functions used by scatter_pwm.py:
-  - loading score tables
-  - subsampling
-  - generating a random‐baseline
-  - computing consensus points
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

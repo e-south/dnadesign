@@ -1,4 +1,11 @@
-"""Plot registry metadata for analysis planning."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/workflows/analyze/plot_registry.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/test_analysis_layout.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from pathlib import Path
 
 from dnadesign.cruncher.utils.analysis_layout import list_analysis_entries_verbose

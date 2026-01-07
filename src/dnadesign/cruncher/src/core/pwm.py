@@ -1,15 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/cruncher/core/pwm.py
+<cruncher project>
+src/dnadesign/cruncher/src/core/pwm.py
 
-PWM container with probability and log-odds support.
-
-Stores a position-specific frequency matrix and optionally pre-parsed log-odds.
-Provides methods to compute Shannon information and log-odds under any zero-order background.
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -1,1 +1,8 @@
-"""Analyze workflows and plots."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/workflows/analyze/__init__.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""

@@ -1,4 +1,11 @@
-"""Fixture payloads for RegulonDB adapter tests (offline, deterministic)."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/fixtures/regulondb_payloads.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

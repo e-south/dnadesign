@@ -1,22 +1,10 @@
 """
-<dnadesign project>
-dnadesign/cruncher/core/scoring.py
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/core/scoring.py
 
-FIMO-like Scorer (inspired by Grant et al. 2011, 10.1093/bioinformatics/btr064).
-
-Utility class that turns raw PWM log-odds into a single fitness value. Supports four scales:
-    • "llr"                 → raw max LLR per PWM
-    • "z"                   → z-score of the raw LLR against its null distribution
-    • "logp"                → -log10(p_seq) per PWM
-    • "consensus-neglop-sum"→ normalized (-log10(p_seq) / -log10(p_consensus)) per PWM
-
-Everything that has to do with “given a PWM + sequence → what's its (LLR, z, p, or
--log₁₀(p))?” should live in one place: Scorer.  Whenever you need per-PWM, per-sequence
-scores (whether you're doing MCMC, gather_everyN, random baseline, or consensus
-points) → call Scorer.compute_all_per_pwm(...)
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,28 +1,10 @@
 """
-<dnadesign project>
-dnadesign/cruncher/core/optimizers/pt.py
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/core/optimizers/pt.py
 
-Parallel-Tempered Gibbs/Metropolis sampler.
-
-*   Each chain is run at a fixed inverse-temperature β taken from the
-    geometric ladder supplied in the cooling block of the YAML config.
-*   Proposal kernel - S / B / M - and acceptance rules are identical to the
-    single-chain Gibbs implementation, except that log-accept ratios are
-    multiplied by β.
-*   After every recorded sweep we perform pair-wise nearest-neighbour swaps in
-    the β-ladder with probability *swap_prob*.
-*   The optimiser records:
-        • `all_samples`  - np.ndarray of each accepted sequence (numeric)
-        • `all_meta`     - tuples (chain_id, draw_index)
-        • `all_scores`   - per-TF scaled score dicts
-        • `trace_idata`  - ArviZ InferenceData of combined fitness
-        • `elites_meta`  - (chain, draw) pointers for the top-k diverse elites
-
-The public API mirrors GibbsOptimizer: call `.optimise()` with no
-arguments and receive a list of elite SequenceState objects.
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

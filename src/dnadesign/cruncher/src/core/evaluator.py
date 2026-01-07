@@ -1,15 +1,10 @@
 """
-<dnadesign project>
-dnadesign/cruncher/core/evaluator.py
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/core/evaluator.py
 
-Wrap a Scorer so that MCMC optimizers can call `evaluator(sequence_state) → float`.
-Gathers each PWM's output from Scorer and then combines them into one number via some reducer.
-
-SequenceEvaluator builds raw LLR maps for every TF, converts to the chosen scale
-(llr, logp, or consensus_neglop_sum), and then reduces to a single fitness value.
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 import logging

@@ -1,4 +1,11 @@
-"""Catalog index stored in the local .cruncher cache."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/store/catalog_index.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,11 @@
-"""Multi-TF summary tables and plots for analysis runs."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/workflows/analyze/plots/summary.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,12 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-cruncher/core/optimizers/base.py
+<cruncher project>
+src/dnadesign/cruncher/src/core/optimizers/base.py
 
-Abstract base class for optimizers (Gibbs & PT share the same interface).
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

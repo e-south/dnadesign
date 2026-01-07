@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/test_sequence_state_validation.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 import numpy as np
 import pytest
 

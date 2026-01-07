@@ -1,4 +1,11 @@
-"""Helpers for resolving Cruncher analysis layout on disk."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/utils/analysis_layout.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

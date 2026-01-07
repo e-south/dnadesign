@@ -1,21 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/cruncher/core/pvalue.py
+<cruncher project>
+src/dnadesign/cruncher/src/core/pvalue.py
 
-Exact p-value lookup for PWM log-odds scores.
-
-This module answers:
-    "If I generate random DNA of this length (zero-order uniform),
-     what is the probability of observing a motif window scoring at least s?"
-
-We implement FIMO's dynamic-programming approach at 0.001-bit resolution,
-building once per PWM a full null distribution and corresponding tail probabilities.
-
-Inspired by Grant et al. 2011 (DOI: 10.1093/bioinformatics/btr064).
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

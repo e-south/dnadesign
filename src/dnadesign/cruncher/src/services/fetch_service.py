@@ -1,4 +1,11 @@
-"""Fetch motifs/sites from adapters into the local catalog cache."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/services/fetch_service.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

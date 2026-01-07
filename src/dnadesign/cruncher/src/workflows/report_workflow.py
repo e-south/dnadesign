@@ -1,4 +1,11 @@
-"""Generate a concise run report from a completed sample run."""
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/workflows/report_workflow.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

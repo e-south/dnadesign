@@ -1,16 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/cruncher/io/parsers/backend.py
+<cruncher project>
+src/dnadesign/cruncher/src/io/parsers/backend.py
 
-Generic registry for PWM parsers.
-
-Add a new format by:
-    1. creating io/parsers/<fmt>.py
-    2. decorating a function with  @register("MYFMT")
-
-Module Author(s): Eric J. South
-Dunlop Lab
+Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
