@@ -29,11 +29,15 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     assert notebook_path.exists()
     content = notebook_path.read_text()
     assert f"default_id_hint = {analysis_id!r}" in content
+    assert "Path(__file__).resolve()" in content
+    assert "analysis_root = notebook_path.parent.parent" in content
+    assert "Refresh analysis list" in content
     assert "plot_options" in content
     assert "Missing JSON at" in content
     assert "scatter controls disabled" in content
     assert "Text output" in content
     assert "mo.ui.pyplot" not in content
+    assert str(run_dir) not in content
 
 
 def test_generate_notebook_strict_requires_summary(tmp_path, monkeypatch) -> None:
@@ -65,7 +69,8 @@ def test_generate_notebook_lenient_allows_missing_summary(tmp_path, monkeypatch)
     notebook_path = notebook_service.generate_notebook(run_dir, latest=True, strict=False)
     assert notebook_path.exists()
     content = notebook_path.read_text()
-    assert "analysis (unindexed)" in content
+    assert "list_analysis_entries_verbose" in content
+    assert "analysis_root = notebook_path.parent.parent" in content
 
 
 def test_generate_notebook_rejects_latest_and_analysis_id(tmp_path, monkeypatch) -> None:

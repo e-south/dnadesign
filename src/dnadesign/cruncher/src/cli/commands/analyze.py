@@ -36,6 +36,18 @@ def _parse_plot_keys(raw: list[str]) -> list[str]:
     return keys
 
 
+def _should_show_run_hint(message: str) -> bool:
+    lowered = message.lower()
+    if "pass --run" in lowered or "use --latest" in lowered:
+        return False
+    run_markers = (
+        "no analysis runs configured",
+        "no sample runs found",
+        "not found under",
+    )
+    return any(marker in lowered for marker in run_markers)
+
+
 def analyze(
     config: Path | None = typer.Argument(
         None,
@@ -135,6 +147,8 @@ def analyze(
             console.print(f"  cruncher notebook --latest {sample_dir}")
             console.print(f"  cruncher report {config_path} {run_name}")
     except (ValueError, FileNotFoundError) as exc:
-        console.print(f"Error: {exc}")
-        console.print("Hint: set analysis.runs, pass --run, or use --latest.")
+        message = str(exc)
+        console.print(f"Error: {message}")
+        if _should_show_run_hint(message):
+            console.print("Hint: set analysis.runs, pass --run, or use --latest.")
         raise typer.Exit(code=1)

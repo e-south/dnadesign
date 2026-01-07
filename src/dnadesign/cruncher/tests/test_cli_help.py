@@ -16,6 +16,7 @@ import yaml
 from typer.testing import CliRunner
 
 import dnadesign.cruncher.cli.commands.sources as sources_module
+import dnadesign.cruncher.workflows.analyze_workflow as analyze_workflow
 from dnadesign.cruncher.cli.app import app
 from dnadesign.cruncher.cli.config_resolver import (
     DEFAULT_WORKSPACE_ENV_VAR,
@@ -130,6 +131,18 @@ def test_config_defaults_to_summary() -> None:
     result = runner.invoke(app, ["config", str(CONFIG_PATH)])
     assert result.exit_code == 0
     assert "Cruncher config summary" in result.output
+
+
+def test_analyze_hint_not_duplicated(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _boom(*args, **kwargs):
+        raise ValueError("No analysis runs configured. Set analysis.runs, pass --run, or use --latest.")
+
+    monkeypatch.setattr(analyze_workflow, "run_analyze", _boom)
+
+    result = runner.invoke(app, ["analyze", str(CONFIG_PATH)])
+    assert result.exit_code != 0
+    assert "No analysis runs configured" in result.output
+    assert "Hint: set analysis.runs" not in result.output
 
 
 def test_sources_summary_remote_error_is_user_friendly(tmp_path, monkeypatch) -> None:

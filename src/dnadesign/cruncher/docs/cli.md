@@ -205,6 +205,8 @@ Notes:
 * pass `--lenient` to generate anyway (warnings appear in the Overview tab)
 * when `summary.json` is missing, lenient mode falls back to `analysis/` as an unindexed entry
 * plot output status is refreshed from disk so missing files are shown accurately
+* the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
+* the notebook infers `run_dir` from its location; keep it under `<run_dir>/analysis/notebooks/` or regenerate it
 * text outputs (for example, `diag__convergence.txt`) render inline in the Plots tab
 * if running in lenient mode and `summary.json` lacks `tf_names`, scatter controls are disabled with an inline warning
 * the notebook includes:

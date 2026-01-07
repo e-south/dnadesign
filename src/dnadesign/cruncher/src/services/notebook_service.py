@@ -155,10 +155,21 @@ def _():
 
 
 @app.cell
-def _(Path, json):
-    run_dir = Path({json.dumps(str(run_dir))})
-    analysis_root = Path({json.dumps(str(analysis_root))})
-    unindexed_label = "analysis (unindexed)"
+def _(Path, json, mo, refresh_button):
+    _ = refresh_button.value
+    notebook_path = Path(__file__).resolve()
+    analysis_root = notebook_path.parent.parent
+    if analysis_root.name != "analysis":
+        mo.stop(
+            True,
+            mo.md(
+                "Expected this notebook to live under `<run_dir>/analysis/notebooks/`.\n"
+                f"Found: {{notebook_path}}"
+            ),
+        )
+    if not analysis_root.exists():
+        mo.stop(True, mo.md(f"Analysis directory not found: {{analysis_root}}"))
+    run_dir = analysis_root.parent
     from dnadesign.cruncher.utils.analysis_layout import list_analysis_entries_verbose
 
     analysis_entries = list_analysis_entries_verbose(run_dir)
@@ -176,6 +187,12 @@ def _(Path, json):
     if default_label is None and analysis_labels:
         default_label = analysis_labels[0]
     return run_dir, analysis_root, analysis_entries, analysis_labels, default_label
+
+
+@app.cell
+def _(mo):
+    refresh_button = mo.ui.button(label="Refresh analysis list", kind="neutral")
+    return refresh_button
 
 
 @app.cell
@@ -201,6 +218,14 @@ def _(analysis_labels, mo):
 def _(analysis_labels, default_label, mo):
     analysis_picker = mo.ui.dropdown(options=analysis_labels, value=default_label, label="analysis")
     return analysis_picker
+
+
+@app.cell
+def _(analysis_picker, mo, refresh_button):
+    if analysis_picker is None:
+        return None
+    analysis_controls = mo.hstack([analysis_picker, refresh_button])
+    return analysis_controls
 
 
 @app.cell
@@ -521,10 +546,10 @@ def _(
 
 
 @app.cell
-def _(analysis_picker, mo, overview_md):
+def _(analysis_controls, mo, overview_md):
     blocks = []
-    if analysis_picker is not None:
-        blocks.append(analysis_picker)
+    if analysis_controls is not None:
+        blocks.append(analysis_controls)
     blocks.append(overview_md)
     overview_block = mo.vstack(blocks)
     return overview_block
