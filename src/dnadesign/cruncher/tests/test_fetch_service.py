@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 
+from dnadesign.cruncher.ingest.adapters.local import LocalMotifAdapter, LocalMotifAdapterConfig
 from dnadesign.cruncher.ingest.models import (
     GenomicInterval,
     MotifDescriptor,
@@ -129,6 +131,21 @@ class CoordOnlyAdapter(StubAdapter):
         )
 
 
+def _write_meme_blocks(path: Path) -> None:
+    path.write_text(
+        "MEME version 4.12.0\n"
+        "ALPHABET= ACGT\n"
+        "MOTIF MEME-1 cusR\n"
+        "letter-probability matrix: alength= 4 w= 3 nsites= 2 E= 1e-3\n"
+        "0.25 0.25 0.25 0.25\n"
+        "0.25 0.25 0.25 0.25\n"
+        "0.25 0.25 0.25 0.25\n"
+        "Motif 1 sites in BLOCKS format\n"
+        "seq1 (10) ACG\n"
+        "seq2 (20) ATG\n"
+    )
+
+
 def test_fetch_sites_updates_catalog(tmp_path):
     adapter = StubAdapter()
     written = fetch_sites(adapter, tmp_path, names=["tf"])
@@ -148,6 +165,30 @@ def test_fetch_sites_by_motif_id(tmp_path):
     written = fetch_sites(adapter, tmp_path, names=[], motif_ids=["M1"])
     assert written
     site_path = tmp_path / "normalized" / "sites" / "stub" / "M1.jsonl"
+    assert site_path.exists()
+
+
+def test_fetch_sites_local_meme_blocks(tmp_path: Path) -> None:
+    motifs_root = tmp_path / "motifs"
+    motifs_root.mkdir()
+    _write_meme_blocks(motifs_root / "cusR.txt")
+    adapter = LocalMotifAdapter(
+        LocalMotifAdapterConfig(
+            source_id="local",
+            root=motifs_root,
+            patterns=("*.txt",),
+            recursive=False,
+            format_map={".txt": "MEME"},
+            default_format=None,
+            tf_name_strategy="stem",
+            matrix_semantics="probabilities",
+            extract_sites=True,
+        )
+    )
+    catalog_root = tmp_path / ".cruncher"
+    written = fetch_sites(adapter, catalog_root, names=["cusR"])
+    assert written
+    site_path = catalog_root / "normalized" / "sites" / "local" / "cusR.jsonl"
     assert site_path.exists()
 
 

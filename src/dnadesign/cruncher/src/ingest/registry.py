@@ -128,6 +128,8 @@ def _local_source_factory(
         source_version=src.source_version,
         tags=dict(src.tags),
         extra_parser_modules=tuple(extra_parser_modules or ()),
+        extract_sites=src.extract_sites,
+        meme_motif_selector=src.meme_motif_selector,
     )
 
     def _factory(_config: IngestConfig) -> SourceAdapter:

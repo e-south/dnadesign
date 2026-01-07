@@ -69,7 +69,9 @@ class CatalogMotifStore(MotifStore):
                 raise FileNotFoundError(f"Motif record not found: {norm_path}")
             payload = json.loads(norm_path.read_text())
             matrix = np.array(payload["matrix"], dtype=float)
-            return PWM(name=payload["descriptor"]["tf_name"], matrix=matrix)
+            log_odds = payload.get("log_odds_matrix")
+            log_odds_matrix = np.array(log_odds, dtype=float) if log_odds is not None else None
+            return PWM(name=payload["descriptor"]["tf_name"], matrix=matrix, log_odds_matrix=log_odds_matrix)
         if self.pwm_source == "sites":
             catalog = CatalogIndex.load(self.root)
             entry = catalog.entries.get(f"{ref.source}:{ref.motif_id}")

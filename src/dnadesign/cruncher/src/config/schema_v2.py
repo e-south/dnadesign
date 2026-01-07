@@ -341,6 +341,14 @@ class LocalMotifSourceConfig(BaseModel):
     source_url: Optional[str] = None
     source_version: Optional[str] = None
     tags: Dict[str, str] = Field(default_factory=dict)
+    extract_sites: bool = Field(
+        False,
+        description="Enable binding-site extraction from MEME BLOCKS sections.",
+    )
+    meme_motif_selector: Optional[Union[str, int]] = Field(
+        None,
+        description="Select a motif from multi-motif MEME files (name_match, MEME-1, index, or label).",
+    )
 
     @field_validator("source_id")
     @classmethod

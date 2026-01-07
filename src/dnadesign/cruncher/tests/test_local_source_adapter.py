@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 
 from dnadesign.cruncher.ingest.adapters.local import LocalMotifAdapter, LocalMotifAdapterConfig
-from dnadesign.cruncher.ingest.models import MotifQuery
+from dnadesign.cruncher.ingest.models import MotifQuery, SiteQuery
 from dnadesign.cruncher.services.fetch_service import fetch_motifs
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 
@@ -24,6 +24,8 @@ from dnadesign.cruncher.store.catalog_index import CatalogIndex
 def _write_meme(path: Path) -> None:
     path.write_text(
         "MEME version 4.12.0\n"
+        "ALPHABET= ACGT\n"
+        "MOTIF MEME-1 demo\n"
         "letter-probability matrix: alength= 4 w= 2 nsites= 5 E= 1e-3\n"
         "0.2 0.3 0.1 0.4\n"
         "0.25 0.25 0.25 0.25\n"
@@ -43,6 +45,21 @@ def _make_adapter(root: Path, *, extra_modules: tuple[str, ...] = ()) -> LocalMo
         extra_parser_modules=extra_modules,
     )
     return LocalMotifAdapter(cfg)
+
+
+def _write_meme_blocks(path: Path) -> None:
+    path.write_text(
+        "MEME version 4.12.0\n"
+        "ALPHABET= ACGT\n"
+        "MOTIF MEME-1 cusR\n"
+        "letter-probability matrix: alength= 4 w= 3 nsites= 2 E= 1e-3\n"
+        "0.25 0.25 0.25 0.25\n"
+        "0.25 0.25 0.25 0.25\n"
+        "0.25 0.25 0.25 0.25\n"
+        "Motif 1 sites in BLOCKS format\n"
+        "seq1 (10) ACG\n"
+        "seq2 (20) ATG\n"
+    )
 
 
 def test_local_adapter_fetches_motifs(tmp_path: Path) -> None:
@@ -128,3 +145,30 @@ def test_extra_parser_module_import(tmp_path: Path) -> None:
         assert np.allclose(record.matrix[0], [0.25, 0.25, 0.25, 0.25])
     finally:
         sys.path.remove(str(tmp_path))
+
+
+def test_local_adapter_extracts_sites_from_meme_blocks(tmp_path: Path) -> None:
+    root = tmp_path / "motifs"
+    root.mkdir()
+    _write_meme_blocks(root / "cusR.txt")
+
+    cfg = LocalMotifAdapterConfig(
+        source_id="local",
+        root=root,
+        patterns=("*.txt",),
+        recursive=False,
+        format_map={".txt": "MEME"},
+        default_format=None,
+        tf_name_strategy="stem",
+        matrix_semantics="probabilities",
+        extract_sites=True,
+    )
+    adapter = LocalMotifAdapter(cfg)
+    sites = list(adapter.list_sites(SiteQuery(motif_id="cusR")))
+    assert len(sites) == 2
+    assert sites[0].sequence == "ACG"
+    assert sites[0].evidence["sequence_name"] == "seq1"
+    assert sites[0].evidence["start"] == 10
+    assert sites[0].provenance.tags["record_kind"] == "meme_blocks"
+    sites_for_motif = list(adapter.get_sites_for_motif("cusR", SiteQuery()))
+    assert len(sites_for_motif) == 2

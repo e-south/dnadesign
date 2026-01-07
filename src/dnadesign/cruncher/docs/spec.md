@@ -224,7 +224,7 @@ Integration tests:
 
 End-to-end:
 
-- LocalDir ingestion (offline)
+- LocalDir ingestion (offline, matrices only by default; MEME BLOCKS sites when extract_sites=true)
 - sample + analyze + report with small draws
 
 ---

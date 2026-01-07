@@ -126,6 +126,7 @@ def build_motif_record(
     motif_id: str,
     tf_name: str,
     matrix: Sequence[Sequence[float]],
+    log_odds_matrix: Optional[Sequence[Sequence[float]]] = None,
     matrix_semantics: str,
     organism: Optional[OrganismRef],
     raw_payload: str,
@@ -136,10 +137,19 @@ def build_motif_record(
     citation: Optional[str] = None,
     raw_artifact_paths: Optional[Iterable[str]] = None,
     tags: Optional[dict[str, str]] = None,
+    background: Optional[Sequence[float]] = None,
 ) -> MotifRecord:
     norm_matrix = normalize_matrix(matrix)
     if matrix_semantics == "probabilities":
         validate_prob_matrix(norm_matrix)
+    norm_log_odds = None
+    if log_odds_matrix is not None:
+        norm_log_odds = normalize_matrix(log_odds_matrix)
+        if len(norm_log_odds) != len(norm_matrix):
+            raise ValueError("log_odds_matrix must match matrix length")
+        for i, row in enumerate(norm_log_odds):
+            if len(row) != 4:
+                raise ValueError(f"log_odds_matrix row {i} length must be 4")
     descriptor = MotifDescriptor(
         source=source,
         motif_id=motif_id,
@@ -162,11 +172,17 @@ def build_motif_record(
     checksum_raw = _sha256_text(raw_payload)
     checksum_norm = _sha256_text(str(norm_matrix))
     checksums = Checksums(sha256_raw=checksum_raw, sha256_norm=checksum_norm)
+    norm_background = None
+    if background is not None:
+        if len(background) != 4:
+            raise ValueError("background must have 4 values (A,C,G,T)")
+        norm_background = tuple(float(v) for v in background)
     return MotifRecord(
         descriptor=descriptor,
         matrix=norm_matrix,
+        log_odds_matrix=norm_log_odds,
         matrix_semantics=matrix_semantics,
-        background=None,
+        background=norm_background,
         provenance=provenance,
         checksums=checksums,
     )

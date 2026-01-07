@@ -85,7 +85,8 @@ Key behaviors:
 - **TF naming**: default is file stem (preserves case), configurable via `tf_name_strategy`.
 - **Provenance**: dataset metadata (DOI, comments) lives in config tags/citation, not code.
 - **Path resolution**: relative roots are resolved from the config file location.
-- **Motifs only**: local sources do not provide binding-site records.
+- **Sites opt-in**: set `extract_sites=true` to parse MEME BLOCKS sites (training-set occurrences).
+- **Motif selection**: use `meme_motif_selector` to disambiguate multi-motif MEME files.
 
 Example config (O'Malley et al. MEME files):
 
@@ -100,6 +101,8 @@ ingest:
       format_map: {".txt": "MEME"}
       tf_name_strategy: stem
       matrix_semantics: probabilities
+      extract_sites: false
+      meme_motif_selector: null  # name_match | MEME-1 | 1 | "<MOTIF label>"
       citation: "O'Malley et al. 2021 (DOI: 10.1038/s41592-021-01312-2)"
       source_url: https://github.com/e-south/dnadesign-data
       tags:

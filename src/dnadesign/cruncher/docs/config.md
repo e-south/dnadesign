@@ -67,7 +67,9 @@ motif_store:
 Notes:
 - `pwm_source=matrix` uses cached motif matrices (default).
 - `pwm_source=sites` builds PWMs from cached binding-site sequences at runtime.
-- Local motif sources provide matrices only; when `pwm_source=sites`, they are ignored by lock/parse.
+- Local motif sources provide matrices by default. Set `ingest.local_sources[].extract_sites=true`
+  to opt into MEME BLOCKS site extraction (training-set occurrences) so they can participate
+  when `pwm_source=sites`.
 - If site lengths vary, set `site_window_lengths` per TF or dataset.
 - `combine_sites=false` avoids mixing curated and HT sites unless you opt in.
 - When `combine_sites=true`, lockfiles hash all matching site sets for the TF (respecting `site_kinds`); adding/removing site sets requires re-locking.
@@ -119,6 +121,8 @@ ingest:
       default_format: null
       tf_name_strategy: stem
       matrix_semantics: probabilities
+      extract_sites: false
+      meme_motif_selector: null  # name_match | MEME-1 | 1 | "<MOTIF label>"
       organism:
         name: Escherichia coli
       citation: "O'Malley et al. 2021 (DOI: 10.1038/s41592-021-01312-2)"
@@ -139,7 +143,10 @@ Notes:
   Roots are resolved relative to the config path if they are not absolute.
 - Each local source must set `format_map` and/or `default_format` so `.txt` (or other)
   files can be parsed. Missing mappings fail fast.
-- Local sources provide motif matrices only (no binding-site records).
+- Local sources provide motif matrices by default. For MEME text output, set
+  `extract_sites=true` to parse BLOCKS sites (training-set occurrences).
+- `meme_motif_selector` selects a motif from multi-motif MEME files (by name match,
+  MEME-1, numeric index, or exact label). Use this to disambiguate multi-motif files.
 - For DAP-seq local datasets (DNA affinity purification sequencing), see the
   `dnadesign-data` repository and cite O'Malley et al. "Persistence and plasticity in
   bacterial gene regulation" (DOI: 10.1038/s41592-021-01312-2). The E. coli motifs are

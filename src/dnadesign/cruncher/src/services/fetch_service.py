@@ -57,6 +57,7 @@ def write_motif_record(root: Path, record: MotifRecord) -> Path:
             "tags": record.descriptor.tags,
         },
         "matrix": record.matrix,
+        "log_odds_matrix": record.log_odds_matrix,
         "matrix_semantics": record.matrix_semantics,
         "background": record.background,
         "provenance": provenance,

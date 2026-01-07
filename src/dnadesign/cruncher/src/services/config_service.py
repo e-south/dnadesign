@@ -29,6 +29,8 @@ def summarize_config(cfg: CruncherConfig) -> Dict[str, Any]:
                 "default_format": src.default_format,
                 "tf_name_strategy": src.tf_name_strategy,
                 "matrix_semantics": src.matrix_semantics,
+                "extract_sites": src.extract_sites,
+                "meme_motif_selector": src.meme_motif_selector,
                 "tags": src.tags,
                 "citation": src.citation,
                 "license": src.license,

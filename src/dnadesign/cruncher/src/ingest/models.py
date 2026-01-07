@@ -59,6 +59,7 @@ class MotifRecord:
     background: Optional[Tuple[float, float, float, float]]
     provenance: Provenance
     checksums: Checksums
+    log_odds_matrix: Optional[List[List[float]]] = None
 
 
 @dataclass(frozen=True, slots=True)
