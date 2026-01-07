@@ -148,6 +148,11 @@ src/dnadesign/opal/campaigns/**
 !src/dnadesign/opal/campaigns/**/plots.yaml
 !src/dnadesign/opal/campaigns/**/plots.yml
 src/dnadesign/opal/campaigns/**/inputs/
+!src/dnadesign/opal/campaigns/demo/inputs/
+!src/dnadesign/opal/campaigns/demo/inputs/**
+!src/dnadesign/opal/campaigns/audit_demo/inputs/
+!src/dnadesign/opal/campaigns/audit_demo/inputs/**
+src/dnadesign/opal/campaigns/**/inputs/**/.DS_Store
 
 # OPAL per-run products anywhere
 **/outputs/

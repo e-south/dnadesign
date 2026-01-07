@@ -43,6 +43,7 @@ plots:
       cbar_width_in: 0.25
       cbar_pad_in: 0.05
       gap_between_panels_in: 0.35
+      on_violin_invalid: line  # explicit: fallback to mean line when sample too small
 
   - name: fold_change_vs_logic
     kind: fold_change_vs_logic_fidelity

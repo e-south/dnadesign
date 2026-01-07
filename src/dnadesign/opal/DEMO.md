@@ -1,40 +1,21 @@
-## Demo Campaign — SFXI (setpoint × intensity)
+## OPAL Demo Campaign -- SFXI (setpoint x intensity)
 
-This demo runs the full OPAL pipeline on mock **X** and **Y** values while exercising real plugins:
+This demo walks a **complete OPAL loop** on a small dataset with the modern, strict
+SFXI ingest + plotting stack. It is designed to be copy/pasteable, deterministic,
+and easy to extend.
 
-- Y-ingest: `sfxi_vec8_from_table_v1`
-- Objective: `sfxi_v1` (setpoint fidelity × intensity)
-- Model: Random Forest
+**What you'll learn (and see):**
+- strict label ingestion with delta checks
+- a full `run` (train -> score -> select)
+- ledger-backed inspection (`status`, `runs`, `log`)
+- plots (quick + configured)
+- where artifacts and ledgers live
 
-See the SFXI objective details [**here**](./docs/setpoint_fidelity_x_intensity.md) (optional).
-
----
-
-### What this demo does
-
-1. **Ingest** a tidy CSV containing logic and intensity (log2*) columns → build an 8-vector label per sequence.
-2. **Train** a Random Forest regressor on your chosen X and these 8-vector labels.
-3. **Predict** Ŷ for the unlabeled candidate pool.
-4. **Score** each candidate with the SFXI-derived scalar.
-5. **Rank & select** top-k by that scalar, write per-round artifacts, and append canonical events.
+> Prefer a self-contained demo without USR datasets? Use `campaigns/audit_demo/`.
 
 ---
 
-### Data used here
-
-- **USR dataset**: `usr/datasets/demo/records.parquet`
-  Contains `sequence`, `mock__X_value`, and a placeholder label column.
-- **Experimental Y labels (SFXI)**: `usr/demo_material/demo_y_sfxi.csv`
-
-**8-vector label convention**:
-
-````
-Y = [v00, v10, v01, v11, y00*, y10*, y01*, y11*]
-````
-
----
-
-### Run the demo
+### TL;DR (happy path)
 
 From the repo root:
 
@@ -42,93 +23,197 @@ From the repo root:
 cd src/dnadesign/opal/campaigns/demo/
 
 # 1) Initialize & validate
-opal init     -c campaign.yaml
-opal validate -c campaign.yaml
+uv run opal init     -c campaign.yaml
+uv run opal validate -c campaign.yaml
 
-# 2) Provide labels for round 0
-mkdir -p inputs/r0/
-cp ../../../usr/demo_material/demo_y_sfxi.csv inputs/r0/
+# 2) Ingest round-0 labels
+uv run opal ingest-y -c campaign.yaml --round 0 \
+  --csv ../../../usr/demo_material/demo_y_sfxi.csv
 
-# 3) Ingest round 0 labels
-opal ingest-y -c campaign.yaml --round 0 --csv inputs/r0/demo_y_sfxi.csv
+# 3) Train, score, select (round 0)
+uv run opal run -c campaign.yaml --round 0
 
-# 4) Train, score, select for round 0
-opal run -c campaign.yaml --round 0
+# 4) Inspect
+uv run opal status -c campaign.yaml
+uv run opal runs list -c campaign.yaml
+uv run opal log -c campaign.yaml --round latest
 
-# 5) Lists objective‑level info per round for row‑level diagnostics
-opal objective-meta -c campaign.yaml --round latest
-````
-
-Tip: when you are **inside** the campaign folder, you can omit `-c campaign.yaml`
-(OPAL auto-discovers the config). From elsewhere, pass `--config`.
-Aliases: `--observed-round` (ingest) and `--labels-as-of` (run) are accepted.
-
-If `opal run` reports labels without `label_hist` (e.g., legacy datasets that
-pre-fill the Y column), explicitly attach them:
-
-```bash
-opal label-hist attach-from-y -c campaign.yaml --round 0 --apply
+# 5) Plot
+MPLCONFIGDIR=$PWD/.tmp/mpl OPAL_SUPPRESS_PYARROW_SYSCTL=1 \
+  uv run opal plot -c campaign.yaml --quick
+MPLCONFIGDIR=$PWD/.tmp/mpl OPAL_SUPPRESS_PYARROW_SYSCTL=1 \
+  uv run opal plot -c campaign.yaml
 ```
 
-Optional reset (start fresh):
+**Notes:**
+- Use `uv run opal ...` to ensure the correct environment.
+- On macOS, `OPAL_SUPPRESS_PYARROW_SYSCTL=1` suppresses PyArrow sysctl warnings.
+- `MPLCONFIGDIR` avoids Matplotlib cache warnings and speeds imports.
 
-```bash
-opal prune-source -c campaign.yaml --scope campaign --yes
+---
+
+### Data used here (demo)
+
+- **USR dataset**: `usr/datasets/demo/records.parquet`
+  - contains `sequence`, `mock__X_value`, and a placeholder label column.
+- **Experimental labels**: `usr/demo_material/demo_y_sfxi.csv`
+  - includes `intensity_log2_offset_delta` (strict delta match).
+
+**8-vector label convention**
+
+```
+Y = [v00, v10, v01, v11, y00*, y10*, y01*, y11*]
 ```
 
-Note: If `outputs/` already exists from an older OPAL version (for example a
-`ledger.runs/` directory or `ledger.index.parquet`), remove `outputs/` and
-`state.json`, then re-run `opal init` and `opal run`. Legacy layouts are not
-supported.
+The demo CSV includes **`intensity_log2_offset_delta`** (constant) so the
+`SFXI` transform can enforce a strict match between data and objective params.
 
-Artifacts appear in `outputs/round_0/`:
+---
 
-* `model.joblib`
-* `model_meta.json`
-* `selection_top_k.csv`
-* `labels_used.parquet`
-* `round_ctx.json`
-* `objective_meta.json`
-* `round.log.jsonl`
+### What to expect (captured outputs, trimmed)
 
-Canonical events are appended to **ledger sinks** under `outputs/`:
+#### `opal status` (after a run)
 
-* `label` → `outputs/ledger.labels.parquet` (rows emitted by `ingest-y`)
-* `run_pred` → `outputs/ledger.predictions/` (one per candidate scored)
-* `run_meta` → `outputs/ledger.runs.parquet` (one per run with config and artifact checksums)
+```
+Campaign
+  name           : Demo (vec8)
+  slug           : demo
+  workdir        : <repo>/src/dnadesign/opal/campaigns/demo
+  X column       : mock__X_value
+  Y column       : mock__y_label
+  num_rounds     : 1
 
-Schema note: `run_pred` uses `pred__`, `obj__`, and `sel__` prefixes; `run_meta` uses
-`model__`, `objective__`, `selection__`, `stats__`, plus `schema__version` / `opal__version`.
+Latest round
+  r              : 0
+  run_id         : r0-2026-01-02T18:48:11+00:00
+  n_train        : 9
+  n_scored       : 15
+  top_k requested: 5
+  top_k effective: 5
+  round_dir      : <repo>/src/dnadesign/opal/campaigns/demo/outputs/round_0
+```
 
-**Ergonomic caches** written to `records.parquet`:
+#### `opal runs list`
 
-* `opal__<slug>__latest_as_of_round`
-* `opal__<slug>__latest_pred_scalar`
+```
+Runs
+  - r=0, run_id=r0-2026-01-01T23:..., model=random_forest, objective=sfxi_v1,
+    selection=top_n, n_train=9, n_scored=15
+  - r=0, run_id=r0-2026-01-02T18:..., model=random_forest, objective=sfxi_v1,
+    selection=top_n, n_train=9, n_scored=15
+```
 
-Inspect:
+#### `opal log --round latest`
 
-```bash
-opal status
-opal status --with-ledger
-opal runs list
-opal log --round latest
-opal record-show -c campaign.yaml --sequence ACCTG...
-opal explain     -c campaign.yaml --round 1
+```
+Round log
+  round            : 0
+  path             : <repo>/.../outputs/round_0/round.log.jsonl
+  events           : 25
+  predict_batches  : 2
+  predict_rows     : 30
+  duration_total_s : 68998.0
+  duration_fit_s   : 68684.0
+
+Stages
+  - done
+  - fit
+  - predict_batch
+  - selection
+  - yops_fit_transform
+  - yops_inverse_done
+```
+
+#### `opal plot --quick`
+
+```
+[ok] quick_score_vs_rank (scatter_score_vs_rank) -> .../outputs/plots/quick_score_vs_rank.png
+[ok] quick_percent_high (percent_high_activity_over_rounds) -> .../outputs/plots/quick_percent_high.png
+[ok] quick_feature_importance (feature_importance_bars) -> .../outputs/plots/quick_feature_importance.png
+```
+
+#### `opal plot` (full config)
+
+```
+[ok] score_vs_rank_latest (scatter_score_vs_rank) -> .../outputs/plots/score_vs_rank_latest.png
+[ok] percent_high_activity (percent_high_activity_over_rounds) -> .../outputs/plots/percent_high_activity.png
+[ok] sfxi_logic_closeness (sfxi_logic_fidelity_closeness) -> .../outputs/plots/sfxi_logic_closeness.png
+[ok] fold_change_vs_logic (fold_change_vs_logic_fidelity) -> .../outputs/plots/fold_change_vs_logic.png
 ```
 
 ---
 
-### IDs: how they’re resolved here
+### Plots: why `on_violin_invalid: line`
 
-If the label CSV has **no** `id`, OPAL will:
+The SFXI closeness plot draws violins by default. The demo dataset is small, so
+we **explicitly** set:
 
-1. Match by `sequence` to existing rows and append a new round label.
-2. If the **same round** already exists, behavior follows `--if-exists` (default: fail).
-3. Create a new row (essentials + generated `id`) if the sequence is new.
+```yaml
+on_violin_invalid: line
+```
+
+This makes the fallback intentional: for small sample sizes, the plot uses a
+mean-line summary instead of failing. If you want strict behavior, set
+`on_violin_invalid: error`.
 
 ---
 
-### Demo `campaign.yaml` (local)
+### Where outputs go
+
+**Per-round artifacts** (for audit + reuse):
+
+```
+outputs/round_<k>/
+  model.joblib
+  model_meta.json
+  selection_top_k.csv
+  labels_used.parquet
+  round_ctx.json
+  objective_meta.json
+  round.log.jsonl
+```
+
+**Ledger sinks (append-only)**:
+
+```
+outputs/ledger.runs.parquet
+outputs/ledger.labels.parquet
+outputs/ledger.predictions/part-*.parquet
+```
+
+---
+
+### Interactive notebook (marimo)
+
+Generate a campaign-tied notebook and open it in marimo:
+
+```bash
+uv run opal notebook generate -c campaign.yaml --round latest
+uv run opal notebook run -c campaign.yaml
+```
+
+The notebook loads ledger artifacts (runs, predictions, labels) and gives you
+interactive filtering and plots for the selected run.
+
+---
+
+### Optional: audit_demo (self-contained)
+
+`campaigns/audit_demo/` ships with a local `records.parquet` and labels under
+`inputs/`. It's ideal if you don't want to use USR datasets.
+
+```bash
+cd src/dnadesign/opal/campaigns/audit_demo/
+uv run opal init -c campaign.yaml
+uv run opal validate -c campaign.yaml
+uv run opal ingest-y -c campaign.yaml --round 0 --csv inputs/r0/demo_y_sfxi.csv
+uv run opal run -c campaign.yaml --round 0
+uv run opal plot -c campaign.yaml
+```
+
+---
+
+### Demo `campaign.yaml` (current, canonical)
 
 ```yaml
 # OPAL demo campaign configuration (local)
@@ -139,7 +224,6 @@ campaign:
   workdir: "."  # resolved relative to this file
 
 data:
-  # Use the "demo" usr records.parquet file included in the repo.
   location: { kind: usr, path: ../../../usr/datasets, dataset: demo }
   x_column_name: "mock__X_value"
   y_column_name: "mock__y_label"
@@ -153,29 +237,24 @@ training:
     cumulative_training: true
     label_cross_round_deduplication_policy: "latest_only"
     allow_resuggesting_candidates_until_labeled: true
-  # Ephemeral Y-ops used at fit-time and inverted at predict-time
   y_ops:
-    - name: intensity_median_iqr     # scales indices 4:8 only; no log2 changes here
+    - name: intensity_median_iqr
       params:
         min_labels: 5
         center: median
         scale: iqr
         eps: 1e-8
 
-# --------------------------
-# Plugin blocks (registry-first)
-# --------------------------
-
-# X transform (raw -> model-ready X)
 transforms_x: { name: identity, params: {} }
 
-# Y ingestion transform (raw -> model-ready y)
 transforms_y:
   name: sfxi_vec8_from_table_v1
   params:
     sequence_column: sequence
     logic_columns: ["v00","v10","v01","v11"]
     intensity_columns: ["y00_star","y10_star","y01_star","y11_star"]
+    enforce_log2_offset_match: true
+    expected_log2_offset_delta: 0.0
 
 model:
   name: "random_forest"
@@ -202,7 +281,7 @@ selection:
   params:
     top_k: 5
     tie_handling: "competition_rank"
-    objective_mode: "maximize"   # minimize|maximize
+    objective_mode: "maximize"
 
 scoring:
   score_batch_size: 1000
@@ -220,7 +299,17 @@ metadata:
 plot_config: plots.yaml
 ```
 
-> Next: read about command surface in the **[CLI Manual](./src/cli/README.md)**, or jump back to the **[Top-level README](./README.md)**.
+---
+
+### Troubleshooting
+
+- **Delta mismatch** during `ingest-y`:
+  - Ensure `intensity_log2_offset_delta` in the CSV equals
+    `objective.params.intensity_log2_offset_delta` in `campaign.yaml`.
+- **Matplotlib cache warning**:
+  - Set `MPLCONFIGDIR=$PWD/.tmp/mpl`.
+- **Old outputs layout**:
+  - Remove `outputs/` and `state.json`, then re-run `opal init`.
 
 ---
 

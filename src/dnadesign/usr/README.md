@@ -67,6 +67,7 @@ Demo inputs in this repo:
 
 * Sequences: `usr/demo_material/demo_sequences.csv`
 * Attachments: `usr/demo_material/demo_attachment_{one|two}.csv`
+* OPAL labels (SFXI vec8): `usr/demo_material/demo_y_sfxi.csv` (includes `intensity_log2_offset_delta`)
 
 **Create a dataset**
 

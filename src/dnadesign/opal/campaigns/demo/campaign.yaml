@@ -41,6 +41,8 @@ transforms_y:
     sequence_column: sequence
     logic_columns: ["v00","v10","v01","v11"]
     intensity_columns: ["y00_star","y10_star","y01_star","y11_star"]
+    enforce_log2_offset_match: true
+    expected_log2_offset_delta: 0.0
 
 model:
   name: random_forest

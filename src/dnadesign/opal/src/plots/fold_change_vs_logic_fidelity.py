@@ -110,14 +110,13 @@ def render(context, params: dict) -> None:
     if rasterize_at is not None:
         rasterize_at = int(rasterize_at)
 
-    # Ensure setpoint is available (backfill from run_meta if needed)
+    # Ensure setpoint is available (joined from run_meta inside load_events_with_setpoint).
     need = {
         "as_of_round",
         "run_id",
         "id",
         "pred__y_hat_model",
         "sel__is_selected",
-        "obj__diag__setpoint",
         "pred__y_obj_scalar",
     }
     # If hue/size ask for objective/pred/sel columns, load them from predictions
