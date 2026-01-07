@@ -521,6 +521,16 @@ def _(
 
 
 @app.cell
+def _(analysis_picker, mo, overview_md):
+    blocks = []
+    if analysis_picker is not None:
+        blocks.append(analysis_picker)
+    blocks.append(overview_md)
+    overview_block = mo.vstack(blocks)
+    return overview_block
+
+
+@app.cell
 def _(mo, per_pwm_df, summary_df, topk_view, topk_slider, topk_path, per_pwm_path, summary_table_path):
     blocks = []
     if summary_df.empty:
@@ -543,8 +553,11 @@ def _(mo, per_pwm_df, summary_df, topk_view, topk_slider, topk_path, per_pwm_pat
 
 
 @app.cell
-def _(chain_picker, draw_slider, fig, mo, plot_df, plot_preview, points_slider, scatter_info, tf_warning):
+def _(chain_picker, draw_slider, fig, mo, plot_df, plot_preview, points_slider, scatter_info, tf_warning, tf_x, tf_y):
     blocks = []
+    tf_controls = [c for c in (tf_x, tf_y) if c is not None]
+    if tf_controls:
+        blocks.append(mo.hstack(tf_controls))
     controls = [c for c in (chain_picker, draw_slider, points_slider) if c is not None]
     if controls:
         blocks.append(mo.hstack(controls))
@@ -571,10 +584,10 @@ def _(mo, artifacts):
 
 
 @app.cell
-def _(mo, overview_md, tables_block, plots_block, artifacts_block):
+def _(mo, overview_block, tables_block, plots_block, artifacts_block):
     tabs = mo.ui.tabs(
         {{
-            "Overview": overview_md,
+            "Overview": overview_block,
             "Tables": tables_block,
             "Plots": plots_block,
             "Artifacts": artifacts_block,

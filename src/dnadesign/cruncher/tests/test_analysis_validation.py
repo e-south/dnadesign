@@ -22,7 +22,7 @@ from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.workflows.analyze.per_pwm import gather_per_pwm_scores
 from dnadesign.cruncher.workflows.analyze.plots.diagnostics import make_pair_idata
-from dnadesign.cruncher.workflows.analyze.plots.scatter import plot_scatter
+from dnadesign.cruncher.workflows.analyze.plots.scatter import _normalize_threshold_points, plot_scatter
 from dnadesign.cruncher.workflows.analyze.plots.summary import write_elite_topk
 from dnadesign.cruncher.workflows.analyze_workflow import _get_git_commit
 
@@ -324,3 +324,9 @@ def test_plot_scatter_requires_score_columns(tmp_path: Path) -> None:
             pwm_sum_threshold=0.0,
             annotation="",
         )
+
+
+def test_normalize_threshold_points_scales_values() -> None:
+    points = [(2.0, 6.0, "a"), (1.0, 3.0, "b")]
+    normalized = _normalize_threshold_points(points, cons_x=2.0, cons_y=3.0)
+    assert normalized == [(1.0, 2.0, "a"), (0.5, 1.0, "b")]

@@ -88,8 +88,16 @@ def plot_scatter(
     # 5) Subsample up to 2000 mcmc points
     df_sub = subsample_df(df_per_pwm, max_n=2000, sort_by="draw")
 
-    # 6) Random baseline
-    df_random = generate_random_baseline(pwms, cfg, length=seq_len, n_samples=len(df_sub), bidirectional=bidirectional)
+    # 6) Random baseline (unused in thresholds mode)
+    df_random = pd.DataFrame()
+    if style != "thresholds":
+        df_random = generate_random_baseline(
+            pwms,
+            cfg,
+            length=seq_len,
+            n_samples=len(df_sub),
+            bidirectional=bidirectional,
+        )
 
     # 7) Consensus points
     consensus_pts = compute_consensus_points(
@@ -165,6 +173,15 @@ def plot_scatter(
     )
 
 
+def _normalize_threshold_points(
+    points: List[Tuple[float, float, object]],
+    *,
+    cons_x: float,
+    cons_y: float,
+) -> List[Tuple[float, float, object]]:
+    return [(float(x) / cons_x, float(y) / cons_y, meta) for x, y, meta in points]
+
+
 def _draw_scatter_figure(
     df_samples: pd.DataFrame,
     df_random: pd.DataFrame,
@@ -204,6 +221,8 @@ def _draw_scatter_figure(
 
     style = cfg.analysis.scatter_style.lower()
     scale = cfg.analysis.scatter_scale.lower()
+    consensus_pts_plot = consensus_pts
+    elite_coords_plot = elite_coords
 
     # 2) “EDGES” STYLE
     if style == "edges":
@@ -321,12 +340,14 @@ def _draw_scatter_figure(
 
         xlabel = f"{x_tf} / consensus_{x_tf}"
         ylabel = f"{y_tf} / consensus_{y_tf}"
+        consensus_pts_plot = _normalize_threshold_points(consensus_pts, cons_x=cons_x, cons_y=cons_y)
+        elite_coords_plot = _normalize_threshold_points(elite_coords, cons_x=cons_x, cons_y=cons_y)
 
     else:
         raise ValueError(f"Unknown scatter_style '{cfg.analysis.scatter_style}'")
 
     # 4) CONSENSUS STARS & ELITE OUTLINES — FOREGROUND accents
-    for cx, cy, name in consensus_pts:
+    for cx, cy, name in consensus_pts_plot:
         ax.scatter(
             cx,
             cy,
@@ -339,7 +360,7 @@ def _draw_scatter_figure(
         )
         ax.text(cx, cy, f" {name}", va="center", ha="left", fontsize=10, zorder=4)
 
-    for ex, ey, _ in elite_coords:
+    for ex, ey, _ in elite_coords_plot:
         ax.scatter(
             ex,
             ey,
@@ -364,8 +385,9 @@ def _draw_scatter_figure(
 
     ax.set_xlabel(xlabel, fontsize=12)
     ax.set_ylabel(ylabel, fontsize=12)
+    title_prefix = "MCMC vs. Random" if style != "thresholds" else "MCMC normalized scores"
     ax.set_title(
-        f"MCMC vs. Random for {x_tf}/{y_tf}\nSeq length={seq_len}, PWM widths: {x_tf}={width_x}, {y_tf}={width_y}",
+        f"{title_prefix} for {x_tf}/{y_tf}\nSeq length={seq_len}, PWM widths: {x_tf}={width_x}, {y_tf}={width_y}",
         fontsize=10,
     )
 

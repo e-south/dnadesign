@@ -248,6 +248,7 @@ Notes:
 - `scatter_scale` supports `llr`, `z`, `logp`, or `consensus-neglop-sum`.
 - `scatter_style` toggles scatter styling (`edges` or `thresholds`).
 - `scatter_style=thresholds` requires `scatter_scale=llr` and uses `sample.pwm_sum_threshold` for the x+y cutoff.
+- Threshold plots normalize per-TF LLRs by each PWM's consensus LLR (axes are 0-1).
 - `subsampling_epsilon` controls how per-PWM draws are subsampled for scatter plots; it is the minimum Euclidean change in per-TF score space required to keep a draw (must be > 0).
 - `cruncher analyze --list-plots` shows the registry and required inputs.
 
