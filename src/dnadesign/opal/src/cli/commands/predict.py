@@ -20,7 +20,15 @@ from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...runtime.predict import run_predict_ephemeral
 from ...storage.state import CampaignState
 from ..registry import cli_command
-from ._common import internal_error, load_cli_config, opal_error, resolve_config_path, store_from_cfg
+from ._common import (
+    internal_error,
+    load_cli_config,
+    opal_error,
+    resolve_config_path,
+    resolve_json_path,
+    resolve_table_path,
+    store_from_cfg,
+)
 
 
 @cli_command("predict", help="Ephemeral inference with a frozen model; no write-backs.")
@@ -39,7 +47,7 @@ def cmd_predict(
     model_params: Path = typer.Option(
         None,
         "--model-params",
-        help="Optional JSON file with model params (used with --model-name).",
+        help="Optional JSON file (.json) with model params (used with --model-name).",
     ),
     round: str = typer.Option(
         None,
@@ -80,11 +88,12 @@ def cmd_predict(
                 raise OpalError(f"--model-path must be a file, got directory: {model_path}")
 
         if input_path is not None:
-            input_path = Path(input_path)
-            if not input_path.exists():
-                raise OpalError(f"--in not found: {input_path}")
-            if input_path.is_dir():
-                raise OpalError(f"--in must be a file, got directory: {input_path}")
+            input_path = resolve_table_path(input_path, label="--in", must_exist=True)
+
+        if out_path is not None:
+            out_path = resolve_table_path(out_path, label="--out", must_exist=False)
+        if model_params is not None:
+            model_params = resolve_json_path(model_params, label="--model-params", must_exist=True)
 
         # Resolve model_path if not provided
         if model_path is None:

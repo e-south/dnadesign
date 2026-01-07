@@ -50,6 +50,52 @@ def resolve_config_path(opt: Optional[Path], *, allow_dir: bool = False) -> Path
     return resolve_campaign_config_path(opt, allow_dir=allow_dir)
 
 
+_TABLE_EXTS = {".csv", ".parquet", ".pq"}
+_JSON_EXTS = {".json"}
+
+
+def resolve_table_path(path: Path, *, label: str, must_exist: bool) -> Path:
+    p = Path(path)
+    if not p.is_absolute():
+        p = (Path.cwd() / p).resolve()
+    suffix = p.suffix.lower()
+    if suffix not in _TABLE_EXTS:
+        raise OpalError(
+            f"{label} must be a CSV or Parquet file with extension {', '.join(sorted(_TABLE_EXTS))}; got '{p}'."
+        )
+    if must_exist:
+        if not p.exists():
+            raise OpalError(f"{label} not found: {p}")
+        if p.is_dir():
+            raise OpalError(f"{label} must be a file, got directory: {p}")
+    else:
+        if p.exists() and p.is_dir():
+            raise OpalError(f"{label} must be a file, got directory: {p}")
+        if not p.parent.exists():
+            raise OpalError(f"{label} parent directory does not exist: {p.parent}")
+    return p
+
+
+def resolve_json_path(path: Path, *, label: str, must_exist: bool) -> Path:
+    p = Path(path)
+    if not p.is_absolute():
+        p = (Path.cwd() / p).resolve()
+    suffix = p.suffix.lower()
+    if suffix not in _JSON_EXTS:
+        raise OpalError(f"{label} must be a JSON file with extension {', '.join(sorted(_JSON_EXTS))}; got '{p}'.")
+    if must_exist:
+        if not p.exists():
+            raise OpalError(f"{label} not found: {p}")
+        if p.is_dir():
+            raise OpalError(f"{label} must be a file, got directory: {p}")
+    else:
+        if p.exists() and p.is_dir():
+            raise OpalError(f"{label} must be a file, got directory: {p}")
+        if not p.parent.exists():
+            raise OpalError(f"{label} parent directory does not exist: {p.parent}")
+    return p
+
+
 def _format_validation_error(e, cfg_path: Path) -> str:
     """
     Turn a Pydantic ValidationError into an actionable, human-first message,

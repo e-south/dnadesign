@@ -30,6 +30,7 @@ def _csv_with_duplicate_sequence():
             "y10_star": [0.1, 0.2],
             "y01_star": [0.1, 0.2],
             "y11_star": [0.1, 0.2],
+            "intensity_log2_offset_delta": [0.0, 0.0],
         }
     )
 

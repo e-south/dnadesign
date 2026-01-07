@@ -39,6 +39,8 @@ from ._common import (
     print_config_context,
     prompt_confirm,
     resolve_config_path,
+    resolve_json_path,
+    resolve_table_path,
     store_from_cfg,
 )
 
@@ -58,7 +60,7 @@ def cmd_ingest_y(
     ),
     csv: Path = typer.Option(..., "--csv", "--in", help="CSV/Parquet with raw reads"),
     transform: str = typer.Option(None, "--transform", help="Override YAML transform name"),
-    params: Optional[Path] = typer.Option(None, "--params", help="JSON file with transform params"),
+    params: Optional[Path] = typer.Option(None, "--params", help="JSON file (.json) with transform params"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip interactive prompt"),
     if_exists: str = typer.Option(
         "fail",
@@ -79,11 +81,7 @@ def cmd_ingest_y(
             print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
 
         # Resolve and read input file
-        csv_path = Path(csv)
-        if not csv_path.is_absolute():
-            csv_path = (Path.cwd() / csv_path).resolve()
-        if not csv_path.exists():
-            raise OpalError(f"CSV not found: {csv_path}")
+        csv_path = resolve_table_path(csv, label="--csv", must_exist=True)
         csv_df = pd.read_parquet(csv_path) if csv_path.suffix.lower() in (".pq", ".parquet") else pd.read_csv(csv_path)
 
         t_name = (transform or cfg.data.transforms_y.name).strip()
@@ -91,7 +89,21 @@ def cmd_ingest_y(
         if params:
             import json as _json
 
-            t_params = _json.loads(Path(params).read_text())
+            params_path = resolve_json_path(params, label="--params", must_exist=True)
+            t_params = _json.loads(params_path.read_text())
+
+        # Default SFXI delta enforcement (explicit Reader→OPAL hand-off)
+        if t_name == "sfxi_vec8_from_table_v1":
+            t_params = dict(t_params or {})
+            if "expected_log2_offset_delta" not in t_params:
+                obj_params = cfg.objective.objective.params or {}
+                t_params["expected_log2_offset_delta"] = float(obj_params.get("intensity_log2_offset_delta", 0.0))
+            if "enforce_log2_offset_match" not in t_params:
+                t_params["enforce_log2_offset_match"] = True
+            if "sfxi_log_json" not in t_params:
+                candidate = csv_path.parent / "sfxi_log.json"
+                if candidate.exists():
+                    t_params["sfxi_log_json"] = str(candidate)
 
         reg = PluginRegistryView(
             model=cfg.model.name,

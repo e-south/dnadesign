@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import List
 
 from ..registries.plots import PlotMeta, register_plot
-from ._events_util import load_events_with_setpoint, resolve_outputs_dir
+from ._events_util import load_events, resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta, scale_to_sizes, scatter_smart
 from ._param_utils import (
     event_columns_for,
@@ -41,7 +41,7 @@ from ._param_utils import (
             "sel__rank_competition",
             "sel__is_selected",
         ],
-        notes=["Reads ledger.predictions + ledger.runs (setpoint join)."],
+        notes=["Reads ledger.predictions."],
     ),
 )
 def render(context, params: dict) -> None:
@@ -87,7 +87,7 @@ def render(context, params: dict) -> None:
     }
     # Ensure optional hue/size columns are loaded if they refer to ledger columns
     need |= event_columns_for(hue_field, size_by)
-    df = load_events_with_setpoint(outputs_dir, need, round_selector=context.rounds)
+    df = load_events(outputs_dir, need, round_selector=context.rounds)
     if df.empty:
         raise ValueError("ledger.predictions had zero rows for requested columns.")
 
@@ -247,14 +247,15 @@ def render(context, params: dict) -> None:
             hue_field or "—",
             size_by or "—",
             alpha,
-            rasterize_at,
+            rasterize_at_log,
         )
+        rasterized_multi = False if rasterize_at is None else len(df) >= rasterize_at
         annotate_plot_meta(
             ax,
             hue=hue_field,
             size_by=size_by,
             alpha=alpha,
-            rasterized=(len(df) >= rasterize_at),
+            rasterized=rasterized_multi,
             extras={"rank": rank_mode, "rounds": f"{len(rounds)}"},
         )
 

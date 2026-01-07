@@ -170,7 +170,8 @@ plugin names and enforce only declared contracts (transforms/models/objectives/s
 Human CLI output uses Rich tables and progress bars when stdout/stderr are TTYs.
 Disable styling with `--no-color` or disable the TUI with `OPAL_CLI_TUI=0`.
 On macOS, OPAL suppresses noisy PyArrow `sysctlbyname` warnings by default
-(`OPAL_SUPPRESS_PYARROW_SYSCTL=0` to show them).
+when stderr is a TTY. Set `OPAL_SUPPRESS_PYARROW_SYSCTL=1` to force suppression
+in non-TTY contexts (e.g., CI logs), or `OPAL_SUPPRESS_PYARROW_SYSCTL=0` to show them.
 
 ---
 
@@ -299,7 +300,7 @@ safety:
   prefer `workdir: "."` for portability.
 * CLI flags override YAML **for that invocation**:
   `run --k` overrides `selection.params.top_k`, `run --score-batch-size` overrides `scoring.score_batch_size`,
-  and `ingest-y --transform/--params` overrides `transforms_y`.
+  and `ingest-y --transform/--params` (JSON file, `.json`) overrides `transforms_y`.
 * `--round` is the canonical flag; `--labels-as-of` and `--observed-round` are aliases.
 * `transforms_y` is used for **ingest only**; model training/prediction uses `transforms_x` plus optional `training.y_ops`.
 * `state.json` records the resolved config per round; ledger sinks are the long‑term source of truth.

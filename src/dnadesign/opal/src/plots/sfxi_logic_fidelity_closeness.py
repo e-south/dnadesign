@@ -103,6 +103,14 @@ def render(context, params: dict) -> None:
                 return None
             latest = int(pd.Series(t.column("observed_round").to_pylist()).max())
             return arrow_pc.field("observed_round") == latest
+        if isinstance(sel, list):
+            try:
+                vals = [int(x) for x in sel]
+            except Exception:
+                return None
+            if not vals:
+                return None
+            return arrow_pc.field("observed_round").isin(vals)
         try:
             r = int(sel)
             return arrow_pc.field("observed_round") == r

@@ -51,6 +51,7 @@ def _write_sfxi_labels(path: Path, *, seqs: list[str]) -> None:
             "y10_star": [0.2] * n,
             "y01_star": [0.3] * n,
             "y11_star": [0.4] * n,
+            "intensity_log2_offset_delta": [0.0] * n,
         }
     )
     df.to_csv(path, index=False)

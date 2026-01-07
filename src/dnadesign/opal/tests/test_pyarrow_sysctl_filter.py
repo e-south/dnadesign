@@ -21,11 +21,16 @@ def test_pyarrow_sysctl_filter_install(monkeypatch) -> None:
 
     calls = {"count": 0}
 
+    class _DummyStderr:
+        def isatty(self) -> bool:
+            return True
+
     def _fake_install(_needles) -> None:
         calls["count"] += 1
 
     monkeypatch.setattr(sf, "_install_stderr_filter", _fake_install)
     monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(sys, "stderr", _DummyStderr())
     monkeypatch.setenv("OPAL_SUPPRESS_PYARROW_SYSCTL", "1")
     if hasattr(sys, "_opal_stderr_filter_installed"):
         delattr(sys, "_opal_stderr_filter_installed")
@@ -39,14 +44,65 @@ def test_pyarrow_sysctl_filter_respects_opt_out(monkeypatch) -> None:
 
     calls = {"count": 0}
 
+    class _DummyStderr:
+        def isatty(self) -> bool:
+            return True
+
     def _fake_install(_needles) -> None:
         calls["count"] += 1
 
     monkeypatch.setattr(sf, "_install_stderr_filter", _fake_install)
     monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(sys, "stderr", _DummyStderr())
     monkeypatch.setenv("OPAL_SUPPRESS_PYARROW_SYSCTL", "0")
     if hasattr(sys, "_opal_stderr_filter_installed"):
         delattr(sys, "_opal_stderr_filter_installed")
 
     sf.maybe_install_pyarrow_sysctl_filter()
     assert calls["count"] == 0
+
+
+def test_pyarrow_sysctl_filter_skips_when_not_tty_and_env_unset(monkeypatch) -> None:
+    from dnadesign.opal.src.core import stderr_filter as sf
+
+    calls = {"count": 0}
+
+    class _DummyStderr:
+        def isatty(self) -> bool:
+            return False
+
+    def _fake_install(_needles) -> None:
+        calls["count"] += 1
+
+    monkeypatch.setattr(sf, "_install_stderr_filter", _fake_install)
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(sys, "stderr", _DummyStderr())
+    monkeypatch.delenv("OPAL_SUPPRESS_PYARROW_SYSCTL", raising=False)
+    if hasattr(sys, "_opal_stderr_filter_installed"):
+        delattr(sys, "_opal_stderr_filter_installed")
+
+    sf.maybe_install_pyarrow_sysctl_filter()
+    assert calls["count"] == 0
+
+
+def test_pyarrow_sysctl_filter_forces_when_not_tty(monkeypatch) -> None:
+    from dnadesign.opal.src.core import stderr_filter as sf
+
+    calls = {"count": 0}
+
+    class _DummyStderr:
+        def isatty(self) -> bool:
+            return False
+
+    def _fake_install(_needles) -> None:
+        calls["count"] += 1
+
+    monkeypatch.setattr(sf, "_install_stderr_filter", _fake_install)
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(sys, "stderr", _DummyStderr())
+    monkeypatch.setenv("OPAL_SUPPRESS_PYARROW_SYSCTL", "1")
+    if hasattr(sys, "_opal_stderr_filter_installed"):
+        delattr(sys, "_opal_stderr_filter_installed")
+
+    sf.maybe_install_pyarrow_sysctl_filter()
+    assert calls["count"] == 1

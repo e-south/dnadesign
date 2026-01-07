@@ -76,11 +76,21 @@ def _install_stderr_filter(needles: Iterable[str]) -> None:
 
 def maybe_install_pyarrow_sysctl_filter() -> None:
     """
-    Suppress noisy PyArrow sysctlbyname warnings on macOS (opt-out via env).
+    Suppress noisy PyArrow sysctlbyname warnings on macOS.
+    Default behavior: only when stderr is a TTY.
+    Override with OPAL_SUPPRESS_PYARROW_SYSCTL=1 to force suppression in non-TTY contexts,
+    or OPAL_SUPPRESS_PYARROW_SYSCTL=0 to disable suppression entirely.
     """
     if sys.platform != "darwin":
         return
-    flag = os.getenv("OPAL_SUPPRESS_PYARROW_SYSCTL", "1").strip().lower()
-    if flag in {"0", "false", "no"}:
+    flag_raw = os.getenv("OPAL_SUPPRESS_PYARROW_SYSCTL")
+    flag = flag_raw.strip().lower() if flag_raw is not None else ""
+    if flag_raw is None or flag == "":
+        try:
+            if not sys.stderr.isatty():
+                return
+        except Exception:
+            return
+    elif flag in {"0", "false", "no"}:
         return
     _install_stderr_filter(_PYARROW_SYSCTL_MATCH)

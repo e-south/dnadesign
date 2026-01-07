@@ -74,9 +74,9 @@ opal ingest-y --config <yaml> --round <r> --csv <path> \
 
 * `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
 * `--round, -r, --observed-round`: Observed round stamp for these labels.
-* `--csv, --in`: CSV/Parquet with raw reads.
+* `--csv, --in`: CSV/Parquet input (`.csv`, `.parquet`, or `.pq`).
 * `--transform`: Override YAML `transforms_y.name`.
-* `--params`: JSON file with transform params (overrides YAML `transforms_y.params`).
+* `--params`: JSON file (.json) with transform params (overrides YAML `transforms_y.params`).
 * `--if-exists`: Behavior if `(id, round)` already exists in label history (`fail`/`skip`/`replace`).
 * `--yes, -y`: Skip interactive prompt.
 
@@ -166,9 +166,9 @@ opal predict --config <yaml> \
 * `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
 * `--model-path`: Path to `model.joblib` (overrides `--round`).
 * `--round, -r`: Round index to resolve model from `state.json` (default: latest). Accepts `latest`.
-* `--model-name` / `--model-params`: Required if `model_meta.json` is missing.
-* `--in`: Optional input CSV/Parquet (defaults to `records.parquet`).
-* `--out`: Optional output CSV/Parquet (defaults to stdout CSV).
+* `--model-name` / `--model-params`: Required if `model_meta.json` is missing. `--model-params` must be a `.json`.
+* `--in`: Optional input CSV/Parquet (`.csv`, `.parquet`, `.pq`; defaults to `records.parquet`).
+* `--out`: Optional output CSV/Parquet (`.csv`, `.parquet`, `.pq`; defaults to stdout CSV).
 * `--id-col`, `--sequence-col`: Column names in the input table.
 * `--generate-id-from-sequence`: Deterministically generate ids if id column is missing.
 * `--assume-no-yops`: Skip Y‑ops inversion even if training used Y‑ops.
@@ -217,7 +217,7 @@ opal model-show \
 * `--model-path`: Path to `model.joblib` (overrides `--config/--round`).
 * `--config, -c`: Path to `campaign.yaml` (required if resolving from `state.json`).
 * `--round, -r`: Round selector (integer or `latest`) to resolve model.
-* `--model-name` / `--model-params`: Required if `model_meta.json` is missing.
+* `--model-name` / `--model-params`: Required if `model_meta.json` is missing. `--model-params` must be a `.json`.
 * `--out-dir`: Write `feature_importance_full.csv` and print top-20 in JSON.
 
 #### `objective-meta`
@@ -593,7 +593,8 @@ export OPAL_DEBUG=1  # full tracebacks on internal errors
 macOS tip (PyArrow noise):
 
 ```bash
-export OPAL_SUPPRESS_PYARROW_SYSCTL=0  # show sysctlbyname warnings (default: suppressed)
+export OPAL_SUPPRESS_PYARROW_SYSCTL=1  # force suppression even when stderr is not a TTY
+export OPAL_SUPPRESS_PYARROW_SYSCTL=0  # show sysctlbyname warnings (disable suppression)
 ```
 
 ---

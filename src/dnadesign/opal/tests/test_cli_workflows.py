@@ -139,6 +139,7 @@ def test_ingest_y_cli(tmp_path: Path) -> None:
             "y10_star": [0.1, 0.2],
             "y01_star": [0.1, 0.2],
             "y11_star": [0.1, 0.2],
+            "intensity_log2_offset_delta": [0.0, 0.0],
         }
     )
     df.to_csv(csv_path, index=False)
@@ -149,3 +150,78 @@ def test_ingest_y_cli(tmp_path: Path) -> None:
     )
     assert res.exit_code == 0, res.stdout
     assert (workdir / "outputs" / "ledger.labels.parquet").exists()
+
+
+def test_ingest_y_rejects_unsupported_extension(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    bad_path = workdir / "labels.txt"
+    df = pd.DataFrame(
+        {
+            "sequence": ["AAA"],
+            "v00": [0.0],
+            "v10": [0.0],
+            "v01": [0.0],
+            "v11": [1.0],
+            "y00_star": [0.1],
+            "y10_star": [0.1],
+            "y01_star": [0.1],
+            "y11_star": [0.1],
+            "intensity_log2_offset_delta": [0.0],
+        }
+    )
+    df.to_csv(bad_path, index=False)
+
+    res = runner.invoke(
+        app,
+        ["--no-color", "ingest-y", "-c", str(campaign), "--round", "0", "--csv", str(bad_path), "--yes"],
+    )
+    assert res.exit_code != 0, res.stdout
+    assert "must be a CSV or Parquet file" in res.output
+
+
+def test_ingest_y_rejects_params_non_json(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    csv_path = workdir / "labels.csv"
+    df = pd.DataFrame(
+        {
+            "sequence": ["AAA"],
+            "v00": [0.0],
+            "v10": [0.0],
+            "v01": [0.0],
+            "v11": [1.0],
+            "y00_star": [0.1],
+            "y10_star": [0.1],
+            "y01_star": [0.1],
+            "y11_star": [0.1],
+            "intensity_log2_offset_delta": [0.0],
+        }
+    )
+    df.to_csv(csv_path, index=False)
+
+    bad_params = workdir / "params.txt"
+    bad_params.write_text("{}")
+
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(csv_path),
+            "--params",
+            str(bad_params),
+            "--yes",
+        ],
+    )
+    assert res.exit_code != 0, res.stdout
+    assert "must be a JSON file" in res.output

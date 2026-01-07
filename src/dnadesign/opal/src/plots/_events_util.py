@@ -15,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, List, Optional, Set, Union
 
-from ..analysis.facade import load_predictions_with_setpoint
+from ..analysis.facade import load_predictions_with_setpoint, read_predictions
 from ..core.stderr_filter import maybe_install_pyarrow_sysctl_filter
 
 if TYPE_CHECKING:
@@ -44,4 +44,27 @@ def load_events_with_setpoint(
     maybe_install_pyarrow_sysctl_filter()
     want: Set[str] = set(map(str, base_columns)) | {"run_id"}
     df = load_predictions_with_setpoint(outputs_dir, want, round_selector=round_selector)
+    return df.to_pandas()
+
+
+def load_events(
+    outputs_dir: Path,
+    base_columns: Iterable[str],
+    round_selector: Optional[Union[str, int, List[int]]] = None,
+    *,
+    allow_missing: bool = False,
+) -> pd.DataFrame:
+    """
+    Read the minimum columns needed for a plot **from the ledger** without
+    joining setpoint metadata. Useful for plots that do not require
+    objective__params.setpoint_vector.
+    """
+    maybe_install_pyarrow_sysctl_filter()
+    want: Set[str] = set(map(str, base_columns))
+    df = read_predictions(
+        outputs_dir / "ledger.predictions",
+        columns=sorted(want),
+        round_selector=round_selector,
+        allow_missing=allow_missing,
+    )
     return df.to_pandas()

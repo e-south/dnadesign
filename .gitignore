@@ -155,6 +155,7 @@ src/dnadesign/opal/campaigns/**/inputs/
 **/round.log.jsonl
 **/state.json
 **/.opal/
+/$OPAL_TMPDIR/
 
 # USR datasets (large, not for git)
 src/dnadesign/usr/datasets/**

@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -36,15 +36,25 @@ from ..registries.transforms_y import run_y_ops_pipeline
 from ..storage.data_access import RecordsStore
 
 
-def _model_meta_has_y_ops(meta_path: Path) -> bool:
+def _load_model_meta(meta_path: Path) -> Optional[Dict[str, Any]]:
     if not meta_path.exists():
-        return False
+        return None
     try:
         meta = json.loads(meta_path.read_text())
-    except Exception:
-        return False
+    except Exception as e:
+        raise OpalError(f"model_meta.json is not valid JSON: {meta_path}. {e}") from e
+    if not isinstance(meta, dict):
+        raise OpalError(f"model_meta.json must be a JSON object: {meta_path}")
+    return meta
+
+
+def _extract_y_ops(meta: Optional[Dict[str, Any]]) -> List[Any]:
+    if not meta:
+        return []
     yops = meta.get("training__y_ops") or meta.get("y_ops") or []
-    return bool(yops)
+    if not isinstance(yops, list):
+        raise OpalError("model_meta.json has invalid training__y_ops (expected list).")
+    return yops
 
 
 def _inverse_yops_if_present(
@@ -89,17 +99,29 @@ def run_predict_ephemeral(
     assume_no_yops: bool = False,
 ) -> pd.DataFrame:
     meta_path = model_path.parent / "model_meta.json"
+    meta = _load_model_meta(meta_path)
     if model_name is None:
-        if not meta_path.exists():
+        if meta is None:
             raise OpalError(
                 f"model_meta.json not found next to {model_path}. "
                 "Provide --model-name/--model-params or re-run a round."
             )
-        meta = json.loads(meta_path.read_text())
         model_name = meta.get("model__name")
         model_params = meta.get("model__params")
         if not model_name:
             raise OpalError(f"model_meta.json missing model__name: {meta_path}")
+    else:
+        if meta is not None:
+            meta_name = meta.get("model__name")
+            if meta_name and str(meta_name) != str(model_name):
+                raise OpalError(
+                    f"Model name mismatch: model_meta.json declares '{meta_name}', "
+                    f"but --model-name provided '{model_name}'."
+                )
+            if model_params is not None:
+                raise OpalError(
+                    "model_meta.json exists; --model-params is only allowed when model_meta.json is missing."
+                )
     mdl = load_model(str(model_name), str(model_path), params=model_params)
     df_work = df.copy()
     if id_column not in df_work.columns:
@@ -143,15 +165,43 @@ def run_predict_ephemeral(
             "Mismatch between inputs and transformed matrix count.",
             ExitCodes.INTERNAL_ERROR,
         )
+    meta_x_dim = meta.get("x_dim") if meta is not None else None
+    if meta_x_dim is not None:
+        try:
+            meta_x_dim = int(meta_x_dim)
+        except Exception as e:
+            raise OpalError(f"model_meta.json has non-integer x_dim: {meta_x_dim}") from e
+        if X.shape[1] != meta_x_dim:
+            raise OpalError(
+                f"X dimension mismatch: model_meta.json expects x_dim={meta_x_dim}, "
+                f"but transform_x produced {X.shape[1]} columns. Check that your config matches the model."
+            )
 
     yhat = mdl.predict(X)
-    y_ops_declared = _model_meta_has_y_ops(meta_path)
+    y_ops_declared = bool(_extract_y_ops(meta))
     yhat = _inverse_yops_if_present(
         yhat,
         Path(model_path),
         require_ctx_if_yops=not assume_no_yops,
         y_ops_declared=y_ops_declared,
     )
+    meta_y_dim = meta.get("y_dim") if meta is not None else None
+    if meta_y_dim is not None:
+        try:
+            meta_y_dim = int(meta_y_dim)
+        except Exception as e:
+            raise OpalError(f"model_meta.json has non-integer y_dim: {meta_y_dim}") from e
+        yhat_arr = np.asarray(yhat)
+        if yhat_arr.ndim == 1:
+            pred_dim = 1
+        elif yhat_arr.ndim == 2:
+            pred_dim = int(yhat_arr.shape[1])
+        else:
+            raise OpalError(f"Predicted Y has unexpected ndim={yhat_arr.ndim}.")
+        if pred_dim != meta_y_dim:
+            raise OpalError(
+                f"Y dimension mismatch: model_meta.json expects y_dim={meta_y_dim}, but prediction produced {pred_dim}."
+            )
 
     # normalize to list for dataframe export (list[float], parquet-friendly)
     y_list = [list(map(float, row)) if yhat.ndim == 2 else [float(row)] for row in yhat]

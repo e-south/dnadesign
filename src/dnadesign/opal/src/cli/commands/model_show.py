@@ -22,7 +22,15 @@ from ...registries.models import load_model
 from ...storage.state import CampaignState
 from ..formatting import render_model_show_human
 from ..registry import cli_command
-from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path
+from ._common import (
+    internal_error,
+    json_out,
+    load_cli_config,
+    opal_error,
+    print_config_context,
+    resolve_config_path,
+    resolve_json_path,
+)
 
 
 @cli_command(
@@ -42,7 +50,7 @@ def cmd_model_show(
     model_params: Optional[Path] = typer.Option(
         None,
         "--model-params",
-        help="Optional JSON file with model params (used with --model-name).",
+        help="Optional JSON file (.json) with model params (used with --model-name).",
     ),
     json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
 ):
@@ -74,6 +82,7 @@ def cmd_model_show(
             model_path = mp
         params_obj = None
         if model_params:
+            model_params = resolve_json_path(model_params, label="--model-params", must_exist=True)
             params_obj = _json.loads(model_params.read_text())
             if not model_name:
                 raise OpalError("Use --model-name with --model-params.")

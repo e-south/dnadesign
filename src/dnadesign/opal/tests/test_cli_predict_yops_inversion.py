@@ -141,3 +141,100 @@ def test_predict_errors_on_missing_model_path(tmp_path: Path) -> None:
     )
     assert res.exit_code != 0, res.output
     assert "--model-path not found" in res.output
+
+
+def test_predict_rejects_unsupported_out_extension(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(campaign, workdir=workdir, records_path=records)
+
+    round_dir = workdir / "outputs" / "round_0"
+    round_dir.mkdir(parents=True, exist_ok=True)
+    model_path = round_dir / "model.joblib"
+    meta = _train_model(model_path)
+    (round_dir / "model_meta.json").write_text(json.dumps(meta))
+
+    write_state(workdir, records_path=records, run_id="run-0", round_index=0)
+
+    out_path = workdir / "preds.txt"
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        ["--no-color", "predict", "-c", str(campaign), "--round", "latest", "--out", str(out_path)],
+    )
+    assert res.exit_code != 0, res.output
+    assert "must be a CSV or Parquet file" in res.output
+
+
+def test_predict_rejects_model_params_non_json(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(campaign, workdir=workdir, records_path=records)
+
+    round_dir = workdir / "outputs" / "round_0"
+    round_dir.mkdir(parents=True, exist_ok=True)
+    model_path = round_dir / "model.joblib"
+    _train_model(model_path)
+
+    bad_params = workdir / "params.txt"
+    bad_params.write_text("{}")
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "predict",
+            "-c",
+            str(campaign),
+            "--model-path",
+            str(model_path),
+            "--model-name",
+            "random_forest",
+            "--model-params",
+            str(bad_params),
+        ],
+    )
+    assert res.exit_code != 0, res.output
+    assert "must be a JSON file" in res.output
+
+
+def test_predict_errors_on_x_dim_mismatch(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(campaign, workdir=workdir, records_path=records)
+
+    round_dir = workdir / "outputs" / "round_0"
+    round_dir.mkdir(parents=True, exist_ok=True)
+    model_path = round_dir / "model.joblib"
+    meta = _train_model(model_path)
+    meta["x_dim"] = 3
+    (round_dir / "model_meta.json").write_text(json.dumps(meta))
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "predict",
+            "-c",
+            str(campaign),
+            "--model-path",
+            str(model_path),
+        ],
+    )
+    assert res.exit_code != 0, res.output
+    assert "X dimension mismatch" in res.output

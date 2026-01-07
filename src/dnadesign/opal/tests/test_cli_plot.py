@@ -30,6 +30,23 @@ def _plot_minimal(ctx: PlotContext, params: dict) -> None:
     out.write_text(f"ok:{params.get('tag', 'none')}")
 
 
+def _write_min_labels(workdir: Path, *, round_index: int = 0) -> None:
+    import pandas as pd
+
+    writer = LedgerWriter(CampaignWorkspace(config_path=workdir / "campaign.yaml", workdir=workdir))
+    labels_df = pd.DataFrame(
+        {
+            "event": ["label"],
+            "observed_round": [int(round_index)],
+            "id": ["a"],
+            "sequence": ["AAA"],
+            "y_obs": [[0.1, 0.2, 0.3, 0.4]],
+            "src": ["test"],
+        }
+    )
+    writer.append_label(labels_df)
+
+
 def test_plot_cli_writes_output(tmp_path):
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)
@@ -137,20 +154,7 @@ def test_plot_cli_quick_mode(tmp_path):
     write_ledger(workdir, run_id="r0", round_index=0)
 
     # Append a minimal labels sink for SFXI plot
-    import pandas as pd
-
-    writer = LedgerWriter(CampaignWorkspace(config_path=campaign, workdir=workdir))
-    labels_df = pd.DataFrame(
-        {
-            "event": ["label"],
-            "observed_round": [0],
-            "id": ["a"],
-            "sequence": ["AAA"],
-            "y_obs": [[0.1, 0.2, 0.3, 0.4]],
-            "src": ["test"],
-        }
-    )
-    writer.append_label(labels_df)
+    _write_min_labels(workdir, round_index=0)
 
     app = _build()
     runner = CliRunner()
@@ -159,6 +163,51 @@ def test_plot_cli_quick_mode(tmp_path):
 
     out_path = Path(workdir) / "outputs" / "plots" / "quick_score_vs_rank.png"
     assert out_path.exists()
+
+
+def test_plot_cli_quick_mode_latest_round_selector(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+    )
+    from ._cli_helpers import write_ledger
+
+    write_ledger(workdir, run_id="r0", round_index=0)
+    _write_min_labels(workdir, round_index=0)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "--quick", "-c", str(campaign), "--round", "latest"])
+    assert res.exit_code == 0, res.stdout
+
+
+def test_plot_cli_quick_mode_multi_rounds(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+    )
+    from ._cli_helpers import write_ledger
+
+    write_ledger(workdir, run_id="r0", round_index=0)
+    write_ledger(workdir, run_id="r1", round_index=1)
+    _write_min_labels(workdir, round_index=0)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "--quick", "-c", str(campaign), "--round", "all"])
+    assert res.exit_code == 0, res.stdout
 
 
 def test_plot_cli_rejects_bad_round_selector(tmp_path):

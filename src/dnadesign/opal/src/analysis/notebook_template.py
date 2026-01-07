@@ -196,18 +196,34 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(mo):
+        def _(mo, pred_df):
+            max_rank = int(pred_df["sel__rank_competition"].max())
+            default_max = min(max_rank, 2000)
             show_selected_ui = mo.ui.checkbox(label="Selected only", value=False)
-            return show_selected_ui
+            max_rank_ui = mo.ui.slider(1, max_rank, value=default_max, label="Max rank")
+            return max_rank_ui, show_selected_ui
 
 
         @app.cell
-        def _(pl, pred_df, show_selected_ui):
-            if show_selected_ui.value and "sel__is_selected" in pred_df.columns:
-                filtered_df = pred_df.filter(pl.col("sel__is_selected") == True)
-            else:
-                filtered_df = pred_df
-            return filtered_df
+        def _(mo, max_rank_ui, show_selected_ui):
+            mo.vstack([show_selected_ui, max_rank_ui])
+            return
+
+
+        @app.cell
+        def _(pl, pred_df, show_selected_ui, max_rank_ui):
+            df = pred_df
+            if show_selected_ui.value and "sel__is_selected" in df.columns:
+                df = df.filter(pl.col("sel__is_selected") == True)
+            max_rank_val = int(max_rank_ui.value)
+            df = df.filter(pl.col("sel__rank_competition") <= max_rank_val)
+            return df
+
+
+        @app.cell
+        def _(mo, filtered_df):
+            mo.stop(filtered_df.is_empty(), mo.md("No rows matched the current filters."))
+            return
 
 
         @app.cell
@@ -228,9 +244,9 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(pl, pred_df, score_field_ui):
+        def _(pl, filtered_df, score_field_ui):
             score_field = score_field_ui.value
-            scores = pred_df.get_column(score_field).cast(pl.Float64, strict=False)
+            scores = filtered_df.get_column(score_field).cast(pl.Float64, strict=False)
             return score_field, scores
 
 
@@ -251,10 +267,10 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(plt, pl, pred_df, score_field):
+        def _(plt, pl, filtered_df, score_field):
             def _make_scatter():
                 fig, ax = plt.subplots(figsize=(6.5, 4.0), constrained_layout=True)
-                df = pred_df.select(
+                df = filtered_df.select(
                     ["sel__rank_competition", score_field, "sel__is_selected"]
                 )
                 x = df["sel__rank_competition"].to_list()
@@ -279,16 +295,16 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(mo, plt, pl, pred_df, is_sfxi):
+        def _(mo, plt, pl, filtered_df, is_sfxi):
             mo.stop(not is_sfxi, mo.md("SFXI diagnostics not applicable."))
             needed = ["obj__logic_fidelity", "obj__effect_scaled"]
-            missing = [c for c in needed if c not in pred_df.columns]
+            missing = [c for c in needed if c not in filtered_df.columns]
             mo.stop(bool(missing), mo.md(f"Missing SFXI diagnostic columns: {missing}"))
 
             def _make_sfxi():
                 fig, ax = plt.subplots(figsize=(6.5, 4.0), constrained_layout=True)
-                x = pred_df["obj__logic_fidelity"].cast(pl.Float64, strict=False).to_list()
-                y = pred_df["obj__effect_scaled"].cast(pl.Float64, strict=False).to_list()
+                x = filtered_df["obj__logic_fidelity"].cast(pl.Float64, strict=False).to_list()
+                y = filtered_df["obj__effect_scaled"].cast(pl.Float64, strict=False).to_list()
                 ax.scatter(x, y, s=18, alpha=0.5)
                 ax.set_title("SFXI: effect_scaled vs logic_fidelity")
                 ax.set_xlabel("logic_fidelity")
