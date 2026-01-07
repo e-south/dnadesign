@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/remote.py
+src/dnadesign/usr/src/remote.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -51,7 +51,7 @@ class SSHRemote:
     # ---- subprocess helpers ----
 
     def _ssh_cmd(self) -> List[str]:
-        cmd = ["ssh"]
+        cmd = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
         if self.cfg.ssh_key_env:
             key_env = self.cfg.ssh_key_env
             key_path = os.environ.get(key_env)
@@ -70,12 +70,14 @@ class SSHRemote:
             "--delete-delay",
             "--delay-updates",
         ]
+        ssh_opts = "ssh -o BatchMode=yes -o ConnectTimeout=10"
         if self.cfg.ssh_key_env:
             key_env = self.cfg.ssh_key_env
             key_path = os.environ.get(key_env)
             if not key_path:
                 raise RemoteUnavailableError(f"Environment variable '{key_env}' not set (SSH key path).")
-            cmd += ["-e", f"ssh -i {shlex.quote(key_path)}"]
+            ssh_opts = f"ssh -i {shlex.quote(key_path)} -o BatchMode=yes -o ConnectTimeout=10"
+        cmd += ["-e", ssh_opts]
         return cmd
 
     def _ssh_run(self, remote_cmd: str, check: bool = True) -> Tuple[int, str, str]:

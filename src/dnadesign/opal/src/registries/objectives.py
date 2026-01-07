@@ -3,11 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/registries/objectives.py
 
-Objective registry with auto-import of built-ins, plugin EPs, and
-RoundCtx contract enforcement at call time.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -19,7 +15,7 @@ import pkgutil
 import sys
 from typing import Any, Dict, List, Protocol
 
-from ..round_context import PluginCtx
+from ..core.round_context import PluginCtx
 
 
 def _dbg(msg: str) -> None:

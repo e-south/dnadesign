@@ -148,6 +148,10 @@ src/dnadesign/opal/campaigns/**
 !src/dnadesign/opal/campaigns/**/plots.yaml
 !src/dnadesign/opal/campaigns/**/plots.yml
 src/dnadesign/opal/campaigns/**/inputs/
+!src/dnadesign/opal/campaigns/demo/inputs/
+!src/dnadesign/opal/campaigns/demo/inputs/**
+!src/dnadesign/opal/campaigns/demo/records.parquet
+src/dnadesign/opal/campaigns/**/inputs/**/.DS_Store
 
 # OPAL per-run products anywhere
 **/outputs/
@@ -155,6 +159,7 @@ src/dnadesign/opal/campaigns/**/inputs/
 **/round.log.jsonl
 **/state.json
 **/.opal/
+/$OPAL_TMPDIR/
 
 # USR datasets (large, not for git)
 src/dnadesign/usr/datasets/**

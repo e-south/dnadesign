@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_objective_meta.py
 
-CLI integration tests for objective-meta.
-
-Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -32,8 +29,46 @@ def test_objective_meta_json_contains_diagnostics(tmp_path):
     runner = CliRunner()
     res = runner.invoke(
         app,
-        ["--no-color", "objective-meta", "-c", str(campaign), "--round", "latest", "--no-profile", "--json"],
+        [
+            "--no-color",
+            "objective-meta",
+            "-c",
+            str(campaign),
+            "--round",
+            "latest",
+            "--no-profile",
+            "--json",
+        ],
     )
     assert res.exit_code == 0, res.stdout
     out = json.loads(res.stdout)
     assert "obj__logic_fidelity" in out["row_level_diagnostics_columns"]
+
+
+def test_objective_meta_accepts_directory_config(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(campaign, workdir=workdir, records_path=records)
+    write_ledger(workdir, run_id="run-0", round_index=0)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "objective-meta",
+            "-c",
+            str(workdir),
+            "--round",
+            "latest",
+            "--no-profile",
+            "--json",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    out = json.loads(res.stdout)
+    assert out["round"] == 0

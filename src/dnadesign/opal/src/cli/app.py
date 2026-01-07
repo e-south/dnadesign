@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/cli/app.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -15,7 +14,8 @@ import sys
 
 import typer
 
-from .pretty import maybe_install_rich_traceback
+from ..core.pretty import maybe_install_rich_traceback
+from ..core.stderr_filter import maybe_install_pyarrow_sysctl_filter
 from .registry import discover_commands, install_registered_commands
 
 # single Typer app exposed as entrypoint in pyproject.toml
@@ -51,6 +51,8 @@ def _root_callback(
     # Pretty tracebacks if Rich is enabled
     if color:
         maybe_install_rich_traceback()
+    # Silence PyArrow sysctlbyname warnings on macOS (no-op elsewhere)
+    maybe_install_pyarrow_sysctl_filter()
 
 
 def _build() -> typer.Typer:
@@ -60,6 +62,7 @@ def _build() -> typer.Typer:
 
 
 def main() -> None:
+    maybe_install_pyarrow_sysctl_filter()
     _build()
     try:
         app()

@@ -3,14 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/transforms_y/intensity_median_iqr.py
 
-Y-op: Robustly center/scale intensity targets (indices 4:8) by median/IQR.
-- Fit phase computes per-dimension center/scale on training Y.
-- Transform applies (Y[:,4:8] - center) / max(iqr, eps).
-- Inverse restores objective-space: Y[:,4:8] * scale + center.
-- Logic entries (0:4) are left unchanged.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

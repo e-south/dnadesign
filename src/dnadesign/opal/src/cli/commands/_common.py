@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/cli/commands/_common.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -13,110 +12,87 @@ from __future__ import annotations
 import dataclasses as _dc
 import json
 import os
+import sys
 from pathlib import Path
 from pathlib import Path as _Path
 from typing import Optional
 
 import typer
 
-from ...utils import ExitCodes, OpalError, print_stderr, print_stdout
+from ...core.utils import ExitCodes, OpalError, print_stderr, print_stdout
 
 try:
     import numpy as _np
 except Exception:
     _np = None
 
-from ...config import LocationLocal, LocationUSR, RootConfig
-from ...data_access import RecordsStore
+from ...config import RootConfig
+from ...core.config_resolve import resolve_campaign_config_path
+from ...storage.data_access import RecordsStore
+from ...storage.store_factory import records_store_from_config
+
+
+def prompt_confirm(prompt: str, *, non_interactive_hint: str) -> bool:
+    """
+    Prompt for a yes/no confirmation. Raises OpalError if stdin is not interactive.
+    """
+    if not sys.stdin.isatty():
+        raise OpalError(non_interactive_hint, ExitCodes.BAD_ARGS)
+    try:
+        resp = input(prompt).strip().lower()
+    except EOFError as e:
+        raise OpalError(non_interactive_hint, ExitCodes.BAD_ARGS) from e
+    return resp in ("y", "yes")
 
 
 def resolve_config_path(opt: Optional[Path], *, allow_dir: bool = False) -> Path:
-    CAND_NAMES = tuple((os.getenv("OPAL_CONFIG_NAMES") or "campaign.yaml,campaign.yml,opal.yaml,opal.yml").split(","))
-    env = os.getenv("OPAL_CONFIG")
-    env_path: Optional[Path] = None
-    if env:
-        env_path = Path(env).expanduser()
-        env_path = env_path if env_path.is_absolute() else (Path.cwd() / env_path)
-        env_path = env_path.resolve()
+    return resolve_campaign_config_path(opt, allow_dir=allow_dir)
 
-    if opt:
-        p = Path(opt).expanduser()
-        p = p if p.is_absolute() else (Path.cwd() / p)
-        p = p.resolve()
-        if not p.exists():
-            if env_path is not None and env_path == p:
-                raise OpalError(f"$OPAL_CONFIG points to a missing path: {p}", ExitCodes.BAD_ARGS)
-            raise OpalError(
-                f"Config path not found: {p}. Tip: from a campaign folder run `opal <cmd>` or pass `-c campaign.yaml`.",
-                ExitCodes.BAD_ARGS,
-            )
-        if p.is_dir() and not allow_dir:
-            if env_path is not None and env_path == p:
-                raise OpalError(f"$OPAL_CONFIG points to a directory (expected campaign YAML): {p}", ExitCodes.BAD_ARGS)
-            raise OpalError(
-                f"Config path is a directory: {p}. Expected a campaign YAML (e.g., campaign.yaml).",
-                ExitCodes.BAD_ARGS,
-            )
-        return p
 
-    if env:
-        p = env_path or Path(env).expanduser().resolve()
+_TABLE_EXTS = {".csv", ".parquet", ".pq"}
+_JSON_EXTS = {".json"}
+
+
+def resolve_table_path(path: Path, *, label: str, must_exist: bool) -> Path:
+    p = Path(path)
+    if not p.is_absolute():
+        p = (Path.cwd() / p).resolve()
+    suffix = p.suffix.lower()
+    if suffix not in _TABLE_EXTS:
+        raise OpalError(
+            f"{label} must be a CSV or Parquet file with extension {', '.join(sorted(_TABLE_EXTS))}; got '{p}'."
+        )
+    if must_exist:
         if not p.exists():
-            raise OpalError(f"$OPAL_CONFIG points to a missing path: {p}", ExitCodes.BAD_ARGS)
+            raise OpalError(f"{label} not found: {p}")
         if p.is_dir():
-            raise OpalError(f"$OPAL_CONFIG points to a directory (expected campaign YAML): {p}", ExitCodes.BAD_ARGS)
-        return p
+            raise OpalError(f"{label} must be a file, got directory: {p}")
+    else:
+        if p.exists() and p.is_dir():
+            raise OpalError(f"{label} must be a file, got directory: {p}")
+        if not p.parent.exists():
+            raise OpalError(f"{label} parent directory does not exist: {p.parent}")
+    return p
 
-    cur = Path.cwd()
-    # 2a) Prefer marker: .opal/config
-    for base in (cur, *cur.parents):
-        marker = base / ".opal" / "config"
-        if marker.exists():
-            txt = marker.read_text().strip()
-            if not txt:
-                raise OpalError(f"Marker file is empty: {marker}", ExitCodes.BAD_ARGS)
-            p = Path(txt)
-            if not p.is_absolute():
-                # Marker paths are defined relative to the campaign workdir
-                p = (marker.parent.parent / p).resolve()
-            if not p.exists():
-                raise OpalError(
-                    f"Marker points to missing config: {p} (from {marker}).",
-                    ExitCodes.BAD_ARGS,
-                )
-            if p.is_dir():
-                raise OpalError(f"Marker points to a directory (expected campaign YAML): {p}", ExitCodes.BAD_ARGS)
-            return p
-    # 2b) Otherwise look for common YAML names, nearest first
-    for base in (cur, *cur.parents):
-        for name in CAND_NAMES:
-            cand = base / name
-            if cand.exists():
-                return cand.resolve()
 
-    root = Path("src/dnadesign/opal/campaigns")
-    if root.exists():
-        found = list(root.glob("*/campaign.yaml"))
-        if len(found) == 1:
-            return found[0].resolve()
-
-    # 3) Fallback: unique campaign under repo campaigns/ (resolve relative to this file)
-    try:
-        pkg_root = Path(__file__).resolve().parents[4]
-    except Exception:
-        pkg_root = Path.cwd()
-    root = pkg_root / "src" / "dnadesign" / "opal" / "campaigns"
-    if root.exists():
-        found = []
-        for name in CAND_NAMES:
-            found.extend(root.glob(f"*/{name}"))
-        if len(found) == 1:
-            return found[0].resolve()
-
-    raise OpalError(
-        "No campaign config found. Use --config, set $OPAL_CONFIG, or run inside a campaign folder.",
-        ExitCodes.BAD_ARGS,
-    )
+def resolve_json_path(path: Path, *, label: str, must_exist: bool) -> Path:
+    p = Path(path)
+    if not p.is_absolute():
+        p = (Path.cwd() / p).resolve()
+    suffix = p.suffix.lower()
+    if suffix not in _JSON_EXTS:
+        raise OpalError(f"{label} must be a JSON file with extension {', '.join(sorted(_JSON_EXTS))}; got '{p}'.")
+    if must_exist:
+        if not p.exists():
+            raise OpalError(f"{label} not found: {p}")
+        if p.is_dir():
+            raise OpalError(f"{label} must be a file, got directory: {p}")
+    else:
+        if p.exists() and p.is_dir():
+            raise OpalError(f"{label} must be a file, got directory: {p}")
+        if not p.parent.exists():
+            raise OpalError(f"{label} parent directory does not exist: {p.parent}")
+    return p
 
 
 def _format_validation_error(e, cfg_path: Path) -> str:
@@ -181,34 +157,7 @@ def load_cli_config(config_opt: Optional[Path]) -> RootConfig:
 
 
 def store_from_cfg(cfg: RootConfig) -> RecordsStore:
-    loc = cfg.data.location
-    if isinstance(loc, LocationUSR):
-        records = Path(loc.path) / loc.dataset / "records.parquet"
-        data_location = {
-            "kind": "usr",
-            "dataset": loc.dataset,
-            "path": str(Path(loc.path).resolve()),
-            "records_path": str(records.resolve()),
-        }
-    elif isinstance(loc, LocationLocal):
-        records = Path(loc.path)
-        data_location = {
-            "kind": "local",
-            "path": str(Path(loc.path).resolve()),
-            "records_path": str(records.resolve()),
-        }
-    else:
-        raise OpalError("Unknown data location kind.", ExitCodes.BAD_ARGS)
-
-    return RecordsStore(
-        kind=data_location["kind"],
-        records_path=records,
-        campaign_slug=cfg.campaign.slug,
-        x_col=cfg.data.x_column_name,
-        y_col=cfg.data.y_column_name,
-        x_transform_name=cfg.data.transforms_x.name,
-        x_transform_params=cfg.data.transforms_x.params,
-    )
+    return records_store_from_config(cfg)
 
 
 def print_config_context(cfg_path: Path, *, cfg: RootConfig | None = None, records_path: Path | None = None) -> None:

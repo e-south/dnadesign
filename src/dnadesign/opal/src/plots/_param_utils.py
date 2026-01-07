@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/plots/_param_utils.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

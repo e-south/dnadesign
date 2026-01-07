@@ -4,13 +4,12 @@
 src/dnadesign/opal/tests/test_selection_exclusion.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
 import pandas as pd
 
-from dnadesign.opal.src.data_access import RecordsStore
+from dnadesign.opal.src.storage.data_access import RecordsStore
 
 
 def test_labeled_id_set_leq_round_basic(tmp_path):

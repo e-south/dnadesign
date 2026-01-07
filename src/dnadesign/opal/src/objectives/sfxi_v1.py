@@ -3,18 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/objectives/sfxi_v1.py
 
-SFXI objective (setpoint fidelity x intensity) for 8-vector targets.
-
-- Splits Ŷ into v_hat[0:4] (logic ∈ [0,1]^4) and y_star[4:8] (log2 intensity).
-- Computes logic fidelity vs setpoint with D(p) normalization.
-- Recovers linear intensities with delta and computes E_raw via setpoint weights.
-- Denominator is computed from TrainView labels and stored into RoundCtx as:
-    objective/sfxi_v1/denom_percentile
-    objective/sfxi_v1/denom_value
-- Final score = (F_logic^beta) * (E_scaled^gamma).
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -24,8 +13,8 @@ from typing import Any, Dict, Optional, Sequence, Tuple
 
 import numpy as np
 
+from ..core.round_context import PluginCtx, roundctx_contract
 from ..registries.objectives import register_objective
-from ..round_context import PluginCtx, roundctx_contract
 
 
 class ObjectiveResult:
@@ -171,6 +160,9 @@ def sfxi_v1(
     y_star = y_pred[:, 4:8].astype(float)
 
     setpoint = _parse_setpoint(params)
+    sum_setpoint = float(np.sum(setpoint))
+    intensity_disabled = bool(not np.isfinite(sum_setpoint) or sum_setpoint <= 1e-12)
+    w = _weights_from_setpoint(setpoint)
 
     beta = float(params.get("logic_exponent_beta", 1.0))
     gamma = float(params.get("intensity_exponent_gamma", 1.0))
@@ -186,10 +178,14 @@ def sfxi_v1(
     p, min_n, eps = _parse_scaling_cfg(scaling_cfg)
 
     # ---- compute denom from training labels (TrainView) ----
-    if train_view is None:
-        raise ValueError("[sfxi_v1] train_view is required")
-    effect_pool = _compute_train_effect_pool(train_view, setpoint=setpoint, delta=delta, min_n=min_n)
-    denom = _resolve_denom_from_pool(effect_pool, p=p, min_n=min_n, eps=eps)
+    if intensity_disabled:
+        effect_pool: Sequence[float] = []
+        denom = 1.0
+    else:
+        if train_view is None:
+            raise ValueError("[sfxi_v1] train_view is required")
+        effect_pool = _compute_train_effect_pool(train_view, setpoint=setpoint, delta=delta, min_n=min_n)
+        denom = _resolve_denom_from_pool(effect_pool, p=p, min_n=min_n, eps=eps)
 
     # persist into RoundCtx (strict: must be declared in produces)
     if ctx is None:
@@ -198,12 +194,16 @@ def sfxi_v1(
     ctx.set("objective/<self>/denom_value", float(denom))
 
     # ---- score candidates ----
-    y_lin = _recover_linear_intensity(y_star, delta=delta)
-    w = _weights_from_setpoint(setpoint)
-    E_raw = (y_lin * w[None, :]).sum(axis=1)
-    E_scaled = np.clip(E_raw / float(denom), 0.0, 1.0)
     F_logic = _logic_fidelity(v_hat, setpoint)
-    score = np.power(F_logic, beta) * np.power(E_scaled, gamma)
+    if intensity_disabled:
+        E_raw = np.zeros(v_hat.shape[0], dtype=float)
+        E_scaled = np.ones(v_hat.shape[0], dtype=float)
+        score = np.power(F_logic, beta)
+    else:
+        y_lin = _recover_linear_intensity(y_star, delta=delta)
+        E_raw = (y_lin * w[None, :]).sum(axis=1)
+        E_scaled = np.clip(E_raw / float(denom), 0.0, 1.0)
+        score = np.power(F_logic, beta) * np.power(E_scaled, gamma)
 
     diagnostics: Dict[str, Any] = {
         "logic_fidelity": F_logic,
@@ -219,6 +219,8 @@ def sfxi_v1(
         "delta": delta,
         "scaling_cfg": dict(scaling_cfg),
         "train_effect_pool_size": int(len(effect_pool)),
+        "intensity_disabled": bool(intensity_disabled),
+        "all_off_setpoint": bool(intensity_disabled),
     }
 
     # Emit optional, named summary stats so the runner can log them generically

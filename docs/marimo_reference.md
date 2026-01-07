@@ -1,4 +1,4 @@
-## Marimo notebooks (context for agents)
+## Marimo notebooks
 
 This document is a reference for working with marimo notebooks.
 

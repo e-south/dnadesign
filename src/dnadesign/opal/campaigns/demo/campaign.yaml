@@ -6,7 +6,7 @@ campaign:
   workdir: "."  # resolved relative to this file
 
 data:
-  location: { kind: usr, path: ../../../usr/datasets, dataset: demo }
+  location: { kind: local, path: records.parquet }
   x_column_name: "mock__X_value"
   y_column_name: "mock__y_label"
   y_expected_length: 8
@@ -41,6 +41,8 @@ transforms_y:
     sequence_column: sequence
     logic_columns: ["v00","v10","v01","v11"]
     intensity_columns: ["y00_star","y10_star","y01_star","y11_star"]
+    enforce_log2_offset_match: true
+    expected_log2_offset_delta: 0.0
 
 model:
   name: random_forest

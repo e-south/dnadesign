@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/registries/__init__.py
 
-Public registry APIs.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -17,10 +14,10 @@ from .models import get_model, list_models, register_model
 from .objectives import get_objective, list_objectives, register_objective
 
 # Plots
-from .plot import get_plot, list_plots, register_plot
+from .plots import get_plot, list_plots, register_plot
 
 # Selections
-from .selections import get_selection, list_selections, register_selection
+from .selection import get_selection, list_selections, register_selection
 
 # X transforms
 from .transforms_x import get_transform_x, list_transforms_x, register_transform_x

@@ -4,18 +4,17 @@
 src/dnadesign/opal/tests/test_ingest_duplicate_policy.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
 import pandas as pd
 import pytest
 
-from dnadesign.opal.src.ingest import run_ingest
+from dnadesign.opal.src.core.round_context import PluginRegistryView, RoundCtx
+from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.registries.transforms_y import get_transform_y
-from dnadesign.opal.src.round_context import PluginRegistryView, RoundCtx
+from dnadesign.opal.src.runtime.ingest import run_ingest
 from dnadesign.opal.src.transforms_y import sfxi_vec8_from_table_v1  # noqa: F401 (registers)
-from dnadesign.opal.src.utils import OpalError
 
 
 def _csv_with_duplicate_sequence():
@@ -30,6 +29,7 @@ def _csv_with_duplicate_sequence():
             "y10_star": [0.1, 0.2],
             "y01_star": [0.1, 0.2],
             "y11_star": [0.1, 0.2],
+            "intensity_log2_offset_delta": [0.0, 0.0],
         }
     )
 
@@ -87,3 +87,30 @@ def test_ingest_duplicate_policy_keep_last():
     assert len(labels) == 1
     assert preview.duplicates_found == 2
     assert preview.duplicates_dropped == 1
+
+
+def test_ingest_transform_error_is_user_friendly():
+    records_df = pd.DataFrame(
+        {
+            "id": ["x"],
+            "sequence": ["AAA"],
+            "bio_type": ["dna"],
+            "alphabet": ["dna_4"],
+        }
+    )
+    # Missing required columns for sfxi_vec8_from_table_v1
+    csv_df = pd.DataFrame({"sequence": ["AAA"], "v00": [0.0]})
+    with pytest.raises(OpalError) as exc:
+        run_ingest(
+            records_df,
+            csv_df,
+            transform_name="sfxi_vec8_from_table_v1",
+            transform_params={"sequence_column": "sequence"},
+            y_expected_length=8,
+            y_column_name="Y",
+            duplicate_policy="error",
+            ctx=_ingest_ctx(),
+        )
+    msg = str(exc.value)
+    assert "Y transform 'sfxi_vec8_from_table_v1' failed" in msg
+    assert "Input columns" in msg

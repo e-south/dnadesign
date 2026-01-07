@@ -4,7 +4,6 @@
 src/dnadesign/opal/tests/test_predict_yops_guard.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -14,11 +13,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from dnadesign.opal.src.data_access import RecordsStore
+from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.models.random_forest import RandomForestModel  # noqa: F401
-from dnadesign.opal.src.predict import run_predict_ephemeral
+from dnadesign.opal.src.runtime.predict import run_predict_ephemeral
+from dnadesign.opal.src.storage.data_access import RecordsStore
 from dnadesign.opal.src.transforms_x import identity  # noqa: F401 (registers)
-from dnadesign.opal.src.utils import OpalError
 
 
 def test_predict_requires_round_ctx_when_yops(tmp_path):
@@ -34,7 +33,14 @@ def test_predict_requires_round_ctx_when_yops(tmp_path):
 
     X_train = np.array([[0.1, 0.2], [0.2, 0.3]])
     Y_train = np.array([[1.0], [2.0]])
-    model = RandomForestModel(params={"n_estimators": 5, "random_state": 1, "bootstrap": True, "oob_score": False})
+    model = RandomForestModel(
+        params={
+            "n_estimators": 5,
+            "random_state": 1,
+            "bootstrap": True,
+            "oob_score": False,
+        }
+    )
     model.fit(X_train, Y_train)
     model_path = tmp_path / "model.joblib"
     model.save(str(model_path))

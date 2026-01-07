@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_runs_status_log.py
 
-CLI integration tests for runs/status/log commands.
-
-Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -42,7 +39,19 @@ def test_runs_list_and_show_json(tmp_path):
     runs = json.loads(res.stdout)
     assert any(r.get("run_id") == run_id for r in runs)
 
-    res = runner.invoke(app, ["--no-color", "runs", "show", "-c", str(campaign), "--run-id", run_id, "--json"])
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "runs",
+            "show",
+            "-c",
+            str(campaign),
+            "--run-id",
+            run_id,
+            "--json",
+        ],
+    )
     assert res.exit_code == 0, res.stdout
     row = json.loads(res.stdout)
     assert row["run_id"] == run_id
@@ -58,6 +67,16 @@ def test_status_with_ledger_json(tmp_path):
     out = json.loads(res.stdout)
     assert out["latest_round"]["run_id"] == run_id
     assert out["latest_round_ledger"]["run_id"] == run_id
+
+
+def test_status_rejects_round_and_all(tmp_path):
+    _, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "status", "-c", str(campaign), "--round", "0", "--all"])
+    assert res.exit_code != 0, res.stdout
+    assert "only one of --all or --round" in res.output.lower()
 
 
 def test_log_json_summary(tmp_path):

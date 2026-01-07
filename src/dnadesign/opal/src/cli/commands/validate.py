@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/cli/commands/validate.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -16,8 +15,8 @@ from pathlib import Path
 
 import typer
 
-from ...data_access import ESSENTIAL_COLS
-from ...utils import ExitCodes, OpalError, print_stdout
+from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...storage.data_access import ESSENTIAL_COLS
 from ..formatting import kv_block
 from ..registry import cli_command
 from ._common import (
@@ -30,7 +29,9 @@ from ._common import (
 
 
 @cli_command("validate", help="End-to-end table checks (essentials present; X column present).")
-def cmd_validate(config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG")):
+def cmd_validate(
+    config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
+):
     try:
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)
@@ -165,17 +166,16 @@ def cmd_validate(config: Path = typer.Option(None, "--config", "-c", envvar="OPA
         except OpalError as e:
             raise OpalError(f"label_hist validation failed: {e}")
 
-        print_stdout("OK: validation passed.")
-
-        # Hint when the user is not inside the campaign workspace
+        # Emit a single, clear success line (with a note if CWD is outside workdir).
+        msg = "OK: validation passed."
         try:
             cwd = Path.cwd().resolve()
             wd = Path(cfg.campaign.workdir).resolve()
             if wd not in cwd.parents and cwd != wd:
-                print_stdout(f"OK: validation passed. (Note: your CWD '{cwd}' is outside campaign workdir '{wd}')")
-                return
+                msg = f"{msg} (Note: your CWD '{cwd}' is outside campaign workdir '{wd}')"
         except Exception:
             pass
+        print_stdout(msg)
 
     except OpalError as e:
         opal_error("validate", e)

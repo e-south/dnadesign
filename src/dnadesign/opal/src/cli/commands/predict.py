@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/cli/commands/predict.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -13,14 +12,23 @@ from __future__ import annotations
 import json as _json
 from pathlib import Path
 
-import pandas as pd
 import typer
 
-from ...predict import run_predict_ephemeral
-from ...state import CampaignState
-from ...utils import ExitCodes, OpalError, print_stdout
+from ...core.rounds import resolve_round_index
+from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...runtime.predict import run_predict_ephemeral
+from ...storage.parquet_io import read_parquet_df, write_parquet_df
+from ...storage.state import CampaignState
 from ..registry import cli_command
-from ._common import internal_error, load_cli_config, opal_error, resolve_config_path, store_from_cfg
+from ._common import (
+    internal_error,
+    load_cli_config,
+    opal_error,
+    resolve_config_path,
+    resolve_json_path,
+    resolve_table_path,
+    store_from_cfg,
+)
 
 
 @cli_command("predict", help="Ephemeral inference with a frozen model; no write-backs.")
@@ -39,13 +47,13 @@ def cmd_predict(
     model_params: Path = typer.Option(
         None,
         "--model-params",
-        help="Optional JSON file with model params (used with --model-name).",
+        help="Optional JSON file (.json) with model params (used with --model-name).",
     ),
-    round: int = typer.Option(
+    round: str = typer.Option(
         None,
         "--round",
         "-r",
-        help="Round index to resolve model from state.json (default: latest)",
+        help="Round index to resolve model from state.json (default: latest). Accepts 'latest'.",
     ),
     input_path: Path = typer.Option(None, "--in", help="Optional input parquet/csv; defaults to records.parquet"),
     out_path: Path = typer.Option(None, "--out", help="Optional output parquet/csv; defaults to stdout CSV"),
@@ -63,8 +71,30 @@ def cmd_predict(
     ),
 ):
     try:
-        cfg = load_cli_config(resolve_config_path(config))
+        import pandas as pd
+
+        cfg_path = resolve_config_path(config)
+        cfg = load_cli_config(cfg_path)
         store = store_from_cfg(cfg)
+
+        if model_path is not None and round is not None:
+            raise OpalError("Use only one of --model-path or --round (they are mutually exclusive).")
+
+        if model_path is not None:
+            model_path = Path(model_path)
+            if not model_path.exists():
+                raise OpalError(f"--model-path not found: {model_path}")
+            if model_path.is_dir():
+                raise OpalError(f"--model-path must be a file, got directory: {model_path}")
+
+        if input_path is not None:
+            input_path = resolve_table_path(input_path, label="--in", must_exist=True)
+
+        if out_path is not None:
+            out_path = resolve_table_path(out_path, label="--out", must_exist=False)
+        if model_params is not None:
+            model_params = resolve_json_path(model_params, label="--model-params", must_exist=True)
+
         # Resolve model_path if not provided
         if model_path is None:
             st_path = Path(cfg.campaign.workdir) / "state.json"
@@ -72,22 +102,30 @@ def cmd_predict(
                 raise OpalError("Provide --model-path or run from a campaign with state.json.")
             st = CampaignState.load(st_path)
             rounds = sorted(st.rounds, key=lambda r: int(r.round_index))
-            if not rounds:
-                raise OpalError(f"No rounds found in {st_path}")
-            entry = (
-                next((r for r in rounds if int(r.round_index) == int(round)), None) if round is not None else rounds[-1]
+            round_values = [int(r.round_index) for r in rounds]
+            round_sel = resolve_round_index(
+                round,
+                rounds=round_values,
+                allow_none=False,
+                empty_message=f"No rounds found in {st_path}",
+                param_label="--round",
             )
+            entry = next((r for r in rounds if int(r.round_index) == int(round_sel)), None)
             if entry is None:
                 raise OpalError(f"Round {round} not found in {st_path}")
             mp = Path(entry.model.get("artifact_path", "")) if entry.model else None
             if not mp or not mp.exists():
                 mp = Path(entry.round_dir) / "model.joblib"
             model_path = mp
+        if model_path is None or not Path(model_path).exists():
+            raise OpalError(f"Resolved model path not found: {model_path}")
+        if Path(model_path).is_dir():
+            raise OpalError(f"Resolved model path must be a file, got directory: {model_path}")
         df = (
             store.load()
             if input_path is None
             else (
-                pd.read_parquet(input_path)
+                read_parquet_df(input_path)
                 if input_path.suffix.lower() in (".parquet", ".pq")
                 else pd.read_csv(input_path)
             )
@@ -116,7 +154,7 @@ def cmd_predict(
                 df_out["y_pred_vec"] = df_out["y_pred_vec"].map(lambda v: _json.dumps(v))
                 df_out.to_csv(out_path, index=False)
             else:
-                preds.to_parquet(out_path, index=False)
+                write_parquet_df(out_path, preds, index=False)
             print_stdout(f"Wrote predictions: {out_path}")
         else:
             df_out = preds.copy()

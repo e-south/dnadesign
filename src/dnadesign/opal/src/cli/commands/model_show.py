@@ -4,7 +4,6 @@
 src/dnadesign/opal/src/cli/commands/model_show.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -14,16 +13,23 @@ import json as _json
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
-import pandas as pd
 import typer
 
+from ...core.rounds import resolve_round_index_from_state
+from ...core.utils import ExitCodes, OpalError, ensure_dir, print_stdout
 from ...registries.models import load_model
-from ...state import CampaignState
-from ...utils import ExitCodes, OpalError, ensure_dir, print_stdout
+from ...storage.state import CampaignState
 from ..formatting import render_model_show_human
 from ..registry import cli_command
-from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path
+from ._common import (
+    internal_error,
+    json_out,
+    load_cli_config,
+    opal_error,
+    print_config_context,
+    resolve_config_path,
+    resolve_json_path,
+)
 
 
 @cli_command(
@@ -34,7 +40,7 @@ def cmd_model_show(
     model_path: Optional[Path] = typer.Option(None, "--model-path"),
     out_dir: Optional[Path] = typer.Option(None, "--out-dir"),
     config: Optional[Path] = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
-    round: Optional[int] = typer.Option(None, "--round", "-r", help="Round index; default = latest"),
+    round: Optional[str] = typer.Option(None, "--round", "-r", help="Round selector: int or 'latest'."),
     model_name: Optional[str] = typer.Option(
         None,
         "--model-name",
@@ -43,11 +49,14 @@ def cmd_model_show(
     model_params: Optional[Path] = typer.Option(
         None,
         "--model-params",
-        help="Optional JSON file with model params (used with --model-name).",
+        help="Optional JSON file (.json) with model params (used with --model-name).",
     ),
     json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
 ):
     try:
+        import numpy as np
+        import pandas as pd
+
         # Resolve model_path if not provided
         if model_path is None:
             if not config:
@@ -61,11 +70,10 @@ def cmd_model_show(
             rounds = sorted(st.rounds, key=lambda r: int(r.round_index))
             if not rounds:
                 raise OpalError(f"No rounds found in {st_path}")
-            entry = (
-                next((r for r in rounds if int(r.round_index) == int(round)), None) if round is not None else rounds[-1]
-            )
+            round_sel = resolve_round_index_from_state(st_path, round)
+            entry = next((r for r in rounds if int(r.round_index) == int(round_sel)), None)
             if entry is None:
-                raise OpalError(f"Round {round} not found in {st_path}")
+                raise OpalError(f"Round {round_sel} not found in {st_path}")
             # Prefer recorded artifact path; fallback to conventional path
             mp = Path(entry.model.get("artifact_path", "")) if entry.model else None
             if not mp or not mp.exists():
@@ -73,6 +81,7 @@ def cmd_model_show(
             model_path = mp
         params_obj = None
         if model_params:
+            model_params = resolve_json_path(model_params, label="--model-params", must_exist=True)
             params_obj = _json.loads(model_params.read_text())
             if not model_name:
                 raise OpalError("Use --model-name with --model-params.")

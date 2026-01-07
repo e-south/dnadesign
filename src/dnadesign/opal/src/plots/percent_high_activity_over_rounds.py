@@ -4,32 +4,42 @@
 src/dnadesign/opal/src/plots/percent_high_activity_over_rounds.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
-import numpy as np
-
-from ..registries.plot import register_plot
-from ._events_util import load_events_with_setpoint, resolve_outputs_dir
-from ._mpl_utils import annotate_plot_meta, scale_to_sizes, swarm_smart
+from ..registries.plots import PlotMeta, register_plot
+from ._events_util import load_events, resolve_outputs_dir
+from ._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir, scale_to_sizes, swarm_smart
 from ._param_utils import event_columns_for, get_str, normalize_metric_field
 
 
-@register_plot("percent_high_activity_over_rounds")
+@register_plot(
+    "percent_high_activity_over_rounds",
+    meta=PlotMeta(
+        summary="Percent of candidates above a score threshold across rounds.",
+        params={
+            "threshold": "Scalar cutoff for 'high' (default 0.8).",
+            "mode": "line|violin|both (default both).",
+            "hue_field": "Optional obj__/pred__/sel__ field for swarm color.",
+            "size_by": "Optional obj__/pred__/sel__ field for swarm size.",
+        },
+        requires=["as_of_round", "pred__y_obj_scalar"],
+        notes=["Reads ledger.predictions."],
+    ),
+)
 def render(context, params: dict) -> None:
+    ensure_mpl_config_dir(workdir=getattr(context.workspace, "workdir", None))
+    import matplotlib.pyplot as plt
+    import numpy as np
+
     threshold = float(params.get("threshold", 0.8))
     mode = str(params.get("mode", "both")).lower()  # "line" | "violin" | "both"
+    if mode not in {"line", "violin", "both"}:
+        raise ValueError("mode must be 'line', 'violin', or 'both'.")
     violin_alpha = float(params.get("violin_alpha", 0.5))
-    # If user doesn't set width, pick a narrower default for N=1.
     violin_width = params.get("violin_width", None)
-    if violin_width is None:
-        # 0.45 looks good for a single category; 0.9 for multiple
-        violin_width = 0.45
-    violin_width = float(violin_width)
     swarm = bool(params.get("swarm", True))
     swarm_max_points = int(params.get("swarm_max_points", 3000))
     swarm_jitter = float(params.get("swarm_jitter", 0.08))
@@ -58,12 +68,12 @@ def render(context, params: dict) -> None:
     # Always read from typed sinks (predictions + runs).
     need = {"as_of_round", "pred__y_obj_scalar"}
     need |= event_columns_for(hue_field, size_by)
-    df = load_events_with_setpoint(outputs_dir, need, round_selector=context.rounds)
+    df = load_events(outputs_dir, need, round_selector=context.rounds)
     if df.empty:
         raise ValueError("Ledger predictions contained zero rows after projection.")
 
     rsel = context.rounds
-    if rsel == "unspecified":
+    if rsel in ("unspecified", "latest"):
         latest = int(df["as_of_round"].max())
         df = df[df["as_of_round"] == latest]
     elif rsel != "all":
@@ -91,6 +101,9 @@ def render(context, params: dict) -> None:
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     rounds = grp["as_of_round"].tolist()
+    if violin_width is None:
+        violin_width = 0.45 if len(rounds) <= 1 else 0.9
+    violin_width = float(violin_width)
     # Build per-round arrays (objective scalar always; optional hue/size aligned by index)
     series = []
     hues = [] if hue_field else None
@@ -169,7 +182,7 @@ def render(context, params: dict) -> None:
 
     # Log + annotate
     total_points = int(sum(len(s) for s in series))
-    raster = total_points >= rasterize_at
+    raster = False if rasterize_at is None else total_points >= rasterize_at
     context.logger.info(
         "params percent_high_activity: mode=%s threshold=%.3f rounds=%s swarm=%s swarm_max=%d points=%d",
         mode,

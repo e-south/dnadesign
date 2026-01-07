@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/config/__init__.py
 
-Re-exports for config loading.
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

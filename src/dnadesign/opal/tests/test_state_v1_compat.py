@@ -4,7 +4,6 @@
 src/dnadesign/opal/tests/test_state_v1_compat.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -13,8 +12,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dnadesign.opal.src.state import CampaignState
-from dnadesign.opal.src.status import build_status
+from dnadesign.opal.src.reporting.status import build_status
+from dnadesign.opal.src.storage.state import CampaignState
 
 
 def test_state_v1_loads_without_run_id(tmp_path):
@@ -24,7 +23,11 @@ def test_state_v1_loads_without_run_id(tmp_path):
         "campaign_slug": "demo",
         "campaign_name": "Demo",
         "workdir": str(tmp_path),
-        "data_location": {"kind": "local", "path": str(tmp_path), "records_path": str(tmp_path / "records.parquet")},
+        "data_location": {
+            "kind": "local",
+            "path": str(tmp_path),
+            "records_path": str(tmp_path / "records.parquet"),
+        },
         "x_column_name": "X",
         "y_column_name": "Y",
         "rounds": [

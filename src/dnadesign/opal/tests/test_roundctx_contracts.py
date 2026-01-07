@@ -4,7 +4,6 @@
 src/dnadesign/opal/tests/test_roundctx_contracts.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -17,10 +16,27 @@ import pytest
 from pydantic import BaseModel
 
 from dnadesign.opal.src.config.types import PluginRef
-from dnadesign.opal.src.registries.objectives import get_objective, list_objectives, register_objective
-from dnadesign.opal.src.registries.selections import get_selection, list_selections, register_selection
-from dnadesign.opal.src.registries.transforms_y import list_y_ops, register_y_op, run_y_ops_pipeline
-from dnadesign.opal.src.round_context import PluginRegistryView, RoundCtx, RoundCtxContractError, roundctx_contract
+from dnadesign.opal.src.core.round_context import (
+    PluginRegistryView,
+    RoundCtx,
+    RoundCtxContractError,
+    roundctx_contract,
+)
+from dnadesign.opal.src.registries.objectives import (
+    get_objective,
+    list_objectives,
+    register_objective,
+)
+from dnadesign.opal.src.registries.selection import (
+    get_selection,
+    list_selections,
+    register_selection,
+)
+from dnadesign.opal.src.registries.transforms_y import (
+    list_y_ops,
+    register_y_op,
+    run_y_ops_pipeline,
+)
 
 
 class _ObjResult:
@@ -67,7 +83,16 @@ def _ensure_selection_contracts() -> None:
             produces=["selection/<self>/note"],
         )
         @register_selection("test_sel_contract")
-        def _sel(*, ids, scores, top_k, objective="maximize", tie_handling="competition_rank", ctx=None, **_):
+        def _sel(
+            *,
+            ids,
+            scores,
+            top_k,
+            objective="maximize",
+            tie_handling="competition_rank",
+            ctx=None,
+            **_,
+        ):
             if ctx is not None:
                 _ = ctx.get("core/data/n_scored")
                 ctx.set("selection/<self>/note", "ok")
@@ -81,7 +106,16 @@ def _ensure_selection_contracts() -> None:
             produces=["selection/<self>/note"],
         )
         @register_selection("test_sel_no_produce")
-        def _sel_missing(*, ids, scores, top_k, objective="maximize", tie_handling="competition_rank", ctx=None, **_):
+        def _sel_missing(
+            *,
+            ids,
+            scores,
+            top_k,
+            objective="maximize",
+            tie_handling="competition_rank",
+            ctx=None,
+            **_,
+        ):
             return {"order_idx": np.arange(len(ids))}
 
 
@@ -92,7 +126,11 @@ class _Params(BaseModel):
 def _ensure_yops_contracts() -> None:
     if "test_yop_contract" not in list_y_ops():
 
-        @register_y_op("test_yop_contract", requires=["yops/<self>/need"], produces=["yops/<self>/made"])
+        @register_y_op(
+            "test_yop_contract",
+            requires=["yops/<self>/need"],
+            produces=["yops/<self>/made"],
+        )
         def _yop():
             def fit(Y, params, ctx=None):
                 if ctx is not None:
@@ -109,7 +147,11 @@ def _ensure_yops_contracts() -> None:
 
     if "test_yop_no_produce" not in list_y_ops():
 
-        @register_y_op("test_yop_no_produce", requires=["yops/<self>/need"], produces=["yops/<self>/made"])
+        @register_y_op(
+            "test_yop_no_produce",
+            requires=["yops/<self>/need"],
+            produces=["yops/<self>/made"],
+        )
         def _yop_missing():
             def fit(Y, params, ctx=None):
                 # Intentionally do not set required key

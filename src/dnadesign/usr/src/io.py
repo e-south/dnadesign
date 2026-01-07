@@ -1,13 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/io.py
-
-Thin wrappers around Arrow/Parquet I/O:
-
-- `write_parquet_atomic`: atomic write with a timestamped snapshot
-- `read_parquet`: convenience wrapper with optional column projection
-- `append_event`: append-only JSONL log of operations (init/import/attach/snapshot)
+src/dnadesign/usr/src/io.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -23,6 +17,8 @@ from typing import Optional
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+
+from .errors import SequencesError
 
 SNAPSHOT_DIR_NAME: str = "_snapshots"
 SNAPSHOT_KEEP_N: int = 5
@@ -53,19 +49,31 @@ def _write_parquet(
 def _prune_snapshots(snapshot_dir: Path, keep_n: int) -> None:
     snaps = sorted(snapshot_dir.glob("records-*.parquet"))
     if keep_n <= 0:
+        failures = []
         for p in snaps:
             try:
                 p.unlink()
-            except Exception:
-                pass
+            except Exception as e:
+                failures.append((p, e))
+        if failures:
+            first_path, first_err = failures[0]
+            raise SequencesError(
+                f"Failed to prune {len(failures)} snapshot(s); first error for {first_path}: {first_err}"
+            ) from first_err
         return
     if len(snaps) <= keep_n:
         return
+    failures = []
     for p in snaps[:-keep_n]:
         try:
             p.unlink()
-        except Exception:
-            pass
+        except Exception as e:
+            failures.append((p, e))
+    if failures:
+        first_path, first_err = failures[0]
+        raise SequencesError(
+            f"Failed to prune {len(failures)} snapshot(s); first error for {first_path}: {first_err}"
+        ) from first_err
 
 
 def write_parquet_atomic(
@@ -93,8 +101,8 @@ def write_parquet_atomic(
             snap_path = snapshot_dir / f"records-{ts}.parquet"
             _write_parquet(table, snap_path, compression=codec)
             _prune_snapshots(snapshot_dir, SNAPSHOT_KEEP_N)
-        except Exception:
-            pass
+        except Exception as e:
+            raise SequencesError(f"Snapshot write/prune failed for {target}: {e}") from e
 
     tmp = target.with_suffix(".tmp.parquet")
     _write_parquet(table, tmp, compression=codec)
@@ -113,5 +121,5 @@ def append_event(event_path: Path, payload: dict) -> None:
     try:
         with event_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(payload, separators=(",", ":")) + "\n")
-    except Exception:
-        pass
+    except Exception as e:
+        raise SequencesError(f"Failed to append event log {event_path}: {e}") from e

@@ -1,22 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/merge_datasets.py
-
-USR ↔ USR MERGE (records.parquet → records.parquet)
-
-Combine rows from a **source** USR dataset into a **destination** USR dataset.
-Features:
-- Duplicate policy: error | skip | prefer-src | prefer-dest
-- Column policy: require-same OR union (fill missing cols with NULLs)
-- Optional column subset (essential columns always included)
-- **Clear reporting**: counts for src rows, duplicates encountered, skipped/replaced,
-  and rows actually added
-- Atomic write with snapshotting to _snapshots/ and events log entry
-
-Use via CLI:
-  usr merge-datasets --dest <name> --src <name> --union-columns --if-duplicate skip
-or programmatically via merge_usr_to_usr(...).
+src/dnadesign/usr/src/merge_datasets.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

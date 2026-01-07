@@ -100,7 +100,7 @@ def _():
     # - Legends: theme-level legend/title colors for visibility on white.
     # - Plots: consistent titles/subtitles and RF/cluster UX improvements.
     # - Clusters: stable numeric ordering for distribution views.
-    from dnadesign.opal.src import promoter_eda_utils as eda_utils
+    from dnadesign.opal.src.analysis import promoter_eda_utils as eda_utils
 
     apply_intensity_median_iqr = eda_utils.apply_intensity_median_iqr
     build_color_dropdown_options = eda_utils.build_color_dropdown_options
@@ -3355,6 +3355,9 @@ def _(
                     pad_inches=0.0,
                     facecolor="white",
                 )
+                from dnadesign.opal.src.plots._mpl_utils import ensure_mpl_config_dir
+
+                ensure_mpl_config_dir()
                 import matplotlib.pyplot as plt
 
                 plt.close(_fig)

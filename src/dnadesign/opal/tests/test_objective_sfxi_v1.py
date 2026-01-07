@@ -3,10 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_objective_sfxi_v1.py
 
-Unit tests for the sfxi_v1 objective.
-
-Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -15,8 +12,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from dnadesign.opal.src.core.round_context import PluginRegistryView, RoundCtx
 from dnadesign.opal.src.objectives.sfxi_v1 import sfxi_v1
-from dnadesign.opal.src.round_context import PluginRegistryView, RoundCtx
 
 
 class _TrainView:
@@ -94,3 +91,31 @@ def test_sfxi_v1_rejects_out_of_range_setpoint():
     octx = rctx.for_plugin(category="objective", name="sfxi_v1", plugin=sfxi_v1)
     with pytest.raises(ValueError, match="setpoint_vector"):
         sfxi_v1(y_pred=y_pred, params=params, ctx=octx, train_view=tv)
+
+
+def test_sfxi_v1_all_off_disables_intensity():
+    y_pred = np.array(
+        [
+            [0.0, 0.0, 0.0, 0.0, 3.0, 3.0, 3.0, 3.0],
+            [1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0],
+        ],
+        dtype=float,
+    )
+    params = {
+        "setpoint_vector": [0, 0, 0, 0],
+        "logic_exponent_beta": 1.0,
+        "intensity_exponent_gamma": 2.0,
+        "scaling": {"percentile": 95, "min_n": 5, "eps": 1e-8},
+    }
+
+    train_Y = np.empty((0, 8), dtype=float)
+    train_R = np.empty((0,), dtype=int)
+    tv = _TrainView(train_Y, train_R, as_of_round=0)
+
+    rctx = _ctx(as_of_round=0)
+    octx = rctx.for_plugin(category="objective", name="sfxi_v1", plugin=sfxi_v1)
+    res = sfxi_v1(y_pred=y_pred, params=params, ctx=octx, train_view=tv)
+
+    assert np.allclose(res.score, np.array([1.0, 0.0], dtype=float))
+    assert res.diagnostics.get("intensity_disabled") is True
+    assert np.allclose(res.diagnostics["effect_scaled"], np.ones(2, dtype=float))

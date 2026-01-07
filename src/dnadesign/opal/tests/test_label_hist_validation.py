@@ -4,15 +4,14 @@
 src/dnadesign/opal/tests/test_label_hist_validation.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
 import pandas as pd
 import pytest
 
-from dnadesign.opal.src.data_access import RecordsStore
-from dnadesign.opal.src.utils import OpalError
+from dnadesign.opal.src.core.utils import OpalError
+from dnadesign.opal.src.storage.data_access import RecordsStore
 
 
 def _store(tmp_path):

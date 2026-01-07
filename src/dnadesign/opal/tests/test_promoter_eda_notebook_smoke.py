@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/tests/test_promoter_eda_notebook_smoke.py
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import importlib.util
@@ -36,9 +45,7 @@ def test_prom60_eda_headless(tmp_path: Path) -> None:
 
     env_backup = os.environ.copy()
     os.environ["DNADESIGN_USR_ROOT"] = str(usr_root)
-    os.environ["MPLCONFIGDIR"] = str(tmp_path / "mpl")
     os.environ["MPLBACKEND"] = "Agg"
-    Path(os.environ["MPLCONFIGDIR"]).mkdir(parents=True, exist_ok=True)
 
     try:
         module = _load_notebook_module()

@@ -4,16 +4,15 @@
 src/dnadesign/opal/tests/test_ledger_strict.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
 import pandas as pd
 import pytest
 
-from dnadesign.opal.src.ledger import LedgerWriter
-from dnadesign.opal.src.utils import LedgerError
-from dnadesign.opal.src.workspace import CampaignWorkspace
+from dnadesign.opal.src.core.utils import LedgerError
+from dnadesign.opal.src.storage.ledger import LedgerWriter
+from dnadesign.opal.src.storage.workspace import CampaignWorkspace
 
 
 def test_ledger_rejects_unknown_columns(tmp_path):

@@ -54,7 +54,7 @@ ssh scc1   # should log in (with Duo/MFA)
 exit
 ```
 
-> **Fallback:** If keys aren’t available, `usr pull/push` will still prompt for your password.
+> **Note:** USR uses SSH BatchMode and will fail fast if keys aren’t configured.
 
 ---
 

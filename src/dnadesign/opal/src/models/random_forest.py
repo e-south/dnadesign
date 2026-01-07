@@ -3,17 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/models/random_forest.py
 
-Random Forest model wrapper.
-
-Registers 'random_forest' with the model registry and exposes:
-- fit(X, Y) -> FitMetrics(oob_r2, oob_mse)
-- predict(X) -> (n, y_dim)
-- predict_per_tree(X) -> (T, n, y_dim)
-- feature_importances()
-- save(path) / load(path)
-
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -28,8 +18,8 @@ from joblib import dump
 from joblib import load as joblib_load
 from sklearn.ensemble import RandomForestRegressor
 
+from ..core.round_context import roundctx_contract
 from ..registries.models import register_model
-from ..round_context import roundctx_contract
 
 
 @dataclass

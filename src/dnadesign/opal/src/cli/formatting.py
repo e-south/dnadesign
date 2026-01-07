@@ -5,6 +5,8 @@ src/dnadesign/opal/src/cli/formatting.py
 
 CLI-wide human-output formatting helpers and renderers.
 Adds optional Rich markup (guarded by OPAL_CLI_MARKUP). JSON remains unstyled.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -15,6 +17,8 @@ import os
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+
+from .tui import kv_table, list_table, tui_enabled
 
 # -------------
 # Markup gate
@@ -30,20 +34,17 @@ def _markup_enabled() -> bool:
     return val in _TRUTHY
 
 
-_M = _markup_enabled()
-
-
 def _b(s: str) -> str:
-    return f"[bold]{s}[/]" if _M else s
+    return f"[bold]{s}[/]" if _markup_enabled() else s
 
 
 def _t(s: str) -> str:
     # title accent
-    return f"[bold cyan]{s}[/]" if _M else s
+    return f"[bold cyan]{s}[/]" if _markup_enabled() else s
 
 
 def _dim(s: str) -> str:
-    return f"[dim]{s}[/]" if _M else s
+    return f"[dim]{s}[/]" if _markup_enabled() else s
 
 
 # -----------------------
@@ -112,7 +113,7 @@ def _as_dict(obj: Any) -> Dict[str, Any]:
 def _fmt_params(params: Any) -> str:
     try:
         txt = json.dumps(params, indent=2, sort_keys=True)
-        return txt if not _M else f"[white]{txt}[/]"
+        return txt if not _markup_enabled() else f"[white]{txt}[/]"
     except Exception:
         return str(params)
 
@@ -137,6 +138,58 @@ def render_explain_human(info: Mapping[str, Any]) -> str:
     obj = sel.get("objective", {}) or {}
     yops = info.get("training_y_ops") or info.get("training_y_ops", []) or []
     yops_str = ", ".join(str(p.get("name")) for p in yops) if yops else "(none)"
+
+    if tui_enabled():
+        from rich.console import Group
+
+        blocks = []
+        head = kv_table(
+            f"Round r={info.get('round_index')}",
+            {
+                "X column": info.get("x_column_name"),
+                "Y column": info.get("y_column_name"),
+                "Vector dim (X)": info.get("representation_vector_dimension"),
+            },
+        )
+        if head is not None:
+            blocks.append(head)
+        model_block = kv_table(
+            "Model",
+            {
+                "name": (info.get("model") or {}).get("name"),
+                "params": _fmt_params((info.get("model") or {}).get("params")),
+                "Y-ops": yops_str,
+            },
+        )
+        if model_block is not None:
+            blocks.append(model_block)
+        selection_block = kv_table(
+            "Selection & Objective",
+            {
+                "strategy": sel.get("strategy"),
+                "selection.params": _fmt_params(sel.get("params")),
+                "objective": obj.get("name"),
+                "objective.params": _fmt_params(obj.get("params")),
+            },
+        )
+        if selection_block is not None:
+            blocks.append(selection_block)
+        counts_block = kv_table(
+            "Counts",
+            {
+                "training labels used": info.get("number_of_training_examples_used_in_round"),
+                "candidates scored": info.get("number_of_candidates_scored_in_round"),
+                "candidate pool total": info.get("candidate_pool_total"),
+                "candidate pool filtered out": info.get("candidate_pool_filtered_out"),
+            },
+        )
+        if counts_block is not None:
+            blocks.append(counts_block)
+        warn_rows = [str(w) for w in (info.get("warnings") or [])]
+        warn_block = list_table("Warnings", warn_rows)
+        if warn_block is not None:
+            blocks.append(warn_block)
+        return Group(*blocks)
 
     header = kv_block(
         f"Round r={info.get('round_index')}",
@@ -188,6 +241,44 @@ def render_ingest_preview_human(
     transform_name: Optional[str] = None,
 ) -> str:
     p = _as_dict(preview)
+    if tui_enabled():
+        from rich import box
+        from rich.console import Group
+        from rich.table import Table
+
+        head = kv_table(
+            f"[Preview] ingest-y (transform={transform_name or '(from YAML)'})",
+            {
+                "rows in input table": p.get("total_rows_in_csv"),
+                "columns present": f"id={'yes' if p.get('rows_with_id') else 'no'}, "
+                f"sequence={'yes' if p.get('rows_with_sequence') else 'no'}",
+                "resolved ids by sequence": p.get("resolved_ids_by_sequence"),
+                "unknown sequences": p.get("unknown_sequences"),
+                "y_expected_length": p.get("y_expected_length"),
+                "y_length_ok (sampled)": p.get("y_length_ok"),
+                "y_length_bad (sampled)": p.get("y_length_bad"),
+                "duplicate policy": p.get("duplicate_policy"),
+                "duplicate key": p.get("duplicate_key"),
+                "duplicates found": p.get("duplicates_found"),
+                "duplicates dropped": p.get("duplicates_dropped"),
+                "warnings": ", ".join(p.get("warnings") or []) or "(none)",
+            },
+        )
+        blocks = [head] if head is not None else []
+        if sample_rows:
+            table = Table(title="Sample (first 5)", box=box.ASCII)
+            table.add_column("id", style="bold")
+            table.add_column("sequence")
+            table.add_column("y")
+            for r in sample_rows[:5]:
+                seq = _truncate(r.get("sequence", ""))
+                rid = r.get("id", "")
+                y = r.get("y", "")
+                y_str = short_array(y, maxlen=6) if isinstance(y, (list, tuple)) else _truncate(str(y), 64)
+                table.add_row(str(rid), str(seq), str(y_str))
+            blocks.append(table)
+        return Group(*blocks)
+
     head = kv_block(
         f"[Preview] ingest-y (transform={transform_name or '(from YAML)'})",
         {
@@ -224,20 +315,36 @@ def render_ingest_commit_human(
     *,
     round_index: int,
     labels_appended: int,
+    labels_skipped: int = 0,
     y_column_updated: str,
 ) -> str:
-    return kv_block(
-        "[Committed] ingest-y",
-        {
-            "round": round_index,
-            "labels appended": labels_appended,
-            "y column updated": y_column_updated,
-            "ledger labels appended": "yes",
-        },
-    )
+    payload = {
+        "round": round_index,
+        "labels appended": labels_appended,
+        "y column updated": y_column_updated,
+        "ledger labels appended": "yes",
+    }
+    if labels_skipped:
+        payload["labels skipped"] = labels_skipped
+    if tui_enabled():
+        table = kv_table("[Committed] ingest-y", payload)
+        if table is not None:
+            return table
+    return kv_block("[Committed] ingest-y", payload)
 
 
 def render_init_human(*, workdir: Path) -> str:
+    if tui_enabled():
+        table = kv_table(
+            "[ok] Initialized campaign workspace",
+            {
+                "workdir": str(Path(workdir).resolve()),
+                "directories": "inputs/, outputs/",
+                "marker": ".opal/config",
+            },
+        )
+        if table is not None:
+            return table
     return kv_block(
         "[ok] Initialized campaign workspace",
         {
@@ -249,6 +356,32 @@ def render_init_human(*, workdir: Path) -> str:
 
 
 def render_model_show_human(info: Mapping[str, Any]) -> str:
+    if tui_enabled():
+        from rich import box
+        from rich.console import Group
+        from rich.table import Table
+
+        head = kv_table(
+            "Model",
+            {
+                "type": info.get("model_type"),
+                "params": _fmt_params(info.get("params", {})),
+            },
+        )
+        blocks = [head] if head is not None else []
+        top = info.get("feature_importance_top20") or []
+        if top:
+            table = Table(title="Top-20 feature importance (if available)", box=box.ASCII)
+            table.add_column("rank", style="bold")
+            table.add_column("feature_index")
+            table.add_column("weight")
+            for i, row in enumerate(top, start=1):
+                fi = row.get("feature_index")
+                w = row.get("feature_importance")
+                table.add_row(str(i), str(fi), f"{w:.6g}" if w is not None else "")
+            blocks.append(table)
+        if blocks:
+            return Group(*blocks)
     head = kv_block(
         "Model",
         {
@@ -322,6 +455,21 @@ def render_run_summary_human(summary: dict) -> str:
         f"objective={obj_mode} tie={tie_hint} | "
         f"top_k={requested} (requested) → selected={effective} (effective after ties)"
     )
+    if tui_enabled():
+        table = kv_table(
+            "Run summary",
+            {
+                "run_id": rid,
+                "as_of_round": summary.get("as_of_round"),
+                "trained_on": summary.get("trained_on"),
+                "scored": summary.get("scored"),
+                "selection": f"objective={obj_mode} tie={tie_hint} | top_k={requested} -> selected={effective}",
+                "ledger": summary.get("ledger"),
+                "top_k_source": summary.get("top_k_source"),
+            },
+        )
+        if table is not None:
+            return table
     lines = [
         f"{_b('run_id')}: {rid}",
         f"{_b('as_of_round')}: {summary.get('as_of_round')}",
@@ -334,6 +482,69 @@ def render_run_summary_human(summary: dict) -> str:
 
 
 def render_status_human(st: Mapping[str, Any]) -> str:
+    if tui_enabled():
+        from rich.console import Group
+
+        blocks = []
+        head = kv_table(
+            "Campaign",
+            {
+                "name": st.get("campaign_name"),
+                "slug": st.get("campaign_slug"),
+                "workdir": st.get("workdir"),
+                "X column": st.get("x_column_name"),
+                "Y column": st.get("y_column_name"),
+                "num_rounds": st.get("num_rounds"),
+            },
+        )
+        if head is not None:
+            blocks.append(head)
+
+        latest = st.get("latest_round") or {}
+        if not latest:
+            empty = list_table("Status", ["No completed rounds."])
+            if empty is not None:
+                blocks.append(empty)
+            return Group(*blocks)
+
+        def _round_table(label: str, round_info: Mapping[str, Any], ledger_info: Mapping[str, Any]):
+            run_id = round_info.get("run_id") or ledger_info.get("run_id")
+            main = kv_table(
+                label,
+                {
+                    "r": round_info.get("round_index"),
+                    "run_id": run_id,
+                    "n_train": round_info.get("number_of_training_examples_used_in_round"),
+                    "n_scored": round_info.get("number_of_candidates_scored_in_round"),
+                    "top_k requested": round_info.get("selection_top_k_requested"),
+                    "top_k effective": round_info.get("selection_top_k_effective_after_ties"),
+                    "round_dir": round_info.get("round_dir"),
+                },
+            )
+            if main is not None:
+                blocks.append(main)
+            if ledger_info:
+                summary = ledger_info.get("objective_summary_stats") or {}
+                kv = {
+                    "model": ledger_info.get("model"),
+                    "objective": ledger_info.get("objective"),
+                    "selection": ledger_info.get("selection"),
+                    "y_ops": ", ".join([p.get("name") for p in (ledger_info.get("y_ops") or [])]) or "(none)",
+                    "score_min": summary.get("score_min"),
+                    "score_median": summary.get("score_median"),
+                    "score_max": summary.get("score_max"),
+                }
+                ledger_block = kv_table(f"{label} (ledger)", kv)
+                if ledger_block is not None:
+                    blocks.append(ledger_block)
+
+        _round_table("Latest round", latest, st.get("latest_round_ledger") or {})
+        selected = st.get("selected_round") or {}
+        if selected and int(selected.get("round_index", -1)) != int(latest.get("round_index", -1)):
+            _round_table("Selected round", selected, st.get("selected_round_ledger") or {})
+
+        return Group(*blocks)
+
     head = kv_block(
         "Campaign",
         {
@@ -396,6 +607,33 @@ def render_status_human(st: Mapping[str, Any]) -> str:
 
 
 def render_runs_list_human(rows: Sequence[Mapping[str, Any]]) -> str:
+    if tui_enabled():
+        from rich import box
+        from rich.table import Table
+
+        if not rows:
+            empty = list_table("Runs", ["No runs found."])
+            if empty is not None:
+                return empty
+        table = Table(title="Runs", box=box.ASCII)
+        table.add_column("r", style="bold")
+        table.add_column("run_id")
+        table.add_column("model")
+        table.add_column("objective")
+        table.add_column("selection")
+        table.add_column("n_train")
+        table.add_column("n_scored")
+        for r in rows:
+            table.add_row(
+                str(r.get("as_of_round")),
+                _truncate(r.get("run_id", ""), 18),
+                str(r.get("model")),
+                str(r.get("objective")),
+                str(r.get("selection")),
+                str(r.get("stats_n_train")),
+                str(r.get("stats_n_scored")),
+            )
+        return table
     if not rows:
         return _dim("No runs found.")
     lines = []
@@ -416,6 +654,34 @@ def render_runs_list_human(rows: Sequence[Mapping[str, Any]]) -> str:
 def render_run_meta_human(row: Mapping[str, Any]) -> str:
     y_ops = row.get("training__y_ops") or []
     y_ops_str = ", ".join([p.get("name") for p in y_ops]) if y_ops else "(none)"
+    if tui_enabled():
+        from rich.console import Group
+
+        head = kv_table(
+            "Run",
+            {
+                "run_id": row.get("run_id"),
+                "as_of_round": row.get("as_of_round"),
+                "model": row.get("model__name"),
+                "objective": row.get("objective__name"),
+                "selection": row.get("selection__name"),
+                "y_ops": y_ops_str,
+                "n_train": row.get("stats__n_train"),
+                "n_scored": row.get("stats__n_scored"),
+            },
+        )
+        blocks = [head] if head is not None else []
+        obj_stats = row.get("objective__summary_stats") or {}
+        if obj_stats:
+            stats_block = kv_table("Objective summary", obj_stats)
+            if stats_block is not None:
+                blocks.append(stats_block)
+        artifacts = row.get("artifacts") or {}
+        if artifacts:
+            artifacts_block = kv_table("Artifacts", artifacts)
+            if artifacts_block is not None:
+                blocks.append(artifacts_block)
+        return Group(*blocks)
     head = kv_block(
         "Run",
         {
@@ -437,9 +703,10 @@ def render_run_meta_human(row: Mapping[str, Any]) -> str:
 
 
 def render_round_log_summary_human(summary: Mapping[str, Any]) -> str:
-    head = kv_block(
-        "Round log",
-        {
+    if tui_enabled():
+        from rich.console import Group
+
+        head_rows = {
             "round": summary.get("round_index"),
             "path": summary.get("path"),
             "events": summary.get("events"),
@@ -447,8 +714,34 @@ def render_round_log_summary_human(summary: Mapping[str, Any]) -> str:
             "predict_rows": summary.get("predict_rows"),
             "duration_total_s": summary.get("duration_sec_total"),
             "duration_fit_s": summary.get("duration_sec_fit"),
-        },
-    )
+        }
+        if (summary.get("run_count") or 0) > 1:
+            head_rows["runs_in_log"] = summary.get("run_count")
+            head_rows["events_total"] = summary.get("events_total")
+        head = kv_table(
+            "Round log",
+            head_rows,
+        )
+        stages = summary.get("stage_counts") or {}
+        stage_lines = [f"{k}: {v}" for k, v in sorted(stages.items())] if stages else []
+        stage_block = list_table("Stages", stage_lines)
+        blocks = [head] if head is not None else []
+        if stage_block is not None:
+            blocks.append(stage_block)
+        return Group(*blocks)
+    head_rows = {
+        "round": summary.get("round_index"),
+        "path": summary.get("path"),
+        "events": summary.get("events"),
+        "predict_batches": summary.get("predict_batches"),
+        "predict_rows": summary.get("predict_rows"),
+        "duration_total_s": summary.get("duration_sec_total"),
+        "duration_fit_s": summary.get("duration_sec_fit"),
+    }
+    if (summary.get("run_count") or 0) > 1:
+        head_rows["runs_in_log"] = summary.get("run_count")
+        head_rows["events_total"] = summary.get("events_total")
+    head = kv_block("Round log", head_rows)
     stages = summary.get("stage_counts") or {}
     stage_lines = [f"{k}: {v}" for k, v in sorted(stages.items())] if stages else []
     stages_block = bullet_list("Stages", stage_lines)

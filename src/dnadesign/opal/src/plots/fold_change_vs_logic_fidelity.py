@@ -11,18 +11,39 @@ from __future__ import annotations
 
 from typing import List
 
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-
-from ..registries.plot import register_plot
+from ..registries.plots import PlotMeta, register_plot
+from ..storage.parquet_io import read_parquet_df
 from ._events_util import load_events_with_setpoint, resolve_outputs_dir
-from ._mpl_utils import annotate_plot_meta, scale_to_sizes, scatter_smart
+from ._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir, scale_to_sizes, scatter_smart
 from ._param_utils import event_columns_for, get_float, get_str, normalize_metric_field
 
 
-@register_plot("fold_change_vs_logic_fidelity")
+@register_plot(
+    "fold_change_vs_logic_fidelity",
+    meta=PlotMeta(
+        summary="Logic fidelity vs fold-change/effect diagnostics (SFXI).",
+        params={
+            "y_axis": "fold_change|effect_raw|effect_scaled|score (default fold_change).",
+            "hue_field": "Optional obj__/pred__/sel__ or records.<col> for color.",
+            "size_by": "Optional obj__/pred__/sel__ field for size.",
+            "alpha": "Point alpha (default 0.40).",
+        },
+        requires=[
+            "as_of_round",
+            "run_id",
+            "pred__y_hat_model",
+            "pred__y_obj_scalar",
+            "obj__diag__setpoint",
+        ],
+        notes=["Reads ledger.predictions + ledger.runs (setpoint join)."],
+    ),
+)
 def render(context, params: dict) -> None:
+    ensure_mpl_config_dir(workdir=getattr(context.workspace, "workdir", None))
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+
     outputs_dir = resolve_outputs_dir(context)
 
     delta = get_float(params, ["intensity_log2_offset_delta"], 0.0)
@@ -91,14 +112,13 @@ def render(context, params: dict) -> None:
     if rasterize_at is not None:
         rasterize_at = int(rasterize_at)
 
-    # Ensure setpoint is available (backfill from run_meta if needed)
+    # Ensure setpoint is available (joined from run_meta inside load_events_with_setpoint).
     need = {
         "as_of_round",
         "run_id",
         "id",
         "pred__y_hat_model",
         "sel__is_selected",
-        "obj__diag__setpoint",
         "pred__y_obj_scalar",
     }
     # If hue/size ask for objective/pred/sel columns, load them from predictions
@@ -129,7 +149,7 @@ def render(context, params: dict) -> None:
                 "Categorical hue requested via 'records.<column>', but no 'records' path is available in the campaign."
             )
         # Only read what we need; restrict to ids present in df
-        rec = pd.read_parquet(rec_path, columns=["id", cat_hue_col])
+        rec = read_parquet_df(rec_path, columns=["id", cat_hue_col])
         rec = rec.rename(columns={cat_hue_col: "__cat_hue__"})
         df = df.merge(rec, on="id", how="left")
         cat_series = df["__cat_hue__"].fillna("(missing)").astype(str)

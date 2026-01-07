@@ -4,11 +4,10 @@
 src/dnadesign/opal/tests/test_exit_codes_lock.py
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-from dnadesign.opal.src.utils import ExitCodes
+from dnadesign.opal.src.core.utils import ExitCodes
 
 
 def test_exit_codes_has_contract_violation():

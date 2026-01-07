@@ -1,17 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/dataset.py
-
-Parquet-backed dataset with fail-fast schema checks, atomic writes, snapshots,
-and an append-only event log. Datasets have immutable essential columns and are
-extended by namespaced derived columns via `Dataset.attach(...)`.
-
-Key ideas:
-- One `records.parquet` per dataset directory (single source of truth)
-- Case-preserving sequences; `id = sha1(bio_type|sequence)` on trimmed text
-- Strict namespacing: derived columns must look like `<tool>__<field>`
-- Pragmatic safety: atomic writes + timestamped snapshots + event log
+src/dnadesign/usr/src/dataset.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -205,28 +195,77 @@ class Dataset:
         if "sequence" not in df_in.columns:
             raise SchemaError("Missing required column: 'sequence'.")
 
-        # Default columns
-        bio = (
-            df_in["bio_type"].astype(str)
-            if "bio_type" in df_in.columns
-            else pd.Series([default_bio_type] * len(df_in), dtype="string")
-        )
-        alph = (
-            df_in["alphabet"].astype(str)
-            if "alphabet" in df_in.columns
-            else pd.Series([default_alphabet] * len(df_in), dtype="string")
-        )
+        def _is_missing_scalar(x: object) -> bool:
+            if x is None:
+                return True
+            if isinstance(x, (list, tuple, dict, np.ndarray)):
+                return False
+            try:
+                res = pd.isna(x)
+            except Exception:
+                return False
+            if isinstance(res, (list, tuple, np.ndarray)):
+                return False
+            return bool(res)
+
+        seq_raw = df_in["sequence"].tolist()
+        bad_seq = [i for i, s in enumerate(seq_raw, start=1) if _is_missing_scalar(s) or str(s).strip() == ""]
+        if bad_seq:
+            sample = ", ".join(str(i) for i in bad_seq[:5])
+            raise SchemaError(
+                f"{len(bad_seq)} row(s) have missing/empty 'sequence' (rows: {sample}). "
+                "Provide a non-empty sequence string."
+            )
+
+        # Default columns (fail fast on missing/empty values if provided)
+        if "bio_type" in df_in.columns:
+            bio_raw = df_in["bio_type"].tolist()
+            bad_bt = [i for i, v in enumerate(bio_raw, start=1) if _is_missing_scalar(v) or str(v).strip() == ""]
+            if bad_bt:
+                sample = ", ".join(str(i) for i in bad_bt[:5])
+                raise SchemaError(
+                    f"{len(bad_bt)} row(s) have missing/empty 'bio_type' (rows: {sample}). "
+                    "Either provide values or omit the column to use the default."
+                )
+            bio_vals = [str(v).strip() for v in bio_raw]
+        else:
+            bio_vals = [default_bio_type] * len(df_in)
+
+        if "alphabet" in df_in.columns:
+            alph_raw = df_in["alphabet"].tolist()
+            bad_ab = [i for i, v in enumerate(alph_raw, start=1) if _is_missing_scalar(v) or str(v).strip() == ""]
+            if bad_ab:
+                sample = ", ".join(str(i) for i in bad_ab[:5])
+                raise SchemaError(
+                    f"{len(bad_ab)} row(s) have missing/empty 'alphabet' (rows: {sample}). "
+                    "Either provide values or omit the column to use the default."
+                )
+            alph_vals = [str(v).strip() for v in alph_raw]
+        else:
+            alph_vals = [default_alphabet] * len(df_in)
 
         # Compute normalized sequences + ids + lengths
         ids, seqs, lens = [], [], []
-        for s, bt, ab in zip(df_in["sequence"], bio, alph):
-            s_norm = normalize_sequence(str(s), str(bt), str(ab))
+        for i, (s, bt, ab) in enumerate(zip(seq_raw, bio_vals, alph_vals), start=1):
+            try:
+                s_norm = normalize_sequence(str(s), str(bt), str(ab))
+            except ValueError as e:
+                raise AlphabetError(f"Row {i}: {e}") from e
             seqs.append(s_norm)
             ids.append(compute_id(str(bt), s_norm))
             lens.append(len(s_norm))
 
         # Optional user-supplied ids must match
         if "id" in df_in.columns and strict_id_check:
+            bad_id = [
+                i for i, v in enumerate(df_in["id"].tolist(), start=1) if _is_missing_scalar(v) or str(v).strip() == ""
+            ]
+            if bad_id:
+                sample = ", ".join(str(i) for i in bad_id[:5])
+                raise SchemaError(
+                    f"{len(bad_id)} row(s) have missing/empty 'id' (rows: {sample}). "
+                    "Drop the column or provide valid ids."
+                )
             bad_idx = [
                 i for i, (given, want) in enumerate(zip(df_in["id"].astype(str), ids)) if str(given) != str(want)
             ]
@@ -254,9 +293,9 @@ class Dataset:
         out_df = pd.DataFrame(
             {
                 "id": ids,
-                "bio_type": bio.astype(str).tolist(),
+                "bio_type": bio_vals,
                 "sequence": seqs,
-                "alphabet": alph.astype(str).tolist(),
+                "alphabet": alph_vals,
                 "length": lens,
                 "source": src_vals,
                 "created_at": created,
@@ -284,7 +323,7 @@ class Dataset:
         # Treat sequences that are the same *ignoring case* as duplicates too
         # (helps catch accidental duplicates when case encodes no biology).
         # Key: (bio_type_lower, uppercase(sequence))
-        bio_list = bio.astype(str).tolist()
+        bio_list = [str(v) for v in bio_vals]
         casefold_map: Dict[tuple, List[int]] = defaultdict(list)
         for i, (bt, s) in enumerate(zip(bio_list, seqs), start=1):
             casefold_map[(bt.lower(), s.upper())].append(i)
@@ -331,27 +370,23 @@ class Dataset:
         if self.records_path.exists():
             existing = read_parquet(self.records_path)
             # -------- case-insensitive duplicate check vs existing on disk --------
-            try:
-                ex_bt = [str(x) for x in existing.column("bio_type").to_pylist()]
-                ex_sq = [str(x) for x in existing.column("sequence").to_pylist()]
-                existing_cf = {(bt.lower(), sq.upper()) for bt, sq in zip(ex_bt, ex_sq)}
-                conflicts = [
-                    i
-                    for i, (bt, s) in enumerate(zip(bio.astype(str).tolist(), seqs), start=1)
-                    if (bt.lower(), s.upper()) in existing_cf
+            ex_bt = [str(x) for x in existing.column("bio_type").to_pylist()]
+            ex_sq = [str(x) for x in existing.column("sequence").to_pylist()]
+            existing_cf = {(bt.lower(), sq.upper()) for bt, sq in zip(ex_bt, ex_sq)}
+            conflicts = [
+                i
+                for i, (bt, s) in enumerate(zip(bio_vals, seqs), start=1)
+                if (str(bt).lower(), s.upper()) in existing_cf
+            ]
+            if conflicts:
+                preview = [
+                    DuplicateGroup(id=ids[i - 1], count=1, rows=[i], sequence=seqs[i - 1]) for i in conflicts[:5]
                 ]
-                if conflicts:
-                    preview = [
-                        DuplicateGroup(id=ids[i - 1], count=1, rows=[i], sequence=seqs[i - 1]) for i in conflicts[:5]
-                    ]
-                    raise DuplicateIDError(
-                        "Case-insensitive duplicate sequences already exist in this dataset.",
-                        casefold_groups=preview,
-                        hint="Run 'usr dedupe-sequences <dataset>' or remove duplicates from the import file.",
-                    )
-            except Exception:
-                # Don’t mask unrelated errors; limit to pretty-preview failure only.
-                pass
+                raise DuplicateIDError(
+                    "Case-insensitive duplicate sequences already exist in this dataset.",
+                    casefold_groups=preview,
+                    hint="Run 'usr dedupe-sequences <dataset>' or remove duplicates from the import file.",
+                )
             existing_ids = set(existing.column("id").to_pylist())
             inter = existing_ids.intersection(set(out_df["id"].tolist()))
             if inter:
@@ -436,6 +471,8 @@ class Dataset:
         id_col: str = "id",
         columns: Optional[Iterable[str]] = None,
         allow_overwrite: bool = False,
+        allow_missing: bool = False,
+        parse_json: bool = True,
         note: str = "",
     ) -> int:
         """
@@ -445,8 +482,8 @@ class Dataset:
         - `namespace` must match `^[a-z][a-z0-9_]*$`
         - Essential columns are immutable
         - Overwriting existing columns requires `allow_overwrite=True`
-        - Values align by `id`; unknown ids are ignored; missing values become NULL
-        - Strings that look like JSON arrays are parsed (generic vector support)
+        - Values align by `id`; missing/ambiguous ids raise unless `allow_missing=True`
+        - Strings that look like JSON arrays/objects are parsed when `parse_json=True`
 
         Supported input formats: .parquet, .csv, .jsonl
         """
@@ -468,40 +505,63 @@ class Dataset:
         if id_col not in inc.columns:
             raise SchemaError(f"Missing id column '{id_col}' in incoming data.")
 
+        rows_incoming = int(len(inc))
+        row_nums = list(range(1, rows_incoming + 1))
+
         # Choose + prefix targets
         attach_cols = [c for c in inc.columns if c != id_col] if columns is None else list(columns)
         if not attach_cols:
             return 0
 
-        # Parse JSON arrays/objects if given as strings (robust to whitespace and single quotes)
-        def _maybe_parse_json_str(x):
-            if not isinstance(x, str):
-                return x
-            s = x.strip()
+        work = inc[[id_col] + attach_cols].copy()
+
+        def _normalize_optional_str(x: object) -> Optional[str]:
+            if x is None:
+                return None
+            s = str(x).strip()
             if not s:
-                return x
-            # Fast path: JSON array/object
+                return None
+            if s.lower() in {"nan", "none"}:
+                return None
+            return s
+
+        def _parse_jsonish(v: object, col: str, row_idx: int) -> object:
+            if not parse_json:
+                return v
+            if not isinstance(v, str):
+                return v
+            s = v.strip()
+            if not s:
+                return v
             if s.startswith("[") or s.startswith("{"):
                 try:
                     return json.loads(s)
                 except Exception:
-                    # try a very small fix for single-quoted CSV-y lists
+                    # try a small fix for single-quoted CSV-y lists
                     if s.startswith("[") and ("'" in s) and ('"' not in s):
                         try:
                             return json.loads(s.replace("'", '"'))
                         except Exception:
-                            return x
-                    return x
-            return x
+                            pass
+                    raise SchemaError(
+                        f"Column '{col}' row {row_idx}: invalid JSON-like value. "
+                        "Provide valid JSON or pass --no-parse-json."
+                    )
+            return v
 
-        work = inc[[id_col] + attach_cols].copy()
-        for c in attach_cols:
-            work[c] = work[c].map(_maybe_parse_json_str)
+        if parse_json:
+            for col in attach_cols:
+                vals = work[col].tolist()
+                parsed = [_parse_jsonish(v, col, i) for i, v in enumerate(vals, start=1)]
+                work[col] = parsed
 
         def target_name(c: str) -> str:
             return c if c.startswith(namespace + "__") else f"{namespace}__{c}"
 
         targets = [target_name(c) for c in attach_cols]
+
+        rows_missing = 0
+        rows_ambiguous = 0
 
         # --- Map sequence → id if requested ---
         existing_tbl = read_parquet(self.records_path, columns=["id", "sequence", "bio_type"])
@@ -516,28 +576,61 @@ class Dataset:
                 pair_to_id[(bt, seq)] = rid
                 seq_to_ids.setdefault(seq, []).append(rid)
 
-            incoming_seq = work[id_col].astype(str).map(lambda s: s.strip()).tolist()
+            incoming_seq = [_normalize_optional_str(s) for s in work[id_col].tolist()]
             incoming_type = (
-                inc["bio_type"].astype(str).tolist() if "bio_type" in inc.columns else [None] * len(incoming_seq)
+                [_normalize_optional_str(bt) for bt in inc["bio_type"].tolist()]
+                if "bio_type" in inc.columns
+                else [None] * len(incoming_seq)
             )
             resolved: List[Optional[str]] = []
-            for bt, seq in zip(incoming_type, incoming_seq):
-                rid: Optional[str] = None
-                if bt is not None and (bt, seq) in pair_to_id:
-                    rid = pair_to_id[(bt, seq)]
-                else:
-                    ids = seq_to_ids.get(seq, [])
-                    if len(ids) == 1:
-                        rid = ids[0]
+            missing_rows: List[int] = []
+            ambiguous_rows: List[int] = []
+            for idx, (bt, seq) in enumerate(zip(incoming_type, incoming_seq), start=1):
+                if seq is None:
+                    missing_rows.append(idx)
+                    resolved.append(None)
+                    continue
+                if bt is not None:
+                    rid = pair_to_id.get((bt, seq))
+                    if rid is None:
+                        missing_rows.append(idx)
+                        resolved.append(None)
                     else:
-                        # ambiguous or missing → leave None (row will be dropped)
-                        rid = None
-                resolved.append(rid)
+                        resolved.append(rid)
+                    continue
+                ids = seq_to_ids.get(seq, [])
+                if len(ids) == 1:
+                    resolved.append(ids[0])
+                elif len(ids) == 0:
+                    missing_rows.append(idx)
+                    resolved.append(None)
+                else:
+                    ambiguous_rows.append(idx)
+                    resolved.append(None)
+
+            if ambiguous_rows:
+                sample = ", ".join(str(i) for i in ambiguous_rows[:5])
+                raise SchemaError(
+                    f"Ambiguous sequence→id mapping for {len(ambiguous_rows)} row(s) (rows: {sample}). "
+                    f"Run 'usr dedupe-sequences {self.name}' or supply a bio_type column."
+                )
+            if missing_rows and not allow_missing:
+                sample = ", ".join(str(i) for i in missing_rows[:5])
+                raise SchemaError(
+                    f"{len(missing_rows)} row(s) could not be matched by sequence (rows: {sample}). "
+                    "Provide a valid bio_type or pass --allow-missing to skip unmatched rows."
+                )
+
+            rows_missing = len(missing_rows)
+            rows_ambiguous = len(ambiguous_rows)
+            if missing_rows:
+                keep_mask = [rid is not None for rid in resolved]
+                row_nums = [rn for rn, keep in zip(row_nums, keep_mask) if keep]
+                work = work[keep_mask].reset_index(drop=True)
+                resolved = [rid for rid in resolved if rid is not None]
 
             work.insert(0, "id", resolved)
             work = work.drop(columns=[id_col])  # remove 'sequence' identifier column
-            # Drop rows that couldn't be matched to an existing id
-            work = work[work["id"].notna()].reset_index(drop=True)
             # Rename incoming columns to namespaced targets (mirror the --id-col 'id' path)
             work.columns = ["id"] + targets
         else:
@@ -562,6 +655,40 @@ class Dataset:
         id_existing = existing_tbl.column("id").to_pylist()
         nrows = len(id_existing)
         pos = {rid: i for i, rid in enumerate(id_existing)}
+
+        id_series_raw = [str(r) for r in work["id"].tolist()]
+        missing_mask = [rid not in pos for rid in id_series_raw]
+        missing_ids = [rid for rid, missing in zip(id_series_raw, missing_mask) if missing]
+        if missing_ids:
+            if not allow_missing:
+                sample = ", ".join(missing_ids[:5])
+                raise SchemaError(
+                    f"{len(missing_ids)} row(s) reference ids not present in the dataset (sample: {sample}). "
+                    "Fix the input file or pass --allow-missing to skip unmatched rows."
+                )
+            rows_missing += len(missing_ids)
+            keep_mask = [not m for m in missing_mask]
+            row_nums = [rn for rn, keep in zip(row_nums, keep_mask) if keep]
+            work = work[keep_mask].reset_index(drop=True)
+            id_series = [rid for rid, missing in zip(id_series_raw, missing_mask) if not missing]
+        else:
+            id_series = id_series_raw
+
+        # Reject duplicate ids in attachment input (avoid silent last-write wins)
+        dup_map: Dict[str, List[int]] = defaultdict(list)
+        for rid, row_num in zip(id_series, row_nums):
+            dup_map[str(rid)].append(row_num)
+        dup = {rid: rows for rid, rows in dup_map.items() if len(rows) > 1}
+        if dup:
+            preview = []
+            for rid, rows in list(dup.items())[:3]:
+                rows_str = ",".join(str(r) for r in rows[:5])
+                preview.append(f"{rid} (rows {rows_str})")
+            sample = "; ".join(preview)
+            raise SchemaError(
+                f"Duplicate ids in attachment input: {len(dup)} id(s) repeated. Sample: {sample}. "
+                "Ensure each id appears once per attachment file."
+            )
 
         # ---------- robust null/typing helpers ----------
 
@@ -610,7 +737,6 @@ class Dataset:
             return pa.array(cleaned)
 
         # id->value map per target (latest wins)
-        id_series = [str(r) for r in work["id"].tolist()]
         maps: Dict[str, Dict[str, object]] = {}
         for col in targets:
             colvals = work[col].tolist()
@@ -645,7 +771,7 @@ class Dataset:
         # Atomic write
         write_parquet_atomic(new_tbl, self.records_path, self.snapshot_dir)
 
-        n_attached = int(work.shape[0])
+        rows_matched = int(work.shape[0])
         append_event(
             self.events_path,
             {
@@ -655,11 +781,15 @@ class Dataset:
                 "namespace": namespace,
                 "columns": targets,
                 "allow_overwrite": allow_overwrite,
-                "rows_seen": n_attached,
+                "rows_incoming": rows_incoming,
+                "rows_matched": rows_matched,
+                "rows_missing": rows_missing,
+                "rows_ambiguous": rows_ambiguous,
+                "rows_seen": rows_matched,  # legacy alias
                 "note": note,
             },
         )
-        return n_attached
+        return rows_matched
 
     # Friendly alias for didactic API name in README/examples
     def attach_columns(
@@ -670,6 +800,8 @@ class Dataset:
         id_col: str = "id",
         columns: Optional[Iterable[str]] = None,
         allow_overwrite: bool = False,
+        allow_missing: bool = False,
+        parse_json: bool = True,
         note: str = "",
     ) -> int:
         return self.attach(
@@ -678,6 +810,8 @@ class Dataset:
             id_col=id_col,
             columns=columns,
             allow_overwrite=allow_overwrite,
+            allow_missing=allow_missing,
+            parse_json=parse_json,
             note=note,
         )
 

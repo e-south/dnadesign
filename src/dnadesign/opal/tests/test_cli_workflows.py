@@ -3,14 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/tests/test_cli_workflows.py
 
-CLI integration tests for core workflows:
-  - init / validate / explain
-  - label-hist validate/repair
-  - ctx show/audit/diff
-  - ingest-y
-
-Module Author(s): Eric J. South (extended by Codex)
-Dunlop Lab
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -102,12 +95,18 @@ def test_ctx_show_audit_diff(tmp_path: Path) -> None:
     (round0 / "round_ctx.json").write_text(json.dumps(ctx0))
     (round1 / "round_ctx.json").write_text(json.dumps(ctx1))
 
-    res = runner.invoke(app, ["--no-color", "ctx", "show", "-c", str(campaign), "--round", "0", "--json"])
+    res = runner.invoke(
+        app,
+        ["--no-color", "ctx", "show", "-c", str(campaign), "--round", "0", "--json"],
+    )
     assert res.exit_code == 0, res.stdout
     out = json.loads(res.stdout)
     assert out["core/run_id"] == "r0"
 
-    res = runner.invoke(app, ["--no-color", "ctx", "audit", "-c", str(campaign), "--round", "0", "--json"])
+    res = runner.invoke(
+        app,
+        ["--no-color", "ctx", "audit", "-c", str(campaign), "--round", "0", "--json"],
+    )
     assert res.exit_code == 0, res.stdout
     audit = json.loads(res.stdout)
     assert "model" in audit
@@ -115,7 +114,18 @@ def test_ctx_show_audit_diff(tmp_path: Path) -> None:
 
     res = runner.invoke(
         app,
-        ["--no-color", "ctx", "diff", "-c", str(campaign), "--round-a", "0", "--round-b", "1", "--json"],
+        [
+            "--no-color",
+            "ctx",
+            "diff",
+            "-c",
+            str(campaign),
+            "--round-a",
+            "0",
+            "--round-b",
+            "1",
+            "--json",
+        ],
     )
     assert res.exit_code == 0, res.stdout
     diff = json.loads(res.stdout)
@@ -139,13 +149,109 @@ def test_ingest_y_cli(tmp_path: Path) -> None:
             "y10_star": [0.1, 0.2],
             "y01_star": [0.1, 0.2],
             "y11_star": [0.1, 0.2],
+            "intensity_log2_offset_delta": [0.0, 0.0],
         }
     )
     df.to_csv(csv_path, index=False)
 
     res = runner.invoke(
         app,
-        ["--no-color", "ingest-y", "-c", str(campaign), "--round", "0", "--csv", str(csv_path), "--yes"],
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(csv_path),
+            "--yes",
+        ],
     )
     assert res.exit_code == 0, res.stdout
     assert (workdir / "outputs" / "ledger.labels.parquet").exists()
+
+
+def test_ingest_y_rejects_unsupported_extension(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    bad_path = workdir / "labels.txt"
+    df = pd.DataFrame(
+        {
+            "sequence": ["AAA"],
+            "v00": [0.0],
+            "v10": [0.0],
+            "v01": [0.0],
+            "v11": [1.0],
+            "y00_star": [0.1],
+            "y10_star": [0.1],
+            "y01_star": [0.1],
+            "y11_star": [0.1],
+            "intensity_log2_offset_delta": [0.0],
+        }
+    )
+    df.to_csv(bad_path, index=False)
+
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(bad_path),
+            "--yes",
+        ],
+    )
+    assert res.exit_code != 0, res.stdout
+    assert "must be a CSV or Parquet file" in res.output
+
+
+def test_ingest_y_rejects_params_non_json(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    csv_path = workdir / "labels.csv"
+    df = pd.DataFrame(
+        {
+            "sequence": ["AAA"],
+            "v00": [0.0],
+            "v10": [0.0],
+            "v01": [0.0],
+            "v11": [1.0],
+            "y00_star": [0.1],
+            "y10_star": [0.1],
+            "y01_star": [0.1],
+            "y11_star": [0.1],
+            "intensity_log2_offset_delta": [0.0],
+        }
+    )
+    df.to_csv(csv_path, index=False)
+
+    bad_params = workdir / "params.txt"
+    bad_params.write_text("{}")
+
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(csv_path),
+            "--params",
+            str(bad_params),
+            "--yes",
+        ],
+    )
+    assert res.exit_code != 0, res.stdout
+    assert "must be a JSON file" in res.output

@@ -4,13 +4,11 @@
 
 `dnadesign` is a collection of modular bioinformatic pipelines and helper packages related to biological sequence design.
 
-- [Directory layout](#directory-layout)
-- [Tools](#tools)
-- [Installation](#installation)
-  - [Local install](#local-install)
-  - [Running dnadesign CLIs](#running-dnadesign-clis)
-  - [Running notebooks](#running-notebooks)
-- [Maintaining dependencies](#maintaining-dependencies)
+### Contents
+
+1. [Directory layout](#directory-layout)
+2. [Documentation](#documentation)
+3. [Available tools](#available-tools)
 
 ---
 
@@ -32,7 +30,17 @@ dnadesign/
 
 ---
 
-### Tools
+### Documentation
+
+1. [Installation](docs/installation.md)
+2. [Quickstart marimo notebooks](docs/notebooks.md)
+3. [Maintaining dependencies](docs/dependencies.md)
+4. [CUDA/GPU install notes (BU SCC)](docs/INSTALL_BU_SCC.md)
+5. [Marimo reference](docs/marimo_reference.md)
+
+---
+
+### Available tools
 
 1. [**usr**](src/dnadesign/usr) (Universal Sequence Record)
 
@@ -88,186 +96,6 @@ dnadesign/
 14. [**archived**](src/dnadesign/archived)
 
       Contains a mix of old legacy projects and prototypes.
-
----
-
-### Installation
-
-This repo is managed with [**uv**](https://docs.astral.sh/uv/):
-
-- `pyproject.toml` declares dependencies (runtime + optional extras).
-- `uv.lock` is the fully pinned dependency graph.
-- `.venv/` is the project virtual environment (created automatically by uv).
-
-**Two key commands:**
-
-- `uv sync` installs everything from the lockfile into `.venv` (and creates `.venv` if it doesn’t exist).
-- `uv run <cmd>` runs commands inside the project environment without requiring `source .venv/bin/activate`.
-
-#### Install uv
-
-macOS/Linux (for other OSs see [here](https://docs.astral.sh/uv/getting-started/installation/)):
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-# ensure your uv bin dir is on PATH
-```
-
-#### Clone repo
-```bash
-git clone https://github.com/e-south/dnadesign.git
-cd dnadesign
-```
-
-#### Local install
-
-This is the default way to start working with most pipelines. Read [**here**](./docs/INSTALL_BU_SCC.md) for added details on building an environment with CUDA/GPU support.
-
-1. Ensure Python 3.12 is available:
-
-      ```bash
-      uv python install 3.12
-      ```
-
-2. Create/sync the environment from the committed lockfile:
-
-      ```bash
-      uv sync --locked
-      ```
-
-3. Sanity checks:
-
-      ```bash
-      uv run python -c "import dnadesign, pandas, pyarrow; print('ok')"
-      uv run usr ls || true
-      ```
-
-#### Dev tools (tests + lint)
-
-Dev tooling is opt-in via a dependency group.
-
-```bash
-uv sync --locked --group dev
-uv run ruff --version
-uv run pytest -q
-```
-
----
-
-#### Running `dnadesign` CLIs
-
-**This repo defines console scripts which can be run via:**
-
-Option A: no `.venv` activation — use `uv run`
-
-```bash
-uv run usr --help
-uv run usr ls
-
-uv run opal --help
-uv run dense --help
-uv run infer --help
-uv run cluster --help
-uv run permuter --help
-uv run baserender --help
-```
-
-Option B: traditional — activate `.venv`
-
-```bash
-source .venv/bin/activate
-usr --help
-usr ls
-deactivate
-```
-
----
-
-#### Running notebooks
-
-There are two ways to use marimo in `dnadesign`:
-
-##### 1. Install marimo into the project
-
-```bash
-uv sync --locked --group notebooks
-uv run marimo edit notebooks/foo.py
-```
-
-This runs marimo inside your project environment, so it can import `dnadesign` and anything in `uv.lock`.
-
-##### 2. Sandboxed / self-contained marimo notebooks (inline dependencies)
-
-Marimo can manage per-notebook sandbox environments using inline metadata. This is great for sharable notebooks.
-
-1. Create/edit a sandbox notebook (marimo installed temporarily via uvx).
-
-      ```bash
-      uvx marimo edit --sandbox notebooks/sandbox_example.py
-      ```
-
-2. Run a sandbox notebook as a script.
-
-      ```bash
-      uv run notebooks/sandbox_example.py
-      ```
-
-3. Make the sandbox notebook use your local `dnadesign` repo in editable mode.
-
-      From the repo root:
-
-      ```bash
-      uv add --script notebooks/sandbox_example.py . --editable
-      ```
-
-      This writes inline metadata into the notebook so its sandbox can install dnadesign from your local checkout in editable mode.
-
-4. Add/remove sandbox dependencies (only affects the notebook file)
-
-      ```bash
-      uv add    --script notebooks/sandbox_example.py numpy
-      uv remove --script notebooks/sandbox_example.py numpy
-      ```
-
-> **Note:** You can also run claude code/codex in the terminal and ask it to edit a marimo notebook on your behalf. Make sure that you run your notebook with the [watch](https://docs.marimo.io/api/watch/) flag turned on, like `marimo edit --watch notebook.py`, to see updates appear live whenever agents makes a change.
-
----
-
-#### Maintaining dependencies
-
-If you want to change dependencies, prefer `uv add` / `uv remove`:
-
-- Add a runtime dependency:
-
-  ```bash
-  uv add <package>
-  ```
-
-- Add to a dependency group (examples):
-
-  ```bash
-  uv add --group dev <package>
-  uv add --group notebooks marimo
-  ```
-
-- Remove:
-
-  ```bash
-  uv remove <package>
-  ```
-
-Then commit `pyproject.toml` + `uv.lock`.
-
-If you edit `pyproject.toml` by hand, regenerate `uv.lock`:
-
-```bash
-uv lock
-```
-
-New users should then run:
-
-```bash
-uv sync --locked
-```
 
 ---
 

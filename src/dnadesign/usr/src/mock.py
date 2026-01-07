@@ -1,24 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/usr/src/mock.py
-
-Mock dataset helpers for USR.
-
-Two entry points:
-- make-mock: create records.parquet with essential columns and demo vectors
-- add-demo-cols: add/overwrite demo vector/label columns on an existing dataset
-
-Demo columns (namespaced):
-- <ns>__x_representation : list<float32>[x_dim] per row (default 512)
-- <ns>__label_vec8       : list<float32>[y_dim] per row (default 8)
-
-Usage (CLI):
-  usr make-mock <dataset> [--n 100] [--length 60] [--x-dim 512] [--y-dim 8]
-                     [--seed 7] [--namespace demo]
-                     [--from-csv template_demo/template_sequences.csv]
-  usr add-demo-cols <dataset> [--x-dim 512] [--y-dim 8] [--seed 7]
-                        [--namespace demo] [--allow-overwrite]
+src/dnadesign/usr/src/mock.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -72,7 +55,7 @@ def make_mock_table(spec: MockSpec) -> pa.Table:
 
     # ----- Essential columns -----
     if spec.csv_path is not None:
-        # Harmonize with template_demo: use exact sequences from CSV
+        # Harmonize with demo_material: use exact sequences from CSV
         seqs_raw = _load_sequences_from_csv(Path(spec.csv_path))
         # If user passed --n, honor it by truncating; otherwise use all
         n_rows = spec.n if spec.n and spec.n <= len(seqs_raw) else len(seqs_raw)
