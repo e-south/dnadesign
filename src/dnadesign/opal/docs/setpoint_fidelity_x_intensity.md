@@ -1,6 +1,6 @@
 ## setpoint_fidelity_x_intensity `sfxi`
 
-> **Scope.** This document describes the end‑to‑end selection scalar used by OPAL’s demo pipeline (logic fidelity × intensity). It spans ingest, Y‑ops, modeling, objective, and events.
+> **Scope.** This document describes the end‑to‑end selection scalar used by OPAL’s demo pipeline (logic fidelity × intensity). It spans ingest, Y‑ops, modeling, objective, and selection events.
 
 **Objective intent:** Combine a model’s predicted **logic pattern** and **absolute fluorescent intensity** into a single score that rewards sequence designs that are both **right** (match the target setpoint) and **bright** (intense in the target conditions).
 

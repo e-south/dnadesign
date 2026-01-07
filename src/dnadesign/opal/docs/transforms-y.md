@@ -1,4 +1,4 @@
-# OPAL Y Transforms
+## OPAL Y Transforms
 
 Transforms convert raw measurement tables into the
 campaign’s canonical **Y** label **per design**.

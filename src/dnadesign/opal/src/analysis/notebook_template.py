@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/analysis/notebook_template.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

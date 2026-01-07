@@ -19,22 +19,17 @@ The pipeline is plugin-driven: swap **data transforms** (X/Y), **models**, **obj
 
 * [Quick start](#quick-start)
 * [How OPAL is wired](#how-opal-is-wired)
-
   * [Code layout](#code-layout)
-  * [CLI overview](#cli-overview)
 * [Campaign layout](#campaign-layout)
 * [Configuration (`campaign.yaml`)](#configuration)
-
   * [Key blocks](#key-blocks)
   * [Defaults](#defaults)
   * [Minimal example](#minimal-example)
   * [Notes on precedence & wiring](#notes-on-precedence--wiring)
 * [Architecture & data flow](#architecture--data-flow)
-
   * [RoundCtx (runtime carrier)](#roundctx-runtime-carrier)
 * [Safety & validation](#safety--validation)
 * [Data contracts](#data-contracts)
-
   * [Records schema](#records-schema)
   * [Ledger output schema](#ledger-output-schema-append-only)
 * [More documentation](#more-documentation)
@@ -147,33 +142,6 @@ src/dnadesign/opal/src/
 └─ …
 ```
 
-### CLI overview
-
-Common commands (details in the **[CLI Manual](./docs/cli.md)**):
-
-* `opal init` — scaffold & register the campaign workspace; write `state.json` and ensure cache columns exist
-* `opal ingest-y` — transform and append labels to `records.parquet`
-* `opal run` — train/score/select for a round; write artifacts + ledger sinks under `outputs/`
-* `opal predict` — score a table from a frozen model (no write-backs)
-* `opal record-show` — per-record history view
-* `opal status` — dashboard summary from `state.json`
-* `opal explain` — dry-run planner (no writes)
-* `opal validate` — table checks (essentials + X present; Y sane if present)
-* `opal plot` — run campaign-declared plots
-* `opal ctx` — inspect `round_ctx.json` carriers (show/audit/diff)
-* `opal runs` — list or show ledger run_meta entries
-* `opal log` — summarize `round.log.jsonl` for a round
-* `opal prune-source` — remove OPAL-derived columns from records.parquet (start fresh)
-
-All commands are **registry-driven** and plugin-agnostic: they operate on your configured
-plugin names and enforce only declared contracts (transforms/models/objectives/selection).
-
-Human CLI output uses Rich tables and progress bars when stdout/stderr are TTYs.
-Disable styling with `--no-color` or disable the TUI with `OPAL_CLI_TUI=0`.
-On macOS, OPAL suppresses noisy PyArrow `sysctlbyname` warnings by default
-when stderr is a TTY. Set `OPAL_SUPPRESS_PYARROW_SYSCTL=1` to force suppression
-in non-TTY contexts (e.g., CI logs), or `OPAL_SUPPRESS_PYARROW_SYSCTL=0` to show them.
-
 ---
 
 ### Campaign layout
@@ -184,9 +152,9 @@ in non-TTY contexts (e.g., CI logs), or `OPAL_SUPPRESS_PYARROW_SYSCTL=0` to show
 ```
 <repo>/src/dnadesign/opal/campaigns/<my_campaign>/
 ├─ campaign.yaml
-├─ plots.yaml                  # optional plot config (recommended)
+├─ plots.yaml                    # optional plot config (recommended)
 ├─ .opal/
-│  └─ config                    # auto-discovery marker (path to campaign.yaml)
+│  └─ config                     # auto-discovery marker (path to campaign.yaml)
 ├─ state.json
 ├─ inputs/                       # drop experimental label files here
 └─ outputs/
@@ -203,13 +171,7 @@ in non-TTY contexts (e.g., CI logs), or `OPAL_SUPPRESS_PYARROW_SYSCTL=0` to show
       └─ round.log.jsonl
 ```
 
-> **Note:** sequences may live in USR datasets under
-> `src/dnadesign/usr/datasets/<dataset>/records.parquet` and are not copied into campaigns.
-
-> **Note:** `.opal/` is created by `opal init` to help CLI auto-discover the config.
-> It is safe to delete and will be regenerated.
-
-> **Note:** `state.json` is a run artifact; do not hand‑edit it.
+> **Note:** sequences may live in USR datasets under `src/dnadesign/usr/datasets/<dataset>/records.parquet` and are not copied into campaigns.
 
 ---
 
@@ -464,11 +426,10 @@ Centralized OPAL docs live in `docs/`:
 * [X transforms](./docs/transforms-x.md)
 * [Y transforms](./docs/transforms-y.md)
 * [Setpoint fidelity x intensity](./docs/setpoint_fidelity_x_intensity.md)
-* [sponging_percent_of_positive (spop)](./docs/spop.md)
 
 ## Demo campaign
 
-See the **[Demo Guide](./DEMO.md)** for a runnable example using `sfxi_v1` (vec8) with a Random Forest model.
+See the **[Demo Guide](./docs/DEMO.md)** for a runnable example using `sfxi_v1` (vec8) with a Random Forest model.
 
 ---
 

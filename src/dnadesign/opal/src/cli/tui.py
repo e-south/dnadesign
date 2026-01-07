@@ -3,15 +3,10 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/tui.py
 
-Module Author(s): Eric J. South
---------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/opal/src/cli/tui.py
-
 Rich-based TUI helpers for CLI output and progress bars.
 Kept optional and gated by OPAL_CLI_RICH, OPAL_CLI_TUI, and TTY checks.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -130,7 +130,12 @@ REQUIRED: dict[str, set[str]] = {
 
 
 def _allow_extra_columns() -> bool:
-    return str(os.getenv("OPAL_LEDGER_ALLOW_EXTRA", "")).strip().lower() in ("1", "true", "yes", "on")
+    return str(os.getenv("OPAL_LEDGER_ALLOW_EXTRA", "")).strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
 
 
 def _validate_columns(df: pd.DataFrame, kind: str) -> None:

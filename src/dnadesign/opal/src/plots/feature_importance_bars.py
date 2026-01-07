@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/plots/feature_importance_bars.py
 
-Module Author(s): You / Dunlop Lab
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/storage/label_history.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -209,7 +209,10 @@ class LabelHistory:
                 changed_rows += 1
             out.at[idx, lh] = cleaned
 
-        report = {"rows_changed": int(changed_rows), "entries_dropped": int(dropped_total)}
+        report = {
+            "rows_changed": int(changed_rows),
+            "entries_dropped": int(dropped_total),
+        }
         return out, report
 
     # --------------- append + training labels ---------------

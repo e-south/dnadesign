@@ -9,11 +9,17 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ..core.stderr_filter import maybe_install_pyarrow_sysctl_filter
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
 from ._mpl_utils import annotate_plot_meta
+
+if TYPE_CHECKING:
+    import numpy as np
+    from pyarrow.dataset import Dataset
 
 
 def _import_pyarrow():
@@ -92,8 +98,8 @@ def render(context, params: dict) -> None:
             ExitCodes.BAD_ARGS,
         )
 
-    # Helper: filter by rounds (on 'observed_round')
-    def _round_filter(dset: ds.Dataset):
+    # Helper: filter by rounds (on 'observed_round')3
+    def _round_filter(dset: Dataset):
         sel = context.rounds
         if sel in (None, "all"):
             return None

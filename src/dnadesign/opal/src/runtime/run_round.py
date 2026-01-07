@@ -834,7 +834,10 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
             "selection_top_k.csv": (sel_sha, str(apaths.selection_csv.resolve())),
             "round_ctx.json": (ctx_sha, str(apaths.round_ctx_json.resolve())),
             "objective_meta.json": (obj_sha, str(apaths.objective_meta_json.resolve())),
-            "model_meta.json": (model_meta_sha, str((rdir / "model_meta.json").resolve())),
+            "model_meta.json": (
+                model_meta_sha,
+                str((rdir / "model_meta.json").resolve()),
+            ),
         }
     )
     artifacts_paths_and_hashes["labels_used.parquet"] = (

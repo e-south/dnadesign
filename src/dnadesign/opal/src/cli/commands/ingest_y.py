@@ -25,7 +25,11 @@ from ...storage.ledger import LedgerWriter
 from ...storage.locks import CampaignLock
 from ...storage.workspace import CampaignWorkspace
 from ...storage.writebacks import build_label_events
-from ..formatting import bullet_list, render_ingest_commit_human, render_ingest_preview_human
+from ..formatting import (
+    bullet_list,
+    render_ingest_commit_human,
+    render_ingest_preview_human,
+)
 from ..registry import cli_command
 from ._common import (
     internal_error,

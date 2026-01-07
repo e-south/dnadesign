@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/core/rounds.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -59,9 +59,15 @@ def resolve_round_index(
     try:
         val = int(sel)
     except Exception as exc:
-        raise OpalError(f"Invalid {param_label}: must be an integer or 'latest'.", ExitCodes.BAD_ARGS) from exc
+        raise OpalError(
+            f"Invalid {param_label}: must be an integer or 'latest'.",
+            ExitCodes.BAD_ARGS,
+        ) from exc
     if val not in {int(r) for r in rounds}:
-        raise OpalError(f"{param_label} {val} not found. Available rounds: {sorted(set(rounds))}", ExitCodes.BAD_ARGS)
+        raise OpalError(
+            f"{param_label} {val} not found. Available rounds: {sorted(set(rounds))}",
+            ExitCodes.BAD_ARGS,
+        )
     return int(val)
 
 

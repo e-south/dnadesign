@@ -19,7 +19,14 @@ from ...core.rounds import resolve_round_index_from_state
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...storage.workspace import CampaignWorkspace
 from ..registry import cli_group
-from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path
+from ._common import (
+    internal_error,
+    json_out,
+    load_cli_config,
+    opal_error,
+    print_config_context,
+    resolve_config_path,
+)
 
 ctx_app = typer.Typer(no_args_is_help=True, help="Inspect runtime carriers (round_ctx.json).")
 

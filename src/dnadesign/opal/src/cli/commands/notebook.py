@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/notebook.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -16,7 +16,12 @@ from typing import Optional
 
 import typer
 
-from ...analysis.facade import CampaignAnalysis, ensure_labels_path, ensure_predictions_dir, ensure_runs_path
+from ...analysis.facade import (
+    CampaignAnalysis,
+    ensure_labels_path,
+    ensure_predictions_dir,
+    ensure_runs_path,
+)
 from ...analysis.notebook_template import render_campaign_notebook
 from ...core.rounds import resolve_round_index_from_runs
 from ...core.utils import ExitCodes, OpalError, print_stdout
@@ -30,7 +35,11 @@ cli_group("notebook", help="Notebook workflows (marimo).")(notebook_app)
 @notebook_app.command("generate", help="Generate a campaign-tied marimo notebook.")
 def cmd_notebook_generate(
     config: Optional[Path] = typer.Option(
-        None, "--config", "-c", help="campaign.yaml or campaign directory", envvar="OPAL_CONFIG"
+        None,
+        "--config",
+        "-c",
+        help="campaign.yaml or campaign directory",
+        envvar="OPAL_CONFIG",
     ),
     round: Optional[str] = typer.Option(
         "latest",
@@ -98,7 +107,11 @@ def cmd_notebook_generate(
 @notebook_app.command("run", help="Launch a marimo notebook (if installed).")
 def cmd_notebook_run(
     config: Optional[Path] = typer.Option(
-        None, "--config", "-c", help="campaign.yaml or campaign directory", envvar="OPAL_CONFIG"
+        None,
+        "--config",
+        "-c",
+        help="campaign.yaml or campaign directory",
+        envvar="OPAL_CONFIG",
     ),
     path: Optional[Path] = typer.Option(None, "--path", help="Notebook path (defaults to generated path)."),
 ) -> None:

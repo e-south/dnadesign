@@ -24,7 +24,10 @@ class CampaignWorkspace:
 
     @classmethod
     def from_config(cls, cfg: RootConfig, config_path: Path) -> "CampaignWorkspace":
-        return cls(config_path=Path(config_path).resolve(), workdir=Path(cfg.campaign.workdir).resolve())
+        return cls(
+            config_path=Path(config_path).resolve(),
+            workdir=Path(cfg.campaign.workdir).resolve(),
+        )
 
     @property
     def outputs_dir(self) -> Path:

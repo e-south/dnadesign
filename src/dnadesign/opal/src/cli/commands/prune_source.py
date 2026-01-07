@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/prune_source.py
 
-Module Author(s): Eric J. South (drafted per user request)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

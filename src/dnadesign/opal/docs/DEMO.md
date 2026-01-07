@@ -1,11 +1,8 @@
 ## OPAL Demo Campaign -- SFXI (setpoint x intensity)
 
-This demo walks a **complete OPAL loop** on a small dataset with the modern, strict
-SFXI ingest + plotting stack. It is designed to be copy/pasteable, deterministic,
-and easy to extend.
+This demo walks a **complete OPAL loop** on a small dataset with the SFXI ingest + plotting stack.
 
 **What you'll learn (and see):**
-- strict label ingestion with delta checks
 - a full `run` (train -> score -> select)
 - ledger-backed inspection (`status`, `runs`, `log`)
 - plots (quick + configured)
@@ -51,7 +48,6 @@ MPLCONFIGDIR=$PWD/.tmp/mpl OPAL_SUPPRESS_PYARROW_SYSCTL=1 \
 
 **Notes:**
 - Use `uv run opal ...` to ensure the correct environment.
-- On macOS, `OPAL_SUPPRESS_PYARROW_SYSCTL=1` suppresses PyArrow sysctl warnings (helpful in CI/non-TTY runs).
 - `MPLCONFIGDIR` avoids Matplotlib cache warnings and speeds imports.
 
 ---
@@ -61,7 +57,7 @@ MPLCONFIGDIR=$PWD/.tmp/mpl OPAL_SUPPRESS_PYARROW_SYSCTL=1 \
 - **Local dataset**: `src/dnadesign/opal/campaigns/demo/records.parquet`
   - contains `sequence`, `mock__X_value`, and a placeholder label column.
 - **Experimental labels**: `src/dnadesign/opal/campaigns/demo/inputs/r0/demo_y_sfxi.csv`
-  - includes `intensity_log2_offset_delta` (strict delta match).
+  - includes `intensity_log2_offset_delta`.
 
 **8-vector label convention**
 
@@ -163,22 +159,6 @@ Stages
 
 ---
 
-### Plots: why `on_violin_invalid: line`
-
-The SFXI closeness plot draws violins by default. The demo dataset is small, so
-we **explicitly** set:
-
-```yaml
-on_violin_invalid: line
-```
-
-This makes the fallback intentional for the demo: for small sample sizes, the
-plot uses a mean-line summary instead of failing. The **default** behavior is
-now strict (`on_violin_invalid: error`), so production configs should choose
-explicitly.
-
----
-
 ### Where outputs go
 
 **Per-round artifacts** (for audit + reuse):
@@ -218,7 +198,7 @@ interactive filtering and plots for the selected run.
 
 ---
 
-### Demo `campaign.yaml` (current, canonical)
+### Demo `campaign.yaml`
 
 ```yaml
 # OPAL demo campaign configuration (local)

@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/core/config_resolve.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -92,7 +92,10 @@ def resolve_campaign_config_path(opt: Optional[Path], *, allow_dir: bool = False
                     ExitCodes.BAD_ARGS,
                 )
             if p.is_dir():
-                raise OpalError(f"Marker points to a directory (expected campaign YAML): {p}", ExitCodes.BAD_ARGS)
+                raise OpalError(
+                    f"Marker points to a directory (expected campaign YAML): {p}",
+                    ExitCodes.BAD_ARGS,
+                )
             return p
     # Otherwise look for common YAML names, nearest first
     for base in (cur, *cur.parents):

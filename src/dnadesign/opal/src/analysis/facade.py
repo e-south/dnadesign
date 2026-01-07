@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/analysis/facade.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -80,7 +80,10 @@ def round_suffix(rounds: RoundSelector) -> str:
 def require_columns(df: pl.DataFrame, columns: Iterable[str], *, ctx: str) -> None:
     missing = [c for c in columns if c not in df.columns]
     if missing:
-        raise OpalError(f"{ctx}: missing required columns {sorted(missing)}", ExitCodes.CONTRACT_VIOLATION)
+        raise OpalError(
+            f"{ctx}: missing required columns {sorted(missing)}",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
 
 
 def available_rounds(runs_df: pl.DataFrame) -> List[int]:
@@ -250,7 +253,10 @@ def load_predictions_with_setpoint(
         return vals
 
     if "objective__params" not in runs_df.columns:
-        raise OpalError("ledger.runs is missing objective__params (cannot resolve setpoints).", ExitCodes.BAD_ARGS)
+        raise OpalError(
+            "ledger.runs is missing objective__params (cannot resolve setpoints).",
+            ExitCodes.BAD_ARGS,
+        )
 
     meta = runs_df.select(["run_id", "objective__params"]).with_columns(
         pl.col("objective__params")

@@ -29,7 +29,9 @@ from ._common import (
 
 
 @cli_command("validate", help="End-to-end table checks (essentials present; X column present).")
-def cmd_validate(config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG")):
+def cmd_validate(
+    config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
+):
     try:
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)

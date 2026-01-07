@@ -20,7 +20,14 @@ from ...reporting.summary import load_round_log, summarize_round_log
 from ...storage.workspace import CampaignWorkspace
 from ..formatting import render_round_log_summary_human
 from ..registry import cli_command
-from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path
+from ._common import (
+    internal_error,
+    json_out,
+    load_cli_config,
+    opal_error,
+    print_config_context,
+    resolve_config_path,
+)
 
 
 @cli_command("log", help="Summarize round.log.jsonl for a given round.")

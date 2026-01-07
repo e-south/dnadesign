@@ -21,7 +21,14 @@ from ...storage.ledger import LedgerReader
 from ...storage.workspace import CampaignWorkspace
 from ..formatting import render_run_meta_human, render_runs_list_human
 from ..registry import cli_group
-from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path
+from ._common import (
+    internal_error,
+    json_out,
+    load_cli_config,
+    opal_error,
+    print_config_context,
+    resolve_config_path,
+)
 
 runs_app = typer.Typer(no_args_is_help=True, help="Inspect ledger run_meta entries.")
 cli_group("runs", help="Inspect ledger run_meta entries.")(runs_app)

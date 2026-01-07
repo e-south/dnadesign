@@ -1,7 +1,6 @@
 # OPAL Plots
 
-This document covers **plot plugins** and the `PlotContext` helper. Plots are
-bespoke by design: each plugin owns its data loading, joins, and styling.
+This document covers **plot plugins** and the `PlotContext` helper. Plots are bespoke by design: each plugin owns its data loading, joins, and styling.
 
 ### How it works
 
@@ -25,7 +24,7 @@ opal plot --describe scatter_score_vs_rank
 opal plot --config /path/to/campaign.yaml --quick
 ```
 
-### Minimal YAML schema (recommended)
+### Minimal YAML schema
 
 **campaign.yaml**
 

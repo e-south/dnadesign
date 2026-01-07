@@ -1,15 +1,16 @@
-# OPAL Models — Registry
+## OPAL Models — Registry
 
 ### Contents
 
 1. [Inventory](#inventory)
 2. [Contracts](#contracts)
-3. [Wiring](#wiring)
 4. [Extending](#extending)
 5. [Entries](#entries)
     i. [random\_forest](#random_forest)
 
-## Inventory
+---
+
+### Inventory
 
 Dashboard of current entries (see details below):
 
@@ -26,7 +27,7 @@ print(list_models())  # e.g., ["random_forest", ...]
 
 ---
 
-## Contracts
+### Contracts
 
 The **registry** maps a model name → factory. A factory must return an object that implements **at minimum**:
 
@@ -50,7 +51,7 @@ Implementations: `src/dnadesign/opal/src/models/`
 
 ---
 
-## Extending
+### Extending
 
 1. Implement a wrapper that satisfies the contract.
 2. Register a factory and import it in `models/__init__.py`.
@@ -76,9 +77,9 @@ model:
 
 ---
 
-## Entries
+### Entries
 
-### random\_forest
+#### random\_forest
 
 **File:** `src/dnadesign/opal/src/models/random_forest.py`
 **Backend:** `sklearn.ensemble.RandomForestRegressor`

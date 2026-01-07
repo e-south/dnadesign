@@ -128,11 +128,21 @@ def _build_quick_plots(cfg, *, outputs_dir: Path) -> List[Dict[str, Any]]:
                     "kind": "sfxi_logic_fidelity_closeness",
                     "params": {"violin": False},
                 },
-                {"name": "quick_fold_change_vs_logic_fidelity", "kind": "fold_change_vs_logic_fidelity", "params": {}},
+                {
+                    "name": "quick_fold_change_vs_logic_fidelity",
+                    "kind": "fold_change_vs_logic_fidelity",
+                    "params": {},
+                },
             ]
         )
     if _has_feature_importance(outputs_dir):
-        plots.append({"name": "quick_feature_importance", "kind": "feature_importance_bars", "params": {}})
+        plots.append(
+            {
+                "name": "quick_feature_importance",
+                "kind": "feature_importance_bars",
+                "params": {},
+            }
+        )
     return plots
 
 
@@ -281,7 +291,12 @@ def _resolve_plot_config_source(
         extra = sorted(set(plot_cfg.keys()) - ALLOWED_PLOT_CONFIG_KEYS)
         if extra:
             raise ValueError(f"[plot] Unknown top-level keys in plot config {plot_cfg_path}: {extra}")
-        return plot_cfg, plot_cfg_path.resolve(), plot_cfg_path.parent.resolve(), "campaign.plot_config"
+        return (
+            plot_cfg,
+            plot_cfg_path.resolve(),
+            plot_cfg_path.parent.resolve(),
+            "campaign.plot_config",
+        )
 
     if inline_plots is None:
         raise ValueError("[plot] No plots found. Provide a plots list or set plot_config.")
@@ -505,7 +520,10 @@ def cmd_plot(
         if not pkind or not isinstance(pkind, str):
             raise ValueError(f"[plot] Plot '{pname}' is missing 'kind' (or preset kind).")
 
-        enabled = _parse_enabled(entry.get("enabled") if "enabled" in entry else preset.get("enabled"), ctx=pname)
+        enabled = _parse_enabled(
+            entry.get("enabled") if "enabled" in entry else preset.get("enabled"),
+            ctx=pname,
+        )
         if not enabled:
             if name:
                 raise ValueError(f"[plot] Plot '{pname}' is disabled (enabled: false).")
@@ -523,12 +541,25 @@ def cmd_plot(
 
         # Merge data paths: built-ins first, then defaults/preset/entry overrides
         data_paths = dict(builtin_resolved)
-        _apply_data_entries(data_paths, plot_defaults.get("data"), base_dir=plot_cfg_dir, ctx="plot_defaults.data")
+        _apply_data_entries(
+            data_paths,
+            plot_defaults.get("data"),
+            base_dir=plot_cfg_dir,
+            ctx="plot_defaults.data",
+        )
         if preset:
             _apply_data_entries(
-                data_paths, preset.get("data"), base_dir=plot_cfg_dir, ctx=f"plot_presets.{preset_name}.data"
+                data_paths,
+                preset.get("data"),
+                base_dir=plot_cfg_dir,
+                ctx=f"plot_presets.{preset_name}.data",
             )
-        _apply_data_entries(data_paths, entry.get("data"), base_dir=plot_cfg_dir, ctx=f"plot '{pname}'.data")
+        _apply_data_entries(
+            data_paths,
+            entry.get("data"),
+            base_dir=plot_cfg_dir,
+            ctx=f"plot '{pname}'.data",
+        )
 
         # Merge output defaults → preset → entry
         preset_out = preset.get("output") or {}
@@ -619,7 +650,12 @@ def cmd_plot(
         # Run plugin (overwrite outputs by default)
         try:
             ctx.output_dir.mkdir(parents=True, exist_ok=True)
-            debug = str(os.getenv("OPAL_DEBUG", "")).strip().lower() in ("1", "true", "yes", "on")
+            debug = str(os.getenv("OPAL_DEBUG", "")).strip().lower() in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            )
             if debug:
                 typer.secho(
                     f"[plot] entry '{pname}': keys={sorted(entry.keys())} "

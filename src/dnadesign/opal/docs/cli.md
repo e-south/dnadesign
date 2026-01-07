@@ -4,14 +4,14 @@ The OPAL CLI is a thin layer over OPAL’s application modules. It lets you init
 
 Commands are registry-driven and plugin‑agnostic: they operate on the configured plugin names and enforce only declared contracts.
 
-This document is **CLI-focused**:
+### Contents
 
-- [Quick start](#quick-start)
-- [Command overview](#command-overview)
-- [Typical workflows](#typical-workflows)
-- [Typing less](#typing-less)
-- [Extending the CLI](#extending-the-cli)
-- [CLI directory map](#cli-directory-map)
+1. [Quick start](#quick-start)
+2. [Command overview](#command-overview)
+3. [Typical workflows](#typical-workflows)
+4. [Typing less](#typing-less)
+5. [Extending the CLI](#extending-the-cli)
+6. [CLI directory map](#cli-directory-map)
 
 For architecture & concepts, see the **[Top-level README](../README.md)**.
 
@@ -24,12 +24,6 @@ See all available commands and flags:
 ```bash
 opal --help
 ```
-
-### Output and TUI
-
-Human output uses Rich tables and progress bars when stdout/stderr are TTYs.
-Disable styling with `--no-color` or disable the TUI with `OPAL_CLI_TUI=0`.
-JSON output is always plain and unstyled.
 
 ---
 
@@ -56,6 +50,8 @@ opal init --config <yaml>
 * Ensures the campaign `workdir` has `outputs/` and `inputs/`.
 * Ensures OPAL cache columns exist in `records.parquet` (adds `label_hist` + cache columns if missing).
 * Writes/updates `state.json` with campaign identity, data location, and settings.
+
+---
 
 #### `ingest-y`
 
@@ -90,6 +86,8 @@ opal ingest-y --config <yaml> --round <r> --csv <path> \
   (CSV will coerce lists to strings).
 * Appends to `opal__<slug>__label_hist` and writes the current Y column.
 * Emits `label` events into `outputs/ledger.labels.parquet`.
+
+---
 
 #### `run`
 
@@ -145,6 +143,8 @@ opal run --config <yaml> --round <r> \
 * `opal__<slug>__latest_as_of_round`
 * `opal__<slug>__latest_pred_scalar`
 
+---
+
 #### `predict`
 
 Run **ephemeral** predictions from a frozen model. No writes to `records.parquet`.
@@ -177,6 +177,8 @@ opal predict --config <yaml> \
 * `--model-path` and `--round` are mutually exclusive; passing both is an error.
 * Defaults to `records.parquet` when `--in` is omitted.
 * Writes CSV to stdout by default; use `--out` for CSV/Parquet files (Parquet keeps vectors as list<float>).
+
+---
 
 #### `record-show`
 
@@ -239,6 +241,8 @@ opal objective-meta --config <yaml-or-dir> [--round <k|latest>] [--profile|--no-
 
 * Reads from `outputs/ledger.runs.parquet` and `outputs/ledger.predictions/`.
 
+---
+
 #### `ctx`
 
 Inspect `round_ctx.json` carriers.
@@ -258,6 +262,8 @@ opal ctx diff  --config <yaml> --round-a <k|latest> --round-b <k|latest> [--keys
 * `--round-a`, `--round-b`: Round selectors for `diff`.
 * `--keys`: Filter by key prefix (repeatable; applies to `show`/`diff`).
 
+---
+
 #### `explain`
 
 Dry-run planner for a round: counts, plan, warnings. **No writes.**
@@ -275,6 +281,8 @@ opal explain --config <yaml> --round <k>
 
 Prints: number of training labels, candidate universe size, transforms/models/selection used,
 vector dimension, and any preflight warnings.
+
+---
 
 #### `status`
 
@@ -311,6 +319,8 @@ opal runs show --config <yaml> [--round <k|latest> | --run-id <rid>]
 * `--round, -r`: Round selector (integer or `latest`).
 * `--run-id`: Explicit run_id to display (show only).
 
+---
+
 #### `log`
 
 Summarize `round.log.jsonl` for a round.
@@ -346,6 +356,8 @@ opal validate --config <yaml>
 * Verifies the configured **X** column exists.
 * If Y is present, validates vector length & numeric/finite cells.
 
+---
+
 #### `label-hist`
 
 Validate, repair, or explicitly attach-from-y into the label history column (no silent fixes).
@@ -378,6 +390,8 @@ OPAL manages a few derived columns in `records.parquet`:
 * `opal__<slug>__latest_pred_scalar` — latest objective scalar cache
 
 `opal init` will add these cache columns if they are missing.
+
+---
 
 #### `plot`
 
@@ -415,6 +429,8 @@ opal plot --config <yaml-or-dir> --quick
 * `--quick` is assertive: it does **not** auto-run unless explicitly requested.
 * `plot_defaults` and `plot_presets` reduce redundancy; `preset: <name>` merges into each plot entry.
 * Set `enabled: false` on any plot entry to keep it in the YAML without running it.
+
+---
 
 #### `notebook`
 
@@ -478,6 +494,8 @@ Built-ins injected for plots:
 * `ledger_predictions_dir`
 * `ledger_runs_parquet`
 * `ledger_labels_parquet`
+
+---
 
 #### `prune-source`
 

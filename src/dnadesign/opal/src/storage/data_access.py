@@ -337,7 +337,10 @@ class RecordsStore:
             for seq in rows_no_id["sequence"].dropna().astype(str).tolist():
                 if seq not in seq_to_id:
                     csv_row = _csv_row_for(None, seq)
-                    new_row = {"id": self.deterministic_id_from_sequence(seq), "sequence": seq}
+                    new_row = {
+                        "id": self.deterministic_id_from_sequence(seq),
+                        "sequence": seq,
+                    }
                     for c in required_cols:
                         if c not in csv_row:
                             raise OpalError(f"CSV missing required column '{c}' for new sequence={seq}.")

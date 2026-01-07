@@ -1,4 +1,4 @@
-# OPAL X Transforms
+## OPAL X Transforms
 
 X‑transforms convert your stored representation column (**X**) into a fixed‑width numeric matrix for models.
 

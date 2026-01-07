@@ -1,8 +1,8 @@
-# OPAL Selection Strategies
+## OPAL Selection Strategies
 
 Selection strategies convert **scores** into **ranks and selected flags**.
 
-## Contract
+### Contract
 
 ```python
 def selection_fn(
