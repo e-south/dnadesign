@@ -174,7 +174,12 @@ def test_sfxi_metrics_edge_cases() -> None:
     )
     assert result.df.height == 1
     assert result.weights == (0.0, 0.0, 0.0, 0.0)
-    assert result.denom == params.eps
+    assert result.denom == 1.0
+    assert result.denom_source == "disabled"
+    row = result.df.row(0)
+    row_dict = dict(zip(result.df.columns, row))
+    assert abs(row_dict["effect_scaled"] - 1.0) < 1e-6
+    assert abs(row_dict["score"] - 1.0) < 1e-6
 
     pool = pl.DataFrame({"sfxi_8_vector_y_label": [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]})
     result_fallback = utils.compute_sfxi_metrics(
@@ -183,8 +188,26 @@ def test_sfxi_metrics_edge_cases() -> None:
         params=params,
         denom_pool_df=pool,
     )
-    assert result_fallback.denom == params.eps
-    assert result_fallback.denom_source == "fallback_p"
+    assert result_fallback.denom == 1.0
+    assert result_fallback.denom_source == "disabled"
+
+    params_strict = utils.compute_sfxi_params(
+        setpoint=[0.25, 0.25, 0.25, 0.25],
+        beta=1.0,
+        gamma=1.0,
+        delta=10.0,
+        p=95.0,
+        fallback_p=75.0,
+        min_n=2,
+        eps=1e-6,
+    )
+    with pytest.raises(ValueError, match="min_n"):
+        utils.compute_sfxi_metrics(
+            df=pool,
+            vec_col="sfxi_8_vector_y_label",
+            params=params_strict,
+            denom_pool_df=pool,
+        )
 
 
 def test_integration_smoke(tmp_path: Path) -> None:
