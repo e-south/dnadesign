@@ -609,6 +609,8 @@ def compute_sfxi_metrics(
     df_valid = df.filter(valid_mask)
 
     p0, p1, p2, p3 = params.setpoint
+    setpoint_sum = p0 + p1 + p2 + p3
+    intensity_disabled = not math.isfinite(setpoint_sum) or setpoint_sum <= 1.0e-12
     v0 = pl.col(vec_col).list.get(0)
     v1 = pl.col(vec_col).list.get(1)
     v2 = pl.col(vec_col).list.get(2)
@@ -616,26 +618,49 @@ def compute_sfxi_metrics(
     dist = ((v0 - p0) ** 2 + (v1 - p1) ** 2 + (v2 - p2) ** 2 + (v3 - p3) ** 2) ** 0.5
     logic_fidelity = (1.0 - dist / params.d).clip(0.0, 1.0)
 
+    if intensity_disabled:
+        df_sfxi = df_valid.with_columns(
+            [
+                logic_fidelity.alias("logic_fidelity"),
+                pl.lit(0.0).alias("effect_raw"),
+                pl.lit(1.0).alias("effect_scaled"),
+            ]
+        ).with_columns((pl.col("logic_fidelity") ** params.beta).alias("score"))
+        return SFXIResult(
+            df=df_sfxi,
+            denom=1.0,
+            weights=params.weights,
+            d=params.d,
+            pool_size=0,
+            denom_source="disabled",
+        )
+
     effect_raw_expr = _effect_raw_expr(vec_col, params.weights, params.delta)
 
     pool_size = 0
-    denom_source = "empty"
-    denom = params.eps
-    if vec_col in denom_pool_df.columns and not denom_pool_df.is_empty():
-        pool_dtype = denom_pool_df.schema.get(vec_col, pl.Null)
-        if pool_dtype != pl.Null:
-            pool_valid = denom_pool_df.filter(valid_vec8_mask_expr(vec_col))
-            pool_effect = pool_valid.select(effect_raw_expr.alias("effect_raw"))
-            pool_size = pool_effect.height
-            if pool_size >= params.min_n:
-                denom = float(pool_effect["effect_raw"].quantile(params.p / 100.0, interpolation="nearest"))
-                denom_source = "p"
-            elif pool_size > 0:
-                denom = float(pool_effect["effect_raw"].quantile(params.fallback_p / 100.0, interpolation="nearest"))
-                denom_source = "fallback_p"
+    denom_source = "p"
+    if vec_col not in denom_pool_df.columns or denom_pool_df.is_empty():
+        raise ValueError(f"Need at least min_n={params.min_n} labels in current round to scale intensity; got 0.")
 
-    if not math.isfinite(denom) or denom <= 0:
-        denom = params.eps
+    pool_dtype = denom_pool_df.schema.get(vec_col, pl.Null)
+    if pool_dtype == pl.Null:
+        raise ValueError(f"Need at least min_n={params.min_n} labels in current round to scale intensity; got 0.")
+
+    pool_valid = denom_pool_df.filter(valid_vec8_mask_expr(vec_col))
+    pool_effect = pool_valid.select(effect_raw_expr.alias("effect_raw"))
+    pool_size = pool_effect.height
+    if pool_size < params.min_n:
+        raise ValueError(
+            f"Need at least min_n={params.min_n} labels in current round to scale intensity; got {pool_size}."
+        )
+
+    denom = float(pool_effect["effect_raw"].quantile(params.p / 100.0, interpolation="nearest"))
+    if not math.isfinite(denom):
+        raise ValueError("Invalid denom computed (non-finite). Check labels and scaling config.")
+    if denom < 0.0:
+        raise ValueError("Invalid denom computed (negative). Check labels and scaling config.")
+    if not math.isfinite(params.eps) or params.eps <= 0.0:
+        raise ValueError(f"eps must be positive and finite; got {params.eps}.")
     denom = max(denom, params.eps)
 
     df_sfxi = (
