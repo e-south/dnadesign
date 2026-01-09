@@ -85,6 +85,14 @@ def summary(
     table.add_row("out_dir", summary["out_dir"])
     table.add_row("regulator_sets", str(summary["regulator_sets"]))
     table.add_row("regulators_flat", ", ".join(summary["regulators_flat"]))
+    table.add_row("regulator_categories", str(summary.get("regulator_categories") or {}))
+    campaign_names = summary.get("campaign_names") or []
+    table.add_row("campaigns", ", ".join(campaign_names) if campaign_names else "-")
+    campaign_meta = summary.get("campaign")
+    if campaign_meta:
+        table.add_row("campaign.name", campaign_meta.get("name", "-"))
+        table.add_row("campaign.id", campaign_meta.get("campaign_id", "-"))
+        table.add_row("campaign.manifest_path", campaign_meta.get("manifest_path", "-"))
     table.add_row("io.parsers.extra_modules", str(summary["io"]["parsers"]["extra_modules"]))
     table.add_row("pwm_source", summary["motif_store"]["pwm_source"])
     table.add_row("site_kinds", str(summary["motif_store"]["site_kinds"]))

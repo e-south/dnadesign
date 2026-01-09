@@ -15,6 +15,7 @@ import typer
 
 from dnadesign.cruncher.cli.commands.analyze import analyze as analyze_cmd
 from dnadesign.cruncher.cli.commands.cache import app as cache_app
+from dnadesign.cruncher.cli.commands.campaign import app as campaign_app
 from dnadesign.cruncher.cli.commands.catalog import app as catalog_app
 from dnadesign.cruncher.cli.commands.config import app as config_app
 from dnadesign.cruncher.cli.commands.fetch import app as fetch_app
@@ -81,6 +82,12 @@ app.command(
     help="Generate an optional marimo notebook for analysis.",
     short_help="Generate a marimo notebook.",
 )(notebook_cmd)
+app.add_typer(
+    campaign_app,
+    name="campaign",
+    help="Generate or summarize regulator campaigns.",
+    short_help="Generate campaign configs.",
+)
 app.add_typer(
     fetch_app,
     name="fetch",

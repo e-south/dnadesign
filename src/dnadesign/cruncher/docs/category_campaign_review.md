@@ -1,162 +1,129 @@
-# Cruncher category/campaign review (ergonomics + extensibility)
+# Cruncher category/campaign specification (ergonomics + extensibility)
 
-Date: 2026-01-08
+Date: 2026-01-09
+Status: Implemented (phases 1-4 complete)
 
-## Executive summary
+## 0) Purpose
 
-What already works:
-- Multi-regulator (N>2) sampling is already supported end-to-end in **parse/sample/analyze/report** as long as `regulator_sets` contains the desired TF list. Sampling/scoring treat TFs as a list and produce per-TF scores for all TFs, not just pairs. This is driven by `regulator_sets` in config and flows through run manifests and artifacts. (refs: `src/config/schema_v2.py:CruncherConfig.regulator_sets`, `src/workflows/sample_workflow.py:_run_sample_for_set`, `src/core/evaluator.py:SequenceEvaluator`, `src/workflows/analyze_workflow.py:run_analyze`, `src/workflows/analyze/plots/summary.py:plot_score_hist`, `src/workflows/report_workflow.py:run_report`)
-- Reproducibility boundaries are solid: lockfiles are mandatory for parse/sample and run manifests record resolved motifs and hashes. (refs: `src/store/lockfile.py:validate_lockfile`, `src/workflows/parse_workflow.py:_lockmap_for`, `src/workflows/sample_workflow.py:_lockmap_for`, `src/utils/manifest.py:build_run_manifest`)
+Define a **pragmatic, decoupled, and extensible** path to support regulator *categories* and *multi-regulator (N>2) campaigns* in Cruncher, with a UX that scales beyond pairwise workflows. This document is a **granular, implementation-ready specification** aligned to current architecture, artifacts, and CLI contracts.
 
-What does not work well for the new category/campaign use case:
-- There is **no category/campaign abstraction**; users must manually enumerate `regulator_sets`, and the CLI has no helper to expand categories into combinations or to run multi-regulator campaigns at scale. (refs: `src/config/schema_v2.py:CruncherConfig.regulator_sets`, `docs/config.md:Root settings`, `src/cli/commands/lock.py:lock`)
-- Analysis/reporting is **mostly per-run** and **pairwise-centric** for many plots. `analysis.tf_pair` is required for pairwise plots and must be exactly two TFs; there is no cross-run “landscape” summary. (refs: `src/config/schema_v2.py:AnalysisConfig._check_tf_pair`, `src/workflows/analyze_workflow.py:_resolve_tf_pair`, `src/workflows/analyze/plot_registry.py:PLOT_SPECS`, `src/workflows/analyze/plots/scatter.py:plot_scatter`)
+## 1) Scope
 
-Recommendation:
-- Add a **campaign expansion layer** that materializes category-based combinations into explicit `regulator_sets`, plus a lightweight **campaign summary** command that aggregates run artifacts across many runs. Keep core compute, lockfiles, and run artifacts unchanged.
+In-scope:
+- Category-aware selection and expansion into explicit `regulator_sets`.
+- Campaign-level UX for “run many combinations” and compare results.
+- Multi-regulator analysis/EDA: pairwise grids, joint metrics, and succinct summaries.
+- Deterministic, reproducible artifacts; offline analysis; no changes to core sampling correctness.
 
----
+Out-of-scope (explicitly unchanged):
+- Core scoring/optimization algorithms and their numerical semantics.
+- Lockfile schema and verification behavior.
+- Existing parse/sample/analyze/report stage semantics (only additive extensions).
 
-## Current-state map (lifecycle + config → behavior)
+## 2) Principles (must-haves)
 
-### Config inputs and run expansion
-- `cruncher.regulator_sets` is the only mechanism to define TF groups; each entry becomes a separate parse/sample run. (refs: `src/config/schema_v2.py:CruncherConfig.regulator_sets`, `docs/config.md:Root settings`, `src/workflows/parse_workflow.py:run_parse`, `src/workflows/sample_workflow.py:run_sample`)
-- `regulator_sets` are iterated as lists; no structural constraints beyond non-empty groups. This already supports N>2 TFs. (refs: `src/workflows/parse_workflow.py:run_parse`, `src/workflows/sample_workflow.py:run_sample`, `src/utils/labels.py:regulator_sets`)
+- **Decoupled:** No network in compute/analysis; only fetch touches the network. Campaign expansion is offline.
+- **Reproducible:** Generated configs/manifests are deterministic and versionable.
+- **Pragmatic:** Prefer additive fields and helper commands to large refactors.
+- **Assertive:** Validate inputs early; fail clearly for ambiguous categories, duplicates, or invalid rules.
+- **Extensible:** Schema and CLI designed for future category rules without breaking existing configs.
+- **Minimal redundancy:** Reuse existing run artifacts and analysis layout; avoid duplicating per-run logic.
 
-### Lifecycle commands
-- **fetch** is explicit and requires individual `--tf`/`--motif-id` values; there is no “fetch all configured targets” or category-aware fetch. (refs: `src/cli/commands/fetch.py:motifs`, `src/cli/commands/fetch.py:sites`, `docs/cli.md:cruncher fetch motifs`)
-- **lock** resolves *all TF names* appearing in `regulator_sets` and writes a single lockfile per config. (refs: `src/cli/commands/lock.py:lock`, `src/services/lock_service.py:resolve_lock`)
-- **parse/sample** run once per `regulator_set` and record the active TF list in the run manifest. (refs: `src/workflows/parse_workflow.py:run_parse`, `src/workflows/sample_workflow.py:_run_sample_for_set`, `src/utils/manifest.py:build_run_manifest`)
-- **analyze/report** operate on a *single sample run* at a time. (refs: `src/cli/commands/analyze.py:analyze`, `src/workflows/analyze_workflow.py:run_analyze`, `src/workflows/report_workflow.py:run_report`)
+## 3) Alignment with current Cruncher architecture (critical constraints)
 
-### Artifacts produced (multi-TF aware)
-- `sequences.parquet` includes `score_<tf>` columns for each TF in the active set. (ref: `src/workflows/sample_workflow.py:_run_sample_for_set`)
-- `elites.parquet` and `elites.json` include per-TF scores for all TFs in the active set. (ref: `src/workflows/sample_workflow.py:_run_sample_for_set`)
-- `config_used.yaml` records `pwms_info` for each TF (matrix + consensus). (ref: `src/workflows/sample_workflow.py:_save_config`)
-- `run_manifest.json` records each TF’s motif metadata (length, site counts, dataset IDs, tags). (ref: `src/utils/manifest.py:build_run_manifest`)
+This spec is grounded in existing architecture and artifact contracts:
 
----
+### 3.1 Lifecycle and decoupling
+- Fetch is the only network stage; analyze/report are offline. (`docs/architecture.md`, `docs/spec.md`)
+- Core compute is I/O-free. (`docs/architecture.md: core/`)
 
-## A) Current capability (with file-level citations)
+### 3.2 Regulator grouping
+- `cruncher.regulator_sets` is the **only** runtime grouping mechanism and already supports N>2 TFs.
+  - `src/config/schema_v2.py:CruncherConfig.regulator_sets`
+  - `src/workflows/sample_workflow.py:_run_sample_for_set`
 
-### Does Cruncher support regulator_sets with N>2 TFs end-to-end?
+### 3.3 Analysis layout
+- Analyze writes `analysis/summary.json`, `analysis/plot_manifest.json`, `analysis/table_manifest.json`, and `analysis/tables/*.csv`.
+  - `src/workflows/analyze_workflow.py:run_analyze`
+  - `src/utils/analysis_layout.py:ANALYSIS_DIR_NAME, TABLES_DIR_NAME`
 
-**Yes, for parse/sample/analyze/report**, as long as the config explicitly provides the set. Evidence:
-- `regulator_sets` is a list of TF lists without pairwise restriction. (ref: `src/config/schema_v2.py:CruncherConfig.regulator_sets`)
-- `parse` and `sample` iterate through each set, de-duplicate TFs, and operate on arbitrary-length `tfs`. (refs: `src/workflows/parse_workflow.py:run_parse`, `src/workflows/sample_workflow.py:run_sample`, `src/workflows/sample_workflow.py:_run_sample_for_set`)
-- `SequenceEvaluator` combines scores across all TFs (default min or sum depending on scale), not pairwise. (ref: `src/core/evaluator.py:SequenceEvaluator`)
-- Non-pairwise analysis plots (score hist/box, correlation heatmap, parallel coords) operate on all TF score columns. (refs: `src/workflows/analyze/plots/summary.py:plot_score_hist`, `src/workflows/analyze/plots/summary.py:plot_correlation_heatmap`, `src/workflows/analyze/plots/summary.py:plot_parallel_coords`)
-- Reports list TF names from run manifest; they are not limited to two. (ref: `src/workflows/report_workflow.py:run_report`)
+### 3.4 Notebook integration
+- `cruncher notebook` already generates a marimo notebook for a run, validated against `summary.json` and `plot_manifest.json`.
+  - `docs/cli.md: cruncher notebook`
+  - `src/cli/commands/notebook.py`
+  - `src/services/notebook_service.py`
 
-### Where “pairwise only” is assumed
+### 3.5 Pairwise limitation
+- Pairwise plots require `analysis.tf_pair` (exactly 2 TFs). (`src/config/schema_v2.py:AnalysisConfig._check_tf_pair`, `src/workflows/analyze/plot_registry.py:PLOT_SPECS`)
 
-Explicit pairwise constraints:
-- `analysis.tf_pair` must have exactly two TFs. (ref: `src/config/schema_v2.py:AnalysisConfig._check_tf_pair`)
-- Pairwise plots depend on `tf_pair`, enforced before plot generation. (refs: `src/workflows/analyze_workflow.py:_resolve_tf_pair`, `src/workflows/analyze_workflow.py:run_analyze`, `src/workflows/analyze/plot_registry.py:PLOT_SPECS`)
-- Scatter and pairwise diagnostics only consume a TF pair. (refs: `src/workflows/analyze/plots/scatter.py:plot_scatter`, `src/workflows/analyze/plots/diagnostics.py:make_pair_idata`)
+This spec **extends** these contracts; it does not replace them.
 
-### Artifacts and summaries for multi-TF runs
+## 4) Terminology
 
-- **Run manifest** includes per-TF motif metadata (matrix length, site counts, dataset IDs, tags). (ref: `src/utils/manifest.py:build_run_manifest`)
-- **Sequences**: `sequences.parquet` includes per-TF scores for *all* TFs in the active set. (ref: `src/workflows/sample_workflow.py:_run_sample_for_set`)
-- **Elites**: `elites.parquet` and `elites.json` include per-TF scores for all TFs. (ref: `src/workflows/sample_workflow.py:_run_sample_for_set`)
-- **Analysis summary** records `tf_names` list for the run. (ref: `src/workflows/analyze_workflow.py:run_analyze`)
-- **Report** shows TF list and run stats; no multi-run aggregation. (ref: `src/workflows/report_workflow.py:run_report`)
+- **Regulator (TF):** a named PWM target (e.g., LexA).
+- **Category:** named set of regulators (can overlap).
+- **Regulator set:** explicit list of TFs used in a single run.
+- **Campaign:** rules that expand categories into multiple regulator sets.
+- **Selector:** filter on candidate TFs (info bits, site count, dataset preference, etc.).
+- **Objective rule (optional):** how TF scores are combined during optimization (future phase).
 
----
+## 5) Requirements
 
-## B) Ergonomics gaps for category/campaign workflows
+### R1: Category + campaign expansion
+- Users define **categories** and **campaign rules** in config.
+- Expansion is deterministic and produces explicit `regulator_sets`.
+- Overlaps are handled explicitly (`allow_overlap` / `distinct_across_categories`).
 
-### What’s awkward today
+### R2: Campaign ergonomics
+- Users can **generate** a derived config and inspect expanded sets.
+- Users can **fetch** all TFs implied by a campaign.
+- Users can **summarize** many runs with a single command (landscape view).
 
-- **No category concept**: Users must explicitly enumerate every combination in `regulator_sets`. This is manual, error-prone, and creates huge configs for pair/triple sweeps. (refs: `src/config/schema_v2.py:CruncherConfig.regulator_sets`, `docs/config.md:Root settings`)
-- **No helper for combinatorics**: There is no CLI or workflow to generate combinations (pairs/triples) within or across categories. (refs: `src/cli/commands/lock.py:lock`, `src/cli/commands/targets.py:list_config_targets`)
-- **Manual fetch**: Fetching is manual per TF (`--tf`), so category-based fetch requires manual scripting. (refs: `src/cli/commands/fetch.py:motifs`, `src/cli/commands/fetch.py:sites`)
+### R3: Multi-regulator analysis
+- Pairwise plots are treated as **projections** of the N-D space.
+- Provide a **pairwise grid** for all TF interactions.
+- Provide **joint metrics** to quantify how “jointly optimized” sequences are.
 
-### What breaks down in discovery/run management
+### R4: Quality metrics
+- Compute PWM quality metrics (info bits, site counts, dataset provenance) as stable metadata.
+- Expose these metrics in summaries and selection rules, without altering optimization.
 
-- **Run explosion without grouping**: Runs are per regulator set, but no campaign grouping or tagging exists in the run index. (refs: `src/services/run_service.py:RunInfo`, `src/utils/manifest.py:build_run_manifest`)
-- **Analysis is per-run**: `analysis.runs` lists explicit run names; no selection by tag/category/campaign. (refs: `src/config/schema_v2.py:AnalysisConfig.runs`, `src/workflows/analyze_workflow.py:run_analyze`)
+### R5: UX for category selection
+- Users can request: “pick one TF from category A and one from B.”
+- Users can request: “optimize for at least one TF from category A and one from B.”
+- Overlapping TFs must not allow trivial one-TF optimization to satisfy multiple categories.
 
-### What’s missing for cross-run comparison
+## 6) Proposed configuration (additive)
 
-- **No aggregated summary** across runs (e.g., best joint scores per combination, elite counts by set). The existing `report` and `analysis` are per-run only. (refs: `src/workflows/report_workflow.py:run_report`, `src/workflows/analyze_workflow.py:run_analyze`)
-- **No landscape view** (heatmaps, tables, or ranked lists) to compare many combinations. (refs: `src/workflows/analyze/plot_registry.py:PLOT_SPECS`, `src/workflows/analyze/plots/summary.py`)
+### 6.1 Schema additions (conceptual)
 
----
+```yaml
+cruncher:
+  regulator_categories:
+    <CategoryName>: [TF_A, TF_B, ...]
 
-## C) Quality metrics (existing signals + recommended location)
+  campaigns:
+    - name: <campaign_name>
+      categories: [Category1, Category2, ...]
+      within_category:
+        sizes: [2, 3]                 # combos within a single category
+      across_categories:
+        sizes: [2, 3]                 # combos across categories
+        max_per_category: 2
+      allow_overlap: true
+      distinct_across_categories: true
+      dedupe_sets: true
+      selectors:
+        min_info_bits: 8.0
+        min_site_count: 10
+        source_preference: [regulondb, coldbacteria]
+        dataset_preference: [dataset_1, dataset_2]
+      tags:
+        organism: ecoli
+        purpose: multi_tf_sweep
+```
 
-### Signals already computed or easily derived
-
-**From catalog / ingestion (source-agnostic):**
-- Matrix length, site counts, site length statistics, dataset IDs, and tags are in catalog entries. (refs: `src/store/catalog_index.py:CatalogEntry`, `src/services/target_service.py:TargetStats`, `src/services/target_service.py:target_stats`)
-- Provenance tags (e.g., dataset method/source) are recorded in catalog entries. (ref: `src/store/catalog_index.py:CatalogEntry`)
-
-**From PWM objects / parse/sample:**
-- Information content (PWM entropy) is computed via `PWM.information_bits()`. (ref: `src/core/pwm.py:PWM.information_bits`)
-- `config_used.yaml` stores PWM matrices and consensus sequences for each TF. (ref: `src/workflows/sample_workflow.py:_save_config`)
-
-**From run artifacts:**
-- Per-TF score distributions exist in `sequences.parquet` and can be summarized (mean/median/std/min/max). (ref: `src/workflows/analyze/plots/summary.py:write_score_summary`)
-- `run_manifest.json` embeds the catalog metadata for each TF (site counts, matrix length, tags). (ref: `src/utils/manifest.py:build_run_manifest`)
-
-### Where “quality scoring” should live
-
-**Recommended separation (to preserve reproducibility and decoupling):**
-- **Catalog-level quality signals** (source-agnostic, stable): compute once at ingest/refresh and store in catalog entries or derived catalog “stats”. This keeps them independent of run-specific settings and makes them reusable across projects. (refs: `src/store/catalog_index.py:CatalogEntry`, `src/services/target_service.py:target_stats`)
-- **Run-level quality summaries** (run-specific): compute in analysis (offline) using `sequences.parquet` and `elites.parquet`, then store in `analysis/summary.json` or new `analysis/tables/*.csv`. (refs: `src/workflows/analyze_workflow.py:run_analyze`, `src/workflows/analyze/plots/summary.py:write_score_summary`)
-
-This keeps network access isolated to fetch while making scoring deterministic and reproducible via lockfiles and run manifests.
-
----
-
-## D) Best-practice design proposal
-
-### Option 1 — Config-driven expansion (minimal UX changes, no new commands)
-
-**Idea:** Add optional `regulator_categories` and `campaigns` in config; expand to `regulator_sets` inside config loading or workflows before lock/parse/sample.
-
-Pros:
-- No new CLI required; users keep calling existing commands.
-- Keeps workflows intact once expansion is done.
-
-Cons:
-- Adds complexity into config parsing and schema validation.
-- Harder to inspect or export the expanded sets; users may want a concrete list for review.
-
-### Option 2 — New CLI helper to materialize regulator_sets (recommended)
-
-**Idea:** Introduce `cruncher campaign generate` (or `cruncher expand`) that reads categories + campaign rules, writes a derived config with explicit `regulator_sets`, and records a campaign manifest. Existing lifecycle commands remain unchanged.
-
-Pros:
-- Minimal changes to core workflows.
-- Clear reproducibility: generated config + manifest can be versioned.
-- Keeps network decoupled from compute (generation is offline).
-
-Cons:
-- Adds an extra step (generate → lock → parse/sample).
-
-### Option 3 — First-class campaign concept with aggregated analysis
-
-**Idea:** Add a campaign object in config + campaign runs, and implement new `cruncher campaign run/analyze/report` commands that group runs and produce aggregate reports.
-
-Pros:
-- Best user experience for large sweeps.
-- Enables integrated “landscape” reports and consistent run grouping.
-
-Cons:
-- Larger surface-area change; more schema and workflow extensions.
-
-### Primary recommendation: Option 2 + lightweight campaign summary
-
-Implement a CLI helper to generate explicit `regulator_sets` **and** add a small, offline “campaign summary” step that aggregates metrics across many runs. This keeps compute decoupled and avoids changes to core sampling logic.
-
----
-
-## Proposed config additions (additive)
-
-### YAML shape (additive, optional)
+### 6.2 Example for provided categories
 
 ```yaml
 cruncher:
@@ -169,92 +136,119 @@ cruncher:
 
   campaigns:
     - name: regulators_v1
-      categories:
-        - Category1
-        - Category2
-        - Category3
+      categories: [Category1, Category2, Category3]
       within_category:
         sizes: [2, 3]
       across_categories:
         sizes: [2, 3]
         max_per_category: 2
       allow_overlap: true
+      distinct_across_categories: true
       dedupe_sets: true
+      selectors:
+        min_info_bits: 8.0
+        min_site_count: 10
       tags:
         organism: ecoli
-        purpose: "multi-regulator sweep"
+        purpose: multi_tf_sweep
 
-  # (Optional) explicit regulator_sets can still be provided
-  regulator_sets: []
+  regulator_sets: []  # optional explicit sets
 ```
 
-Notes:
-- `regulator_sets` remains the runtime contract. Campaigns only **generate** it.
-- Overlapping regulators (Fur, Lrp) are allowed; `allow_overlap: true` controls whether a TF can appear multiple times across categories.
+## 7) Directory-level change map (module-level spec)
 
----
+This is the minimal set of modules to touch, aligned to existing architecture:
 
-## Proposed CLI UX (minimal additions)
+- `src/config/schema_v2.py`
+  - Add `regulator_categories` and `campaigns` config blocks.
+  - Add validation for overlap rules, size ranges, and selectors.
 
-### 1) Generate explicit regulator_sets
+- `src/config/load.py`
+  - Load new fields; no side effects beyond validation.
+  - Expansion remains in a **service**, not the config loader.
 
-```
-cruncher campaign generate --campaign regulators_v1 --out config.generated.yaml
-```
+- `src/services/campaign_service.py` (new)
+  - Expand categories + rules into explicit regulator sets.
+  - Deterministic ordering + dedupe.
+  - No I/O beyond reading config payload.
 
-Behavior:
-- Reads `regulator_categories` + `campaigns` and writes an expanded config with explicit `regulator_sets`.
-- Writes a campaign manifest under `.cruncher/campaigns/<campaign_id>.json` (or alongside the generated config).
-- No network access.
+- `src/cli/commands/campaign.py` (new)
+  - `campaign generate`: write derived config + campaign manifest.
+  - `campaign summarize`: aggregate run artifacts into cross-run tables/plots.
 
-### 2) Optional: fetch all campaign targets
+- `src/cli/commands/targets.py`
+  - Add `--category` and `--campaign` filters for list/status/candidates/stats.
 
-```
-cruncher fetch motifs --targets --campaign regulators_v1 <config>
-cruncher fetch sites  --targets --campaign regulators_v1 <config>
-```
+- `src/workflows/analyze/plots/summary.py`
+  - Add pairwise grid plot.
+  - Add joint metrics table (new CSV).
 
-Behavior:
-- Resolves the TF list from the campaign or expanded config.
-- Calls existing fetch logic per TF.
+- `src/workflows/analyze/plot_registry.py`
+  - Register pairwise grid plot (and label it “projection”).
 
-### 3) Aggregate “landscape” summary
+- `src/workflows/analyze_workflow.py`
+  - Add new table outputs to `analysis/tables` and `table_manifest.json`.
+  - Keep existing analysis artifacts unchanged.
 
-```
-cruncher campaign summarize --campaign regulators_v1 --runs runs/*
-```
+- `src/workflows/campaign_summary.py` (new)
+  - Offline aggregation of multiple runs into summary tables + plots.
 
-Behavior:
-- Consumes run artifacts (`run_manifest.json`, `sequences.parquet`, `elites.parquet`) and produces:
-  - `campaign_summary.csv` (per-run metrics)
-  - `campaign_best.csv` (top combinations)
-  - Optional plots (heatmap / top-K bar chart)
-- No network access.
+- `src/services/notebook_service.py`
+  - Extend run-level notebook to surface new tables/plots if present.
 
----
+- `tests/*`
+  - Add unit tests for campaign expansion, validation, and summary outputs.
 
-## Implementation locations (minimal touch points)
+## 8) Data contracts & artifacts
 
-### Config/schema
-- Add optional `regulator_categories` and `campaigns` to config schema. (new fields in `src/config/schema_v2.py:CruncherConfig`)
+### 8.1 Campaign manifest (new)
 
-### Campaign expansion
-- New service module: `src/services/campaign_service.py` (expand categories → list of TF sets, dedupe, validate).
-- CLI command: `src/cli/commands/campaign.py` (generate, summarize).
+Path (example):
+- `<workspace>/.cruncher/campaigns/<campaign_id>.json` or alongside generated config.
 
-### Lockfiles and manifests
-- **Unchanged lockfile format**: `cruncher lock` already resolves the union of TFs in `regulator_sets`. (ref: `src/cli/commands/lock.py:lock`)
-- Add optional `campaign` metadata into run manifest extras so runs can be grouped later. (ref: `src/utils/manifest.py:build_run_manifest`)
+Required fields:
+- `campaign_id` (stable hash of config + rules + selectors)
+- `campaign_name`
+- `created_at`
+- `source_config` (path + sha256)
+- `categories` (resolved map)
+- `selectors` (resolved)
+- `rules` (sizes, overlap, dedupe)
+- `expanded_sets` (list of TF lists, deterministic order)
+- `expanded_count`
 
-### Analysis summaries
-- Add a new workflow `src/workflows/campaign_summary.py` that reads existing run artifacts and writes aggregate tables/plots.
-- Keep `analyze` and `report` unchanged for per-run diagnostics. (refs: `src/workflows/analyze_workflow.py:run_analyze`, `src/workflows/report_workflow.py:run_report`)
+### 8.2 Generated config (derived)
 
----
+Path: specified via `--out`.
 
-## Proposed analysis/report outputs for “surveying the landscape”
+Required behavior:
+- Must include explicit `cruncher.regulator_sets` matching `expanded_sets`.
+- Should include a `campaign` metadata block (readable by CLI) but **not** required by core workflows.
 
-### Output layout (new)
+### 8.3 Analysis tables/plots (per-run)
+
+Existing analysis layout (must preserve):
+- `analysis/summary.json`
+- `analysis/plot_manifest.json`
+- `analysis/table_manifest.json`
+- `analysis/tables/score_summary.csv` (existing)
+- `analysis/tables/elite_topk.csv` (existing)
+
+Additions (new):
+- `analysis/tables/joint_metrics.csv`
+  - Columns: tf_names, joint_min, joint_mean, joint_hmean, balance_index, pareto_front_size, pareto_fraction
+- `analysis/plots/score__pairgrid.png`
+  - Pairwise grid; labeled as projection.
+
+Table manifest updates:
+- Register `joint_metrics.csv` in `analysis/table_manifest.json`.
+
+Plot manifest updates:
+- Register `score__pairgrid.png` with description “pairwise projection grid.”
+
+### 8.4 Campaign summary outputs (cross-run)
+
+Output layout:
 
 ```
 <out_dir>/campaigns/<campaign_id>/
@@ -262,63 +256,194 @@ Behavior:
   campaign_summary.csv
   campaign_best.csv
   plots/
-    best_normsum_bar.png
+    best_jointscore_bar.png
     tf_coverage_heatmap.png
+    pairgrid_overview.png
 ```
 
-### Metrics to include (all derivable offline)
-
-Per-run rows in `campaign_summary.csv`:
-- run_name, set_index, tf_list
-- n_tfs, sequence_length
+Required columns for `campaign_summary.csv`:
+- run_name, set_index, tf_list, n_tfs
 - n_sequences, n_elites
-- best_norm_sum (from elites)
-- mean_score_<tf> / median_score_<tf> (from sequences.parquet)
-- pwm_info_bits_<tf> (from PWM matrices in config_used.yaml)
-- site_count_<tf> (from run manifest motifs)
+- joint_min_best, joint_mean_best
+- balance_index_best
+- per-TF mean/median scores
+- PWM quality stats (info bits, site counts)
 
-Per-run summary can be computed without touching ingestion or network.
+## 9) CLI UX specification (additive)
+
+### 9.1 Generate explicit regulator_sets
+
+```
+cruncher campaign generate --campaign regulators_v1 --out config.generated.yaml
+```
+
+Behavior:
+- Expands campaign rules into explicit `regulator_sets`.
+- Writes campaign manifest.
+- No network calls.
+
+### 9.2 Fetch all campaign targets
+
+```
+cruncher fetch motifs --campaign regulators_v1 <config>
+cruncher fetch sites  --campaign regulators_v1 <config>
+```
+
+Behavior:
+- Resolves union of TFs implied by campaign.
+- Reuses existing fetch logic per TF.
+
+### 9.3 Summarize a campaign (landscape view)
+
+```
+cruncher campaign summarize --campaign regulators_v1 --runs runs/*
+```
+
+Behavior:
+- Aggregates per-run artifacts into cross-run tables and plots.
+- No network calls.
+
+### 9.4 Category selection previews
+
+```
+cruncher targets list --category Category2
+cruncher targets stats --category Category2
+cruncher targets candidates --category Category2 --fuzzy
+```
+
+### 9.5 Notebook UX (existing command, extended)
+
+- `cruncher notebook` already generates a marimo notebook per run.
+- Extend it to show `joint_metrics.csv` and `score__pairgrid.png` if present.
+- `cruncher campaign notebook` explores `campaign_summary.csv` outputs.
+
+## 10) UX semantics for category selection
+
+### 10.1 Selection vs objective
+
+Define two distinct concepts:
+- **Selection rule**: which TFs are included in a regulator set.
+- **Objective rule**: how TF scores are combined during optimization.
+
+### 10.2 Supported selection modes (phase 1)
+
+- **Cross-category combinations**: choose 1 TF from each category, or any size specified.
+- **Within-category combinations**: choose k TFs within a single category.
+- **Selectors** filter candidates before combinations (min info bits, site count, dataset preference).
+
+### 10.3 Objective semantics (phase 2, optional)
+
+To support “at least one TF from category A and one from category B” within a single run:
+- Compute a **category score** = `max` (or softmax) of TF scores within that category.
+- Combine category scores via `min` or `sum` (configurable).
+- If a TF appears in multiple categories, treat it **once** to avoid double counting.
+
+This is a deeper change (scoring), so it is optional and staged later.
+
+## 11) Analysis & visualization specification
+
+### 11.1 Pairwise grid (N>2 view)
+
+Purpose: show all pairwise projections for N-D optimization.
+
+- Input: `sequences.parquet` score columns for all TFs.
+- Output: `analysis/plots/score__pairgrid.png` (optional PDF).
+- Use subsampling to cap point counts.
+
+### 11.2 Joint optimization summaries
+
+Per run, compute and persist:
+- `joint_min`, `joint_mean`, `joint_hmean` (across TF scores).
+- `balance_index = min / mean` (higher is more balanced).
+- `pareto_front_size` and `pareto_fraction` (elites).
+- Optional `hypervolume` (if implemented with a fixed reference point).
+
+Output:
+- `analysis/tables/joint_metrics.csv`.
+
+### 11.3 Category satisfaction metrics
+
+If categories defined, compute:
+- `% sequences where all categories have ≥1 TF above threshold`.
+- `% sequences where every TF exceeds threshold`.
+- `% sequences where at least one TF per category exceeds threshold`.
+
+### 11.4 Existing plots remain, with clarity updates
+
+- Pairwise scatter plots must be labeled as **projections**.
+- Parallel coordinates should highlight the joint score (color scale) to spot balanced elites.
+
+## 12) Quality metrics and selection rules
+
+### 12.1 Quality signals (existing sources)
+
+- PWM info bits: `src/core/pwm.py:PWM.information_bits`.
+- Site counts and length stats: `src/services/target_service.py:target_stats`.
+- Provenance tags: `src/store/catalog_index.py:CatalogEntry`.
+
+### 12.2 Where quality scoring lives
+
+- Catalog-level metrics: compute once (ingest/catalog), reused across campaigns.
+- Run-level metrics: derived from run artifacts in analysis/campaign summary.
+
+## 13) Validation & error handling
+
+Explicit errors (no fallbacks):
+- Missing category name in campaign rules.
+- Invalid size ranges or `max_per_category`.
+- Overlap conflicts when `distinct_across_categories=true`.
+- Selector filters produce zero candidates.
+- Generated config missing or invalid `regulator_sets`.
+
+## 14) Implementation checklist (phased)
+
+### Phase 1 — Config + expansion (low risk)
+- [x] Add `regulator_categories` + `campaigns` to schema.
+- [x] Implement `campaign_service.expand_campaign()`.
+- [x] CLI `cruncher campaign generate`.
+- [ ] Optional: record campaign metadata into run manifest extras.
+
+### Phase 2 — Analysis extensions
+- [x] Add pairwise grid plot to analysis outputs.
+- [x] Add `joint_metrics.csv` and register in table manifest.
+- [x] Update notebook scaffold to surface new outputs.
+
+### Phase 3 — Campaign summary
+- [x] CLI `cruncher campaign summarize` (aggregate runs).
+- [x] Output `campaign_summary.csv` + plots.
+
+### Phase 4 — UX polish
+- [x] Add `--category`/`--campaign` filters to `cruncher targets`.
+- [x] Add `--campaign` to fetch commands.
+- [x] Optional: campaign-level marimo notebook.
+
+## 15) Test plan
+
+- **Campaign expansion**: deterministic output sets; handles overlaps; validates selectors.
+- **Generated config**: passes `load_config` and runs parse/sample.
+- **Manifest tagging**: run manifests include campaign metadata when used.
+- **Pairwise grid plot**: produces output for N>2 TFs (and N=1/2).
+- **Joint metrics**: values match expected from synthetic data.
+- **Campaign summary**: aggregates multiple runs into correct tables.
+- **Notebook**: detects and renders new tables/plots; strict mode still validates.
+
+## 16) Outcomes if implemented
+
+If fully implemented, Cruncher will:
+- Support **category-driven campaigns** without changing core optimization.
+- Enable scalable **N>2 regulator** workflows with clear projections and joint metrics.
+- Provide **campaign-level summaries** for landscape exploration.
+- Keep the system **reproducible, decoupled, and assertive** with deterministic manifests and offline analysis.
+- Improve UX for TF discovery and selection while preserving existing CLI contracts.
 
 ---
 
-## Explicit “unchanged” components
+## Appendix: File references
 
-- Core PWM scoring and MCMC optimization (no changes). (refs: `src/core/evaluator.py:SequenceEvaluator`, `src/core/scoring.py:Scorer`)
-- Lockfile semantics and verification. (refs: `src/store/lockfile.py:validate_lockfile`, `src/store/lockfile.py:verify_lockfile_hashes`)
-- Existing parse/sample/analyze/report stages and artifacts.
-
----
-
-## Implementation plan (phased, minimal)
-
-**Phase 1 — Expansion + metadata (no core changes)**
-1. Add optional config schema fields for `regulator_categories` and `campaigns`.
-2. Implement `campaign_service.expand_campaign(...)` to produce explicit TF sets.
-3. Add CLI `cruncher campaign generate` to write a derived config + manifest.
-4. Add run manifest extras for `campaign_id`/`campaign_entry` when using generated config.
-
-**Phase 2 — Landscape summaries (offline)**
-5. Implement `cruncher campaign summarize` to aggregate run artifacts into CSV/plots.
-6. Add doc updates + examples.
-
-**Phase 3 — UX polish**
-7. Optional fetch helper: `cruncher fetch motifs/sites --targets --campaign <name>`.
-8. Optional “runs list --campaign <name>” filter (reading campaign metadata from run_index).
-
----
-
-## Test plan
-
-Add/modify tests to cover:
-- **Campaign expansion**: given categories + rules, expansion produces deterministic regulator_sets; overlaps handled. (new tests in `tests/test_campaign_expand.py`)
-- **Generated config**: output YAML contains explicit `regulator_sets` and is still accepted by `load_config`. (tests around `src/config/schema_v2.py:CruncherConfig`)
-- **Manifest tagging**: sample runs store campaign metadata in `run_manifest.json` when generated config is used. (tests similar to `tests/test_regulator_sets_runs.py`)
-- **Campaign summary**: aggregate summary produces expected columns from synthetic run artifacts. (new tests in `tests/test_campaign_summary.py`)
-
----
-
-## Appendix: Notable current constraints (for awareness)
-
-- Pairwise plots require `analysis.tf_pair` with exactly two TFs. (refs: `src/config/schema_v2.py:AnalysisConfig._check_tf_pair`, `src/workflows/analyze/plot_registry.py:PLOT_SPECS`)
-- Fetching is TF-by-TF unless manually scripted; no “all configured targets” helper. (refs: `src/cli/commands/fetch.py:motifs`, `src/cli/commands/fetch.py:sites`)
-- Run naming is based on TF slug + set index, which becomes unwieldy for large sets. (ref: `src/utils/labels.py:build_run_name`)
+- Config validation: `src/config/schema_v2.py:AnalysisConfig._check_tf_pair`
+- Analysis layout: `src/utils/analysis_layout.py`
+- Analysis workflow: `src/workflows/analyze_workflow.py:run_analyze`
+- Plot registry: `src/workflows/analyze/plot_registry.py:PLOT_SPECS`
+- Summary plots: `src/workflows/analyze/plots/summary.py:*`
+- Notebook: `src/cli/commands/notebook.py`, `src/services/notebook_service.py`
+- Run index: `src/services/run_service.py`

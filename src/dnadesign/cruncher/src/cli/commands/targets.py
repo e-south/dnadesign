@@ -15,6 +15,7 @@ from typing import List, Optional
 import typer
 from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
 from dnadesign.cruncher.config.load import load_config
+from dnadesign.cruncher.services.campaign_service import expand_campaign, resolve_category_targets
 from dnadesign.cruncher.services.target_service import (
     has_blocking_target_errors,
     list_targets,
@@ -30,6 +31,31 @@ app = typer.Typer(no_args_is_help=True, help="Check target readiness and catalog
 console = Console()
 
 
+def _select_targets(
+    *,
+    cfg,
+    config_path: Path,
+    category: Optional[str],
+    campaign: Optional[str],
+) -> tuple:
+    if category and campaign:
+        raise ValueError("Use either --category or --campaign, not both.")
+    if category:
+        tfs = resolve_category_targets(cfg=cfg, category_name=category)
+        target_cfg = cfg.model_copy(update={"regulator_sets": [tfs]})
+        return target_cfg, f"Category targets: {category}", False
+    if campaign:
+        expansion = expand_campaign(
+            cfg=cfg,
+            config_path=config_path,
+            campaign_name=campaign,
+            include_metrics=False,
+        )
+        target_cfg = cfg.model_copy(update={"regulator_sets": expansion.regulator_sets})
+        return target_cfg, f"Campaign targets: {campaign}", False
+    return cfg, "Configured targets", True
+
+
 @app.command("list", help="List configured TF targets from regulator_sets.")
 def list_config_targets(
     config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
@@ -39,6 +65,16 @@ def list_config_targets(
         "-c",
         help="Path to cruncher config.yaml (overrides positional CONFIG).",
     ),
+    category: Optional[str] = typer.Option(
+        None,
+        "--category",
+        help="List targets from a named regulator category.",
+    ),
+    campaign: Optional[str] = typer.Option(
+        None,
+        "--campaign",
+        help="List targets from a named campaign (expanded regulator_sets).",
+    ),
 ) -> None:
     try:
         config_path = resolve_config_path(config_option or config)
@@ -46,10 +82,20 @@ def list_config_targets(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    table = Table(title="Configured targets", header_style="bold")
+    try:
+        target_cfg, title, _ = _select_targets(
+            cfg=cfg,
+            config_path=config_path,
+            category=category,
+            campaign=campaign,
+        )
+    except ValueError as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1)
+    table = Table(title=title, header_style="bold")
     table.add_column("Set", style="dim", justify="right")
     table.add_column("TF")
-    for set_index, tf in list_targets(cfg):
+    for set_index, tf in list_targets(target_cfg):
         table.add_row(str(set_index), tf)
     console.print(table)
 
@@ -73,6 +119,16 @@ def targets_status(
         "--site-kind",
         help="Limit site kinds when previewing pwm_source=sites (repeatable).",
     ),
+    category: Optional[str] = typer.Option(
+        None,
+        "--category",
+        help="Report status for targets in a named regulator category.",
+    ),
+    campaign: Optional[str] = typer.Option(
+        None,
+        "--campaign",
+        help="Report status for targets in a named campaign (expanded regulator_sets).",
+    ),
 ) -> None:
     try:
         config_path = resolve_config_path(config_option or config)
@@ -80,15 +136,26 @@ def targets_status(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
+    try:
+        target_cfg, title, use_lockfile = _select_targets(
+            cfg=cfg,
+            config_path=config_path,
+            category=category,
+            campaign=campaign,
+        )
+    except ValueError as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1)
     if pwm_source is not None and pwm_source not in {"matrix", "sites"}:
         raise typer.BadParameter("--pwm-source must be 'matrix' or 'sites'.")
     statuses = target_statuses(
-        cfg=cfg,
+        cfg=target_cfg,
         config_path=config_path,
         pwm_source=pwm_source,
         site_kinds=site_kinds or None,
+        use_lockfile=use_lockfile,
     )
-    table = Table(title="Target status", header_style="bold")
+    table = Table(title=title, header_style="bold")
     table.add_column("Set", style="dim", justify="right")
     table.add_column("TF")
     table.add_column("Source")
@@ -152,6 +219,16 @@ def targets_candidates(
     fuzzy: bool = typer.Option(False, "--fuzzy", help="Use fuzzy matching for catalog candidates."),
     min_score: float = typer.Option(0.6, "--min-score", help="Minimum fuzzy score (0-1)."),
     limit: int = typer.Option(10, "--limit", help="Max candidates per TF when fuzzy."),
+    category: Optional[str] = typer.Option(
+        None,
+        "--category",
+        help="Show candidates for targets in a named regulator category.",
+    ),
+    campaign: Optional[str] = typer.Option(
+        None,
+        "--campaign",
+        help="Show candidates for targets in a named campaign (expanded regulator_sets).",
+    ),
 ) -> None:
     try:
         config_path = resolve_config_path(config_option or config)
@@ -159,13 +236,28 @@ def targets_candidates(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
+    try:
+        target_cfg, title, _ = _select_targets(
+            cfg=cfg,
+            config_path=config_path,
+            category=category,
+            campaign=campaign,
+        )
+    except ValueError as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1)
     if fuzzy and not (0.0 <= min_score <= 1.0):
         raise typer.BadParameter("--min-score must be between 0 and 1. Hint: try 0.6.")
     if fuzzy:
-        candidates = target_candidates_fuzzy(cfg=cfg, config_path=config_path, min_score=min_score, limit=limit)
+        candidates = target_candidates_fuzzy(
+            cfg=target_cfg,
+            config_path=config_path,
+            min_score=min_score,
+            limit=limit,
+        )
     else:
-        candidates = target_candidates(cfg=cfg, config_path=config_path)
-    table = Table(title="Target candidates (catalog)", header_style="bold")
+        candidates = target_candidates(cfg=target_cfg, config_path=config_path)
+    table = Table(title=title, header_style="bold")
     table.add_column("Set", style="dim", justify="right")
     table.add_column("TF")
     table.add_column("Candidates")
@@ -187,6 +279,16 @@ def targets_stats(
         "-c",
         help="Path to cruncher config.yaml (overrides positional CONFIG).",
     ),
+    category: Optional[str] = typer.Option(
+        None,
+        "--category",
+        help="Show stats for targets in a named regulator category.",
+    ),
+    campaign: Optional[str] = typer.Option(
+        None,
+        "--campaign",
+        help="Show stats for targets in a named campaign (expanded regulator_sets).",
+    ),
 ) -> None:
     try:
         config_path = resolve_config_path(config_option or config)
@@ -194,12 +296,22 @@ def targets_stats(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    stats = target_stats(cfg=cfg, config_path=config_path)
+    try:
+        target_cfg, title, _ = _select_targets(
+            cfg=cfg,
+            config_path=config_path,
+            category=category,
+            campaign=campaign,
+        )
+    except ValueError as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1)
+    stats = target_stats(cfg=target_cfg, config_path=config_path)
     if not stats:
         console.print("No catalog entries found for configured targets.")
         console.print("Hint: run cruncher fetch motifs/sites to populate the cache.")
         raise typer.Exit(code=1)
-    table = Table(title="Target stats", header_style="bold")
+    table = Table(title=title, header_style="bold")
     table.add_column("Set", style="dim", justify="right")
     table.add_column("TF")
     table.add_column("Source")

@@ -50,13 +50,20 @@ Examples:
 * `cruncher fetch motifs --tf lexA --tf cpxR <config>`
 * `cruncher fetch motifs --motif-id RDBECOLITFC00214 <config>`
 * `cruncher fetch motifs --source omalley_ecoli_meme --tf lexA <config>`
+* `cruncher fetch motifs --campaign regulators_v1 <config>`
 * `cruncher fetch motifs --dry-run --tf lexA <config>`
 
 Common options:
 
-* `--tf`, `--motif-id`, `--source`
+* `--tf`, `--motif-id`, `--campaign`, `--source`
+* `--apply-selectors/--no-selectors` (campaigns)
 * `--dry-run`, `--all`, `--offline`, `--update`
 * `--summary/--no-summary`, `--paths`
+
+Note:
+
+* `--campaign` applies campaign selectors by default; use `--no-selectors` to fetch raw category TFs when the
+  local catalog is empty.
 
 ---
 
@@ -76,10 +83,12 @@ Examples:
 * `cruncher fetch sites --dry-run --tf lexA <config>`
 * `cruncher fetch sites --dataset-id <id> --tf lexA <config>`
 * `cruncher fetch sites --genome-fasta genome.fna <config>`
+* `cruncher fetch sites --campaign regulators_v1 <config>`
 
 Common options:
 
-* `--tf`, `--motif-id`, `--dataset-id`, `--limit`
+* `--tf`, `--motif-id`, `--campaign`, `--dataset-id`, `--limit`
+* `--apply-selectors/--no-selectors` (campaigns)
 * `--hydrate` (hydrates missing sequences)
 * `--offline`, `--update`
 * `--genome-fasta`
@@ -88,6 +97,8 @@ Common options:
 Note:
 
 * `--hydrate` with no `--tf/--motif-id` hydrates all cached site sets by default.
+* `--campaign` applies campaign selectors by default; use `--no-selectors` to fetch raw category TFs when the
+  local catalog is empty.
 
 ---
 
@@ -104,6 +115,59 @@ When to use:
 Example:
 
 * `cruncher lock <config>`
+
+---
+
+#### `cruncher campaign generate`
+
+Expands a campaign into explicit `regulator_sets` and writes a derived config plus a manifest.
+
+Example:
+
+* `cruncher campaign generate --campaign regulators_v1 --out config.campaign.yaml <config>`
+
+Notes:
+
+* The base config must define `regulator_categories` and `campaigns`.
+* Selector filters require cached motifs/sites; fetch before generating if you use them.
+* The manifest is written alongside the output config by default.
+
+---
+
+#### `cruncher campaign summarize`
+
+Aggregates multiple campaign runs into summary tables and plots (offline).
+
+Examples:
+
+* `cruncher campaign summarize --campaign regulators_v1 --runs runs/* --config <config>`
+* `cruncher campaign summarize --campaign regulators_v1 --no-metrics <config>`
+
+Outputs:
+
+* `campaign_summary.csv`, `campaign_best.csv`
+* plots under `plots/` (including `best_jointscore_bar.png` and `tf_coverage_heatmap.png`)
+
+Notes:
+
+* `--metrics` requires a local catalog; fetch motifs/sites first.
+* `--skip-missing` skips runs missing `analysis/tables/joint_metrics.csv` or `score_summary.csv`.
+
+---
+
+#### `cruncher campaign notebook`
+
+Generates a marimo notebook for exploring `campaign_summary.csv` outputs.
+
+Examples:
+
+* `cruncher campaign notebook --campaign regulators_v1 <config>`
+* `cruncher campaign notebook --campaign regulators_v1 --out runs/campaigns/<id> <config>`
+
+Notes:
+
+* Requires `cruncher campaign summarize` to have been run first (summary CSVs + manifest present).
+* Install marimo with `uv sync --locked --group notebooks`.
 
 ---
 
@@ -162,6 +226,11 @@ Preconditions:
 
 * provide runs via `analysis.runs`, `--run`, or `--latest`
 * trace-dependent plots require `trace.nc`
+
+Outputs:
+
+* tables: `analysis/tables/score_summary.csv`, `analysis/tables/elite_topk.csv`, `analysis/tables/joint_metrics.csv`
+* plots: `analysis/plots/score__pairgrid.png` (when `analysis.plots.pairgrid=true`)
 
 ---
 
@@ -249,7 +318,7 @@ Examples:
 
 #### `cruncher targets`
 
-Check readiness for the configured `regulator_sets`.
+Check readiness for the configured `regulator_sets` (or a category/campaign preview).
 
 Subcommands:
 
@@ -262,6 +331,8 @@ Examples:
 
 * `cruncher targets status <config>`
 * `cruncher targets candidates --fuzzy <config>`
+* `cruncher targets list --category Category2 <config>`
+* `cruncher targets status --campaign regulators_v1 <config>`
 
 ---
 

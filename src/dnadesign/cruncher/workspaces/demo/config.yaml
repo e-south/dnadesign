@@ -2,6 +2,18 @@ cruncher:
   out_dir: runs/
   regulator_sets:
     - [lexA, cpxR]
+  regulator_categories:
+    Stress: [lexA]
+    Envelope: [cpxR]
+  campaigns:
+    - name: demo_pair
+      categories: [Stress, Envelope]
+      across_categories:
+        sizes: [2]
+        max_per_category: 1
+      allow_overlap: true
+      distinct_across_categories: true
+      dedupe_sets: true
 
   io:
     parsers:
@@ -49,7 +61,7 @@ cruncher:
       min_sites_for_pwm: 2
       allow_low_sites: false
       curated_sites: true
-      ht_sites: true
+      ht_sites: false
       ht_dataset_sources: null
       ht_dataset_type: TFBINDING
       ht_binding_mode: tfbinding

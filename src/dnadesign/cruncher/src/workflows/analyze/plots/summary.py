@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Iterable
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 
@@ -59,6 +60,74 @@ def write_elite_topk(elites_df: pd.DataFrame, tf_names: list[str], out_path: Pat
     keep_cols = ["sequence"] + [c for c in ("rank", "norm_sum") if c in df.columns] + cols
     out_path.parent.mkdir(parents=True, exist_ok=True)
     df[keep_cols].to_csv(out_path, index=False)
+
+
+def _safe_max(values: np.ndarray) -> float | None:
+    if values.size == 0:
+        return None
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return None
+    return float(finite.max())
+
+
+def _pareto_front_mask(scores: np.ndarray) -> np.ndarray:
+    n = scores.shape[0]
+    if n == 0:
+        return np.array([], dtype=bool)
+    scores = np.nan_to_num(scores, nan=-np.inf)
+    dominated = np.zeros(n, dtype=bool)
+    for i in range(n):
+        if dominated[i]:
+            continue
+        better_or_equal = (scores >= scores[i]).all(axis=1)
+        strictly_better = (scores > scores[i]).any(axis=1)
+        if np.any(better_or_equal & strictly_better):
+            dominated[i] = True
+    return ~dominated
+
+
+def write_joint_metrics(elites_df: pd.DataFrame, tf_names: list[str], out_path: Path) -> None:
+    cols = _score_columns(tf_names)
+    missing = [col for col in cols if col not in elites_df.columns]
+    if missing:
+        raise ValueError(f"Missing score columns in elites parquet: {missing}")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tf_blob = ",".join(tf_names)
+    if elites_df.empty:
+        payload = {
+            "tf_names": tf_blob,
+            "joint_min": None,
+            "joint_mean": None,
+            "joint_hmean": None,
+            "balance_index": None,
+            "pareto_front_size": 0,
+            "pareto_fraction": 0.0,
+        }
+        pd.DataFrame([payload]).to_csv(out_path, index=False)
+        return
+
+    scores = elites_df[cols].to_numpy(dtype=float)
+    joint_min = scores.min(axis=1)
+    joint_mean = scores.mean(axis=1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        joint_hmean = scores.shape[1] / np.sum(1.0 / scores, axis=1)
+    balance_index = joint_min / joint_mean
+
+    pareto_mask = _pareto_front_mask(scores)
+    pareto_front_size = int(pareto_mask.sum())
+    pareto_fraction = pareto_front_size / float(scores.shape[0]) if scores.shape[0] else 0.0
+
+    payload = {
+        "tf_names": tf_blob,
+        "joint_min": _safe_max(joint_min),
+        "joint_mean": _safe_max(joint_mean),
+        "joint_hmean": _safe_max(joint_hmean),
+        "balance_index": _safe_max(balance_index),
+        "pareto_front_size": pareto_front_size,
+        "pareto_fraction": pareto_fraction,
+    }
+    pd.DataFrame([payload]).to_csv(out_path, index=False)
 
 
 def plot_score_hist(score_df: pd.DataFrame, tf_names: list[str], out_path: Path) -> None:
@@ -138,3 +207,51 @@ def plot_parallel_coords(elites_df: pd.DataFrame, tf_names: list[str], out_path:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
+
+
+def plot_score_pairgrid(
+    score_df: pd.DataFrame,
+    tf_names: list[str],
+    out_path: Path,
+    *,
+    max_points: int = 2000,
+) -> None:
+    if len(tf_names) < 2:
+        fig, ax = plt.subplots(figsize=(5, 3))
+        ax.text(
+            0.5,
+            0.5,
+            f"Pairgrid requires at least 2 TFs (found {len(tf_names)}).",
+            ha="center",
+            va="center",
+        )
+        ax.axis("off")
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        return
+    if score_df.empty:
+        fig, ax = plt.subplots(figsize=(5, 3))
+        ax.text(0.5, 0.5, "No sequence scores available for pairgrid.", ha="center", va="center")
+        ax.axis("off")
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        return
+    cols = _score_columns(tf_names)
+    missing = [col for col in cols if col not in score_df.columns]
+    if missing:
+        raise ValueError(f"Missing score columns in sequences.parquet: {missing}")
+    df = score_df[cols].copy()
+    df.columns = list(tf_names)
+    if max_points > 0 and len(df) > max_points:
+        df = df.sample(n=max_points, random_state=0)
+    sns.set_style("ticks", {"axes.grid": False})
+    grid = sns.PairGrid(df, corner=True, diag_sharey=False, height=2.2)
+    grid.map_lower(sns.scatterplot, s=10, alpha=0.5, linewidth=0)
+    grid.map_diag(sns.histplot, bins=30)
+    grid.fig.suptitle("TF score pairgrid (pairwise projections)", y=1.02)
+    grid.fig.tight_layout()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    grid.fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    plt.close(grid.fig)

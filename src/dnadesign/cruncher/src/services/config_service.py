@@ -16,6 +16,7 @@ from dnadesign.cruncher.config.schema_v2 import CruncherConfig
 
 def summarize_config(cfg: CruncherConfig) -> Dict[str, Any]:
     regulators = [tf for group in cfg.regulator_sets for tf in group]
+    campaign_names = [campaign.name for campaign in cfg.campaigns]
     local_sources = []
     for src in cfg.ingest.local_sources:
         local_sources.append(
@@ -43,6 +44,10 @@ def summarize_config(cfg: CruncherConfig) -> Dict[str, Any]:
         "out_dir": str(cfg.out_dir),
         "regulator_sets": cfg.regulator_sets,
         "regulators_flat": regulators,
+        "regulator_categories": cfg.regulator_categories,
+        "campaigns": [campaign.model_dump(mode="json") for campaign in cfg.campaigns],
+        "campaign_names": campaign_names,
+        "campaign": cfg.campaign.model_dump(mode="json") if cfg.campaign else None,
         "io": {"parsers": {"extra_modules": cfg.io.parsers.extra_modules}},
         "motif_store": {
             "catalog_root": str(cfg.motif_store.catalog_root),

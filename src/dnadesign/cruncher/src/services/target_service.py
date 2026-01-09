@@ -15,6 +15,7 @@ from typing import Iterable, Optional, Tuple
 
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig
 from dnadesign.cruncher.ingest.site_windows import resolve_window_length
+from dnadesign.cruncher.services.campaign_service import select_catalog_entry
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.lockfile import LockedMotif, read_lockfile
 
@@ -169,6 +170,7 @@ def target_statuses(
     site_kinds: Optional[list[str]] = None,
     combine_sites: Optional[bool] = None,
     site_window_lengths: Optional[dict[str, int]] = None,
+    use_lockfile: bool = True,
 ) -> list[TargetStatus]:
     catalog_root = config_path.parent / cfg.motif_store.catalog_root
     lock_path = catalog_root / "locks" / f"{config_path.stem}.lock.json"
@@ -183,7 +185,7 @@ def target_statuses(
     lockfile_pwm = None
     lockfile_site_kinds: Optional[list[str]] = None
     lockfile_combine_sites: Optional[bool] = None
-    if lock_path.exists():
+    if use_lockfile and lock_path.exists():
         lockfile = read_lockfile(lock_path)
         lockmap = lockfile.resolved
         lockfile_pwm = lockfile.pwm_source
@@ -191,7 +193,7 @@ def target_statuses(
         lockfile_combine_sites = lockfile.combine_sites
 
     required = {tf for _, tf in list_targets(cfg)}
-    if lock_path.exists():
+    if use_lockfile and lock_path.exists():
         missing = required - set(lockmap.keys())
         extra = set(lockmap.keys()) - required
         mismatch = None
@@ -250,10 +252,31 @@ def target_statuses(
     statuses: list[TargetStatus] = []
     for set_index, tf in list_targets(cfg):
         entry = None
-        locked = lockmap.get(tf)
+        locked = lockmap.get(tf) if use_lockfile else None
         if locked is not None:
             entry = catalog.entries.get(f"{locked.source}:{locked.motif_id}")
-        if locked is None:
+            if entry is None:
+                statuses.append(
+                    TargetStatus(
+                        set_index=set_index,
+                        tf_name=tf,
+                        source=locked.source,
+                        motif_id=locked.motif_id,
+                        organism=None,
+                        has_matrix=False,
+                        has_sites=False,
+                        site_count=0,
+                        site_total=0,
+                        site_kind=None,
+                        dataset_id=None,
+                        matrix_source=None,
+                        pwm_source=effective_pwm_source,
+                        status="missing-catalog",
+                        message=f"Catalog entry missing for {locked.source}:{locked.motif_id}.",
+                    )
+                )
+                continue
+        elif use_lockfile:
             statuses.append(
                 TargetStatus(
                     set_index=set_index,
@@ -274,27 +297,40 @@ def target_statuses(
                 )
             )
             continue
-        if entry is None:
-            statuses.append(
-                TargetStatus(
-                    set_index=set_index,
+        else:
+            try:
+                entry = select_catalog_entry(
+                    catalog=catalog,
                     tf_name=tf,
-                    source=locked.source,
-                    motif_id=locked.motif_id,
-                    organism=None,
-                    has_matrix=False,
-                    has_sites=False,
-                    site_count=0,
-                    site_total=0,
-                    site_kind=None,
-                    dataset_id=None,
-                    matrix_source=None,
                     pwm_source=effective_pwm_source,
-                    status="missing-catalog",
-                    message=f"Catalog entry missing for {locked.source}:{locked.motif_id}.",
+                    site_kinds=effective_site_kinds,
+                    combine_sites=effective_combine_sites,
+                    source_preference=cfg.motif_store.source_preference,
+                    dataset_preference=cfg.motif_store.dataset_preference,
+                    dataset_map=cfg.motif_store.dataset_map,
+                    allow_ambiguous=cfg.motif_store.allow_ambiguous,
                 )
-            )
-            continue
+            except ValueError as exc:
+                statuses.append(
+                    TargetStatus(
+                        set_index=set_index,
+                        tf_name=tf,
+                        source=None,
+                        motif_id=None,
+                        organism=None,
+                        has_matrix=False,
+                        has_sites=False,
+                        site_count=0,
+                        site_total=0,
+                        site_kind=None,
+                        dataset_id=None,
+                        matrix_source=None,
+                        pwm_source=effective_pwm_source,
+                        status="unresolved-target",
+                        message=str(exc),
+                    )
+                )
+                continue
         site_entries = [entry]
         site_count = entry.site_count
         site_total = entry.site_total
@@ -375,8 +411,8 @@ def target_statuses(
             TargetStatus(
                 set_index=set_index,
                 tf_name=tf,
-                source=locked.source,
-                motif_id=locked.motif_id,
+                source=locked.source if locked is not None else entry.source,
+                motif_id=locked.motif_id if locked is not None else entry.motif_id,
                 organism=entry.organism,
                 has_matrix=entry.has_matrix,
                 has_sites=any(candidate.has_sites for candidate in site_entries),
@@ -399,6 +435,7 @@ def has_blocking_target_errors(statuses: Iterable[TargetStatus]) -> bool:
         in {
             "missing-lock",
             "missing-catalog",
+            "unresolved-target",
             "missing-matrix",
             "missing-matrix-file",
             "missing-sites",

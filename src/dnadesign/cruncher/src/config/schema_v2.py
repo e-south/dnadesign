@@ -227,6 +227,7 @@ class AnalysisPlotConfig(BaseModel):
     scatter_pwm: bool = False
     pair_pwm: bool = False
     parallel_pwm: bool = False
+    pairgrid: bool = False
     score_hist: bool = False
     score_box: bool = False
     correlation_heatmap: bool = False
@@ -269,6 +270,172 @@ class AnalysisConfig(BaseModel):
         if self.scatter_style == "thresholds" and self.scatter_scale != "llr":
             raise ValueError("scatter_style='thresholds' requires scatter_scale='llr'")
         return self
+
+
+class CampaignSelectorsConfig(BaseModel):
+    min_info_bits: Optional[float] = None
+    min_site_count: Optional[int] = None
+    min_pwm_length: Optional[int] = None
+    max_pwm_length: Optional[int] = None
+    source_preference: List[str] = Field(default_factory=list)
+    dataset_preference: List[str] = Field(default_factory=list)
+
+    @field_validator("min_info_bits")
+    @classmethod
+    def _check_min_info_bits(cls, v: Optional[float]) -> Optional[float]:
+        if v is None:
+            return None
+        if not isinstance(v, (int, float)) or v < 0:
+            raise ValueError("selectors.min_info_bits must be a non-negative number")
+        return float(v)
+
+    @field_validator("min_site_count", "min_pwm_length", "max_pwm_length")
+    @classmethod
+    def _check_non_negative_ints(cls, v: Optional[int], info) -> Optional[int]:
+        if v is None:
+            return None
+        if not isinstance(v, int) or v < 0:
+            raise ValueError(f"selectors.{info.field_name} must be a non-negative integer")
+        return v
+
+    @field_validator("source_preference", "dataset_preference")
+    @classmethod
+    def _check_text_list(cls, v: List[str], info) -> List[str]:
+        cleaned: list[str] = []
+        for item in v:
+            name = str(item).strip()
+            if not name:
+                raise ValueError(f"selectors.{info.field_name} entries must be non-empty strings")
+            cleaned.append(name)
+        return cleaned
+
+    @model_validator(mode="after")
+    def _check_pwm_length_bounds(self) -> "CampaignSelectorsConfig":
+        if self.min_pwm_length is not None and self.max_pwm_length is not None:
+            if self.max_pwm_length < self.min_pwm_length:
+                raise ValueError("selectors.max_pwm_length must be >= selectors.min_pwm_length")
+        return self
+
+    def requires_catalog(self) -> bool:
+        return any(
+            [
+                self.min_info_bits is not None,
+                self.min_site_count is not None,
+                self.min_pwm_length is not None,
+                self.max_pwm_length is not None,
+                bool(self.source_preference),
+                bool(self.dataset_preference),
+            ]
+        )
+
+
+class CampaignWithinCategoryConfig(BaseModel):
+    sizes: List[int] = Field(default_factory=list)
+
+    @field_validator("sizes")
+    @classmethod
+    def _check_sizes(cls, v: List[int]) -> List[int]:
+        if not v:
+            raise ValueError("within_category.sizes must be a non-empty list")
+        cleaned: list[int] = []
+        for size in v:
+            if not isinstance(size, int) or size < 1:
+                raise ValueError("within_category.sizes must be positive integers")
+            cleaned.append(size)
+        return sorted(set(cleaned))
+
+
+class CampaignAcrossCategoriesConfig(BaseModel):
+    sizes: List[int] = Field(default_factory=list)
+    max_per_category: Optional[int] = None
+
+    @field_validator("sizes")
+    @classmethod
+    def _check_sizes(cls, v: List[int]) -> List[int]:
+        if not v:
+            raise ValueError("across_categories.sizes must be a non-empty list")
+        cleaned: list[int] = []
+        for size in v:
+            if not isinstance(size, int) or size < 2:
+                raise ValueError("across_categories.sizes must be integers >= 2")
+            cleaned.append(size)
+        return sorted(set(cleaned))
+
+    @field_validator("max_per_category")
+    @classmethod
+    def _check_max_per_category(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return None
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("across_categories.max_per_category must be a positive integer")
+        return v
+
+
+class CampaignConfig(BaseModel):
+    name: str
+    categories: List[str]
+    within_category: Optional[CampaignWithinCategoryConfig] = None
+    across_categories: Optional[CampaignAcrossCategoriesConfig] = None
+    allow_overlap: bool = True
+    distinct_across_categories: bool = True
+    dedupe_sets: bool = True
+    selectors: CampaignSelectorsConfig = CampaignSelectorsConfig()
+    tags: Dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("name")
+    @classmethod
+    def _check_name(cls, v: str) -> str:
+        name = str(v).strip()
+        if not name:
+            raise ValueError("campaign.name must be a non-empty string")
+        return name
+
+    @field_validator("categories")
+    @classmethod
+    def _check_categories(cls, v: List[str]) -> List[str]:
+        if not v:
+            raise ValueError("campaign.categories must be a non-empty list")
+        cleaned: list[str] = []
+        for item in v:
+            name = str(item).strip()
+            if not name:
+                raise ValueError("campaign.categories entries must be non-empty strings")
+            cleaned.append(name)
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("campaign.categories must be unique")
+        return cleaned
+
+    @field_validator("tags")
+    @classmethod
+    def _check_tags(cls, v: Dict[str, str]) -> Dict[str, str]:
+        cleaned: dict[str, str] = {}
+        for key, value in v.items():
+            key_clean = str(key).strip()
+            if not key_clean:
+                raise ValueError("campaign.tags keys must be non-empty strings")
+            cleaned[key_clean] = str(value)
+        return cleaned
+
+    @model_validator(mode="after")
+    def _check_rules(self) -> "CampaignConfig":
+        if self.within_category is None and self.across_categories is None:
+            raise ValueError("campaign must define within_category or across_categories rules")
+        return self
+
+
+class CampaignMetadataConfig(BaseModel):
+    name: str
+    campaign_id: str
+    manifest_path: Optional[Path] = None
+    generated_at: Optional[str] = None
+
+    @field_validator("name", "campaign_id")
+    @classmethod
+    def _check_required_text(cls, v: str, info) -> str:
+        text = str(v).strip()
+        if not text:
+            raise ValueError(f"campaign.{info.field_name} must be a non-empty string")
+        return text
 
 
 class MotifStoreConfig(BaseModel):
@@ -455,6 +622,9 @@ class IngestConfig(BaseModel):
 class CruncherConfig(BaseModel):
     out_dir: Path
     regulator_sets: List[List[str]]
+    regulator_categories: Dict[str, List[str]] = Field(default_factory=dict)
+    campaigns: List[CampaignConfig] = Field(default_factory=list)
+    campaign: Optional[CampaignMetadataConfig] = None
     io: IOConfig = IOConfig()
     motif_store: MotifStoreConfig = MotifStoreConfig()
     ingest: IngestConfig = IngestConfig()
@@ -462,6 +632,59 @@ class CruncherConfig(BaseModel):
     parse: ParseConfig
     sample: Optional[SampleConfig] = None
     analysis: Optional[AnalysisConfig] = None
+
+    @field_validator("regulator_categories")
+    @classmethod
+    def _check_regulator_categories(cls, v: Dict[str, List[str]]) -> Dict[str, List[str]]:
+        cleaned: dict[str, list[str]] = {}
+        for raw_name, raw_tfs in v.items():
+            name = str(raw_name).strip()
+            if not name:
+                raise ValueError("regulator_categories keys must be non-empty strings")
+            if not raw_tfs:
+                raise ValueError(f"regulator_categories['{name}'] must be a non-empty list")
+            tfs: list[str] = []
+            for tf in raw_tfs:
+                tf_name = str(tf).strip()
+                if not tf_name:
+                    raise ValueError(f"regulator_categories['{name}'] entries must be non-empty strings")
+                tfs.append(tf_name)
+            if len(set(tfs)) != len(tfs):
+                raise ValueError(f"regulator_categories['{name}'] contains duplicate TF names")
+            cleaned[name] = tfs
+        return cleaned
+
+    @model_validator(mode="after")
+    def _check_campaigns(self) -> "CruncherConfig":
+        if not self.campaigns:
+            return self
+        if not self.regulator_categories:
+            raise ValueError("campaigns require regulator_categories to be defined")
+        seen: set[str] = set()
+        category_names = set(self.regulator_categories.keys())
+        for campaign in self.campaigns:
+            if campaign.name in seen:
+                raise ValueError(f"campaign name '{campaign.name}' is duplicated")
+            seen.add(campaign.name)
+            missing = [name for name in campaign.categories if name not in category_names]
+            if missing:
+                missing_list = ", ".join(missing)
+                raise ValueError(f"campaign '{campaign.name}' references missing categories: {missing_list}")
+            if not campaign.allow_overlap:
+                overlaps: set[str] = set()
+                seen_tfs: set[str] = set()
+                for category in campaign.categories:
+                    for tf in self.regulator_categories.get(category, []):
+                        if tf in seen_tfs:
+                            overlaps.add(tf)
+                        seen_tfs.add(tf)
+                if overlaps:
+                    overlaps_list = ", ".join(sorted(overlaps))
+                    raise ValueError(
+                        f"campaign '{campaign.name}' forbids overlaps, but TFs appear in multiple categories: "
+                        f"{overlaps_list}"
+                    )
+        return self
 
 
 class CruncherRoot(BaseModel):

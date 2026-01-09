@@ -354,7 +354,9 @@ def run_analyze(
         plot_parallel_coords,
         plot_score_box,
         plot_score_hist,
+        plot_score_pairgrid,
         write_elite_topk,
+        write_joint_metrics,
         write_score_summary,
     )
 
@@ -500,6 +502,9 @@ def run_analyze(
         topk_path = tables_dir / "elite_topk.csv"
         write_elite_topk(elites_df, tf_names, topk_path, top_k=sample_meta.top_k)
 
+        joint_metrics_path = tables_dir / "joint_metrics.csv"
+        write_joint_metrics(elites_df, tf_names, joint_metrics_path)
+
         enabled_specs = [spec for spec in PLOT_SPECS if getattr(plots, spec.key, False)]
         if enabled_specs:
             logger.info("Enabled plots: %s", ", ".join(spec.key for spec in enabled_specs))
@@ -555,6 +560,8 @@ def run_analyze(
             plot_score_box(score_df, tf_names, plots_dir / "score__box.png")
         if plots.correlation_heatmap:
             plot_correlation_heatmap(score_df, tf_names, plots_dir / "score__correlation.png")
+        if plots.pairgrid:
+            plot_score_pairgrid(score_df, tf_names, plots_dir / "score__pairgrid.png")
         if plots.parallel_coords:
             if elites_df.empty:
                 logger.warning("Skipping parallel coordinates: no elites available.")
@@ -678,6 +685,12 @@ def run_analyze(
                     "path": str(topk_path.relative_to(sample_dir)),
                     "exists": topk_path.exists(),
                 },
+                {
+                    "key": "joint_metrics",
+                    "label": "Joint score metrics (CSV)",
+                    "path": str(joint_metrics_path.relative_to(sample_dir)),
+                    "exists": joint_metrics_path.exists(),
+                },
             ],
         }
         table_manifest_path = analysis_root / "table_manifest.json"
@@ -688,6 +701,13 @@ def run_analyze(
             artifact_entry(per_pwm_path, sample_dir, kind="table", label="Per-PWM scores (CSV)", stage="analysis"),
             artifact_entry(summary_path, sample_dir, kind="table", label="Per-TF summary (CSV)", stage="analysis"),
             artifact_entry(topk_path, sample_dir, kind="table", label="Elite top-K (CSV)", stage="analysis"),
+            artifact_entry(
+                joint_metrics_path,
+                sample_dir,
+                kind="table",
+                label="Joint score metrics (CSV)",
+                stage="analysis",
+            ),
             artifact_entry(
                 plot_manifest_path,
                 sample_dir,

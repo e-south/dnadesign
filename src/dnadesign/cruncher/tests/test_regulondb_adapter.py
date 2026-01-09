@@ -61,6 +61,12 @@ def _fixture_transport(query: str, variables: dict) -> dict:
     return regulon_list_for_search(variables.get("search"))
 
 
+def _fixture_transport_no_ht(query: str, variables: dict) -> dict:
+    if "listAllHTSources" in query:
+        return {"listAllHTSources": []}
+    return _fixture_transport(query, variables)
+
+
 def test_list_motifs_returns_descriptors() -> None:
     adapter = RegulonDBAdapter(transport=_fixture_transport)
     results = adapter.list_motifs(MotifQuery(tf_name=None))
@@ -99,6 +105,17 @@ def test_list_sites_curated() -> None:
     sites = list(adapter.list_sites(SiteQuery(tf_name="lexA")))
     assert len(sites) == 2
     assert sites[0].sequence == "ACGTAC"
+
+
+def test_list_sites_curated_with_missing_ht_warns(caplog: pytest.LogCaptureFixture) -> None:
+    adapter = RegulonDBAdapter(
+        RegulonDBAdapterConfig(curated_sites=True, ht_sites=True),
+        transport=_fixture_transport_no_ht,
+    )
+    with caplog.at_level("WARNING"):
+        sites = list(adapter.list_sites(SiteQuery(tf_name="lexA")))
+    assert len(sites) == 2
+    assert any("using curated sites only" in record.message for record in caplog.records)
 
 
 def test_list_sites_ht() -> None:

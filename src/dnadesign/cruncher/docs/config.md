@@ -5,12 +5,13 @@ This page explains the `config.yaml` and how each block maps to the **cruncher**
 ### Contents
 
 1. [Root settings](#root-settings)
-2. [IO](#io)
-3. [Motif store](#motif_store)
-4. [Ingest](#ingest)
-5. [Parse](#parse)
-6. [Sample](#sample)
-7. [Analysis](#analysis)
+2. [Categories & campaigns](#categories--campaigns)
+3. [IO](#io)
+4. [Motif store](#motif_store)
+5. [Ingest](#ingest)
+6. [Parse](#parse)
+7. [Sample](#sample)
+8. [Analysis](#analysis)
 
 ---
 
@@ -21,12 +22,54 @@ cruncher:
   out_dir: runs/
   regulator_sets:
     - [lexA, cpxR]
+  regulator_categories: {}
+  campaigns: []
 ```
 
 Notes:
 - `out_dir` is resolved relative to the config file.
 - Each regulator set creates its own `parse_...` and `sample_...` run folders.
 - `runs/` is the recommended workspace-local runs directory (keeps outputs alongside the config).
+
+### Categories & campaigns
+
+Category and campaign blocks let you generate many regulator combinations without hand-writing
+pairwise sets. They are **additive** and do not change core sampling behavior.
+
+```yaml
+cruncher:
+  regulator_categories:
+    Category1: [CpxR, BaeR]
+    Category2: [LexA, RcdA, Lrp, Fur]
+    Category3: [Fnr, Fur, AcrR, SoxR, SoxS, Lrp]
+
+  campaigns:
+    - name: regulators_v1
+      categories: [Category1, Category2, Category3]
+      within_category:
+        sizes: [2, 3]
+      across_categories:
+        sizes: [2, 3]
+        max_per_category: 2
+      allow_overlap: true
+      distinct_across_categories: true
+      dedupe_sets: true
+      selectors:
+        min_info_bits: 8.0
+        min_site_count: 10
+      tags:
+        organism: ecoli
+        purpose: multi_tf_sweep
+
+  regulator_sets: []  # generated via cruncher campaign generate
+```
+
+Notes:
+- Campaigns expand into explicit `regulator_sets`; they do not run automatically.
+- Run `cruncher campaign generate --campaign <name>` to materialize a derived config.
+- `allow_overlap=false` rejects TFs shared across categories.
+- `distinct_across_categories=true` prevents a single TF from satisfying multiple categories.
+- Selector filters require cached motifs/sites; fetch before generating if you use them.
 
 ### io
 
@@ -240,6 +283,7 @@ analysis:
     score_hist: true
     score_box: false
     correlation_heatmap: true
+    pairgrid: false
     parallel_coords: true
   scatter_scale: llr
   scatter_style: edges
@@ -258,6 +302,8 @@ Notes:
 - Threshold plots normalize per-TF LLRs by each PWM's consensus LLR (axes are 0-1).
 - `subsampling_epsilon` controls how per-PWM draws are subsampled for scatter plots; it is the minimum Euclidean change in per-TF score space required to keep a draw (must be > 0).
 - `cruncher analyze --list-plots` shows the registry and required inputs.
+- `pairgrid` produces a pairwise projection grid across TF scores (useful for N>2).
+- Analysis tables include `joint_metrics.csv`, summarizing joint score balance and Pareto-front size for elites.
 
 ### Inspect resolved config
 
@@ -321,7 +367,7 @@ Example output (captured with `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200`):
 │ swap_prob                        │ 0.1                                                                                                                                                               │
 │ analysis.runs                    │ []                                                                                                                                                                │
 │ analysis.plots                   │ {'trace': True, 'autocorr': True, 'convergence': True, 'scatter_pwm': True, 'pair_pwm': True, 'parallel_pwm': True, 'score_hist': True, 'score_box': False,       │
-│                                  │ 'correlation_heatmap': True, 'parallel_coords': True}                                                                                                             │
+│                                  │ 'correlation_heatmap': True, 'pairgrid': False, 'parallel_coords': True}                                                                                          │
 │ analysis.scatter_scale           │ llr                                                                                                                                                               │
 │ analysis.subsampling_epsilon     │ 10.0                                                                                                                                                              │
 │ analysis.scatter_style           │ edges                                                                                                                                                             │

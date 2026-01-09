@@ -78,7 +78,13 @@ def test_workspaces_list_includes_demo() -> None:
 def test_fetch_motifs_requires_tf_or_motif_id() -> None:
     result = invoke_cli(["fetch", "motifs", str(CONFIG_PATH)])
     assert result.exit_code != 0
-    assert "Provide at least one --tf or --motif-id" in combined_output(result)
+    assert "Provide at least one --tf, --motif-id, or --campaign" in combined_output(result)
+
+
+def test_fetch_motifs_rejects_campaign_and_tf() -> None:
+    result = invoke_cli(["fetch", "motifs", "--campaign", "demo", "--tf", "lexA", str(CONFIG_PATH)])
+    assert result.exit_code != 0
+    assert "--campaign cannot be combined with --tf or --motif-id" in combined_output(result)
 
 
 def test_catalog_show_requires_source_ref() -> None:

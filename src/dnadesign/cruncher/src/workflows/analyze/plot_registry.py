@@ -103,6 +103,14 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         "Correlation matrix across TF score dimensions.",
     ),
     PlotSpec(
+        "pairgrid",
+        "Pairwise score pairgrid",
+        (),
+        ("plots/score__pairgrid.png",),
+        "summary",
+        "Pairwise projection grid across TF score dimensions.",
+    ),
+    PlotSpec(
         "parallel_coords",
         "Parallel coordinates (top-K)",
         ("elites",),

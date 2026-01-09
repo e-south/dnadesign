@@ -3,7 +3,7 @@
 This walkthrough shows an end-to-end process for discovering, fetching, locking, sampling, and analyzing two TFs (LexA + CpxR) with the bundled demo workspace. The demo includes:
 
 - a local MEME motif source (`demo_local_meme`) for fast, offline matrix ingestion
-- RegulonDB curated + HT binding-site access for real-world inventory and site-based PWMs
+- RegulonDB curated binding-site access for real-world inventory and site-based PWMs (HT optional)
 
 Captured outputs below were generated on **2026-01-06** using `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200`
 to avoid truncated tables (unless noted otherwise). Expect timestamps and counts to differ in your environment.
@@ -136,11 +136,12 @@ Example output:
 └──────┴──────────────────┴──────────┴───────────┴──────────┘
 ```
 
-### Fetch binding sites (curated + HT)
+### Fetch binding sites (curated; HT optional)
 
 This demo uses `motif_store.pwm_source: sites`, so we cache curated sites and
-build PWMs at runtime. With `ingest.regulondb.ht_sites: true`, HT datasets are
-also available (use `--dataset-id` to pin a specific HT dataset).
+build PWMs at runtime. If you set `ingest.regulondb.ht_sites: true`, HT datasets
+are also available (use `--dataset-id` to pin a specific HT dataset). Some TFs
+may not have HT data; cruncher will warn and continue with curated sites.
 
 ```bash
 cruncher fetch sites --tf lexA --tf cpxR
@@ -244,6 +245,17 @@ $ cruncher targets list
 │   1 │ lexA │
 │   1 │ cpxR │
 └─────┴──────┘
+```
+
+### Categories & campaigns (optional)
+
+The demo config also defines two regulator categories and a small campaign to
+exercise the category/campaign workflow:
+
+```bash
+cruncher targets list --category Stress
+cruncher targets list --campaign demo_pair
+cruncher campaign generate --campaign demo_pair --out config.demo_pair.yaml
 ```
 
 Example output (targets status):

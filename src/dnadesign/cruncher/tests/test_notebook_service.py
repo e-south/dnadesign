@@ -23,7 +23,7 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     (analysis_dir / "summary.json").write_text(json.dumps({"tf_names": ["LexA"], "analysis_id": analysis_id}))
     (analysis_dir / "plot_manifest.json").write_text(json.dumps({"plots": []}))
 
-    monkeypatch.setattr(notebook_service, "_ensure_marimo", lambda: None)
+    monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
     notebook_path = notebook_service.generate_notebook(run_dir, latest=True)
     assert notebook_path.exists()
@@ -47,7 +47,7 @@ def test_generate_notebook_strict_requires_summary(tmp_path, monkeypatch) -> Non
     analysis_dir.mkdir(parents=True)
     (run_dir / "run_manifest.json").write_text(json.dumps({"artifacts": [], "config_path": ""}))
 
-    monkeypatch.setattr(notebook_service, "_ensure_marimo", lambda: None)
+    monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
     try:
         notebook_service.generate_notebook(run_dir, analysis_id=analysis_id, strict=True)
@@ -64,7 +64,7 @@ def test_generate_notebook_lenient_allows_missing_summary(tmp_path, monkeypatch)
     (run_dir / "run_manifest.json").write_text(json.dumps({"artifacts": [], "config_path": ""}))
     (analysis_dir / "plot_manifest.json").write_text(json.dumps({"plots": []}))
 
-    monkeypatch.setattr(notebook_service, "_ensure_marimo", lambda: None)
+    monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
     notebook_path = notebook_service.generate_notebook(run_dir, latest=True, strict=False)
     assert notebook_path.exists()
@@ -76,7 +76,7 @@ def test_generate_notebook_lenient_allows_missing_summary(tmp_path, monkeypatch)
 def test_generate_notebook_rejects_latest_and_analysis_id(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()
-    monkeypatch.setattr(notebook_service, "_ensure_marimo", lambda: None)
+    monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
     with pytest.raises(ValueError, match="analysis-id|latest"):
         notebook_service.generate_notebook(run_dir, analysis_id="20250101T000000Z", latest=True)

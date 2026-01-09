@@ -19,7 +19,7 @@ from dnadesign.cruncher.utils.artifacts import append_artifacts, artifact_entry,
 from dnadesign.cruncher.utils.manifest import load_manifest, write_manifest
 
 
-def _ensure_marimo() -> None:
+def ensure_marimo() -> None:
     try:
         import marimo as _  # noqa: F401
     except Exception as exc:  # pragma: no cover - optional dependency
@@ -102,7 +102,7 @@ def generate_notebook(
         raise ValueError("analysis_id must be a non-empty string.")
     if analysis_id is not None and latest:
         raise ValueError("Use either --analysis-id or --latest, not both.")
-    _ensure_marimo()
+    ensure_marimo()
     run_dir = run_dir.resolve()
     manifest = load_manifest(run_dir)
     analysis_root = run_dir / "analysis"
@@ -269,9 +269,20 @@ def _(analysis_dir, pd):
     per_pwm_df = pd.read_csv(per_pwm_path) if per_pwm_path.exists() else pd.DataFrame()
     summary_table_path = analysis_dir / "tables" / "score_summary.csv"
     summary_df = pd.read_csv(summary_table_path) if summary_table_path.exists() else pd.DataFrame()
+    joint_metrics_path = analysis_dir / "tables" / "joint_metrics.csv"
+    joint_metrics_df = pd.read_csv(joint_metrics_path) if joint_metrics_path.exists() else pd.DataFrame()
     topk_path = analysis_dir / "tables" / "elite_topk.csv"
     topk_df = pd.read_csv(topk_path) if topk_path.exists() else pd.DataFrame()
-    return per_pwm_df, per_pwm_path, summary_df, summary_table_path, topk_df, topk_path
+    return (
+        per_pwm_df,
+        per_pwm_path,
+        summary_df,
+        summary_table_path,
+        joint_metrics_df,
+        joint_metrics_path,
+        topk_df,
+        topk_path,
+    )
 
 
 @app.cell
@@ -556,12 +567,27 @@ def _(analysis_controls, mo, overview_md):
 
 
 @app.cell
-def _(mo, per_pwm_df, summary_df, topk_view, topk_slider, topk_path, per_pwm_path, summary_table_path):
+def _(
+    joint_metrics_df,
+    joint_metrics_path,
+    mo,
+    per_pwm_df,
+    per_pwm_path,
+    summary_df,
+    summary_table_path,
+    topk_path,
+    topk_slider,
+    topk_view,
+):
     blocks = []
     if summary_df.empty:
         blocks.append(mo.md("No summary table found."))
     else:
         blocks.append(mo.ui.dataframe(summary_df))
+    if joint_metrics_df.empty:
+        blocks.append(mo.md("No joint metrics table found."))
+    else:
+        blocks.append(mo.ui.dataframe(joint_metrics_df))
     if topk_slider is not None:
         blocks.append(topk_slider)
     if not topk_view.empty:
@@ -571,6 +597,7 @@ def _(mo, per_pwm_df, summary_df, topk_view, topk_slider, topk_path, per_pwm_pat
     else:
         blocks.append(mo.ui.data_explorer(per_pwm_df))
     blocks.append(mo.md(f"Summary table: {{summary_table_path}}"))
+    blocks.append(mo.md(f"Joint metrics table: {{joint_metrics_path}}"))
     blocks.append(mo.md(f"Top-K table: {{topk_path}}"))
     blocks.append(mo.md(f"Per-PWM table: {{per_pwm_path}}"))
     tables_block = mo.vstack(blocks)
