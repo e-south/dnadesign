@@ -1,7 +1,7 @@
 # Cruncher category/campaign specification (ergonomics + extensibility)
 
 Date: 2026-01-09
-Status: Implemented (phases 1-4 complete)
+Status: Implemented (phases 1-4 complete; demo expanded)
 
 ## 0) Purpose
 
@@ -416,6 +416,10 @@ Explicit errors (no fallbacks):
 - [x] Add `--category`/`--campaign` filters to `cruncher targets`.
 - [x] Add `--campaign` to fetch commands.
 - [x] Optional: campaign-level marimo notebook.
+
+### Demo alignment
+- [x] Demo workspace includes Category1/2/3 + `demo_categories(_best)` campaign.
+- [x] Demo walkthrough covers fetch, selectors, and multi-TF analysis (`docs/demo.md`).
 
 ## 15) Test plan
 

@@ -84,15 +84,17 @@ def summarize_campaign(
         include_metrics=include_metrics,
     )
     metrics = expansion.metrics
-    if include_metrics and not metrics:
-        campaign = _find_campaign(cfg, campaign_name)
-        metrics = collect_campaign_metrics(
-            cfg=cfg,
-            config_path=config_path,
-            tf_names=_unique_tfs(expansion),
-            source_preference=campaign.selectors.source_preference,
-            dataset_preference=campaign.selectors.dataset_preference,
-        )
+    if include_metrics:
+        needs_info_bits = not metrics or any(metric.info_bits is None for metric in metrics.values())
+        if needs_info_bits:
+            campaign = _find_campaign(cfg, campaign_name)
+            metrics = collect_campaign_metrics(
+                cfg=cfg,
+                config_path=config_path,
+                tf_names=_unique_tfs(expansion),
+                source_preference=campaign.selectors.source_preference,
+                dataset_preference=campaign.selectors.dataset_preference,
+            )
 
     set_index_map = _set_index_map(expansion)
     runs_root = config_path.parent / cfg.out_dir

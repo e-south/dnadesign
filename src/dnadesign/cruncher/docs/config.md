@@ -70,6 +70,9 @@ Notes:
 - `allow_overlap=false` rejects TFs shared across categories.
 - `distinct_across_categories=true` prevents a single TF from satisfying multiple categories.
 - Selector filters require cached motifs/sites; fetch before generating if you use them.
+- `selectors.min_info_bits` requires PWMs to be buildable. For site-based sources
+  with variable site lengths, set `motif_store.site_window_lengths` or switch to
+  matrix-based sources before enabling that selector.
 
 ### io
 
@@ -114,6 +117,8 @@ Notes:
   to opt into MEME BLOCKS site extraction (training-set occurrences) so they can participate
   when `pwm_source=sites`.
 - If site lengths vary, set `site_window_lengths` per TF or dataset.
+- Window lengths must not exceed the shortest cached site length for a TF; use the
+  min length from `cruncher targets stats` if unsure.
 - `combine_sites=false` avoids mixing curated and HT sites unless you opt in.
 - When `combine_sites=true`, lockfiles hash all matching site sets for the TF (respecting `site_kinds`); adding/removing site sets requires re-locking.
 - `site_window_center=summit` requires per-site summit metadata; use `midpoint` unless your source provides summits.

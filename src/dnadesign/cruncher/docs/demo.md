@@ -249,14 +249,86 @@ $ cruncher targets list
 
 ### Categories & campaigns (optional)
 
-The demo config also defines two regulator categories and a small campaign to
-exercise the category/campaign workflow:
+The demo config includes both a small pairwise campaign and an expanded
+multi-category campaign:
+
+- `demo_pair` (Stress + Envelope)
+- `demo_categories` (Category1/2/3, no selectors)
+- `demo_categories_best` (Category1/2/3 with quality selectors)
+
+Category definitions (from the demo config):
+
+- Category1: CpxR, BaeR
+- Category2: LexA, RcdA, Lrp, Fur
+- Category3: Fnr, Fur, AcrR, SoxR, SoxS, Lrp
+
+List targets by category or campaign:
 
 ```bash
 cruncher targets list --category Stress
+cruncher targets list --category Category1
 cruncher targets list --campaign demo_pair
-cruncher campaign generate --campaign demo_pair --out config.demo_pair.yaml
+cruncher targets list --campaign demo_categories
 ```
+
+Fetch sites for the expanded categories (RegulonDB curated sites):
+
+```bash
+cruncher fetch sites --campaign demo_categories --no-selectors
+```
+
+Optional DAP-seq local source:
+
+- If you have the O'Malley DAP-seq MEME files locally, add a `local_sources`
+  entry (see `docs/config.md`) with `extract_sites: true`.
+- Then fetch from that source instead of RegulonDB:
+
+```bash
+cruncher fetch sites --source omalley_ecoli_meme --campaign demo_categories --no-selectors
+```
+
+Summarize what is available:
+
+```bash
+cruncher sources summary --source regulondb --scope cache
+cruncher targets stats --campaign demo_categories
+```
+
+Apply selectors to keep the strongest candidates and generate a derived config:
+
+```bash
+cruncher campaign generate --campaign demo_categories_best --out config.demo_categories_best.yaml
+```
+
+The companion manifest (`config.demo_categories_best.campaign_manifest.json`)
+records per-TF metrics (site counts, plus info bits if you enable that selector).
+
+Run a multi-dimensional optimization and plot the facet grid:
+
+```bash
+cruncher lock config.demo_categories_best.yaml
+cruncher parse config.demo_categories_best.yaml
+cruncher sample config.demo_categories_best.yaml
+cruncher analyze --latest --plots pairgrid config.demo_categories_best.yaml
+```
+
+Optional campaign-level summary (pairs + facets across runs):
+
+```bash
+cruncher campaign summarize --campaign demo_categories_best --skip-missing
+```
+
+Notes:
+
+- Large campaigns can generate many regulator sets. For a quick demo, trim
+  `regulator_sets` in the generated config to a smaller subset.
+- If you want pairwise plots for a specific TF pair, update `analysis.tf_pair`
+  in the generated config before running `cruncher analyze`.
+- `selectors.min_info_bits` requires PWMs to be buildable. For site-based PWMs
+  with variable site lengths, set `motif_store.site_window_lengths` per TF (or
+  switch to matrix-based sources) before enabling that selector.
+- The demo config pre-populates `site_window_lengths` for the expanded TF list
+  so multi-TF parse/sample runs work without extra edits.
 
 Example output (targets status):
 

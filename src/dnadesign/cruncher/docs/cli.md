@@ -131,6 +131,8 @@ Notes:
 * The base config must define `regulator_categories` and `campaigns`.
 * Selector filters require cached motifs/sites; fetch before generating if you use them.
 * The manifest is written alongside the output config by default.
+* If `--out` is outside the original config directory, relative paths are rebased
+  so the generated config still points at the original workspace.
 
 ---
 
@@ -152,6 +154,8 @@ Notes:
 
 * `--metrics` requires a local catalog; fetch motifs/sites first.
 * `--skip-missing` skips runs missing `analysis/tables/joint_metrics.csv` or `score_summary.csv`.
+* With site-derived PWMs, `--metrics` also requires `motif_store.site_window_lengths`
+  for TFs with variable site lengths. Use `--no-metrics` if you haven't set them.
 
 ---
 

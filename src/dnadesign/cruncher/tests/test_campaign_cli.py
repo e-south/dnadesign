@@ -10,6 +10,7 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import yaml
@@ -69,6 +70,61 @@ def test_campaign_generate_cli(tmp_path: Path) -> None:
     manifest = json.loads(manifest_path.read_text())
     assert manifest["campaign_name"] == "demo"
     assert manifest["expanded_count"] == 6
+
+
+def test_campaign_generate_rebases_relative_paths(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    config = {
+        "cruncher": {
+            "out_dir": "runs",
+            "regulator_sets": [],
+            "regulator_categories": {"CatA": ["A"], "CatB": ["B"]},
+            "campaigns": [
+                {
+                    "name": "demo",
+                    "categories": ["CatA", "CatB"],
+                    "across_categories": {"sizes": [2], "max_per_category": 1},
+                }
+            ],
+            "motif_store": {"catalog_root": ".cruncher"},
+            "ingest": {
+                "genome_fasta": "data/genome.fna",
+                "genome_cache": ".cruncher/genomes",
+                "regulondb": {"ca_bundle": "certs/ca.pem"},
+                "local_sources": [
+                    {
+                        "source_id": "local",
+                        "root": "data/motifs",
+                        "format_map": {".txt": "MEME"},
+                    }
+                ],
+            },
+            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+        }
+    }
+    config_path = workspace / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    out_dir = tmp_path / "exports"
+    out_dir.mkdir()
+    out_path = out_dir / "expanded.yaml"
+    result = runner.invoke(
+        app,
+        ["campaign", "generate", "--campaign", "demo", "--out", str(out_path), str(config_path)],
+    )
+    assert result.exit_code == 0
+    payload = yaml.safe_load(out_path.read_text())["cruncher"]
+
+    def rel(target: str) -> str:
+        return os.path.relpath((workspace / target).resolve(), out_dir)
+
+    assert payload["out_dir"] == rel("runs")
+    assert payload["motif_store"]["catalog_root"] == rel(".cruncher")
+    assert payload["ingest"]["genome_cache"] == rel(".cruncher/genomes")
+    assert payload["ingest"]["genome_fasta"] == rel("data/genome.fna")
+    assert payload["ingest"]["regulondb"]["ca_bundle"] == rel("certs/ca.pem")
+    assert payload["ingest"]["local_sources"][0]["root"] == rel("data/motifs")
 
 
 def test_campaign_summarize_cli(tmp_path: Path) -> None:

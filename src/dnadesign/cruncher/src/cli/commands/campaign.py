@@ -10,6 +10,7 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,6 +25,45 @@ from rich.console import Console
 
 app = typer.Typer(no_args_is_help=True, help="Generate or summarize category campaigns.")
 console = Console()
+
+
+def _rebase_path(value: str | None, *, src_dir: Path, dst_dir: Path) -> str | None:
+    if value is None:
+        return None
+    path = Path(value)
+    if path.is_absolute():
+        return str(path)
+    absolute = (src_dir / path).resolve()
+    try:
+        if absolute.drive and dst_dir.drive and absolute.drive != dst_dir.drive:
+            return str(absolute)
+    except AttributeError:
+        pass
+    return os.path.relpath(absolute, dst_dir)
+
+
+def _rebase_config_paths(data: dict, *, src_dir: Path, dst_dir: Path) -> None:
+    if src_dir == dst_dir:
+        return
+    data["out_dir"] = _rebase_path(data.get("out_dir"), src_dir=src_dir, dst_dir=dst_dir)
+    motif_store = data.get("motif_store") or {}
+    motif_store["catalog_root"] = _rebase_path(
+        motif_store.get("catalog_root"),
+        src_dir=src_dir,
+        dst_dir=dst_dir,
+    )
+    ingest = data.get("ingest") or {}
+    ingest["genome_fasta"] = _rebase_path(ingest.get("genome_fasta"), src_dir=src_dir, dst_dir=dst_dir)
+    ingest["genome_cache"] = _rebase_path(ingest.get("genome_cache"), src_dir=src_dir, dst_dir=dst_dir)
+    regulondb = ingest.get("regulondb") or {}
+    regulondb["ca_bundle"] = _rebase_path(regulondb.get("ca_bundle"), src_dir=src_dir, dst_dir=dst_dir)
+    ingest["regulondb"] = regulondb
+    local_sources = ingest.get("local_sources") or []
+    for src in local_sources:
+        src["root"] = _rebase_path(src.get("root"), src_dir=src_dir, dst_dir=dst_dir)
+    ingest["local_sources"] = local_sources
+    data["motif_store"] = motif_store
+    data["ingest"] = ingest
 
 
 @app.command("generate", help="Expand a campaign into explicit regulator_sets.")
@@ -82,6 +122,7 @@ def generate(
         "manifest_path": str(manifest_path),
         "generated_at": generated_at,
     }
+    _rebase_config_paths(data, src_dir=config_path.parent, dst_dir=out_path.parent)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w") as fh:
