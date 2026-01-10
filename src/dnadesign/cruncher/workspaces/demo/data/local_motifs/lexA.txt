@@ -1,5 +1,7 @@
 MEME version 4
 
+MOTIF lexA
+
 letter-probability matrix: alength= 4 w= 6 nsites= 18 E= 1e-6
 0.10 0.20 0.30 0.40
 0.25 0.25 0.25 0.25

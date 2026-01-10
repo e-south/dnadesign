@@ -30,6 +30,7 @@ Notes:
 - `out_dir` is resolved relative to the config file.
 - Each regulator set creates its own `parse_...` and `sample_...` run folders.
 - `runs/` is the recommended workspace-local runs directory (keeps outputs alongside the config).
+- Config parsing is strict: unknown keys are rejected to avoid silent typos.
 
 ### Categories & campaigns
 
@@ -326,12 +327,16 @@ Example output (captured with `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200`):
 │ out_dir                          │ runs                                                                                                                                                              │
 │ regulator_sets                   │ [['lexA', 'cpxR']]                                                                                                                                                │
 │ regulators_flat                  │ lexA, cpxR                                                                                                                                                        │
+│ regulator_categories             │ {'Stress': ['lexA'], 'Envelope': ['cpxR'], 'Category1': ['cpxR', 'baeR'], 'Category2': ['lexA', 'rcdA', 'lrp', 'fur'], 'Category3': ['fnr', 'fur', 'acrR',        │
+│                                  │ 'soxR', 'soxS', 'lrp']}                                                                                                                                           │
+│ campaigns                        │ demo_pair, demo_categories, demo_categories_best                                                                                                                  │
+│ io.parsers.extra_modules         │ []                                                                                                                                                                │
 │ pwm_source                       │ sites                                                                                                                                                             │
 │ site_kinds                       │ None                                                                                                                                                              │
 │ combine_sites                    │ False                                                                                                                                                             │
 │ dataset_preference               │ []                                                                                                                                                                │
 │ dataset_map                      │ {}                                                                                                                                                                │
-│ site_window_lengths              │ {'lexA': 15, 'cpxR': 11}                                                                                                                                          │
+│ site_window_lengths              │ {'lexA': 15, 'cpxR': 11, 'baeR': 20, 'rcdA': 10, 'lrp': 12, 'fur': 12, 'fnr': 14, 'acrR': 10, 'soxR': 18, 'soxS': 20}                                             │
 │ site_window_center               │ midpoint                                                                                                                                                          │
 │ min_sites_for_pwm                │ 2                                                                                                                                                                 │
 │ source_preference                │ ['regulondb']                                                                                                                                                     │
@@ -347,6 +352,7 @@ Example output (captured with `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200`):
 │ ingest.http.retries              │ 3                                                                                                                                                                 │
 │ ingest.http.backoff_seconds      │ 0.5                                                                                                                                                               │
 │ ingest.http.max_backoff_seconds  │ 8.0                                                                                                                                                               │
+│ ingest.local_sources             │ demo_local_meme@data/local_motifs                                                                                                                                 │
 │ ingest.regulondb.curated_sites   │ True                                                                                                                                                              │
 │ ingest.regulondb.ht_sites        │ False                                                                                                                                                             │
 │ ingest.regulondb.ht_dataset_type │ TFBINDING                                                                                                                                                         │
@@ -373,8 +379,8 @@ Example output (captured with `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200`):
 │ cooling                          │ {'kind': 'linear', 'beta': (0.0001, 0.001)}                                                                                                                       │
 │ swap_prob                        │ 0.1                                                                                                                                                               │
 │ analysis.runs                    │ []                                                                                                                                                                │
-│ analysis.plots                   │ {'trace': True, 'autocorr': True, 'convergence': True, 'scatter_pwm': True, 'pair_pwm': True, 'parallel_pwm': True, 'score_hist': True, 'score_box': False,       │
-│                                  │ 'correlation_heatmap': True, 'pairgrid': False, 'parallel_coords': True}                                                                                          │
+│ analysis.plots                   │ {'trace': True, 'autocorr': True, 'convergence': True, 'scatter_pwm': True, 'pair_pwm': True, 'parallel_pwm': True, 'pairgrid': True, 'score_hist': True,         │
+│                                  │ 'score_box': False, 'correlation_heatmap': True, 'parallel_coords': True}                                                                                         │
 │ analysis.scatter_scale           │ llr                                                                                                                                                               │
 │ analysis.subsampling_epsilon     │ 10.0                                                                                                                                                              │
 │ analysis.scatter_style           │ edges                                                                                                                                                             │

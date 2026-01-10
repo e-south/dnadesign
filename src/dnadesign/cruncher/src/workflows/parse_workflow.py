@@ -19,79 +19,18 @@ from dnadesign.cruncher.services.run_service import (
     update_run_index_from_manifest,
     update_run_index_from_status,
 )
-from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
+from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.store.lockfile import read_lockfile, validate_lockfile, verify_lockfile_hashes
 from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.artifacts import artifact_entry
 from dnadesign.cruncher.utils.labels import build_run_name, regulator_sets
+from dnadesign.cruncher.utils.logos import logo_subtitle
 from dnadesign.cruncher.utils.manifest import build_run_manifest, write_manifest
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
 from dnadesign.cruncher.utils.run_status import RunStatusWriter
 
 logger = logging.getLogger(__name__)
-
-
-def _site_kind_label(kind: str | None) -> str:
-    if not kind:
-        return "unknown"
-    lower = kind.lower()
-    if lower == "curated":
-        return "curated"
-    if lower.startswith("ht_"):
-        detail = lower[len("ht_") :].replace("_", " ")
-        return f"high-throughput ({detail})"
-    if lower == "mixed":
-        return "combined"
-    return kind
-
-
-def _site_entries_for_logo(
-    *,
-    catalog: CatalogIndex,
-    entry: CatalogEntry,
-    combine_sites: bool,
-    site_kinds: list[str] | None,
-) -> list[CatalogEntry]:
-    entries = [entry]
-    if combine_sites:
-        entries = [
-            candidate
-            for candidate in catalog.entries.values()
-            if candidate.tf_name.lower() == entry.tf_name.lower() and candidate.has_sites
-        ]
-    if site_kinds is not None:
-        entries = [candidate for candidate in entries if candidate.site_kind in site_kinds]
-    return entries
-
-
-def _logo_subtitle(
-    cfg: CruncherConfig,
-    entry: CatalogEntry,
-    catalog: CatalogIndex,
-) -> str:
-    if cfg.motif_store.pwm_source == "matrix":
-        if entry.matrix_source:
-            return f"matrix: {entry.matrix_source}"
-        return "matrix"
-    if cfg.motif_store.pwm_source == "sites":
-        entries = _site_entries_for_logo(
-            catalog=catalog,
-            entry=entry,
-            combine_sites=cfg.motif_store.combine_sites,
-            site_kinds=cfg.motif_store.site_kinds,
-        )
-        kinds = [candidate.site_kind for candidate in entries if candidate.site_kind]
-        if len(kinds) > 1 and "mixed" in kinds:
-            kinds = [kind for kind in kinds if kind != "mixed"]
-        labels = [_site_kind_label(kind) for kind in sorted(set(kinds))]
-        if not labels:
-            labels = ["unknown"]
-        base = " + ".join(labels)
-        if cfg.motif_store.combine_sites and (len(entries) > 1 or len(labels) > 1):
-            return "combined" if base == "combined" else f"combined ({base})"
-        return base
-    return "unknown"
 
 
 def _store(cfg: CruncherConfig, config_path: Path):
@@ -200,7 +139,17 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
 
             if render_logos:
                 entry = catalog.entries.get(f"{ref.source}:{ref.motif_id}")
-                subtitle = _logo_subtitle(cfg, entry, catalog) if entry else "unknown"
+                subtitle = (
+                    logo_subtitle(
+                        pwm_source=cfg.motif_store.pwm_source,
+                        entry=entry,
+                        catalog=catalog,
+                        combine_sites=cfg.motif_store.combine_sites,
+                        site_kinds=cfg.motif_store.site_kinds,
+                    )
+                    if entry
+                    else "unknown"
+                )
                 plot_pwm(
                     pwm,
                     mode=cfg.parse.plot.bits_mode,

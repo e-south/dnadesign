@@ -6,18 +6,18 @@ working on ingestion, optimization, and UX. It is not required for end users.
 
 ### Contents
 
-1. [Goals](#goals)ens
+1. [Goals](#goals)
 2. [Architecture](#architecture)
 3. [Registries](#registries)
 4. [Data model](#data-model)
 5. [Cache layout](#cache-layout)
 6. [Lockfiles](#lockfiles)
-6. [PWM creation strategy](#pwm-creation-strategy)
-6. [MCMC optimization spec](#mcmc-optimization-spec)
-6. [Outputs and reporting](#outputs-and-reporting)
-6. [CLI contract](#cli-contract)
-6. [Error handling](#error-handling)
-6. [Testing plan](#testing-plan)
+7. [PWM creation strategy](#pwm-creation-strategy)
+8. [MCMC optimization spec](#mcmc-optimization-spec)
+9. [Outputs and reporting](#outputs-and-reporting)
+10. [CLI contract](#cli-contract)
+11. [Error handling](#error-handling)
+12. [Testing plan](#testing-plan)
 
 ---
 
@@ -155,8 +155,9 @@ Each run directory contains:
 Core lifecycle:
 
 Most commands accept an explicit config (`--config` or legacy positional). If omitted,
-**cruncher** searches the current directory for `cruncher.yaml`, `cruncher.yml`,
-`config.yaml`, or `config.yml`.
+**cruncher** resolves a config from `--workspace`/`CRUNCHER_WORKSPACE`, then from
+`cruncher.yaml`/`config.yaml` in the current directory (or parent directories), and
+finally from discoverable workspaces.
 
 - `cruncher fetch motifs ...`
 - `cruncher fetch sites ...`
@@ -178,7 +179,10 @@ Most commands accept an explicit config (`--config` or legacy positional). If om
 
 Pairwise plots only run when `analysis.tf_pair` is set; there is no implicit pairwise sweep.
 
-No command performs hidden network access. Fetching is explicit.
+Network access is explicit and opt-in. `cruncher fetch ...` and remote inventory
+commands (for example `cruncher sources summary --scope remote` or
+`cruncher sources datasets`) contact sources; other commands operate on local
+cache and run artifacts only.
 
 Inspection:
 

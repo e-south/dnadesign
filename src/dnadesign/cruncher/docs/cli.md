@@ -1,6 +1,8 @@
 ## cruncher CLI
 
-Most commands operate relative to a `config.yaml` file. For end-to-end walkthroughs, see the [two-TF demo](demo.md) and the [campaign demo](demo_campaigns.md).
+Most commands operate relative to a `config.yaml` file. Examples below include CONFIG for clarity; if you're in a workspace (or set `CRUNCHER_WORKSPACE`), you can omit it. Some commands (notably `cruncher notebook`) operate on a run directory instead of a config. For end-to-end walkthroughs, see the [two-TF demo](demo.md) and the [campaign demo](demo_campaigns.md).
+
+Network access is explicit and opt-in: `cruncher fetch ...` always contacts sources unless `--offline`, and remote inventory commands like `cruncher sources summary --scope remote` or `cruncher sources datasets` query upstream services. Everything else is cache- or artifact-only.
 
 ### Workspace discovery & config resolution
 
@@ -29,16 +31,46 @@ cruncher workspaces list
 
 ### Contents
 
-1. [Core lifecycle commands](#core-lifecycle-commands)
-2. [Discovery and inspection](#discovery-and-inspection)
+1. [Which command should I use?](#which-command-should-i-use)
+2. [Core lifecycle commands](#core-lifecycle-commands)
+3. [Discovery and inspection](#discovery-and-inspection)
+4. [Global options](#global-options)
 
 ---
+
+### Which command should I use?
+
+Common tasks mapped to commands:
+
+* **Get data into the cache** → `cruncher fetch motifs` (matrices) or `cruncher fetch sites` (binding sites / HT datasets).
+* **Check what is available** → `cruncher sources list/summary` (source inventory) or `cruncher catalog list/search/show/pwms/logos` (cached entries + PWM/logo outputs).
+* **Pin TFs for reproducible runs** → `cruncher lock`.
+* **Validate cached PWMs + render logos** → `cruncher parse`.
+* **Run the optimizer** → `cruncher sample`.
+* **Analyze a sample run** → `cruncher analyze` (plots/tables), then `cruncher report` (summary), optionally `cruncher notebook`.
+* **Campaign workflows** → `cruncher campaign validate` (preflight), `cruncher campaign generate` (derived config),
+  `cruncher campaign summarize` (aggregate results), `cruncher campaign notebook` (campaign summary exploration).
+* **Check target readiness** → `cruncher targets status` (and `targets candidates/stats` for deeper inspection).
+* **Inspect run artifacts** → `cruncher runs list/show/latest/watch`.
+* **Quick snapshot of workspace health** → `cruncher status`.
+* **Inspect config resolution** → `cruncher config` (summary table).
+* **List available optimizers** → `cruncher optimizers list`.
+* **Find workspaces** → `cruncher workspaces list`.
 
 ### Core lifecycle commands
 
 #### `cruncher fetch motifs`
 
 Caches motif matrices into `<catalog_root>/normalized/motifs/...`.
+
+Inputs:
+
+* CONFIG (explicit or resolved)
+* at least one of `--tf`, `--motif-id`, or `--campaign`
+
+Network:
+
+* yes by default; use `--offline` to restrict to cached motifs only
 
 When to use:
 
@@ -60,6 +92,11 @@ Common options:
 * `--dry-run`, `--all`, `--offline`, `--update`
 * `--summary/--no-summary`, `--paths`
 
+Outputs:
+
+* writes cached motif JSON files and updates `catalog.json`
+* prints a summary table by default (or raw paths with `--paths`)
+
 Note:
 
 * `--campaign` applies campaign selectors by default; use `--no-selectors` to fetch raw category TFs when the
@@ -70,6 +107,15 @@ Note:
 #### `cruncher fetch sites`
 
 Caches binding-site instances into `<catalog_root>/normalized/sites/...`.
+
+Inputs:
+
+* CONFIG (explicit or resolved)
+* at least one of `--tf`, `--motif-id`, `--campaign`, or `--hydrate`
+
+Network:
+
+* yes by default; use `--offline` to restrict to cached sites only
 
 When to use:
 
@@ -94,6 +140,11 @@ Common options:
 * `--genome-fasta`
 * `--summary/--no-summary`, `--paths`
 
+Outputs:
+
+* writes cached site JSONL files and updates `catalog.json`
+* prints a summary table by default (or raw paths with `--paths`)
+
 Note:
 
 * `--hydrate` with no `--tf/--motif-id` hydrates all cached site sets by default.
@@ -106,6 +157,15 @@ Note:
 
 Resolves TF names in `cruncher.regulator_sets` to exact cached artifacts (IDs + hashes).
 Writes `<catalog_root>/locks/<config>.lock.json`.
+
+Inputs:
+
+* CONFIG (explicit or resolved)
+* cached motifs/sites for the configured regulators
+
+Network:
+
+* no (cache-only)
 
 When to use:
 
@@ -121,6 +181,15 @@ Example:
 #### `cruncher campaign generate`
 
 Expands a campaign into explicit `regulator_sets` and writes a derived config plus a manifest.
+
+Inputs:
+
+* CONFIG (explicit or resolved)
+* `--campaign <name>` matching a campaign in config
+
+Network:
+
+* no (uses cache only if selectors require metrics)
 
 Example:
 
@@ -140,6 +209,15 @@ Notes:
 
 Validate a campaign against cached motifs/sites and selector rules.
 
+Inputs:
+
+* CONFIG (explicit or resolved)
+* `--campaign <name>`
+
+Network:
+
+* no (cache-only; `--no-metrics` avoids cache requirements)
+
 Examples:
 
 * `cruncher campaign validate --campaign regulators_v1 <config>`
@@ -156,6 +234,16 @@ Notes:
 #### `cruncher campaign summarize`
 
 Aggregates multiple campaign runs into summary tables and plots (offline).
+
+Inputs:
+
+* CONFIG (explicit or resolved)
+* `--campaign <name>`
+* `--runs` (optional; defaults to all sample runs)
+
+Network:
+
+* no (uses local run artifacts; `--metrics` requires local catalog)
 
 Examples:
 
@@ -180,6 +268,15 @@ Notes:
 
 Generates a marimo notebook for exploring `campaign_summary.csv` outputs.
 
+Inputs:
+
+* CONFIG (explicit or resolved)
+* `--campaign <name>`
+
+Network:
+
+* no (requires local summary outputs; marimo is a local dependency)
+
 Examples:
 
 * `cruncher campaign notebook --campaign regulators_v1 <config>`
@@ -195,6 +292,15 @@ Notes:
 #### `cruncher parse`
 
 Validates cached PWMs (matrix- or site-derived) and renders logos/QC artifacts.
+
+Inputs:
+
+* CONFIG (explicit or resolved)
+* lockfile (from `cruncher lock`)
+
+Network:
+
+* no (cache-only)
 
 Example:
 
@@ -216,6 +322,15 @@ Notes:
 
 Runs MCMC optimization to design sequences scoring well across TFs.
 
+Inputs:
+
+* CONFIG (explicit or resolved)
+* lockfile (from `cruncher lock`)
+
+Network:
+
+* no (cache-only)
+
 Example:
 
 * `cruncher sample <config>`
@@ -234,6 +349,16 @@ Notes:
 #### `cruncher analyze`
 
 Generates diagnostics and plots for one or more sample runs.
+
+Inputs:
+
+* CONFIG (explicit or resolved)
+* runs via `analysis.runs`, `--run`, or `--latest`
+* run artifacts: `sequences.parquet` (required) and `trace.nc` for trace-based plots
+
+Network:
+
+* no (run artifacts only)
 
 Examples:
 
@@ -259,6 +384,16 @@ Outputs:
 
 Writes `report.json` and `report.md` for a sample run.
 
+Inputs:
+
+* CONFIG (explicit or resolved)
+* run name (sample run)
+* required artifacts: `sequences.parquet` and `trace.nc` (plus elites)
+
+Network:
+
+* no (run artifacts only)
+
 Example:
 
 * `cruncher report <config> <run_name>`
@@ -282,6 +417,14 @@ directly (or pass `--config` when running elsewhere).
 #### `cruncher notebook`
 
 Generates a marimo notebook for interactive exploration.
+
+Inputs:
+
+* run directory (`<run_dir>`) and optional `--analysis-id` or `--latest`
+
+Network:
+
+* no (local artifacts only; marimo is a local dependency)
 
 Example:
 
@@ -312,6 +455,14 @@ Notes:
 
 List discoverable workspaces and their config paths.
 
+Inputs:
+
+* none
+
+Network:
+
+* no
+
 Example:
 
 * `cruncher workspaces list`
@@ -322,24 +473,49 @@ Example:
 
 Inspect cached motifs and site sets.
 
+Use `catalog pwms` to compute PWMs from cached matrices or binding sites and
+survey their lengths/bit scores, and `catalog logos` to render PNG logos for the
+same selection criteria.
+
+Inputs:
+
+* CONFIG (explicit or resolved)
+
+Network:
+
+* no (catalog only)
+
 Subcommands:
 
 * `catalog list` — list cached motifs and site sets
 * `catalog search` — search by TF name or motif ID
 * `catalog resolve` — resolve a TF name to cached candidates
 * `catalog show` — show metadata for a cached `<source>:<motif_id>`
+* `catalog pwms` — summarize or export resolved PWMs (matrix or site-derived)
+* `catalog logos` — render PWM logos for selected TFs or motif refs
 
 Examples:
 
 * `cruncher catalog list <config>`
 * `cruncher catalog search <config> lexA --fuzzy`
 * `cruncher catalog show <config> regulondb:RDBECOLITFC00214`
+* `cruncher catalog pwms <config>`
+* `cruncher catalog pwms --set 1 <config>`
+* `cruncher catalog logos --set 1 <config>`
 
 ---
 
 #### `cruncher targets`
 
 Check readiness for the configured `regulator_sets` (or a category/campaign preview).
+
+Inputs:
+
+* CONFIG (explicit or resolved)
+
+Network:
+
+* no (catalog + config only)
 
 Subcommands:
 
@@ -360,6 +536,15 @@ Examples:
 #### `cruncher sources`
 
 List or inspect ingestion sources.
+
+Inputs:
+
+* optional CONFIG (explicit or resolved)
+
+Network:
+
+* `sources list` is local-only
+* `sources datasets` and `sources summary --scope remote|both` contact upstream services
 
 Subcommands:
 
@@ -385,6 +570,7 @@ Regulator inventory for a single source:
 
 Note:
 
+* `sources list` only auto-detects config in the current directory; pass CONFIG or set `CRUNCHER_WORKSPACE` when running elsewhere.
 * Some sources do not expose full remote inventories; use `--remote-limit` (partial counts)
   or `--scope cache` if you only need cached regulators.
 
@@ -396,20 +582,34 @@ Example output (cache, abridged; captured with `CRUNCHER_LOG_LEVEL=WARNING` and 
 ┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
 ┃ Metric            ┃ Value   ┃
 ┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
-│ entries           │ 2       │
+│ entries           │ 10      │
 │ sources           │ 1       │
-│ TFs               │ 2       │
+│ TFs               │ 10      │
 │ motifs            │ 0       │
-│ site sets         │ 2       │
-│ sites (seq/total) │ 203/203 │
+│ site sets         │ 10      │
+│ sites (seq/total) │ 872/872 │
 │ datasets          │ 0       │
 └───────────────────┴─────────┘
+                  Cache by source (source=regulondb)
+┏━━━━━━━━━━━┳━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Source    ┃ TFs ┃ Motifs ┃ Site sets ┃ Sites (seq/total) ┃ Datasets ┃
+┡━━━━━━━━━━━╇━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ regulondb │  10 │      0 │        10 │ 872/872           │        0 │
+└───────────┴─────┴────────┴───────────┴───────────────────┴──────────┘
                   Cache regulators (source=regulondb)
 ┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
 ┃ TF   ┃ Sources   ┃ Motifs ┃ Site sets ┃ Sites (seq/total) ┃ Datasets ┃
 ┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ lrp  │ regulondb │      0 │         1 │ 219/219           │        0 │
+│ fur  │ regulondb │      0 │         1 │ 217/217           │        0 │
 │ cpxR │ regulondb │      0 │         1 │ 154/154           │        0 │
+│ fnr  │ regulondb │      0 │         1 │ 152/152           │        0 │
 │ lexA │ regulondb │      0 │         1 │ 49/49             │        0 │
+│ soxS │ regulondb │      0 │         1 │ 44/44             │        0 │
+│ rcdA │ regulondb │      0 │         1 │ 15/15             │        0 │
+│ acrR │ regulondb │      0 │         1 │ 11/11             │        0 │
+│ soxR │ regulondb │      0 │         1 │ 7/7               │        0 │
+│ baeR │ regulondb │      0 │         1 │ 4/4               │        0 │
 └──────┴───────────┴────────┴───────────┴───────────────────┴──────────┘
 ```
 
@@ -418,6 +618,14 @@ Example output (cache, abridged; captured with `CRUNCHER_LOG_LEVEL=WARNING` and 
 #### `cruncher cache`
 
 Inspect cache integrity.
+
+Inputs:
+
+* CONFIG (explicit or resolved)
+
+Network:
+
+* no (cache only)
 
 * `cache stats <config>` — counts of cached motifs and site sets
 * `cache verify <config>` — verify cache paths exist on disk
@@ -428,6 +636,14 @@ Inspect cache integrity.
 
 Bird’s-eye view of cache, targets, and recent runs.
 
+Inputs:
+
+* CONFIG (explicit or resolved)
+
+Network:
+
+* no (cache + run index only)
+
 Example:
 
 * `cruncher status <config>`
@@ -437,6 +653,15 @@ Example:
 #### `cruncher runs`
 
 Inspect past run artifacts.
+
+Inputs:
+
+* CONFIG (explicit or resolved)
+* run name for `show/watch`
+
+Network:
+
+* no (run artifacts only)
 
 * `runs list <config>` — list run folders (optionally filter by stage)
 * `runs show <config> <run>` — show manifest + artifacts
@@ -457,6 +682,14 @@ Notes:
 
 Summarize effective configuration settings.
 
+Inputs:
+
+* CONFIG (explicit or resolved)
+
+Network:
+
+* no
+
 Examples:
 
 * `cruncher config <config>`
@@ -473,6 +706,14 @@ Note:
 
 List available optimizer kernels.
 
+Inputs:
+
+* none
+
+Network:
+
+* no
+
 Example:
 
 * `cruncher optimizers list`
@@ -482,6 +723,7 @@ Example:
 ### Global options
 
 * `--log-level INFO|DEBUG|WARNING` (or set `CRUNCHER_LOG_LEVEL`)
+* `--workspace/-w <name|index|path>` (or set `CRUNCHER_WORKSPACE`) to pick a workspace config
 
 
 ---

@@ -10,7 +10,7 @@ Translate the category/campaign spec into **ticketized, module-level work** with
 ## 1) Assumptions & constraints
 
 - No core algorithm changes unless explicitly scoped (optimization/scoring stays intact).
-- Network access remains exclusive to `cruncher fetch`.
+- Network access remains explicit and opt-in (fetch + remote inventory commands only).
 - All new functionality is additive and must not break existing configs.
 - Analysis and campaign summaries operate only on run artifacts.
 - No fallbacks: missing/invalid inputs should error clearly.
@@ -170,7 +170,7 @@ Key reference contracts:
 
 ## 4) Acceptance checklist (system-level)
 
-- [ ] No new network access outside fetch.
+- [ ] No new implicit network access outside fetch/explicit remote inventory commands.
 - [ ] Deterministic campaign expansion (hash-stable).
 - [ ] Generated configs are reproducible and load with `load_config`.
 - [ ] Analysis outputs register in manifests.

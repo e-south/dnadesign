@@ -12,20 +12,24 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Tuple, Union
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-class PlotConfig(BaseModel):
+class StrictBaseModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class PlotConfig(StrictBaseModel):
     logo: bool
     bits_mode: Literal["information", "probability"]
     dpi: int
 
 
-class ParseConfig(BaseModel):
+class ParseConfig(StrictBaseModel):
     plot: PlotConfig
 
 
-class ParserConfig(BaseModel):
+class ParserConfig(StrictBaseModel):
     extra_modules: List[str] = Field(
         default_factory=list,
         description="Additional modules to import for parser registration.",
@@ -43,18 +47,18 @@ class ParserConfig(BaseModel):
         return cleaned
 
 
-class IOConfig(BaseModel):
+class IOConfig(StrictBaseModel):
     parsers: ParserConfig = ParserConfig()
 
 
-class OrganismConfig(BaseModel):
+class OrganismConfig(StrictBaseModel):
     taxon: Optional[int] = None
     name: Optional[str] = None
     strain: Optional[str] = None
     assembly: Optional[str] = None
 
 
-class MoveConfig(BaseModel):
+class MoveConfig(StrictBaseModel):
     block_len_range: Tuple[int, int] = (3, 12)
     multi_k_range: Tuple[int, int] = (2, 6)
     slide_max_shift: int = 2
@@ -88,7 +92,7 @@ class MoveConfig(BaseModel):
         return out
 
 
-class CoolingFixed(BaseModel):
+class CoolingFixed(StrictBaseModel):
     kind: Literal["fixed"] = "fixed"
     beta: float = 1.0
 
@@ -100,7 +104,7 @@ class CoolingFixed(BaseModel):
         return v
 
 
-class CoolingLinear(BaseModel):
+class CoolingLinear(StrictBaseModel):
     kind: Literal["linear"] = "linear"
     beta: Tuple[float, float]
 
@@ -114,7 +118,7 @@ class CoolingLinear(BaseModel):
         return v
 
 
-class CoolingGeometric(BaseModel):
+class CoolingGeometric(StrictBaseModel):
     kind: Literal["geometric"] = "geometric"
     beta: List[float]
 
@@ -131,14 +135,14 @@ class CoolingGeometric(BaseModel):
 CoolingConfig = Union[CoolingFixed, CoolingLinear, CoolingGeometric]
 
 
-class OptimiserConfig(BaseModel):
+class OptimiserConfig(StrictBaseModel):
     kind: Literal["gibbs", "pt"]
     scorer_scale: Literal["llr", "z", "logp", "consensus-neglop-sum"]
     cooling: CoolingConfig
     swap_prob: float = 0.10
 
 
-class InitConfig(BaseModel):
+class InitConfig(StrictBaseModel):
     kind: Literal["random", "consensus", "consensus_mix"]
     length: int
     regulator: Optional[str] = None
@@ -158,7 +162,7 @@ class InitConfig(BaseModel):
         return self
 
 
-class SampleConfig(BaseModel):
+class SampleConfig(StrictBaseModel):
     bidirectional: bool = True
     seed: int = Field(42, description="Random seed for reproducible sampling.")
     record_tune: bool = Field(
@@ -224,7 +228,7 @@ class SampleConfig(BaseModel):
         return v
 
 
-class AnalysisPlotConfig(BaseModel):
+class AnalysisPlotConfig(StrictBaseModel):
     trace: bool = False
     autocorr: bool = False
     convergence: bool = False
@@ -238,7 +242,7 @@ class AnalysisPlotConfig(BaseModel):
     parallel_coords: bool = False
 
 
-class AnalysisConfig(BaseModel):
+class AnalysisConfig(StrictBaseModel):
     runs: Optional[List[str]]
     plots: AnalysisPlotConfig = AnalysisPlotConfig()
     scatter_scale: Literal["llr", "z", "logp", "consensus-neglop-sum"]
@@ -276,7 +280,7 @@ class AnalysisConfig(BaseModel):
         return self
 
 
-class CampaignSelectorsConfig(BaseModel):
+class CampaignSelectorsConfig(StrictBaseModel):
     min_info_bits: Optional[float] = None
     min_site_count: Optional[int] = None
     min_pwm_length: Optional[int] = None
@@ -333,7 +337,7 @@ class CampaignSelectorsConfig(BaseModel):
         )
 
 
-class CampaignWithinCategoryConfig(BaseModel):
+class CampaignWithinCategoryConfig(StrictBaseModel):
     sizes: List[int] = Field(default_factory=list)
 
     @field_validator("sizes")
@@ -349,7 +353,7 @@ class CampaignWithinCategoryConfig(BaseModel):
         return sorted(set(cleaned))
 
 
-class CampaignAcrossCategoriesConfig(BaseModel):
+class CampaignAcrossCategoriesConfig(StrictBaseModel):
     sizes: List[int] = Field(default_factory=list)
     max_per_category: Optional[int] = None
 
@@ -375,7 +379,7 @@ class CampaignAcrossCategoriesConfig(BaseModel):
         return v
 
 
-class CampaignConfig(BaseModel):
+class CampaignConfig(StrictBaseModel):
     name: str
     categories: List[str]
     within_category: Optional[CampaignWithinCategoryConfig] = None
@@ -427,7 +431,7 @@ class CampaignConfig(BaseModel):
         return self
 
 
-class CampaignMetadataConfig(BaseModel):
+class CampaignMetadataConfig(StrictBaseModel):
     name: str
     campaign_id: str
     manifest_path: Optional[Path] = None
@@ -442,9 +446,9 @@ class CampaignMetadataConfig(BaseModel):
         return text
 
 
-class MotifStoreConfig(BaseModel):
+class MotifStoreConfig(StrictBaseModel):
     catalog_root: Path = Path(".cruncher")
-    source_preference: List[str] = []
+    source_preference: List[str] = Field(default_factory=list)
     allow_ambiguous: bool = False
     pwm_source: Literal["matrix", "sites"] = "matrix"
     site_kinds: Optional[List[str]] = None
@@ -481,7 +485,7 @@ class MotifStoreConfig(BaseModel):
         return v
 
 
-class LocalMotifSourceConfig(BaseModel):
+class LocalMotifSourceConfig(StrictBaseModel):
     source_id: str = Field(..., description="Unique identifier for the local motif source.")
     description: Optional[str] = Field(None, description="Human-readable description for the source list.")
     root: Path = Field(..., description="Root directory containing motif files.")
@@ -549,7 +553,7 @@ class LocalMotifSourceConfig(BaseModel):
         return self
 
 
-class RegulonDBConfig(BaseModel):
+class RegulonDBConfig(StrictBaseModel):
     base_url: str = "https://regulondb.ccg.unam.mx/graphql"
     verify_ssl: bool = True
     ca_bundle: Optional[Path] = None
@@ -573,7 +577,7 @@ class RegulonDBConfig(BaseModel):
         return v
 
 
-class HttpRetryConfig(BaseModel):
+class HttpRetryConfig(StrictBaseModel):
     retries: int = Field(3, description="Number of retry attempts for transient network failures.")
     backoff_seconds: float = Field(0.5, description="Base backoff (seconds) between retries.")
     max_backoff_seconds: float = Field(8.0, description="Maximum backoff between retries.")
@@ -598,7 +602,7 @@ class HttpRetryConfig(BaseModel):
         return float(v)
 
 
-class IngestConfig(BaseModel):
+class IngestConfig(StrictBaseModel):
     genome_source: Literal["ncbi", "fasta", "none"] = "ncbi"
     genome_fasta: Optional[Path] = None
     genome_cache: Path = Path(".cruncher/genomes")
@@ -623,7 +627,7 @@ class IngestConfig(BaseModel):
         return v
 
 
-class CruncherConfig(BaseModel):
+class CruncherConfig(StrictBaseModel):
     out_dir: Path
     regulator_sets: List[List[str]]
     regulator_categories: Dict[str, List[str]] = Field(default_factory=dict)
@@ -691,5 +695,5 @@ class CruncherConfig(BaseModel):
         return self
 
 
-class CruncherRoot(BaseModel):
+class CruncherRoot(StrictBaseModel):
     cruncher: CruncherConfig

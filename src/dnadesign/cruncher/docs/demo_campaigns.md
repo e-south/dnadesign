@@ -2,7 +2,7 @@
 
 This walkthrough extends the demo workspace to run category-based campaigns and N>2 TF optimizations. Start with the two-TF demo first ([demo.md](demo.md)) to confirm your cache, lockfiles, and basic parse/sample/analyze flow. For live sampling and validation UX, see [demo_progressive.md](demo_progressive.md).
 
-Captured outputs below were generated on **2026-01-09** using `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200` to avoid truncated tables (unless noted otherwise). Expect timestamps and counts to differ in your environment.
+Captured outputs below were generated on **2026-01-10** using `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200` to avoid truncated tables (unless noted otherwise). Expect timestamps and counts to differ in your environment.
 
 ### Enter the demo workspace
 
@@ -10,15 +10,19 @@ The demo workspace lives here:
 
 - `src/dnadesign/cruncher/workspaces/demo/`
 
-You can either `cd` into the workspace (auto-detects `config.yaml`), or run from anywhere using the workspace-aware flags:
+You can either `cd` into the workspace (auto-detects `config.yaml`), or run from anywhere by setting a workspace selector:
 
 ```bash
 # Option A: cd into the workspace
 cd src/dnadesign/cruncher/workspaces/demo
 
 # Option B: run from anywhere
-cruncher --workspace demo sources list
-cruncher --config src/dnadesign/cruncher/workspaces/demo/config.yaml sources list
+export CRUNCHER_WORKSPACE=demo
+# (or: cruncher --workspace demo <command>)
+# (or: cruncher --config src/dnadesign/cruncher/workspaces/demo/config.yaml <command>)
+
+# From here on, commands assume the config is discoverable
+# (via CWD or CRUNCHER_WORKSPACE).
 ```
 
 ### Campaigns configured in the demo workspace

@@ -10,6 +10,8 @@ Captured outputs below were generated on **2026-01-10** using `CRUNCHER_LOG_LEVE
 cd src/dnadesign/cruncher/workspaces/demo
 ```
 
+If you're running from elsewhere, set `CRUNCHER_WORKSPACE=demo` (or pass `--config ...` to each command).
+
 ### 2) Validate the campaign definitions (no cache required)
 
 This checks category and campaign rules without hitting the catalog:

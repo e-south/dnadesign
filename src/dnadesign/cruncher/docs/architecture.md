@@ -49,7 +49,8 @@
 
 The core contract is:
 
-- **Network access is explicit** (only during `cruncher fetch ...`).
+- **Network access is explicit** (fetch commands and optional remote inventory commands like
+  `cruncher sources summary --scope remote` and `cruncher sources datasets`).
 - The **store** is the only persistence layer (project-local; no global state).
 - The **core** (PWM scoring + optimizers) is pure compute and does no I/O.
 - **Analyze/report** consume run artifacts only and can run fully offline.

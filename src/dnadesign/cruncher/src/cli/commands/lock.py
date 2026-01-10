@@ -20,7 +20,7 @@ from dnadesign.cruncher.services.lock_service import resolve_lock
 def lock(
     config: Path | None = typer.Argument(
         None,
-        help="Path to cruncher config.yaml (required).",
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
         metavar="CONFIG",
     ),
     config_option: Path | None = typer.Option(

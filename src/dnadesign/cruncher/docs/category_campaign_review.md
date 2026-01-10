@@ -22,7 +22,7 @@ Out-of-scope (explicitly unchanged):
 
 ## 2) Principles (must-haves)
 
-- **Decoupled:** No network in compute/analysis; only fetch touches the network. Campaign expansion is offline.
+- **Decoupled:** No network in compute/analysis; network access is explicit in fetch and remote inventory commands. Campaign expansion is offline.
 - **Reproducible:** Generated configs/manifests are deterministic and versionable.
 - **Pragmatic:** Prefer additive fields and helper commands to large refactors.
 - **Assertive:** Validate inputs early; fail clearly for ambiguous categories, duplicates, or invalid rules.

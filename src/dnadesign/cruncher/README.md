@@ -32,7 +32,11 @@ A typical workflow looks like:
 cd src/dnadesign/cruncher/workspaces/demo
 
 # Option B: run from anywhere
-cruncher --workspace demo sources list
+export CRUNCHER_WORKSPACE=demo
+# (or: cruncher --workspace demo <command>)
+
+# From here on, commands assume the config is discoverable
+# (via CWD or CRUNCHER_WORKSPACE).
 
 # Quick sanity check: list sources
 cruncher sources list
@@ -42,6 +46,10 @@ cruncher fetch sites --tf lexA --tf cpxR
 
 # Reproducibility pinning
 cruncher lock
+
+# Inspect cached PWMs / logos (optional)
+cruncher catalog pwms
+cruncher catalog logos --set 1
 
 # Optional: validate + render logos
 cruncher parse

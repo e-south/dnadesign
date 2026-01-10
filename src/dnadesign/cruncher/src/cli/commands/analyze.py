@@ -51,7 +51,7 @@ def _should_show_run_hint(message: str) -> bool:
 def analyze(
     config: Path | None = typer.Argument(
         None,
-        help="Path to cruncher config.yaml (required).",
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
         metavar="CONFIG",
     ),
     config_option: Path | None = typer.Option(

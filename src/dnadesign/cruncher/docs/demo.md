@@ -5,7 +5,7 @@ This walkthrough shows an end-to-end process for discovering, fetching, locking,
 - a local MEME motif source (`demo_local_meme`) for fast, offline matrix ingestion
 - RegulonDB curated binding-site access for real-world inventory and site-based PWMs (HT optional)
 
-Captured outputs below were generated on **2026-01-09** using `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200`
+Captured outputs below were generated on **2026-01-10** using `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200`
 to avoid truncated tables (unless noted otherwise). Expect timestamps and counts to differ in your environment.
 
 ### Enter the demo workspace
@@ -15,15 +15,19 @@ The demo workspace lives here:
 - `src/dnadesign/cruncher/workspaces/demo/`
 
 You can either `cd` into the workspace (auto-detects `config.yaml`), or run from
-anywhere using the workspace-aware flags:
+anywhere by setting a workspace selector:
 
 ```bash
 # Option A: cd into the workspace
 cd src/dnadesign/cruncher/workspaces/demo
 
 # Option B: run from anywhere
-cruncher --workspace demo sources list
-cruncher --config src/dnadesign/cruncher/workspaces/demo/config.yaml sources list
+export CRUNCHER_WORKSPACE=demo
+# (or: cruncher --workspace demo <command>)
+# (or: cruncher --config src/dnadesign/cruncher/workspaces/demo/config.yaml <command>)
+
+# From here on, commands assume the config is discoverable
+# (via CWD or CRUNCHER_WORKSPACE).
 ```
 
 The demo config is tuned for fast local runs. Increase `draws` and `tune` for
@@ -39,7 +43,7 @@ To point to a real dataset, update `ingest.local_sources[].root` in the config.
 List the sources registered by the demo config:
 
 ```bash
-cruncher sources list config.yaml
+cruncher sources list
 ```
 
 Example output:
@@ -57,8 +61,8 @@ Example output:
 Summarize available regulators for a specific source (remote inventory):
 
 ```bash
-cruncher sources summary --source demo_local_meme --scope remote config.yaml
-cruncher sources summary --source regulondb --scope remote --remote-limit 20 config.yaml
+cruncher sources summary --source demo_local_meme --scope remote
+cruncher sources summary --source regulondb --scope remote --remote-limit 20
 ```
 
 Example output (local inventory):
@@ -150,13 +154,10 @@ cruncher fetch sites --tf lexA --tf cpxR
 Example output (abridged, default INFO log level):
 
 ```bash
-10:42:47 INFO     Using config from CWD: ./config.yaml
-         INFO     Fetching binding sites from regulondb for TFs=['lexA', 'cpxR']
-                  motif_ids=[]
-         INFO     Skipping TF 'lexA' (cached sites exist). Use --update to
-                  refresh.
-         INFO     Skipping TF 'cpxR' (cached sites exist). Use --update to
-                  refresh.
+09:08:33 INFO     Using config from CWD: ./config.yaml
+         INFO     Fetching binding sites from regulondb for TFs=['lexA', 'cpxR'] motif_ids=[]
+         INFO     Skipping TF 'lexA' (cached sites exist). Use --update to refresh.
+         INFO     Skipping TF 'cpxR' (cached sites exist). Use --update to refresh.
 No new sites cached (all matches already present). Use --update to refresh.
 ```
 
@@ -185,6 +186,12 @@ Example output (local cache):
 │ sites (seq/total) │ 0/0   │
 │ datasets          │ 0     │
 └───────────────────┴───────┘
+                  Cache by source (source=demo_local_meme)
+┏━━━━━━━━━━━━━━━━━┳━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Source          ┃ TFs ┃ Motifs ┃ Site sets ┃ Sites (seq/total) ┃ Datasets ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ demo_local_meme │   2 │      2 │         0 │ 0/0               │        0 │
+└─────────────────┴─────┴────────┴───────────┴───────────────────┴──────────┘
                   Cache regulators (source=demo_local_meme)
 ┏━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
 ┃ TF   ┃ Sources         ┃ Motifs ┃ Site sets ┃ Sites (seq/total) ┃ Datasets ┃
@@ -202,20 +209,34 @@ Example output (RegulonDB cache, abridged):
 ┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
 ┃ Metric            ┃ Value   ┃
 ┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
-│ entries           │ 2       │
+│ entries           │ 10      │
 │ sources           │ 1       │
-│ TFs               │ 2       │
+│ TFs               │ 10      │
 │ motifs            │ 0       │
-│ site sets         │ 2       │
-│ sites (seq/total) │ 203/203 │
+│ site sets         │ 10      │
+│ sites (seq/total) │ 872/872 │
 │ datasets          │ 0       │
 └───────────────────┴─────────┘
+                  Cache by source (source=regulondb)
+┏━━━━━━━━━━━┳━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Source    ┃ TFs ┃ Motifs ┃ Site sets ┃ Sites (seq/total) ┃ Datasets ┃
+┡━━━━━━━━━━━╇━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ regulondb │  10 │      0 │        10 │ 872/872           │        0 │
+└───────────┴─────┴────────┴───────────┴───────────────────┴──────────┘
                   Cache regulators (source=regulondb)
 ┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
 ┃ TF   ┃ Sources   ┃ Motifs ┃ Site sets ┃ Sites (seq/total) ┃ Datasets ┃
 ┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ lrp  │ regulondb │      0 │         1 │ 219/219           │        0 │
+│ fur  │ regulondb │      0 │         1 │ 217/217           │        0 │
 │ cpxR │ regulondb │      0 │         1 │ 154/154           │        0 │
+│ fnr  │ regulondb │      0 │         1 │ 152/152           │        0 │
 │ lexA │ regulondb │      0 │         1 │ 49/49             │        0 │
+│ soxS │ regulondb │      0 │         1 │ 44/44             │        0 │
+│ rcdA │ regulondb │      0 │         1 │ 15/15             │        0 │
+│ acrR │ regulondb │      0 │         1 │ 11/11             │        0 │
+│ soxR │ regulondb │      0 │         1 │ 7/7               │        0 │
+│ baeR │ regulondb │      0 │         1 │ 4/4               │        0 │
 └──────┴───────────┴────────┴───────────┴───────────────────┴──────────┘
 ```
 
@@ -250,7 +271,7 @@ $ cruncher targets list
 Example output (targets status):
 
 ```bash
-                                                          Target status
+                                                       Configured targets
 ┏━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┓
 ┃ Set ┃ TF   ┃ Source    ┃ Motif ID         ┃ Organism ┃ Matrix ┃ Sites (seq/total) ┃ Site kind ┃ Dataset ┃ PWM source ┃ Status ┃
 ┡━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━┩
@@ -262,37 +283,47 @@ Example output (targets status):
 Example output (catalog list):
 
 ```bash
-                                                               Catalog
-┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
-┃ TF   ┃ Source    ┃ Motif ID         ┃ Organism ┃ Matrix ┃ Sites (seq/total) ┃ Site kind ┃ Dataset ┃ Method ┃ Mean len ┃ Updated    ┃
-┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ cpxR │ regulondb │ RDBECOLITFC00170 │ -        │ no     │ 154/154           │ curated   │ -       │ -      │ 15.3     │ 2026-01-05 │
-│ lexA │ regulondb │ RDBECOLITFC00214 │ -        │ no     │ 49/49             │ curated   │ -       │ -      │ 19.5     │ 2026-01-04 │
-└──────┴───────────┴──────────────────┴──────────┴────────┴───────────────────┴───────────┴─────────┴────────┴──────────┴────────────┘
+                                                                        Catalog
+┏━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃ TF   ┃ Source          ┃ Motif ID         ┃ Organism         ┃ Matrix     ┃ Sites (seq/total) ┃ Site kind ┃ Dataset ┃ Method ┃ Mean len ┃ Updated    ┃
+┡━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ acrR │ regulondb       │ RDBECOLITFC00065 │ -                │ no         │ 11/11             │ curated   │ -       │ -      │ 18.9     │ 2026-01-09 │
+│ baeR │ regulondb       │ RDBECOLITFC00182 │ -                │ no         │ 4/4               │ curated   │ -       │ -      │ 20.0     │ 2026-01-09 │
+│ cpxR │ demo_local_meme │ cpxR             │ Escherichia coli │ yes (file) │ no                │ -         │ -       │ -      │ -        │ 2026-01-10 │
+│ cpxR │ regulondb       │ RDBECOLITFC00170 │ -                │ no         │ 154/154           │ curated   │ -       │ -      │ 15.3     │ 2026-01-09 │
+│ fnr  │ regulondb       │ RDBECOLITFC00128 │ -                │ no         │ 152/152           │ curated   │ -       │ -      │ 14.3     │ 2026-01-09 │
+│ fur  │ regulondb       │ RDBECOLITFC00093 │ -                │ no         │ 217/217           │ curated   │ -       │ -      │ 18.6     │ 2026-01-09 │
+│ lexA │ demo_local_meme │ lexA             │ Escherichia coli │ yes (file) │ no                │ -         │ -       │ -      │ -        │ 2026-01-10 │
+│ lexA │ regulondb       │ RDBECOLITFC00214 │ -                │ no         │ 49/49             │ curated   │ -       │ -      │ 19.5     │ 2026-01-09 │
+│ lrp  │ regulondb       │ RDBECOLITFC00014 │ -                │ no         │ 219/219           │ curated   │ -       │ -      │ 14.7     │ 2026-01-09 │
+│ rcdA │ regulondb       │ RDBECOLITFC00048 │ -                │ no         │ 15/15             │ curated   │ -       │ -      │ 10.0     │ 2026-01-09 │
+│ soxR │ regulondb       │ RDBECOLITFC00071 │ -                │ no         │ 7/7               │ curated   │ -       │ -      │ 18.0     │ 2026-01-09 │
+│ soxS │ regulondb       │ RDBECOLITFC00201 │ -                │ no         │ 44/44             │ curated   │ -       │ -      │ 20.0     │ 2026-01-09 │
+└──────┴─────────────────┴──────────────────┴──────────────────┴────────────┴───────────────────┴───────────┴─────────┴────────┴──────────┴────────────┘
 ```
 
 Optional: a bird's-eye view of cache, targets, and recent runs (abridged; paths shortened for portability):
 
 ```bash
 $ cruncher status
-                               Configuration
-┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Setting      ┃ Value                                                     ┃
-┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ config       │ /path/to/repo/src/dnadesign/cruncher/workspaces/demo/config.yaml             │
-│ catalog_root │ /path/to/repo/src/dnadesign/cruncher/workspaces/demo/.cruncher               │
-│ out_dir      │ /path/to/repo/src/dnadesign/cruncher/workspaces/demo/runs                    │
-│ pwm_source   │ sites                                                     │
-│ sources      │ regulondb                                                 │
-│ lockfile     │ present                                                   │
-└──────────────┴───────────────────────────────────────────────────────────┘
+                                                    Configuration
+┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Setting      ┃ Value                                                                                              ┃
+┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ config       │ /path/to/repo/src/dnadesign/cruncher/workspaces/demo/config.yaml                                   │
+│ catalog_root │ /path/to/repo/src/dnadesign/cruncher/workspaces/demo/.cruncher                                     │
+│ out_dir      │ /path/to/repo/src/dnadesign/cruncher/workspaces/demo/runs                                          │
+│ pwm_source   │ sites                                                                                              │
+│ sources      │ demo_local_meme, regulondb                                                                         │
+│ lockfile     │ present                                                                                            │
+└──────────────┴────────────────────────────────────────────────────────────────────────────────────────────────────┘
         Cache
 ┏━━━━━━━━━━━┳━━━━━━━┓
 ┃ Metric    ┃ Value ┃
 ┡━━━━━━━━━━━╇━━━━━━━┩
-│ entries   │ 3     │
-│ motifs    │ 0     │
-│ site_sets │ 3     │
+│ entries   │ 12    │
+│ motifs    │ 2     │
+│ site_sets │ 10    │
 └───────────┴───────┘
                Targets
 ┏━━━━━━━┳━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┓
@@ -300,14 +331,17 @@ $ cruncher status
 ┡━━━━━━━╇━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━┩
 │     2 │     2 │       0 │        0 │
 └───────┴───────┴─────────┴──────────┘
-Runs total: 8 (parse:4, sample:4)
-                                  Recent runs
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Run                        ┃ Stage  ┃ Status    ┃ Created                    ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ sample_set1_lexA-cpxR_20260105_162916_52e28b │ sample │ completed │ 20260105 │
-│ parse_set1_lexA-cpxR_20260105_162915_906e79  │ parse  │ completed │ 20260105 │
-└────────────────────────────┴────────┴───────────┴────────────────────────────┘
+Runs total: 11 (parse:6, sample:5)
+                                              Recent runs
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Run                                          ┃ Stage  ┃ Status    ┃ Created                          ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ sample_set1_lexA-cpxR_20260110_084954_637d14 │ sample │ completed │ 2026-01-10T13:49:57.965750+00:00 │
+│ parse_set1_lexA-cpxR_20260110_084951_321d1a  │ parse  │ completed │ 2026-01-10T13:49:51.070655+00:00 │
+│ sample_set1_lexA-cpxR_20260109_222246_6ef55c │ sample │ completed │ 2026-01-10T03:22:49.845352+00:00 │
+│ parse_set1_lexA-cpxR_20260109_222242_7960d9  │ parse  │ completed │ 2026-01-10T03:22:42.297514+00:00 │
+│ sample_set1_lexA-cpxR_20260109_152547_c7afe6 │ sample │ completed │ 2026-01-09T20:25:50.689524+00:00 │
+└──────────────────────────────────────────────┴────────┴───────────┴──────────────────────────────────┘
 ```
 
 ### Lock TFs to exact cached motifs
@@ -352,9 +386,9 @@ Example output (runs list, abridged):
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
 ┃ Name                                         ┃ Stage  ┃ Status    ┃ Created                          ┃ Motifs ┃ Regulator set  ┃ PWM source ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ sample_set1_lexA-cpxR_20260105_162916_52e28b │ sample │ completed │ 2026-01-05T21:29:20.934494+00:00 │ 2      │ set1:lexA,cpxR │ sites      │
-│ parse_set1_lexA-cpxR_20260105_162915_906e79  │ parse  │ completed │ 2026-01-05T21:29:15.480222+00:00 │ 2      │ set1:lexA,cpxR │ sites      │
-│ sample_set1_lexA-cpxR_20260105_151840_e817e1 │ sample │ completed │ 2026-01-05T20:18:44.655691+00:00 │ 2      │ set1:lexA,cpxR │ sites      │
+│ sample_set1_lexA-cpxR_20260110_084954_637d14 │ sample │ completed │ 2026-01-10T13:49:57.965750+00:00 │ 2      │ set1:lexA,cpxR │ sites      │
+│ parse_set1_lexA-cpxR_20260110_084951_321d1a  │ parse  │ completed │ 2026-01-10T13:49:51.070655+00:00 │ 2      │ set1:lexA,cpxR │ sites      │
+│ sample_set1_lexA-cpxR_20260109_222246_6ef55c │ sample │ completed │ 2026-01-10T03:22:49.845352+00:00 │ 2      │ set1:lexA,cpxR │ sites      │
 └──────────────────────────────────────────────┴────────┴───────────┴──────────────────────────────────┴────────┴────────────────┴────────────┘
 ```
 
@@ -401,8 +435,8 @@ Example output (local motifs):
 ┏━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┓
 ┃ TF   ┃ Source          ┃ Motif ID ┃ Length ┃ Matrix     ┃ Updated    ┃
 ┡━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ cpxR │ demo_local_meme │ cpxR     │ 5      │ yes (file) │ 2026-01-06 │
-│ lexA │ demo_local_meme │ lexA     │ 6      │ yes (file) │ 2026-01-06 │
+│ cpxR │ demo_local_meme │ cpxR     │ 5      │ yes (file) │ 2026-01-10 │
+│ lexA │ demo_local_meme │ lexA     │ 6      │ yes (file) │ 2026-01-10 │
 └──────┴─────────────────┴──────────┴────────┴────────────┴────────────┘
 ```
 
