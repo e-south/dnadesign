@@ -1,6 +1,6 @@
 ## cruncher demo (two TFs: LexA + CpxR)
 
-This walkthrough shows an end-to-end process for discovering, fetching, locking, sampling, and analyzing two TFs (LexA + CpxR) with the bundled demo workspace. For multi-category campaigns and N>2 TF demos, see [demo_campaigns.md](demo_campaigns.md). The demo includes:
+This walkthrough shows an end-to-end process for discovering, fetching, locking, sampling, and analyzing two TFs (LexA + CpxR) with the bundled demo workspace. For multi-category campaigns and N>2 TF demos, see [demo_campaigns.md](demo_campaigns.md). For live sampling and validation UX, see [demo_progressive.md](demo_progressive.md). The demo includes:
 
 - a local MEME motif source (`demo_local_meme`) for fast, offline matrix ingestion
 - RegulonDB curated binding-site access for real-world inventory and site-based PWMs (HT optional)

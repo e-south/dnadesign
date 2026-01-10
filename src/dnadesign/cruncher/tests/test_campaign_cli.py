@@ -194,3 +194,60 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
     assert (out_dir / "plots" / "best_jointscore_bar.png").exists()
     assert (out_dir / "plots" / "tf_coverage_heatmap.png").exists()
     assert (out_dir / "plots" / "pairgrid_overview.png").exists()
+    assert (out_dir / "plots" / "joint_trend.png").exists()
+    assert (out_dir / "plots" / "pareto_projection.png").exists()
+
+
+def test_campaign_validate_cli_no_selectors(tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "out_dir": "runs",
+            "regulator_sets": [],
+            "regulator_categories": {"CatA": ["A", "B"], "CatB": ["C"]},
+            "campaigns": [
+                {
+                    "name": "demo",
+                    "categories": ["CatA", "CatB"],
+                    "across_categories": {"sizes": [2], "max_per_category": 1},
+                }
+            ],
+            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    result = runner.invoke(
+        app,
+        ["campaign", "validate", "--campaign", "demo", "--no-selectors", "--no-metrics", str(config_path)],
+    )
+    assert result.exit_code == 0
+    assert "Campaign validation" in result.output
+
+
+def test_campaign_validate_requires_catalog(tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "out_dir": "runs",
+            "regulator_sets": [],
+            "regulator_categories": {"CatA": ["A", "B"], "CatB": ["C"]},
+            "campaigns": [
+                {
+                    "name": "demo",
+                    "categories": ["CatA", "CatB"],
+                    "across_categories": {"sizes": [2], "max_per_category": 1},
+                    "selectors": {"min_site_count": 1},
+                }
+            ],
+            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    result = runner.invoke(
+        app,
+        ["campaign", "validate", "--campaign", "demo", str(config_path)],
+    )
+    assert result.exit_code == 1
+    assert "Catalog root not found" in result.output

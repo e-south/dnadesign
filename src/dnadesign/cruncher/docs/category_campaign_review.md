@@ -416,6 +416,7 @@ Explicit errors (no fallbacks):
 - [x] Add `--category`/`--campaign` filters to `cruncher targets`.
 - [x] Add `--campaign` to fetch commands.
 - [x] Optional: campaign-level marimo notebook.
+- [x] Add `cruncher campaign validate` for preflight selector + cache checks.
 
 ### Demo alignment
 - [x] Demo workspace includes Category1/2/3 + `demo_categories(_best)` campaign.

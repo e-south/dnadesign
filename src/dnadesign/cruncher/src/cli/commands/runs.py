@@ -10,6 +10,7 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 
@@ -57,6 +58,85 @@ def _artifact_counts(artifacts: list[dict]) -> list[dict[str, str | int]]:
         counts[key] = counts.get(key, 0) + 1
     payload = [{"stage": stage, "type": kind, "count": count} for (stage, kind), count in sorted(counts.items())]
     return payload
+
+
+def _tail_lines(path: Path, *, max_lines: int, max_bytes: int = 65536) -> list[str]:
+    if not path.exists():
+        return []
+    with path.open("rb") as fh:
+        fh.seek(0, os.SEEK_END)
+        pos = fh.tell()
+        block = b""
+        while pos > 0 and block.count(b"\n") <= max_lines:
+            read_size = min(max_bytes, pos)
+            pos -= read_size
+            fh.seek(pos)
+            block = fh.read(read_size) + block
+            if pos == 0:
+                break
+    lines = block.splitlines()[-max_lines:]
+    return [line.decode("utf-8", errors="ignore") for line in lines if line.strip()]
+
+
+def _load_live_metrics(run_dir: Path, *, max_points: int) -> list[dict]:
+    metrics_path = run_dir / "live_metrics.jsonl"
+    if not metrics_path.exists():
+        return []
+    lines = _tail_lines(metrics_path, max_lines=max_points)
+    payloads: list[dict] = []
+    for line in lines:
+        try:
+            payloads.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return payloads
+
+
+def _sparkline(values: list[float], *, width: int = 32) -> str:
+    if not values:
+        return "-"
+    charset = " .:-=+*#%@"
+    cleaned = [float(v) for v in values if v is not None]
+    if not cleaned:
+        return "-"
+    if len(cleaned) > width:
+        step = max(len(cleaned) / width, 1.0)
+        cleaned = [cleaned[int(i * step)] for i in range(width)]
+    vmin = min(cleaned)
+    vmax = max(cleaned)
+    if vmax == vmin:
+        return charset[-1] * len(cleaned)
+    bins = len(charset) - 1
+    chars = []
+    for value in cleaned:
+        idx = int((value - vmin) / (vmax - vmin) * bins)
+        idx = max(0, min(bins, idx))
+        chars.append(charset[idx])
+    return "".join(chars)
+
+
+def _plot_live_metrics(history: list[dict], out_path: Path) -> None:
+    if not history:
+        return
+    best_vals = [item.get("best_score") for item in history if item.get("best_score") is not None]
+    current_vals = [item.get("current_score") for item in history if item.get("current_score") is not None]
+    if not best_vals and not current_vals:
+        return
+    import matplotlib.pyplot as plt
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(figsize=(6, 3))
+    if best_vals:
+        ax.plot(best_vals, label="best_score", color="steelblue")
+    if current_vals:
+        ax.plot(current_vals, label="current_score", color="darkorange", alpha=0.7)
+    ax.set_xlabel("update")
+    ax.set_ylabel("score")
+    ax.set_title("Live score trend")
+    ax.legend(loc="best", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
 
 
 @app.command("list", help="List run artifacts found in the results directory.")
@@ -307,6 +387,16 @@ def watch_run_cmd(
         help="Path to cruncher config.yaml (overrides positional CONFIG).",
     ),
     interval: float = typer.Option(1.0, "--interval", help="Polling interval in seconds."),
+    metrics: bool = typer.Option(True, "--metrics/--no-metrics", help="Show live metrics trends if available."),
+    metric_points: int = typer.Option(40, "--metric-points", help="Number of recent metric points to render."),
+    metric_width: int = typer.Option(32, "--metric-width", help="Width of ASCII sparklines."),
+    plot: bool = typer.Option(False, "--plot/--no-plot", help="Write a live metrics plot during watch."),
+    plot_path: Path | None = typer.Option(
+        None,
+        "--plot-path",
+        help="Optional path to write a live metrics plot (PNG) on refresh.",
+    ),
+    plot_every: int = typer.Option(5, "--plot-every", help="Write live plot every N refreshes."),
 ) -> None:
     try:
         config_path, run_name = parse_config_and_value(
@@ -330,6 +420,17 @@ def watch_run_cmd(
         console.print(f"No run_status.json found for run '{run_name}'.")
         console.print("Hint: watch is only available for active runs writing run_status.json.")
         raise typer.Exit(code=1)
+    if metric_points < 1:
+        console.print("Error: --metric-points must be >= 1.")
+        raise typer.Exit(code=1)
+    if metric_width < 1:
+        console.print("Error: --metric-width must be >= 1.")
+        raise typer.Exit(code=1)
+    if plot_every < 1:
+        console.print("Error: --plot-every must be >= 1.")
+        raise typer.Exit(code=1)
+
+    plot_target = plot_path or (run.run_dir / "live" / "live_metrics.png")
 
     def _render(payload: dict) -> Table:
         table = Table(title=f"Run status: {run.name}", header_style="bold")
@@ -364,8 +465,21 @@ def watch_run_cmd(
         _add_row("best_draw", "best_draw")
         _add_row("acceptance_rate", "acceptance_rate")
         _add_row("updated_at", "updated_at", default=payload.get("started_at", "-"))
+        if metrics:
+            history = _load_live_metrics(run.run_dir, max_points=metric_points)
+            if history:
+                best_vals = [item.get("best_score") for item in history if item.get("best_score") is not None]
+                current_vals = [item.get("current_score") for item in history if item.get("current_score") is not None]
+                if best_vals:
+                    table.add_row("best_score_trend", _sparkline(best_vals, width=metric_width))
+                if current_vals:
+                    table.add_row("current_score_trend", _sparkline(current_vals, width=metric_width))
+                table.add_row("metric_points", str(len(history)))
+            else:
+                table.add_row("live_metrics", "live_metrics.jsonl not found")
         return table
 
+    tick = 0
     with Live(_render(status), refresh_per_second=4, console=console) as live:
         while True:
             status = load_run_status(run.run_dir)
@@ -373,6 +487,11 @@ def watch_run_cmd(
                 console.print("run_status.json missing.")
                 break
             live.update(_render(status))
+            if plot or plot_path is not None:
+                if tick % plot_every == 0:
+                    history = _load_live_metrics(run.run_dir, max_points=metric_points)
+                    _plot_live_metrics(history, plot_target)
             if status.get("status") in {"completed", "failed"}:
                 break
             time.sleep(interval)
+            tick += 1

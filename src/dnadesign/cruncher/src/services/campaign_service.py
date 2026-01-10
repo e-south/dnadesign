@@ -47,6 +47,18 @@ class CampaignExpansion:
     metrics: Dict[str, RegulatorMetrics]
 
 
+@dataclass(frozen=True)
+class CampaignValidationResult:
+    name: str
+    campaign_id: Optional[str]
+    categories: Dict[str, list[str]]
+    selected: Dict[str, list[str]]
+    filtered: Dict[str, list[str]]
+    errors: list[str]
+    warnings: list[str]
+    metrics: Dict[str, RegulatorMetrics]
+
+
 def resolve_category_targets(*, cfg: CruncherConfig, category_name: str) -> list[str]:
     tfs = cfg.regulator_categories.get(category_name)
     if tfs is None:
@@ -83,6 +95,125 @@ def resolve_campaign_tf_names(
     if not tf_names:
         raise ValueError(f"campaign '{campaign.name}' produced no TFs")
     return tf_names
+
+
+def validate_campaign(
+    *,
+    cfg: CruncherConfig,
+    config_path: Path,
+    campaign_name: str,
+    apply_selectors: bool = True,
+    include_metrics: bool = True,
+) -> CampaignValidationResult:
+    campaign = _find_campaign(cfg, campaign_name)
+    categories = _resolve_categories(cfg, campaign)
+
+    errors: list[str] = []
+    warnings: list[str] = []
+    selected: Dict[str, list[str]] = {}
+    filtered: Dict[str, list[str]] = {}
+    metrics: Dict[str, RegulatorMetrics] = {}
+
+    needs_catalog = apply_selectors or include_metrics
+    catalog = None
+    store: Optional[CatalogMotifStore] = None
+    if needs_catalog:
+        catalog_root = config_path.parent / cfg.motif_store.catalog_root
+        if not catalog_root.exists():
+            errors.append(
+                f"Catalog root not found at {catalog_root}. Run `cruncher fetch motifs/sites` before validation."
+            )
+        else:
+            catalog = CatalogIndex.load(catalog_root)
+            if campaign.selectors.min_info_bits is not None:
+                store = CatalogMotifStore(
+                    catalog_root,
+                    pwm_source=cfg.motif_store.pwm_source,
+                    site_kinds=cfg.motif_store.site_kinds,
+                    combine_sites=cfg.motif_store.combine_sites,
+                    site_window_lengths=cfg.motif_store.site_window_lengths,
+                    site_window_center=cfg.motif_store.site_window_center,
+                    min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
+                    allow_low_sites=cfg.motif_store.allow_low_sites,
+                )
+
+    if errors:
+        return CampaignValidationResult(
+            name=campaign.name,
+            campaign_id=None,
+            categories=categories,
+            selected=selected,
+            filtered=filtered,
+            errors=errors,
+            warnings=warnings,
+            metrics=metrics,
+        )
+
+    for category_name in campaign.categories:
+        tfs = categories.get(category_name, [])
+        keep: list[str] = []
+        dropped: list[str] = []
+        for tf_name in tfs:
+            try:
+                if catalog is None:
+                    if apply_selectors or include_metrics:
+                        raise ValueError("Catalog not loaded.")
+                    keep.append(tf_name)
+                    continue
+                entry = select_catalog_entry(
+                    catalog=catalog,
+                    tf_name=tf_name,
+                    pwm_source=cfg.motif_store.pwm_source,
+                    site_kinds=cfg.motif_store.site_kinds,
+                    combine_sites=cfg.motif_store.combine_sites,
+                    source_preference=campaign.selectors.source_preference or cfg.motif_store.source_preference,
+                    dataset_preference=campaign.selectors.dataset_preference or cfg.motif_store.dataset_preference,
+                    dataset_map=cfg.motif_store.dataset_map,
+                    allow_ambiguous=cfg.motif_store.allow_ambiguous,
+                )
+                metric = _build_metrics(
+                    entry=entry,
+                    catalog=catalog,
+                    store=store,
+                    selectors=campaign.selectors,
+                    include_metrics=include_metrics,
+                    combine_sites=cfg.motif_store.combine_sites,
+                    site_kinds=cfg.motif_store.site_kinds,
+                )
+                if include_metrics:
+                    metrics[tf_name] = metric
+                if apply_selectors and not _passes_selectors(metric, campaign.selectors):
+                    dropped.append(tf_name)
+                    continue
+                keep.append(tf_name)
+            except Exception as exc:
+                errors.append(f"{category_name}/{tf_name} - {exc}")
+        if apply_selectors and not keep:
+            errors.append(f"campaign '{campaign.name}' selectors removed all TFs in category '{category_name}'.")
+        selected[category_name] = keep if apply_selectors else list(tfs)
+        if apply_selectors:
+            filtered[category_name] = dropped
+
+    if not errors:
+        try:
+            _validate_category_rules(campaign, selected if apply_selectors else categories)
+        except ValueError as exc:
+            errors.append(str(exc))
+
+    campaign_id = None
+    if not errors:
+        campaign_id = _campaign_id(campaign, selected if apply_selectors else categories)
+
+    return CampaignValidationResult(
+        name=campaign.name,
+        campaign_id=campaign_id,
+        categories=categories,
+        selected=selected,
+        filtered=filtered,
+        errors=errors,
+        warnings=warnings,
+        metrics=metrics,
+    )
 
 
 def expand_campaign(

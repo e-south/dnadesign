@@ -228,6 +228,7 @@ sample:
   record_tune: false
   progress_bar: true
   progress_every: 1000
+  live_metrics: true
   save_trace: true
   save_sequences: true
   init:
@@ -262,6 +263,7 @@ sample:
 Notes:
 - `save_sequences=true` is required for `analyze` and `report`.
 - `save_trace=true` is required for trace-based plots and `report`.
+- `live_metrics=true` writes `live_metrics.jsonl` with progress snapshots (used by `cruncher runs watch`).
 - `bidirectional=true` scores both strands (reverse complement) when scanning PWMs.
 - `min_dist` is the Hamming-distance filter for elite sequences (0 disables).
 - `top_k` controls how many top sequences per chain are retained before elite filtering.

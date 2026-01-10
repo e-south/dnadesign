@@ -1,6 +1,6 @@
 ## cruncher demo (category campaigns + multi-TF)
 
-This walkthrough extends the demo workspace to run category-based campaigns and N>2 TF optimizations. Start with the two-TF demo first ([demo.md](demo.md)) to confirm your cache, lockfiles, and basic parse/sample/analyze flow.
+This walkthrough extends the demo workspace to run category-based campaigns and N>2 TF optimizations. Start with the two-TF demo first ([demo.md](demo.md)) to confirm your cache, lockfiles, and basic parse/sample/analyze flow. For live sampling and validation UX, see [demo_progressive.md](demo_progressive.md).
 
 Captured outputs below were generated on **2026-01-09** using `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200` to avoid truncated tables (unless noted otherwise). Expect timestamps and counts to differ in your environment.
 
@@ -95,6 +95,8 @@ Aggregate many runs (pairs + facets across runs):
 ```bash
 cruncher campaign summarize --campaign demo_categories_best --skip-missing
 ```
+
+Summary outputs include `campaign_summary.csv`, `campaign_best.csv`, and plots such as `best_jointscore_bar.png`, `tf_coverage_heatmap.png`, `joint_trend.png`, and `pareto_projection.png`.
 
 ### Notes
 

@@ -173,6 +173,10 @@ class SampleConfig(BaseModel):
         1000,
         description="Log a progress summary every N iterations per chain (0 disables logging).",
     )
+    live_metrics: bool = Field(
+        True,
+        description="Write live_metrics.jsonl with progress snapshots during sampling.",
+    )
     save_trace: bool = Field(
         True,
         description="Write trace.nc for analyze/report. Disable to skip NetCDF output.",

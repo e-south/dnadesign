@@ -162,6 +162,8 @@ def summarize_campaign(
         _plot_best_jointscore(best_df, plots_dir / "best_jointscore_bar.png"),
         _plot_tf_coverage(expansion, plots_dir / "tf_coverage_heatmap.png"),
         _plot_pairgrid_overview(summary_df, plots_dir / "pairgrid_overview.png"),
+        _plot_joint_trend(summary_df, plots_dir / "joint_trend.png"),
+        _plot_pareto_projection(summary_df, plots_dir / "pareto_projection.png"),
     ]
 
     return CampaignSummaryResult(
@@ -575,6 +577,78 @@ def _plot_pairgrid_overview(summary_df: pd.DataFrame, out_path: Path) -> Path:
     grid.fig.tight_layout()
     grid.fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(grid.fig)
+    return out_path
+
+
+def _plot_joint_trend(summary_df: pd.DataFrame, out_path: Path) -> Path:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    pd, _ = _load_pandas_numpy()
+    plt, _ = _load_plotting()
+    if summary_df.empty or "joint_min_best" not in summary_df.columns:
+        fig, ax = plt.subplots(figsize=(5, 3))
+        ax.text(0.5, 0.5, "No joint_min_best values available", ha="center", va="center")
+        ax.axis("off")
+        fig.savefig(out_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        return out_path
+    df = summary_df.copy()
+    df["_joint"] = pd.to_numeric(df["joint_min_best"], errors="coerce")
+    df = df.dropna(subset=["_joint"])
+    if df.empty:
+        fig, ax = plt.subplots(figsize=(5, 3))
+        ax.text(0.5, 0.5, "No valid joint_min_best values", ha="center", va="center")
+        ax.axis("off")
+        fig.savefig(out_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        return out_path
+    df = df.sort_values(["run_name"], ignore_index=True)
+    fig, ax = plt.subplots(figsize=(8, 3.5))
+    x = range(1, len(df) + 1)
+    ax.plot(x, df["_joint"], marker="o", linewidth=1.5, color="steelblue")
+    ax.set_xlabel("Run index (sorted)")
+    ax.set_ylabel("joint_min_best")
+    ax.set_title("Joint score trend across runs")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    return out_path
+
+
+def _plot_pareto_projection(summary_df: pd.DataFrame, out_path: Path) -> Path:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    pd, _ = _load_pandas_numpy()
+    plt, _ = _load_plotting()
+    required = {"pareto_fraction", "joint_min_best"}
+    if summary_df.empty or not required.issubset(summary_df.columns):
+        fig, ax = plt.subplots(figsize=(5, 3))
+        ax.text(0.5, 0.5, "Pareto projection requires pareto_fraction + joint_min_best", ha="center", va="center")
+        ax.axis("off")
+        fig.savefig(out_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        return out_path
+    df = summary_df.copy()
+    df["_pareto"] = pd.to_numeric(df["pareto_fraction"], errors="coerce")
+    df["_joint"] = pd.to_numeric(df["joint_min_best"], errors="coerce")
+    df = df.dropna(subset=["_pareto", "_joint"])
+    if df.empty:
+        fig, ax = plt.subplots(figsize=(5, 3))
+        ax.text(0.5, 0.5, "No valid pareto/joint values", ha="center", va="center")
+        ax.axis("off")
+        fig.savefig(out_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        return out_path
+    fig, ax = plt.subplots(figsize=(5, 4))
+    sizes = None
+    if "n_tfs" in df.columns:
+        sizes = pd.to_numeric(df["n_tfs"], errors="coerce").fillna(2).tolist()
+        sizes = [max(30, float(val) * 10) for val in sizes]
+    ax.scatter(df["_pareto"], df["_joint"], s=sizes, alpha=0.7, color="slateblue")
+    ax.set_xlabel("Pareto fraction")
+    ax.set_ylabel("joint_min_best")
+    ax.set_title("Pareto projection")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
     return out_path
 
 

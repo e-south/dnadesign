@@ -184,10 +184,12 @@ def _run_sample_for_set(
     logger.info("=== RUN SAMPLE: %s ===", out_dir)
     logger.debug("Full sample config: %s", sample_cfg.model_dump_json())
 
+    metrics_path = out_dir / "live_metrics.jsonl" if sample_cfg.live_metrics else None
     status_writer = RunStatusWriter(
         path=out_dir / "run_status.json",
         stage="sample",
         run_dir=out_dir,
+        metrics_path=metrics_path,
         payload={
             "config_path": str(config_path.resolve()),
             "status_message": "initializing",

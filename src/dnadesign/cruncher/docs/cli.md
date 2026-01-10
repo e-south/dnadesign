@@ -136,6 +136,23 @@ Notes:
 
 ---
 
+#### `cruncher campaign validate`
+
+Validate a campaign against cached motifs/sites and selector rules.
+
+Examples:
+
+* `cruncher campaign validate --campaign regulators_v1 <config>`
+* `cruncher campaign validate --campaign regulators_v1 --no-selectors <config>`
+* `cruncher campaign validate --campaign regulators_v1 --show-filtered <config>`
+
+Notes:
+
+* `--no-selectors` disables selector filtering; add `--no-metrics` to validate categories without cached data.
+* `--metrics` (default) computes per-TF metrics and requires a local catalog.
+
+---
+
 #### `cruncher campaign summarize`
 
 Aggregates multiple campaign runs into summary tables and plots (offline).
@@ -148,7 +165,7 @@ Examples:
 Outputs:
 
 * `campaign_summary.csv`, `campaign_best.csv`
-* plots under `plots/` (including `best_jointscore_bar.png` and `tf_coverage_heatmap.png`)
+* plots under `plots/` (including `best_jointscore_bar.png`, `tf_coverage_heatmap.png`,\n  `joint_trend.png`, and `pareto_projection.png`)
 
 Notes:
 
@@ -424,11 +441,15 @@ Inspect past run artifacts.
 * `runs list <config>` — list run folders (optionally filter by stage)
 * `runs show <config> <run>` — show manifest + artifacts
 * `runs latest <config>` — print most recent run
-* `runs watch <config> <run>` — live progress snapshot
+* `runs watch <config> <run>` — live progress snapshot (reads `run_status.json`, optionally `live_metrics.jsonl`)
 * `runs rebuild-index <config>` — rebuild `<catalog_root>/run_index.json`
 
 Tip: inside a workspace you can drop the config argument entirely (for example,
 `cruncher runs show <run>` or `cruncher runs list`).
+
+Notes:
+* `runs watch --plot` writes a live PNG plot to `<run_dir>/live/live_metrics.png`.
+* `runs watch --metric-points` and `--metric-width` control the trend window size.
 
 ---
 

@@ -19,9 +19,14 @@ import yaml
 from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.services.campaign_notebook_service import generate_campaign_notebook
-from dnadesign.cruncher.services.campaign_service import build_campaign_manifest, expand_campaign
+from dnadesign.cruncher.services.campaign_service import (
+    build_campaign_manifest,
+    expand_campaign,
+    validate_campaign,
+)
 from dnadesign.cruncher.workflows.campaign_summary import summarize_campaign
 from rich.console import Console
+from rich.table import Table
 
 app = typer.Typer(no_args_is_help=True, help="Generate or summarize category campaigns.")
 console = Console()
@@ -210,6 +215,75 @@ def summarize(
     if result.skipped:
         console.print("Skipped runs:")
         for item in result.skipped:
+            console.print(f"- {item}")
+
+
+@app.command("validate", help="Validate a campaign against cached motifs/sites and selectors.")
+def validate(
+    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config_option: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to cruncher config.yaml (overrides positional CONFIG).",
+    ),
+    campaign: str = typer.Option(..., "--campaign", "-n", help="Campaign name to validate."),
+    apply_selectors: bool = typer.Option(
+        True,
+        "--apply-selectors/--no-selectors",
+        help="Apply selectors when validating (recommended).",
+    ),
+    include_metrics: bool = typer.Option(
+        True,
+        "--metrics/--no-metrics",
+        help="Compute per-TF metrics (requires local catalog).",
+    ),
+    show_filtered: bool = typer.Option(False, "--show-filtered", help="List filtered TFs per category."),
+) -> None:
+    try:
+        config_path = resolve_config_path(config_option or config)
+    except ConfigResolutionError as exc:
+        console.print(str(exc))
+        raise typer.Exit(code=1)
+    cfg = load_config(config_path)
+    try:
+        result = validate_campaign(
+            cfg=cfg,
+            config_path=config_path,
+            campaign_name=campaign,
+            apply_selectors=apply_selectors,
+            include_metrics=include_metrics,
+        )
+    except ValueError as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title=f"Campaign validation: {result.name}", header_style="bold")
+    table.add_column("Category")
+    table.add_column("Total")
+    table.add_column("Selected")
+    if show_filtered:
+        table.add_column("Filtered TFs")
+    for name in result.categories:
+        total = len(result.categories.get(name, []))
+        selected = len(result.selected.get(name, [])) if apply_selectors else total
+        row = [name, str(total), str(selected)]
+        if show_filtered:
+            filtered = result.filtered.get(name, [])
+            row.append(", ".join(filtered) if filtered else "-")
+        table.add_row(*row)
+    console.print(table)
+    if result.campaign_id:
+        console.print(f"campaign_id: {result.campaign_id}")
+
+    if result.errors:
+        console.print("Errors:")
+        for item in result.errors:
+            console.print(f"- {item}")
+        raise typer.Exit(code=1)
+    if result.warnings:
+        console.print("Warnings:")
+        for item in result.warnings:
             console.print(f"- {item}")
 
 

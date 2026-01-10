@@ -64,10 +64,11 @@ cruncher report <run_name>
 1. [CLI reference](docs/cli.md)
 2. [Two-TF end-to-end demo](docs/demo.md)
 3. [Category campaign demo](docs/demo_campaigns.md)
-4. [Configuring a project](docs/config.md)
-5. [Ingesting and caching external data](docs/ingestion.md)
-6. [Architecture and artifacts](docs/architecture.md)
-7. [Package specification for developers](docs/spec.md)
+4. [Progressive demo (validation + live sampling)](docs/demo_progressive.md)
+5. [Configuring a project](docs/config.md)
+6. [Ingesting and caching external data](docs/ingestion.md)
+7. [Architecture and artifacts](docs/architecture.md)
+8. [Package specification for developers](docs/spec.md)
 
 ---
 
