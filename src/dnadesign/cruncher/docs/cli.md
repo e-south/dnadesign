@@ -1,6 +1,6 @@
 ## cruncher CLI
 
-Most commands operate relative to a `config.yaml` file. For an end-to-end walkthrough, see the [demo](demo.md).
+Most commands operate relative to a `config.yaml` file. For end-to-end walkthroughs, see the [two-TF demo](demo.md) and the [campaign demo](demo_campaigns.md).
 
 ### Workspace discovery & config resolution
 

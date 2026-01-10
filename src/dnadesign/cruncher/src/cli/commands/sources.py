@@ -10,6 +10,7 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Optional
 from urllib.error import HTTPError, URLError
@@ -17,6 +18,7 @@ from urllib.error import HTTPError, URLError
 import typer
 from dnadesign.cruncher.cli.config_resolver import (
     CANDIDATE_CONFIG_FILENAMES,
+    WORKSPACE_ENV_VAR,
     ConfigResolutionError,
     parse_config_and_value,
     resolve_config_path,
@@ -52,7 +54,8 @@ def list_sources(
 ) -> None:
     registry = default_registry()
     config_path: Path | None = None
-    if config_option is not None or config is not None:
+    workspace_selector = os.environ.get(WORKSPACE_ENV_VAR)
+    if config_option is not None or config is not None or workspace_selector:
         try:
             config_path = resolve_config_path(config_option or config)
         except ConfigResolutionError as exc:

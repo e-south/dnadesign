@@ -62,11 +62,12 @@ cruncher report <run_name>
 ### More documentation
 
 1. [CLI reference](docs/cli.md)
-2. [End-to-end demo](docs/demo.md)
-3. [Configuring a project](docs/config.md)
-4. [Ingesting and caching external data](docs/ingestion.md)
-5. [Architecture and artifacts](docs/architecture.md)
-6. [Package specification for developers](docs/spec.md)
+2. [Two-TF end-to-end demo](docs/demo.md)
+3. [Category campaign demo](docs/demo_campaigns.md)
+4. [Configuring a project](docs/config.md)
+5. [Ingesting and caching external data](docs/ingestion.md)
+6. [Architecture and artifacts](docs/architecture.md)
+7. [Package specification for developers](docs/spec.md)
 
 ---
 

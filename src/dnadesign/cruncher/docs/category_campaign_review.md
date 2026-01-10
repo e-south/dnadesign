@@ -419,7 +419,7 @@ Explicit errors (no fallbacks):
 
 ### Demo alignment
 - [x] Demo workspace includes Category1/2/3 + `demo_categories(_best)` campaign.
-- [x] Demo walkthrough covers fetch, selectors, and multi-TF analysis (`docs/demo.md`).
+- [x] Demo walkthrough covers fetch, selectors, and multi-TF analysis (`docs/demo_campaigns.md`).
 
 ## 15) Test plan
 

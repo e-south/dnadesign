@@ -92,7 +92,14 @@ def resolve_lock(
     for name in names:
         candidates = catalog.list(tf_name=name, include_synonyms=True)
         if not candidates:
-            raise ValueError(f"No cached motifs found for '{name}'. Run `cruncher fetch motifs` first.")
+            if pwm_source == "sites":
+                raise ValueError(f"No cached sites found for '{name}'. Run `cruncher fetch sites` first.")
+            if pwm_source == "matrix":
+                raise ValueError(f"No cached motifs found for '{name}'. Run `cruncher fetch motifs` first.")
+            raise ValueError(
+                f"No cached motifs or sites found for '{name}'. Run `cruncher fetch motifs` or "
+                "`cruncher fetch sites` first."
+            )
         if pwm_source:
             if pwm_source == "matrix":
                 candidates = [c for c in candidates if c.has_matrix]

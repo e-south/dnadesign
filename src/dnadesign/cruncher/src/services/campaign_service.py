@@ -478,6 +478,8 @@ def select_catalog_entry(
 ) -> CatalogEntry:
     candidates = catalog.list(tf_name=tf_name, include_synonyms=True)
     if not candidates:
+        if pwm_source == "sites":
+            raise ValueError(f"No cached sites found for '{tf_name}'. Run `cruncher fetch sites` first.")
         raise ValueError(f"No cached motifs found for '{tf_name}'. Run `cruncher fetch motifs` first.")
     if pwm_source == "matrix":
         candidates = [c for c in candidates if c.has_matrix]
