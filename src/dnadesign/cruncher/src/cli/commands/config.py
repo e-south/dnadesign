@@ -13,7 +13,10 @@ from pathlib import Path
 
 import click
 import typer
-from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
+from dnadesign.cruncher.cli.config_resolver import (
+    ConfigResolutionError,
+    resolve_config_path,
+)
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.services.config_service import summarize_config
 from rich.console import Console
@@ -30,7 +33,11 @@ console = Console()
 @app.callback(invoke_without_command=True)
 def config_main(
     ctx: typer.Context,
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -57,7 +64,11 @@ def config_main(
 
 @app.command("summary", help="Show resolved config and key sampling settings.")
 def summary(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -114,17 +125,29 @@ def summary(
     table.add_row("ingest.ncbi_timeout", str(summary["ingest"]["ncbi_timeout_seconds"]))
     table.add_row("ingest.http.retries", str(summary["ingest"]["http"]["retries"]))
     table.add_row("ingest.http.backoff_seconds", str(summary["ingest"]["http"]["backoff_seconds"]))
-    table.add_row("ingest.http.max_backoff_seconds", str(summary["ingest"]["http"]["max_backoff_seconds"]))
+    table.add_row(
+        "ingest.http.max_backoff_seconds",
+        str(summary["ingest"]["http"]["max_backoff_seconds"]),
+    )
     local_sources = summary["ingest"].get("local_sources") or []
     if local_sources:
         rendered = ", ".join(f"{src['source_id']}@{src['root']}" for src in local_sources)
     else:
         rendered = "-"
     table.add_row("ingest.local_sources", rendered)
-    table.add_row("ingest.regulondb.curated_sites", str(summary["ingest"]["regulondb"]["curated_sites"]))
+    table.add_row(
+        "ingest.regulondb.curated_sites",
+        str(summary["ingest"]["regulondb"]["curated_sites"]),
+    )
     table.add_row("ingest.regulondb.ht_sites", str(summary["ingest"]["regulondb"]["ht_sites"]))
-    table.add_row("ingest.regulondb.ht_dataset_type", str(summary["ingest"]["regulondb"].get("ht_dataset_type", "-")))
-    table.add_row("ingest.regulondb.ht_binding_mode", summary["ingest"]["regulondb"]["ht_binding_mode"])
+    table.add_row(
+        "ingest.regulondb.ht_dataset_type",
+        str(summary["ingest"]["regulondb"].get("ht_dataset_type", "-")),
+    )
+    table.add_row(
+        "ingest.regulondb.ht_binding_mode",
+        summary["ingest"]["regulondb"]["ht_binding_mode"],
+    )
 
     sample = summary.get("sample")
     if sample is None:

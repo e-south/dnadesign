@@ -66,3 +66,17 @@ def test_missing_cruncher_root_is_rejected(tmp_path: Path) -> None:
         load_config(config_path)
 
     assert any(err.get("type") == "missing" and err.get("loc") == ("cruncher",) for err in exc.value.errors())
+
+
+@pytest.mark.parametrize("out_dir", ["__absolute__", "../runs"])
+def test_out_dir_must_be_workspace_relative(tmp_path: Path, out_dir: str) -> None:
+    config = _base_config()
+    if out_dir == "__absolute__":
+        out_dir = str(tmp_path / "runs")
+    config["cruncher"]["out_dir"] = str(out_dir)
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+
+    assert any(err.get("loc") == ("cruncher", "out_dir") for err in exc.value.errors())

@@ -1,8 +1,6 @@
 ## cruncher for developers
 
-This document defines the end-to-end requirements and architecture for **cruncher**
-after the refactor. It is intended as a build and review guide for engineers
-working on ingestion, optimization, and UX. It is not required for end users.
+This document defines the end-to-end requirements and architecture for **cruncher**. It is intended as a build and review guide for engineers working on ingestion, optimization, and UX. It is not required for end users.
 
 ### Contents
 
@@ -25,7 +23,7 @@ working on ingestion, optimization, and UX. It is not required for end users.
 
 - Decoupled: core optimization is source-agnostic and runs offline.
 - Assertive: explicit errors for missing inputs, ambiguous TFs, invalid matrices.
-- Extendable: new sources and optimizers are adapters/registries, not rewrites.
+- Extendable: new sources and optimizers are adapters/registries.
 - Reproducible: lockfiles + run manifests + deterministic seeds.
 - Operational UX: clear CLI commands, deterministic cache, readable reports, crisp docs.
 - No fallbacks: no implicit legacy modes, no silent fallbacks, no hidden network access.
@@ -84,8 +82,7 @@ working on ingestion, optimization, and UX. It is not required for end users.
     sites/<source>/<motif_id>.jsonl
 ```
 
-`catalog.json` is the single source of truth for “what we have in-house”.
-It tracks matrix availability, site counts, and provenance tags.
+`catalog.json` is the single source of truth for “what we have in-house”. It tracks matrix availability, site counts, and provenance tags.
 
 ---
 
@@ -96,8 +93,7 @@ Lockfiles pin TF names to exact source IDs and checksums. Lockfiles are **requir
 - parse
 - sample
 
-If a TF cannot be uniquely resolved, **cruncher** errors immediately.
-Analyze/report operate on run artifacts and validate the lockfile recorded in the run manifest.
+If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze/report operate on run artifacts and validate the lockfile recorded in the run manifest.
 
 ---
 
@@ -105,7 +101,7 @@ Analyze/report operate on run artifacts and validate the lockfile recorded in th
 
 - Default: use cached matrices (`motif_store.pwm_source=matrix`).
 - Optional: build PWM from cached sites (`motif_store.pwm_source=sites`).
-- `motif_store.site_kinds` can restrict which site sets are eligible (e.g., curated vs HT).
+- `motif_store.site_kinds` can restrict which site sets are eligible (e.g., curated vs HT vs local).
 - `motif_store.combine_sites=true` concatenates site sets for a TF before PWM creation (explicit opt‑in).
 - When `combine_sites=true`, lockfiles hash the full set of site files used for that TF, so cache changes require re-locking.
 - HT site sets with variable lengths require per‑TF/per‑dataset window lengths via `motif_store.site_window_lengths`.
@@ -152,12 +148,7 @@ Each run directory contains:
 
 ### CLI contract
 
-Core lifecycle:
-
-Most commands accept an explicit config (`--config` or legacy positional). If omitted,
-**cruncher** resolves a config from `--workspace`/`CRUNCHER_WORKSPACE`, then from
-`cruncher.yaml`/`config.yaml` in the current directory (or parent directories), and
-finally from discoverable workspaces.
+Most commands accept an explicit config `--config`. If omitted, **cruncher** resolves a config from `--workspace`/`CRUNCHER_WORKSPACE`, then from `config.yaml` in the current directory (or parent directories), and finally from discoverable workspaces.
 
 - `cruncher fetch motifs ...`
 - `cruncher fetch sites ...`
@@ -179,8 +170,7 @@ finally from discoverable workspaces.
 
 Pairwise plots only run when `analysis.tf_pair` is set; there is no implicit pairwise sweep.
 
-Network access is explicit and opt-in. `cruncher fetch ...` and remote inventory
-commands (for example `cruncher sources summary --scope remote` or
+Network access is explicit and opt-in. `cruncher fetch ...` and remote inventory commands (for example `cruncher sources summary --scope remote` or
 `cruncher sources datasets`) contact sources; other commands operate on local
 cache and run artifacts only.
 

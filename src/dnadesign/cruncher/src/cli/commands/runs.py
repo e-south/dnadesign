@@ -27,8 +27,12 @@ from dnadesign.cruncher.services.run_service import (
     load_run_status,
     rebuild_run_index,
 )
-from dnadesign.cruncher.utils.analysis_layout import current_analysis_id, list_analysis_entries
+from dnadesign.cruncher.utils.analysis_layout import (
+    current_analysis_id,
+    list_analysis_entries,
+)
 from dnadesign.cruncher.utils.artifacts import normalize_artifacts
+from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
 from rich.console import Console
 from rich.live import Live
 from rich.table import Table
@@ -141,7 +145,11 @@ def _plot_live_metrics(history: list[dict], out_path: Path) -> None:
 
 @app.command("list", help="List run artifacts found in the results directory.")
 def list_runs_cmd(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -310,7 +318,11 @@ def show_run_cmd(
 
 @app.command("latest", help="Print the most recent run name (optionally filtered by stage).")
 def latest_run_cmd(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -355,7 +367,11 @@ def latest_run_cmd(
 
 @app.command("rebuild-index", help="Rebuild the run index from run_manifest.json files.")
 def rebuild_index_cmd(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -409,6 +425,8 @@ def watch_run_cmd(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
+    if plot or plot_path is not None:
+        ensure_mpl_cache(config_path.parent / cfg.motif_store.catalog_root)
     try:
         run = get_run(cfg, config_path, run_name)
     except FileNotFoundError as exc:
@@ -473,7 +491,10 @@ def watch_run_cmd(
                 if best_vals:
                     table.add_row("best_score_trend", _sparkline(best_vals, width=metric_width))
                 if current_vals:
-                    table.add_row("current_score_trend", _sparkline(current_vals, width=metric_width))
+                    table.add_row(
+                        "current_score_trend",
+                        _sparkline(current_vals, width=metric_width),
+                    )
                 table.add_row("metric_points", str(len(history)))
             else:
                 table.add_row("live_metrics", "live_metrics.jsonl not found")

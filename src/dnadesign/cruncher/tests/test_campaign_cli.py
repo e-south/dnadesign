@@ -10,7 +10,6 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import yaml
@@ -72,7 +71,7 @@ def test_campaign_generate_cli(tmp_path: Path) -> None:
     assert manifest["expanded_count"] == 6
 
 
-def test_campaign_generate_rebases_relative_paths(tmp_path: Path) -> None:
+def test_campaign_generate_keeps_workspace_relative_paths(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     config = {
@@ -106,25 +105,20 @@ def test_campaign_generate_rebases_relative_paths(tmp_path: Path) -> None:
     config_path = workspace / "config.yaml"
     config_path.write_text(yaml.safe_dump(config))
 
-    out_dir = tmp_path / "exports"
-    out_dir.mkdir()
-    out_path = out_dir / "expanded.yaml"
+    out_path = workspace / "expanded.yaml"
     result = runner.invoke(
-        app,
-        ["campaign", "generate", "--campaign", "demo", "--out", str(out_path), str(config_path)],
+        app, ["campaign", "generate", "--campaign", "demo", "--out", "expanded.yaml", str(config_path)]
     )
     assert result.exit_code == 0
+    assert out_path.exists()
     payload = yaml.safe_load(out_path.read_text())["cruncher"]
 
-    def rel(target: str) -> str:
-        return os.path.relpath((workspace / target).resolve(), out_dir)
-
-    assert payload["out_dir"] == rel("runs")
-    assert payload["motif_store"]["catalog_root"] == rel(".cruncher")
-    assert payload["ingest"]["genome_cache"] == rel(".cruncher/genomes")
-    assert payload["ingest"]["genome_fasta"] == rel("data/genome.fna")
-    assert payload["ingest"]["regulondb"]["ca_bundle"] == rel("certs/ca.pem")
-    assert payload["ingest"]["local_sources"][0]["root"] == rel("data/motifs")
+    assert payload["out_dir"] == "runs"
+    assert payload["motif_store"]["catalog_root"] == ".cruncher"
+    assert payload["ingest"]["genome_cache"] == ".cruncher/genomes"
+    assert payload["ingest"]["genome_fasta"] == "data/genome.fna"
+    assert payload["ingest"]["regulondb"]["ca_bundle"] == "certs/ca.pem"
+    assert payload["ingest"]["local_sources"][0]["root"] == "data/motifs"
 
 
 def test_campaign_summarize_cli(tmp_path: Path) -> None:

@@ -96,7 +96,10 @@ config.yaml
 runs/
 ```
 
-In this repo, the bundled demo workspace lives at `src/dnadesign/cruncher/workspaces/demo/`.
+In this repo, the bundled demo workspaces live at:
+
+- `src/dnadesign/cruncher/workspaces/demo_basics_two_tf/`
+- `src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/`
 
 #### Catalog root (`catalog_root`, default: `.cruncher/`)
 

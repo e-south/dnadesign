@@ -18,7 +18,10 @@ import numpy as np
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.ingest.models import MotifDescriptor, MotifQuery
 from dnadesign.cruncher.ingest.normalize import compute_pwm_from_sites
-from dnadesign.cruncher.ingest.site_windows import resolve_window_length, window_sequence
+from dnadesign.cruncher.ingest.site_windows import (
+    resolve_window_length,
+    window_sequence,
+)
 from dnadesign.cruncher.store.catalog_index import CatalogIndex, build_descriptor
 from dnadesign.cruncher.store.motif_store import MotifRef, MotifStore
 
@@ -71,7 +74,11 @@ class CatalogMotifStore(MotifStore):
             matrix = np.array(payload["matrix"], dtype=float)
             log_odds = payload.get("log_odds_matrix")
             log_odds_matrix = np.array(log_odds, dtype=float) if log_odds is not None else None
-            return PWM(name=payload["descriptor"]["tf_name"], matrix=matrix, log_odds_matrix=log_odds_matrix)
+            return PWM(
+                name=payload["descriptor"]["tf_name"],
+                matrix=matrix,
+                log_odds_matrix=log_odds_matrix,
+            )
         if self.pwm_source == "sites":
             catalog = CatalogIndex.load(self.root)
             entry = catalog.entries.get(f"{ref.source}:{ref.motif_id}")

@@ -15,7 +15,10 @@ from typing import Iterable, List, Optional, Tuple
 from urllib.error import HTTPError, URLError
 
 import typer
-from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
+from dnadesign.cruncher.cli.config_resolver import (
+    ConfigResolutionError,
+    resolve_config_path,
+)
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.http_client import HttpRetryPolicy
 from dnadesign.cruncher.ingest.models import DatasetQuery, MotifQuery
@@ -26,12 +29,19 @@ from dnadesign.cruncher.ingest.sequence_provider import (
     SequenceProvider,
 )
 from dnadesign.cruncher.services.campaign_service import resolve_campaign_tf_names
-from dnadesign.cruncher.services.fetch_service import fetch_motifs, fetch_sites, hydrate_sites
+from dnadesign.cruncher.services.fetch_service import (
+    fetch_motifs,
+    fetch_sites,
+    hydrate_sites,
+)
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from rich.console import Console
 from rich.table import Table
 
-app = typer.Typer(no_args_is_help=True, help="Fetch motifs or binding sites from sources into the cache.")
+app = typer.Typer(
+    no_args_is_help=True,
+    help="Fetch motifs or binding sites from sources into the cache.",
+)
 logger = logging.getLogger(__name__)
 console = Console()
 
@@ -109,7 +119,11 @@ def _render_sites_summary(catalog_root: Path, paths: Iterable[Path]) -> None:
 
 @app.command("motifs", help="Fetch motif matrices into the local cache.")
 def motifs(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -229,7 +243,11 @@ def motifs(
 
 @app.command("sites", help="Fetch binding-site sequences into the local cache.")
 def sites(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -389,7 +407,11 @@ def sites(
         if hydrate:
             if provider is None:
                 raise ValueError("Hydration requires genome_source or --genome-fasta.")
-            logger.info("Hydrating cached sites for TFs=%s motif_ids=%s", effective_tfs, motif_id)
+            logger.info(
+                "Hydrating cached sites for TFs=%s motif_ids=%s",
+                effective_tfs,
+                motif_id,
+            )
             written = hydrate_sites(
                 catalog_root,
                 names=effective_tfs,

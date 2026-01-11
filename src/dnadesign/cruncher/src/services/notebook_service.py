@@ -15,7 +15,11 @@ from typing import Optional
 
 from dnadesign.cruncher.services.run_service import update_run_index_from_manifest
 from dnadesign.cruncher.utils.analysis_layout import resolve_analysis_dir
-from dnadesign.cruncher.utils.artifacts import append_artifacts, artifact_entry, normalize_artifacts
+from dnadesign.cruncher.utils.artifacts import (
+    append_artifacts,
+    artifact_entry,
+    normalize_artifacts,
+)
 from dnadesign.cruncher.utils.manifest import load_manifest, write_manifest
 
 

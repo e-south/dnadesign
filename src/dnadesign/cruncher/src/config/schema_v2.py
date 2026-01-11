@@ -662,6 +662,16 @@ class CruncherConfig(StrictBaseModel):
             cleaned[name] = tfs
         return cleaned
 
+    @field_validator("out_dir")
+    @classmethod
+    def _check_out_dir(cls, v: Path) -> Path:
+        if v.is_absolute():
+            raise ValueError("out_dir must be a relative path")
+        normalized = Path(v)
+        if any(part == ".." for part in normalized.parts):
+            raise ValueError("out_dir must not traverse outside the workspace")
+        return normalized
+
     @model_validator(mode="after")
     def _check_campaigns(self) -> "CruncherConfig":
         if not self.campaigns:

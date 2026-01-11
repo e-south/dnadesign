@@ -27,6 +27,7 @@ CANDIDATE_CONFIG_FILENAMES: tuple[str, ...] = (
 WORKSPACE_ENV_VAR = "CRUNCHER_WORKSPACE"
 WORKSPACE_ROOTS_ENV_VAR = "CRUNCHER_WORKSPACE_ROOTS"
 DEFAULT_WORKSPACE_ENV_VAR = "CRUNCHER_DEFAULT_WORKSPACE"
+CONFIG_ENV_VAR = "CRUNCHER_CONFIG"
 NONINTERACTIVE_ENV_VAR = "CRUNCHER_NONINTERACTIVE"
 
 
@@ -261,6 +262,9 @@ def resolve_config_path(config: Path | None, *, cwd: Path | None = None, log: bo
     cwd_path = (cwd or Path.cwd()).expanduser().resolve()
     if config is not None:
         return _resolve_explicit_config(config, cwd=cwd_path)
+    env_config = os.environ.get(CONFIG_ENV_VAR)
+    if env_config:
+        return _resolve_explicit_config(Path(env_config), cwd=cwd_path)
     selector = os.environ.get(WORKSPACE_ENV_VAR)
     if selector:
         return _resolve_workspace_selector(selector, cwd=cwd_path, log=log)
@@ -284,7 +288,8 @@ def resolve_config_path(config: Path | None, *, cwd: Path | None = None, log: bo
         raise ConfigResolutionError(
             "No config argument provided and no default config file was found in the current directory.\n"
             f"Expected one of: {expected}\n"
-            "Hint: pass --config PATH or create a config.yaml (or cruncher.yaml) in this directory.\n"
+            "Hint: pass --config PATH, set CRUNCHER_CONFIG, or create a config.yaml "
+            "(or cruncher.yaml) in this directory.\n"
             "Workspace discovery searched:\n"
             f"{roots_rendered}\n"
             f"To add roots: set {WORKSPACE_ROOTS_ENV_VAR}=/path/a{os.pathsep}/path/b"

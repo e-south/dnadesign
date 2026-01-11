@@ -79,7 +79,10 @@ def gather_per_pwm_scores(
         # Keep the first draw unconditionally:
         first_row = df_chain.iloc[0]
         seq_str = first_row["sequence"]
-        seq_ints = encode_sequence(seq_str, context=f"sequences.parquet chain={chain_label} draw={first_row['draw']}")
+        seq_ints = encode_sequence(
+            seq_str,
+            context=f"sequences.parquet chain={chain_label} draw={first_row['draw']}",
+        )
 
         # Compute per-TF scores for the first draw:
         per_tf_last: dict[str, float] = scorer.compute_all_per_pwm(seq_ints, len(seq_ints))
@@ -92,7 +95,10 @@ def gather_per_pwm_scores(
         for idx in range(1, n_rows - 1):
             row = df_chain.iloc[idx]
             seq_str = row["sequence"]
-            seq_ints = encode_sequence(seq_str, context=f"sequences.parquet chain={chain_label} draw={row['draw']}")
+            seq_ints = encode_sequence(
+                seq_str,
+                context=f"sequences.parquet chain={chain_label} draw={row['draw']}",
+            )
 
             per_tf_curr = scorer.compute_all_per_pwm(seq_ints, len(seq_ints))
 
@@ -118,7 +124,8 @@ def gather_per_pwm_scores(
             last_row = df_chain.iloc[-1]
             seq_str = last_row["sequence"]
             seq_ints = encode_sequence(
-                seq_str, context=f"sequences.parquet chain={chain_label} draw={last_row['draw']}"
+                seq_str,
+                context=f"sequences.parquet chain={chain_label} draw={last_row['draw']}",
             )
 
             per_tf_final = scorer.compute_all_per_pwm(seq_ints, len(seq_ints))

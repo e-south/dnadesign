@@ -79,7 +79,11 @@ class Scorer:
 
         self.bidirectional = bool(bidirectional)
 
-        logger.info("Building Scorer (scale=%r, bidirectional=%s)", self.scale, self.bidirectional)
+        logger.info(
+            "Building Scorer (scale=%r, bidirectional=%s)",
+            self.scale,
+            self.bidirectional,
+        )
 
         # Build per‐PWM info (lom, null_scores, tail_p, width, plus compute null mean/std).
         self._cache: Dict[str, _PWMInfo] = {}
@@ -143,7 +147,13 @@ class Scorer:
         p_seq = 1.0 - (1.0 - p_win) ** n_win
         p_seq = max(p_seq, 1e-300)
         neglogp = -np.log10(p_seq)
-        logger.debug("    PWMCALC: raw_llr=%.3f, width=%d, n_win=%d, neglogp=%.3f", raw_llr, w, n_win, neglogp)
+        logger.debug(
+            "    PWMCALC: raw_llr=%.3f, width=%d, n_win=%d, neglogp=%.3f",
+            raw_llr,
+            w,
+            n_win,
+            neglogp,
+        )
         return neglogp
 
     def _best_llr_and_location(self, seq: np.ndarray, info: _PWMInfo) -> Tuple[float, int, str]:
@@ -169,7 +179,12 @@ class Scorer:
             if rev_llr > best_llr:
                 best_llr, best_offset, best_strand = rev_llr, rev_offset, rev_strand
 
-        logger.debug("    BEST_LLR: best_llr=%.3f at offset=%d, strand=%s", best_llr, best_offset, best_strand)
+        logger.debug(
+            "    BEST_LLR: best_llr=%.3f at offset=%d, strand=%s",
+            best_llr,
+            best_offset,
+            best_strand,
+        )
         return best_llr, best_offset, best_strand
 
     def _info(self, tf: str) -> _PWMInfo:

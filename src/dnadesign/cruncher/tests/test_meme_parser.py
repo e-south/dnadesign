@@ -67,6 +67,22 @@ def test_parse_meme_text_multi_motif_blocks() -> None:
     assert second.block_sites[0].pvalue is None
 
 
+def test_meme_blocks_header_is_ignored() -> None:
+    text = _meme_text().replace(
+        "Motif 1 sites in BLOCKS format\n",
+        "Motif 1 sites in BLOCKS format\nBL   MOTIF cusR width=3 seqs=4\n",
+    )
+    result = parse_meme_text(text, Path("demo.txt"))
+    assert len(result.motifs) == 2
+    assert len(result.motifs[0].block_sites) == 2
+
+
+def test_meme_blocks_terminator_is_ignored() -> None:
+    text = _meme_text() + "\n//\n"
+    result = parse_meme_text(text, Path("demo.txt"))
+    assert len(result.motifs) == 2
+
+
 def test_select_meme_motif_by_index() -> None:
     result = parse_meme_text(_meme_text(), Path("demo.txt"))
     motif = select_meme_motif(result, file_stem="demo", selector=2, path=Path("demo.txt"))

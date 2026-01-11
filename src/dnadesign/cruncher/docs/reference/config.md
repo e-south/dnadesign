@@ -5,7 +5,7 @@ This page explains the `config.yaml` and how each block maps to the **cruncher**
 ### Contents
 
 1. [Root settings](#root-settings)
-2. [Categories & campaigns](#categories--campaigns)
+2. [Categories and campaigns](#categories-and-campaigns)
 3. [IO](#io)
 4. [Motif store](#motif_store)
 5. [Ingest](#ingest)
@@ -27,15 +27,13 @@ cruncher:
 ```
 
 Notes:
-- `out_dir` is resolved relative to the config file.
+- `out_dir` is resolved relative to the config file and must be a relative path.
 - Each regulator set creates its own `parse_...` and `sample_...` run folders.
-- `runs/` is the recommended workspace-local runs directory (keeps outputs alongside the config).
 - Config parsing is strict: unknown keys are rejected to avoid silent typos.
 
-### Categories & campaigns
+### Categories and campaigns
 
-Category and campaign blocks let you generate many regulator combinations without hand-writing
-pairwise sets. They are **additive** and do not change core sampling behavior.
+Category and campaign blocks let you generate many regulator combinations without hand-writing pairwise sets. They are **additive** and do not change core sampling behavior.
 
 ```yaml
 cruncher:
@@ -100,13 +98,13 @@ motif_store:
   catalog_root: .cruncher
   source_preference: [regulondb]
   allow_ambiguous: false
-  pwm_source: matrix   # matrix | sites
-  site_kinds: null     # optional filter: ["curated"], ["ht_tfbinding"], ["ht_peak"]
+  pwm_source: matrix              # matrix | sites
+  site_kinds: null                # optional filter: ["curated"], ["ht_tfbinding"], ["ht_peak"]
   combine_sites: false
-  dataset_preference: []  # HT dataset ranking
-  dataset_map: {}         # TF -> dataset ID
-  site_window_lengths: {} # TF or dataset:<id> -> length (bp)
-  site_window_center: midpoint # midpoint | summit
+  dataset_preference: []          # HT dataset ranking
+  dataset_map: {}                 # TF -> dataset ID
+  site_window_lengths: {}         # TF or dataset:<id> -> length (bp)
+  site_window_center: midpoint    # midpoint | summit
   min_sites_for_pwm: 2
   allow_low_sites: false
 ```
@@ -120,7 +118,7 @@ Notes:
 - If site lengths vary, set `site_window_lengths` per TF or dataset.
 - Window lengths must not exceed the shortest cached site length for a TF; use the
   min length from `cruncher targets stats` if unsure.
-- `combine_sites=false` avoids mixing curated and HT sites unless you opt in.
+- `combine_sites=false` avoids mixing curated, HT, and local sites unless you opt in.
 - When `combine_sites=true`, lockfiles hash all matching site sets for the TF (respecting `site_kinds`); adding/removing site sets requires re-locking.
 - `site_window_center=summit` requires per-site summit metadata; use `midpoint` unless your source provides summits.
 
@@ -325,8 +323,8 @@ Example output (captured with `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200`):
 ┃ Key                              ┃ Value                                                                                                                                                             ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
 │ out_dir                          │ runs                                                                                                                                                              │
-│ regulator_sets                   │ [['lexA', 'cpxR']]                                                                                                                                                │
-│ regulators_flat                  │ lexA, cpxR                                                                                                                                                        │
+│ regulator_sets                   │ [['lexA', 'cpxR', 'fur']]                                                                                                                                         │
+│ regulators_flat                  │ lexA, cpxR, fur                                                                                                                                                   │
 │ regulator_categories             │ {'Stress': ['lexA'], 'Envelope': ['cpxR'], 'Category1': ['cpxR', 'baeR'], 'Category2': ['lexA', 'rcdA', 'lrp', 'fur'], 'Category3': ['fnr', 'fur', 'acrR',        │
 │                                  │ 'soxR', 'soxS', 'lrp']}                                                                                                                                           │
 │ campaigns                        │ demo_pair, demo_categories, demo_categories_best                                                                                                                  │
@@ -384,7 +382,7 @@ Example output (captured with `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200`):
 │ analysis.scatter_scale           │ llr                                                                                                                                                               │
 │ analysis.subsampling_epsilon     │ 10.0                                                                                                                                                              │
 │ analysis.scatter_style           │ edges                                                                                                                                                             │
-│ analysis.tf_pair                 │ ['lexA', 'cpxR']                                                                                                                                                  │
+│ analysis.tf_pair                 │ None                                                                                                                                                              │
 │ analysis.archive                 │ False                                                                                                                                                             │
 └──────────────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```

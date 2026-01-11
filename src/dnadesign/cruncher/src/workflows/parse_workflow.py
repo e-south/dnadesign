@@ -21,7 +21,11 @@ from dnadesign.cruncher.services.run_service import (
 )
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
-from dnadesign.cruncher.store.lockfile import read_lockfile, validate_lockfile, verify_lockfile_hashes
+from dnadesign.cruncher.store.lockfile import (
+    read_lockfile,
+    validate_lockfile,
+    verify_lockfile_hashes,
+)
 from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.artifacts import artifact_entry
 from dnadesign.cruncher.utils.labels import build_run_name, regulator_sets
@@ -177,7 +181,11 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
                 columns=list(pwm.alphabet),
                 index=[f"pos{i + 1}" for i in range(log_odds.shape[0])],
             )
-            logger.debug("Log-odds matrix for %s:\n%s", tf, df_lo.to_string(float_format=lambda x: f"{x:.3f}"))
+            logger.debug(
+                "Log-odds matrix for %s:\n%s",
+                tf,
+                df_lo.to_string(float_format=lambda x: f"{x:.3f}"),
+            )
 
         set_lockmap = {tf: lockmap[tf] for tf in tfs}
         manifest = build_run_manifest(

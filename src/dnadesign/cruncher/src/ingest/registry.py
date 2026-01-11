@@ -15,8 +15,14 @@ from typing import Callable, Dict, List, Sequence
 
 from dnadesign.cruncher.config.schema_v2 import IngestConfig, LocalMotifSourceConfig
 from dnadesign.cruncher.ingest.adapters.base import SourceAdapter
-from dnadesign.cruncher.ingest.adapters.local import LocalMotifAdapter, LocalMotifAdapterConfig
-from dnadesign.cruncher.ingest.adapters.regulondb import RegulonDBAdapter, RegulonDBAdapterConfig
+from dnadesign.cruncher.ingest.adapters.local import (
+    LocalMotifAdapter,
+    LocalMotifAdapterConfig,
+)
+from dnadesign.cruncher.ingest.adapters.regulondb import (
+    RegulonDBAdapter,
+    RegulonDBAdapterConfig,
+)
 from dnadesign.cruncher.ingest.http_client import HttpRetryPolicy
 from dnadesign.cruncher.ingest.models import OrganismRef
 

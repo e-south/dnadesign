@@ -621,7 +621,13 @@ def _plot_pareto_projection(summary_df: pd.DataFrame, out_path: Path) -> Path:
     required = {"pareto_fraction", "joint_min_best"}
     if summary_df.empty or not required.issubset(summary_df.columns):
         fig, ax = plt.subplots(figsize=(5, 3))
-        ax.text(0.5, 0.5, "Pareto projection requires pareto_fraction + joint_min_best", ha="center", va="center")
+        ax.text(
+            0.5,
+            0.5,
+            "Pareto projection requires pareto_fraction + joint_min_best",
+            ha="center",
+            va="center",
+        )
         ax.axis("off")
         fig.savefig(out_path, dpi=300, bbox_inches="tight")
         plt.close(fig)

@@ -1,14 +1,24 @@
 ## cruncher CLI
 
-Most commands operate relative to a `config.yaml` file. Examples below include CONFIG for clarity; if you're in a workspace (or set `CRUNCHER_WORKSPACE`), you can omit it. Some commands (notably `cruncher notebook`) operate on a run directory instead of a config. For end-to-end walkthroughs, see the [two-TF demo](demo.md) and the [campaign demo](demo_campaigns.md).
+Most commands operate relative to a `config.yaml` file. You can also pass `--config/-c` globally (before the command). Some commands (notably `cruncher notebook`) operate on a run directory instead of a config.
 
-Network access is explicit and opt-in: `cruncher fetch ...` always contacts sources unless `--offline`, and remote inventory commands like `cruncher sources summary --scope remote` or `cruncher sources datasets` query upstream services. Everything else is cache- or artifact-only.
+### Contents
 
-### Workspace discovery & config resolution
+1. [Workspace discovery and config resolution](#workspace-discovery-and-config-resolution)
+2. [Which command should I use?](#which-command-should-i-use)
+2. [Core lifecycle commands](#core-lifecycle-commands)
+3. [Discovery and inspection](#discovery-and-inspection)
+4. [Global options](#global-options)
+
+> Network access occurs in fetch and remote inventory commands (for example, `cruncher fetch ...`, `cruncher sources summary --scope remote`, `cruncher sources datasets`). Some workflows (such as site hydration via NCBI) also use the network depending on your config. Use `--offline` where supported to force cache-only behavior.
+
+---
+
+### Workspace discovery and config resolution
 
 Cruncher resolves the config path in this order:
 
-1. `--config/-c` or positional `CONFIG` (explicit config path)
+1. `--config/-c` (global or per-command), positional `CONFIG` (explicit config path)
 2. `--workspace/-w` (workspace name, index from `workspaces list`, or a path to a workspace dir/config)
    * also accepts `CRUNCHER_WORKSPACE=<name|index|path>`
 3. `config.yaml` / `cruncher.yaml` in the current directory
@@ -20,21 +30,12 @@ Cruncher resolves the config path in this order:
 
 If exactly one workspace is discovered, Cruncher auto-selects it and logs a one-line note.
 If multiple are found, Cruncher prints a numbered list and shows how to select one via `--workspace` or `--config`.
-Interactive selection is only offered on TTYs and can be disabled with `CRUNCHER_NONINTERACTIVE=1`.
-Set `CRUNCHER_DEFAULT_WORKSPACE=<name>` to auto-select when multiple workspaces exist.
 
 To see what is available (with stable indices), run:
 
 ```
 cruncher workspaces list
 ```
-
-### Contents
-
-1. [Which command should I use?](#which-command-should-i-use)
-2. [Core lifecycle commands](#core-lifecycle-commands)
-3. [Discovery and inspection](#discovery-and-inspection)
-4. [Global options](#global-options)
 
 ---
 
@@ -56,6 +57,8 @@ Common tasks mapped to commands:
 * **Inspect config resolution** → `cruncher config` (summary table).
 * **List available optimizers** → `cruncher optimizers list`.
 * **Find workspaces** → `cruncher workspaces list`.
+
+---
 
 ### Core lifecycle commands
 
@@ -200,8 +203,8 @@ Notes:
 * The base config must define `regulator_categories` and `campaigns`.
 * Selector filters require cached motifs/sites; fetch before generating if you use them.
 * The manifest is written alongside the output config by default.
-* If `--out` is outside the original config directory, relative paths are rebased
-  so the generated config still points at the original workspace.
+* `--out` must live alongside the workspace `config.yaml` so `out_dir` remains workspace-relative.
+  Relative `--out` paths are interpreted from the workspace root.
 
 ---
 
@@ -570,7 +573,8 @@ Regulator inventory for a single source:
 
 Note:
 
-* `sources list` only auto-detects config in the current directory; pass CONFIG or set `CRUNCHER_WORKSPACE` when running elsewhere.
+* `sources list` attempts full config resolution (workspace/CWD). If none is found, it lists built-in sources only.
+  Pass CONFIG (or set `CRUNCHER_CONFIG`/`CRUNCHER_WORKSPACE`) to include local sources from a workspace config.
 * Some sources do not expose full remote inventories; use `--remote-limit` (partial counts)
   or `--scope cache` if you only need cached regulators.
 
@@ -582,34 +586,26 @@ Example output (cache, abridged; captured with `CRUNCHER_LOG_LEVEL=WARNING` and 
 ┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
 ┃ Metric            ┃ Value   ┃
 ┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
-│ entries           │ 10      │
+│ entries           │ 2       │
 │ sources           │ 1       │
-│ TFs               │ 10      │
+│ TFs               │ 2       │
 │ motifs            │ 0       │
-│ site sets         │ 10      │
-│ sites (seq/total) │ 872/872 │
+│ site sets         │ 2       │
+│ sites (seq/total) │ 203/203 │
 │ datasets          │ 0       │
 └───────────────────┴─────────┘
                   Cache by source (source=regulondb)
 ┏━━━━━━━━━━━┳━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
 ┃ Source    ┃ TFs ┃ Motifs ┃ Site sets ┃ Sites (seq/total) ┃ Datasets ┃
 ┡━━━━━━━━━━━╇━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
-│ regulondb │  10 │      0 │        10 │ 872/872           │        0 │
+│ regulondb │   2 │      0 │         2 │ 203/203           │        0 │
 └───────────┴─────┴────────┴───────────┴───────────────────┴──────────┘
                   Cache regulators (source=regulondb)
 ┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
 ┃ TF   ┃ Sources   ┃ Motifs ┃ Site sets ┃ Sites (seq/total) ┃ Datasets ┃
 ┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
-│ lrp  │ regulondb │      0 │         1 │ 219/219           │        0 │
-│ fur  │ regulondb │      0 │         1 │ 217/217           │        0 │
 │ cpxR │ regulondb │      0 │         1 │ 154/154           │        0 │
-│ fnr  │ regulondb │      0 │         1 │ 152/152           │        0 │
 │ lexA │ regulondb │      0 │         1 │ 49/49             │        0 │
-│ soxS │ regulondb │      0 │         1 │ 44/44             │        0 │
-│ rcdA │ regulondb │      0 │         1 │ 15/15             │        0 │
-│ acrR │ regulondb │      0 │         1 │ 11/11             │        0 │
-│ soxR │ regulondb │      0 │         1 │ 7/7               │        0 │
-│ baeR │ regulondb │      0 │         1 │ 4/4               │        0 │
 └──────┴───────────┴────────┴───────────┴───────────────────┴──────────┘
 ```
 
@@ -723,6 +719,7 @@ Example:
 ### Global options
 
 * `--log-level INFO|DEBUG|WARNING` (or set `CRUNCHER_LOG_LEVEL`)
+* `--config/-c <path>` (or set `CRUNCHER_CONFIG`) to pin a specific config file
 * `--workspace/-w <name|index|path>` (or set `CRUNCHER_WORKSPACE`) to pick a workspace config
 
 

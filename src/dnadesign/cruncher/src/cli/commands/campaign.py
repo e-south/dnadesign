@@ -16,9 +16,14 @@ from pathlib import Path
 
 import typer
 import yaml
-from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
+from dnadesign.cruncher.cli.config_resolver import (
+    ConfigResolutionError,
+    resolve_config_path,
+)
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.campaign_notebook_service import generate_campaign_notebook
+from dnadesign.cruncher.services.campaign_notebook_service import (
+    generate_campaign_notebook,
+)
 from dnadesign.cruncher.services.campaign_service import (
     build_campaign_manifest,
     expand_campaign,
@@ -73,7 +78,11 @@ def _rebase_config_paths(data: dict, *, src_dir: Path, dst_dir: Path) -> None:
 
 @app.command("generate", help="Expand a campaign into explicit regulator_sets.")
 def generate(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -115,16 +124,39 @@ def generate(
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1)
 
-    out_path = out or config_path.with_name(f"{config_path.stem}.{campaign}.yaml")
-    manifest_path = manifest or out_path.with_suffix(".campaign_manifest.json")
+    workspace_root = config_path.parent.resolve()
+    out_path = (out or config_path.with_name(f"{config_path.stem}.{campaign}.yaml")).expanduser()
+    if not out_path.is_absolute():
+        out_path = (workspace_root / out_path).resolve()
+    else:
+        out_path = out_path.resolve()
+    if out_path.parent != workspace_root:
+        raise typer.BadParameter(
+            f"--out must be inside the workspace ({workspace_root}). "
+            "Derived configs must live alongside config.yaml so out_dir remains workspace-relative."
+        )
+    manifest_path = (manifest or out_path.with_suffix(".campaign_manifest.json")).expanduser()
+    if not manifest_path.is_absolute():
+        manifest_path = (workspace_root / manifest_path).resolve()
+    else:
+        manifest_path = manifest_path.resolve()
+    if manifest_path.parent != workspace_root:
+        raise typer.BadParameter(
+            f"--manifest must be inside the workspace ({workspace_root}) to keep campaign artifacts collocated."
+        )
     generated_at = datetime.now(timezone.utc).isoformat()
 
     data = cfg.model_dump(mode="json")
     data["regulator_sets"] = expansion.regulator_sets
+    manifest_value: Path | str
+    try:
+        manifest_value = manifest_path.relative_to(workspace_root)
+    except ValueError:
+        manifest_value = manifest_path
     data["campaign"] = {
         "name": expansion.name,
         "campaign_id": expansion.campaign_id,
-        "manifest_path": str(manifest_path),
+        "manifest_path": str(manifest_value),
         "generated_at": generated_at,
     }
     _rebase_config_paths(data, src_dir=config_path.parent, dst_dir=out_path.parent)
@@ -144,7 +176,11 @@ def generate(
 
 @app.command("summarize", help="Aggregate campaign runs into summary tables and plots.")
 def summarize(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -220,7 +256,11 @@ def summarize(
 
 @app.command("validate", help="Validate a campaign against cached motifs/sites and selectors.")
 def validate(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -289,7 +329,11 @@ def validate(
 
 @app.command("notebook", help="Generate a marimo notebook for a campaign summary.")
 def notebook(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",

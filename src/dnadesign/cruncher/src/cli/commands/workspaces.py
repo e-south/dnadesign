@@ -12,7 +12,10 @@ from __future__ import annotations
 import os
 
 import typer
-from dnadesign.cruncher.cli.config_resolver import discover_workspaces, workspace_search_roots
+from dnadesign.cruncher.cli.config_resolver import (
+    discover_workspaces,
+    workspace_search_roots,
+)
 from rich.console import Console
 from rich.table import Table
 

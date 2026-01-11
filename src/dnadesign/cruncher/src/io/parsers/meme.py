@@ -23,7 +23,7 @@ from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.io.parsers.backend import register
 
 _META_KV_RE = re.compile(r"(\w+)\s*=\s*([0-9.eE+-]+)")
-_BLOCK_SITE_RE = re.compile(r"^(?P<name>\S+)\s*\((?P<start>-?\d+)\)\s+(?P<seq>[A-Za-z]+)")
+_BLOCK_SITE_RE = re.compile(r"^(?P<name>\S+)\s*\(\s*(?P<start>-?\d+)\s*\)\s+(?P<seq>[A-Za-z]+)")
 _PVAL_RE = re.compile(r"^(?P<name>\S+)\s+(?P<start>-?\d+)\s+(?P<pval>[0-9.eE+-]+)")
 _ALPHABET_RE = re.compile(r"^ALPHABET\s*=\s*(.+)$", re.IGNORECASE)
 _VERSION_RE = re.compile(r"^MEME\s+version\s+(?P<version>.+)$", re.IGNORECASE)
@@ -196,6 +196,10 @@ def parse_meme_text(text: str, path: Path) -> MemeFileParseResult:
             if bg_next:
                 bg_next = False
             continue
+        if stripped == "//":
+            if state in {"prob_matrix", "log_odds", "blocks", "pvalues"}:
+                state = None
+            continue
 
         version_match = _VERSION_RE.match(stripped)
         if version_match:
@@ -290,10 +294,18 @@ def parse_meme_text(text: str, path: Path) -> MemeFileParseResult:
         if state == "blocks":
             if stripped.startswith("---") or lower.startswith("sequence"):
                 continue
+            if lower.startswith("bl") and "motif" in lower:
+                continue
             match = _BLOCK_SITE_RE.match(stripped)
             if not match:
                 raise ValueError(f"Unrecognized BLOCKS line in {path}: '{stripped}'")
-            _add_block_site(current, match.group("name"), int(match.group("start")), match.group("seq"), path)
+            _add_block_site(
+                current,
+                match.group("name"),
+                int(match.group("start")),
+                match.group("seq"),
+                path,
+            )
             continue
 
     if current is not None:
@@ -478,7 +490,11 @@ def _render_selection_error(message: str, motifs: list[MemeMotif], *, path: Opti
     header = f"{message}"
     if path is not None:
         header = f"{message} ({path})."
-    lines = [header, "Available motifs:", "Hint: select a motif by name, label, or index."]
+    lines = [
+        header,
+        "Available motifs:",
+        "Hint: select a motif by name, label, or index.",
+    ]
     for idx, motif in enumerate(motifs, start=1):
         label = motif.motif_label
         lines.append(f"  [{idx}] {label}")

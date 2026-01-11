@@ -25,7 +25,8 @@ def find_elites_parquet(run_dir: Path) -> Path:
     if legacy:
         latest = max(legacy, key=lambda p: p.stat().st_mtime)
         logger.warning(
-            "Using legacy elites layout at %s; re-run `cruncher sample` to regenerate elites.parquet.", latest
+            "Using legacy elites layout at %s; re-run `cruncher sample` to regenerate elites.parquet.",
+            latest,
         )
         return latest
 

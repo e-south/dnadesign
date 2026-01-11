@@ -331,8 +331,18 @@ def make_pair_idata(sample_dir: Path, tf_pair: tuple[str, str]) -> az.InferenceD
         arr_x[i, :] = sub[f"score_{x_tf}"].to_numpy()
         arr_y[i, :] = sub[f"score_{y_tf}"].to_numpy()
 
-    da_x = xr.DataArray(arr_x, dims=("chain", "draw"), coords={"chain": chains, "draw": draws}, name=f"score_{x_tf}")
-    da_y = xr.DataArray(arr_y, dims=("chain", "draw"), coords={"chain": chains, "draw": draws}, name=f"score_{y_tf}")
+    da_x = xr.DataArray(
+        arr_x,
+        dims=("chain", "draw"),
+        coords={"chain": chains, "draw": draws},
+        name=f"score_{x_tf}",
+    )
+    da_y = xr.DataArray(
+        arr_y,
+        dims=("chain", "draw"),
+        coords={"chain": chains, "draw": draws},
+        name=f"score_{y_tf}",
+    )
 
     return az.InferenceData(posterior=da_x.to_dataset().merge(da_y.to_dataset()))
 
@@ -387,7 +397,13 @@ def plot_parallel_pwm_scores(
     fig, ax = plt.subplots(figsize=(4, 6))
 
     for _, row in df.iterrows():
-        ax.plot([0, 1], [row[f"score_{x_tf}"], row[f"score_{y_tf}"]], color=palette[row["chain"]], alpha=0.3, lw=0.5)
+        ax.plot(
+            [0, 1],
+            [row[f"score_{x_tf}"], row[f"score_{y_tf}"]],
+            color=palette[row["chain"]],
+            alpha=0.3,
+            lw=0.5,
+        )
 
     ax.set_xticks([0, 1])
     ax.set_xticklabels([x_tf, y_tf], fontsize=10)

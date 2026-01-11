@@ -12,7 +12,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
+from dnadesign.cruncher.cli.config_resolver import (
+    ConfigResolutionError,
+    resolve_config_path,
+)
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.services.catalog_service import catalog_stats, verify_cache
 from rich.console import Console
@@ -24,7 +27,11 @@ console = Console()
 
 @app.command("stats", help="Show counts of cached motifs and site sets.")
 def stats(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -51,7 +58,11 @@ def stats(
 
 @app.command("verify", help="Verify cached motif/site files are present on disk.")
 def verify(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",

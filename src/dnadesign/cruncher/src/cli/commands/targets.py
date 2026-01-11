@@ -13,9 +13,15 @@ from pathlib import Path
 from typing import List, Optional
 
 import typer
-from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
+from dnadesign.cruncher.cli.config_resolver import (
+    ConfigResolutionError,
+    resolve_config_path,
+)
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.campaign_service import expand_campaign, resolve_category_targets
+from dnadesign.cruncher.services.campaign_service import (
+    expand_campaign,
+    resolve_category_targets,
+)
 from dnadesign.cruncher.services.target_service import (
     has_blocking_target_errors,
     list_targets,
@@ -58,7 +64,11 @@ def _select_targets(
 
 @app.command("list", help="List configured TF targets from regulator_sets.")
 def list_config_targets(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -102,7 +112,11 @@ def list_config_targets(
 
 @app.command("status", help="Report cached PWM/site readiness for configured targets.")
 def targets_status(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -148,10 +162,15 @@ def targets_status(
         raise typer.Exit(code=1)
     if pwm_source is not None and pwm_source not in {"matrix", "sites"}:
         raise typer.BadParameter("--pwm-source must be 'matrix' or 'sites'.")
+    resolved_pwm_source = pwm_source or cfg.motif_store.pwm_source
+    if site_kinds and resolved_pwm_source != "sites":
+        raise typer.BadParameter(
+            "--site-kind requires pwm_source=sites (set motif_store.pwm_source or pass --pwm-source sites)."
+        )
     statuses = target_statuses(
         cfg=target_cfg,
         config_path=config_path,
-        pwm_source=pwm_source,
+        pwm_source=resolved_pwm_source,
         site_kinds=site_kinds or None,
         use_lockfile=use_lockfile,
     )
@@ -209,7 +228,11 @@ def targets_status(
 
 @app.command("candidates", help="Show catalog candidates for each configured TF.")
 def targets_candidates(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -272,7 +295,11 @@ def targets_candidates(
 
 @app.command("stats", help="Show site-length and PWM length statistics for configured targets.")
 def targets_stats(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",

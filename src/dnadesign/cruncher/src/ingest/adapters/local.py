@@ -28,7 +28,10 @@ from dnadesign.cruncher.ingest.models import (
     SiteInstance,
     SiteQuery,
 )
-from dnadesign.cruncher.ingest.normalize import build_motif_record, normalize_site_sequence
+from dnadesign.cruncher.ingest.normalize import (
+    build_motif_record,
+    normalize_site_sequence,
+)
 from dnadesign.cruncher.io.parsers.backend import load_pwm
 from dnadesign.cruncher.io.parsers.meme import (
     MemeFileParseResult,
@@ -404,7 +407,10 @@ class LocalMotifAdapter:
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
     def _site_tags(self) -> dict[str, object]:
-        tags: dict[str, object] = {"record_kind": "meme_blocks", "matrix_source": "file"}
+        tags: dict[str, object] = {
+            "record_kind": "meme_blocks",
+            "matrix_source": "file",
+        }
         tags.update(self._config.tags)
         return tags
 

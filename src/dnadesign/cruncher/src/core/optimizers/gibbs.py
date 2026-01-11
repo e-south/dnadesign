@@ -79,7 +79,10 @@ class GibbsOptimizer(Optimizer):
             [cfg["move_probs"]["S"], cfg["move_probs"]["B"], cfg["move_probs"]["M"]],
             dtype=float,
         )
-        logger.debug("  Move probabilities: %s", dict(S=self.move_probs[0], B=self.move_probs[1], M=self.move_probs[2]))
+        logger.debug(
+            "  Move probabilities: %s",
+            dict(S=self.move_probs[0], B=self.move_probs[1], M=self.move_probs[2]),
+        )
 
         # Build cooling schedule
         total = self.tune + self.draws
@@ -163,7 +166,12 @@ class GibbsOptimizer(Optimizer):
                     self.all_samples.append(seq.copy())
                     self.all_meta.append((c, draw_i))
                     self.all_scores.append(per_tf_map)
-                    logger.debug("Chain %d burn‐in %d: recorded state draw_index=%d", c + 1, b, draw_i)
+                    logger.debug(
+                        "Chain %d burn‐in %d: recorded state draw_index=%d",
+                        c + 1,
+                        b,
+                        draw_i,
+                    )
 
                 global_iter += 1
                 self._maybe_log_progress("burn-in", c, b + 1, tune, beta=beta_mcmc)
@@ -191,7 +199,13 @@ class GibbsOptimizer(Optimizer):
                 self.all_scores.append(per_tf_map)
                 chain_trace.append(combined_scalar)
 
-                logger.debug("Chain %d draw %d: combined_scalar=%.6f, per_tf=%s", c + 1, d, combined_scalar, per_tf_map)
+                logger.debug(
+                    "Chain %d draw %d: combined_scalar=%.6f, per_tf=%s",
+                    c + 1,
+                    d,
+                    combined_scalar,
+                    per_tf_map,
+                )
                 global_iter += 1
                 self._maybe_log_progress(
                     "sampling",
@@ -241,7 +255,12 @@ class GibbsOptimizer(Optimizer):
                 continue
             elites.append(SequenceState(seq_arr.copy()))
             used_indices.append(idx)
-            logger.debug("Selected elite #%d (idx=%d, combined=%.6f)", len(elites), idx, combined_val)
+            logger.debug(
+                "Selected elite #%d (idx=%d, combined=%.6f)",
+                len(elites),
+                idx,
+                combined_val,
+            )
 
         self.elites_meta = [self.all_meta[i] for i in used_indices]
         logger.info("Selected %d elites", len(elites))
@@ -415,4 +434,8 @@ class GibbsOptimizer(Optimizer):
         totals = dict(self.move_tally)
         accepted = dict(self.accept_tally)
         acceptance_rate = {k: (accepted.get(k, 0) / totals[k]) if totals.get(k, 0) else 0.0 for k in totals}
-        return {"moves": totals, "accepted": accepted, "acceptance_rate": acceptance_rate}
+        return {
+            "moves": totals,
+            "accepted": accepted,
+            "acceptance_rate": acceptance_rate,
+        }

@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class SequenceEvaluator:
     """
     Wraps a single Scorer instance. Based on the chosen scale, it:
-      1) Returns a per‐TF dict of scaled values, via Scorer.compute_all_per_pwm().
+      1) Returns a per-TF dict of scaled values, via Scorer.compute_all_per_pwm().
       2) Combines them into a single float for MCMC acceptance.
     """
 
@@ -89,5 +89,9 @@ class SequenceEvaluator:
             combined_val = -logsum / beta
         else:
             combined_val = float(self._combiner(per_tf_vals))
-        logger.debug("Evaluator combined: per-TF values = %s → combined = %.6f", per_tf_vals, combined_val)
+        logger.debug(
+            "Evaluator combined: per-TF values = %s → combined = %.6f",
+            per_tf_vals,
+            combined_val,
+        )
         return combined_val

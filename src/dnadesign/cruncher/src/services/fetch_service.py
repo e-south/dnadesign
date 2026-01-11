@@ -16,7 +16,13 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, TextIO, Tuple
 
 from dnadesign.cruncher.ingest.adapters.base import SourceAdapter
-from dnadesign.cruncher.ingest.models import GenomicInterval, MotifQuery, MotifRecord, SiteInstance, SiteQuery
+from dnadesign.cruncher.ingest.models import (
+    GenomicInterval,
+    MotifQuery,
+    MotifRecord,
+    SiteInstance,
+    SiteQuery,
+)
 from dnadesign.cruncher.ingest.normalize import normalize_site_sequence
 from dnadesign.cruncher.ingest.sequence_provider import SequenceProvider
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
@@ -329,7 +335,10 @@ def fetch_motifs(
         if not update:
             cached = catalog.list(tf_name=name, include_synonyms=True)
             if any(entry.has_matrix and _motif_path(root, entry.source, entry.motif_id).exists() for entry in cached):
-                logger.info("Skipping TF '%s' (cached motif exists). Use --update to refresh.", name)
+                logger.info(
+                    "Skipping TF '%s' (cached motif exists). Use --update to refresh.",
+                    name,
+                )
                 continue
         logger.info("Searching motifs for TF '%s'", name)
         records = adapter.list_motifs(MotifQuery(tf_name=name))
@@ -342,7 +351,11 @@ def fetch_motifs(
         for rec in selected:
             path = _motif_path(root, rec.source, rec.motif_id)
             if path.exists() and not update:
-                logger.info("Skipping motif %s:%s (already cached). Use --update to refresh.", rec.source, rec.motif_id)
+                logger.info(
+                    "Skipping motif %s:%s (already cached). Use --update to refresh.",
+                    rec.source,
+                    rec.motif_id,
+                )
                 written.append(path)
                 continue
             logger.info("Fetching motif %s:%s (%s)", rec.source, rec.motif_id, rec.tf_name)
@@ -393,7 +406,10 @@ def fetch_sites(
             continue
         path = _sites_path(root, adapter.source_id, motif_id)
         if path.exists() and not update:
-            logger.info("Skipping motif_id '%s' (cached sites exist). Use --update to refresh.", motif_id)
+            logger.info(
+                "Skipping motif_id '%s' (cached sites exist). Use --update to refresh.",
+                motif_id,
+            )
             written.append(path)
             continue
         logger.info("Fetching binding sites for motif_id '%s'", motif_id)
@@ -562,7 +578,10 @@ def fetch_sites(
             if dataset_id:
                 cached = [entry for entry in cached if entry.dataset_id == dataset_id]
             if any(entry.has_sites and _sites_path(root, entry.source, entry.motif_id).exists() for entry in cached):
-                logger.info("Skipping TF '%s' (cached sites exist). Use --update to refresh.", name)
+                logger.info(
+                    "Skipping TF '%s' (cached sites exist). Use --update to refresh.",
+                    name,
+                )
                 continue
         logger.info("Fetching binding sites for TF '%s'", name)
         writers: Dict[str, Tuple[Path, TextIO]] = {}

@@ -17,7 +17,11 @@ from typing import Any, Dict
 
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig
 from dnadesign.cruncher.services.run_service import update_run_index_from_manifest
-from dnadesign.cruncher.utils.artifacts import append_artifacts, artifact_entry, normalize_artifacts
+from dnadesign.cruncher.utils.artifacts import (
+    append_artifacts,
+    artifact_entry,
+    normalize_artifacts,
+)
 from dnadesign.cruncher.utils.elites import find_elites_parquet
 from dnadesign.cruncher.utils.hashing import sha256_path
 from dnadesign.cruncher.utils.manifest import load_manifest, write_manifest

@@ -12,10 +12,16 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
+from dnadesign.cruncher.cli.config_resolver import (
+    ConfigResolutionError,
+    resolve_config_path,
+)
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.utils.analysis_layout import load_summary
-from dnadesign.cruncher.workflows.analyze.plot_registry import plot_keys, plot_registry_rows
+from dnadesign.cruncher.workflows.analyze.plot_registry import (
+    plot_keys,
+    plot_registry_rows,
+)
 from rich.console import Console
 from rich.table import Table
 

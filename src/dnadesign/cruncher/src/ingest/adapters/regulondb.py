@@ -35,7 +35,11 @@ from dnadesign.cruncher.ingest.models import (
     SiteInstance,
     SiteQuery,
 )
-from dnadesign.cruncher.ingest.normalize import build_motif_record, compute_pwm_from_sites, normalize_site_sequence
+from dnadesign.cruncher.ingest.normalize import (
+    build_motif_record,
+    compute_pwm_from_sites,
+    normalize_site_sequence,
+)
 
 _REGULONDB_URL = "https://regulondb.ccg.unam.mx/graphql"
 _REGULONDB_INTERMEDIATE_PEM = "globalsign_rsa_ov_ssl_ca_2018.pem"
@@ -585,7 +589,10 @@ class RegulonDBAdapter:
         provenance = Provenance(
             retrieved_at=datetime.now(timezone.utc),
             source_url=self._config.base_url,
-            tags={"coord_system": "regulondb_1based_inclusive", "record_kind": "curated"},
+            tags={
+                "coord_system": "regulondb_1based_inclusive",
+                "record_kind": "curated",
+            },
         )
         return SiteInstance(
             source=self.source_id,
@@ -771,7 +778,10 @@ class RegulonDBAdapter:
                     sequence=seq,
                     strand=self._normalize_strand(item.get("strand")),
                     score=item.get("score"),
-                    evidence={"peak_id": item.get("peakId"), "dataset_ids": item.get("datasetIds")},
+                    evidence={
+                        "peak_id": item.get("peakId"),
+                        "dataset_ids": item.get("datasetIds"),
+                    },
                     provenance=provenance,
                 )
                 yield site
@@ -838,7 +848,10 @@ class RegulonDBAdapter:
                     sequence=None,
                     strand=None,
                     score=item.get("score"),
-                    evidence={"site_ids": item.get("siteIds"), "dataset_ids": item.get("datasetIds")},
+                    evidence={
+                        "site_ids": item.get("siteIds"),
+                        "dataset_ids": item.get("datasetIds"),
+                    },
                     provenance=provenance,
                 )
                 yield site

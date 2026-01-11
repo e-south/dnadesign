@@ -232,7 +232,13 @@ def plot_score_pairgrid(
         return
     if score_df.empty:
         fig, ax = plt.subplots(figsize=(5, 3))
-        ax.text(0.5, 0.5, "No sequence scores available for pairgrid.", ha="center", va="center")
+        ax.text(
+            0.5,
+            0.5,
+            "No sequence scores available for pairgrid.",
+            ha="center",
+            va="center",
+        )
         ax.axis("off")
         out_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(out_path, dpi=300, bbox_inches="tight")

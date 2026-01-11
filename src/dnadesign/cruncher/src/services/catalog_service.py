@@ -78,4 +78,8 @@ def catalog_stats(root: Path) -> dict[str, int]:
     catalog = CatalogIndex.load(root)
     motif_count = sum(1 for entry in catalog.entries.values() if entry.has_matrix)
     site_sets = sum(1 for entry in catalog.entries.values() if entry.has_sites)
-    return {"entries": len(catalog.entries), "motifs": motif_count, "site_sets": site_sets}
+    return {
+        "entries": len(catalog.entries),
+        "motifs": motif_count,
+        "site_sets": site_sets,
+    }

@@ -16,7 +16,11 @@ from itertools import combinations
 from pathlib import Path
 from typing import Dict, Iterable, Optional
 
-from dnadesign.cruncher.config.schema_v2 import CampaignConfig, CampaignSelectorsConfig, CruncherConfig
+from dnadesign.cruncher.config.schema_v2 import (
+    CampaignConfig,
+    CampaignSelectorsConfig,
+    CruncherConfig,
+)
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.store.motif_store import MotifRef

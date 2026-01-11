@@ -74,9 +74,8 @@ with guidance. In that case, rerun later or scope to cached inventory only
 
 ### Local motif directories
 
-Local motif sources let you ingest directories of MEME (or other) motif files as
-first-class sources. Each file becomes a cached motif entry, with TF names derived
-from the filename stem by default.
+Local motif sources let you register on-disk dataset as a first-class source
+when there is no remote API (or when you want to use local precomputed artifacts). That includes motif matrices and, when the format supports it, binding-site instances. In the demos we use DAP-seq data that ships as MEME text files, which is why a MEME parser exists and why local sources can optionally extract MEME BLOCKS sites. Each file becomes a cached motif entry, with TF names derived from the filename stem by default.
 
 Key behaviors:
 
@@ -88,7 +87,7 @@ Key behaviors:
 - **Sites opt-in**: set `extract_sites=true` to parse MEME BLOCKS sites (training-set occurrences).
 - **Motif selection**: use `meme_motif_selector` to disambiguate multi-motif MEME files.
 
-Example config (O'Malley et al. MEME files):
+Example config (DAP-seq MEME files on disk):
 
 ```yaml
 ingest:
@@ -119,15 +118,11 @@ Example CLI flow:
 - `cruncher lock <config>`
 - `cruncher parse <config>`
 
-If you need custom parsing, register your parser module via
-`io.parsers.extra_modules` and map extensions to your format.
+If you need custom parsing, register your parser module via `io.parsers.extra_modules` and map extensions to your format.
 
-Data note: the `dnadesign-data` repository contains a curated local copy of the
-O'Malley et al. DAP-seq dataset (DNA affinity purification sequencing).
-This high-throughput study reports TF-gene interactions across 354 TFs in
-48 bacteria and generates ~17,000 genome-wide binding maps. The E. coli TF
-DNA-binding motifs are provided in MEME format (Supplementary Data 2). Use the
-`source_url` field to point to the repository and keep provenance in `tags`.
+Data note: the `dnadesign-data` repository is a convenience local copy of the
+O'Malley et al. DAP-seq dataset (DNA affinity purification sequencing). For
+*E. coli* the TF motifs are published as MEME files (Supplementary Data 2), which is why this example maps `*.txt` to `MEME`. Use `source_url` plus `tags` to keep provenance, and swap in your own on-disk dataset as needed.
 
 ---
 
@@ -173,6 +168,9 @@ Example output (`fetch sites --dry-run`, captured with `CRUNCHER_LOG_LEVEL=WARNI
 │ cpxR │ RHTECOLIBSD02988 │ GALAGAN  │ TFBINDING │ -        │
 └──────┴──────────────────┴──────────┴───────────┴──────────┘
 ```
+
+Note (as of January 10, 2026): only a subset of HT TFBinding datasets return
+records in the RegulonDB API. In our probe, 11 of 188 TFs (~5.9%) had TFBinding records: FNR, Fis, FlhDC, Fur, GlaR, H-NS, Lrp, Nac, NtrC, OmpR, PhoB.
 
 When multiple HT datasets exist for a TF, pin selection with:
 

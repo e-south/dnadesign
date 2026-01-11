@@ -23,12 +23,17 @@ from dnadesign.cruncher.cli.config_resolver import (
 )
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.services.campaign_service import select_catalog_entry
-from dnadesign.cruncher.services.catalog_service import get_entry, list_catalog, search_catalog
+from dnadesign.cruncher.services.catalog_service import (
+    get_entry,
+    list_catalog,
+    search_catalog,
+)
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.labels import build_run_name
 from dnadesign.cruncher.utils.logos import logo_subtitle, site_entries_for_logo
+from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
 from rich.console import Console
 from rich.table import Table
 
@@ -230,7 +235,11 @@ def _render_pwm_matrix(table_title: str, pwm_matrix: list[list[float]]) -> Table
 
 @app.command("list", help="List cached motifs and site sets.")
 def list_entries(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -541,7 +550,11 @@ def show(
 
 @app.command("pwms", help="Summarize or export cached PWMs for selected TFs or motif refs.")
 def pwms(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -657,7 +670,11 @@ def pwms(
 
 @app.command("logos", help="Render PWM logos for selected TFs or motif refs.")
 def logos(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -699,6 +716,7 @@ def logos(
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
     try:
+        ensure_mpl_cache(config_path.parent / cfg.motif_store.catalog_root)
         targets, catalog = _resolve_targets(
             cfg=cfg,
             config_path=config_path,

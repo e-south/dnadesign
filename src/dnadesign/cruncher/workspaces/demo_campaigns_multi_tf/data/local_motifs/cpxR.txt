@@ -1,0 +1,21 @@
+MEME version 4
+
+MOTIF cpxR
+
+letter-probability matrix: alength= 4 w= 11 nsites= 4 E= 1e-6
+0.25 0.25 0.25 0.25
+0.40 0.20 0.20 0.20
+0.10 0.10 0.70 0.10
+0.05 0.05 0.05 0.85
+0.30 0.30 0.10 0.30
+0.15 0.35 0.15 0.35
+0.20 0.20 0.40 0.20
+0.60 0.10 0.10 0.20
+0.10 0.10 0.10 0.70
+0.35 0.15 0.15 0.35
+0.25 0.25 0.25 0.25
+BLOCKS format
+seq1 (0) ACGTTCGATCA
+seq2 (10) TTGACGTTACG
+seq3 (25) GCTAACGTTGA
+seq4 (40) AACGTTCGATT

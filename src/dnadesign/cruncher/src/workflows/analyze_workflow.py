@@ -21,7 +21,11 @@ from dnadesign.cruncher.config.schema_v2 import AnalysisConfig, CruncherConfig
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.services.run_service import list_runs
 from dnadesign.cruncher.utils.analysis_layout import ANALYSIS_LAYOUT_VERSION
-from dnadesign.cruncher.utils.artifacts import append_artifacts, artifact_entry, normalize_artifacts
+from dnadesign.cruncher.utils.artifacts import (
+    append_artifacts,
+    artifact_entry,
+    normalize_artifacts,
+)
 from dnadesign.cruncher.utils.hashing import sha256_path
 from dnadesign.cruncher.utils.manifest import load_manifest
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
@@ -430,7 +434,11 @@ def run_analyze(
 
         elites_path = find_elites_parquet(sample_dir)
         elites_df = read_parquet(elites_path)
-        logger.info("Loaded %d elites from %s", len(elites_df), elites_path.relative_to(sample_dir))
+        logger.info(
+            "Loaded %d elites from %s",
+            len(elites_df),
+            elites_path.relative_to(sample_dir),
+        )
 
         # ── load trace & sequences for downstream plots ───────────────────────
         seq_path, trace_path = sample_dir / "sequences.parquet", sample_dir / "trace.nc"
@@ -615,7 +623,12 @@ def run_analyze(
                 logger.info("Top-5 elites (all TFs):")
                 for _, row in elites_df.nsmallest(5, "rank").iterrows():
                     score_blob = " ".join(f"{tf}={row[f'score_{tf}']:.1f}" for tf in tf_names)
-                    logger.info("rank=%d seq=%s %s", int(row["rank"]), row["sequence"], score_blob)
+                    logger.info(
+                        "rank=%d seq=%s %s",
+                        int(row["rank"]),
+                        row["sequence"],
+                        score_blob,
+                    )
             else:
                 logger.warning("No regulators configured; skipping elite summary.")
 
@@ -697,10 +710,34 @@ def run_analyze(
         table_manifest_path.write_text(json.dumps(table_manifest, indent=2))
 
         artifacts: list[dict[str, object]] = [
-            artifact_entry(analysis_used_path, sample_dir, kind="config", label="Analysis settings", stage="analysis"),
-            artifact_entry(per_pwm_path, sample_dir, kind="table", label="Per-PWM scores (CSV)", stage="analysis"),
-            artifact_entry(summary_path, sample_dir, kind="table", label="Per-TF summary (CSV)", stage="analysis"),
-            artifact_entry(topk_path, sample_dir, kind="table", label="Elite top-K (CSV)", stage="analysis"),
+            artifact_entry(
+                analysis_used_path,
+                sample_dir,
+                kind="config",
+                label="Analysis settings",
+                stage="analysis",
+            ),
+            artifact_entry(
+                per_pwm_path,
+                sample_dir,
+                kind="table",
+                label="Per-PWM scores (CSV)",
+                stage="analysis",
+            ),
+            artifact_entry(
+                summary_path,
+                sample_dir,
+                kind="table",
+                label="Per-TF summary (CSV)",
+                stage="analysis",
+            ),
+            artifact_entry(
+                topk_path,
+                sample_dir,
+                kind="table",
+                label="Elite top-K (CSV)",
+                stage="analysis",
+            ),
             artifact_entry(
                 joint_metrics_path,
                 sample_dir,
@@ -765,13 +802,21 @@ def run_analyze(
         summary_path_json = analysis_root / "summary.json"
         summary_path_json.write_text(json.dumps(summary_payload, indent=2))
         artifacts.append(
-            artifact_entry(summary_path_json, sample_dir, kind="json", label="Analysis summary", stage="analysis")
+            artifact_entry(
+                summary_path_json,
+                sample_dir,
+                kind="json",
+                label="Analysis summary",
+                stage="analysis",
+            )
         )
 
         append_artifacts(manifest, artifacts)
         analysis_root.mkdir(parents=True, exist_ok=True)
 
-        from dnadesign.cruncher.services.run_service import update_run_index_from_manifest
+        from dnadesign.cruncher.services.run_service import (
+            update_run_index_from_manifest,
+        )
         from dnadesign.cruncher.utils.manifest import write_manifest
 
         write_manifest(sample_dir, manifest)

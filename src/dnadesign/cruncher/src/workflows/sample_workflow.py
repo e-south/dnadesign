@@ -28,13 +28,24 @@ from dnadesign.cruncher.services.run_service import (
     update_run_index_from_manifest,
     update_run_index_from_status,
 )
-from dnadesign.cruncher.services.target_service import has_blocking_target_errors, target_statuses
+from dnadesign.cruncher.services.target_service import (
+    has_blocking_target_errors,
+    target_statuses,
+)
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
-from dnadesign.cruncher.store.lockfile import read_lockfile, validate_lockfile, verify_lockfile_hashes
+from dnadesign.cruncher.store.lockfile import (
+    read_lockfile,
+    validate_lockfile,
+    verify_lockfile_hashes,
+)
 from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.artifacts import artifact_entry
-from dnadesign.cruncher.utils.labels import build_run_name, format_regulator_slug, regulator_sets
+from dnadesign.cruncher.utils.labels import (
+    build_run_name,
+    format_regulator_slug,
+    regulator_sets,
+)
 from dnadesign.cruncher.utils.manifest import build_run_manifest, write_manifest
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
 from dnadesign.cruncher.utils.run_status import RunStatusWriter
@@ -347,7 +358,13 @@ def _run_sample_for_set(
 
         save_trace(optimizer.trace_idata, out_dir / "trace.nc")
         artifacts.append(
-            artifact_entry(out_dir / "trace.nc", out_dir, kind="trace", label="Trace (NetCDF)", stage="sample")
+            artifact_entry(
+                out_dir / "trace.nc",
+                out_dir,
+                kind="trace",
+                label="Trace (NetCDF)",
+                stage="sample",
+            )
         )
         logger.info("Saved MCMC trace → %s", (out_dir / "trace.nc").relative_to(out_dir.parent))
     elif not sample_cfg.save_trace:
@@ -563,9 +580,27 @@ def _run_sample_for_set(
 
     artifacts.extend(
         [
-            artifact_entry(parquet_path, out_dir, kind="table", label="Elite sequences (Parquet)", stage="sample"),
-            artifact_entry(json_path, out_dir, kind="json", label="Elite sequences (JSON)", stage="sample"),
-            artifact_entry(yaml_path, out_dir, kind="metadata", label="Elite metadata (YAML)", stage="sample"),
+            artifact_entry(
+                parquet_path,
+                out_dir,
+                kind="table",
+                label="Elite sequences (Parquet)",
+                stage="sample",
+            ),
+            artifact_entry(
+                json_path,
+                out_dir,
+                kind="json",
+                label="Elite sequences (JSON)",
+                stage="sample",
+            ),
+            artifact_entry(
+                yaml_path,
+                out_dir,
+                kind="metadata",
+                label="Elite metadata (YAML)",
+                stage="sample",
+            ),
         ]
     )
 
