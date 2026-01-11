@@ -11,6 +11,7 @@ The demo includes:
 - RegulonDB curated binding-site access with optional high-throughput (HT) datasets.
 
 Timestamps and run IDs in the example output will differ run-to-run.
+This demo uses a dedicated cache root (`.cruncher/demo_basics_two_tf/`) so only LexA and CpxR appear in the cache summaries.
 
 ### Demo instance
 
@@ -65,11 +66,7 @@ demo_local_meme: motifs:get, motifs:iter, motifs:list, sites:list
 regulondb: datasets:list, motifs:get, motifs:iter, motifs:list, sites:list
 ```
 
-Capabilities quick-read:
-
-- `motifs:*` are motif matrix inventories (curated or local).
-- `sites:list` means the source can return binding-site sequences (curated or MEME BLOCKS training sites).
-- `datasets:list` is the HT dataset registry (RegulonDB only). Dataset availability is separate from curated motifs.
+`motifs:*` are motif matrix inventories (curated or local). `sites:list` means the source can return binding-site sequences (curated or MEME BLOCKS training sites). `datasets:list` is the HT dataset registry (RegulonDB only).
 
 Summarize available regulators for a specific source (remote inventory):
 
@@ -349,7 +346,7 @@ uv run cruncher -c "$CONFIG" lock
 Example output:
 
 ```bash
-/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/.cruncher/locks/config.lock.json
+/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/.cruncher/demo_basics_two_tf/locks/config.lock.json
 ```
 
 Lockfiles are required for `parse`, `sample`, and `targets status`.
@@ -405,7 +402,7 @@ reference_genome: -
 updated_at: 2026-01-10T21:04:06.147428+00:00
 synonyms: -
 motif_path: -
-sites_path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/.cruncher/normalized/sites/regulondb/RDBECOLITFC00214.jsonl
+sites_path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/.cruncher/demo_basics_two_tf/normalized/sites/regulondb/RDBECOLITFC00214.jsonl
 ```
 
 Example output (targets list):
@@ -443,7 +440,7 @@ $ uv run cruncher -c "$CONFIG" status
 ┃ Setting      ┃ Value                                                                                                            ┃
 ┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
 │ config       │ /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml │
-│ catalog_root │ /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/.cruncher   │
+│ catalog_root │ /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/.cruncher/demo_basics_two_tf   │
 │ out_dir      │ /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/runs        │
 │ pwm_source   │ sites                                                                                                            │
 │ sources      │ demo_local_meme, regulondb                                                                                       │
@@ -696,7 +693,7 @@ If HT site lengths vary, use `uv run cruncher -c "$CONFIG" targets stats` and se
 
 ## Where outputs live
 
-- `.cruncher/` - project-local cache, lockfiles, and run index.
+- `.cruncher/demo_basics_two_tf/` - demo-local cache, lockfiles, and run index.
 - `<out_dir>/` - parse/sample runs (this demo writes to `runs/`).
 
 Sample run contents:

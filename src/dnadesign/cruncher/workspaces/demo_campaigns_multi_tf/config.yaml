@@ -50,7 +50,7 @@ cruncher:
       extra_modules: []
 
   motif_store:
-    catalog_root: .cruncher
+    catalog_root: .cruncher/demo_campaigns_multi_tf
     source_preference: [regulondb]
     allow_ambiguous: false
     pwm_source: sites
