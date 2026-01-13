@@ -137,6 +137,7 @@ class RegulonDBAdapterConfig:
     motif_matrix_source: str = "alignment"  # alignment | sites
     alignment_matrix_semantics: str = "probabilities"  # probabilities | counts
     min_sites_for_pwm: int = 2
+    pseudocounts: float = 0.5
     allow_low_sites: bool = False
     curated_sites: bool = True
     ht_sites: bool = False
@@ -954,6 +955,7 @@ class RegulonDBAdapter:
                     min_sites=self._config.min_sites_for_pwm,
                     strict_min_sites=not self._config.allow_low_sites,
                     return_count=True,
+                    pseudocounts=self._config.pseudocounts,
                 )
             except ValueError as exc:
                 raise ValueError(
@@ -964,6 +966,8 @@ class RegulonDBAdapter:
             matrix_source = "sites"
             tags["matrix_source"] = matrix_source
             tags["site_count"] = str(site_count)
+            tags["pwm_backend"] = "biopython"
+            tags["pseudocounts"] = str(self._config.pseudocounts)
         else:
             raise ValueError("motif_matrix_source must be 'alignment' or 'sites'")
         raw_payload = json.dumps(item, sort_keys=True)

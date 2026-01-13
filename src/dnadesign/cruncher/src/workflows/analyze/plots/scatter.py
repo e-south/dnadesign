@@ -42,6 +42,11 @@ logging.getLogger("fontTools").setLevel(logging.WARNING)
 logging.getLogger("fontTools.subset").setLevel(logging.WARNING)
 
 
+def _pastelize(color: np.ndarray, weight: float = 0.5) -> np.ndarray:
+    """Blend a color toward white for pastel tones (weight in [0,1])."""
+    return np.clip(color + (1.0 - color) * weight, 0.0, 1.0)
+
+
 def plot_scatter(
     run_dir: Path,
     pwms: Dict[str, PWM],
@@ -71,7 +76,7 @@ def plot_scatter(
     manifest = load_manifest(run_dir)
     seq_len = int(manifest.get("sequence_length") or 0)
     if seq_len < 1:
-        raise ValueError("plot_scatter: sequence_length missing from run_manifest.json")
+        raise ValueError("plot_scatter: sequence_length missing from meta/run_manifest.json")
 
     # 4) Pick TF pair
     x_tf, y_tf = tf_pair
@@ -90,14 +95,20 @@ def plot_scatter(
 
     # 6) Random baseline (unused in thresholds mode)
     df_random = pd.DataFrame()
-    if style != "thresholds":
-        df_random = generate_random_baseline(
-            pwms,
-            cfg,
-            length=seq_len,
-            n_samples=len(df_sub),
-            bidirectional=bidirectional,
-        )
+    if style != "thresholds" and cfg.analysis.scatter_background:
+        n_samples = cfg.analysis.scatter_background_samples
+        if n_samples is None:
+            n_samples = len(df_sub)
+        if n_samples > 0:
+            df_random = generate_random_baseline(
+                pwms,
+                cfg,
+                length=seq_len,
+                n_samples=n_samples,
+                bidirectional=bidirectional,
+                seed=cfg.analysis.scatter_background_seed,
+                progress_bar=False,
+            )
 
     # 7) Consensus points
     consensus_pts = compute_consensus_points(
@@ -227,12 +238,13 @@ def _draw_scatter_figure(
     # 2) “EDGES” STYLE
     if style == "edges":
         chains = sorted(df_samples["chain"].unique())
-        palette = sns.color_palette("deep", len(chains))
-        chain_to_color = {c: np.array(palette[i]) for i, c in enumerate(chains)}
+        palette = sns.color_palette("colorblind", len(chains))
+        chain_to_color = {c: _pastelize(np.array(palette[i]), weight=0.55) for i, c in enumerate(chains)}
 
-        # Point alpha progression (slightly higher at onset, ramps with draw index)
-        alpha_min = 0.65  # higher baseline opacity at t0
-        alpha_max = 0.95  # grows toward near-opaque
+        # Pastel fills; edge opacity grows with time.
+        fill_alpha = 0.65
+        edge_alpha_min = 0.05
+        edge_alpha_max = 0.90
 
         # Precompute per-chain geometry & colors so we can
         # draw EDGES first (middle layer), then POINTS (top layer).
@@ -244,40 +256,36 @@ def _draw_scatter_figure(
             norm = np.zeros_like(iters, float) if t1 == t0 else (iters - t0) / (t1 - t0)
             hue = chain_to_color[c]
 
-            # Color progression (fade from near-white to chain hue)
-            shade = 0.35 + 0.65 * norm  # start slightly closer to white than before
-            rgb = (1 - shade)[:, None] + shade[:, None] * hue  # Nx3
-
-            # Alpha progression for points
-            alphas = alpha_min + (alpha_max - alpha_min) * norm  # N
-            rgba = np.concatenate([rgb, alphas[:, None]], axis=1)  # Nx4
-
             pts = dfc[[f"score_{x_tf}", f"score_{y_tf}"]].to_numpy()
-            per_chain.append((c, dfc, pts, hue, rgba))
+            per_chain.append((c, dfc, pts, hue, norm))
 
         # 2a) Draw EDGES (constant hue) — MIDDLE layer
-        for c, dfc, pts, hue, _rgba in per_chain:
+        for c, dfc, pts, hue, norm in per_chain:
             if len(pts) >= 2:
-                segs = [np.array([pts[i], pts[i + 1]]) for i in range(len(pts) - 1)]
+                segs = np.stack([pts[:-1], pts[1:]], axis=1)
+                edge_norm = norm[1:] if len(norm) > 1 else np.array([1.0])
+                edge_alpha = edge_alpha_min + (edge_alpha_max - edge_alpha_min) * edge_norm
+                edge_rgb = np.tile(hue, (len(segs), 1))
+                edge_rgba = np.concatenate([edge_rgb, edge_alpha[:, None]], axis=1)
                 ax.add_collection(
                     LineCollection(
                         segs,
-                        colors=[hue] * (len(segs)),
-                        linewidths=1.2,
-                        alpha=0.85,
+                        colors=edge_rgba,
+                        linewidths=1.1,
                         zorder=2,
                     )
                 )
 
-        # 2b) Draw POINTS with maturation color+alpha — TOP layer
-        for c, dfc, _pts, _hue, rgba in per_chain:
+        # 2b) Draw POINTS with light fill — TOP layer
+        for c, dfc, _pts, hue, _norm in per_chain:
             ax.scatter(
                 dfc[f"score_{x_tf}"],
                 dfc[f"score_{y_tf}"],
-                c=rgba,  # per-point RGBA
-                s=30,
+                c=[hue],
+                s=36,
                 linewidth=0,
                 edgecolors="none",
+                alpha=fill_alpha,
                 label=f"chain {c}",
                 zorder=3,
             )
@@ -365,10 +373,10 @@ def _draw_scatter_figure(
             ex,
             ey,
             marker="o",
-            s=50,
+            s=60,
             facecolors="none",
-            edgecolors="blue",
-            linewidth=1,
+            edgecolors="#1f1f1f",
+            linewidth=2.0,
             zorder=4,
         )
 

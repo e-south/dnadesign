@@ -21,6 +21,7 @@ from dnadesign.cruncher.cli.config_resolver import (
     parse_config_and_value,
     resolve_config_path,
 )
+from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.services.campaign_service import select_catalog_entry
 from dnadesign.cruncher.services.catalog_service import (
@@ -34,6 +35,7 @@ from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.labels import build_run_name
 from dnadesign.cruncher.utils.logos import logo_subtitle, site_entries_for_logo
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
+from dnadesign.cruncher.utils.run_layout import logos_dir_for_run, out_root
 from rich.console import Console
 from rich.table import Table
 
@@ -544,8 +546,8 @@ def show(
     console.print(f"synonyms: {synonyms or '-'}")
     motif_path = catalog_root / "normalized" / "motifs" / entry.source / f"{entry.motif_id}.json"
     sites_path = catalog_root / "normalized" / "sites" / entry.source / f"{entry.motif_id}.jsonl"
-    console.print(f"motif_path: {motif_path if motif_path.exists() else '-'}")
-    console.print(f"sites_path: {sites_path if sites_path.exists() else '-'}")
+    console.print(f"motif_path: {render_path(motif_path, base=config_path.parent) if motif_path.exists() else '-'}")
+    console.print(f"sites_path: {render_path(sites_path, base=config_path.parent) if sites_path.exists() else '-'}")
 
 
 @app.command("pwms", help="Summarize or export cached PWMs for selected TFs or motif refs.")
@@ -607,8 +609,11 @@ def pwms(
             combine_sites=cfg.motif_store.combine_sites,
             site_window_lengths=cfg.motif_store.site_window_lengths,
             site_window_center=cfg.motif_store.site_window_center,
+            pwm_window_lengths=cfg.motif_store.pwm_window_lengths,
+            pwm_window_strategy=cfg.motif_store.pwm_window_strategy,
             min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
             allow_low_sites=cfg.motif_store.allow_low_sites,
+            pseudocounts=cfg.motif_store.pseudocounts,
         )
         payloads: list[dict[str, object]] = []
         resolved: list[tuple[ResolvedTarget, object]] = []
@@ -618,6 +623,7 @@ def pwms(
         table.add_column("Motif ID")
         table.add_column("PWM source")
         table.add_column("Length")
+        table.add_column("Window")
         table.add_column("Bits")
         table.add_column("n sites")
         table.add_column("Site sets")
@@ -626,12 +632,16 @@ def pwms(
             resolved.append((target, pwm))
             info_bits = pwm.information_bits()
             site_sets = "-" if cfg.motif_store.pwm_source == "matrix" else str(len(target.site_entries))
+            window = "-"
+            if pwm.source_length is not None and pwm.window_start is not None:
+                window = f"{pwm.window_start}:{pwm.window_start + pwm.length}/{pwm.source_length}"
             table.add_row(
                 target.tf_name,
                 target.entry.source,
                 target.entry.motif_id,
                 cfg.motif_store.pwm_source,
                 str(pwm.length),
+                window,
                 f"{info_bits:.2f}",
                 str(pwm.nsites or "-"),
                 site_sets,
@@ -642,6 +652,10 @@ def pwms(
                 "motif_id": target.entry.motif_id,
                 "pwm_source": cfg.motif_store.pwm_source,
                 "length": pwm.length,
+                "window_start": pwm.window_start,
+                "source_length": pwm.source_length,
+                "window_strategy": pwm.window_strategy,
+                "window_score": pwm.window_score,
                 "info_bits": info_bits,
                 "nsites": pwm.nsites,
                 "site_sets": len(target.site_entries) if cfg.motif_store.pwm_source == "sites" else None,
@@ -696,7 +710,7 @@ def logos(
     out_dir: Path | None = typer.Option(
         None,
         "--out-dir",
-        help="Directory to write logo PNGs (defaults to <out_dir>/catalog_logos/<run>).",
+        help="Directory to write logo PNGs (defaults to <out_dir>/logos/catalog/<run>).",
     ),
     bits_mode: str | None = typer.Option(
         None,
@@ -732,8 +746,11 @@ def logos(
             combine_sites=cfg.motif_store.combine_sites,
             site_window_lengths=cfg.motif_store.site_window_lengths,
             site_window_center=cfg.motif_store.site_window_center,
+            pwm_window_lengths=cfg.motif_store.pwm_window_lengths,
+            pwm_window_strategy=cfg.motif_store.pwm_window_strategy,
             min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
             allow_low_sites=cfg.motif_store.allow_low_sites,
+            pseudocounts=cfg.motif_store.pseudocounts,
         )
         resolved_bits_mode = bits_mode or cfg.parse.plot.bits_mode
         resolved_dpi = dpi or cfg.parse.plot.dpi
@@ -741,9 +758,17 @@ def logos(
             raise typer.BadParameter("--bits-mode must be 'information' or 'probability'.")
         out_base = out_dir
         if out_base is None:
-            default_root = config_path.parent / cfg.out_dir / "catalog_logos"
-            run_name = build_run_name("logos", [t.tf_name for t in targets], set_index=set_index)
-            out_base = default_root / run_name
+            run_name = build_run_name(
+                "catalog",
+                [t.tf_name for t in targets],
+                set_index=set_index,
+                include_stage=False,
+            )
+            out_base = logos_dir_for_run(
+                out_root(config_path, cfg.out_dir),
+                "catalog",
+                run_name,
+            )
         out_base.mkdir(parents=True, exist_ok=True)
         from dnadesign.cruncher.io.plots.pssm import plot_pwm
 
@@ -779,10 +804,10 @@ def logos(
                 target.entry.motif_id,
                 str(pwm.length),
                 f"{info_bits:.2f}",
-                str(out_path),
+                render_path(out_path, base=config_path.parent),
             )
         console.print(table)
-        console.print(f"Logos saved to {out_base}")
+        console.print(f"Logos saved to {render_path(out_base, base=config_path.parent)}")
     except (ValueError, FileNotFoundError) as exc:
         console.print(f"Error: {exc}")
         console.print("Hint: run cruncher fetch motifs/sites before catalog logos.")

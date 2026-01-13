@@ -20,6 +20,7 @@ from pydantic import ValidationError
 
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.core.pwm import PWM
+from dnadesign.cruncher.utils.run_layout import elites_path, manifest_path, sequences_path
 from dnadesign.cruncher.workflows.analyze.per_pwm import gather_per_pwm_scores
 from dnadesign.cruncher.workflows.analyze.plots.diagnostics import make_pair_idata
 from dnadesign.cruncher.workflows.analyze.plots.scatter import _normalize_threshold_points, plot_scatter
@@ -38,7 +39,9 @@ def test_gather_per_pwm_scores_rejects_invalid_sequence(tmp_path: Path) -> None:
             "sequence": ["ACGTN"],
         }
     )
-    df.to_parquet(run_dir / "sequences.parquet", engine="fastparquet")
+    seq_path = sequences_path(run_dir)
+    seq_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(seq_path, engine="fastparquet")
 
     pwm_matrix = np.full((4, 4), 0.25)
     pwms = {"lexA": PWM(name="lexA", matrix=pwm_matrix)}
@@ -65,7 +68,9 @@ def test_gather_per_pwm_scores_rejects_non_positive_threshold(tmp_path: Path) ->
             "sequence": ["ACGT"],
         }
     )
-    df.to_parquet(run_dir / "sequences.parquet", engine="fastparquet")
+    seq_path = sequences_path(run_dir)
+    seq_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(seq_path, engine="fastparquet")
 
     pwm_matrix = np.full((4, 4), 0.25)
     pwms = {"lexA": PWM(name="lexA", matrix=pwm_matrix)}
@@ -92,7 +97,9 @@ def test_gather_per_pwm_scores_single_draw_not_duplicated(tmp_path: Path) -> Non
             "sequence": ["ACGTACGT"],
         }
     )
-    df.to_parquet(run_dir / "sequences.parquet", engine="fastparquet")
+    seq_path = sequences_path(run_dir)
+    seq_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(seq_path, engine="fastparquet")
 
     pwm_matrix = np.full((4, 4), 0.25)
     pwms = {"lexA": PWM(name="lexA", matrix=pwm_matrix)}
@@ -125,7 +132,9 @@ def test_make_pair_idata_requires_consistent_draws(tmp_path: Path) -> None:
             "score_cpxR": [0.8, 0.85, 0.75],
         }
     )
-    df.to_parquet(sample_dir / "sequences.parquet", engine="fastparquet")
+    seq_path = sequences_path(sample_dir)
+    seq_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(seq_path, engine="fastparquet")
 
     with pytest.raises(ValueError, match="Inconsistent draws"):
         make_pair_idata(sample_dir, ("lexA", "cpxR"))
@@ -294,7 +303,9 @@ def test_plot_scatter_requires_score_columns(tmp_path: Path) -> None:
 
     run_dir = tmp_path / "run"
     run_dir.mkdir(parents=True)
-    (run_dir / "run_manifest.json").write_text(json.dumps({"sequence_length": 12}))
+    manifest_file = manifest_path(run_dir)
+    manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    manifest_file.write_text(json.dumps({"sequence_length": 12}))
 
     elites_df = pd.DataFrame(
         {
@@ -304,7 +315,8 @@ def test_plot_scatter_requires_score_columns(tmp_path: Path) -> None:
             "score_cpxR": [0.8],
         }
     )
-    elites_df.to_parquet(run_dir / "elites.parquet", engine="fastparquet")
+    elites_path(run_dir).parent.mkdir(parents=True, exist_ok=True)
+    elites_df.to_parquet(elites_path(run_dir), engine="fastparquet")
 
     per_pwm_path = run_dir / "per_pwm.csv"
     pd.DataFrame({"chain": [0], "draw": [0]}).to_csv(per_pwm_path, index=False)

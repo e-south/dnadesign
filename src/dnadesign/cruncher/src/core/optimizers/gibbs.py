@@ -207,6 +207,13 @@ class GibbsOptimizer(Optimizer):
                     per_tf_map,
                 )
                 global_iter += 1
+                score_mean = None
+                score_std = None
+                if chain_trace:
+                    window = min(len(chain_trace), 100)
+                    window_scores = chain_trace[-window:]
+                    score_mean = float(np.mean(window_scores))
+                    score_std = float(np.std(window_scores))
                 self._maybe_log_progress(
                     "sampling",
                     c,
@@ -214,6 +221,8 @@ class GibbsOptimizer(Optimizer):
                     draws,
                     beta=beta_mcmc,
                     current_score=combined_scalar,
+                    score_mean=score_mean,
+                    score_std=score_std,
                 )
 
             chain_scores.append(chain_trace)
@@ -396,6 +405,8 @@ class GibbsOptimizer(Optimizer):
         *,
         beta: float | None = None,
         current_score: float | None = None,
+        score_mean: float | None = None,
+        score_std: float | None = None,
     ) -> None:
         if not self.progress_every:
             return
@@ -406,14 +417,22 @@ class GibbsOptimizer(Optimizer):
         acceptance_rate = {k: (accepted.get(k, 0) / totals[k]) if totals.get(k, 0) else 0.0 for k in totals}
         acc_label = ", ".join(f"{k}={acceptance_rate[k]:.2f}" for k in sorted(acceptance_rate))
         pct = (step / total) * 100 if total else 100.0
+        score_blob = ""
+        if current_score is not None:
+            score_blob = f" score={current_score:.3f}"
+        if score_mean is not None and score_std is not None:
+            score_blob += f" mean={score_mean:.3f}±{score_std:.3f}"
+        if self.best_score is not None:
+            score_blob += f" best={self.best_score:.3f}"
         logger.info(
-            "Progress: chain %d %s %d/%d (%.1f%%) accept={%s}",
+            "Progress: chain %d %s %d/%d (%.1f%%) accept={%s}%s",
             chain_idx + 1,
             phase,
             step,
             total,
             pct,
             acc_label,
+            score_blob,
         )
         if self.status_writer is not None:
             self.status_writer.update(
@@ -425,6 +444,8 @@ class GibbsOptimizer(Optimizer):
                 acceptance_rate=acceptance_rate,
                 beta=beta,
                 current_score=current_score,
+                score_mean=score_mean,
+                score_std=score_std,
                 best_score=self.best_score,
                 best_chain=(self.best_meta[0] + 1) if self.best_meta else None,
                 best_draw=(self.best_meta[1]) if self.best_meta else None,

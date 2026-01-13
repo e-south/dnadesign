@@ -61,21 +61,13 @@ Ingestion is how **cruncher** discovers and caches motif matrices and binding si
 https://regulondb.ccg.unam.mx/graphql
 ```
 
-NOTE: **cruncher** uses the default trust store plus a bundled RegulonDB intermediate
-certificate. If the server rotates its chain, set `ingest.regulondb.ca_bundle`.
-Inventory listing uses `getAllRegulon`; `getRegulonBy` expects a non-empty search
-string and will error if the search is blank.
-If the RegulonDB GraphQL service returns internal errors (for example,
-`Cannot read properties of undefined (reading 'length')`), **cruncher** fails fast
-with guidance. In that case, rerun later or scope to cached inventory only
-(`cruncher sources summary --scope cache`) until the upstream issue is resolved.
+NOTE: **cruncher** uses the default trust store plus a bundled RegulonDB intermediate certificate. If the server rotates its chain, set `ingest.regulondb.ca_bundle`. Inventory listing uses `getAllRegulon`; `getRegulonBy` expects a non-empty search string and will error if the search is blank. If the RegulonDB GraphQL service returns internal errors (for example, `Cannot read properties of undefined (reading 'length')`), **cruncher** fails fast with guidance. In that case, rerun later or scope to cached inventory only (`cruncher sources summary --scope cache`) until the upstream issue is resolved.
 
 ---
 
 ### Local motif directories
 
-Local motif sources let you register on-disk dataset as a first-class source
-when there is no remote API (or when you want to use local precomputed artifacts). That includes motif matrices and, when the format supports it, binding-site instances. In the demos we use DAP-seq data that ships as MEME text files, which is why a MEME parser exists and why local sources can optionally extract MEME BLOCKS sites. Each file becomes a cached motif entry, with TF names derived from the filename stem by default.
+Local motif sources let you register on-disk dataset as a first-class source when there is no remote API (or when you want to use local precomputed artifacts). That includes motif matrices and binding-site instances. In the demos we use DAP-seq data that ships as MEME text files, which is why a MEME parser exists and why local sources can optionally extract MEME BLOCKS sites. Each file becomes a cached motif entry, with TF names derived from the filename stem by default.
 
 Key behaviors:
 
@@ -120,24 +112,19 @@ Example CLI flow:
 
 If you need custom parsing, register your parser module via `io.parsers.extra_modules` and map extensions to your format.
 
-Data note: the `dnadesign-data` repository is a convenience local copy of the
-O'Malley et al. DAP-seq dataset (DNA affinity purification sequencing). For
-*E. coli* the TF motifs are published as MEME files (Supplementary Data 2), which is why this example maps `*.txt` to `MEME`. Use `source_url` plus `tags` to keep provenance, and swap in your own on-disk dataset as needed.
+Data note: the `dnadesign-data` repository is a convenience local copy of the O'Malley *et al.* [DAP-seq dataset](https://www.nature.com/articles/s41592-021-01312-2). For *E. coli* the TF motifs are published as MEME files (Supplementary Data 2), which is why this example maps `*.txt` to `MEME`. Use `source_url` plus `tags` to keep provenance, and swap in your own on-disk dataset as needed.
 
 ---
 
 ### Curated TF binding sites
 
-Curated binding sites are fetched from the regulon datamart and cached as
-`SiteInstance` records. If you set `ingest.regulondb.motif_matrix_source: alignment`,
-**cruncher** uses the alignment payload when present; otherwise it fails fast.
+Curated binding sites are fetched from the regulon datamart and cached as `SiteInstance` records. If you set `ingest.regulondb.motif_matrix_source: alignment`, **cruncher** uses the alignment payload when present; otherwise it fails fast.
 
 ---
 
 ### High-throughput datasets
 
-HT datasets (ChIP-seq, ChIP-exo, DAP-seq, gSELEX) are discovered and fetched via
-dedicated dataset queries. Use these tools to inspect them:
+HT datasets (ChIP-seq, ChIP-exo, DAP-seq, gSELEX) are discovered and fetched via dedicated dataset queries. Use these tools to inspect them:
 
 - `cruncher sources datasets regulondb <config> [--tf <TF>]`
 - `cruncher fetch sites --dry-run --tf <TF> <config>`
@@ -169,8 +156,7 @@ Example output (`fetch sites --dry-run`, captured with `CRUNCHER_LOG_LEVEL=WARNI
 └──────┴──────────────────┴──────────┴───────────┴──────────┘
 ```
 
-Note (as of January 10, 2026): only a subset of HT TFBinding datasets return
-records in the RegulonDB API. In our probe, 11 of 188 TFs (~5.9%) had TFBinding records: FNR, Fis, FlhDC, Fur, GlaR, H-NS, Lrp, Nac, NtrC, OmpR, PhoB.
+Note (as of January 10, 2026): only a subset of HT TFBinding datasets return records in the RegulonDB API. In our probe, 11 of 188 TFs (~5.9%) had TFBinding records: FNR, Fis, FlhDC, Fur, GlaR, H-NS, Lrp, Nac, NtrC, OmpR, PhoB.
 
 When multiple HT datasets exist for a TF, pin selection with:
 
@@ -186,8 +172,7 @@ Lockfiles record the chosen dataset ID for reproducibility.
 
 ### Hydration
 
-Some HT datasets return coordinates without sequences. **cruncher** hydrates those
-coordinates using a reference genome.
+Some HT datasets return coordinates without sequences. **cruncher** hydrates those coordinates using a reference genome.
 
 Defaults:
 - `ingest.genome_source=ncbi` (NCBI E-utilities)

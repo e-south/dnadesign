@@ -20,6 +20,7 @@ from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
 )
+from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.services.campaign_notebook_service import (
     generate_campaign_notebook,
@@ -170,8 +171,8 @@ def generate(
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(payload, indent=2))
 
-    console.print(str(out_path))
-    console.print(str(manifest_path))
+    console.print(render_path(out_path, base=config_path.parent))
+    console.print(render_path(manifest_path, base=config_path.parent))
 
 
 @app.command("summarize", help="Aggregate campaign runs into summary tables and plots.")
@@ -244,10 +245,10 @@ def summarize(
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1)
 
-    console.print(str(result.summary_path))
-    console.print(str(result.best_path))
+    console.print(render_path(result.summary_path, base=config_path.parent))
+    console.print(render_path(result.best_path, base=config_path.parent))
     for path in result.plot_paths:
-        console.print(str(path))
+        console.print(render_path(path, base=config_path.parent))
     if result.skipped:
         console.print("Skipped runs:")
         for item in result.skipped:
@@ -380,4 +381,4 @@ def notebook(
     except (RuntimeError, FileNotFoundError, ValueError) as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1)
-    console.print(str(notebook_path))
+    console.print(render_path(notebook_path, base=config_path.parent))

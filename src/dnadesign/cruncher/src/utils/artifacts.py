@@ -25,13 +25,20 @@ def artifact_entry(
     kind: str,
     label: str | None = None,
     stage: str | None = None,
+    root_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Build a structured artifact entry relative to the run directory."""
     rel = path
-    try:
-        rel = path.relative_to(run_dir)
-    except ValueError:
-        rel = path
+    if root_dir is not None:
+        try:
+            rel = path.relative_to(root_dir)
+        except ValueError:
+            rel = path
+    if rel == path:
+        try:
+            rel = path.relative_to(run_dir)
+        except ValueError:
+            rel = path
     size_bytes = None
     if path.exists():
         size_bytes = path.stat().st_size

@@ -16,6 +16,7 @@ from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
 )
+from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.services.lock_service import resolve_lock
 
@@ -59,4 +60,4 @@ def lock(
         typer.echo(f"Error: {exc}", err=True)
         typer.echo("Hint: run cruncher fetch motifs/sites before locking.", err=True)
         raise typer.Exit(code=1)
-    typer.echo(str(lock_path))
+    typer.echo(render_path(lock_path, base=config_path.parent))

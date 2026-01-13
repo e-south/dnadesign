@@ -35,6 +35,37 @@ def _write_config(tmp_path: Path, config: dict) -> Path:
     return config_path
 
 
+def _sample_block(*, optimiser_kind: str, cooling: dict, chains: int = 2) -> dict:
+    return {
+        "bidirectional": True,
+        "seed": 7,
+        "record_tune": False,
+        "progress_bar": False,
+        "progress_every": 0,
+        "save_trace": False,
+        "init": {"kind": "random", "length": 12, "pad_with": "background"},
+        "draws": 2,
+        "tune": 1,
+        "chains": chains,
+        "min_dist": 0,
+        "top_k": 1,
+        "moves": {
+            "block_len_range": [2, 2],
+            "multi_k_range": [2, 2],
+            "slide_max_shift": 1,
+            "swap_len_range": [2, 2],
+            "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
+        },
+        "optimiser": {
+            "kind": optimiser_kind,
+            "scorer_scale": "llr",
+            "cooling": cooling,
+            "swap_prob": 0.1,
+        },
+        "save_sequences": True,
+    }
+
+
 def test_unknown_top_level_key_is_rejected(tmp_path: Path) -> None:
     config = _base_config()
     config["cruncher"]["unknown_block"] = {"value": 1}
@@ -80,3 +111,75 @@ def test_out_dir_must_be_workspace_relative(tmp_path: Path, out_dir: str) -> Non
         load_config(config_path)
 
     assert any(err.get("loc") == ("cruncher", "out_dir") for err in exc.value.errors())
+
+
+@pytest.mark.parametrize("catalog_root", ["__absolute__", "../catalog"])
+def test_catalog_root_must_be_workspace_relative(tmp_path: Path, catalog_root: str) -> None:
+    config = _base_config()
+    if catalog_root == "__absolute__":
+        catalog_root = str(tmp_path / "catalog")
+    config["cruncher"]["motif_store"]["catalog_root"] = str(catalog_root)
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+
+    assert any(err.get("loc") == ("cruncher", "motif_store", "catalog_root") for err in exc.value.errors())
+
+
+@pytest.mark.parametrize("genome_cache", ["__absolute__", "../genomes"])
+def test_genome_cache_must_be_workspace_relative(tmp_path: Path, genome_cache: str) -> None:
+    config = _base_config()
+    if genome_cache == "__absolute__":
+        genome_cache = str(tmp_path / "genomes")
+    config["cruncher"]["ingest"] = {"genome_cache": str(genome_cache)}
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+
+    assert any(err.get("loc") == ("cruncher", "ingest", "genome_cache") for err in exc.value.errors())
+
+
+def test_gibbs_rejects_geometric_cooling(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["sample"] = _sample_block(
+        optimiser_kind="gibbs",
+        cooling={"kind": "geometric", "beta": [1.0, 0.5]},
+    )
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+
+    assert any("gibbs" in str(err.get("msg")) for err in exc.value.errors())
+
+
+def test_pt_requires_beta_ladder_length_match(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["sample"] = _sample_block(
+        optimiser_kind="pt",
+        cooling={"kind": "geometric", "beta": [1.0, 0.5, 0.25]},
+        chains=2,
+    )
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+
+    assert any("cooling.beta length must match sample.chains" in str(err.get("msg")) for err in exc.value.errors())
+
+
+def test_pt_fixed_requires_single_chain(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["sample"] = _sample_block(
+        optimiser_kind="pt",
+        cooling={"kind": "fixed", "beta": 1.0},
+        chains=4,
+    )
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+
+    assert any("fixed cooling requires chains=1" in str(err.get("msg")) for err in exc.value.errors())

@@ -29,6 +29,13 @@ from dnadesign.cruncher.tests.fixtures.regulondb_payloads import (
     REGULON_DETAIL,
     regulon_list_for_search,
 )
+from dnadesign.cruncher.utils.run_layout import (
+    config_used_path,
+    logos_dir_for_run,
+    manifest_path,
+    out_root,
+    sequences_path,
+)
 from dnadesign.cruncher.workflows.parse_workflow import run_parse
 from dnadesign.cruncher.workflows.sample_workflow import run_sample
 
@@ -94,6 +101,7 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
                 "progress_bar": False,
                 "progress_every": 0,
                 "save_trace": False,
+                "auto_opt": {"enabled": False},
                 "init": {"kind": "random", "length": 12, "pad_with": "background"},
                 "draws": 2,
                 "tune": 1,
@@ -141,18 +149,33 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
     run_sample(cfg, config_path)
 
     results_dir = tmp_path / "results"
-    parse_runs = [d for d in results_dir.iterdir() if d.is_dir() and d.name.startswith("parse_")]
-    sample_runs = [d for d in results_dir.iterdir() if d.is_dir() and d.name.startswith("sample_")]
+
+    def _find_runs(stage_dir: Path) -> list[Path]:
+        runs: list[Path] = []
+        for child in stage_dir.iterdir():
+            if not child.is_dir():
+                continue
+            if manifest_path(child).exists():
+                runs.append(child)
+                continue
+            for grand in child.iterdir():
+                if grand.is_dir() and manifest_path(grand).exists():
+                    runs.append(grand)
+        return runs
+
+    parse_runs = _find_runs(results_dir / "parse")
+    sample_runs = _find_runs(results_dir / "sample")
     assert parse_runs
     assert sample_runs
     parse_dir = parse_runs[0]
     sample_dir = sample_runs[0]
 
-    assert (parse_dir / "lexA_logo.png").exists()
-    assert (parse_dir / "cpxR_logo.png").exists()
-    assert (sample_dir / "config_used.yaml").exists()
-    assert (sample_dir / "sequences.parquet").exists()
-    assert not (sample_dir / "trace.nc").exists()
+    logo_dir = logos_dir_for_run(out_root(config_path, cfg.out_dir), "parse", parse_dir.name)
+    assert (logo_dir / "lexA_logo.png").exists()
+    assert (logo_dir / "cpxR_logo.png").exists()
+    assert config_used_path(sample_dir).exists()
+    assert sequences_path(sample_dir).exists()
+    assert not (sample_dir / "artifacts" / "trace.nc").exists()
 
 
 def test_demo_workspace_cli_without_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -194,6 +217,7 @@ def test_demo_workspace_cli_without_config(tmp_path: Path, monkeypatch: pytest.M
                 "progress_bar": False,
                 "progress_every": 0,
                 "save_trace": False,
+                "auto_opt": {"enabled": False},
                 "init": {"kind": "random", "length": 12, "pad_with": "background"},
                 "draws": 2,
                 "tune": 1,

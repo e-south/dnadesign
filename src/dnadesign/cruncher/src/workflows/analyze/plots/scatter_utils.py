@@ -66,7 +66,7 @@ def load_per_pwm(path: Path) -> pd.DataFrame:
 
 def load_elites(sample_dir: Path) -> pd.DataFrame:
     """
-    Read elites.parquet (or legacy layout) into a DataFrame.
+    Read artifacts/elites.parquet into a DataFrame.
     Expects at least a "sequence" column.
     """
     path = find_elites_parquet(sample_dir)
@@ -95,12 +95,14 @@ def generate_random_baseline(
     n_samples: int,
     *,
     bidirectional: bool | None = None,
+    seed: int = 0,
+    progress_bar: bool = False,
 ) -> pd.DataFrame:
     """
     Build a DataFrame of `n_samples` random sequences (uniform over A/C/G/T) of length `length`,
     scored against all PWMs using cfg.analysis.scatter_scale (which may be "llr", "z", "logp",
     or "consensus-neglop-sum").
-    Uses RNG seed=0 for reproducibility.
+    Uses RNG seed for reproducibility.
     If bidirectional is provided, overrides cfg.sample.bidirectional.
 
     Leverages Scorer to build null distributions and compute per-PWM scores.
@@ -122,10 +124,10 @@ def generate_random_baseline(
         scale=runner_scale,
     )
 
-    rng = np.random.default_rng(0)
+    rng = np.random.default_rng(seed)
     records: list[dict[str, float]] = []
 
-    for _ in tqdm(range(n_samples), desc="Random baseline"):
+    for _ in tqdm(range(n_samples), desc="Random baseline", disable=not progress_bar):
         # Generate a random sequence (0..3) of length `length`
         seq_ints = rng.integers(0, 4, size=length, dtype=np.int8)
 

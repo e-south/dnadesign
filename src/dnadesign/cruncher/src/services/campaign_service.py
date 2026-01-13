@@ -137,8 +137,11 @@ def validate_campaign(
                     combine_sites=cfg.motif_store.combine_sites,
                     site_window_lengths=cfg.motif_store.site_window_lengths,
                     site_window_center=cfg.motif_store.site_window_center,
+                    pwm_window_lengths=cfg.motif_store.pwm_window_lengths,
+                    pwm_window_strategy=cfg.motif_store.pwm_window_strategy,
                     min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
                     allow_low_sites=cfg.motif_store.allow_low_sites,
+                    pseudocounts=cfg.motif_store.pseudocounts,
                 )
 
     if errors:
@@ -334,8 +337,11 @@ def collect_campaign_metrics(
         combine_sites=cfg.motif_store.combine_sites,
         site_window_lengths=cfg.motif_store.site_window_lengths,
         site_window_center=cfg.motif_store.site_window_center,
+        pwm_window_lengths=cfg.motif_store.pwm_window_lengths,
+        pwm_window_strategy=cfg.motif_store.pwm_window_strategy,
         min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
         allow_low_sites=cfg.motif_store.allow_low_sites,
+        pseudocounts=cfg.motif_store.pseudocounts,
     )
     metrics: Dict[str, RegulatorMetrics] = {}
     for tf_name in sorted({name for name in tf_names if name}):
@@ -435,8 +441,11 @@ def _apply_selectors(
             combine_sites=cfg.motif_store.combine_sites,
             site_window_lengths=cfg.motif_store.site_window_lengths,
             site_window_center=cfg.motif_store.site_window_center,
+            pwm_window_lengths=cfg.motif_store.pwm_window_lengths,
+            pwm_window_strategy=cfg.motif_store.pwm_window_strategy,
             min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
             allow_low_sites=cfg.motif_store.allow_low_sites,
+            pseudocounts=cfg.motif_store.pseudocounts,
         )
 
     selected: Dict[str, list[str]] = {}

@@ -9,6 +9,7 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Iterable
 
@@ -19,13 +20,14 @@ import seaborn as sns
 
 from dnadesign.cruncher.utils.parquet import read_parquet
 
+logger = logging.getLogger(__name__)
+
 
 def _score_columns(tf_names: Iterable[str]) -> list[str]:
     return [f"score_{tf}" for tf in tf_names]
 
 
-def load_score_frame(seq_path: Path, tf_names: list[str]) -> pd.DataFrame:
-    df = read_parquet(seq_path)
+def score_frame_from_df(df: pd.DataFrame, tf_names: list[str]) -> pd.DataFrame:
     if "phase" in df.columns:
         df = df[df["phase"] == "draw"].copy()
     cols = _score_columns(tf_names)
@@ -33,6 +35,11 @@ def load_score_frame(seq_path: Path, tf_names: list[str]) -> pd.DataFrame:
     if missing:
         raise ValueError(f"Missing score columns in sequences.parquet: {missing}")
     return df[cols].copy()
+
+
+def load_score_frame(seq_path: Path, tf_names: list[str]) -> pd.DataFrame:
+    df = read_parquet(seq_path)
+    return score_frame_from_df(df, tf_names)
 
 
 def write_score_summary(score_df: pd.DataFrame, tf_names: list[str], out_path: Path) -> None:
@@ -112,7 +119,18 @@ def write_joint_metrics(elites_df: pd.DataFrame, tf_names: list[str], out_path: 
     joint_mean = scores.mean(axis=1)
     with np.errstate(divide="ignore", invalid="ignore"):
         joint_hmean = scores.shape[1] / np.sum(1.0 / scores, axis=1)
-    balance_index = joint_min / joint_mean
+    zero_mean = np.isfinite(joint_mean) & (joint_mean == 0)
+    if np.any(zero_mean):
+        logger.warning(
+            "Balance index undefined for %d rows with joint_mean=0; writing NaN.",
+            int(zero_mean.sum()),
+        )
+    balance_index = np.divide(
+        joint_min,
+        joint_mean,
+        out=np.full_like(joint_min, np.nan, dtype=float),
+        where=joint_mean != 0,
+    )
 
     pareto_mask = _pareto_front_mask(scores)
     pareto_front_size = int(pareto_mask.sum())

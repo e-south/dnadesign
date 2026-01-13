@@ -149,7 +149,18 @@ class PTGibbsOptimizer(Optimizer):
                 if Δ >= 0 or np.log(rng.random()) < Δ:
                     chain_states[c], chain_states[c + 1] = s1, s0  # swap in‑place
                     self.swap_accepts += 1
-            self._maybe_log_progress("sampling", d + 1, D)
+            current_scores = [scores[-1] for scores in chain_scores if scores]
+            score_mean = float(np.mean(current_scores)) if current_scores else None
+            score_std = float(np.std(current_scores)) if current_scores else None
+            current_best = float(max(current_scores)) if current_scores else None
+            self._maybe_log_progress(
+                "sampling",
+                d + 1,
+                D,
+                current_score=current_best,
+                score_mean=score_mean,
+                score_std=score_std,
+            )
 
         logger.info("PT optimisation finished. Move utilisation: %s", dict(self.move_tally))
 
@@ -245,7 +256,16 @@ class PTGibbsOptimizer(Optimizer):
         kinds = ["S", "B", "M"]
         return rng.choice(kinds, p=self.move_probs)
 
-    def _maybe_log_progress(self, phase: str, step: int, total: int) -> None:
+    def _maybe_log_progress(
+        self,
+        phase: str,
+        step: int,
+        total: int,
+        *,
+        current_score: float | None = None,
+        score_mean: float | None = None,
+        score_std: float | None = None,
+    ) -> None:
         if not self.progress_every:
             return
         if step % self.progress_every != 0 and step != total:
@@ -256,14 +276,22 @@ class PTGibbsOptimizer(Optimizer):
         acc_label = ", ".join(f"{k}={acceptance_rate[k]:.2f}" for k in sorted(acceptance_rate))
         pct = (step / total) * 100 if total else 100.0
         swap_rate = self.swap_accepts / self.swap_attempts if self.swap_attempts else 0.0
+        score_blob = ""
+        if current_score is not None:
+            score_blob = f" score={current_score:.3f}"
+        if score_mean is not None and score_std is not None:
+            score_blob += f" mean={score_mean:.3f}±{score_std:.3f}"
+        if self.best_score is not None:
+            score_blob += f" best={self.best_score:.3f}"
         logger.info(
-            "Progress: %s %d/%d (%.1f%%) accept={%s} swap_acc=%.2f",
+            "Progress: %s %d/%d (%.1f%%) accept={%s} swap_acc=%.2f%s",
             phase,
             step,
             total,
             pct,
             acc_label,
             swap_rate,
+            score_blob,
         )
         if self.status_writer is not None:
             self.status_writer.update(
@@ -275,6 +303,9 @@ class PTGibbsOptimizer(Optimizer):
                 swap_accepts=self.swap_accepts,
                 swap_attempts=self.swap_attempts,
                 swap_rate=swap_rate,
+                current_score=current_score,
+                score_mean=score_mean,
+                score_std=score_std,
                 beta_min=min(self.beta_ladder) if self.beta_ladder else None,
                 beta_max=max(self.beta_ladder) if self.beta_ladder else None,
                 best_score=self.best_score,

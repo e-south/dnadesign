@@ -15,6 +15,7 @@ import pytest
 from dnadesign.cruncher.cli.config_resolver import (
     CANDIDATE_CONFIG_FILENAMES,
     DEFAULT_WORKSPACE_ENV_VAR,
+    INVOCATION_CWD_ENV_VAR,
     NONINTERACTIVE_ENV_VAR,
     WORKSPACE_ENV_VAR,
     WORKSPACE_ROOTS_ENV_VAR,
@@ -27,10 +28,12 @@ from dnadesign.cruncher.cli.config_resolver import (
 @pytest.fixture(autouse=True)
 def _clear_workspace_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for var in (
+        INVOCATION_CWD_ENV_VAR,
         WORKSPACE_ENV_VAR,
         DEFAULT_WORKSPACE_ENV_VAR,
         WORKSPACE_ROOTS_ENV_VAR,
         NONINTERACTIVE_ENV_VAR,
+        "INIT_CWD",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -73,6 +76,30 @@ def test_resolve_config_explicit_path(tmp_path: Path) -> None:
     resolved = resolve_config_path(config_path, cwd=tmp_path, log=False)
 
     assert resolved == config_path.resolve()
+
+
+def test_resolve_config_explicit_path_uses_init_cwd_when_cwd_diff(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = tmp_path / "repo"
+    workspace = repo_root / "workspaces" / "demo"
+    workspace.mkdir(parents=True)
+    config_path = workspace / "config.yaml"
+    config_path.write_text("cruncher: {}\n")
+    monkeypatch.setenv("INIT_CWD", str(workspace))
+    monkeypatch.chdir(repo_root)
+
+    resolved = resolve_config_path(Path("config.yaml"), log=False)
+
+    assert resolved == config_path.resolve()
+
+
+def test_resolve_config_invalid_invocation_cwd_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    missing = tmp_path / "missing"
+    monkeypatch.setenv(INVOCATION_CWD_ENV_VAR, str(missing))
+    with pytest.raises(ConfigResolutionError) as excinfo:
+        resolve_config_path(None)
+    assert "CRUNCHER_CWD points to a missing directory" in str(excinfo.value)
 
 
 def test_parse_config_and_value_single_config_path_errors(tmp_path: Path) -> None:

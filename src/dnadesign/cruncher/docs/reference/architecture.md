@@ -40,7 +40,7 @@
    - never calls sources or the network
 
 6. **report**
-   - produces `report.json` and `report.md` from run artifacts
+   - produces `report/report.json` and `report/report.md` from run artifacts
    - fails fast if required artifacts are missing
 
 ---
@@ -117,13 +117,17 @@ genomes/              # if genome hydration is enabled
 - `catalog.json` is the “what do we have cached?” index.
 - `locks/<config>.lock.json` pins TF names → exact cached artifacts + hashes.
 - `run_index.json` tracks run folders for `cruncher runs ...`.
+- `catalog_root` must be workspace-relative (no absolute paths or `..` segments).
 
 #### Run outputs (`out_dir`, e.g. `runs/`)
 
-Each configured regulator set produces **separate** runs, with timestamped names like:
+Each configured regulator set produces **separate** runs, grouped by stage and regulator set:
 
-- `parse_set1_lexA-cpxR_20260101_143210_f3a9d2/`
-- `sample_set1_lexA-cpxR_20260101_143512_a91c0e/`
+- `runs/parse/set1_lexA-cpxR/set1_lexA-cpxR_20260101_143210_f3a9d2/`
+- `runs/sample/set1_lexA-cpxR/set1_lexA-cpxR_20260101_143512_a91c0e/`
+- `runs/pilot/set1_lexA-cpxR/set1_lexA-cpxR_20260101_143530_91acb1/` (auto-opt pilots)
+- `runs/logos/parse/set1_lexA-cpxR_20260101_143210_f3a9d2/`
+- `runs/logos/catalog/set1_lexA-cpxR_20260101_143210_f3a9d2/`
 
 ---
 
@@ -131,15 +135,25 @@ Each configured regulator set produces **separate** runs, with timestamped names
 
 A typical **sample** run directory contains:
 
-- `config_used.yaml` — resolved runtime config + PWM summaries
-- `run_manifest.json` — provenance, resolved motifs, optimizer stats, hashes
-- `run_status.json` — live progress snapshots during parse/sample
-- `sequences.parquet` — per-draw sequences + per-TF scores *(required for analyze/report)*
-- `trace.nc` — ArviZ-compatible trace *(required for trace-based plots and some report metrics)*
-- `elites.parquet` / `elites.json` / `elites.yaml` — elite sequences and exports
-- `analysis/` — latest analysis artifacts (plots, tables, summary files)
+- `meta/` — metadata + provenance
+  - `meta/config_used.yaml` — resolved runtime config + PWM summaries
+  - `meta/run_manifest.json` — provenance, resolved motifs, optimizer stats, hashes
+  - `meta/run_status.json` — live progress snapshots during parse/sample
+- `artifacts/` — generated outputs
+  - `artifacts/sequences.parquet` — per-draw sequences + per-TF scores *(required for analyze/report)*
+  - `artifacts/trace.nc` — ArviZ-compatible trace *(required for trace-based plots and some report metrics)*
+  - `artifacts/elites.parquet` / `elites.json` / `elites.yaml` — elite sequences and exports
+- `analysis/` — latest analysis artifacts
+  - `analysis/meta/summary.json` — analysis summary + manifest links
+  - `analysis/meta/analysis_used.yaml` — analysis settings (resolved)
+  - `analysis/meta/plot_manifest.json` — plot registry output
+  - `analysis/meta/table_manifest.json` — table registry output
+  - `analysis/plots/` — plots (PNG/PDF)
+  - `analysis/tables/` — CSV/JSON tables
+  - `analysis/notebooks/` — optional notebooks
 - `analysis/_archive/<analysis_id>/` — optional archived analyses (when enabled)
-- `report.json` / `report.md` — generated summaries (from `cruncher report`)
+- `live/metrics.jsonl` — live sampling progress snapshots (when enabled)
+- `report/` — generated summaries (from `cruncher report`)
 
 ---
 

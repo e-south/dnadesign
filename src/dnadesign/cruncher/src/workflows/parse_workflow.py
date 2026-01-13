@@ -28,10 +28,18 @@ from dnadesign.cruncher.store.lockfile import (
 )
 from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.artifacts import artifact_entry
-from dnadesign.cruncher.utils.labels import build_run_name, regulator_sets
-from dnadesign.cruncher.utils.logos import logo_subtitle
+from dnadesign.cruncher.utils.labels import regulator_sets
+from dnadesign.cruncher.utils.logos import logo_subtitle, pwm_provenance_summary
 from dnadesign.cruncher.utils.manifest import build_run_manifest, write_manifest
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
+from dnadesign.cruncher.utils.run_layout import (
+    build_run_dir,
+    ensure_run_dirs,
+    logos_dir_for_run,
+    out_root,
+    run_group_label,
+    status_path,
+)
 from dnadesign.cruncher.utils.run_status import RunStatusWriter
 
 logger = logging.getLogger(__name__)
@@ -45,8 +53,11 @@ def _store(cfg: CruncherConfig, config_path: Path):
         combine_sites=cfg.motif_store.combine_sites,
         site_window_lengths=cfg.motif_store.site_window_lengths,
         site_window_center=cfg.motif_store.site_window_center,
+        pwm_window_lengths=cfg.motif_store.pwm_window_lengths,
+        pwm_window_strategy=cfg.motif_store.pwm_window_strategy,
         min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
         allow_low_sites=cfg.motif_store.allow_low_sites,
+        pseudocounts=cfg.motif_store.pseudocounts,
     )
 
 
@@ -84,7 +95,7 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
       - cfg.parse.plot.dpi       : DPI for each saved logo
 
     Outputs (per run):
-      - <base_out>/<run_name>/<tf>_logo.png  (one per TF when logo=true)
+      - <base_out>/logos/parse/<run_name>/<tf>_logo.png  (one per TF when logo=true)
       - Console: "[OK] <tf> L=<length> bits=<info_bits>"
                  followed by the log-odds matrix (pandas DataFrame) printout
 
@@ -100,13 +111,20 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
     store = _store(cfg, config_path)
 
     # Prepare output folder
-    out_base = config_path.parent / Path(cfg.out_dir)
+    out_base = out_root(config_path, cfg.out_dir)
     out_base.mkdir(parents=True, exist_ok=True)
 
     lockmap = _lockmap_for(cfg, config_path)
     catalog = CatalogIndex.load(catalog_root)
     lock_root = catalog_root / "locks"
     lock_path = lock_root / f"{config_path.stem}.lock.json"
+    logger.info("Using lockfile: %s", lock_path)
+    logger.info(
+        "PWM config: source=%s combine_sites=%s site_kinds=%s",
+        cfg.motif_store.pwm_source,
+        cfg.motif_store.combine_sites,
+        cfg.motif_store.site_kinds,
+    )
 
     for set_index, group in enumerate(regulator_sets(cfg.regulator_sets), start=1):
         if not group:
@@ -114,10 +132,16 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
         seen: set[str] = set()
         tfs = [tf for tf in group if not (tf in seen or seen.add(tf))]
 
-        run_dir = out_base / build_run_name("parse", tfs, set_index=set_index)
-        run_dir.mkdir(parents=True, exist_ok=True)
+        run_dir = build_run_dir(
+            config_path=config_path,
+            out_dir=cfg.out_dir,
+            stage="parse",
+            tfs=tfs,
+            set_index=set_index,
+        )
+        ensure_run_dirs(run_dir, meta=True)
         status_writer = RunStatusWriter(
-            path=run_dir / "run_status.json",
+            path=status_path(run_dir),
             stage="parse",
             run_dir=run_dir,
             payload={
@@ -135,45 +159,72 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
 
         artifacts: list[dict[str, object]] = []
         for tf in sorted(tfs):
-            entry = lockmap.get(tf)
-            if entry is None:
+            locked = lockmap.get(tf)
+            if locked is None:
                 raise ValueError(f"Missing lock entry for TF '{tf}'")
-            ref = MotifRef(source=entry.source, motif_id=entry.motif_id)
+            ref = MotifRef(source=locked.source, motif_id=locked.motif_id)
+            catalog_entry = catalog.entries.get(f"{ref.source}:{ref.motif_id}")
+            if catalog_entry is None:
+                raise ValueError(f"Catalog entry missing for {ref.source}:{ref.motif_id}")
+            provenance = pwm_provenance_summary(
+                pwm_source=cfg.motif_store.pwm_source,
+                entry=catalog_entry,
+                catalog=catalog,
+                combine_sites=cfg.motif_store.combine_sites,
+                site_kinds=cfg.motif_store.site_kinds,
+            )
+            logger.info("PWM %s ← %s:%s | %s", tf, ref.source, ref.motif_id, provenance)
+
             pwm = store.get_pwm(ref)
 
             if render_logos:
-                entry = catalog.entries.get(f"{ref.source}:{ref.motif_id}")
                 subtitle = (
                     logo_subtitle(
                         pwm_source=cfg.motif_store.pwm_source,
-                        entry=entry,
+                        entry=catalog_entry,
                         catalog=catalog,
                         combine_sites=cfg.motif_store.combine_sites,
                         site_kinds=cfg.motif_store.site_kinds,
                     )
-                    if entry
+                    if catalog_entry
                     else "unknown"
                 )
+                logo_root = logos_dir_for_run(out_base, "parse", run_dir.name)
+                logo_root.mkdir(parents=True, exist_ok=True)
+                logo_path = logo_root / f"{tf}_logo.png"
                 plot_pwm(
                     pwm,
                     mode=cfg.parse.plot.bits_mode,
-                    out=run_dir / f"{tf}_logo.png",
+                    out=logo_path,
                     dpi=cfg.parse.plot.dpi,
                     subtitle=f"sites: {subtitle}" if cfg.motif_store.pwm_source == "sites" else subtitle,
                 )
                 artifacts.append(
                     artifact_entry(
-                        run_dir / f"{tf}_logo.png",
+                        logo_path,
                         run_dir,
                         kind="plot",
                         label=f"{tf} PWM logo",
                         stage="parse",
+                        root_dir=out_base,
                     )
                 )
 
             length = pwm.length
             bits = pwm.information_bits()
-            logger.info("[OK] %s L=%d bits=%.1f", tf, length, bits)
+            if pwm.nsites is not None:
+                logger.info("[OK] %s L=%d bits=%.1f n=%d", tf, length, bits, pwm.nsites)
+            else:
+                logger.info("[OK] %s L=%d bits=%.1f", tf, length, bits)
+            if pwm.source_length is not None and pwm.window_start is not None:
+                logger.info(
+                    "PWM window %s: %d:%d/%d (%s)",
+                    tf,
+                    pwm.window_start,
+                    pwm.window_start + pwm.length,
+                    pwm.source_length,
+                    pwm.window_strategy or "max_info",
+                )
 
             log_odds = pwm.log_odds()
             df_lo = pd.DataFrame(
@@ -200,6 +251,7 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
             extra={
                 "sequence_length": cfg.sample.init.length if cfg.sample else None,
                 "regulator_set": {"index": set_index, "tfs": tfs},
+                "run_group": run_group_label(tfs, set_index),
             },
         )
         manifest_path = write_manifest(run_dir, manifest)

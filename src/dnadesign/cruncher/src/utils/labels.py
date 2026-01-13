@@ -32,14 +32,22 @@ def format_regulator_slug(tfs: Sequence[str], *, max_len: int = 60) -> str:
     return _slugify(format_regulator_label(tfs), max_len=max_len)
 
 
-def build_run_name(stage: str, tfs: Sequence[str], *, set_index: int | None = None) -> str:
+def build_run_name(
+    stage: str,
+    tfs: Sequence[str],
+    *,
+    set_index: int | None = None,
+    include_stage: bool = True,
+) -> str:
     date_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     label = format_regulator_slug(tfs)
     seed = f"{stage}|{date_stamp}|{','.join(tfs)}|{set_index or ''}"
     short_hash = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:6]
     if set_index is not None:
-        return f"{stage}_set{set_index}_{label}_{date_stamp}_{short_hash}"
-    return f"{stage}_{label}_{date_stamp}_{short_hash}"
+        base = f"set{set_index}_{label}_{date_stamp}_{short_hash}"
+    else:
+        base = f"{label}_{date_stamp}_{short_hash}"
+    return f"{stage}_{base}" if include_stage else base
 
 
 def regulator_sets(regulator_sets: Iterable[Iterable[str]]) -> list[list[str]]:

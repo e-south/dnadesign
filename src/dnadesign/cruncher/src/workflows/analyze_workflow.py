@@ -20,7 +20,14 @@ from pathlib import Path
 from dnadesign.cruncher.config.schema_v2 import AnalysisConfig, CruncherConfig
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.services.run_service import list_runs
-from dnadesign.cruncher.utils.analysis_layout import ANALYSIS_LAYOUT_VERSION
+from dnadesign.cruncher.utils.analysis_layout import (
+    ANALYSIS_LAYOUT_VERSION,
+    analysis_meta_root,
+    analysis_used_path,
+    plot_manifest_path,
+    summary_path,
+    table_manifest_path,
+)
 from dnadesign.cruncher.utils.artifacts import (
     append_artifacts,
     artifact_entry,
@@ -30,18 +37,16 @@ from dnadesign.cruncher.utils.hashing import sha256_path
 from dnadesign.cruncher.utils.manifest import load_manifest
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
 from dnadesign.cruncher.utils.parquet import read_parquet
+from dnadesign.cruncher.utils.run_layout import config_used_path, sequences_path, trace_path
 from dnadesign.cruncher.workflows.analyze.plot_registry import PLOT_SPECS
 
 logger = logging.getLogger(__name__)
 
 _ANALYSIS_ITEMS = (
+    "meta",
     "plots",
     "tables",
     "notebooks",
-    "summary.json",
-    "analysis_used.yaml",
-    "plot_manifest.json",
-    "table_manifest.json",
 )
 
 
@@ -63,18 +68,18 @@ def _prune_latest_analysis_artifacts(manifest: dict) -> None:
 
 
 def _load_summary_id(analysis_root: Path) -> str | None:
-    summary_path = analysis_root / "summary.json"
-    if not summary_path.exists():
+    summary_file = summary_path(analysis_root)
+    if not summary_file.exists():
         return None
     try:
-        payload = json.loads(summary_path.read_text())
+        payload = json.loads(summary_file.read_text())
     except Exception as exc:
-        raise ValueError(f"analysis summary is not valid JSON: {summary_path}") from exc
+        raise ValueError(f"analysis summary is not valid JSON: {summary_file}") from exc
     if not isinstance(payload, dict):
-        raise ValueError(f"analysis summary must be a JSON object: {summary_path}")
+        raise ValueError(f"analysis summary must be a JSON object: {summary_file}")
     analysis_id = payload.get("analysis_id")
     if not isinstance(analysis_id, str) or not analysis_id:
-        raise ValueError(f"analysis summary missing analysis_id: {summary_path}")
+        raise ValueError(f"analysis summary missing analysis_id: {summary_file}")
     return analysis_id
 
 
@@ -93,12 +98,12 @@ def _rewrite_manifest_paths(manifest: dict, analysis_id: str, moved_prefixes: li
 
 
 def _update_archived_summary(archive_root: Path, analysis_id: str, moved_prefixes: list[str]) -> None:
-    summary_path = archive_root / "summary.json"
-    if not summary_path.exists():
+    summary_file = summary_path(archive_root)
+    if not summary_file.exists():
         return
-    payload = json.loads(summary_path.read_text())
+    payload = json.loads(summary_file.read_text())
     if not isinstance(payload, dict):
-        raise ValueError(f"analysis summary must be a JSON object: {summary_path}")
+        raise ValueError(f"analysis summary must be a JSON object: {summary_file}")
 
     def _rewrite_path(value: str) -> str:
         for prefix in moved_prefixes:
@@ -119,7 +124,7 @@ def _update_archived_summary(archive_root: Path, analysis_id: str, moved_prefixe
 
     payload["analysis_dir"] = str(archive_root.resolve())
     payload["archived_at"] = datetime.now(timezone.utc).isoformat()
-    summary_path.write_text(json.dumps(payload, indent=2))
+    summary_file.write_text(json.dumps(payload, indent=2))
 
 
 def _archive_existing_analysis(analysis_root: Path, manifest: dict, analysis_id: str) -> None:
@@ -162,9 +167,9 @@ def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
     import numpy as np
     import yaml
 
-    config_path = run_dir / "config_used.yaml"
+    config_path = config_used_path(run_dir)
     if not config_path.exists():
-        raise FileNotFoundError(f"Missing config_used.yaml in {run_dir}")
+        raise FileNotFoundError(f"Missing meta/config_used.yaml in {run_dir}")
     payload = yaml.safe_load(config_path.read_text()) or {}
     cruncher_cfg = payload.get("cruncher")
     if not isinstance(cruncher_cfg, dict):
@@ -328,6 +333,9 @@ def run_analyze(
     use_latest: bool = False,
     tf_pair_override: tuple[str, str] | None = None,
     plot_keys_override: list[str] | None = None,
+    scatter_background_override: bool | None = None,
+    scatter_background_samples_override: int | None = None,
+    scatter_background_seed_override: int | None = None,
 ) -> list[Path]:
     """Iterate over runs listed in cfg.analysis.runs and generate diagnostics."""
     # Shared PWM store
@@ -340,6 +348,7 @@ def run_analyze(
     import arviz as az
     import yaml
 
+    from dnadesign.cruncher.utils.diagnostics import summarize_sampling_diagnostics
     from dnadesign.cruncher.workflows.analyze.per_pwm import gather_per_pwm_scores
     from dnadesign.cruncher.workflows.analyze.plots.diagnostics import (
         make_pair_idata,
@@ -353,12 +362,12 @@ def run_analyze(
     )
     from dnadesign.cruncher.workflows.analyze.plots.scatter import plot_scatter
     from dnadesign.cruncher.workflows.analyze.plots.summary import (
-        load_score_frame,
         plot_correlation_heatmap,
         plot_parallel_coords,
         plot_score_box,
         plot_score_hist,
         plot_score_pairgrid,
+        score_frame_from_df,
         write_elite_topk,
         write_joint_metrics,
         write_score_summary,
@@ -366,7 +375,7 @@ def run_analyze(
 
     analysis_cfg = cfg.analysis
     plot_keys = {spec.key for spec in PLOT_SPECS}
-    override_payload: dict[str, object] | None = None
+    override_payload: dict[str, object] = {}
     if plot_keys_override:
         requested = [key for key in plot_keys_override if key]
         if "all" in requested and len(requested) > 1:
@@ -374,7 +383,7 @@ def run_analyze(
         unknown = [key for key in requested if key != "all" and key not in plot_keys]
         if unknown:
             raise ValueError(f"Unknown plot keys: {', '.join(unknown)}")
-        analysis_cfg = cfg.analysis.model_copy(deep=True)
+        analysis_cfg = analysis_cfg.model_copy(deep=True)
         for key in plot_keys:
             setattr(analysis_cfg.plots, key, False)
         if "all" in requested:
@@ -383,14 +392,34 @@ def run_analyze(
         else:
             for key in requested:
                 setattr(analysis_cfg.plots, key, True)
-        override_payload = {"plots": requested}
+        override_payload["plots"] = requested
+
+    if scatter_background_override is not None or scatter_background_samples_override is not None:
+        if analysis_cfg is cfg.analysis:
+            analysis_cfg = analysis_cfg.model_copy(deep=True)
+        if scatter_background_override is not None:
+            analysis_cfg.scatter_background = scatter_background_override
+            override_payload["scatter_background"] = scatter_background_override
+        if scatter_background_samples_override is not None:
+            if scatter_background_samples_override < 0:
+                raise ValueError("--scatter-background-samples must be >= 0.")
+            analysis_cfg.scatter_background_samples = scatter_background_samples_override
+            override_payload["scatter_background_samples"] = scatter_background_samples_override
+    if scatter_background_seed_override is not None:
+        if scatter_background_seed_override < 0:
+            raise ValueError("--scatter-background-seed must be >= 0.")
+        if analysis_cfg is cfg.analysis:
+            analysis_cfg = analysis_cfg.model_copy(deep=True)
+        analysis_cfg.scatter_background_seed = scatter_background_seed_override
+        override_payload["scatter_background_seed"] = scatter_background_seed_override
+
+    override_payload = override_payload or None
 
     cfg_effective = cfg
     if analysis_cfg is not cfg.analysis:
         cfg_effective = cfg.model_copy(deep=True)
         cfg_effective.analysis = analysis_cfg
 
-    results_dir = config_path.parent / Path(cfg.out_dir)
     runs = runs_override if runs_override else (analysis_cfg.runs or [])
     if not runs:
         if not use_latest:
@@ -401,11 +430,14 @@ def run_analyze(
         runs = [latest[0].name]
         logger.info("Analyzing latest sample run: %s", runs[0])
     analysis_runs: list[Path] = []
-    for run_name in runs:
-        sample_dir = results_dir / run_name
+    from dnadesign.cruncher.services.run_service import get_run
 
-        if not sample_dir.is_dir():
-            raise FileNotFoundError(f"Run '{run_name}' not found under {results_dir}")
+    for run_name in runs:
+        run_info = get_run(cfg, config_path, run_name)
+        sample_dir = run_info.run_dir
+
+        if run_info.stage != "sample":
+            raise ValueError(f"Run '{run_name}' is not a sample run (stage={run_info.stage})")
 
         logger.info("Analyzing run: %s", run_name)
         manifest = load_manifest(sample_dir)
@@ -441,20 +473,21 @@ def run_analyze(
         )
 
         # ── load trace & sequences for downstream plots ───────────────────────
-        seq_path, trace_path = sample_dir / "sequences.parquet", sample_dir / "trace.nc"
+        seq_path, trace_file = sequences_path(sample_dir), trace_path(sample_dir)
         if not seq_path.exists():
             raise FileNotFoundError(
-                f"Missing sequences.parquet in {sample_dir}. Re-run `cruncher sample` with sample.save_sequences=true."
+                f"Missing artifacts/sequences.parquet in {sample_dir}. "
+                "Re-run `cruncher sample` with sample.save_sequences=true."
             )
         plots = analysis_cfg.plots
         needs_trace = plots.trace or plots.autocorr or plots.convergence
         trace_idata = None
-        if needs_trace:
-            if not trace_path.exists():
-                raise FileNotFoundError(
-                    f"Missing trace.nc in {sample_dir}. Re-run `cruncher sample` with sample.save_trace=true."
-                )
-            trace_idata = az.from_netcdf(trace_path)
+        if trace_file.exists():
+            trace_idata = az.from_netcdf(trace_file)
+        elif needs_trace:
+            raise FileNotFoundError(
+                f"Missing artifacts/trace.nc in {sample_dir}. Re-run `cruncher sample` with sample.save_trace=true."
+            )
 
         analysis_id = _analysis_id()
         analysis_root = sample_dir / "analysis"
@@ -463,8 +496,8 @@ def run_analyze(
         existing_id = _load_summary_id(analysis_root)
         if existing_items and existing_id is None:
             raise ValueError(
-                "analysis/ contains artifacts but summary.json is missing. "
-                "Remove analysis/ or restore summary.json before re-running analyze."
+                "analysis/ contains artifacts but meta/summary.json is missing. "
+                "Remove analysis/ or restore meta/summary.json before re-running analyze."
             )
         if existing_id:
             if analysis_cfg.archive:
@@ -472,6 +505,8 @@ def run_analyze(
             else:
                 _clear_latest_analysis(analysis_root)
                 _prune_latest_analysis_artifacts(manifest)
+        analysis_meta = analysis_meta_root(analysis_root)
+        analysis_meta.mkdir(parents=True, exist_ok=True)
         plots_dir = analysis_root / "plots"
         tables_dir = analysis_root / "tables"
         notebooks_dir = analysis_root / "notebooks"
@@ -479,7 +514,7 @@ def run_analyze(
         tables_dir.mkdir(parents=True, exist_ok=True)
         notebooks_dir.mkdir(parents=True, exist_ok=True)
 
-        analysis_used_path = analysis_root / "analysis_used.yaml"
+        analysis_used_file = analysis_used_path(analysis_root)
         analysis_used_payload = {
             "analysis_id": analysis_id,
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -489,7 +524,8 @@ def run_analyze(
         if override_payload:
             analysis_used_payload["analysis_overrides"] = override_payload
             analysis_used_payload["analysis_base"] = cfg.analysis.model_dump()
-        analysis_used_path.write_text(yaml.safe_dump(analysis_used_payload, sort_keys=False))
+        analysis_used_file.parent.mkdir(parents=True, exist_ok=True)
+        analysis_used_file.write_text(yaml.safe_dump(analysis_used_payload, sort_keys=False))
 
         # gather per-PWM scores (for scatter etc.)
         per_pwm_path = tables_dir / "gathered_per_pwm_everyN.csv"
@@ -503,15 +539,44 @@ def run_analyze(
         )
         logger.info("Wrote per-PWM score table → %s", per_pwm_path.relative_to(sample_dir))
 
-        score_df = load_score_frame(seq_path, tf_names)
-        summary_path = tables_dir / "score_summary.csv"
-        write_score_summary(score_df, tf_names, summary_path)
+        seq_df = read_parquet(seq_path)
+        score_df = score_frame_from_df(seq_df, tf_names)
+        score_summary_path = tables_dir / "score_summary.csv"
+        write_score_summary(score_df, tf_names, score_summary_path)
 
         topk_path = tables_dir / "elite_topk.csv"
         write_elite_topk(elites_df, tf_names, topk_path, top_k=sample_meta.top_k)
 
         joint_metrics_path = tables_dir / "joint_metrics.csv"
         write_joint_metrics(elites_df, tf_names, joint_metrics_path)
+
+        sample_meta_payload = {
+            "chains": sample_meta.chains,
+            "draws": sample_meta.draws,
+            "tune": sample_meta.tune,
+            "top_k": sample_meta.top_k,
+            "pwm_sum_threshold": sample_meta.pwm_sum_threshold,
+            "bidirectional": sample_meta.bidirectional,
+            "move_probs": sample_meta.move_probs,
+            "cooling_kind": sample_meta.cooling_kind,
+        }
+        diagnostics_summary = summarize_sampling_diagnostics(
+            trace_idata=trace_idata,
+            sequences_df=seq_df,
+            elites_df=elites_df,
+            tf_names=tf_names,
+            optimizer=manifest.get("optimizer", {}),
+            optimizer_stats=manifest.get("optimizer_stats", {}),
+            sample_meta=sample_meta_payload,
+        )
+        diagnostics_path = tables_dir / "diagnostics.json"
+        diagnostics_path.write_text(json.dumps(diagnostics_summary, indent=2))
+        if diagnostics_summary.get("warnings"):
+            logger.warning(
+                "Diagnostics warnings detected (%d). See %s.",
+                len(diagnostics_summary["warnings"]),
+                diagnostics_path.relative_to(sample_dir),
+            )
 
         enabled_specs = [spec for spec in PLOT_SPECS if getattr(plots, spec.key, False)]
         if enabled_specs:
@@ -673,8 +738,9 @@ def run_analyze(
                 }
             )
 
-        plot_manifest_path = analysis_root / "plot_manifest.json"
-        plot_manifest_path.write_text(json.dumps(plot_manifest, indent=2))
+        plot_manifest_file = plot_manifest_path(analysis_root)
+        plot_manifest_file.parent.mkdir(parents=True, exist_ok=True)
+        plot_manifest_file.write_text(json.dumps(plot_manifest, indent=2))
 
         table_manifest = {
             "analysis_id": analysis_id,
@@ -689,8 +755,8 @@ def run_analyze(
                 {
                     "key": "score_summary",
                     "label": "Per-TF summary (CSV)",
-                    "path": str(summary_path.relative_to(sample_dir)),
-                    "exists": summary_path.exists(),
+                    "path": str(score_summary_path.relative_to(sample_dir)),
+                    "exists": score_summary_path.exists(),
                 },
                 {
                     "key": "elite_topk",
@@ -704,14 +770,21 @@ def run_analyze(
                     "path": str(joint_metrics_path.relative_to(sample_dir)),
                     "exists": joint_metrics_path.exists(),
                 },
+                {
+                    "key": "diagnostics",
+                    "label": "Diagnostics summary (JSON)",
+                    "path": str(diagnostics_path.relative_to(sample_dir)),
+                    "exists": diagnostics_path.exists(),
+                },
             ],
         }
-        table_manifest_path = analysis_root / "table_manifest.json"
-        table_manifest_path.write_text(json.dumps(table_manifest, indent=2))
+        table_manifest_file = table_manifest_path(analysis_root)
+        table_manifest_file.parent.mkdir(parents=True, exist_ok=True)
+        table_manifest_file.write_text(json.dumps(table_manifest, indent=2))
 
         artifacts: list[dict[str, object]] = [
             artifact_entry(
-                analysis_used_path,
+                analysis_used_file,
                 sample_dir,
                 kind="config",
                 label="Analysis settings",
@@ -725,7 +798,7 @@ def run_analyze(
                 stage="analysis",
             ),
             artifact_entry(
-                summary_path,
+                score_summary_path,
                 sample_dir,
                 kind="table",
                 label="Per-TF summary (CSV)",
@@ -746,14 +819,21 @@ def run_analyze(
                 stage="analysis",
             ),
             artifact_entry(
-                plot_manifest_path,
+                diagnostics_path,
+                sample_dir,
+                kind="json",
+                label="Diagnostics summary (JSON)",
+                stage="analysis",
+            ),
+            artifact_entry(
+                plot_manifest_file,
                 sample_dir,
                 kind="json",
                 label="Plot manifest",
                 stage="analysis",
             ),
             artifact_entry(
-                table_manifest_path,
+                table_manifest_file,
                 sample_dir,
                 kind="json",
                 label="Table manifest",
@@ -772,14 +852,14 @@ def run_analyze(
                 "sha256": sha256_path(elites_path),
             },
             "config_used.yaml": {
-                "path": "config_used.yaml",
-                "sha256": sha256_path(sample_dir / "config_used.yaml"),
+                "path": str(config_used_path(sample_dir).relative_to(sample_dir)),
+                "sha256": sha256_path(config_used_path(sample_dir)),
             },
         }
-        if trace_path.exists():
+        if trace_file.exists():
             inputs_payload["trace.nc"] = {
-                "path": str(trace_path.relative_to(sample_dir)),
-                "sha256": sha256_path(trace_path),
+                "path": str(trace_file.relative_to(sample_dir)),
+                "sha256": sha256_path(trace_file),
             }
         summary_payload = {
             "analysis_id": analysis_id,
@@ -788,22 +868,24 @@ def run_analyze(
             "run_dir": str(sample_dir.resolve()),
             "analysis_dir": str(analysis_root.resolve()),
             "tf_names": tf_names,
+            "diagnostics": diagnostics_summary,
             "analysis_layout_version": ANALYSIS_LAYOUT_VERSION,
             "analysis_config": analysis_cfg.model_dump(),
             "cruncher_version": _get_version(),
             "git_commit": _get_git_commit(config_path),
-            "analysis_used": str(analysis_used_path.relative_to(sample_dir)),
-            "config_used": "config_used.yaml",
-            "plot_manifest": str(plot_manifest_path.relative_to(sample_dir)),
-            "table_manifest": str(table_manifest_path.relative_to(sample_dir)),
+            "analysis_used": str(analysis_used_file.relative_to(sample_dir)),
+            "config_used": str(config_used_path(sample_dir).relative_to(sample_dir)),
+            "plot_manifest": str(plot_manifest_file.relative_to(sample_dir)),
+            "table_manifest": str(table_manifest_file.relative_to(sample_dir)),
             "inputs": inputs_payload,
             "artifacts": [item["path"] for item in artifacts],
         }
-        summary_path_json = analysis_root / "summary.json"
-        summary_path_json.write_text(json.dumps(summary_payload, indent=2))
+        summary_file = summary_path(analysis_root)
+        summary_file.parent.mkdir(parents=True, exist_ok=True)
+        summary_file.write_text(json.dumps(summary_payload, indent=2))
         artifacts.append(
             artifact_entry(
-                summary_path_json,
+                summary_file,
                 sample_dir,
                 kind="json",
                 label="Analysis summary",

@@ -20,6 +20,7 @@ from dnadesign.cruncher.cli.config_resolver import (
     parse_config_and_value,
     resolve_config_path,
 )
+from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.services.run_service import (
     get_run,
@@ -33,6 +34,7 @@ from dnadesign.cruncher.utils.analysis_layout import (
 )
 from dnadesign.cruncher.utils.artifacts import normalize_artifacts
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
+from dnadesign.cruncher.utils.run_layout import live_metrics_path
 from rich.console import Console
 from rich.live import Live
 from rich.table import Table
@@ -83,7 +85,7 @@ def _tail_lines(path: Path, *, max_lines: int, max_bytes: int = 65536) -> list[s
 
 
 def _load_live_metrics(run_dir: Path, *, max_points: int) -> list[dict]:
-    metrics_path = run_dir / "live_metrics.jsonl"
+    metrics_path = live_metrics_path(run_dir)
     if not metrics_path.exists():
         return []
     lines = _tail_lines(metrics_path, max_lines=max_points)
@@ -180,6 +182,7 @@ def list_runs_cmd(
                 "created_at": run.created_at,
                 "motif_count": run.motif_count,
                 "pwm_source": run.pwm_source,
+                "best_score": run.best_score,
                 "regulator_set": run.regulator_set,
                 "run_dir": str(run.run_dir),
                 "artifacts": run.artifacts,
@@ -279,7 +282,8 @@ def show_run_cmd(
     if run.regulator_set:
         console.print(f"regulator_set: {run.regulator_set}")
     console.print(f"pwm_source: {run.pwm_source or '-'}")
-    console.print(f"run_dir: {run.run_dir}")
+    base = config_path.parent
+    console.print(f"run_dir: {render_path(run.run_dir, base=base)}")
     artifacts = normalize_artifacts(run.artifacts)
     analysis_ids = _analysis_ids(run.run_dir)
     latest_analysis = _latest_analysis_id(run.run_dir)
@@ -289,7 +293,7 @@ def show_run_cmd(
         console.print(f"latest_analysis: {latest_analysis}")
         notebook_path = run.run_dir / "analysis" / "notebooks" / "run_overview.py"
         if notebook_path.exists():
-            console.print(f"notebook: {notebook_path}")
+            console.print(f"notebook: {render_path(notebook_path, base=base)}")
     if artifacts:
         console.print("artifacts:")
         table = Table(header_style="bold")
@@ -298,11 +302,13 @@ def show_run_cmd(
         table.add_column("Label")
         table.add_column("Path")
         for item in artifacts:
+            path_val = item.get("path")
+            rendered_path = "-" if path_val in {None, "-"} else render_path(path_val, base=base)
             table.add_row(
                 str(item.get("stage") or "-"),
                 str(item.get("type") or "-"),
                 str(item.get("label") or "-"),
-                str(item.get("path") or "-"),
+                rendered_path,
             )
         console.print(table)
         counts = _artifact_counts(artifacts)
@@ -330,6 +336,7 @@ def latest_run_cmd(
         help="Path to cruncher config.yaml (overrides positional CONFIG).",
     ),
     stage: str | None = typer.Option(None, "--stage", help="Filter by stage (parse, sample, analyze, report)."),
+    set_index: int | None = typer.Option(None, "--set-index", help="Filter by regulator set index."),
     json_output: bool = typer.Option(False, "--json", help="Emit run metadata as JSON."),
 ) -> None:
     try:
@@ -339,6 +346,8 @@ def latest_run_cmd(
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
     runs = list_runs(cfg, config_path, stage=stage)
+    if set_index is not None:
+        runs = [run for run in runs if (run.regulator_set or {}).get("index") == set_index]
     if not runs:
         console.print("No runs found.")
         console.print("Hint: run cruncher sample <config> or cruncher parse <config> to create a run.")
@@ -365,7 +374,76 @@ def latest_run_cmd(
     console.print(run.name)
 
 
-@app.command("rebuild-index", help="Rebuild the run index from run_manifest.json files.")
+@app.command("best", help="Print the run name with the highest best_score (default stage=sample).")
+def best_run_cmd(
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
+    config_option: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to cruncher config.yaml (overrides positional CONFIG).",
+    ),
+    stage: str = typer.Option("sample", "--stage", help="Filter by stage (parse, sample, analyze, report)."),
+    set_index: int | None = typer.Option(None, "--set-index", help="Filter by regulator set index."),
+    json_output: bool = typer.Option(False, "--json", help="Emit run metadata as JSON."),
+) -> None:
+    try:
+        config_path = resolve_config_path(config_option or config)
+    except ConfigResolutionError as exc:
+        console.print(str(exc))
+        raise typer.Exit(code=1)
+    cfg = load_config(config_path)
+    runs = list_runs(cfg, config_path, stage=stage)
+    if set_index is not None:
+        runs = [run for run in runs if (run.regulator_set or {}).get("index") == set_index]
+    if not runs:
+        console.print("No runs found.")
+        console.print("Hint: run cruncher sample <config> or cruncher parse <config> to create a run.")
+        raise typer.Exit(code=1)
+    best_run = None
+    best_score = None
+    for run in runs:
+        score = run.best_score
+        if score is None:
+            status_payload = load_run_status(run.run_dir)
+            if status_payload is not None:
+                score = status_payload.get("best_score")
+        if score is None:
+            continue
+        if best_score is None or score > best_score:
+            best_score = float(score)
+            best_run = run
+    if best_run is None:
+        console.print("No runs with best_score found.")
+        console.print("Hint: run cruncher sample to generate best_score metadata.")
+        raise typer.Exit(code=1)
+    if json_output:
+        typer.echo(
+            json.dumps(
+                {
+                    "name": best_run.name,
+                    "stage": best_run.stage,
+                    "status": best_run.status,
+                    "created_at": best_run.created_at,
+                    "motif_count": best_run.motif_count,
+                    "pwm_source": best_run.pwm_source,
+                    "best_score": best_score,
+                    "regulator_set": best_run.regulator_set,
+                    "run_dir": str(best_run.run_dir),
+                    "artifacts": best_run.artifacts,
+                },
+                indent=2,
+            )
+        )
+        return
+    console.print(best_run.name)
+
+
+@app.command("rebuild-index", help="Rebuild the run index from meta/run_manifest.json files.")
 def rebuild_index_cmd(
     config: Path | None = typer.Argument(
         None,
@@ -386,10 +464,10 @@ def rebuild_index_cmd(
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
     index_path = rebuild_run_index(cfg, config_path)
-    console.print(f"Rebuilt run index → {index_path}")
+    console.print(f"Rebuilt run index → {render_path(index_path, base=config_path.parent)}")
 
 
-@app.command("watch", help="Tail run_status.json for a live progress snapshot.")
+@app.command("watch", help="Tail meta/run_status.json for a live progress snapshot.")
 def watch_run_cmd(
     args: list[str] = typer.Argument(
         None,
@@ -435,8 +513,8 @@ def watch_run_cmd(
         raise typer.Exit(code=1)
     status = load_run_status(run.run_dir)
     if status is None:
-        console.print(f"No run_status.json found for run '{run_name}'.")
-        console.print("Hint: watch is only available for active runs writing run_status.json.")
+        console.print(f"No meta/run_status.json found for run '{run_name}'.")
+        console.print("Hint: watch is only available for active runs writing meta/run_status.json.")
         raise typer.Exit(code=1)
     if metric_points < 1:
         console.print("Error: --metric-points must be >= 1.")
@@ -497,7 +575,7 @@ def watch_run_cmd(
                     )
                 table.add_row("metric_points", str(len(history)))
             else:
-                table.add_row("live_metrics", "live_metrics.jsonl not found")
+                table.add_row("live_metrics", "live/metrics.jsonl not found")
         return table
 
     tick = 0
@@ -505,7 +583,7 @@ def watch_run_cmd(
         while True:
             status = load_run_status(run.run_dir)
             if status is None:
-                console.print("run_status.json missing.")
+                console.print("meta/run_status.json missing.")
                 break
             live.update(_render(status))
             if plot or plot_path is not None:

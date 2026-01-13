@@ -16,6 +16,7 @@ from dnadesign.cruncher.cli.config_resolver import (
     discover_workspaces,
     workspace_search_roots,
 )
+from dnadesign.cruncher.cli.paths import render_path
 from rich.console import Console
 from rich.table import Table
 
@@ -46,8 +47,8 @@ def list_workspaces() -> None:
         table.add_row(
             str(idx),
             workspace.name,
-            str(workspace.config_path),
-            str(workspace.root),
+            render_path(workspace.config_path),
+            render_path(workspace.root),
             catalog_flag,
         )
     console.print(table)

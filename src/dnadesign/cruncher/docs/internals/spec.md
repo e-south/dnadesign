@@ -83,6 +83,7 @@ This document defines the end-to-end requirements and architecture for **crunche
 ```
 
 `catalog.json` is the single source of truth for “what we have in-house”. It tracks matrix availability, site counts, and provenance tags.
+`catalog_root` must be workspace-relative (no absolute paths or `..` segments).
 
 ---
 
@@ -101,12 +102,17 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze/re
 
 - Default: use cached matrices (`motif_store.pwm_source=matrix`).
 - Optional: build PWM from cached sites (`motif_store.pwm_source=sites`).
+- Site-derived PWMs use Biopython with configurable pseudocounts (`motif_store.pseudocounts`).
 - `motif_store.site_kinds` can restrict which site sets are eligible (e.g., curated vs HT vs local).
 - `motif_store.combine_sites=true` concatenates site sets for a TF before PWM creation (explicit opt‑in).
 - When `combine_sites=true`, lockfiles hash the full set of site files used for that TF, so cache changes require re-locking.
 - HT site sets with variable lengths require per‑TF/per‑dataset window lengths via `motif_store.site_window_lengths`.
+- If optimization requires a shorter PWM, set `motif_store.pwm_window_lengths` to trim to the highest‑information sub-window.
 - Fail if fewer than `min_sites_for_pwm` binding sites are available (unless `allow_low_sites=true`).
 - All PWMs are validated (shape Lx4, rows sum to 1, non-negative).
+- De novo alignment/discovery is handled via MEME Suite (`cruncher discover motifs`) and stored as catalog matrices.
+  Tool resolution uses `motif_discovery.tool_path` (resolved relative to config), `MEME_BIN`, or PATH, and discovery
+  writes a `discover_manifest.json` with tool/version metadata per run.
 
 ---
 
@@ -126,21 +132,22 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze/re
 
 Each run directory contains:
 
-- `config_used.yaml` — resolved config + PWM summaries
-- `trace.nc` — canonical ArviZ trace
-- `sequences.parquet` — per-draw sequences + per-TF scores
-- `elites.parquet` — elite sequences (parquet)
-- `elites.json` — elite sequences (JSON, human-readable)
-- `elites.yaml` — elite metadata (YAML)
+- `meta/config_used.yaml` — resolved config + PWM summaries
+- `meta/run_manifest.json` — provenance, hashes, optimizer stats
+- `meta/run_status.json` — live progress updates (written during parse and sampling)
+- `artifacts/trace.nc` — canonical ArviZ trace
+- `artifacts/sequences.parquet` — per-draw sequences + per-TF scores
+- `artifacts/elites.parquet` — elite sequences (parquet)
+- `artifacts/elites.json` — elite sequences (JSON, human-readable)
+- `artifacts/elites.yaml` — elite metadata (YAML)
 - `analysis/` — latest analysis (plots/tables/notebooks)
-- `analysis/summary.json` — analysis provenance and artifacts
-- `analysis/analysis_used.yaml` — analysis settings used
-- `analysis/plot_manifest.json` — plot registry and generated outputs
-- `analysis/table_manifest.json` — table registry and generated outputs
+- `analysis/meta/summary.json` — analysis provenance and artifacts
+- `analysis/meta/analysis_used.yaml` — analysis settings used
+- `analysis/meta/plot_manifest.json` — plot registry and generated outputs
+- `analysis/meta/table_manifest.json` — table registry and generated outputs
 - `analysis/_archive/<analysis_id>/` — optional archived analyses (when enabled)
-- `run_manifest.json` — provenance, hashes, optimizer stats
-- `run_status.json` — live progress updates (written during parse and sampling)
-- `report.json` + `report.md` — summary (from `cruncher report`)
+- `live/metrics.jsonl` — live sampling progress (when enabled)
+- `report/report.json` + `report/report.md` — summary (from `cruncher report`)
 
 `cruncher report` **fails** if required artifacts are missing.
 

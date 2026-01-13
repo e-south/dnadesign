@@ -18,6 +18,7 @@ from dnadesign.cruncher.config.schema_v2 import CruncherConfig
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.lockfile import LockedMotif
 from dnadesign.cruncher.utils.hashing import sha256_path
+from dnadesign.cruncher.utils.run_layout import manifest_path
 
 
 def _motif_payload(
@@ -92,13 +93,14 @@ def build_run_manifest(
 
 def write_manifest(run_dir: Path, manifest: Dict[str, Any]) -> Path:
     run_dir.mkdir(parents=True, exist_ok=True)
-    path = run_dir / "run_manifest.json"
+    path = manifest_path(run_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(manifest, indent=2))
     return path
 
 
 def load_manifest(run_dir: Path) -> Dict[str, Any]:
-    path = run_dir / "run_manifest.json"
+    path = manifest_path(run_dir)
     if not path.exists():
-        raise FileNotFoundError(f"run_manifest.json not found in {run_dir}")
+        raise FileNotFoundError(f"meta/run_manifest.json not found in {run_dir}")
     return json.loads(path.read_text())

@@ -35,6 +35,10 @@ class PWM:
     nsites: Optional[int] = None
     evalue: Optional[float] = None
     log_odds_matrix: Optional[np.ndarray] = None
+    source_length: Optional[int] = None
+    window_start: Optional[int] = None
+    window_strategy: Optional[str] = None
+    window_score: Optional[float] = None
 
     def __post_init__(self) -> None:
         matrix = np.asarray(self.matrix, dtype=float)
@@ -54,6 +58,14 @@ class PWM:
             if lom.shape != matrix.shape:
                 raise ValueError("log_odds_matrix must match PWM.matrix shape")
             object.__setattr__(self, "log_odds_matrix", lom)
+
+        if self.source_length is not None and self.source_length < self.length:
+            raise ValueError("source_length must be >= PWM length")
+        if self.window_start is not None:
+            if self.source_length is None:
+                raise ValueError("window_start requires source_length")
+            if self.window_start < 0 or (self.window_start + self.length) > self.source_length:
+                raise ValueError("window_start is out of bounds for source_length")
 
     @property
     def length(self) -> int:

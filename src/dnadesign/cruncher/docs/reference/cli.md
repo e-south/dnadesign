@@ -1,6 +1,8 @@
 ## cruncher CLI
 
 Most commands operate relative to a `config.yaml` file. You can also pass `--config/-c` globally (before the command). Some commands (notably `cruncher notebook`) operate on a run directory instead of a config.
+When using the pixi task (`pixi run cruncher -- ...`), place `-c/--config` after the subcommand because pixi inserts `--`.
+By default, CLI output renders paths relative to the workspace root to keep demos readable.
 
 ### Contents
 
@@ -31,6 +33,11 @@ Cruncher resolves the config path in this order:
 If exactly one workspace is discovered, Cruncher auto-selects it and logs a one-line note.
 If multiple are found, Cruncher prints a numbered list and shows how to select one via `--workspace` or `--config`.
 
+Relative path resolution uses the *invocation* directory when available:
+- `CRUNCHER_CWD` (explicit override)
+- `INIT_CWD` (set by pixi)
+- `PWD` / process CWD
+
 To see what is available (with stable indices), run:
 
 ```
@@ -52,7 +59,7 @@ Common tasks mapped to commands:
 * **Campaign workflows** → `cruncher campaign validate` (preflight), `cruncher campaign generate` (derived config),
   `cruncher campaign summarize` (aggregate results), `cruncher campaign notebook` (campaign summary exploration).
 * **Check target readiness** → `cruncher targets status` (and `targets candidates/stats` for deeper inspection).
-* **Inspect run artifacts** → `cruncher runs list/show/latest/watch`.
+* **Inspect run artifacts** → `cruncher runs list/show/latest/best/watch`.
 * **Quick snapshot of workspace health** → `cruncher status`.
 * **Inspect config resolution** → `cruncher config` (summary table).
 * **List available optimizers** → `cruncher optimizers list`.
@@ -316,8 +323,13 @@ Precondition:
 Notes:
 
 * `parse.plot.logo=false` skips logo rendering (still validates PWMs + writes a run manifest).
+* `cruncher parse` always uses the lockfile to pin exact motif IDs/hashes.
+  If you add new motifs (e.g., via `discover motifs`) or change `motif_store` preferences,
+  re-run `cruncher lock <config>` to refresh what parse will use.
 * When `motif_store.pwm_source=sites`, logos include a subtitle describing site provenance
-  (curated, high-throughput, or combined).
+  (combined set count, sources, and site kinds).
+* When `motif_store.pwm_source=matrix`, subtitles include the source adapter plus the
+  matrix origin (alignment/meme/streme/file).
 
 ---
 
@@ -337,6 +349,7 @@ Network:
 Example:
 
 * `cruncher sample <config>`
+* `cruncher sample --no-auto-opt <config>`
 
 Precondition:
 
@@ -346,6 +359,7 @@ Notes:
 
 * `cruncher.sample.save_sequences: true` is required for later analysis/reporting.
 * `cruncher.sample.save_trace: true` enables trace-based diagnostics.
+* Auto-opt is enabled by default: it runs short Gibbs + PT pilots, logs their diagnostics, then runs the best candidate. Use `--no-auto-opt` to disable.
 
 ---
 
@@ -357,7 +371,7 @@ Inputs:
 
 * CONFIG (explicit or resolved)
 * runs via `analysis.runs`, `--run`, or `--latest`
-* run artifacts: `sequences.parquet` (required) and `trace.nc` for trace-based plots
+* run artifacts: `artifacts/sequences.parquet` (required) and `artifacts/trace.nc` for trace-based plots
 
 Network:
 
@@ -369,29 +383,32 @@ Examples:
 * `cruncher analyze --run <run_name> <config>`
 * `cruncher analyze --tf-pair lexA,cpxR <config>`
 * `cruncher analyze --plots trace --plots score_hist <config>`
+* `cruncher analyze --scatter-background --scatter-background-samples 2000 <config>`
 * `cruncher analyze --list-plots`
 
 Preconditions:
 
 * provide runs via `analysis.runs`, `--run`, or `--latest`
-* trace-dependent plots require `trace.nc`
+* trace-dependent plots require `artifacts/trace.nc`
 
 Outputs:
 
-* tables: `analysis/tables/score_summary.csv`, `analysis/tables/elite_topk.csv`, `analysis/tables/joint_metrics.csv`
+* tables: `analysis/tables/score_summary.csv`, `analysis/tables/elite_topk.csv`, `analysis/tables/joint_metrics.csv`,
+  `analysis/tables/diagnostics.json`
 * plots: `analysis/plots/score__pairgrid.png` (when `analysis.plots.pairgrid=true`)
+* summaries: `analysis/meta/summary.json`, `analysis/meta/plot_manifest.json`, `analysis/meta/table_manifest.json`
 
 ---
 
 #### `cruncher report`
 
-Writes `report.json` and `report.md` for a sample run.
+Writes `report/report.json` and `report/report.md` for a sample run.
 
 Inputs:
 
 * CONFIG (explicit or resolved)
-* run name (sample run)
-* required artifacts: `sequences.parquet` and `trace.nc` (plus elites)
+* run name (sample run) or `--latest`
+* required artifacts: `artifacts/sequences.parquet` and `artifacts/trace.nc` (plus elites)
 
 Network:
 
@@ -399,11 +416,12 @@ Network:
 
 Example:
 
+* `cruncher report --latest <config>`
 * `cruncher report <config> <run_name>`
 
 Preconditions:
 
-* required artifacts must exist in the run directory (commonly `sequences.parquet`, `elites.parquet`, and often `trace.nc`)
+* required artifacts must exist in the run directory (commonly `artifacts/sequences.parquet`, `artifacts/elites.parquet`, and often `artifacts/trace.nc`)
 * if required artifacts are missing, reporting should fail fast rather than silently omitting sections
 
 Diagnostics note:
@@ -411,8 +429,10 @@ Diagnostics note:
 * R-hat requires at least 2 chains.
 * ESS is not meaningful with too few draws.
   When metrics cannot be computed, reports should record diagnostics warnings.
+* Reports also include a diagnostics summary (`report/report.json` → `diagnostics`) with
+  acceptance rates, mixing heuristics, and diversity warnings.
 
-Tip: if you are in a workspace with `config.yaml`, you can run `cruncher report <run_name>`
+Tip: if you are in a workspace with `config.yaml`, you can run `cruncher report --latest`
 directly (or pass `--config` when running elsewhere).
 
 ---
@@ -437,14 +457,14 @@ Notes:
 
 * requires `marimo` to be installed (for example: `uv add --group notebooks marimo`)
 * useful when you want interactive slicing/filtering beyond static plots
-* strict by default: requires `summary.json` + `plot_manifest.json` to exist and parse, and `summary.json` must include a non-empty `tf_names` list
+* strict by default: requires `analysis/meta/summary.json` + `analysis/meta/plot_manifest.json` to exist and parse, and `analysis/meta/summary.json` must include a non-empty `tf_names` list
 * pass `--lenient` to generate anyway (warnings appear in the Overview tab)
-* when `summary.json` is missing, lenient mode falls back to `analysis/` as an unindexed entry
+* when `analysis/meta/summary.json` is missing, lenient mode falls back to `analysis/` as an unindexed entry
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
 * the notebook infers `run_dir` from its location; keep it under `<run_dir>/analysis/notebooks/` or regenerate it
 * text outputs (for example, `diag__convergence.txt`) render inline in the Plots tab
-* if running in lenient mode and `summary.json` lacks `tf_names`, scatter controls are disabled with an inline warning
+* if running in lenient mode and `analysis/meta/summary.json` lacks `tf_names`, scatter controls are disabled with an inline warning
 * the notebook includes:
   * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
   * Tables tab with a Top-K slider and a per-PWM data explorer
@@ -477,7 +497,7 @@ Example:
 Inspect cached motifs and site sets.
 
 Use `catalog pwms` to compute PWMs from cached matrices or binding sites and
-survey their lengths/bit scores, and `catalog logos` to render PNG logos for the
+survey their lengths/bit scores (and any trimmed window), and `catalog logos` to render PNG logos for the
 same selection criteria.
 
 Inputs:
@@ -505,6 +525,80 @@ Examples:
 * `cruncher catalog pwms <config>`
 * `cruncher catalog pwms --set 1 <config>`
 * `cruncher catalog logos --set 1 <config>`
+
+---
+
+#### `cruncher discover`
+
+Discover motifs from cached binding sites using MEME Suite (STREME or MEME).
+
+Inputs:
+
+* CONFIG (explicit or resolved)
+
+Network:
+
+* no (local; requires MEME Suite CLI tools via PATH or tool_path/MEME_BIN)
+
+Subcommands:
+
+* `discover motifs` — run STREME/MEME per TF and ingest discovered motifs into the catalog
+* `discover check` — validate that MEME Suite tools are available and report versions
+
+Examples:
+
+* `cruncher discover motifs --set 1 <config>`
+* `cruncher discover motifs --tf lexA --tf cpxR --tool streme <config>`
+* `cruncher discover motifs --tf lexA --tf cpxR --tool meme <config>`
+* `cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops <config>`
+* `cruncher discover motifs --tf lexA --tf cpxR --tool streme --source-id meme_suite_streme <config>`
+* `cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id meme_suite_meme <config>`
+* `cruncher discover motifs --tf lexA --tool streme --replace-existing <config>`
+* `cruncher discover motifs --tool-path /opt/meme/bin --tool streme <config>`
+* `cruncher discover check <config>`
+
+Notes:
+* `tool=auto` selects STREME when there are enough sequences; use `--tool meme` if STREME is not installed.
+* Discovery reads cached binding sites (run `cruncher fetch sites` first).
+  Discovery always uses cached sites regardless of `motif_store.pwm_source`.
+* By default discovery uses raw cached site sequences. Use `--window-sites` (or
+  `motif_discovery.window_sites=true`) to pre-window with `motif_store.site_window_lengths`
+  before running MEME/STREME.
+  If enabled without window lengths for a TF, discovery exits with a helpful error.
+* If `--minw/--maxw` are omitted (and unset in config), Cruncher derives them from the min/max
+  site lengths per TF.
+* Use `cruncher targets stats` to set `--minw/--maxw` from site-length ranges.
+* If you plan to run both MEME and STREME, set distinct `motif_discovery.source_id` values between runs to avoid lock ambiguity.
+  You can also pass `--source-id` per run to avoid editing config.
+* By default discovery replaces previous discovered motifs for the same TF/source
+  (`motif_discovery.replace_existing=true`). Pass `--keep-existing` to retain historical runs.
+* `--meme-mod` applies to MEME only; use it when each sequence is expected to contain one site.
+* Use `--tool-path` or the `MEME_BIN` environment variable to point at a specific install.
+  Relative `--tool-path` values resolve from the config file location.
+* MEME Suite is a system dependency; install `streme`/`meme` via your system package manager,
+  pixi, or the official MEME Suite installer, and ensure they are discoverable.
+  If you use the repo's pixi toolchain, run `pixi run cruncher -- discover ...` so MEME is on PATH
+  (place `-c/--config` after the subcommand when using pixi tasks).
+* See [MEME Suite dependency guide](../guides/meme_suite.md) for a reproducible setup pattern.
+
+---
+
+#### `cruncher doctor`
+
+Fail-fast environment checks for external dependencies (currently MEME Suite).
+
+Inputs:
+
+* optional CONFIG (explicit or resolved)
+
+Network:
+
+* no (local)
+
+Examples:
+
+* `cruncher doctor <config>`
+* `cruncher doctor --tool streme --tool-path /opt/meme/bin <config>`
 
 ---
 
@@ -661,8 +755,9 @@ Network:
 
 * `runs list <config>` — list run folders (optionally filter by stage)
 * `runs show <config> <run>` — show manifest + artifacts
-* `runs latest <config>` — print most recent run
-* `runs watch <config> <run>` — live progress snapshot (reads `run_status.json`, optionally `live_metrics.jsonl`)
+* `runs latest <config> --set-index 1` — print most recent run for a regulator set
+* `runs best <config> --set-index 1` — print best run by `best_score` for a regulator set
+* `runs watch <config> <run>` — live progress snapshot (reads `meta/run_status.json`, optionally `live/metrics.jsonl`)
 * `runs rebuild-index <config>` — rebuild `<catalog_root>/run_index.json`
 
 Tip: inside a workspace you can drop the config argument entirely (for example,

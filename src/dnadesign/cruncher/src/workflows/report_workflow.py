@@ -16,35 +16,22 @@ from pathlib import Path
 from typing import Any, Dict
 
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig
-from dnadesign.cruncher.services.run_service import update_run_index_from_manifest
-from dnadesign.cruncher.utils.artifacts import (
-    append_artifacts,
-    artifact_entry,
-    normalize_artifacts,
-)
+from dnadesign.cruncher.services.run_service import get_run, update_run_index_from_manifest
+from dnadesign.cruncher.utils.analysis_layout import analysis_root, summary_path
+from dnadesign.cruncher.utils.artifacts import append_artifacts, artifact_entry, normalize_artifacts
+from dnadesign.cruncher.utils.diagnostics import summarize_sampling_diagnostics
 from dnadesign.cruncher.utils.elites import find_elites_parquet
 from dnadesign.cruncher.utils.hashing import sha256_path
 from dnadesign.cruncher.utils.manifest import load_manifest, write_manifest
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
 from dnadesign.cruncher.utils.parquet import read_parquet
+from dnadesign.cruncher.utils.run_layout import (
+    report_dir,
+    sequences_path,
+    trace_path,
+)
 
 logger = logging.getLogger(__name__)
-
-
-def _trace_shape(idata: Any) -> tuple[int | None, int | None]:
-    try:
-        score = idata.posterior["score"]
-    except Exception:
-        return None, None
-    sizes = getattr(score, "sizes", {}) or {}
-    chains = sizes.get("chain")
-    draws = sizes.get("draw")
-    if chains is None or draws is None:
-        shape = getattr(score, "shape", None) or ()
-        if len(shape) >= 2:
-            chains = chains or shape[0]
-            draws = draws or shape[1]
-    return chains, draws
 
 
 def _safe_metric(value: float | None, label: str, warnings: list[str]) -> float | None:
@@ -58,12 +45,8 @@ def _safe_metric(value: float | None, label: str, warnings: list[str]) -> float 
 
 def run_report(cfg: CruncherConfig, config_path: Path, run_name: str) -> None:
     ensure_mpl_cache(config_path.parent / cfg.motif_store.catalog_root)
-    import arviz as az
-
-    base_out = config_path.parent / cfg.out_dir
-    run_dir = base_out / run_name
-    if not run_dir.is_dir():
-        raise FileNotFoundError(f"Run directory not found: {run_dir}")
+    run = get_run(cfg, config_path, run_name)
+    run_dir = run.run_dir
 
     manifest = load_manifest(run_dir)
     if manifest.get("stage") != "sample":
@@ -81,13 +64,16 @@ def run_report(cfg: CruncherConfig, config_path: Path, run_name: str) -> None:
         if actual_sha != expected_sha:
             raise ValueError(f"Lockfile checksum mismatch for {lock_path}")
 
-    trace_path = run_dir / "trace.nc"
-    seq_path = run_dir / "sequences.parquet"
-    if not trace_path.exists():
-        raise FileNotFoundError(f"Missing trace.nc in {run_dir}. Re-run `cruncher sample` with sample.save_trace=true.")
+    trace_file = trace_path(run_dir)
+    seq_path = sequences_path(run_dir)
+    if not trace_file.exists():
+        raise FileNotFoundError(
+            f"Missing artifacts/trace.nc in {run_dir}. Re-run `cruncher sample` with sample.save_trace=true."
+        )
     if not seq_path.exists():
         raise FileNotFoundError(
-            f"Missing sequences.parquet in {run_dir}. Re-run `cruncher sample` with sample.save_sequences=true."
+            f"Missing artifacts/sequences.parquet in {run_dir}. "
+            "Re-run `cruncher sample` with sample.save_sequences=true."
         )
 
     elite_path = find_elites_parquet(run_dir)
@@ -95,34 +81,32 @@ def run_report(cfg: CruncherConfig, config_path: Path, run_name: str) -> None:
     seq_df = read_parquet(seq_path)
     elites_df = read_parquet(elite_path)
 
-    idata = az.from_netcdf(trace_path)
+    tf_names = [m["tf_name"] for m in manifest.get("motifs", [])]
+
+    import arviz as az
+
+    idata = az.from_netcdf(trace_file)
     warnings: list[str] = []
     rhat = None
     ess = None
-    n_chains, n_draws = _trace_shape(idata)
-    posterior = getattr(idata, "posterior", None)
-    score = posterior.get("score") if hasattr(posterior, "get") else None
-    if n_chains is None or n_draws is None or score is None:
-        warnings.append("Unable to determine trace shape; skipping R-hat/ESS.")
-    else:
-        if n_chains < 2:
-            warnings.append(f"R-hat requires at least 2 chains (got {n_chains}).")
-        else:
-            try:
-                rhat = float(az.rhat(score)["score"].item())
-            except Exception as exc:
-                warnings.append(f"R-hat computation failed: {exc}")
-        if n_draws < 4:
-            warnings.append(f"ESS requires at least 4 draws (got {n_draws}).")
-        else:
-            try:
-                ess = float(az.ess(score)["score"].item())
-            except Exception as exc:
-                warnings.append(f"ESS computation failed: {exc}")
-    rhat = _safe_metric(rhat, "R-hat", warnings)
-    ess = _safe_metric(ess, "ESS", warnings)
+    diagnostics_summary = None
+    try:
+        diagnostics_summary = summarize_sampling_diagnostics(
+            trace_idata=idata,
+            sequences_df=seq_df,
+            elites_df=elites_df,
+            tf_names=tf_names,
+            optimizer=manifest.get("optimizer", {}),
+            optimizer_stats=manifest.get("optimizer_stats", {}),
+            sample_meta=None,
+        )
+        warnings = diagnostics_summary.get("warnings", []) if isinstance(diagnostics_summary, dict) else []
+        trace_metrics = diagnostics_summary.get("metrics", {}).get("trace", {}) if diagnostics_summary else {}
+        rhat = _safe_metric(trace_metrics.get("rhat"), "R-hat", warnings)
+        ess = _safe_metric(trace_metrics.get("ess"), "ESS", warnings)
+    except Exception as exc:
+        warnings.append(f"Diagnostics summary failed: {exc}")
 
-    tf_names = [m["tf_name"] for m in manifest.get("motifs", [])]
     report: Dict[str, Any] = {
         "run": run_name,
         "run_dir": str(run_dir.resolve()),
@@ -136,20 +120,24 @@ def run_report(cfg: CruncherConfig, config_path: Path, run_name: str) -> None:
         "optimizer_stats": manifest.get("optimizer_stats", {}),
         "artifacts": manifest.get("artifacts", []),
     }
+    if diagnostics_summary:
+        report["diagnostics"] = diagnostics_summary
     if warnings:
         report["diagnostics_warnings"] = warnings
 
-    report_path = run_dir / "report.json"
+    report_root = report_dir(run_dir)
+    report_root.mkdir(parents=True, exist_ok=True)
+    report_path = report_root / "report.json"
     report_path.write_text(json.dumps(report, indent=2, allow_nan=False))
 
     latest_analysis_id = None
-    latest_analysis_dir = run_dir / "analysis"
-    summary_path = latest_analysis_dir / "summary.json"
-    if summary_path.exists():
+    latest_analysis_dir = analysis_root(run_dir)
+    summary_file = summary_path(latest_analysis_dir)
+    if summary_file.exists():
         try:
-            summary_payload = json.loads(summary_path.read_text())
+            summary_payload = json.loads(summary_file.read_text())
         except Exception as exc:
-            raise ValueError(f"Invalid analysis summary JSON at {summary_path}: {exc}") from exc
+            raise ValueError(f"Invalid analysis summary JSON at {summary_file}: {exc}") from exc
         if isinstance(summary_payload, dict):
             latest_analysis_id = summary_payload.get("analysis_id")
 
@@ -160,10 +148,7 @@ def run_report(cfg: CruncherConfig, config_path: Path, run_name: str) -> None:
             "plots",
             "tables",
             "notebooks",
-            "summary.json",
-            "analysis_used.yaml",
-            "plot_manifest.json",
-            "table_manifest.json",
+            "meta",
         }
         artifacts = normalize_artifacts(manifest.get("artifacts"))
         for item in artifacts:
@@ -190,6 +175,9 @@ def run_report(cfg: CruncherConfig, config_path: Path, run_name: str) -> None:
         f"- R-hat (score): {rhat_text}",
         f"- ESS (score): {ess_text}",
     ]
+    if diagnostics_summary:
+        diag_status = diagnostics_summary.get("status", "n/a")
+        md_lines.insert(7, f"- Diagnostics status: {diag_status}")
     if warnings:
         md_lines.extend(["", "## Diagnostics notes", ""])
         md_lines.extend([f"- {item}" for item in warnings])
@@ -208,12 +196,12 @@ def run_report(cfg: CruncherConfig, config_path: Path, run_name: str) -> None:
             "",
             "## What to look at",
             "",
-            "- Summary: analysis/summary.json",
+            "- Summary: analysis/meta/summary.json",
             "- Plots: analysis/plots/",
             "- Tables: analysis/tables/",
         ]
     )
-    md_path = run_dir / "report.md"
+    md_path = report_root / "report.md"
     md_path.write_text("\n".join(md_lines))
 
     report_artifacts = [

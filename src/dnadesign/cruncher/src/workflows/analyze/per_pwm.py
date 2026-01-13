@@ -14,6 +14,7 @@ import pandas as pd
 
 from dnadesign.cruncher.core.scoring import Scorer
 from dnadesign.cruncher.utils.parquet import read_parquet
+from dnadesign.cruncher.utils.run_layout import sequences_path
 from dnadesign.cruncher.workflows.analyze.plots.scatter_utils import encode_sequence
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ def gather_per_pwm_scores(
     Replace “first N + every_n” subsampling with “keep when per-PWM score changes by ≥ ε.”
 
     Steps:
-      1. Read sequences.parquet (must have 'chain', 'draw', 'sequence').
+      1. Read artifacts/sequences.parquet (must have 'chain', 'draw', 'sequence').
       2. Build a single Scorer(pwms, bidirectional, scale).
       3. For each chain (grouped & sorted by 'draw'):
          a. Always keep the very first draw (index 0).
@@ -42,9 +43,9 @@ def gather_per_pwm_scores(
       4. Write out all kept rows (chain, draw, score_<tf>...) → gathered_per_pwm_everyN.csv
     """
 
-    seq_path = run_dir / "sequences.parquet"
+    seq_path = sequences_path(run_dir)
     if not seq_path.exists():
-        raise FileNotFoundError(f"[gather] sequences.parquet not found in '{run_dir}'")
+        raise FileNotFoundError(f"[gather] artifacts/sequences.parquet not found in '{run_dir}'")
     if change_threshold <= 0:
         raise ValueError("gather_per_pwm_scores: change_threshold must be > 0")
 

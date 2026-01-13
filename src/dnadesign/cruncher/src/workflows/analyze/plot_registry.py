@@ -144,11 +144,11 @@ def plot_registry_rows(
                     enabled_label = "no"
         requires = []
         if "trace" in spec.requires:
-            requires.append("trace.nc")
+            requires.append("artifacts/trace.nc")
         if "tf_pair" in spec.requires:
             requires.append("tf_pair")
         if "elites" in spec.requires:
-            requires.append("elites.parquet")
+            requires.append("artifacts/elites.parquet")
         requires_label = ", ".join(requires) if requires else "-"
         if enabled is not None and "tf_pair" in spec.requires and pair_available is False and enabled_label == "yes":
             enabled_label = "missing tf_pair"

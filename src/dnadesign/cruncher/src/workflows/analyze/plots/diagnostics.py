@@ -20,6 +20,7 @@ import seaborn as sns
 import xarray as xr
 
 from dnadesign.cruncher.utils.parquet import read_parquet
+from dnadesign.cruncher.utils.run_layout import sequences_path
 
 logger = logging.getLogger(__name__)
 
@@ -304,7 +305,7 @@ def make_pair_idata(sample_dir: Path, tf_pair: tuple[str, str]) -> az.InferenceD
     """
     x_tf, y_tf = _tf_pair(tf_pair)
 
-    df = read_parquet(sample_dir / "sequences.parquet")
+    df = read_parquet(sequences_path(sample_dir))
     required = {"chain", "draw", f"score_{x_tf}", f"score_{y_tf}"}
     missing = [col for col in required if col not in df.columns]
     if missing:

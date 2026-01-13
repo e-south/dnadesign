@@ -24,11 +24,12 @@ from dnadesign.cruncher.services.campaign_service import (
     expand_campaign,
 )
 from dnadesign.cruncher.services.run_service import list_runs
-from dnadesign.cruncher.utils.analysis_layout import load_summary, resolve_analysis_dir
+from dnadesign.cruncher.utils.analysis_layout import load_summary, resolve_analysis_dir, summary_path
 from dnadesign.cruncher.utils.elites import find_elites_parquet
 from dnadesign.cruncher.utils.manifest import load_manifest
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
 from dnadesign.cruncher.utils.parquet import read_parquet
+from dnadesign.cruncher.utils.run_layout import report_dir, sequences_path
 
 logger = logging.getLogger(__name__)
 
@@ -266,7 +267,7 @@ def _summarize_run(
     reg = manifest.get("regulator_set") or {}
     tfs = reg.get("tfs") or []
     if not tfs:
-        raise ValueError(f"Run '{run_dir.name}' missing regulator_set.tfs in run_manifest.json")
+        raise ValueError(f"Run '{run_dir.name}' missing regulator_set.tfs in meta/run_manifest.json")
 
     set_key = _tf_key(tfs)
     set_index = set_index_map.get(set_key)
@@ -282,7 +283,7 @@ def _summarize_run(
         analysis_id=analysis_id,
         latest=analysis_id is None,
     )
-    summary = load_summary(analysis_dir / "summary.json", required=True)
+    summary = load_summary(summary_path(analysis_dir), required=True)
     tf_names = summary.get("tf_names") if isinstance(summary, dict) else None
     if tf_names:
         if _tf_key(tf_names) != set_key:
@@ -333,17 +334,17 @@ def _summarize_run(
 
 
 def _load_counts(run_dir: Path) -> tuple[int, int]:
-    report_path = run_dir / "report.json"
+    report_path = report_dir(run_dir) / "report.json"
     if report_path.exists():
         payload = json.loads(report_path.read_text())
         n_sequences = payload.get("n_sequences")
         n_elites = payload.get("n_elites")
         if isinstance(n_sequences, int) and isinstance(n_elites, int):
             return n_sequences, n_elites
-    seq_path = run_dir / "sequences.parquet"
+    seq_path = sequences_path(run_dir)
     elite_path = find_elites_parquet(run_dir)
     if not seq_path.exists():
-        raise FileNotFoundError(f"Missing sequences.parquet for run '{run_dir.name}'.")
+        raise FileNotFoundError(f"Missing artifacts/sequences.parquet for run '{run_dir.name}'.")
     seq_df = read_parquet(seq_path)
     if "phase" in seq_df.columns:
         seq_df = seq_df[seq_df["phase"] == "draw"].copy()

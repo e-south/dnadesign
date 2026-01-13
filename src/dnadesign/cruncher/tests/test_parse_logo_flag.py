@@ -16,6 +16,7 @@ import yaml
 
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
+from dnadesign.cruncher.utils.run_layout import logos_dir_for_run, manifest_path, out_root, status_path
 from dnadesign.cruncher.workflows.parse_workflow import run_parse
 
 
@@ -69,10 +70,20 @@ def test_parse_skips_logos_when_disabled(tmp_path: Path) -> None:
 
     run_parse(cfg, config_path)
 
-    out_dir = tmp_path / "runs"
-    parse_runs = [d for d in out_dir.iterdir() if d.is_dir() and d.name.startswith("parse_")]
+    out_dir = tmp_path / "runs" / "parse"
+    parse_runs = []
+    for child in out_dir.iterdir():
+        if not child.is_dir():
+            continue
+        if manifest_path(child).exists():
+            parse_runs.append(child)
+            continue
+        for grand in child.iterdir():
+            if grand.is_dir() and manifest_path(grand).exists():
+                parse_runs.append(grand)
     assert len(parse_runs) == 1
     parse_dir = parse_runs[0]
-    assert (parse_dir / "run_manifest.json").exists()
-    assert (parse_dir / "run_status.json").exists()
-    assert not list(parse_dir.glob("*_logo.png"))
+    assert manifest_path(parse_dir).exists()
+    assert status_path(parse_dir).exists()
+    logo_dir = logos_dir_for_run(out_root(config_path, cfg.out_dir), "parse", parse_dir.name)
+    assert not list(logo_dir.glob("*_logo.png"))

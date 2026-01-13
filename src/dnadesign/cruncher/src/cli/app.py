@@ -19,6 +19,8 @@ from dnadesign.cruncher.cli.commands.cache import app as cache_app
 from dnadesign.cruncher.cli.commands.campaign import app as campaign_app
 from dnadesign.cruncher.cli.commands.catalog import app as catalog_app
 from dnadesign.cruncher.cli.commands.config import app as config_app
+from dnadesign.cruncher.cli.commands.discover import app as discover_app
+from dnadesign.cruncher.cli.commands.doctor import doctor as doctor_cmd
 from dnadesign.cruncher.cli.commands.fetch import app as fetch_app
 from dnadesign.cruncher.cli.commands.lock import lock as lock_cmd
 from dnadesign.cruncher.cli.commands.notebook import notebook as notebook_cmd
@@ -115,6 +117,17 @@ app.add_typer(
     help="Inspect what motifs and sites are cached locally.",
     short_help="Inspect cached motifs/sites.",
 )
+app.add_typer(
+    discover_app,
+    name="discover",
+    help="Discover motifs from cached binding sites (MEME Suite).",
+    short_help="Discover motifs.",
+)
+app.command(
+    "doctor",
+    help="Check external dependencies (e.g., MEME Suite).",
+    short_help="Check dependencies.",
+)(doctor_cmd)
 app.command(
     "lock",
     help="Resolve TF names to exact cached motif IDs.",

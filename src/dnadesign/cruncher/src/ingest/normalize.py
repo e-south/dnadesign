@@ -23,6 +23,7 @@ from dnadesign.cruncher.ingest.models import (
 )
 
 logger = logging.getLogger(__name__)
+PROB_ROW_TOL = 1e-4
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -37,20 +38,26 @@ def normalize_matrix(matrix: Sequence[Sequence[float]]) -> List[List[float]]:
     return [[float(v) for v in row] for row in matrix]
 
 
-def validate_prob_matrix(matrix: Sequence[Sequence[float]]) -> None:
-    if not matrix:
+def normalize_prob_matrix(matrix: Sequence[Sequence[float]]) -> List[List[float]]:
+    norm = normalize_matrix(matrix)
+    if not norm:
         raise ValueError("matrix is empty")
-    width = len(matrix)
-    for i, row in enumerate(matrix):
+    for i, row in enumerate(norm):
         if len(row) != 4:
             raise ValueError(f"matrix row {i} length must be 4")
-        s = sum(row)
-        if abs(s - 1.0) > 1e-6:
-            raise ValueError(f"matrix row {i} must sum to 1.0 (got {s:.6f})")
         if any(v < 0 for v in row):
             raise ValueError("matrix rows must be non-negative")
-    if width < 1:
-        raise ValueError("matrix must have at least 1 row")
+        s = sum(row)
+        if s <= 0:
+            raise ValueError(f"matrix row {i} must sum to > 0 (got {s:.6f})")
+        if abs(s - 1.0) > PROB_ROW_TOL:
+            raise ValueError(f"matrix row {i} must sum to 1.0 (got {s:.6f})")
+        norm[i] = [v / s for v in row]
+    return norm
+
+
+def validate_prob_matrix(matrix: Sequence[Sequence[float]]) -> None:
+    normalize_prob_matrix(matrix)
 
 
 def normalize_site_sequence(seq: str, uppercase_only: bool) -> str:
@@ -74,12 +81,15 @@ def compute_pwm_from_sites(
     min_sites: int = 2,
     return_count: bool = False,
     strict_min_sites: bool = True,
+    pseudocounts: float = 0.5,
 ) -> List[List[float]] | tuple[List[List[float]], int]:
     if min_sites < 1:
         raise ValueError("min_sites must be >= 1")
+    if pseudocounts < 0:
+        raise ValueError("pseudocounts must be >= 0")
     length: Optional[int] = None
-    counts: List[List[int]] = []
     site_count = 0
+    sequences_clean: list[str] = []
     for seq in sequences:
         if not seq:
             continue
@@ -87,20 +97,12 @@ def compute_pwm_from_sites(
             length = len(seq)
             if length == 0:
                 raise ValueError("binding-site sequence is empty")
-            counts = [[0, 0, 0, 0] for _ in range(length)]
         if len(seq) != length:
             raise ValueError("binding-site sequences must have equal length")
         for i, ch in enumerate(seq):
             if ch not in "ACGT":
                 raise ValueError("binding-site sequence contains non-ACGT characters")
-            if ch == "A":
-                counts[i][0] += 1
-            elif ch == "C":
-                counts[i][1] += 1
-            elif ch == "G":
-                counts[i][2] += 1
-            else:
-                counts[i][3] += 1
+        sequences_clean.append(seq)
         site_count += 1
     if site_count == 0:
         raise ValueError("no sequences available to compute PWM")
@@ -109,12 +111,19 @@ def compute_pwm_from_sites(
         if strict_min_sites:
             raise ValueError(msg)
         logger.warning("%s PWM may be unreliable.", msg)
-    matrix: List[List[float]] = []
-    for row in counts:
-        total = sum(row)
-        if total == 0:
-            raise ValueError("binding-site column has no A/C/G/T bases")
-        matrix.append([row[0] / total, row[1] / total, row[2] / total, row[3] / total])
+    try:
+        from Bio import motifs
+        from Bio.Seq import Seq
+    except ImportError as exc:
+        raise ImportError(
+            "Biopython is required to build PWMs from sites. "
+            "Install with `uv add biopython` (already a project dependency)."
+        ) from exc
+
+    instances = [Seq(seq) for seq in sequences_clean]
+    motif = motifs.create(instances)
+    pwm = motif.counts.normalize(pseudocounts=pseudocounts)
+    matrix = [[float(pwm[base][idx]) for base in "ACGT"] for idx in range(motif.length)]
     if return_count:
         return matrix, site_count
     return matrix
@@ -139,9 +148,10 @@ def build_motif_record(
     tags: Optional[dict[str, str]] = None,
     background: Optional[Sequence[float]] = None,
 ) -> MotifRecord:
-    norm_matrix = normalize_matrix(matrix)
     if matrix_semantics == "probabilities":
-        validate_prob_matrix(norm_matrix)
+        norm_matrix = normalize_prob_matrix(matrix)
+    else:
+        norm_matrix = normalize_matrix(matrix)
     norm_log_odds = None
     if log_odds_matrix is not None:
         norm_log_odds = normalize_matrix(log_odds_matrix)

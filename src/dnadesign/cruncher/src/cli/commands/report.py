@@ -15,8 +15,10 @@ import typer
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     parse_config_and_value,
+    resolve_config_path,
 )
 from dnadesign.cruncher.config.load import load_config
+from dnadesign.cruncher.services.run_service import list_runs
 from rich.console import Console
 
 console = Console()
@@ -34,18 +36,30 @@ def report(
         "-c",
         help="Path to cruncher config.yaml (overrides positional CONFIG).",
     ),
+    latest: bool = typer.Option(False, "--latest", help="Use the latest sample run."),
 ) -> None:
     try:
-        config_path, run_name = parse_config_and_value(
-            args,
-            config_option,
-            value_label="RUN",
-            command_hint="cruncher report <run_name>",
-        )
+        if latest:
+            if args and len(args) > 1:
+                raise ConfigResolutionError("When using --latest, provide at most a config path.")
+            config_arg = Path(args[0]) if args else None
+            config_path = resolve_config_path(config_option or config_arg)
+            cfg = load_config(config_path)
+            runs = list_runs(cfg, config_path, stage="sample")
+            if not runs:
+                raise FileNotFoundError("No sample runs found. Run `cruncher sample` first.")
+            run_name = runs[0].name
+        else:
+            config_path, run_name = parse_config_and_value(
+                args,
+                config_option,
+                value_label="RUN",
+                command_hint="cruncher report <run_name>",
+            )
+            cfg = load_config(config_path)
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
     try:
         from dnadesign.cruncher.workflows.report_workflow import run_report
 

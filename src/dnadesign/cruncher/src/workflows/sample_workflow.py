@@ -13,13 +13,22 @@ import json
 import logging
 import uuid
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import yaml
 
-from dnadesign.cruncher.config.schema_v2 import CruncherConfig
+from dnadesign.cruncher.config.schema_v2 import (
+    AutoOptimizeConfig,
+    CoolingFixed,
+    CoolingGeometric,
+    CoolingLinear,
+    CruncherConfig,
+    SampleConfig,
+)
 from dnadesign.cruncher.core.evaluator import SequenceEvaluator
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
@@ -41,16 +50,42 @@ from dnadesign.cruncher.store.lockfile import (
 )
 from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.artifacts import artifact_entry
-from dnadesign.cruncher.utils.labels import (
-    build_run_name,
-    format_regulator_slug,
-    regulator_sets,
-)
-from dnadesign.cruncher.utils.manifest import build_run_manifest, write_manifest
+from dnadesign.cruncher.utils.diagnostics import summarize_sampling_diagnostics
+from dnadesign.cruncher.utils.elites import find_elites_parquet
+from dnadesign.cruncher.utils.labels import format_regulator_slug, regulator_sets
+from dnadesign.cruncher.utils.manifest import build_run_manifest, load_manifest, write_manifest
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
+from dnadesign.cruncher.utils.parquet import read_parquet
+from dnadesign.cruncher.utils.run_layout import (
+    build_run_dir,
+    config_used_path,
+    elites_json_path,
+    elites_path,
+    elites_yaml_path,
+    ensure_run_dirs,
+    live_metrics_path,
+    run_group_label,
+    sequences_path,
+    status_path,
+    trace_path,
+)
 from dnadesign.cruncher.utils.run_status import RunStatusWriter
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class AutoOptCandidate:
+    kind: str
+    run_dir: Path
+    best_score: float | None
+    rhat: float | None
+    ess: float | None
+    unique_fraction: float | None
+    status: str
+    quality: str
+    warnings: list[str]
+    diagnostics: dict[str, object]
 
 
 def _store(cfg: CruncherConfig, config_path: Path):
@@ -61,8 +96,11 @@ def _store(cfg: CruncherConfig, config_path: Path):
         combine_sites=cfg.motif_store.combine_sites,
         site_window_lengths=cfg.motif_store.site_window_lengths,
         site_window_center=cfg.motif_store.site_window_center,
+        pwm_window_lengths=cfg.motif_store.pwm_window_lengths,
+        pwm_window_strategy=cfg.motif_store.pwm_window_strategy,
         min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
         allow_low_sites=cfg.motif_store.allow_low_sites,
+        pseudocounts=cfg.motif_store.pseudocounts,
     )
 
 
@@ -97,13 +135,14 @@ def _save_config(
     set_index: int,
 ) -> None:
     """
-    Save the exact Pydantic-validated config into <batch_dir>/config_used.yaml,
+    Save the exact Pydantic-validated config into <batch_dir>/meta/config_used.yaml,
     plus, for each TF:
       - alphabet: ["A","C","G","T"]
       - pwm_matrix: a list of [p_A, p_C, p_G, p_T] for each position
       - consensus: consensus sequence string
     """
-    cfg_path = batch_dir / "config_used.yaml"
+    cfg_path = config_used_path(batch_dir)
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
     data = cfg.model_dump(mode="json")
 
     store = _store(cfg, config_path)
@@ -173,6 +212,441 @@ def _write_parquet_rows(
     return count
 
 
+def _default_beta_ladder(chains: int, beta_min: float, beta_max: float) -> list[float]:
+    if chains < 2:
+        raise ValueError("PT beta ladder requires at least 2 chains")
+    ladder = np.linspace(beta_min, beta_max, chains, dtype=float)
+    return [float(beta) for beta in ladder]
+
+
+def _derive_pt_beta(
+    base_cfg: SampleConfig,
+    auto_cfg: AutoOptimizeConfig,
+    *,
+    chains: int,
+) -> tuple[list[float], list[str]]:
+    notes: list[str] = []
+    if auto_cfg.pt_beta is not None:
+        if len(auto_cfg.pt_beta) != chains:
+            raise ValueError(
+                "auto_opt.pt_beta length must match sample.chains for the selected PT run "
+                f"(expected {chains}, got {len(auto_cfg.pt_beta)})"
+            )
+        return list(auto_cfg.pt_beta), notes
+    if base_cfg.optimiser.kind == "pt" and base_cfg.optimiser.cooling.kind == "geometric":
+        base_beta = list(base_cfg.optimiser.cooling.beta)
+        if len(base_beta) == chains:
+            return base_beta, notes
+        notes.append("derived PT beta ladder from base config range")
+        return _default_beta_ladder(chains, min(base_beta), max(base_beta)), notes
+    notes.append("derived PT beta ladder from auto_opt bounds")
+    return _default_beta_ladder(chains, auto_cfg.pt_beta_min, auto_cfg.pt_beta_max), notes
+
+
+def _boost_cooling(cooling: Any, factor: float) -> tuple[Any, list[str]]:
+    if factor <= 1:
+        return cooling, []
+    notes = [f"boosted cooling by ×{factor:g} for stabilization"]
+    if isinstance(cooling, CoolingLinear):
+        beta = [float(cooling.beta[0]) * factor, float(cooling.beta[1]) * factor]
+        return CoolingLinear(beta=beta), notes
+    if isinstance(cooling, CoolingFixed):
+        return CoolingFixed(beta=float(cooling.beta) * factor), notes
+    if isinstance(cooling, CoolingGeometric):
+        beta = [float(b) * factor for b in cooling.beta]
+        return CoolingGeometric(beta=beta), notes
+    return cooling, notes
+
+
+def _derive_gibbs_cooling(base_cfg: SampleConfig, auto_cfg: AutoOptimizeConfig) -> tuple[Any, list[str]]:
+    notes: list[str] = []
+    if base_cfg.optimiser.kind == "gibbs" and base_cfg.optimiser.cooling.kind != "geometric":
+        return base_cfg.optimiser.cooling, notes
+    notes.append("using auto_opt.gibbs_cooling for Gibbs pilot")
+    return auto_cfg.gibbs_cooling, notes
+
+
+def _build_pilot_sample_cfg(
+    base_cfg: SampleConfig,
+    *,
+    kind: str,
+    auto_cfg: AutoOptimizeConfig,
+    draws_factor: float = 1.0,
+    tune_factor: float = 1.0,
+    cooling_boost: float = 1.0,
+) -> tuple[SampleConfig, list[str]]:
+    notes: list[str] = []
+    pilot = base_cfg.model_copy(deep=True)
+    pilot.draws = max(4, int(round(auto_cfg.pilot_draws * draws_factor)))
+    pilot.tune = max(0, int(round(auto_cfg.pilot_tune * tune_factor)))
+    if base_cfg.draws != pilot.draws or base_cfg.tune != pilot.tune:
+        notes.append("overrode draws/tune for pilot sweeps")
+    pilot.save_trace = True
+    if not base_cfg.save_trace:
+        notes.append("enabled save_trace for pilot diagnostics")
+    pilot.save_sequences = True
+    if not base_cfg.save_sequences:
+        notes.append("enabled save_sequences for pilot diagnostics")
+    pilot.record_tune = False
+    if base_cfg.record_tune:
+        notes.append("disabled record_tune for pilot sweeps")
+    pilot.progress_bar = auto_cfg.pilot_progress_bar
+    pilot.progress_every = auto_cfg.pilot_progress_every
+    if base_cfg.progress_bar != pilot.progress_bar or base_cfg.progress_every != pilot.progress_every:
+        notes.append("adjusted progress output for pilots")
+
+    if kind == "gibbs":
+        pilot.chains = auto_cfg.pilot_chains_gibbs
+        if base_cfg.chains != pilot.chains:
+            notes.append("overrode chains for Gibbs pilot")
+        pilot.optimiser.kind = "gibbs"
+        cooling, cooling_notes = _derive_gibbs_cooling(base_cfg, auto_cfg)
+        cooling, boost_notes = _boost_cooling(cooling, cooling_boost)
+        pilot.optimiser.cooling = cooling
+        notes.extend(cooling_notes + boost_notes)
+        return pilot, notes
+
+    if kind == "pt":
+        pilot.optimiser.kind = "pt"
+        beta, beta_notes = _derive_pt_beta(base_cfg, auto_cfg, chains=auto_cfg.pilot_chains_pt)
+        pilot.chains = len(beta)
+        if base_cfg.chains != pilot.chains:
+            notes.append("overrode chains for PT pilot")
+        cooling, boost_notes = _boost_cooling(CoolingGeometric(beta=beta), cooling_boost)
+        pilot.optimiser.cooling = cooling
+        notes.extend(beta_notes + boost_notes)
+        return pilot, notes
+
+    raise ValueError(f"Unknown auto-opt candidate kind '{kind}'")
+
+
+def _build_final_sample_cfg(
+    base_cfg: SampleConfig,
+    *,
+    kind: str,
+    auto_cfg: AutoOptimizeConfig,
+) -> tuple[SampleConfig, list[str]]:
+    notes: list[str] = []
+    final_cfg = base_cfg.model_copy(deep=True)
+
+    if kind == "gibbs":
+        final_cfg.optimiser.kind = "gibbs"
+        if base_cfg.optimiser.kind != "gibbs":
+            cooling, cooling_notes = _derive_gibbs_cooling(base_cfg, auto_cfg)
+            final_cfg.optimiser.cooling = cooling
+            notes.extend(cooling_notes)
+        return final_cfg, notes
+
+    if kind == "pt":
+        if final_cfg.chains < 2:
+            raise ValueError("PT requires sample.chains >= 2 for the final run.")
+        final_cfg.optimiser.kind = "pt"
+        beta, beta_notes = _derive_pt_beta(base_cfg, auto_cfg, chains=final_cfg.chains)
+        final_cfg.optimiser.cooling = CoolingGeometric(beta=beta)
+        notes.extend(beta_notes)
+        return final_cfg, notes
+
+    raise ValueError(f"Unknown auto-opt candidate kind '{kind}'")
+
+
+def _assess_candidate_quality(candidate: AutoOptCandidate, auto_cfg: AutoOptimizeConfig) -> list[str]:
+    notes: list[str] = []
+    if candidate.status == "fail":
+        candidate.quality = "fail"
+        return notes
+    if candidate.rhat is None or candidate.ess is None or candidate.unique_fraction is None:
+        candidate.quality = "fail"
+        notes.append("missing pilot metrics required for auto-opt thresholds")
+        return notes
+    quality = "ok"
+    if candidate.rhat > auto_cfg.max_rhat:
+        quality = "warn"
+        notes.append(f"rhat={candidate.rhat:.3f} exceeds auto_opt.max_rhat={auto_cfg.max_rhat:.3f}")
+    if candidate.ess < auto_cfg.min_ess:
+        quality = "warn"
+        notes.append(f"ess={candidate.ess:.1f} below auto_opt.min_ess={auto_cfg.min_ess:.1f}")
+    if candidate.unique_fraction < auto_cfg.min_unique_fraction:
+        quality = "warn"
+        notes.append(
+            (
+                f"unique_fraction={candidate.unique_fraction:.2f} below "
+                f"auto_opt.min_unique_fraction={auto_cfg.min_unique_fraction:.2f}"
+            )
+        )
+    if auto_cfg.max_unique_fraction is not None and candidate.unique_fraction > auto_cfg.max_unique_fraction:
+        quality = "warn"
+        notes.append(
+            (
+                f"unique_fraction={candidate.unique_fraction:.2f} above "
+                f"auto_opt.max_unique_fraction={auto_cfg.max_unique_fraction:.2f}"
+            )
+        )
+    candidate.quality = quality
+    return notes
+
+
+def _run_auto_optimize_for_set(
+    cfg: CruncherConfig,
+    config_path: Path,
+    *,
+    set_index: int,
+    tfs: list[str],
+    lockmap: dict[str, object],
+    sample_cfg: SampleConfig,
+    auto_cfg: AutoOptimizeConfig,
+) -> Path:
+    logger.info("Auto-optimize enabled: running pilot sweeps (gibbs + pt).")
+
+    def _run_pilots(
+        *,
+        label: str,
+        draws_factor: float,
+        tune_factor: float,
+        cooling_boost: float,
+    ) -> list[AutoOptCandidate]:
+        pilot_candidates: list[AutoOptCandidate] = []
+        for kind in ("gibbs", "pt"):
+            pilot_cfg, notes = _build_pilot_sample_cfg(
+                sample_cfg,
+                kind=kind,
+                auto_cfg=auto_cfg,
+                draws_factor=draws_factor,
+                tune_factor=tune_factor,
+                cooling_boost=cooling_boost,
+            )
+            if notes:
+                logger.info("Auto-opt %s %s overrides: %s", label, kind, "; ".join(notes))
+            pilot_meta = {
+                "mode": "pilot",
+                "attempt": label,
+                "candidate": kind,
+                "draws": pilot_cfg.draws,
+                "tune": pilot_cfg.tune,
+                "chains": pilot_cfg.chains,
+                "cooling_boost": cooling_boost,
+            }
+            pilot_run_dir = _run_sample_for_set(
+                cfg,
+                config_path,
+                set_index=set_index,
+                tfs=tfs,
+                lockmap=lockmap,
+                sample_cfg=pilot_cfg,
+                stage="pilot",
+                run_kind=f"auto_opt_{label}_{kind}",
+                auto_opt_meta=pilot_meta,
+            )
+            try:
+                candidate = _evaluate_pilot_run(pilot_run_dir, kind)
+            except Exception as exc:
+                logger.warning("Auto-opt %s %s failed: %s", label, kind, exc)
+                candidate = AutoOptCandidate(
+                    kind=kind,
+                    run_dir=pilot_run_dir,
+                    best_score=None,
+                    rhat=None,
+                    ess=None,
+                    unique_fraction=None,
+                    status="fail",
+                    quality="fail",
+                    warnings=[str(exc)],
+                    diagnostics={},
+                )
+            pilot_candidates.append(candidate)
+        return pilot_candidates
+
+    candidates = _run_pilots(label="pilot", draws_factor=1.0, tune_factor=1.0, cooling_boost=1.0)
+
+    def _log_candidate(candidate: AutoOptCandidate, *, label: str) -> None:
+        logger.info(
+            "Auto-opt %s %s: status=%s quality=%s best_score=%s rhat=%s ess=%s unique_fraction=%s",
+            label,
+            candidate.kind,
+            candidate.status,
+            candidate.quality,
+            f"{candidate.best_score:.3f}" if candidate.best_score is not None else "n/a",
+            f"{candidate.rhat:.3f}" if candidate.rhat is not None else "n/a",
+            f"{candidate.ess:.1f}" if candidate.ess is not None else "n/a",
+            f"{candidate.unique_fraction:.2f}" if candidate.unique_fraction is not None else "n/a",
+        )
+        if candidate.warnings:
+            logger.warning("Auto-opt %s %s warnings: %s", label, candidate.kind, "; ".join(candidate.warnings))
+
+    for candidate in candidates:
+        candidate_notes = _assess_candidate_quality(candidate, auto_cfg)
+        if candidate_notes:
+            candidate.warnings.extend(candidate_notes)
+        _log_candidate(candidate, label="pilot")
+
+    ok_candidates = [candidate for candidate in candidates if candidate.quality == "ok"]
+    if not ok_candidates and auto_cfg.retry_on_warn:
+        logger.info(
+            "Auto-optimize: no pilot met thresholds; retrying with cooler schedule (boost=%sx).",
+            auto_cfg.cooling_boost,
+        )
+        retry_candidates = _run_pilots(
+            label="retry",
+            draws_factor=auto_cfg.retry_draws_factor,
+            tune_factor=auto_cfg.retry_tune_factor,
+            cooling_boost=auto_cfg.cooling_boost,
+        )
+        for candidate in retry_candidates:
+            candidate_notes = _assess_candidate_quality(candidate, auto_cfg)
+            if candidate_notes:
+                candidate.warnings.extend(candidate_notes)
+            _log_candidate(candidate, label="retry")
+        candidates.extend(retry_candidates)
+        ok_candidates = [candidate for candidate in candidates if candidate.quality == "ok"]
+
+    if not ok_candidates:
+        summary = ", ".join(f"{c.kind}:{c.quality}" for c in candidates)
+        raise ValueError(
+            "Auto-optimize failed: no pilot candidate met quality thresholds. "
+            f"Candidates={summary}. Adjust auto_opt thresholds or cooling."
+        )
+
+    winner = _select_auto_opt_candidate(ok_candidates)
+    logger.info(
+        "Auto-optimize selected %s (best_score=%s, rhat=%s, ess=%s, unique_fraction=%s).",
+        winner.kind,
+        f"{winner.best_score:.3f}" if winner.best_score is not None else "n/a",
+        f"{winner.rhat:.3f}" if winner.rhat is not None else "n/a",
+        f"{winner.ess:.1f}" if winner.ess is not None else "n/a",
+        f"{winner.unique_fraction:.2f}" if winner.unique_fraction is not None else "n/a",
+    )
+
+    final_cfg, notes = _build_final_sample_cfg(sample_cfg, kind=winner.kind, auto_cfg=auto_cfg)
+    if notes:
+        logger.info("Auto-opt final overrides: %s", "; ".join(notes))
+
+    decision_payload = {
+        "mode": "final",
+        "selected": winner.kind,
+        "thresholds": {
+            "max_rhat": auto_cfg.max_rhat,
+            "min_ess": auto_cfg.min_ess,
+            "min_unique_fraction": auto_cfg.min_unique_fraction,
+            "max_unique_fraction": auto_cfg.max_unique_fraction,
+        },
+        "candidates": [
+            {
+                "kind": candidate.kind,
+                "run": candidate.run_dir.name,
+                "status": candidate.status,
+                "quality": candidate.quality,
+                "best_score": candidate.best_score,
+                "rhat": candidate.rhat,
+                "ess": candidate.ess,
+                "unique_fraction": candidate.unique_fraction,
+            }
+            for candidate in candidates
+        ],
+    }
+    return _run_sample_for_set(
+        cfg,
+        config_path,
+        set_index=set_index,
+        tfs=tfs,
+        lockmap=lockmap,
+        sample_cfg=final_cfg,
+        stage="sample",
+        run_kind="auto_opt_final",
+        auto_opt_meta=decision_payload,
+    )
+
+
+def _evaluate_pilot_run(run_dir: Path, kind: str) -> AutoOptCandidate:
+    manifest = load_manifest(run_dir)
+    status_payload = json.loads(status_path(run_dir).read_text()) if status_path(run_dir).exists() else {}
+    best_score = status_payload.get("best_score")
+    trace_file = trace_path(run_dir)
+    seq_path = sequences_path(run_dir)
+    if not trace_file.exists():
+        raise FileNotFoundError(f"Missing trace.nc in {run_dir}")
+    if not seq_path.exists():
+        raise FileNotFoundError(f"Missing sequences.parquet in {run_dir}")
+    elite_path = find_elites_parquet(run_dir)
+    seq_df = read_parquet(seq_path)
+    elites_df = read_parquet(elite_path)
+    tf_names = [m["tf_name"] for m in manifest.get("motifs", [])]
+
+    import arviz as az
+
+    trace_idata = az.from_netcdf(trace_file)
+    diagnostics = summarize_sampling_diagnostics(
+        trace_idata=trace_idata,
+        sequences_df=seq_df,
+        elites_df=elites_df,
+        tf_names=tf_names,
+        optimizer=manifest.get("optimizer", {}),
+        optimizer_stats=manifest.get("optimizer_stats", {}),
+        sample_meta=None,
+    )
+    metrics = diagnostics.get("metrics", {}) if isinstance(diagnostics, dict) else {}
+    trace_metrics = metrics.get("trace", {})
+    seq_metrics = metrics.get("sequences", {})
+    rhat = trace_metrics.get("rhat")
+    ess = trace_metrics.get("ess")
+    unique_fraction = seq_metrics.get("unique_fraction")
+    status = diagnostics.get("status", "warn") if isinstance(diagnostics, dict) else "warn"
+    warnings = diagnostics.get("warnings", []) if isinstance(diagnostics, dict) else []
+
+    missing = []
+    if best_score is None:
+        warnings = list(warnings)
+        warnings.append("Missing pilot metric: best_score")
+    if rhat is None:
+        missing.append("rhat")
+    if ess is None:
+        missing.append("ess")
+    if unique_fraction is None:
+        missing.append("unique_fraction")
+    if missing:
+        warnings = list(warnings)
+        warnings.append(f"Missing pilot metrics: {', '.join(missing)}")
+        status = "fail"
+
+    return AutoOptCandidate(
+        kind=kind,
+        run_dir=run_dir,
+        best_score=best_score,
+        rhat=rhat,
+        ess=ess,
+        unique_fraction=unique_fraction,
+        status=status,
+        quality=status,
+        warnings=warnings,
+        diagnostics=diagnostics if isinstance(diagnostics, dict) else {},
+    )
+
+
+def _select_auto_opt_candidate(candidates: list[AutoOptCandidate]) -> AutoOptCandidate:
+    if not candidates:
+        raise ValueError("Auto-optimize did not produce any pilot candidates")
+
+    ranked: list[tuple[tuple[float, float, float, float, float], AutoOptCandidate]] = []
+    status_rank = {"ok": 2, "warn": 1, "fail": 0}
+    for candidate in candidates:
+        score = candidate.best_score if candidate.best_score is not None else float("-inf")
+        ess = candidate.ess if candidate.ess is not None else float("-inf")
+        uniq = candidate.unique_fraction if candidate.unique_fraction is not None else float("-inf")
+        rhat = candidate.rhat
+        rhat_score = -abs(rhat - 1.0) if rhat is not None else float("-inf")
+        rank = (
+            float(status_rank.get(candidate.quality, status_rank.get(candidate.status, 0))),
+            float(score),
+            float(ess),
+            float(uniq),
+            float(rhat_score),
+        )
+        ranked.append((rank, candidate))
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    winner = ranked[0][1]
+    if winner.status == "fail":
+        raise ValueError("Auto-optimize failed: all pilot candidates reported missing diagnostics.")
+    return winner
+
+
 def _run_sample_for_set(
     cfg: CruncherConfig,
     config_path: Path,
@@ -180,31 +654,40 @@ def _run_sample_for_set(
     set_index: int,
     tfs: list[str],
     lockmap: dict[str, object],
-) -> None:
+    sample_cfg: SampleConfig,
+    stage: str = "sample",
+    run_kind: str | None = None,
+    auto_opt_meta: dict[str, object] | None = None,
+) -> Path:
     """
-    Run MCMC sampler, save enriched config, trace.nc, sequences.parquet (including per-TF scores),
-    and elites.json. Each chain gets its own independent seed (random/consensus/consensus_mix).
+    Run MCMC sampler, save config/meta plus artifacts (trace.nc, sequences.parquet, elites.*).
+    Each chain gets its own independent seed (random/consensus/consensus_mix).
     """
-    if cfg.sample is None:
-        raise ValueError("sample section is required for sample")
-    sample_cfg = cfg.sample
     base_out = config_path.parent / Path(cfg.out_dir)
     base_out.mkdir(parents=True, exist_ok=True)
-    out_dir = base_out / build_run_name("sample", tfs, set_index=set_index)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    logger.info("=== RUN SAMPLE: %s ===", out_dir)
+    out_dir = build_run_dir(
+        config_path=config_path,
+        out_dir=cfg.out_dir,
+        stage=stage,
+        tfs=tfs,
+        set_index=set_index,
+    )
+    ensure_run_dirs(out_dir, meta=True, artifacts=True, live=sample_cfg.live_metrics)
+    logger.info("=== RUN %s: %s ===", stage.upper(), out_dir)
     logger.debug("Full sample config: %s", sample_cfg.model_dump_json())
 
-    metrics_path = out_dir / "live_metrics.jsonl" if sample_cfg.live_metrics else None
+    metrics_path = live_metrics_path(out_dir) if sample_cfg.live_metrics else None
     status_writer = RunStatusWriter(
-        path=out_dir / "run_status.json",
-        stage="sample",
+        path=status_path(out_dir),
+        stage=stage,
         run_dir=out_dir,
         metrics_path=metrics_path,
         payload={
             "config_path": str(config_path.resolve()),
             "status_message": "initializing",
             "regulator_set": {"index": set_index, "tfs": tfs},
+            "run_kind": run_kind,
+            "auto_opt": auto_opt_meta,
         },
     )
     update_run_index_from_status(
@@ -241,10 +724,10 @@ def _run_sample_for_set(
             )
 
     max_w = max(pwm.length for pwm in pwms.values())
-    if cfg.sample.init.length < max_w:
+    if sample_cfg.init.length < max_w:
         names = ", ".join(f"{tf}:{pwms[tf].length}" for tf in sorted(pwms))
         raise ValueError(
-            f"init.length={cfg.sample.init.length} is shorter than the widest PWM (max={max_w}). "
+            f"init.length={sample_cfg.init.length} is shorter than the widest PWM (max={max_w}). "
             f"Per-TF lengths: {names}. Increase sample.init.length."
         )
 
@@ -335,6 +818,13 @@ def _run_sample_for_set(
     except Exception as exc:  # pragma: no cover - ensures run status is updated on failure
         status_writer.finish(status="failed", error=str(exc))
         raise
+    if status_writer is not None and hasattr(optimizer, "best_score"):
+        best_meta = getattr(optimizer, "best_meta", None)
+        status_writer.update(
+            best_score=getattr(optimizer, "best_score", None),
+            best_chain=(best_meta[0] + 1) if best_meta else None,
+            best_draw=(best_meta[1]) if best_meta else None,
+        )
     logger.info("MCMC sampling complete.")
     status_writer.update(status_message="sampling complete")
     status_writer.update(status_message="saving_artifacts")
@@ -344,11 +834,11 @@ def _run_sample_for_set(
 
     artifacts: list[dict[str, object]] = [
         artifact_entry(
-            out_dir / "config_used.yaml",
+            config_used_path(out_dir),
             out_dir,
             kind="config",
             label="Resolved config (config_used.yaml)",
-            stage="sample",
+            stage=stage,
         )
     ]
 
@@ -356,17 +846,17 @@ def _run_sample_for_set(
     if sample_cfg.save_trace and hasattr(optimizer, "trace_idata") and optimizer.trace_idata is not None:
         from dnadesign.cruncher.utils.traces import save_trace
 
-        save_trace(optimizer.trace_idata, out_dir / "trace.nc")
+        save_trace(optimizer.trace_idata, trace_path(out_dir))
         artifacts.append(
             artifact_entry(
-                out_dir / "trace.nc",
+                trace_path(out_dir),
                 out_dir,
                 kind="trace",
                 label="Trace (NetCDF)",
-                stage="sample",
+                stage=stage,
             )
         )
-        logger.info("Saved MCMC trace → %s", (out_dir / "trace.nc").relative_to(out_dir.parent))
+        logger.info("Saved MCMC trace → %s", trace_path(out_dir).relative_to(out_dir.parent))
     elif not sample_cfg.save_trace:
         logger.info("Skipping trace.nc (sample.save_trace=false)")
 
@@ -377,7 +867,7 @@ def _run_sample_for_set(
         and hasattr(optimizer, "all_meta")
         and hasattr(optimizer, "all_scores")
     ):
-        seq_parquet = out_dir / "sequences.parquet"
+        seq_parquet = sequences_path(out_dir)
         tf_order = sorted(tfs)
 
         def _sequence_rows() -> Iterable[dict[str, object]]:
@@ -408,7 +898,7 @@ def _run_sample_for_set(
                 out_dir,
                 kind="table",
                 label="Sequences with per-TF scores (Parquet)",
-                stage="sample",
+                stage=stage,
             )
         )
         logger.info(
@@ -418,8 +908,8 @@ def _run_sample_for_set(
 
     # 9)  BUILD elites list — keep draws whose ∑ normalised ≥ pwm_sum_threshold
     #     + enforce a per-sequence Hamming-distance diversity filter
-    thr_norm: float = cfg.sample.pwm_sum_threshold  # e.g. 1.50
-    min_dist: int = cfg.sample.min_dist  # e.g. 1
+    thr_norm: float = sample_cfg.pwm_sum_threshold  # e.g. 1.50
+    min_dist: int = sample_cfg.min_dist  # e.g. 1
     raw_elites: list[tuple[np.ndarray, int, int, float, dict[str, float]]] = []
     norm_sums: list[float] = []  # diagnostics only
 
@@ -487,7 +977,7 @@ def _run_sample_for_set(
 
     # serialise elites
     elites: list[dict[str, object]] = []
-    want_cons = bool(getattr(cfg.sample, "include_consensus_in_elites", False))
+    want_cons = bool(getattr(sample_cfg, "include_consensus_in_elites", False))
 
     for rank, (seq_arr, chain_id, draw_idx, total_norm, per_tf_map) in enumerate(kept_elites, 1):
         seq_str = SequenceState(seq_arr).to_string()
@@ -542,7 +1032,7 @@ def _run_sample_for_set(
     tf_label = format_regulator_slug(tfs)
 
     # 1)  parquet payload ----------------------------------------------------
-    parquet_path = out_dir / "elites.parquet"
+    parquet_path = elites_path(out_dir)
 
     def _elite_rows() -> Iterable[dict[str, object]]:
         for entry in elites:
@@ -557,7 +1047,7 @@ def _run_sample_for_set(
     _write_parquet_rows(parquet_path, _elite_rows(), chunk_size=2000)
     logger.info("Saved elites Parquet → %s", parquet_path.relative_to(out_dir.parent))
 
-    json_path = out_dir / "elites.json"
+    json_path = elites_json_path(out_dir)
     json_path.write_text(json.dumps(elites, indent=2))
     logger.info("Saved elites JSON → %s", json_path.relative_to(out_dir.parent))
 
@@ -568,12 +1058,12 @@ def _run_sample_for_set(
         "threshold_norm_sum": thr_norm,
         "min_hamming_dist": min_dist,
         "tf_label": tf_label,
-        "sequence_length": cfg.sample.init.length,
+        "sequence_length": sample_cfg.init.length,
         #  you can inline the full cfg if you prefer – this keeps it concise
-        "config_file": str((out_dir / "config_used.yaml").resolve()),
+        "config_file": str(config_used_path(out_dir).resolve()),
         "regulator_set": {"index": set_index, "tfs": tfs},
     }
-    yaml_path = out_dir / "elites.yaml"
+    yaml_path = elites_yaml_path(out_dir)
     with yaml_path.open("w") as fh:
         yaml.safe_dump(meta, fh, sort_keys=False)
     logger.info("Saved metadata → %s", yaml_path.relative_to(out_dir.parent))
@@ -585,21 +1075,21 @@ def _run_sample_for_set(
                 out_dir,
                 kind="table",
                 label="Elite sequences (Parquet)",
-                stage="sample",
+                stage=stage,
             ),
             artifact_entry(
                 json_path,
                 out_dir,
                 kind="json",
                 label="Elite sequences (JSON)",
-                stage="sample",
+                stage=stage,
             ),
             artifact_entry(
                 yaml_path,
                 out_dir,
                 kind="metadata",
                 label="Elite metadata (YAML)",
-                stage="sample",
+                stage=stage,
             ),
         ]
     )
@@ -610,7 +1100,7 @@ def _run_sample_for_set(
     lock_root = catalog_root / "locks"
     lock_path = lock_root / f"{config_path.stem}.lock.json"
     manifest = build_run_manifest(
-        stage="sample",
+        stage=stage,
         cfg=cfg,
         config_path=config_path,
         lock_path=lock_path,
@@ -625,6 +1115,9 @@ def _run_sample_for_set(
             "record_tune": sample_cfg.record_tune,
             "save_trace": sample_cfg.save_trace,
             "regulator_set": {"index": set_index, "tfs": tfs},
+            "run_group": run_group_label(tfs, set_index),
+            "run_kind": run_kind,
+            "auto_opt": auto_opt_meta,
             "optimizer": {
                 "kind": sample_cfg.optimiser.kind,
                 "scorer_scale": sample_cfg.optimiser.scorer_scale,
@@ -649,18 +1142,35 @@ def _run_sample_for_set(
         status_writer.payload,
         catalog_root=cfg.motif_store.catalog_root,
     )
+    return out_dir
 
 
-def run_sample(cfg: CruncherConfig, config_path: Path) -> None:
+def run_sample(
+    cfg: CruncherConfig,
+    config_path: Path,
+    *,
+    auto_opt_override: bool | None = None,
+) -> None:
     """
-    Run MCMC sampler, save enriched config, trace.nc, sequences.parquet (including per-TF scores),
-    and elites.json. Each regulator set is sampled independently for clear provenance.
+    Run MCMC sampler, save config/meta plus artifacts (trace.nc, sequences.parquet, elites.*).
+    Each regulator set is sampled independently for clear provenance.
     """
     if cfg.sample is None:
         raise ValueError("sample section is required for sample")
     ensure_mpl_cache(config_path.parent / cfg.motif_store.catalog_root)
     lockmap = _lockmap_for(cfg, config_path)
     statuses = target_statuses(cfg=cfg, config_path=config_path)
+    sample_cfg = cfg.sample
+    auto_cfg = sample_cfg.auto_opt
+    if auto_opt_override is not None:
+        if auto_opt_override:
+            if auto_cfg is None:
+                auto_cfg = AutoOptimizeConfig()
+            else:
+                auto_cfg = auto_cfg.model_copy(update={"enabled": True})
+        else:
+            auto_cfg = None
+    use_auto_opt = auto_cfg is not None and auto_cfg.enabled
     for set_index, group in enumerate(regulator_sets(cfg.regulator_sets), start=1):
         if not group:
             raise ValueError(f"regulator_sets[{set_index}] is empty.")
@@ -673,4 +1183,22 @@ def run_sample(cfg: CruncherConfig, config_path: Path) -> None:
                 f"Target readiness failed for set {set_index} ({details}). "
                 f"Run `cruncher targets status {config_path.name}` for details."
             )
-        _run_sample_for_set(cfg, config_path, set_index=set_index, tfs=tfs, lockmap=lockmap)
+        if use_auto_opt:
+            _run_auto_optimize_for_set(
+                cfg,
+                config_path,
+                set_index=set_index,
+                tfs=tfs,
+                lockmap=lockmap,
+                sample_cfg=sample_cfg,
+                auto_cfg=auto_cfg,
+            )
+        else:
+            _run_sample_for_set(
+                cfg,
+                config_path,
+                set_index=set_index,
+                tfs=tfs,
+                lockmap=lockmap,
+                sample_cfg=sample_cfg,
+            )

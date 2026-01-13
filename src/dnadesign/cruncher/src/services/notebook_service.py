@@ -14,7 +14,11 @@ from pathlib import Path
 from typing import Optional
 
 from dnadesign.cruncher.services.run_service import update_run_index_from_manifest
-from dnadesign.cruncher.utils.analysis_layout import resolve_analysis_dir
+from dnadesign.cruncher.utils.analysis_layout import (
+    plot_manifest_path,
+    resolve_analysis_dir,
+    summary_path,
+)
 from dnadesign.cruncher.utils.artifacts import (
     append_artifacts,
     artifact_entry,
@@ -42,22 +46,22 @@ def _read_json(path: Path, label: str) -> object:
 
 
 def _validate_notebook_inputs(analysis_dir: Path) -> None:
-    summary_path = analysis_dir / "summary.json"
-    plot_manifest_path = analysis_dir / "plot_manifest.json"
-    missing = [path for path in (summary_path, plot_manifest_path) if not path.exists()]
+    summary_file = summary_path(analysis_dir)
+    plot_manifest_file = plot_manifest_path(analysis_dir)
+    missing = [path for path in (summary_file, plot_manifest_file) if not path.exists()]
     if missing:
         missing_blob = ", ".join(str(path) for path in missing)
         raise FileNotFoundError(
             f"Missing analysis artifacts required for the notebook: {missing_blob}. "
             "Run `cruncher analyze <config>` to regenerate."
         )
-    summary = _read_json(summary_path, "summary.json")
+    summary = _read_json(summary_file, "summary.json")
     if not isinstance(summary, dict):
         raise ValueError("summary.json must be a JSON object.")
     tf_names = summary.get("tf_names")
     if not isinstance(tf_names, list) or not tf_names:
         raise ValueError("summary.json must include a non-empty 'tf_names' list.")
-    plot_manifest = _read_json(plot_manifest_path, "plot_manifest.json")
+    plot_manifest = _read_json(plot_manifest_file, "plot_manifest.json")
     if not isinstance(plot_manifest, dict):
         raise ValueError("plot_manifest.json must be a JSON object.")
     plots = plot_manifest.get("plots")
@@ -234,24 +238,29 @@ def _(analysis_picker, mo, refresh_button):
 
 @app.cell
 def _(analysis_entries, analysis_picker, _load_json, Path):
+    from dnadesign.cruncher.utils.analysis_layout import summary_path as analysis_summary_path
+
     selected = analysis_picker.value or ""
     entry = next((item for item in analysis_entries if item.get("label") == selected), None)
     analysis_id = entry.get("id") if entry else ""
     analysis_dir = Path(entry.get("path")) if entry else Path()
     entry_warnings = entry.get("warnings", []) if entry else []
-    summary_path = analysis_dir / "summary.json"
-    summary, summary_error = _load_json(summary_path, default={{}})
+    summary_file = analysis_summary_path(analysis_dir)
+    summary, summary_error = _load_json(summary_file, default={{}})
     tf_names = summary.get("tf_names", []) if isinstance(summary, dict) else []
-    return analysis_id, analysis_dir, summary, summary_path, tf_names, summary_error, entry_warnings
+    return analysis_id, analysis_dir, summary, summary_file, tf_names, summary_error, entry_warnings
 
 
 @app.cell
 def _(analysis_dir, _load_json, run_dir):
-    manifest_path = run_dir / "run_manifest.json"
+    from dnadesign.cruncher.utils.analysis_layout import plot_manifest_path as analysis_plot_manifest_path
+    from dnadesign.cruncher.utils.run_layout import manifest_path as run_manifest_path
+
+    manifest_path = run_manifest_path(run_dir)
     manifest, manifest_error = _load_json(manifest_path, default={{}})
-    plot_manifest_path = analysis_dir / "plot_manifest.json"
-    plot_manifest, plot_manifest_error = _load_json(plot_manifest_path, default={{"plots": []}})
-    return manifest, manifest_path, plot_manifest, plot_manifest_path, manifest_error, plot_manifest_error
+    plot_manifest_file = analysis_plot_manifest_path(analysis_dir)
+    plot_manifest, plot_manifest_error = _load_json(plot_manifest_file, default={{"plots": []}})
+    return manifest, manifest_path, plot_manifest, plot_manifest_file, manifest_error, plot_manifest_error
 
 
 @app.cell

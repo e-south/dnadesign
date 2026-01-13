@@ -32,6 +32,8 @@ DEFAULT_METRICS_FIELDS = (
     "progress_pct",
     "beta",
     "current_score",
+    "score_mean",
+    "score_std",
     "best_score",
     "best_chain",
     "best_draw",
@@ -98,6 +100,8 @@ def _should_emit_metrics(fields: Dict[str, Any]) -> bool:
     tracked = {
         "progress_pct",
         "current_score",
+        "score_mean",
+        "score_std",
         "best_score",
         "acceptance_rate",
         "swap_rate",

@@ -12,6 +12,7 @@ import json
 import pytest
 
 from dnadesign.cruncher.services import notebook_service
+from dnadesign.cruncher.utils.run_layout import manifest_path
 
 
 def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
@@ -19,9 +20,13 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     analysis_id = "20250101T000000Z_test"
     analysis_dir = run_dir / "analysis"
     analysis_dir.mkdir(parents=True)
-    (run_dir / "run_manifest.json").write_text(json.dumps({"artifacts": [], "config_path": ""}))
-    (analysis_dir / "summary.json").write_text(json.dumps({"tf_names": ["LexA"], "analysis_id": analysis_id}))
-    (analysis_dir / "plot_manifest.json").write_text(json.dumps({"plots": []}))
+    meta_dir = analysis_dir / "meta"
+    meta_dir.mkdir(parents=True)
+    manifest_file = manifest_path(run_dir)
+    manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
+    (meta_dir / "summary.json").write_text(json.dumps({"tf_names": ["LexA"], "analysis_id": analysis_id}))
+    (meta_dir / "plot_manifest.json").write_text(json.dumps({"plots": []}))
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
@@ -45,7 +50,9 @@ def test_generate_notebook_strict_requires_summary(tmp_path, monkeypatch) -> Non
     analysis_id = "20250101T000000Z_missing"
     analysis_dir = run_dir / "analysis" / analysis_id
     analysis_dir.mkdir(parents=True)
-    (run_dir / "run_manifest.json").write_text(json.dumps({"artifacts": [], "config_path": ""}))
+    manifest_file = manifest_path(run_dir)
+    manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
@@ -61,8 +68,12 @@ def test_generate_notebook_lenient_allows_missing_summary(tmp_path, monkeypatch)
     run_dir = tmp_path / "run"
     analysis_dir = run_dir / "analysis"
     analysis_dir.mkdir(parents=True)
-    (run_dir / "run_manifest.json").write_text(json.dumps({"artifacts": [], "config_path": ""}))
-    (analysis_dir / "plot_manifest.json").write_text(json.dumps({"plots": []}))
+    meta_dir = analysis_dir / "meta"
+    meta_dir.mkdir(parents=True)
+    manifest_file = manifest_path(run_dir)
+    manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
+    (meta_dir / "plot_manifest.json").write_text(json.dumps({"plots": []}))
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 

@@ -2,42 +2,80 @@
 
 **Jointly maximizing a sequence based on two TFs.**
 
-This demo walks through a process for discovering TFs (e.g., LexA + CpxR), fetching binding sites, locking motif data (i.e., our "scorecards"), sampling sequence space, optimization, and analyzing results with the bundled `demo_basics_two_tf` workspace.
+This demo walks through generating DNA sequences that jointly resemble motifs for two TFs (e.g., LexA + CpxR). The process involves fetching binding sites, locking motif data (i.e., our "scorecards"), sampling sequence space, optimization, and analyzing results with the bundled `demo_basics_two_tf` workspace.
 
-The demo includes:
+### Contents
 
-- a local DAP-seq MEME source (`demo_local_meme`) that provides motif matrices
-  and MEME BLOCKS training-site sequences.
-- RegulonDB curated binding-site access with optional high-throughput (HT) datasets.
+- [Demo setup](#demo-setup)
+- Core workflow
+  - [Preview sources and inventories](#preview-sources-and-inventories)
+  - [Fetch binding sites](#fetch-binding-sites)
+  - [Fetch local DAP-seq motifs + binding sites](#fetch-local-dap-seq-motifs--binding-sites)
+  - [Summarize cached regulators by source](#summarize-cached-regulators-by-source)
+  - [Combine curated + DAP-seq sites for discovery](#combine-curated--dap-seq-sites-for-discovery)
+  - [Discover motifs from merged sites (MEME/STREME)](#discover-motifs-from-merged-sites-memestreme)
+  - [Compare MEME vs STREME outputs (logos)](#compare-meme-vs-streme-outputs-logos)
+  - [Optional: trim aligned PWMs to a fixed window](#optional-trim-aligned-pwms-to-a-fixed-window)
+  - [Select motif source + lock](#select-motif-source--lock)
+  - [Inspect cached entries and targets](#inspect-cached-entries-and-targets)
+  - [Compute PWMs + inspect information content](#compute-pwms--inspect-information-content)
+  - [Render PWM logos (catalog)](#render-pwm-logos-catalog)
+  - [Parse workflow (validate motifs + render logos)](#parse-workflow-validate-motifs--render-logos)
+  - [Sample (MCMC optimization)](#sample-mcmc-optimization)
+  - [Run artifacts + performance snapshot](#run-artifacts--performance-snapshot)
+  - [Analyze + report](#analyze--report)
+- Optional workflows
+  - [Optional: live analysis notebook](#optional-live-analysis-notebook)
+  - [Optional: local motifs or alignment matrices](#optional-local-motifs-or-alignment-matrices)
+  - [Optional: HT-only or combined site modes (RegulonDB)](#optional-ht-only-or-combined-site-modes-regulondb)
 
-Timestamps and run IDs in the example output will differ run-to-run.
-This demo uses a dedicated cache root (`.cruncher/demo_basics_two_tf/`) so only LexA and CpxR appear in the cache summaries.
+---
 
-### Demo instance
+### Demo setup
 
 - **Workspace**: `src/dnadesign/cruncher/workspaces/demo_basics_two_tf/`
 - **Config**: `config.yaml`
-- **Output root**: `runs/` (relative to the workspace)
+- **Output root**: `runs/` (relative to the workspace; runs are grouped by regulator set under `runs/<stage>/setN_<tfs>/...`, plus shared `runs/logos/`)
+- **Motif flow**: fetch sites → discover MEME/STREME motifs → lock/sample using those matrices
+- **Path placeholders**: example outputs use `<workspace>` for the demo workspace root
 
 ```bash
 # Option A: cd into the workspace
 cd src/dnadesign/cruncher/workspaces/demo_basics_two_tf
-CONFIG=config.yaml
+CONFIG="$PWD/config.yaml"
 
 # Option B: run from anywhere in the repo
 CONFIG=src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml
 
+# Choose a runner (pixi recommended when using MEME Suite).
+cruncher() { pixi run cruncher -- "$@"; }
+# cruncher() { uv run cruncher "$@"; }
+
+# Optional: widen tables to avoid truncation in rich output.
+export COLUMNS=160
+
+# If you haven't installed system tools yet (from repo root):
+# pixi install
+
 # From here on, commands use $CONFIG for clarity; if you're in the workspace, you can omit --config.
 ```
 
-Local demo motifs live at `data/local_motifs/`, residing in two MEME files derived from [this](https://www.nature.com/articles/s41592-021-01312-2) DAP-seq article).
+Smoke test for external dependencies (MEME Suite):
 
-### Preview sources and inventories (optional)
+```bash
+cruncher doctor -c "$CONFIG"
+```
+
+If it reports missing tools, install MEME Suite (pixi recommended) or set `motif_discovery.tool_path`; see the [MEME Suite guide](../guides/meme_suite.md). Local demo motifs live at `data/local_motifs/` (DAP‑seq MEME files from [this](https://www.nature.com/articles/s41592-021-01312-2) study).
+
+---
+
+### Preview sources and inventories
 
 List the sources registered by the demo config:
 
 ```bash
-uv run cruncher -c "$CONFIG" sources list
+cruncher sources list -c "$CONFIG"
 ```
 
 Example output:
@@ -52,133 +90,30 @@ Example output:
 └─────────────────┴────────────────────────────────────────────┘
 ```
 
-Inspect source capabilities (what each source can provide):
+Inspect capabilities or inventory as needed:
 
 ```bash
-uv run cruncher -c "$CONFIG" sources info demo_local_meme
-uv run cruncher -c "$CONFIG" sources info regulondb
+cruncher sources info demo_local_meme -c "$CONFIG"
+cruncher sources info regulondb -c "$CONFIG"
+cruncher sources summary --source regulondb --scope remote --remote-limit 20 -c "$CONFIG"
 ```
 
-Example output:
+Notes:
+
+- `motifs:*` are motif matrix inventories; `sites:list` means binding-site sequences are available.
+- If remote inventories are large use `--remote-limit`.
+- Use `sources datasets` or `fetch sites --dry-run` when you need HT dataset coverage.
+
+---
+
+### Fetch binding sites
+
+This demo prefers MEME/STREME‑discovered motifs for optimization (`pwm_source: matrix`) but still fetches sites because discovery runs on sites (and because you may want to compare site‑derived PWMs). Use `--dataset-id` to pin HT datasets; if a dataset returns zero TF‑binding records, **cruncher** fails fast so you can choose a different dataset.
+
+Note: `motif_store.site_window_lengths` only affects site‑derived PWMs (or discovery if you enable `motif_discovery.window_sites=true`).
 
 ```bash
-demo_local_meme: motifs:get, motifs:iter, motifs:list, sites:list
-regulondb: datasets:list, motifs:get, motifs:iter, motifs:list, sites:list
-```
-
-`motifs:*` are motif matrix inventories (curated or local). `sites:list` means the source can return binding-site sequences (curated or MEME BLOCKS training sites). `datasets:list` is the HT dataset registry (RegulonDB only).
-
-Summarize available regulators for a specific source (remote inventory):
-
-```bash
-uv run cruncher -c "$CONFIG" sources summary --source demo_local_meme --scope remote
-uv run cruncher -c "$CONFIG" sources summary --source regulondb --scope remote --remote-limit 20
-```
-
-Example output (local inventory):
-
-```bash
-         Remote inventory by source
-┏━━━━━━━━━━━━━━━━━┳━━━━━┳━━━━━━━━┳━━━━━━━━━━┓
-┃ Source          ┃ TFs ┃ Motifs ┃ Datasets ┃
-┡━━━━━━━━━━━━━━━━━╇━━━━━╇━━━━━━━━╇━━━━━━━━━━┩
-│ demo_local_meme │   2 │      2 │        0 │
-└─────────────────┴─────┴────────┴──────────┘
-      Remote regulators: demo_local_meme
-┏━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┓
-┃ TF   ┃ Sources         ┃ Motifs ┃ Datasets ┃
-┡━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━┩
-│ cpxR │ demo_local_meme │      1 │        0 │
-│ lexA │ demo_local_meme │      1 │        0 │
-└──────┴─────────────────┴────────┴──────────┘
-Legend: Motifs = source inventory entries; Datasets = HT dataset IDs mentioning the TF (not binding sites).
-```
-
-Example output (RegulonDB inventory, remote-limit=20):
-
-```bash
- Remote inventory by source (limit=20)
-┏━━━━━━━━━━━┳━━━━━┳━━━━━━━━┳━━━━━━━━━━┓
-┃ Source    ┃ TFs ┃ Motifs ┃ Datasets ┃
-┡━━━━━━━━━━━╇━━━━━╇━━━━━━━━╇━━━━━━━━━━┩
-│ regulondb │  20 │     20 │      533 │
-└───────────┴─────┴────────┴──────────┘
- Remote regulators: regulondb (limit=20)
-┏━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┓
-┃ TF     ┃ Sources   ┃ Motifs ┃ Datasets ┃
-┡━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━┩
-│ AgrB   │ regulondb │      1 │        0 │
-│ ArrS   │ regulondb │      1 │        0 │
-│ ChiX   │ regulondb │      1 │        0 │
-│ DicF   │ regulondb │      1 │        0 │
-│ DsrA   │ regulondb │      1 │        0 │
-│ FnrS   │ regulondb │      1 │        0 │
-│ GadY   │ regulondb │      1 │        0 │
-│ GcvB   │ regulondb │      1 │        0 │
-│ IstR-1 │ regulondb │      1 │        0 │
-│ McaS   │ regulondb │      1 │        0 │
-│ MgrR   │ regulondb │      1 │        0 │
-│ MicF   │ regulondb │      1 │        0 │
-│ OhsC   │ regulondb │      1 │        0 │
-│ OxyS   │ regulondb │      1 │        0 │
-│ ppGpp  │ regulondb │      1 │        0 │
-│ RseX   │ regulondb │      1 │        0 │
-│ RydC   │ regulondb │      1 │        0 │
-│ SdsN   │ regulondb │      1 │        0 │
-│ SgrS   │ regulondb │      1 │        0 │
-│ SymR   │ regulondb │      1 │        0 │
-└────────┴───────────┴────────┴──────────┘
-Legend: Motifs = source inventory entries; Datasets = HT dataset IDs mentioning the TF (not binding sites).
-Note: --remote-limit samples the motif inventory; regulator rows are a partial view.
-```
-
-The remote regulators table is a **motif inventory** (not site counts). A TF can have curated motifs but no HT datasets, so `Datasets=0` is expected for many entries. Use `sources datasets` or `fetch sites --dry-run` to inspect HT availability for specific TFs.
-
-List HT datasets for a TF (RegulonDB only):
-
-```bash
-uv run cruncher -c "$CONFIG" sources datasets regulondb --tf lexA --limit 5
-```
-
-Example output:
-
-```bash
-                                                 regulondb datasets
-┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
-┃ Dataset ID       ┃ Source   ┃ Method    ┃ TFs                                                          ┃ Genome   ┃
-┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
-│ RHTECOLIBSD02444 │ BAUMGART │ TFBINDING │ DNA-binding transcriptional repressor LexA, ExrA, LexA, Spr… │ U00096.3 │
-│ RHTECOLIBSD03022 │ GALAGAN  │ TFBINDING │ DNA-binding transcriptional repressor LexA, ExrA, LexA, Spr… │ -        │
-└──────────────────┴──────────┴───────────┴──────────────────────────────────────────────────────────────┴──────────┘
-```
-
-Optional: use the fetch pipeline itself to preview HT datasets (TF-scoped and filter-aware):
-
-```bash
-uv run cruncher -c "$CONFIG" fetch sites --tf lexA --tf cpxR --dry-run
-```
-
-Example output:
-
-```bash
-                         HT datasets
-┏━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┓
-┃ TF   ┃ Dataset ID       ┃ Source   ┃ Method    ┃ Genome   ┃
-┡━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━┩
-│ lexA │ RHTECOLIBSD02444 │ BAUMGART │ TFBINDING │ U00096.3 │
-│ lexA │ RHTECOLIBSD03022 │ GALAGAN  │ TFBINDING │ -        │
-│ cpxR │ RHTECOLIBSD02736 │ PALSSON  │ TFBINDING │ U00096.3 │
-│ cpxR │ RHTECOLIBSD02409 │ BAUMGART │ TFBINDING │ U00096.3 │
-│ cpxR │ RHTECOLIBSD02988 │ GALAGAN  │ TFBINDING │ -        │
-└──────┴──────────────────┴──────────┴───────────┴──────────┘
-```
-
-### Fetch binding sites (curated; HT optional)
-
-This demo uses `motif_store.pwm_source: sites`, so we cache curated sites and build PWMs at runtime. You can pin a specific HT dataset with `--dataset-id`, which enables HT access for that request. If a dataset returns zero TF-binding records, cruncher fails fast with a clear error so you can choose a different dataset.
-
-```bash
-uv run cruncher -c "$CONFIG" fetch sites --tf lexA --tf cpxR --update
+cruncher fetch sites --tf lexA --tf cpxR --update -c "$CONFIG"
 ```
 
 Example output (abridged, INFO log level):
@@ -192,22 +127,22 @@ Example output (abridged, INFO log level):
 ┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
 ┃ TF   ┃ Source    ┃ Motif ID         ┃ Kind    ┃ Dataset ┃ Method ┃ Sites ┃ Total ┃ Mean len ┃ Updated    ┃
 ┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ cpxR │ regulondb │ RDBECOLITFC00170 │ curated │ -       │ -      │ 154   │ 154   │ 15.3     │ 2026-01-11 │
-│ lexA │ regulondb │ RDBECOLITFC00214 │ curated │ -       │ -      │ 49    │ 49    │ 19.5     │ 2026-01-11 │
+│ cpxR │ regulondb │ RDBECOLITFC00170 │ curated │ -       │ -      │ 154   │ 154   │ 15.3     │ 2026-01-13 │
+│ lexA │ regulondb │ RDBECOLITFC00214 │ curated │ -       │ -      │ 49    │ 49    │ 19.5     │ 2026-01-13 │
 └──────┴───────────┴──────────────────┴─────────┴─────────┴────────┴───────┴───────┴──────────┴────────────┘
 ```
 
-Curated site sets do not carry a dataset or method (those fields are only populated for HT datasets).
+Curated site sets do not carry a dataset or method (those fields are only populated for HT datasets). Repeat runs will report “No new sites cached” unless you pass `--update`.
 
-Repeat runs will report “No new sites cached” unless you pass `--update`.
+---
 
-### Fetch local DAP-seq motifs + training sites
+### Fetch local DAP-seq motifs + binding sites
 
 Local DAP-seq MEME files live under `data/local_motifs/` in the workspace. Fetch the motif matrices and the MEME BLOCKS training sites:
 
 ```bash
-uv run cruncher -c "$CONFIG" fetch motifs --source demo_local_meme --tf lexA --tf cpxR --update
-uv run cruncher -c "$CONFIG" fetch sites --source demo_local_meme --tf lexA --tf cpxR --update
+cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
 ```
 
 Example output:
@@ -217,8 +152,8 @@ Example output:
 ┏━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┓
 ┃ TF   ┃ Source          ┃ Motif ID ┃ Length ┃ Matrix     ┃ Updated    ┃
 ┡━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ cpxR │ demo_local_meme │ cpxR     │ 21     │ yes (file) │ 2026-01-11 │
-│ lexA │ demo_local_meme │ lexA     │ 22     │ yes (file) │ 2026-01-11 │
+│ cpxR │ demo_local_meme │ cpxR     │ 21     │ yes (file) │ 2026-01-13 │
+│ lexA │ demo_local_meme │ lexA     │ 22     │ yes (file) │ 2026-01-13 │
 └──────┴─────────────────┴──────────┴────────┴────────────┴────────────┘
 ```
 
@@ -229,312 +164,228 @@ Example output (local sites):
 ┏━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
 ┃ TF   ┃ Source          ┃ Motif ID ┃ Kind        ┃ Dataset ┃ Method ┃ Sites ┃ Total ┃ Mean len ┃ Updated    ┃
 ┡━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ cpxR │ demo_local_meme │ cpxR     │ meme_blocks │ -       │ -      │ 50    │ 50    │ 21.0     │ 2026-01-11 │
-│ lexA │ demo_local_meme │ lexA     │ meme_blocks │ -       │ -      │ 50    │ 50    │ 22.0     │ 2026-01-11 │
+│ cpxR │ demo_local_meme │ cpxR     │ meme_blocks │ -       │ -      │ 50    │ 50    │ 21.0     │ 2026-01-13 │
+│ lexA │ demo_local_meme │ lexA     │ meme_blocks │ -       │ -      │ 50    │ 50    │ 22.0     │ 2026-01-13 │
 └──────┴─────────────────┴──────────┴──────────━──┴─────────┴────────┴───────┴───────┴──────────┴────────────┘
 ```
 
-### Summarize cached regulators (per source)
+---
 
-After fetching, you can summarize cached regulators for each source:
+### Summarize cached regulators by source
 
-```bash
-uv run cruncher -c "$CONFIG" sources summary --source demo_local_meme --scope cache
-uv run cruncher -c "$CONFIG" sources summary --source regulondb --scope cache
-```
-
-Example output (local cache):
+Summarize cached regulators:
 
 ```bash
-       Cache overview
-  (source=demo_local_meme)
-┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━┓
-┃ Metric            ┃ Value ┃
-┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━┩
-│ entries           │ 2     │
-│ sources           │ 1     │
-│ TFs               │ 2     │
-│ motifs            │ 2     │
-│ site sets         │ 2     │
-│ sites (seq/total) │ 100/100 │
-│ datasets          │ 0     │
-└───────────────────┴───────┘
-                  Cache by source (source=demo_local_meme)
-┏━━━━━━━━━━━━━━━━━┳━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
-┃ Source          ┃ TFs ┃ Motifs ┃ Site sets ┃ Sites (seq/total) ┃ Datasets ┃
-┡━━━━━━━━━━━━━━━━━╇━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
-│ demo_local_meme │   2 │      2 │         2 │ 100/100           │        0 │
-└─────────────────┴─────┴────────┴───────────┴───────────────────┴──────────┘
-                  Cache regulators (source=demo_local_meme)
-┏━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
-┃ TF   ┃ Sources         ┃ Motifs ┃ Site sets ┃ Sites (seq/total) ┃ Datasets ┃
-┡━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
-│ cpxR │ demo_local_meme │      1 │         1 │ 50/50             │        0 │
-│ lexA │ demo_local_meme │      1 │         1 │ 50/50             │        0 │
-└──────┴─────────────────┴────────┴───────────┴───────────────────┴──────────┘
+cruncher sources summary --source demo_local_meme --scope cache -c "$CONFIG"
+cruncher sources summary --source regulondb --scope cache -c "$CONFIG"
 ```
 
-Example output (RegulonDB cache, abridged):
+This is a quick sanity check on cached motifs/sites per source before discovery.
 
-```bash
-        Cache overview
-      (source=regulondb)
-┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
-┃ Metric            ┃ Value   ┃
-┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
-│ entries           │ 2       │
-│ sources           │ 1       │
-│ TFs               │ 2       │
-│ motifs            │ 0       │
-│ site sets         │ 2       │
-│ sites (seq/total) │ 203/203 │
-│ datasets          │ 0       │
-└───────────────────┴─────────┘
-                  Cache by source (source=regulondb)
-┏━━━━━━━━━━━┳━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
-┃ Source    ┃ TFs ┃ Motifs ┃ Site sets ┃ Sites (seq/total) ┃ Datasets ┃
-┡━━━━━━━━━━━╇━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
-│ regulondb │   2 │      0 │         2 │ 203/203           │        0 │
-└───────────┴─────┴────────┴───────────┴───────────────────┴──────────┘
-                  Cache regulators (source=regulondb)
-┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
-┃ TF   ┃ Sources   ┃ Motifs ┃ Site sets ┃ Sites (seq/total) ┃ Datasets ┃
-┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
-│ cpxR │ regulondb │      0 │         1 │ 154/154           │        0 │
-│ lexA │ regulondb │      0 │         1 │ 49/49             │        0 │
-└──────┴───────────┴────────┴───────────┴───────────────────┴──────────┘
-```
+---
 
-## Optional: combine curated + DAP-seq sites for a single PWM
+### Combine curated + DAP-seq sites for discovery
 
-Now that both sources are cached, you can merge their site sets per TF and build
-one PWM from multiple sources. Toggle `combine_sites` and re-lock:
+This demo config already merges site sets per TF (`combine_sites: true`) so MEME/STREME sees all available sites. If you want to keep sources separate, set `combine_sites: false` and re-lock:
 
 ```yaml
 motif_store:
-  combine_sites: true
+  combine_sites: false
 ```
 
 ```bash
-uv run cruncher -c "$CONFIG" lock
-uv run cruncher -c "$CONFIG" targets status
+cruncher lock -c "$CONFIG"
+cruncher targets status -c "$CONFIG"
 ```
+Tip: `catalog pwms --set 1` will show the currently preferred matrix source. To use only
+the local DAP-seq training sites in discovery, set `site_kinds: ["meme_blocks"]`.
 
-Example output (combined sites):
+---
+
+### Discover motifs from merged sites (MEME/STREME)
+
+If you fetched binding sites from multiple sources and want a single aligned PWM per TF (e.g., to reconcile different site lengths), run MEME Suite on the combined site sets. This creates new motif matrices under `motif_discovery.source_id` (default `meme_suite_streme`, or override with `--source-id`).
+
+Discovery notes:
+
+- Discovery uses cached binding sites (variable lengths are OK), regardless of `motif_store.pwm_source`.
+- Width bounds default to the per‑TF site length range; override with explicit `minw/maxw` if needed.
+- Runs write under `.cruncher/<workspace>/discoveries/` and ingest motifs into the catalog, replacing prior entries for the same TF/source unless you pass `--keep-existing`.
+- Discovery uses raw sites by default; set `motif_discovery.window_sites=true` to pre‑window.
 
 ```bash
-                                                       Configured targets
-┏━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┓
-┃ Set ┃ TF   ┃ Source    ┃ Motif ID         ┃ Organism ┃ Matrix ┃ Sites (seq/total) ┃ Site kind ┃ Dataset ┃ PWM source ┃ Status ┃
-┡━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━┩
-│   1 │ lexA │ regulondb │ RDBECOLITFC00214 │ -        │ no     │ 99/99             │ mixed     │ -       │ sites      │ ready  │
-│   1 │ cpxR │ regulondb │ RDBECOLITFC00170 │ -        │ no     │ 204/204           │ mixed     │ -       │ sites      │ ready  │
-└─────┴──────┴───────────┴──────────────────┴──────────┴────────┴───────────────────┴───────────┴─────────┴────────────┴────────┘
-```
-
-Tip: `catalog pwms --set 1` will now show `site sets=2` per TF. To use only the
-local DAP-seq training sites, set `site_kinds: ["meme_blocks"]`.
-
-## Lock TFs to exact cached motifs
-
-Lockfiles resolve TF names to exact motif IDs and hashes for reproducibility:
-
-```bash
-uv run cruncher -c "$CONFIG" lock
-```
-
-Example output:
-
-```bash
-/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/.cruncher/demo_basics_two_tf/locks/config.lock.json
-```
-
-Lockfiles are required for `parse`, `sample`, and `targets status`.
-
-## Inspect cached entries and targets (optional)
-
-```bash
-uv run cruncher -c "$CONFIG" catalog list
-uv run cruncher -c "$CONFIG" catalog show regulondb:RDBECOLITFC00214
-uv run cruncher -c "$CONFIG" targets list
-uv run cruncher -c "$CONFIG" targets status
-uv run cruncher -c "$CONFIG" targets stats
-uv run cruncher -c "$CONFIG" targets candidates --fuzzy
-uv run cruncher -c "$CONFIG" status
-```
-
-Example output (catalog list):
-
-```bash
-                                                                        Catalog
-┏━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
-┃ TF   ┃ Source          ┃ Motif ID         ┃ Organism         ┃ Matrix     ┃ Sites (seq/total) ┃ Site kind ┃ Dataset ┃ Method ┃ Mean len ┃ Updated    ┃
-┡━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ cpxR │ demo_local_meme │ cpxR             │ Escherichia coli │ yes (file) │ 50/50             │ meme_blocks │ -       │ -      │ 21.0     │ 2026-01-10 │
-│ cpxR │ regulondb       │ RDBECOLITFC00170 │ -                │ no         │ 154/154           │ curated   │ -       │ -      │ 15.3     │ 2026-01-10 │
-│ lexA │ demo_local_meme │ lexA             │ Escherichia coli │ yes (file) │ 50/50             │ meme_blocks │ -       │ -      │ 22.0     │ 2026-01-10 │
-│ lexA │ regulondb       │ RDBECOLITFC00214 │ -                │ no         │ 49/49             │ curated   │ -       │ -      │ 19.5     │ 2026-01-10 │
-└──────┴─────────────────┴──────────────────┴──────────────────┴────────────┴───────────────────┴───────────┴─────────┴────────┴──────────┴────────────┘
-```
-
-Example output (catalog show for a binding-site set):
-
-```bash
-source: regulondb
-motif_id: RDBECOLITFC00214
-tf_name: lexA
-organism: -
-kind: PFM
-matrix_length: None
-matrix_source: None
-matrix_semantics: None
-has_matrix: False
-has_sites: True
-site_count: 49
-site_total: 49
-site_kind: curated
-site_length_mean: 19.49 (min=15, max=20, n=49)
-site_length_source: sequence
-dataset_id: -
-dataset_source: -
-dataset_method: -
-reference_genome: -
-updated_at: 2026-01-10T21:04:06.147428+00:00
-synonyms: -
-motif_path: -
-sites_path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/.cruncher/demo_basics_two_tf/normalized/sites/regulondb/RDBECOLITFC00214.jsonl
-```
-
-Example output (targets list):
-
-```bash
-$ uv run cruncher -c "$CONFIG" targets list
-  Configured
-   targets
-┏━━━━━┳━━━━━━┓
-┃ Set ┃ TF   ┃
-┡━━━━━╇━━━━━━┩
-│   1 │ lexA │
-│   1 │ cpxR │
-└─────┴──────┘
-```
-
-Example output (targets status):
-
-```bash
-                                                       Configured targets
-┏━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┓
-┃ Set ┃ TF   ┃ Source    ┃ Motif ID         ┃ Organism ┃ Matrix ┃ Sites (seq/total) ┃ Site kind ┃ Dataset ┃ PWM source ┃ Status ┃
-┡━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━┩
-│   1 │ lexA │ regulondb │ RDBECOLITFC00214 │ -        │ no     │ 49/49             │ curated   │ -       │ sites      │ ready  │
-│   1 │ cpxR │ regulondb │ RDBECOLITFC00170 │ -        │ no     │ 154/154           │ curated   │ -       │ sites      │ ready  │
-└─────┴──────┴───────────┴──────────────────┴──────────┴────────┴───────────────────┴───────────┴─────────┴────────────┴────────┘
-```
-
-Optional: a bird's-eye view of cache, targets, and recent runs (abridged; paths shortened for portability):
-
-```bash
-$ uv run cruncher -c "$CONFIG" status
-                                                           Configuration
-┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Setting      ┃ Value                                                                                                            ┃
-┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ config       │ /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml │
-│ catalog_root │ /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/.cruncher/demo_basics_two_tf   │
-│ out_dir      │ /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/runs        │
-│ pwm_source   │ sites                                                                                                            │
-│ sources      │ demo_local_meme, regulondb                                                                                       │
-│ lockfile     │ present                                                                                                          │
-└──────────────┴──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-        Cache
-┏━━━━━━━━━━━┳━━━━━━━┓
-┃ Metric    ┃ Value ┃
-┡━━━━━━━━━━━╇━━━━━━━┩
-│ entries   │ 4     │
-│ motifs    │ 2     │
-│ site_sets │ 4     │
-└───────────┴───────┘
-               Targets
-┏━━━━━━━┳━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┓
-┃ Total ┃ Ready ┃ Warning ┃ Blocking ┃
-┡━━━━━━━╇━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━┩
-│     2 │     2 │       0 │        0 │
-└───────┴───────┴─────────┴──────────┘
-Runs total: 5 (parse:2, sample:3)
-                                              Recent runs
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Run                                          ┃ Stage  ┃ Status    ┃ Created                          ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ sample_set1_lexA-cpxR_20260110_160900_58723f │ sample │ completed │ 2026-01-10T21:09:03.989466+00:00 │
-│ parse_set1_lexA-cpxR_20260110_160854_41bbc7  │ parse  │ completed │ 2026-01-10T21:08:54.641651+00:00 │
-│ sample_set1_lexA-cpxR_20260110_130820_e63208 │ sample │ completed │ 2026-01-10T18:08:20.007353+00:00 │
-│ sample_set1_lexA-cpxR_20260110_125203_feea4f │ sample │ completed │ 2026-01-10T17:52:07.208085+00:00 │
-│ parse_set1_lexA-cpxR_20260110_125126_67336d  │ parse  │ completed │ 2026-01-10T17:51:26.301780+00:00 │
-└──────────────────────────────────────────────┴────────┴───────────┴──────────────────────────────────┘
-```
-
-## Compute PWMs + inspect information content
-
-`catalog pwms` builds PWMs from cached sites (or matrices) and reports
-information content in bits:
-
-```bash
-uv run cruncher -c "$CONFIG" catalog pwms --set 1
+cruncher discover check -c "$CONFIG"
+cruncher discover motifs --tf lexA --tf cpxR --tool streme --source-id meme_suite_streme -c "$CONFIG"
+cruncher catalog list --source meme_suite_streme -c "$CONFIG"
 ```
 
 Example output:
 
 ```bash
-                                        PWM summary
-┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━┓
-┃ TF   ┃ Source    ┃ Motif ID         ┃ PWM source ┃ Length ┃ Bits  ┃ n sites ┃ Site sets ┃
-┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━┩
-│ lexA │ regulondb │ RDBECOLITFC00214 │ sites      │ 15     │ 10.36 │ 49      │ 1         │
-│ cpxR │ regulondb │ RDBECOLITFC00170 │ sites      │ 11     │ 3.63  │ 154     │ 1         │
-└──────┴───────────┴──────────────────┴────────────┴────────┴───────┴─────────┴───────────┘
+INFO lexA: using site-length bounds for discovery (minw=15, maxw=22, site lengths 15-22).
+INFO cpxR: using site-length bounds for discovery (minw=11, maxw=21, site lengths 11-21).
+                                                                        Motif discovery
+┏━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ TF   ┃ Tool   ┃ Motif ID                                      ┃ Length ┃ Output                                                                              ┃
+┡━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ lexA │ streme │ meme_suite_streme:lexA_1-CTGTATAWAWWHACAGT    │ 17     │ <workspace>/.cruncher/demo_basics_two_tf/discoveries/discover_lexA_20260113_114748_ │
+│ cpxR │ streme │ meme_suite_streme:cpxR_1-MTTTACAYWWMTTTACAWWW │ 20     │ <workspace>/.cruncher/demo_basics_two_tf/discoveries/discover_cpxR_20260113_114748_ │
+└──────┴────────┴───────────────────────────────────────────────┴────────┴─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Tip: add `--matrix` to print the full PWM matrices or `--log-odds` for log-odds matrices.
-
-Use the **Bits** and **n sites** columns as a quick quality screen. Low site counts
-or very low information content are signals to (a) prefer another source, (b) combine
-curated + DAP-seq sites, or (c) raise `motif_store.min_sites_for_pwm` if you want to
-enforce stricter minimums.
-
-## Render PWM logos
+The “Motif discovery” table reports the tool used, the motif ID, and the discovered width. **Tip:** if each sequence represents one site, prefer MEME and set `--meme-mod oops`:
 
 ```bash
-uv run cruncher -c "$CONFIG" catalog logos --set 1
+cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id meme_suite_meme -c "$CONFIG"
+```
+
+This demo config already prefers MEME motifs for optimization: `pwm_source: matrix` with `source_preference: [meme_suite_meme, meme_suite_streme, ...]`. After discovery, continue to “Select motif source + lock” below so parse/sample use the new motifs.
+
+---
+
+### Compare MEME vs STREME outputs (logos)
+
+If you want to compare both tools, run discovery into distinct sources and render both logos.
+
+```bash
+cruncher discover motifs --tf lexA --tf cpxR --tool streme --source-id meme_suite_streme -c "$CONFIG"
+cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id meme_suite_meme -c "$CONFIG"
+
+# Compare matrices and logos per tool
+cruncher catalog pwms --source meme_suite_streme --set 1 -c "$CONFIG"
+cruncher catalog pwms --source meme_suite_meme --set 1 -c "$CONFIG"
+cruncher catalog logos --source meme_suite_streme --set 1 -c "$CONFIG"
+cruncher catalog logos --source meme_suite_meme --set 1 -c "$CONFIG"
+```
+After comparing, re-run `cruncher lock -c "$CONFIG"`; this demo prefers MEME-derived motifs first so sampling/analysis uses MEME when both are available. To switch, reorder `motif_store.source_preference` in `config.yaml`.
+
+---
+
+### Optional: trim aligned PWMs to a fixed window
+
+If optimization needs a shorter PWM, set `pwm_window_lengths` to select the highest-information contiguous window before sampling:
+
+```yaml
+motif_store:
+  pwm_window_lengths:
+    lexA: 15
+    cpxR: 15
+```
+
+```bash
+cruncher catalog pwms --set 1 -c "$CONFIG"
+```
+
+Then proceed to `lock` and `sample` below to run optimization with the aligned (and optionally trimmed) PWMs.
+
+---
+
+### Select motif source + lock
+
+Lockfiles resolve TF names to exact motif IDs and hashes for reproducibility.
+
+```bash
+cruncher lock -c "$CONFIG"
+```
+
+Example output:
+
+```bash
+<workspace>/.cruncher/demo_basics_two_tf/locks/config.lock.json
+```
+
+Lockfiles are required for `parse`, `sample`, and `targets status`. If you add new motifs (e.g., after `discover motifs`) or change `motif_store` preferences, re-run `lock` to refresh the pinned motif IDs and hashes.
+
+---
+
+### Inspect cached entries and targets
+
+Use these when you want deeper visibility into what’s cached and what will be used:
+
+```bash
+cruncher catalog list -c "$CONFIG"
+cruncher catalog show regulondb:RDBECOLITFC00214 -c "$CONFIG"
+cruncher targets list -c "$CONFIG"
+cruncher targets status -c "$CONFIG"
+cruncher targets stats -c "$CONFIG"
+cruncher targets candidates --fuzzy -c "$CONFIG"
+cruncher status -c "$CONFIG"
+```
+
+---
+
+### Compute PWMs + inspect information content
+
+`catalog pwms` builds PWMs from cached sites (or matrices) and reports information content in bits. Site-derived PWMs use Biopython with configurable pseudocounts (`motif_store.pseudocounts`):
+
+```bash
+cruncher catalog pwms --set 1 -c "$CONFIG"
+```
+
+Example output:
+
+```bash
+                                                 PWM summary
+┏━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━┓
+┃ TF   ┃ Source          ┃ Motif ID             ┃ PWM source ┃ Length ┃ Window ┃ Bits  ┃ n sites ┃ Site sets ┃
+┡━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━┩
+│ lexA │ meme_suite_meme │ lexA_CTGTATAWAWWHACA │ matrix     │ 15     │ -      │ 16.13 │ 99      │ -         │
+│ cpxR │ meme_suite_meme │ cpxR_MANWWHTTTAM     │ matrix     │ 11     │ -      │ 5.47  │ 204     │ -         │
+└──────┴─────────────────┴──────────────────────┴────────────┴────────┴────────┴───────┴─────────┴───────────┘
+```
+
+Tip: add `--matrix` to print full PWM matrices or `--log-odds` for log‑odds matrices.
+
+Use **Bits** as a quick quality screen. **n sites** is populated when the source tracks
+site counts (e.g., discovery runs, site‑derived PWMs); otherwise it is `-`. Low counts or
+very low information content are signals to switch sources, combine sites, or raise
+`motif_store.min_sites_for_pwm`. To constrain PWM length for optimization, set
+`motif_store.pwm_window_lengths`; the chosen window appears in **Window**.
+
+---
+
+### Render PWM logos (catalog)
+
+```bash
+cruncher catalog logos --set 1 -c "$CONFIG"
 ```
 
 Example output (paths shortened):
 
 ```bash
 Rendered PWM logos
-┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ TF   ┃ Source    ┃ Motif ID         ┃ Length ┃ Bits  ┃ Output                                                       ┃
-┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ lexA │ regulondb │ RDBECOLITFC00214 │ 15     │ 10.36 │ /path/to/.../logos_set1_lexA-cpxR_20260110_160826_7b196a │
-│ cpxR │ regulondb │ RDBECOLITFC00170 │ 11     │ 3.63  │ /path/to/.../logos_set1_lexA-cpxR_20260110_160826_7b196a │
-└──────┴───────────┴──────────────────┴────────┴───────┴──────────────────────────────────────────────────────────────────────┘
-Logos saved to /path/to/.../logos_set1_lexA-cpxR_20260110_160826_7b196a
+┏━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ TF   ┃ Source          ┃ Motif ID             ┃ Length ┃ Bits  ┃ Output                                                               ┃
+┡━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ lexA │ meme_suite_meme │ lexA_CTGTATAWAWWHACA │ 15     │ 16.13 │ <workspace>/runs/logos/catalog/set1_lexA-cpxR_20260113_114842_d986f5 │
+│ cpxR │ meme_suite_meme │ cpxR_MANWWHTTTAM     │ 11     │ 5.47  │ <workspace>/runs/logos/catalog/set1_lexA-cpxR_20260113_114842_d986f5 │
+└──────┴─────────────────┴──────────────────────┴────────┴───────┴──────────────────────────────────────────────────────────────────────┘
+Logos saved to <workspace>/runs/logos/catalog/set1_lexA-cpxR_20260113_114842_d986f5
 ```
+Logos include the site count (`n=...`) in the subtitle when available (e.g., MEME/STREME discoveries or site-derived PWMs).
 
-## Parse logos (optional)
+---
+
+### Parse workflow (validate motifs + render logos)
 
 ```bash
-uv run cruncher -c "$CONFIG" parse
+cruncher parse -c "$CONFIG"
 ```
 
-Logos are written under `runs/parse_set<index>_<tfset>_<timestamp>/`.
-When `motif_store.pwm_source=sites`, the logo subtitle shows whether binding sites were
-curated, high-throughput, or combined.
+Logos are written under `runs/logos/parse/<run_id>/`. This demo uses `pwm_source=matrix`, so the subtitle shows the adapter source and matrix origin (alignment/meme/streme/file). If you switch to `pwm_source=sites`, the subtitle will instead show how many site sets were merged, the contributing sources, and the site-kind mix.
 
-## Sample (MCMC optimization)
+---
+
+### Sample (MCMC optimization)
+
+Auto‑optimize is enabled by default (short Gibbs + PT pilots). Use `--no-auto-opt` to skip pilots and force the configured optimizer. For diagnostics and tuning guidance, see the [sampling + analysis guide](../guides/sampling_and_analysis.md).
 
 ```bash
-uv run cruncher -c "$CONFIG" sample
-uv run cruncher -c "$CONFIG" runs list
+cruncher sample -c "$CONFIG"
+cruncher sample --no-auto-opt -c "$CONFIG"
+cruncher runs list -c "$CONFIG"
+cruncher runs latest --set-index 1 -c "$CONFIG"
+cruncher runs best --set-index 1 -c "$CONFIG"
 ```
 
 Example output (runs list, abridged):
@@ -544,110 +395,108 @@ Example output (runs list, abridged):
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
 ┃ Name                                         ┃ Stage  ┃ Status    ┃ Created                          ┃ Motifs ┃ Regulator set  ┃ PWM source ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ sample_set1_lexA-cpxR_20260110_160900_58723f │ sample │ completed │ 2026-01-10T21:09:03.989466+00:00 │ 2      │ set1:lexA,cpxR │ sites      │
-│ parse_set1_lexA-cpxR_20260110_160854_41bbc7  │ parse  │ completed │ 2026-01-10T21:08:54.641651+00:00 │ 2      │ set1:lexA,cpxR │ sites      │
-│ sample_set1_lexA-cpxR_20260110_130820_e63208 │ sample │ completed │ 2026-01-10T18:08:20.007353+00:00 │ 2      │ set1:lexA,cpxR │ sites      │
-│ sample_set1_lexA-cpxR_20260110_125203_feea4f │ sample │ completed │ 2026-01-10T17:52:07.208085+00:00 │ 2      │ set1:lexA,cpxR │ sites      │
-│ parse_set1_lexA-cpxR_20260110_125126_67336d  │ parse  │ completed │ 2026-01-10T17:51:26.301780+00:00 │ 2      │ set1:lexA,cpxR │ sites      │
+│ set1_lexA-cpxR_20260113_115749_e72283 │ sample │ completed │ 2026-01-13T16:57:49.511391+00:00 │ 2      │ set1:lexA,cpxR │ matrix     │
+│ set1_lexA-cpxR_20260113_114853_a44d99 │ parse  │ completed │ 2026-01-13T16:48:53.807009+00:00 │ 2      │ set1:lexA,cpxR │ matrix     │
 └──────────────────────────────────────────────┴────────┴───────────┴──────────────────────────────────┴────────┴────────────────┴────────────┘
 ```
 
 For live progress, you can watch the run status in another terminal:
 
 ```bash
-uv run cruncher -c "$CONFIG" runs watch <run_name>
+cruncher runs watch <run_name> -c "$CONFIG"
+cruncher runs watch <run_name> --plot -c "$CONFIG"
 ```
 
-To plot live trends as PNGs while sampling:
+---
 
-```bash
-uv run cruncher -c "$CONFIG" runs watch <run_name> --plot
-```
-
-To widen the live metrics window:
-
-```bash
-uv run cruncher -c "$CONFIG" runs watch <run_name> --metric-points 80 --metric-width 40
-```
-
-## Run artifacts and performance snapshot
+### Run artifacts + performance snapshot
 
 Use `runs show` to inspect what a run produced:
 
 ```bash
-uv run cruncher -c "$CONFIG" runs show sample_set1_lexA-cpxR_20260110_160900_58723f
+cruncher runs show set1_lexA-cpxR_20260113_115749_e72283 -c "$CONFIG"
 ```
 
 Example output (abridged):
 
 ```bash
-run: sample_set1_lexA-cpxR_20260110_160900_58723f
+run: set1_lexA-cpxR_20260113_115749_e72283
 stage: sample
 status: completed
-created_at: 2026-01-10T21:09:00.008157+00:00
+created_at: 2026-01-13T16:57:49.511391+00:00
 motif_count: 2
 regulator_set: {'index': 1, 'tfs': ['lexA', 'cpxR']}
-pwm_source: sites
-run_dir: /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/runs/sample_set1_lexA-cpxR_20260110_160900_58723f
+pwm_source: matrix
+run_dir: <workspace>/runs/sample/set1_lexA-cpxR/set1_lexA-cpxR_20260113_115749_e72283
 artifacts:
 ┏━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓
 ┃ Stage  ┃ Type     ┃ Label                                  ┃ Path              ┃
 ┡━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩
-│ sample │ config   │ Resolved config (config_used.yaml)     │ config_used.yaml  │
-│ sample │ trace    │ Trace (NetCDF)                         │ trace.nc          │
-│ sample │ table    │ Sequences with per-TF scores (Parquet) │ sequences.parquet │
-│ sample │ table    │ Elite sequences (Parquet)              │ elites.parquet    │
-│ sample │ json     │ Elite sequences (JSON)                 │ elites.json       │
-│ sample │ metadata │ Elite metadata (YAML)                  │ elites.yaml       │
+│ sample │ config   │ Resolved config (config_used.yaml)     │ meta/config_used.yaml        │
+│ sample │ trace    │ Trace (NetCDF)                         │ artifacts/trace.nc            │
+│ sample │ table    │ Sequences with per-TF scores (Parquet) │ artifacts/sequences.parquet   │
+│ sample │ table    │ Elite sequences (Parquet)              │ artifacts/elites.parquet      │
+│ sample │ json     │ Elite sequences (JSON)                 │ artifacts/elites.json         │
+│ sample │ metadata │ Elite metadata (YAML)                  │ artifacts/elites.yaml         │
 └────────┴──────────┴────────────────────────────────────────┴───────────────────┘
 ```
 
 Runtime scales with `draws`, `tune`, and `chains` in the config; adjust them to match your runtime/quality budget.
 
-## Analyze + report
+---
+
+### Analyze + report
 
 ```bash
-uv run cruncher -c "$CONFIG" analyze --latest
-uv run cruncher -c "$CONFIG" report sample_set1_lexA-cpxR_20260110_160900_58723f
+cruncher analyze --latest -c "$CONFIG"
+cruncher report --latest -c "$CONFIG"
 ```
 
 Example output (analyze):
 
 ```bash
-Random baseline: 100%|██████████| 12/12 [00:00<00:00, 11583.81it/s]
-Analysis outputs → /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/runs/sample_set1_lexA-cpxR_20260110_160900_58723f/analysis
-  summary: /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/runs/sample_set1_lexA-cpxR_20260110_160900_58723f/analysis/summary.json
-  analysis_id: 20260110T210926Z_9eb3c2
+WARNING  Balance index undefined for 4 rows with joint_mean=0; writing NaN.
+Analysis outputs → <workspace>/runs/sample/set1_lexA-cpxR/set1_lexA-cpxR_20260113_115749_e72283/analysis
+  summary: <workspace>/runs/sample/set1_lexA-cpxR/set1_lexA-cpxR_20260113_115749_e72283/analysis/meta/summary.json
+  diagnostics: <workspace>/runs/sample/set1_lexA-cpxR/set1_lexA-cpxR_20260113_115749_e72283/analysis/tables/diagnostics.json
+  analysis_id: 20260113T165803Z_e758d7
 Next steps:
-  cruncher runs show /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml sample_set1_lexA-cpxR_20260110_160900_58723f
-  cruncher notebook --latest /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/runs/sample_set1_lexA-cpxR_20260110_160900_58723f
-  cruncher report /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml sample_set1_lexA-cpxR_20260110_160900_58723f
+  cruncher runs show <workspace>/config.yaml set1_lexA-cpxR_20260113_115749_e72283
+  cruncher notebook --latest <workspace>/runs/sample/set1_lexA-cpxR/set1_lexA-cpxR_20260113_115749_e72283
+  cruncher report --latest <workspace>/config.yaml
 ```
 
-If you're running via `uv`, prefix those next-step commands with `uv run`.
+If you're running via `pixi`, prefix those next-step commands with `pixi run cruncher --`.
 
-## Optional: open the analysis notebook (real time)
+For a compact diagnostics checklist and tuning guidance, see the
+[sampling + analysis guide](../guides/sampling_and_analysis.md).
+
+---
+
+### Optional: live analysis notebook
 
 ```bash
-uv run cruncher notebook /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/runs/sample_set1_lexA-cpxR_20260110_160900_58723f --latest
+cruncher notebook <workspace>/runs/sample/set1_lexA-cpxR/set1_lexA-cpxR_20260113_115749_e72283 --latest
 ```
 
 Example output:
 
 ```bash
 Notebook created →
-/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/runs/sample_set1_lexA-cpxR_20260110_160900_58723f/analysis/notebooks/run_overview.py
+<workspace>/runs/sample/set1_lexA-cpxR/set1_lexA-cpxR_20260113_115749_e72283/analysis/notebooks/run_overview.py
 Open with: marimo edit
-/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/runs/sample_set1_lexA-cpxR_20260110_160900_58723f/analysis/notebooks/run_overview.py
+<workspace>/runs/sample/set1_lexA-cpxR/set1_lexA-cpxR_20260113_115749_e72283/analysis/notebooks/run_overview.py
 Read-only app: marimo run
-/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_basics_two_tf/runs/sample_set1_lexA-cpxR_20260110_160900_58723f/analysis/notebooks/run_overview.py
+<workspace>/runs/sample/set1_lexA-cpxR/set1_lexA-cpxR_20260113_115749_e72283/analysis/notebooks/run_overview.py
 ```
 
-## Optional: use matrix mode (local motifs + alignment)
+---
 
-To use local motif matrices (or alignment matrices from RegulonDB), switch to
-matrix mode. This preserves the full MEME motif length for DAP-seq sources (no
-site windowing):
+### Optional: local motifs or alignment matrices
+
+This demo already uses matrix mode. If you want to **prefer local motif matrices**
+or RegulonDB alignments over MEME/STREME discoveries, reorder `source_preference`
+like this:
 
 ```yaml
 motif_store:
@@ -658,14 +507,16 @@ motif_store:
 Then fetch local MEME motifs (if you have not already):
 
 ```bash
-uv run cruncher -c "$CONFIG" fetch motifs --source demo_local_meme --tf lexA --tf cpxR
+cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR -c "$CONFIG"
 ```
 
 Note: not all RegulonDB regulons ship alignment matrices. If `fetch motifs` fails
-with “alignment matrix is missing”, use `pwm_source: sites` and `fetch sites`
-instead.
+with “alignment matrix is missing”, temporarily switch to `pwm_source: sites` and
+`fetch sites` instead.
 
-## Optional: HT-only or combined site modes (RegulonDB)
+---
+
+### Optional: HT-only or combined site modes (RegulonDB)
 
 You can restrict `pwm_source: sites` to curated or HT sites, or combine them:
 
@@ -682,25 +533,10 @@ Tip: if HT datasets return peaks without sequences, hydration uses NCBI by defau
 (`ingest.genome_source=ncbi`). To run offline, provide a local FASTA via
 `--genome-fasta` or `ingest.genome_fasta`.
 
-If HT site lengths vary, use `uv run cruncher -c "$CONFIG" targets stats` and set
-`motif_store.site_window_lengths` per TF or dataset before building PWMs.
+If HT site lengths vary, use `cruncher targets stats` and set -c "$CONFIG"
+`motif_store.site_window_lengths` per TF or dataset before building site-derived PWMs (sites mode).
+Discovery uses raw sites unless `motif_discovery.window_sites=true`.
 
-## See also
+---
 
-- Command reference: [CLI reference](../reference/cli.md)
-- Config knobs: [Config reference](../reference/config.md)
-- Ingestion details: [Ingestion guide](../guides/ingestion.md)
-
-## Where outputs live
-
-- `.cruncher/demo_basics_two_tf/` - demo-local cache, lockfiles, and run index.
-- `<out_dir>/` - parse/sample runs (this demo writes to `runs/`).
-
-Sample run contents:
-
-```
-config_used.yaml
-run_manifest.json
-analysis/
-report.md
-```
+@e-south

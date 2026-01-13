@@ -16,6 +16,7 @@ from typing import Optional
 
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig
 from dnadesign.cruncher.utils.artifacts import normalize_artifacts
+from dnadesign.cruncher.utils.run_layout import manifest_path, status_path
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class RunInfo:
     status: Optional[str]
     motif_count: int
     pwm_source: Optional[str]
+    best_score: float | None
     artifacts: list[dict]
     regulator_set: Optional[dict]
 
@@ -42,6 +44,7 @@ class RunInfo:
             status=payload.get("status"),
             motif_count=int(payload.get("motif_count", 0)),
             pwm_source=payload.get("pwm_source"),
+            best_score=payload.get("best_score"),
             artifacts=normalize_artifacts(payload.get("artifacts", [])),
             regulator_set=payload.get("regulator_set"),
         )
@@ -66,6 +69,22 @@ def save_run_index(config_path: Path, payload: dict[str, dict], catalog_root: Pa
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True))
     return path
+
+
+def _iter_run_dirs(stage_dir: Path) -> list[Path]:
+    runs: list[Path] = []
+    for child in stage_dir.iterdir():
+        if not child.is_dir():
+            continue
+        if manifest_path(child).exists():
+            runs.append(child)
+            continue
+        for grand in child.iterdir():
+            if not grand.is_dir():
+                continue
+            if manifest_path(grand).exists():
+                runs.append(grand)
+    return runs
 
 
 def _merge_payload(existing: dict, updates: dict) -> dict:
@@ -103,6 +122,7 @@ def _updates_from_manifest(manifest: dict) -> dict:
         "lockfile_sha256": manifest.get("lockfile_sha256"),
         "motif_count": len(motifs),
         "pwm_source": motif_store.get("pwm_source"),
+        "run_group": manifest.get("run_group"),
         "regulator_set": manifest.get("regulator_set"),
         "artifacts": manifest.get("artifacts", []),
     }
@@ -116,6 +136,7 @@ def _updates_from_status(status_payload: dict) -> dict:
         "updated_at": status_payload.get("updated_at") or status_payload.get("finished_at"),
         "run_dir": status_payload.get("run_dir"),
         "regulator_set": status_payload.get("regulator_set"),
+        "best_score": status_payload.get("best_score"),
     }
 
 
@@ -157,19 +178,20 @@ def rebuild_run_index(cfg: CruncherConfig, config_path: Path) -> Path:
     out_dir = config_path.parent / cfg.out_dir
     index: dict[str, dict] = {}
     if out_dir.exists():
-        for child in out_dir.iterdir():
-            if not child.is_dir():
+        for stage_dir in out_dir.iterdir():
+            if not stage_dir.is_dir():
                 continue
-            manifest_path = child / "run_manifest.json"
-            if not manifest_path.exists():
-                continue
-            payload = json.loads(manifest_path.read_text())
-            entry = _updates_from_manifest(payload)
-            status_payload = load_run_status(child)
-            if status_payload:
-                entry = _merge_payload(entry, _updates_from_status(status_payload))
-            entry.setdefault("run_dir_guess", str(child.resolve()))
-            index[child.name] = entry
+            for child in _iter_run_dirs(stage_dir):
+                manifest_file = manifest_path(child)
+                if not manifest_file.exists():
+                    continue
+                payload = json.loads(manifest_file.read_text())
+                entry = _updates_from_manifest(payload)
+                status_payload = load_run_status(child)
+                if status_payload:
+                    entry = _merge_payload(entry, _updates_from_status(status_payload))
+                entry.setdefault("run_dir_guess", str(child.resolve()))
+                index[child.name] = entry
     return save_run_index(config_path, index, cfg.motif_store.catalog_root)
 
 
@@ -187,30 +209,32 @@ def list_runs(cfg: CruncherConfig, config_path: Path, *, stage: Optional[str] = 
     out_dir = config_path.parent / cfg.out_dir
     if not out_dir.exists():
         return []
-    for child in out_dir.iterdir():
-        if not child.is_dir():
+    for stage_dir in out_dir.iterdir():
+        if not stage_dir.is_dir():
             continue
-        manifest_path = child / "run_manifest.json"
-        if not manifest_path.exists():
-            continue
-        payload = json.loads(manifest_path.read_text())
-        run_stage = payload.get("stage", "unknown")
-        if stage and run_stage != stage:
-            continue
-        status_payload = load_run_status(child)
-        runs.append(
-            RunInfo(
-                name=child.name,
-                stage=run_stage,
-                created_at=payload.get("created_at"),
-                run_dir=child,
-                status=status_payload.get("status") if status_payload else None,
-                motif_count=len(payload.get("motifs", [])),
-                pwm_source=(payload.get("motif_store") or {}).get("pwm_source"),
-                artifacts=normalize_artifacts(payload.get("artifacts", [])),
-                regulator_set=payload.get("regulator_set"),
+        for child in _iter_run_dirs(stage_dir):
+            manifest_file = manifest_path(child)
+            if not manifest_file.exists():
+                continue
+            payload = json.loads(manifest_file.read_text())
+            run_stage = payload.get("stage", "unknown")
+            if stage and run_stage != stage:
+                continue
+            status_payload = load_run_status(child)
+            runs.append(
+                RunInfo(
+                    name=child.name,
+                    stage=run_stage,
+                    created_at=payload.get("created_at"),
+                    run_dir=child,
+                    status=status_payload.get("status") if status_payload else None,
+                    motif_count=len(payload.get("motifs", [])),
+                    pwm_source=(payload.get("motif_store") or {}).get("pwm_source"),
+                    best_score=status_payload.get("best_score") if status_payload else None,
+                    artifacts=normalize_artifacts(payload.get("artifacts", [])),
+                    regulator_set=payload.get("regulator_set"),
+                )
             )
-        )
     runs.sort(key=lambda r: r.created_at or "", reverse=True)
     return runs
 
@@ -220,11 +244,21 @@ def get_run(cfg: CruncherConfig, config_path: Path, run_name: str) -> RunInfo:
     if index and run_name in index:
         return RunInfo.from_payload(run_name, index[run_name])
     out_dir = config_path.parent / cfg.out_dir
-    run_dir = out_dir / run_name
-    manifest_path = run_dir / "run_manifest.json"
-    if not manifest_path.exists():
-        raise FileNotFoundError(f"run_manifest.json not found for run '{run_name}'")
-    payload = json.loads(manifest_path.read_text())
+    run_dir = None
+    if out_dir.exists():
+        for stage_dir in out_dir.iterdir():
+            if not stage_dir.is_dir():
+                continue
+            for candidate in _iter_run_dirs(stage_dir):
+                if candidate.name == run_name and manifest_path(candidate).exists():
+                    run_dir = candidate
+                    break
+            if run_dir is not None:
+                break
+    if run_dir is None:
+        raise FileNotFoundError(f"Run directory not found (or missing manifest) for run '{run_name}'")
+    manifest_file = manifest_path(run_dir)
+    payload = json.loads(manifest_file.read_text())
     status_payload = load_run_status(run_dir)
     return RunInfo(
         name=run_name,
@@ -234,13 +268,14 @@ def get_run(cfg: CruncherConfig, config_path: Path, run_name: str) -> RunInfo:
         status=status_payload.get("status") if status_payload else None,
         motif_count=len(payload.get("motifs", [])),
         pwm_source=(payload.get("motif_store") or {}).get("pwm_source"),
+        best_score=status_payload.get("best_score") if status_payload else None,
         artifacts=normalize_artifacts(payload.get("artifacts", [])),
         regulator_set=payload.get("regulator_set"),
     )
 
 
 def load_run_status(run_dir: Path) -> Optional[dict]:
-    status_path = run_dir / "run_status.json"
-    if not status_path.exists():
+    status_file = status_path(run_dir)
+    if not status_file.exists():
         return None
-    return json.loads(status_path.read_text())
+    return json.loads(status_file.read_text())

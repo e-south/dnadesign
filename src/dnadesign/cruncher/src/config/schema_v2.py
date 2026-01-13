@@ -63,7 +63,7 @@ class MoveConfig(StrictBaseModel):
     multi_k_range: Tuple[int, int] = (2, 6)
     slide_max_shift: int = 2
     swap_len_range: Tuple[int, int] = (6, 12)
-    move_probs: Dict[Literal["S", "B", "M"], float] = {"S": 0.50, "B": 0.30, "M": 0.20}
+    move_probs: Dict[Literal["S", "B", "M"], float] = {"S": 0.80, "B": 0.10, "M": 0.10}
 
     @field_validator("block_len_range", "multi_k_range", "swap_len_range", mode="before")
     @classmethod
@@ -141,6 +141,117 @@ class OptimiserConfig(StrictBaseModel):
     cooling: CoolingConfig
     swap_prob: float = 0.10
 
+    @model_validator(mode="after")
+    def _validate_cooling_kind(self) -> "OptimiserConfig":
+        cooling_kind = self.cooling.kind
+        if self.kind == "pt" and cooling_kind not in {"geometric", "fixed"}:
+            raise ValueError("optimiser.kind='pt' requires cooling.kind='geometric' or 'fixed'")
+        if self.kind == "gibbs" and cooling_kind == "geometric":
+            raise ValueError("optimiser.kind='gibbs' does not support cooling.kind='geometric'")
+        return self
+
+
+class AutoOptimizeConfig(StrictBaseModel):
+    enabled: bool = True
+    pilot_draws: int = 200
+    pilot_tune: int = 100
+    pilot_chains_gibbs: int = 2
+    pilot_chains_pt: int = 4
+    pilot_progress_bar: bool = False
+    pilot_progress_every: int = 0
+    retry_on_warn: bool = True
+    retry_draws_factor: float = 2.0
+    retry_tune_factor: float = 2.0
+    cooling_boost: float = 5.0
+    max_rhat: float = 1.2
+    min_ess: float = 20.0
+    min_unique_fraction: float = 0.10
+    max_unique_fraction: float | None = None
+    gibbs_cooling: CoolingConfig = Field(
+        default_factory=lambda: CoolingLinear(beta=[0.01, 0.1]),
+        description="Cooling schedule for Gibbs pilots when the base config is PT.",
+    )
+    pt_beta_min: float = 0.2
+    pt_beta_max: float = 1.0
+    pt_beta: List[float] | None = None
+
+    @field_validator("pilot_draws")
+    @classmethod
+    def _check_pilot_draws(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 4:
+            raise ValueError("auto_opt.pilot_draws must be >= 4 to compute diagnostics")
+        return v
+
+    @field_validator("pilot_tune", "pilot_progress_every")
+    @classmethod
+    def _check_pilot_non_negative(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 0:
+            raise ValueError("auto_opt pilot settings must be non-negative integers")
+        return v
+
+    @field_validator("pilot_chains_gibbs", "pilot_chains_pt")
+    @classmethod
+    def _check_pilot_chains(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 2:
+            raise ValueError("auto_opt pilot chains must be >= 2 for R-hat/ESS")
+        return v
+
+    @field_validator("pt_beta_min", "pt_beta_max")
+    @classmethod
+    def _check_beta_bounds(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError("auto_opt PT beta bounds must be positive")
+        return float(v)
+
+    @field_validator("retry_draws_factor", "retry_tune_factor", "cooling_boost")
+    @classmethod
+    def _check_retry_factors(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 1:
+            raise ValueError("auto_opt retry factors must be >= 1")
+        return float(v)
+
+    @field_validator("max_rhat")
+    @classmethod
+    def _check_max_rhat(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 1.0:
+            raise ValueError("auto_opt.max_rhat must be > 1.0")
+        return float(v)
+
+    @field_validator("min_ess", "min_unique_fraction")
+    @classmethod
+    def _check_positive_thresholds(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0:
+            raise ValueError("auto_opt thresholds must be non-negative")
+        return float(v)
+
+    @field_validator("max_unique_fraction")
+    @classmethod
+    def _check_max_unique_fraction(cls, v: float | None) -> float | None:
+        if v is None:
+            return v
+        if not isinstance(v, (int, float)) or v < 0:
+            raise ValueError("auto_opt.max_unique_fraction must be >= 0")
+        return float(v)
+
+    @field_validator("pt_beta")
+    @classmethod
+    def _check_pt_beta(cls, v: List[float] | None) -> List[float] | None:
+        if v is None:
+            return v
+        if len(v) < 2:
+            raise ValueError("auto_opt.pt_beta must contain at least 2 values")
+        if any(beta <= 0 for beta in v):
+            raise ValueError("auto_opt.pt_beta values must be > 0")
+        return v
+
+    @model_validator(mode="after")
+    def _check_beta_range(self) -> "AutoOptimizeConfig":
+        if self.pt_beta_min > self.pt_beta_max:
+            raise ValueError("auto_opt.pt_beta_min must be <= pt_beta_max")
+        if self.pt_beta is not None and len(self.pt_beta) != self.pilot_chains_pt:
+            raise ValueError("auto_opt.pt_beta length must match auto_opt.pilot_chains_pt")
+        return self
+
 
 class InitConfig(StrictBaseModel):
     kind: Literal["random", "consensus", "consensus_mix"]
@@ -179,7 +290,7 @@ class SampleConfig(StrictBaseModel):
     )
     live_metrics: bool = Field(
         True,
-        description="Write live_metrics.jsonl with progress snapshots during sampling.",
+        description="Write live/metrics.jsonl with progress snapshots during sampling.",
     )
     save_trace: bool = Field(
         True,
@@ -195,6 +306,7 @@ class SampleConfig(StrictBaseModel):
 
     moves: MoveConfig = MoveConfig()
     optimiser: OptimiserConfig
+    auto_opt: AutoOptimizeConfig | None = AutoOptimizeConfig()
     save_sequences: bool = True
     include_consensus_in_elites: bool = Field(
         False,
@@ -205,6 +317,20 @@ class SampleConfig(StrictBaseModel):
         0.0,
         description="If >0, only sequences with sum(per-TF scaled_score) ≥ this are written to elites.json",
     )
+
+    @model_validator(mode="after")
+    def _validate_optimizer_params(self) -> "SampleConfig":
+        if self.optimiser.kind == "pt":
+            cooling_kind = self.optimiser.cooling.kind
+            if cooling_kind == "fixed" and self.chains != 1:
+                raise ValueError("PT with fixed cooling requires chains=1 (use geometric for multi-chain ladders)")
+            if cooling_kind == "geometric":
+                beta = self.optimiser.cooling.beta
+                if len(beta) != self.chains:
+                    raise ValueError("PT cooling.beta length must match sample.chains")
+                if self.chains < 2:
+                    raise ValueError("PT with geometric cooling requires chains >= 2")
+        return self
 
     @field_validator("draws", "tune", "chains", "min_dist", "top_k")
     @classmethod
@@ -248,6 +374,9 @@ class AnalysisConfig(StrictBaseModel):
     scatter_scale: Literal["llr", "z", "logp", "consensus-neglop-sum"]
     subsampling_epsilon: float
     scatter_style: Literal["edges", "thresholds"] = "edges"
+    scatter_background: bool = True
+    scatter_background_samples: Optional[int] = None
+    scatter_background_seed: int = 0
     tf_pair: Optional[List[str]] = None
     archive: bool = Field(
         False,
@@ -271,6 +400,22 @@ class AnalysisConfig(StrictBaseModel):
             return None
         if len(v) != 2:
             raise ValueError("analysis.tf_pair must contain exactly two TF names.")
+        return v
+
+    @field_validator("scatter_background_samples")
+    @classmethod
+    def _check_scatter_background_samples(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return None
+        if not isinstance(v, int) or v < 0:
+            raise ValueError("analysis.scatter_background_samples must be a non-negative integer or null.")
+        return v
+
+    @field_validator("scatter_background_seed")
+    @classmethod
+    def _check_scatter_background_seed(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 0:
+            raise ValueError("analysis.scatter_background_seed must be a non-negative integer")
         return v
 
     @model_validator(mode="after")
@@ -453,6 +598,10 @@ class MotifStoreConfig(StrictBaseModel):
     pwm_source: Literal["matrix", "sites"] = "matrix"
     site_kinds: Optional[List[str]] = None
     combine_sites: bool = False
+    pseudocounts: float = Field(
+        0.5,
+        description="Pseudocounts for PWM construction from sites (Biopython).",
+    )
     dataset_preference: List[str] = Field(
         default_factory=list,
         description="Preferred dataset IDs to resolve HT ambiguity (first match wins).",
@@ -466,8 +615,23 @@ class MotifStoreConfig(StrictBaseModel):
         description="Window length overrides for HT sites keyed by TF name or dataset:<id>.",
     )
     site_window_center: Literal["midpoint", "summit"] = "midpoint"
+    pwm_window_lengths: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Window length overrides for PWM trimming keyed by TF name or dataset:<id>.",
+    )
+    pwm_window_strategy: Literal["max_info"] = "max_info"
     min_sites_for_pwm: int = 2
     allow_low_sites: bool = False
+
+    @field_validator("catalog_root")
+    @classmethod
+    def _check_catalog_root(cls, v: Path) -> Path:
+        if v.is_absolute():
+            raise ValueError("motif_store.catalog_root must be a relative path")
+        normalized = Path(v)
+        if any(part == ".." for part in normalized.parts):
+            raise ValueError("motif_store.catalog_root must not traverse outside the workspace")
+        return normalized
 
     @field_validator("site_window_lengths")
     @classmethod
@@ -477,12 +641,83 @@ class MotifStoreConfig(StrictBaseModel):
                 raise ValueError(f"site_window_lengths['{key}'] must be > 0")
         return v
 
+    @field_validator("pwm_window_lengths")
+    @classmethod
+    def _check_pwm_window_lengths(cls, v: Dict[str, int]) -> Dict[str, int]:
+        for key, value in v.items():
+            if value <= 0:
+                raise ValueError(f"pwm_window_lengths['{key}'] must be > 0")
+        return v
+
+    @field_validator("pseudocounts")
+    @classmethod
+    def _check_pseudocounts(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("pseudocounts must be >= 0")
+        return float(v)
+
     @field_validator("min_sites_for_pwm")
     @classmethod
     def _check_min_sites(cls, v: int) -> int:
         if v < 1:
             raise ValueError("min_sites_for_pwm must be >= 1")
         return v
+
+
+class MotifDiscoveryConfig(StrictBaseModel):
+    tool: Literal["auto", "streme", "meme"] = Field(
+        "auto",
+        description="Motif discovery tool: auto selects STREME for larger sets, MEME for small sets.",
+    )
+    tool_path: Optional[Path] = Field(
+        None,
+        description="Optional path to MEME Suite executable or bin directory (overrides PATH).",
+    )
+    window_sites: bool = Field(
+        False,
+        description="Pre-window binding sites using motif_store.site_window_lengths before discovery.",
+    )
+    minw: Optional[int] = Field(
+        None,
+        description="Minimum motif width for discovery (auto from site lengths when unset).",
+    )
+    maxw: Optional[int] = Field(
+        None,
+        description="Maximum motif width for discovery (auto from site lengths when unset).",
+    )
+    nmotifs: int = Field(1, description="Number of motifs to report per TF.")
+    meme_mod: Optional[Literal["oops", "zoops", "anr"]] = Field(
+        None,
+        description="Optional MEME -mod setting (oops/zoops/anr). When unset, MEME defaults apply.",
+    )
+    min_sequences_for_streme: int = Field(50, description="Threshold for auto tool selection.")
+    source_id: str = Field("meme_suite", description="Catalog source_id for discovered motifs.")
+    replace_existing: bool = Field(
+        True,
+        description="Replace existing discovered motifs for the same TF/source to avoid cache bloat.",
+    )
+
+    @field_validator("minw", "maxw")
+    @classmethod
+    def _check_optional_positive_ints(cls, v: Optional[int], info) -> Optional[int]:
+        if v is None:
+            return v
+        if v < 1:
+            raise ValueError(f"{info.field_name} must be >= 1")
+        return int(v)
+
+    @field_validator("nmotifs", "min_sequences_for_streme")
+    @classmethod
+    def _check_positive_ints(cls, v: int, info) -> int:
+        if v < 1:
+            raise ValueError(f"{info.field_name} must be >= 1")
+        return v
+
+    @model_validator(mode="after")
+    def _check_widths(self) -> "MotifDiscoveryConfig":
+        if self.minw is not None and self.maxw is not None and self.maxw < self.minw:
+            raise ValueError("motif_discovery.maxw must be >= motif_discovery.minw")
+        return self
 
 
 class LocalMotifSourceConfig(StrictBaseModel):
@@ -561,6 +796,10 @@ class RegulonDBConfig(StrictBaseModel):
     motif_matrix_source: Literal["alignment", "sites"] = "alignment"
     alignment_matrix_semantics: Literal["probabilities", "counts"] = "probabilities"
     min_sites_for_pwm: int = 2
+    pseudocounts: float = Field(
+        0.5,
+        description="Pseudocounts for PWM construction from curated sites (Biopython).",
+    )
     allow_low_sites: bool = False
     curated_sites: bool = True
     ht_sites: bool = False
@@ -575,6 +814,13 @@ class RegulonDBConfig(StrictBaseModel):
         if v < 1:
             raise ValueError("min_sites_for_pwm must be >= 1")
         return v
+
+    @field_validator("pseudocounts")
+    @classmethod
+    def _check_pseudocounts(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("pseudocounts must be >= 0")
+        return float(v)
 
 
 class HttpRetryConfig(StrictBaseModel):
@@ -619,6 +865,16 @@ class IngestConfig(StrictBaseModel):
         description="Local filesystem motif sources.",
     )
 
+    @field_validator("genome_cache")
+    @classmethod
+    def _check_genome_cache(cls, v: Path) -> Path:
+        if v.is_absolute():
+            raise ValueError("ingest.genome_cache must be a relative path")
+        normalized = Path(v)
+        if any(part == ".." for part in normalized.parts):
+            raise ValueError("ingest.genome_cache must not traverse outside the workspace")
+        return normalized
+
     @field_validator("ncbi_timeout_seconds")
     @classmethod
     def _check_ncbi_timeout(cls, v: int) -> int:
@@ -635,6 +891,7 @@ class CruncherConfig(StrictBaseModel):
     campaign: Optional[CampaignMetadataConfig] = None
     io: IOConfig = IOConfig()
     motif_store: MotifStoreConfig = MotifStoreConfig()
+    motif_discovery: MotifDiscoveryConfig = MotifDiscoveryConfig()
     ingest: IngestConfig = IngestConfig()
 
     parse: ParseConfig

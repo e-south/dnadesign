@@ -12,17 +12,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from dnadesign.cruncher.utils.run_layout import live_metrics_path, status_path
 from dnadesign.cruncher.utils.run_status import RunStatusWriter
 
 
 def test_run_status_writer_emits_live_metrics(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()
-    status_path = run_dir / "run_status.json"
-    metrics_path = run_dir / "live_metrics.jsonl"
+    status_file = status_path(run_dir)
+    metrics_path = live_metrics_path(run_dir)
 
     writer = RunStatusWriter(
-        path=status_path,
+        path=status_file,
         stage="sample",
         run_dir=run_dir,
         metrics_path=metrics_path,

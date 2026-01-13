@@ -184,6 +184,9 @@ def summary(
         table.add_row("analysis.scatter_scale", str(analysis["scatter_scale"]))
         table.add_row("analysis.subsampling_epsilon", str(analysis["subsampling_epsilon"]))
         table.add_row("analysis.scatter_style", str(analysis["scatter_style"]))
+        table.add_row("analysis.scatter_background", str(analysis["scatter_background"]))
+        table.add_row("analysis.scatter_background_samples", str(analysis["scatter_background_samples"]))
+        table.add_row("analysis.scatter_background_seed", str(analysis["scatter_background_seed"]))
         table.add_row("analysis.tf_pair", str(analysis["tf_pair"]))
         table.add_row("analysis.archive", str(analysis.get("archive")))
 

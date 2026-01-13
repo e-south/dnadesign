@@ -8,7 +8,8 @@ This demo walks through a process of running category-based sequence optimizatio
 
 - **Workspace**: `src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/`
 - **Config**: `config.yaml`
-- **Output root**: `runs/` (relative to the workspace)
+- **Output root**: `runs/` (relative to the workspace; runs are grouped by regulator set under `runs/<stage>/setN_<tfs>/...`)
+- **Motif flow**: fetch sites → discover MEME/STREME motifs → lock/sample using those matrices
 
 ### Enter the demo workspace
 
@@ -22,14 +23,34 @@ own workspace so its outputs stay isolated.
 ```bash
 # Option A: cd into the workspace
 cd src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf
-CONFIG=config.yaml
+CONFIG="$PWD/config.yaml"
 
 # Option B: run from anywhere
 CONFIG=src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/config.yaml
 
+# Choose a runner (pixi recommended when using MEME Suite).
+cruncher() { pixi run cruncher -- "$@"; }
+# cruncher() { uv run cruncher "$@"; }
+
+# Optional: widen tables to avoid truncation in rich output.
+export COLUMNS=160
+
+# Note: when using pixi tasks, put -c/--config after the subcommand (pixi inserts `--`).
+
+# If you haven't installed system tools yet (from repo root):
+# pixi install
+
 # From here on, commands use $CONFIG for clarity; if you're in the workspace, you can omit -c.
-# Commands are shown as `uv run cruncher ...` so they work out of the box.
 ```
+
+Fail fast on external dependencies (MEME Suite):
+
+```bash
+cruncher doctor -c "$CONFIG"
+```
+
+If it reports missing tools, install MEME Suite (pixi recommended) or set `motif_discovery.tool_path`.
+See the [MEME Suite guide](../guides/meme_suite.md) for details.
 
 This workspace also registers the demo local DAP-seq source (`demo_local_meme`)
 used in the two-TF demo. It only covers LexA + CpxR; for the full multi-source
@@ -55,8 +76,8 @@ Category definitions (from the demo config):
 List targets by category or campaign:
 
 ```bash
-uv run cruncher -c "$CONFIG" targets list --category Category1
-uv run cruncher -c "$CONFIG" targets list --campaign demo_pair
+cruncher targets list --category Category1 -c "$CONFIG"
+cruncher targets list --campaign demo_pair -c "$CONFIG"
 ```
 
 Example output (Category1):
@@ -94,7 +115,7 @@ Example output (demo_pair campaign):
 Validate campaign wiring (category membership, selectors, and constraints) without hitting the catalog:
 
 ```bash
-uv run cruncher -c "$CONFIG" campaign validate --campaign demo_categories_best --no-selectors --no-metrics
+cruncher campaign validate --campaign demo_categories_best --no-selectors --no-metrics -c "$CONFIG"
 ```
 
 Example output:
@@ -117,79 +138,19 @@ campaign_id: bcca78ce83989eb24a25f5bc93ebda1e02d118420475ed778a35352e591242af
 Fetch curated RegulonDB sites for all TFs implied by the campaign:
 
 ```bash
-uv run cruncher -c "$CONFIG" fetch sites --campaign demo_categories --no-selectors --update
+cruncher fetch sites --campaign demo_categories --no-selectors --update -c "$CONFIG"
 ```
-
-Example output (abridged, INFO log level):
-
-```bash
-16:07:02 INFO     Fetching binding sites from regulondb for TFs=['acrR', 'baeR', 'cpxR', 'fnr', 'fur', 'lexA', 'lrp', 'rcdA', 'soxR', 'soxS'] motif_ids=[]
-         INFO     Fetching binding sites for TF 'acrR'
-         INFO     Fetching binding sites for TF 'baeR'
-16:07:03 INFO     Fetching binding sites for TF 'cpxR'
-16:07:04 WARNING  Skipping curated site RDBECOLIBSC04560: invalid curated binding-site coordinates
-         INFO     Fetching binding sites for TF 'fnr'
-16:07:05 INFO     Fetching binding sites for TF 'fur'
-16:07:06 INFO     Fetching binding sites for TF 'lexA'
-         INFO     Fetching binding sites for TF 'lrp'
-16:07:08 INFO     Fetching binding sites for TF 'rcdA'
-         INFO     Fetching binding sites for TF 'soxR'
-         INFO     Fetching binding sites for TF 'soxS'
-                                         Fetched binding-site sets
-┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
-┃ TF   ┃ Source    ┃ Motif ID         ┃ Kind    ┃ Dataset ┃ Method ┃ Sites ┃ Total ┃ Mean len ┃ Updated    ┃
-┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ lrp  │ regulondb │ RDBECOLITFC00014 │ curated │ -       │ -      │ 219   │ 219   │ 14.7     │ 2026-01-10 │
-│ rcdA │ regulondb │ RDBECOLITFC00048 │ curated │ -       │ -      │ 15    │ 15    │ 10.0     │ 2026-01-10 │
-│ acrR │ regulondb │ RDBECOLITFC00065 │ curated │ -       │ -      │ 11    │ 11    │ 18.9     │ 2026-01-10 │
-│ soxR │ regulondb │ RDBECOLITFC00071 │ curated │ -       │ -      │ 7     │ 7     │ 18.0     │ 2026-01-10 │
-│ fur  │ regulondb │ RDBECOLITFC00093 │ curated │ -       │ -      │ 217   │ 217   │ 18.6     │ 2026-01-10 │
-│ fnr  │ regulondb │ RDBECOLITFC00128 │ curated │ -       │ -      │ 152   │ 152   │ 14.3     │ 2026-01-10 │
-│ cpxR │ regulondb │ RDBECOLITFC00170 │ curated │ -       │ -      │ 154   │ 154   │ 15.3     │ 2026-01-10 │
-│ baeR │ regulondb │ RDBECOLITFC00182 │ curated │ -       │ -      │ 4     │ 4     │ 20.0     │ 2026-01-10 │
-│ soxS │ regulondb │ RDBECOLITFC00201 │ curated │ -       │ -      │ 44    │ 44    │ 20.0     │ 2026-01-10 │
-│ lexA │ regulondb │ RDBECOLITFC00214 │ curated │ -       │ -      │ 49    │ 49    │ 19.5     │ 2026-01-10 │
-└──────┴───────────┴──────────────────┴─────────┴─────────┴────────┴───────┴───────┴──────────┴────────────┘
-```
+Output includes per‑TF site counts and any warnings about invalid coordinates.
 
 ## Inspect cached inventory + group stats
 
 Summarize cached inventory and check per-set stats:
 
 ```bash
-uv run cruncher -c "$CONFIG" sources summary --source regulondb --scope cache
-uv run cruncher -c "$CONFIG" targets stats --campaign demo_pair
+cruncher sources summary --source regulondb --scope cache -c "$CONFIG"
+cruncher targets stats --campaign demo_pair -c "$CONFIG"
 ```
-
-Example output (cache summary, abridged):
-
-```bash
-        Cache overview
-      (source=regulondb)
-┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
-┃ Metric            ┃ Value   ┃
-┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
-│ entries           │ 10      │
-│ sources           │ 1       │
-│ TFs               │ 10      │
-│ motifs            │ 0       │
-│ site sets         │ 10      │
-│ sites (seq/total) │ 872/872 │
-│ datasets          │ 0       │
-└───────────────────┴─────────┘
-```
-
-Example output (demo_pair stats):
-
-```bash
-                                                               Campaign targets: demo_pair
-┏━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┓
-┃ Set ┃ TF   ┃ Source    ┃ Motif ID         ┃ Kind    ┃ Matrix len ┃ Sites (seq/total) ┃ Mean len ┃ Len min/max ┃ Len source ┃ Dataset ┃ Method ┃ Genome ┃
-┡━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━╇━━━━━━━━┩
-│   1 │ lexA │ regulondb │ RDBECOLITFC00214 │ curated │ -          │ 49/49             │ 19.5     │ 15/20       │ sequence   │ -       │ -      │ -      │
-│   1 │ cpxR │ regulondb │ RDBECOLITFC00170 │ curated │ -          │ 154/154           │ 15.3     │ 11/19       │ sequence   │ -       │ -      │ -      │
-└─────┴──────┴───────────┴──────────────────┴─────────┴────────────┴───────────────────┴──────────┴─────────────┴────────────┴─────────┴────────┴────────┘
-```
+These summaries confirm cached counts and site‑length ranges before selection.
 
 For `demo_categories`, the stats table is much larger; use it when you are ready to inspect all expanded sets.
 
@@ -202,23 +163,86 @@ Compute PWM info-bits for a representative subset before you scale up. This help
 `selectors.min_info_bits` gate for the campaign:
 
 ```bash
-uv run cruncher -c "$CONFIG" catalog pwms --tf lexA --tf cpxR --source regulondb
+cruncher catalog pwms --tf lexA --tf cpxR --source regulondb -c "$CONFIG"
 ```
 
 Example output:
 
 ```bash
-                                        PWM summary
-┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━┓
-┃ TF   ┃ Source    ┃ Motif ID         ┃ PWM source ┃ Length ┃ Bits  ┃ n sites ┃ Site sets ┃
-┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━┩
-│ lexA │ regulondb │ RDBECOLITFC00214 │ sites      │ 15     │ 10.36 │ 49      │ 1         │
-│ cpxR │ regulondb │ RDBECOLITFC00170 │ sites      │ 11     │ 3.63  │ 154     │ 1         │
-└──────┴───────────┴──────────────────┴────────────┴────────┴───────┴─────────┴───────────┘
+                                           PWM summary
+┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━┓
+┃ TF   ┃ Source    ┃ Motif ID         ┃ PWM source ┃ Length ┃ Window ┃ Bits  ┃ n sites ┃ Site sets ┃
+┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━┩
+│ lexA │ regulondb │ RDBECOLITFC00214 │ matrix     │ 22     │ -      │ 12.10 │ -       │ -         │
+│ cpxR │ regulondb │ RDBECOLITFC00170 │ matrix     │ 11     │ -      │ 3.52 │ -       │ -         │
+└──────┴───────────┴──────────────────┴────────────┴────────┴────────┴───────┴─────────┴───────────┘
 ```
 
 If you want to enforce information content, add `selectors.min_info_bits` to the
 `demo_categories_best` campaign in `config.yaml` and re-run `campaign validate`.
+
+## Optional: align sites with MEME Suite (recommended before multi-source metrics)
+
+If you want aligned PWMs (e.g., when combining variable-length sites), run MEME Suite
+on cached sites first. For the small `demo_pair` baseline, store each tool in its own
+`source_id`:
+
+What happens here (and why):
+
+- `discover check` confirms `meme` and `streme` are on PATH (pixi installs both).
+- `discover motifs` selects the tool based on `motif_discovery.tool` and `min_sequences_for_streme`
+  (auto defaults to STREME for larger site counts). It writes a per‑TF run folder under
+  `.cruncher/<workspace>/discoveries/` and ingests the discovered motif(s) into the catalog.
+- By default, discovery replaces earlier discovered motifs for the same TF/source to avoid cache bloat.
+  Use `--keep-existing` if you want to retain historical runs.
+- The “Motif discovery” table in stdout reports the tool used, the new motif ID, the width, and the
+  output file path (MEME format).
+- By default, discovery uses raw cached site sequences. To pre-window, set
+  `motif_discovery.window_sites=true` and provide `motif_store.site_window_lengths`.
+- Raw sites can be variable length; MEME/STREME accept that input and Cruncher passes it through.
+- If `minw/maxw` are omitted, Cruncher derives them from the min/max site lengths per TF.
+- This demo config sets `combine_sites: true` so discovery sees all cached site sets per TF.
+- Discovery always uses cached sites regardless of `motif_store.pwm_source`.
+
+```bash
+cruncher discover check -c "$CONFIG"
+cruncher discover motifs --tf lexA --tf cpxR --tool streme --source-id meme_suite_streme -c "$CONFIG"
+cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id meme_suite_meme -c "$CONFIG"
+```
+
+Tip: if each sequence represents one site, prefer MEME with `--meme-mod oops`. If STREME is not
+installed, pass `--tool meme`.
+
+How to read the outputs:
+
+- In `discover check`, “ok” means the binary resolved and the version was read.
+To compare both tools without manual IDs:
+
+```bash
+cruncher catalog pwms --source meme_suite_streme --set 1 -c "$CONFIG"
+cruncher catalog pwms --source meme_suite_meme --set 1 -c "$CONFIG"
+cruncher catalog logos --source meme_suite_streme --set 1 -c "$CONFIG"
+cruncher catalog logos --source meme_suite_meme --set 1 -c "$CONFIG"
+```
+
+The demo config already prefers `meme_suite_meme` then `meme_suite_streme`, so after discovery
+you can run `cruncher lock` and proceed to sampling without editing IDs.
+
+If you need shorter PWMs for optimization, add a window constraint before sampling:
+
+```yaml
+motif_store:
+  pwm_window_lengths:
+    lexA: 15
+    cpxR: 15
+```
+
+```bash
+cruncher catalog pwms --set 1 -c "$CONFIG"
+```
+
+For larger campaigns, run discovery on a curated shortlist first (or per-category),
+then re-run `campaign validate --metrics` so selector metrics reflect the aligned motifs.
 
 ## Apply selectors and generate a derived config
 
@@ -226,7 +250,7 @@ Apply selectors to keep the strongest candidates and preview what got filtered
 (include metrics so min-site-count / info-bit checks can run):
 
 ```bash
-uv run cruncher -c "$CONFIG" campaign validate --campaign demo_categories_best --metrics --show-filtered
+cruncher campaign validate --campaign demo_categories_best --metrics --show-filtered -c "$CONFIG"
 ```
 
 Example output:
@@ -249,14 +273,14 @@ Generate a derived config from the campaign:
 
 ```bash
 DERIVED=campaign.demo_categories_best.yaml
-uv run cruncher -c "$CONFIG" campaign generate --campaign demo_categories_best --out "$DERIVED"
+cruncher campaign generate --campaign demo_categories_best --out "$DERIVED" -c "$CONFIG"
 ```
 
 Example output:
 
 ```bash
-/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/campaign.demo_categories_best.yaml
-/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/campaign.demo_categories_best.campaign_manifest.json
+<workspace>/campaign.demo_categories_best.yaml
+<workspace>/campaign.demo_categories_best.campaign_manifest.json
 ```
 
 The derived config lives inside the workspace so outputs remain workspace-scoped. The companion manifest records per-TF metrics (site counts, plus info bits when `selectors.min_info_bits` is enabled).
@@ -276,12 +300,21 @@ Example (manifest excerpt; info_bits is `null` unless you enable the selector):
 
 The base workspace config includes a small 3-TF set (`lexA`, `cpxR`, `fur`) for a baseline end-to-end run. Use it to validate the multi-TF pipeline before running a large campaign-derived config.
 
+If you ran MEME/STREME discovery above, `lock` will prefer those motifs because the demo config
+lists `meme_suite_meme`/`meme_suite_streme` first in `source_preference`.
+
 ```bash
-uv run cruncher -c "$CONFIG" lock
-uv run cruncher -c "$CONFIG" parse
-uv run cruncher -c "$CONFIG" sample
-uv run cruncher -c "$CONFIG" runs list --stage sample
+cruncher lock -c "$CONFIG"
+cruncher parse -c "$CONFIG"
+cruncher sample -c "$CONFIG"
+cruncher sample --no-auto-opt -c "$CONFIG"
+cruncher runs list --stage sample -c "$CONFIG"
+cruncher runs latest --stage sample --set-index 1 -c "$CONFIG"
+cruncher runs best --stage sample --set-index 1 -c "$CONFIG"
 ```
+
+For diagnostics and tuning guidance, see the
+[sampling + analysis guide](../guides/sampling_and_analysis.md).
 
 Example output (runs list, abridged):
 
@@ -290,46 +323,46 @@ Example output (runs list, abridged):
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
 ┃ Name                                             ┃ Stage  ┃ Status    ┃ Created                          ┃ Motifs ┃ Regulator set      ┃ PWM source ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ sample_set1_lexA-cpxR-fur_20260110_161355_df8fcb │ sample │ completed │ 2026-01-10T21:13:55.663756+00:00 │ 3      │ set1:lexA,cpxR,fur │ sites      │
-│ sample_set1_lexA-cpxR-fur_20260110_161221_d63ebd │ sample │ completed │ 2026-01-10T21:12:22.000163+00:00 │ 3      │ set1:lexA,cpxR,fur │ sites      │
-│ sample_set1_lexA-cpxR-fur_20260110_125635_0affef │ sample │ completed │ 2026-01-10T17:56:39.263742+00:00 │ 3      │ set1:lexA,cpxR,fur │ sites      │
+│ set1_lexA-cpxR-fur_20260110_161355_df8fcb │ sample │ completed │ 2026-01-10T21:13:55.663756+00:00 │ 3      │ set1:lexA,cpxR,fur │ matrix     │
+│ set1_lexA-cpxR-fur_20260110_161221_d63ebd │ sample │ completed │ 2026-01-10T21:12:22.000163+00:00 │ 3      │ set1:lexA,cpxR,fur │ matrix     │
+│ set1_lexA-cpxR-fur_20260110_125635_0affef │ sample │ completed │ 2026-01-10T17:56:39.263742+00:00 │ 3      │ set1:lexA,cpxR,fur │ matrix     │
 └──────────────────────────────────────────────────┴────────┴───────────┴──────────────────────────────────┴────────┴────────────────────┴────────────┘
 ```
 
 ## Inspect run artifacts and outputs
 
 ```bash
-uv run cruncher -c "$CONFIG" runs show sample_set1_lexA-cpxR-fur_20260110_161355_df8fcb
+cruncher runs show set1_lexA-cpxR-fur_20260110_161355_df8fcb -c "$CONFIG"
 ```
 
 Example output (abridged):
 
 ```bash
-run: sample_set1_lexA-cpxR-fur_20260110_161355_df8fcb
+run: set1_lexA-cpxR-fur_20260110_161355_df8fcb
 stage: sample
 status: completed
 created_at: 2026-01-10T21:13:55.663756+00:00
 motif_count: 3
 regulator_set: {'index': 1, 'tfs': ['lexA', 'cpxR', 'fur']}
-pwm_source: sites
-run_dir: /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/runs/sample_set1_lexA-cpxR-fur_20260110_161355_df8fcb
+pwm_source: matrix
+run_dir: <workspace>/runs/sample/set1_lexA-cpxR-fur/set1_lexA-cpxR-fur_20260110_161355_df8fcb
 artifacts:
 ┏━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓
 ┃ Stage  ┃ Type     ┃ Label                                  ┃ Path              ┃
 ┡━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩
-│ sample │ config   │ Resolved config (config_used.yaml)     │ config_used.yaml  │
-│ sample │ trace    │ Trace (NetCDF)                         │ trace.nc          │
-│ sample │ table    │ Sequences with per-TF scores (Parquet) │ sequences.parquet │
-│ sample │ table    │ Elite sequences (Parquet)              │ elites.parquet    │
-│ sample │ json     │ Elite sequences (JSON)                 │ elites.json       │
-│ sample │ metadata │ Elite metadata (YAML)                  │ elites.yaml       │
+│ sample │ config   │ Resolved config (config_used.yaml)     │ meta/config_used.yaml        │
+│ sample │ trace    │ Trace (NetCDF)                         │ artifacts/trace.nc            │
+│ sample │ table    │ Sequences with per-TF scores (Parquet) │ artifacts/sequences.parquet   │
+│ sample │ table    │ Elite sequences (Parquet)              │ artifacts/elites.parquet      │
+│ sample │ json     │ Elite sequences (JSON)                 │ artifacts/elites.json         │
+│ sample │ metadata │ Elite metadata (YAML)                  │ artifacts/elites.yaml         │
 └────────┴──────────┴────────────────────────────────────────┴───────────────────┘
 ```
 
 ## Render PWM logos (visual QA)
 
 ```bash
-uv run cruncher -c "$CONFIG" catalog logos --set 1
+cruncher catalog logos --set 1 -c "$CONFIG"
 ```
 
 Example output (abridged; third row omitted):
@@ -339,54 +372,51 @@ Rendered PWM logos
 ┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ TF   ┃ Source    ┃ Motif ID         ┃ Length ┃ Bits  ┃ Output                                                       ┃
 ┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ lexA │ regulondb │ RDBECOLITFC00214 │ 15     │ 10.36 │ /path/to/.../logos_set1_lexA-cpxR-fur_20260110_161412_a1b2c3 │
-│ cpxR │ regulondb │ RDBECOLITFC00170 │ 11     │ 3.63  │ /path/to/.../logos_set1_lexA-cpxR-fur_20260110_161412_a1b2c3 │
+│ lexA │ regulondb │ RDBECOLITFC00214 │ 15     │ 10.36 │ /path/to/.../runs/logos/catalog/set1_lexA-cpxR-fur_20260110_161412_a1b2c3 │
+│ cpxR │ regulondb │ RDBECOLITFC00170 │ 11     │ 3.63  │ /path/to/.../runs/logos/catalog/set1_lexA-cpxR-fur_20260110_161412_a1b2c3 │
 └──────┴───────────┴──────────────────┴────────┴───────┴──────────────────────────────────────────────────────────────────────┘
-Logos saved to /path/to/.../logos_set1_lexA-cpxR-fur_20260110_161412_a1b2c3
+Logos saved to /path/to/.../runs/logos/catalog/set1_lexA-cpxR-fur_20260110_161412_a1b2c3
 ```
 
 For live progress during sampling:
 
 ```bash
-uv run cruncher -c "$CONFIG" runs watch <run_name>
+cruncher runs watch <run_name> -c "$CONFIG"
+cruncher runs watch <run_name> --plot -c "$CONFIG"
 ```
-
-To write a live metrics plot alongside the watch loop:
-
-```bash
-uv run cruncher -c "$CONFIG" runs watch <run_name> --plot
-```
-
-This writes `live_metrics.jsonl` and `live/live_metrics.png` under the run directory.
 
 ## Analyze + report (pairwise plots)
 
 Pairwise plots require a TF pair. For the 3-TF demo run, pick a pair and pass `--tf-pair`:
 
 ```bash
-uv run cruncher -c "$CONFIG" analyze --latest --tf-pair lexA,cpxR
-uv run cruncher -c "$CONFIG" report sample_set1_lexA-cpxR-fur_20260110_161355_df8fcb
+cruncher analyze --latest --tf-pair lexA,cpxR -c "$CONFIG"
+cruncher report --latest -c "$CONFIG"
 ```
 
 Example output (analyze):
 
 ```bash
 Random baseline: 100%|██████████| 25/25 [00:00<00:00, 11676.79it/s]
-Analysis outputs → /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/runs/sample_set1_lexA-cpxR-fur_20260110_161355_df8fcb/analysis
-  summary: /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/runs/sample_set1_lexA-cpxR-fur_20260110_161355_df8fcb/analysis/summary.json
+Analysis outputs → <workspace>/runs/sample/set1_lexA-cpxR-fur/set1_lexA-cpxR-fur_20260110_161355_df8fcb/analysis
+  summary: <workspace>/runs/sample/set1_lexA-cpxR-fur/set1_lexA-cpxR-fur_20260110_161355_df8fcb/analysis/meta/summary.json
+  diagnostics: <workspace>/runs/sample/set1_lexA-cpxR-fur/set1_lexA-cpxR-fur_20260110_161355_df8fcb/analysis/tables/diagnostics.json
   analysis_id: 20260110T211410Z_1febb3
 Next steps:
-  cruncher runs show /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/config.yaml sample_set1_lexA-cpxR-fur_20260110_161355_df8fcb
-  cruncher notebook --latest /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/runs/sample_set1_lexA-cpxR-fur_20260110_161355_df8fcb
-  cruncher report /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/config.yaml sample_set1_lexA-cpxR-fur_20260110_161355_df8fcb
+  cruncher runs show <workspace>/config.yaml set1_lexA-cpxR-fur_20260110_161355_df8fcb
+  cruncher notebook --latest <workspace>/runs/sample/set1_lexA-cpxR-fur/set1_lexA-cpxR-fur_20260110_161355_df8fcb
+  cruncher report --latest <workspace>/config.yaml
 ```
 
-If you're running via `uv`, prefix those next-step commands with `uv run`.
+If you're running via `pixi`, prefix those next-step commands with `pixi run cruncher --`.
+
+For a compact diagnostics checklist and tuning guidance, see the
+[sampling + analysis guide](../guides/sampling_and_analysis.md).
 
 ## Open the run notebook (optional, real-time exploration)
 
 ```bash
-uv run cruncher notebook --latest /Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/runs/sample_set1_lexA-cpxR-fur_20260110_161355_df8fcb
+cruncher notebook --latest <workspace>/runs/sample/set1_lexA-cpxR-fur/set1_lexA-cpxR-fur_20260110_161355_df8fcb
 ```
 
 ## Optional: campaign-level summary
@@ -395,7 +425,7 @@ Aggregate many runs (pairs + facets across runs):
 
 ```bash
 # Summarize only the analyzed runs (repeat --runs as needed)
-uv run cruncher -c "$DERIVED" campaign summarize --campaign demo_categories_best --runs "$RUN"
+cruncher campaign summarize --campaign demo_categories_best --runs "$RUN" -c "$DERIVED"
 ```
 
 Summary outputs include `campaign_summary.csv`, `campaign_best.csv`, and plots such as `best_jointscore_bar.png`, `tf_coverage_heatmap.png`, `joint_trend.png`, and `pareto_projection.png`.
@@ -404,7 +434,7 @@ Use `--skip-missing` if you summarize a larger run set where some analyses are i
 To explore the campaign summary in a notebook (requires the summary artifacts above):
 
 ```bash
-uv run cruncher -c "$DERIVED" campaign notebook --campaign demo_categories_best
+cruncher campaign notebook --campaign demo_categories_best -c "$DERIVED"
 ```
 
 ## Notes
@@ -413,11 +443,13 @@ uv run cruncher -c "$DERIVED" campaign notebook --campaign demo_categories_best
   `regulator_sets` in the generated config to a smaller subset before sampling.
 - If you want a default TF pair for repeated analyses, set `analysis.tf_pair`
   in the generated config; otherwise pass `--tf-pair` on each analyze call.
-- `selectors.min_info_bits` requires PWMs to be buildable. For site-based PWMs
-  with variable site lengths, set `motif_store.site_window_lengths` per TF (or
-  switch to matrix-based sources) before enabling that selector.
-- The demo config pre-populates `site_window_lengths` for the expanded TF list
-  so multi-TF parse/sample runs work without extra edits.
+- `selectors.min_info_bits` requires PWMs to be buildable. If you switch to
+  `pwm_source: sites` and your site lengths vary, set `motif_store.site_window_lengths`
+  per TF (or stay in matrix mode). Discovery uses raw sites unless
+  `motif_discovery.window_sites=true`.
+- The demo config pre-populates `site_window_lengths` for the expanded TF list so
+  site-derived PWMs are available if you opt in. This does **not** affect MEME/STREME
+  discovery unless you enable `motif_discovery.window_sites=true`.
 
 ## Where outputs live
 

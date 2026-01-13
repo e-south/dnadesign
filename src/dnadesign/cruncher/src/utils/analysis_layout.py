@@ -16,9 +16,10 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-ANALYSIS_LAYOUT_VERSION = "v2"
+ANALYSIS_LAYOUT_VERSION = "v3"
 ANALYSIS_DIR_NAME = "analysis"
 ARCHIVE_DIR_NAME = "_archive"
+META_DIR_NAME = "meta"
 PLOTS_DIR_NAME = "plots"
 TABLES_DIR_NAME = "tables"
 NOTEBOOKS_DIR_NAME = "notebooks"
@@ -26,6 +27,26 @@ NOTEBOOKS_DIR_NAME = "notebooks"
 
 def analysis_root(run_dir: Path) -> Path:
     return run_dir / ANALYSIS_DIR_NAME
+
+
+def analysis_meta_root(analysis_root: Path) -> Path:
+    return analysis_root / META_DIR_NAME
+
+
+def summary_path(analysis_root: Path) -> Path:
+    return analysis_meta_root(analysis_root) / "summary.json"
+
+
+def analysis_used_path(analysis_root: Path) -> Path:
+    return analysis_meta_root(analysis_root) / "analysis_used.yaml"
+
+
+def plot_manifest_path(analysis_root: Path) -> Path:
+    return analysis_meta_root(analysis_root) / "plot_manifest.json"
+
+
+def table_manifest_path(analysis_root: Path) -> Path:
+    return analysis_meta_root(analysis_root) / "table_manifest.json"
 
 
 def load_summary(path: Path, *, required: bool = False) -> Optional[dict]:
@@ -44,7 +65,7 @@ def load_summary(path: Path, *, required: bool = False) -> Optional[dict]:
 
 def current_summary(run_dir: Path) -> Optional[dict]:
     root = analysis_root(run_dir)
-    return load_summary(root / "summary.json", required=False)
+    return load_summary(summary_path(root), required=False)
 
 
 def current_analysis_id(run_dir: Path) -> Optional[str]:
@@ -64,7 +85,7 @@ def list_analysis_entries(run_dir: Path) -> list[dict]:
         return entries
 
     try:
-        summary = load_summary(root / "summary.json", required=False)
+        summary = load_summary(summary_path(root), required=False)
     except ValueError as exc:
         logger.warning("Skipping invalid analysis summary: %s", exc)
         summary = None
@@ -73,7 +94,7 @@ def list_analysis_entries(run_dir: Path) -> list[dict]:
         if isinstance(analysis_id, str) and analysis_id:
             entries.append({"id": analysis_id, "path": root, "kind": "latest"})
         else:
-            logger.warning("analysis summary missing analysis_id: %s", root / "summary.json")
+            logger.warning("analysis summary missing analysis_id: %s", summary_path(root))
 
     archive_root = root / ARCHIVE_DIR_NAME
     if archive_root.exists():
@@ -81,7 +102,7 @@ def list_analysis_entries(run_dir: Path) -> list[dict]:
             if not child.is_dir():
                 continue
             try:
-                summary = load_summary(child / "summary.json", required=False)
+                summary = load_summary(summary_path(child), required=False)
             except ValueError as exc:
                 logger.warning("Skipping invalid archive summary: %s", exc)
                 summary = None
@@ -91,12 +112,12 @@ def list_analysis_entries(run_dir: Path) -> list[dict]:
                 logger.warning("archive summary missing analysis_id, using folder name: %s", child)
             entries.append({"id": analysis_id, "path": child, "kind": "archive"})
 
-    known_dirs = {ARCHIVE_DIR_NAME, PLOTS_DIR_NAME, TABLES_DIR_NAME, NOTEBOOKS_DIR_NAME}
+    known_dirs = {ARCHIVE_DIR_NAME, META_DIR_NAME, PLOTS_DIR_NAME, TABLES_DIR_NAME, NOTEBOOKS_DIR_NAME}
     for child in sorted(root.iterdir()):
         if not child.is_dir() or child.name in known_dirs:
             continue
         try:
-            summary = load_summary(child / "summary.json", required=False)
+            summary = load_summary(summary_path(child), required=False)
         except ValueError as exc:
             logger.warning("Skipping invalid legacy summary: %s", exc)
             summary = None
@@ -142,14 +163,14 @@ def list_analysis_entries_verbose(run_dir: Path) -> list[dict]:
             }
         )
 
-    summary_path = root / "summary.json"
-    summary, summary_error = _safe_summary(summary_path)
+    summary_file = summary_path(root)
+    summary, summary_error = _safe_summary(summary_file)
     warnings: list[str] = []
     analysis_id: Optional[str] = None
     if summary:
         analysis_id = summary.get("analysis_id")
         if not isinstance(analysis_id, str) or not analysis_id:
-            warnings.append(f"analysis summary missing analysis_id: {summary_path}")
+            warnings.append(f"analysis summary missing analysis_id: {summary_file}")
             analysis_id = None
     elif summary_error:
         warnings.append(summary_error)
@@ -182,8 +203,8 @@ def list_analysis_entries_verbose(run_dir: Path) -> list[dict]:
         for child in sorted(archive_root.iterdir()):
             if not child.is_dir():
                 continue
-            summary_path = child / "summary.json"
-            summary, summary_error = _safe_summary(summary_path)
+            summary_file = summary_path(child)
+            summary, summary_error = _safe_summary(summary_file)
             warnings = []
             if summary_error:
                 warnings.append(summary_error)
@@ -199,12 +220,12 @@ def list_analysis_entries_verbose(run_dir: Path) -> list[dict]:
                 warnings=warnings,
             )
 
-    known_dirs = {ARCHIVE_DIR_NAME, PLOTS_DIR_NAME, TABLES_DIR_NAME, NOTEBOOKS_DIR_NAME}
+    known_dirs = {ARCHIVE_DIR_NAME, META_DIR_NAME, PLOTS_DIR_NAME, TABLES_DIR_NAME, NOTEBOOKS_DIR_NAME}
     for child in sorted(root.iterdir()):
         if not child.is_dir() or child.name in known_dirs:
             continue
-        summary_path = child / "summary.json"
-        summary, summary_error = _safe_summary(summary_path)
+        summary_file = summary_path(child)
+        summary, summary_error = _safe_summary(summary_file)
         warnings = []
         if summary_error:
             warnings.append(summary_error)
@@ -231,7 +252,7 @@ def resolve_analysis_dir(
 ) -> tuple[Path, Optional[str]]:
     root = analysis_root(run_dir)
     if latest or analysis_id is None:
-        summary = load_summary(root / "summary.json", required=True)
+        summary = load_summary(summary_path(root), required=True)
         resolved_id = summary.get("analysis_id") if isinstance(summary, dict) else None
         return root, resolved_id
 

@@ -18,6 +18,7 @@ from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.normalize import build_motif_record
 from dnadesign.cruncher.services.fetch_service import write_motif_record
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
+from dnadesign.cruncher.utils.run_layout import config_used_path, manifest_path
 from dnadesign.cruncher.workflows.sample_workflow import run_sample
 
 
@@ -87,6 +88,7 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
                 "progress_bar": False,
                 "progress_every": 0,
                 "save_trace": False,
+                "auto_opt": {"enabled": False},
                 "init": {"kind": "random", "length": 6, "pad_with": "background"},
                 "draws": 1,
                 "tune": 1,
@@ -117,15 +119,25 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
     cfg = load_config(config_path)
     run_sample(cfg, config_path)
 
-    results_dir = tmp_path / "results"
-    runs = sorted([p for p in results_dir.iterdir() if p.is_dir() and p.name.startswith("sample_")])
+    results_dir = tmp_path / "results" / "sample"
+    runs = []
+    for child in results_dir.iterdir():
+        if not child.is_dir():
+            continue
+        if manifest_path(child).exists():
+            runs.append(child)
+            continue
+        for grand in child.iterdir():
+            if grand.is_dir() and manifest_path(grand).exists():
+                runs.append(grand)
+    runs = sorted(runs)
     assert len(runs) == 2
     for run_dir in runs:
-        manifest_path = run_dir / "run_manifest.json"
-        cfg_path = run_dir / "config_used.yaml"
-        assert manifest_path.exists()
+        manifest_file = manifest_path(run_dir)
+        cfg_path = config_used_path(run_dir)
+        assert manifest_file.exists()
         assert cfg_path.exists()
-        manifest = json.loads(manifest_path.read_text())
+        manifest = json.loads(manifest_file.read_text())
         assert "regulator_set" in manifest
         config_used = yaml.safe_load(cfg_path.read_text())["cruncher"]
         assert "active_regulator_set" in config_used

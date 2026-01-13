@@ -34,6 +34,11 @@ def sample(
         "-c",
         help="Path to cruncher config.yaml (overrides positional CONFIG).",
     ),
+    auto_opt: bool | None = typer.Option(
+        None,
+        "--auto-opt/--no-auto-opt",
+        help="Run auto-optimization pilots (Gibbs + PT) and select the best candidate.",
+    ),
 ) -> None:
     try:
         config_path = resolve_config_path(config_option or config)
@@ -44,7 +49,7 @@ def sample(
     try:
         from dnadesign.cruncher.workflows.sample_workflow import run_sample
 
-        run_sample(cfg, config_path)
+        run_sample(cfg, config_path, auto_opt_override=auto_opt)
     except (ValueError, FileNotFoundError) as exc:
         console.print(f"Error: {exc}")
         console.print("Hint: run cruncher fetch + lock, then cruncher sample <config>.")

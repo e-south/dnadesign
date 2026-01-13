@@ -16,8 +16,9 @@ from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
 )
+from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.utils.analysis_layout import load_summary
+from dnadesign.cruncher.utils.analysis_layout import load_summary, summary_path
 from dnadesign.cruncher.workflows.analyze.plot_registry import (
     plot_keys,
     plot_registry_rows,
@@ -82,6 +83,21 @@ def analyze(
         "--plots",
         help="Override analysis plots by key (repeatable or comma-separated). Use 'all' to enable every plot.",
     ),
+    scatter_background: bool | None = typer.Option(
+        None,
+        "--scatter-background/--no-scatter-background",
+        help="Toggle random baseline points in pwm__scatter (overrides analysis.scatter_background).",
+    ),
+    scatter_background_samples: int | None = typer.Option(
+        None,
+        "--scatter-background-samples",
+        help="Number of random baseline sequences for pwm__scatter (defaults to MCMC subsample size).",
+    ),
+    scatter_background_seed: int | None = typer.Option(
+        None,
+        "--scatter-background-seed",
+        help="Seed for random baseline sequences (overrides analysis.scatter_background_seed).",
+    ),
     list_plots: bool = typer.Option(False, "--list-plots", help="List which plots would run and exit."),
 ) -> None:
     plot_keys_override: list[str] | None = None
@@ -139,19 +155,25 @@ def analyze(
             use_latest=latest,
             tf_pair_override=tf_pair_override,
             plot_keys_override=plot_keys_override,
+            scatter_background_override=scatter_background,
+            scatter_background_samples_override=scatter_background_samples,
+            scatter_background_seed_override=scatter_background_seed,
         )
         for analysis_dir in analysis_runs:
-            summary = load_summary(analysis_dir / "summary.json", required=True)
+            summary = load_summary(summary_path(analysis_dir), required=True)
             analysis_id = summary.get("analysis_id")
-            console.print(f"Analysis outputs → {analysis_dir}")
-            console.print(f"  summary: {analysis_dir / 'summary.json'}")
+            console.print(f"Analysis outputs → {render_path(analysis_dir, base=config_path.parent)}")
+            console.print(f"  summary: {render_path(summary_path(analysis_dir), base=config_path.parent)}")
             console.print(f"  analysis_id: {analysis_id}")
             sample_dir = analysis_dir.parent
             run_name = sample_dir.name
             console.print("Next steps:")
             console.print(f"  cruncher runs show {config_path} {run_name}")
-            console.print(f"  cruncher notebook --latest {sample_dir}")
-            console.print(f"  cruncher report {config_path} {run_name}")
+            console.print(f"  cruncher notebook --latest {render_path(sample_dir, base=config_path.parent)}")
+            if latest and not runs:
+                console.print(f"  cruncher report --latest {config_path}")
+            else:
+                console.print(f"  cruncher report {config_path} {run_name}")
     except (ValueError, FileNotFoundError) as exc:
         message = str(exc)
         console.print(f"Error: {message}")
