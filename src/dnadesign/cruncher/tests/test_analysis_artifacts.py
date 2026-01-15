@@ -66,12 +66,13 @@ def _make_sample_run_dir(tmp_path: Path, name: str) -> Path:
 
 
 def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
     config = {
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA", "cpxR"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": [],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
@@ -201,12 +202,13 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
 
 
 def test_analyze_pairgrid_plot(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
     config = {
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA", "cpxR", "fur"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": [],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
@@ -311,12 +313,13 @@ def test_analyze_pairgrid_plot(tmp_path: Path) -> None:
 
 
 def test_analyze_pairgrid_single_tf(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
     config = {
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": [],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
@@ -414,12 +417,13 @@ def test_analyze_pairgrid_single_tf(tmp_path: Path) -> None:
 
 
 def test_analyze_without_trace_when_no_trace_plots(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
     config = {
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA", "cpxR"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": [],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
@@ -519,12 +523,13 @@ def test_analyze_without_trace_when_no_trace_plots(tmp_path: Path) -> None:
 
 
 def test_analyze_prunes_stale_analysis_artifacts_when_not_archiving(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
     config = {
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA", "cpxR"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": [],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
@@ -632,12 +637,13 @@ def test_analyze_prunes_stale_analysis_artifacts_when_not_archiving(tmp_path: Pa
 
 
 def test_analyze_fails_on_lockfile_mismatch(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
     config = {
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA", "cpxR"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": [],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",

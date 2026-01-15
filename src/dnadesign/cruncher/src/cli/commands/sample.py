@@ -44,7 +44,12 @@ def sample(
     verbose: bool = typer.Option(
         False,
         "--verbose",
-        help="Enable per-chain progress logging during sampling (overrides progress_every when disabled).",
+        help="Enable periodic progress logging during sampling (overrides progress_every when disabled).",
+    ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        help="Enable debug logging (very verbose).",
     ),
 ) -> None:
     try:
@@ -54,6 +59,10 @@ def sample(
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
     if verbose:
+        if cfg.sample.ui.progress_every == 0:
+            cfg.sample.ui.progress_every = 1000
+        cfg.sample.ui.progress_bar = True
+    if debug:
         logging.getLogger().setLevel(logging.DEBUG)
         if cfg.sample.ui.progress_every == 0:
             cfg.sample.ui.progress_every = 1000

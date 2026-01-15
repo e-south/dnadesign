@@ -18,6 +18,7 @@ from dnadesign.cruncher.config.schema_v2 import CruncherConfig
 from dnadesign.cruncher.ingest.site_windows import resolve_window_length
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.lockfile import LockedMotif, read_lockfile
+from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
 
 
 @dataclass(frozen=True)
@@ -172,8 +173,8 @@ def target_statuses(
     site_window_lengths: Optional[dict[str, int]] = None,
     use_lockfile: bool = True,
 ) -> list[TargetStatus]:
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
-    lock_path = catalog_root / "locks" / f"{config_path.stem}.lock.json"
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    lock_path = resolve_lock_path(config_path)
     effective_pwm_source = pwm_source or cfg.motif_store.pwm_source
     effective_site_kinds = site_kinds if site_kinds is not None else cfg.motif_store.site_kinds
     effective_combine_sites = combine_sites if combine_sites is not None else cfg.motif_store.combine_sites
@@ -453,7 +454,7 @@ def has_blocking_target_errors(statuses: Iterable[TargetStatus]) -> bool:
 
 
 def target_candidates(*, cfg: CruncherConfig, config_path: Path) -> list[TargetCandidate]:
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     catalog = CatalogIndex.load(catalog_root)
     candidates: list[TargetCandidate] = []
     for set_index, tf in list_targets(cfg):
@@ -469,7 +470,7 @@ def target_candidates_fuzzy(
     min_score: float = 0.6,
     limit: int = 10,
 ) -> list[TargetCandidate]:
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     catalog = CatalogIndex.load(catalog_root)
     candidates: list[TargetCandidate] = []
     for set_index, tf in list_targets(cfg):
@@ -483,7 +484,7 @@ def target_stats(
     cfg: CruncherConfig,
     config_path: Path,
 ) -> list[TargetStats]:
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     catalog = CatalogIndex.load(catalog_root)
     stats: list[TargetStats] = []
     for set_index, tf in list_targets(cfg):

@@ -18,6 +18,7 @@ from dnadesign.cruncher.app.parse_workflow import run_parse
 from dnadesign.cruncher.artifacts.layout import logos_dir_for_run, manifest_path, out_root, status_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
+from dnadesign.cruncher.utils.paths import resolve_lock_path
 
 
 def _write_motif(path: Path, *, source: str, motif_id: str, tf_name: str) -> None:
@@ -45,7 +46,19 @@ def test_parse_skips_logos_when_disabled(tmp_path: Path) -> None:
     motif_path = catalog_root / "normalized" / "motifs" / "regulondb" / "RBM1.json"
     _write_motif(motif_path, source="regulondb", motif_id="RBM1", tf_name="lexA")
 
-    lock_path = catalog_root / "locks" / "config.lock.json"
+    config = {
+        "cruncher": {
+            "out_dir": "runs",
+            "regulator_sets": [["lexA"]],
+            "motif_store": {"catalog_root": str(catalog_root), "pwm_source": "matrix"},
+            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+    cfg = load_config(config_path)
+
+    lock_path = resolve_lock_path(config_path)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     lock_path.write_text(
         json.dumps(
@@ -55,18 +68,6 @@ def test_parse_skips_logos_when_disabled(tmp_path: Path) -> None:
             }
         )
     )
-
-    config = {
-        "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": ".cruncher", "pwm_source": "matrix"},
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
-        }
-    }
-    config_path = tmp_path / "config.yaml"
-    config_path.write_text(yaml.safe_dump(config))
-    cfg = load_config(config_path)
 
     run_parse(cfg, config_path)
 
@@ -86,7 +87,7 @@ def test_parse_skips_logos_when_disabled(tmp_path: Path) -> None:
     assert manifest_path(parse_dir).exists()
     assert status_path(parse_dir).exists()
     logo_dir = logos_dir_for_run(out_root(config_path, cfg.out_dir), "parse", parse_dir.name)
-    assert not list(logo_dir.glob("*_logo.png"))
+    assert not logo_dir.exists() or not list(logo_dir.glob("*_logo.png"))
 
 
 def test_parse_is_idempotent_when_inputs_match(tmp_path: Path) -> None:
@@ -104,7 +105,19 @@ def test_parse_is_idempotent_when_inputs_match(tmp_path: Path) -> None:
     motif_path = catalog_root / "normalized" / "motifs" / "regulondb" / "RBM1.json"
     _write_motif(motif_path, source="regulondb", motif_id="RBM1", tf_name="lexA")
 
-    lock_path = catalog_root / "locks" / "config.lock.json"
+    config = {
+        "cruncher": {
+            "out_dir": "runs",
+            "regulator_sets": [["lexA"]],
+            "motif_store": {"catalog_root": str(catalog_root), "pwm_source": "matrix"},
+            "parse": {"plot": {"logo": True, "bits_mode": "information", "dpi": 72}},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+    cfg = load_config(config_path)
+
+    lock_path = resolve_lock_path(config_path)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     lock_path.write_text(
         json.dumps(
@@ -114,18 +127,6 @@ def test_parse_is_idempotent_when_inputs_match(tmp_path: Path) -> None:
             }
         )
     )
-
-    config = {
-        "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": ".cruncher", "pwm_source": "matrix"},
-            "parse": {"plot": {"logo": True, "bits_mode": "information", "dpi": 72}},
-        }
-    }
-    config_path = tmp_path / "config.yaml"
-    config_path.write_text(yaml.safe_dump(config))
-    cfg = load_config(config_path)
 
     run_parse(cfg, config_path)
     lock_path.write_text(

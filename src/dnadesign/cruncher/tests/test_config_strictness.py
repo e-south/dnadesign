@@ -122,11 +122,9 @@ def test_out_dir_must_be_workspace_relative(tmp_path: Path, out_dir: str) -> Non
     assert any(err.get("loc") == ("cruncher", "out_dir") for err in exc.value.errors())
 
 
-@pytest.mark.parametrize("catalog_root", ["__absolute__", "../catalog"])
-def test_catalog_root_must_be_workspace_relative(tmp_path: Path, catalog_root: str) -> None:
+@pytest.mark.parametrize("catalog_root", ["../catalog"])
+def test_catalog_root_rejects_parent_traversal(tmp_path: Path, catalog_root: str) -> None:
     config = _base_config()
-    if catalog_root == "__absolute__":
-        catalog_root = str(tmp_path / "catalog")
     config["cruncher"]["motif_store"]["catalog_root"] = str(catalog_root)
     config_path = _write_config(tmp_path, config)
 
@@ -134,6 +132,15 @@ def test_catalog_root_must_be_workspace_relative(tmp_path: Path, catalog_root: s
         load_config(config_path)
 
     assert any(err.get("loc") == ("cruncher", "motif_store", "catalog_root") for err in exc.value.errors())
+
+
+def test_catalog_root_allows_absolute(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["motif_store"]["catalog_root"] = str(tmp_path / "catalog")
+    config_path = _write_config(tmp_path, config)
+
+    cfg = load_config(config_path)
+    assert cfg.motif_store.catalog_root.is_absolute()
 
 
 @pytest.mark.parametrize("genome_cache", ["__absolute__", "../genomes"])

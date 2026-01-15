@@ -35,6 +35,7 @@ from dnadesign.cruncher.ingest.sequence_provider import (
     SequenceProvider,
 )
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
+from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from rich.console import Console
 from rich.table import Table
 
@@ -190,7 +191,7 @@ def motifs(
             extra_parser_modules=cfg.io.parsers.extra_modules,
         )
         adapter = registry.create(source, cfg.ingest)
-        catalog_root = config_path.parent / cfg.motif_store.catalog_root
+        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
         if dry_run:
             if not effective_tfs:
                 raise typer.BadParameter("--dry-run requires at least one --tf or --campaign.")
@@ -340,7 +341,7 @@ def sites(
             ingest_cfg.regulondb.ht_sites = True
             console.print("Note: enabling HT dataset access for this request (--dataset-id).")
         adapter = registry.create(source, ingest_cfg)
-        catalog_root = config_path.parent / cfg.motif_store.catalog_root
+        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
         if dry_run:
             if not effective_tfs:
                 raise typer.BadParameter("--dry-run requires --tf or --campaign to resolve HT datasets.")

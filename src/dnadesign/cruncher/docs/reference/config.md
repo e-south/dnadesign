@@ -103,7 +103,7 @@ Notes:
 - `pwm_source=matrix` uses cached motif matrices (default).
 - `pwm_source=sites` builds PWMs from cached binding-site sequences at runtime.
 - `pseudocounts` controls PWM smoothing when building from sites (Biopython).
-- `catalog_root` must be workspace-relative (no absolute paths or `..` segments).
+- `catalog_root` can be absolute or relative to the cruncher root (`src/dnadesign/cruncher`); relative paths must not include `..`.
 - Local motif sources provide matrices by default. Set `ingest.local_sources[].extract_sites=true`
   to opt into MEME BLOCKS site extraction for site‑derived PWMs.
 - If site lengths vary for site-derived PWMs, set `site_window_lengths` per TF or dataset. MEME/STREME
@@ -221,7 +221,7 @@ Notes:
 
 ### parse
 
-Logo rendering settings for cached PWMs.
+Logo rendering defaults for `cruncher catalog logos` (legacy location under `parse.plot`).
 
 ```yaml
 parse:
@@ -232,9 +232,9 @@ parse:
 ```
 
 Notes:
-- `logo: false` skips logo rendering but still validates cached PWMs and writes a run manifest.
-- When `motif_store.pwm_source=sites`, logo subtitles indicate site provenance
-  (curated, high-throughput, or combined).
+- `cruncher parse` no longer renders logos; it only validates locked motifs.
+- `plot.logo` is currently unused (reserved for future toggles).
+- When `motif_store.pwm_source=sites`, logo subtitles indicate site provenance (curated, high-throughput, or combined).
 
 ### sample
 
@@ -250,6 +250,10 @@ sample:
     tune: 200
     draws: 500
     restarts: 2
+  early_stop:
+    enabled: true
+    patience: 500
+    min_delta: 0.5
   init:
     kind: random
     length: 30
@@ -362,7 +366,7 @@ sample:
       max_rounds: 2
       improvement_tol: 0.0
   ui:
-    progress_bar: false
+    progress_bar: true
     progress_every: 0
 ```
 
@@ -388,6 +392,7 @@ Notes:
 - The selected pilot is recorded in `runs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
 - Auto-opt is enabled by default when `optimizer.name=auto`; set `auto_opt.enabled: false` or pass `--no-auto-opt` to disable.
 - If no pilot meets the quality thresholds, auto-opt retries with cooler settings and then proceeds with the best available candidate (logging warnings). When a boosted-cooling retry wins, the final run uses that boosted schedule (recorded in `config_used.yaml` and auto-opt notes).
+- `early_stop` halts sampling when the best score fails to improve by `min_delta` for `patience` draws (per chain for Gibbs, per sweep for PT).
 - Auto-opt selection details are stored in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/tables/auto_opt_pilots.csv` and `analysis/plots/auto_opt_tradeoffs.png`.
 - `sample.rng.deterministic=true` isolates a stable RNG stream per pilot config.
 - `auto_opt.length` searches candidate lengths; the shortest passing the scorecard is preferred, and length comparisons are ranked by normalized balance to reduce length bias.

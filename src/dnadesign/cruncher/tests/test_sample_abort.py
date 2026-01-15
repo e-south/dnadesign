@@ -22,6 +22,7 @@ from dnadesign.cruncher.artifacts.layout import status_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.normalize import build_motif_record
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
+from dnadesign.cruncher.utils.paths import resolve_lock_path
 
 
 def _write_motif(catalog_root: Path, *, tf_name: str, motif_id: str) -> None:
@@ -49,8 +50,6 @@ def test_sample_abort_marks_run_status(tmp_path: Path, monkeypatch: pytest.Monke
     catalog_root = tmp_path / ".cruncher"
     _write_motif(catalog_root, tf_name="lexA", motif_id="RBM1")
 
-    lock_path = catalog_root / "locks" / "config.lock.json"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
     lock_payload = {
         "pwm_source": "matrix",
         "resolved": {
@@ -61,14 +60,12 @@ def test_sample_abort_marks_run_status(tmp_path: Path, monkeypatch: pytest.Monke
             }
         },
     }
-    lock_path.write_text(json.dumps(lock_payload))
-
     config = {
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": ["regulondb"],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
@@ -97,6 +94,10 @@ def test_sample_abort_marks_run_status(tmp_path: Path, monkeypatch: pytest.Monke
 
     cfg = load_config(config_path)
 
+    lock_path = resolve_lock_path(config_path)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path.write_text(json.dumps(lock_payload))
+
     class AbortOptimizer:
         def __init__(self, **_kwargs) -> None:
             pass
@@ -112,7 +113,7 @@ def test_sample_abort_marks_run_status(tmp_path: Path, monkeypatch: pytest.Monke
     with pytest.raises(KeyboardInterrupt):
         run_sample(cfg, config_path)
 
-    run_index = load_run_index(config_path, catalog_root)
+    run_index = load_run_index(config_path)
     assert run_index
     entry = next(iter(run_index.values()))
     assert entry.get("status") == "aborted"

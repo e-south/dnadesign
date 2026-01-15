@@ -18,6 +18,7 @@ from dnadesign.cruncher.cli.config_resolver import (
     resolve_config_path,
 )
 from dnadesign.cruncher.config.load import load_config
+from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from rich.console import Console
 from rich.table import Table
 
@@ -45,7 +46,7 @@ def stats(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     stats = catalog_stats(catalog_root)
     table = Table(title="Cache stats", header_style="bold")
     table.add_column("Metric")
@@ -76,7 +77,7 @@ def verify(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     issues = verify_cache(catalog_root)
     if not issues:
         console.print("Cache verification OK.")

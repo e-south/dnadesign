@@ -37,6 +37,7 @@ from dnadesign.cruncher.cli.config_resolver import (
 )
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
+from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 from rich.console import Console
 from rich.live import Live
@@ -656,7 +657,7 @@ def watch_run_cmd(
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
     if plot or plot_path is not None:
-        ensure_mpl_cache(config_path.parent / cfg.motif_store.catalog_root)
+        ensure_mpl_cache(resolve_catalog_root(config_path, cfg.motif_store.catalog_root))
     try:
         run = get_run(cfg, config_path, run_name)
     except FileNotFoundError as exc:

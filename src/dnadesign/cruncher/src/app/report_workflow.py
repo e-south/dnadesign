@@ -29,6 +29,7 @@ from dnadesign.cruncher.artifacts.layout import (
 from dnadesign.cruncher.artifacts.manifest import load_manifest, write_manifest
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig
 from dnadesign.cruncher.utils.hashing import sha256_path
+from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ def _safe_metric(value: float | None, label: str, warnings: list[str]) -> float 
 
 
 def run_report(cfg: CruncherConfig, config_path: Path, run_name: str) -> None:
-    ensure_mpl_cache(config_path.parent / cfg.motif_store.catalog_root)
+    ensure_mpl_cache(resolve_catalog_root(config_path, cfg.motif_store.catalog_root))
     run = get_run(cfg, config_path, run_name)
     run_dir = run.run_dir
 

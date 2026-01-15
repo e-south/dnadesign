@@ -32,11 +32,12 @@ def _write_motif(path: Path, *, source: str, motif_id: str, tf_name: str) -> Non
 
 
 def _write_config(tmp_path: Path, *, pwm_source: str = "matrix") -> Path:
+    catalog_root = tmp_path / ".cruncher"
     config = {
         "cruncher": {
             "out_dir": "runs",
             "regulator_sets": [["lexA", "cpxR"]],
-            "motif_store": {"catalog_root": ".cruncher", "pwm_source": pwm_source},
+            "motif_store": {"catalog_root": str(catalog_root), "pwm_source": pwm_source},
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }

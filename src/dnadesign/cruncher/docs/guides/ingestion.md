@@ -14,11 +14,8 @@ Ingestion is how **cruncher** discovers and caches motif matrices and binding si
 ### Cache layout
 
 ```
-.cruncher/
+<catalog_root>/
   catalog.json
-  run_index.json
-  locks/
-    <config>.lock.json
   normalized/
     motifs/<source>/<motif_id>.json
     sites/<source>/<motif_id>.jsonl
@@ -26,8 +23,18 @@ Ingestion is how **cruncher** discovers and caches motif matrices and binding si
   .mplcache/         # Matplotlib cache (auto-managed)
 ```
 
-`catalog.json` is the local source of truth for cached motifs and sites. `run_index.json` tracks known runs;
-`discoveries/` is created only when you run `cruncher discover motifs`.
+Workspace state (per workspace `.cruncher/`):
+
+```
+<workspace>/.cruncher/
+  locks/
+    <config>.lock.json
+  run_index.json
+```
+
+`catalog.json` is the local source of truth for cached motifs and sites. `discoveries/` is created only when you run
+`cruncher discover motifs`. By default, the catalog cache is shared across workspaces (`src/dnadesign/cruncher/.cruncher`).
+`run_index.json` tracks known runs for the workspace.
 
 ---
 

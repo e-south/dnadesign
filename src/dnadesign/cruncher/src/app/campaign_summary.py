@@ -29,6 +29,7 @@ from dnadesign.cruncher.app.run_service import list_runs
 from dnadesign.cruncher.artifacts.layout import report_dir, sequences_path
 from dnadesign.cruncher.artifacts.manifest import load_manifest
 from dnadesign.cruncher.config.schema_v2 import CampaignConfig, CruncherConfig
+from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 
 logger = logging.getLogger(__name__)
@@ -77,7 +78,7 @@ def summarize_campaign(
     pd, _ = _load_pandas_numpy()
     if top_k < 1:
         raise ValueError("top_k must be >= 1")
-    ensure_mpl_cache(config_path.parent / cfg.motif_store.catalog_root)
+    ensure_mpl_cache(resolve_catalog_root(config_path, cfg.motif_store.catalog_root))
     expansion = expand_campaign(
         cfg=cfg,
         config_path=config_path,

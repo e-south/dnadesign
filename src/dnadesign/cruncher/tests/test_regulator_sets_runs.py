@@ -20,6 +20,7 @@ from dnadesign.cruncher.artifacts.layout import config_used_path, manifest_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.normalize import build_motif_record
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
+from dnadesign.cruncher.utils.paths import resolve_lock_path
 
 
 def _write_motif(catalog_root: Path, *, tf_name: str, motif_id: str) -> None:
@@ -48,8 +49,6 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
     _write_motif(catalog_root, tf_name="lexA", motif_id="RBM1")
     _write_motif(catalog_root, tf_name="cpxR", motif_id="RBM2")
 
-    lock_path = catalog_root / "locks" / "config.lock.json"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
     lock_payload = {
         "pwm_source": "matrix",
         "resolved": {
@@ -65,14 +64,12 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
             },
         },
     }
-    lock_path.write_text(json.dumps(lock_payload))
-
     config = {
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA"], ["cpxR"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": ["regulondb"],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
@@ -112,6 +109,9 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
     config_path.write_text(yaml.safe_dump(config))
 
     cfg = load_config(config_path)
+    lock_path = resolve_lock_path(config_path)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path.write_text(json.dumps(lock_payload))
     run_sample(cfg, config_path)
 
     results_dir = tmp_path / "results" / "sample"

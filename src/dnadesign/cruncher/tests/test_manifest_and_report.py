@@ -82,6 +82,7 @@ def test_build_manifest_and_report(tmp_path: Path) -> None:
     config_path.write_text("dummy: config")
 
     catalog_root = tmp_path / ".cruncher"
+    cfg.motif_store.catalog_root = catalog_root
     entry = CatalogEntry(
         source="regulondb",
         motif_id="RBM0001",
@@ -98,7 +99,9 @@ def test_build_manifest_and_report(tmp_path: Path) -> None:
     catalog = CatalogIndex(entries={entry.key: entry})
     catalog.save(catalog_root)
 
-    lock_path = catalog_root / "locks" / "config.lock.json"
+    from dnadesign.cruncher.utils.paths import resolve_lock_path
+
+    lock_path = resolve_lock_path(config_path)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     lock_path.write_text(
         json.dumps(

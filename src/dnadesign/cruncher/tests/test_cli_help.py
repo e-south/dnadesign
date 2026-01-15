@@ -100,7 +100,7 @@ def test_targets_status_rejects_site_kinds_with_matrix_pwm(tmp_path: Path) -> No
         "cruncher": {
             "out_dir": "runs",
             "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": ".cruncher", "pwm_source": "matrix"},
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
@@ -125,7 +125,7 @@ def test_campaign_generate_resolves_relative_out_to_workspace(tmp_path: Path, mo
                     "across_categories": {"sizes": [2]},
                 }
             ],
-            "motif_store": {"catalog_root": ".cruncher", "pwm_source": "matrix"},
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
@@ -154,7 +154,7 @@ def test_campaign_generate_rejects_outside_workspace(tmp_path: Path) -> None:
                     "across_categories": {"sizes": [2]},
                 }
             ],
-            "motif_store": {"catalog_root": ".cruncher", "pwm_source": "matrix"},
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
@@ -199,7 +199,7 @@ def test_sources_list_auto_detects_config_in_cwd(tmp_path, monkeypatch) -> None:
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": ".cruncher"},
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
             "ingest": {
                 "local_sources": [
@@ -250,7 +250,7 @@ def test_sources_summary_remote_error_is_user_friendly(tmp_path, monkeypatch) ->
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": ".cruncher"},
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
@@ -281,7 +281,7 @@ def test_sources_summary_cache_filters_source_and_titles(tmp_path) -> None:
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": ".cruncher"},
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
@@ -325,7 +325,7 @@ def test_sources_summary_requires_remote_limit_when_no_iter(tmp_path, monkeypatc
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": ".cruncher"},
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }

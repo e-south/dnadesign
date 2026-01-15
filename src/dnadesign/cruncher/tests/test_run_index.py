@@ -86,7 +86,7 @@ def test_run_index_rebuild(tmp_path: Path) -> None:
     status_file.write_text(json.dumps({"stage": "sample", "status": "completed", "started_at": created_at}))
 
     index_path = rebuild_run_index(cfg, config_path)
-    assert index_path == tmp_path / "cache_root" / "run_index.json"
+    assert index_path == tmp_path / ".cruncher" / "run_index.json"
     payload = json.loads(index_path.read_text())
     assert run_name in payload
 

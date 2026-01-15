@@ -19,6 +19,7 @@ from dnadesign.cruncher.config.schema_v2 import CruncherConfig
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.lockfile import LockedMotif
 from dnadesign.cruncher.utils.hashing import sha256_path
+from dnadesign.cruncher.utils.paths import resolve_catalog_root
 
 
 def _motif_payload(
@@ -77,7 +78,7 @@ def build_run_manifest(
         "lockfile_path": str(lock_path.resolve()),
         "lockfile_sha256": sha256_path(lock_path),
         "motif_store": {
-            "catalog_root": str(cfg.motif_store.catalog_root),
+            "catalog_root": str(resolve_catalog_root(config_path, cfg.motif_store.catalog_root)),
             "pwm_source": cfg.motif_store.pwm_source,
             "site_kinds": cfg.motif_store.site_kinds,
             "combine_sites": cfg.motif_store.combine_sites,

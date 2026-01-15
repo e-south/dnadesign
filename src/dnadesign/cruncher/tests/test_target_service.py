@@ -42,7 +42,7 @@ def _config(
         out_dir=Path("out"),
         regulator_sets=regulator_sets,
         motif_store=MotifStoreConfig(
-            catalog_root=Path(".cruncher"),
+            catalog_root=(tmp_path / ".cruncher"),
             pwm_source=pwm_source,
             min_sites_for_pwm=min_sites,
             allow_low_sites=allow_low_sites,

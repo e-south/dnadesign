@@ -15,10 +15,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+from dnadesign.cruncher.utils.paths import find_repo_root, resolve_cruncher_root
+
 logger = logging.getLogger(__name__)
 
 _NUMBA_CACHE_ENV = "NUMBA_CACHE_DIR"
-_REPO_MARKERS = ("pyproject.toml", ".git")
 
 
 def _env_path(name: str) -> Path | None:
@@ -32,21 +33,6 @@ def _env_path(name: str) -> Path | None:
     if not path.is_absolute():
         path = Path.cwd() / path
     return path.resolve()
-
-
-def _find_repo_root(anchor: Path) -> Path | None:
-    for parent in (anchor, *anchor.parents):
-        for marker in _REPO_MARKERS:
-            if (parent / marker).exists():
-                return parent
-    return None
-
-
-def _prefer_cache_root(repo_root: Path) -> Path:
-    cruncher_root = repo_root / "src" / "dnadesign" / "cruncher"
-    if cruncher_root.is_dir():
-        return cruncher_root
-    return repo_root
 
 
 def ensure_numba_cache_dir(anchor: Path, *, env_var: str = _NUMBA_CACHE_ENV) -> Path:
@@ -63,12 +49,12 @@ def ensure_numba_cache_dir(anchor: Path, *, env_var: str = _NUMBA_CACHE_ENV) -> 
 
     cache_dir = _env_path(env_var)
     if cache_dir is None:
-        repo_root = _find_repo_root(anchor)
+        repo_root = find_repo_root(anchor)
         if repo_root is None:
             raise RuntimeError(
                 f"Numba cache dir not set and repo root not found from {anchor}. Set {env_var} to a writable path."
             )
-        cache_root = _prefer_cache_root(repo_root)
+        cache_root = resolve_cruncher_root(anchor) or repo_root
         cache_dir = (cache_root / ".cruncher" / "numba_cache").resolve()
         os.environ[env_var] = str(cache_dir)
         logger.info("NUMBA cache dir not set; using %s", cache_dir)

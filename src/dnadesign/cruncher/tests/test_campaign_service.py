@@ -114,7 +114,7 @@ def test_campaign_selectors_min_site_count(tmp_path: Path) -> None:
     config = _base_config()
     config["cruncher"].update(
         {
-            "motif_store": {"catalog_root": ".cruncher", "pwm_source": "sites"},
+            "motif_store": {"catalog_root": str(catalog_root), "pwm_source": "sites"},
             "regulator_categories": {"CatA": ["LexA", "CpxR"]},
             "campaigns": [
                 {

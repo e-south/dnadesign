@@ -78,9 +78,6 @@ This document defines the end-to-end requirements and architecture for **crunche
 ```
 <catalog_root>/
   catalog.json
-  run_index.json
-  locks/
-    <config>.lock.json
   normalized/
     motifs/<source>/<motif_id>.json
     sites/<source>/<motif_id>.jsonl
@@ -89,7 +86,17 @@ This document defines the end-to-end requirements and architecture for **crunche
 ```
 
 `catalog.json` is the single source of truth for “what we have in-house”. It tracks matrix availability, site counts, and provenance tags.
-`catalog_root` must be workspace-relative (no absolute paths or `..` segments).
+`catalog_root` can be absolute or relative to the cruncher root (`src/dnadesign/cruncher`); relative paths must not include `..`.
+By default the catalog cache is shared across workspaces (`src/dnadesign/cruncher/.cruncher`).
+
+Workspace state (per workspace `.cruncher/`):
+
+```
+<workspace>/.cruncher/
+  locks/
+    <config>.lock.json
+  run_index.json
+```
 
 Tooling caches:
 

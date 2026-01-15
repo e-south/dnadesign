@@ -60,6 +60,12 @@ class PTGibbsOptimizer(Optimizer):
         self.progress_bar: bool = bool(cfg.get("progress_bar", True))
         self.progress_every: int = int(cfg.get("progress_every", 0))
         self.status_writer = status_writer
+        early_cfg = cfg.get("early_stop") or {}
+        self.early_stop_enabled = bool(early_cfg.get("enabled", False))
+        self.early_stop_patience = int(early_cfg.get("patience", 0))
+        self.early_stop_min_delta = float(early_cfg.get("min_delta", 0.0))
+        if self.early_stop_patience <= 0:
+            self.early_stop_enabled = False
 
         # β‑ladder (base)
         cooling_cfg = {"kind": cfg["kind"], "beta": cfg["beta"]}
@@ -199,6 +205,8 @@ class PTGibbsOptimizer(Optimizer):
             self._maybe_log_progress("burn-in", t + 1, T)
 
         # Sampling sweeps + swap attempts
+        no_improve = 0
+        best_global: float | None = None
         for d in tqdm(range(D), desc="sampling", leave=False, disable=not self.progress_bar):
             sweep_idx = T + d
             beta_softmin = self.softmin_of(sweep_idx) if self.softmin_of else None
@@ -260,10 +268,39 @@ class PTGibbsOptimizer(Optimizer):
                 score_std=score_std,
                 beta_softmin=beta_softmin,
             )
+            if self.early_stop_enabled and current_best is not None:
+                if best_global is None or current_best > best_global + self.early_stop_min_delta:
+                    best_global = current_best
+                    no_improve = 0
+                else:
+                    no_improve += 1
+                    if no_improve >= self.early_stop_patience:
+                        logger.info(
+                            "Early-stop: stalled for %d sweeps (min_delta=%.3f).",
+                            self.early_stop_patience,
+                            self.early_stop_min_delta,
+                        )
+                        if self.status_writer is not None:
+                            self.status_writer.update(
+                                status_message="early_stop",
+                                early_stop={
+                                    "patience": self.early_stop_patience,
+                                    "min_delta": self.early_stop_min_delta,
+                                    "best_score": best_global,
+                                },
+                            )
+                        break
 
         logger.debug("PT optimisation finished. Move utilisation: %s", dict(self.move_tally))
 
         # Build ArviZ trace from draw phase only
+        if chain_scores:
+            max_len = max(len(scores) for scores in chain_scores)
+            for scores in chain_scores:
+                if not scores:
+                    continue
+                if len(scores) < max_len:
+                    scores.extend([scores[-1]] * (max_len - len(scores)))
         score_arr = np.asarray(chain_scores)  # (C, D)
         self.trace_idata = az.from_dict(posterior={"score": score_arr})
 

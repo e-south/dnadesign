@@ -76,8 +76,8 @@ def main(
 
 app.command(
     "parse",
-    help="Validate cached motifs and render PWM logos.",
-    short_help="Validate motifs + render logos.",
+    help="Validate cached motifs and summarize locked PWMs.",
+    short_help="Validate locked motifs.",
 )(parse_cmd)
 app.command(
     "sample",

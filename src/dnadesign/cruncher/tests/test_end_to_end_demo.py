@@ -21,7 +21,7 @@ from dnadesign.cruncher.app.parse_workflow import run_parse
 from dnadesign.cruncher.app.sample_workflow import run_sample
 from dnadesign.cruncher.artifacts.layout import (
     config_used_path,
-    logos_dir_for_run,
+    logos_root,
     manifest_path,
     out_root,
     sequences_path,
@@ -38,6 +38,7 @@ from dnadesign.cruncher.tests.fixtures.regulondb_payloads import (
     REGULON_DETAIL,
     regulon_list_for_search,
 )
+from dnadesign.cruncher.utils.paths import resolve_lock_path
 
 
 def _sample_block() -> dict:
@@ -92,12 +93,13 @@ def _fixture_transport(query: str, variables: dict) -> dict:
 
 
 def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
     config = {
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA", "cpxR"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": ["regulondb"],
                 "allow_ambiguous": False,
                 "pwm_source": "sites",
@@ -131,11 +133,10 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
         RegulonDBAdapterConfig(curated_sites=True, ht_sites=False),
         transport=_fixture_transport,
     )
-    catalog_root = tmp_path / ".cruncher"
     fetch_sites(adapter, catalog_root, names=["lexA", "cpxR"])
     fetch_motifs(adapter, catalog_root, names=["lexA", "cpxR"])
 
-    lock_path = catalog_root / "locks" / "config.lock.json"
+    lock_path = resolve_lock_path(config_path)
     resolve_lock(
         names=["lexA", "cpxR"],
         catalog_root=catalog_root,
@@ -166,12 +167,14 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
     sample_runs = _find_runs(results_dir / "sample")
     assert parse_runs
     assert sample_runs
-    parse_dir = parse_runs[0]
     sample_dir = sample_runs[0]
 
-    logo_dir = logos_dir_for_run(out_root(config_path, cfg.out_dir), "parse", parse_dir.name)
-    assert (logo_dir / "lexA_logo.png").exists()
-    assert (logo_dir / "cpxR_logo.png").exists()
+    result = runner.invoke(app, ["catalog", "logos", "--set", "1", "-c", str(config_path)])
+    assert result.exit_code == 0
+    logo_root = logos_root(out_root(config_path, cfg.out_dir)) / "catalog"
+    logos = list(logo_root.glob("**/*_logo.png"))
+    assert any("lexA" in path.name for path in logos)
+    assert any("cpxR" in path.name for path in logos)
     assert config_used_path(sample_dir).exists()
     assert sequences_path(sample_dir).exists()
     assert not (sample_dir / "artifacts" / "trace.nc").exists()
@@ -180,12 +183,13 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
 def test_demo_workspace_cli_without_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     workspace = tmp_path / "regulondb_ecoli"
     workspace.mkdir()
+    catalog_root = workspace / ".cruncher"
     config = {
         "cruncher": {
             "out_dir": "runs",
             "regulator_sets": [["lexA", "cpxR"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": ["regulondb"],
                 "allow_ambiguous": False,
                 "pwm_source": "sites",
@@ -219,11 +223,10 @@ def test_demo_workspace_cli_without_config(tmp_path: Path, monkeypatch: pytest.M
         RegulonDBAdapterConfig(curated_sites=True, ht_sites=False),
         transport=_fixture_transport,
     )
-    catalog_root = workspace / ".cruncher"
     fetch_sites(adapter, catalog_root, names=["lexA", "cpxR"])
     fetch_motifs(adapter, catalog_root, names=["lexA", "cpxR"])
 
-    lock_path = catalog_root / "locks" / "config.lock.json"
+    lock_path = resolve_lock_path(config_path)
     resolve_lock(
         names=["lexA", "cpxR"],
         catalog_root=catalog_root,

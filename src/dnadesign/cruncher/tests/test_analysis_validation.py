@@ -194,12 +194,13 @@ def test_write_elite_topk_requires_sequence(tmp_path: Path) -> None:
 
 
 def test_scatter_thresholds_requires_llr(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
     config = {
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA", "cpxR"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": [],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
@@ -234,12 +235,13 @@ def test_scatter_thresholds_requires_llr(tmp_path: Path) -> None:
 
 
 def test_plot_scatter_requires_score_columns(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
     config = {
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA", "cpxR"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": [],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",

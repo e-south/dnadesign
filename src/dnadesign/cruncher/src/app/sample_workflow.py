@@ -80,6 +80,7 @@ from dnadesign.cruncher.store.lockfile import (
     verify_lockfile_hashes,
 )
 from dnadesign.cruncher.store.motif_store import MotifRef
+from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 
 logger = logging.getLogger(__name__)
@@ -129,7 +130,7 @@ class AutoOptCandidate:
 
 def _store(cfg: CruncherConfig, config_path: Path):
     return CatalogMotifStore(
-        config_path.parent / cfg.motif_store.catalog_root,
+        resolve_catalog_root(config_path, cfg.motif_store.catalog_root),
         pwm_source=cfg.motif_store.pwm_source,
         site_kinds=cfg.motif_store.site_kinds,
         combine_sites=cfg.motif_store.combine_sites,
@@ -144,8 +145,8 @@ def _store(cfg: CruncherConfig, config_path: Path):
 
 
 def _lockmap_for(cfg: CruncherConfig, config_path: Path) -> dict[str, object]:
-    lock_root = config_path.parent / cfg.motif_store.catalog_root
-    lock_path = lock_root / "locks" / f"{config_path.stem}.lock.json"
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    lock_path = resolve_lock_path(config_path)
     if not lock_path.exists():
         raise ValueError(f"Lockfile is required: {lock_path}. Run `cruncher lock {config_path.name}`.")
     lockfile = read_lockfile(lock_path)
@@ -159,7 +160,7 @@ def _lockmap_for(cfg: CruncherConfig, config_path: Path) -> dict[str, object]:
     )
     verify_lockfile_hashes(
         lockfile=lockfile,
-        catalog_root=lock_root,
+        catalog_root=catalog_root,
         expected_pwm_source=cfg.motif_store.pwm_source,
     )
     return lockfile.resolved
@@ -1426,6 +1427,7 @@ def _run_sample_for_set(
         "record_tune": sample_cfg.output.trace.include_tune,
         "progress_bar": sample_cfg.ui.progress_bar,
         "progress_every": sample_cfg.ui.progress_every,
+        "early_stop": sample_cfg.early_stop.model_dump(),
         **moves.model_dump(),
         "softmin": sample_cfg.objective.softmin.model_dump(),
     }
@@ -1859,10 +1861,9 @@ def _run_sample_for_set(
     )
 
     # 10) RUN MANIFEST (for reporting + provenance)
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     catalog = CatalogIndex.load(catalog_root)
-    lock_root = catalog_root / "locks"
-    lock_path = lock_root / f"{config_path.stem}.lock.json"
+    lock_path = resolve_lock_path(config_path)
     manifest = build_run_manifest(
         stage=stage,
         cfg=cfg,
@@ -1881,6 +1882,7 @@ def _run_sample_for_set(
             "tune": sample_cfg.budget.tune,
             "draws": sample_cfg.budget.draws,
             "restarts": sample_cfg.budget.restarts,
+            "early_stop": sample_cfg.early_stop.model_dump(),
             "top_k": sample_cfg.elites.k,
             "min_dist": sample_cfg.elites.min_hamming,
             "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
@@ -1931,7 +1933,7 @@ def run_sample(
     if cfg.sample is None:
         raise ValueError("sample section is required for sample")
     with _sigterm_as_keyboard_interrupt():
-        ensure_mpl_cache(config_path.parent / cfg.motif_store.catalog_root)
+        ensure_mpl_cache(resolve_catalog_root(config_path, cfg.motif_store.catalog_root))
         lockmap = _lockmap_for(cfg, config_path)
         statuses = target_statuses(cfg=cfg, config_path=config_path)
         sample_cfg = cfg.sample

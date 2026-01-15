@@ -23,7 +23,8 @@ cruncher workspaces list
 * **Cache data** → `fetch motifs` / `fetch sites`
 * **Inspect cache** → `sources ...` / `catalog ...`
 * **Pin TFs** → `lock`
-* **Validate + logos** → `parse`
+* **Validate motifs** → `parse`
+* **Render logos** → `catalog logos`
 * **Optimize** → `sample`
 * **Analyze/report** → `analyze`, `report`, `notebook`
 * **Campaigns** → `campaign validate|generate|summarize|notebook`
@@ -131,7 +132,7 @@ Note:
 #### `cruncher lock`
 
 Resolves TF names in `cruncher.regulator_sets` to exact cached artifacts (IDs + hashes).
-Writes `<catalog_root>/locks/<config>.lock.json`.
+Writes `<workspace>/.cruncher/locks/<config>.lock.json`.
 
 Inputs:
 
@@ -266,7 +267,7 @@ Notes:
 
 #### `cruncher parse`
 
-Validates cached PWMs (matrix- or site-derived) and renders logos/QC artifacts.
+Validates cached PWMs (matrix- or site-derived) and writes a run manifest.
 
 Inputs:
 
@@ -287,16 +288,13 @@ Precondition:
 
 Notes:
 
-* `parse.plot.logo=false` skips logo rendering (still validates PWMs + writes a run manifest).
+* Logos are rendered via `cruncher catalog logos`; its defaults come from `parse.plot.bits_mode` and `parse.plot.dpi`.
 * `cruncher parse` always uses the lockfile to pin exact motif IDs/hashes.
   If you add new motifs (e.g., via `discover motifs`) or change `motif_store` preferences,
   re-run `cruncher lock <config>` to refresh what parse will use.
 * Parse is idempotent for identical inputs; if matching outputs already exist, it reports
   the existing run instead of creating a new one.
-* When `motif_store.pwm_source=sites`, logos include a subtitle describing site provenance
-  (combined set count, sources, and site kinds).
-* When `motif_store.pwm_source=matrix`, subtitles include the source adapter plus the
-  matrix origin (alignment/meme/streme/file).
+* Use `cruncher catalog logos` to render PWM logos with provenance subtitles.
 
 ---
 
@@ -318,6 +316,7 @@ Example:
 * `cruncher sample <config>`
 * `cruncher sample --no-auto-opt <config>`
 * `cruncher sample --verbose <config>`
+* `cruncher sample --debug <config>`
 
 Precondition:
 
@@ -328,7 +327,7 @@ Notes:
 * `sample.output.save_sequences: true` is required for later analysis/reporting.
 * `sample.output.trace.save: true` enables trace-based diagnostics.
 * Auto-opt is enabled by default: it runs short Gibbs + PT pilots, scores them via the auto-opt scorecard (balance/diversity/acceptance), logs diagnostics warnings, then runs the best candidate. If thresholds are not met, it still proceeds with the best available candidate and logs warnings. Use `--no-auto-opt` to disable.
-* `--verbose` enables per-chain progress logging and bumps the log level to DEBUG for more detail.
+* `--verbose` enables periodic progress logging; `--debug` enables very verbose debug logs.
 * Auto-opt selection details are recorded in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/tables/auto_opt_pilots.csv` for the latest run. The selected pilot is also recorded in `runs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
 
 ---
@@ -739,7 +738,7 @@ Network:
 * `runs latest <config> --set-index 1` — print most recent run for a regulator set
 * `runs best <config> --set-index 1` — print best run by `best_score` for a regulator set
 * `runs watch <config> <run>` — live progress snapshot (run name or run dir; reads `meta/run_status.json`, optionally `live/metrics.jsonl`)
-* `runs rebuild-index <config>` — rebuild `<catalog_root>/run_index.json`
+* `runs rebuild-index <config>` — rebuild `<workspace>/.cruncher/run_index.json`
 * `runs clean <config> --stale` — mark stale `running` runs as `aborted` (use `--drop` to remove from the index)
 
 Tip: inside a workspace you can drop the config argument entirely (for example,

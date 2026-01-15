@@ -34,6 +34,7 @@ from dnadesign.cruncher.integrations.meme_suite import (
 from dnadesign.cruncher.io.parsers.meme import parse_meme_file
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.store.catalog_store import iter_site_sequences
+from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from rich.console import Console
 from rich.table import Table
 
@@ -329,7 +330,7 @@ def discover_motifs(
         console.print("Hint: run cruncher fetch sites before discovery.")
         raise typer.Exit(code=1)
 
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     catalog_root.mkdir(parents=True, exist_ok=True)
     out_root = catalog_root / "discoveries"
     out_root.mkdir(parents=True, exist_ok=True)

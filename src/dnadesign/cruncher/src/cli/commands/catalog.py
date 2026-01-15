@@ -36,6 +36,7 @@ from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_lines, sha256_path
+from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.logos import logo_subtitle, site_entries_for_logo
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 from rich.console import Console
@@ -244,7 +245,7 @@ def _resolve_targets(
 ) -> tuple[list[ResolvedTarget], CatalogIndex]:
     if set_index is not None and (tfs or refs):
         raise typer.BadParameter("--set cannot be combined with --tf or --ref.")
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     catalog = CatalogIndex.load(catalog_root)
     tf_names = list(tfs)
     if set_index is not None:
@@ -388,7 +389,7 @@ def list_entries(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     entries = list_catalog(
         catalog_root,
         tf_name=tf,
@@ -406,7 +407,8 @@ def list_entries(
     table.add_column("Motif ID")
     table.add_column("Organism")
     table.add_column("Matrix")
-    table.add_column("Sites (seq/total)")
+    table.add_column("Sites (cached seq/total)")
+    table.add_column("Sites (matrix n)")
     table.add_column("Site kind")
     table.add_column("Dataset")
     table.add_column("Method")
@@ -419,7 +421,9 @@ def list_entries(
         matrix_flag = "yes" if entry.has_matrix else "no"
         if entry.has_matrix and entry.matrix_source:
             matrix_flag = f"{matrix_flag} ({entry.matrix_source})"
-        sites_flag = f"{entry.site_count}/{entry.site_total}" if entry.has_sites else "no"
+        sites_flag = f"{entry.site_count}/{entry.site_total}" if entry.has_sites else "-"
+        matrix_sites = _matrix_site_count_from_tags(entry.tags)
+        matrix_sites_flag = str(matrix_sites) if matrix_sites is not None else "-"
         mean_len = "-"
         if entry.site_length_mean is not None:
             mean_len = f"{entry.site_length_mean:.1f}"
@@ -430,6 +434,7 @@ def list_entries(
             organism_label,
             matrix_flag,
             sites_flag,
+            matrix_sites_flag,
             entry.site_kind or "-",
             entry.dataset_id or "-",
             entry.dataset_method or "-",
@@ -477,7 +482,7 @@ def search_entries(
         )
     if not (0.0 <= min_score <= 1.0):
         raise typer.BadParameter("--min-score must be between 0 and 1. Hint: try 0.6.")
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     entries = search_catalog(
         catalog_root,
         query=query,
@@ -499,7 +504,8 @@ def search_entries(
     table.add_column("Motif ID")
     table.add_column("Organism")
     table.add_column("Matrix")
-    table.add_column("Sites (seq/total)")
+    table.add_column("Sites (cached seq/total)")
+    table.add_column("Sites (matrix n)")
     table.add_column("Site kind")
     table.add_column("Dataset")
     table.add_column("Method")
@@ -511,7 +517,9 @@ def search_entries(
         matrix_flag = "yes" if entry.has_matrix else "no"
         if entry.has_matrix and entry.matrix_source:
             matrix_flag = f"{matrix_flag} ({entry.matrix_source})"
-        sites_flag = f"{entry.site_count}/{entry.site_total}" if entry.has_sites else "no"
+        sites_flag = f"{entry.site_count}/{entry.site_total}" if entry.has_sites else "-"
+        matrix_sites = _matrix_site_count_from_tags(entry.tags)
+        matrix_sites_flag = str(matrix_sites) if matrix_sites is not None else "-"
         mean_len = "-"
         if entry.site_length_mean is not None:
             mean_len = f"{entry.site_length_mean:.1f}"
@@ -522,6 +530,7 @@ def search_entries(
             organism_label,
             matrix_flag,
             sites_flag,
+            matrix_sites_flag,
             entry.site_kind or "-",
             entry.dataset_id or "-",
             entry.dataset_method or "-",
@@ -558,7 +567,7 @@ def resolve_tf(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     entries = list_catalog(
         catalog_root,
         tf_name=tf,
@@ -575,7 +584,8 @@ def resolve_tf(
     table.add_column("Motif ID")
     table.add_column("Organism")
     table.add_column("Matrix")
-    table.add_column("Sites (seq/total)")
+    table.add_column("Sites (cached seq/total)")
+    table.add_column("Sites (matrix n)")
     table.add_column("Site kind")
     table.add_column("Dataset")
     table.add_column("Method")
@@ -587,7 +597,9 @@ def resolve_tf(
         matrix_flag = "yes" if entry.has_matrix else "no"
         if entry.has_matrix and entry.matrix_source:
             matrix_flag = f"{matrix_flag} ({entry.matrix_source})"
-        sites_flag = f"{entry.site_count}/{entry.site_total}" if entry.has_sites else "no"
+        sites_flag = f"{entry.site_count}/{entry.site_total}" if entry.has_sites else "-"
+        matrix_sites = _matrix_site_count_from_tags(entry.tags)
+        matrix_sites_flag = str(matrix_sites) if matrix_sites is not None else "-"
         mean_len = "-"
         if entry.site_length_mean is not None:
             mean_len = f"{entry.site_length_mean:.1f}"
@@ -597,6 +609,7 @@ def resolve_tf(
             organism_label,
             matrix_flag,
             sites_flag,
+            matrix_sites_flag,
             entry.site_kind or "-",
             entry.dataset_id or "-",
             entry.dataset_method or "-",
@@ -635,7 +648,7 @@ def show(
             "Expected <source>:<motif_id> reference. Hint: cruncher catalog show regulondb:RBM000123"
         )
     source, motif_id = ref.split(":", 1)
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     entry = get_entry(catalog_root, source=source, motif_id=motif_id)
     if entry is None:
         console.print(f"No catalog entry found for {ref}")
@@ -727,8 +740,9 @@ def pwms(
             set_index=set_index,
             source_filter=source,
         )
+        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
         store = CatalogMotifStore(
-            config_path.parent / cfg.motif_store.catalog_root,
+            catalog_root,
             pwm_source=cfg.motif_store.pwm_source,
             site_kinds=cfg.motif_store.site_kinds,
             combine_sites=cfg.motif_store.combine_sites,
@@ -750,12 +764,14 @@ def pwms(
         table.add_column("Length")
         table.add_column("Window")
         table.add_column("Bits")
-        table.add_column("n sites")
+        table.add_column("Sites (cached seq/total)")
+        table.add_column("Sites (matrix n)")
         table.add_column("Site sets")
         for target in targets:
             pwm = store.get_pwm(target.ref)
             resolved.append((target, pwm))
             info_bits = pwm.information_bits()
+            cached_sites = f"{target.entry.site_count}/{target.entry.site_total}" if target.entry.has_sites else "-"
             site_sets = "-" if cfg.motif_store.pwm_source == "matrix" else str(len(target.site_entries))
             window = "-"
             if pwm.source_length is not None and pwm.window_start is not None:
@@ -768,6 +784,7 @@ def pwms(
                 str(pwm.length),
                 window,
                 f"{info_bits:.2f}",
+                cached_sites,
                 str(pwm.nsites or "-"),
                 site_sets,
             )
@@ -783,6 +800,8 @@ def pwms(
                 "window_score": pwm.window_score,
                 "info_bits": info_bits,
                 "nsites": pwm.nsites,
+                "sites_cached": target.entry.site_count if target.entry.has_sites else None,
+                "sites_cached_total": target.entry.site_total if target.entry.has_sites else None,
                 "site_sets": len(target.site_entries) if cfg.motif_store.pwm_source == "sites" else None,
             }
             if output_format == "json":
@@ -855,7 +874,8 @@ def logos(
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
     try:
-        ensure_mpl_cache(config_path.parent / cfg.motif_store.catalog_root)
+        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+        ensure_mpl_cache(catalog_root)
         targets, catalog = _resolve_targets(
             cfg=cfg,
             config_path=config_path,
@@ -865,7 +885,7 @@ def logos(
             source_filter=source,
         )
         store = CatalogMotifStore(
-            config_path.parent / cfg.motif_store.catalog_root,
+            catalog_root,
             pwm_source=cfg.motif_store.pwm_source,
             site_kinds=cfg.motif_store.site_kinds,
             combine_sites=cfg.motif_store.combine_sites,
@@ -881,7 +901,6 @@ def logos(
         resolved_dpi = dpi or cfg.parse.plot.dpi
         if resolved_bits_mode not in {"information", "probability"}:
             raise typer.BadParameter("--bits-mode must be 'information' or 'probability'.")
-        catalog_root = config_path.parent / cfg.motif_store.catalog_root
         signature, signature_payload = _build_logo_signature(
             cfg=cfg,
             catalog_root=catalog_root,

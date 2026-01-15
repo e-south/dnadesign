@@ -71,6 +71,12 @@ class GibbsOptimizer(Optimizer):
         self.progress_bar = bool(cfg.get("progress_bar", True))
         self.progress_every = int(cfg.get("progress_every", 0))
         self.status_writer = status_writer
+        early_cfg = cfg.get("early_stop") or {}
+        self.early_stop_enabled = bool(early_cfg.get("enabled", False))
+        self.early_stop_patience = int(early_cfg.get("patience", 0))
+        self.early_stop_min_delta = float(early_cfg.get("min_delta", 0.0))
+        if self.early_stop_patience <= 0:
+            self.early_stop_enabled = False
 
         # Unpack move‐ranges
         self.move_cfg = {
@@ -193,6 +199,8 @@ class GibbsOptimizer(Optimizer):
             seed_state = make_seed(self.init_cfg, self.pwms, rng)
             seq = seed_state.seq.copy()  # numpy array (L,)
             chain_trace: List[float] = []
+            best_local: float | None = None
+            no_improve = 0
             chain_iter = 0
 
             beta_controller = None
@@ -312,13 +320,44 @@ class GibbsOptimizer(Optimizer):
                     score_mean=score_mean,
                     score_std=score_std,
                 )
+                if self.early_stop_enabled:
+                    if best_local is None or combined_scalar > best_local + self.early_stop_min_delta:
+                        best_local = combined_scalar
+                        no_improve = 0
+                    else:
+                        no_improve += 1
+                        if no_improve >= self.early_stop_patience:
+                            logger.info(
+                                "Early-stop: chain %d stalled for %d draws (min_delta=%.3f).",
+                                c + 1,
+                                self.early_stop_patience,
+                                self.early_stop_min_delta,
+                            )
+                            if self.status_writer is not None:
+                                self.status_writer.update(
+                                    status_message="early_stop",
+                                    early_stop={
+                                        "chain": c + 1,
+                                        "patience": self.early_stop_patience,
+                                        "min_delta": self.early_stop_min_delta,
+                                        "best_score": best_local,
+                                    },
+                                )
+                            break
 
             chain_scores.append(chain_trace)
-            logger.debug("Chain %d: sampling complete with %d recorded draws", c + 1, draws)
+            logger.debug("Chain %d: sampling complete with %d recorded draws", c + 1, len(chain_trace))
 
         logger.debug("All chains complete. Move utilization: %s", dict(self.move_tally))
 
         # Build ArviZ InferenceData for combined fitness (chains × draws)
+        if chain_scores:
+            max_len = max(len(trace) for trace in chain_scores)
+            for trace in chain_scores:
+                if not trace:
+                    continue
+                if len(trace) < max_len:
+                    trace.extend([trace[-1]] * (max_len - len(trace)))
         scores_arr = np.asarray(chain_scores)
         if scores_arr.size == 0:
             raise RuntimeError(

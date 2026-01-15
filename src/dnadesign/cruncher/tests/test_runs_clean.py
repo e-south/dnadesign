@@ -24,11 +24,16 @@ runner = CliRunner()
 
 
 def test_runs_clean_marks_stale_running(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
     config = {
         "cruncher": {
             "out_dir": "runs",
             "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": ".cruncher", "pwm_source": "matrix", "source_preference": ["regulondb"]},
+            "motif_store": {
+                "catalog_root": str(catalog_root),
+                "pwm_source": "matrix",
+                "source_preference": ["regulondb"],
+            },
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }

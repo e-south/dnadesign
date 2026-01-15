@@ -713,6 +713,26 @@ class SampleBudgetConfig(StrictBaseModel):
         return v
 
 
+class SampleEarlyStopConfig(StrictBaseModel):
+    enabled: bool = True
+    patience: int = 500
+    min_delta: float = 0.5
+
+    @field_validator("patience")
+    @classmethod
+    def _check_patience(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 0:
+            raise ValueError("sample.early_stop.patience must be a non-negative integer")
+        return v
+
+    @field_validator("min_delta")
+    @classmethod
+    def _check_min_delta(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0:
+            raise ValueError("sample.early_stop.min_delta must be >= 0")
+        return float(v)
+
+
 class SampleObjectiveConfig(StrictBaseModel):
     bidirectional: bool = True
     score_scale: Literal["llr", "z", "logp", "consensus-neglop-sum", "normalized-llr"] = "llr"
@@ -831,7 +851,7 @@ class SampleOutputConfig(StrictBaseModel):
 
 
 class SampleUiConfig(StrictBaseModel):
-    progress_bar: bool = False
+    progress_bar: bool = True
     progress_every: int = 0
 
     @field_validator("progress_every")
@@ -846,6 +866,7 @@ class SampleConfig(StrictBaseModel):
     mode: Literal["optimize", "sample"] = "optimize"
     rng: SampleRngConfig = SampleRngConfig()
     budget: SampleBudgetConfig
+    early_stop: SampleEarlyStopConfig = SampleEarlyStopConfig()
     init: InitConfig
     objective: SampleObjectiveConfig = SampleObjectiveConfig()
     elites: SampleElitesConfig = SampleElitesConfig()
@@ -1142,11 +1163,11 @@ class MotifStoreConfig(StrictBaseModel):
     @field_validator("catalog_root")
     @classmethod
     def _check_catalog_root(cls, v: Path) -> Path:
-        if v.is_absolute():
-            raise ValueError("motif_store.catalog_root must be a relative path")
         normalized = Path(v)
-        if any(part == ".." for part in normalized.parts):
-            raise ValueError("motif_store.catalog_root must not traverse outside the workspace")
+        if not str(normalized).strip():
+            raise ValueError("motif_store.catalog_root must be a non-empty path")
+        if not normalized.is_absolute() and any(part == ".." for part in normalized.parts):
+            raise ValueError("motif_store.catalog_root must not traverse outside the cruncher root")
         return normalized
 
     @field_validator("site_window_lengths")

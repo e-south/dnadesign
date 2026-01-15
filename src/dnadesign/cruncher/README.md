@@ -40,7 +40,11 @@ cruncher() { pixi run cruncher -- "$@"; }
 # Quick sanity check: list sources
 cruncher sources list
 
-# Network access (explicit)
+# Local demo cache (no network required)
+cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR
+cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR
+
+# Optional: fetch curated sites from RegulonDB (network)
 cruncher fetch sites --tf lexA --tf cpxR
 
 # Reproducibility pinning
@@ -50,7 +54,7 @@ cruncher lock
 cruncher catalog pwms
 cruncher catalog logos --set 1
 
-# Optional: validate + render logos
+# Optional: validate locked motifs
 cruncher parse
 
 # Optimization

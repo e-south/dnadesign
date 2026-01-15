@@ -26,6 +26,7 @@ from dnadesign.cruncher.cli.config_resolver import (
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.registry import default_registry
+from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
 from rich.console import Console
 from rich.table import Table
 
@@ -54,8 +55,8 @@ def status(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
-    lock_path = catalog_root / "locks" / f"{config_path.stem}.lock.json"
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    lock_path = resolve_lock_path(config_path)
     sources = default_registry(
         cfg.ingest,
         config_path=config_path,

@@ -19,6 +19,7 @@ from dnadesign.cruncher.cli.config_resolver import (
 )
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
+from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
 
 
 def lock(
@@ -40,8 +41,8 @@ def lock(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
-    lock_path = catalog_root / "locks" / f"{config_path.stem}.lock.json"
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    lock_path = resolve_lock_path(config_path)
     names = {tf for group in cfg.regulator_sets for tf in group}
     try:
         resolve_lock(

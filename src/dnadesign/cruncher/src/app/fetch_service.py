@@ -333,7 +333,7 @@ def fetch_motifs(
                 written.append(path)
             continue
         if not update:
-            cached = catalog.list(tf_name=name, include_synonyms=True)
+            cached = catalog.list(tf_name=name, source=adapter.source_id, include_synonyms=True)
             if any(entry.has_matrix and _motif_path(root, entry.source, entry.motif_id).exists() for entry in cached):
                 logger.info(
                     "Skipping TF '%s' (cached motif exists). Use --update to refresh.",
@@ -574,7 +574,7 @@ def fetch_sites(
             written.append(path)
             continue
         if not update:
-            cached = catalog.list(tf_name=name, include_synonyms=True)
+            cached = catalog.list(tf_name=name, source=adapter.source_id, include_synonyms=True)
             if dataset_id:
                 cached = [entry for entry in cached if entry.dataset_id == dataset_id]
             if any(entry.has_sites and _sites_path(root, entry.source, entry.motif_id).exists() for entry in cached):
@@ -635,12 +635,12 @@ def fetch_sites(
                         counts[key]["site_kind"] = record_kind
                     elif current != record_kind:
                         counts[key]["site_kind"] = "mixed"
-                dataset_id = tags.get("dataset_id")
-                if dataset_id:
+                tag_dataset_id = tags.get("dataset_id")
+                if tag_dataset_id:
                     current = counts[key]["dataset_id"]
                     if current is None:
-                        counts[key]["dataset_id"] = dataset_id
-                    elif current != dataset_id:
+                        counts[key]["dataset_id"] = tag_dataset_id
+                    elif current != tag_dataset_id:
                         counts[key]["dataset_id"] = "mixed"
                 dataset_source = tags.get("dataset_source")
                 if dataset_source:

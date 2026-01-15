@@ -32,6 +32,7 @@ from dnadesign.cruncher.cli.config_resolver import (
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.models import DatasetQuery
 from dnadesign.cruncher.ingest.registry import default_registry
+from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from rich.console import Console
 from rich.table import Table
 
@@ -293,7 +294,7 @@ def summary(
     combined_summary: dict | None = None
 
     if scope in {"cache", "both"}:
-        catalog_root = config_path.parent / cfg.motif_store.catalog_root
+        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
         cache_summary = summarize_cache(catalog_root, source=source)
         payload["cache"] = cache_summary
         if output_format == "table" and view == "split":

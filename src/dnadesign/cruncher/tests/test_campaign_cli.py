@@ -27,6 +27,7 @@ def test_campaign_generate_cli(tmp_path: Path) -> None:
         "cruncher": {
             "out_dir": "runs",
             "regulator_sets": [],
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
             "regulator_categories": {
                 "CatA": ["A", "B"],
                 "CatB": ["C", "D"],
@@ -126,6 +127,7 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
         "cruncher": {
             "out_dir": "runs",
             "regulator_sets": [],
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
             "regulator_categories": {"CatA": ["A", "B"], "CatB": ["C", "D"]},
             "campaigns": [
                 {
@@ -230,6 +232,7 @@ def test_campaign_validate_requires_catalog(tmp_path: Path) -> None:
         "cruncher": {
             "out_dir": "runs",
             "regulator_sets": [],
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
             "regulator_categories": {"CatA": ["A", "B"], "CatB": ["C"]},
             "campaigns": [
                 {

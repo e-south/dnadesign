@@ -25,6 +25,7 @@ from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_path
+from dnadesign.cruncher.utils.paths import resolve_catalog_root
 
 
 @dataclass(frozen=True)
@@ -122,7 +123,7 @@ def validate_campaign(
     catalog = None
     store: Optional[CatalogMotifStore] = None
     if needs_catalog:
-        catalog_root = config_path.parent / cfg.motif_store.catalog_root
+        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
         if not catalog_root.exists():
             errors.append(
                 f"Catalog root not found at {catalog_root}. Run `cruncher fetch motifs/sites` before validation."
@@ -324,7 +325,7 @@ def collect_campaign_metrics(
     source_preference: Optional[list[str]] = None,
     dataset_preference: Optional[list[str]] = None,
 ) -> Dict[str, RegulatorMetrics]:
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     if not catalog_root.exists():
         raise ValueError(
             f"Catalog root not found at {catalog_root}. Run `cruncher fetch motifs/sites` before campaign metrics."
@@ -426,7 +427,7 @@ def _apply_selectors(
     categories: Dict[str, list[str]],
     include_metrics: bool,
 ) -> tuple[Dict[str, list[str]], Dict[str, RegulatorMetrics]]:
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     if not catalog_root.exists():
         raise ValueError(
             f"Catalog root not found at {catalog_root}. Run `cruncher fetch motifs/sites` before campaign selection."

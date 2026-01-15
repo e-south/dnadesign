@@ -17,6 +17,7 @@ from typing import Iterable, Optional
 from dnadesign.cruncher.artifacts.entries import normalize_artifacts
 from dnadesign.cruncher.artifacts.layout import manifest_path, status_path
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig
+from dnadesign.cruncher.utils.paths import resolve_run_index_path
 
 
 @dataclass(frozen=True)
@@ -53,10 +54,7 @@ class RunInfo:
 
 
 def run_index_path(config_path: Path, catalog_root: Path | str | None = None) -> Path:
-    root = Path(catalog_root) if catalog_root is not None else Path(".cruncher")
-    if not root.is_absolute():
-        root = config_path.parent / root
-    return root / "run_index.json"
+    return resolve_run_index_path(config_path)
 
 
 def load_run_index(config_path: Path, catalog_root: Path | str | None = None) -> dict[str, dict]:

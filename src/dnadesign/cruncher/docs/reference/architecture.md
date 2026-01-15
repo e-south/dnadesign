@@ -6,8 +6,8 @@
 ### Run lifecycle
 
 1. **fetch** → cache motifs/sites and update `catalog.json`
-2. **lock** → resolve TFs to exact cached artifacts (`.cruncher/locks/<config>.lock.json`)
-3. **parse** *(optional)* → validate PWMs and render logos
+2. **lock** → resolve TFs to exact cached artifacts (`<workspace>/.cruncher/locks/<config>.lock.json`)
+3. **parse** *(optional)* → validate cached PWMs (no logo rendering)
 4. **sample** → run MCMC and write sequences/trace + manifests
 5. **analyze** → plots/tables from sample artifacts (offline)
 6. **report** → summary outputs from run artifacts (fails fast if missing inputs)
@@ -90,8 +90,6 @@ In this repo, the bundled demo workspaces live at:
 ```
 <catalog_root>/
 catalog.json
-run_index.json
-locks/ <config>.lock.json
 normalized/
 motifs/<source>/<motif_id>.json
 sites/<source>/<motif_id>.jsonl
@@ -101,9 +99,19 @@ discoveries/          # MEME/STREME discovery runs
 ```
 
 - `catalog.json` is the “what do we have cached?” index.
+- `catalog_root` can be absolute or relative to the cruncher root (`src/dnadesign/cruncher`); relative paths must not include `..`.
+- By default the catalog cache is shared across workspaces (`src/dnadesign/cruncher/.cruncher`); locks/run_index live in each workspace’s `.cruncher/`.
+
+#### Workspace state (per workspace `.cruncher/`)
+
+```
+<workspace>/.cruncher/
+locks/<config>.lock.json
+run_index.json
+```
+
 - `locks/<config>.lock.json` pins TF names → exact cached artifacts + hashes.
-- `run_index.json` tracks run folders for `cruncher runs ...`.
-- `catalog_root` must be workspace-relative (no absolute paths or `..` segments).
+- `run_index.json` tracks run folders for `cruncher runs ...` within that workspace.
 
 #### Tooling caches
 
@@ -118,7 +126,6 @@ Each configured regulator set produces **separate** runs, grouped by stage. Run 
 - `runs/parse/lexA-cpxR_20260101_143210_f3a9d2/`
 - `runs/sample/lexA-cpxR_20260101_143512_a91c0e/`
 - `runs/auto_opt/lexA-cpxR_20260101_143530_91acb1/` (auto-opt pilots)
-- `runs/logos/parse/20260101_143210_f3a9d2/`
 - `runs/logos/catalog/lexA-cpxR_20260101_143210_f3a9d2/` *(prefix `setN_` only when multiple regulator sets are configured)*
 
 ---
