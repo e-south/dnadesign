@@ -1,0 +1,47 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from dnadesign.densegen.src.adapters.sources import BindingSitesDataSource, SequenceLibraryDataSource
+
+
+def test_binding_sites_rejects_empty_values(tmp_path: Path) -> None:
+    csv_path = tmp_path / "tfbs.csv"
+    csv_path.write_text("tf,tfbs\nLexA,\n")
+    ds = BindingSitesDataSource(path=str(csv_path), cfg_path=tmp_path / "config.yaml")
+    with pytest.raises(ValueError, match="Null regulator/sequence|Empty regulator/sequence"):
+        ds.load_data()
+
+
+def test_binding_sites_rejects_duplicates(tmp_path: Path) -> None:
+    csv_path = tmp_path / "tfbs.csv"
+    csv_path.write_text("tf,tfbs\nLexA,AAA\nLexA,AAA\n")
+    ds = BindingSitesDataSource(path=str(csv_path), cfg_path=tmp_path / "config.yaml")
+    with pytest.raises(ValueError, match="Duplicate regulator/binding-site"):
+        ds.load_data()
+
+
+def test_binding_sites_rejects_invalid_bases(tmp_path: Path) -> None:
+    csv_path = tmp_path / "tfbs.csv"
+    csv_path.write_text("tf,tfbs\nLexA,AAAN\n")
+    ds = BindingSitesDataSource(path=str(csv_path), cfg_path=tmp_path / "config.yaml")
+    with pytest.raises(ValueError, match="Invalid binding-site motifs"):
+        ds.load_data()
+
+
+def test_sequence_library_rejects_nulls(tmp_path: Path) -> None:
+    csv_path = tmp_path / "seqs.csv"
+    csv_path.write_text('sequence\nAAA\n""\n')
+    ds = SequenceLibraryDataSource(path=str(csv_path), cfg_path=tmp_path / "config.yaml")
+    with pytest.raises(ValueError, match="Null sequences|Empty sequences"):
+        ds.load_data()
+
+
+def test_sequence_library_rejects_invalid_bases(tmp_path: Path) -> None:
+    csv_path = tmp_path / "seqs.csv"
+    csv_path.write_text("sequence\nAAAN\n")
+    ds = SequenceLibraryDataSource(path=str(csv_path), cfg_path=tmp_path / "config.yaml")
+    with pytest.raises(ValueError, match="Invalid sequences"):
+        ds.load_data()

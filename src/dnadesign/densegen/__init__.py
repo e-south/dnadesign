@@ -1,9 +1,5 @@
 """
---------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/__init__.py
+DenseGen package root.
 
-Module Author(s): Eric J. South
-Dunlop Lab
---------------------------------------------------------------------------------
+Implementation lives in the nested src/ package.
 """

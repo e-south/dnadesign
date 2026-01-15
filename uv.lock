@@ -305,10 +305,12 @@ wheels = [
 [[package]]
 name = "dense-arrays"
 version = "0.1.0"
-source = { git = "https://github.com/e-south/dense-arrays#6389709d2ea1277efbc775ccfb98d17a4916d4f2" }
+source = { git = "https://github.com/e-south/dense-arrays#2ce9401dc0deea82c05c6c92385c5f57a44a646a" }
 dependencies = [
     { name = "numpy", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "ortools", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "rich", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "typer", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
 ]
 
 [[package]]

@@ -1,0 +1,167 @@
+# DenseGen config (breaking v2 schema, no fallbacks).
+# For real runs, copy this file into a run directory and keep outputs relative to it.
+
+densegen:
+  schema_version: "2.0"
+  inputs:
+    - name: 60bp_dual_promoter_cpxR_LexA
+      type: binding_sites
+      path: ../inputs/tf2tfbs_mapping_cpxR_LexA.csv
+      format: csv
+
+  output:
+    targets: [usr, parquet]
+    schema:
+      bio_type: dna
+      alphabet: dna_4
+    usr:
+      dataset: 60bp_dual_promoter_cpxR_LexA
+      root: ../../../usr/datasets
+      chunk_size: 10
+      allow_overwrite: false
+    parquet:
+      path: ../../runs/60bp_dual_promoter_cpxR_LexA/parquet
+      deduplicate: true
+      chunk_size: 4096
+
+  generation:
+    sequence_length: 60
+    quota: 30000
+    sampling:
+      pool_strategy: subsample
+      library_size: 16
+      subsample_over_length_budget_by: 120
+      cover_all_regulators: true
+      unique_binding_sites: true
+      max_sites_per_regulator: null
+      relax_on_exhaustion: false
+      allow_incomplete_coverage: false
+      iterative_max_libraries: 50
+      iterative_min_new_solutions: 1
+
+    plan:
+      - name: sigma70_high
+        quota: 10000
+        fixed_elements:
+          promoter_constraints:
+            - upstream: "TTGACA"
+              downstream: "TATAAT"
+              spacer_length: [16, 18]
+              upstream_pos: [0, 60]
+      - name: sigma70_mid
+        quota: 10000
+        fixed_elements:
+          promoter_constraints:
+            - upstream: "ACCGCG"
+              downstream: "TATAAT"
+              spacer_length: [16, 18]
+              upstream_pos: [0, 60]
+      - name: sigma70_low
+        quota: 10000
+        fixed_elements:
+          promoter_constraints:
+            - upstream: "GCAGGT"
+              downstream: "TATAAT"
+              spacer_length: [16, 18]
+              upstream_pos: [0, 60]
+
+  solver:
+    backend: GUROBI
+    strategy: diverse
+    options:
+      - "Threads=16"
+      - "TimeLimit=10"
+
+  runtime:
+    round_robin: true
+    arrays_generated_before_resample: 20
+    min_count_per_tf: 1
+    max_duplicate_solutions: 3
+    stall_seconds_before_resample: 5
+    stall_warning_every_seconds: 15
+    max_resample_attempts: 3
+    max_total_resamples: 500
+    max_seconds_per_plan: 0
+    max_failed_solutions: 0
+    random_seed: 42
+
+  postprocess:
+    gap_fill:
+      mode: adaptive         # off | strict | adaptive
+      end: 5prime
+      gc_min: 0.40
+      gc_max: 0.60
+      max_tries: 2000
+
+  logging:
+    log_dir: ../../runs/60bp_dual_promoter_cpxR_LexA/logs
+    level: INFO
+    suppress_solver_stderr: true
+    print_visual: true
+
+plots:
+  out_dir: ../../runs/60bp_dual_promoter_cpxR_LexA/plots
+  source: parquet           # required when output.targets has multiple sinks
+
+  # Global style applied to every plot (can be overridden per-plot)
+  style:
+    font_size: 14
+    palette: okabe_ito
+    seaborn_style: true
+    despine: true
+    legend_frame: false
+
+  default:
+    - compression_ratio
+    - tf_usage
+    - tfbs_usage
+    - plan_counts
+    - tf_coverage
+    - tfbs_length_density
+    - gap_fill_gc
+
+  options:
+    compression_ratio:
+      dims: [6, 6]
+
+    tf_usage:
+      dims: [8, 6]
+      mode: stack_lengths        # stack_lengths | stack_tfbs | totals
+      max_segments: 20
+      top_k_tfs: null
+
+    tfbs_usage:
+      dims: [32, 6]
+      couple_sigma_pairs: true
+      exclude_tfbs: ["G"]
+
+    plan_counts:
+      dims: [6, 6]
+      stacked_by_day: true
+      created_at_col: densegen__created_at
+
+    tf_coverage:
+      dims: [16, 3]
+      top_k: 20
+      normalize: false
+      stacked: false
+      alpha: 0.35
+      palette: seagreen
+      edge_on: true
+      edge_width: 1.9
+      edge_alpha: 0.9
+      edge_color: auto
+      edge_dark_factor: 0.80
+      include_promoter_sites: true
+      promoter_edge_style: solid
+
+    tfbs_length_density:
+      dims: [6, 6]
+      kde: true
+      kde_bandwidth: null
+      kde_points: 256
+      fill_alpha: 0.35
+      include_promoter_sites: false
+
+    gap_fill_gc:
+      dims: [6, 6]
