@@ -1,10 +1,21 @@
-# Generation and constraints
+## Generation and constraints
 
-DenseGen generates a **plan** of sequences using dense-arrays. Each plan item is a constraint bucket.
+Generation is driven by a plan. Each plan item is a constraint bucket with a quota or fraction,
+and DenseGen enforces fixed motifs and regulator requirements through the dense-arrays solver.
 
-## Plan definition
+### Contents
+- [Plan definition](#plan-definition) - quota/fraction rules and plan item shape.
+- [Promoter constraints](#promoter-constraints) - fixed motifs and spacing.
+- [Side biases](#side-biases-positional-preferences) - left/right placement preferences.
+- [Solver strategy](#solver-strategy) - solution ordering and backend selection.
+- [Sampling controls](#sampling-controls) - how libraries are built and resampled.
+- [Regulator constraints](#regulator-constraints) - per-plan requirements and validation.
 
-- Each plan item has a `name` and **either** `quota` or `fraction`.
+---
+
+### Plan definition
+
+- Each plan item has a `name` and either `quota` or `fraction`.
 - Mixing quotas and fractions across items is not allowed.
 
 ```yaml
@@ -22,18 +33,23 @@ plan:
           spacer_length: [16, 18]
 ```
 
-## Promoter constraints
+---
 
-Use `fixed_elements.promoter_constraints` to enforce fixed motifs and spacing. Motifs must be A/C/G/T only.
+### Promoter constraints
+
+Use `fixed_elements.promoter_constraints` to enforce fixed motifs and spacing. Motifs must be
+A/C/G/T only.
 
 Fields:
 - `upstream`, `downstream` (motif strings)
 - `spacer_length: [min, max]`
 - `upstream_pos`, `downstream_pos` (optional ranges)
 
-## Side biases (positional preferences)
+---
 
-Use `fixed_elements.side_biases` to bias motifs to the left or right of the sequence.
+### Side biases (positional preferences)
+
+Use `fixed_elements.side_biases` to bias motifs toward the left or right of the sequence.
 
 ```yaml
 fixed_elements:
@@ -44,18 +60,20 @@ fixed_elements:
 
 Rules:
 - Motifs must be A/C/G/T only.
-- Motifs **must exist in the sampled library** (DenseGen fails fast if missing).
-- A motif cannot be in both `left` and `right`.
+- Motifs must exist in the sampled library (DenseGen fails fast if missing).
+- A motif cannot appear in both `left` and `right`.
 
-## Solver strategy
+---
+
+### Solver strategy
 
 DenseGen exposes dense-arrays solution modes via `solver.strategy`:
 
-- `iterate` — yield solutions in descending score.
-- `diverse` — yield solutions with diversity-biased ordering.
-- `optimal` — only the best solution per library.
-- `approximate` — heuristic solution per library (no solver options; backend optional).
-- `strands` — `single | double` (default: `double`).
+- `iterate` - yield solutions in descending score.
+- `diverse` - yield solutions with diversity-biased ordering.
+- `optimal` - only the best solution per library.
+- `approximate` - heuristic solution per library (no solver options; backend optional).
+- `strands` - `single | double` (default: `double`).
 
 ```yaml
 solver:
@@ -65,9 +83,12 @@ solver:
   strands: double
 ```
 
-## Sampling controls
+---
 
-`generation.sampling` controls how binding-site libraries are built (pool strategy, coverage, uniqueness, caps, and relaxation). DenseGen records sampling policy and outcomes in metadata.
+### Sampling controls
+
+`generation.sampling` controls how binding-site libraries are built (pool strategy, coverage,
+uniqueness, caps, and relaxation). DenseGen records sampling policy and outcomes in metadata.
 
 Key fields:
 - `pool_strategy`: `full | subsample | iterative_subsample`
@@ -80,13 +101,15 @@ Notes:
 - Use `iterative_subsample` when you want multiple libraries or adaptive retries.
 - `unique_binding_sites` enforces uniqueness at the regulator+sequence pair level.
 
-## Regulator constraints
+---
+
+### Regulator constraints
 
 DenseGen supports three regulator constraint modes per plan item:
 
 - `required_regulators`: enforce at least one site per listed regulator.
-- `min_required_regulators`: enforce at least K distinct regulators (k‑of‑n).
-- `min_count_by_regulator`: enforce per‑regulator minimum counts.
+- `min_required_regulators`: enforce at least K distinct regulators (k-of-n).
+- `min_count_by_regulator`: enforce per-regulator minimum counts.
 
 Solver strategies (`iterate|diverse|optimal`) enforce these constraints at the solver level;
 `approximate` runs are validated in the pipeline to keep behavior consistent.
@@ -94,3 +117,7 @@ Solver strategies (`iterate|diverse|optimal`) enforce these constraints at the s
 Notes:
 - `min_count_by_regulator` takes precedence over the global `runtime.min_count_per_tf`
   for listed regulators (DenseGen uses the maximum of the two).
+
+---
+
+@e-south
