@@ -60,11 +60,11 @@ DEFAULT_RUNS_ROOT = DENSEGEN_ROOT / "runs"
 
 def _default_config_path() -> Path:
     # Prefer a small, run-scoped example config inside the package tree.
-    return DENSEGEN_ROOT / "runs" / "smoke_v2" / "config.yaml"
+    return DENSEGEN_ROOT / "runs" / "demo" / "config.yaml"
 
 
 def _default_template_path() -> Path:
-    return DENSEGEN_ROOT / "runs" / "_campaigns" / "template" / "config.yaml"
+    return DENSEGEN_ROOT / "runs" / "demo" / "config.yaml"
 
 
 # ----------------- schema & helpers -----------------
