@@ -12,13 +12,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+from dnadesign.cruncher.app.lock_service import resolve_lock
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
 )
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.lock_service import resolve_lock
 
 
 def lock(

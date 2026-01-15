@@ -16,24 +16,24 @@ from pathlib import Path
 from typing import Iterable
 
 import typer
+from dnadesign.cruncher.app.fetch_service import write_motif_record
 from dnadesign.cruncher.cli.commands.catalog import _resolve_targets
 from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
+from dnadesign.cruncher.core.labels import build_run_name
 from dnadesign.cruncher.ingest.models import OrganismRef
 from dnadesign.cruncher.ingest.normalize import build_motif_record
 from dnadesign.cruncher.ingest.site_windows import resolve_window_length
-from dnadesign.cruncher.io.parsers.meme import parse_meme_file
-from dnadesign.cruncher.services.fetch_service import write_motif_record
-from dnadesign.cruncher.store.catalog_index import CatalogIndex
-from dnadesign.cruncher.store.catalog_store import iter_site_sequences
-from dnadesign.cruncher.utils.labels import build_run_name
-from dnadesign.cruncher.utils.meme_suite import (
+from dnadesign.cruncher.integrations.meme_suite import (
     check_meme_tools,
     resolve_executable,
     resolve_tool_path,
     tool_version,
 )
+from dnadesign.cruncher.io.parsers.meme import parse_meme_file
+from dnadesign.cruncher.store.catalog_index import CatalogIndex
+from dnadesign.cruncher.store.catalog_store import iter_site_sequences
 from rich.console import Console
 from rich.table import Table
 

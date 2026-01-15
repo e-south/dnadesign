@@ -17,6 +17,13 @@ from pathlib import Path
 from typing import Optional, Sequence
 
 import typer
+from dnadesign.cruncher.app.campaign_service import select_catalog_entry
+from dnadesign.cruncher.app.catalog_service import (
+    get_entry,
+    list_catalog,
+    search_catalog,
+)
+from dnadesign.cruncher.artifacts.layout import RUN_META_DIR, logos_dir_for_run, logos_root, out_root
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     parse_config_and_value,
@@ -24,20 +31,13 @@ from dnadesign.cruncher.cli.config_resolver import (
 )
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.campaign_service import select_catalog_entry
-from dnadesign.cruncher.services.catalog_service import (
-    get_entry,
-    list_catalog,
-    search_catalog,
-)
+from dnadesign.cruncher.core.labels import build_run_name
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_lines, sha256_path
-from dnadesign.cruncher.utils.labels import build_run_name
-from dnadesign.cruncher.utils.logos import logo_subtitle, site_entries_for_logo
-from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
-from dnadesign.cruncher.utils.run_layout import RUN_META_DIR, logos_dir_for_run, logos_root, out_root
+from dnadesign.cruncher.viz.logos import logo_subtitle, site_entries_for_logo
+from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 from rich.console import Console
 from rich.table import Table
 
@@ -916,7 +916,7 @@ def logos(
                 console.print(f"Logos already rendered at {render_path(out_base, base=config_path.parent)}")
                 return
         out_base.mkdir(parents=True, exist_ok=True)
-        from dnadesign.cruncher.io.plots.pssm import plot_pwm
+        from dnadesign.cruncher.viz.pwm import plot_pwm
 
         table = Table(title="Rendered PWM logos", header_style="bold")
         table.add_column("TF")

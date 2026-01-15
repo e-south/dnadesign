@@ -16,9 +16,9 @@ from pathlib import Path
 import yaml
 from typer.testing import CliRunner
 
+from dnadesign.cruncher.app.run_service import load_run_index, save_run_index
+from dnadesign.cruncher.artifacts.layout import status_path
 from dnadesign.cruncher.cli.app import app
-from dnadesign.cruncher.services.run_service import load_run_index, save_run_index
-from dnadesign.cruncher.utils.run_layout import status_path
 
 runner = CliRunner()
 

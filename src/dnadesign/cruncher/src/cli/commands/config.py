@@ -13,12 +13,12 @@ from pathlib import Path
 
 import click
 import typer
+from dnadesign.cruncher.app.config_service import summarize_config
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
 )
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.config_service import summarize_config
 from rich.console import Console
 from rich.table import Table
 

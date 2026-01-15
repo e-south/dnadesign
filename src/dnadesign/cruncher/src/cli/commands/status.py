@@ -13,6 +13,12 @@ from collections import Counter
 from pathlib import Path
 
 import typer
+from dnadesign.cruncher.app.catalog_service import catalog_stats
+from dnadesign.cruncher.app.run_service import list_runs
+from dnadesign.cruncher.app.target_service import (
+    has_blocking_target_errors,
+    target_statuses,
+)
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
@@ -20,12 +26,6 @@ from dnadesign.cruncher.cli.config_resolver import (
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.registry import default_registry
-from dnadesign.cruncher.services.catalog_service import catalog_stats
-from dnadesign.cruncher.services.run_service import list_runs
-from dnadesign.cruncher.services.target_service import (
-    has_blocking_target_errors,
-    target_statuses,
-)
 from rich.console import Console
 from rich.table import Table
 

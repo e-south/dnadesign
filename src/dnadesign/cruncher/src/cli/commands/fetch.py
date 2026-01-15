@@ -15,6 +15,12 @@ from typing import Iterable, List, Optional, Tuple
 from urllib.error import HTTPError, URLError
 
 import typer
+from dnadesign.cruncher.app.campaign_service import resolve_campaign_tf_names
+from dnadesign.cruncher.app.fetch_service import (
+    fetch_motifs,
+    fetch_sites,
+    hydrate_sites,
+)
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
@@ -27,12 +33,6 @@ from dnadesign.cruncher.ingest.sequence_provider import (
     FastaSequenceProvider,
     NCBISequenceProvider,
     SequenceProvider,
-)
-from dnadesign.cruncher.services.campaign_service import resolve_campaign_tf_names
-from dnadesign.cruncher.services.fetch_service import (
-    fetch_motifs,
-    fetch_sites,
-    hydrate_sites,
 )
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from rich.console import Console

@@ -14,8 +14,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from dnadesign.cruncher.app.campaign_service import expand_campaign
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.campaign_service import expand_campaign
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 
 

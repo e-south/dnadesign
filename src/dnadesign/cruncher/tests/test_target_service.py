@@ -12,13 +12,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dnadesign.cruncher.config.schema_v2 import CruncherConfig, IngestConfig, MotifStoreConfig, ParseConfig, PlotConfig
-from dnadesign.cruncher.services.target_service import (
+from dnadesign.cruncher.app.target_service import (
     has_blocking_target_errors,
     target_candidates,
     target_candidates_fuzzy,
     target_statuses,
 )
+from dnadesign.cruncher.config.schema_v2 import CruncherConfig, IngestConfig, MotifStoreConfig, ParseConfig, PlotConfig
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 
 

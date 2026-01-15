@@ -15,7 +15,7 @@ import typer
 from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.utils.meme_suite import check_meme_tools, resolve_tool_path
+from dnadesign.cruncher.integrations.meme_suite import check_meme_tools, resolve_tool_path
 from rich.console import Console
 from rich.table import Table
 

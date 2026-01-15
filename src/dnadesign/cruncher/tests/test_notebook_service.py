@@ -11,8 +11,8 @@ import json
 
 import pytest
 
-from dnadesign.cruncher.services import notebook_service
-from dnadesign.cruncher.utils.run_layout import manifest_path
+from dnadesign.cruncher.app import notebook_service
+from dnadesign.cruncher.artifacts.layout import manifest_path
 
 
 def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:

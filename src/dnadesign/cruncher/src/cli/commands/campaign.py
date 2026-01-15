@@ -16,21 +16,21 @@ from pathlib import Path
 
 import typer
 import yaml
+from dnadesign.cruncher.app.campaign_notebook_service import (
+    generate_campaign_notebook,
+)
+from dnadesign.cruncher.app.campaign_service import (
+    build_campaign_manifest,
+    expand_campaign,
+    validate_campaign,
+)
+from dnadesign.cruncher.app.campaign_summary import summarize_campaign
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
 )
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.campaign_notebook_service import (
-    generate_campaign_notebook,
-)
-from dnadesign.cruncher.services.campaign_service import (
-    build_campaign_manifest,
-    expand_campaign,
-    validate_campaign,
-)
-from dnadesign.cruncher.workflows.campaign_summary import summarize_campaign
 from rich.console import Console
 from rich.table import Table
 

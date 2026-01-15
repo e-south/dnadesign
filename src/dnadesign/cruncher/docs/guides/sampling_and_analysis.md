@@ -25,6 +25,17 @@ cruncher report --latest
 
 If you run via pixi, prefix each command with `pixi run cruncher --`.
 
+### Numba cache (required for fast diagnostics)
+
+Cruncher uses ArviZ + Numba for trace diagnostics. If `NUMBA_CACHE_DIR` is not set, cruncher
+sets it to `<repo>/src/dnadesign/cruncher/.cruncher/numba_cache` (repo root discovered via
+`pyproject.toml` or `.git`; falls back to `<repo>/.cruncher/numba_cache` if the cruncher dir
+is missing) and requires it to be writable. To override:
+
+```bash
+export NUMBA_CACHE_DIR=/path/to/writable/cache
+```
+
 Logging defaults to concise progress. For verbose traces, use:
 
 ```bash

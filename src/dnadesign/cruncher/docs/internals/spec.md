@@ -37,7 +37,11 @@ This document defines the end-to-end requirements and architecture for **crunche
 - **core/** — PWM, scoring, evaluator, state, optimizers; no I/O.
 - **ingest/** — source adapters (RegulonDB first), normalization, validation.
 - **store/** — local catalog + lockfiles (project-local `.cruncher/` only).
-- **workflows/** — parse/sample/analyze/report orchestration.
+- **analysis/** — analysis helpers, plot registry, per-PWM summaries.
+- **artifacts/** — run layout, manifest + status helpers.
+- **viz/** — plotting helpers + PWM logo rendering.
+- **integrations/** — external tool wrappers (e.g., MEME Suite).
+- **app/** — parse/sample/analyze/report orchestration + application services.
 - **cli/** — Typer CLI, no business logic.
 
 #### Registries

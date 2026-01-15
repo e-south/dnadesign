@@ -10,7 +10,7 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
-from dnadesign.cruncher.utils.logos import logo_subtitle, pwm_provenance_summary
+from dnadesign.cruncher.viz.logos import logo_subtitle, pwm_provenance_summary
 
 
 def test_logo_subtitle_matrix_includes_source_and_origin() -> None:

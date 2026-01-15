@@ -18,14 +18,14 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
+from dnadesign.cruncher.analysis.per_pwm import gather_per_pwm_scores
+from dnadesign.cruncher.analysis.plots.diagnostics import make_pair_idata
+from dnadesign.cruncher.analysis.plots.scatter import _normalize_threshold_points, plot_scatter
+from dnadesign.cruncher.analysis.plots.summary import write_elite_topk
+from dnadesign.cruncher.app.analyze_workflow import _get_git_commit
+from dnadesign.cruncher.artifacts.layout import elites_path, manifest_path, sequences_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.core.pwm import PWM
-from dnadesign.cruncher.utils.run_layout import elites_path, manifest_path, sequences_path
-from dnadesign.cruncher.workflows.analyze.per_pwm import gather_per_pwm_scores
-from dnadesign.cruncher.workflows.analyze.plots.diagnostics import make_pair_idata
-from dnadesign.cruncher.workflows.analyze.plots.scatter import _normalize_threshold_points, plot_scatter
-from dnadesign.cruncher.workflows.analyze.plots.summary import write_elite_topk
-from dnadesign.cruncher.workflows.analyze_workflow import _get_git_commit
 
 
 def _sample_block() -> dict:

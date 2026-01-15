@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dnadesign.cruncher.utils.sequence import hamming_distance
+from dnadesign.cruncher.core.sequence import hamming_distance
 
 
 def test_hamming_distance_equal_length() -> None:

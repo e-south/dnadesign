@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dnadesign.cruncher.services.fetch_service import hydrate_sites
+from dnadesign.cruncher.app.fetch_service import hydrate_sites
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 
 

@@ -15,13 +15,13 @@ from pathlib import Path
 import pytest
 import yaml
 
+from dnadesign.cruncher.app.fetch_service import write_motif_record
+from dnadesign.cruncher.app.run_service import load_run_index
+from dnadesign.cruncher.app.sample_workflow import run_sample
+from dnadesign.cruncher.artifacts.layout import status_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.normalize import build_motif_record
-from dnadesign.cruncher.services.fetch_service import write_motif_record
-from dnadesign.cruncher.services.run_service import load_run_index
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
-from dnadesign.cruncher.utils.run_layout import status_path
-from dnadesign.cruncher.workflows.sample_workflow import run_sample
 
 
 def _write_motif(catalog_root: Path, *, tf_name: str, motif_id: str) -> None:

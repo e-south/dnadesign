@@ -12,9 +12,9 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
+from dnadesign.cruncher.app.fetch_service import fetch_sites
 from dnadesign.cruncher.ingest.models import GenomicInterval, Provenance, SiteInstance, SiteQuery
 from dnadesign.cruncher.ingest.sequence_provider import FastaSequenceProvider, NCBISequenceProvider
-from dnadesign.cruncher.services.fetch_service import fetch_sites
 
 
 class CoordOnlyAdapter:

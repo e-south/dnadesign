@@ -12,17 +12,18 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+from dnadesign.cruncher.analysis.layout import load_summary, summary_path
+from dnadesign.cruncher.analysis.plot_registry import (
+    plot_keys,
+    plot_registry_rows,
+)
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
 )
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.utils.analysis_layout import load_summary, summary_path
-from dnadesign.cruncher.workflows.analyze.plot_registry import (
-    plot_keys,
-    plot_registry_rows,
-)
+from dnadesign.cruncher.utils.numba_cache import ensure_numba_cache_dir
 from rich.console import Console
 from rich.table import Table
 
@@ -146,7 +147,8 @@ def analyze(
             console.print("Hint: pairwise plots require analysis.tf_pair or --tf-pair TF1,TF2.")
         return
     try:
-        from dnadesign.cruncher.workflows.analyze_workflow import run_analyze
+        ensure_numba_cache_dir(config_path.parent)
+        from dnadesign.cruncher.app.analyze_workflow import run_analyze
 
         analysis_runs = run_analyze(
             cfg,
@@ -174,7 +176,7 @@ def analyze(
                 console.print(f"  cruncher report --latest {config_path}")
             else:
                 console.print(f"  cruncher report {config_path} {run_name}")
-    except (ValueError, FileNotFoundError) as exc:
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
         message = str(exc)
         console.print(f"Error: {message}")
         if _should_show_run_hint(message):

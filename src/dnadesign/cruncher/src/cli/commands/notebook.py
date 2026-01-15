@@ -12,8 +12,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+from dnadesign.cruncher.app.notebook_service import generate_notebook
 from dnadesign.cruncher.cli.paths import render_path
-from dnadesign.cruncher.services.notebook_service import generate_notebook
 from rich.console import Console
 
 console = Console()

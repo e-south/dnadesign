@@ -40,14 +40,29 @@ Core contract:
 - lockfiles (what’s pinned)
 - run index (what runs exist)
 
-#### `workflows/` (orchestration)
+#### `analysis/` (analysis + diagnostics)
+- plot registry, per-PWM summaries, and analysis helpers
+- plot implementations live under `analysis/plots/`
+
+#### `artifacts/` (run layout + manifests)
+- run directory layout + status helpers
+- manifest + artifact bookkeeping utilities
+
+#### `viz/` (plotting)
+- matplotlib/logomaker setup
+- PWM logo rendering + visualization helpers
+
+#### `integrations/` (external tools)
+- wrappers for external binaries (e.g., MEME Suite)
+
+#### `app/` (orchestration)
 - fetch / lock / parse / sample / analyze / report coordination
 - translates CLI intent + config into concrete runs and artifacts
 
 #### `cli/` (UX only)
 - Typer commands
 - argument parsing, output formatting
-- delegates work to services/workflows (no business logic)
+- delegates work to app modules (no business logic)
 
 ---
 

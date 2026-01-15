@@ -11,12 +11,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from dnadesign.cruncher.ingest.models import DatasetDescriptor, MotifDescriptor, OrganismRef
-from dnadesign.cruncher.services.source_summary_service import (
+from dnadesign.cruncher.app.source_summary_service import (
     summarize_cache,
     summarize_combined,
     summarize_remote,
 )
+from dnadesign.cruncher.ingest.models import DatasetDescriptor, MotifDescriptor, OrganismRef
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 
 

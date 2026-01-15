@@ -42,7 +42,7 @@ def parse(
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
     try:
-        from dnadesign.cruncher.workflows.parse_workflow import run_parse
+        from dnadesign.cruncher.app.parse_workflow import run_parse
 
         run_parse(cfg, config_path)
     except (ValueError, FileNotFoundError) as exc:

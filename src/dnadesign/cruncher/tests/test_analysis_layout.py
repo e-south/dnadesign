@@ -9,7 +9,7 @@ Author(s): Eric J. South
 
 from pathlib import Path
 
-from dnadesign.cruncher.utils.analysis_layout import list_analysis_entries_verbose
+from dnadesign.cruncher.analysis.layout import list_analysis_entries_verbose
 
 
 def test_analysis_entries_verbose_marks_unindexed_when_summary_missing(tmp_path: Path) -> None:

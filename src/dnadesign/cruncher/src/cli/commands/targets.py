@@ -13,16 +13,11 @@ from pathlib import Path
 from typing import List, Optional
 
 import typer
-from dnadesign.cruncher.cli.config_resolver import (
-    ConfigResolutionError,
-    resolve_config_path,
-)
-from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.campaign_service import (
+from dnadesign.cruncher.app.campaign_service import (
     expand_campaign,
     resolve_category_targets,
 )
-from dnadesign.cruncher.services.target_service import (
+from dnadesign.cruncher.app.target_service import (
     has_blocking_target_errors,
     list_targets,
     target_candidates,
@@ -30,6 +25,11 @@ from dnadesign.cruncher.services.target_service import (
     target_stats,
     target_statuses,
 )
+from dnadesign.cruncher.cli.config_resolver import (
+    ConfigResolutionError,
+    resolve_config_path,
+)
+from dnadesign.cruncher.config.load import load_config
 from rich.console import Console
 from rich.table import Table
 

@@ -15,11 +15,20 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
+from dnadesign.cruncher.app.fetch_service import fetch_motifs, fetch_sites
+from dnadesign.cruncher.app.lock_service import resolve_lock
+from dnadesign.cruncher.app.parse_workflow import run_parse
+from dnadesign.cruncher.app.sample_workflow import run_sample
+from dnadesign.cruncher.artifacts.layout import (
+    config_used_path,
+    logos_dir_for_run,
+    manifest_path,
+    out_root,
+    sequences_path,
+)
 from dnadesign.cruncher.cli.app import app
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.adapters.regulondb import RegulonDBAdapter, RegulonDBAdapterConfig
-from dnadesign.cruncher.services.fetch_service import fetch_motifs, fetch_sites
-from dnadesign.cruncher.services.lock_service import resolve_lock
 from dnadesign.cruncher.tests.fixtures.regulondb_payloads import (
     CPXR_ID,
     HT_DATASETS,
@@ -29,15 +38,6 @@ from dnadesign.cruncher.tests.fixtures.regulondb_payloads import (
     REGULON_DETAIL,
     regulon_list_for_search,
 )
-from dnadesign.cruncher.utils.run_layout import (
-    config_used_path,
-    logos_dir_for_run,
-    manifest_path,
-    out_root,
-    sequences_path,
-)
-from dnadesign.cruncher.workflows.parse_workflow import run_parse
-from dnadesign.cruncher.workflows.sample_workflow import run_sample
 
 
 def _sample_block() -> dict:

@@ -14,12 +14,12 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.cruncher.app.fetch_service import write_motif_record
+from dnadesign.cruncher.app.sample_workflow import run_sample
+from dnadesign.cruncher.artifacts.layout import config_used_path, manifest_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.normalize import build_motif_record
-from dnadesign.cruncher.services.fetch_service import write_motif_record
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
-from dnadesign.cruncher.utils.run_layout import config_used_path, manifest_path
-from dnadesign.cruncher.workflows.sample_workflow import run_sample
 
 
 def _write_motif(catalog_root: Path, *, tf_name: str, motif_id: str) -> None:

@@ -18,6 +18,7 @@ from dnadesign.cruncher.cli.config_resolver import (
     resolve_config_path,
 )
 from dnadesign.cruncher.config.load import load_config
+from dnadesign.cruncher.utils.numba_cache import ensure_numba_cache_dir
 from rich.console import Console
 
 console = Console()
@@ -58,10 +59,11 @@ def sample(
             cfg.sample.ui.progress_every = 1000
         cfg.sample.ui.progress_bar = True
     try:
-        from dnadesign.cruncher.workflows.sample_workflow import run_sample
+        ensure_numba_cache_dir(config_path.parent)
+        from dnadesign.cruncher.app.sample_workflow import run_sample
 
         run_sample(cfg, config_path, auto_opt_override=auto_opt)
-    except (ValueError, FileNotFoundError) as exc:
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
         console.print(f"Error: {exc}")
         console.print("Hint: run cruncher fetch + lock, then cruncher sample <config>.")
         raise typer.Exit(code=1)

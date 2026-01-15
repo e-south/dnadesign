@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.cruncher.utils.meme_suite import resolve_tool_path
+from dnadesign.cruncher.integrations.meme_suite import resolve_tool_path
 
 
 def test_resolve_tool_path_none() -> None:

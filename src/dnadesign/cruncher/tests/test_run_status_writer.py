@@ -12,8 +12,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dnadesign.cruncher.utils.run_layout import live_metrics_path, status_path
-from dnadesign.cruncher.utils.run_status import RunStatusWriter
+from dnadesign.cruncher.artifacts.layout import live_metrics_path, status_path
+from dnadesign.cruncher.artifacts.status import RunStatusWriter
 
 
 def test_run_status_writer_emits_live_metrics(tmp_path: Path) -> None:

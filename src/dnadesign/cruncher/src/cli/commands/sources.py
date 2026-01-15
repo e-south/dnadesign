@@ -16,6 +16,11 @@ from typing import Optional
 from urllib.error import HTTPError, URLError
 
 import typer
+from dnadesign.cruncher.app.source_summary_service import (
+    summarize_cache,
+    summarize_combined,
+    summarize_remote,
+)
 from dnadesign.cruncher.cli.config_resolver import (
     CONFIG_ENV_VAR,
     DEFAULT_WORKSPACE_ENV_VAR,
@@ -27,11 +32,6 @@ from dnadesign.cruncher.cli.config_resolver import (
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.models import DatasetQuery
 from dnadesign.cruncher.ingest.registry import default_registry
-from dnadesign.cruncher.services.source_summary_service import (
-    summarize_cache,
-    summarize_combined,
-    summarize_remote,
-)
 from rich.console import Console
 from rich.table import Table
 

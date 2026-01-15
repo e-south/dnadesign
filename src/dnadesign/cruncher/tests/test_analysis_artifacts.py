@@ -17,16 +17,16 @@ import pandas as pd
 import pytest
 import yaml
 
-from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.utils.hashing import sha256_path
-from dnadesign.cruncher.utils.run_layout import (
+from dnadesign.cruncher.app.analyze_workflow import run_analyze
+from dnadesign.cruncher.artifacts.layout import (
     config_used_path,
     elites_path,
     manifest_path,
     sequences_path,
     trace_path,
 )
-from dnadesign.cruncher.workflows.analyze_workflow import run_analyze
+from dnadesign.cruncher.config.load import load_config
+from dnadesign.cruncher.utils.hashing import sha256_path
 
 
 def _sample_block(*, save_trace: bool, top_k: int, draws: int = 2, tune: int = 1) -> dict:

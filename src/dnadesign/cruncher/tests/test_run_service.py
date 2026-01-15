@@ -15,14 +15,14 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.run_service import (
+from dnadesign.cruncher.app.run_service import (
     drop_run_index_entries,
     get_run,
     load_run_index,
     save_run_index,
 )
-from dnadesign.cruncher.utils.run_layout import manifest_path
+from dnadesign.cruncher.artifacts.layout import manifest_path
+from dnadesign.cruncher.config.load import load_config
 
 
 def test_get_run_accepts_path(tmp_path: Path) -> None:

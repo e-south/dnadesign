@@ -16,8 +16,8 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
+import dnadesign.cruncher.app.analyze_workflow as analyze_workflow
 import dnadesign.cruncher.cli.commands.sources as sources_module
-import dnadesign.cruncher.workflows.analyze_workflow as analyze_workflow
 from dnadesign.cruncher.cli.app import app
 from dnadesign.cruncher.cli.config_resolver import (
     CONFIG_ENV_VAR,

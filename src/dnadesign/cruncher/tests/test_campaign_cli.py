@@ -15,9 +15,9 @@ from pathlib import Path
 import yaml
 from typer.testing import CliRunner
 
+from dnadesign.cruncher.app.campaign_service import expand_campaign
 from dnadesign.cruncher.cli.app import app
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.campaign_service import expand_campaign
 
 runner = CliRunner()
 

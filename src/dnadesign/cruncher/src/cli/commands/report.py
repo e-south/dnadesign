@@ -12,13 +12,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+from dnadesign.cruncher.app.run_service import list_runs
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     parse_config_and_value,
     resolve_config_path,
 )
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.run_service import list_runs
+from dnadesign.cruncher.utils.numba_cache import ensure_numba_cache_dir
 from rich.console import Console
 
 console = Console()
@@ -61,10 +62,11 @@ def report(
         console.print(str(exc))
         raise typer.Exit(code=1)
     try:
-        from dnadesign.cruncher.workflows.report_workflow import run_report
+        ensure_numba_cache_dir(config_path.parent)
+        from dnadesign.cruncher.app.report_workflow import run_report
 
         run_report(cfg, config_path, run_name)
-    except (ValueError, FileNotFoundError) as exc:
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
         console.print(f"Error: {exc}")
         console.print("Hint: run cruncher sample first, then cruncher report <run> (use --config if needed).")
         raise typer.Exit(code=1)

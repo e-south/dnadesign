@@ -16,14 +16,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
-from dnadesign.cruncher.cli.config_resolver import (
-    ConfigResolutionError,
-    parse_config_and_value,
-    resolve_config_path,
+from dnadesign.cruncher.analysis.layout import (
+    current_analysis_id,
+    list_analysis_entries,
 )
-from dnadesign.cruncher.cli.paths import render_path
-from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.run_service import (
+from dnadesign.cruncher.app.run_service import (
     drop_run_index_entries,
     get_run,
     list_runs,
@@ -31,13 +28,16 @@ from dnadesign.cruncher.services.run_service import (
     rebuild_run_index,
     update_run_index_from_status,
 )
-from dnadesign.cruncher.utils.analysis_layout import (
-    current_analysis_id,
-    list_analysis_entries,
+from dnadesign.cruncher.artifacts.entries import normalize_artifacts
+from dnadesign.cruncher.artifacts.layout import live_metrics_path, status_path
+from dnadesign.cruncher.cli.config_resolver import (
+    ConfigResolutionError,
+    parse_config_and_value,
+    resolve_config_path,
 )
-from dnadesign.cruncher.utils.artifacts import normalize_artifacts
-from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
-from dnadesign.cruncher.utils.run_layout import live_metrics_path, status_path
+from dnadesign.cruncher.cli.paths import render_path
+from dnadesign.cruncher.config.load import load_config
+from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 from rich.console import Console
 from rich.live import Live
 from rich.table import Table

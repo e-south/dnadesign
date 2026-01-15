@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from dnadesign.cruncher.app.fetch_service import fetch_motifs, fetch_sites
 from dnadesign.cruncher.ingest.adapters.local import LocalMotifAdapter, LocalMotifAdapterConfig
 from dnadesign.cruncher.ingest.models import (
     GenomicInterval,
@@ -26,7 +27,6 @@ from dnadesign.cruncher.ingest.models import (
     SiteQuery,
 )
 from dnadesign.cruncher.ingest.normalize import build_motif_record
-from dnadesign.cruncher.services.fetch_service import fetch_motifs, fetch_sites
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 
 

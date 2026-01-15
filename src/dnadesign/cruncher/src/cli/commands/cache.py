@@ -12,12 +12,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+from dnadesign.cruncher.app.catalog_service import catalog_stats, verify_cache
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
 )
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.catalog_service import catalog_stats, verify_cache
 from rich.console import Console
 from rich.table import Table
 

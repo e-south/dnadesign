@@ -12,19 +12,19 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from dnadesign.cruncher.app.sample_workflow import (
+    AutoOptCandidate,
+    _assess_candidate_quality,
+    _build_final_sample_cfg,
+    _select_auto_opt_candidate,
+    _write_auto_opt_best_marker,
+)
 from dnadesign.cruncher.config.schema_v2 import (
     AutoOptConfig,
     AutoOptLengthConfig,
     InitConfig,
     SampleBudgetConfig,
     SampleConfig,
-)
-from dnadesign.cruncher.workflows.sample_workflow import (
-    AutoOptCandidate,
-    _assess_candidate_quality,
-    _build_final_sample_cfg,
-    _select_auto_opt_candidate,
-    _write_auto_opt_best_marker,
 )
 
 

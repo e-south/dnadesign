@@ -17,7 +17,7 @@ import numpy as np
 
 matplotlib.use("Agg", force=True)
 
-from dnadesign.cruncher.workflows.analyze.plots.diagnostics import plot_trace
+from dnadesign.cruncher.analysis.plots.diagnostics import plot_trace
 
 
 def test_plot_trace_constant_score(tmp_path: Path) -> None:
