@@ -154,6 +154,7 @@ src/dnadesign/cruncher/**/trace.nc
 src/dnadesign/cruncher/**/report.json
 src/dnadesign/cruncher/**/report.md
 src/dnadesign/cruncher/**/gathered_per_pwm_*.csv
+src/dnadesign/cruncher/workspaces/archived/
 projects/**/projects/
 src/dnadesign/cruncher/projects/**/projects/
 
