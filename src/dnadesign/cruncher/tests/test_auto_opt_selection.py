@@ -12,11 +12,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from dnadesign.cruncher.app.sample_workflow import (
     AutoOptCandidate,
     _assess_candidate_quality,
     _build_final_sample_cfg,
     _select_auto_opt_candidate,
+    _validate_auto_opt_candidates,
     _write_auto_opt_best_marker,
 )
 from dnadesign.cruncher.config.schema_v2 import (
@@ -126,6 +129,33 @@ def test_auto_opt_all_fail_allowed_when_requested(tmp_path: Path) -> None:
 
     winner = _select_auto_opt_candidate([candidate], auto_cfg, allow_fail=True)
     assert winner.status == "fail"
+
+
+def test_auto_opt_requires_ok_candidates_unless_allow_warn(tmp_path: Path) -> None:
+    candidate = _candidate(tmp_path, "warn", status="warn", quality="warn", best_score=1.0)
+    with pytest.raises(ValueError, match="no pilot met thresholds"):
+        _validate_auto_opt_candidates([candidate], allow_warn=False)
+    viable, allow_fail = _validate_auto_opt_candidates([candidate], allow_warn=True)
+    assert viable == [candidate]
+    assert allow_fail is False
+
+
+def test_auto_opt_missing_diagnostics_requires_allow_warn(tmp_path: Path) -> None:
+    candidate = _candidate(
+        tmp_path,
+        "fail",
+        status="fail",
+        quality="fail",
+        best_score=None,
+        balance_median=None,
+        diversity=None,
+        unique_fraction=None,
+    )
+    with pytest.raises(ValueError, match="missing diagnostics"):
+        _validate_auto_opt_candidates([candidate], allow_warn=False)
+    viable, allow_fail = _validate_auto_opt_candidates([candidate], allow_warn=True)
+    assert viable == [candidate]
+    assert allow_fail is True
 
 
 def test_auto_opt_final_applies_cooling_boost() -> None:

@@ -334,6 +334,7 @@ sample:
       step: 2
       max_candidates: 4
     policy:
+      allow_warn: false
       retry_on_warn: true
       retry_draws_factor: 2.0
       retry_tune_factor: 2.0
@@ -391,7 +392,7 @@ Notes:
 - Auto-opt pilots always write `trace.nc` + `sequences.parquet` (required for diagnostics) and are stored under `runs/auto_opt/`.
 - The selected pilot is recorded in `runs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
 - Auto-opt is enabled by default when `optimizer.name=auto`; set `auto_opt.enabled: false` or pass `--no-auto-opt` to disable.
-- If no pilot meets the quality thresholds, auto-opt retries with cooler settings and then proceeds with the best available candidate (logging warnings). When a boosted-cooling retry wins, the final run uses that boosted schedule (recorded in `config_used.yaml` and auto-opt notes).
+- If no pilot meets the quality thresholds, auto-opt retries with cooler settings. By default it **fails fast**; set `auto_opt.policy.allow_warn: true` to proceed with the best available candidate (logging warnings). When a boosted-cooling retry wins, the final run uses that boosted schedule (recorded in `config_used.yaml` and auto-opt notes).
 - `early_stop` halts sampling when the best score fails to improve by `min_delta` for `patience` draws (per chain for Gibbs, per sweep for PT).
 - Auto-opt selection details are stored in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/tables/auto_opt_pilots.csv` and `analysis/plots/auto_opt_tradeoffs.png`.
 - `sample.rng.deterministic=true` isolates a stable RNG stream per pilot config.

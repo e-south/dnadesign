@@ -135,6 +135,8 @@ cruncher:
       enabled: true
       budget_levels: [200, 800]
       replicates: 1
+      policy:
+        allow_warn: true
     output:
       save_sequences: true
       include_consensus_in_elites: false

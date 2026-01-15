@@ -350,6 +350,8 @@ Re-running parse with the same config + lock fingerprint reuses existing outputs
 
 Auto‑optimize is enabled by default (short Gibbs + PT pilots). The selected pilot is recorded in `runs/auto_opt/best_<run_group>.json` and marked with a leading `*` in `cruncher runs list`. The final chosen config is always written to `runs/sample/<run_name>/meta/config_used.yaml`. Use `--no-auto-opt` to skip pilots and force the configured optimizer. For diagnostics and tuning guidance, see the [sampling + analysis guide](../guides/sampling_and_analysis.md).
 
+This demo config sets `auto_opt.policy.allow_warn: true` so short pilots can proceed even if they don't meet strict thresholds. For strict mode, set `allow_warn: false` and increase budgets or adjust thresholds until pilots pass.
+
 ```bash
 # Run sampling with auto-opt
 cruncher sample -c "$CONFIG"  # run sampling with auto-opt pilots

@@ -169,13 +169,14 @@ def analyze(
             console.print(f"  analysis_id: {analysis_id}")
             sample_dir = analysis_dir.parent
             run_name = sample_dir.name
+            config_hint = render_path(config_path)
             console.print("Next steps:")
-            console.print(f"  cruncher runs show {config_path} {run_name}")
+            console.print(f"  cruncher runs show {run_name} -c {config_hint}")
             console.print(f"  cruncher notebook --latest {render_path(sample_dir, base=config_path.parent)}")
             if latest and not runs:
-                console.print(f"  cruncher report --latest {config_path}")
+                console.print(f"  cruncher report --latest -c {config_hint}")
             else:
-                console.print(f"  cruncher report {config_path} {run_name}")
+                console.print(f"  cruncher report {run_name} -c {config_hint}")
     except (RuntimeError, ValueError, FileNotFoundError) as exc:
         message = str(exc)
         console.print(f"Error: {message}")

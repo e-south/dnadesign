@@ -773,11 +773,11 @@ def _run_auto_optimize_for_set(
         final_level_candidates.extend(retry_candidates)
         ok_candidates = [candidate for candidate in final_level_candidates if candidate.quality == "ok"]
 
-    viable = [candidate for candidate in final_level_candidates if candidate.status != "fail"]
-    allow_fail = False
-    if not viable:
-        allow_fail = True
-        viable = final_level_candidates
+    viable, allow_fail = _validate_auto_opt_candidates(
+        final_level_candidates,
+        allow_warn=auto_cfg.policy.allow_warn,
+    )
+    if allow_fail:
         logger.warning(
             "Auto-optimize: all pilot candidates missing diagnostics; proceeding with best available candidate."
         )
@@ -1158,6 +1158,32 @@ def _rank_auto_opt_candidates(
         ranked.append((rank, candidate))
     ranked.sort(key=lambda item: item[0], reverse=True)
     return [item[1] for item in ranked]
+
+
+def _validate_auto_opt_candidates(
+    candidates: list[AutoOptCandidate],
+    *,
+    allow_warn: bool,
+) -> tuple[list[AutoOptCandidate], bool]:
+    if not candidates:
+        raise ValueError("Auto-optimize did not produce any pilot candidates.")
+    viable = [c for c in candidates if c.status != "fail"]
+    if not viable:
+        if not allow_warn:
+            raise ValueError(
+                "Auto-optimize failed: all pilot candidates missing diagnostics. "
+                "Set auto_opt.policy.allow_warn=true to proceed, or disable auto-opt."
+            )
+        return list(candidates), True
+    ok_candidates = [c for c in candidates if c.quality == "ok"]
+    if not ok_candidates and not allow_warn:
+        summary = ", ".join(f"{c.kind}:{c.quality}" for c in candidates)
+        raise ValueError(
+            "Auto-optimize failed: no pilot met thresholds "
+            f"(candidates={summary}). Set auto_opt.policy.allow_warn=true to proceed, "
+            "or increase auto_opt budgets/adjust thresholds."
+        )
+    return viable, False
 
 
 def _select_auto_opt_candidate(

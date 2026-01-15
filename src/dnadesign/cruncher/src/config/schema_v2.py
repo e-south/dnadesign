@@ -507,6 +507,7 @@ class AutoOptScorecardConfig(StrictBaseModel):
 
 
 class AutoOptPolicyConfig(StrictBaseModel):
+    allow_warn: bool = False
     retry_on_warn: bool = True
     retry_draws_factor: float = 2.0
     retry_tune_factor: float = 2.0

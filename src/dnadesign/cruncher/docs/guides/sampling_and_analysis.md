@@ -45,7 +45,7 @@ cruncher --log-level DEBUG analyze --latest
 
 ### Auto‑optimize (default)
 
-Auto‑opt runs short **Gibbs** and **parallel tempering (PT)** pilots, compares **optimization quality** signals (balance, diversity, acceptance bands, best‑score progress), logs the decision, then runs the final sample with the best‑scoring candidate. Pilot trace diagnostics (R‑hat/ESS) are still reported as warnings, but the auto‑opt scorecard is the source of truth for selection. There is **no silent fallback**: if neither pilot meets quality thresholds, auto‑opt retries with cooler settings and then proceeds with the best available candidate (logging warnings). It only errors when no pilot produced usable diagnostics.
+Auto‑opt runs short **Gibbs** and **parallel tempering (PT)** pilots, compares **optimization quality** signals (balance, diversity, acceptance bands, best‑score progress), logs the decision, then runs the final sample with the best‑scoring candidate. Pilot trace diagnostics (R‑hat/ESS) are still reported as warnings, but the auto‑opt scorecard is the source of truth for selection. There is **no silent fallback**: if neither pilot meets quality thresholds, auto‑opt retries with cooler settings and then **fails fast by default**. Set `auto_opt.policy.allow_warn: true` to proceed with the best available candidate (logging warnings). It also fails if no pilot produced usable diagnostics unless `allow_warn` is enabled.
 Auto‑opt pilot runs are stored under `runs/auto_opt/`.
 
 Disable auto‑opt when you want a single fixed optimizer (set `sample.optimizer.name`
