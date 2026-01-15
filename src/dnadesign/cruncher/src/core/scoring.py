@@ -48,10 +48,11 @@ class _PWMInfo:
 
 class Scorer:
     """
-    Multi‐PWM scorer with exactly four supported scales:
+    Multi‐PWM scorer with supported scales:
       • "llr"                 → raw max LLR per PWM
       • "z"                   → z-score of raw LLR vs the PWM-specific null distribution
       • "logp"                → -log10(p_seq) per PWM
+      • "normalized-llr"      → (raw_llr − null_mean) / (consensus_llr − null_mean)
       • "consensus-neglop-sum"→ normalized (-log10(p_seq) / -log10(p_consensus)) per PWM
 
     Usage:
@@ -59,7 +60,7 @@ class Scorer:
         per_tf = scorer.compute_all_per_pwm(seq_array, seq_length)
     """
 
-    SUPPORTED_SCALES = {"llr", "z", "logp", "consensus-neglop-sum"}
+    SUPPORTED_SCALES = {"llr", "z", "logp", "normalized-llr", "consensus-neglop-sum"}
 
     def __init__(
         self,
@@ -68,6 +69,8 @@ class Scorer:
         background: Sequence[float] = (0.25, 0.25, 0.25, 0.25),
         bidirectional: bool = True,
         scale: str = "logp",
+        pseudocounts: float = 0.0,
+        log_odds_clip: float | None = None,
     ) -> None:
         self.scale = scale.lower()
         if self.scale not in self.SUPPORTED_SCALES:
@@ -78,8 +81,10 @@ class Scorer:
             raise ValueError("background must be a length-4 probability vector summing to 1.0.")
 
         self.bidirectional = bool(bidirectional)
+        self.pseudocounts = float(pseudocounts)
+        self.log_odds_clip = log_odds_clip if log_odds_clip is None else float(log_odds_clip)
 
-        logger.info(
+        logger.debug(
             "Building Scorer (scale=%r, bidirectional=%s)",
             self.scale,
             self.bidirectional,
@@ -89,7 +94,12 @@ class Scorer:
         self._cache: Dict[str, _PWMInfo] = {}
         for name, pwm in pwms.items():
             logger.debug("  Precomputing PWM info for %s", name)
-            info = self._build_one_pwm_info(pwm, self.bg)
+            info = self._build_one_pwm_info(
+                pwm,
+                self.bg,
+                pseudocounts=self.pseudocounts,
+                log_odds_clip=self.log_odds_clip,
+            )
 
             # Precompute consensus_llr for each PWM (sum of column‐maxes).
             info.consensus_llr = float(np.max(info.lom, axis=1).sum())
@@ -114,14 +124,20 @@ class Scorer:
 
             self._cache[name] = info
 
-        logger.info("Finished building cache with %d PWMs", len(self._cache))
+        logger.debug("Finished building cache with %d PWMs", len(self._cache))
 
     @staticmethod
-    def _build_one_pwm_info(pwm: PWM, background: np.ndarray) -> _PWMInfo:
+    def _build_one_pwm_info(
+        pwm: PWM,
+        background: np.ndarray,
+        *,
+        pseudocounts: float = 0.0,
+        log_odds_clip: float | None = None,
+    ) -> _PWMInfo:
         """
         Given a PWM, compute its log‐odds matrix and null distribution lookup table.
         """
-        lom = pwm.log_odds()  # shape (w, 4)
+        lom = pwm.log_odds(background, pseudocounts=pseudocounts, log_odds_clip=log_odds_clip)
         null_scores, tail_p = logodds_to_p_lookup(lom, background)
         return _PWMInfo(lom=lom, null_scores=null_scores, tail_p=tail_p, width=lom.shape[0])
 
@@ -217,14 +233,17 @@ class Scorer:
         info = self._info(tf)
         return self._best_llr_and_location(seq, info)
 
-    def normalized_llr_components(self, seq: np.ndarray) -> list[float]:
-        components: list[float] = []
-        for info in self._cache.values():
+    def normalized_llr_map(self, seq: np.ndarray) -> Dict[str, float]:
+        out: Dict[str, float] = {}
+        for tf, info in self._cache.items():
             raw_llr, *_ = self._best_llr_and_location(seq, info)
             num, denom = raw_llr - info.null_mean, info.consensus_llr - info.null_mean
             frac = 0.0 if denom <= 0 else max(0.0, num / denom)
-            components.append(frac)
-        return components
+            out[tf] = float(frac)
+        return out
+
+    def normalized_llr_components(self, seq: np.ndarray) -> list[float]:
+        return list(self.normalized_llr_map(seq).values())
 
     def compute_all_per_pwm(self, seq: np.ndarray, seq_length: int) -> Dict[str, float]:
         """
@@ -233,6 +252,7 @@ class Scorer:
           • "llr" : raw LLR
           • "z"   : z-score → (raw_llr − null_mean) / null_std
           • "logp": −log10(p_seq)
+          • "normalized-llr": (raw_llr − null_mean) / (consensus_llr − null_mean)
           • "consensus-neglop-sum":
               (-log10(p_seq) / precomputed_neglogp(consensus_llr))
 
@@ -254,6 +274,12 @@ class Scorer:
                 # z = (raw_llr - mean_null) / std_null
                 z_val = (raw_llr - info.null_mean) / info.null_std
                 out[tf] = float(z_val)
+                continue
+
+            if self.scale == "normalized-llr":
+                num, denom = raw_llr - info.null_mean, info.consensus_llr - info.null_mean
+                frac = 0.0 if denom <= 0 else max(0.0, num / denom)
+                out[tf] = float(frac)
                 continue
 
             # For any neglogp‐based result (logp or consensus‐neglop-sum):

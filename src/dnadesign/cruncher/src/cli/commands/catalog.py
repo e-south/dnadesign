@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -32,10 +33,11 @@ from dnadesign.cruncher.services.catalog_service import (
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.store.motif_store import MotifRef
+from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_lines, sha256_path
 from dnadesign.cruncher.utils.labels import build_run_name
 from dnadesign.cruncher.utils.logos import logo_subtitle, site_entries_for_logo
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
-from dnadesign.cruncher.utils.run_layout import logos_dir_for_run, out_root
+from dnadesign.cruncher.utils.run_layout import RUN_META_DIR, logos_dir_for_run, logos_root, out_root
 from rich.console import Console
 from rich.table import Table
 
@@ -52,6 +54,9 @@ class ResolvedTarget:
     site_entries: list[CatalogEntry]
 
 
+LOGO_MANIFEST_NAME = "logo_manifest.json"
+
+
 def _safe_stem(label: str) -> str:
     cleaned = _SAFE_RE.sub("_", label).strip("_")
     return cleaned or "motif"
@@ -66,6 +71,126 @@ def _dedupe(values: Sequence[str]) -> list[str]:
         output.append(value)
         seen.add(value)
     return output
+
+
+def _logo_manifest_path(out_dir: Path) -> Path:
+    return out_dir / RUN_META_DIR / LOGO_MANIFEST_NAME
+
+
+def _load_logo_manifest(out_dir: Path) -> dict | None:
+    path = _logo_manifest_path(out_dir)
+    if not path.exists():
+        return None
+    return json.loads(path.read_text())
+
+
+def _write_logo_manifest(out_dir: Path, payload: dict) -> None:
+    path = _logo_manifest_path(out_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2))
+
+
+def _matrix_site_count_from_tags(tags: dict[str, object] | None) -> int | None:
+    if not tags:
+        return None
+    for key in ("discovery_nsites", "meme_nsites", "site_count", "nsites"):
+        raw = tags.get(key)
+        if raw is None:
+            continue
+        try:
+            parsed = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if parsed > 0:
+            return parsed
+    return None
+
+
+def _entry_signature(entry: CatalogEntry) -> dict[str, object]:
+    return {
+        "source": entry.source,
+        "motif_id": entry.motif_id,
+        "matrix_source": entry.matrix_source,
+        "site_kind": entry.site_kind,
+        "site_count": entry.site_count,
+        "site_total": entry.site_total,
+        "matrix_site_count": _matrix_site_count_from_tags(entry.tags),
+    }
+
+
+def _matrix_checksum(catalog_root: Path, entry: CatalogEntry) -> str:
+    motif_path = catalog_root / "normalized" / "motifs" / entry.source / f"{entry.motif_id}.json"
+    return sha256_path(motif_path)
+
+
+def _sites_checksum(catalog_root: Path, entries: list[CatalogEntry]) -> str:
+    lines: list[str] = []
+    for candidate in sorted(entries, key=lambda e: (e.source, e.motif_id)):
+        sites_path = catalog_root / "normalized" / "sites" / candidate.source / f"{candidate.motif_id}.jsonl"
+        lines.append(f"{candidate.source}:{candidate.motif_id}:{sha256_path(sites_path)}")
+    return sha256_lines(lines)
+
+
+def _build_logo_signature(
+    *,
+    cfg,
+    catalog_root: Path,
+    targets: Sequence[ResolvedTarget],
+    bits_mode: str,
+    dpi: int,
+) -> tuple[str, dict]:
+    pwm_config = {
+        "pwm_source": cfg.motif_store.pwm_source,
+        "pwm_window_lengths": cfg.motif_store.pwm_window_lengths,
+        "pwm_window_strategy": cfg.motif_store.pwm_window_strategy,
+    }
+    if cfg.motif_store.pwm_source == "sites":
+        pwm_config.update(
+            {
+                "combine_sites": cfg.motif_store.combine_sites,
+                "site_kinds": cfg.motif_store.site_kinds,
+                "site_window_lengths": cfg.motif_store.site_window_lengths,
+                "site_window_center": cfg.motif_store.site_window_center,
+                "min_sites_for_pwm": cfg.motif_store.min_sites_for_pwm,
+                "allow_low_sites": cfg.motif_store.allow_low_sites,
+                "pseudocounts": cfg.motif_store.pseudocounts,
+            }
+        )
+    target_payloads: list[dict[str, object]] = []
+    for target in sorted(targets, key=lambda t: (t.tf_name, t.entry.source, t.entry.motif_id)):
+        payload: dict[str, object] = {
+            "tf_name": target.tf_name,
+            "ref": f"{target.entry.source}:{target.entry.motif_id}",
+            "entry": _entry_signature(target.entry),
+        }
+        if cfg.motif_store.pwm_source == "matrix":
+            payload["matrix_sha256"] = _matrix_checksum(catalog_root, target.entry)
+        else:
+            entries = target.site_entries
+            payload["site_entries"] = [
+                _entry_signature(candidate) for candidate in sorted(entries, key=lambda e: (e.source, e.motif_id))
+            ]
+            payload["sites_sha256"] = _sites_checksum(catalog_root, entries)
+        target_payloads.append(payload)
+    signature_payload = {
+        "render": {"bits_mode": bits_mode, "dpi": dpi},
+        "pwm": pwm_config,
+        "targets": target_payloads,
+    }
+    signature = sha256_bytes(json.dumps(signature_payload, sort_keys=True).encode("utf-8"))
+    return signature, signature_payload
+
+
+def _find_existing_logo_run(root_dir: Path, signature: str) -> Path | None:
+    if not root_dir.exists():
+        return None
+    for child in sorted(root_dir.iterdir()):
+        if not child.is_dir():
+            continue
+        manifest = _load_logo_manifest(child)
+        if manifest and manifest.get("signature") == signature:
+            return child
+    return None
 
 
 def _resolve_set_tfs(cfg, set_index: int | None) -> list[str]:
@@ -756,12 +881,28 @@ def logos(
         resolved_dpi = dpi or cfg.parse.plot.dpi
         if resolved_bits_mode not in {"information", "probability"}:
             raise typer.BadParameter("--bits-mode must be 'information' or 'probability'.")
+        catalog_root = config_path.parent / cfg.motif_store.catalog_root
+        signature, signature_payload = _build_logo_signature(
+            cfg=cfg,
+            catalog_root=catalog_root,
+            targets=targets,
+            bits_mode=resolved_bits_mode,
+            dpi=resolved_dpi,
+        )
         out_base = out_dir
         if out_base is None:
+            existing = _find_existing_logo_run(
+                logos_root(out_root(config_path, cfg.out_dir)) / "catalog",
+                signature,
+            )
+            if existing is not None:
+                console.print(f"Logos already rendered at {render_path(existing, base=config_path.parent)}")
+                return
+            name_set_index = set_index if len(cfg.regulator_sets) > 1 else None
             run_name = build_run_name(
                 "catalog",
                 [t.tf_name for t in targets],
-                set_index=set_index,
+                set_index=name_set_index,
                 include_stage=False,
             )
             out_base = logos_dir_for_run(
@@ -769,6 +910,11 @@ def logos(
                 "catalog",
                 run_name,
             )
+        else:
+            manifest = _load_logo_manifest(out_base)
+            if manifest and manifest.get("signature") == signature:
+                console.print(f"Logos already rendered at {render_path(out_base, base=config_path.parent)}")
+                return
         out_base.mkdir(parents=True, exist_ok=True)
         from dnadesign.cruncher.io.plots.pssm import plot_pwm
 
@@ -779,6 +925,7 @@ def logos(
         table.add_column("Length")
         table.add_column("Bits")
         table.add_column("Output")
+        outputs: list[str] = []
         for target in targets:
             pwm = store.get_pwm(target.ref)
             info_bits = pwm.information_bits()
@@ -798,6 +945,7 @@ def logos(
                 dpi=resolved_dpi,
                 subtitle=f"sites: {subtitle}" if cfg.motif_store.pwm_source == "sites" else subtitle,
             )
+            outputs.append(str(out_path))
             table.add_row(
                 target.tf_name,
                 target.entry.source,
@@ -808,6 +956,17 @@ def logos(
             )
         console.print(table)
         console.print(f"Logos saved to {render_path(out_base, base=config_path.parent)}")
+        _write_logo_manifest(
+            out_base,
+            {
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "signature": signature,
+                "render": signature_payload["render"],
+                "pwm": signature_payload["pwm"],
+                "targets": signature_payload["targets"],
+                "outputs": outputs,
+            },
+        )
     except (ValueError, FileNotFoundError) as exc:
         console.print(f"Error: {exc}")
         console.print("Hint: run cruncher fetch motifs/sites before catalog logos.")

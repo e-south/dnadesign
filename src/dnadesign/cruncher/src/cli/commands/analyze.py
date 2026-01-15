@@ -70,7 +70,7 @@ def analyze(
     runs: list[str] | None = typer.Option(
         None,
         "--run",
-        help="Sample run name to analyze (repeatable). Overrides analysis.runs.",
+        help="Sample run name or run directory path to analyze (repeatable). Overrides analysis.runs.",
     ),
     latest: bool = typer.Option(False, "--latest", help="Analyze the latest sample run."),
     tf_pair: str | None = typer.Option(

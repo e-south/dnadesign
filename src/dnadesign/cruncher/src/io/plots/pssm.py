@@ -13,6 +13,7 @@ from pathlib import Path
 
 import logomaker
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from dnadesign.cruncher.core.pwm import PWM
@@ -40,6 +41,16 @@ def plot_pwm(
             from_type="probability",
             to_type="information",
         )
+    data = df.to_numpy()
+    flat = False
+    min_val = max_val = 0.0
+    if data.size:
+        min_val = float(data.min())
+        max_val = float(data.max())
+        flat = np.isclose(min_val, max_val)
+    if flat:
+        # Avoid singular y-limits in Logomaker for flat matrices.
+        df.iloc[0, 0] = max_val + 1.0e-3
 
     # Draw logo
     fig, ax = plt.subplots(figsize=(8, 3))
@@ -84,6 +95,8 @@ def plot_pwm(
 
     # Zero‐reference line
     ax.axhline(0, color="black", lw=0.5)
+    if flat:
+        ax.set_ylim(min_val - 1.0, max_val + 1.0)
 
     fig.tight_layout()
 

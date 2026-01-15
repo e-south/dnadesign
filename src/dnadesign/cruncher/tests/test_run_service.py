@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <cruncher project>
-src/dnadesign/cruncher/tests/test_run_index.py
+src/dnadesign/cruncher/tests/test_run_service.py
 
 Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,11 +16,16 @@ from pathlib import Path
 import yaml
 
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.run_service import list_runs, rebuild_run_index
-from dnadesign.cruncher.utils.run_layout import manifest_path, status_path
+from dnadesign.cruncher.services.run_service import (
+    drop_run_index_entries,
+    get_run,
+    load_run_index,
+    save_run_index,
+)
+from dnadesign.cruncher.utils.run_layout import manifest_path
 
 
-def test_run_index_rebuild(tmp_path: Path) -> None:
+def test_get_run_accepts_path(tmp_path: Path) -> None:
     config = {
         "cruncher": {
             "out_dir": "results",
@@ -81,16 +86,26 @@ def test_run_index_rebuild(tmp_path: Path) -> None:
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     manifest_file.write_text(json.dumps(manifest))
-    status_file = status_path(run_dir)
-    status_file.parent.mkdir(parents=True, exist_ok=True)
-    status_file.write_text(json.dumps({"stage": "sample", "status": "completed", "started_at": created_at}))
 
-    index_path = rebuild_run_index(cfg, config_path)
-    assert index_path == tmp_path / "cache_root" / "run_index.json"
-    payload = json.loads(index_path.read_text())
-    assert run_name in payload
+    run = get_run(cfg, config_path, str(run_dir))
+    assert run.name == run_name
+    assert run.run_dir == run_dir
 
-    runs = list_runs(cfg, config_path)
-    assert runs
-    assert runs[0].name == run_name
-    assert runs[0].status == "completed"
+    rel_path = run_dir.relative_to(config_path.parent)
+    run_rel = get_run(cfg, config_path, str(rel_path))
+    assert run_rel.run_dir == run_dir
+
+
+def test_drop_run_index_entries(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("cruncher: {}")
+    payload = {
+        "run_a": {"stage": "sample", "run_dir": str(tmp_path / "run_a")},
+        "run_b": {"stage": "auto_opt", "run_dir": str(tmp_path / "run_b")},
+    }
+    save_run_index(config_path, payload, catalog_root=".cruncher")
+    removed = drop_run_index_entries(config_path, ["run_b"], catalog_root=".cruncher")
+    assert removed == 1
+    index = load_run_index(config_path, catalog_root=".cruncher")
+    assert "run_b" not in index
+    assert "run_a" in index

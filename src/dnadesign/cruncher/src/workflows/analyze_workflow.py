@@ -17,7 +17,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from dnadesign.cruncher.config.schema_v2 import AnalysisConfig, CruncherConfig
+import pandas as pd
+
+from dnadesign.cruncher.config.schema_v2 import AnalysisConfig, CruncherConfig, SampleMovesConfig
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.services.run_service import list_runs
 from dnadesign.cruncher.utils.analysis_layout import (
@@ -33,8 +35,9 @@ from dnadesign.cruncher.utils.artifacts import (
     artifact_entry,
     normalize_artifacts,
 )
-from dnadesign.cruncher.utils.hashing import sha256_path
+from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_path
 from dnadesign.cruncher.utils.manifest import load_manifest
+from dnadesign.cruncher.utils.moves import resolve_move_config
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
 from dnadesign.cruncher.utils.parquet import read_parquet
 from dnadesign.cruncher.utils.run_layout import config_used_path, sequences_path, trace_path
@@ -81,6 +84,45 @@ def _load_summary_id(analysis_root: Path) -> str | None:
     if not isinstance(analysis_id, str) or not analysis_id:
         raise ValueError(f"analysis summary missing analysis_id: {summary_file}")
     return analysis_id
+
+
+def _load_summary_payload(analysis_root: Path) -> dict | None:
+    summary_file = summary_path(analysis_root)
+    if not summary_file.exists():
+        return None
+    try:
+        payload = json.loads(summary_file.read_text())
+    except Exception as exc:
+        raise ValueError(f"analysis summary is not valid JSON: {summary_file}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"analysis summary must be a JSON object: {summary_file}")
+    return payload
+
+
+def _analysis_signature(
+    *,
+    analysis_cfg: AnalysisConfig,
+    override_payload: dict[str, object] | None,
+    config_used_file: Path,
+    sequences_file: Path,
+    elites_file: Path,
+    trace_file: Path,
+) -> tuple[str, dict[str, object]]:
+    inputs: dict[str, object] = {
+        "config_used_sha256": sha256_path(config_used_file),
+        "sequences_sha256": sha256_path(sequences_file),
+        "elites_sha256": sha256_path(elites_file),
+        "analysis_layout_version": ANALYSIS_LAYOUT_VERSION,
+    }
+    if trace_file.exists():
+        inputs["trace_sha256"] = sha256_path(trace_file)
+    payload = {
+        "analysis": analysis_cfg.model_dump(),
+        "analysis_overrides": override_payload or {},
+        "inputs": inputs,
+    }
+    signature = sha256_bytes(json.dumps(payload, sort_keys=True).encode("utf-8"))
+    return signature, payload
 
 
 def _rewrite_manifest_paths(manifest: dict, analysis_id: str, moved_prefixes: list[str]) -> None:
@@ -153,6 +195,7 @@ def _clear_latest_analysis(analysis_root: Path) -> None:
 
 @dataclass(frozen=True)
 class SampleMeta:
+    optimizer_kind: str
     chains: int
     draws: int
     tune: int
@@ -161,6 +204,7 @@ class SampleMeta:
     pwm_sum_threshold: float
     bidirectional: bool
     top_k: int
+    mode: str
 
 
 def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
@@ -213,29 +257,52 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
             raise ValueError(f"config_used.yaml sample.{label} must be a number.")
         return float(value)
 
-    chains = _coerce_int(_require(["chains"], "chains"), "chains")
-    draws = _coerce_int(_require(["draws"], "draws"), "draws")
-    tune = _coerce_int(_require(["tune"], "tune"), "tune")
-    bidirectional_val = _require(["bidirectional"], "bidirectional")
+    optimizer_kind = str(_require(["optimizer", "name"], "optimizer.name"))
+    draws = _coerce_int(_require(["budget", "draws"], "budget.draws"), "budget.draws")
+    tune = _coerce_int(_require(["budget", "tune"], "budget.tune"), "budget.tune")
+    restarts = _coerce_int(_require(["budget", "restarts"], "budget.restarts"), "budget.restarts")
+    mode_val = _require(["mode"], "mode")
+    if not isinstance(mode_val, str):
+        raise ValueError("config_used.yaml sample.mode must be a string.")
+    bidirectional_val = _require(["objective", "bidirectional"], "objective.bidirectional")
     if not isinstance(bidirectional_val, bool):
-        raise ValueError("config_used.yaml sample.bidirectional must be a boolean.")
+        raise ValueError("config_used.yaml sample.objective.bidirectional must be a boolean.")
     bidirectional = bidirectional_val
-    top_k = _coerce_int(_require(["top_k"], "top_k"), "top_k")
-    pwm_sum_threshold = _coerce_float(_require(["pwm_sum_threshold"], "pwm_sum_threshold"), "pwm_sum_threshold")
-    cooling_kind = str(_require(["optimiser", "cooling", "kind"], "optimiser.cooling.kind"))
-    move_probs_val = _require(["moves", "move_probs"], "moves.move_probs")
-    if not isinstance(move_probs_val, dict):
-        raise ValueError("config_used.yaml sample.moves.move_probs must be a mapping with keys S, B, M.")
-    if set(move_probs_val.keys()) != {"S", "B", "M"}:
-        raise ValueError("config_used.yaml sample.moves.move_probs must have keys S, B, M.")
-    move_probs = {}
-    for key in ("S", "B", "M"):
-        move_probs[key] = _coerce_float(move_probs_val[key], f"moves.move_probs.{key}")
-    total = sum(move_probs.values())
-    if abs(total - 1.0) > 1e-6:
-        raise ValueError("config_used.yaml sample.moves.move_probs must sum to 1.0.")
+    top_k = _coerce_int(_require(["elites", "k"], "elites.k"), "elites.k")
+    pwm_sum_threshold = _coerce_float(
+        _require(["elites", "filters", "pwm_sum_min"], "elites.filters.pwm_sum_min"),
+        "elites.filters.pwm_sum_min",
+    )
+
+    moves_payload = _require(["moves"], "moves")
+    moves_cfg = SampleMovesConfig.model_validate(moves_payload)
+    move_probs = resolve_move_config(moves_cfg).move_probs
+
+    if optimizer_kind not in {"gibbs", "pt"}:
+        raise ValueError("config_used.yaml sample.optimizer.name must be 'gibbs' or 'pt'.")
+    if optimizer_kind == "gibbs":
+        chains = restarts
+        cooling_path = ["optimizers", "gibbs", "beta_schedule", "kind"]
+        cooling_kind = str(_require(cooling_path, "optimizers.gibbs.beta_schedule.kind"))
+    else:
+        ladder = _require(["optimizers", "pt", "beta_ladder"], "optimizers.pt.beta_ladder")
+        if not isinstance(ladder, dict):
+            raise ValueError("config_used.yaml sample.optimizers.pt.beta_ladder must be a mapping.")
+        cooling_kind = str(ladder.get("kind") or "")
+        if cooling_kind == "fixed":
+            chains = 1
+        else:
+            betas = ladder.get("betas")
+            n_temps = ladder.get("n_temps")
+            if isinstance(betas, list) and betas:
+                chains = len(betas)
+            elif isinstance(n_temps, int):
+                chains = int(n_temps)
+            else:
+                raise ValueError("config_used.yaml sample.optimizers.pt.beta_ladder must define betas or n_temps.")
 
     return SampleMeta(
+        optimizer_kind=optimizer_kind,
         chains=chains,
         draws=draws,
         tune=tune,
@@ -244,7 +311,29 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
         pwm_sum_threshold=pwm_sum_threshold,
         bidirectional=bidirectional,
         top_k=top_k,
+        mode=mode_val,
     )
+
+
+def _resolve_scoring_params(used_cfg: dict) -> tuple[float, float | None]:
+    if not isinstance(used_cfg, dict):
+        raise ValueError("config_used.yaml is missing sample config; re-run `cruncher sample`.")
+    sample = used_cfg.get("sample")
+    if not isinstance(sample, dict):
+        raise ValueError("config_used.yaml missing sample section; re-run `cruncher sample`.")
+    objective = sample.get("objective")
+    if not isinstance(objective, dict):
+        raise ValueError("config_used.yaml missing sample.objective; re-run `cruncher sample`.")
+    scoring = objective.get("scoring")
+    if not isinstance(scoring, dict):
+        raise ValueError("config_used.yaml missing sample.objective.scoring; re-run `cruncher sample`.")
+    pseudocounts = scoring.get("pwm_pseudocounts")
+    if not isinstance(pseudocounts, (int, float)):
+        raise ValueError("config_used.yaml sample.objective.scoring.pwm_pseudocounts must be a number.")
+    log_odds_clip = scoring.get("log_odds_clip")
+    if log_odds_clip is not None and not isinstance(log_odds_clip, (int, float)):
+        raise ValueError("config_used.yaml sample.objective.scoring.log_odds_clip must be a number or null.")
+    return float(pseudocounts), float(log_odds_clip) if log_odds_clip is not None else None
 
 
 def _analysis_id() -> str:
@@ -439,7 +528,9 @@ def run_analyze(
         if run_info.stage != "sample":
             raise ValueError(f"Run '{run_name}' is not a sample run (stage={run_info.stage})")
 
-        logger.info("Analyzing run: %s", run_name)
+        logger.info("Analyzing run: %s", run_info.name)
+        if run_name != run_info.name:
+            logger.debug("Run path override: %s", run_name)
         manifest = load_manifest(sample_dir)
         if manifest.get("stage") != "sample":
             raise ValueError(f"Run '{run_name}' is not a sample run (stage={manifest.get('stage')})")
@@ -459,6 +550,7 @@ def run_analyze(
         pwms, used_cfg = _load_pwms_from_config(sample_dir)
         tf_names = list(pwms.keys())
         sample_meta = _resolve_sample_meta(cfg, used_cfg)
+        scoring_pseudocounts, scoring_log_odds_clip = _resolve_scoring_params(used_cfg)
         bidirectional = sample_meta.bidirectional
 
         # ── locate elites parquet file ──────────────────────────────────────
@@ -477,7 +569,7 @@ def run_analyze(
         if not seq_path.exists():
             raise FileNotFoundError(
                 f"Missing artifacts/sequences.parquet in {sample_dir}. "
-                "Re-run `cruncher sample` with sample.save_sequences=true."
+                "Re-run `cruncher sample` with sample.output.save_sequences=true."
             )
         plots = analysis_cfg.plots
         needs_trace = plots.trace or plots.autocorr or plots.convergence
@@ -485,13 +577,28 @@ def run_analyze(
         if trace_file.exists():
             trace_idata = az.from_netcdf(trace_file)
         elif needs_trace:
-            raise FileNotFoundError(
-                f"Missing artifacts/trace.nc in {sample_dir}. Re-run `cruncher sample` with sample.save_trace=true."
+            msg = (
+                f"Missing artifacts/trace.nc in {sample_dir}. "
+                "Re-run `cruncher sample` with sample.output.trace.save=true."
             )
+            raise FileNotFoundError(msg)
 
-        analysis_id = _analysis_id()
         analysis_root = sample_dir / "analysis"
         analysis_root.mkdir(parents=True, exist_ok=True)
+        analysis_signature, signature_payload = _analysis_signature(
+            analysis_cfg=analysis_cfg,
+            override_payload=override_payload,
+            config_used_file=config_used_path(sample_dir),
+            sequences_file=seq_path,
+            elites_file=elites_path,
+            trace_file=trace_file,
+        )
+        existing_summary = _load_summary_payload(analysis_root)
+        if existing_summary and existing_summary.get("signature") == analysis_signature:
+            logger.info("Analysis already up to date: %s", analysis_root)
+            analysis_runs.append(analysis_root)
+            continue
+        analysis_id = _analysis_id()
         existing_items = [path for path in _analysis_item_paths(analysis_root) if path.exists()]
         existing_id = _load_summary_id(analysis_root)
         if existing_items and existing_id is None:
@@ -536,6 +643,8 @@ def run_analyze(
             bidirectional=bidirectional,
             scale=analysis_cfg.scatter_scale,
             out_path=per_pwm_path,
+            pseudocounts=scoring_pseudocounts,
+            log_odds_clip=scoring_log_odds_clip,
         )
         logger.info("Wrote per-PWM score table → %s", per_pwm_path.relative_to(sample_dir))
 
@@ -551,6 +660,8 @@ def run_analyze(
         write_joint_metrics(elites_df, tf_names, joint_metrics_path)
 
         sample_meta_payload = {
+            "mode": sample_meta.mode,
+            "optimizer_kind": sample_meta.optimizer_kind,
             "chains": sample_meta.chains,
             "draws": sample_meta.draws,
             "tune": sample_meta.tune,
@@ -567,6 +678,8 @@ def run_analyze(
             tf_names=tf_names,
             optimizer=manifest.get("optimizer", {}),
             optimizer_stats=manifest.get("optimizer_stats", {}),
+            mode=sample_meta.mode,
+            optimizer_kind=sample_meta.optimizer_kind,
             sample_meta=sample_meta_payload,
         )
         diagnostics_path = tables_dir / "diagnostics.json"
@@ -578,9 +691,47 @@ def run_analyze(
                 diagnostics_path.relative_to(sample_dir),
             )
 
+        auto_opt_table_path = None
+        auto_opt_plot_path = None
+        auto_opt_payload = manifest.get("auto_opt")
+        if isinstance(auto_opt_payload, dict):
+            candidates = auto_opt_payload.get("candidates")
+            if isinstance(candidates, list) and candidates:
+                auto_opt_table_path = tables_dir / "auto_opt_pilots.csv"
+                pd.DataFrame(candidates).to_csv(auto_opt_table_path, index=False)
+                required_cols = {"best_score", "balance_median"}
+                if required_cols.issubset({col for col in pd.DataFrame(candidates).columns}):
+                    df_auto = pd.DataFrame(candidates)
+                    df_auto = df_auto.dropna(subset=["best_score", "balance_median"])
+                    if not df_auto.empty:
+                        import matplotlib.pyplot as plt
+
+                        auto_opt_plot_path = plots_dir / "auto_opt_tradeoffs.png"
+                        fig, ax = plt.subplots(figsize=(6, 4))
+                        lengths = df_auto.get("length")
+                        colors = None
+                        if lengths is not None and lengths.notna().any():
+                            colors = lengths.astype(float)
+                        scatter = ax.scatter(
+                            df_auto["balance_median"],
+                            df_auto["best_score"],
+                            c=colors,
+                            cmap="viridis" if colors is not None else None,
+                            s=50,
+                            alpha=0.85,
+                        )
+                        ax.set_xlabel("Balance (median min normalized)")
+                        ax.set_ylabel("Best score")
+                        ax.set_title("Auto-opt tradeoffs")
+                        if colors is not None:
+                            fig.colorbar(scatter, ax=ax, label="Length")
+                        fig.tight_layout()
+                        fig.savefig(auto_opt_plot_path, dpi=150)
+                        plt.close(fig)
+
         enabled_specs = [spec for spec in PLOT_SPECS if getattr(plots, spec.key, False)]
         if enabled_specs:
-            logger.info("Enabled plots: %s", ", ".join(spec.key for spec in enabled_specs))
+            logger.debug("Enabled plots: %s", ", ".join(spec.key for spec in enabled_specs))
         tf_pair = _resolve_tf_pair(analysis_cfg, tf_names, tf_pair_override=tf_pair_override)
         pairwise_requested = any("tf_pair" in spec.requires for spec in enabled_specs)
         if pairwise_requested and tf_pair is None:
@@ -614,6 +765,14 @@ def run_analyze(
                 f"{sample_meta.move_probs['M']:.2f}\n"
                 f"cooling = {sample_meta.cooling_kind}"
             )
+            if any(sample_meta.move_probs.get(k, 0.0) > 0 for k in ("L", "W", "I")):
+                annotation = (
+                    annotation
+                    + "\n"
+                    + f"L/W/I   = {sample_meta.move_probs.get('L', 0.0):.2f}/"
+                    + f"{sample_meta.move_probs.get('W', 0.0):.2f}/"
+                    + f"{sample_meta.move_probs.get('I', 0.0):.2f}"
+                )
             plot_scatter(
                 sample_dir,
                 pwms,
@@ -624,8 +783,10 @@ def run_analyze(
                 bidirectional=bidirectional,
                 pwm_sum_threshold=sample_meta.pwm_sum_threshold,
                 annotation=annotation,
+                pseudocounts=scoring_pseudocounts,
+                log_odds_clip=scoring_log_odds_clip,
             )
-            logger.info("Wrote pwm__scatter.pdf")
+            logger.debug("Wrote pwm__scatter.pdf")
 
         if plots.score_hist:
             plot_score_hist(score_df, tf_names, plots_dir / "score__hist.png")
@@ -653,9 +814,9 @@ def run_analyze(
                     raise ValueError(
                         "Elites parquet missing score columns. Re-run `cruncher sample` to regenerate elites.parquet."
                     )
-                logger.info("Top-5 elites (%s & %s):", x_tf, y_tf)
+                logger.debug("Top-5 elites (%s & %s):", x_tf, y_tf)
                 for _, row in elites_df.nsmallest(5, "rank").iterrows():
-                    logger.info(
+                    logger.debug(
                         "rank=%d seq=%s %s=%.1f %s=%.1f",
                         int(row["rank"]),
                         row["sequence"],
@@ -670,9 +831,9 @@ def run_analyze(
                     raise ValueError(
                         "Elites parquet missing score columns. Re-run `cruncher sample` to regenerate elites.parquet."
                     )
-                logger.info("Top-5 elites (%s):", x_tf)
+                logger.debug("Top-5 elites (%s):", x_tf)
                 for _, row in elites_df.nsmallest(5, "rank").iterrows():
-                    logger.info(
+                    logger.debug(
                         "rank=%d seq=%s %s=%.1f",
                         int(row["rank"]),
                         row["sequence"],
@@ -685,10 +846,10 @@ def run_analyze(
                     raise ValueError(
                         "Elites parquet missing score columns. Re-run `cruncher sample` to regenerate elites.parquet."
                     )
-                logger.info("Top-5 elites (all TFs):")
+                logger.debug("Top-5 elites (all TFs):")
                 for _, row in elites_df.nsmallest(5, "rank").iterrows():
                     score_blob = " ".join(f"{tf}={row[f'score_{tf}']:.1f}" for tf in tf_names)
-                    logger.info(
+                    logger.debug(
                         "rank=%d seq=%s %s",
                         int(row["rank"]),
                         row["sequence"],
@@ -737,6 +898,31 @@ def run_analyze(
                     "generated": enabled_flag and any(out["exists"] for out in outputs),
                 }
             )
+        if auto_opt_plot_path is not None:
+            plot_manifest["plots"].append(
+                {
+                    "key": "auto_opt_tradeoffs",
+                    "label": "Auto-opt tradeoffs (PNG)",
+                    "group": "auto_opt",
+                    "description": "Balance vs best score across auto-opt pilots.",
+                    "requires": [],
+                    "enabled": True,
+                    "outputs": [
+                        {"path": str(auto_opt_plot_path.relative_to(sample_dir)), "exists": auto_opt_plot_path.exists()}
+                    ],
+                    "missing_outputs": [] if auto_opt_plot_path.exists() else ["plots/auto_opt_tradeoffs.png"],
+                    "generated": auto_opt_plot_path.exists(),
+                }
+            )
+            plot_artifacts.append(
+                artifact_entry(
+                    auto_opt_plot_path,
+                    sample_dir,
+                    kind="plot",
+                    label="Auto-opt tradeoffs (PNG)",
+                    stage="analysis",
+                )
+            )
 
         plot_manifest_file = plot_manifest_path(analysis_root)
         plot_manifest_file.parent.mkdir(parents=True, exist_ok=True)
@@ -778,6 +964,15 @@ def run_analyze(
                 },
             ],
         }
+        if auto_opt_table_path is not None:
+            table_manifest["tables"].append(
+                {
+                    "key": "auto_opt_pilots",
+                    "label": "Auto-opt pilot scorecard (CSV)",
+                    "path": str(auto_opt_table_path.relative_to(sample_dir)),
+                    "exists": auto_opt_table_path.exists(),
+                }
+            )
         table_manifest_file = table_manifest_path(analysis_root)
         table_manifest_file.parent.mkdir(parents=True, exist_ok=True)
         table_manifest_file.write_text(json.dumps(table_manifest, indent=2))
@@ -824,6 +1019,32 @@ def run_analyze(
                 kind="json",
                 label="Diagnostics summary (JSON)",
                 stage="analysis",
+            ),
+            *(
+                [
+                    artifact_entry(
+                        auto_opt_table_path,
+                        sample_dir,
+                        kind="table",
+                        label="Auto-opt pilot scorecard (CSV)",
+                        stage="analysis",
+                    )
+                ]
+                if auto_opt_table_path is not None
+                else []
+            ),
+            *(
+                [
+                    artifact_entry(
+                        auto_opt_plot_path,
+                        sample_dir,
+                        kind="plot",
+                        label="Auto-opt tradeoffs (PNG)",
+                        stage="analysis",
+                    )
+                ]
+                if auto_opt_plot_path is not None
+                else []
             ),
             artifact_entry(
                 plot_manifest_file,
@@ -878,6 +1099,8 @@ def run_analyze(
             "plot_manifest": str(plot_manifest_file.relative_to(sample_dir)),
             "table_manifest": str(table_manifest_file.relative_to(sample_dir)),
             "inputs": inputs_payload,
+            "signature": analysis_signature,
+            "signature_inputs": signature_payload,
             "artifacts": [item["path"] for item in artifacts],
         }
         summary_file = summary_path(analysis_root)

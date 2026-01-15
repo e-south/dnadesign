@@ -2,22 +2,6 @@
 
 Ingestion is how **cruncher** discovers and caches motif matrices and binding sites from external sources.
 
-### Contents
-
-1. [How ingestion works](#how-ingestion-works)
-2. [Cache layout](#cache-layout)
-3. [General normalization rules](#general-normalization-rules)
-4. [RegulonDB](#regulondb)
-5. [Local motif directories](#local-motif-directories)
-6. [Curated TF binding sites](#curated-tf-binding-sites)
-7. [High-throughput datasets](#high-throughput-datasets)
-8. [Hydration](#hydration)
-9. [Fetching data](#fetching-data)
-10. [PWM creation strategy](#pwm-creation-strategy)
-11. [Common issues](#common-issues)
-
----
-
 ### How ingestion works
 
 1. **Fetch** raw payloads from a source adapter (for example RegulonDB).
@@ -61,13 +45,13 @@ Ingestion is how **cruncher** discovers and caches motif matrices and binding si
 https://regulondb.ccg.unam.mx/graphql
 ```
 
-NOTE: **cruncher** uses the default trust store plus a bundled RegulonDB intermediate certificate. If the server rotates its chain, set `ingest.regulondb.ca_bundle`. Inventory listing uses `getAllRegulon`; `getRegulonBy` expects a non-empty search string and will error if the search is blank. If the RegulonDB GraphQL service returns internal errors (for example, `Cannot read properties of undefined (reading 'length')`), **cruncher** fails fast with guidance. In that case, rerun later or scope to cached inventory only (`cruncher sources summary --scope cache`) until the upstream issue is resolved.
+Notes: **cruncher** uses the default trust store plus a bundled RegulonDB intermediate certificate. If the server rotates its chain, set `ingest.regulondb.ca_bundle`. If the API returns internal errors, **cruncher** fails fast; retry later or work from cache (`cruncher sources summary --scope cache`).
 
 ---
 
 ### Local motif directories
 
-Local motif sources let you register on-disk dataset as a first-class source when there is no remote API (or when you want to use local precomputed artifacts). That includes motif matrices and binding-site instances. In the demos we use DAP-seq data that ships as MEME text files, which is why a MEME parser exists and why local sources can optionally extract MEME BLOCKS sites. Each file becomes a cached motif entry, with TF names derived from the filename stem by default.
+Local motif sources let you register on‑disk datasets as first‑class sources. Each file becomes a cached motif entry, with TF names derived from the filename stem by default. MEME files can also expose MEME BLOCKS sites.
 
 Key behaviors:
 
@@ -105,14 +89,14 @@ ingest:
 
 Example CLI flow:
 
-- `cruncher sources list <config>` (should include `omalley_ecoli_meme`)
+- `cruncher sources list <config>`
 - `cruncher fetch motifs --source omalley_ecoli_meme --tf lexA <config>`
 - `cruncher lock <config>`
 - `cruncher parse <config>`
 
 If you need custom parsing, register your parser module via `io.parsers.extra_modules` and map extensions to your format.
 
-Data note: the `dnadesign-data` repository is a convenience local copy of the O'Malley *et al.* [DAP-seq dataset](https://www.nature.com/articles/s41592-021-01312-2). For *E. coli* the TF motifs are published as MEME files (Supplementary Data 2), which is why this example maps `*.txt` to `MEME`. Use `source_url` plus `tags` to keep provenance, and swap in your own on-disk dataset as needed.
+Use `source_url` plus `tags` to keep provenance, and swap in your own on‑disk dataset as needed.
 
 ---
 
@@ -124,39 +108,10 @@ Curated binding sites are fetched from the regulon datamart and cached as `SiteI
 
 ### High-throughput datasets
 
-HT datasets (ChIP-seq, ChIP-exo, DAP-seq, gSELEX) are discovered and fetched via dedicated dataset queries. Use these tools to inspect them:
+HT datasets (ChIP‑seq, ChIP‑exo, DAP‑seq, gSELEX) are discovered and fetched via dataset queries:
 
 - `cruncher sources datasets regulondb <config> [--tf <TF>]`
 - `cruncher fetch sites --dry-run --tf <TF> <config>`
-
-Example output (datasets, captured with `CRUNCHER_LOG_LEVEL=WARNING`):
-
-```bash
-                                                 regulondb datasets
-┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
-┃ Dataset ID       ┃ Source   ┃ Method    ┃ TFs                                                          ┃ Genome   ┃
-┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
-│ RHTECOLIBSD02444 │ BAUMGART │ TFBINDING │ DNA-binding transcriptional repressor LexA, ExrA, LexA, Spr… │ U00096.3 │
-│ RHTECOLIBSD03022 │ GALAGAN  │ TFBINDING │ DNA-binding transcriptional repressor LexA, ExrA, LexA, Spr… │ -        │
-└──────────────────┴──────────┴───────────┴──────────────────────────────────────────────────────────────┴──────────┘
-```
-
-Example output (`fetch sites --dry-run`, captured with `CRUNCHER_LOG_LEVEL=WARNING`):
-
-```bash
-                         HT datasets
-┏━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┓
-┃ TF   ┃ Dataset ID       ┃ Source   ┃ Method    ┃ Genome   ┃
-┡━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━┩
-│ lexA │ RHTECOLIBSD02444 │ BAUMGART │ TFBINDING │ U00096.3 │
-│ lexA │ RHTECOLIBSD03022 │ GALAGAN  │ TFBINDING │ -        │
-│ cpxR │ RHTECOLIBSD02736 │ PALSSON  │ TFBINDING │ U00096.3 │
-│ cpxR │ RHTECOLIBSD02409 │ BAUMGART │ TFBINDING │ U00096.3 │
-│ cpxR │ RHTECOLIBSD02988 │ GALAGAN  │ TFBINDING │ -        │
-└──────┴──────────────────┴──────────┴───────────┴──────────┘
-```
-
-Note (as of January 10, 2026): only a subset of HT TFBinding datasets return records in the RegulonDB API. In our probe, 11 of 188 TFs (~5.9%) had TFBinding records: FNR, Fis, FlhDC, Fur, GlaR, H-NS, Lrp, Nac, NtrC, OmpR, PhoB.
 
 When multiple HT datasets exist for a TF, pin selection with:
 

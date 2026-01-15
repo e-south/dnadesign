@@ -27,6 +27,9 @@ def gather_per_pwm_scores(
     bidirectional: bool,
     scale: str,
     out_path: Path,
+    *,
+    pseudocounts: float = 0.0,
+    log_odds_clip: float | None = None,
 ) -> None:
     """
     Replace “first N + every_n” subsampling with “keep when per-PWM score changes by ≥ ε.”
@@ -59,7 +62,13 @@ def gather_per_pwm_scores(
         raise ValueError(f"gather_per_pwm_scores: sequences.parquet missing columns: {missing_cols}")
 
     # Build a single Scorer to do all of the “raw→z/p/logp” logic:
-    scorer = Scorer(pwms, bidirectional=bidirectional, scale=scale)
+    scorer = Scorer(
+        pwms,
+        bidirectional=bidirectional,
+        scale=scale,
+        pseudocounts=pseudocounts,
+        log_odds_clip=log_odds_clip,
+    )
 
     # We will collect “kept” entries here
     records: list[dict[str, object]] = []

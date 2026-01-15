@@ -9,6 +9,7 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import typer
@@ -39,6 +40,11 @@ def sample(
         "--auto-opt/--no-auto-opt",
         help="Run auto-optimization pilots (Gibbs + PT) and select the best candidate.",
     ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        help="Enable per-chain progress logging during sampling (overrides progress_every when disabled).",
+    ),
 ) -> None:
     try:
         config_path = resolve_config_path(config_option or config)
@@ -46,6 +52,11 @@ def sample(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
+    if verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+        if cfg.sample.ui.progress_every == 0:
+            cfg.sample.ui.progress_every = 1000
+        cfg.sample.ui.progress_bar = True
     try:
         from dnadesign.cruncher.workflows.sample_workflow import run_sample
 

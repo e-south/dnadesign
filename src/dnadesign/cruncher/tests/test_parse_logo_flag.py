@@ -87,3 +87,69 @@ def test_parse_skips_logos_when_disabled(tmp_path: Path) -> None:
     assert status_path(parse_dir).exists()
     logo_dir = logos_dir_for_run(out_root(config_path, cfg.out_dir), "parse", parse_dir.name)
     assert not list(logo_dir.glob("*_logo.png"))
+
+
+def test_parse_is_idempotent_when_inputs_match(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    entry = CatalogEntry(
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="PFM",
+        has_matrix=True,
+        matrix_source="alignment",
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+
+    motif_path = catalog_root / "normalized" / "motifs" / "regulondb" / "RBM1.json"
+    _write_motif(motif_path, source="regulondb", motif_id="RBM1", tf_name="lexA")
+
+    lock_path = catalog_root / "locks" / "config.lock.json"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path.write_text(
+        json.dumps(
+            {
+                "pwm_source": "matrix",
+                "resolved": {"lexA": {"source": "regulondb", "motif_id": "RBM1", "sha256": "good"}},
+            }
+        )
+    )
+
+    config = {
+        "cruncher": {
+            "out_dir": "runs",
+            "regulator_sets": [["lexA"]],
+            "motif_store": {"catalog_root": ".cruncher", "pwm_source": "matrix"},
+            "parse": {"plot": {"logo": True, "bits_mode": "information", "dpi": 72}},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+    cfg = load_config(config_path)
+
+    run_parse(cfg, config_path)
+    lock_path.write_text(
+        json.dumps(
+            {
+                "pwm_source": "matrix",
+                "generated_at": "2026-01-14T12:00:00Z",
+                "resolved": {"lexA": {"source": "regulondb", "motif_id": "RBM1", "sha256": "good"}},
+            }
+        )
+    )
+    run_parse(cfg, config_path)
+
+    out_dir = tmp_path / "runs" / "parse"
+    parse_runs = []
+    for child in out_dir.iterdir():
+        if not child.is_dir():
+            continue
+        if manifest_path(child).exists():
+            parse_runs.append(child)
+            continue
+        for grand in child.iterdir():
+            if grand.is_dir() and manifest_path(grand).exists():
+                parse_runs.append(grand)
+    assert len(parse_runs) == 1
+    manifest = json.loads(manifest_path(parse_runs[0]).read_text())
+    assert manifest.get("parse_signature")

@@ -9,6 +9,7 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -22,21 +23,25 @@ from dnadesign.cruncher.services.run_service import (
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.store.lockfile import (
+    Lockfile,
+    lockfile_fingerprint,
     read_lockfile,
     validate_lockfile,
     verify_lockfile_hashes,
 )
 from dnadesign.cruncher.store.motif_store import MotifRef
-from dnadesign.cruncher.utils.artifacts import artifact_entry
+from dnadesign.cruncher.utils.artifacts import artifact_entry, normalize_artifacts
+from dnadesign.cruncher.utils.hashing import sha256_bytes
 from dnadesign.cruncher.utils.labels import regulator_sets
 from dnadesign.cruncher.utils.logos import logo_subtitle, pwm_provenance_summary
-from dnadesign.cruncher.utils.manifest import build_run_manifest, write_manifest
+from dnadesign.cruncher.utils.manifest import build_run_manifest, load_manifest, write_manifest
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
 from dnadesign.cruncher.utils.run_layout import (
     build_run_dir,
     ensure_run_dirs,
     logos_dir_for_run,
     out_root,
+    run_group_dir,
     run_group_label,
     status_path,
 )
@@ -61,7 +66,7 @@ def _store(cfg: CruncherConfig, config_path: Path):
     )
 
 
-def _lockmap_for(cfg: CruncherConfig, config_path: Path) -> dict[str, object]:
+def _lockmap_for(cfg: CruncherConfig, config_path: Path) -> tuple[Lockfile, dict[str, object]]:
     lock_root = config_path.parent / cfg.motif_store.catalog_root
     lock_path = lock_root / "locks" / f"{config_path.stem}.lock.json"
     if not lock_path.exists():
@@ -80,7 +85,85 @@ def _lockmap_for(cfg: CruncherConfig, config_path: Path) -> dict[str, object]:
         catalog_root=lock_root,
         expected_pwm_source=cfg.motif_store.pwm_source,
     )
-    return lockfile.resolved
+    return lockfile, lockfile.resolved
+
+
+def _parse_signature(
+    *,
+    cfg: CruncherConfig,
+    lockfile: Lockfile,
+    tfs: list[str],
+) -> tuple[str, dict[str, object]]:
+    lock_sig, _ = lockfile_fingerprint(lockfile)
+    payload = {
+        "tfs": sorted(tfs),
+        "lockfile_fingerprint": lock_sig,
+        "motif_store": {
+            "pwm_source": cfg.motif_store.pwm_source,
+            "combine_sites": cfg.motif_store.combine_sites,
+            "site_kinds": cfg.motif_store.site_kinds,
+            "site_window_lengths": cfg.motif_store.site_window_lengths,
+            "site_window_center": cfg.motif_store.site_window_center,
+            "pwm_window_lengths": cfg.motif_store.pwm_window_lengths,
+            "pwm_window_strategy": cfg.motif_store.pwm_window_strategy,
+            "min_sites_for_pwm": cfg.motif_store.min_sites_for_pwm,
+            "allow_low_sites": cfg.motif_store.allow_low_sites,
+            "pseudocounts": cfg.motif_store.pseudocounts,
+        },
+        "parse_plot": {
+            "logo": cfg.parse.plot.logo,
+            "bits_mode": cfg.parse.plot.bits_mode,
+            "dpi": cfg.parse.plot.dpi,
+        },
+    }
+    signature = sha256_bytes(json.dumps(payload, sort_keys=True).encode("utf-8"))
+    return signature, payload
+
+
+def _parse_artifacts_present(out_base: Path, manifest: dict, *, require_logos: bool) -> bool:
+    artifacts = normalize_artifacts(manifest.get("artifacts"))
+    if require_logos and not artifacts:
+        return False
+    for item in artifacts:
+        raw_path = item.get("path")
+        if not raw_path:
+            continue
+        path = Path(str(raw_path))
+        if not path.is_absolute():
+            path = out_base / path
+        if not path.exists():
+            return False
+    return True
+
+
+def _find_existing_parse_run(
+    *,
+    cfg: CruncherConfig,
+    config_path: Path,
+    tfs: list[str],
+    set_index: int,
+    signature: str,
+    require_logos: bool,
+) -> Path | None:
+    stage_dir = run_group_dir(out_root(config_path, cfg.out_dir), "parse", tfs, set_index)
+    if not stage_dir.exists():
+        return None
+    out_base = out_root(config_path, cfg.out_dir)
+    for child in sorted(stage_dir.iterdir()):
+        if not child.is_dir():
+            continue
+        try:
+            manifest = load_manifest(child)
+        except FileNotFoundError:
+            continue
+        if manifest.get("stage") != "parse":
+            continue
+        if manifest.get("parse_signature") != signature:
+            continue
+        if not _parse_artifacts_present(out_base, manifest, require_logos=require_logos):
+            continue
+        return child
+    return None
 
 
 def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
@@ -113,8 +196,11 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
     # Prepare output folder
     out_base = out_root(config_path, cfg.out_dir)
     out_base.mkdir(parents=True, exist_ok=True)
+    groups = regulator_sets(cfg.regulator_sets)
+    set_count = len(groups)
+    include_set_index = set_count > 1
 
-    lockmap = _lockmap_for(cfg, config_path)
+    lockfile, lockmap = _lockmap_for(cfg, config_path)
     catalog = CatalogIndex.load(catalog_root)
     lock_root = catalog_root / "locks"
     lock_path = lock_root / f"{config_path.stem}.lock.json"
@@ -126,18 +212,36 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
         cfg.motif_store.site_kinds,
     )
 
-    for set_index, group in enumerate(regulator_sets(cfg.regulator_sets), start=1):
+    for set_index, group in enumerate(groups, start=1):
         if not group:
             raise ValueError(f"regulator_sets[{set_index}] is empty.")
         seen: set[str] = set()
         tfs = [tf for tf in group if not (tf in seen or seen.add(tf))]
+        signature, signature_payload = _parse_signature(
+            cfg=cfg,
+            lockfile=lockfile,
+            tfs=tfs,
+        )
+        existing = _find_existing_parse_run(
+            cfg=cfg,
+            config_path=config_path,
+            tfs=tfs,
+            set_index=set_index,
+            signature=signature,
+            require_logos=render_logos,
+        )
+        if existing is not None:
+            logger.info("Parse outputs already generated: %s", existing)
+            continue
 
+        run_group = run_group_label(tfs, set_index, include_set_index=include_set_index)
         run_dir = build_run_dir(
             config_path=config_path,
             out_dir=cfg.out_dir,
             stage="parse",
             tfs=tfs,
             set_index=set_index,
+            include_set_index=include_set_index,
         )
         ensure_run_dirs(run_dir, meta=True)
         status_writer = RunStatusWriter(
@@ -147,7 +251,8 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
             payload={
                 "config_path": str(config_path.resolve()),
                 "status_message": "parsing",
-                "regulator_set": {"index": set_index, "tfs": tfs},
+                "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
+                "run_group": run_group,
             },
         )
         update_run_index_from_status(
@@ -250,8 +355,10 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
             artifacts=artifacts,
             extra={
                 "sequence_length": cfg.sample.init.length if cfg.sample else None,
-                "regulator_set": {"index": set_index, "tfs": tfs},
-                "run_group": run_group_label(tfs, set_index),
+                "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
+                "run_group": run_group,
+                "parse_signature": signature,
+                "parse_inputs": signature_payload,
             },
         )
         manifest_path = write_manifest(run_dir, manifest)

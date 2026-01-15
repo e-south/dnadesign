@@ -97,13 +97,15 @@ def generate_random_baseline(
     bidirectional: bool | None = None,
     seed: int = 0,
     progress_bar: bool = False,
+    pseudocounts: float = 0.0,
+    log_odds_clip: float | None = None,
 ) -> pd.DataFrame:
     """
     Build a DataFrame of `n_samples` random sequences (uniform over A/C/G/T) of length `length`,
     scored against all PWMs using cfg.analysis.scatter_scale (which may be "llr", "z", "logp",
     or "consensus-neglop-sum").
     Uses RNG seed for reproducibility.
-    If bidirectional is provided, overrides cfg.sample.bidirectional.
+    If bidirectional is provided, overrides cfg.sample.objective.bidirectional.
 
     Leverages Scorer to build null distributions and compute per-PWM scores.
     Raises ValueError if length < 1 or n_samples < 1.
@@ -114,14 +116,16 @@ def generate_random_baseline(
         raise ValueError("generate_random_baseline: n_samples must be ≥ 1")
 
     runner_scale = cfg.analysis.scatter_scale.lower()
-    if runner_scale not in {"llr", "z", "logp", "consensus-neglop-sum"}:
+    if runner_scale not in {"llr", "z", "logp", "normalized-llr", "consensus-neglop-sum"}:
         raise ValueError(f"generate_random_baseline: unsupported scatter_scale '{runner_scale}'")
 
     # Build a Scorer to handle all per-PWM scoring logic
     scorer = Scorer(
         pwms,
-        bidirectional=bidirectional if bidirectional is not None else cfg.sample.bidirectional,
+        bidirectional=bidirectional if bidirectional is not None else cfg.sample.objective.bidirectional,
         scale=runner_scale,
+        pseudocounts=pseudocounts,
+        log_odds_clip=log_odds_clip,
     )
 
     rng = np.random.default_rng(seed)
@@ -144,29 +148,34 @@ def compute_consensus_points(
     tf_pair: Tuple[str, str],
     *,
     bidirectional: bool | None = None,
+    pseudocounts: float = 0.0,
+    log_odds_clip: float | None = None,
 ) -> list[tuple[float, float, str]]:
     """
     Build a “full-length consensus” for each TF in the (x_tf, y_tf) pair.
     We embed each PWM's actual consensus motif into a background of total length `length`
     (using SequenceState.from_consensus), then call Scorer.compute_all_per_pwm(…) on that
     full-length array. Returns a list of (x_val, y_val, tfname).
-    If bidirectional is provided, overrides cfg.sample.bidirectional.
+    If bidirectional is provided, overrides cfg.sample.objective.bidirectional.
     """
     if length < 1:
         raise ValueError("compute_consensus_points: length must be ≥ 1")
 
     x_tf, y_tf = tf_pair
     scatter_scale = cfg.analysis.scatter_scale.lower()
-    if scatter_scale not in {"llr", "z", "logp", "consensus-neglop-sum"}:
+    if scatter_scale not in {"llr", "z", "logp", "normalized-llr", "consensus-neglop-sum"}:
         raise ValueError(
-            f"Unsupported scatter_scale '{scatter_scale}' in config. Use 'llr', 'z', 'logp', or 'consensus-neglop-sum'."
+            "Unsupported scatter_scale '%s' in config. Use 'llr', 'z', 'logp', "
+            "'normalized-llr', or 'consensus-neglop-sum'." % scatter_scale
         )
 
     # Build a Scorer for exactly the two PWMs (x_tf and y_tf)
     pair_scorer = Scorer(
         {x_tf: pwms[x_tf], y_tf: pwms[y_tf]},
-        bidirectional=bidirectional if bidirectional is not None else cfg.sample.bidirectional,
+        bidirectional=bidirectional if bidirectional is not None else cfg.sample.objective.bidirectional,
         scale=scatter_scale,
+        pseudocounts=pseudocounts,
+        log_odds_clip=log_odds_clip,
     )
 
     out: list[tuple[float, float, str]] = []

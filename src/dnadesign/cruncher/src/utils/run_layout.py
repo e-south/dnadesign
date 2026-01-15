@@ -29,11 +29,16 @@ def stage_root(out_root_path: Path, stage: str) -> Path:
     return out_root_path / stage
 
 
-def run_group_label(tfs: Iterable[str], set_index: int | None) -> str:
+def run_group_label(
+    tfs: Iterable[str],
+    set_index: int | None,
+    *,
+    include_set_index: bool = False,
+) -> str:
     label = format_regulator_slug(list(tfs))
-    if set_index is None:
-        return label
-    return f"set{set_index}_{label}"
+    if include_set_index and set_index is not None:
+        return f"set{set_index}_{label}"
+    return label
 
 
 def run_group_dir(
@@ -42,7 +47,7 @@ def run_group_dir(
     tfs: Iterable[str],
     set_index: int | None,
 ) -> Path:
-    return stage_root(out_root_path, stage) / run_group_label(tfs, set_index)
+    return stage_root(out_root_path, stage)
 
 
 def build_run_dir(
@@ -52,9 +57,17 @@ def build_run_dir(
     stage: str,
     tfs: Iterable[str],
     set_index: int | None,
+    include_set_index: bool = False,
 ) -> Path:
     root = run_group_dir(out_root(config_path, out_dir), stage, tfs, set_index)
-    return root / build_run_name(stage, list(tfs), set_index=set_index, include_stage=False)
+    return root / build_run_name(
+        stage,
+        list(tfs),
+        set_index=set_index,
+        include_stage=False,
+        include_label=True,
+        include_set_index=include_set_index,
+    )
 
 
 def ensure_run_dirs(

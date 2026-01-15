@@ -109,42 +109,7 @@ def summarize_config(cfg: CruncherConfig) -> Dict[str, Any]:
     if cfg.sample is None:
         summary["sample"] = None
     else:
-        sample = cfg.sample
-        summary["sample"] = {
-            "init": {
-                "kind": sample.init.kind,
-                "length": sample.init.length,
-                "regulator": sample.init.regulator,
-                "pad_with": sample.init.pad_with,
-            },
-            "draws": sample.draws,
-            "tune": sample.tune,
-            "chains": sample.chains,
-            "top_k": sample.top_k,
-            "min_dist": sample.min_dist,
-            "bidirectional": sample.bidirectional,
-            "seed": sample.seed,
-            "record_tune": sample.record_tune,
-            "progress_bar": sample.progress_bar,
-            "progress_every": sample.progress_every,
-            "save_trace": sample.save_trace,
-            "save_sequences": sample.save_sequences,
-            "pwm_sum_threshold": sample.pwm_sum_threshold,
-            "include_consensus_in_elites": sample.include_consensus_in_elites,
-            "optimiser": {
-                "kind": sample.optimiser.kind,
-                "scorer_scale": sample.optimiser.scorer_scale,
-                "cooling": sample.optimiser.cooling.model_dump(),
-                "swap_prob": sample.optimiser.swap_prob,
-            },
-            "moves": {
-                "block_len_range": sample.moves.block_len_range,
-                "multi_k_range": sample.moves.multi_k_range,
-                "slide_max_shift": sample.moves.slide_max_shift,
-                "swap_len_range": sample.moves.swap_len_range,
-                "move_probs": sample.moves.move_probs,
-            },
-        }
+        summary["sample"] = cfg.sample.model_dump()
     if cfg.analysis is None:
         summary["analysis"] = None
     else:

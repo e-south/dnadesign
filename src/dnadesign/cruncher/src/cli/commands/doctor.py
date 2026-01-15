@@ -96,4 +96,9 @@ def doctor(
     console.print(table)
 
     if not ok:
+        console.print(
+            "Tip: if MEME Suite is installed via pixi, run `pixi run cruncher -- doctor -c <config>`, "
+            "or set motif_discovery.tool_path (or MEME_BIN) to the MEME bin directory "
+            "(see docs/guides/meme_suite.md)."
+        )
         raise typer.Exit(code=1)

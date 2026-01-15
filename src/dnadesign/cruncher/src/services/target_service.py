@@ -331,19 +331,26 @@ def target_statuses(
                     )
                 )
                 continue
-        site_entries = [entry]
-        site_count = entry.site_count
-        site_total = entry.site_total
-        site_kind = entry.site_kind
-        dataset_id = entry.dataset_id
-
-        if effective_pwm_source == "sites":
-            site_entries = _site_entries_for_target(
+        status_site_entries = [entry]
+        if effective_combine_sites:
+            status_site_entries = _site_entries_for_target(
                 catalog=catalog,
                 entry=entry,
                 combine_sites=effective_combine_sites,
                 site_kinds=effective_site_kinds,
             )
+        site_count = 0
+        site_total = 0
+        site_kind = None
+        dataset_id = None
+        if status_site_entries:
+            site_count = sum(candidate.site_count for candidate in status_site_entries)
+            site_total = sum(candidate.site_total for candidate in status_site_entries)
+            site_kind = _merge_text(candidate.site_kind for candidate in status_site_entries)
+            dataset_id = _merge_text(candidate.dataset_id for candidate in status_site_entries)
+        site_entries = status_site_entries
+
+        if effective_pwm_source == "sites":
             if not site_entries:
                 status = "missing-sites"
                 message = "No cached binding-site sequences available."
@@ -352,10 +359,6 @@ def target_statuses(
                 site_kind = None
                 dataset_id = None
             else:
-                site_count = sum(candidate.site_count for candidate in site_entries)
-                site_total = sum(candidate.site_total for candidate in site_entries)
-                site_kind = _merge_text(candidate.site_kind for candidate in site_entries)
-                dataset_id = _merge_text(candidate.dataset_id for candidate in site_entries)
                 if site_count < cfg.motif_store.min_sites_for_pwm:
                     msg = f"Only {site_count} sites available (min_sites_for_pwm={cfg.motif_store.min_sites_for_pwm})."
                     if cfg.motif_store.allow_low_sites:

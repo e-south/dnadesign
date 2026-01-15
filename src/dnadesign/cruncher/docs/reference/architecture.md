@@ -3,57 +3,25 @@
 **cruncher** is structured so that data access, sequence optimization logic, and the CLI can evolve independently.
 
 
-### Contents
-
-1. [Run lifecycle](#run-lifecycle)
-2. [Layers and responsibilities](#layers-and-responsibilities)
-3. [On-disk layout](#on-disk-layout)
-4. [Run artifacts](#run-artifacts)
-5. [Reproducibility boundaries](#reproducibility-boundaries)
-6. [Extensibility points](#extensibility-points)
-
----
-
 ### Run lifecycle
 
-1. **fetch**
-   - populates `normalized/` (motifs and/or sites)
-   - updates `catalog.json`
-
-2. **lock**
-   - resolves TF names in `regulator_sets` to exact cached candidates
-   - writes `.cruncher/locks/<config>.lock.json`
-   - locking is what makes later stages reproducible
-
-3. **parse** (optional)
-   - validates cached motifs (and/or site-derived PWMs)
-   - renders logos and basic QC artifacts
-   - records provenance into a run manifest
-
-4. **sample**
-   - loads the locked PWMs
-   - runs MCMC optimization
-   - writes sequences + (optionally) traces + manifests
-
-5. **analyze**
-   - generates plots/tables from sample artifacts
-   - never calls sources or the network
-
-6. **report**
-   - produces `report/report.json` and `report/report.md` from run artifacts
-   - fails fast if required artifacts are missing
+1. **fetch** → cache motifs/sites and update `catalog.json`
+2. **lock** → resolve TFs to exact cached artifacts (`.cruncher/locks/<config>.lock.json`)
+3. **parse** *(optional)* → validate PWMs and render logos
+4. **sample** → run MCMC and write sequences/trace + manifests
+5. **analyze** → plots/tables from sample artifacts (offline)
+6. **report** → summary outputs from run artifacts (fails fast if missing inputs)
 
 ---
 
 ### Layers and responsibilities
 
-The core contract is:
+Core contract:
 
-- **Network access is explicit** (fetch commands and optional remote inventory commands like
-  `cruncher sources summary --scope remote` and `cruncher sources datasets`).
-- The **store** is the only persistence layer (project-local; no global state).
-- The **core** (PWM scoring + optimizers) is pure compute and does no I/O.
-- **Analyze/report** consume run artifacts only and can run fully offline.
+- **Network access is explicit** (fetch and remote inventory).
+- The **store** is the only persistence layer (project‑local).
+- The **core** (PWM scoring + optimizers) is pure compute (no I/O).
+- **Analyze/report** read run artifacts only and can run offline.
 
 #### `core/` (pure compute)
 - PWM representation and validation
@@ -121,13 +89,13 @@ genomes/              # if genome hydration is enabled
 
 #### Run outputs (`out_dir`, e.g. `runs/`)
 
-Each configured regulator set produces **separate** runs, grouped by stage and regulator set:
+Each configured regulator set produces **separate** runs, grouped by stage. Run names include the TF slug (and a `setN_` prefix only when multiple regulator sets are configured):
 
-- `runs/parse/set1_lexA-cpxR/set1_lexA-cpxR_20260101_143210_f3a9d2/`
-- `runs/sample/set1_lexA-cpxR/set1_lexA-cpxR_20260101_143512_a91c0e/`
-- `runs/pilot/set1_lexA-cpxR/set1_lexA-cpxR_20260101_143530_91acb1/` (auto-opt pilots)
-- `runs/logos/parse/set1_lexA-cpxR_20260101_143210_f3a9d2/`
-- `runs/logos/catalog/set1_lexA-cpxR_20260101_143210_f3a9d2/`
+- `runs/parse/lexA-cpxR_20260101_143210_f3a9d2/`
+- `runs/sample/lexA-cpxR_20260101_143512_a91c0e/`
+- `runs/auto_opt/lexA-cpxR_20260101_143530_91acb1/` (auto-opt pilots)
+- `runs/logos/parse/20260101_143210_f3a9d2/`
+- `runs/logos/catalog/lexA-cpxR_20260101_143210_f3a9d2/` *(prefix `setN_` only when multiple regulator sets are configured)*
 
 ---
 
@@ -135,25 +103,11 @@ Each configured regulator set produces **separate** runs, grouped by stage and r
 
 A typical **sample** run directory contains:
 
-- `meta/` — metadata + provenance
-  - `meta/config_used.yaml` — resolved runtime config + PWM summaries
-  - `meta/run_manifest.json` — provenance, resolved motifs, optimizer stats, hashes
-  - `meta/run_status.json` — live progress snapshots during parse/sample
-- `artifacts/` — generated outputs
-  - `artifacts/sequences.parquet` — per-draw sequences + per-TF scores *(required for analyze/report)*
-  - `artifacts/trace.nc` — ArviZ-compatible trace *(required for trace-based plots and some report metrics)*
-  - `artifacts/elites.parquet` / `elites.json` / `elites.yaml` — elite sequences and exports
-- `analysis/` — latest analysis artifacts
-  - `analysis/meta/summary.json` — analysis summary + manifest links
-  - `analysis/meta/analysis_used.yaml` — analysis settings (resolved)
-  - `analysis/meta/plot_manifest.json` — plot registry output
-  - `analysis/meta/table_manifest.json` — table registry output
-  - `analysis/plots/` — plots (PNG/PDF)
-  - `analysis/tables/` — CSV/JSON tables
-  - `analysis/notebooks/` — optional notebooks
-- `analysis/_archive/<analysis_id>/` — optional archived analyses (when enabled)
-- `live/metrics.jsonl` — live sampling progress snapshots (when enabled)
-- `report/` — generated summaries (from `cruncher report`)
+- `meta/` — manifests, config_used, live status snapshots
+- `artifacts/` — sequences, trace (if enabled), elites exports
+- `analysis/` — plots, tables, and analysis metadata (plus optional notebooks/archive)
+- `live/` — streaming metrics (if enabled)
+- `report/` — summary outputs from `cruncher report`
 
 ---
 

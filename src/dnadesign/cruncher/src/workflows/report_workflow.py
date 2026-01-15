@@ -68,12 +68,12 @@ def run_report(cfg: CruncherConfig, config_path: Path, run_name: str) -> None:
     seq_path = sequences_path(run_dir)
     if not trace_file.exists():
         raise FileNotFoundError(
-            f"Missing artifacts/trace.nc in {run_dir}. Re-run `cruncher sample` with sample.save_trace=true."
+            f"Missing artifacts/trace.nc in {run_dir}. Re-run `cruncher sample` with sample.output.trace.save=true."
         )
     if not seq_path.exists():
         raise FileNotFoundError(
             f"Missing artifacts/sequences.parquet in {run_dir}. "
-            "Re-run `cruncher sample` with sample.save_sequences=true."
+            "Re-run `cruncher sample` with sample.output.save_sequences=true."
         )
 
     elite_path = find_elites_parquet(run_dir)
@@ -98,6 +98,7 @@ def run_report(cfg: CruncherConfig, config_path: Path, run_name: str) -> None:
             tf_names=tf_names,
             optimizer=manifest.get("optimizer", {}),
             optimizer_stats=manifest.get("optimizer_stats", {}),
+            optimizer_kind=(manifest.get("optimizer", {}) or {}).get("kind"),
             sample_meta=None,
         )
         warnings = diagnostics_summary.get("warnings", []) if isinstance(diagnostics_summary, dict) else []

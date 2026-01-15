@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
@@ -23,10 +24,12 @@ from dnadesign.cruncher.cli.config_resolver import (
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.services.run_service import (
+    drop_run_index_entries,
     get_run,
     list_runs,
     load_run_status,
     rebuild_run_index,
+    update_run_index_from_status,
 )
 from dnadesign.cruncher.utils.analysis_layout import (
     current_analysis_id,
@@ -34,10 +37,22 @@ from dnadesign.cruncher.utils.analysis_layout import (
 )
 from dnadesign.cruncher.utils.artifacts import normalize_artifacts
 from dnadesign.cruncher.utils.mpl import ensure_mpl_cache
-from dnadesign.cruncher.utils.run_layout import live_metrics_path
+from dnadesign.cruncher.utils.run_layout import live_metrics_path, status_path
 from rich.console import Console
 from rich.live import Live
 from rich.table import Table
+
+
+def _auto_opt_best_run_name(stage_dir: Path, run_group: str | None) -> str | None:
+    if not run_group:
+        return None
+    best_path = stage_dir / f"best_{run_group}.json"
+    if not best_path.exists():
+        return None
+    payload = json.loads(best_path.read_text())
+    selected = payload.get("selected_candidate") or {}
+    return selected.get("pilot_run")
+
 
 app = typer.Typer(no_args_is_help=True, help="List, inspect, or watch past run artifacts.")
 console = Console()
@@ -121,6 +136,18 @@ def _sparkline(values: list[float], *, width: int = 32) -> str:
     return "".join(chars)
 
 
+def _parse_timestamp(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
 def _plot_live_metrics(history: list[dict], out_path: Path) -> None:
     if not history:
         return
@@ -174,21 +201,27 @@ def list_runs_cmd(
         console.print("Hint: run cruncher sample <config> or cruncher parse <config> to create a run.")
         raise typer.Exit(code=1)
     if json_output:
-        payload = [
-            {
-                "name": run.name,
-                "stage": run.stage,
-                "status": run.status,
-                "created_at": run.created_at,
-                "motif_count": run.motif_count,
-                "pwm_source": run.pwm_source,
-                "best_score": run.best_score,
-                "regulator_set": run.regulator_set,
-                "run_dir": str(run.run_dir),
-                "artifacts": run.artifacts,
-            }
-            for run in runs
-        ]
+        payload = []
+        for run in runs:
+            is_best = False
+            if run.stage == "auto_opt":
+                best_name = _auto_opt_best_run_name(run.run_dir.parent, run.run_group)
+                is_best = best_name == run.name
+            payload.append(
+                {
+                    "name": run.name,
+                    "stage": run.stage,
+                    "status": run.status,
+                    "created_at": run.created_at,
+                    "motif_count": run.motif_count,
+                    "pwm_source": run.pwm_source,
+                    "best_score": run.best_score,
+                    "regulator_set": run.regulator_set,
+                    "run_dir": str(run.run_dir),
+                    "artifacts": run.artifacts,
+                    "auto_opt_best": is_best,
+                }
+            )
         typer.echo(json.dumps(payload, indent=2))
         return
     table = Table(title="Runs", header_style="bold")
@@ -199,14 +232,23 @@ def list_runs_cmd(
     table.add_column("Motifs")
     table.add_column("Regulator set")
     table.add_column("PWM source")
+    include_index = len(cfg.regulator_sets) > 1
     for run in runs:
         reg_label = "-"
         if run.regulator_set:
             idx = run.regulator_set.get("index")
             tfs = run.regulator_set.get("tfs") or []
-            reg_label = f"set{idx}:" + ",".join(tfs) if idx else ",".join(tfs)
+            if idx and include_index:
+                reg_label = f"set{idx}:" + ",".join(tfs)
+            else:
+                reg_label = ",".join(tfs)
+        name = run.name
+        if run.stage == "auto_opt":
+            best_name = _auto_opt_best_run_name(run.run_dir.parent, run.run_group)
+            if best_name == run.name:
+                name = f"*{run.name}"
         table.add_row(
-            run.name,
+            name,
             run.stage,
             run.status or "-",
             run.created_at or "-",
@@ -221,7 +263,7 @@ def list_runs_cmd(
 def show_run_cmd(
     args: list[str] = typer.Argument(
         None,
-        help="Run name (optionally preceded by CONFIG).",
+        help="Run name or run directory path (optionally preceded by CONFIG).",
         metavar="ARGS",
     ),
     config_option: Path | None = typer.Option(
@@ -237,7 +279,7 @@ def show_run_cmd(
             args,
             config_option,
             value_label="RUN",
-            command_hint="cruncher runs show <run_name>",
+            command_hint="cruncher runs show <run_name|run_dir>",
         )
     except ConfigResolutionError as exc:
         console.print(str(exc))
@@ -467,11 +509,121 @@ def rebuild_index_cmd(
     console.print(f"Rebuilt run index → {render_path(index_path, base=config_path.parent)}")
 
 
+@app.command("clean", help="Mark stale running runs as aborted (or drop from index).")
+def clean_runs_cmd(
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
+    config_option: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to cruncher config.yaml (overrides positional CONFIG).",
+    ),
+    stale: bool = typer.Option(False, "--stale", help="Mark stale running runs as aborted."),
+    older_than_hours: float = typer.Option(
+        24.0,
+        "--older-than-hours",
+        help="Consider runs stale if no updates within this many hours.",
+    ),
+    drop: bool = typer.Option(False, "--drop", help="Remove stale runs from the run index instead of marking aborted."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show stale runs without modifying anything."),
+) -> None:
+    try:
+        config_path = resolve_config_path(config_option or config)
+    except ConfigResolutionError as exc:
+        console.print(str(exc))
+        raise typer.Exit(code=1)
+    if not stale:
+        console.print("Nothing to clean. Pass --stale to mark stale running runs.")
+        return
+    if older_than_hours < 0:
+        console.print("Error: --older-than-hours must be >= 0.")
+        raise typer.Exit(code=1)
+    cfg = load_config(config_path)
+    runs = list_runs(cfg, config_path)
+    if not runs:
+        console.print("No runs found.")
+        raise typer.Exit(code=1)
+
+    now = datetime.now(timezone.utc)
+    stale_seconds = older_than_hours * 3600
+    stale_runs: list[tuple[Path, dict | None, str]] = []
+
+    for run in runs:
+        if run.status != "running":
+            continue
+        status_payload = load_run_status(run.run_dir)
+        last_update = None
+        if status_payload is not None:
+            last_update = _parse_timestamp(
+                status_payload.get("updated_at")
+                or status_payload.get("finished_at")
+                or status_payload.get("started_at")
+            )
+        if last_update is None:
+            reason = "missing status file" if status_payload is None else "missing timestamps"
+            is_stale = True
+        else:
+            age = now - last_update
+            is_stale = age.total_seconds() >= stale_seconds
+            reason = f"no updates for {age.total_seconds() / 3600:.1f}h"
+        if is_stale:
+            payload = status_payload or {"stage": run.stage}
+            payload["run_dir"] = str(run.run_dir.resolve())
+            payload.setdefault("started_at", run.created_at or now.isoformat())
+            stale_runs.append((run.run_dir, payload, reason))
+
+    if not stale_runs:
+        console.print("No stale running runs found.")
+        return
+
+    if dry_run:
+        table = Table(title="Stale runs (dry-run)", header_style="bold")
+        table.add_column("Run")
+        table.add_column("Stage")
+        table.add_column("Reason")
+        for run_dir, payload, reason in stale_runs:
+            table.add_row(run_dir.name, str(payload.get("stage") or "-"), reason)
+        console.print(table)
+        return
+
+    if drop:
+        removed = drop_run_index_entries(
+            config_path,
+            [run_dir.name for run_dir, _payload, _reason in stale_runs],
+            catalog_root=cfg.motif_store.catalog_root,
+        )
+        console.print(f"Dropped {removed} stale run(s) from the run index.")
+        return
+
+    updated = 0
+    now_iso = now.isoformat()
+    for run_dir, payload, reason in stale_runs:
+        payload["status"] = "aborted"
+        payload["status_message"] = f"stale ({reason})"
+        payload["updated_at"] = now_iso
+        payload["finished_at"] = now_iso
+        status_file = status_path(run_dir)
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        status_file.write_text(json.dumps(payload, indent=2))
+        update_run_index_from_status(
+            config_path,
+            run_dir,
+            payload,
+            catalog_root=cfg.motif_store.catalog_root,
+        )
+        updated += 1
+    console.print(f"Marked {updated} stale run(s) as aborted.")
+
+
 @app.command("watch", help="Tail meta/run_status.json for a live progress snapshot.")
 def watch_run_cmd(
     args: list[str] = typer.Argument(
         None,
-        help="Run name (optionally preceded by CONFIG).",
+        help="Run name or run directory path (optionally preceded by CONFIG).",
         metavar="ARGS",
     ),
     config_option: Path | None = typer.Option(
@@ -497,7 +649,7 @@ def watch_run_cmd(
             args,
             config_option,
             value_label="RUN",
-            command_hint="cruncher runs watch <run_name>",
+            command_hint="cruncher runs watch <run_name|run_dir>",
         )
     except ConfigResolutionError as exc:
         console.print(str(exc))

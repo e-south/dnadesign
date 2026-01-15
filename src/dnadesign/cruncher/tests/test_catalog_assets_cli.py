@@ -115,3 +115,13 @@ def test_catalog_logos_writes_pngs(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "Rendered PWM logos" in result.output
     assert list(out_dir.glob("*_logo.png"))
+    manifest = out_dir / "meta" / "logo_manifest.json"
+    assert manifest.exists()
+
+    repeat = runner.invoke(
+        app,
+        ["catalog", "logos", "--tf", "lexA", "--out-dir", str(out_dir), str(config_path)],
+        color=False,
+    )
+    assert repeat.exit_code == 0
+    assert "already rendered" in repeat.output

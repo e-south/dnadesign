@@ -8,17 +8,12 @@ This demo walks through a process of running category-based sequence optimizatio
 
 - **Workspace**: `src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/`
 - **Config**: `config.yaml`
-- **Output root**: `runs/` (relative to the workspace; runs are grouped by regulator set under `runs/<stage>/setN_<tfs>/...`)
+- **Output root**: `runs/` (relative to the workspace; runs live under `runs/<stage>/<run_name>/`)
 - **Motif flow**: fetch sites → discover MEME/STREME motifs → lock/sample using those matrices
 
 ### Enter the demo workspace
 
-The demo workspace lives here:
-
-- `src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/`
-
-You can either `cd` into the workspace or run from anywhere. This demo uses its
-own workspace so its outputs stay isolated.
+The demo workspace lives under `src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/`.
 
 ```bash
 # Option A: cd into the workspace
@@ -28,16 +23,14 @@ CONFIG="$PWD/config.yaml"
 # Option B: run from anywhere
 CONFIG=src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/config.yaml
 
-# Choose a runner (pixi recommended when using MEME Suite).
-cruncher() { pixi run cruncher -- "$@"; }
-# cruncher() { uv run cruncher "$@"; }
+# Choose a runner (uv is the default in this repo; pixi is optional).
+cruncher() { uv run cruncher "$@"; }
+# cruncher() { pixi run cruncher -- "$@"; }
 
 # Optional: widen tables to avoid truncation in rich output.
 export COLUMNS=160
 
 # Note: when using pixi tasks, put -c/--config after the subcommand (pixi inserts `--`).
-
-# If you haven't installed system tools yet (from repo root):
 # pixi install
 
 # From here on, commands use $CONFIG for clarity; if you're in the workspace, you can omit -c.
@@ -49,7 +42,7 @@ Fail fast on external dependencies (MEME Suite):
 cruncher doctor -c "$CONFIG"
 ```
 
-If it reports missing tools, install MEME Suite (pixi recommended) or set `motif_discovery.tool_path`.
+If it reports missing tools, install MEME Suite (pixi or system install) or set `motif_discovery.tool_path`.
 See the [MEME Suite guide](../guides/meme_suite.md) for details.
 
 This workspace also registers the demo local DAP-seq source (`demo_local_meme`)
@@ -80,34 +73,6 @@ cruncher targets list --category Category1 -c "$CONFIG"
 cruncher targets list --campaign demo_pair -c "$CONFIG"
 ```
 
-Example output (Category1):
-
-```bash
-   Category
-   targets:
-  Category1
-┏━━━━━┳━━━━━━┓
-┃ Set ┃ TF   ┃
-┡━━━━━╇━━━━━━┩
-│   1 │ cpxR │
-│   1 │ baeR │
-└─────┴──────┘
-```
-
-Example output (demo_pair campaign):
-
-```bash
-   Campaign
-   targets:
-  demo_pair
-┏━━━━━┳━━━━━━┓
-┃ Set ┃ TF   ┃
-┡━━━━━╇━━━━━━┩
-│   1 │ lexA │
-│   1 │ cpxR │
-└─────┴──────┘
-```
-
 `demo_categories` expands to many sets; use it once your cache is warmed and you are ready for larger runs.
 
 ## Validate campaign definitions (no cache required)
@@ -118,20 +83,7 @@ Validate campaign wiring (category membership, selectors, and constraints) witho
 cruncher campaign validate --campaign demo_categories_best --no-selectors --no-metrics -c "$CONFIG"
 ```
 
-Example output:
-
-```bash
-      Campaign validation:
-      demo_categories_best
-┏━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━┓
-┃ Category  ┃ Total ┃ Selected ┃
-┡━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━┩
-│ Category1 │ 2     │ 2        │
-│ Category2 │ 4     │ 4        │
-│ Category3 │ 6     │ 6        │
-└───────────┴───────┴──────────┘
-campaign_id: bcca78ce83989eb24a25f5bc93ebda1e02d118420475ed778a35352e591242af
-```
+This prints category totals/selected counts plus the campaign_id.
 
 ## Fetch curated sites for campaign TFs
 
@@ -155,7 +107,7 @@ These summaries confirm cached counts and site‑length ranges before selection.
 For `demo_categories`, the stats table is much larger; use it when you are ready to inspect all expanded sets.
 
 These stats are the first selection signal: **site counts** drive `selectors.min_site_count`, and length ranges
-let you decide if `motif_store.site_window_lengths` needs tuning for any TFs with variable sites.
+help decide whether to tune `motif_store.site_window_lengths`.
 
 ## Evaluate PWM quality (information content)
 
@@ -164,18 +116,6 @@ Compute PWM info-bits for a representative subset before you scale up. This help
 
 ```bash
 cruncher catalog pwms --tf lexA --tf cpxR --source regulondb -c "$CONFIG"
-```
-
-Example output:
-
-```bash
-                                           PWM summary
-┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━┓
-┃ TF   ┃ Source    ┃ Motif ID         ┃ PWM source ┃ Length ┃ Window ┃ Bits  ┃ n sites ┃ Site sets ┃
-┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━┩
-│ lexA │ regulondb │ RDBECOLITFC00214 │ matrix     │ 22     │ -      │ 12.10 │ -       │ -         │
-│ cpxR │ regulondb │ RDBECOLITFC00170 │ matrix     │ 11     │ -      │ 3.52 │ -       │ -         │
-└──────┴───────────┴──────────────────┴────────────┴────────┴────────┴───────┴─────────┴───────────┘
 ```
 
 If you want to enforce information content, add `selectors.min_info_bits` to the
@@ -187,22 +127,9 @@ If you want aligned PWMs (e.g., when combining variable-length sites), run MEME 
 on cached sites first. For the small `demo_pair` baseline, store each tool in its own
 `source_id`:
 
-What happens here (and why):
-
-- `discover check` confirms `meme` and `streme` are on PATH (pixi installs both).
-- `discover motifs` selects the tool based on `motif_discovery.tool` and `min_sequences_for_streme`
-  (auto defaults to STREME for larger site counts). It writes a per‑TF run folder under
-  `.cruncher/<workspace>/discoveries/` and ingests the discovered motif(s) into the catalog.
-- By default, discovery replaces earlier discovered motifs for the same TF/source to avoid cache bloat.
-  Use `--keep-existing` if you want to retain historical runs.
-- The “Motif discovery” table in stdout reports the tool used, the new motif ID, the width, and the
-  output file path (MEME format).
-- By default, discovery uses raw cached site sequences. To pre-window, set
-  `motif_discovery.window_sites=true` and provide `motif_store.site_window_lengths`.
-- Raw sites can be variable length; MEME/STREME accept that input and Cruncher passes it through.
-- If `minw/maxw` are omitted, Cruncher derives them from the min/max site lengths per TF.
-- This demo config sets `combine_sites: true` so discovery sees all cached site sets per TF.
-- Discovery always uses cached sites regardless of `motif_store.pwm_source`.
+Discovery uses cached sites and writes results under `.cruncher/<workspace>/discoveries/`.
+By default it replaces earlier discoveries for the same TF/source to avoid cache bloat.
+Use `--keep-existing` to retain historical runs.
 
 ```bash
 cruncher discover check -c "$CONFIG"
@@ -210,8 +137,7 @@ cruncher discover motifs --tf lexA --tf cpxR --tool streme --source-id meme_suit
 cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id meme_suite_meme -c "$CONFIG"
 ```
 
-Tip: if each sequence represents one site, prefer MEME with `--meme-mod oops`. If STREME is not
-installed, pass `--tool meme`.
+Tip: if each sequence represents one site, prefer MEME with `--meme-mod oops`.
 
 How to read the outputs:
 
@@ -323,29 +249,29 @@ Example output (runs list, abridged):
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
 ┃ Name                                             ┃ Stage  ┃ Status    ┃ Created                          ┃ Motifs ┃ Regulator set      ┃ PWM source ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ set1_lexA-cpxR-fur_20260110_161355_df8fcb │ sample │ completed │ 2026-01-10T21:13:55.663756+00:00 │ 3      │ set1:lexA,cpxR,fur │ matrix     │
-│ set1_lexA-cpxR-fur_20260110_161221_d63ebd │ sample │ completed │ 2026-01-10T21:12:22.000163+00:00 │ 3      │ set1:lexA,cpxR,fur │ matrix     │
-│ set1_lexA-cpxR-fur_20260110_125635_0affef │ sample │ completed │ 2026-01-10T17:56:39.263742+00:00 │ 3      │ set1:lexA,cpxR,fur │ matrix     │
+│ 20260110_161355_df8fcb │ sample │ completed │ 2026-01-10T21:13:55.663756+00:00 │ 3      │ set1:lexA,cpxR,fur │ matrix     │
+│ 20260110_161221_d63ebd │ sample │ completed │ 2026-01-10T21:12:22.000163+00:00 │ 3      │ set1:lexA,cpxR,fur │ matrix     │
+│ 20260110_125635_0affef │ sample │ completed │ 2026-01-10T17:56:39.263742+00:00 │ 3      │ set1:lexA,cpxR,fur │ matrix     │
 └──────────────────────────────────────────────────┴────────┴───────────┴──────────────────────────────────┴────────┴────────────────────┴────────────┘
 ```
 
 ## Inspect run artifacts and outputs
 
 ```bash
-cruncher runs show set1_lexA-cpxR-fur_20260110_161355_df8fcb -c "$CONFIG"
+cruncher runs show 20260110_161355_df8fcb -c "$CONFIG"
 ```
 
 Example output (abridged):
 
 ```bash
-run: set1_lexA-cpxR-fur_20260110_161355_df8fcb
+run: 20260110_161355_df8fcb
 stage: sample
 status: completed
 created_at: 2026-01-10T21:13:55.663756+00:00
 motif_count: 3
 regulator_set: {'index': 1, 'tfs': ['lexA', 'cpxR', 'fur']}
 pwm_source: matrix
-run_dir: <workspace>/runs/sample/set1_lexA-cpxR-fur/set1_lexA-cpxR-fur_20260110_161355_df8fcb
+run_dir: <workspace>/runs/sample/lexA-cpxR-fur_20260110_161355_df8fcb
 artifacts:
 ┏━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓
 ┃ Stage  ┃ Type     ┃ Label                                  ┃ Path              ┃
@@ -398,13 +324,12 @@ Example output (analyze):
 
 ```bash
 Random baseline: 100%|██████████| 25/25 [00:00<00:00, 11676.79it/s]
-Analysis outputs → <workspace>/runs/sample/set1_lexA-cpxR-fur/set1_lexA-cpxR-fur_20260110_161355_df8fcb/analysis
-  summary: <workspace>/runs/sample/set1_lexA-cpxR-fur/set1_lexA-cpxR-fur_20260110_161355_df8fcb/analysis/meta/summary.json
-  diagnostics: <workspace>/runs/sample/set1_lexA-cpxR-fur/set1_lexA-cpxR-fur_20260110_161355_df8fcb/analysis/tables/diagnostics.json
+Analysis outputs → <workspace>/runs/sample/lexA-cpxR-fur_20260110_161355_df8fcb/analysis
+  summary: <workspace>/runs/sample/lexA-cpxR-fur_20260110_161355_df8fcb/analysis/meta/summary.json
   analysis_id: 20260110T211410Z_1febb3
 Next steps:
-  cruncher runs show <workspace>/config.yaml set1_lexA-cpxR-fur_20260110_161355_df8fcb
-  cruncher notebook --latest <workspace>/runs/sample/set1_lexA-cpxR-fur/set1_lexA-cpxR-fur_20260110_161355_df8fcb
+  cruncher runs show <workspace>/config.yaml 20260110_161355_df8fcb
+  cruncher notebook --latest <workspace>/runs/sample/lexA-cpxR-fur_20260110_161355_df8fcb
   cruncher report --latest <workspace>/config.yaml
 ```
 
@@ -416,7 +341,7 @@ For a compact diagnostics checklist and tuning guidance, see the
 ## Open the run notebook (optional, real-time exploration)
 
 ```bash
-cruncher notebook --latest <workspace>/runs/sample/set1_lexA-cpxR-fur/set1_lexA-cpxR-fur_20260110_161355_df8fcb
+cruncher notebook --latest <workspace>/runs/sample/lexA-cpxR-fur_20260110_161355_df8fcb
 ```
 
 ## Optional: campaign-level summary

@@ -63,7 +63,18 @@ class MoveConfig(StrictBaseModel):
     multi_k_range: Tuple[int, int] = (2, 6)
     slide_max_shift: int = 2
     swap_len_range: Tuple[int, int] = (6, 12)
-    move_probs: Dict[Literal["S", "B", "M"], float] = {"S": 0.80, "B": 0.10, "M": 0.10}
+    move_probs: Dict[Literal["S", "B", "M", "L", "W", "I"], float] = {
+        "S": 0.80,
+        "B": 0.10,
+        "M": 0.10,
+        "L": 0.00,
+        "W": 0.00,
+        "I": 0.00,
+    }
+    move_schedule: Optional["MoveScheduleConfig"] = None
+    target_worst_tf_prob: float = 0.0
+    target_window_pad: int = 0
+    insertion_consensus_prob: float = 0.50
 
     @field_validator("block_len_range", "multi_k_range", "swap_len_range", mode="before")
     @classmethod
@@ -72,24 +83,69 @@ class MoveConfig(StrictBaseModel):
             return tuple(int(x) for x in v)
         return v
 
-    @field_validator("move_probs")
-    @classmethod
-    def _check_move_probs_keys_and_values(cls, v):
-        expected_keys = {"S", "B", "M"}
+    @staticmethod
+    def _normalize_move_probs(v: Dict[str, float], *, label: str) -> Dict[str, float]:
+        expected_keys = {"S", "B", "M", "L", "W", "I"}
         got_keys = set(v.keys())
-        if got_keys != expected_keys:
-            raise ValueError(f"move_probs keys must be exactly {expected_keys}, but got {got_keys}")
+        if not got_keys.issubset(expected_keys):
+            extra = sorted(got_keys - expected_keys)
+            raise ValueError(f"{label} keys must be a subset of {sorted(expected_keys)}, but got extra {extra}")
         total = 0.0
         out = {}
-        for k in ("S", "B", "M"):
-            fv = float(v[k])
+        for k in ("S", "B", "M", "L", "W", "I"):
+            fv = float(v.get(k, 0.0))
             if fv < 0:
-                raise ValueError(f"move_probs['{k}'] must be ≥ 0, but got {fv}")
+                raise ValueError(f"{label}['{k}'] must be ≥ 0, but got {fv}")
             out[k] = fv
             total += fv
         if abs(total - 1.0) > 1e-6:
-            raise ValueError(f"move_probs values must sum to 1.0; got sum={total:.6f}")
+            raise ValueError(f"{label} values must sum to 1.0; got sum={total:.6f}")
         return out
+
+    @field_validator("move_probs")
+    @classmethod
+    def _check_move_probs_keys_and_values(cls, v):
+        return cls._normalize_move_probs(v, label="move_probs")
+
+    @field_validator("target_worst_tf_prob")
+    @classmethod
+    def _check_target_worst_tf_prob(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0 or v > 1:
+            raise ValueError("target_worst_tf_prob must be between 0 and 1")
+        return float(v)
+
+    @field_validator("target_window_pad")
+    @classmethod
+    def _check_target_window_pad(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 0:
+            raise ValueError("target_window_pad must be a non-negative integer")
+        return v
+
+    @field_validator("insertion_consensus_prob")
+    @classmethod
+    def _check_insertion_consensus_prob(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0 or v > 1:
+            raise ValueError("insertion_consensus_prob must be between 0 and 1")
+        return float(v)
+
+
+class MoveScheduleConfig(StrictBaseModel):
+    enabled: bool = False
+    kind: Literal["linear"] = "linear"
+    end: Optional[Dict[Literal["S", "B", "M", "L", "W", "I"], float]] = None
+
+    @field_validator("end")
+    @classmethod
+    def _check_end_probs(cls, v):
+        if v is None:
+            return v
+        return MoveConfig._normalize_move_probs(v, label="move_schedule.end")
+
+    @model_validator(mode="after")
+    def _validate_schedule(self) -> "MoveScheduleConfig":
+        if self.enabled and self.end is None:
+            raise ValueError("move_schedule.enabled=true requires move_schedule.end")
+        return self
 
 
 class CoolingFixed(StrictBaseModel):
@@ -132,33 +188,325 @@ class CoolingGeometric(StrictBaseModel):
         return v
 
 
-CoolingConfig = Union[CoolingFixed, CoolingLinear, CoolingGeometric]
+class CoolingStage(StrictBaseModel):
+    sweeps: int
+    beta: float
+
+    @field_validator("sweeps")
+    @classmethod
+    def _check_sweeps(cls, v: int) -> int:
+        if not isinstance(v, int) or v <= 0:
+            raise ValueError("cooling.stages.sweeps must be a positive integer")
+        return v
+
+    @field_validator("beta")
+    @classmethod
+    def _check_beta(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError("cooling.stages.beta must be > 0")
+        return float(v)
 
 
-class OptimiserConfig(StrictBaseModel):
-    kind: Literal["gibbs", "pt"]
-    scorer_scale: Literal["llr", "z", "logp", "consensus-neglop-sum"]
-    cooling: CoolingConfig
-    swap_prob: float = 0.10
+class CoolingPiecewise(StrictBaseModel):
+    kind: Literal["piecewise"] = "piecewise"
+    stages: List[CoolingStage]
+
+    @field_validator("stages")
+    @classmethod
+    def _check_stages(cls, v: List[CoolingStage]) -> List[CoolingStage]:
+        if not isinstance(v, list) or len(v) < 2:
+            raise ValueError("Piecewise cooling.stages must contain at least two stages")
+        sweeps = [stage.sweeps for stage in v]
+        if sweeps != sorted(sweeps):
+            raise ValueError("Piecewise cooling.stages must be sorted by increasing sweeps")
+        return v
+
+
+CoolingConfig = Union[CoolingFixed, CoolingLinear, CoolingGeometric, CoolingPiecewise]
+
+
+class SoftminConfig(StrictBaseModel):
+    enabled: bool = True
+    kind: Literal["fixed", "linear", "piecewise"] = "linear"
+    beta: Optional[Union[float, Tuple[float, float]]] = None
+    stages: Optional[List[CoolingStage]] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _set_defaults(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        kind = data.get("kind", "linear")
+        if "beta" not in data and "stages" not in data:
+            if kind == "fixed":
+                data["beta"] = 1.0
+            elif kind == "linear":
+                data["beta"] = (0.5, 10.0)
+        return data
 
     @model_validator(mode="after")
-    def _validate_cooling_kind(self) -> "OptimiserConfig":
-        cooling_kind = self.cooling.kind
-        if self.kind == "pt" and cooling_kind not in {"geometric", "fixed"}:
-            raise ValueError("optimiser.kind='pt' requires cooling.kind='geometric' or 'fixed'")
-        if self.kind == "gibbs" and cooling_kind == "geometric":
-            raise ValueError("optimiser.kind='gibbs' does not support cooling.kind='geometric'")
+    def _validate_softmin(self) -> "SoftminConfig":
+        if self.kind == "fixed":
+            if self.stages is not None:
+                raise ValueError("softmin.stages is not allowed for kind='fixed'")
+            if not isinstance(self.beta, (int, float)):
+                raise ValueError("softmin.beta must be a positive float for kind='fixed'")
+            if float(self.beta) <= 0:
+                raise ValueError("softmin.beta must be > 0")
+            self.beta = float(self.beta)
+            return self
+        if self.kind == "linear":
+            if self.stages is not None:
+                raise ValueError("softmin.stages is not allowed for kind='linear'")
+            if not isinstance(self.beta, (list, tuple)) or len(self.beta) != 2:
+                raise ValueError("softmin.beta must be length-2 [beta_start, beta_end] for kind='linear'")
+            b0, b1 = float(self.beta[0]), float(self.beta[1])
+            if b0 <= 0 or b1 <= 0:
+                raise ValueError("softmin beta values must be > 0")
+            self.beta = (b0, b1)
+            return self
+        if self.kind == "piecewise":
+            if self.beta is not None:
+                raise ValueError("softmin.beta is not allowed for kind='piecewise'")
+            if not self.stages:
+                raise ValueError("softmin.stages must be provided for kind='piecewise'")
+            return self
+        raise ValueError(f"Unknown softmin.kind '{self.kind}'")
+
+
+class AdaptiveBetaConfig(StrictBaseModel):
+    enabled: bool = False
+    target_acceptance: float = 0.40
+    window: int = 100
+    k: float = 0.50
+    min_beta: float = 1.0e-3
+    max_beta: float = 10.0
+    moves: List[Literal["S", "B", "M", "L", "W", "I"]] = Field(default_factory=lambda: ["B", "M"])
+    stop_after_tune: bool = True
+
+    @field_validator("target_acceptance")
+    @classmethod
+    def _check_target_acceptance(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0 or v >= 1:
+            raise ValueError("adaptive_beta.target_acceptance must be between 0 and 1")
+        return float(v)
+
+    @field_validator("window")
+    @classmethod
+    def _check_window(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("adaptive_beta.window must be >= 1")
+        return v
+
+    @field_validator("k")
+    @classmethod
+    def _check_k(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError("adaptive_beta.k must be > 0")
+        return float(v)
+
+    @model_validator(mode="after")
+    def _check_beta_bounds(self) -> "AdaptiveBetaConfig":
+        if self.min_beta <= 0 or self.max_beta <= 0:
+            raise ValueError("adaptive_beta min/max beta must be > 0")
+        if self.min_beta > self.max_beta:
+            raise ValueError("adaptive_beta.min_beta must be <= adaptive_beta.max_beta")
         return self
 
 
-class AutoOptimizeConfig(StrictBaseModel):
-    enabled: bool = True
-    pilot_draws: int = 200
-    pilot_tune: int = 100
-    pilot_chains_gibbs: int = 2
-    pilot_chains_pt: int = 4
-    pilot_progress_bar: bool = False
-    pilot_progress_every: int = 0
+class AdaptiveSwapConfig(StrictBaseModel):
+    enabled: bool = False
+    target_swap: float = 0.25
+    window: int = 50
+    k: float = 0.50
+    min_scale: float = 0.25
+    max_scale: float = 4.0
+    stop_after_tune: bool = True
+
+    @field_validator("target_swap")
+    @classmethod
+    def _check_target_swap(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0 or v >= 1:
+            raise ValueError("adaptive_swap.target_swap must be between 0 and 1")
+        return float(v)
+
+    @field_validator("window")
+    @classmethod
+    def _check_swap_window(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("adaptive_swap.window must be >= 1")
+        return v
+
+    @field_validator("k")
+    @classmethod
+    def _check_swap_k(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError("adaptive_swap.k must be > 0")
+        return float(v)
+
+    @model_validator(mode="after")
+    def _check_swap_bounds(self) -> "AdaptiveSwapConfig":
+        if self.min_scale <= 0 or self.max_scale <= 0:
+            raise ValueError("adaptive_swap min/max scale must be > 0")
+        if self.min_scale > self.max_scale:
+            raise ValueError("adaptive_swap.min_scale must be <= adaptive_swap.max_scale")
+        return self
+
+
+class BetaLadderFixed(StrictBaseModel):
+    kind: Literal["fixed"] = "fixed"
+    beta: float = 1.0
+
+    @field_validator("beta")
+    @classmethod
+    def _check_beta(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError("beta_ladder.beta must be > 0")
+        return float(v)
+
+
+class BetaLadderGeometric(StrictBaseModel):
+    kind: Literal["geometric"] = "geometric"
+    betas: Optional[List[float]] = None
+    beta_min: Optional[float] = None
+    beta_max: Optional[float] = None
+    n_temps: Optional[int] = None
+
+    @field_validator("betas")
+    @classmethod
+    def _check_betas(cls, v: Optional[List[float]]) -> Optional[List[float]]:
+        if v is None:
+            return v
+        if len(v) < 2:
+            raise ValueError("beta_ladder.betas must contain at least 2 values")
+        if any(beta <= 0 for beta in v):
+            raise ValueError("beta_ladder.betas values must be > 0")
+        return v
+
+    @field_validator("beta_min", "beta_max")
+    @classmethod
+    def _check_beta_bounds(cls, v: Optional[float], info) -> Optional[float]:
+        if v is None:
+            return v
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError(f"beta_ladder.{info.field_name} must be > 0")
+        return float(v)
+
+    @field_validator("n_temps")
+    @classmethod
+    def _check_n_temps(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return v
+        if not isinstance(v, int) or v < 2:
+            raise ValueError("beta_ladder.n_temps must be >= 2")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_inputs(self) -> "BetaLadderGeometric":
+        if self.betas is not None:
+            if self.beta_min is not None or self.beta_max is not None or self.n_temps is not None:
+                raise ValueError("beta_ladder: provide either betas or (beta_min,beta_max,n_temps), not both.")
+            return self
+        if self.beta_min is None or self.beta_max is None or self.n_temps is None:
+            raise ValueError("beta_ladder requires betas or beta_min/beta_max/n_temps")
+        if self.beta_min > self.beta_max:
+            raise ValueError("beta_ladder.beta_min must be <= beta_ladder.beta_max")
+        return self
+
+
+BetaLadderConfig = Union[BetaLadderFixed, BetaLadderGeometric]
+
+
+class GibbsOptimizerConfig(StrictBaseModel):
+    beta_schedule: CoolingConfig = Field(default_factory=lambda: CoolingLinear(beta=[0.05, 0.5]))
+    apply_during: Literal["tune", "all"] = "tune"
+    schedule_scope: Literal["per_chain", "global"] = "per_chain"
+    adaptive_beta: AdaptiveBetaConfig = AdaptiveBetaConfig()
+
+    @model_validator(mode="after")
+    def _validate_beta_schedule(self) -> "GibbsOptimizerConfig":
+        if self.beta_schedule.kind == "geometric":
+            raise ValueError("optimizers.gibbs.beta_schedule does not support kind='geometric'")
+        if self.schedule_scope == "global" and self.apply_during == "tune":
+            raise ValueError(
+                "optimizers.gibbs.schedule_scope='global' requires apply_during='all' "
+                "(global schedules span tune+draws across all chains)."
+            )
+        return self
+
+
+class PTOptimizerConfig(StrictBaseModel):
+    beta_ladder: BetaLadderConfig = Field(default_factory=lambda: BetaLadderGeometric(betas=[0.05, 0.1, 0.2, 0.4]))
+    swap_prob: float = 0.10
+    ladder_adapt: AdaptiveSwapConfig = AdaptiveSwapConfig()
+
+    @field_validator("swap_prob")
+    @classmethod
+    def _check_swap_prob(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0 or v > 1:
+            raise ValueError("optimizers.pt.swap_prob must be between 0 and 1")
+        return float(v)
+
+
+class OptimizersConfig(StrictBaseModel):
+    gibbs: GibbsOptimizerConfig = GibbsOptimizerConfig()
+    pt: PTOptimizerConfig = PTOptimizerConfig()
+
+
+class OptimizerSelectionConfig(StrictBaseModel):
+    name: Literal["auto", "gibbs", "pt"] = "auto"
+
+
+class AutoOptToleranceConfig(StrictBaseModel):
+    score: float = 0.01
+
+    @field_validator("score")
+    @classmethod
+    def _check_score(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0:
+            raise ValueError("auto_opt.tolerance.score must be >= 0")
+        return float(v)
+
+
+class AutoOptScorecardConfig(StrictBaseModel):
+    top_k: int = 10
+    min_balance: float = 0.25
+    min_diversity: float = 0.10
+    acceptance_target: float = 0.40
+    acceptance_tolerance: float = 0.25
+    swap_target: float = 0.25
+    swap_tolerance: float = 0.20
+
+    @field_validator("top_k")
+    @classmethod
+    def _check_top_k(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("auto_opt.scorecard.top_k must be >= 1")
+        return v
+
+    @field_validator("min_balance", "min_diversity")
+    @classmethod
+    def _check_non_negative(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0:
+            raise ValueError("auto_opt.scorecard balance/diversity thresholds must be >= 0")
+        return float(v)
+
+    @field_validator("acceptance_target", "swap_target")
+    @classmethod
+    def _check_targets(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0 or v >= 1:
+            raise ValueError("auto_opt.scorecard target rates must be between 0 and 1")
+        return float(v)
+
+    @field_validator("acceptance_tolerance", "swap_tolerance")
+    @classmethod
+    def _check_tolerances(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0 or v >= 1:
+            raise ValueError("auto_opt.scorecard tolerances must be between 0 and 1")
+        return float(v)
+
+
+class AutoOptPolicyConfig(StrictBaseModel):
     retry_on_warn: bool = True
     retry_draws_factor: float = 2.0
     retry_tune_factor: float = 2.0
@@ -167,61 +515,27 @@ class AutoOptimizeConfig(StrictBaseModel):
     min_ess: float = 20.0
     min_unique_fraction: float = 0.10
     max_unique_fraction: float | None = None
-    gibbs_cooling: CoolingConfig = Field(
-        default_factory=lambda: CoolingLinear(beta=[0.01, 0.1]),
-        description="Cooling schedule for Gibbs pilots when the base config is PT.",
-    )
-    pt_beta_min: float = 0.2
-    pt_beta_max: float = 1.0
-    pt_beta: List[float] | None = None
-
-    @field_validator("pilot_draws")
-    @classmethod
-    def _check_pilot_draws(cls, v: int) -> int:
-        if not isinstance(v, int) or v < 4:
-            raise ValueError("auto_opt.pilot_draws must be >= 4 to compute diagnostics")
-        return v
-
-    @field_validator("pilot_tune", "pilot_progress_every")
-    @classmethod
-    def _check_pilot_non_negative(cls, v: int) -> int:
-        if not isinstance(v, int) or v < 0:
-            raise ValueError("auto_opt pilot settings must be non-negative integers")
-        return v
-
-    @field_validator("pilot_chains_gibbs", "pilot_chains_pt")
-    @classmethod
-    def _check_pilot_chains(cls, v: int) -> int:
-        if not isinstance(v, int) or v < 2:
-            raise ValueError("auto_opt pilot chains must be >= 2 for R-hat/ESS")
-        return v
-
-    @field_validator("pt_beta_min", "pt_beta_max")
-    @classmethod
-    def _check_beta_bounds(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v <= 0:
-            raise ValueError("auto_opt PT beta bounds must be positive")
-        return float(v)
+    scorecard: AutoOptScorecardConfig = Field(default_factory=AutoOptScorecardConfig)
 
     @field_validator("retry_draws_factor", "retry_tune_factor", "cooling_boost")
     @classmethod
     def _check_retry_factors(cls, v: float) -> float:
         if not isinstance(v, (int, float)) or v < 1:
-            raise ValueError("auto_opt retry factors must be >= 1")
+            raise ValueError("auto_opt.policy retry factors must be >= 1")
         return float(v)
 
     @field_validator("max_rhat")
     @classmethod
     def _check_max_rhat(cls, v: float) -> float:
         if not isinstance(v, (int, float)) or v <= 1.0:
-            raise ValueError("auto_opt.max_rhat must be > 1.0")
+            raise ValueError("auto_opt.policy.max_rhat must be > 1.0")
         return float(v)
 
     @field_validator("min_ess", "min_unique_fraction")
     @classmethod
     def _check_positive_thresholds(cls, v: float) -> float:
         if not isinstance(v, (int, float)) or v < 0:
-            raise ValueError("auto_opt thresholds must be non-negative")
+            raise ValueError("auto_opt.policy thresholds must be non-negative")
         return float(v)
 
     @field_validator("max_unique_fraction")
@@ -230,27 +544,64 @@ class AutoOptimizeConfig(StrictBaseModel):
         if v is None:
             return v
         if not isinstance(v, (int, float)) or v < 0:
-            raise ValueError("auto_opt.max_unique_fraction must be >= 0")
+            raise ValueError("auto_opt.policy.max_unique_fraction must be >= 0")
         return float(v)
 
-    @field_validator("pt_beta")
+
+class AutoOptLengthConfig(StrictBaseModel):
+    enabled: bool = False
+    min_length: Optional[int] = None
+    max_length: Optional[int] = None
+    step: int = 2
+    max_candidates: int = 4
+    prefer_shortest: bool = True
+
+    @field_validator("min_length", "max_length")
     @classmethod
-    def _check_pt_beta(cls, v: List[float] | None) -> List[float] | None:
+    def _check_length(cls, v: Optional[int]) -> Optional[int]:
         if v is None:
             return v
-        if len(v) < 2:
-            raise ValueError("auto_opt.pt_beta must contain at least 2 values")
-        if any(beta <= 0 for beta in v):
-            raise ValueError("auto_opt.pt_beta values must be > 0")
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("auto_opt.length min/max must be positive integers or null")
         return v
 
-    @model_validator(mode="after")
-    def _check_beta_range(self) -> "AutoOptimizeConfig":
-        if self.pt_beta_min > self.pt_beta_max:
-            raise ValueError("auto_opt.pt_beta_min must be <= pt_beta_max")
-        if self.pt_beta is not None and len(self.pt_beta) != self.pilot_chains_pt:
-            raise ValueError("auto_opt.pt_beta length must match auto_opt.pilot_chains_pt")
-        return self
+    @field_validator("step", "max_candidates")
+    @classmethod
+    def _check_positive(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("auto_opt.length step/max_candidates must be >= 1")
+        return v
+
+
+class AutoOptConfig(StrictBaseModel):
+    enabled: bool = True
+    budget_levels: List[int] = Field(default_factory=lambda: [200, 800])
+    eta: int = 3
+    replicates: int = 1
+    keep_pilots: Literal["all", "ok", "best"] = "ok"
+    prefer_simpler_if_close: bool = True
+    tolerance: AutoOptToleranceConfig = AutoOptToleranceConfig()
+    length: AutoOptLengthConfig = Field(default_factory=AutoOptLengthConfig)
+    policy: AutoOptPolicyConfig = AutoOptPolicyConfig()
+
+    @field_validator("budget_levels")
+    @classmethod
+    def _check_budget_levels(cls, v: List[int]) -> List[int]:
+        if not isinstance(v, list) or not v:
+            raise ValueError("auto_opt.budget_levels must be a non-empty list of integers")
+        cleaned: list[int] = []
+        for item in v:
+            if not isinstance(item, int) or item < 4:
+                raise ValueError("auto_opt.budget_levels entries must be >= 4")
+            cleaned.append(item)
+        return cleaned
+
+    @field_validator("eta", "replicates")
+    @classmethod
+    def _check_positive_ints(cls, v: int, info) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError(f"auto_opt.{info.field_name} must be >= 1")
+        return v
 
 
 class InitConfig(StrictBaseModel):
@@ -273,85 +624,250 @@ class InitConfig(StrictBaseModel):
         return self
 
 
-class SampleConfig(StrictBaseModel):
-    bidirectional: bool = True
-    seed: int = Field(42, description="Random seed for reproducible sampling.")
-    record_tune: bool = Field(
-        False,
-        description="Whether to store burn-in states in sequences.parquet and optimizer buffers.",
-    )
-    progress_bar: bool = Field(
-        True,
-        description="Show progress bars during optimization.",
-    )
-    progress_every: int = Field(
-        1000,
-        description="Log a progress summary every N iterations per chain (0 disables logging).",
-    )
-    live_metrics: bool = Field(
-        True,
-        description="Write live/metrics.jsonl with progress snapshots during sampling.",
-    )
-    save_trace: bool = Field(
-        True,
-        description="Write trace.nc for analyze/report. Disable to skip NetCDF output.",
-    )
+class ScoringConfig(StrictBaseModel):
+    pwm_pseudocounts: float = 0.10
+    log_odds_clip: Optional[float] = None
 
-    init: InitConfig
-    draws: int
-    tune: int
-    chains: int
-    min_dist: int
-    top_k: int
-
-    moves: MoveConfig = MoveConfig()
-    optimiser: OptimiserConfig
-    auto_opt: AutoOptimizeConfig | None = AutoOptimizeConfig()
-    save_sequences: bool = True
-    include_consensus_in_elites: bool = Field(
-        False,
-        description="Include PWM consensus strings in elite metadata (adds per-TF consensus to elites JSON).",
-    )
-
-    pwm_sum_threshold: float = Field(
-        0.0,
-        description="If >0, only sequences with sum(per-TF scaled_score) ≥ this are written to elites.json",
-    )
-
-    @model_validator(mode="after")
-    def _validate_optimizer_params(self) -> "SampleConfig":
-        if self.optimiser.kind == "pt":
-            cooling_kind = self.optimiser.cooling.kind
-            if cooling_kind == "fixed" and self.chains != 1:
-                raise ValueError("PT with fixed cooling requires chains=1 (use geometric for multi-chain ladders)")
-            if cooling_kind == "geometric":
-                beta = self.optimiser.cooling.beta
-                if len(beta) != self.chains:
-                    raise ValueError("PT cooling.beta length must match sample.chains")
-                if self.chains < 2:
-                    raise ValueError("PT with geometric cooling requires chains >= 2")
-        return self
-
-    @field_validator("draws", "tune", "chains", "min_dist", "top_k")
+    @field_validator("pwm_pseudocounts")
     @classmethod
-    def _check_positive_ints(cls, v: int) -> int:
+    def _check_pwm_pseudocounts(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0:
+            raise ValueError("scoring.pwm_pseudocounts must be >= 0")
+        return float(v)
+
+    @field_validator("log_odds_clip")
+    @classmethod
+    def _check_log_odds_clip(cls, v: Optional[float]) -> Optional[float]:
+        if v is None:
+            return v
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError("scoring.log_odds_clip must be a positive number or null")
+        return float(v)
+
+
+class TrimConfig(StrictBaseModel):
+    enabled: bool = True
+    padding: int = 1
+    require_non_decreasing: bool = True
+
+    @field_validator("padding")
+    @classmethod
+    def _check_padding(cls, v: int) -> int:
         if not isinstance(v, int) or v < 0:
-            raise ValueError("must be a non-negative integer")
+            raise ValueError("trim.padding must be a non-negative integer")
         return v
+
+
+class PolishConfig(StrictBaseModel):
+    enabled: bool = True
+    max_rounds: int = 2
+    improvement_tol: float = 0.0
+
+    @field_validator("max_rounds")
+    @classmethod
+    def _check_rounds(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("polish.max_rounds must be >= 1")
+        return v
+
+    @field_validator("improvement_tol")
+    @classmethod
+    def _check_tol(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0:
+            raise ValueError("polish.improvement_tol must be >= 0")
+        return float(v)
+
+
+class SampleRngConfig(StrictBaseModel):
+    seed: int = Field(42, description="Random seed for reproducible sampling.")
+    deterministic: bool = Field(
+        True,
+        description="If true, auto-opt pilots derive deterministic seeds from config + locks.",
+    )
 
     @field_validator("seed")
     @classmethod
     def _check_seed(cls, v: int) -> int:
         if not isinstance(v, int) or v < 0:
-            raise ValueError("seed must be a non-negative integer")
+            raise ValueError("sample.rng.seed must be a non-negative integer")
         return v
+
+
+class SampleBudgetConfig(StrictBaseModel):
+    tune: int
+    draws: int
+    restarts: int = 1
+
+    @field_validator("tune", "draws")
+    @classmethod
+    def _check_non_negative(cls, v: int, info) -> int:
+        if not isinstance(v, int) or v < 0:
+            raise ValueError(f"sample.budget.{info.field_name} must be a non-negative integer")
+        return v
+
+    @field_validator("restarts")
+    @classmethod
+    def _check_restarts(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("sample.budget.restarts must be >= 1")
+        return v
+
+
+class SampleObjectiveConfig(StrictBaseModel):
+    bidirectional: bool = True
+    score_scale: Literal["llr", "z", "logp", "consensus-neglop-sum", "normalized-llr"] = "llr"
+    scoring: ScoringConfig = ScoringConfig()
+    softmin: SoftminConfig = SoftminConfig()
+
+
+class EliteFiltersConfig(StrictBaseModel):
+    pwm_sum_min: float = 0.0
+
+    @field_validator("pwm_sum_min")
+    @classmethod
+    def _check_pwm_sum_min(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0:
+            raise ValueError("sample.elites.filters.pwm_sum_min must be >= 0")
+        return float(v)
+
+
+class SampleElitesConfig(StrictBaseModel):
+    k: int = 10
+    min_hamming: int = 1
+    filters: EliteFiltersConfig = EliteFiltersConfig()
+
+    @field_validator("k", "min_hamming")
+    @classmethod
+    def _check_elite_ints(cls, v: int, info) -> int:
+        if not isinstance(v, int) or v < 0:
+            raise ValueError(f"sample.elites.{info.field_name} must be a non-negative integer")
+        return v
+
+
+class MoveOverridesConfig(StrictBaseModel):
+    block_len_range: Optional[Tuple[int, int]] = None
+    multi_k_range: Optional[Tuple[int, int]] = None
+    slide_max_shift: Optional[int] = None
+    swap_len_range: Optional[Tuple[int, int]] = None
+    move_probs: Optional[Dict[Literal["S", "B", "M", "L", "W", "I"], float]] = None
+    move_schedule: Optional[MoveScheduleConfig] = None
+    target_worst_tf_prob: Optional[float] = None
+    target_window_pad: Optional[int] = None
+    insertion_consensus_prob: Optional[float] = None
+
+    @field_validator("block_len_range", "multi_k_range", "swap_len_range", mode="before")
+    @classmethod
+    def _list_to_tuple(cls, v):
+        if v is None:
+            return v
+        if isinstance(v, (list, tuple)):
+            return tuple(int(x) for x in v)
+        return v
+
+    @field_validator("move_probs")
+    @classmethod
+    def _check_move_probs(cls, v):
+        if v is None:
+            return v
+        return MoveConfig._normalize_move_probs(v, label="moves.overrides.move_probs")
+
+    @field_validator("slide_max_shift")
+    @classmethod
+    def _check_slide_max_shift(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return v
+        if not isinstance(v, int) or v < 0:
+            raise ValueError("moves.overrides.slide_max_shift must be a non-negative integer")
+        return v
+
+    @field_validator("target_worst_tf_prob")
+    @classmethod
+    def _check_target_worst_tf_prob(cls, v: Optional[float]) -> Optional[float]:
+        if v is None:
+            return v
+        if not isinstance(v, (int, float)) or v < 0 or v > 1:
+            raise ValueError("moves.overrides.target_worst_tf_prob must be between 0 and 1")
+        return float(v)
+
+    @field_validator("target_window_pad")
+    @classmethod
+    def _check_target_window_pad(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return v
+        if not isinstance(v, int) or v < 0:
+            raise ValueError("moves.overrides.target_window_pad must be a non-negative integer")
+        return v
+
+    @field_validator("insertion_consensus_prob")
+    @classmethod
+    def _check_insertion_consensus_prob(cls, v: Optional[float]) -> Optional[float]:
+        if v is None:
+            return v
+        if not isinstance(v, (int, float)) or v < 0 or v > 1:
+            raise ValueError("moves.overrides.insertion_consensus_prob must be between 0 and 1")
+        return float(v)
+
+
+class SampleMovesConfig(StrictBaseModel):
+    profile: Literal["balanced", "local", "global", "aggressive"] = "balanced"
+    overrides: MoveOverridesConfig = MoveOverridesConfig()
+
+
+class SampleOutputTraceConfig(StrictBaseModel):
+    save: bool = Field(True, description="Write trace.nc for analyze/report.")
+    include_tune: bool = Field(
+        False,
+        description="Include tune phase samples in sequences/trace outputs.",
+    )
+
+
+class SampleOutputConfig(StrictBaseModel):
+    save_sequences: bool = True
+    include_consensus_in_elites: bool = False
+    live_metrics: bool = True
+    trace: SampleOutputTraceConfig = SampleOutputTraceConfig()
+    trim: TrimConfig = TrimConfig()
+    polish: PolishConfig = PolishConfig()
+
+
+class SampleUiConfig(StrictBaseModel):
+    progress_bar: bool = False
+    progress_every: int = 0
 
     @field_validator("progress_every")
     @classmethod
     def _check_progress_every(cls, v: int) -> int:
         if not isinstance(v, int) or v < 0:
-            raise ValueError("progress_every must be a non-negative integer")
+            raise ValueError("sample.ui.progress_every must be a non-negative integer")
         return v
+
+
+class SampleConfig(StrictBaseModel):
+    mode: Literal["optimize", "sample"] = "optimize"
+    rng: SampleRngConfig = SampleRngConfig()
+    budget: SampleBudgetConfig
+    init: InitConfig
+    objective: SampleObjectiveConfig = SampleObjectiveConfig()
+    elites: SampleElitesConfig = SampleElitesConfig()
+    moves: SampleMovesConfig = SampleMovesConfig()
+    optimizer: OptimizerSelectionConfig = OptimizerSelectionConfig()
+    optimizers: OptimizersConfig = OptimizersConfig()
+    auto_opt: AutoOptConfig | None = AutoOptConfig()
+    output: SampleOutputConfig = SampleOutputConfig()
+    ui: SampleUiConfig = SampleUiConfig()
+
+    @model_validator(mode="after")
+    def _validate_optimizer_settings(self) -> "SampleConfig":
+        if self.optimizer.name == "auto":
+            if self.auto_opt is None or not self.auto_opt.enabled:
+                raise ValueError("sample.optimizer.name='auto' requires auto_opt.enabled=true")
+        else:
+            if self.auto_opt is not None and self.auto_opt.enabled:
+                raise ValueError("auto_opt.enabled must be false when optimizer.name is not 'auto'")
+
+        if self.optimizer.name == "pt" and self.budget.restarts != 1:
+            raise ValueError("PT does not support budget.restarts > 1; set sample.budget.restarts=1.")
+        return self
 
 
 class AnalysisPlotConfig(StrictBaseModel):
@@ -371,7 +887,7 @@ class AnalysisPlotConfig(StrictBaseModel):
 class AnalysisConfig(StrictBaseModel):
     runs: Optional[List[str]]
     plots: AnalysisPlotConfig = AnalysisPlotConfig()
-    scatter_scale: Literal["llr", "z", "logp", "consensus-neglop-sum"]
+    scatter_scale: Literal["llr", "z", "logp", "consensus-neglop-sum", "normalized-llr"]
     subsampling_epsilon: float
     scatter_style: Literal["edges", "thresholds"] = "edges"
     scatter_background: bool = True

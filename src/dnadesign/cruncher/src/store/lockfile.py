@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
-from dnadesign.cruncher.utils.hashing import sha256_lines, sha256_path
+from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_lines, sha256_path
 
 
 @dataclass(frozen=True)
@@ -56,6 +56,26 @@ def read_lockfile(path: Path) -> Lockfile:
 
 def load_lockfile(path: Path) -> dict[str, LockedMotif]:
     return read_lockfile(path).resolved
+
+
+def lockfile_fingerprint(lockfile: Lockfile) -> tuple[str, dict[str, object]]:
+    resolved_payload: dict[str, dict[str, object]] = {}
+    for name in sorted(lockfile.resolved.keys()):
+        locked = lockfile.resolved[name]
+        resolved_payload[name] = {
+            "source": locked.source,
+            "motif_id": locked.motif_id,
+            "sha256": locked.sha256,
+            "dataset_id": locked.dataset_id,
+        }
+    payload = {
+        "pwm_source": lockfile.pwm_source,
+        "site_kinds": sorted(lockfile.site_kinds) if lockfile.site_kinds else None,
+        "combine_sites": lockfile.combine_sites,
+        "resolved": resolved_payload,
+    }
+    signature = sha256_bytes(json.dumps(payload, sort_keys=True).encode("utf-8"))
+    return signature, payload
 
 
 def validate_lockfile(

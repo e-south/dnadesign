@@ -28,6 +28,32 @@ from dnadesign.cruncher.workflows.analyze.plots.summary import write_elite_topk
 from dnadesign.cruncher.workflows.analyze_workflow import _get_git_commit
 
 
+def _sample_block() -> dict:
+    return {
+        "mode": "sample",
+        "rng": {"seed": 7, "deterministic": True},
+        "budget": {"draws": 2, "tune": 1, "restarts": 1},
+        "init": {"kind": "random", "length": 12, "pad_with": "background"},
+        "objective": {"bidirectional": True, "score_scale": "llr"},
+        "elites": {"k": 1, "min_hamming": 0, "filters": {"pwm_sum_min": 0.0}},
+        "moves": {
+            "profile": "balanced",
+            "overrides": {
+                "block_len_range": [2, 2],
+                "multi_k_range": [2, 2],
+                "slide_max_shift": 1,
+                "swap_len_range": [2, 2],
+                "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
+            },
+        },
+        "optimizer": {"name": "gibbs"},
+        "optimizers": {"gibbs": {"beta_schedule": {"kind": "fixed", "beta": 1.0}, "apply_during": "tune"}},
+        "auto_opt": {"enabled": False},
+        "output": {"trace": {"save": False}, "save_sequences": True},
+        "ui": {"progress_bar": False, "progress_every": 0},
+    }
+
+
 def test_gather_per_pwm_scores_rejects_invalid_sequence(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()
@@ -179,35 +205,7 @@ def test_scatter_thresholds_requires_llr(tmp_path: Path) -> None:
                 "pwm_source": "matrix",
             },
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
-            "sample": {
-                "bidirectional": True,
-                "seed": 7,
-                "record_tune": False,
-                "progress_bar": False,
-                "progress_every": 0,
-                "save_trace": False,
-                "init": {"kind": "random", "length": 12, "pad_with": "background"},
-                "draws": 2,
-                "tune": 1,
-                "chains": 1,
-                "min_dist": 0,
-                "top_k": 1,
-                "moves": {
-                    "block_len_range": [2, 2],
-                    "multi_k_range": [2, 2],
-                    "slide_max_shift": 1,
-                    "swap_len_range": [2, 2],
-                    "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
-                },
-                "optimiser": {
-                    "kind": "gibbs",
-                    "scorer_scale": "llr",
-                    "cooling": {"kind": "fixed", "beta": 1.0},
-                    "swap_prob": 0.1,
-                },
-                "save_sequences": True,
-                "pwm_sum_threshold": 0.0,
-            },
+            "sample": _sample_block(),
             "analysis": {
                 "runs": ["sample_thresholds"],
                 "tf_pair": ["lexA", "cpxR"],
@@ -247,35 +245,7 @@ def test_plot_scatter_requires_score_columns(tmp_path: Path) -> None:
                 "pwm_source": "matrix",
             },
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
-            "sample": {
-                "bidirectional": True,
-                "seed": 7,
-                "record_tune": False,
-                "progress_bar": False,
-                "progress_every": 0,
-                "save_trace": False,
-                "init": {"kind": "random", "length": 12, "pad_with": "background"},
-                "draws": 2,
-                "tune": 1,
-                "chains": 1,
-                "min_dist": 0,
-                "top_k": 1,
-                "moves": {
-                    "block_len_range": [2, 2],
-                    "multi_k_range": [2, 2],
-                    "slide_max_shift": 1,
-                    "swap_len_range": [2, 2],
-                    "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
-                },
-                "optimiser": {
-                    "kind": "gibbs",
-                    "scorer_scale": "llr",
-                    "cooling": {"kind": "fixed", "beta": 1.0},
-                    "swap_prob": 0.1,
-                },
-                "save_sequences": True,
-                "pwm_sum_threshold": 0.0,
-            },
+            "sample": _sample_block(),
             "analysis": {
                 "runs": [],
                 "tf_pair": ["lexA", "cpxR"],

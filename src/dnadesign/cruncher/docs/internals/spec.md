@@ -1,6 +1,6 @@
 ## cruncher for developers
 
-This document defines the end-to-end requirements and architecture for **cruncher**. It is intended as a build and review guide for engineers working on ingestion, optimization, and UX. It is not required for end users.
+This document defines the end-to-end requirements and architecture for **cruncher**. It is intended as a build and review guide for engineers working on ingestion, optimization, and UX.
 
 ### Contents
 
@@ -118,13 +118,17 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze/re
 
 ### MCMC optimization spec
 
-- Deterministic RNG via `sample.seed`.
-- Burn-in storage is optional via `sample.record_tune` (default: false).
+- Deterministic RNG via `sample.rng.seed` (and `sample.rng.deterministic=true` for stable pilot seeding).
+- Burn-in storage is optional via `sample.output.trace.include_tune` (default: false).
 - Optimizer registry supports `gibbs` and `pt` out of the box.
 - Each optimizer reports:
   - move tallies
   - acceptance ratios for B/M moves
   - PT swap acceptance rates
+- Cooling and soft-min schedules are independent; `optimizers.gibbs.apply_during` controls whether annealing happens during tune only or all sweeps.
+- `optimizers.gibbs.schedule_scope` selects per‑chain vs global cooling schedules (global spans all chains and requires `apply_during=all`).
+- Optional adaptive controllers tune Gibbs acceptance or PT ladder scale toward target bands.
+- Move policies support slide/swap/insertion moves plus optional “worst TF” targeting and move scheduling.
 
 ---
 
@@ -145,6 +149,8 @@ Each run directory contains:
 - `analysis/meta/analysis_used.yaml` — analysis settings used
 - `analysis/meta/plot_manifest.json` — plot registry and generated outputs
 - `analysis/meta/table_manifest.json` — table registry and generated outputs
+- `analysis/tables/auto_opt_pilots.csv` — pilot scorecard (when auto-opt runs)
+- `analysis/plots/auto_opt_tradeoffs.png` — balance vs best-score tradeoffs (when auto-opt runs)
 - `analysis/_archive/<analysis_id>/` — optional archived analyses (when enabled)
 - `live/metrics.jsonl` — live sampling progress (when enabled)
 - `report/report.json` + `report/report.md` — summary (from `cruncher report`)
@@ -167,7 +173,7 @@ Most commands accept an explicit config `--config`. If omitted, **cruncher** res
 - `cruncher targets candidates <config>`
 - `cruncher parse <config>`
 - `cruncher sample <config>`
-- `cruncher analyze --run <sample_run> <config>`
+- `cruncher analyze --run <run_name|run_dir> <config>`
 - `cruncher analyze --latest <config>`
 - `cruncher report <config> <run_name>`
 - `cruncher runs list <config> [--stage sample]`

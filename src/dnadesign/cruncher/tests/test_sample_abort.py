@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <cruncher project>
-src/dnadesign/cruncher/tests/test_regulator_sets_runs.py
+src/dnadesign/cruncher/tests/test_sample_abort.py
 
 Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -12,13 +12,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.normalize import build_motif_record
 from dnadesign.cruncher.services.fetch_service import write_motif_record
+from dnadesign.cruncher.services.run_service import load_run_index
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
-from dnadesign.cruncher.utils.run_layout import config_used_path, manifest_path
+from dnadesign.cruncher.utils.run_layout import status_path
 from dnadesign.cruncher.workflows.sample_workflow import run_sample
 
 
@@ -43,10 +45,9 @@ def _motif_checksum(catalog_root: Path, motif_id: str) -> str:
     return payload["checksums"]["sha256_norm"]
 
 
-def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
+def test_sample_abort_marks_run_status(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     catalog_root = tmp_path / ".cruncher"
     _write_motif(catalog_root, tf_name="lexA", motif_id="RBM1")
-    _write_motif(catalog_root, tf_name="cpxR", motif_id="RBM2")
 
     lock_path = catalog_root / "locks" / "config.lock.json"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -57,12 +58,7 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
                 "source": "regulondb",
                 "motif_id": "RBM1",
                 "sha256": _motif_checksum(catalog_root, "RBM1"),
-            },
-            "cpxR": {
-                "source": "regulondb",
-                "motif_id": "RBM2",
-                "sha256": _motif_checksum(catalog_root, "RBM2"),
-            },
+            }
         },
     }
     lock_path.write_text(json.dumps(lock_payload))
@@ -70,40 +66,28 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
     config = {
         "cruncher": {
             "out_dir": "results",
-            "regulator_sets": [["lexA"], ["cpxR"]],
+            "regulator_sets": [["lexA"]],
             "motif_store": {
                 "catalog_root": ".cruncher",
                 "source_preference": ["regulondb"],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
-                "min_sites_for_pwm": 2,
-                "allow_low_sites": False,
+                "min_sites_for_pwm": 1,
+                "allow_low_sites": True,
             },
-            "ingest": {"regulondb": {"min_sites_for_pwm": 2}},
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
             "sample": {
-                "mode": "sample",
+                "mode": "optimize",
                 "rng": {"seed": 11, "deterministic": True},
                 "budget": {"draws": 1, "tune": 1, "restarts": 1},
                 "init": {"kind": "random", "length": 6, "pad_with": "background"},
                 "objective": {"bidirectional": True, "score_scale": "llr"},
                 "elites": {"k": 1, "min_hamming": 0, "filters": {"pwm_sum_min": 0.0}},
-                "moves": {
-                    "profile": "balanced",
-                    "overrides": {
-                        "block_len_range": [2, 2],
-                        "multi_k_range": [2, 2],
-                        "slide_max_shift": 1,
-                        "swap_len_range": [2, 2],
-                        "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0},
-                    },
-                },
+                "moves": {"profile": "balanced", "overrides": {"move_probs": {"S": 1.0, "B": 0.0, "M": 0.0}}},
                 "optimizer": {"name": "gibbs"},
-                "optimizers": {
-                    "gibbs": {"beta_schedule": {"kind": "fixed", "beta": 1.0}, "apply_during": "tune"},
-                },
+                "optimizers": {"gibbs": {"beta_schedule": {"kind": "fixed", "beta": 1.0}, "apply_during": "tune"}},
                 "auto_opt": {"enabled": False},
-                "output": {"trace": {"save": False}, "save_sequences": True},
+                "output": {"trace": {"save": False}, "save_sequences": False},
                 "ui": {"progress_bar": False, "progress_every": 0},
             },
         }
@@ -112,27 +96,27 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
     config_path.write_text(yaml.safe_dump(config))
 
     cfg = load_config(config_path)
-    run_sample(cfg, config_path)
 
-    results_dir = tmp_path / "results" / "sample"
-    runs = []
-    for child in results_dir.iterdir():
-        if not child.is_dir():
-            continue
-        if manifest_path(child).exists():
-            runs.append(child)
-            continue
-        for grand in child.iterdir():
-            if grand.is_dir() and manifest_path(grand).exists():
-                runs.append(grand)
-    runs = sorted(runs)
-    assert len(runs) == 2
-    for run_dir in runs:
-        manifest_file = manifest_path(run_dir)
-        cfg_path = config_used_path(run_dir)
-        assert manifest_file.exists()
-        assert cfg_path.exists()
-        manifest = json.loads(manifest_file.read_text())
-        assert "regulator_set" in manifest
-        config_used = yaml.safe_load(cfg_path.read_text())["cruncher"]
-        assert "active_regulator_set" in config_used
+    class AbortOptimizer:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        def optimise(self) -> None:
+            raise KeyboardInterrupt("test interrupt")
+
+    def _factory(_name: str):
+        return AbortOptimizer
+
+    monkeypatch.setattr("dnadesign.cruncher.core.optimizers.registry.get_optimizer", _factory)
+
+    with pytest.raises(KeyboardInterrupt):
+        run_sample(cfg, config_path)
+
+    run_index = load_run_index(config_path, catalog_root)
+    assert run_index
+    entry = next(iter(run_index.values()))
+    assert entry.get("status") == "aborted"
+    status_file = status_path(Path(entry["run_dir"]))
+    assert status_file.exists()
+    status_payload = json.loads(status_file.read_text())
+    assert status_payload.get("status") == "aborted"

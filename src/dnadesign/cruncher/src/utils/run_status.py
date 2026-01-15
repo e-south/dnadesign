@@ -31,6 +31,9 @@ DEFAULT_METRICS_FIELDS = (
     "total",
     "progress_pct",
     "beta",
+    "beta_softmin",
+    "beta_min",
+    "beta_max",
     "current_score",
     "score_mean",
     "score_std",
@@ -107,5 +110,7 @@ def _should_emit_metrics(fields: Dict[str, Any]) -> bool:
         "swap_rate",
         "status_message",
         "phase",
+        "beta",
+        "beta_softmin",
     }
     return bool(keys & tracked)

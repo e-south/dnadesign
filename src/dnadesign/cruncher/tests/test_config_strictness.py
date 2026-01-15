@@ -35,34 +35,43 @@ def _write_config(tmp_path: Path, config: dict) -> Path:
     return config_path
 
 
-def _sample_block(*, optimiser_kind: str, cooling: dict, chains: int = 2) -> dict:
+def _sample_block(
+    *,
+    optimizer_name: str,
+    gibbs_schedule: dict | None = None,
+    pt_ladder: dict | None = None,
+    restarts: int = 2,
+) -> dict:
     return {
-        "bidirectional": True,
-        "seed": 7,
-        "record_tune": False,
-        "progress_bar": False,
-        "progress_every": 0,
-        "save_trace": False,
+        "mode": "sample",
+        "rng": {"seed": 7, "deterministic": True},
+        "budget": {"draws": 2, "tune": 1, "restarts": restarts},
         "init": {"kind": "random", "length": 12, "pad_with": "background"},
-        "draws": 2,
-        "tune": 1,
-        "chains": chains,
-        "min_dist": 0,
-        "top_k": 1,
+        "objective": {"bidirectional": True, "score_scale": "llr"},
+        "elites": {"k": 1, "min_hamming": 0, "filters": {"pwm_sum_min": 0.0}},
         "moves": {
-            "block_len_range": [2, 2],
-            "multi_k_range": [2, 2],
-            "slide_max_shift": 1,
-            "swap_len_range": [2, 2],
-            "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
+            "profile": "balanced",
+            "overrides": {
+                "block_len_range": [2, 2],
+                "multi_k_range": [2, 2],
+                "slide_max_shift": 1,
+                "swap_len_range": [2, 2],
+                "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
+            },
         },
-        "optimiser": {
-            "kind": optimiser_kind,
-            "scorer_scale": "llr",
-            "cooling": cooling,
-            "swap_prob": 0.1,
+        "optimizer": {"name": optimizer_name},
+        "optimizers": {
+            "gibbs": {
+                "beta_schedule": gibbs_schedule or {"kind": "linear", "beta": [0.1, 0.2]},
+                "apply_during": "tune",
+            },
+            "pt": {
+                "beta_ladder": pt_ladder or {"kind": "geometric", "betas": [1.0, 0.5]},
+                "swap_prob": 0.1,
+            },
         },
-        "save_sequences": True,
+        "auto_opt": {"enabled": optimizer_name == "auto"},
+        "output": {"trace": {"save": False}, "save_sequences": True},
     }
 
 
@@ -144,8 +153,8 @@ def test_genome_cache_must_be_workspace_relative(tmp_path: Path, genome_cache: s
 def test_gibbs_rejects_geometric_cooling(tmp_path: Path) -> None:
     config = _base_config()
     config["cruncher"]["sample"] = _sample_block(
-        optimiser_kind="gibbs",
-        cooling={"kind": "geometric", "beta": [1.0, 0.5]},
+        optimizer_name="gibbs",
+        gibbs_schedule={"kind": "geometric", "beta": [1.0, 0.5]},
     )
     config_path = _write_config(tmp_path, config)
 
@@ -155,31 +164,45 @@ def test_gibbs_rejects_geometric_cooling(tmp_path: Path) -> None:
     assert any("gibbs" in str(err.get("msg")) for err in exc.value.errors())
 
 
-def test_pt_requires_beta_ladder_length_match(tmp_path: Path) -> None:
+def test_gibbs_global_schedule_requires_apply_all(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["sample"] = _sample_block(optimizer_name="gibbs")
+    config["cruncher"]["sample"]["optimizers"]["gibbs"]["schedule_scope"] = "global"
+    config["cruncher"]["sample"]["optimizers"]["gibbs"]["apply_during"] = "tune"
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+
+    assert any("schedule_scope" in str(err.get("msg")) for err in exc.value.errors())
+
+
+def test_pt_rejects_missing_ladder_params(tmp_path: Path) -> None:
     config = _base_config()
     config["cruncher"]["sample"] = _sample_block(
-        optimiser_kind="pt",
-        cooling={"kind": "geometric", "beta": [1.0, 0.5, 0.25]},
-        chains=2,
+        optimizer_name="pt",
+        pt_ladder={"kind": "geometric"},
     )
     config_path = _write_config(tmp_path, config)
 
     with pytest.raises(ValidationError) as exc:
         load_config(config_path)
 
-    assert any("cooling.beta length must match sample.chains" in str(err.get("msg")) for err in exc.value.errors())
+    assert any(
+        "beta_ladder requires betas or beta_min/beta_max/n_temps" in str(err.get("msg")) for err in exc.value.errors()
+    )
 
 
-def test_pt_fixed_requires_single_chain(tmp_path: Path) -> None:
+def test_pt_requires_restarts_one(tmp_path: Path) -> None:
     config = _base_config()
     config["cruncher"]["sample"] = _sample_block(
-        optimiser_kind="pt",
-        cooling={"kind": "fixed", "beta": 1.0},
-        chains=4,
+        optimizer_name="pt",
+        pt_ladder={"kind": "fixed", "beta": 1.0},
+        restarts=4,
     )
     config_path = _write_config(tmp_path, config)
 
     with pytest.raises(ValidationError) as exc:
         load_config(config_path)
 
-    assert any("fixed cooling requires chains=1" in str(err.get("msg")) for err in exc.value.errors())
+    assert any("budget.restarts" in str(err.get("msg")) for err in exc.value.errors())

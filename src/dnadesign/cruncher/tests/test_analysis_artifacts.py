@@ -29,6 +29,36 @@ from dnadesign.cruncher.utils.run_layout import (
 from dnadesign.cruncher.workflows.analyze_workflow import run_analyze
 
 
+def _sample_block(*, save_trace: bool, top_k: int, draws: int = 2, tune: int = 1) -> dict:
+    return {
+        "mode": "sample",
+        "rng": {"seed": 7, "deterministic": True},
+        "budget": {"draws": draws, "tune": tune, "restarts": 1},
+        "init": {"kind": "random", "length": 12, "pad_with": "background"},
+        "objective": {
+            "bidirectional": True,
+            "score_scale": "llr",
+            "scoring": {"pwm_pseudocounts": 0.1, "log_odds_clip": None},
+        },
+        "elites": {"k": top_k, "min_hamming": 0, "filters": {"pwm_sum_min": 0.0}},
+        "moves": {
+            "profile": "balanced",
+            "overrides": {
+                "block_len_range": [2, 2],
+                "multi_k_range": [2, 2],
+                "slide_max_shift": 1,
+                "swap_len_range": [2, 2],
+                "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
+            },
+        },
+        "optimizer": {"name": "gibbs"},
+        "optimizers": {"gibbs": {"beta_schedule": {"kind": "fixed", "beta": 1.0}, "apply_during": "tune"}},
+        "auto_opt": {"enabled": False},
+        "output": {"trace": {"save": save_trace}, "save_sequences": True},
+        "ui": {"progress_bar": False, "progress_every": 0},
+    }
+
+
 def _make_sample_run_dir(tmp_path: Path, name: str) -> Path:
     run_dir = tmp_path / "results" / "sample" / name
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -47,35 +77,7 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
                 "pwm_source": "matrix",
             },
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
-            "sample": {
-                "bidirectional": True,
-                "seed": 7,
-                "record_tune": False,
-                "progress_bar": False,
-                "progress_every": 0,
-                "save_trace": True,
-                "init": {"kind": "random", "length": 12, "pad_with": "background"},
-                "draws": 2,
-                "tune": 1,
-                "chains": 1,
-                "min_dist": 0,
-                "top_k": 2,
-                "moves": {
-                    "block_len_range": [2, 2],
-                    "multi_k_range": [2, 2],
-                    "slide_max_shift": 1,
-                    "swap_len_range": [2, 2],
-                    "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
-                },
-                "optimiser": {
-                    "kind": "gibbs",
-                    "scorer_scale": "llr",
-                    "cooling": {"kind": "fixed", "beta": 1.0},
-                    "swap_prob": 0.1,
-                },
-                "save_sequences": True,
-                "pwm_sum_threshold": 0.0,
-            },
+            "sample": _sample_block(save_trace=True, top_k=2),
             "analysis": {
                 "runs": ["sample_test"],
                 "tf_pair": ["lexA", "cpxR"],
@@ -159,11 +161,12 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
     # run_manifest.json
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    run_dir_str = str(run_dir.resolve())
     manifest_file.write_text(
         f"""{{
   "stage": "sample",
-  "run_dir": "sample_test",
-  "config_path": "{config_path}",
+  "run_dir": "{run_dir_str}",
+  "config_path": "{config_path.resolve()}",
   "lockfile_path": "{lock_path.resolve()}",
   "lockfile_sha256": "{lock_sha}",
   "artifacts": []
@@ -190,6 +193,12 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
     artifacts = manifest.get("artifacts", [])
     assert artifacts
 
+    summary_before = json.loads((analysis_dir / "meta" / "summary.json").read_text())
+    analysis_runs_repeat = run_analyze(cfg, config_path)
+    assert analysis_runs_repeat
+    summary_after = json.loads((analysis_dir / "meta" / "summary.json").read_text())
+    assert summary_before.get("analysis_id") == summary_after.get("analysis_id")
+
 
 def test_analyze_pairgrid_plot(tmp_path: Path) -> None:
     config = {
@@ -203,35 +212,7 @@ def test_analyze_pairgrid_plot(tmp_path: Path) -> None:
                 "pwm_source": "matrix",
             },
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
-            "sample": {
-                "bidirectional": True,
-                "seed": 7,
-                "record_tune": False,
-                "progress_bar": False,
-                "progress_every": 0,
-                "save_trace": False,
-                "init": {"kind": "random", "length": 12, "pad_with": "background"},
-                "draws": 2,
-                "tune": 1,
-                "chains": 1,
-                "min_dist": 0,
-                "top_k": 2,
-                "moves": {
-                    "block_len_range": [2, 2],
-                    "multi_k_range": [2, 2],
-                    "slide_max_shift": 1,
-                    "swap_len_range": [2, 2],
-                    "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
-                },
-                "optimiser": {
-                    "kind": "gibbs",
-                    "scorer_scale": "llr",
-                    "cooling": {"kind": "fixed", "beta": 1.0},
-                    "swap_prob": 0.1,
-                },
-                "save_sequences": True,
-                "pwm_sum_threshold": 0.0,
-            },
+            "sample": _sample_block(save_trace=False, top_k=2),
             "analysis": {
                 "runs": ["sample_pairgrid"],
                 "tf_pair": ["lexA", "cpxR"],
@@ -341,35 +322,7 @@ def test_analyze_pairgrid_single_tf(tmp_path: Path) -> None:
                 "pwm_source": "matrix",
             },
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
-            "sample": {
-                "bidirectional": True,
-                "seed": 7,
-                "record_tune": False,
-                "progress_bar": False,
-                "progress_every": 0,
-                "save_trace": False,
-                "init": {"kind": "random", "length": 12, "pad_with": "background"},
-                "draws": 2,
-                "tune": 1,
-                "chains": 1,
-                "min_dist": 0,
-                "top_k": 1,
-                "moves": {
-                    "block_len_range": [2, 2],
-                    "multi_k_range": [2, 2],
-                    "slide_max_shift": 1,
-                    "swap_len_range": [2, 2],
-                    "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
-                },
-                "optimiser": {
-                    "kind": "gibbs",
-                    "scorer_scale": "llr",
-                    "cooling": {"kind": "fixed", "beta": 1.0},
-                    "swap_prob": 0.1,
-                },
-                "save_sequences": True,
-                "pwm_sum_threshold": 0.0,
-            },
+            "sample": _sample_block(save_trace=False, top_k=1),
             "analysis": {
                 "runs": ["sample_pairgrid_single"],
                 "plots": {
@@ -472,35 +425,7 @@ def test_analyze_without_trace_when_no_trace_plots(tmp_path: Path) -> None:
                 "pwm_source": "matrix",
             },
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
-            "sample": {
-                "bidirectional": True,
-                "seed": 7,
-                "record_tune": False,
-                "progress_bar": False,
-                "progress_every": 0,
-                "save_trace": False,
-                "init": {"kind": "random", "length": 12, "pad_with": "background"},
-                "draws": 2,
-                "tune": 1,
-                "chains": 1,
-                "min_dist": 0,
-                "top_k": 1,
-                "moves": {
-                    "block_len_range": [2, 2],
-                    "multi_k_range": [2, 2],
-                    "slide_max_shift": 1,
-                    "swap_len_range": [2, 2],
-                    "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
-                },
-                "optimiser": {
-                    "kind": "gibbs",
-                    "scorer_scale": "llr",
-                    "cooling": {"kind": "fixed", "beta": 1.0},
-                    "swap_prob": 0.1,
-                },
-                "save_sequences": True,
-                "pwm_sum_threshold": 0.0,
-            },
+            "sample": _sample_block(save_trace=False, top_k=1),
             "analysis": {
                 "runs": ["sample_no_trace"],
                 "tf_pair": ["lexA", "cpxR"],
@@ -605,35 +530,7 @@ def test_analyze_prunes_stale_analysis_artifacts_when_not_archiving(tmp_path: Pa
                 "pwm_source": "matrix",
             },
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
-            "sample": {
-                "bidirectional": True,
-                "seed": 7,
-                "record_tune": False,
-                "progress_bar": False,
-                "progress_every": 0,
-                "save_trace": False,
-                "init": {"kind": "random", "length": 12, "pad_with": "background"},
-                "draws": 2,
-                "tune": 1,
-                "chains": 1,
-                "min_dist": 0,
-                "top_k": 1,
-                "moves": {
-                    "block_len_range": [2, 2],
-                    "multi_k_range": [2, 2],
-                    "slide_max_shift": 1,
-                    "swap_len_range": [2, 2],
-                    "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
-                },
-                "optimiser": {
-                    "kind": "gibbs",
-                    "scorer_scale": "llr",
-                    "cooling": {"kind": "fixed", "beta": 1.0},
-                    "swap_prob": 0.1,
-                },
-                "save_sequences": True,
-                "pwm_sum_threshold": 0.0,
-            },
+            "sample": _sample_block(save_trace=False, top_k=1),
             "analysis": {
                 "runs": ["sample_stale"],
                 "tf_pair": ["lexA", "cpxR"],
@@ -746,35 +643,7 @@ def test_analyze_fails_on_lockfile_mismatch(tmp_path: Path) -> None:
                 "pwm_source": "matrix",
             },
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
-            "sample": {
-                "bidirectional": True,
-                "seed": 7,
-                "record_tune": False,
-                "progress_bar": False,
-                "progress_every": 0,
-                "save_trace": False,
-                "init": {"kind": "random", "length": 12, "pad_with": "background"},
-                "draws": 2,
-                "tune": 1,
-                "chains": 1,
-                "min_dist": 0,
-                "top_k": 1,
-                "moves": {
-                    "block_len_range": [2, 2],
-                    "multi_k_range": [2, 2],
-                    "slide_max_shift": 1,
-                    "swap_len_range": [2, 2],
-                    "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
-                },
-                "optimiser": {
-                    "kind": "gibbs",
-                    "scorer_scale": "llr",
-                    "cooling": {"kind": "fixed", "beta": 1.0},
-                    "swap_prob": 0.1,
-                },
-                "save_sequences": True,
-                "pwm_sum_threshold": 0.0,
-            },
+            "sample": _sample_block(save_trace=False, top_k=1),
             "analysis": {
                 "runs": ["sample_bad_lock"],
                 "tf_pair": ["lexA", "cpxR"],

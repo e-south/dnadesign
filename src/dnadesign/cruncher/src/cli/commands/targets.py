@@ -174,6 +174,9 @@ def targets_status(
         site_kinds=site_kinds or None,
         use_lockfile=use_lockfile,
     )
+    site_label = "Sites (seq/total)"
+    if target_cfg.motif_store.combine_sites:
+        site_label = "Sites (merged seq/total)"
     table = Table(title=title, header_style="bold")
     table.add_column("Set", style="dim", justify="right")
     table.add_column("TF")
@@ -181,7 +184,7 @@ def targets_status(
     table.add_column("Motif ID")
     table.add_column("Organism")
     table.add_column("Matrix")
-    table.add_column("Sites (seq/total)")
+    table.add_column(site_label)
     table.add_column("Site kind")
     table.add_column("Dataset")
     table.add_column("PWM source")

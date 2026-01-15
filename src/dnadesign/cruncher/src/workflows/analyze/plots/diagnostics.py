@@ -51,6 +51,23 @@ def _flatten_axes(obj: object) -> list[plt.Axes]:
     return flat
 
 
+def _plot_trace_only(score_values: np.ndarray, out: Path) -> None:
+    values = np.asarray(score_values, dtype=float)
+    if values.ndim == 1:
+        values = values[None, :]
+    fig, ax = plt.subplots(figsize=(8, 3))
+    for idx, chain in enumerate(values):
+        ax.plot(chain, alpha=0.7, label=f"chain {idx + 1}")
+    ax.set_title("Trace of Score (all chains)")
+    ax.set_xlabel("Iteration")
+    ax.set_ylabel("Score")
+    if values.shape[0] > 1:
+        ax.legend(loc="best", frameon=False, fontsize=8)
+    sns.despine(ax=ax)
+    fig.savefig(out, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_trace(idata: az.InferenceData, out_dir: Path) -> None:
     """
     Overlay all chains' score-traces + posterior density → trace_score.png.
@@ -65,12 +82,27 @@ def plot_trace(idata: az.InferenceData, out_dir: Path) -> None:
     if score is None:
         logger.warning("Skipping trace plot: 'score' not found in trace.")
         return
+    values = np.asarray(score.values, dtype=float)
+    if values.size == 0:
+        logger.warning("Skipping trace plot: empty score array.")
+        return
+    with np.errstate(all="ignore"):
+        spread = np.nanmax(values) - np.nanmin(values)
+    if not np.isfinite(spread) or spread <= 0:
+        logger.warning("Trace plot: score is constant or non-finite; rendering trace-only plot.")
+        _plot_trace_only(values, out)
+        return
 
     sns.set_style("ticks", {"axes.grid": False})
     sns.set_palette("colorblind")
 
     with az.style.context("arviz-doc"):
-        axes = az.plot_trace(idata, var_names=["score"], combined=False)
+        try:
+            axes = az.plot_trace(idata, var_names=["score"], combined=False)
+        except Exception as exc:
+            logger.warning("Trace plot failed (%s); rendering trace-only plot.", exc)
+            _plot_trace_only(values, out)
+            return
 
         # Figure‐level title
         fig = plt.gcf()

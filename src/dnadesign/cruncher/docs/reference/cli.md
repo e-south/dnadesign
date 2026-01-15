@@ -1,44 +1,16 @@
 ## cruncher CLI
 
-Most commands operate relative to a `config.yaml` file. You can also pass `--config/-c` globally (before the command). Some commands (notably `cruncher notebook`) operate on a run directory instead of a config.
-When using the pixi task (`pixi run cruncher -- ...`), place `-c/--config` after the subcommand because pixi inserts `--`.
-By default, CLI output renders paths relative to the workspace root to keep demos readable.
+Most commands operate relative to a `config.yaml` file; some (notably `cruncher notebook`) operate on a run directory. You can pass `--config/-c` globally (before the command). With pixi (`pixi run cruncher -- ...`), place `-c/--config` after the subcommand because pixi inserts `--`. By default, paths render relative to the workspace root.
 
-### Contents
-
-1. [Workspace discovery and config resolution](#workspace-discovery-and-config-resolution)
-2. [Which command should I use?](#which-command-should-i-use)
-2. [Core lifecycle commands](#core-lifecycle-commands)
-3. [Discovery and inspection](#discovery-and-inspection)
-4. [Global options](#global-options)
-
-> Network access occurs in fetch and remote inventory commands (for example, `cruncher fetch ...`, `cruncher sources summary --scope remote`, `cruncher sources datasets`). Some workflows (such as site hydration via NCBI) also use the network depending on your config. Use `--offline` where supported to force cache-only behavior.
+> Network access occurs in fetch and remote inventory commands (for example, `cruncher fetch ...`, `cruncher sources summary --scope remote`, `cruncher sources datasets`). Some workflows (such as site hydration via NCBI) also use the network depending on your config. Use `--offline` where supported to force cache‑only behavior.
 
 ---
 
 ### Workspace discovery and config resolution
 
-Cruncher resolves the config path in this order:
+Cruncher resolves config in this order: `--config/-c`, `--workspace/-w` (or `CRUNCHER_WORKSPACE`), local `config.yaml`/`cruncher.yaml`, parent‑dir search, then known workspace roots (repo `workspaces/`, bundled demo path, or `CRUNCHER_WORKSPACE_ROOTS`). If one workspace is found, it is auto‑selected; if multiple are found, Cruncher prints a numbered list. Path resolution uses `CRUNCHER_CWD`, `INIT_CWD`, then `PWD`.
 
-1. `--config/-c` (global or per-command), positional `CONFIG` (explicit config path)
-2. `--workspace/-w` (workspace name, index from `workspaces list`, or a path to a workspace dir/config)
-   * also accepts `CRUNCHER_WORKSPACE=<name|index|path>`
-3. `config.yaml` / `cruncher.yaml` in the current directory
-4. walk up parent directories looking for a config
-5. workspace discovery in known roots:
-   * git root: `workspaces/*/config.yaml` (and `workspace/*/config.yaml`)
-   * git root: `src/dnadesign/cruncher/workspaces/*/config.yaml` (bundled demo)
-   * any roots in `CRUNCHER_WORKSPACE_ROOTS` (colon-separated)
-
-If exactly one workspace is discovered, Cruncher auto-selects it and logs a one-line note.
-If multiple are found, Cruncher prints a numbered list and shows how to select one via `--workspace` or `--config`.
-
-Relative path resolution uses the *invocation* directory when available:
-- `CRUNCHER_CWD` (explicit override)
-- `INIT_CWD` (set by pixi)
-- `PWD` / process CWD
-
-To see what is available (with stable indices), run:
+See available workspaces with:
 
 ```
 cruncher workspaces list
@@ -46,24 +18,17 @@ cruncher workspaces list
 
 ---
 
-### Which command should I use?
+### Quick command map
 
-Common tasks mapped to commands:
-
-* **Get data into the cache** → `cruncher fetch motifs` (matrices) or `cruncher fetch sites` (binding sites / HT datasets).
-* **Check what is available** → `cruncher sources list/summary` (source inventory) or `cruncher catalog list/search/show/pwms/logos` (cached entries + PWM/logo outputs).
-* **Pin TFs for reproducible runs** → `cruncher lock`.
-* **Validate cached PWMs + render logos** → `cruncher parse`.
-* **Run the optimizer** → `cruncher sample`.
-* **Analyze a sample run** → `cruncher analyze` (plots/tables), then `cruncher report` (summary), optionally `cruncher notebook`.
-* **Campaign workflows** → `cruncher campaign validate` (preflight), `cruncher campaign generate` (derived config),
-  `cruncher campaign summarize` (aggregate results), `cruncher campaign notebook` (campaign summary exploration).
-* **Check target readiness** → `cruncher targets status` (and `targets candidates/stats` for deeper inspection).
-* **Inspect run artifacts** → `cruncher runs list/show/latest/best/watch`.
-* **Quick snapshot of workspace health** → `cruncher status`.
-* **Inspect config resolution** → `cruncher config` (summary table).
-* **List available optimizers** → `cruncher optimizers list`.
-* **Find workspaces** → `cruncher workspaces list`.
+* **Cache data** → `fetch motifs` / `fetch sites`
+* **Inspect cache** → `sources ...` / `catalog ...`
+* **Pin TFs** → `lock`
+* **Validate + logos** → `parse`
+* **Optimize** → `sample`
+* **Analyze/report** → `analyze`, `report`, `notebook`
+* **Campaigns** → `campaign validate|generate|summarize|notebook`
+* **Run management** → `runs list/show/latest/best/watch/clean`
+* **Workspace health** → `status`
 
 ---
 
@@ -326,6 +291,8 @@ Notes:
 * `cruncher parse` always uses the lockfile to pin exact motif IDs/hashes.
   If you add new motifs (e.g., via `discover motifs`) or change `motif_store` preferences,
   re-run `cruncher lock <config>` to refresh what parse will use.
+* Parse is idempotent for identical inputs; if matching outputs already exist, it reports
+  the existing run instead of creating a new one.
 * When `motif_store.pwm_source=sites`, logos include a subtitle describing site provenance
   (combined set count, sources, and site kinds).
 * When `motif_store.pwm_source=matrix`, subtitles include the source adapter plus the
@@ -350,6 +317,7 @@ Example:
 
 * `cruncher sample <config>`
 * `cruncher sample --no-auto-opt <config>`
+* `cruncher sample --verbose <config>`
 
 Precondition:
 
@@ -357,9 +325,11 @@ Precondition:
 
 Notes:
 
-* `cruncher.sample.save_sequences: true` is required for later analysis/reporting.
-* `cruncher.sample.save_trace: true` enables trace-based diagnostics.
-* Auto-opt is enabled by default: it runs short Gibbs + PT pilots, logs their diagnostics, then runs the best candidate. Use `--no-auto-opt` to disable.
+* `sample.output.save_sequences: true` is required for later analysis/reporting.
+* `sample.output.trace.save: true` enables trace-based diagnostics.
+* Auto-opt is enabled by default: it runs short Gibbs + PT pilots, scores them via the auto-opt scorecard (balance/diversity/acceptance), logs diagnostics warnings, then runs the best candidate. If thresholds are not met, it still proceeds with the best available candidate and logs warnings. Use `--no-auto-opt` to disable.
+* `--verbose` enables per-chain progress logging and bumps the log level to DEBUG for more detail.
+* Auto-opt selection details are recorded in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/tables/auto_opt_pilots.csv` for the latest run. The selected pilot is also recorded in `runs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
 
 ---
 
@@ -380,7 +350,7 @@ Network:
 Examples:
 
 * `cruncher analyze --latest <config>`
-* `cruncher analyze --run <run_name> <config>`
+* `cruncher analyze --run <run_name|run_dir> <config>`
 * `cruncher analyze --tf-pair lexA,cpxR <config>`
 * `cruncher analyze --plots trace --plots score_hist <config>`
 * `cruncher analyze --scatter-background --scatter-background-samples 2000 <config>`
@@ -390,6 +360,7 @@ Preconditions:
 
 * provide runs via `analysis.runs`, `--run`, or `--latest`
 * trace-dependent plots require `artifacts/trace.nc`
+* if `analysis/` exists without `analysis/meta/summary.json`, remove the incomplete analysis folder before re-running `cruncher analyze`
 
 Outputs:
 
@@ -397,6 +368,11 @@ Outputs:
   `analysis/tables/diagnostics.json`
 * plots: `analysis/plots/score__pairgrid.png` (when `analysis.plots.pairgrid=true`)
 * summaries: `analysis/meta/summary.json`, `analysis/meta/plot_manifest.json`, `analysis/meta/table_manifest.json`
+
+Note:
+
+* Analyze is idempotent for identical inputs + analysis config; if the current summary signature matches,
+  it reports that analysis is already up to date and skips re-running plots/tables.
 
 ---
 
@@ -417,6 +393,7 @@ Network:
 Example:
 
 * `cruncher report --latest <config>`
+* `cruncher report <run_name|run_dir> <config>`
 * `cruncher report <config> <run_name>`
 
 Preconditions:
@@ -516,6 +493,9 @@ Subcommands:
 * `catalog show` — show metadata for a cached `<source>:<motif_id>`
 * `catalog pwms` — summarize or export resolved PWMs (matrix or site-derived)
 * `catalog logos` — render PWM logos for selected TFs or motif refs
+
+Note: `catalog logos` is idempotent for identical inputs. If matching logos already exist
+under `runs/logos/catalog/`, it reports the existing path instead of writing a new run.
 
 Examples:
 
@@ -747,18 +727,19 @@ Inspect past run artifacts.
 Inputs:
 
 * CONFIG (explicit or resolved)
-* run name for `show/watch`
+* run name or run directory path for `show/watch`
 
 Network:
 
 * no (run artifacts only)
 
-* `runs list <config>` — list run folders (optionally filter by stage)
-* `runs show <config> <run>` — show manifest + artifacts
+* `runs list <config>` — list run folders (optionally filter by stage). Auto-opt pilots marked with a leading `*` indicate the selected candidate.
+* `runs show <config> <run>` — show manifest + artifacts (run name or run dir)
 * `runs latest <config> --set-index 1` — print most recent run for a regulator set
 * `runs best <config> --set-index 1` — print best run by `best_score` for a regulator set
-* `runs watch <config> <run>` — live progress snapshot (reads `meta/run_status.json`, optionally `live/metrics.jsonl`)
+* `runs watch <config> <run>` — live progress snapshot (run name or run dir; reads `meta/run_status.json`, optionally `live/metrics.jsonl`)
 * `runs rebuild-index <config>` — rebuild `<catalog_root>/run_index.json`
+* `runs clean <config> --stale` — mark stale `running` runs as `aborted` (use `--drop` to remove from the index)
 
 Tip: inside a workspace you can drop the config argument entirely (for example,
 `cruncher runs show <run>` or `cruncher runs list`).

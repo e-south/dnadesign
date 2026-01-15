@@ -199,6 +199,51 @@ def test_target_status_missing_matrix_file(tmp_path: Path) -> None:
     assert has_blocking_target_errors(statuses) is True
 
 
+def test_target_status_merges_sites_for_matrix_targets(tmp_path: Path) -> None:
+    cfg = _config(tmp_path, pwm_source="matrix", min_sites=2, combine_sites=True, regulator_sets=[["lexA"]])
+    lock_payload = {
+        "pwm_source": "matrix",
+        "resolved": {"lexA": {"source": "regulondb", "motif_id": "RBM1", "sha256": "aaa"}},
+    }
+    _write_lock(tmp_path, json.dumps(lock_payload))
+    catalog = CatalogIndex(
+        entries={
+            "regulondb:RBM1": CatalogEntry(
+                source="regulondb",
+                motif_id="RBM1",
+                tf_name="lexA",
+                kind="PFM",
+                has_matrix=True,
+                has_sites=True,
+                site_count=5,
+                site_total=5,
+                site_kind="curated",
+                dataset_id="regulondb_curated",
+            ),
+            "demo_local_meme:lexA_demo": CatalogEntry(
+                source="demo_local_meme",
+                motif_id="lexA_demo",
+                tf_name="lexA",
+                kind="PFM",
+                has_sites=True,
+                site_count=7,
+                site_total=8,
+                site_kind="meme_blocks",
+                dataset_id="dapseq_demo",
+            ),
+        }
+    )
+    catalog.save(tmp_path / ".cruncher")
+    motif_path = tmp_path / ".cruncher" / "normalized" / "motifs" / "regulondb" / "RBM1.json"
+    motif_path.parent.mkdir(parents=True, exist_ok=True)
+    motif_path.write_text("{}")
+    statuses = target_statuses(cfg=cfg, config_path=tmp_path / "config.yaml")
+    assert statuses[0].site_count == 12
+    assert statuses[0].site_total == 13
+    assert statuses[0].site_kind == "mixed"
+    assert statuses[0].dataset_id == "mixed"
+
+
 def test_target_status_needs_window_for_ht_sites(tmp_path: Path) -> None:
     cfg = _config(tmp_path, pwm_source="sites", min_sites=2, regulator_sets=[["lexA"]])
     lock_payload = {

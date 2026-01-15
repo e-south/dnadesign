@@ -38,15 +38,24 @@ def build_run_name(
     *,
     set_index: int | None = None,
     include_stage: bool = True,
+    include_label: bool = True,
+    include_set_index: bool = True,
 ) -> str:
     date_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    label = format_regulator_slug(tfs)
-    seed = f"{stage}|{date_stamp}|{','.join(tfs)}|{set_index or ''}"
+    label = format_regulator_slug(tfs) if include_label else ""
+    seed = f"{stage}|{date_stamp}|{','.join(tfs)}|{set_index or ''}|{include_label}|{include_set_index}"
     short_hash = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:6]
-    if set_index is not None:
-        base = f"set{set_index}_{label}_{date_stamp}_{short_hash}"
+    set_token = set_index if include_set_index else None
+    if set_token is not None:
+        if label:
+            base = f"set{set_token}_{label}_{date_stamp}_{short_hash}"
+        else:
+            base = f"set{set_token}_{date_stamp}_{short_hash}"
     else:
-        base = f"{label}_{date_stamp}_{short_hash}"
+        if label:
+            base = f"{label}_{date_stamp}_{short_hash}"
+        else:
+            base = f"{date_stamp}_{short_hash}"
     return f"{stage}_{base}" if include_stage else base
 
 

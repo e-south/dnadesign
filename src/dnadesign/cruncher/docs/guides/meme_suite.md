@@ -36,9 +36,7 @@ cruncher catalog logos --source meme_suite_meme <config>
 ```
 
 After choosing, set `motif_store.source_preference` and re‑run `cruncher lock`.
-
-Note: MEME/STREME matrices are rounded in their text output. **cruncher** renormalizes
-near‑1.0 rows to avoid false validation errors.
+Note: MEME/STREME matrices are rounded in their text output. **cruncher** renormalizes near‑1.0 rows to avoid false validation errors.
 
 ### If you don't use pixi
 
@@ -54,7 +52,7 @@ export MEME_BIN="$DNADESIGN_ROOT/.pixi/envs/default/bin"
 
 ### Alternative: official MEME Suite installer
 
-Install MEME Suite with the official installer and ensure `meme` and `streme` are on PATH,
+Install MEME Suite with the official installer, ensure `meme` and `streme` are on PATH,
 then verify:
 
 ```bash
@@ -62,11 +60,6 @@ cruncher doctor -c <config>
 ```
 
 If you're not in an activated virtualenv, prefix with `uv run`.
-
-### Why external
-
-Keeping MEME Suite external preserves a clean Python environment while still pinning and
-tracking the tool version via `discover_manifest.json`.
 
 ---
 

@@ -58,6 +58,8 @@ def plot_scatter(
     bidirectional: bool,
     pwm_sum_threshold: float,
     annotation: str,
+    pseudocounts: float = 0.0,
+    log_odds_clip: float | None = None,
 ) -> None:
     """
     Orchestrator for pwm__scatter.{png,pdf} under the analysis plots directory.
@@ -108,6 +110,8 @@ def plot_scatter(
                 bidirectional=bidirectional,
                 seed=cfg.analysis.scatter_background_seed,
                 progress_bar=False,
+                pseudocounts=pseudocounts,
+                log_odds_clip=log_odds_clip,
             )
 
     # 7) Consensus points
@@ -117,6 +121,8 @@ def plot_scatter(
         length=seq_len,
         tf_pair=(x_tf, y_tf),
         bidirectional=bidirectional,
+        pseudocounts=pseudocounts,
+        log_odds_clip=log_odds_clip,
     )
 
     # 8) Elite coordinates (skip cleanly if no elites or no 'sequence' column)
@@ -128,6 +134,8 @@ def plot_scatter(
             {x_tf: pwms[x_tf], y_tf: pwms[y_tf]},
             bidirectional=bidirectional,
             scale=scale,
+            pseudocounts=pseudocounts,
+            log_odds_clip=log_odds_clip,
         )
         for idx, row in df_elites.iterrows():
             seq = row["sequence"]
@@ -161,6 +169,8 @@ def plot_scatter(
         pwms=pwms,
         cfg=cfg,
         bidirectional=bidirectional,
+        pseudocounts=pseudocounts,
+        log_odds_clip=log_odds_clip,
         pwm_sum_threshold=pwm_sum_threshold,
         annotation=annotation,
         out_path=out_pdf,
@@ -178,6 +188,8 @@ def plot_scatter(
         pwms=pwms,
         cfg=cfg,
         bidirectional=bidirectional,
+        pseudocounts=pseudocounts,
+        log_odds_clip=log_odds_clip,
         pwm_sum_threshold=pwm_sum_threshold,
         annotation=annotation,
         out_path=out_png,
@@ -206,6 +218,8 @@ def _draw_scatter_figure(
     pwms: Dict[str, PWM],
     cfg: CruncherConfig,
     bidirectional: bool,
+    pseudocounts: float,
+    log_odds_clip: float | None,
     pwm_sum_threshold: float,
     annotation: str,
     out_path: Path,
@@ -299,6 +313,8 @@ def _draw_scatter_figure(
             {x_tf: pwms[x_tf], y_tf: pwms[y_tf]},
             bidirectional=bidirectional,
             scale="llr",
+            pseudocounts=pseudocounts,
+            log_odds_clip=log_odds_clip,
         )
         cons_x = raw_scorer.consensus_llr(x_tf)
         cons_y = raw_scorer.consensus_llr(y_tf)

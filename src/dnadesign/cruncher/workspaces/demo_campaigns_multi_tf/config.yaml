@@ -134,38 +134,67 @@ cruncher:
       dpi: 150
 
   sample:
-    bidirectional: true
-    seed: 42
-    record_tune: false
-    progress_bar: true
-    progress_every: 1000
-    save_trace: true
+    mode: optimize
+    rng:
+      seed: 42
+      deterministic: true
+    budget:
+      tune: 1000
+      draws: 2000
+      restarts: 4
     init:
       kind: random
       length: 30
       pad_with: background
-    draws: 2000
-    tune: 1000
-    chains: 4
-    min_dist: 1
-    top_k: 5
+    objective:
+      bidirectional: true
+      score_scale: llr
+      scoring:
+        pwm_pseudocounts: 0.10
+        log_odds_clip: null
+    elites:
+      k: 5
+      min_hamming: 1
+      filters:
+        pwm_sum_min: 0.0
     moves:
-      block_len_range: [2, 6]
-      multi_k_range: [2, 6]
-      slide_max_shift: 4
-      swap_len_range: [2, 8]
-      move_probs:
-        S: 0.80
-        B: 0.10
-        M: 0.10
-    optimiser:
-      kind: gibbs
-      scorer_scale: llr
-      cooling:
-        kind: linear
-        beta: [0.01, 0.1]
-      swap_prob: 0.10
-    save_sequences: true
+      profile: balanced
+      overrides:
+        block_len_range: [2, 6]
+        multi_k_range: [2, 6]
+        slide_max_shift: 4
+        swap_len_range: [2, 8]
+        move_probs:
+          S: 0.80
+          B: 0.10
+          M: 0.10
+    optimizer:
+      name: auto
+    optimizers:
+      gibbs:
+        beta_schedule:
+          kind: linear
+          beta: [0.05, 0.5]
+        apply_during: tune
+      pt:
+        beta_ladder:
+          kind: geometric
+          betas: [0.05, 0.1, 0.2, 0.4]
+        swap_prob: 0.10
+    auto_opt:
+      enabled: true
+      budget_levels: [200, 800]
+      replicates: 1
+    output:
+      save_sequences: true
+      include_consensus_in_elites: false
+      live_metrics: true
+      trace:
+        save: true
+        include_tune: false
+    ui:
+      progress_bar: false
+      progress_every: 1000
 
   analysis:
     runs: []

@@ -27,7 +27,7 @@ console = Console()
 def report(
     args: list[str] = typer.Argument(
         None,
-        help="Run name (optionally preceded by CONFIG).",
+        help="Run name or run directory path (optionally preceded by CONFIG).",
         metavar="ARGS",
     ),
     config_option: Path | None = typer.Option(
@@ -54,7 +54,7 @@ def report(
                 args,
                 config_option,
                 value_label="RUN",
-                command_hint="cruncher report <run_name>",
+                command_hint="cruncher report <run_name|run_dir>",
             )
             cfg = load_config(config_path)
     except ConfigResolutionError as exc:

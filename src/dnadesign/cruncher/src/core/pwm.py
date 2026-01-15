@@ -81,6 +81,9 @@ class PWM:
     def log_odds(
         self,
         background: Sequence[float] = (0.25, 0.25, 0.25, 0.25),
+        *,
+        pseudocounts: Optional[float] = None,
+        log_odds_clip: Optional[float] = None,
     ) -> np.ndarray:
         """
         Return or compute the log-odds matrix:
@@ -88,9 +91,17 @@ class PWM:
 
         Args:
           background: length-4 array of bg frequencies
+          pseudocounts: optional Dirichlet-style smoothing toward background
+          log_odds_clip: optional absolute-value clip for log-odds
         """
         if self.log_odds_matrix is not None:
             return self.log_odds_matrix
-        p = self.matrix + 1e-9
         bg = np.array(background, float)
-        return np.log2(p / bg)
+        p = self.matrix
+        if pseudocounts is not None and pseudocounts > 0:
+            p = (p + float(pseudocounts) * bg) / (1.0 + float(pseudocounts))
+        p = p + 1e-9
+        lom = np.log2(p / bg)
+        if log_odds_clip is not None:
+            lom = np.clip(lom, -float(log_odds_clip), float(log_odds_clip))
+        return lom

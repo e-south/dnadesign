@@ -2,19 +2,6 @@
 
 This page explains the `config.yaml` and how each block maps to the **cruncher** lifecycle. The YAML root key is `cruncher`, the CLI chooses *what* runs (fetch, lock, sample, analyze), the config defines *how* each stage behaves.
 
-### Contents
-
-1. [Root settings](#root-settings)
-2. [Categories and campaigns](#categories-and-campaigns)
-3. [IO](#io)
-4. [Motif store](#motif_store)
-5. [Ingest](#ingest)
-6. [Parse](#parse)
-7. [Sample](#sample)
-8. [Analysis](#analysis)
-
----
-
 ### Root settings
 
 ```yaml
@@ -28,7 +15,7 @@ cruncher:
 
 Notes:
 - `out_dir` is resolved relative to the config file and must be a relative path.
-- Each regulator set creates its own `parse_...` and `sample_...` run folders.
+- Each regulator set creates its own run folder under `runs/<stage>/`.
 - Config parsing is strict: unknown keys are rejected to avoid silent typos.
 
 ### Categories and campaigns
@@ -118,17 +105,14 @@ Notes:
 - `pseudocounts` controls PWM smoothing when building from sites (Biopython).
 - `catalog_root` must be workspace-relative (no absolute paths or `..` segments).
 - Local motif sources provide matrices by default. Set `ingest.local_sources[].extract_sites=true`
-  to opt into MEME BLOCKS site extraction (training-set occurrences) so they can participate
-  when `pwm_source=sites`.
+  to opt into MEME BLOCKS site extraction for site‑derived PWMs.
 - If site lengths vary for site-derived PWMs, set `site_window_lengths` per TF or dataset. MEME/STREME
   discovery uses raw cached sites unless `motif_discovery.window_sites=true`.
-- Window lengths must not exceed the shortest cached site length for a TF; use the
-  min length from `cruncher targets stats` if unsure.
 - If PWM length must be constrained (e.g., optimization length is shorter), set
   `pwm_window_lengths` to select a contiguous sub-window by information content.
 - `combine_sites=false` avoids mixing curated, HT, and local sites unless you opt in.
-- When `combine_sites=true`, lockfiles hash all matching site sets for the TF (respecting `site_kinds`); adding/removing site sets requires re-locking.
-- `site_window_center=summit` requires per-site summit metadata; use `midpoint` unless your source provides summits.
+- When `combine_sites=true`, lockfiles hash all matching site sets for the TF; adding/removing site sets requires re‑locking.
+- `site_window_center=summit` requires per‑site summit metadata.
 
 ### motif_discovery
 
@@ -150,26 +134,11 @@ motif_discovery:
 ```
 
 Notes:
-- `tool=auto` chooses STREME when there are enough sequences (>= min_sequences_for_streme), MEME otherwise.
-- Discovery requires cached binding sites (run `cruncher fetch sites`) and uses the MEME Suite
-  CLI tools (`streme`/`meme`) on PATH. This is independent of `motif_store.pwm_source`.
-- Discovery always uses cached binding sites, even when `pwm_source=matrix`.
-- By default, discovery uses raw cached site sequences. Set `motif_discovery.window_sites=true`
-  to pre-window binding sites using `motif_store.site_window_lengths` (errors if no window lengths are set).
-- If `minw`/`maxw` are unset, Cruncher derives them from the min/max site lengths per TF.
-- Use `cruncher targets stats` to choose `minw/maxw` based on site-length ranges; avoid narrow caps that force truncated motifs.
-- If you run both MEME and STREME, use distinct `motif_discovery.source_id` values between runs so `lock` can disambiguate.
-- You can override `motif_discovery.source_id` per run with `cruncher discover motifs --source-id ...`.
-- When `replace_existing=true` (default), re-running discovery replaces previous discovered motifs for the
-  same TF/source to avoid cache bloat. Set it to false if you want to keep historical runs.
-- `meme_mod` applies to MEME only; leave it unset to use MEME defaults.
-- Use `motif_discovery.tool_path` (or set `MEME_BIN`) to point at a versioned MEME Suite install
-  without modifying your PATH. Relative `tool_path` values are resolved from the config file
-  location, so prefer absolute paths when using repo-level `.pixi/` installs.
-- When `tool=auto`, prefer a bin directory (not a single executable) so both tools can be resolved.
-- To use newly discovered motifs in downstream runs, set `motif_store.pwm_source: matrix`,
-  add `meme_suite` (or your chosen `source_id`) to `motif_store.source_preference`, and re-run
-  `cruncher lock <config>` to refresh the lockfile.
+- Discovery requires cached binding sites and MEME Suite binaries on PATH (or `motif_discovery.tool_path`).
+- `tool=auto` chooses STREME when `min_sequences_for_streme` is met, MEME otherwise.
+- `minw/maxw` default to per‑TF site length ranges unless set explicitly.
+- Use distinct `source_id` values for MEME vs STREME so `lock` can disambiguate.
+- Re‑run `cruncher lock` after discovery to pin the new matrices.
 
 ### ingest
 
@@ -273,87 +242,177 @@ Sampling and optimizer settings.
 
 ```yaml
 sample:
-  bidirectional: true
-  seed: 42
-  record_tune: false
-  progress_bar: true
-  progress_every: 1000
-  live_metrics: true
-  save_trace: true
-  save_sequences: true
+  mode: optimize          # optimize | sample
+  rng:
+    seed: 42
+    deterministic: true
+  budget:
+    tune: 200
+    draws: 500
+    restarts: 2
   init:
     kind: random
     length: 30
     pad_with: background
-  draws: 500
-  tune: 200
-  chains: 2
-  min_dist: 1
-  top_k: 5
-  moves:
-    block_len_range: [3, 12]
-    multi_k_range: [2, 8]
-    slide_max_shift: 4
-    swap_len_range: [2, 8]
-    move_probs:
-      S: 0.80
-      B: 0.10
-      M: 0.10
-  optimiser:
-    kind: gibbs        # gibbs | pt
-    scorer_scale: llr  # llr | z | logp | consensus-neglop-sum
-    cooling:
+  objective:
+    bidirectional: true
+    score_scale: normalized-llr
+    scoring:
+      pwm_pseudocounts: 0.10
+      log_odds_clip: null
+    softmin:
+      enabled: true
       kind: linear
-      beta: [0.01, 0.1]
-    swap_prob: 0.10
+      beta: [0.5, 10.0]
+  elites:
+    k: 5
+    min_hamming: 1
+    filters:
+      pwm_sum_min: 0.0
+  moves:
+    profile: balanced
+    overrides:
+      block_len_range: [3, 12]
+      multi_k_range: [2, 8]
+      slide_max_shift: 4
+      swap_len_range: [2, 8]
+      move_probs:
+        S: 0.85
+        B: 0.05
+        M: 0.05
+        L: 0.03
+        W: 0.01
+        I: 0.01
+  optimizer:
+    name: auto          # auto | gibbs | pt
+  optimizers:
+    gibbs:
+      beta_schedule:
+        kind: linear
+        beta: [0.05, 0.5]
+      apply_during: tune
+      schedule_scope: per_chain
+      adaptive_beta:
+        enabled: true
+        target_acceptance: 0.40
+        window: 100
+        k: 0.50
+        min_beta: 1.0e-3
+        max_beta: 10.0
+        moves: [B, M]
+        stop_after_tune: true
+    pt:
+      beta_ladder:
+        kind: geometric
+        betas: [0.05, 0.1, 0.2, 0.4]
+      swap_prob: 0.10
+      ladder_adapt:
+        enabled: false
+        target_swap: 0.25
+        window: 50
+        k: 0.50
+        min_scale: 0.25
+        max_scale: 4.0
+        stop_after_tune: true
   auto_opt:
     enabled: true
-    pilot_draws: 200
-    pilot_tune: 100
-    pilot_chains_gibbs: 2
-    pilot_chains_pt: 4
-    retry_on_warn: true
-    retry_draws_factor: 2.0
-    retry_tune_factor: 2.0
-    cooling_boost: 5.0
-    max_rhat: 1.2
-    min_ess: 20
-    min_unique_fraction: 0.10
-    pt_beta_min: 0.2
-    pt_beta_max: 1.0
-  pwm_sum_threshold: 0.0
-  include_consensus_in_elites: false
+    budget_levels: [200, 800]
+    eta: 3
+    replicates: 1
+    keep_pilots: ok
+    prefer_simpler_if_close: true
+    tolerance:
+      score: 0.01
+    length:
+      enabled: true
+      min_length: null
+      max_length: null
+      step: 2
+      max_candidates: 4
+    policy:
+      retry_on_warn: true
+      retry_draws_factor: 2.0
+      retry_tune_factor: 2.0
+      cooling_boost: 5.0
+      max_rhat: 1.2
+      min_ess: 20
+      min_unique_fraction: 0.10
+      max_unique_fraction: null
+      scorecard:
+        top_k: 10
+        min_balance: 0.25
+        min_diversity: 0.10
+        acceptance_target: 0.40
+        acceptance_tolerance: 0.25
+        swap_target: 0.25
+        swap_tolerance: 0.20
+  output:
+    save_sequences: true
+    include_consensus_in_elites: false
+    live_metrics: true
+    trace:
+      save: true
+      include_tune: false
+    trim:
+      enabled: true
+      padding: 1
+      require_non_decreasing: true
+    polish:
+      enabled: true
+      max_rounds: 2
+      improvement_tol: 0.0
+  ui:
+    progress_bar: false
+    progress_every: 0
 ```
 
 Notes:
-- `save_sequences=true` is required for `analyze` and `report`.
-- `save_trace=true` is required for trace-based plots and `report`.
-- `live_metrics=true` writes `live/metrics.jsonl` with progress snapshots (used by `cruncher runs watch`).
-- `bidirectional=true` scores both strands (reverse complement) when scanning PWMs.
-- `min_dist` is the Hamming-distance filter for elite sequences (0 disables).
-- `top_k` controls how many top sequences per chain are retained before elite filtering.
-- `pwm_sum_threshold` filters elites by summed normalized scores (0 keeps all).
-- `include_consensus_in_elites` adds per-TF PWM consensus strings to elites metadata.
-- R-hat needs ≥2 chains and ESS needs ≥4 draws; otherwise `report` shows `n/a` and records diagnostics warnings.
-- `gibbs` expects `cooling.kind` to be `fixed` or `linear`; `pt` expects `geometric` (beta ladder) or `fixed` with a single chain.
-- `auto_opt` runs short Gibbs + PT pilots, compares diagnostics (ESS/R-hat/unique_fraction/best_score), logs the decision, and runs a final sample using the selected optimizer.
-- Auto-opt pilots always write `trace.nc` + `sequences.parquet` (required for diagnostics) and are stored under `runs/pilot/`.
-- Auto-opt is enabled by default; set `auto_opt.enabled: false` or use `--no-auto-opt` to disable.
-- If no pilot meets the quality thresholds, auto-opt retries with cooler settings (and raises an error if still unstable).
-- Optional: set `auto_opt.pt_beta` to a full beta ladder (must match `sample.chains` for PT finals).
-- If the base config uses PT, Gibbs pilots use `auto_opt.gibbs_cooling` (default: linear 0.01→0.1).
-PT starting point (optional; requires a beta ladder):
+- `output.save_sequences=true` is required for `analyze` and `report`.
+- `output.trace.save=true` is required for trace-based plots and `report`.
+- `output.live_metrics=true` writes `live/metrics.jsonl` with progress snapshots (used by `cruncher runs watch`).
+- `output.trace.include_tune=true` includes burn-in samples in `trace.nc` and `sequences.parquet`.
+- `objective.bidirectional=true` scores both strands (reverse complement) when scanning PWMs.
+- `elites.min_hamming` is the Hamming-distance filter for elites (0 disables). If `output.trim.enabled=true` yields variable lengths, the distance is computed over the shared prefix plus the length difference.
+- `elites.k` controls how many sequences are retained before diversity filtering.
+- `objective.scoring.pwm_pseudocounts` smooths matrix-derived PWMs (set to 0 for raw matrices).
+- `objective.scoring.log_odds_clip` caps log-odds magnitudes (use to avoid extreme cliffs).
+- `elites.filters.pwm_sum_min` filters elites by summed normalized scores (0 keeps all).
+- `output.include_consensus_in_elites` adds per-TF PWM consensus strings to elites metadata.
+- `objective.softmin` controls the min-approximation hardness separately from MCMC temperature.
+- `optimizers.gibbs.beta_schedule` sets the MCMC temperature schedule; use `apply_during: tune` to anneal only during burn-in.
+- `optimizers.gibbs.schedule_scope` controls whether the beta schedule is applied per chain (`per_chain`) or across all chains (`global`). Global schedules require `apply_during: all`.
+- `optimizers.pt.beta_ladder` defines the temperature ladder; PT does not support `budget.restarts>1` (use ladder size for chain count).
+- `adaptive_beta` tunes Gibbs acceptance (B/M moves) toward a target band; `ladder_adapt` tunes PT ladder scale.
+- `auto_opt` runs short Gibbs + PT pilots, compares balance/diversity/acceptance signals, logs the decision, and runs a final sample using the selected optimizer.
+- Auto-opt pilots always write `trace.nc` + `sequences.parquet` (required for diagnostics) and are stored under `runs/auto_opt/`.
+- The selected pilot is recorded in `runs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
+- Auto-opt is enabled by default when `optimizer.name=auto`; set `auto_opt.enabled: false` or pass `--no-auto-opt` to disable.
+- If no pilot meets the quality thresholds, auto-opt retries with cooler settings and then proceeds with the best available candidate (logging warnings). When a boosted-cooling retry wins, the final run uses that boosted schedule (recorded in `config_used.yaml` and auto-opt notes).
+- Auto-opt selection details are stored in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/tables/auto_opt_pilots.csv` and `analysis/plots/auto_opt_tradeoffs.png`.
+- `sample.rng.deterministic=true` isolates a stable RNG stream per pilot config.
+- `auto_opt.length` searches candidate lengths; the shortest passing the scorecard is preferred, and length comparisons are ranked by normalized balance to reduce length bias.
+- `auto_opt.policy.scorecard.top_k` controls how many pilot elites are used for balance/diversity scoring.
+- `auto_opt.keep_pilots` controls pilot retention after selection: `all` keeps everything, `ok` keeps candidates that met thresholds (plus the selected pilot), and `best` keeps only the selected pilot.
+- `moves.overrides.move_schedule` interpolates between `moves.overrides.move_probs` (start) and `move_schedule.end` (end).
+- `moves.overrides.target_worst_tf_prob` biases proposals toward the current worst TF window (0 disables).
+- `moves.overrides.insertion_consensus_prob` controls whether insertion moves use consensus vs PWM sampling.
+- `output.trim` shrinks elites to the minimal best-hit window union; it fails fast if a trim would be shorter than the widest PWM. `output.polish` runs deterministic coordinate ascent.
+PT starting point (optional; uses a beta ladder):
 ```yaml
-optimiser:
-  kind: pt
-  cooling:
-    kind: geometric
-    beta: [0.2, 0.4, 0.7, 1.0]
-  swap_prob: 0.20
+sample:
+  optimizer:
+    name: pt
+  budget:
+    restarts: 1
+  optimizers:
+    pt:
+      beta_ladder:
+        kind: geometric
+        betas: [0.2, 0.4, 0.7, 1.0]
+      swap_prob: 0.20
 ```
-Note: `cooling.beta` must be the same length as `sample.chains` (one β per chain).
 Tuning hints (use `analysis/tables/diagnostics.json` and `report/report.json`):
-- Low ESS / high R-hat → increase `draws`/`tune` first; PT can help but is not always better.
+- Low ESS / high R-hat → increase `budget.draws`/`budget.tune` first; PT can help but is not always better.
 - PT swap acceptance < ~0.05 → widen the beta ladder or increase `swap_prob`.
 - Very high/low block or multi-site acceptance → adjust move ranges or cooling strength.
 
@@ -392,9 +451,9 @@ Notes:
 - `tf_pair` is required for pairwise plots.
 - `archive=true` moves the previous analysis into `analysis/_archive/<analysis_id>/`
   before writing the new one.
-- `scatter_scale` supports `llr`, `z`, `logp`, or `consensus-neglop-sum`.
+- `scatter_scale` supports `llr`, `z`, `logp`, `normalized-llr`, or `consensus-neglop-sum`.
 - `scatter_style` toggles scatter styling (`edges` or `thresholds`).
-- `scatter_style=thresholds` requires `scatter_scale=llr` and uses `sample.pwm_sum_threshold` for the x+y cutoff.
+- `scatter_style=thresholds` requires `scatter_scale=llr` and uses `sample.elites.filters.pwm_sum_min` for the x+y cutoff.
 - Threshold plots normalize per-TF LLRs by each PWM's consensus LLR (axes are 0-1).
 - `scatter_background=true` adds a random-sequence baseline cloud to `pwm__scatter`.
 - `scatter_background_samples` controls how many random sequences to draw (defaults to the MCMC subsample size).
@@ -408,92 +467,8 @@ Notes:
 
 `cruncher config` prints the resolved settings that will be used by the CLI.
 
-Example output (captured with `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200`):
-
-```bash
-                                                                                        Cruncher config summary
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Key                              ┃ Value                                                                                                                                                             ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ out_dir                          │ runs                                                                                                                                                              │
-│ regulator_sets                   │ [['lexA', 'cpxR', 'fur']]                                                                                                                                         │
-│ regulators_flat                  │ lexA, cpxR, fur                                                                                                                                                   │
-│ regulator_categories             │ {'Stress': ['lexA'], 'Envelope': ['cpxR'], 'Category1': ['cpxR', 'baeR'], 'Category2': ['lexA', 'rcdA', 'lrp', 'fur'], 'Category3': ['fnr', 'fur', 'acrR',        │
-│                                  │ 'soxR', 'soxS', 'lrp']}                                                                                                                                           │
-│ campaigns                        │ demo_pair, demo_categories, demo_categories_best                                                                                                                  │
-│ io.parsers.extra_modules         │ []                                                                                                                                                                │
-│ pwm_source                       │ sites                                                                                                                                                             │
-│ site_kinds                       │ None                                                                                                                                                              │
-│ combine_sites                    │ False                                                                                                                                                             │
-│ pseudocounts                     │ 0.5                                                                                                                                                               │
-│ dataset_preference               │ []                                                                                                                                                                │
-│ dataset_map                      │ {}                                                                                                                                                                │
-│ site_window_lengths              │ {'lexA': 15, 'cpxR': 11, 'baeR': 20, 'rcdA': 10, 'lrp': 12, 'fur': 12, 'fnr': 14, 'acrR': 10, 'soxR': 18, 'soxS': 20}                                             │
-│ site_window_center               │ midpoint                                                                                                                                                          │
-│ pwm_window_lengths               │ {}                                                                                                                                                                │
-│ pwm_window_strategy              │ max_info                                                                                                                                                          │
-│ min_sites_for_pwm                │ 2                                                                                                                                                                 │
-│ source_preference                │ ['regulondb']                                                                                                                                                     │
-│ allow_ambiguous                  │ False                                                                                                                                                             │
-│ motif_discovery.tool             │ auto                                                                                                                                                              │
-│ motif_discovery.tool_path        │ -                                                                                                                                                                 │
-│ motif_discovery.window_sites     │ False                                                                                                                                                             │
-│ motif_discovery.minw             │ -                                                                                                                                                                 │
-│ motif_discovery.maxw             │ -                                                                                                                                                                 │
-│ motif_discovery.nmotifs          │ 1                                                                                                                                                                 │
-│ motif_discovery.min_sequences_for_streme │ 50                                                                                                                                                          │
-│ motif_discovery.source_id        │ meme_suite                                                                                                                                                        │
-│ motif_discovery.replace_existing │ True                                                                                                                                                              │
-│ ingest.genome_source             │ ncbi                                                                                                                                                              │
-│ ingest.genome_fasta              │ -                                                                                                                                                                 │
-│ ingest.genome_cache              │ .cruncher/genomes                                                                                                                                                 │
-│ ingest.genome_assembly           │ -                                                                                                                                                                 │
-│ ingest.contig_aliases            │ {}                                                                                                                                                                │
-│ ingest.ncbi_email                │ -                                                                                                                                                                 │
-│ ingest.ncbi_tool                 │ cruncher                                                                                                                                                          │
-│ ingest.ncbi_timeout              │ 30                                                                                                                                                                │
-│ ingest.http.retries              │ 3                                                                                                                                                                 │
-│ ingest.http.backoff_seconds      │ 0.5                                                                                                                                                               │
-│ ingest.http.max_backoff_seconds  │ 8.0                                                                                                                                                               │
-│ ingest.local_sources             │ demo_local_meme@data/local_motifs                                                                                                                                 │
-│ ingest.regulondb.curated_sites   │ True                                                                                                                                                              │
-│ ingest.regulondb.ht_sites        │ False                                                                                                                                                             │
-│ ingest.regulondb.ht_dataset_type │ TFBINDING                                                                                                                                                         │
-│ ingest.regulondb.ht_binding_mode │ tfbinding                                                                                                                                                         │
-│ init.kind                        │ random                                                                                                                                                            │
-│ init.length                      │ 30                                                                                                                                                                │
-│ init.regulator                   │ None                                                                                                                                                              │
-│ draws                            │ 500                                                                                                                                                               │
-│ tune                             │ 200                                                                                                                                                               │
-│ chains                           │ 2                                                                                                                                                                 │
-│ top_k                            │ 5                                                                                                                                                                 │
-│ min_dist                         │ 1                                                                                                                                                                 │
-│ seed                             │ 42                                                                                                                                                                │
-│ record_tune                      │ False                                                                                                                                                             │
-│ progress_bar                     │ True                                                                                                                                                              │
-│ progress_every                   │ 200                                                                                                                                                               │
-│ save_trace                       │ True                                                                                                                                                              │
-│ save_sequences                   │ True                                                                                                                                                              │
-│ bidirectional                    │ True                                                                                                                                                              │
-│ pwm_sum_threshold                │ 0.0                                                                                                                                                               │
-│ include_consensus_in_elites      │ False                                                                                                                                                             │
-│ optimizer.kind                   │ gibbs                                                                                                                                                             │
-│ scorer_scale                     │ llr                                                                                                                                                               │
-│ cooling                          │ {'kind': 'linear', 'beta': (0.01, 0.1)}                                                                                                                           │
-│ swap_prob                        │ 0.1                                                                                                                                                               │
-│ analysis.runs                    │ []                                                                                                                                                                │
-│ analysis.plots                   │ {'trace': True, 'autocorr': True, 'convergence': True, 'scatter_pwm': True, 'pair_pwm': True, 'parallel_pwm': True, 'pairgrid': True, 'score_hist': True,         │
-│                                  │ 'score_box': False, 'correlation_heatmap': True, 'parallel_coords': True}                                                                                         │
-│ analysis.scatter_scale           │ llr                                                                                                                                                               │
-│ analysis.subsampling_epsilon     │ 10.0                                                                                                                                                              │
-│ analysis.scatter_style           │ edges                                                                                                                                                             │
-│ analysis.scatter_background      │ True                                                                                                                                                              │
-│ analysis.scatter_background_samples │ None                                                                                                                                                            │
-│ analysis.scatter_background_seed │ 0                                                                                                                                                                 │
-│ analysis.tf_pair                 │ None                                                                                                                                                              │
-│ analysis.archive                 │ False                                                                                                                                                             │
-└──────────────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-```
+The output is a flattened key/value table; use it to confirm the resolved
+`sample.*` and `motif_store.*` settings match your intent.
 
 ---
 
