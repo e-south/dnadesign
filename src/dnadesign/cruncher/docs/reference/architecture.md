@@ -68,7 +68,8 @@ Core contract:
 
 ### On-disk layout
 
-**cruncher** uses **project-local state** (relative to the config file). No global cache.
+**cruncher** uses **project-local state** (relative to the config file). Data artifacts live in the workspace;
+tooling caches stay within the repo/workspace unless you override their environment variables.
 
 Recommended workspace layout:
 
@@ -95,12 +96,20 @@ normalized/
 motifs/<source>/<motif_id>.json
 sites/<source>/<motif_id>.jsonl
 genomes/              # if genome hydration is enabled
+discoveries/          # MEME/STREME discovery runs
+.mplcache/            # Matplotlib cache (MPLCONFIGDIR)
 ```
 
 - `catalog.json` is the “what do we have cached?” index.
 - `locks/<config>.lock.json` pins TF names → exact cached artifacts + hashes.
 - `run_index.json` tracks run folders for `cruncher runs ...`.
 - `catalog_root` must be workspace-relative (no absolute paths or `..` segments).
+
+#### Tooling caches
+
+- Matplotlib writes its cache under `<catalog_root>/.mplcache/` unless `MPLCONFIGDIR` is set.
+- Numba JIT cache defaults to `<repo>/src/dnadesign/cruncher/.cruncher/numba_cache` (or `<repo>/.cruncher/numba_cache`)
+  unless `NUMBA_CACHE_DIR` is set.
 
 #### Run outputs (`out_dir`, e.g. `runs/`)
 

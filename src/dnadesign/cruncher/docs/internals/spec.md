@@ -84,10 +84,18 @@ This document defines the end-to-end requirements and architecture for **crunche
   normalized/
     motifs/<source>/<motif_id>.json
     sites/<source>/<motif_id>.jsonl
+  discoveries/
+  .mplcache/
 ```
 
 `catalog.json` is the single source of truth for “what we have in-house”. It tracks matrix availability, site counts, and provenance tags.
 `catalog_root` must be workspace-relative (no absolute paths or `..` segments).
+
+Tooling caches:
+
+- Matplotlib caches in `<catalog_root>/.mplcache/` unless `MPLCONFIGDIR` is set.
+- Numba JIT cache defaults to `<repo>/src/dnadesign/cruncher/.cruncher/numba_cache` (or `<repo>/.cruncher/numba_cache`)
+  unless `NUMBA_CACHE_DIR` is set.
 
 ---
 
@@ -165,7 +173,14 @@ Each run directory contains:
 
 ### CLI contract
 
-Most commands accept an explicit config `--config`. If omitted, **cruncher** resolves a config from `--workspace`/`CRUNCHER_WORKSPACE`, then from `config.yaml` in the current directory (or parent directories), and finally from discoverable workspaces.
+Most commands accept an explicit config `--config`. If omitted, **cruncher** resolves a config from `--workspace`/`CRUNCHER_WORKSPACE`, then from `config.yaml` in the current directory (or parent directories), and finally from discoverable workspaces. When multiple workspaces are discovered, Cruncher prompts in interactive shells.
+
+Defaults + automation:
+
+- `workspaces/.default_workspace` (or `<workspace_root>/.default_workspace`) can pin a workspace name or config path.
+- `CRUNCHER_DEFAULT_WORKSPACE=<name>` selects a default when multiple workspaces exist.
+- `CRUNCHER_NONINTERACTIVE=1` disables prompts and fails fast when ambiguous.
+- `CRUNCHER_WORKSPACE_ROOTS=/path/a:/path/b` adds workspace search roots.
 
 - `cruncher fetch motifs ...`
 - `cruncher fetch sites ...`

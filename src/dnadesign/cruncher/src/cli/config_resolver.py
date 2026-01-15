@@ -30,6 +30,7 @@ DEFAULT_WORKSPACE_ENV_VAR = "CRUNCHER_DEFAULT_WORKSPACE"
 CONFIG_ENV_VAR = "CRUNCHER_CONFIG"
 NONINTERACTIVE_ENV_VAR = "CRUNCHER_NONINTERACTIVE"
 INVOCATION_CWD_ENV_VAR = "CRUNCHER_CWD"
+DEFAULT_WORKSPACE_FILE = ".default_workspace"
 
 
 class ConfigResolutionError(ValueError):
@@ -190,6 +191,47 @@ def discover_workspaces(cwd: Path | None = None) -> list[WorkspaceCandidate]:
     return candidates
 
 
+def _resolve_default_workspace_file(
+    workspaces: Sequence[WorkspaceCandidate],
+    *,
+    cwd: Path,
+) -> WorkspaceCandidate | None:
+    roots = workspace_search_roots(cwd)
+    defaults: list[tuple[Path, str]] = []
+    for root in roots:
+        candidate = root / DEFAULT_WORKSPACE_FILE
+        if candidate.is_file():
+            value = candidate.read_text().strip()
+            if not value:
+                raise ConfigResolutionError(f"Default workspace file is empty: {candidate}")
+            defaults.append((candidate, value))
+    if not defaults:
+        return None
+    unique_values = {value for _, value in defaults}
+    if len(unique_values) > 1:
+        rendered = "\n".join(f"- {path}: {value}" for path, value in defaults)
+        raise ConfigResolutionError(
+            "Conflicting default workspace files found:\n"
+            f"{rendered}\n"
+            f"Hint: keep a single {DEFAULT_WORKSPACE_FILE} value or pass --workspace."
+        )
+    default_path, value = defaults[0]
+    match = next((item for item in workspaces if item.name == value), None)
+    if match is not None:
+        return match
+    if looks_like_config_path(value, cwd=default_path.parent):
+        path = _normalize_path(Path(value), cwd=default_path.parent)
+        for item in workspaces:
+            if item.config_path == path or item.root == path:
+                return item
+    rendered = _format_workspace_list(workspaces)
+    raise ConfigResolutionError(
+        f"{DEFAULT_WORKSPACE_FILE} requested '{value}', but no matching workspace was found.\n"
+        f"Discovered {len(workspaces)} workspace configs:\n{rendered}\n"
+        "Hint: update the default file or pass --workspace."
+    )
+
+
 def _format_workspace_list(workspaces: Sequence[WorkspaceCandidate]) -> str:
     if not workspaces:
         return "- (none)"
@@ -336,6 +378,16 @@ def resolve_config_path(config: Path | None, *, cwd: Path | None = None, log: bo
                 chosen.name,
             )
         return chosen.config_path
+    default_file_match = _resolve_default_workspace_file(workspaces, cwd=cwd_path)
+    if default_file_match is not None:
+        if log:
+            logger.info(
+                'Using workspace "%s" config: %s (from %s).',
+                default_file_match.name,
+                default_file_match.config_path,
+                DEFAULT_WORKSPACE_FILE,
+            )
+        return default_file_match.config_path
     default_name = os.environ.get(DEFAULT_WORKSPACE_ENV_VAR)
     if default_name:
         matches = [item for item in workspaces if item.name == default_name]

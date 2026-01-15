@@ -16,14 +16,18 @@ Ingestion is how **cruncher** discovers and caches motif matrices and binding si
 ```
 .cruncher/
   catalog.json
+  run_index.json
   locks/
     <config>.lock.json
   normalized/
     motifs/<source>/<motif_id>.json
     sites/<source>/<motif_id>.jsonl
+  discoveries/      # MEME/STREME discovery runs (optional)
+  .mplcache/         # Matplotlib cache (auto-managed)
 ```
 
-`catalog.json` is the local source of truth for cached motifs and sites.
+`catalog.json` is the local source of truth for cached motifs and sites. `run_index.json` tracks known runs;
+`discoveries/` is created only when you run `cruncher discover motifs`.
 
 ---
 

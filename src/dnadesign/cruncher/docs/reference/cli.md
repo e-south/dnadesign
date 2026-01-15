@@ -8,7 +8,7 @@ Most commands operate relative to a `config.yaml` file; some (notably `cruncher 
 
 ### Workspace discovery and config resolution
 
-Cruncher resolves config in this order: `--config/-c`, `--workspace/-w` (or `CRUNCHER_WORKSPACE`), local `config.yaml`/`cruncher.yaml`, parent‑dir search, then known workspace roots (repo `workspaces/`, bundled demo path, or `CRUNCHER_WORKSPACE_ROOTS`). If one workspace is found, it is auto‑selected; if multiple are found, Cruncher prints a numbered list. Path resolution uses `CRUNCHER_CWD`, `INIT_CWD`, then `PWD`.
+Cruncher resolves config from `--config/-c` or `--workspace/-w`, then the nearest `config.yaml` in the current directory or parents, then known workspace roots. If multiple workspaces are found, **cruncher** prompts for a selection (interactive shells only).
 
 See available workspaces with:
 
@@ -717,6 +717,7 @@ Network:
 Example:
 
 * `cruncher status <config>`
+* `cruncher status --runs 10 <config>`
 
 ---
 
@@ -747,6 +748,7 @@ Tip: inside a workspace you can drop the config argument entirely (for example,
 Notes:
 * `runs watch --plot` writes a live PNG plot to `<run_dir>/live/live_metrics.png`.
 * `runs watch --metric-points` and `--metric-width` control the trend window size.
+* `runs watch --plot-path` writes plots to a custom path; `--plot-every` controls refresh cadence.
 
 ---
 
