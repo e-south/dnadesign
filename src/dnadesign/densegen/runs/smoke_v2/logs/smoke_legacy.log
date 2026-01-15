@@ -1,0 +1,87 @@
+2026-01-13 16:33:20 | INFO | dnadesign.densegen.src.logging_utils | Logging initialized (level=INFO)
+2026-01-13 16:33:20 | INFO | dnadesign.densegen.src.main | Solver selected: CBC
+2026-01-13 16:33:47 | INFO | dnadesign.densegen.src.logging_utils | Logging initialized (level=INFO)
+2026-01-13 16:33:47 | INFO | dnadesign.densegen.src.main | Solver selected: CBC
+2026-01-13 16:34:53 | INFO | dnadesign.densegen.src.logging_utils | Logging initialized (level=INFO)
+2026-01-13 16:34:53 | INFO | dnadesign.densegen.src.main | Solver selected: CBC
+2026-01-13 16:34:54 | INFO | dnadesign.densegen.src.main | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 16:35:07 | INFO | dnadesign.densegen.src.logging_utils | Logging initialized (level=INFO)
+2026-01-13 16:35:07 | INFO | dnadesign.densegen.src.main | Solver selected: CBC
+2026-01-13 16:35:08 | INFO | dnadesign.densegen.src.main | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 16:35:42 | INFO | dnadesign.densegen.src.logging_utils | Logging initialized (level=INFO)
+2026-01-13 16:35:42 | INFO | dnadesign.densegen.src.main | Solver selected: CBC
+2026-01-13 16:35:43 | INFO | dnadesign.densegen.src.main | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 16:37:24 | INFO | dnadesign.densegen.src.logging_utils | Logging initialized (level=INFO)
+2026-01-13 16:37:24 | INFO | dnadesign.densegen.src.main | Solver selected: CBC
+2026-01-13 16:37:25 | INFO | dnadesign.densegen.src.main | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 16:37:26 | INFO | dnadesign.densegen.src.main | [smoke/smoke] 1/5 (20.00%) (local 1/2) CR=1.033 | seq AAGGTTGACACTGTTTTTATTTCAGGTATAATGGTGATCTCTTTACATTAACTGACTTTC
+2026-01-13 16:37:27 | INFO | dnadesign.densegen.src.main | [smoke/smoke] 2/5 (40.00%) (local 2/2) CR=1.050 | seq AGCATTGACAGTAAACCTGCGGGAAATATAATGCAAATACGGAGTAAATAATAAGGAAAA
+2026-01-13 16:37:27 | INFO | dnadesign.densegen.src.main | Library for smoke/smoke: 11 motifs | TF counts: cpxr×6, lexa×5
+2026-01-13 16:37:28 | INFO | dnadesign.densegen.src.main | [smoke/smoke] 3/5 (60.00%) (local 1/2) CR=1.000 | seq CTTTTCAGGGGTATTACTGGTTAGATAAATGCTTGACACGTAAACAGCAATAAATATAAT
+2026-01-13 16:37:29 | INFO | dnadesign.densegen.src.main | [smoke/smoke] 4/5 (80.00%) (local 2/2) CR=0.983 | seq GTTGACACTGTTTTTATTTCAGGTATAATGTAAAAATATATAAATTTTCAGGGGTATTAC
+2026-01-13 16:37:29 | INFO | dnadesign.densegen.src.main | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 16:37:30 | INFO | dnadesign.densegen.src.main | [smoke/smoke] 5/5 (100.00%) (local 1/2) CR=1.067 | seq TACTTGACATACTGTATAAATAAACAGTATAATCGTTACGGAACTTTACAATGCGTTTAC
+2026-01-13 16:47:09 | INFO | dnadesign.densegen.src.logging_utils | Logging initialized (level=INFO)
+2026-01-13 16:47:09 | INFO | dnadesign.densegen.src.main | Solver selected: CBC
+2026-01-13 16:47:10 | INFO | dnadesign.densegen.src.main | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 16:47:10 | INFO | dnadesign.densegen.src.main | [smoke/smoke] 1/5 (20.00%) (local 1/2) CR=1.033 | seq AAGGTTGACACTGTTTTTATTTCAGGTATAATGGTGATCTCTTTACATTAACTGACTTTC
+2026-01-13 16:47:12 | INFO | dnadesign.densegen.src.main | [smoke/smoke] 2/5 (40.00%) (local 2/2) CR=1.050 | seq AGCATTGACAGTAAACCTGCGGGAAATATAATGCAAATACGGAGTAAATAATAAGGAAAA
+2026-01-13 16:47:12 | INFO | dnadesign.densegen.src.main | Library for smoke/smoke: 11 motifs | TF counts: cpxr×6, lexa×5
+2026-01-13 16:47:13 | INFO | dnadesign.densegen.src.main | [smoke/smoke] 3/5 (60.00%) (local 1/2) CR=1.000 | seq CTTTTCAGGGGTATTACTGGTTAGATAAATGCTTGACACGTAAACAGCAATAAATATAAT
+2026-01-13 16:47:14 | INFO | dnadesign.densegen.src.main | [smoke/smoke] 4/5 (80.00%) (local 2/2) CR=0.983 | seq GTTGACACTGTTTTTATTTCAGGTATAATGTAAAAATATATAAATTTTCAGGGGTATTAC
+2026-01-13 16:47:14 | INFO | dnadesign.densegen.src.main | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 16:47:14 | INFO | dnadesign.densegen.src.main | [smoke/smoke] 5/5 (100.00%) (local 1/2) CR=1.067 | seq TACTTGACATACTGTATAAATAAACAGTATAATCGTTACGGAACTTTACAATGCGTTTAC
+2026-01-13 17:09:11 | INFO | dnadesign.densegen.src.logging_utils | Logging initialized (level=INFO)
+2026-01-13 17:09:11 | INFO | dnadesign.densegen.src.pipeline | Solver selected: CBC
+2026-01-13 17:09:11 | INFO | dnadesign.densegen.src.pipeline | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 17:09:12 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] Output duplicate detected; skipping.
+2026-01-13 17:09:13 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] Output duplicate detected; skipping.
+2026-01-13 17:09:14 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 1/5 (20.00%) (local 1/2) CR=1.017 | seq CGTTTGACATTTACTCCGTATTTGCTATAATGGTGATCTCTTTACTGTTTTTATTTCAGG
+2026-01-13 17:09:14 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 2/5 (40.00%) (local 2/2) CR=1.033 | seq CGGAATTGACACCTGAAATAAAAACAGTATAATTTTCCTTATTATTTACTCCGTATTTGC
+2026-01-13 17:09:14 | INFO | dnadesign.densegen.src.pipeline | Library for smoke/smoke: 11 motifs | TF counts: cpxr×6, lexa×5
+2026-01-13 17:09:16 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 3/5 (60.00%) (local 1/2) CR=1.000 | seq TTTTTCAGGGGTATTACTGGTTAGATAAATGCTTGACACGTAAACAGCAATAAATATAAT
+2026-01-13 17:09:16 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 4/5 (80.00%) (local 2/2) CR=0.983 | seq ATTGACACTGTTTTTATTTCAGGTATAATGTAAAAATATATAAATTTTCAGGGGTATTAC
+2026-01-13 17:09:16 | INFO | dnadesign.densegen.src.pipeline | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 17:09:17 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 5/5 (100.00%) (local 1/2) CR=1.067 | seq AATTTGACATACTGTATAAATAAACAGTATAATCGTTACGGAACTTTACAATGCGTTTAC
+2026-01-13 17:25:19 | INFO | dnadesign.densegen.src.logging_utils | Logging initialized (level=INFO)
+2026-01-13 17:25:19 | INFO | dnadesign.densegen.src.pipeline | Solver selected: CBC
+2026-01-13 17:25:19 | INFO | dnadesign.densegen.src.pipeline | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 17:25:20 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] Output duplicate detected; skipping.
+2026-01-13 17:25:21 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] Output duplicate detected; skipping.
+2026-01-13 17:25:22 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] Output duplicate detected; skipping.
+2026-01-13 17:25:22 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] Output duplicate detected; skipping.
+2026-01-13 17:25:23 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 1/5 (20.00%) (local 1/2) CR=1.017 | seq TAATTGACATTTCCCGCAGGTTTACTATAATGGTGATCTCTTTACTGTTTTTATTTCAGG
+2026-01-13 17:25:23 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 2/5 (40.00%) (local 2/2) CR=1.050 | seq ATCGTTGACATTTCCCGCAGGTTTACTATAATGGTGATCTCTTTACATTAACTGACTTTC
+2026-01-13 17:25:23 | INFO | dnadesign.densegen.src.pipeline | Library for smoke/smoke: 11 motifs | TF counts: cpxr×6, lexa×5
+2026-01-13 17:25:25 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 3/5 (60.00%) (local 1/2) CR=1.000 | seq GTTTTCAGGGGTATTACTGGTTAGATAAATGCTTGACACGTAAACAGCAATAAATATAAT
+2026-01-13 17:25:25 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] Output duplicate detected; skipping.
+2026-01-13 17:25:26 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 4/5 (80.00%) (local 2/2) CR=0.983 | seq CCATTGACACGTAAACAGCAATAAATATAATTTATATATTTTTACTGGTTAGATAAATGC
+2026-01-13 17:25:26 | INFO | dnadesign.densegen.src.pipeline | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 17:25:26 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 5/5 (100.00%) (local 1/2) CR=1.067 | seq ATTTTGACATACTGTATAAATAAACAGTATAATCGTTACGGAACTTTACAATGCGTTTAC
+2026-01-13 18:27:13 | INFO | dnadesign.densegen.src.logging_utils | Logging initialized (level=INFO)
+2026-01-13 18:27:13 | INFO | dnadesign.densegen.src.pipeline | Solver selected: CBC
+2026-01-13 18:27:13 | INFO | dnadesign.densegen.src.pipeline | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 18:27:13 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] Output duplicate detected; skipping.
+2026-01-13 18:27:15 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] Output duplicate detected; skipping.
+2026-01-13 18:27:15 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] Output duplicate detected; skipping.
+2026-01-13 18:27:16 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] Output duplicate detected; skipping.
+2026-01-13 18:27:16 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] Output duplicate detected; skipping.
+2026-01-13 18:27:17 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] Output duplicate detected; skipping.
+2026-01-13 18:27:18 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 1/5 (20.00%) (local 1/2) CR=1.033 | seq TTGACATTTACTCCGTATTTGCTATAATGTAAATAATAAGGAAAATGGTGATCTCTTTAC
+2026-01-13 18:27:18 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 2/5 (40.00%) (local 2/2) CR=1.017 | seq ACCTGTTTTTATTTCAGGTAAAGAGATCACCATTGACAGCAAATACGGAGTAAATATAAT
+2026-01-13 18:27:18 | INFO | dnadesign.densegen.src.pipeline | Library for smoke/smoke: 11 motifs | TF counts: cpxr×6, lexa×5
+2026-01-13 18:27:20 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] Output duplicate detected; skipping.
+2026-01-13 18:27:21 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 3/5 (60.00%) (local 1/2) CR=0.983 | seq TTTGACACTGTTTTTATTTCAGGTATAATGTAAAAATATATAAATTTTCAGGGGTATTAC
+2026-01-13 18:27:21 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 4/5 (80.00%) (local 2/2) CR=0.983 | seq GTCTTGACACGTAAACAGCAATAAATATAATTTATATATTTTTACTGGTTAGATAAATGC
+2026-01-13 18:27:21 | INFO | dnadesign.densegen.src.pipeline | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 18:27:22 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 5/5 (100.00%) (local 1/2) CR=1.067 | seq TTATTGACATACTGTATAAATAAACAGTATAATCGTTACGGAACTTTACAATGCGTTTAC
+2026-01-13 18:40:56 | INFO | dnadesign.densegen.src.logging_utils | Logging initialized (level=INFO)
+2026-01-13 18:40:56 | INFO | dnadesign.densegen.src.pipeline | Solver selected: CBC
+2026-01-13 18:40:56 | INFO | dnadesign.densegen.src.pipeline | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 18:40:57 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 1/5 (20.00%) (local 1/2) CR=1.033 | seq AAGGTTGACACTGTTTTTATTTCAGGTATAATGGTGATCTCTTTACATTAACTGACTTTC
+2026-01-13 18:40:58 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 2/5 (40.00%) (local 2/2) CR=1.050 | seq AGCATTGACAGTAAACCTGCGGGAAATATAATGCAAATACGGAGTAAATAATAAGGAAAA
+2026-01-13 18:40:58 | INFO | dnadesign.densegen.src.pipeline | Library for smoke/smoke: 11 motifs | TF counts: cpxr×6, lexa×5
+2026-01-13 18:40:59 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 3/5 (60.00%) (local 1/2) CR=1.000 | seq CTTTTCAGGGGTATTACTGGTTAGATAAATGCTTGACACGTAAACAGCAATAAATATAAT
+2026-01-13 18:41:00 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 4/5 (80.00%) (local 2/2) CR=0.983 | seq GTTGACACTGTTTTTATTTCAGGTATAATGTAAAAATATATAAATTTTCAGGGGTATTAC
+2026-01-13 18:41:00 | INFO | dnadesign.densegen.src.pipeline | Library for smoke/smoke: 10 motifs | TF counts: lexa×5, cpxr×5
+2026-01-13 18:41:01 | INFO | dnadesign.densegen.src.pipeline | [smoke/smoke] 5/5 (100.00%) (local 1/2) CR=1.067 | seq TACTTGACATACTGTATAAATAAACAGTATAATCGTTACGGAACTTTACAATGCGTTTAC

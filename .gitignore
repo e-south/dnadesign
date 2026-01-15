@@ -185,6 +185,9 @@ src/dnadesign/opal/campaigns/**/inputs/**/.DS_Store
 
 # OPAL per-run products anywhere
 **/outputs/
+!src/dnadesign/densegen/runs/
+!src/dnadesign/densegen/runs/**
+**/_densegen_ids.sqlite
 **/campaign.log.jsonl
 **/round.log.jsonl
 **/state.json

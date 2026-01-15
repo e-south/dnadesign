@@ -1,0 +1,80 @@
+# DenseGen smoke config (small, Parquet-only, CBC backend)
+
+densegen:
+  schema_version: "2.0"
+  inputs:
+    - name: smoke
+      type: binding_sites
+      path: ../inputs/tf2tfbs_mapping_cpxR_LexA.csv
+      format: csv
+
+  output:
+    targets: [parquet]
+    schema:
+      bio_type: dna
+      alphabet: dna_4
+    parquet:
+      path: ../../runs/smoke_v2/parquet
+      deduplicate: true
+      chunk_size: 64
+
+  generation:
+    sequence_length: 60
+    quota: 5
+    sampling:
+      pool_strategy: subsample
+      library_size: 16
+      subsample_over_length_budget_by: 120
+      cover_all_regulators: true
+      unique_binding_sites: true
+      max_sites_per_regulator: null
+      relax_on_exhaustion: false
+      allow_incomplete_coverage: false
+      iterative_max_libraries: 25
+      iterative_min_new_solutions: 1
+
+    plan:
+      - name: smoke
+        quota: 5
+        fixed_elements:
+          promoter_constraints:
+            - upstream: "TTGACA"
+              downstream: "TATAAT"
+              spacer_length: [16, 18]
+              upstream_pos: [0, 60]
+
+  solver:
+    backend: CBC
+    strategy: iterate
+    options: []
+
+  runtime:
+    round_robin: true
+    arrays_generated_before_resample: 2
+    min_count_per_tf: 0
+    max_duplicate_solutions: 3
+    stall_seconds_before_resample: 10
+    stall_warning_every_seconds: 10
+    max_resample_attempts: 2
+    max_total_resamples: 50
+    max_seconds_per_plan: 0
+    max_failed_solutions: 0
+    random_seed: 42
+
+  postprocess:
+    gap_fill:
+      mode: adaptive         # off | strict | adaptive
+      end: 5prime
+      gc_min: 0.40
+      gc_max: 0.60
+      max_tries: 2000
+
+  logging:
+    log_dir: ../../runs/smoke_v2/logs
+    level: INFO
+    suppress_solver_stderr: true
+    print_visual: false
+
+plots:
+  source: parquet
+  out_dir: ../../runs/smoke_v2/plots
