@@ -1,11 +1,25 @@
-# Inputs
+## Inputs
 
-DenseGen accepts four input types. Choose one per entry in `densegen.inputs`.
-Sample input files live in:
-- `src/dnadesign/densegen/runs/_campaigns/template/inputs` (binding sites)
-- `src/dnadesign/densegen/runs/_campaigns/pwm_demo/inputs` (PWM demos)
+Inputs define the binding-site library that feeds planning and optimization. Each entry in
+`densegen.inputs` is a named source (choose one input type per entry), and paths resolve relative
+to the config file location.
 
-## Binding site table (`type: binding_sites`)
+Sample inputs live in:
+- `src/dnadesign/densegen/runs/demo/inputs` (binding sites + PWM demos)
+
+### Contents
+- [Binding site table](#binding-site-table-type-binding_sites) - explicit TF/TFBS pairs.
+- [Sequence library](#sequence-library-type-sequence_library) - raw sequence seeds.
+- [PWM MEME](#pwm-meme-type-pwm_meme) - sample from MEME PWMs.
+- [PWM JASPAR](#pwm-jaspar-type-pwm_jaspar) - sample from JASPAR PFMs.
+- [PWM matrix CSV](#pwm-matrix-csv-type-pwm_matrix_csv) - sample from CSV matrices.
+- [USR sequences](#usr-sequences-type-usr_sequences) - read sequences from USR.
+- [Path resolution](#path-resolution) - how relative paths are resolved.
+- [Interaction with constraints](#interaction-with-constraints) - constraints that depend on inputs.
+
+---
+
+### Binding site table (`type: binding_sites`)
 
 Use a CSV or Parquet table with regulator and binding-site sequences.
 
@@ -32,7 +46,9 @@ inputs:
     format: csv
 ```
 
-## Sequence library (`type: sequence_library`)
+---
+
+### Sequence library (`type: sequence_library`)
 
 Use a CSV or Parquet table with a `sequence` column (override via `sequence_column`).
 
@@ -50,19 +66,21 @@ inputs:
     format: csv
 ```
 
-## PWM MEME (`type: pwm_meme`)
+---
+
+### PWM MEME (`type: pwm_meme`)
 
 Use a MEME-format PWM file and explicitly sample binding sites.
 
 Required sampling fields:
 - `strategy`: `consensus | stochastic | background`
 - `n_sites`: number of binding sites to generate per motif
-- `score_threshold` **or** `score_percentile` (exactly one)
+- `score_threshold` or `score_percentile` (exactly one)
 - `oversample_factor`: oversampling multiplier for candidate generation
 
 Notes:
 - `consensus` requires `n_sites: 1`.
-- `background` selects **low-scoring** sequences from the PWM.
+- `background` selects low-scoring sequences from the PWM.
 
 Example:
 
@@ -79,7 +97,9 @@ inputs:
       score_percentile: 90
 ```
 
-## PWM JASPAR (`type: pwm_jaspar`)
+---
+
+### PWM JASPAR (`type: pwm_jaspar`)
 
 Use a JASPAR PFM file and explicitly sample binding sites.
 
@@ -100,7 +120,9 @@ inputs:
       score_percentile: 10
 ```
 
-## PWM matrix CSV (`type: pwm_matrix_csv`)
+---
+
+### PWM matrix CSV (`type: pwm_matrix_csv`)
 
 Use a CSV matrix with `A,C,G,T` columns (override via `columns`) and a single motif ID.
 
@@ -126,7 +148,9 @@ inputs:
       score_threshold: -9.0
 ```
 
-## USR sequences (`type: usr_sequences`)
+---
+
+### USR sequences (`type: usr_sequences`)
 
 Read sequences from a USR dataset.
 
@@ -144,12 +168,20 @@ inputs:
     root: /path/to/usr/datasets
 ```
 
-## Path resolution
+---
 
-All relative paths resolve against the **config file directory**.
+### Path resolution
 
-## Interaction with constraints
+All relative paths resolve against the config file directory.
 
-- Promoter constraints are fixed motifs and are enforced by the optimizer.
+---
+
+### Interaction with constraints
+
+- Promoter constraints are fixed motifs and enforced by the optimizer.
 - `side_biases` motifs must exist in the sampled library (DenseGen fails fast if missing).
 - `required_regulators` (per plan item) must appear in the sampled library and in each solution.
+
+---
+
+@e-south
