@@ -1,12 +1,12 @@
-# DenseGen smoke config (small, Parquet-only, CBC backend)
+# DenseGen demo config (small, Parquet-only, CBC backend)
 
 densegen:
   schema_version: "2.1"
   run:
-    id: smoke_v2
+    id: demo
     root: "."
   inputs:
-    - name: smoke
+    - name: demo
       type: binding_sites
       path: inputs/tf2tfbs_mapping_cpxR_LexA.csv
       format: csv
@@ -37,7 +37,7 @@ densegen:
       iterative_min_new_solutions: 1
 
     plan:
-      - name: smoke
+      - name: demo
         quota: 5
         fixed_elements:
           promoter_constraints:
