@@ -185,8 +185,15 @@ src/dnadesign/opal/campaigns/**/inputs/**/.DS_Store
 
 # OPAL per-run products anywhere
 **/outputs/
-!src/dnadesign/densegen/runs/
-!src/dnadesign/densegen/runs/**
+# DenseGen runs: ignore everything by default, allow demo + README
+src/dnadesign/densegen/runs/**
+!src/dnadesign/densegen/runs/README.md
+!src/dnadesign/densegen/runs/demo/
+!src/dnadesign/densegen/runs/demo/config.yaml
+!src/dnadesign/densegen/runs/demo/inputs/
+!src/dnadesign/densegen/runs/demo/inputs/*.csv
+!src/dnadesign/densegen/runs/demo/inputs/*.meme
+!src/dnadesign/densegen/runs/demo/inputs/*.jaspar
 **/_densegen_ids.sqlite
 **/campaign.log.jsonl
 **/round.log.jsonl
