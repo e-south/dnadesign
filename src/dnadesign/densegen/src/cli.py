@@ -12,7 +12,6 @@ Commands:
   - run      : Execute generation pipeline; optionally auto-plot.
   - plot     : Generate plots from outputs using config YAML.
   - ls-plots : List available plot names and descriptions.
-  - ls-runs  : List run directories and summarize artifacts.
   - summarize : Print a run_manifest.json summary table.
 
 Run:
@@ -307,20 +306,6 @@ def stage(
     config_path = run_dir / "config.yaml"
     config_path.write_text(yaml.safe_dump(raw, sort_keys=False))
     console.print(f":sparkles: [bold green]Run staged[/]: {config_path}")
-
-
-@app.command("ls-runs", help="List run directories and summarize contents.")
-def ls_runs(
-    root: Path = typer.Option(DEFAULT_RUNS_ROOT, "--root", help="Runs root directory."),
-    limit: int = typer.Option(0, "--limit", help="Limit number of runs displayed (0 = all)."),
-    show_all: bool = typer.Option(False, "--all", help="Include directories without config.yaml."),
-):
-    runs_root = root.resolve()
-    if not runs_root.exists() or not runs_root.is_dir():
-        console.print(f"[bold red]Runs root not found:[/] {runs_root}")
-        raise typer.Exit(code=1)
-    console.print("[yellow]Note:[/] dense ls-runs is deprecated; use dense summarize --root instead.")
-    console.print(_list_runs_table(runs_root, limit=limit, show_all=show_all))
 
 
 @app.command(help="Summarize a run manifest.")
