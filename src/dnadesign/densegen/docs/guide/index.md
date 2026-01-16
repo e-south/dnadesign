@@ -14,6 +14,7 @@ Use it when you are building or modifying configs, or when you want to understan
 
 The guide focuses on how to supply inputs, define constraints, interpret outputs, and keep runs
 reproducible. It does not list every config key; use the reference for the full schema.
+For a hands-on walkthrough, start with the demo.
 
 ---
 

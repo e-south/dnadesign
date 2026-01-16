@@ -64,6 +64,6 @@ plots:
 When a run is complete, archive or sync the run directory as a unit.
 
 Tip: use `dense stage --id <run_name>` to scaffold a new run directory. Use
-`dense ls-runs --root runs/_archive` to inspect archived runs.
+`dense summarize --root runs/_archive` to inspect archived runs.
 
 @e-south
