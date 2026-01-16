@@ -8,3 +8,4 @@ Module Author(s): Eric J. South
 """
 
 from . import random_forest  # noqa: F401
+from . import gaussian_process 
