@@ -24,6 +24,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 from pathlib import Path
@@ -115,6 +116,20 @@ def _count_files(path: Path, pattern: str = "*") -> int:
     if not path.exists() or not path.is_dir():
         return 0
     return sum(1 for p in path.glob(pattern) if p.is_file())
+
+
+def _ensure_mpl_cache_dir() -> None:
+    if os.environ.get("MPLCONFIGDIR"):
+        return
+    cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+    target = cache_root / "densegen" / "matplotlib"
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+        os.environ["MPLCONFIGDIR"] = str(target)
+    except Exception:
+        tmp = Path(os.getenv("TMPDIR") or "/tmp") / "densegen-matplotlib"
+        tmp.mkdir(parents=True, exist_ok=True)
+        os.environ["MPLCONFIGDIR"] = str(tmp)
 
 
 def _list_runs_table(runs_root: Path, *, limit: int, show_all: bool) -> Table:
@@ -572,6 +587,7 @@ def run(
 
     # Auto-plot if configured
     if not no_plot and root.plots:
+        _ensure_mpl_cache_dir()
         from .viz.plotting import run_plots_from_config
 
         console.print("[bold]Generating plots...[/]")
@@ -587,6 +603,7 @@ def plot(
 ):
     cfg_path = _resolve_config_path(ctx, config)
     loaded = _load_config_or_exit(cfg_path)
+    _ensure_mpl_cache_dir()
     from .viz.plotting import run_plots_from_config
 
     run_plots_from_config(loaded.root, loaded.path, only=only)
