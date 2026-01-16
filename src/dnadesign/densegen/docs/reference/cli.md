@@ -109,8 +109,6 @@ Options:
 - `--config` - config path (used to resolve run root when `--run` is not set).
 - `--verbose` - show failure breakdown columns (constraint filters + duplicate solutions).
 
-Note: `dense ls-runs` is a legacy alias and may be removed in the future.
-
 ---
 
 ### Examples
