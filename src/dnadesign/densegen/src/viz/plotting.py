@@ -33,6 +33,7 @@ from rich.table import Table
 
 from ..adapters.outputs import load_records_from_config
 from ..config import RootConfig, resolve_run_root, resolve_run_scoped_path
+from . import mpl_config  # noqa: F401
 from .plot_registry import PLOT_SPECS
 
 # Embed TrueType fonts for clean text in vector exports
