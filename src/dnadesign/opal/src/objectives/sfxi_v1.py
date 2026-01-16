@@ -113,6 +113,11 @@ def sfxi_v1(
     ctx: Optional[PluginCtx] = None,
     train_view=None,
 ) -> ObjectiveResult:
+    if y_pred.ndim == 3:
+        y_pred, std_devs = y_pred
+        scalar_uncertainty = np.nanmean(std_devs, axis = 1)
+    else:
+        scalar_uncertainty = None
     # assert y_pred dims
     if not (isinstance(y_pred, np.ndarray) and y_pred.ndim == 2 and y_pred.shape[1] >= 8):
         raise ValueError(f"[sfxi_v1] Expected y_pred shape (n, 8+); got {getattr(y_pred, 'shape', None)}.")
@@ -207,6 +212,6 @@ def sfxi_v1(
 
     return ObjectiveResult(
         score=np.asarray(score, dtype=float).ravel(),
-        scalar_uncertainty=None,
+        scalar_uncertainty=scalar_uncertainty,
         diagnostics=diagnostics,
     )
