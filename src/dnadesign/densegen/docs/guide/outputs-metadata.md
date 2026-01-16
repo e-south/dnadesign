@@ -5,6 +5,8 @@ namespaced and recorded consistently so outputs remain resume-safe and auditable
 
 ### Contents
 - [Output targets](#output-targets) - Parquet and USR sinks.
+- [Run manifest](#run-manifest) - run-level summary JSON.
+- [Rejection log](#rejection-log) - rejected solutions audit.
 - [Source field](#source-field) - per-record provenance string.
 - [Metadata scheme](#metadata-scheme) - namespacing and categories.
 - [Parquet vs USR encoding](#parquet-vs-usr-encoding) - differences in storage.
@@ -18,6 +20,29 @@ namespaced and recorded consistently so outputs remain resume-safe and auditable
 - **USR**: Dataset.attach with namespace `densegen`.
 
 When multiple targets are configured, DenseGen asserts all targets are in sync before writing.
+
+---
+
+### Run manifest
+
+Each run writes `run_manifest.json` in the run root with per-input/plan counts (generated,
+duplicates, failures, resamples, libraries built, stalls), plus solver settings, schema version,
+and the dense-arrays version source. The manifest also tracks constraint-filter failure reasons
+and duplicate-solution counts.
+Use the CLI to summarize a run:
+
+```
+uv run dense summarize --run path/to/run
+```
+
+---
+
+### Rejection log
+
+When solutions are rejected by post-solve constraints or output deduplication, DenseGen writes
+Parquet records under `rejections/` in the run root (`part-*.parquet`). Each row includes the
+reason, constraint details (JSON), the sequence, and solver/provenance fields. If no rejections
+occur, the directory is not created. Rejection logs use Parquet and therefore require `pyarrow`.
 
 ---
 

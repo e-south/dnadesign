@@ -12,10 +12,10 @@ and uses the dense-arrays CBC backend. All paths are explicit; missing files fai
 - [4) Plan constraints](#4-plan-constraints) - see resolved quotas and constraint buckets.
 - [5) Describe the resolved run](#5-describe-the-resolved-run) - verify inputs, outputs, solver.
 - [6) Run generation](#6-run-generation) - produce sequences and metadata.
-- [7) Inspect outputs](#7-inspect-outputs) - list Parquet artifacts.
-- [8) Plot analysis](#8-plot-analysis) - render tf_usage and tf_coverage.
-- [Optional: PWM sampling input](#optional-pwm-sampling-input) - sample TFBSs from PWM files.
-- [Optional: Add USR output](#optional-add-usr-output) - enable USR alongside Parquet.
+- [7) Summarize the run](#7-summarize-the-run) - review run-level counts.
+- [8) Inspect outputs](#8-inspect-outputs) - list Parquet artifacts.
+- [9) Plot analysis](#9-plot-analysis) - render tf_usage and tf_coverage.
+- [Appendix (optional)](#appendix-optional) - PWM sampling + USR output.
 
 ## 0) Prereqs
 
@@ -137,7 +137,31 @@ Quota plan: demo=5
 On macOS you may see Arrow sysctl warnings after generation; they are emitted by pyarrow and do
 not indicate a DenseGen failure.
 
-## 7) Inspect outputs
+## 7) Summarize the run
+
+DenseGen writes a `run_manifest.json` in the run root. Summarize it:
+
+```bash
+uv run dense summarize --run /private/tmp/densegen-demo-20260115-1405/demo_press
+```
+
+Example output:
+
+```text
+Run: demo_press  Root: /private/tmp/densegen-demo-20260115-1405/demo_press  Schema: 2.1  dense-arrays: <version> (<source>)
+┏━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┓
+┃ input ┃ plan ┃ generated ┃ duplica… ┃ failed ┃ resamples ┃ librari… ┃ stalls ┃
+┡━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━┩
+│ demo  │ demo │ 5         │ 0        │ 0      │ 0         │ 1        │ 0      │
+└───────┴──────┴───────────┴──────────┴────────┴───────────┴──────────┴────────┘
+```
+
+Use `--verbose` for constraint-failure breakdowns and duplicate-solution counts.
+
+If any solutions are rejected, DenseGen writes them to `rejections/part-*.parquet` in the run
+root.
+
+## 8) Inspect outputs
 
 List the generated Parquet artifacts:
 
@@ -152,7 +176,7 @@ _densegen_ids.sqlite
 part-10ca57ae0c1d410d8b88206d194a2ff1.parquet
 ```
 
-## 8) Plot analysis
+## 9) Plot analysis
 
 First, list the available plots:
 
@@ -215,7 +239,9 @@ tf_coverage.pdf
 tf_usage.pdf
 ```
 
-## Optional: PWM sampling input
+## Appendix (optional)
+
+### PWM sampling input
 
 DenseGen can sample binding sites directly from PWM files. The example below uses a
 low-percentile (background-like) sampling strategy:
@@ -235,7 +261,7 @@ inputs:
 
 Swap `type` and `path` to `pwm_meme` or `pwm_matrix_csv` with the same `sampling` block.
 
-## Optional: Add USR output
+### Add USR output
 
 USR is an optional I/O adapter. To write both Parquet and USR:
 

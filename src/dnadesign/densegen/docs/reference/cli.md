@@ -15,7 +15,7 @@ the run root. USR is optional and is only imported when configured.
 - [`dense plot`](#dense-plot) - render plots from outputs.
 - [`dense ls-plots`](#dense-ls-plots) - list available plots.
 - [`dense stage`](#dense-stage) - scaffold a run directory.
-- [`dense ls-runs`](#dense-ls-runs) - summarize run directories.
+- [`dense summarize`](#dense-summarize) - summarize run_manifest.json or list runs.
 - [Examples](#examples) - common command sequences.
 
 ---
@@ -99,12 +99,17 @@ Options:
 
 ---
 
-#### `dense ls-runs`
-List runs under a root directory and summarize artifacts.
+#### `dense summarize`
+Summarize a run manifest (`run_manifest.json`).
 Options:
-- `--root` - runs root directory (default: package `runs/` directory).
-- `--limit` - maximum number of runs to display.
-- `--all` - include directories without `config.yaml`.
+- `--run` - run directory (defaults to `densegen.run.root` from config).
+- `--root` - list runs under a root directory (replacement for `dense ls-runs`).
+- `--limit` - limit runs displayed when using `--root`.
+- `--all` - include directories without `config.yaml` when using `--root`.
+- `--config` - config path (used to resolve run root when `--run` is not set).
+- `--verbose` - show failure breakdown columns (constraint filters + duplicate solutions).
+
+Note: `dense ls-runs` is a legacy alias and may be removed in the future.
 
 ---
 
@@ -116,6 +121,8 @@ uv run dense plan     -c src/dnadesign/densegen/runs/demo/config.yaml
 uv run dense describe -c src/dnadesign/densegen/runs/demo/config.yaml
 uv run dense run      -c src/dnadesign/densegen/runs/demo/config.yaml
 uv run dense plot     -c src/dnadesign/densegen/runs/demo/config.yaml --only tf_usage,tf_coverage
+uv run dense summarize --run src/dnadesign/densegen/runs/demo
+uv run dense summarize --root src/dnadesign/densegen/runs
 ```
 
 Demo run (small, Parquet-only config):

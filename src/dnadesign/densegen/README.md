@@ -30,11 +30,10 @@ For a full end-to-end walkthrough with expected outputs, see
 
 ### More documentation
 
-Docs live in `docs/`. Quick map:
-- [DenseGen demo](docs/demo/demo_basic.md)
-- [DenseGen guide](docs/guide/index.md)
-- [CLI](docs/reference/cli.md), [Config](docs/reference/config.md), [Outputs](docs/reference/outputs.md)
-- Architecture (internal): [Architecture](docs/dev/architecture.md)
+Docs live in `docs/`:
+- [DenseGen demo](docs/demo/demo_basic.md) - canonical end-to-end walkthrough.
+- [DenseGen guide](docs/guide/index.md) - concepts and data flow.
+- [Reference](docs/reference/cli.md) - CLI, config, outputs (schema-level detail).
 
 ---
 

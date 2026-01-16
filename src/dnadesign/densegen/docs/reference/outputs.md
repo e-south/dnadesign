@@ -10,6 +10,7 @@ appendable, analytics-ready).
 - [USR](#usr) - attach semantics and optional dependency.
 - [Metadata (common)](#metadata-common) - namespacing and core categories.
 - [Source column](#source-column) - provenance string.
+- [Rejected solutions](#rejected-solutions) - constraint rejections audit.
 
 ---
 
@@ -75,6 +76,15 @@ The `source` column is always present and encodes provenance as:
 ```
 densegen:{input_name}:{plan_name}
 ```
+
+---
+
+### Rejected solutions
+
+If solutions are rejected by post-solve constraints or output deduplication, DenseGen writes
+Parquet rows under `rejections/` in the run root. Each row includes the rejection reason,
+constraint details (JSON), and solver/provenance fields. If no rejections occur, the directory is
+not created. Rejection logs require `pyarrow`.
 
 ---
 
