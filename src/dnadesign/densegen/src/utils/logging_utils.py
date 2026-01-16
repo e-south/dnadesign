@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 
-def _install_native_stderr_deduper(patterns: Iterable[str]) -> None:
+def _install_native_stderr_deduper(patterns: Iterable[tuple[str, str | None]]) -> None:
     """
     Redirect the *process*'s stderr (FD=2) through a pipe and suppress repeated
     lines matching any of `patterns` (regex). The first time a pattern is seen,
@@ -32,7 +32,7 @@ def _install_native_stderr_deduper(patterns: Iterable[str]) -> None:
     if getattr(_install_native_stderr_deduper, "_installed", False):
         return
 
-    pats = [re.compile(p) for p in patterns]
+    pats = [(re.compile(pat), msg) for pat, msg in patterns]
     log = logging.getLogger("densegen.stderr")
 
     # Duplicate current stderr FD (so we can still forward non-matching lines)
@@ -65,16 +65,13 @@ def _install_native_stderr_deduper(patterns: Iterable[str]) -> None:
                     line, buf = buf.split(b"\n", 1)
                     text = line.decode("utf-8", errors="replace")
                     suppressed = False
-                    for pat in pats:
+                    for pat, msg in pats:
                         if pat.search(text):
                             key = pat.pattern
                             if key not in seen:
                                 seen.add(key)
-                                # Emit one clean Python warning instead of the raw native spam
-                                log.warning(
-                                    "CBC backend does not support SetSolverSpecificParametersAsString; "
-                                    "continuing without solver-specific parameter strings."
-                                )
+                                if msg and log.hasHandlers():
+                                    log.warning(msg)
                             suppressed = True
                             break
                     if not suppressed:
@@ -97,6 +94,20 @@ def _install_native_stderr_deduper(patterns: Iterable[str]) -> None:
     t = threading.Thread(target=reader, daemon=True)
     t.start()
     _install_native_stderr_deduper._installed = True  # type: ignore[attr-defined]
+
+
+def install_native_stderr_filters() -> None:
+    _install_native_stderr_deduper(
+        patterns=[
+            (
+                r"SetSolverSpecificParametersAsString\(\) not supported by Cbc",
+                "CBC backend does not support SetSolverSpecificParametersAsString; "
+                "continuing without solver-specific parameter strings.",
+            ),
+            (r"arrow/cpp/src/arrow/util/cpu_info\.cc", None),
+            (r"sysctlbyname failed for 'hw\.", None),
+        ]
+    )
 
 
 def setup_logging(
@@ -147,8 +158,4 @@ def setup_logging(
     logging.getLogger(__name__).info("Logging initialized (level=%s)", level)
 
     if suppress_solver_stderr:
-        _install_native_stderr_deduper(
-            patterns=[
-                r"SetSolverSpecificParametersAsString\(\) not supported by Cbc",
-            ]
-        )
+        install_native_stderr_filters()
