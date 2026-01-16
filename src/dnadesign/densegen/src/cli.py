@@ -13,6 +13,7 @@ Commands:
   - plot     : Generate plots from outputs using config YAML.
   - ls-plots : List available plot names and descriptions.
   - ls-runs  : List run directories and summarize artifacts.
+  - summarize : Print a run_manifest.json summary table.
 
 Run:
   python -m dnadesign.densegen.src.cli --help
@@ -43,6 +44,7 @@ from .config import (
     resolve_run_scoped_path,
 )
 from .core.pipeline import resolve_plan, run_pipeline
+from .core.run_manifest import load_run_manifest
 from .utils.logging_utils import setup_logging
 
 rich_traceback(show_locals=False)
@@ -114,6 +116,71 @@ def _count_files(path: Path, pattern: str = "*") -> int:
     if not path.exists() or not path.is_dir():
         return 0
     return sum(1 for p in path.glob(pattern) if p.is_file())
+
+
+def _list_runs_table(runs_root: Path, *, limit: int, show_all: bool) -> Table:
+    run_dirs = sorted([p for p in runs_root.iterdir() if p.is_dir()], key=lambda p: p.name)
+    if limit and limit > 0:
+        run_dirs = run_dirs[: int(limit)]
+
+    table = Table("run", "id", "config", "parquet", "plots", "logs", "status")
+    for run_dir in run_dirs:
+        cfg_path = run_dir / "config.yaml"
+        if not show_all and not cfg_path.exists():
+            continue
+
+        run_id = run_dir.name
+        status = "ok"
+        parquet_count = "-"
+        plots_count = _count_files(run_dir / "plots", pattern="*")
+        logs_count = _count_files(run_dir / "logs", pattern="*")
+
+        if cfg_path.exists():
+            try:
+                loaded = load_config(cfg_path)
+                run_id = loaded.root.densegen.run.id
+                run_root = resolve_run_root(cfg_path, loaded.root.densegen.run.root)
+                if loaded.root.densegen.output.parquet is not None:
+                    pq_dir = resolve_run_scoped_path(
+                        cfg_path,
+                        run_root,
+                        loaded.root.densegen.output.parquet.path,
+                        label="output.parquet.path",
+                    )
+                    parquet_count = _count_files(pq_dir, pattern="*.parquet")
+                plots_count = _count_files(
+                    resolve_run_scoped_path(
+                        cfg_path,
+                        run_root,
+                        loaded.root.plots.out_dir if loaded.root.plots else "plots",
+                        label="plots.out_dir",
+                    ),
+                    pattern="*",
+                )
+                logs_count = _count_files(
+                    resolve_run_scoped_path(
+                        cfg_path,
+                        run_root,
+                        loaded.root.densegen.logging.log_dir,
+                        label="logging.log_dir",
+                    ),
+                    pattern="*",
+                )
+            except Exception:
+                status = "invalid"
+        else:
+            status = "missing config.yaml"
+
+        table.add_row(
+            run_dir.name,
+            run_id,
+            str(cfg_path) if cfg_path.exists() else "-",
+            str(parquet_count),
+            str(plots_count),
+            str(logs_count),
+            status,
+        )
+    return table
 
 
 # ----------------- Typer CLI -----------------
@@ -252,69 +319,97 @@ def ls_runs(
     if not runs_root.exists() or not runs_root.is_dir():
         console.print(f"[bold red]Runs root not found:[/] {runs_root}")
         raise typer.Exit(code=1)
+    console.print("[yellow]Note:[/] dense ls-runs is deprecated; use dense summarize --root instead.")
+    console.print(_list_runs_table(runs_root, limit=limit, show_all=show_all))
 
-    run_dirs = sorted([p for p in runs_root.iterdir() if p.is_dir()], key=lambda p: p.name)
-    if limit and limit > 0:
-        run_dirs = run_dirs[: int(limit)]
 
-    table = Table("run", "id", "config", "parquet", "plots", "logs", "status")
-    for run_dir in run_dirs:
-        cfg_path = run_dir / "config.yaml"
-        if not show_all and not cfg_path.exists():
-            continue
+@app.command(help="Summarize a run manifest.")
+def summarize(
+    ctx: typer.Context,
+    run: Optional[Path] = typer.Option(None, "--run", "-r", help="Run directory (defaults to config run root)."),
+    root: Optional[Path] = typer.Option(None, "--root", help="Runs root directory (lists runs)."),
+    limit: int = typer.Option(0, "--limit", help="Limit runs displayed when using --root (0 = all)."),
+    show_all: bool = typer.Option(False, "--all", help="Include directories without config.yaml when using --root."),
+    config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show failure breakdown columns."),
+):
+    if root is not None and run is not None:
+        console.print("[bold red]Choose either --root or --run, not both.[/]")
+        raise typer.Exit(code=1)
+    if root is not None:
+        runs_root = root.resolve()
+        if not runs_root.exists() or not runs_root.is_dir():
+            console.print(f"[bold red]Runs root not found:[/] {runs_root}")
+            raise typer.Exit(code=1)
+        console.print(_list_runs_table(runs_root, limit=limit, show_all=show_all))
+        return
+    if run is None:
+        cfg_path = _resolve_config_path(ctx, config)
+        loaded = _load_config_or_exit(cfg_path)
+        run_root = _run_root_for(loaded)
+    else:
+        run_root = run
+    manifest_path = run_root / "run_manifest.json"
+    if not manifest_path.exists():
+        console.print(f"[bold red]Run manifest not found:[/] {manifest_path}")
+        raise typer.Exit(code=1)
 
-        run_id = run_dir.name
-        status = "ok"
-        parquet_count = "-"
-        plots_count = _count_files(run_dir / "plots", pattern="*")
-        logs_count = _count_files(run_dir / "logs", pattern="*")
-
-        if cfg_path.exists():
-            try:
-                loaded = load_config(cfg_path)
-                run_id = loaded.root.densegen.run.id
-                run_root = resolve_run_root(cfg_path, loaded.root.densegen.run.root)
-                if loaded.root.densegen.output.parquet is not None:
-                    pq_dir = resolve_run_scoped_path(
-                        cfg_path,
-                        run_root,
-                        loaded.root.densegen.output.parquet.path,
-                        label="output.parquet.path",
-                    )
-                    parquet_count = _count_files(pq_dir, pattern="*.parquet")
-                plots_count = _count_files(
-                    resolve_run_scoped_path(
-                        cfg_path,
-                        run_root,
-                        loaded.root.plots.out_dir if loaded.root.plots else "plots",
-                        label="plots.out_dir",
-                    ),
-                    pattern="*",
-                )
-                logs_count = _count_files(
-                    resolve_run_scoped_path(
-                        cfg_path,
-                        run_root,
-                        loaded.root.densegen.logging.log_dir,
-                        label="logging.log_dir",
-                    ),
-                    pattern="*",
-                )
-            except Exception:
-                status = "invalid"
-        else:
-            status = "missing config.yaml"
-
-        table.add_row(
-            run_dir.name,
-            run_id,
-            str(cfg_path) if cfg_path.exists() else "-",
-            str(parquet_count),
-            str(plots_count),
-            str(logs_count),
-            status,
+    manifest = load_run_manifest(manifest_path)
+    schema_label = manifest.schema_version or "-"
+    dense_arrays_label = manifest.dense_arrays_version or "-"
+    dense_arrays_source = manifest.dense_arrays_version_source or "-"
+    if dense_arrays_label != "-" and dense_arrays_source != "-":
+        dense_arrays_label = f"{dense_arrays_label} ({dense_arrays_source})"
+    console.print(
+        f"[bold]Run:[/] {manifest.run_id}  [bold]Root:[/] {manifest.run_root}  "
+        f"[bold]Schema:[/] {schema_label}  [bold]dense-arrays:[/] {dense_arrays_label}"
+    )
+    if verbose:
+        table = Table(
+            "input",
+            "plan",
+            "generated",
+            "dup_out",
+            "dup_sol",
+            "failed",
+            "fail_tf",
+            "fail_req",
+            "fail_min",
+            "fail_k",
+            "resamples",
+            "libraries",
+            "stalls",
         )
-
+    else:
+        table = Table("input", "plan", "generated", "duplicates", "failed", "resamples", "libraries", "stalls")
+    for item in manifest.items:
+        if verbose:
+            table.add_row(
+                item.input_name,
+                item.plan_name,
+                str(item.generated),
+                str(item.duplicates_skipped),
+                str(item.duplicate_solutions),
+                str(item.failed_solutions),
+                str(item.failed_min_count_per_tf),
+                str(item.failed_required_regulators),
+                str(item.failed_min_count_by_regulator),
+                str(item.failed_min_required_regulators),
+                str(item.total_resamples),
+                str(item.libraries_built),
+                str(item.stall_events),
+            )
+        else:
+            table.add_row(
+                item.input_name,
+                item.plan_name,
+                str(item.generated),
+                str(item.duplicates_skipped),
+                str(item.failed_solutions),
+                str(item.total_resamples),
+                str(item.libraries_built),
+                str(item.stall_events),
+            )
     console.print(table)
 
 
