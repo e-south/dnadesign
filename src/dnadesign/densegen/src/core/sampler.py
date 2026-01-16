@@ -97,8 +97,17 @@ class TFSampler:
         sites: list[str] = []
         meta: list[str] = []
         labels: list[str] = []
+        site_ids: list[str | None] = []
+        sources: list[str | None] = []
         seen_tfbs = set()  # for unique_binding_sites (tf, tfbs)
         used_per_tf: dict[str, int] = {}
+
+        has_site_id = "site_id" in self.df.columns
+        has_source = "source" in self.df.columns
+
+        def _append_provenance(row) -> None:
+            site_ids.append(str(row["site_id"]) if has_site_id else None)
+            sources.append(str(row["source"]) if has_source else None)
 
         unique_tfs = self.df["tf"].unique().tolist()
         self.rng.shuffle(unique_tfs)
@@ -135,6 +144,7 @@ class TFSampler:
                     sites.append(tfbs)
                     meta.append(f"{tf}:{tfbs}")
                     labels.append(tf)
+                    _append_provenance(row.iloc[0])
                     seen_tfbs.add(key)
                     used_per_tf[tf] = used_per_tf.get(tf, 0) + 1
                     return True
@@ -147,10 +157,12 @@ class TFSampler:
                 rows = self.df[self.df["tfbs"] == motif]
                 if rows.empty:
                     raise ValueError(f"Required TFBS motif not found in input: {motif}")
-                tf = rows["tf"].iloc[0]
+                row = rows.iloc[0]
+                tf = row["tf"]
                 sites.append(motif)
                 meta.append(f"{tf}:{motif}")
                 labels.append(tf)
+                _append_provenance(row)
                 seen_tfbs.add((tf, motif))
                 used_per_tf[tf] = used_per_tf.get(tf, 0) + 1
 
@@ -216,6 +228,8 @@ class TFSampler:
             "achieved_length": int(sum(len(s) for s in sites)),
             "relaxed_cap": bool(relaxed_cap),
             "final_cap": cap,
+            "site_id_by_index": site_ids if has_site_id else None,
+            "source_by_index": sources if has_source else None,
         }
 
         return sites, meta, labels, info

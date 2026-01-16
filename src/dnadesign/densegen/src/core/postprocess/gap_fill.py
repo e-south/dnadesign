@@ -52,11 +52,10 @@ def random_fill(
 
     Behavior
     --------
-    - strict: infeasible windows or inability to hit GC target raise ValueError.
-    - adaptive: infeasible windows or misses after max_tries relax to [0, 1],
-      and are recorded with relaxed=True.
+    - strict: infeasible windows raise ValueError.
+    - adaptive: infeasible windows relax to [0, 1] and are recorded with relaxed=True.
+    - GC content is constructed directly within the final window (no rejection sampling).
     """
-    nucleotides = "ATGC"
     rng = rng or random
 
     if length <= 0:
@@ -86,32 +85,12 @@ def random_fill(
         lo, hi = 0, length
         final_min, final_max = 0.0, 1.0
 
-    # Try within the (possibly relaxed) window
-    attempts = 0
-    for attempts in range(1, max_tries + 1):
-        seq = "".join(rng.choices(nucleotides, k=length))
-        gc_count = seq.count("G") + seq.count("C")
-        if lo <= gc_count <= hi:
-            return seq, {
-                "attempts": attempts,
-                "gc_actual": _gc_fraction(seq),
-                "relaxed": relaxed,
-                "final_gc_min": final_min,
-                "final_gc_max": final_max,
-                "target_gc_min": gc_min,
-                "target_gc_max": gc_max,
-            }
-
-    if mode == "strict":
-        raise ValueError(f"Failed to hit GC target after {max_tries} tries (len={length}, min={gc_min}, max={gc_max}).")
-
-    # Adaptive: relax and return next draw.
-    if not relaxed:
-        relaxed = True
-        final_min, final_max = 0.0, 1.0
-    seq = "".join(rng.choices(nucleotides, k=length))
+    gc_count = rng.randint(lo, hi) if lo <= hi else 0
+    bases = [rng.choice("GC") for _ in range(gc_count)] + [rng.choice("AT") for _ in range(length - gc_count)]
+    rng.shuffle(bases)
+    seq = "".join(bases)
     return seq, {
-        "attempts": attempts,
+        "attempts": 1,
         "gc_actual": _gc_fraction(seq),
         "relaxed": relaxed,
         "final_gc_min": final_min,

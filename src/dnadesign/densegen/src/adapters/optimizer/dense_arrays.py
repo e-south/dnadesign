@@ -13,6 +13,7 @@ Dunlop Lab
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import Iterable, Protocol
 
@@ -160,17 +161,46 @@ class DenseArraysAdapter:
         elif strategy == "optimal":
 
             def _gen():
-                yield opt.optimal(solver=solver_name, solver_options=solver_options)
+                start = time.monotonic()
+                sol = opt.optimal(solver=solver_name, solver_options=solver_options)
+                try:
+                    setattr(sol, "_densegen_solve_time_s", time.monotonic() - start)
+                except Exception:
+                    pass
+                yield sol
 
             gen = _gen()
         elif strategy == "approximate":
 
             def _gen():
-                yield opt.approximate()
+                start = time.monotonic()
+                sol = opt.approximate()
+                try:
+                    setattr(sol, "_densegen_solve_time_s", time.monotonic() - start)
+                except Exception:
+                    pass
+                yield sol
 
             gen = _gen()
         else:
             raise ValueError(f"Unknown solver strategy: {strategy}")
+        if strategy in {"diverse", "iterate"}:
+            base_gen = iter(gen)
+
+            def _timed_gen():
+                while True:
+                    start = time.monotonic()
+                    try:
+                        sol = next(base_gen)
+                    except StopIteration:
+                        return
+                    try:
+                        setattr(sol, "_densegen_solve_time_s", time.monotonic() - start)
+                    except Exception:
+                        pass
+                    yield sol
+
+            gen = _timed_gen()
         return OptimizerRun(optimizer=opt, generator=gen, forbid_each=False)
 
 
