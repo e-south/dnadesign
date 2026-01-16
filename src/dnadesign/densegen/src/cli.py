@@ -45,7 +45,7 @@ from .config import (
 )
 from .core.pipeline import resolve_plan, run_pipeline
 from .core.run_manifest import load_run_manifest
-from .utils.logging_utils import setup_logging
+from .utils.logging_utils import install_native_stderr_filters, setup_logging
 
 rich_traceback(show_locals=False)
 console = Console()
@@ -588,6 +588,7 @@ def run(
     # Auto-plot if configured
     if not no_plot and root.plots:
         _ensure_mpl_cache_dir()
+        install_native_stderr_filters()
         from .viz.plotting import run_plots_from_config
 
         console.print("[bold]Generating plots...[/]")
@@ -604,6 +605,7 @@ def plot(
     cfg_path = _resolve_config_path(ctx, config)
     loaded = _load_config_or_exit(cfg_path)
     _ensure_mpl_cache_dir()
+    install_native_stderr_filters()
     from .viz.plotting import run_plots_from_config
 
     run_plots_from_config(loaded.root, loaded.path, only=only)
