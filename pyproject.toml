@@ -102,6 +102,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 addopts = "-ra -q"
 testpaths = ["src/dnadesign"]
+pythonpath = ["src"]
 norecursedirs = ["*/archived/*", ".venv", "venv", "build", "dist", "*.egg-info"]
 markers = ["slow: sampling-heavy tests (>10 s)"]
 
