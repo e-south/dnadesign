@@ -108,6 +108,7 @@ markers = ["slow: sampling-heavy tests (>10 s)"]
 [tool.ruff]
 line-length = 120
 target-version = "py312"
+src = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
