@@ -35,6 +35,10 @@ class PWM:
     nsites: Optional[int] = None
     evalue: Optional[float] = None
     log_odds_matrix: Optional[np.ndarray] = None
+    source_length: Optional[int] = None
+    window_start: Optional[int] = None
+    window_strategy: Optional[str] = None
+    window_score: Optional[float] = None
 
     def __post_init__(self) -> None:
         matrix = np.asarray(self.matrix, dtype=float)
@@ -55,6 +59,14 @@ class PWM:
                 raise ValueError("log_odds_matrix must match PWM.matrix shape")
             object.__setattr__(self, "log_odds_matrix", lom)
 
+        if self.source_length is not None and self.source_length < self.length:
+            raise ValueError("source_length must be >= PWM length")
+        if self.window_start is not None:
+            if self.source_length is None:
+                raise ValueError("window_start requires source_length")
+            if self.window_start < 0 or (self.window_start + self.length) > self.source_length:
+                raise ValueError("window_start is out of bounds for source_length")
+
     @property
     def length(self) -> int:
         return self.matrix.shape[0]
@@ -69,6 +81,9 @@ class PWM:
     def log_odds(
         self,
         background: Sequence[float] = (0.25, 0.25, 0.25, 0.25),
+        *,
+        pseudocounts: Optional[float] = None,
+        log_odds_clip: Optional[float] = None,
     ) -> np.ndarray:
         """
         Return or compute the log-odds matrix:
@@ -76,9 +91,17 @@ class PWM:
 
         Args:
           background: length-4 array of bg frequencies
+          pseudocounts: optional Dirichlet-style smoothing toward background
+          log_odds_clip: optional absolute-value clip for log-odds
         """
         if self.log_odds_matrix is not None:
             return self.log_odds_matrix
-        p = self.matrix + 1e-9
         bg = np.array(background, float)
-        return np.log2(p / bg)
+        p = self.matrix
+        if pseudocounts is not None and pseudocounts > 0:
+            p = (p + float(pseudocounts) * bg) / (1.0 + float(pseudocounts))
+        p = p + 1e-9
+        lom = np.log2(p / bg)
+        if log_odds_clip is not None:
+            lom = np.clip(lom, -float(log_odds_clip), float(log_odds_clip))
+        return lom

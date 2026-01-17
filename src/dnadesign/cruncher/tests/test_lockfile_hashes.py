@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.cruncher.services.lock_service import resolve_lock
+from dnadesign.cruncher.app.lock_service import resolve_lock
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.lockfile import LockedMotif, Lockfile, read_lockfile, verify_lockfile_hashes
 from dnadesign.cruncher.utils.hashing import sha256_lines, sha256_path

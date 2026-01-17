@@ -25,6 +25,11 @@ jobs:
       - name: Install dependencies (locked)
         run: uv sync --locked --dev
 
+      - name: Pre-commit (non-Ruff hooks)
+        env:
+          SKIP: ruff-check,ruff-format
+        run: uv run pre-commit run --all-files
+
       - name: Lint
         run: uv run ruff check .
 

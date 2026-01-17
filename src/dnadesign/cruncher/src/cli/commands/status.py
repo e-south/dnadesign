@@ -13,12 +13,20 @@ from collections import Counter
 from pathlib import Path
 
 import typer
-from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
+from dnadesign.cruncher.app.catalog_service import catalog_stats
+from dnadesign.cruncher.app.run_service import list_runs
+from dnadesign.cruncher.app.target_service import (
+    has_blocking_target_errors,
+    target_statuses,
+)
+from dnadesign.cruncher.cli.config_resolver import (
+    ConfigResolutionError,
+    resolve_config_path,
+)
+from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.registry import default_registry
-from dnadesign.cruncher.services.catalog_service import catalog_stats
-from dnadesign.cruncher.services.run_service import list_runs
-from dnadesign.cruncher.services.target_service import has_blocking_target_errors, target_statuses
+from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
 from rich.console import Console
 from rich.table import Table
 
@@ -26,7 +34,11 @@ console = Console()
 
 
 def status(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml (required).", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -43,8 +55,8 @@ def status(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
-    lock_path = catalog_root / "locks" / f"{config_path.stem}.lock.json"
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    lock_path = resolve_lock_path(config_path)
     sources = default_registry(
         cfg.ingest,
         config_path=config_path,
@@ -55,9 +67,9 @@ def status(
     config_table = Table(title="Configuration", header_style="bold")
     config_table.add_column("Setting")
     config_table.add_column("Value")
-    config_table.add_row("config", str(config_path))
-    config_table.add_row("catalog_root", str(catalog_root))
-    config_table.add_row("out_dir", str(config_path.parent / cfg.out_dir))
+    config_table.add_row("config", render_path(config_path, base=config_path.parent))
+    config_table.add_row("catalog_root", render_path(catalog_root, base=config_path.parent))
+    config_table.add_row("out_dir", render_path(config_path.parent / cfg.out_dir, base=config_path.parent))
     config_table.add_row("pwm_source", cfg.motif_store.pwm_source)
     config_table.add_row("sources", source_ids)
     config_table.add_row("lockfile", "present" if lock_path.exists() else "missing")

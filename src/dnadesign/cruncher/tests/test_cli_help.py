@@ -16,10 +16,11 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
+import dnadesign.cruncher.app.analyze_workflow as analyze_workflow
 import dnadesign.cruncher.cli.commands.sources as sources_module
-import dnadesign.cruncher.workflows.analyze_workflow as analyze_workflow
 from dnadesign.cruncher.cli.app import app
 from dnadesign.cruncher.cli.config_resolver import (
+    CONFIG_ENV_VAR,
     DEFAULT_WORKSPACE_ENV_VAR,
     NONINTERACTIVE_ENV_VAR,
     WORKSPACE_ENV_VAR,
@@ -29,7 +30,7 @@ from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mK]")
 runner = CliRunner()
-CONFIG_PATH = Path(__file__).resolve().parents[1] / "workspaces" / "demo" / "config.yaml"
+CONFIG_PATH = Path(__file__).resolve().parents[1] / "workspaces" / "demo_basics_two_tf" / "config.yaml"
 
 
 def invoke_cli(args: list[str], env: dict[str, str] | None = None):
@@ -52,6 +53,7 @@ def invoke_isolated(args: list[str], env: dict[str, str] | None = None):
 @pytest.fixture(autouse=True)
 def _clear_workspace_env(monkeypatch: pytest.MonkeyPatch):
     for var in (
+        CONFIG_ENV_VAR,
         WORKSPACE_ENV_VAR,
         DEFAULT_WORKSPACE_ENV_VAR,
         WORKSPACE_ROOTS_ENV_VAR,
@@ -70,15 +72,102 @@ def test_root_help_includes_command_descriptions() -> None:
 
 
 def test_workspaces_list_includes_demo() -> None:
-    result = invoke_cli(["workspaces", "list"])
+    result = invoke_cli(["workspaces", "list"], env={"COLUMNS": "200"})
     assert result.exit_code == 0
-    assert "demo" in result.output
+    assert "demo_basics_two_tf" in result.output
 
 
 def test_fetch_motifs_requires_tf_or_motif_id() -> None:
     result = invoke_cli(["fetch", "motifs", str(CONFIG_PATH)])
     assert result.exit_code != 0
-    assert "Provide at least one --tf or --motif-id" in combined_output(result)
+    assert "Provide at least one --tf, --motif-id, or --campaign" in combined_output(result)
+
+
+def test_fetch_motifs_rejects_campaign_and_tf() -> None:
+    result = invoke_cli(["fetch", "motifs", "--campaign", "demo_pair", "--tf", "lexA", str(CONFIG_PATH)])
+    assert result.exit_code != 0
+    assert "--campaign cannot be combined with --tf or --motif-id" in combined_output(result)
+
+
+def test_global_config_option_resolves_workspace() -> None:
+    result = invoke_cli(["-c", str(CONFIG_PATH), "sources", "list"])
+    assert result.exit_code == 0
+    assert "demo_local_meme" in result.output
+
+
+def test_targets_status_rejects_site_kinds_with_matrix_pwm(tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "out_dir": "runs",
+            "regulator_sets": [["lexA"]],
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
+            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    result = invoke_cli(["targets", "status", "--site-kind", "curated", str(config_path)])
+    assert result.exit_code != 0
+    assert "--site-kind requires pwm_source=sites" in combined_output(result)
+
+
+def test_campaign_generate_resolves_relative_out_to_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config = {
+        "cruncher": {
+            "out_dir": "runs",
+            "regulator_sets": [["lexA"]],
+            "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
+            "campaigns": [
+                {
+                    "name": "demo",
+                    "categories": ["A", "B"],
+                    "across_categories": {"sizes": [2]},
+                }
+            ],
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
+            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    other_dir = tmp_path / "elsewhere"
+    other_dir.mkdir()
+    monkeypatch.chdir(other_dir)
+
+    result = invoke_cli(["campaign", "generate", "--campaign", "demo", "--out", "derived.yaml", str(config_path)])
+    assert result.exit_code == 0
+    assert (tmp_path / "derived.yaml").exists()
+
+
+def test_campaign_generate_rejects_outside_workspace(tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "out_dir": "runs",
+            "regulator_sets": [["lexA"]],
+            "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
+            "campaigns": [
+                {
+                    "name": "demo",
+                    "categories": ["A", "B"],
+                    "across_categories": {"sizes": [2]},
+                }
+            ],
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
+            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    out_path = outside / "derived.yaml"
+
+    result = invoke_cli(["campaign", "generate", "--campaign", "demo", "--out", str(out_path), str(config_path)])
+    assert result.exit_code != 0
+    assert "--out must be inside the workspace" in combined_output(result)
 
 
 def test_catalog_show_requires_source_ref() -> None:
@@ -110,7 +199,7 @@ def test_sources_list_auto_detects_config_in_cwd(tmp_path, monkeypatch) -> None:
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": ".cruncher"},
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
             "ingest": {
                 "local_sources": [
@@ -161,7 +250,7 @@ def test_sources_summary_remote_error_is_user_friendly(tmp_path, monkeypatch) ->
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": ".cruncher"},
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
@@ -192,7 +281,7 @@ def test_sources_summary_cache_filters_source_and_titles(tmp_path) -> None:
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": ".cruncher"},
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
@@ -236,7 +325,7 @@ def test_sources_summary_requires_remote_limit_when_no_iter(tmp_path, monkeypatc
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": ".cruncher"},
+            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }

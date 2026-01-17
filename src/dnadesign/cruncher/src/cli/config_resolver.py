@@ -27,7 +27,10 @@ CANDIDATE_CONFIG_FILENAMES: tuple[str, ...] = (
 WORKSPACE_ENV_VAR = "CRUNCHER_WORKSPACE"
 WORKSPACE_ROOTS_ENV_VAR = "CRUNCHER_WORKSPACE_ROOTS"
 DEFAULT_WORKSPACE_ENV_VAR = "CRUNCHER_DEFAULT_WORKSPACE"
+CONFIG_ENV_VAR = "CRUNCHER_CONFIG"
 NONINTERACTIVE_ENV_VAR = "CRUNCHER_NONINTERACTIVE"
+INVOCATION_CWD_ENV_VAR = "CRUNCHER_CWD"
+DEFAULT_WORKSPACE_FILE = ".default_workspace"
 
 
 class ConfigResolutionError(ValueError):
@@ -49,6 +52,36 @@ def _env_truthy(name: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def _resolve_invocation_cwd(cwd: Path | None, *, log: bool) -> Path:
+    if cwd is not None:
+        resolved = cwd.expanduser().resolve()
+        if not resolved.is_dir():
+            raise ConfigResolutionError(f"cwd is not a directory: {resolved}")
+        return resolved
+    actual_cwd = Path.cwd().expanduser().resolve()
+    for env_var in (INVOCATION_CWD_ENV_VAR, "INIT_CWD", "PWD"):
+        value = os.environ.get(env_var)
+        if not value:
+            continue
+        candidate = Path(value).expanduser()
+        if not candidate.exists():
+            raise ConfigResolutionError(f"{env_var} points to a missing directory: {candidate}")
+        if not candidate.is_dir():
+            raise ConfigResolutionError(f"{env_var} must point to a directory: {candidate}")
+        resolved = candidate.resolve()
+        if env_var == "INIT_CWD" and resolved != actual_cwd:
+            try:
+                resolved.relative_to(actual_cwd)
+            except ValueError:
+                continue
+        if env_var == "PWD" and resolved != actual_cwd:
+            continue
+        if log and resolved != actual_cwd:
+            logger.info("Using invocation CWD from %s: %s", env_var, resolved)
+        return resolved
+    return actual_cwd
+
+
 def _is_interactive() -> bool:
     if _env_truthy(NONINTERACTIVE_ENV_VAR) or _env_truthy("CI"):
         return False
@@ -67,11 +100,11 @@ def _normalize_path(path: Path, cwd: Path) -> Path:
 
 def _resolve_explicit_config(config: Path, *, cwd: Path) -> Path:
     path = _normalize_path(config, cwd)
-    if not path.exists():
-        raise ConfigResolutionError(f"Config file not found: {path}")
-    if not path.is_file():
-        raise ConfigResolutionError(f"Config path is not a file: {path}")
-    return path
+    if path.exists():
+        if not path.is_file():
+            raise ConfigResolutionError(f"Config path is not a file: {path}")
+        return path
+    raise ConfigResolutionError(f"Config file not found: {path}")
 
 
 def _candidate_configs_in_dir(directory: Path) -> list[Path]:
@@ -106,7 +139,7 @@ def _find_git_root(cwd: Path) -> Path | None:
 
 
 def workspace_search_roots(cwd: Path | None = None) -> list[Path]:
-    cwd_path = (cwd or Path.cwd()).expanduser().resolve()
+    cwd_path = _resolve_invocation_cwd(cwd, log=False)
     roots: list[Path] = []
     env_value = os.environ.get(WORKSPACE_ROOTS_ENV_VAR, "")
     if env_value:
@@ -130,7 +163,7 @@ def workspace_search_roots(cwd: Path | None = None) -> list[Path]:
 
 
 def discover_workspaces(cwd: Path | None = None) -> list[WorkspaceCandidate]:
-    cwd_path = (cwd or Path.cwd()).expanduser().resolve()
+    cwd_path = _resolve_invocation_cwd(cwd, log=False)
     candidates: list[WorkspaceCandidate] = []
     seen_configs: set[Path] = set()
     for root in workspace_search_roots(cwd_path):
@@ -156,6 +189,47 @@ def discover_workspaces(cwd: Path | None = None) -> list[WorkspaceCandidate]:
             )
     candidates.sort(key=lambda item: (item.name, str(item.config_path)))
     return candidates
+
+
+def _resolve_default_workspace_file(
+    workspaces: Sequence[WorkspaceCandidate],
+    *,
+    cwd: Path,
+) -> WorkspaceCandidate | None:
+    roots = workspace_search_roots(cwd)
+    defaults: list[tuple[Path, str]] = []
+    for root in roots:
+        candidate = root / DEFAULT_WORKSPACE_FILE
+        if candidate.is_file():
+            value = candidate.read_text().strip()
+            if not value:
+                raise ConfigResolutionError(f"Default workspace file is empty: {candidate}")
+            defaults.append((candidate, value))
+    if not defaults:
+        return None
+    unique_values = {value for _, value in defaults}
+    if len(unique_values) > 1:
+        rendered = "\n".join(f"- {path}: {value}" for path, value in defaults)
+        raise ConfigResolutionError(
+            "Conflicting default workspace files found:\n"
+            f"{rendered}\n"
+            f"Hint: keep a single {DEFAULT_WORKSPACE_FILE} value or pass --workspace."
+        )
+    default_path, value = defaults[0]
+    match = next((item for item in workspaces if item.name == value), None)
+    if match is not None:
+        return match
+    if looks_like_config_path(value, cwd=default_path.parent):
+        path = _normalize_path(Path(value), cwd=default_path.parent)
+        for item in workspaces:
+            if item.config_path == path or item.root == path:
+                return item
+    rendered = _format_workspace_list(workspaces)
+    raise ConfigResolutionError(
+        f"{DEFAULT_WORKSPACE_FILE} requested '{value}', but no matching workspace was found.\n"
+        f"Discovered {len(workspaces)} workspace configs:\n{rendered}\n"
+        "Hint: update the default file or pass --workspace."
+    )
 
 
 def _format_workspace_list(workspaces: Sequence[WorkspaceCandidate]) -> str:
@@ -258,9 +332,12 @@ def _prompt_for_workspace(
 
 def resolve_config_path(config: Path | None, *, cwd: Path | None = None, log: bool = True) -> Path:
     """Resolve a config path from an explicit argument or from workspace discovery."""
-    cwd_path = (cwd or Path.cwd()).expanduser().resolve()
+    cwd_path = _resolve_invocation_cwd(cwd, log=log)
     if config is not None:
         return _resolve_explicit_config(config, cwd=cwd_path)
+    env_config = os.environ.get(CONFIG_ENV_VAR)
+    if env_config:
+        return _resolve_explicit_config(Path(env_config), cwd=cwd_path)
     selector = os.environ.get(WORKSPACE_ENV_VAR)
     if selector:
         return _resolve_workspace_selector(selector, cwd=cwd_path, log=log)
@@ -284,7 +361,8 @@ def resolve_config_path(config: Path | None, *, cwd: Path | None = None, log: bo
         raise ConfigResolutionError(
             "No config argument provided and no default config file was found in the current directory.\n"
             f"Expected one of: {expected}\n"
-            "Hint: pass --config PATH or create a config.yaml (or cruncher.yaml) in this directory.\n"
+            "Hint: pass --config PATH, set CRUNCHER_CONFIG, or create a config.yaml "
+            "(or cruncher.yaml) in this directory.\n"
             "Workspace discovery searched:\n"
             f"{roots_rendered}\n"
             f"To add roots: set {WORKSPACE_ROOTS_ENV_VAR}=/path/a{os.pathsep}/path/b"
@@ -300,6 +378,16 @@ def resolve_config_path(config: Path | None, *, cwd: Path | None = None, log: bo
                 chosen.name,
             )
         return chosen.config_path
+    default_file_match = _resolve_default_workspace_file(workspaces, cwd=cwd_path)
+    if default_file_match is not None:
+        if log:
+            logger.info(
+                'Using workspace "%s" config: %s (from %s).',
+                default_file_match.name,
+                default_file_match.config_path,
+                DEFAULT_WORKSPACE_FILE,
+            )
+        return default_file_match.config_path
     default_name = os.environ.get(DEFAULT_WORKSPACE_ENV_VAR)
     if default_name:
         matches = [item for item in workspaces if item.name == default_name]
@@ -342,7 +430,7 @@ def resolve_config_path(config: Path | None, *, cwd: Path | None = None, log: bo
 
 def looks_like_config_path(value: str, *, cwd: Path | None = None) -> bool:
     """Heuristic: treat as config if it looks like a yaml path or exists on disk."""
-    cwd_path = (cwd or Path.cwd()).expanduser().resolve()
+    cwd_path = _resolve_invocation_cwd(cwd, log=False)
     path = Path(value).expanduser()
     if path.suffix.lower() in {".yaml", ".yml"}:
         return True
@@ -360,7 +448,7 @@ def parse_config_and_value(
 ) -> tuple[Path, str]:
     """Resolve config + a required positional value from mixed args."""
     items = list(args or [])
-    cwd_path = (cwd or Path.cwd()).expanduser().resolve()
+    cwd_path = _resolve_invocation_cwd(cwd, log=False)
     if config_option is not None:
         if len(items) != 1:
             raise ConfigResolutionError(f"Expected {value_label}. Example: {command_hint}")

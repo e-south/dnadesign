@@ -15,7 +15,16 @@ from typing import Iterable, List, Optional, Tuple
 from urllib.error import HTTPError, URLError
 
 import typer
-from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
+from dnadesign.cruncher.app.campaign_service import resolve_campaign_tf_names
+from dnadesign.cruncher.app.fetch_service import (
+    fetch_motifs,
+    fetch_sites,
+    hydrate_sites,
+)
+from dnadesign.cruncher.cli.config_resolver import (
+    ConfigResolutionError,
+    resolve_config_path,
+)
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.http_client import HttpRetryPolicy
 from dnadesign.cruncher.ingest.models import DatasetQuery, MotifQuery
@@ -25,12 +34,15 @@ from dnadesign.cruncher.ingest.sequence_provider import (
     NCBISequenceProvider,
     SequenceProvider,
 )
-from dnadesign.cruncher.services.fetch_service import fetch_motifs, fetch_sites, hydrate_sites
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
+from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from rich.console import Console
 from rich.table import Table
 
-app = typer.Typer(no_args_is_help=True, help="Fetch motifs or binding sites from sources into the cache.")
+app = typer.Typer(
+    no_args_is_help=True,
+    help="Fetch motifs or binding sites from sources into the cache.",
+)
 logger = logging.getLogger(__name__)
 console = Console()
 
@@ -108,7 +120,11 @@ def _render_sites_summary(catalog_root: Path, paths: Iterable[Path]) -> None:
 
 @app.command("motifs", help="Fetch motif matrices into the local cache.")
 def motifs(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -117,6 +133,16 @@ def motifs(
     ),
     tf: List[str] = typer.Option([], "--tf", help="TF name to fetch (repeatable)."),
     motif_id: List[str] = typer.Option([], "--motif-id", help="Motif ID to fetch (repeatable)."),
+    campaign: Optional[str] = typer.Option(
+        None,
+        "--campaign",
+        help="Fetch TFs implied by a named campaign.",
+    ),
+    apply_selectors: bool = typer.Option(
+        True,
+        "--apply-selectors/--no-selectors",
+        help="Apply campaign selectors when resolving TFs (requires local catalog).",
+    ),
     source: str = typer.Option("regulondb", "--source", help="Source adapter to query."),
     dry_run: bool = typer.Option(False, "--dry-run", help="List matching motifs without caching."),
     limit: Optional[int] = typer.Option(None, "--limit", help="Limit remote matches (dry-run only)."),
@@ -132,9 +158,23 @@ def motifs(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    if not tf and not motif_id:
+    if campaign and (tf or motif_id):
+        raise typer.BadParameter("--campaign cannot be combined with --tf or --motif-id.")
+    effective_tfs = list(tf)
+    if campaign:
+        try:
+            effective_tfs = resolve_campaign_tf_names(
+                cfg=cfg,
+                config_path=config_path,
+                campaign_name=campaign,
+                apply_selectors=apply_selectors,
+                include_metrics=False,
+            )
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc))
+    if not effective_tfs and not motif_id:
         raise typer.BadParameter(
-            "Provide at least one --tf or --motif-id. Hint: cruncher fetch motifs --tf lexA <config>"
+            "Provide at least one --tf, --motif-id, or --campaign. Hint: cruncher fetch motifs --tf lexA <config>"
         )
     if offline and update:
         raise typer.BadParameter(
@@ -151,12 +191,12 @@ def motifs(
             extra_parser_modules=cfg.io.parsers.extra_modules,
         )
         adapter = registry.create(source, cfg.ingest)
-        catalog_root = config_path.parent / cfg.motif_store.catalog_root
+        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
         if dry_run:
-            if not tf:
-                raise typer.BadParameter("--dry-run requires at least one --tf query.")
+            if not effective_tfs:
+                raise typer.BadParameter("--dry-run requires at least one --tf or --campaign.")
             rows: list[tuple[str, str, str, str]] = []
-            for name in tf:
+            for name in effective_tfs:
                 results = adapter.list_motifs(MotifQuery(tf_name=name, limit=limit))
                 if not results:
                     raise ValueError(f"No motifs found for {name}")
@@ -174,11 +214,16 @@ def motifs(
                 table.add_row(*row)
             console.print(table)
             return
-        logger.info("Fetching motifs from %s for TFs=%s motif_ids=%s", source, tf, motif_id)
+        logger.info(
+            "Fetching motifs from %s for TFs=%s motif_ids=%s",
+            source,
+            effective_tfs,
+            motif_id,
+        )
         written = fetch_motifs(
             adapter,
             catalog_root,
-            names=tf,
+            names=effective_tfs,
             motif_ids=motif_id,
             fetch_all=all_matches,
             update=update,
@@ -199,7 +244,11 @@ def motifs(
 
 @app.command("sites", help="Fetch binding-site sequences into the local cache.")
 def sites(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -208,6 +257,16 @@ def sites(
     ),
     tf: List[str] = typer.Option([], "--tf", help="TF name to fetch (repeatable)."),
     motif_id: List[str] = typer.Option([], "--motif-id", help="Motif ID to fetch (repeatable)."),
+    campaign: Optional[str] = typer.Option(
+        None,
+        "--campaign",
+        help="Fetch TFs implied by a named campaign.",
+    ),
+    apply_selectors: bool = typer.Option(
+        True,
+        "--apply-selectors/--no-selectors",
+        help="Apply campaign selectors when resolving TFs (requires local catalog).",
+    ),
     source: str = typer.Option("regulondb", "--source", help="Source adapter to query."),
     limit: Optional[int] = typer.Option(None, "--limit", help="Optional limit on sites per TF."),
     dataset_id: Optional[str] = typer.Option(
@@ -237,9 +296,23 @@ def sites(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    if not tf and not motif_id and not hydrate:
+    if campaign and (tf or motif_id):
+        raise typer.BadParameter("--campaign cannot be combined with --tf or --motif-id.")
+    effective_tfs = list(tf)
+    if campaign:
+        try:
+            effective_tfs = resolve_campaign_tf_names(
+                cfg=cfg,
+                config_path=config_path,
+                campaign_name=campaign,
+                apply_selectors=apply_selectors,
+                include_metrics=False,
+            )
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc))
+    if not effective_tfs and not motif_id and not hydrate:
         raise typer.BadParameter(
-            "Provide at least one --tf or --motif-id. Hint: cruncher fetch sites --tf lexA <config>"
+            "Provide at least one --tf, --motif-id, or --campaign. Hint: cruncher fetch sites --tf lexA <config>"
         )
     if offline and update:
         raise typer.BadParameter(
@@ -253,7 +326,7 @@ def sites(
         raise typer.BadParameter("--hydrate cannot be combined with --update.")
     if hydrate and dry_run:
         raise typer.BadParameter("--hydrate cannot be combined with --dry-run.")
-    if hydrate and not tf and not motif_id:
+    if hydrate and not effective_tfs and not motif_id:
         console.print("Hydrating all cached site sets (no --tf/--motif-id provided).")
     provider: Optional[SequenceProvider] = None
     try:
@@ -268,15 +341,15 @@ def sites(
             ingest_cfg.regulondb.ht_sites = True
             console.print("Note: enabling HT dataset access for this request (--dataset-id).")
         adapter = registry.create(source, ingest_cfg)
-        catalog_root = config_path.parent / cfg.motif_store.catalog_root
+        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
         if dry_run:
-            if not tf:
-                raise typer.BadParameter("--dry-run requires --tf to resolve HT datasets.")
+            if not effective_tfs:
+                raise typer.BadParameter("--dry-run requires --tf or --campaign to resolve HT datasets.")
             if not hasattr(adapter, "list_datasets"):
                 raise typer.BadParameter(f"Source '{source}' does not support dataset discovery.")
             rows: list[tuple[str, str, str, str, str]] = []
             seen: set[tuple[str, str]] = set()
-            for name in tf:
+            for name in effective_tfs:
                 datasets = adapter.list_datasets(DatasetQuery(tf_name=name))
                 if dataset_id:
                     datasets = [ds for ds in datasets if ds.dataset_id == dataset_id]
@@ -335,19 +408,28 @@ def sites(
         if hydrate:
             if provider is None:
                 raise ValueError("Hydration requires genome_source or --genome-fasta.")
-            logger.info("Hydrating cached sites for TFs=%s motif_ids=%s", tf, motif_id)
+            logger.info(
+                "Hydrating cached sites for TFs=%s motif_ids=%s",
+                effective_tfs,
+                motif_id,
+            )
             written = hydrate_sites(
                 catalog_root,
-                names=tf,
+                names=effective_tfs,
                 motif_ids=motif_id,
                 sequence_provider=provider,
             )
         else:
-            logger.info("Fetching binding sites from %s for TFs=%s motif_ids=%s", source, tf, motif_id)
+            logger.info(
+                "Fetching binding sites from %s for TFs=%s motif_ids=%s",
+                source,
+                effective_tfs,
+                motif_id,
+            )
             written = fetch_sites(
                 adapter,
                 catalog_root,
-                names=tf,
+                names=effective_tfs,
                 motif_ids=motif_id,
                 limit=limit,
                 dataset_id=dataset_id,

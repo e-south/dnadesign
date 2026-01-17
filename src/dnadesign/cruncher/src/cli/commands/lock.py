@@ -12,15 +12,20 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
+from dnadesign.cruncher.app.lock_service import resolve_lock
+from dnadesign.cruncher.cli.config_resolver import (
+    ConfigResolutionError,
+    resolve_config_path,
+)
+from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.lock_service import resolve_lock
+from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
 
 
 def lock(
     config: Path | None = typer.Argument(
         None,
-        help="Path to cruncher config.yaml (required).",
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
         metavar="CONFIG",
     ),
     config_option: Path | None = typer.Option(
@@ -36,8 +41,8 @@ def lock(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
-    lock_path = catalog_root / "locks" / f"{config_path.stem}.lock.json"
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    lock_path = resolve_lock_path(config_path)
     names = {tf for group in cfg.regulator_sets for tf in group}
     try:
         resolve_lock(
@@ -56,4 +61,4 @@ def lock(
         typer.echo(f"Error: {exc}", err=True)
         typer.echo("Hint: run cruncher fetch motifs/sites before locking.", err=True)
         raise typer.Exit(code=1)
-    typer.echo(str(lock_path))
+    typer.echo(render_path(lock_path, base=config_path.parent))

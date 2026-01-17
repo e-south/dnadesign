@@ -12,7 +12,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-from dnadesign.cruncher.services.notebook_service import generate_notebook
+from dnadesign.cruncher.app.notebook_service import generate_notebook
+from dnadesign.cruncher.cli.paths import render_path
 from rich.console import Console
 
 console = Console()
@@ -41,6 +42,7 @@ def notebook(
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1)
-    console.print(f"Notebook created → {notebook_path}")
-    console.print("Open with: marimo edit " + str(notebook_path))
-    console.print("Read-only app: marimo run " + str(notebook_path))
+    rendered = render_path(notebook_path)
+    console.print(f"Notebook created → {rendered}")
+    console.print("Open with: marimo edit " + rendered)
+    console.print("Read-only app: marimo run " + rendered)

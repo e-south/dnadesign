@@ -34,12 +34,18 @@ def slide_window(seq: np.ndarray, start: int, length: int, shift: int):
     Slide in-place a contiguous window of size `length` at position `start`
     by `shift` (positive→right, negative→left). Reserved for future use.
     """
-    win = seq[start : start + length].copy()
     if shift > 0:
-        seq[start : start + length + shift] = np.concatenate([seq[start + shift : start + length + shift], win])
-    else:
-        s = start + shift
+        win = seq[start : start + length].copy()
+        tail = seq[start + length : start + length + shift].copy()
+        seq[start : start + shift] = tail
+        seq[start + shift : start + shift + length] = win
+    elif shift < 0:
+        k = -shift
+        s = start - k
+        win = seq[start : start + length].copy()
+        head = seq[s : s + k].copy()
         seq[s : s + length] = win
+        seq[s + length : s + length + k] = head
 
 
 @njit

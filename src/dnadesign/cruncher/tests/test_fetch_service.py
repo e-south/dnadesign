@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from dnadesign.cruncher.app.fetch_service import fetch_motifs, fetch_sites
 from dnadesign.cruncher.ingest.adapters.local import LocalMotifAdapter, LocalMotifAdapterConfig
 from dnadesign.cruncher.ingest.models import (
     GenomicInterval,
@@ -26,7 +27,6 @@ from dnadesign.cruncher.ingest.models import (
     SiteQuery,
 )
 from dnadesign.cruncher.ingest.normalize import build_motif_record
-from dnadesign.cruncher.services.fetch_service import fetch_motifs, fetch_sites
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 
 
@@ -124,6 +124,76 @@ class CoordOnlyAdapter(StubAdapter):
             organism=None,
             coordinate=GenomicInterval(contig="chr", start=0, end=4),
             sequence=None,
+            strand="+",
+            score=None,
+            evidence={},
+            provenance=provenance,
+        )
+
+
+class SourceTaggedAdapter(StubAdapter):
+    def __init__(self, source_id: str):
+        self.source_id = source_id
+
+    def list_motifs(self, query: MotifQuery):
+        return [
+            MotifDescriptor(
+                source=self.source_id,
+                motif_id="M1",
+                tf_name=query.tf_name or "tf",
+                organism=None,
+                length=4,
+                kind="PFM",
+            )
+        ]
+
+    def get_motif(self, motif_id: str):
+        return build_motif_record(
+            source=self.source_id,
+            motif_id=motif_id,
+            tf_name="tf",
+            matrix=[[0.25, 0.25, 0.25, 0.25]],
+            matrix_semantics="probabilities",
+            organism=None,
+            raw_payload="{}",
+        )
+
+    def list_sites(self, query: SiteQuery):
+        now = datetime.now(timezone.utc)
+        provenance = Provenance(retrieved_at=now, source_url="stub://", tags={"dataset_id": "tagged"})
+        yield SiteInstance(
+            source=self.source_id,
+            site_id="s1",
+            motif_ref=f"{self.source_id}:M1",
+            organism=None,
+            coordinate=GenomicInterval(contig="chr", start=0, end=4),
+            sequence="ACGT",
+            strand="+",
+            score=None,
+            evidence={},
+            provenance=provenance,
+        )
+
+
+class DatasetGuardAdapter(StubAdapter):
+    def __init__(self, expected_dataset_id: str):
+        self.expected_dataset_id = expected_dataset_id
+        self.source_id = "guarded"
+        self.calls: list[str | None] = []
+
+    def list_sites(self, query: SiteQuery):
+        self.calls.append(query.dataset_id)
+        if query.dataset_id != self.expected_dataset_id:
+            raise ValueError(f"Unexpected dataset_id={query.dataset_id}")
+        now = datetime.now(timezone.utc)
+        provenance = Provenance(retrieved_at=now, source_url="stub://", tags={"dataset_id": "tagged"})
+        yield SiteInstance(
+            source=self.source_id,
+            site_id="s1",
+            motif_ref=f"{self.source_id}:M1",
+            organism=None,
+            coordinate=GenomicInterval(contig="chr", start=0, end=4),
+            sequence="ACGT",
             strand="+",
             score=None,
             evidence={},
@@ -305,3 +375,25 @@ def test_fetch_sites_requires_hydration_for_coord_only(tmp_path):
     adapter = CoordOnlyAdapter()
     with pytest.raises(ValueError, match="genome hydration"):
         fetch_sites(adapter, tmp_path, names=["tf"])
+
+
+def test_fetch_motifs_does_not_skip_other_sources(tmp_path: Path) -> None:
+    adapter_a = SourceTaggedAdapter("stub_a")
+    adapter_b = SourceTaggedAdapter("stub_b")
+    fetch_motifs(adapter_a, tmp_path, names=["tf"])
+    paths = fetch_motifs(adapter_b, tmp_path, names=["tf"])
+    assert any(path.name == "M1.json" and path.parent.name == "stub_b" for path in paths)
+
+
+def test_fetch_sites_does_not_skip_other_sources(tmp_path: Path) -> None:
+    adapter_a = SourceTaggedAdapter("stub_a")
+    adapter_b = SourceTaggedAdapter("stub_b")
+    fetch_sites(adapter_a, tmp_path, names=["tf"])
+    paths = fetch_sites(adapter_b, tmp_path, names=["tf"])
+    assert any(path.name == "M1.jsonl" and path.parent.name == "stub_b" for path in paths)
+
+
+def test_fetch_sites_dataset_id_is_not_overwritten(tmp_path: Path) -> None:
+    adapter = DatasetGuardAdapter(expected_dataset_id="expected")
+    fetch_sites(adapter, tmp_path, names=["tf1", "tf2"], dataset_id="expected")
+    assert adapter.calls == ["expected", "expected"]

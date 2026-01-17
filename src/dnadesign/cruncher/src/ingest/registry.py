@@ -15,8 +15,14 @@ from typing import Callable, Dict, List, Sequence
 
 from dnadesign.cruncher.config.schema_v2 import IngestConfig, LocalMotifSourceConfig
 from dnadesign.cruncher.ingest.adapters.base import SourceAdapter
-from dnadesign.cruncher.ingest.adapters.local import LocalMotifAdapter, LocalMotifAdapterConfig
-from dnadesign.cruncher.ingest.adapters.regulondb import RegulonDBAdapter, RegulonDBAdapterConfig
+from dnadesign.cruncher.ingest.adapters.local import (
+    LocalMotifAdapter,
+    LocalMotifAdapterConfig,
+)
+from dnadesign.cruncher.ingest.adapters.regulondb import (
+    RegulonDBAdapter,
+    RegulonDBAdapterConfig,
+)
 from dnadesign.cruncher.ingest.http_client import HttpRetryPolicy
 from dnadesign.cruncher.ingest.models import OrganismRef
 
@@ -68,6 +74,7 @@ def _build_regulondb(config: IngestConfig) -> SourceAdapter:
             motif_matrix_source=reg_cfg.motif_matrix_source,
             alignment_matrix_semantics=reg_cfg.alignment_matrix_semantics,
             min_sites_for_pwm=reg_cfg.min_sites_for_pwm,
+            pseudocounts=reg_cfg.pseudocounts,
             allow_low_sites=reg_cfg.allow_low_sites,
             curated_sites=reg_cfg.curated_sites,
             ht_sites=reg_cfg.ht_sites,

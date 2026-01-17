@@ -10,13 +10,21 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Optional
 from urllib.error import HTTPError, URLError
 
 import typer
+from dnadesign.cruncher.app.source_summary_service import (
+    summarize_cache,
+    summarize_combined,
+    summarize_remote,
+)
 from dnadesign.cruncher.cli.config_resolver import (
-    CANDIDATE_CONFIG_FILENAMES,
+    CONFIG_ENV_VAR,
+    DEFAULT_WORKSPACE_ENV_VAR,
+    WORKSPACE_ENV_VAR,
     ConfigResolutionError,
     parse_config_and_value,
     resolve_config_path,
@@ -24,11 +32,7 @@ from dnadesign.cruncher.cli.config_resolver import (
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.models import DatasetQuery
 from dnadesign.cruncher.ingest.registry import default_registry
-from dnadesign.cruncher.services.source_summary_service import (
-    summarize_cache,
-    summarize_combined,
-    summarize_remote,
-)
+from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from rich.console import Console
 from rich.table import Table
 
@@ -40,7 +44,7 @@ console = Console()
 def list_sources(
     config: Path | None = typer.Argument(
         None,
-        help="Optional path to cruncher config.yaml (includes local sources).",
+        help="Optional path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
         metavar="CONFIG",
     ),
     config_option: Path | None = typer.Option(
@@ -52,25 +56,21 @@ def list_sources(
 ) -> None:
     registry = default_registry()
     config_path: Path | None = None
-    if config_option is not None or config is not None:
-        try:
-            config_path = resolve_config_path(config_option or config)
-        except ConfigResolutionError as exc:
-            console.print(str(exc))
-            raise typer.Exit(code=1)
-    else:
-        cwd = Path.cwd().expanduser().resolve()
-        matches = [cwd / name for name in CANDIDATE_CONFIG_FILENAMES if (cwd / name).is_file()]
-        if len(matches) == 1:
-            config_path = matches[0].resolve()
-        elif len(matches) > 1:
-            rendered = "\n".join(f"- {path.relative_to(cwd).as_posix()}" for path in matches)
-            console.print(
-                "Multiple config files found in the current directory:\n"
-                f"{rendered}\n"
-                "Hint: pass --config PATH to disambiguate."
-            )
-            raise typer.Exit(code=1)
+    explicit_env = any(os.environ.get(var) for var in (CONFIG_ENV_VAR, WORKSPACE_ENV_VAR, DEFAULT_WORKSPACE_ENV_VAR))
+    try:
+        if config_option is not None or config is not None:
+            config_path = resolve_config_path(config_option or config, log=False)
+        else:
+            try:
+                config_path = resolve_config_path(None, log=False)
+            except ConfigResolutionError as exc:
+                if explicit_env:
+                    raise exc
+                console.print("Note: no config resolved; showing built-in sources only.")
+                config_path = None
+    except ConfigResolutionError as exc:
+        console.print(str(exc))
+        raise typer.Exit(code=1)
     if config_path is not None:
         cfg = load_config(config_path)
         registry = default_registry(
@@ -208,7 +208,11 @@ def datasets(
 
 @app.command("summary", help="Summarize local cache and remote inventories for sources.")
 def summary(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -259,7 +263,14 @@ def summary(
     view = view.lower()
     if view not in {"split", "combined"}:
         raise typer.BadParameter("--view must be one of: split, combined.")
-    if sort_by not in {"tf", "motifs", "site_sets", "sites_seq", "sites_total", "datasets"}:
+    if sort_by not in {
+        "tf",
+        "motifs",
+        "site_sets",
+        "sites_seq",
+        "sites_total",
+        "datasets",
+    }:
         raise typer.BadParameter("--sort-by must be one of: tf, motifs, site_sets, sites_seq, sites_total, datasets.")
     if all_rows:
         limit = None
@@ -283,7 +294,7 @@ def summary(
     combined_summary: dict | None = None
 
     if scope in {"cache", "both"}:
-        catalog_root = config_path.parent / cfg.motif_store.catalog_root
+        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
         cache_summary = summarize_cache(catalog_root, source=source)
         payload["cache"] = cache_summary
         if output_format == "table" and view == "split":
@@ -345,6 +356,8 @@ def summary(
                     )
                 else:
                     _render_empty_regulators("remote", source_id)
+            if remote_summaries:
+                _render_remote_legend(remote_limit=remote_limit)
 
     if output_format == "table" and view == "combined":
         combined_summary = summarize_combined(cache_summary=cache_summary, remote_summaries=remote_summaries)
@@ -354,7 +367,11 @@ def summary(
             _render_combined_regulators_table(
                 combined_regs,
                 limit=limit,
-                title=_title_with_scope("Combined regulators (cache + remote)", source=source, limit=remote_limit),
+                title=_title_with_scope(
+                    "Combined regulators (cache + remote)",
+                    source=source,
+                    limit=remote_limit,
+                ),
             )
         else:
             _render_empty_regulators("combined", source)
@@ -390,7 +407,10 @@ def _render_cache_tables(summary: dict, *, source: Optional[str] = None) -> None
     overview.add_row("datasets", _fmt_int(totals["datasets"]))
     console.print(overview)
     if sources:
-        table = Table(title=_title_with_scope("Cache by source", source=source), header_style="bold")
+        table = Table(
+            title=_title_with_scope("Cache by source", source=source),
+            header_style="bold",
+        )
         table.add_column("Source")
         table.add_column("TFs", justify="right")
         table.add_column("Motifs", justify="right")
@@ -431,6 +451,14 @@ def _render_remote_tables(summaries: dict[str, dict], *, remote_limit: Optional[
     console.print(table)
 
 
+def _render_remote_legend(*, remote_limit: Optional[int]) -> None:
+    console.print(
+        "Legend: Motifs = source inventory entries; Datasets = HT dataset IDs mentioning the TF (not binding sites)."
+    )
+    if remote_limit is not None:
+        console.print("Note: --remote-limit samples the motif inventory; regulator rows are a partial view.")
+
+
 def _render_combined_overview(
     summary: dict,
     *,
@@ -440,14 +468,21 @@ def _render_combined_overview(
     totals = summary.get("totals") or {}
     cache = totals.get("cache") or {}
     remote = totals.get("remote") or {}
-    table = Table(title=_title_with_scope("Inventory overview", source=source, limit=remote_limit), header_style="bold")
+    table = Table(
+        title=_title_with_scope("Inventory overview", source=source, limit=remote_limit),
+        header_style="bold",
+    )
     table.add_column("Metric")
     table.add_column("Cache")
     table.add_column("Remote")
     table.add_row("TFs", _fmt_int(cache.get("tfs")), _fmt_int(remote.get("tfs")))
     table.add_row("Motifs", _fmt_int(cache.get("motifs")), _fmt_int(remote.get("motifs")))
     table.add_row("Site sets", _fmt_int(cache.get("site_sets")), _fmt_int(None))
-    table.add_row("Sites (seq/total)", _fmt_sites(cache.get("sites_seq"), cache.get("sites_total")), "-")
+    table.add_row(
+        "Sites (seq/total)",
+        _fmt_sites(cache.get("sites_seq"), cache.get("sites_total")),
+        "-",
+    )
     table.add_row("Datasets", _fmt_int(cache.get("datasets")), _fmt_int(remote.get("datasets")))
     console.print(table)
 

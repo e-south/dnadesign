@@ -18,13 +18,40 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
+from dnadesign.cruncher.analysis.per_pwm import gather_per_pwm_scores
+from dnadesign.cruncher.analysis.plots.diagnostics import make_pair_idata
+from dnadesign.cruncher.analysis.plots.scatter import _normalize_threshold_points, plot_scatter
+from dnadesign.cruncher.analysis.plots.summary import write_elite_topk
+from dnadesign.cruncher.app.analyze_workflow import _get_git_commit
+from dnadesign.cruncher.artifacts.layout import elites_path, manifest_path, sequences_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.core.pwm import PWM
-from dnadesign.cruncher.workflows.analyze.per_pwm import gather_per_pwm_scores
-from dnadesign.cruncher.workflows.analyze.plots.diagnostics import make_pair_idata
-from dnadesign.cruncher.workflows.analyze.plots.scatter import _normalize_threshold_points, plot_scatter
-from dnadesign.cruncher.workflows.analyze.plots.summary import write_elite_topk
-from dnadesign.cruncher.workflows.analyze_workflow import _get_git_commit
+
+
+def _sample_block() -> dict:
+    return {
+        "mode": "sample",
+        "rng": {"seed": 7, "deterministic": True},
+        "budget": {"draws": 2, "tune": 1, "restarts": 1},
+        "init": {"kind": "random", "length": 12, "pad_with": "background"},
+        "objective": {"bidirectional": True, "score_scale": "normalized-llr"},
+        "elites": {"k": 1, "min_hamming": 0, "filters": {"pwm_sum_min": 0.0}},
+        "moves": {
+            "profile": "balanced",
+            "overrides": {
+                "block_len_range": [2, 2],
+                "multi_k_range": [2, 2],
+                "slide_max_shift": 1,
+                "swap_len_range": [2, 2],
+                "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
+            },
+        },
+        "optimizer": {"name": "gibbs"},
+        "optimizers": {"gibbs": {"beta_schedule": {"kind": "fixed", "beta": 1.0}, "apply_during": "tune"}},
+        "auto_opt": {"enabled": False},
+        "output": {"trace": {"save": False}, "save_sequences": True},
+        "ui": {"progress_bar": False, "progress_every": 0},
+    }
 
 
 def test_gather_per_pwm_scores_rejects_invalid_sequence(tmp_path: Path) -> None:
@@ -38,7 +65,9 @@ def test_gather_per_pwm_scores_rejects_invalid_sequence(tmp_path: Path) -> None:
             "sequence": ["ACGTN"],
         }
     )
-    df.to_parquet(run_dir / "sequences.parquet", engine="fastparquet")
+    seq_path = sequences_path(run_dir)
+    seq_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(seq_path, engine="fastparquet")
 
     pwm_matrix = np.full((4, 4), 0.25)
     pwms = {"lexA": PWM(name="lexA", matrix=pwm_matrix)}
@@ -65,7 +94,9 @@ def test_gather_per_pwm_scores_rejects_non_positive_threshold(tmp_path: Path) ->
             "sequence": ["ACGT"],
         }
     )
-    df.to_parquet(run_dir / "sequences.parquet", engine="fastparquet")
+    seq_path = sequences_path(run_dir)
+    seq_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(seq_path, engine="fastparquet")
 
     pwm_matrix = np.full((4, 4), 0.25)
     pwms = {"lexA": PWM(name="lexA", matrix=pwm_matrix)}
@@ -92,7 +123,9 @@ def test_gather_per_pwm_scores_single_draw_not_duplicated(tmp_path: Path) -> Non
             "sequence": ["ACGTACGT"],
         }
     )
-    df.to_parquet(run_dir / "sequences.parquet", engine="fastparquet")
+    seq_path = sequences_path(run_dir)
+    seq_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(seq_path, engine="fastparquet")
 
     pwm_matrix = np.full((4, 4), 0.25)
     pwms = {"lexA": PWM(name="lexA", matrix=pwm_matrix)}
@@ -125,7 +158,9 @@ def test_make_pair_idata_requires_consistent_draws(tmp_path: Path) -> None:
             "score_cpxR": [0.8, 0.85, 0.75],
         }
     )
-    df.to_parquet(sample_dir / "sequences.parquet", engine="fastparquet")
+    seq_path = sequences_path(sample_dir)
+    seq_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(seq_path, engine="fastparquet")
 
     with pytest.raises(ValueError, match="Inconsistent draws"):
         make_pair_idata(sample_dir, ("lexA", "cpxR"))
@@ -159,46 +194,19 @@ def test_write_elite_topk_requires_sequence(tmp_path: Path) -> None:
 
 
 def test_scatter_thresholds_requires_llr(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
     config = {
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA", "cpxR"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": [],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
             },
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
-            "sample": {
-                "bidirectional": True,
-                "seed": 7,
-                "record_tune": False,
-                "progress_bar": False,
-                "progress_every": 0,
-                "save_trace": False,
-                "init": {"kind": "random", "length": 12, "pad_with": "background"},
-                "draws": 2,
-                "tune": 1,
-                "chains": 1,
-                "min_dist": 0,
-                "top_k": 1,
-                "moves": {
-                    "block_len_range": [2, 2],
-                    "multi_k_range": [2, 2],
-                    "slide_max_shift": 1,
-                    "swap_len_range": [2, 2],
-                    "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
-                },
-                "optimiser": {
-                    "kind": "gibbs",
-                    "scorer_scale": "llr",
-                    "cooling": {"kind": "fixed", "beta": 1.0},
-                    "swap_prob": 0.1,
-                },
-                "save_sequences": True,
-                "pwm_sum_threshold": 0.0,
-            },
+            "sample": _sample_block(),
             "analysis": {
                 "runs": ["sample_thresholds"],
                 "tf_pair": ["lexA", "cpxR"],
@@ -227,46 +235,19 @@ def test_scatter_thresholds_requires_llr(tmp_path: Path) -> None:
 
 
 def test_plot_scatter_requires_score_columns(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
     config = {
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA", "cpxR"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": [],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
             },
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
-            "sample": {
-                "bidirectional": True,
-                "seed": 7,
-                "record_tune": False,
-                "progress_bar": False,
-                "progress_every": 0,
-                "save_trace": False,
-                "init": {"kind": "random", "length": 12, "pad_with": "background"},
-                "draws": 2,
-                "tune": 1,
-                "chains": 1,
-                "min_dist": 0,
-                "top_k": 1,
-                "moves": {
-                    "block_len_range": [2, 2],
-                    "multi_k_range": [2, 2],
-                    "slide_max_shift": 1,
-                    "swap_len_range": [2, 2],
-                    "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
-                },
-                "optimiser": {
-                    "kind": "gibbs",
-                    "scorer_scale": "llr",
-                    "cooling": {"kind": "fixed", "beta": 1.0},
-                    "swap_prob": 0.1,
-                },
-                "save_sequences": True,
-                "pwm_sum_threshold": 0.0,
-            },
+            "sample": _sample_block(),
             "analysis": {
                 "runs": [],
                 "tf_pair": ["lexA", "cpxR"],
@@ -294,7 +275,9 @@ def test_plot_scatter_requires_score_columns(tmp_path: Path) -> None:
 
     run_dir = tmp_path / "run"
     run_dir.mkdir(parents=True)
-    (run_dir / "run_manifest.json").write_text(json.dumps({"sequence_length": 12}))
+    manifest_file = manifest_path(run_dir)
+    manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    manifest_file.write_text(json.dumps({"sequence_length": 12}))
 
     elites_df = pd.DataFrame(
         {
@@ -304,7 +287,8 @@ def test_plot_scatter_requires_score_columns(tmp_path: Path) -> None:
             "score_cpxR": [0.8],
         }
     )
-    elites_df.to_parquet(run_dir / "elites.parquet", engine="fastparquet")
+    elites_path(run_dir).parent.mkdir(parents=True, exist_ok=True)
+    elites_df.to_parquet(elites_path(run_dir), engine="fastparquet")
 
     per_pwm_path = run_dir / "per_pwm.csv"
     pd.DataFrame({"chain": [0], "draw": [0]}).to_csv(per_pwm_path, index=False)

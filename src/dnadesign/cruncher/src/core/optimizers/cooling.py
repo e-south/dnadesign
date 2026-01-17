@@ -39,9 +39,14 @@ def make_beta_scheduler(cooling_cfg: Dict[str, Any], total_sweeps: int):
 
     if kind == "linear":
         β_start, β_end = cooling_cfg["beta"]
+        if total_sweeps <= 1:
+            β_const = float(β_end)
 
         def beta_of(it: int) -> float:
-            frac = min(it / total_sweeps, 1.0)
+            if total_sweeps <= 1:
+                return β_const
+            denom = max(total_sweeps - 1, 1)
+            frac = min(it / denom, 1.0)
             return β_start + frac * (β_end - β_start)
 
         return beta_of
@@ -52,6 +57,10 @@ def make_beta_scheduler(cooling_cfg: Dict[str, Any], total_sweeps: int):
     betas = [s["beta"] for s in stages]
 
     def beta_of(it: int) -> float:
+        if len(betas) == 1:
+            return betas[0]
+        if it <= sweep_pts[0]:
+            return betas[0]
         # If beyond last stage, return last β
         if it >= sweep_pts[-1]:
             return betas[-1]

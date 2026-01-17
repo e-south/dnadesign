@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 
-from dnadesign.cruncher.services.catalog_service import verify_cache
+from dnadesign.cruncher.app.catalog_service import verify_cache
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 
 

@@ -14,11 +14,13 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.cruncher.app.fetch_service import write_motif_record
+from dnadesign.cruncher.app.sample_workflow import run_sample
+from dnadesign.cruncher.artifacts.layout import config_used_path, manifest_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.normalize import build_motif_record
-from dnadesign.cruncher.services.fetch_service import write_motif_record
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
-from dnadesign.cruncher.workflows.sample_workflow import run_sample
+from dnadesign.cruncher.utils.paths import resolve_lock_path
 
 
 def _write_motif(catalog_root: Path, *, tf_name: str, motif_id: str) -> None:
@@ -47,8 +49,6 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
     _write_motif(catalog_root, tf_name="lexA", motif_id="RBM1")
     _write_motif(catalog_root, tf_name="cpxR", motif_id="RBM2")
 
-    lock_path = catalog_root / "locks" / "config.lock.json"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
     lock_payload = {
         "pwm_source": "matrix",
         "resolved": {
@@ -64,14 +64,12 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
             },
         },
     }
-    lock_path.write_text(json.dumps(lock_payload))
-
     config = {
         "cruncher": {
             "out_dir": "results",
             "regulator_sets": [["lexA"], ["cpxR"]],
             "motif_store": {
-                "catalog_root": ".cruncher",
+                "catalog_root": str(catalog_root),
                 "source_preference": ["regulondb"],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
@@ -81,33 +79,29 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
             "ingest": {"regulondb": {"min_sites_for_pwm": 2}},
             "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
             "sample": {
-                "bidirectional": True,
-                "seed": 11,
-                "record_tune": False,
-                "progress_bar": False,
-                "progress_every": 0,
-                "save_trace": False,
+                "mode": "sample",
+                "rng": {"seed": 11, "deterministic": True},
+                "budget": {"draws": 1, "tune": 1, "restarts": 1},
                 "init": {"kind": "random", "length": 6, "pad_with": "background"},
-                "draws": 1,
-                "tune": 1,
-                "chains": 1,
-                "min_dist": 0,
-                "top_k": 1,
+                "objective": {"bidirectional": True, "score_scale": "llr"},
+                "elites": {"k": 1, "min_hamming": 0, "filters": {"pwm_sum_min": 0.0}},
                 "moves": {
-                    "block_len_range": [2, 2],
-                    "multi_k_range": [2, 2],
-                    "slide_max_shift": 1,
-                    "swap_len_range": [2, 2],
-                    "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0},
+                    "profile": "balanced",
+                    "overrides": {
+                        "block_len_range": [2, 2],
+                        "multi_k_range": [2, 2],
+                        "slide_max_shift": 1,
+                        "swap_len_range": [2, 2],
+                        "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0},
+                    },
                 },
-                "optimiser": {
-                    "kind": "gibbs",
-                    "scorer_scale": "llr",
-                    "cooling": {"kind": "fixed", "beta": 1.0},
-                    "swap_prob": 0.0,
+                "optimizer": {"name": "gibbs"},
+                "optimizers": {
+                    "gibbs": {"beta_schedule": {"kind": "fixed", "beta": 1.0}, "apply_during": "tune"},
                 },
-                "save_sequences": True,
-                "pwm_sum_threshold": 0.0,
+                "auto_opt": {"enabled": False},
+                "output": {"trace": {"save": False}, "save_sequences": True},
+                "ui": {"progress_bar": False, "progress_every": 0},
             },
         }
     }
@@ -115,17 +109,30 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
     config_path.write_text(yaml.safe_dump(config))
 
     cfg = load_config(config_path)
+    lock_path = resolve_lock_path(config_path)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path.write_text(json.dumps(lock_payload))
     run_sample(cfg, config_path)
 
-    results_dir = tmp_path / "results"
-    runs = sorted([p for p in results_dir.iterdir() if p.is_dir() and p.name.startswith("sample_")])
+    results_dir = tmp_path / "results" / "sample"
+    runs = []
+    for child in results_dir.iterdir():
+        if not child.is_dir():
+            continue
+        if manifest_path(child).exists():
+            runs.append(child)
+            continue
+        for grand in child.iterdir():
+            if grand.is_dir() and manifest_path(grand).exists():
+                runs.append(grand)
+    runs = sorted(runs)
     assert len(runs) == 2
     for run_dir in runs:
-        manifest_path = run_dir / "run_manifest.json"
-        cfg_path = run_dir / "config_used.yaml"
-        assert manifest_path.exists()
+        manifest_file = manifest_path(run_dir)
+        cfg_path = config_used_path(run_dir)
+        assert manifest_file.exists()
         assert cfg_path.exists()
-        manifest = json.loads(manifest_path.read_text())
+        manifest = json.loads(manifest_file.read_text())
         assert "regulator_set" in manifest
         config_used = yaml.safe_load(cfg_path.read_text())["cruncher"]
         assert "active_regulator_set" in config_used

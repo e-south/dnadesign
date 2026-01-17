@@ -37,3 +37,25 @@ def test_scorer_helpers_surface_consensus_and_llr() -> None:
     assert offset == 0
     assert strand == "+"
     assert best_llr == pytest.approx(scorer.consensus_llr("tfA"))
+
+
+def test_consensus_neglogp_cached_by_length() -> None:
+    matrix = np.array(
+        [
+            [0.9, 0.05, 0.03, 0.02],
+            [0.9, 0.05, 0.03, 0.02],
+        ],
+        dtype=float,
+    )
+    pwm = PWM(name="tfA", matrix=matrix)
+    scorer = Scorer({"tfA": pwm}, bidirectional=False, scale="consensus-neglop-sum")
+    seq1 = np.zeros(5, dtype=int)
+    seq2 = np.zeros(8, dtype=int)
+
+    scorer.compute_all_per_pwm(seq1, seq1.size)
+    scorer.compute_all_per_pwm(seq2, seq2.size)
+
+    info = scorer._cache["tfA"]
+    assert seq1.size in info.consensus_neglogp_by_len
+    assert seq2.size in info.consensus_neglogp_by_len
+    assert info.consensus_neglogp_by_len[seq1.size] != info.consensus_neglogp_by_len[seq2.size]

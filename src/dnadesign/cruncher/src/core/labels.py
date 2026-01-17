@@ -1,0 +1,63 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/src/core/labels.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import hashlib
+import re
+from datetime import datetime
+from typing import Iterable, Sequence
+
+_SAFE_RE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _slugify(label: str, *, max_len: int = 60) -> str:
+    cleaned = _SAFE_RE.sub("_", label).strip("_")
+    if max_len and len(cleaned) > max_len:
+        return cleaned[:max_len].rstrip("_")
+    return cleaned
+
+
+def format_regulator_label(tfs: Sequence[str]) -> str:
+    return "-".join(tfs)
+
+
+def format_regulator_slug(tfs: Sequence[str], *, max_len: int = 60) -> str:
+    return _slugify(format_regulator_label(tfs), max_len=max_len)
+
+
+def build_run_name(
+    stage: str,
+    tfs: Sequence[str],
+    *,
+    set_index: int | None = None,
+    include_stage: bool = True,
+    include_label: bool = True,
+    include_set_index: bool = True,
+) -> str:
+    date_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    label = format_regulator_slug(tfs) if include_label else ""
+    seed = f"{stage}|{date_stamp}|{','.join(tfs)}|{set_index or ''}|{include_label}|{include_set_index}"
+    short_hash = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:6]
+    set_token = set_index if include_set_index else None
+    if set_token is not None:
+        if label:
+            base = f"set{set_token}_{label}_{date_stamp}_{short_hash}"
+        else:
+            base = f"set{set_token}_{date_stamp}_{short_hash}"
+    else:
+        if label:
+            base = f"{label}_{date_stamp}_{short_hash}"
+        else:
+            base = f"{date_stamp}_{short_hash}"
+    return f"{stage}_{base}" if include_stage else base
+
+
+def regulator_sets(regulator_sets: Iterable[Iterable[str]]) -> list[list[str]]:
+    return [list(group) for group in regulator_sets]

@@ -10,13 +10,17 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import typer
 
 from dnadesign.cruncher.cli.commands.analyze import analyze as analyze_cmd
 from dnadesign.cruncher.cli.commands.cache import app as cache_app
+from dnadesign.cruncher.cli.commands.campaign import app as campaign_app
 from dnadesign.cruncher.cli.commands.catalog import app as catalog_app
 from dnadesign.cruncher.cli.commands.config import app as config_app
+from dnadesign.cruncher.cli.commands.discover import app as discover_app
+from dnadesign.cruncher.cli.commands.doctor import doctor as doctor_cmd
 from dnadesign.cruncher.cli.commands.fetch import app as fetch_app
 from dnadesign.cruncher.cli.commands.lock import lock as lock_cmd
 from dnadesign.cruncher.cli.commands.notebook import notebook as notebook_cmd
@@ -29,10 +33,13 @@ from dnadesign.cruncher.cli.commands.sources import app as sources_app
 from dnadesign.cruncher.cli.commands.status import status as status_cmd
 from dnadesign.cruncher.cli.commands.targets import app as targets_app
 from dnadesign.cruncher.cli.commands.workspaces import app as workspaces_app
-from dnadesign.cruncher.cli.config_resolver import WORKSPACE_ENV_VAR
+from dnadesign.cruncher.cli.config_resolver import CONFIG_ENV_VAR, WORKSPACE_ENV_VAR
 from dnadesign.cruncher.utils.logging import configure_logging
 
-app = typer.Typer(no_args_is_help=True, help="Design short DNA sequences that score highly across TF motifs.")
+app = typer.Typer(
+    no_args_is_help=True,
+    help="Design short DNA sequences that score highly across TF motifs.",
+)
 app.info.epilog = "Tip: run `cruncher <command> --help` for examples and details."
 
 
@@ -44,6 +51,13 @@ def main(
         envvar="CRUNCHER_LOG_LEVEL",
         help="Logging level (e.g., DEBUG, INFO, WARNING).",
     ),
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        envvar=CONFIG_ENV_VAR,
+        help="Path to cruncher config.yaml (overrides workspace/CWD resolution).",
+    ),
     workspace: str | None = typer.Option(
         None,
         "--workspace",
@@ -54,13 +68,17 @@ def main(
 ) -> None:
     """Design short DNA sequences that score highly across multiple TF motifs."""
     configure_logging(log_level)
+    if config:
+        os.environ[CONFIG_ENV_VAR] = str(config)
     if workspace:
         os.environ[WORKSPACE_ENV_VAR] = workspace
 
 
-app.command("parse", help="Validate cached motifs and render PWM logos.", short_help="Validate motifs + render logos.")(
-    parse_cmd
-)
+app.command(
+    "parse",
+    help="Validate cached motifs and summarize locked PWMs.",
+    short_help="Validate locked motifs.",
+)(parse_cmd)
 app.command(
     "sample",
     help="Run MCMC optimization to design high-scoring sequences.",
@@ -82,6 +100,12 @@ app.command(
     short_help="Generate a marimo notebook.",
 )(notebook_cmd)
 app.add_typer(
+    campaign_app,
+    name="campaign",
+    help="Generate or summarize regulator campaigns.",
+    short_help="Generate campaign configs.",
+)
+app.add_typer(
     fetch_app,
     name="fetch",
     help="Fetch motifs or binding sites into the local cache.",
@@ -93,7 +117,22 @@ app.add_typer(
     help="Inspect what motifs and sites are cached locally.",
     short_help="Inspect cached motifs/sites.",
 )
-app.command("lock", help="Resolve TF names to exact cached motif IDs.", short_help="Resolve TFs to lockfile.")(lock_cmd)
+app.add_typer(
+    discover_app,
+    name="discover",
+    help="Discover motifs from cached binding sites (MEME Suite).",
+    short_help="Discover motifs.",
+)
+app.command(
+    "doctor",
+    help="Check external dependencies (e.g., MEME Suite).",
+    short_help="Check dependencies.",
+)(doctor_cmd)
+app.command(
+    "lock",
+    help="Resolve TF names to exact cached motif IDs.",
+    short_help="Resolve TFs to lockfile.",
+)(lock_cmd)
 app.add_typer(
     cache_app,
     name="cache",

@@ -60,6 +60,7 @@ dist/
 .venv/
 env/
 venv/
+.pixi/
 
 # Test/analysis caches
 .pytest_cache/
@@ -137,7 +138,12 @@ temp.md
 src/dnadesign/cruncher/.cruncher/
 src/dnadesign/cruncher/results/
 src/dnadesign/cruncher/experiments/
-src/dnadesign/cruncher/workspaces/demo/runs/
+src/dnadesign/cruncher/old_results/
+src/dnadesign/cruncher/workspaces/**/.cruncher/
+src/dnadesign/cruncher/**/runs/
+src/dnadesign/cruncher/workspaces/**/runs/
+src/dnadesign/cruncher/workspaces/**/campaign.*.yaml
+src/dnadesign/cruncher/workspaces/**/*.campaign_manifest.json
 src/dnadesign/cruncher/**/run_manifest.json
 src/dnadesign/cruncher/**/run_status.json
 src/dnadesign/cruncher/**/config_used.yaml
@@ -145,10 +151,12 @@ src/dnadesign/cruncher/**/sequences.csv
 src/dnadesign/cruncher/**/sequences.parquet
 src/dnadesign/cruncher/**/elites.*
 !src/dnadesign/cruncher/src/utils/elites.py
+!src/dnadesign/cruncher/src/analysis/elites.py
 src/dnadesign/cruncher/**/trace.nc
 src/dnadesign/cruncher/**/report.json
 src/dnadesign/cruncher/**/report.md
 src/dnadesign/cruncher/**/gathered_per_pwm_*.csv
+src/dnadesign/cruncher/workspaces/archived/
 projects/**/projects/
 src/dnadesign/cruncher/projects/**/projects/
 

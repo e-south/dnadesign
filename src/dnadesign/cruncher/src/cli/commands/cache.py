@@ -12,9 +12,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
+from dnadesign.cruncher.app.catalog_service import catalog_stats, verify_cache
+from dnadesign.cruncher.cli.config_resolver import (
+    ConfigResolutionError,
+    resolve_config_path,
+)
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.services.catalog_service import catalog_stats, verify_cache
+from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from rich.console import Console
 from rich.table import Table
 
@@ -24,7 +28,11 @@ console = Console()
 
 @app.command("stats", help="Show counts of cached motifs and site sets.")
 def stats(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -38,7 +46,7 @@ def stats(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     stats = catalog_stats(catalog_root)
     table = Table(title="Cache stats", header_style="bold")
     table.add_column("Metric")
@@ -51,7 +59,11 @@ def stats(
 
 @app.command("verify", help="Verify cached motif/site files are present on disk.")
 def verify(
-    config: Path | None = typer.Argument(None, help="Path to cruncher config.yaml.", metavar="CONFIG"),
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -65,7 +77,7 @@ def verify(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    catalog_root = config_path.parent / cfg.motif_store.catalog_root
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     issues = verify_cache(catalog_root)
     if not issues:
         console.print("Cache verification OK.")

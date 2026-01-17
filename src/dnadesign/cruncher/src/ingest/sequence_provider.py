@@ -19,7 +19,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Protocol
 
-from dnadesign.cruncher.ingest.http_client import HttpRetryPolicy, download_to, request_json
+from dnadesign.cruncher.ingest.http_client import (
+    HttpRetryPolicy,
+    download_to,
+    request_json,
+)
 from dnadesign.cruncher.ingest.models import GenomicInterval
 
 _NCBI_EUTILS_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"

@@ -15,9 +15,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from dnadesign.cruncher.app.fetch_service import fetch_motifs
 from dnadesign.cruncher.ingest.adapters.local import LocalMotifAdapter, LocalMotifAdapterConfig
 from dnadesign.cruncher.ingest.models import MotifQuery, SiteQuery
-from dnadesign.cruncher.services.fetch_service import fetch_motifs
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 
 
