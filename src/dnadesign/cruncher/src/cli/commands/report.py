@@ -12,6 +12,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+from rich.console import Console
+
 from dnadesign.cruncher.app.run_service import list_runs
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
@@ -20,7 +22,6 @@ from dnadesign.cruncher.cli.config_resolver import (
 )
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.utils.numba_cache import ensure_numba_cache_dir
-from rich.console import Console
 
 console = Console()
 

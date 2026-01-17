@@ -13,6 +13,9 @@ from collections import Counter
 from pathlib import Path
 
 import typer
+from rich.console import Console
+from rich.table import Table
+
 from dnadesign.cruncher.app.catalog_service import catalog_stats
 from dnadesign.cruncher.app.run_service import list_runs
 from dnadesign.cruncher.app.target_service import (
@@ -27,8 +30,6 @@ from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.registry import default_registry
 from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
-from rich.console import Console
-from rich.table import Table
 
 console = Console()
 

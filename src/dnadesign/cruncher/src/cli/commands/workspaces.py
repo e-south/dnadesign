@@ -12,13 +12,14 @@ from __future__ import annotations
 import os
 
 import typer
+from rich.console import Console
+from rich.table import Table
+
 from dnadesign.cruncher.cli.config_resolver import (
     discover_workspaces,
     workspace_search_roots,
 )
 from dnadesign.cruncher.cli.paths import render_path
-from rich.console import Console
-from rich.table import Table
 
 app = typer.Typer(no_args_is_help=True, help="List discoverable cruncher workspaces.")
 console = Console()

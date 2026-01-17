@@ -113,6 +113,9 @@ src = ["src"]
 [tool.ruff.lint]
 select = ["E", "F", "I"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["dnadesign"]
+
 [tool.uv]
 required-version = ">=0.9.18,<0.10"
 default-groups = []

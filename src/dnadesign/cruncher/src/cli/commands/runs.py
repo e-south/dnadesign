@@ -16,6 +16,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
+from rich.console import Console
+from rich.live import Live
+from rich.table import Table
+
 from dnadesign.cruncher.analysis.layout import (
     current_analysis_id,
     list_analysis_entries,
@@ -39,9 +43,6 @@ from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
-from rich.console import Console
-from rich.live import Live
-from rich.table import Table
 
 
 def _auto_opt_best_run_name(stage_dir: Path, run_group: str | None) -> str | None:

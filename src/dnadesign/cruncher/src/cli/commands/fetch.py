@@ -15,6 +15,9 @@ from typing import Iterable, List, Optional, Tuple
 from urllib.error import HTTPError, URLError
 
 import typer
+from rich.console import Console
+from rich.table import Table
+
 from dnadesign.cruncher.app.campaign_service import resolve_campaign_tf_names
 from dnadesign.cruncher.app.fetch_service import (
     fetch_motifs,
@@ -36,8 +39,6 @@ from dnadesign.cruncher.ingest.sequence_provider import (
 )
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
-from rich.console import Console
-from rich.table import Table
 
 app = typer.Typer(
     no_args_is_help=True,

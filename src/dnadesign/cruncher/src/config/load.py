@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
+
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig, CruncherRoot
 
 

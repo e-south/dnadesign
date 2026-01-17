@@ -17,6 +17,9 @@ from pathlib import Path
 from typing import Optional, Sequence
 
 import typer
+from rich.console import Console
+from rich.table import Table
+
 from dnadesign.cruncher.app.campaign_service import select_catalog_entry
 from dnadesign.cruncher.app.catalog_service import (
     get_entry,
@@ -39,8 +42,6 @@ from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_lines, sha256_
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.logos import logo_subtitle, site_entries_for_logo
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
-from rich.console import Console
-from rich.table import Table
 
 app = typer.Typer(no_args_is_help=True, help="Query or inspect cached motifs and binding sites.")
 console = Console()

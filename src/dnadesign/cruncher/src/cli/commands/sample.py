@@ -13,13 +13,14 @@ import logging
 from pathlib import Path
 
 import typer
+from rich.console import Console
+
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
 )
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.utils.numba_cache import ensure_numba_cache_dir
-from rich.console import Console
 
 console = Console()
 

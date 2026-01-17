@@ -16,6 +16,9 @@ from typing import Optional
 from urllib.error import HTTPError, URLError
 
 import typer
+from rich.console import Console
+from rich.table import Table
+
 from dnadesign.cruncher.app.source_summary_service import (
     summarize_cache,
     summarize_combined,
@@ -33,8 +36,6 @@ from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.models import DatasetQuery
 from dnadesign.cruncher.ingest.registry import default_registry
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
-from rich.console import Console
-from rich.table import Table
 
 app = typer.Typer(no_args_is_help=True, help="List available ingestion sources and capabilities.")
 console = Console()

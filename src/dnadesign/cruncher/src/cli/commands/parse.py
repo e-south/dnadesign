@@ -12,12 +12,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+from rich.console import Console
+
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
 )
 from dnadesign.cruncher.config.load import load_config
-from rich.console import Console
 
 console = Console()
 

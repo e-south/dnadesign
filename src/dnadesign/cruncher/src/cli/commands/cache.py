@@ -12,6 +12,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+from rich.console import Console
+from rich.table import Table
+
 from dnadesign.cruncher.app.catalog_service import catalog_stats, verify_cache
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
@@ -19,8 +22,6 @@ from dnadesign.cruncher.cli.config_resolver import (
 )
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
-from rich.console import Console
-from rich.table import Table
 
 app = typer.Typer(no_args_is_help=True, help="Inspect cache stats or verify cached artifacts.")
 console = Console()
