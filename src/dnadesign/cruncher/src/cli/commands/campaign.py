@@ -16,6 +16,9 @@ from pathlib import Path
 
 import typer
 import yaml
+from rich.console import Console
+from rich.table import Table
+
 from dnadesign.cruncher.app.campaign_notebook_service import (
     generate_campaign_notebook,
 )
@@ -31,8 +34,6 @@ from dnadesign.cruncher.cli.config_resolver import (
 )
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
-from rich.console import Console
-from rich.table import Table
 
 app = typer.Typer(no_args_is_help=True, help="Generate or summarize category campaigns.")
 console = Console()

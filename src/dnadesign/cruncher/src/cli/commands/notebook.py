@@ -12,9 +12,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+from rich.console import Console
+
 from dnadesign.cruncher.app.notebook_service import generate_notebook
 from dnadesign.cruncher.cli.paths import render_path
-from rich.console import Console
 
 console = Console()
 

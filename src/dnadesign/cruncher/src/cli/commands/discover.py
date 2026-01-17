@@ -16,6 +16,9 @@ from pathlib import Path
 from typing import Iterable
 
 import typer
+from rich.console import Console
+from rich.table import Table
+
 from dnadesign.cruncher.app.fetch_service import write_motif_record
 from dnadesign.cruncher.cli.commands.catalog import _resolve_targets
 from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
@@ -35,8 +38,6 @@ from dnadesign.cruncher.io.parsers.meme import parse_meme_file
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.store.catalog_store import iter_site_sequences
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
-from rich.console import Console
-from rich.table import Table
 
 app = typer.Typer(no_args_is_help=True, help="Discover motifs from cached binding sites.")
 console = Console()

@@ -12,6 +12,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+from rich.console import Console
+from rich.table import Table
+
 from dnadesign.cruncher.analysis.layout import load_summary, summary_path
 from dnadesign.cruncher.analysis.plot_registry import (
     plot_keys,
@@ -24,8 +27,6 @@ from dnadesign.cruncher.cli.config_resolver import (
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.utils.numba_cache import ensure_numba_cache_dir
-from rich.console import Console
-from rich.table import Table
 
 console = Console()
 

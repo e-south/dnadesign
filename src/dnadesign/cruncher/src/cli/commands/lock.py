@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+
 from dnadesign.cruncher.app.lock_service import resolve_lock
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,

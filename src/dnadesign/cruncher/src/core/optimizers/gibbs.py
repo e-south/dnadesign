@@ -15,6 +15,8 @@ from typing import Any, Dict, List, Tuple
 
 import arviz as az
 import numpy as np
+from tqdm import tqdm
+
 from dnadesign.cruncher.artifacts.status import RunStatusWriter
 from dnadesign.cruncher.core.optimizers.base import Optimizer
 from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
@@ -29,7 +31,6 @@ from dnadesign.cruncher.core.optimizers.policies import (
 )
 from dnadesign.cruncher.core.sequence import dsdna_hamming, hamming_distance, revcomp_int
 from dnadesign.cruncher.core.state import SequenceState, make_seed
-from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 

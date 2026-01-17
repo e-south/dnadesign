@@ -13,6 +13,9 @@ from pathlib import Path
 from typing import List, Optional
 
 import typer
+from rich.console import Console
+from rich.table import Table
+
 from dnadesign.cruncher.app.campaign_service import (
     expand_campaign,
     resolve_category_targets,
@@ -30,8 +33,6 @@ from dnadesign.cruncher.cli.config_resolver import (
     resolve_config_path,
 )
 from dnadesign.cruncher.config.load import load_config
-from rich.console import Console
-from rich.table import Table
 
 app = typer.Typer(no_args_is_help=True, help="Check target readiness and catalog candidates.")
 console = Console()
