@@ -185,6 +185,11 @@ src/dnadesign/opal/campaigns/**/inputs/**/.DS_Store
 
 # OPAL per-run products anywhere
 **/outputs/
+# DenseGen code package named "outputs" (not a run artifact)
+!src/dnadesign/densegen/src/adapters/outputs/
+!src/dnadesign/densegen/src/adapters/outputs/**
+src/dnadesign/densegen/src/adapters/outputs/**/__pycache__/
+src/dnadesign/densegen/src/adapters/outputs/**/*.pyc
 # DenseGen runs: ignore everything by default, allow demo + README
 src/dnadesign/densegen/runs/**
 !src/dnadesign/densegen/runs/README.md
