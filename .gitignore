@@ -151,6 +151,7 @@ src/dnadesign/cruncher/**/sequences.csv
 src/dnadesign/cruncher/**/sequences.parquet
 src/dnadesign/cruncher/**/elites.*
 !src/dnadesign/cruncher/src/utils/elites.py
+!src/dnadesign/cruncher/src/analysis/elites.py
 src/dnadesign/cruncher/**/trace.nc
 src/dnadesign/cruncher/**/report.json
 src/dnadesign/cruncher/**/report.md
