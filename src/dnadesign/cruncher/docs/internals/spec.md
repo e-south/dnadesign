@@ -138,7 +138,7 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze/re
 ### MCMC optimization spec
 
 - Deterministic RNG via `sample.rng.seed` (and `sample.rng.deterministic=true` for stable pilot seeding).
-- Burn-in storage is optional via `sample.output.trace.include_tune` (default: false).
+- Burn-in storage is optional via `sample.output.trace.include_tune` (default: false, affects sequences.parquet only).
 - Optimizer registry supports `gibbs` and `pt` out of the box.
 - Each optimizer reports:
   - move tallies
@@ -164,10 +164,11 @@ Each run directory contains:
 - `artifacts/elites.json` — elite sequences (JSON, human-readable)
 - `artifacts/elites.yaml` — elite metadata (YAML)
 - `analysis/` — latest analysis (plots/tables/notebooks)
-- `analysis/meta/summary.json` — analysis provenance and artifacts
-- `analysis/meta/analysis_used.yaml` — analysis settings used
-- `analysis/meta/plot_manifest.json` — plot registry and generated outputs
-- `analysis/meta/table_manifest.json` — table registry and generated outputs
+- `analysis/summary.json` — analysis provenance and artifacts
+- `analysis/manifest.json` — artifact inventory with generation reasons
+- `analysis/analysis_used.yaml` — analysis settings used
+- `analysis/plot_manifest.json` — plot registry and generated outputs
+- `analysis/table_manifest.json` — table registry and generated outputs
 - `analysis/tables/auto_opt_pilots.csv` — pilot scorecard (when auto-opt runs)
 - `analysis/plots/auto_opt_tradeoffs.png` — balance vs best-score tradeoffs (when auto-opt runs)
 - `analysis/_archive/<analysis_id>/` — optional archived analyses (when enabled)

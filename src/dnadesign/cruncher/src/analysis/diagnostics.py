@@ -15,6 +15,9 @@ from typing import Any, Iterable
 import numpy as np
 import pandas as pd
 
+from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
+from dnadesign.cruncher.core.sequence import canon_string
+
 
 def _safe_float(value: object) -> float | None:
     if value is None:
@@ -60,6 +63,60 @@ def _sequence_frame(draw_df: pd.DataFrame) -> pd.DataFrame:
     return draw_df
 
 
+def _revcomp_str(seq: str) -> str:
+    comp = {"A": "T", "C": "G", "G": "C", "T": "A"}
+    return "".join(comp[ch] for ch in reversed(seq))
+
+
+def _hamming_str(a: str, b: str) -> float:
+    return float(sum(c0 != c1 for c0, c1 in zip(a, b))) / float(len(a)) if a else 0.0
+
+
+def _acceptance_tail_from_move_stats(
+    move_stats: list[dict[str, object]],
+    *,
+    phase: str = "draw",
+    mh_only: bool = True,
+    window_fraction: float = 0.2,
+    min_window: int = 20,
+    max_window: int = 200,
+) -> tuple[float | None, int | None, int | None]:
+    if not move_stats:
+        return None, None, None
+    rows = []
+    for row in move_stats:
+        if phase and row.get("phase") != phase:
+            continue
+        move_kind = row.get("move_kind")
+        if mh_only and move_kind == "S":
+            continue
+        sweep_idx = _safe_int(row.get("sweep_idx"))
+        attempted = _safe_int(row.get("attempted"))
+        accepted = _safe_int(row.get("accepted"))
+        if sweep_idx is None or attempted is None or accepted is None:
+            continue
+        rows.append((sweep_idx, attempted, accepted))
+    if not rows:
+        return None, None, None
+    sweeps = sorted({sweep for sweep, _, _ in rows})
+    if not sweeps:
+        return None, None, None
+    total_sweeps = len(sweeps)
+    window = int(round(window_fraction * total_sweeps))
+    window = max(min_window, min(max_window, window))
+    window = min(window, total_sweeps)
+    cutoff = sweeps[-window]
+    attempted_total = 0
+    accepted_total = 0
+    for sweep_idx, attempted, accepted in rows:
+        if sweep_idx >= cutoff:
+            attempted_total += attempted
+            accepted_total += accepted
+    if attempted_total <= 0:
+        return None, window, total_sweeps
+    return accepted_total / float(attempted_total), window, total_sweeps
+
+
 def summarize_sampling_diagnostics(
     *,
     trace_idata: Any | None,
@@ -71,6 +128,7 @@ def summarize_sampling_diagnostics(
     mode: str | None = None,
     optimizer_kind: str | None = None,
     sample_meta: dict[str, object] | None = None,
+    trace_required: bool = True,
 ) -> dict[str, object]:
     """
     Build a diagnostics summary for sample/analyze/report.
@@ -110,6 +168,9 @@ def summarize_sampling_diagnostics(
     if optimizer_kind is None and isinstance(optimizer, dict):
         optimizer_kind = optimizer.get("kind") if isinstance(optimizer.get("kind"), str) else optimizer_kind
     optimizer_kind = str(optimizer_kind).lower() if optimizer_kind else None
+    dsdna_canonicalize = bool(sample_meta.get("dsdna_canonicalize")) if sample_meta else False
+    dsdna_hamming = bool(sample_meta.get("dsdna_hamming")) if sample_meta else False
+
     if mode:
         metrics["mode"] = mode
     if optimizer_kind:
@@ -121,60 +182,129 @@ def summarize_sampling_diagnostics(
     ess = None
     score_arr = None
     if trace_idata is None:
-        warnings.append("Trace missing: trace-based diagnostics unavailable.")
-        _mark("warn")
+        if trace_required:
+            warnings.append("Trace missing: trace-based diagnostics unavailable.")
+            _mark("warn")
     else:
         score_arr = _trace_score_array(trace_idata)
-        if score_arr is None or score_arr.ndim < 2:
+        if score_arr is None:
             warnings.append("Trace missing score array; skipping R-hat/ESS.")
             _mark("warn")
         else:
-            n_chains, n_draws = int(score_arr.shape[0]), int(score_arr.shape[1])
-            trace_metrics["chains"] = n_chains
-            trace_metrics["draws"] = n_draws
-            skip_mixing = optimizer_kind == "pt"
-            if skip_mixing:
-                trace_metrics["mixing_note"] = "PT ladder: R-hat/ESS not computed across temperatures."
-            else:
-                if n_chains < 2:
-                    warnings.append(f"R-hat requires ≥2 chains (got {n_chains}).")
+            score_arr = np.asarray(score_arr, dtype=float)
+            if score_arr.ndim < 2:
+                warnings.append("Trace missing score array; skipping R-hat/ESS.")
+                _mark("warn")
+                score_arr = None
+        if score_arr is not None:
+            if not np.isfinite(score_arr).all():
+                warnings.append("Trace contains non-finite scores; dropping invalid draws for diagnostics.")
+                _mark("warn")
+                cleaned_chains: list[np.ndarray] = []
+                counts: list[int] = []
+                for chain in score_arr:
+                    valid = chain[np.isfinite(chain)]
+                    if valid.size == 0:
+                        continue
+                    cleaned_chains.append(valid)
+                    counts.append(int(valid.size))
+                if not cleaned_chains:
+                    warnings.append("Trace has only NaN-padded chains; skipping diagnostics.")
                     _mark("warn")
-                if n_draws < 4:
-                    warnings.append(f"ESS requires ≥4 draws (got {n_draws}).")
-                    _mark("warn")
-                if n_chains >= 2 and n_draws >= 4:
-                    try:
-                        import arviz as az
-
-                        score = trace_idata.posterior["score"]
-                        rhat = _safe_float(az.rhat(score)["score"].item())
-                        ess = _safe_float(az.ess(score)["score"].item())
-                    except Exception as exc:
-                        warnings.append(f"Trace diagnostics failed: {exc}")
+                    score_arr = None
+                else:
+                    dropped = int(score_arr.shape[0] - len(cleaned_chains))
+                    if dropped > 0:
+                        warnings.append(f"Trace diagnostics dropped {dropped} empty chains.")
                         _mark("warn")
-                if rhat is not None:
-                    trace_metrics["rhat"] = rhat
-                    if mode == "sample":
-                        if rhat >= thresholds["rhat_fail"]:
-                            warnings.append(f"R-hat={rhat:.3f} suggests failed mixing.")
-                            _mark("fail")
-                        elif rhat > thresholds["rhat_warn"]:
-                            warnings.append(f"R-hat={rhat:.3f} indicates weak mixing.")
-                            _mark("warn")
-                if ess is not None:
-                    trace_metrics["ess"] = ess
-                    denom = max(1, n_chains * n_draws)
-                    ess_ratio = float(ess) / float(denom)
-                    trace_metrics["ess_ratio"] = ess_ratio
-                    if mode == "sample":
-                        if ess_ratio <= thresholds["ess_ratio_fail"]:
-                            warnings.append(f"ESS ratio {ess_ratio:.3f} suggests failed mixing.")
-                            _mark("fail")
-                        elif ess_ratio < thresholds["ess_ratio_warn"]:
-                            warnings.append(f"ESS ratio {ess_ratio:.3f} is low; consider longer runs.")
-                            _mark("warn")
+                    min_draws = min(counts)
+                    max_draws = max(counts)
+                    if min_draws != max_draws:
+                        warnings.append(
+                            "Trace chains have unequal lengths; diagnostics computed on shortest chain length."
+                        )
+                        _mark("warn")
+                        trace_metrics["draws_min"] = int(min_draws)
+                        trace_metrics["draws_max"] = int(max_draws)
+                    score_arr = np.vstack([chain[:min_draws] for chain in cleaned_chains])
 
-            if score_arr is not None and score_arr.size > 0:
+            if score_arr is None or score_arr.size == 0:
+                warnings.append("Trace missing usable score array; skipping R-hat/ESS.")
+                _mark("warn")
+                score_arr = None
+            if score_arr is not None:
+                n_chains, n_draws = int(score_arr.shape[0]), int(score_arr.shape[1])
+                trace_metrics["chains"] = n_chains
+                trace_metrics["draws"] = n_draws
+                pt_mixing = optimizer_kind == "pt"
+                if pt_mixing:
+                    trace_metrics["mixing_note"] = "PT ladder: R-hat/ESS computed on cold chain only."
+                    if n_draws < 4:
+                        warnings.append(f"ESS requires ≥4 draws (got {n_draws}).")
+                        _mark("warn")
+                    else:
+                        try:
+                            import arviz as az
+
+                            cold_scores = score_arr[-1:, :]
+                            score_idata = az.from_dict(posterior={"score": cold_scores})
+                            score = score_idata.posterior["score"]
+                            ess = _safe_float(az.ess(score)["score"].item())
+                        except Exception as exc:
+                            warnings.append(f"Trace diagnostics failed: {exc}")
+                            _mark("warn")
+                    if ess is not None:
+                        trace_metrics["ess"] = ess
+                        denom = max(1, n_draws)
+                        ess_ratio = float(ess) / float(denom)
+                        trace_metrics["ess_ratio"] = ess_ratio
+                        if mode == "sample":
+                            if ess_ratio <= thresholds["ess_ratio_fail"]:
+                                warnings.append(f"ESS ratio {ess_ratio:.3f} suggests failed mixing.")
+                                _mark("fail")
+                            elif ess_ratio < thresholds["ess_ratio_warn"]:
+                                warnings.append(f"ESS ratio {ess_ratio:.3f} is low; consider longer runs.")
+                                _mark("warn")
+                else:
+                    if n_chains < 2:
+                        warnings.append(f"R-hat requires ≥2 chains (got {n_chains}).")
+                        _mark("warn")
+                    if n_draws < 4:
+                        warnings.append(f"ESS requires ≥4 draws (got {n_draws}).")
+                        _mark("warn")
+                    if n_chains >= 2 and n_draws >= 4:
+                        try:
+                            import arviz as az
+
+                            score_idata = az.from_dict(posterior={"score": score_arr})
+                            score = score_idata.posterior["score"]
+                            rhat = _safe_float(az.rhat(score)["score"].item())
+                            ess = _safe_float(az.ess(score)["score"].item())
+                        except Exception as exc:
+                            warnings.append(f"Trace diagnostics failed: {exc}")
+                            _mark("warn")
+                    if rhat is not None:
+                        trace_metrics["rhat"] = rhat
+                        if mode == "sample":
+                            if rhat >= thresholds["rhat_fail"]:
+                                warnings.append(f"R-hat={rhat:.3f} suggests failed mixing.")
+                                _mark("fail")
+                            elif rhat > thresholds["rhat_warn"]:
+                                warnings.append(f"R-hat={rhat:.3f} indicates weak mixing.")
+                                _mark("warn")
+                    if ess is not None:
+                        trace_metrics["ess"] = ess
+                        denom = max(1, n_chains * n_draws)
+                        ess_ratio = float(ess) / float(denom)
+                        trace_metrics["ess_ratio"] = ess_ratio
+                        if mode == "sample":
+                            if ess_ratio <= thresholds["ess_ratio_fail"]:
+                                warnings.append(f"ESS ratio {ess_ratio:.3f} suggests failed mixing.")
+                                _mark("fail")
+                            elif ess_ratio < thresholds["ess_ratio_warn"]:
+                                warnings.append(f"ESS ratio {ess_ratio:.3f} is low; consider longer runs.")
+                                _mark("warn")
+
                 flat = score_arr.reshape(-1)
                 trace_metrics["score_mean"] = _safe_float(np.mean(flat))
                 trace_metrics["score_std"] = _safe_float(np.std(flat))
@@ -206,10 +336,20 @@ def summarize_sampling_diagnostics(
     if sequences_df is not None and "sequence" in sequences_df.columns:
         draw_df = _sequence_frame(sequences_df)
         total = int(len(draw_df))
-        unique = int(draw_df["sequence"].nunique())
+        unique = None
+        if "canonical_sequence" in draw_df.columns:
+            unique = int(draw_df["canonical_sequence"].astype(str).nunique())
+            seq_metrics["unique_sequences_canonical"] = unique
+            seq_metrics["unique_sequences_raw"] = int(draw_df["sequence"].astype(str).nunique())
+        elif dsdna_canonicalize:
+            canon = draw_df["sequence"].astype(str).map(canon_string)
+            unique = int(canon.nunique())
+        else:
+            unique = int(draw_df["sequence"].astype(str).nunique())
         seq_metrics["n_sequences"] = total
-        seq_metrics["unique_sequences"] = unique
-        if total > 0:
+        if unique is not None:
+            seq_metrics["unique_sequences"] = unique
+        if total > 0 and unique is not None:
             unique_fraction = unique / float(total)
             seq_metrics["unique_fraction"] = unique_fraction
             if unique_fraction < thresholds["unique_fraction_warn"]:
@@ -222,6 +362,9 @@ def summarize_sampling_diagnostics(
 
     # ---- elite balance ----------------------------------------------------
     elites_metrics: dict[str, object] = {}
+    if elites_df is not None and elites_df.empty:
+        warnings.append("No elites matched filters; consider relaxing elite thresholds.")
+        _mark("warn")
     if elites_df is not None and not elites_df.empty:
         elites_metrics["n_elites"] = int(len(elites_df))
         if sample_meta:
@@ -283,11 +426,25 @@ def summarize_sampling_diagnostics(
                         s0, s1 = seqs[i], seqs[j]
                         if len(s0) != len(s1):
                             continue
-                        dist = sum(c0 != c1 for c0, c1 in zip(s0, s1)) / float(len(s0))
+                        if dsdna_hamming:
+                            dist = min(_hamming_str(s0, s1), _hamming_str(_revcomp_str(s0), s1))
+                        else:
+                            dist = _hamming_str(s0, s1)
                         total += dist
                         count += 1
                 if count:
                     elites_metrics["diversity_hamming"] = _safe_float(total / count)
+        try:
+            pair_df, elite_df, overlap_summary = compute_overlap_tables(elites_df, tf_names)
+            overlap_rate_median = overlap_summary.get("overlap_rate_median")
+            overlap_total_bp_median = overlap_summary.get("overlap_total_bp_median")
+            if overlap_rate_median is not None:
+                elites_metrics["overlap_rate_median"] = _safe_float(overlap_rate_median)
+            if overlap_total_bp_median is not None:
+                elites_metrics["overlap_total_bp_median"] = _safe_float(overlap_total_bp_median)
+        except Exception as exc:
+            warnings.append(f"Overlap metrics unavailable: {exc}")
+            _mark("warn")
     metrics["elites"] = elites_metrics
 
     # ---- optimizer stats --------------------------------------------------
@@ -310,6 +467,24 @@ def summarize_sampling_diagnostics(
             if acc_m < thresholds["acceptance_low"] or acc_m > thresholds["acceptance_high"]:
                 warnings.append(f"Multi-site acceptance {acc_m:.2f} is outside typical bounds.")
                 _mark("warn")
+        acc_mh = _safe_float(optimizer_stats.get("acceptance_rate_mh"))
+        acc_all = _safe_float(optimizer_stats.get("acceptance_rate_all"))
+        if acc_mh is not None:
+            optimizer_metrics["acceptance_rate_mh"] = acc_mh
+        if acc_all is not None:
+            optimizer_metrics["acceptance_rate_all"] = acc_all
+        move_stats = optimizer_stats.get("move_stats")
+        if isinstance(move_stats, list):
+            tail_rate, tail_window, tail_total = _acceptance_tail_from_move_stats(move_stats)
+            if tail_rate is not None:
+                optimizer_metrics["acceptance_rate_mh_tail"] = tail_rate
+                optimizer_metrics["acceptance_rate_mh_tail_window"] = tail_window
+                optimizer_metrics["acceptance_rate_mh_tail_sweeps"] = tail_total
+                if tail_rate < thresholds["acceptance_low"] or tail_rate > thresholds["acceptance_high"]:
+                    warnings.append(
+                        f"Tail MH acceptance {tail_rate:.2f} is outside typical bounds (window={tail_window})."
+                    )
+                    _mark("warn")
         swap_rate = _safe_float(optimizer_stats.get("swap_acceptance_rate"))
         if swap_rate is not None:
             optimizer_metrics["swap_acceptance_rate"] = swap_rate

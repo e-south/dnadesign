@@ -19,7 +19,12 @@ MOVE_KINDS: Tuple[str, ...] = ("S", "B", "M", "L", "W", "I")
 
 
 def move_probs_array(move_probs: Dict[str, float]) -> np.ndarray:
-    return np.array([float(move_probs[k]) for k in MOVE_KINDS], dtype=float)
+    raw = np.array([float(move_probs.get(k, 0.0)) for k in MOVE_KINDS], dtype=float)
+    raw = np.clip(raw, 0.0, None)
+    total = float(raw.sum())
+    if total <= 0:
+        return np.full(len(MOVE_KINDS), 1.0 / len(MOVE_KINDS), dtype=float)
+    return raw / total
 
 
 @dataclass
@@ -29,13 +34,13 @@ class MoveSchedule:
 
     def probs(self, frac: float) -> np.ndarray:
         if self.end is None:
-            return self.start
+            return move_probs_array(dict(zip(MOVE_KINDS, self.start.tolist())))
         frac = min(max(float(frac), 0.0), 1.0)
         probs = self.start + frac * (self.end - self.start)
         probs = np.clip(probs, 0.0, None)
         total = float(probs.sum())
         if total <= 0:
-            return self.start
+            return np.full_like(probs, 1.0 / len(probs))
         return probs / total
 
 
@@ -52,17 +57,16 @@ class TargetingPolicy:
         state: object,
         evaluator: object,
         rng: np.random.Generator,
+        per_tf: Optional[Dict[str, float]] = None,
     ) -> Optional[Tuple[str, int, int]]:
         if not self.enabled or rng.random() >= self.worst_tf_prob:
             return None
-        per_tf = evaluator(state)
+        if per_tf is None:
+            per_tf = evaluator(state)
         if not per_tf:
             return None
         worst_tf = sorted(per_tf.items(), key=lambda item: (item[1], item[0]))[0][0]
-        best_hits = evaluator.best_hits(state)
-        if worst_tf not in best_hits:
-            return None
-        best_score, offset, strand = best_hits[worst_tf]
+        best_score, offset, strand = evaluator.best_hit(state, worst_tf)
         if not math.isfinite(best_score):
             return None
         width = evaluator.pwm_width(worst_tf)

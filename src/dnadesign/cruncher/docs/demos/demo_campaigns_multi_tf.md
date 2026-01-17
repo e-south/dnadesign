@@ -325,7 +325,7 @@ Example output (analyze):
 ```bash
 Random baseline: 100%|██████████| 25/25 [00:00<00:00, 11676.79it/s]
 Analysis outputs → <workspace>/runs/sample/lexA-cpxR-fur_20260110_161355_df8fcb/analysis
-  summary: <workspace>/runs/sample/lexA-cpxR-fur_20260110_161355_df8fcb/analysis/meta/summary.json
+  summary: <workspace>/runs/sample/lexA-cpxR-fur_20260110_161355_df8fcb/analysis/summary.json
   analysis_id: 20260110T211410Z_1febb3
 Next steps:
   cruncher runs show <workspace>/config.yaml 20260110_161355_df8fcb

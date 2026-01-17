@@ -22,7 +22,7 @@ A typical workflow looks like:
 
 ---
 
-### Quickstart
+### Quickstart (happy path)
 
 **cruncher** uses **uv** for Python deps and **pixi** for system binaries (MEME Suite).
 
@@ -57,20 +57,27 @@ cruncher catalog logos --set 1
 # Optional: validate locked motifs
 cruncher parse
 
-# Optimization
+# Optimization (auto-optimize is enabled by default)
 cruncher sample
-# Auto-optimize is enabled by default; disable with:
-# cruncher sample --no-auto-opt
 
-# Diagnostics + plots
-cruncher analyze --latest
+# Diagnostics + plots (defaults to latest run)
+cruncher analyze
 
-# Report (JSON + Markdown) for a specific run name
-cruncher runs list
+# Report (JSON + Markdown)
 cruncher report --latest
+
+# Optional: generate all plots
+# cruncher analyze --plots all
 ```
 
 ---
+
+Notes:
+- Analysis writes a canonical summary to `analysis/summary.json` and a detailed
+  artifact manifest to `analysis/manifest.json`.
+- `trace.nc` contains draw phase only; `sample.output.trace.include_tune` controls
+  whether tune samples appear in `sequences.parquet`.
+- Motif overlap is a feature, not a failure; overlap plots are descriptive only.
 
 ### More documentation
 

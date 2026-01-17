@@ -57,7 +57,7 @@ def ensure_numba_cache_dir(anchor: Path, *, env_var: str = _NUMBA_CACHE_ENV) -> 
         cache_root = resolve_cruncher_root(anchor) or repo_root
         cache_dir = (cache_root / ".cruncher" / "numba_cache").resolve()
         os.environ[env_var] = str(cache_dir)
-        logger.info("NUMBA cache dir not set; using %s", cache_dir)
+        logger.debug("NUMBA cache dir not set; using %s", cache_dir)
 
     try:
         cache_dir.mkdir(parents=True, exist_ok=True)

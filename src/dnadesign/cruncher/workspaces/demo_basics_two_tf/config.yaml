@@ -92,49 +92,55 @@ cruncher:
       tune: 1000
       draws: 2000
       restarts: 4
+    early_stop:
+      enabled: false
     init:
       kind: random
       length: 30
       pad_with: background
     objective:
       bidirectional: true
-      score_scale: llr
+      score_scale: normalized-llr
       scoring:
         pwm_pseudocounts: 0.10
         log_odds_clip: null
     elites:
       k: 10
       min_hamming: 1
+      dsDNA_canonicalize: true
+      dsDNA_hamming: true
       filters:
-        pwm_sum_min: 0.6
+        pwm_sum_min: 0.0
+        min_per_tf_norm: null
+        require_all_tfs_over_min_norm: true
     moves:
       profile: balanced
       overrides:
-        block_len_range: [3, 12]
-        multi_k_range: [2, 8]
+        block_len_range: [4, 16]
+        multi_k_range: [3, 10]
         slide_max_shift: 4
         swap_len_range: [2, 8]
         move_probs:
-          S: 0.80
-          B: 0.10
-          M: 0.10
+          S: 0.60
+          B: 0.20
+          M: 0.20
     optimizer:
       name: auto
     optimizers:
       gibbs:
         beta_schedule:
           kind: linear
-          beta: [0.05, 0.5]
+          beta: [0.2, 1.0]
         apply_during: tune
       pt:
         beta_ladder:
           kind: geometric
-          betas: [0.05, 0.1, 0.2, 0.4]
+          betas: [0.2, 0.4, 0.8, 1.6]
         swap_prob: 0.10
     auto_opt:
       enabled: true
-      budget_levels: [200, 800]
-      replicates: 1
+      budget_levels: [2000, 3000]
+      replicates: 2
       policy:
         allow_warn: true
     output:
@@ -152,16 +158,10 @@ cruncher:
     runs: []
     tf_pair: [lexA, cpxR]
     plots:
-      trace: true
-      autocorr: true
-      convergence: true
-      scatter_pwm: true
-      pair_pwm: true
-      parallel_pwm: true
-      pairgrid: true
-      score_hist: true
-      score_box: false
-      correlation_heatmap: true
-      parallel_coords: true
+      worst_tf_trace: true
+      worst_tf_identity: true
+      elite_filter_waterfall: true
+      overlap_heatmap: true
+      overlap_bp_distribution: true
     scatter_scale: llr
     subsampling_epsilon: 10.0

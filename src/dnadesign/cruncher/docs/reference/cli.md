@@ -326,7 +326,7 @@ Notes:
 
 * `sample.output.save_sequences: true` is required for later analysis/reporting.
 * `sample.output.trace.save: true` enables trace-based diagnostics.
-* Auto-opt is enabled by default: it runs short Gibbs + PT pilots, scores them via the auto-opt scorecard (balance/diversity/acceptance), logs diagnostics warnings, then runs the best candidate. If thresholds are not met, it still proceeds with the best available candidate and logs warnings. Use `--no-auto-opt` to disable.
+* Auto-opt is enabled by default: it runs short Gibbs + PT pilots, evaluates objective-aligned scores from draw-phase `combined_score_final` (top-K median), logs diagnostics warnings, then runs the best candidate. Selection is thresholdless and confidence-based; `auto_opt.policy.allow_warn: true` will always pick a winner at the max budget (logging low-confidence warnings). Use `--no-auto-opt` to disable.
 * `--verbose` enables periodic progress logging; `--debug` enables very verbose debug logs.
 * Auto-opt selection details are recorded in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/tables/auto_opt_pilots.csv` for the latest run. The selected pilot is also recorded in `runs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
 
@@ -339,7 +339,7 @@ Generates diagnostics and plots for one or more sample runs.
 Inputs:
 
 * CONFIG (explicit or resolved)
-* runs via `analysis.runs`, `--run`, or `--latest`
+* runs via `analysis.runs` or `--run` (defaults to latest sample run if empty)
 * run artifacts: `artifacts/sequences.parquet` (required) and `artifacts/trace.nc` for trace-based plots
 
 Network:
@@ -357,16 +357,16 @@ Examples:
 
 Preconditions:
 
-* provide runs via `analysis.runs`, `--run`, or `--latest`
+* provide runs via `analysis.runs`/`--run` or rely on the default latest run
 * trace-dependent plots require `artifacts/trace.nc`
-* if `analysis/` exists without `analysis/meta/summary.json`, remove the incomplete analysis folder before re-running `cruncher analyze`
+* if `analysis/` exists without `analysis/summary.json`, remove the incomplete analysis folder before re-running `cruncher analyze`
 
 Outputs:
 
 * tables: `analysis/tables/score_summary.csv`, `analysis/tables/elite_topk.csv`, `analysis/tables/joint_metrics.csv`,
   `analysis/tables/diagnostics.json`
 * plots: `analysis/plots/score__pairgrid.png` (when `analysis.plots.pairgrid=true`)
-* summaries: `analysis/meta/summary.json`, `analysis/meta/plot_manifest.json`, `analysis/meta/table_manifest.json`
+* summaries: `analysis/summary.json`, `analysis/manifest.json`, `analysis/plot_manifest.json`, `analysis/table_manifest.json`
 
 Note:
 
@@ -433,14 +433,14 @@ Notes:
 
 * requires `marimo` to be installed (for example: `uv add --group notebooks marimo`)
 * useful when you want interactive slicing/filtering beyond static plots
-* strict by default: requires `analysis/meta/summary.json` + `analysis/meta/plot_manifest.json` to exist and parse, and `analysis/meta/summary.json` must include a non-empty `tf_names` list
+* strict by default: requires `analysis/summary.json` + `analysis/plot_manifest.json` to exist and parse, and `analysis/summary.json` must include a non-empty `tf_names` list
 * pass `--lenient` to generate anyway (warnings appear in the Overview tab)
-* when `analysis/meta/summary.json` is missing, lenient mode falls back to `analysis/` as an unindexed entry
+* when `analysis/summary.json` is missing, lenient mode falls back to `analysis/` as an unindexed entry
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
 * the notebook infers `run_dir` from its location; keep it under `<run_dir>/analysis/notebooks/` or regenerate it
 * text outputs (for example, `diag__convergence.txt`) render inline in the Plots tab
-* if running in lenient mode and `analysis/meta/summary.json` lacks `tf_names`, scatter controls are disabled with an inline warning
+* if running in lenient mode and `analysis/summary.json` lacks `tf_names`, scatter controls are disabled with an inline warning
 * the notebook includes:
   * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
   * Tables tab with a Top-K slider and a per-PWM data explorer

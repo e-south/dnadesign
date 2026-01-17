@@ -10,7 +10,7 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Sequence, Tuple
 
 import numpy as np
@@ -29,7 +29,7 @@ class _PWMInfo:
       • null_scores, tail_p: DP table → P(X ≥ LLR) for each possible LLR
       • width             : motif length
       • consensus_llr     : sum of column-max LLRs (for normalization)
-      • consensus_neglogp : -log₁₀(p_seq) of that consensus LLR (once seq_length is known)
+      • consensus_neglogp_by_len : cache of -log₁₀(p_seq) for consensus per seq_length
       • null_mean         : mean of the null distribution of single-window LLRs
       • null_std          : standard deviation of that null distribution
     """
@@ -40,7 +40,7 @@ class _PWMInfo:
     width: int
 
     consensus_llr: float = 0.0
-    consensus_neglogp: float = 0.0
+    consensus_neglogp_by_len: Dict[int, float] = field(default_factory=dict)
 
     null_mean: float = 0.0
     null_std: float = 1.0
@@ -256,8 +256,8 @@ class Scorer:
           • "consensus-neglop-sum":
               (-log10(p_seq) / precomputed_neglogp(consensus_llr))
 
-        On the very first call for a given PWM, we fill in info.consensus_neglogp using
-        info.consensus_llr and the same Bonferroni formula.
+        For "consensus-neglop-sum", we cache consensus neglogp by sequence length
+        because the Bonferroni correction depends on the number of windows.
         """
         out: Dict[str, float] = {}
         logger.debug("compute_all_per_pwm: seq_length=%d, scale=%s", seq_length, self.scale)
@@ -289,14 +289,20 @@ class Scorer:
                 continue
 
             # Now scale must be "consensus-neglop-sum"
-            if info.consensus_neglogp <= 0.0:
+            neglogp_cons = info.consensus_neglogp_by_len.get(seq_length)
+            if neglogp_cons is None:
                 cons_llr = info.consensus_llr
                 neglogp_cons = self._per_pwm_neglogp(cons_llr, info, seq_length)
-                info.consensus_neglogp = neglogp_cons
-                logger.debug("    Set consensus_neglogp for %s = %.3f", tf, neglogp_cons)
+                info.consensus_neglogp_by_len[seq_length] = neglogp_cons
+                logger.debug(
+                    "    Set consensus_neglogp for %s (len=%d) = %.3f",
+                    tf,
+                    seq_length,
+                    neglogp_cons,
+                )
 
-            if info.consensus_neglogp > 0.0:
-                normalized = float(neglogp_seq / info.consensus_neglogp)
+            if neglogp_cons > 0.0:
+                normalized = float(neglogp_seq / neglogp_cons)
                 out[tf] = normalized
             else:
                 out[tf] = 0.0

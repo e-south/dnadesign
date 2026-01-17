@@ -470,12 +470,6 @@ class AutoOptToleranceConfig(StrictBaseModel):
 
 class AutoOptScorecardConfig(StrictBaseModel):
     top_k: int = 10
-    min_balance: float = 0.25
-    min_diversity: float = 0.10
-    acceptance_target: float = 0.40
-    acceptance_tolerance: float = 0.25
-    swap_target: float = 0.25
-    swap_tolerance: float = 0.20
 
     @field_validator("top_k")
     @classmethod
@@ -484,78 +478,30 @@ class AutoOptScorecardConfig(StrictBaseModel):
             raise ValueError("auto_opt.scorecard.top_k must be >= 1")
         return v
 
-    @field_validator("min_balance", "min_diversity")
-    @classmethod
-    def _check_non_negative(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v < 0:
-            raise ValueError("auto_opt.scorecard balance/diversity thresholds must be >= 0")
-        return float(v)
-
-    @field_validator("acceptance_target", "swap_target")
-    @classmethod
-    def _check_targets(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v <= 0 or v >= 1:
-            raise ValueError("auto_opt.scorecard target rates must be between 0 and 1")
-        return float(v)
-
-    @field_validator("acceptance_tolerance", "swap_tolerance")
-    @classmethod
-    def _check_tolerances(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v < 0 or v >= 1:
-            raise ValueError("auto_opt.scorecard tolerances must be between 0 and 1")
-        return float(v)
-
 
 class AutoOptPolicyConfig(StrictBaseModel):
     allow_warn: bool = False
-    retry_on_warn: bool = True
-    retry_draws_factor: float = 2.0
-    retry_tune_factor: float = 2.0
     cooling_boost: float = 5.0
-    max_rhat: float = 1.2
-    min_ess: float = 20.0
-    min_unique_fraction: float = 0.10
-    max_unique_fraction: float | None = None
     scorecard: AutoOptScorecardConfig = Field(default_factory=AutoOptScorecardConfig)
 
-    @field_validator("retry_draws_factor", "retry_tune_factor", "cooling_boost")
+    @field_validator("cooling_boost")
     @classmethod
     def _check_retry_factors(cls, v: float) -> float:
         if not isinstance(v, (int, float)) or v < 1:
-            raise ValueError("auto_opt.policy retry factors must be >= 1")
-        return float(v)
-
-    @field_validator("max_rhat")
-    @classmethod
-    def _check_max_rhat(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v <= 1.0:
-            raise ValueError("auto_opt.policy.max_rhat must be > 1.0")
-        return float(v)
-
-    @field_validator("min_ess", "min_unique_fraction")
-    @classmethod
-    def _check_positive_thresholds(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v < 0:
-            raise ValueError("auto_opt.policy thresholds must be non-negative")
-        return float(v)
-
-    @field_validator("max_unique_fraction")
-    @classmethod
-    def _check_max_unique_fraction(cls, v: float | None) -> float | None:
-        if v is None:
-            return v
-        if not isinstance(v, (int, float)) or v < 0:
-            raise ValueError("auto_opt.policy.max_unique_fraction must be >= 0")
+            raise ValueError("auto_opt.policy.cooling_boost must be >= 1")
         return float(v)
 
 
 class AutoOptLengthConfig(StrictBaseModel):
     enabled: bool = False
+    mode: Literal["grid", "ladder"] = "grid"
     min_length: Optional[int] = None
     max_length: Optional[int] = None
     step: int = 2
     max_candidates: int = 4
     prefer_shortest: bool = True
+    warm_start: bool = True
+    ladder_budget_scale: float = 0.5
 
     @field_validator("min_length", "max_length")
     @classmethod
@@ -573,13 +519,26 @@ class AutoOptLengthConfig(StrictBaseModel):
             raise ValueError("auto_opt.length step/max_candidates must be >= 1")
         return v
 
+    @field_validator("ladder_budget_scale")
+    @classmethod
+    def _check_ladder_budget_scale(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError("auto_opt.length.ladder_budget_scale must be > 0")
+        return float(v)
+
+    @model_validator(mode="after")
+    def _check_ladder_mode(self) -> "AutoOptLengthConfig":
+        if self.mode == "ladder" and self.step != 1:
+            raise ValueError("auto_opt.length.step must be 1 when mode='ladder'")
+        return self
+
 
 class AutoOptConfig(StrictBaseModel):
     enabled: bool = True
     budget_levels: List[int] = Field(default_factory=lambda: [200, 800])
-    eta: int = 3
     replicates: int = 1
     keep_pilots: Literal["all", "ok", "best"] = "ok"
+    allow_trim_polish_in_pilots: bool = False
     prefer_simpler_if_close: bool = True
     tolerance: AutoOptToleranceConfig = AutoOptToleranceConfig()
     length: AutoOptLengthConfig = Field(default_factory=AutoOptLengthConfig)
@@ -597,7 +556,7 @@ class AutoOptConfig(StrictBaseModel):
             cleaned.append(item)
         return cleaned
 
-    @field_validator("eta", "replicates")
+    @field_validator("replicates")
     @classmethod
     def _check_positive_ints(cls, v: int, info) -> int:
         if not isinstance(v, int) or v < 1:
@@ -663,6 +622,8 @@ class PolishConfig(StrictBaseModel):
     enabled: bool = True
     max_rounds: int = 2
     improvement_tol: float = 0.0
+    max_elites: int | None = 50
+    max_evals: int | None = None
 
     @field_validator("max_rounds")
     @classmethod
@@ -677,6 +638,15 @@ class PolishConfig(StrictBaseModel):
         if not isinstance(v, (int, float)) or v < 0:
             raise ValueError("polish.improvement_tol must be >= 0")
         return float(v)
+
+    @field_validator("max_elites", "max_evals")
+    @classmethod
+    def _check_caps(cls, v: int | None, info) -> int | None:
+        if v is None:
+            return v
+        if not isinstance(v, int) or v < 1:
+            raise ValueError(f"polish.{info.field_name} must be >= 1 or null")
+        return v
 
 
 class SampleRngConfig(StrictBaseModel):
@@ -737,12 +707,27 @@ class SampleEarlyStopConfig(StrictBaseModel):
 class SampleObjectiveConfig(StrictBaseModel):
     bidirectional: bool = True
     score_scale: Literal["llr", "z", "logp", "consensus-neglop-sum", "normalized-llr"] = "llr"
+    combine: Literal["min", "sum"] | None = Field(
+        None,
+        description="How to combine per-TF scores. Defaults to min (or sum for consensus-neglop-sum).",
+    )
     scoring: ScoringConfig = ScoringConfig()
     softmin: SoftminConfig = SoftminConfig()
+    length_penalty_lambda: float = 0.0
+    allow_unscaled_llr: bool = False
+
+    @field_validator("length_penalty_lambda")
+    @classmethod
+    def _check_length_penalty_lambda(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0:
+            raise ValueError("objective.length_penalty_lambda must be >= 0")
+        return float(v)
 
 
 class EliteFiltersConfig(StrictBaseModel):
     pwm_sum_min: float = 0.0
+    min_per_tf_norm: float | None = None
+    require_all_tfs_over_min_norm: bool = True
 
     @field_validator("pwm_sum_min")
     @classmethod
@@ -751,11 +736,22 @@ class EliteFiltersConfig(StrictBaseModel):
             raise ValueError("sample.elites.filters.pwm_sum_min must be >= 0")
         return float(v)
 
+    @field_validator("min_per_tf_norm")
+    @classmethod
+    def _check_min_per_tf_norm(cls, v: float | None) -> float | None:
+        if v is None:
+            return v
+        if not isinstance(v, (int, float)) or v < 0:
+            raise ValueError("sample.elites.filters.min_per_tf_norm must be >= 0")
+        return float(v)
+
 
 class SampleElitesConfig(StrictBaseModel):
     k: int = 10
     min_hamming: int = 1
     filters: EliteFiltersConfig = EliteFiltersConfig()
+    dsDNA_canonicalize: bool = False
+    dsDNA_hamming: bool | None = None
 
     @field_validator("k", "min_hamming")
     @classmethod
@@ -763,6 +759,12 @@ class SampleElitesConfig(StrictBaseModel):
         if not isinstance(v, int) or v < 0:
             raise ValueError(f"sample.elites.{info.field_name} must be a non-negative integer")
         return v
+
+    @model_validator(mode="after")
+    def _set_dsdna_hamming_default(self) -> "SampleElitesConfig":
+        if self.dsDNA_hamming is None:
+            self.dsDNA_hamming = self.dsDNA_canonicalize
+        return self
 
 
 class MoveOverridesConfig(StrictBaseModel):
@@ -838,7 +840,7 @@ class SampleOutputTraceConfig(StrictBaseModel):
     save: bool = Field(True, description="Write trace.nc for analyze/report.")
     include_tune: bool = Field(
         False,
-        description="Include tune phase samples in sequences/trace outputs.",
+        description="Include tune phase samples in sequences.parquet (trace.nc is draws-only).",
     )
 
 
@@ -893,6 +895,7 @@ class SampleConfig(StrictBaseModel):
 
 
 class AnalysisPlotConfig(StrictBaseModel):
+    dashboard: bool = True
     trace: bool = False
     autocorr: bool = False
     convergence: bool = False
@@ -904,10 +907,23 @@ class AnalysisPlotConfig(StrictBaseModel):
     score_box: bool = False
     correlation_heatmap: bool = False
     parallel_coords: bool = False
+    worst_tf_trace: bool = True
+    worst_tf_identity: bool = True
+    elite_filter_waterfall: bool = True
+    overlap_heatmap: bool = True
+    overlap_bp_distribution: bool = True
+    overlap_strand_combos: bool = False
+    motif_offset_rug: bool = False
+    pt_swap_by_pair: bool = False
+    move_acceptance_time: bool = False
+    move_usage_time: bool = False
 
 
 class AnalysisConfig(StrictBaseModel):
     runs: Optional[List[str]]
+    extra_plots: bool = False
+    extra_tables: bool = False
+    mcmc_diagnostics: bool = False
     plots: AnalysisPlotConfig = AnalysisPlotConfig()
     scatter_scale: Literal["llr", "z", "logp", "consensus-neglop-sum", "normalized-llr"]
     subsampling_epsilon: float
@@ -1497,6 +1513,20 @@ class CruncherConfig(StrictBaseModel):
                         f"campaign '{campaign.name}' forbids overlaps, but TFs appear in multiple categories: "
                         f"{overlaps_list}"
                     )
+        return self
+
+    @model_validator(mode="after")
+    def _check_score_scale_llr(self) -> "CruncherConfig":
+        if self.sample is None:
+            return self
+        objective = self.sample.objective
+        if objective.score_scale == "llr" and not objective.allow_unscaled_llr:
+            if any(len(regs) > 1 for regs in self.regulator_sets):
+                raise ValueError(
+                    "score_scale='llr' is not comparable across PWMs in multi-TF runs. "
+                    "Use a normalized scale (e.g. normalized-llr or logp) or set "
+                    "sample.objective.allow_unscaled_llr=true to proceed."
+                )
         return self
 
 

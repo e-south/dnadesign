@@ -17,16 +17,21 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+import yaml
 
 from dnadesign.cruncher.analysis.layout import (
     ANALYSIS_LAYOUT_VERSION,
+    analysis_manifest_path,
     analysis_meta_root,
     analysis_used_path,
     plot_manifest_path,
     summary_path,
     table_manifest_path,
 )
+from dnadesign.cruncher.analysis.objective import compute_objective_components
+from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
 from dnadesign.cruncher.analysis.parquet import read_parquet
 from dnadesign.cruncher.analysis.plot_registry import PLOT_SPECS
 from dnadesign.cruncher.app.run_service import list_runs
@@ -35,7 +40,12 @@ from dnadesign.cruncher.artifacts.entries import (
     artifact_entry,
     normalize_artifacts,
 )
-from dnadesign.cruncher.artifacts.layout import config_used_path, sequences_path, trace_path
+from dnadesign.cruncher.artifacts.layout import (
+    config_used_path,
+    elites_yaml_path,
+    sequences_path,
+    trace_path,
+)
 from dnadesign.cruncher.artifacts.manifest import load_manifest
 from dnadesign.cruncher.config.moves import resolve_move_config
 from dnadesign.cruncher.config.schema_v2 import AnalysisConfig, CruncherConfig, SampleMovesConfig
@@ -47,7 +57,11 @@ from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 logger = logging.getLogger(__name__)
 
 _ANALYSIS_ITEMS = (
-    "meta",
+    "summary.json",
+    "analysis_used.yaml",
+    "plot_manifest.json",
+    "table_manifest.json",
+    "manifest.json",
     "plots",
     "tables",
     "notebooks",
@@ -206,11 +220,12 @@ class SampleMeta:
     bidirectional: bool
     top_k: int
     mode: str
+    dsdna_canonicalize: bool
+    dsdna_hamming: bool
 
 
 def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
     import numpy as np
-    import yaml
 
     config_path = config_used_path(run_dir)
     if not config_path.exists():
@@ -274,6 +289,17 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
         _require(["elites", "filters", "pwm_sum_min"], "elites.filters.pwm_sum_min"),
         "elites.filters.pwm_sum_min",
     )
+    elites_cfg = used_sample.get("elites") if isinstance(used_sample, dict) else None
+    if not isinstance(elites_cfg, dict):
+        elites_cfg = {}
+    dsdna_canonicalize_val = elites_cfg.get("dsDNA_canonicalize", False)
+    if not isinstance(dsdna_canonicalize_val, bool):
+        raise ValueError("config_used.yaml sample.elites.dsDNA_canonicalize must be a boolean.")
+    dsdna_hamming_val = elites_cfg.get("dsDNA_hamming")
+    if dsdna_hamming_val is None:
+        dsdna_hamming_val = dsdna_canonicalize_val
+    if not isinstance(dsdna_hamming_val, bool):
+        raise ValueError("config_used.yaml sample.elites.dsDNA_hamming must be a boolean.")
 
     moves_payload = _require(["moves"], "moves")
     moves_cfg = SampleMovesConfig.model_validate(moves_payload)
@@ -313,6 +339,8 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
         bidirectional=bidirectional,
         top_k=top_k,
         mode=mode_val,
+        dsdna_canonicalize=dsdna_canonicalize_val,
+        dsdna_hamming=dsdna_hamming_val,
     )
 
 
@@ -436,10 +464,10 @@ def run_analyze(
 
     ensure_mpl_cache(resolve_catalog_root(config_path, cfg.motif_store.catalog_root))
     import arviz as az
-    import yaml
 
     from dnadesign.cruncher.analysis.diagnostics import summarize_sampling_diagnostics
     from dnadesign.cruncher.analysis.per_pwm import gather_per_pwm_scores
+    from dnadesign.cruncher.analysis.plots.dashboard import plot_dashboard
     from dnadesign.cruncher.analysis.plots.diagnostics import (
         make_pair_idata,
         plot_autocorr,
@@ -449,6 +477,22 @@ def run_analyze(
         plot_rank_diagnostic,
         plot_trace,
         report_convergence,
+    )
+    from dnadesign.cruncher.analysis.plots.moves import (
+        plot_move_acceptance_time,
+        plot_move_usage_time,
+        plot_pt_swap_by_pair,
+    )
+    from dnadesign.cruncher.analysis.plots.optimization import (
+        plot_elite_filter_waterfall,
+        plot_worst_tf_identity,
+        plot_worst_tf_trace,
+    )
+    from dnadesign.cruncher.analysis.plots.overlap import (
+        plot_motif_offset_rug,
+        plot_overlap_bp_distribution,
+        plot_overlap_heatmap,
+        plot_overlap_strand_combos,
     )
     from dnadesign.cruncher.analysis.plots.scatter import plot_scatter
     from dnadesign.cruncher.analysis.plots.summary import (
@@ -465,6 +509,25 @@ def run_analyze(
 
     analysis_cfg = cfg.analysis
     plot_keys = {spec.key for spec in PLOT_SPECS}
+    tier0_plot_keys = {
+        "dashboard",
+        "worst_tf_trace",
+        "worst_tf_identity",
+        "elite_filter_waterfall",
+        "overlap_heatmap",
+        "overlap_bp_distribution",
+    }
+    mcmc_plot_keys = {
+        "trace",
+        "autocorr",
+        "convergence",
+        "pt_swap_by_pair",
+        "move_acceptance_time",
+        "move_usage_time",
+    }
+    extra_plot_keys = plot_keys - tier0_plot_keys - mcmc_plot_keys
+    extra_plots = analysis_cfg.extra_plots
+    mcmc_diagnostics = analysis_cfg.mcmc_diagnostics
     override_payload: dict[str, object] = {}
     if plot_keys_override:
         requested = [key for key in plot_keys_override if key]
@@ -479,9 +542,19 @@ def run_analyze(
         if "all" in requested:
             for key in plot_keys:
                 setattr(analysis_cfg.plots, key, True)
+            extra_plots = True
+            mcmc_diagnostics = True
+            override_payload["extra_plots"] = True
+            override_payload["mcmc_diagnostics"] = True
         else:
             for key in requested:
                 setattr(analysis_cfg.plots, key, True)
+            if any(key in extra_plot_keys for key in requested):
+                extra_plots = True
+                override_payload["extra_plots"] = True
+            if any(key in mcmc_plot_keys for key in requested):
+                mcmc_diagnostics = True
+                override_payload["mcmc_diagnostics"] = True
         override_payload["plots"] = requested
 
     if scatter_background_override is not None or scatter_background_samples_override is not None:
@@ -503,6 +576,39 @@ def run_analyze(
         analysis_cfg.scatter_background_seed = scatter_background_seed_override
         override_payload["scatter_background_seed"] = scatter_background_seed_override
 
+    if analysis_cfg.extra_plots != extra_plots or analysis_cfg.mcmc_diagnostics != mcmc_diagnostics:
+        if analysis_cfg is cfg.analysis:
+            analysis_cfg = analysis_cfg.model_copy(deep=True)
+        analysis_cfg.extra_plots = extra_plots
+        analysis_cfg.mcmc_diagnostics = mcmc_diagnostics
+
+    disabled_plots: list[str] = []
+    if not analysis_cfg.extra_plots:
+        if analysis_cfg is cfg.analysis:
+            analysis_cfg = analysis_cfg.model_copy(deep=True)
+        for key in sorted(extra_plot_keys):
+            if getattr(analysis_cfg.plots, key, False):
+                setattr(analysis_cfg.plots, key, False)
+                disabled_plots.append(key)
+        if disabled_plots:
+            logger.info(
+                "Disabled extra plots (analysis.extra_plots=false): %s",
+                ", ".join(disabled_plots),
+            )
+    disabled_mcmc_plots: list[str] = []
+    if not analysis_cfg.mcmc_diagnostics:
+        if analysis_cfg is cfg.analysis:
+            analysis_cfg = analysis_cfg.model_copy(deep=True)
+        for key in sorted(mcmc_plot_keys):
+            if getattr(analysis_cfg.plots, key, False):
+                setattr(analysis_cfg.plots, key, False)
+                disabled_mcmc_plots.append(key)
+        if disabled_mcmc_plots:
+            logger.info(
+                "Disabled MCMC diagnostics plots (analysis.mcmc_diagnostics=false): %s",
+                ", ".join(disabled_mcmc_plots),
+            )
+
     override_payload = override_payload or None
 
     cfg_effective = cfg
@@ -513,7 +619,8 @@ def run_analyze(
     runs = runs_override if runs_override else (analysis_cfg.runs or [])
     if not runs:
         if not use_latest:
-            raise ValueError("No analysis runs configured. Set analysis.runs, pass --run, or use --latest.")
+            logger.info("No analysis runs configured; defaulting to latest sample run.")
+            use_latest = True
         latest = list_runs(cfg, config_path, stage="sample")
         if not latest:
             raise ValueError("No sample runs found. Run `cruncher sample <config>` first.")
@@ -553,6 +660,13 @@ def run_analyze(
         sample_meta = _resolve_sample_meta(cfg, used_cfg)
         scoring_pseudocounts, scoring_log_odds_clip = _resolve_scoring_params(used_cfg)
         bidirectional = sample_meta.bidirectional
+        used_sample = used_cfg.get("sample") if isinstance(used_cfg, dict) else None
+        if isinstance(used_sample, dict):
+            trace_cfg = used_sample.get("output", {}).get("trace", {})
+            if isinstance(trace_cfg, dict) and trace_cfg.get("include_tune"):
+                logger.warning(
+                    "sample.output.trace.include_tune affects sequences.parquet only; trace.nc contains draw samples."
+                )
 
         # ── locate elites parquet file ──────────────────────────────────────
         from dnadesign.cruncher.analysis.elites import find_elites_parquet
@@ -564,6 +678,13 @@ def run_analyze(
             len(elites_df),
             elites_path.relative_to(sample_dir),
         )
+        elites_meta: dict[str, object] = {}
+        elites_meta_path = elites_yaml_path(sample_dir)
+        if elites_meta_path.exists():
+            try:
+                elites_meta = yaml.safe_load(elites_meta_path.read_text()) or {}
+            except Exception as exc:
+                logger.warning("Failed to read elites metadata (%s): %s", elites_meta_path, exc)
 
         # ── load trace & sequences for downstream plots ───────────────────────
         seq_path, trace_file = sequences_path(sample_dir), trace_path(sample_dir)
@@ -573,9 +694,16 @@ def run_analyze(
                 "Re-run `cruncher sample` with sample.output.save_sequences=true."
             )
         plots = analysis_cfg.plots
-        needs_trace = plots.trace or plots.autocorr or plots.convergence
+        needs_trace = (
+            analysis_cfg.mcmc_diagnostics
+            or plots.trace
+            or plots.autocorr
+            or plots.convergence
+            or plots.pair_pwm
+            or plots.parallel_pwm
+        )
         trace_idata = None
-        if trace_file.exists():
+        if trace_file.exists() and needs_trace:
             trace_idata = az.from_netcdf(trace_file)
         elif needs_trace:
             msg = (
@@ -604,8 +732,8 @@ def run_analyze(
         existing_id = _load_summary_id(analysis_root)
         if existing_items and existing_id is None:
             raise ValueError(
-                "analysis/ contains artifacts but meta/summary.json is missing. "
-                "Remove analysis/ or restore meta/summary.json before re-running analyze."
+                "analysis/ contains artifacts but summary.json is missing. "
+                "Remove analysis/ or restore summary.json before re-running analyze."
             )
         if existing_id:
             if analysis_cfg.archive:
@@ -635,19 +763,21 @@ def run_analyze(
         analysis_used_file.parent.mkdir(parents=True, exist_ok=True)
         analysis_used_file.write_text(yaml.safe_dump(analysis_used_payload, sort_keys=False))
 
-        # gather per-PWM scores (for scatter etc.)
-        per_pwm_path = tables_dir / "gathered_per_pwm_everyN.csv"
-        gather_per_pwm_scores(
-            sample_dir,
-            analysis_cfg.subsampling_epsilon,
-            pwms,
-            bidirectional=bidirectional,
-            scale=analysis_cfg.scatter_scale,
-            out_path=per_pwm_path,
-            pseudocounts=scoring_pseudocounts,
-            log_odds_clip=scoring_log_odds_clip,
-        )
-        logger.info("Wrote per-PWM score table → %s", per_pwm_path.relative_to(sample_dir))
+        # gather per-PWM scores (scatter plot only)
+        per_pwm_path: Path | None = None
+        if plots.scatter_pwm:
+            per_pwm_path = tables_dir / "gathered_per_pwm_everyN.csv"
+            gather_per_pwm_scores(
+                sample_dir,
+                analysis_cfg.subsampling_epsilon,
+                pwms,
+                bidirectional=bidirectional,
+                scale=analysis_cfg.scatter_scale,
+                out_path=per_pwm_path,
+                pseudocounts=scoring_pseudocounts,
+                log_odds_clip=scoring_log_odds_clip,
+            )
+            logger.info("Wrote per-PWM score table → %s", per_pwm_path.relative_to(sample_dir))
 
         seq_df = read_parquet(seq_path)
         score_df = score_frame_from_df(seq_df, tf_names)
@@ -660,6 +790,17 @@ def run_analyze(
         joint_metrics_path = tables_dir / "joint_metrics.csv"
         write_joint_metrics(elites_df, tf_names, joint_metrics_path)
 
+        pwm_widths = {tf: pwm.length for tf, pwm in pwms.items()}
+        overlap_summary_df, elite_overlap_df, overlap_summary = compute_overlap_tables(
+            elites_df,
+            tf_names,
+            pwm_widths=pwm_widths,
+        )
+        overlap_summary_path = tables_dir / "overlap_summary.csv"
+        elite_overlap_path = tables_dir / "elite_overlap.csv"
+        overlap_summary_df.to_csv(overlap_summary_path, index=False)
+        elite_overlap_df.to_csv(elite_overlap_path, index=False)
+
         sample_meta_payload = {
             "mode": sample_meta.mode,
             "optimizer_kind": sample_meta.optimizer_kind,
@@ -671,6 +812,8 @@ def run_analyze(
             "bidirectional": sample_meta.bidirectional,
             "move_probs": sample_meta.move_probs,
             "cooling_kind": sample_meta.cooling_kind,
+            "dsdna_canonicalize": sample_meta.dsdna_canonicalize,
+            "dsdna_hamming": sample_meta.dsdna_hamming,
         }
         diagnostics_summary = summarize_sampling_diagnostics(
             trace_idata=trace_idata,
@@ -682,6 +825,7 @@ def run_analyze(
             mode=sample_meta.mode,
             optimizer_kind=sample_meta.optimizer_kind,
             sample_meta=sample_meta_payload,
+            trace_required=analysis_cfg.mcmc_diagnostics,
         )
         diagnostics_path = tables_dir / "diagnostics.json"
         diagnostics_path.write_text(json.dumps(diagnostics_summary, indent=2))
@@ -692,43 +836,99 @@ def run_analyze(
                 diagnostics_path.relative_to(sample_dir),
             )
 
+        objective_components_path = tables_dir / "objective_components.json"
+        objective_components = compute_objective_components(
+            seq_df,
+            tf_names,
+            top_k=sample_meta.top_k,
+            dsdna_canonicalize=sample_meta.dsdna_canonicalize,
+            overlap_total_bp_median=overlap_summary.get("overlap_total_bp_median"),
+        )
+        objective_components_path.write_text(json.dumps(objective_components, indent=2))
+
+        move_stats_path = None
+        move_stats_df = None
+        optimizer_stats = manifest.get("optimizer_stats", {})
+        if analysis_cfg.mcmc_diagnostics and isinstance(optimizer_stats, dict):
+            move_stats = optimizer_stats.get("move_stats")
+            if isinstance(move_stats, list) and move_stats:
+                move_stats_df = pd.DataFrame(move_stats)
+                move_stats_path = tables_dir / "move_stats.csv"
+                move_stats_df.to_csv(move_stats_path, index=False)
+
+        pt_swap_pairs_path = None
+        pt_swap_pairs_df = None
+        if analysis_cfg.mcmc_diagnostics and isinstance(optimizer_stats, dict) and sample_meta.optimizer_kind == "pt":
+            attempts = optimizer_stats.get("swap_attempts_by_pair")
+            accepts = optimizer_stats.get("swap_accepts_by_pair")
+            beta_ladder = optimizer_stats.get("beta_ladder_base") or []
+            if isinstance(attempts, list) and isinstance(accepts, list):
+                rows = []
+                for idx, (att, acc) in enumerate(zip(attempts, accepts)):
+                    att = int(att)
+                    acc = int(acc)
+                    rate = acc / float(att) if att else 0.0
+                    beta_low = None
+                    beta_high = None
+                    if idx < len(beta_ladder):
+                        beta_low = beta_ladder[idx]
+                    if idx + 1 < len(beta_ladder):
+                        beta_high = beta_ladder[idx + 1]
+                    rows.append(
+                        {
+                            "pair_index": idx,
+                            "beta_low": beta_low,
+                            "beta_high": beta_high,
+                            "attempts": att,
+                            "accepts": acc,
+                            "acceptance_rate": rate,
+                        }
+                    )
+                if rows:
+                    pt_swap_pairs_df = pd.DataFrame(rows)
+                    pt_swap_pairs_path = tables_dir / "pt_swap_pairs.csv"
+                    pt_swap_pairs_df.to_csv(pt_swap_pairs_path, index=False)
+
         auto_opt_table_path = None
         auto_opt_plot_path = None
         auto_opt_payload = manifest.get("auto_opt")
         if isinstance(auto_opt_payload, dict):
             candidates = auto_opt_payload.get("candidates")
             if isinstance(candidates, list) and candidates:
-                auto_opt_table_path = tables_dir / "auto_opt_pilots.csv"
-                pd.DataFrame(candidates).to_csv(auto_opt_table_path, index=False)
-                required_cols = {"best_score", "balance_median"}
-                if required_cols.issubset({col for col in pd.DataFrame(candidates).columns}):
+                if analysis_cfg.extra_tables:
+                    auto_opt_table_path = tables_dir / "auto_opt_pilots.csv"
+                    pd.DataFrame(candidates).to_csv(auto_opt_table_path, index=False)
+                if analysis_cfg.extra_plots:
                     df_auto = pd.DataFrame(candidates)
-                    df_auto = df_auto.dropna(subset=["best_score", "balance_median"])
-                    if not df_auto.empty:
-                        import matplotlib.pyplot as plt
+                    score_col = "top_k_median_final" if "top_k_median_final" in df_auto.columns else "best_score"
+                    required_cols = {score_col, "balance_median"}
+                    if required_cols.issubset({col for col in df_auto.columns}):
+                        df_auto = df_auto.dropna(subset=[score_col, "balance_median"])
+                        if not df_auto.empty:
+                            import matplotlib.pyplot as plt
 
-                        auto_opt_plot_path = plots_dir / "auto_opt_tradeoffs.png"
-                        fig, ax = plt.subplots(figsize=(6, 4))
-                        lengths = df_auto.get("length")
-                        colors = None
-                        if lengths is not None and lengths.notna().any():
-                            colors = lengths.astype(float)
-                        scatter = ax.scatter(
-                            df_auto["balance_median"],
-                            df_auto["best_score"],
-                            c=colors,
-                            cmap="viridis" if colors is not None else None,
-                            s=50,
-                            alpha=0.85,
-                        )
-                        ax.set_xlabel("Balance (median min normalized)")
-                        ax.set_ylabel("Best score")
-                        ax.set_title("Auto-opt tradeoffs")
-                        if colors is not None:
-                            fig.colorbar(scatter, ax=ax, label="Length")
-                        fig.tight_layout()
-                        fig.savefig(auto_opt_plot_path, dpi=150)
-                        plt.close(fig)
+                            auto_opt_plot_path = plots_dir / "auto_opt_tradeoffs.png"
+                            fig, ax = plt.subplots(figsize=(6, 4))
+                            lengths = df_auto.get("length")
+                            colors = None
+                            if lengths is not None and lengths.notna().any():
+                                colors = lengths.astype(float)
+                            scatter = ax.scatter(
+                                df_auto["balance_median"],
+                                df_auto[score_col],
+                                c=colors,
+                                cmap="viridis" if colors is not None else None,
+                                s=50,
+                                alpha=0.85,
+                            )
+                            ax.set_xlabel("Balance (median min normalized)")
+                            ax.set_ylabel("Top-K median score (final beta)")
+                            ax.set_title("Auto-opt tradeoffs")
+                            if colors is not None:
+                                fig.colorbar(scatter, ax=ax, label="Length")
+                            fig.tight_layout()
+                            fig.savefig(auto_opt_plot_path, dpi=150)
+                            plt.close(fig)
 
         enabled_specs = [spec for spec in PLOT_SPECS if getattr(plots, spec.key, False)]
         if enabled_specs:
@@ -744,19 +944,41 @@ def run_analyze(
         if plots.autocorr:
             plot_autocorr(trace_idata, plots_dir)
         if plots.convergence:
-            report_convergence(trace_idata, plots_dir)
-            plot_rank_diagnostic(trace_idata, plots_dir)
-            plot_ess(trace_idata, plots_dir)
+            idata_for_convergence = trace_idata
+            if sample_meta.optimizer_kind == "pt" and trace_idata is not None:
+                score = trace_idata.posterior.get("score") if hasattr(trace_idata, "posterior") else None
+                if score is not None:
+                    values = np.asarray(score)
+                    if values.ndim >= 2 and values.shape[0] > 0:
+                        idata_for_convergence = az.from_dict(posterior={"score": values[-1:, :]})
+            report_convergence(idata_for_convergence, plots_dir)
+            plot_rank_diagnostic(idata_for_convergence, plots_dir)
+            plot_ess(idata_for_convergence, plots_dir)
         if plots.pair_pwm or plots.parallel_pwm:
             idata_pair = make_pair_idata(sample_dir, tf_pair=tf_pair)
             if plots.pair_pwm:
                 plot_pair_pwm_scores(idata_pair, plots_dir, tf_pair=tf_pair)
             if plots.parallel_pwm:
                 plot_parallel_pwm_scores(idata_pair, plots_dir, tf_pair=tf_pair)
+        if plots.worst_tf_trace:
+            plot_worst_tf_trace(seq_df, tf_names, plots_dir / "plot__worst_tf_trace.png")
+        if plots.worst_tf_identity:
+            plot_worst_tf_identity(seq_df, tf_names, plots_dir / "plot__worst_tf_identity.png")
+        if plots.elite_filter_waterfall:
+            plot_elite_filter_waterfall(elites_meta, plots_dir / "plot__elite_filter_waterfall.png")
+        if plots.dashboard:
+            plot_dashboard(
+                seq_df,
+                elites_df,
+                tf_names,
+                overlap_summary_df,
+                elite_overlap_df,
+                plots_dir / "plot__dashboard.png",
+            )
 
         # ── scatter plot ──────────────────────────────────────────────────────
         if plots.scatter_pwm:
-            if not per_pwm_path.exists():
+            if per_pwm_path is None or not per_pwm_path.exists():
                 raise FileNotFoundError(f"Missing gathered_per_pwm_everyN.csv in {tables_dir}")
             annotation = (
                 f"chains = {sample_meta.chains}\n"
@@ -802,6 +1024,26 @@ def run_analyze(
                 logger.warning("Skipping parallel coordinates: no elites available.")
             else:
                 plot_parallel_coords(elites_df, tf_names, plots_dir / "elites__parallel_coords.png")
+
+        if plots.overlap_heatmap:
+            plot_overlap_heatmap(overlap_summary_df, tf_names, plots_dir / "plot__overlap_heatmap.png")
+        if plots.overlap_bp_distribution:
+            plot_overlap_bp_distribution(elite_overlap_df, plots_dir / "plot__overlap_bp_distribution.png")
+        if plots.overlap_strand_combos:
+            plot_overlap_strand_combos(overlap_summary_df, plots_dir / "plot__overlap_strand_combos.png")
+        if plots.motif_offset_rug:
+            plot_motif_offset_rug(
+                elites_df,
+                tf_names,
+                plots_dir / "plot__motif_offset_rug.png",
+                pwm_widths=pwm_widths,
+            )
+        if plots.pt_swap_by_pair and pt_swap_pairs_df is not None:
+            plot_pt_swap_by_pair(pt_swap_pairs_df, plots_dir / "plot__pt_swap_by_pair.png")
+        if plots.move_acceptance_time and move_stats_df is not None:
+            plot_move_acceptance_time(move_stats_df, plots_dir / "plot__move_acceptance_time.png")
+        if plots.move_usage_time and move_stats_df is not None:
+            plot_move_usage_time(move_stats_df, plots_dir / "plot__move_usage_time.png")
 
         # ── top-5 tabular summary (unchanged logic – dynamic TF names) ────────
         if not elites_df.empty:
@@ -905,7 +1147,7 @@ def run_analyze(
                     "key": "auto_opt_tradeoffs",
                     "label": "Auto-opt tradeoffs (PNG)",
                     "group": "auto_opt",
-                    "description": "Balance vs best score across auto-opt pilots.",
+                    "description": "Balance vs top-K median score across auto-opt pilots.",
                     "requires": [],
                     "enabled": True,
                     "outputs": [
@@ -929,16 +1171,18 @@ def run_analyze(
         plot_manifest_file.parent.mkdir(parents=True, exist_ok=True)
         plot_manifest_file.write_text(json.dumps(plot_manifest, indent=2))
 
-        table_manifest = {
-            "analysis_id": analysis_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "tables": [
+        tables_manifest_entries: list[dict[str, object]] = []
+        if per_pwm_path is not None:
+            tables_manifest_entries.append(
                 {
                     "key": "per_pwm",
                     "label": "Per-PWM scores (CSV)",
                     "path": str(per_pwm_path.relative_to(sample_dir)),
                     "exists": per_pwm_path.exists(),
-                },
+                }
+            )
+        tables_manifest_entries.extend(
+            [
                 {
                     "key": "score_summary",
                     "label": "Per-TF summary (CSV)",
@@ -958,13 +1202,54 @@ def run_analyze(
                     "exists": joint_metrics_path.exists(),
                 },
                 {
+                    "key": "overlap_summary",
+                    "label": "Overlap summary (CSV)",
+                    "path": str(overlap_summary_path.relative_to(sample_dir)),
+                    "exists": overlap_summary_path.exists(),
+                },
+                {
+                    "key": "elite_overlap",
+                    "label": "Elite overlap details (CSV)",
+                    "path": str(elite_overlap_path.relative_to(sample_dir)),
+                    "exists": elite_overlap_path.exists(),
+                },
+                {
                     "key": "diagnostics",
                     "label": "Diagnostics summary (JSON)",
                     "path": str(diagnostics_path.relative_to(sample_dir)),
                     "exists": diagnostics_path.exists(),
                 },
-            ],
+                {
+                    "key": "objective_components",
+                    "label": "Objective components (JSON)",
+                    "path": str(objective_components_path.relative_to(sample_dir)),
+                    "exists": objective_components_path.exists(),
+                },
+            ]
+        )
+        table_manifest = {
+            "analysis_id": analysis_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "tables": tables_manifest_entries,
         }
+        if move_stats_path is not None:
+            table_manifest["tables"].append(
+                {
+                    "key": "move_stats",
+                    "label": "Move stats (CSV)",
+                    "path": str(move_stats_path.relative_to(sample_dir)),
+                    "exists": move_stats_path.exists(),
+                }
+            )
+        if pt_swap_pairs_path is not None:
+            table_manifest["tables"].append(
+                {
+                    "key": "pt_swap_pairs",
+                    "label": "PT swap by pair (CSV)",
+                    "path": str(pt_swap_pairs_path.relative_to(sample_dir)),
+                    "exists": pt_swap_pairs_path.exists(),
+                }
+            )
         if auto_opt_table_path is not None:
             table_manifest["tables"].append(
                 {
@@ -978,6 +1263,92 @@ def run_analyze(
         table_manifest_file.parent.mkdir(parents=True, exist_ok=True)
         table_manifest_file.write_text(json.dumps(table_manifest, indent=2))
 
+        def _plot_reason(key: str) -> str:
+            if key in tier0_plot_keys:
+                return "default"
+            if key in mcmc_plot_keys:
+                return "mcmc_diagnostics"
+            return "extra_plots"
+
+        def _table_reason(key: str) -> str:
+            if key in {"move_stats", "pt_swap_pairs"}:
+                return "mcmc_diagnostics"
+            if key in {"auto_opt_pilots"}:
+                return "extra_tables"
+            if key in {"per_pwm"}:
+                return "scatter_pwm"
+            return "default"
+
+        analysis_manifest_entries: list[dict[str, object]] = [
+            {
+                "path": str(analysis_used_file.relative_to(sample_dir)),
+                "kind": "config",
+                "label": "Analysis settings",
+                "reason": "default",
+                "exists": analysis_used_file.exists(),
+            },
+            {
+                "path": str(plot_manifest_file.relative_to(sample_dir)),
+                "kind": "manifest",
+                "label": "Plot manifest",
+                "reason": "default",
+                "exists": plot_manifest_file.exists(),
+            },
+            {
+                "path": str(table_manifest_file.relative_to(sample_dir)),
+                "kind": "manifest",
+                "label": "Table manifest",
+                "reason": "default",
+                "exists": table_manifest_file.exists(),
+            },
+        ]
+        for table in table_manifest.get("tables", []):
+            if not isinstance(table, dict):
+                continue
+            key = str(table.get("key") or "")
+            path = table.get("path")
+            analysis_manifest_entries.append(
+                {
+                    "path": path,
+                    "kind": "table",
+                    "label": table.get("label"),
+                    "reason": _table_reason(key),
+                    "exists": bool(table.get("exists")),
+                    "key": key,
+                }
+            )
+        for plot in plot_manifest.get("plots", []):
+            if not isinstance(plot, dict):
+                continue
+            key = str(plot.get("key") or "")
+            enabled = bool(plot.get("enabled"))
+            for output in plot.get("outputs", []):
+                if not isinstance(output, dict):
+                    continue
+                if not enabled and not output.get("exists"):
+                    continue
+                analysis_manifest_entries.append(
+                    {
+                        "path": output.get("path"),
+                        "kind": "plot",
+                        "label": plot.get("label"),
+                        "reason": _plot_reason(key),
+                        "exists": bool(output.get("exists")),
+                        "key": key,
+                    }
+                )
+
+        analysis_manifest_file = analysis_manifest_path(analysis_root)
+        analysis_manifest_payload = {
+            "analysis_id": analysis_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "extra_plots": analysis_cfg.extra_plots,
+            "extra_tables": analysis_cfg.extra_tables,
+            "mcmc_diagnostics": analysis_cfg.mcmc_diagnostics,
+            "artifacts": analysis_manifest_entries,
+        }
+        analysis_manifest_file.write_text(json.dumps(analysis_manifest_payload, indent=2))
+
         artifacts: list[dict[str, object]] = [
             artifact_entry(
                 analysis_used_file,
@@ -986,82 +1357,135 @@ def run_analyze(
                 label="Analysis settings",
                 stage="analysis",
             ),
-            artifact_entry(
-                per_pwm_path,
-                sample_dir,
-                kind="table",
-                label="Per-PWM scores (CSV)",
-                stage="analysis",
-            ),
-            artifact_entry(
-                score_summary_path,
-                sample_dir,
-                kind="table",
-                label="Per-TF summary (CSV)",
-                stage="analysis",
-            ),
-            artifact_entry(
-                topk_path,
-                sample_dir,
-                kind="table",
-                label="Elite top-K (CSV)",
-                stage="analysis",
-            ),
-            artifact_entry(
-                joint_metrics_path,
-                sample_dir,
-                kind="table",
-                label="Joint score metrics (CSV)",
-                stage="analysis",
-            ),
-            artifact_entry(
-                diagnostics_path,
-                sample_dir,
-                kind="json",
-                label="Diagnostics summary (JSON)",
-                stage="analysis",
-            ),
-            *(
-                [
-                    artifact_entry(
-                        auto_opt_table_path,
-                        sample_dir,
-                        kind="table",
-                        label="Auto-opt pilot scorecard (CSV)",
-                        stage="analysis",
-                    )
-                ]
-                if auto_opt_table_path is not None
-                else []
-            ),
-            *(
-                [
-                    artifact_entry(
-                        auto_opt_plot_path,
-                        sample_dir,
-                        kind="plot",
-                        label="Auto-opt tradeoffs (PNG)",
-                        stage="analysis",
-                    )
-                ]
-                if auto_opt_plot_path is not None
-                else []
-            ),
-            artifact_entry(
-                plot_manifest_file,
-                sample_dir,
-                kind="json",
-                label="Plot manifest",
-                stage="analysis",
-            ),
-            artifact_entry(
-                table_manifest_file,
-                sample_dir,
-                kind="json",
-                label="Table manifest",
-                stage="analysis",
-            ),
         ]
+        if per_pwm_path is not None:
+            artifacts.append(
+                artifact_entry(
+                    per_pwm_path,
+                    sample_dir,
+                    kind="table",
+                    label="Per-PWM scores (CSV)",
+                    stage="analysis",
+                )
+            )
+        artifacts.extend(
+            [
+                artifact_entry(
+                    score_summary_path,
+                    sample_dir,
+                    kind="table",
+                    label="Per-TF summary (CSV)",
+                    stage="analysis",
+                ),
+                artifact_entry(
+                    topk_path,
+                    sample_dir,
+                    kind="table",
+                    label="Elite top-K (CSV)",
+                    stage="analysis",
+                ),
+                artifact_entry(
+                    joint_metrics_path,
+                    sample_dir,
+                    kind="table",
+                    label="Joint score metrics (CSV)",
+                    stage="analysis",
+                ),
+                artifact_entry(
+                    overlap_summary_path,
+                    sample_dir,
+                    kind="table",
+                    label="Overlap summary (CSV)",
+                    stage="analysis",
+                ),
+                artifact_entry(
+                    elite_overlap_path,
+                    sample_dir,
+                    kind="table",
+                    label="Elite overlap details (CSV)",
+                    stage="analysis",
+                ),
+                artifact_entry(
+                    diagnostics_path,
+                    sample_dir,
+                    kind="json",
+                    label="Diagnostics summary (JSON)",
+                    stage="analysis",
+                ),
+                artifact_entry(
+                    objective_components_path,
+                    sample_dir,
+                    kind="json",
+                    label="Objective components (JSON)",
+                    stage="analysis",
+                ),
+            ]
+        )
+        if move_stats_path is not None:
+            artifacts.append(
+                artifact_entry(
+                    move_stats_path,
+                    sample_dir,
+                    kind="table",
+                    label="Move stats (CSV)",
+                    stage="analysis",
+                )
+            )
+        if pt_swap_pairs_path is not None:
+            artifacts.append(
+                artifact_entry(
+                    pt_swap_pairs_path,
+                    sample_dir,
+                    kind="table",
+                    label="PT swap by pair (CSV)",
+                    stage="analysis",
+                )
+            )
+        if auto_opt_table_path is not None:
+            artifacts.append(
+                artifact_entry(
+                    auto_opt_table_path,
+                    sample_dir,
+                    kind="table",
+                    label="Auto-opt pilot scorecard (CSV)",
+                    stage="analysis",
+                )
+            )
+        if auto_opt_plot_path is not None:
+            artifacts.append(
+                artifact_entry(
+                    auto_opt_plot_path,
+                    sample_dir,
+                    kind="plot",
+                    label="Auto-opt tradeoffs (PNG)",
+                    stage="analysis",
+                )
+            )
+        artifacts.extend(
+            [
+                artifact_entry(
+                    plot_manifest_file,
+                    sample_dir,
+                    kind="json",
+                    label="Plot manifest",
+                    stage="analysis",
+                ),
+                artifact_entry(
+                    table_manifest_file,
+                    sample_dir,
+                    kind="json",
+                    label="Table manifest",
+                    stage="analysis",
+                ),
+                artifact_entry(
+                    analysis_manifest_file,
+                    sample_dir,
+                    kind="json",
+                    label="Analysis manifest",
+                    stage="analysis",
+                ),
+            ]
+        )
         artifacts.extend(plot_artifacts)
 
         inputs_payload = {
@@ -1099,14 +1523,28 @@ def run_analyze(
             "config_used": str(config_used_path(sample_dir).relative_to(sample_dir)),
             "plot_manifest": str(plot_manifest_file.relative_to(sample_dir)),
             "table_manifest": str(table_manifest_file.relative_to(sample_dir)),
+            "analysis_manifest": str(analysis_manifest_file.relative_to(sample_dir)),
             "inputs": inputs_payload,
             "signature": analysis_signature,
             "signature_inputs": signature_payload,
             "artifacts": [item["path"] for item in artifacts],
+            "objective_components": objective_components,
+            "overlap_summary": overlap_summary,
         }
         summary_file = summary_path(analysis_root)
         summary_file.parent.mkdir(parents=True, exist_ok=True)
         summary_file.write_text(json.dumps(summary_payload, indent=2))
+        analysis_manifest_entries.append(
+            {
+                "path": str(summary_file.relative_to(sample_dir)),
+                "kind": "summary",
+                "label": "Analysis summary",
+                "reason": "default",
+                "exists": summary_file.exists(),
+            }
+        )
+        analysis_manifest_payload["artifacts"] = analysis_manifest_entries
+        analysis_manifest_file.write_text(json.dumps(analysis_manifest_payload, indent=2))
         artifacts.append(
             artifact_entry(
                 summary_file,

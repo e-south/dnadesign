@@ -16,13 +16,13 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-ANALYSIS_LAYOUT_VERSION = "v3"
+ANALYSIS_LAYOUT_VERSION = "v5"
 ANALYSIS_DIR_NAME = "analysis"
 ARCHIVE_DIR_NAME = "_archive"
-META_DIR_NAME = "meta"
 PLOTS_DIR_NAME = "plots"
 TABLES_DIR_NAME = "tables"
 NOTEBOOKS_DIR_NAME = "notebooks"
+MANIFEST_FILE_NAME = "manifest.json"
 
 
 def analysis_root(run_dir: Path) -> Path:
@@ -30,7 +30,7 @@ def analysis_root(run_dir: Path) -> Path:
 
 
 def analysis_meta_root(analysis_root: Path) -> Path:
-    return analysis_root / META_DIR_NAME
+    return analysis_root
 
 
 def summary_path(analysis_root: Path) -> Path:
@@ -47,6 +47,10 @@ def plot_manifest_path(analysis_root: Path) -> Path:
 
 def table_manifest_path(analysis_root: Path) -> Path:
     return analysis_meta_root(analysis_root) / "table_manifest.json"
+
+
+def analysis_manifest_path(analysis_root: Path) -> Path:
+    return analysis_meta_root(analysis_root) / MANIFEST_FILE_NAME
 
 
 def load_summary(path: Path, *, required: bool = False) -> Optional[dict]:
@@ -111,21 +115,6 @@ def list_analysis_entries(run_dir: Path) -> list[dict]:
                 analysis_id = child.name
                 logger.warning("archive summary missing analysis_id, using folder name: %s", child)
             entries.append({"id": analysis_id, "path": child, "kind": "archive"})
-
-    known_dirs = {ARCHIVE_DIR_NAME, META_DIR_NAME, PLOTS_DIR_NAME, TABLES_DIR_NAME, NOTEBOOKS_DIR_NAME}
-    for child in sorted(root.iterdir()):
-        if not child.is_dir() or child.name in known_dirs:
-            continue
-        try:
-            summary = load_summary(summary_path(child), required=False)
-        except ValueError as exc:
-            logger.warning("Skipping invalid legacy summary: %s", exc)
-            summary = None
-        analysis_id = summary.get("analysis_id") if isinstance(summary, dict) else None
-        if not isinstance(analysis_id, str) or not analysis_id:
-            analysis_id = child.name
-            logger.warning("legacy analysis missing summary.json; using folder name: %s", child)
-        entries.append({"id": analysis_id, "path": child, "kind": "legacy"})
 
     return entries
 
@@ -219,27 +208,6 @@ def list_analysis_entries_verbose(run_dir: Path) -> list[dict]:
                 label=f"{analysis_id} (archive)",
                 warnings=warnings,
             )
-
-    known_dirs = {ARCHIVE_DIR_NAME, META_DIR_NAME, PLOTS_DIR_NAME, TABLES_DIR_NAME, NOTEBOOKS_DIR_NAME}
-    for child in sorted(root.iterdir()):
-        if not child.is_dir() or child.name in known_dirs:
-            continue
-        summary_file = summary_path(child)
-        summary, summary_error = _safe_summary(summary_file)
-        warnings = []
-        if summary_error:
-            warnings.append(summary_error)
-        analysis_id = summary.get("analysis_id") if isinstance(summary, dict) else None
-        if not isinstance(analysis_id, str) or not analysis_id:
-            warnings.append(f"legacy analysis missing analysis_id; using folder name: {child}")
-            analysis_id = child.name
-        _append_entry(
-            analysis_id=analysis_id,
-            path=child,
-            kind="legacy",
-            label=f"{analysis_id} (legacy)",
-            warnings=warnings,
-        )
 
     return entries
 

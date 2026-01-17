@@ -151,9 +151,7 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
         (run_b, ["C", "D"]),
     ):
         (run_dir / "analysis" / "tables").mkdir(parents=True, exist_ok=True)
-        meta_dir = run_dir / "analysis" / "meta"
-        meta_dir.mkdir(parents=True, exist_ok=True)
-        (meta_dir / "summary.json").write_text(json.dumps({"analysis_id": "analysis-1", "tf_names": tfs}))
+        (run_dir / "analysis" / "summary.json").write_text(json.dumps({"analysis_id": "analysis-1", "tf_names": tfs}))
         score_summary = f"tf,mean,median,std,min,max\n{tfs[0]},1.0,1.0,0.1,0.8,1.2\n{tfs[1]},0.9,0.9,0.1,0.7,1.1\n"
         (run_dir / "analysis" / "tables" / "score_summary.csv").write_text(score_summary)
         joint_metrics = (

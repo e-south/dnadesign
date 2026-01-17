@@ -1,8 +1,14 @@
 ## cruncher demo 1
 
-**Jointly maximizing a sequence based on two TFs.**
+**Design short dsDNA sequences that satisfy two PWMs at once.**
 
-This demo walks through generating DNA sequences that jointly resemble motifs for two TFs (e.g., LexA + CpxR). The process involves fetching binding sites, locking motif/PWM data (i.e., our "scorecards"), sampling sequence space, optimization, and analyzing results.
+**cruncher** scores each TF by the best PWM match anywhere in the candidate sequence on either strand, then optimizes the min/soft‑min across TFs so the weakest TF improves. It explores sequence space with Gibbs + parallel tempering (MCMC) and returns a diverse elite set (unique up to reverse‑complement) plus diagnostics for stability/mixing. Motif overlap is allowed and treated as informative structure in analysis.
+
+**Terminology:**
+
+- **sites** = training binding sequences
+- **PWMs/matrices** = scoring models
+- **lock** pins the exact matrices used for scoring.
 
 ### Contents
 
@@ -21,20 +27,34 @@ This demo walks through generating DNA sequences that jointly resemble motifs fo
   - [Select motif source + lock](#select-motif-source--lock)
   - [Inspect cached entries and targets (post-lock)](#inspect-cached-entries-and-targets-post-lock)
   - [Parse workflow (validate locked motifs)](#parse-workflow-validate-locked-motifs)
-  - [Sample (MCMC optimization)](#sample-mcmc-optimization)
+- [Sample (MCMC optimization)](#sample-mcmc-optimization)
     - [Run artifacts + performance snapshot](#run-artifacts--performance-snapshot)
     - [Analyze + report](#analyze--report)
     - [Optional: live analysis notebook](#optional-live-analysis-notebook)
 
 ---
 
+> **Fast path (local-only, no discovery):** run end‑to‑end using the packaged demo motifs (no network and no MEME Suite required).
+>
+> ```bash
+> cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+> cruncher fetch sites  --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+> cruncher lock   -c "$CONFIG"
+> cruncher parse  -c "$CONFIG"
+> cruncher sample -c "$CONFIG"
+> cruncher analyze -c "$CONFIG"
+> cruncher report --latest -c "$CONFIG"
+> ```
+>
+> Continue below for a more in depth guide.
+
 ### Demo setup
 
 - **Workspace**: `src/dnadesign/cruncher/workspaces/demo_basics_two_tf/`
 - **Config**: `config.yaml`
-- **Output root**: `runs/` (relative to the workspace; runs live under `runs/<stage>/<run_name>/`, where run_name includes the TF slug; `setN_` is added only when multiple regulator sets are configured)
-- **Catalog cache**: `src/dnadesign/cruncher/.cruncher/` (shared across workspaces by default; override with `motif_store.catalog_root`)
-- **Motif flow**: fetch sites + local motifs → (optional discovery) → inspect/select → lock/sample using chosen matrices
+- **Output root**: `runs/` (relative to the workspace)
+- **Catalog cache**: `src/dnadesign/cruncher/.cruncher/` (shared across workspaces by default)
+- **Motif flow**: fetch sites + local motifs → inspect/select → lock/sample using chosen matrices
 - **Path placeholders**: example outputs use `<workspace>` for the demo workspace root
 
 ```bash
@@ -54,27 +74,24 @@ cruncher() { pixi run cruncher -- "$@"; }  # convenience wrapper
 # From here on, commands use $CONFIG for clarity; if you're in the workspace, you can omit --config.
 ```
 
-Smoke test for external dependencies:
+If you plan to run **motif discovery** (`discover`), verify MEME Suite and external tools:
 
 ```bash
-# Verify MEME Suite and external tools
-cruncher doctor -c "$CONFIG"  # check external dependencies
+cruncher doctor -c "$CONFIG"
 ```
 
-If it reports missing tools, install MEME Suite (pixi or system install) or set `motif_discovery.tool_path`; see the [MEME Suite guide](../guides/meme_suite.md). Local demo motifs live at `data/local_motifs/` (DAP‑seq MEME files from [this](https://www.nature.com/articles/s41592-021-01312-2) study).
+Sampling + analysis do **not** require MEME Suite, so you can still run the fast path above without it. If it reports missing tools, install MEME Suite (pixi or system install) or set `motif_discovery.tool_path`; see the [MEME Suite guide](../guides/meme_suite.md). Local demo motifs live at `data/local_motifs/` (DAP‑seq MEME files from [this](https://www.nature.com/articles/s41592-021-01312-2) study).
 
 ---
 
 ### Preview sources and inventories
 
-List the sources registered by the demo config:
+Optional: run this if you want to confirm which sources the config will use (and which steps will require network access).
 
 ```bash
 # List configured sources
 cruncher sources list -c "$CONFIG"  # list configured sources
 ```
-
-Optional deep‑dive (inventory / datasets):
 
 ```bash
 # Inspect local demo source metadata
@@ -82,11 +99,8 @@ cruncher sources info demo_local_meme -c "$CONFIG"  # inspect demo source metada
 
 # Inspect RegulonDB source metadata
 cruncher sources info regulondb -c "$CONFIG"  # inspect RegulonDB metadata
-
-# Sample remote inventory
-cruncher sources summary --source regulondb --scope remote --remote-limit 20 -c "$CONFIG"  # sample remote inventory
 ```
-Use `--remote-limit` for large inventories. `sources datasets` or `fetch sites --dry-run` are useful when you need HT dataset coverage.
+If you’re debugging RegulonDB inventory size, `cruncher sources summary --source regulondb --scope remote --remote-limit 20` is a quick sample. Use `sources datasets` or `fetch sites --dry-run` when you need HT dataset coverage.
 
 ---
 
@@ -106,14 +120,14 @@ cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$
 
 ### Fetch binding sites (RegulonDB, network)
 
-We optimize with MEME/STREME‑discovered matrices (`pwm_source: matrix`), but discovery is site‑driven, so we fetch sites too. This step hits the network‑backed RegulonDB source; if you’re offline, skip it and continue with local motifs.
+Optional: fetch curated sites from RegulonDB if you want extra site evidence for discovery or to compare against curated annotations. If you’re offline, skip this — the demo still runs end‑to‑end with local motifs.
 
 ```bash
 # Fetch curated sites from RegulonDB
 cruncher fetch sites --tf lexA --tf cpxR --update -c "$CONFIG"  # fetch curated RegulonDB sites
 ```
 
-Curated site sets do not carry a dataset or method (those fields are only populated for HT datasets). Repeat runs will report “No new sites cached” unless you pass `--update`.
+Note: curated site sets aren’t partitioned by dataset/method; those fields are populated for HT datasets.
 
 ---
 
@@ -136,46 +150,40 @@ Tip: if HT datasets return peaks without sequences, hydration uses NCBI by defau
 
 ### Verify cache (pre-lock)
 
-Confirm what you have cached before discovery/lock:
+Optional sanity check. If you just ran `fetch`, you can skip this; `lock` / `targets status` will fail loudly if required inputs are missing.
 
 ```bash
-# Verify local cache entries
-cruncher sources summary --source demo_local_meme --scope cache -c "$CONFIG"  # check local cache
-
-# Verify RegulonDB cache entries
-cruncher sources summary --source regulondb --scope cache -c "$CONFIG"  # check RegulonDB cache
-
-# List cached motifs/sites
-cruncher catalog list -c "$CONFIG"  # list cached motifs and sites
+cruncher catalog list -c "$CONFIG"  # quick view of cached motifs + sites
 ```
 
-If a source shows zero entries, you likely haven’t fetched from it yet (cache scope only shows what’s already cached).
+If you need per‑source cache counts, use `cruncher sources summary --scope cache`.
 
 ---
 
 ### Combine curated + DAP-seq sites for discovery
 
-This demo config already merges site sets per TF (`combine_sites: true`) so MEME/STREME sees all available sites. If you want to keep sources separate, set `combine_sites: false` and re-lock:
+This only affects **motif discovery** (how site sets are merged before running MEME/STREME). With `combine_sites: true` (the demo default), all selected site sources for a TF are merged into one discovery input. Set `combine_sites: false` if you want separate per-source discoveries.
 
 ```yaml
 motif_store:
   combine_sites: false
 ```
 
-After changing `combine_sites` or `site_kinds`, re-run `cruncher lock` so parse/sample use the updated site sets. Tip: `catalog pwms --set 1` shows the preferred matrix source; to use only local DAP‑seq training sites in discovery, set `site_kinds: ["meme_blocks"]`.
+After changing `combine_sites` or `site_kinds`, re-run `cruncher lock` so parse/sample use the updated site sets. Tip: to use only local DAP‑seq training sites in discovery, set `site_kinds: ["meme_blocks"]`.
 
 ---
 
 ### Discover motifs from merged sites (MEME/STREME)
 
+Optional: run discovery if you want to **rebuild a single aligned PWM per TF from cached sites** (useful when sites have mixed lengths or come from multiple sources). If you already trust the packaged matrices, skip to **Inspect candidate PWMs + logos** (or go straight to `lock`).
+
 If you fetched binding sites from multiple sources and want a single aligned PWM per TF (e.g., to reconcile different site lengths), run MEME Suite on the combined site sets. This creates new motif matrices under `motif_discovery.source_id` (default `meme_suite_streme`, or override with `--source-id`).
 
-Discovery notes:
+Key points:
 
-- Discovery uses cached binding sites (variable lengths are OK), regardless of `motif_store.pwm_source`.
-- Width bounds default to the per‑TF site length range; override with explicit `minw/maxw` if needed.
-- Runs write under `src/dnadesign/cruncher/.cruncher/discoveries/` (the shared catalog root) and ingest motifs into the catalog, replacing prior entries for the same TF/source unless you pass `--keep-existing`.
-- Discovery uses raw sites by default; set `motif_discovery.window_sites=true` to pre‑window.
+- Reads cached binding sites (variable lengths are OK).
+- Outputs new PWM entries under the discovery `source_id`; `source_preference` selects which to use and `lock` pins IDs/hashes.
+- Runs write under `src/dnadesign/cruncher/.cruncher/discoveries/` (shared catalog root) and ingest motifs into the catalog.
 
 ```bash
 # Verify discovery prerequisites
@@ -188,21 +196,7 @@ cruncher discover motifs --tf lexA --tf cpxR --tool streme --source-id meme_suit
 cruncher catalog list --source meme_suite_streme -c "$CONFIG"  # verify new motif entries
 ```
 
-Example output:
-
-```text
-INFO lexA: using site-length bounds for discovery (minw=15, maxw=22, site lengths 15-22).
-INFO cpxR: using site-length bounds for discovery (minw=11, maxw=21, site lengths 11-21).
-                                                                        Motif discovery
-┏━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ TF   ┃ Tool   ┃ Motif ID                                      ┃ Length ┃ Output                                                                              ┃
-┡━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ lexA │ streme │ meme_suite_streme:lexA_1-CTGTATAWAWWHACAGT    │ 17     │ <repo>/src/dnadesign/cruncher/.cruncher/discoveries/discover_lexA_20260113_114748_ │
-│ cpxR │ streme │ meme_suite_streme:cpxR_1-MTTTACAYWWMTTTACAWWW │ 20     │ <repo>/src/dnadesign/cruncher/.cruncher/discoveries/discover_cpxR_20260113_114748_ │
-└──────┴────────┴───────────────────────────────────────────────┴────────┴─────────────────────────────────────────────────────────────────────────────────────┘
-```
-
-The “Motif discovery” table reports the tool used, the motif ID, and the discovered width. **Tip:** if each sequence represents one site, prefer MEME and set `--meme-mod oops`:
+Discovery prints a short table (TF, tool, motif ID, length) and stores full outputs under the shared catalog root (e.g., `.../.cruncher/discoveries/`). Tip: if each sequence represents one site, prefer MEME and set `--meme-mod oops`.
 
 ```bash
 # Run MEME discovery (OOPS)
@@ -258,9 +252,13 @@ Example output:
 
 Tip: add `--matrix` to print full PWM matrices or `--log-odds` for log‑odds matrices.
 
-Use **Bits** as a quick quality screen. **Sites (cached seq/total)** reflects cached site coverage for the source (if any), while **Sites (matrix n)** is the site count embedded in the matrix metadata (e.g., discovery runs, site‑derived PWMs). If either is low, consider switching sources, combining sites, or raising `motif_store.min_sites_for_pwm`. To constrain PWM length for optimization, set `motif_store.pwm_window_lengths`; the chosen window appears in **Window**.
+How to read the summary:
 
-Logos are written under `runs/logos/catalog/<run_name>/` and include site counts (`n=...`) when available. Re-running with unchanged inputs reuses existing outputs. Use `--source` on `catalog pwms/logos` to compare tools directly.
+- **Bits**: quick specificity screen (very low bits often means a weak/degenerate PWM).
+- **Length/Window**: confirm the width you intend to optimize against (use `pwm_window_lengths` if you want a shorter high‑information window).
+- **Sites (cached seq/total)** vs **Sites (matrix n)**: cached coverage vs the count embedded in the matrix metadata (e.g., discovery output).
+
+Logos are written under `runs/logos/catalog/<run_name>/` and include site counts (`n=...`) when available.
 
 ---
 
@@ -300,26 +298,28 @@ Example output:
 <workspace>/.cruncher/locks/config.lock.json
 ```
 
+Think of `lock` as the “commit”: it freezes the exact motif IDs + hashes used for scoring. Re‑run it after discovery, after changing `source_preference`, or after changing any PWM windowing/trimming settings.
+
 Lockfiles are required for `parse`, `sample`, and `targets status`. If you add new motifs (e.g., after `discover motifs`) or change `motif_store` preferences, re-run `lock` to refresh the pinned motif IDs and hashes.
 
 ---
 
 ### Inspect cached entries and targets (post-lock)
 
-Optional deeper visibility into what’s cached and what will be used (target status requires a lockfile):
+Quick checks (target status requires a lockfile):
 
 ```bash
-# List cached motifs/sites
-cruncher catalog list -c "$CONFIG"  # list catalog entries
-
-# Show one catalog entry
-cruncher catalog show regulondb:RDBECOLITFC00214 -c "$CONFIG"  # inspect a specific entry
-
-# List TF targets by set
 cruncher targets list -c "$CONFIG"  # list targets per regulator set
 
 # Readiness check (lock + cache)
 cruncher targets status -c "$CONFIG"  # validate lock + cache alignment
+```
+
+Optional debugging / deeper visibility:
+
+```bash
+# Show one catalog entry
+cruncher catalog show regulondb:RDBECOLITFC00214 -c "$CONFIG"  # inspect a specific entry
 
 # Stats across candidates
 cruncher targets stats -c "$CONFIG"  # show stats across candidates
@@ -337,20 +337,24 @@ Note: with `combine_sites: true`, `targets status` reports merged site counts pe
 
 ### Parse workflow (validate locked motifs)
 
+Parse is a cheap sanity check that validates the locked PWMs load correctly and writes a manifest used by sampling.
+
 ```bash
 # Validate lock + cached motifs
 cruncher parse -c "$CONFIG"  # validate locked PWMs and write a parse manifest
 ```
 
-Re-running parse with the same config + lock fingerprint reuses existing outputs and reports the location. Parse outputs live under `runs/parse/<run_name>/meta/` and include a run manifest for traceability. Use `cruncher catalog logos` if you want PWM logos.
+Re-running parse with the same config + lock fingerprint reuses existing outputs and reports the location. Parse outputs live under `runs/parse/<run_name>/meta/`.
 
 ---
 
 ### Sample (MCMC optimization)
 
-Auto‑optimize is enabled by default (short Gibbs + PT pilots). The selected pilot is recorded in `runs/auto_opt/best_<run_group>.json` and marked with a leading `*` in `cruncher runs list`. The final chosen config is always written to `runs/sample/<run_name>/meta/config_used.yaml`. Use `--no-auto-opt` to skip pilots and force the configured optimizer. For diagnostics and tuning guidance, see the [sampling + analysis guide](../guides/sampling_and_analysis.md).
+Each candidate dsDNA sequence is scored by scanning both strands for each PWM, taking the best match per TF, then optimizing the min/soft‑min across TFs (raise the weakest TF). The goal is not a single winner: **cruncher** returns a diverse elite set.
 
-This demo config sets `auto_opt.policy.allow_warn: true` so short pilots can proceed even if they don't meet strict thresholds. For strict mode, set `allow_warn: false` and increase budgets or adjust thresholds until pilots pass.
+**Auto‑opt** runs short Gibbs + parallel tempering pilots to pick a robust optimizer/temperature ladder/budget so the final run is more performant. The chosen pilot is recorded in `runs/auto_opt/best_<run_group>.json`, and the final effective config is written to `runs/sample/<run_name>/meta/config_used.yaml`. For diagnostics and tuning guidance, see the [sampling + analysis guide](../guides/sampling_and_analysis.md).
+
+This demo config sets `auto_opt.policy.allow_warn: true` so auto-opt will always pick a winner by the end of the configured budget levels, even if confidence is low (warnings are recorded). Set `allow_warn: false` to require a confidence-separated winner; if none emerges at the maximum configured budgets/replicates, auto-opt fails fast with guidance to increase `auto_opt.budget_levels` and/or `auto_opt.replicates`.
 
 ```bash
 # Run sampling with auto-opt
@@ -422,16 +426,28 @@ Runtime scales with `budget.draws`, `budget.tune`, and `budget.restarts` in the 
 
 #### Analyze + report
 
+Use analysis to answer three questions:
+
+1. **Did we raise the weakest TF?** (look at per‑TF scores and the min/soft‑min objective distribution)
+2. **Did we keep diversity?** (unique sequences *up to reverse‑complement*, avoid a single collapsed cluster)
+3. **Did the sampler mix?** (trace/tempering diagnostics; poor mixing usually means you should rerun with auto‑opt or increase budgets)
+
+Motif overlap/co‑localization is allowed; use the overlap/structure plots to see *how* the PWMs are being jointly satisfied.
+
 ```bash
-# Analyze latest sample run
-cruncher analyze --latest -c "$CONFIG"  # analyze latest sample run
+# Analyze latest sample run (default when analysis.runs is empty)
+cruncher analyze -c "$CONFIG"
+# Or pin to a specific run:
+# cruncher analyze --run <run_name|run_dir> -c "$CONFIG"
 
 # Write report from latest run
 cruncher report --latest -c "$CONFIG"  # write report from latest run
 ```
 
 Outputs land under `<workspace>/runs/sample/<run_name>/analysis/` with a
-summary in `analysis/meta/summary.json`.
+summary in `analysis/summary.json`.
+This demo enables a small Tier‑0 plot set by default; use
+`cruncher analyze --plots all` to generate the full suite.
 
 If you're running via `pixi`, prefix those next-step commands with `pixi run cruncher --`.
 
@@ -441,6 +457,8 @@ For a compact diagnostics checklist and tuning guidance, see the
 ---
 
 #### Optional: live analysis notebook
+
+Replace the run directory below with your own sample run (see `cruncher runs latest`).
 
 ```bash
 cruncher notebook <workspace>/runs/sample/lexA-cpxR_20260113_115749_e72283 --latest  # generate analysis notebook

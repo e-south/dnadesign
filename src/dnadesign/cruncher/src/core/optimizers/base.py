@@ -35,3 +35,15 @@ class Optimizer(ABC):
         sorted by descending fitness.
         """
         ...
+
+    def final_softmin_beta(self) -> float | None:
+        """Return the optimizer's final soft-min beta, if applicable."""
+        return None
+
+    def final_mcmc_beta(self) -> float | None:
+        """Return the optimizer's final MCMC beta, if applicable."""
+        return None
+
+    def objective_schedule_summary(self) -> Dict[str, object]:
+        """Summarize objective schedule parameters for downstream consumers."""
+        return {}

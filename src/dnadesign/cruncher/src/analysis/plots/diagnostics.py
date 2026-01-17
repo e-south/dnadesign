@@ -34,6 +34,50 @@ def _score_stats(idata: az.InferenceData) -> tuple[xr.DataArray | None, int, int
     return score, n_chains, n_draws
 
 
+def _trim_nan_padded(values: np.ndarray) -> tuple[np.ndarray, bool]:
+    arr = np.asarray(values, dtype=float)
+    if arr.ndim == 1:
+        arr = arr[None, :]
+    if not np.isfinite(arr).all():
+        arr = arr.copy()
+        arr[~np.isfinite(arr)] = np.nan
+    if not np.isnan(arr).any():
+        return arr, False
+    cleaned_chains: list[np.ndarray] = []
+    counts: list[int] = []
+    for chain in arr:
+        valid = chain[~np.isnan(chain)]
+        if valid.size == 0:
+            continue
+        cleaned_chains.append(valid)
+        counts.append(int(valid.size))
+    if not cleaned_chains:
+        return np.zeros((0, 0), dtype=float), True
+    min_draws = min(counts)
+    trimmed = np.vstack([chain[:min_draws] for chain in cleaned_chains])
+    return trimmed, True
+
+
+def _clean_idata_for_score(
+    idata: az.InferenceData,
+) -> tuple[az.InferenceData | None, xr.DataArray | None, int, int]:
+    score, n_chains, n_draws = _score_stats(idata)
+    if score is None:
+        return None, None, 0, 0
+    values = np.asarray(score.values, dtype=float)
+    if not np.isfinite(values).all():
+        logger.debug("Trace contains non-finite scores; dropping invalid draws for plots.")
+    cleaned, trimmed = _trim_nan_padded(values)
+    if trimmed:
+        if cleaned.size == 0:
+            return None, None, 0, 0
+        logger.debug("Trace contains NaN padding; truncating to %d draws for plots.", cleaned.shape[1])
+        idata = az.from_dict(posterior={"score": cleaned})
+        score = idata.posterior["score"]
+        n_chains, n_draws = cleaned.shape
+    return idata, score, n_chains, n_draws
+
+
 #  Generic helpers
 def _tf_pair(tf_pair: tuple[str, str]) -> Tuple[str, str]:
     if len(tf_pair) != 2:
@@ -78,10 +122,11 @@ def plot_trace(idata: az.InferenceData, out_dir: Path) -> None:
     out = out_dir / "diag__trace_score.png"
     out_dir.mkdir(exist_ok=True, parents=True)
 
-    score, _, _ = _score_stats(idata)
-    if score is None:
+    idata_clean, score, _, _ = _clean_idata_for_score(idata)
+    if score is None or idata_clean is None:
         logger.warning("Skipping trace plot: 'score' not found in trace.")
         return
+    idata = idata_clean
     values = np.asarray(score.values, dtype=float)
     if values.size == 0:
         logger.warning("Skipping trace plot: empty score array.")
@@ -153,10 +198,11 @@ def plot_autocorr(idata: az.InferenceData, out_dir: Path, max_lag: int = 100) ->
     out = out_dir / "diag__autocorr_score.png"
     out_dir.mkdir(exist_ok=True, parents=True)
 
-    score, _, n_draws = _score_stats(idata)
-    if score is None:
+    idata_clean, score, _, n_draws = _clean_idata_for_score(idata)
+    if score is None or idata_clean is None:
         logger.warning("Skipping autocorr plot: 'score' not found in trace.")
         return
+    idata = idata_clean
     if n_draws < 2:
         logger.warning("Skipping autocorr plot: need at least 2 draws (found %d).", n_draws)
         return
@@ -187,13 +233,14 @@ def report_convergence(idata: az.InferenceData, out_dir: Path) -> None:
     out = out_dir / "diag__convergence.txt"
     out_dir.mkdir(exist_ok=True, parents=True)
 
-    score, n_chains, n_draws = _score_stats(idata)
-    if score is None:
+    idata_clean, score, n_chains, n_draws = _clean_idata_for_score(idata)
+    if score is None or idata_clean is None:
         logger.warning("Skipping convergence metrics: 'score' not found in trace.")
         with out.open("w") as fh:
             fh.write("rhat: n/a\n")
             fh.write("ess:  n/a\n")
         return
+    idata = idata_clean
     if n_chains < 2 or n_draws < 4:
         logger.warning(
             "Skipping convergence metrics: need >=2 chains and >=4 draws (got chains=%d draws=%d).",
@@ -220,10 +267,11 @@ def plot_rank_diagnostic(idata: az.InferenceData, out_dir: Path) -> None:
     out = out_dir / "diag__rank_plot_score.png"
     out_dir.mkdir(exist_ok=True, parents=True)
 
-    score, n_chains, n_draws = _score_stats(idata)
-    if score is None:
+    idata_clean, score, n_chains, n_draws = _clean_idata_for_score(idata)
+    if score is None or idata_clean is None:
         logger.warning("Skipping rank plot: 'score' not found in trace.")
         return
+    idata = idata_clean
     if n_chains < 2 or n_draws < 4:
         logger.warning(
             "Skipping rank plot: need >=2 chains and >=4 draws (got chains=%d draws=%d).",
@@ -257,10 +305,11 @@ def plot_ess(idata: az.InferenceData, out_dir: Path) -> None:
     out = out_dir / "diag__ess_evolution_score.png"
     out_dir.mkdir(exist_ok=True, parents=True)
 
-    score, n_chains, n_draws = _score_stats(idata)
-    if score is None:
+    idata_clean, score, n_chains, n_draws = _clean_idata_for_score(idata)
+    if score is None or idata_clean is None:
         logger.warning("Skipping ESS plot: 'score' not found in trace.")
         return
+    idata = idata_clean
     if n_draws < 4:
         logger.warning("Skipping ESS plot: need >=4 draws (found %d).", n_draws)
         return
@@ -293,10 +342,11 @@ def plot_ess_local_and_quantile(idata: az.InferenceData, out_dir: Path) -> None:
     out2 = out_dir / "diag__ess_quantile_score.png"
     out_dir.mkdir(exist_ok=True, parents=True)
 
-    score, n_chains, n_draws = _score_stats(idata)
-    if score is None:
+    idata_clean, score, n_chains, n_draws = _clean_idata_for_score(idata)
+    if score is None or idata_clean is None:
         logger.warning("Skipping ESS diagnostics: 'score' not found in trace.")
         return
+    idata = idata_clean
     if n_draws < 4:
         logger.warning("Skipping ESS diagnostics: need >=4 draws (found %d).", n_draws)
         return

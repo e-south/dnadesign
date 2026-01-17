@@ -198,7 +198,7 @@ def run_report(cfg: CruncherConfig, config_path: Path, run_name: str) -> None:
             "",
             "## What to look at",
             "",
-            "- Summary: analysis/meta/summary.json",
+            "- Summary: analysis/summary.json",
             "- Plots: analysis/plots/",
             "- Tables: analysis/tables/",
         ]

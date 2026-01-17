@@ -9,12 +9,13 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import logging
-import math
 import shutil
 import signal
+import time
 import uuid
 from collections.abc import Iterable
 from contextlib import contextmanager
@@ -24,6 +25,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import numpy as np
+import pandas as pd
 import yaml
 
 from dnadesign.cruncher.analysis.diagnostics import summarize_sampling_diagnostics
@@ -70,7 +72,7 @@ from dnadesign.cruncher.core.labels import format_regulator_slug, regulator_sets
 from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
-from dnadesign.cruncher.core.sequence import hamming_distance
+from dnadesign.cruncher.core.sequence import canon_int, dsdna_hamming, hamming_distance
 from dnadesign.cruncher.core.state import SequenceState
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
@@ -113,6 +115,10 @@ class AutoOptCandidate:
     run_dir: Path
     run_dirs: list[Path]
     best_score: float | None
+    top_k_median_final: float | None
+    best_score_final: float | None
+    top_k_ci_low: float | None
+    top_k_ci_high: float | None
     rhat: float | None
     ess: float | None
     unique_fraction: float | None
@@ -121,6 +127,7 @@ class AutoOptCandidate:
     improvement: float | None
     acceptance_b: float | None
     acceptance_m: float | None
+    acceptance_mh: float | None
     swap_rate: float | None
     status: str
     quality: str
@@ -216,23 +223,398 @@ def _stable_pilot_seed(
 
 def _candidate_lengths(sample_cfg: SampleConfig, auto_cfg: AutoOptConfig, pwms: dict[str, PWM]) -> list[int]:
     max_w = max(pwm.length for pwm in pwms.values()) if pwms else sample_cfg.init.length
+    sum_w = sum(pwm.length for pwm in pwms.values()) if pwms else sample_cfg.init.length
     length_cfg = auto_cfg.length
     if not length_cfg.enabled:
         return [sample_cfg.init.length]
-    min_len = length_cfg.min_length if length_cfg.min_length is not None else max_w
-    max_len = length_cfg.max_length if length_cfg.max_length is not None else sample_cfg.init.length
-    min_len = max(min_len, max_w)
-    max_len = max(max_len, min_len)
-    step = max(1, length_cfg.step)
-    lengths = list(range(min_len, max_len + 1, step))
-    if sample_cfg.init.length not in lengths and min_len <= sample_cfg.init.length <= max_len:
-        lengths.append(sample_cfg.init.length)
-    lengths = sorted(set(lengths))
-    if length_cfg.max_candidates and len(lengths) > length_cfg.max_candidates:
-        lengths = lengths[: length_cfg.max_candidates]
+    if length_cfg.mode == "ladder":
+        min_len = length_cfg.min_length if length_cfg.min_length is not None else max_w
+        max_len = length_cfg.max_length if length_cfg.max_length is not None else sum_w
+        min_len = max(min_len, max_w)
+        max_len = max(max_len, min_len)
+        lengths = list(range(min_len, max_len + 1, 1))
+    else:
+        min_len = length_cfg.min_length if length_cfg.min_length is not None else max_w
+        max_len = length_cfg.max_length if length_cfg.max_length is not None else sample_cfg.init.length
+        min_len = max(min_len, max_w)
+        max_len = max(max_len, min_len)
+        step = max(1, length_cfg.step)
+        lengths = list(range(min_len, max_len + 1, step))
+        if sample_cfg.init.length not in lengths and min_len <= sample_cfg.init.length <= max_len:
+            lengths.append(sample_cfg.init.length)
+        lengths = sorted(set(lengths))
+        if length_cfg.max_candidates and len(lengths) > length_cfg.max_candidates:
+            lengths = lengths[: length_cfg.max_candidates]
     if not lengths:
         raise ValueError("Auto-opt length selection produced no valid candidates.")
     return lengths
+
+
+_BASE_TO_INT = {"A": 0, "C": 1, "G": 2, "T": 3}
+
+
+def _encode_sequence_string(seq: str) -> np.ndarray:
+    clean = seq.strip().upper()
+    try:
+        return np.array([_BASE_TO_INT[ch] for ch in clean], dtype=np.int8)
+    except KeyError as exc:
+        raise ValueError(f"Invalid base in sequence '{seq}'") from exc
+
+
+def _sample_insert_base(pad_with: str | None, rng: np.random.Generator) -> np.int8:
+    if pad_with is None or pad_with == "background":
+        return np.int8(rng.integers(0, 4))
+    base = pad_with.upper()
+    if base not in _BASE_TO_INT:
+        raise ValueError(f"Invalid pad_with='{pad_with}' for warm-start insertion")
+    return np.int8(_BASE_TO_INT[base])
+
+
+def _extend_sequence_by_one(seq_arr: np.ndarray, *, rng: np.random.Generator, pad_with: str | None) -> np.ndarray:
+    insert_pos = int(rng.integers(0, seq_arr.size + 1))
+    insert_base = _sample_insert_base(pad_with, rng)
+    return np.concatenate([seq_arr[:insert_pos], np.array([insert_base], dtype=np.int8), seq_arr[insert_pos:]])
+
+
+def _warm_start_seeds_from_elites(
+    run_dir: Path,
+    *,
+    target_length: int,
+    rng: np.random.Generator,
+    pad_with: str | None,
+    max_seeds: int | None = None,
+) -> list[np.ndarray]:
+    try:
+        elite_path = find_elites_parquet(run_dir)
+        elites_df = read_parquet(elite_path)
+    except Exception as exc:
+        logger.warning("Warm-start: unable to load elites from %s (%s).", run_dir, exc)
+        return []
+    if "sequence" not in elites_df.columns:
+        return []
+    seeds: list[np.ndarray] = []
+    for seq_str in elites_df["sequence"].astype(str).tolist():
+        seq_arr = _encode_sequence_string(seq_str)
+        if seq_arr.size == target_length:
+            seeds.append(seq_arr.copy())
+        elif seq_arr.size == target_length - 1:
+            seeds.append(_extend_sequence_by_one(seq_arr, rng=rng, pad_with=pad_with))
+        else:
+            continue
+        if max_seeds is not None and len(seeds) >= max_seeds:
+            break
+    return seeds
+
+
+def _warm_start_seeds_from_sequences(
+    run_dir: Path,
+    *,
+    target_length: int,
+    rng: np.random.Generator,
+    pad_with: str | None,
+    max_seeds: int | None = None,
+) -> list[np.ndarray]:
+    try:
+        seq_path = sequences_path(run_dir)
+        seq_df = read_parquet(seq_path)
+    except Exception as exc:
+        logger.warning("Warm-start: unable to load sequences from %s (%s).", run_dir, exc)
+        return []
+    if "sequence" not in seq_df.columns:
+        return []
+    if "phase" in seq_df.columns:
+        seq_df = seq_df[seq_df["phase"] == "draw"].copy()
+
+    score_cols = [col for col in seq_df.columns if col.startswith("score_")]
+    use_combined = "combined_score_final" in seq_df.columns
+
+    candidates: list[tuple[float, np.ndarray]] = []
+    for _, row in seq_df.iterrows():
+        seq_str = str(row["sequence"])
+        seq_arr = _encode_sequence_string(seq_str)
+        score = 0.0
+        if use_combined:
+            raw = row.get("combined_score_final")
+            score = float(raw) if raw is not None else 0.0
+        elif score_cols:
+            vals = [row.get(col) for col in score_cols]
+            vals = [float(v) for v in vals if v is not None]
+            if vals:
+                score = float(np.mean(vals))
+        if seq_arr.size == target_length:
+            candidates.append((score, seq_arr.copy()))
+        elif seq_arr.size == target_length - 1:
+            candidates.append((score, _extend_sequence_by_one(seq_arr, rng=rng, pad_with=pad_with)))
+
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    seeds: list[np.ndarray] = []
+    for _, seq_arr in candidates:
+        seeds.append(seq_arr)
+        if max_seeds is not None and len(seeds) >= max_seeds:
+            break
+    return seeds
+
+
+def _elite_filter_passes(
+    *,
+    norm_map: dict[str, float],
+    min_norm: float,
+    sum_norm: float,
+    min_per_tf_norm: float | None,
+    require_all_tfs_over_min_norm: bool,
+    pwm_sum_min: float,
+) -> bool:
+    if min_per_tf_norm is not None:
+        if require_all_tfs_over_min_norm:
+            if not all(score >= min_per_tf_norm for score in norm_map.values()):
+                return False
+        else:
+            if min_norm < min_per_tf_norm:
+                return False
+    if pwm_sum_min > 0 and sum_norm < pwm_sum_min:
+        return False
+    return True
+
+
+def _filter_elite_candidates(
+    candidates: list["_EliteCandidate"],
+    *,
+    min_per_tf_norm: float | None,
+    require_all_tfs_over_min_norm: bool,
+    pwm_sum_min: float,
+) -> list["_EliteCandidate"]:
+    filtered: list[_EliteCandidate] = []
+    for cand in candidates:
+        if _elite_filter_passes(
+            norm_map=cand.norm_map,
+            min_norm=cand.min_norm,
+            sum_norm=cand.sum_norm,
+            min_per_tf_norm=min_per_tf_norm,
+            require_all_tfs_over_min_norm=require_all_tfs_over_min_norm,
+            pwm_sum_min=pwm_sum_min,
+        ):
+            filtered.append(cand)
+    return filtered
+
+
+def _elite_rank_key(combined_score: float, min_norm: float, sum_norm: float) -> tuple[float, float, float]:
+    return (combined_score, min_norm, sum_norm)
+
+
+def _resolve_final_softmin_beta(optimizer: object, sample_cfg: SampleConfig) -> float | None:
+    if hasattr(optimizer, "final_softmin_beta") and callable(getattr(optimizer, "final_softmin_beta")):
+        try:
+            return getattr(optimizer, "final_softmin_beta")()
+        except Exception:
+            pass
+    if hasattr(optimizer, "stats") and callable(getattr(optimizer, "stats")):
+        try:
+            stats = getattr(optimizer, "stats")()
+            if isinstance(stats, dict):
+                value = stats.get("final_softmin_beta")
+                if isinstance(value, (int, float)):
+                    return float(value)
+        except Exception:
+            pass
+    softmin_cfg = sample_cfg.objective.softmin
+    if softmin_cfg.enabled:
+        total = sample_cfg.budget.tune + sample_cfg.budget.draws
+        softmin_sched = {k: v for k, v in softmin_cfg.model_dump().items() if k in ("kind", "beta", "stages")}
+        return make_beta_scheduler(softmin_sched, total)(total - 1)
+    return None
+
+
+_AUTO_OPT_BOOTSTRAP_SAMPLES = 300
+_AUTO_OPT_BOOTSTRAP_PCT = (5.0, 95.0)
+
+
+def _draw_scores_from_sequences(seq_df: pd.DataFrame) -> np.ndarray:
+    if "combined_score_final" not in seq_df.columns:
+        return np.array([], dtype=float)
+    df = seq_df
+    if "phase" in df.columns:
+        df = df[df["phase"] == "draw"]
+    series = pd.to_numeric(df["combined_score_final"], errors="coerce")
+    series = series.replace([np.inf, -np.inf], np.nan).dropna()
+    if series.empty:
+        return np.array([], dtype=float)
+    return series.to_numpy(dtype=float)
+
+
+def _best_score_final_from_sequences(seq_df: pd.DataFrame) -> float | None:
+    scores = _draw_scores_from_sequences(seq_df)
+    if scores.size == 0:
+        return None
+    return float(np.max(scores))
+
+
+def _top_k_median_from_scores(scores: np.ndarray, k: int) -> float | None:
+    if scores.size == 0:
+        return None
+    k = max(1, min(int(k), int(scores.size)))
+    if k >= scores.size:
+        return float(np.median(scores))
+    topk = np.partition(scores, scores.size - k)[scores.size - k :]
+    return float(np.median(topk))
+
+
+def _top_k_median_from_sequences(seq_df: pd.DataFrame, *, k: int) -> float | None:
+    scores = _draw_scores_from_sequences(seq_df)
+    return _top_k_median_from_scores(scores, k)
+
+
+def _bootstrap_top_k_ci(
+    scores: np.ndarray,
+    *,
+    k: int,
+    rng: np.random.Generator,
+    n_boot: int = _AUTO_OPT_BOOTSTRAP_SAMPLES,
+) -> tuple[float, float] | None:
+    if scores.size == 0:
+        return None
+    if scores.size == 1:
+        value = float(scores[0])
+        return value, value
+    n_boot = max(1, int(n_boot))
+    boot = np.empty(n_boot, dtype=float)
+    for i in range(n_boot):
+        idx = rng.integers(0, scores.size, size=scores.size)
+        sample = scores[idx]
+        boot[i] = _top_k_median_from_scores(sample, k) or float("nan")
+    boot = boot[np.isfinite(boot)]
+    if boot.size == 0:
+        return None
+    low, high = np.percentile(boot, _AUTO_OPT_BOOTSTRAP_PCT)
+    return float(low), float(high)
+
+
+def _bootstrap_seed_payload(payload: dict[str, object]) -> int:
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+    return int(digest[:8], 16)
+
+
+def _bootstrap_seed(
+    *,
+    manifest: dict[str, object],
+    run_dir: Path,
+    kind: str,
+) -> int:
+    _ = run_dir  # unused but retained for call sites; keep signature stable
+    auto_meta = manifest.get("auto_opt") or {}
+    regulator_set = manifest.get("regulator_set") or {}
+    payload = {
+        "seed": manifest.get("seed"),
+        "kind": kind,
+        "attempt": auto_meta.get("attempt"),
+        "candidate": auto_meta.get("candidate"),
+        "budget": auto_meta.get("budget"),
+        "replicate": auto_meta.get("replicate"),
+        "length": manifest.get("sequence_length"),
+        "tfs": regulator_set.get("tfs"),
+    }
+    return _bootstrap_seed_payload(payload)
+
+
+def _pooled_bootstrap_seed(
+    *,
+    manifests: list[dict[str, object]],
+    kind: str,
+    length: int | None,
+    budget: int | None,
+) -> int | None:
+    if not manifests:
+        return None
+    replicates: list[dict[str, object]] = []
+    for manifest in manifests:
+        auto_meta = manifest.get("auto_opt") or {}
+        replicates.append(
+            {
+                "seed": manifest.get("seed"),
+                "attempt": auto_meta.get("attempt"),
+                "candidate": auto_meta.get("candidate"),
+                "budget": auto_meta.get("budget"),
+                "replicate": auto_meta.get("replicate"),
+                "length": manifest.get("sequence_length"),
+            }
+        )
+    payload = {
+        "kind": kind,
+        "length": length,
+        "budget": budget,
+        "replicates": sorted(replicates, key=lambda item: json.dumps(item, sort_keys=True)),
+    }
+    return _bootstrap_seed_payload(payload)
+
+
+def _polish_sequence(
+    seq_arr: np.ndarray,
+    *,
+    evaluator: SequenceEvaluator,
+    beta_softmin_final: float | None,
+    max_rounds: int,
+    improvement_tol: float,
+    max_evals: int | None,
+) -> np.ndarray:
+    seq = seq_arr.copy()
+    evals = 0
+
+    def _score() -> float:
+        nonlocal evals
+        evals += 1
+        return evaluator.combined(SequenceState(seq), beta=beta_softmin_final)
+
+    best_score = _score()
+    for _ in range(max_rounds):
+        improved = False
+        for i in range(seq.size):
+            old_base = seq[i]
+            best_base = old_base
+            best_local = best_score
+            for b in range(4):
+                if b == old_base:
+                    continue
+                seq[i] = b
+                score = _score()
+                if score > best_local + improvement_tol:
+                    best_local = score
+                    best_base = b
+                if max_evals is not None and evals >= max_evals:
+                    seq[i] = best_base
+                    return seq
+            seq[i] = best_base
+            if best_base != old_base:
+                best_score = best_local
+                improved = True
+            if max_evals is not None and evals >= max_evals:
+                return seq
+        if not improved:
+            break
+    return seq
+
+
+@dataclass
+class _EliteCandidate:
+    seq_arr: np.ndarray
+    chain_id: int
+    draw_idx: int
+    combined_score: float
+    min_norm: float
+    sum_norm: float
+    per_tf_map: dict[str, float]
+    norm_map: dict[str, float]
+
+
+def _write_length_ladder_table(rows: list[dict[str, object]], *, pilot_root: Path) -> Path:
+    tables_dir = pilot_root / "analysis" / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    out_path = tables_dir / "length_ladder.csv"
+    fieldnames = ["length", "best_score", "balance", "diversity", "unique_fraction", "runtime_sec"]
+    with out_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({key: row.get(key) for key in fieldnames})
+    return out_path
 
 
 def _save_config(
@@ -298,6 +680,7 @@ def _write_parquet_rows(
     rows: Iterable[dict[str, object]],
     *,
     chunk_size: int = 10000,
+    schema: Any | None = None,
 ) -> int:
     import pyarrow as pa
     import pyarrow.parquet as pq
@@ -323,13 +706,58 @@ def _write_parquet_rows(
         count += len(buffer)
     if writer is not None:
         writer.close()
+    elif schema is not None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        empty = pa.Table.from_pylist([], schema=schema)
+        pq.write_table(empty, str(path))
     return count
+
+
+def _elite_parquet_schema(tfs: Iterable[str], *, include_canonical: bool) -> Any:
+    import pyarrow as pa
+
+    fields = [
+        pa.field("sequence", pa.string()),
+        pa.field("rank", pa.int64()),
+        pa.field("norm_sum", pa.float64()),
+        pa.field("min_norm", pa.float64()),
+        pa.field("sum_norm", pa.float64()),
+        pa.field("combined_score_final", pa.float64()),
+        pa.field("chain", pa.int64()),
+        pa.field("chain_1based", pa.int64()),
+        pa.field("draw_idx", pa.int64()),
+        pa.field("draw_in_phase", pa.int64()),
+        pa.field("meta_type", pa.string()),
+        pa.field("meta_source", pa.string()),
+        pa.field("meta_date", pa.string()),
+        pa.field("per_tf_json", pa.string()),
+    ]
+    if include_canonical:
+        fields.append(pa.field("canonical_sequence", pa.string()))
+    for tf_name in sorted(tfs):
+        fields.append(pa.field(f"score_{tf_name}", pa.float64()))
+        fields.append(pa.field(f"norm_{tf_name}", pa.float64()))
+    return pa.schema(fields)
+
+
+def _norm_map_for_elites(
+    seq_arr: np.ndarray,
+    per_tf_map: dict[str, float],
+    *,
+    scorer: Scorer,
+    score_scale: str,
+) -> dict[str, float]:
+    if score_scale.lower() == "normalized-llr":
+        return {tf: float(per_tf_map.get(tf, 0.0)) for tf in scorer.tf_names}
+    return scorer.normalized_llr_map(seq_arr)
 
 
 def _default_beta_ladder(chains: int, beta_min: float, beta_max: float) -> list[float]:
     if chains < 2:
         raise ValueError("PT beta ladder requires at least 2 chains")
-    ladder = np.linspace(beta_min, beta_max, chains, dtype=float)
+    if beta_min <= 0 or beta_max <= 0:
+        raise ValueError("PT geometric ladder requires beta_min>0 and beta_max>0")
+    ladder = np.geomspace(beta_min, beta_max, chains, dtype=float)
     return [float(beta) for beta in ladder]
 
 
@@ -430,6 +858,13 @@ def _build_pilot_sample_cfg(
         notes.append("disabled output.live_metrics for pilots")
     pilot.ui.progress_bar = False
     pilot.ui.progress_every = 0
+    if not auto_cfg.allow_trim_polish_in_pilots:
+        if pilot.output.trim.enabled:
+            pilot.output.trim.enabled = False
+            notes.append("disabled output.trim.enabled for pilots")
+        if pilot.output.polish.enabled:
+            pilot.output.polish.enabled = False
+            notes.append("disabled output.polish.enabled for pilots")
 
     if length_override is not None and pilot.init.length != length_override:
         pilot.init.length = int(length_override)
@@ -479,90 +914,13 @@ def _assess_candidate_quality(
     *,
     mode: str,
 ) -> list[str]:
+    _ = auto_cfg
+    _ = mode
     notes: list[str] = []
     if candidate.status == "fail":
         candidate.quality = "fail"
         return notes
-    quality = "ok"
-    policy = auto_cfg.policy
-    scorecard = policy.scorecard
-
-    if candidate.kind != "pt":
-        if candidate.rhat is None:
-            notes.append("missing pilot metric: rhat")
-        elif candidate.rhat > policy.max_rhat:
-            notes.append(f"rhat={candidate.rhat:.3f} exceeds auto_opt.policy.max_rhat={policy.max_rhat:.3f}")
-            if mode == "sample":
-                quality = "warn"
-        if candidate.ess is None:
-            notes.append("missing pilot metric: ess")
-        elif candidate.ess < policy.min_ess:
-            notes.append(f"ess={candidate.ess:.1f} below auto_opt.policy.min_ess={policy.min_ess:.1f}")
-            if mode == "sample":
-                quality = "warn"
-
-    if candidate.unique_fraction is None:
-        quality = "warn"
-        notes.append("missing pilot metric: unique_fraction")
-    else:
-        if candidate.unique_fraction < policy.min_unique_fraction:
-            quality = "warn"
-            notes.append(
-                (
-                    f"unique_fraction={candidate.unique_fraction:.2f} below "
-                    f"auto_opt.policy.min_unique_fraction={policy.min_unique_fraction:.2f}"
-                )
-            )
-        if policy.max_unique_fraction is not None and candidate.unique_fraction > policy.max_unique_fraction:
-            quality = "warn"
-            notes.append(
-                (
-                    f"unique_fraction={candidate.unique_fraction:.2f} above "
-                    f"auto_opt.policy.max_unique_fraction={policy.max_unique_fraction:.2f}"
-                )
-            )
-    if candidate.balance_median is None:
-        quality = "warn"
-        notes.append("missing pilot metric: balance_median")
-    elif candidate.balance_median < scorecard.min_balance:
-        quality = "warn"
-        notes.append(
-            (
-                f"balance_median={candidate.balance_median:.3f} below "
-                f"auto_opt.policy.scorecard.min_balance={scorecard.min_balance:.3f}"
-            )
-        )
-    if candidate.diversity is None:
-        quality = "warn"
-        notes.append("missing pilot metric: diversity")
-    elif candidate.diversity < scorecard.min_diversity:
-        quality = "warn"
-        notes.append(
-            (
-                f"diversity={candidate.diversity:.3f} below "
-                f"auto_opt.policy.scorecard.min_diversity={scorecard.min_diversity:.3f}"
-            )
-        )
-
-    def _acceptance_note(label: str, rate: float | None, target: float, tol: float) -> None:
-        nonlocal quality
-        if rate is None:
-            quality = "warn"
-            notes.append(f"missing pilot metric: {label}")
-            return
-        if abs(rate - target) > tol:
-            quality = "warn"
-            notes.append(f"{label}={rate:.3f} outside target {target:.2f}±{tol:.2f}")
-
-    _acceptance_note(
-        "acceptance_B", candidate.acceptance_b, scorecard.acceptance_target, scorecard.acceptance_tolerance
-    )
-    _acceptance_note(
-        "acceptance_M", candidate.acceptance_m, scorecard.acceptance_target, scorecard.acceptance_tolerance
-    )
-    if candidate.kind == "pt":
-        _acceptance_note("swap_rate", candidate.swap_rate, scorecard.swap_target, scorecard.swap_tolerance)
-    candidate.quality = quality
+    candidate.quality = "ok"
     return notes
 
 
@@ -587,6 +945,7 @@ def _run_auto_optimize_for_set(
     logger.info("Auto-opt budget levels: %s", ", ".join(str(b) for b in budgets))
     logger.info("Auto-opt keep_pilots: %s", auto_cfg.keep_pilots)
 
+    length_cfg = auto_cfg.length
     candidate_specs = [(kind, length) for length in lengths for kind in ("gibbs", "pt")]
     seed_rng = np.random.default_rng(sample_cfg.rng.seed)
 
@@ -597,6 +956,7 @@ def _run_auto_optimize_for_set(
         budget: int,
         label: str,
         cooling_boost: float,
+        init_seeds: list[np.ndarray] | None = None,
     ) -> AutoOptCandidate:
         runs: list[AutoOptCandidate] = []
         for rep in range(auto_cfg.replicates):
@@ -650,6 +1010,7 @@ def _run_auto_optimize_for_set(
                 stage="auto_opt",
                 run_kind=f"auto_opt_{label}_{kind}_L{pilot_cfg.init.length}_B{budget}_R{rep + 1}",
                 auto_opt_meta=pilot_meta,
+                init_seeds=init_seeds,
             )
             try:
                 candidate = _evaluate_pilot_run(
@@ -672,6 +1033,10 @@ def _run_auto_optimize_for_set(
                     run_dir=pilot_run_dir,
                     run_dirs=[pilot_run_dir],
                     best_score=None,
+                    top_k_median_final=None,
+                    best_score_final=None,
+                    top_k_ci_low=None,
+                    top_k_ci_high=None,
                     rhat=None,
                     ess=None,
                     unique_fraction=None,
@@ -680,6 +1045,7 @@ def _run_auto_optimize_for_set(
                     improvement=None,
                     acceptance_b=None,
                     acceptance_m=None,
+                    acceptance_mh=None,
                     swap_rate=None,
                     status="fail",
                     quality="fail",
@@ -687,7 +1053,7 @@ def _run_auto_optimize_for_set(
                     diagnostics={},
                 )
             runs.append(candidate)
-        return _aggregate_candidate_runs(runs, budget=budget)
+        return _aggregate_candidate_runs(runs, budget=budget, scorecard_top_k=auto_cfg.policy.scorecard.top_k)
 
     def _log_candidate(candidate: AutoOptCandidate, *, label: str) -> None:
         diag_status = "n/a"
@@ -695,8 +1061,8 @@ def _run_auto_optimize_for_set(
             diag_status = candidate.diagnostics.get("status") or "n/a"
         logger.debug(
             (
-                "Auto-opt %s %s L=%s B=%s boost=%s: scorecard=%s diagnostics=%s best_score=%s balance=%s "
-                "diversity=%s rhat=%s ess=%s unique_fraction=%s"
+                "Auto-opt %s %s L=%s B=%s boost=%s: scorecard=%s diagnostics=%s top_k_median=%s best=%s "
+                "balance=%s diversity=%s rhat=%s ess=%s unique_fraction=%s"
             ),
             label,
             candidate.kind,
@@ -705,7 +1071,8 @@ def _run_auto_optimize_for_set(
             f"{candidate.cooling_boost:g}",
             candidate.quality,
             diag_status,
-            f"{candidate.best_score:.3f}" if candidate.best_score is not None else "n/a",
+            f"{candidate.top_k_median_final:.3f}" if candidate.top_k_median_final is not None else "n/a",
+            f"{candidate.best_score_final:.3f}" if candidate.best_score_final is not None else "n/a",
             f"{candidate.balance_median:.3f}" if candidate.balance_median is not None else "n/a",
             f"{candidate.diversity:.3f}" if candidate.diversity is not None else "n/a",
             f"{candidate.rhat:.3f}" if candidate.rhat is not None else "n/a",
@@ -716,93 +1083,167 @@ def _run_auto_optimize_for_set(
             logger.warning("Auto-opt %s %s warnings: %s", label, candidate.kind, "; ".join(candidate.warnings))
 
     all_candidates: list[AutoOptCandidate] = []
-    current_specs = list(candidate_specs)
     final_level_candidates: list[AutoOptCandidate] = []
+    length_summary_rows: list[dict[str, object]] = []
 
-    for idx, budget in enumerate(budgets):
-        level_candidates: list[AutoOptCandidate] = []
-        for kind, length in current_specs:
-            label = f"pilot_{idx + 1}_L{length}_B{budget}"
-            candidate = _run_candidate(
-                kind=kind,
-                length=length,
-                budget=budget,
-                label=label,
-                cooling_boost=1.0,
+    def _scaled_budgets(base_budgets: list[int], *, scale: float) -> list[int]:
+        base_total = sample_cfg.budget.tune + sample_cfg.budget.draws
+        return [min(base_total, max(4, int(round(b * scale)))) for b in base_budgets]
+
+    if length_cfg.mode == "ladder":
+        previous_best_run: Path | None = None
+        final_level_candidates_all: list[AutoOptCandidate] = []
+        for length_idx, length in enumerate(lengths):
+            length_budgets = budgets
+            if length_idx > 0:
+                length_budgets = _scaled_budgets(budgets, scale=length_cfg.ladder_budget_scale)
+            init_seeds: list[np.ndarray] | None = None
+            if length_cfg.warm_start and previous_best_run is not None:
+                init_seeds = _warm_start_seeds_from_sequences(
+                    previous_best_run,
+                    target_length=length,
+                    rng=seed_rng,
+                    pad_with=sample_cfg.init.pad_with,
+                    max_seeds=sample_cfg.elites.k,
+                )
+                if not init_seeds:
+                    init_seeds = _warm_start_seeds_from_elites(
+                        previous_best_run,
+                        target_length=length,
+                        rng=seed_rng,
+                        pad_with=sample_cfg.init.pad_with,
+                        max_seeds=sample_cfg.elites.k,
+                    )
+                if not init_seeds:
+                    logger.warning("Warm-start: no usable seeds for length %d; falling back to fresh init.", length)
+            current_specs = [("gibbs", length), ("pt", length)]
+            level_candidates: list[AutoOptCandidate] = []
+            length_final_candidates: list[AutoOptCandidate] = []
+            start_time = time.perf_counter()
+            for idx, budget in enumerate(length_budgets):
+                level_candidates = []
+                for kind, _ in current_specs:
+                    label = f"pilot_{idx + 1}_L{length}_B{budget}"
+                    candidate = _run_candidate(
+                        kind=kind,
+                        length=length,
+                        budget=budget,
+                        label=label,
+                        cooling_boost=1.0,
+                        init_seeds=init_seeds,
+                    )
+                    candidate_notes = _assess_candidate_quality(candidate, auto_cfg, mode=sample_cfg.mode)
+                    if candidate_notes:
+                        candidate.warnings.extend(candidate_notes)
+                    _log_candidate(candidate, label=label)
+                    level_candidates.append(candidate)
+                    all_candidates.append(candidate)
+                confident, _, _ = _confidence_from_candidates(level_candidates, auto_cfg)
+                if confident:
+                    length_final_candidates = level_candidates
+                    if idx < len(length_budgets) - 1:
+                        logger.info(
+                            "Auto-opt length %s: confident at budget %s; skipping remaining budget levels.",
+                            length,
+                            budget,
+                        )
+                    break
+                if idx < len(length_budgets) - 1:
+                    ranked = _rank_auto_opt_candidates(level_candidates, auto_cfg)
+                    current_specs = [(c.kind, c.length) for c in ranked]
+                else:
+                    length_final_candidates = level_candidates
+            runtime_sec = time.perf_counter() - start_time
+            if not length_final_candidates:
+                raise ValueError("Auto-optimize failed: no final-level candidates were evaluated.")
+            ranked_length = _rank_auto_opt_candidates(length_final_candidates, auto_cfg)
+            best_for_length = ranked_length[0]
+            previous_best_run = best_for_length.run_dir
+            length_summary_rows.append(
+                {
+                    "length": length,
+                    "best_score": best_for_length.top_k_median_final,
+                    "balance": best_for_length.balance_median,
+                    "diversity": best_for_length.diversity,
+                    "unique_fraction": best_for_length.unique_fraction,
+                    "runtime_sec": round(runtime_sec, 3),
+                }
             )
-            candidate_notes = _assess_candidate_quality(candidate, auto_cfg, mode=sample_cfg.mode)
-            if candidate_notes:
-                candidate.warnings.extend(candidate_notes)
-            _log_candidate(candidate, label=label)
-            level_candidates.append(candidate)
-            all_candidates.append(candidate)
+            final_level_candidates_all.extend(length_final_candidates)
+        final_level_candidates = final_level_candidates_all
+    else:
+        current_specs = list(candidate_specs)
+        for idx, budget in enumerate(budgets):
+            level_candidates = []
+            for kind, length in current_specs:
+                label = f"pilot_{idx + 1}_L{length}_B{budget}"
+                candidate = _run_candidate(
+                    kind=kind,
+                    length=length,
+                    budget=budget,
+                    label=label,
+                    cooling_boost=1.0,
+                )
+                candidate_notes = _assess_candidate_quality(candidate, auto_cfg, mode=sample_cfg.mode)
+                if candidate_notes:
+                    candidate.warnings.extend(candidate_notes)
+                _log_candidate(candidate, label=label)
+                level_candidates.append(candidate)
+                all_candidates.append(candidate)
 
-        if idx < len(budgets) - 1:
-            ranked = _rank_auto_opt_candidates(level_candidates, auto_cfg)
-            keep_n = max(1, int(math.ceil(len(ranked) / max(1, auto_cfg.eta))))
-            current_specs = [(c.kind, c.length) for c in ranked[:keep_n]]
-        else:
-            final_level_candidates = level_candidates
+            confident, _, _ = _confidence_from_candidates(level_candidates, auto_cfg)
+            if confident:
+                final_level_candidates = level_candidates
+                if idx < len(budgets) - 1:
+                    logger.info(
+                        "Auto-opt: confident at budget %s; skipping remaining budget levels.",
+                        budget,
+                    )
+                break
+            if idx < len(budgets) - 1:
+                ranked = _rank_auto_opt_candidates(level_candidates, auto_cfg)
+                current_specs = [(c.kind, c.length) for c in ranked]
+            else:
+                final_level_candidates = level_candidates
 
     if not final_level_candidates:
         raise ValueError("Auto-optimize failed: no final-level candidates were evaluated.")
 
     decision_notes: list[str] = []
-    ok_candidates = [candidate for candidate in final_level_candidates if candidate.quality == "ok"]
-    if not ok_candidates and auto_cfg.policy.retry_on_warn:
-        logger.info(
-            "Auto-optimize: no pilot met thresholds; retrying at max budget with boosted cooling (x%s).",
-            auto_cfg.policy.cooling_boost,
-        )
-        retry_candidates: list[AutoOptCandidate] = []
-        for kind, length in current_specs:
-            label = f"retry_L{length}_B{budgets[-1]}"
-            candidate = _run_candidate(
-                kind=kind,
-                length=length,
-                budget=budgets[-1],
-                label=label,
-                cooling_boost=auto_cfg.policy.cooling_boost,
-            )
-            candidate_notes = _assess_candidate_quality(candidate, auto_cfg, mode=sample_cfg.mode)
-            if candidate_notes:
-                candidate.warnings.extend(candidate_notes)
-            _log_candidate(candidate, label=label)
-            retry_candidates.append(candidate)
-            all_candidates.append(candidate)
-        final_level_candidates.extend(retry_candidates)
-        ok_candidates = [candidate for candidate in final_level_candidates if candidate.quality == "ok"]
-
-    viable, allow_fail = _validate_auto_opt_candidates(
+    viable, _ = _validate_auto_opt_candidates(
         final_level_candidates,
         allow_warn=auto_cfg.policy.allow_warn,
     )
-    if allow_fail:
-        logger.warning(
-            "Auto-optimize: all pilot candidates missing diagnostics; proceeding with best available candidate."
-        )
-    if not ok_candidates:
-        summary = ", ".join(f"{c.kind}:{c.quality}" for c in final_level_candidates)
-        logger.warning(
-            "Auto-optimize: no pilot met thresholds (candidates=%s). Proceeding with best available candidate.",
-            summary,
-        )
-        decision_notes.append("no_pilot_met_thresholds")
-    else:
-        logger.info(
-            "Auto-optimize: %d candidate(s) met thresholds; selecting best score across %d viable candidates.",
-            len(ok_candidates),
-            len(viable),
-        )
 
-    winner = _select_auto_opt_candidate(viable, auto_cfg, allow_fail=allow_fail)
+    confident, _best_candidate, _second_candidate = _confidence_from_candidates(viable, auto_cfg)
+    selection_confident = bool(confident)
+    if selection_confident:
+        decision_notes.append("confidence=high")
+    else:
+        decision_notes.append("confidence=low")
+        if auto_cfg.policy.allow_warn:
+            logger.warning(
+                "Auto-optimize: could not confidently separate top candidates at max budget; "
+                "selecting best available candidate."
+            )
+        else:
+            raise ValueError(
+                "Auto-optimize failed: could not confidently separate top candidates at the maximum "
+                "configured budgets/replicates. Increase auto_opt.budget_levels and/or auto_opt.replicates."
+            )
+
+    winner = _select_auto_opt_candidate(viable, auto_cfg, allow_fail=False)
 
     if winner.quality == "ok":
         logger.info(
-            "Auto-optimize selected %s L=%s (best_score=%s, balance=%s, rhat=%s, ess=%s, unique_fraction=%s).",
+            (
+                "Auto-optimize selected %s L=%s (top_k_median=%s, best=%s, "
+                "balance=%s, rhat=%s, ess=%s, unique_fraction=%s)."
+            ),
             winner.kind,
             winner.length if winner.length is not None else "n/a",
-            f"{winner.best_score:.3f}" if winner.best_score is not None else "n/a",
+            f"{winner.top_k_median_final:.3f}" if winner.top_k_median_final is not None else "n/a",
+            f"{winner.best_score_final:.3f}" if winner.best_score_final is not None else "n/a",
             f"{winner.balance_median:.3f}" if winner.balance_median is not None else "n/a",
             f"{winner.rhat:.3f}" if winner.rhat is not None else "n/a",
             f"{winner.ess:.1f}" if winner.ess is not None else "n/a",
@@ -811,13 +1252,14 @@ def _run_auto_optimize_for_set(
     else:
         logger.warning(
             (
-                "Auto-optimize selected %s L=%s (quality=%s best_score=%s, balance=%s, rhat=%s, "
+                "Auto-optimize selected %s L=%s (quality=%s top_k_median=%s, best=%s, balance=%s, rhat=%s, "
                 "ess=%s, unique_fraction=%s)."
             ),
             winner.kind,
             winner.length if winner.length is not None else "n/a",
             winner.quality,
-            f"{winner.best_score:.3f}" if winner.best_score is not None else "n/a",
+            f"{winner.top_k_median_final:.3f}" if winner.top_k_median_final is not None else "n/a",
+            f"{winner.best_score_final:.3f}" if winner.best_score_final is not None else "n/a",
             f"{winner.balance_median:.3f}" if winner.balance_median is not None else "n/a",
             f"{winner.rhat:.3f}" if winner.rhat is not None else "n/a",
             f"{winner.ess:.1f}" if winner.ess is not None else "n/a",
@@ -838,14 +1280,21 @@ def _run_auto_optimize_for_set(
         logger.info("Auto-opt final overrides: %s", "; ".join(notes))
     length_aware = auto_cfg.length.enabled and len({c.length for c in all_candidates if c.length is not None}) > 1
     ranking_label = (
-        "balance -> best_score -> diversity -> improvement -> acceptance -> swap_rate -> diagnostics"
+        "top_k_median -> best_score_final -> balance -> diversity -> improvement"
         if length_aware
-        else "best_score -> balance -> diversity -> improvement -> acceptance -> swap_rate -> diagnostics"
+        else "top_k_median -> best_score_final -> balance -> diversity -> improvement"
     )
     logger.info("Auto-opt selection ranking: %s.", ranking_label)
     logger.info("Auto-opt final config: %s", _format_auto_opt_config_summary(final_cfg))
     pilot_root = all_candidates[0].run_dir.parent if all_candidates else None
     best_marker_path = _auto_opt_best_marker_path(pilot_root, run_group=run_group) if pilot_root is not None else None
+    length_ladder_path: Path | None = None
+    if length_cfg.mode == "ladder" and length_summary_rows and pilot_root is not None:
+        length_ladder_path = _write_length_ladder_table(length_summary_rows, pilot_root=pilot_root)
+        logger.info(
+            "Length ladder summary -> %s",
+            _format_run_path(length_ladder_path, base=config_path.parent),
+        )
     if pilot_root is not None:
         logger.info(
             "Auto-opt details: pilot manifests under %s; best marker -> %s; final config in config_used.yaml.",
@@ -858,29 +1307,26 @@ def _run_auto_optimize_for_set(
         "selected": winner.kind,
         "selected_length": winner.length,
         "selection_quality": winner.quality,
-        "thresholds_met": winner.quality == "ok",
+        "selection_confident": selection_confident,
+        "selection_confidence": "high" if selection_confident else "low",
         "notes": decision_notes,
         "config_summary": _format_auto_opt_config_summary(final_cfg),
         "selected_config": _selected_config_payload(final_cfg),
+        "selection_metrics": {
+            "top_k_median_final": winner.top_k_median_final,
+            "best_score_final": winner.best_score_final,
+            "top_k_ci_low": winner.top_k_ci_low,
+            "top_k_ci_high": winner.top_k_ci_high,
+        },
         "length_config": auto_cfg.length.model_dump(),
+        "length_ladder_table": str(length_ladder_path) if length_ladder_path is not None else None,
         "auto_opt_config": {
             "budget_levels": auto_cfg.budget_levels,
-            "eta": auto_cfg.eta,
             "replicates": auto_cfg.replicates,
             "keep_pilots": auto_cfg.keep_pilots,
             "prefer_simpler_if_close": auto_cfg.prefer_simpler_if_close,
             "tolerance": auto_cfg.tolerance.model_dump(),
-        },
-        "thresholds": {
-            "min_unique_fraction": auto_cfg.policy.min_unique_fraction,
-            "max_unique_fraction": auto_cfg.policy.max_unique_fraction,
             "scorecard_top_k": auto_cfg.policy.scorecard.top_k,
-            "min_balance": auto_cfg.policy.scorecard.min_balance,
-            "min_diversity": auto_cfg.policy.scorecard.min_diversity,
-            "acceptance_target": auto_cfg.policy.scorecard.acceptance_target,
-            "acceptance_tolerance": auto_cfg.policy.scorecard.acceptance_tolerance,
-            "swap_target": auto_cfg.policy.scorecard.swap_target,
-            "swap_tolerance": auto_cfg.policy.scorecard.swap_tolerance,
         },
         "pilot_root": str(pilot_root) if pilot_root is not None else None,
         "best_marker": str(best_marker_path) if best_marker_path is not None else None,
@@ -894,11 +1340,16 @@ def _run_auto_optimize_for_set(
                 "status": candidate.status,
                 "quality": candidate.quality,
                 "best_score": candidate.best_score,
+                "top_k_median_final": candidate.top_k_median_final,
+                "best_score_final": candidate.best_score_final,
+                "top_k_ci_low": candidate.top_k_ci_low,
+                "top_k_ci_high": candidate.top_k_ci_high,
                 "balance_median": candidate.balance_median,
                 "diversity": candidate.diversity,
                 "improvement": candidate.improvement,
                 "acceptance_b": candidate.acceptance_b,
                 "acceptance_m": candidate.acceptance_m,
+                "acceptance_mh": candidate.acceptance_mh,
                 "swap_rate": candidate.swap_rate,
                 "rhat": candidate.rhat,
                 "ess": candidate.ess,
@@ -968,8 +1419,6 @@ def _evaluate_pilot_run(
     cooling_boost: float = 1.0,
 ) -> AutoOptCandidate:
     manifest = load_manifest(run_dir)
-    status_payload = json.loads(status_path(run_dir).read_text()) if status_path(run_dir).exists() else {}
-    best_score = status_payload.get("best_score")
     length = manifest.get("sequence_length")
     trace_file = trace_path(run_dir)
     seq_path = sequences_path(run_dir)
@@ -981,6 +1430,18 @@ def _evaluate_pilot_run(
     seq_df = read_parquet(seq_path)
     elites_df = read_parquet(elite_path)
     tf_names = [m["tf_name"] for m in manifest.get("motifs", [])]
+    top_k = scorecard_top_k
+    if top_k is None:
+        top_k = int(manifest.get("top_k") or 10)
+    draw_scores = _draw_scores_from_sequences(seq_df)
+    top_k_median_final = _top_k_median_from_scores(draw_scores, top_k)
+    best_score_final = float(np.max(draw_scores)) if draw_scores.size else None
+    best_score = top_k_median_final
+    bootstrap_ci: tuple[float, float] | None = None
+    if draw_scores.size:
+        seed = _bootstrap_seed(manifest=manifest, run_dir=run_dir, kind=kind)
+        rng = np.random.default_rng(seed)
+        bootstrap_ci = _bootstrap_top_k_ci(draw_scores, k=top_k, rng=rng)
 
     import arviz as az
 
@@ -995,6 +1456,10 @@ def _evaluate_pilot_run(
     if mode is not None:
         sample_meta["mode"] = mode
     sample_meta["optimizer_kind"] = kind
+    elites_cfg = manifest.get("elites")
+    if isinstance(elites_cfg, dict):
+        sample_meta["dsdna_canonicalize"] = elites_cfg.get("dsDNA_canonicalize", False)
+        sample_meta["dsdna_hamming"] = elites_cfg.get("dsDNA_hamming", False)
     diagnostics = summarize_sampling_diagnostics(
         trace_idata=trace_idata,
         sequences_df=seq_df,
@@ -1017,11 +1482,13 @@ def _evaluate_pilot_run(
     improvement = trace_metrics.get("best_so_far_slope") or trace_metrics.get("score_delta")
     acceptance_b = None
     acceptance_m = None
+    acceptance_mh = None
     if isinstance(optimizer_metrics, dict):
         acc = optimizer_metrics.get("acceptance_rate") or {}
         if isinstance(acc, dict):
             acceptance_b = acc.get("B")
             acceptance_m = acc.get("M")
+        acceptance_mh = optimizer_metrics.get("acceptance_rate_mh")
     swap_rate = optimizer_metrics.get("swap_acceptance_rate") if isinstance(optimizer_metrics, dict) else None
     warnings = diagnostics.get("warnings", []) if isinstance(diagnostics, dict) else []
     status = "ok"
@@ -1031,10 +1498,40 @@ def _evaluate_pilot_run(
             warnings = list(warnings)
             warnings.append(f"Diagnostics status={diag_status}; see diagnostics.json for details.")
 
-    if best_score is None:
+    if draw_scores.size == 0:
         warnings = list(warnings)
-        warnings.append("Missing pilot metric: best_score")
+        warnings.append("Missing pilot metric: combined_score_final draw-phase values.")
         status = "fail"
+
+    unique_draws: int | None = None
+    if "sequence" in seq_df.columns:
+        df_unique = seq_df
+        if "phase" in df_unique.columns:
+            df_unique = df_unique[df_unique["phase"] == "draw"]
+        try:
+            unique_draws = int(df_unique["sequence"].nunique())
+        except Exception:
+            unique_draws = None
+
+    if kind == "gibbs" and status != "fail":
+        moved = unique_draws is not None and unique_draws > 1
+        accepted = acceptance_mh is not None and acceptance_mh > 0
+        if not accepted and not moved:
+            warnings = list(warnings)
+            warnings.append("Gibbs pilot shows no accepted MH moves and no unique sequences.")
+            status = "fail"
+
+    if kind == "pt" and isinstance(optimizer_metrics, dict):
+        swap_attempts = optimizer_metrics.get("swap_attempts")
+        swap_prob = None
+        optimizer_cfg = manifest.get("optimizer", {})
+        if isinstance(optimizer_cfg, dict):
+            pt_cfg = optimizer_cfg.get("pt", {})
+            if isinstance(pt_cfg, dict):
+                swap_prob = pt_cfg.get("swap_prob")
+        if swap_prob and swap_attempts == 0:
+            warnings = list(warnings)
+            warnings.append("PT pilot recorded swap_prob>0 but swap_attempts=0.")
 
     return AutoOptCandidate(
         kind=kind,
@@ -1044,6 +1541,10 @@ def _evaluate_pilot_run(
         run_dir=run_dir,
         run_dirs=[run_dir],
         best_score=best_score,
+        top_k_median_final=top_k_median_final,
+        best_score_final=best_score_final,
+        top_k_ci_low=bootstrap_ci[0] if bootstrap_ci else None,
+        top_k_ci_high=bootstrap_ci[1] if bootstrap_ci else None,
         rhat=rhat,
         ess=ess,
         unique_fraction=unique_fraction,
@@ -1052,6 +1553,7 @@ def _evaluate_pilot_run(
         improvement=improvement,
         acceptance_b=acceptance_b,
         acceptance_m=acceptance_m,
+        acceptance_mh=acceptance_mh,
         swap_rate=swap_rate,
         status=status,
         quality=status,
@@ -1060,7 +1562,12 @@ def _evaluate_pilot_run(
     )
 
 
-def _aggregate_candidate_runs(runs: list[AutoOptCandidate], *, budget: int) -> AutoOptCandidate:
+def _aggregate_candidate_runs(
+    runs: list[AutoOptCandidate],
+    *,
+    budget: int,
+    scorecard_top_k: int,
+) -> AutoOptCandidate:
     if not runs:
         raise ValueError("Auto-opt aggregation requires at least one pilot run")
 
@@ -1076,28 +1583,86 @@ def _aggregate_candidate_runs(runs: list[AutoOptCandidate], *, budget: int) -> A
     status = "ok"
     if all(run.status == "fail" for run in runs):
         status = "fail"
-    elif any(run.status == "fail" for run in runs):
-        status = "warn"
 
     warnings: list[str] = []
     for run in runs:
         warnings.extend(run.warnings)
-    if status == "warn":
+    if status != "ok":
         warnings.append("One or more pilot replicates failed")
 
     diagnostics = {
         "replicates": [run.diagnostics for run in runs],
         "run_dirs": [str(path) for path in run_dirs],
     }
+    best_run = max(
+        runs,
+        key=lambda run: (
+            float(run.top_k_median_final) if run.top_k_median_final is not None else float("-inf"),
+            float(run.best_score_final) if run.best_score_final is not None else float("-inf"),
+            float(run.balance_median) if run.balance_median is not None else float("-inf"),
+        ),
+    )
+
+    pooled_scores: list[np.ndarray] = []
+    manifests: list[dict[str, object]] = []
+    for run_dir in run_dirs:
+        seq_path = sequences_path(run_dir)
+        if not seq_path.exists():
+            warnings.append(f"Missing sequences.parquet for replicate {run_dir.name}")
+            continue
+        try:
+            seq_df = read_parquet(seq_path)
+        except Exception as exc:
+            warnings.append(f"Failed to read sequences.parquet for {run_dir.name}: {exc}")
+            continue
+        scores = _draw_scores_from_sequences(seq_df)
+        if scores.size:
+            pooled_scores.append(scores)
+        try:
+            manifest = load_manifest(run_dir)
+        except Exception as exc:
+            warnings.append(f"Failed to read manifest for {run_dir.name}: {exc}")
+        else:
+            manifests.append(manifest)
+
+    combined_scores = np.concatenate(pooled_scores) if pooled_scores else np.array([], dtype=float)
+    if combined_scores.size:
+        top_k_median_final = _top_k_median_from_scores(combined_scores, scorecard_top_k)
+        best_score_final = float(np.max(combined_scores))
+        best_score = top_k_median_final
+    else:
+        top_k_median_final = _median([run.top_k_median_final for run in runs])
+        best_score_final = max(
+            [float(run.best_score_final) for run in runs if run.best_score_final is not None],
+            default=None,
+        )
+        best_score = top_k_median_final
+    bootstrap_ci: tuple[float, float] | None = None
+    if combined_scores.size:
+        seed = _pooled_bootstrap_seed(manifests=manifests, kind=kind, length=length, budget=budget)
+        if seed is None:
+            payload = {"kind": kind, "length": length, "budget": budget, "replicate_count": len(run_dirs)}
+            seed = _bootstrap_seed_payload(payload)
+        rng = np.random.default_rng(seed)
+        bootstrap_ci = _bootstrap_top_k_ci(combined_scores, k=scorecard_top_k, rng=rng)
+    else:
+        lows = [run.top_k_ci_low for run in runs if run.top_k_ci_low is not None]
+        highs = [run.top_k_ci_high for run in runs if run.top_k_ci_high is not None]
+        if lows and highs:
+            bootstrap_ci = (float(min(lows)), float(max(highs)))
 
     return AutoOptCandidate(
         kind=kind,
         length=length,
         budget=budget,
         cooling_boost=float(np.median([run.cooling_boost for run in runs])),
-        run_dir=run_dirs[0],
+        run_dir=best_run.run_dir,
         run_dirs=run_dirs,
-        best_score=_median([run.best_score for run in runs]),
+        best_score=best_score,
+        top_k_median_final=top_k_median_final,
+        best_score_final=best_score_final,
+        top_k_ci_low=bootstrap_ci[0] if bootstrap_ci else None,
+        top_k_ci_high=bootstrap_ci[1] if bootstrap_ci else None,
         rhat=_median([run.rhat for run in runs]),
         ess=_median([run.ess for run in runs]),
         unique_fraction=_median([run.unique_fraction for run in runs]),
@@ -1106,6 +1671,7 @@ def _aggregate_candidate_runs(runs: list[AutoOptCandidate], *, budget: int) -> A
         improvement=_median([run.improvement for run in runs]),
         acceptance_b=_median([run.acceptance_b for run in runs]),
         acceptance_m=_median([run.acceptance_m for run in runs]),
+        acceptance_mh=_median([run.acceptance_mh for run in runs]),
         swap_rate=_median([run.swap_rate for run in runs]),
         status=status,
         quality=status,
@@ -1118,41 +1684,28 @@ def _rank_auto_opt_candidates(
     candidates: list[AutoOptCandidate],
     auto_cfg: AutoOptConfig,
 ) -> list[AutoOptCandidate]:
-    def _closeness(rate: float | None, target: float, tol: float) -> float:
-        if rate is None:
-            return float("-inf")
-        return 1.0 - min(1.0, abs(rate - target) / max(tol, 1.0e-6))
-
     ranked: list[tuple[tuple[float, float, float, float, float, float, float], AutoOptCandidate]] = []
     status_rank = {"ok": 2, "warn": 1, "fail": 0}
-    scorecard = auto_cfg.policy.scorecard
-    lengths = {c.length for c in candidates if c.length is not None}
-    length_aware = auto_cfg.length.enabled and len(lengths) > 1
     for candidate in candidates:
-        score = candidate.best_score if candidate.best_score is not None else float("-inf")
+        score = candidate.top_k_median_final if candidate.top_k_median_final is not None else candidate.best_score
+        if score is None:
+            score = float("-inf")
+        secondary = (
+            candidate.best_score_final
+            if candidate.best_score_final is not None
+            else (candidate.best_score if candidate.best_score is not None else float("-inf"))
+        )
         balance = candidate.balance_median if candidate.balance_median is not None else float("-inf")
         diversity = candidate.diversity if candidate.diversity is not None else float("-inf")
         improvement = candidate.improvement if candidate.improvement is not None else float("-inf")
-        acceptance = np.mean(
-            [
-                _closeness(candidate.acceptance_b, scorecard.acceptance_target, scorecard.acceptance_tolerance),
-                _closeness(candidate.acceptance_m, scorecard.acceptance_target, scorecard.acceptance_tolerance),
-            ]
-        )
-        swap_score = (
-            _closeness(candidate.swap_rate, scorecard.swap_target, scorecard.swap_tolerance)
-            if candidate.kind == "pt"
-            else 0.0
-        )
-        primary = balance if length_aware else score
-        secondary = score if length_aware else balance
+        unique_fraction = candidate.unique_fraction if candidate.unique_fraction is not None else float("-inf")
         rank = (
-            float(primary),
+            float(score),
             float(secondary),
+            float(balance),
             float(diversity),
             float(improvement),
-            float(acceptance),
-            float(swap_score),
+            float(unique_fraction),
             float(status_rank.get(candidate.quality, status_rank.get(candidate.status, 0))),
         )
         ranked.append((rank, candidate))
@@ -1160,28 +1713,35 @@ def _rank_auto_opt_candidates(
     return [item[1] for item in ranked]
 
 
+def _confidence_from_candidates(
+    candidates: list[AutoOptCandidate],
+    auto_cfg: AutoOptConfig,
+) -> tuple[bool, AutoOptCandidate | None, AutoOptCandidate | None]:
+    if not candidates:
+        return False, None, None
+    ranked = _rank_auto_opt_candidates(candidates, auto_cfg)
+    best = ranked[0]
+    if len(ranked) == 1:
+        return True, best, None
+    second = ranked[1]
+    if best.top_k_ci_low is None or second.top_k_ci_high is None:
+        return False, best, second
+    return best.top_k_ci_low > second.top_k_ci_high, best, second
+
+
 def _validate_auto_opt_candidates(
     candidates: list[AutoOptCandidate],
     *,
     allow_warn: bool,
 ) -> tuple[list[AutoOptCandidate], bool]:
+    _ = allow_warn
     if not candidates:
         raise ValueError("Auto-optimize did not produce any pilot candidates.")
     viable = [c for c in candidates if c.status != "fail"]
     if not viable:
-        if not allow_warn:
-            raise ValueError(
-                "Auto-optimize failed: all pilot candidates missing diagnostics. "
-                "Set auto_opt.policy.allow_warn=true to proceed, or disable auto-opt."
-            )
-        return list(candidates), True
-    ok_candidates = [c for c in candidates if c.quality == "ok"]
-    if not ok_candidates and not allow_warn:
-        summary = ", ".join(f"{c.kind}:{c.quality}" for c in candidates)
         raise ValueError(
-            "Auto-optimize failed: no pilot met thresholds "
-            f"(candidates={summary}). Set auto_opt.policy.allow_warn=true to proceed, "
-            "or increase auto_opt budgets/adjust thresholds."
+            "Auto-optimize failed: all pilot candidates failed catastrophic checks "
+            "(missing scores or no movement). Re-run with larger budgets or fix the model inputs."
         )
     return viable, False
 
@@ -1199,9 +1759,6 @@ def _select_auto_opt_candidate(
     if not ok_candidates and allow_fail:
         ok_candidates = list(candidates)
     if auto_cfg.length.enabled and auto_cfg.length.prefer_shortest:
-        ok_quality = [c for c in ok_candidates if c.quality == "ok"]
-        if ok_quality:
-            ok_candidates = ok_quality
         lengths = [c.length for c in ok_candidates if c.length is not None]
         if lengths:
             min_len = min(lengths)
@@ -1214,8 +1771,8 @@ def _select_auto_opt_candidate(
 
     if auto_cfg.prefer_simpler_if_close and winner.kind == "pt":
         gibbs = [c for c in ranked if c.kind == "gibbs"]
-        if gibbs and winner.best_score is not None and gibbs[0].best_score is not None:
-            if gibbs[0].best_score >= winner.best_score - auto_cfg.tolerance.score:
+        if gibbs and winner.top_k_median_final is not None and gibbs[0].top_k_median_final is not None:
+            if gibbs[0].top_k_median_final >= winner.top_k_median_final - auto_cfg.tolerance.score:
                 return gibbs[0]
     return winner
 
@@ -1303,6 +1860,7 @@ def _format_move_probs(move_probs: dict[str, float]) -> str:
 def _format_auto_opt_config_summary(cfg: SampleConfig) -> str:
     kind = cfg.optimizer.name
     moves = _format_move_probs(resolve_move_config(cfg.moves).move_probs)
+    combine = cfg.objective.combine or ("sum" if cfg.objective.score_scale == "consensus-neglop-sum" else "min")
     if kind == "gibbs":
         cooling = _format_cooling_summary(cfg.optimizers.gibbs.beta_schedule)
         chains = cfg.budget.restarts
@@ -1311,7 +1869,7 @@ def _format_auto_opt_config_summary(cfg: SampleConfig) -> str:
         chains = len(_resolve_beta_ladder(cfg.optimizers.pt)[0])
     return (
         f"optimizer={kind} scorer={cfg.objective.score_scale} "
-        f"length={cfg.init.length} chains={chains} tune={cfg.budget.tune} draws={cfg.budget.draws} "
+        f"combine={combine} length={cfg.init.length} chains={chains} tune={cfg.budget.tune} draws={cfg.budget.draws} "
         f"cooling={cooling} moves={moves} progress_every={cfg.ui.progress_every}"
     )
 
@@ -1341,10 +1899,12 @@ def _run_sample_for_set(
     stage: str = "sample",
     run_kind: str | None = None,
     auto_opt_meta: dict[str, object] | None = None,
+    init_seeds: list[np.ndarray] | None = None,
 ) -> Path:
     """
     Run MCMC sampler, save config/meta plus artifacts (trace.nc, sequences.parquet, elites.*).
-    Each chain gets its own independent seed (random/consensus/consensus_mix).
+    Each chain gets its own independent seed (random/consensus/consensus_mix) unless
+    init_seeds are provided for warm-started runs.
     """
     base_out = config_path.parent / Path(cfg.out_dir)
     base_out.mkdir(parents=True, exist_ok=True)
@@ -1415,8 +1975,44 @@ def _run_sample_for_set(
 
     # 2) INSTANTIATE SCORER and SequenceEvaluator
     scale = sample_cfg.objective.score_scale
+    combine_cfg = sample_cfg.objective.combine
     logger.debug("Using score_scale = %r", scale)
-    combiner = (lambda vs: sum(vs)) if scale == "consensus-neglop-sum" else None
+    if scale == "llr" and len(tfs) > 1:
+        logger.warning(
+            "score_scale='llr' is not comparable across PWMs in multi-TF runs. "
+            "Consider normalized-llr or logp, or set objective.allow_unscaled_llr=true to silence this warning."
+        )
+    if sample_cfg.objective.bidirectional and not (
+        sample_cfg.elites.dsDNA_canonicalize or sample_cfg.elites.dsDNA_hamming
+    ):
+        logger.warning(
+            "Bidirectional scoring is enabled but dsDNA equivalence is disabled "
+            "(reverse complements will be treated as distinct for diversity/uniqueness). "
+            "Consider setting sample.elites.dsDNA_canonicalize=true."
+        )
+
+    def _sum_combine(values):
+        return float(sum(values))
+
+    combiner = None
+    combine_resolved = "min"
+    if combine_cfg == "sum":
+        combiner = _sum_combine
+        combine_resolved = "sum"
+        if sample_cfg.objective.softmin.enabled:
+            logger.warning("objective.combine='sum' disables softmin; softmin schedule will be ignored.")
+    elif combine_cfg == "min":
+        if scale == "consensus-neglop-sum":
+            combiner = min
+        combine_resolved = "min"
+    elif scale == "consensus-neglop-sum":
+        combiner = _sum_combine
+        combine_resolved = "sum"
+        if sample_cfg.objective.softmin.enabled:
+            logger.warning(
+                "score_scale='consensus-neglop-sum' defaults to sum() and disables softmin. "
+                "Set objective.combine='min' to enforce weakest-TF optimization."
+            )
     logger.debug("Building Scorer and SequenceEvaluator with scale=%r", scale)
     scorer = Scorer(
         pwms,
@@ -1426,6 +2022,17 @@ def _run_sample_for_set(
         pseudocounts=sample_cfg.objective.scoring.pwm_pseudocounts,
         log_odds_clip=sample_cfg.objective.scoring.log_odds_clip,
     )
+    length_penalty_lambda = sample_cfg.objective.length_penalty_lambda
+    length_penalty_ref = None
+    if length_penalty_lambda > 0:
+        if (
+            sample_cfg.auto_opt is not None
+            and sample_cfg.auto_opt.length is not None
+            and sample_cfg.auto_opt.length.min_length is not None
+        ):
+            length_penalty_ref = sample_cfg.auto_opt.length.min_length
+        else:
+            length_penalty_ref = max_w
     evaluator = SequenceEvaluator(
         pwms=pwms,
         scale=scale,
@@ -1435,6 +2042,8 @@ def _run_sample_for_set(
         background=(0.25, 0.25, 0.25, 0.25),
         pseudocounts=sample_cfg.objective.scoring.pwm_pseudocounts,
         log_odds_clip=sample_cfg.objective.scoring.log_odds_clip,
+        length_penalty_lambda=length_penalty_lambda,
+        length_penalty_ref=length_penalty_ref,
     )
 
     logger.debug("Scorer and SequenceEvaluator instantiated")
@@ -1450,6 +2059,8 @@ def _run_sample_for_set(
         "chains": chain_count,
         "min_dist": sample_cfg.elites.min_hamming,
         "top_k": sample_cfg.elites.k,
+        "bidirectional": sample_cfg.objective.bidirectional,
+        "dsdna_hamming": bool(sample_cfg.elites.dsDNA_hamming),
         "record_tune": sample_cfg.output.trace.include_tune,
         "progress_bar": sample_cfg.ui.progress_bar,
         "progress_every": sample_cfg.ui.progress_every,
@@ -1457,6 +2068,8 @@ def _run_sample_for_set(
         **moves.model_dump(),
         "softmin": sample_cfg.objective.softmin.model_dump(),
     }
+    if init_seeds:
+        opt_cfg["init_seeds"] = init_seeds
 
     if optimizer_kind == "gibbs":
         schedule = sample_cfg.optimizers.gibbs.beta_schedule
@@ -1563,6 +2176,9 @@ def _run_sample_for_set(
     elif not sample_cfg.output.trace.save:
         logger.debug("Skipping trace.nc (sample.output.trace.save=false)")
 
+    # Resolve final soft-min beta for polishing/trimming/elite ranking (from optimizer schedule)
+    beta_softmin_final: float | None = _resolve_final_softmin_beta(optimizer, sample_cfg)
+
     # 8) SAVE sequences.parquet (chain, draw, phase, sequence_string, per-TF scaled scores)
     if (
         sample_cfg.output.save_sequences
@@ -1572,6 +2188,7 @@ def _run_sample_for_set(
     ):
         seq_parquet = sequences_path(out_dir)
         tf_order = sorted(tfs)
+        want_canonical_all = bool(sample_cfg.elites.dsDNA_canonicalize)
 
         def _sequence_rows() -> Iterable[dict[str, object]]:
             for (chain_id, draw_i), seq_arr, per_tf_map in zip(
@@ -1580,16 +2197,25 @@ def _run_sample_for_set(
                 if draw_i < sample_cfg.budget.tune:
                     phase = "tune"
                     draw_i_to_write = draw_i
+                    draw_in_phase = draw_i
                 else:
                     phase = "draw"
                     draw_i_to_write = draw_i
+                    draw_in_phase = draw_i - sample_cfg.budget.tune
                 seq_str = SequenceState(seq_arr).to_string()
                 row: dict[str, object] = {
                     "chain": int(chain_id),
+                    "chain_1based": int(chain_id) + 1,
                     "draw": int(draw_i_to_write),
+                    "draw_in_phase": int(draw_in_phase),
                     "phase": phase,
                     "sequence": seq_str,
                 }
+                if want_canonical_all:
+                    row["canonical_sequence"] = SequenceState(canon_int(seq_arr)).to_string()
+                row["combined_score_final"] = float(
+                    evaluator.combined_from_scores(per_tf_map, beta=beta_softmin_final, length=seq_arr.size)
+                )
                 for tf in tf_order:
                     row[f"score_{tf}"] = float(per_tf_map[tf])
                 yield row
@@ -1609,68 +2235,99 @@ def _run_sample_for_set(
             seq_parquet.relative_to(out_dir.parent),
         )
 
-    # Resolve final soft-min beta for polishing/trimming
-    beta_softmin_final: float | None = None
-    softmin_cfg = sample_cfg.objective.softmin
-    if softmin_cfg.enabled:
-        total = sample_cfg.budget.tune + sample_cfg.budget.draws
-        softmin_sched = {k: v for k, v in softmin_cfg.model_dump().items() if k in ("kind", "beta", "stages")}
-        beta_softmin_final = make_beta_scheduler(softmin_sched, total)(total - 1)
-
-    # 9)  BUILD elites list — keep draws whose ∑ normalised ≥ pwm_sum_threshold
-    #     + enforce a per-sequence Hamming-distance diversity filter
-    thr_norm: float = sample_cfg.elites.filters.pwm_sum_min  # e.g. 1.50
-    min_dist: int = sample_cfg.elites.min_hamming  # e.g. 1
-    raw_elites: list[tuple[np.ndarray, int, int, float, dict[str, float]]] = []
-    norm_sums: list[float] = []  # diagnostics only
+    # 9) BUILD elites list — filter (representativeness), rank (objective), diversify
+    filters = sample_cfg.elites.filters
+    min_per_tf_norm = filters.min_per_tf_norm
+    require_all = filters.require_all_tfs_over_min_norm
+    pwm_sum_min = filters.pwm_sum_min
+    min_dist: int = sample_cfg.elites.min_hamming
+    use_dsdna_hamming = bool(sample_cfg.elites.dsDNA_hamming)
+    raw_elites: list[_EliteCandidate] = []
+    norm_sums: list[float] = []
+    min_norms: list[float] = []
+    total_draws_seen = len(optimizer.all_samples)
 
     for (chain_id, draw_idx), seq_arr, per_tf_map in zip(
         optimizer.all_meta, optimizer.all_samples, optimizer.all_scores
     ):
-        # ---------- per-PWM normalisation --------------------------
-        #   raw_llr -> frac = (raw_llr - mu_null) / (llr_consensus - mu_null)
-        #   - mu_null = null_mean (expected background)
-        #   - frac < 0 => treat as 0 (below background contributes nothing)
-        #   - frac may exceed 1 if a window scores better than "column max"
-        # -------------------------------------------------------------------
-        fracs = scorer.normalized_llr_components(seq_arr)
-        total_norm = float(sum(fracs))  # 0 … n_TF + ε
-        norm_sums.append(total_norm)
+        norm_map = _norm_map_for_elites(
+            seq_arr,
+            per_tf_map,
+            scorer=scorer,
+            score_scale=sample_cfg.objective.score_scale,
+        )
+        min_norm = min(norm_map.values()) if norm_map else 0.0
+        sum_norm = float(sum(norm_map.values()))
+        norm_sums.append(sum_norm)
+        min_norms.append(min_norm)
 
-        if total_norm >= thr_norm:
-            raw_elites.append((seq_arr, chain_id, draw_idx, total_norm, per_tf_map))
+        if not _elite_filter_passes(
+            norm_map=norm_map,
+            min_norm=min_norm,
+            sum_norm=sum_norm,
+            min_per_tf_norm=min_per_tf_norm,
+            require_all_tfs_over_min_norm=require_all,
+            pwm_sum_min=pwm_sum_min,
+        ):
+            continue
+
+        combined_score = evaluator.combined_from_scores(
+            per_tf_map,
+            beta=beta_softmin_final,
+            length=seq_arr.size,
+        )
+        raw_elites.append(
+            _EliteCandidate(
+                seq_arr=seq_arr,
+                chain_id=chain_id,
+                draw_idx=draw_idx,
+                combined_score=float(combined_score),
+                min_norm=float(min_norm),
+                sum_norm=float(sum_norm),
+                per_tf_map=per_tf_map,
+                norm_map=norm_map,
+            )
+        )
 
     # -------- percentile diagnostics ----------------------------------------
     if norm_sums:
         p50, p90 = np.percentile(norm_sums, [50, 90])
         n_tf = scorer.pwm_count
-        avg_thr_pct = 100 * thr_norm / n_tf
+        avg_thr_pct = 100 * pwm_sum_min / n_tf if n_tf else 0.0
         logger.debug("Normalised-sum percentiles  |  median %.2f   90%% %.2f", p50, p90)
-        logger.debug(
-            "Threshold %.2f ⇒ ~%.0f%%-of-consensus on average per TF (%d regulators)",
-            thr_norm,
-            avg_thr_pct,
-            n_tf,
-        )
+        if pwm_sum_min > 0:
+            logger.debug(
+                "Threshold %.2f ⇒ ~%.0f%%-of-consensus on average per TF (%d regulators)",
+                pwm_sum_min,
+                avg_thr_pct,
+                n_tf,
+            )
         logger.debug(
             "Typical draw: med %.2f (≈ %.0f%%/TF); top-10%% %.2f (≈ %.0f%%/TF)",
             p50,
-            100 * p50 / n_tf,
+            100 * p50 / n_tf if n_tf else 0.0,
             p90,
-            100 * p90 / n_tf,
+            100 * p90 / n_tf if n_tf else 0.0,
         )
+    if min_norms and min_per_tf_norm is not None:
+        p50_min, p90_min = np.percentile(min_norms, [50, 90])
+        logger.debug("Normalised-min percentiles |  median %.2f   90%% %.2f", p50_min, p90_min)
 
-    # -------- rank raw_elites by score --------------------------------------
-    raw_elites.sort(key=lambda t: t[3], reverse=True)  # highest first
+    # -------- rank raw_elites by objective ----------------------------------
+    raw_elites.sort(
+        key=lambda cand: _elite_rank_key(cand.combined_score, cand.min_norm, cand.sum_norm),
+        reverse=True,
+    )
 
-    # -------- apply Hamming diversity filter -------------------------------
-    kept_elites: list[tuple[np.ndarray, int, int, float, dict[str, float]]] = []
+    # -------- apply diversity filter ----------------------------------------
+    kept_elites: list[_EliteCandidate] = []
     kept_seqs: list[np.ndarray] = []
+    dist_fn = dsdna_hamming if use_dsdna_hamming else hamming_distance
 
-    for tpl in raw_elites:
-        seq_arr = tpl[0]
-        if all(hamming_distance(seq_arr, s) >= min_dist for s in kept_seqs):
-            kept_elites.append(tpl)
+    for cand in raw_elites:
+        seq_arr = cand.seq_arr
+        if all(dist_fn(seq_arr, s) >= min_dist for s in kept_seqs):
+            kept_elites.append(cand)
             kept_seqs.append(seq_arr)
 
     if min_dist > 0:
@@ -1683,34 +2340,18 @@ def _run_sample_for_set(
     else:
         kept_elites = raw_elites  # no filtering
 
+    kept_after_diversity_pre_polish = len(kept_elites)
+    passed_post_polish_filter = kept_after_diversity_pre_polish
+    kept_after_diversity_final = kept_after_diversity_pre_polish
+
+    if not kept_elites and (pwm_sum_min > 0 or min_per_tf_norm is not None):
+        logger.warning("Elite filters removed all candidates; relax min_per_tf_norm/pwm_sum_min or min_hamming.")
+
     # Optional deterministic polish + trimming
     if kept_elites and (sample_cfg.output.polish.enabled or sample_cfg.output.trim.enabled):
         max_w = max(pwm.length for pwm in pwms.values())
-
-        def _polish(seq_arr: np.ndarray) -> np.ndarray:
-            seq = seq_arr.copy()
-            best_score = evaluator.combined(SequenceState(seq.copy()), beta=beta_softmin_final)
-            for _ in range(sample_cfg.output.polish.max_rounds):
-                improved = False
-                for i in range(seq.size):
-                    old_base = seq[i]
-                    best_base = old_base
-                    best_local = best_score
-                    for b in range(4):
-                        if b == old_base:
-                            continue
-                        seq[i] = b
-                        score = evaluator.combined(SequenceState(seq.copy()), beta=beta_softmin_final)
-                        if score > best_local + sample_cfg.output.polish.improvement_tol:
-                            best_local = score
-                            best_base = b
-                    seq[i] = best_base
-                    if best_base != old_base:
-                        best_score = best_local
-                        improved = True
-                if not improved:
-                    break
-            return seq
+        polish_cfg = sample_cfg.output.polish
+        polish_cap = polish_cfg.max_elites
 
         def _trim(seq_arr: np.ndarray) -> np.ndarray:
             L = seq_arr.size
@@ -1733,40 +2374,91 @@ def _run_sample_for_set(
                 )
             trimmed = seq_arr[start:end].copy()
             if sample_cfg.output.trim.require_non_decreasing:
-                old_score = evaluator.combined(SequenceState(seq_arr.copy()), beta=beta_softmin_final)
-                new_score = evaluator.combined(SequenceState(trimmed.copy()), beta=beta_softmin_final)
+                old_score = evaluator.combined(SequenceState(seq_arr), beta=beta_softmin_final)
+                new_score = evaluator.combined(SequenceState(trimmed), beta=beta_softmin_final)
                 if new_score < old_score:
                     return seq_arr
             return trimmed
 
-        updated: list[tuple[np.ndarray, int, int, float, dict[str, float]]] = []
-        for seq_arr, chain_id, draw_idx, _total_norm, _per_tf_map in kept_elites:
-            seq_new = seq_arr
-            if sample_cfg.output.polish.enabled:
-                seq_new = _polish(seq_new)
+        updated: list[_EliteCandidate] = []
+        for idx, cand in enumerate(kept_elites):
+            seq_new = cand.seq_arr
+            if sample_cfg.output.polish.enabled and (polish_cap is None or idx < polish_cap):
+                seq_new = _polish_sequence(
+                    seq_new,
+                    evaluator=evaluator,
+                    beta_softmin_final=beta_softmin_final,
+                    max_rounds=polish_cfg.max_rounds,
+                    improvement_tol=polish_cfg.improvement_tol,
+                    max_evals=polish_cfg.max_evals,
+                )
             if sample_cfg.output.trim.enabled:
                 seq_new = _trim(seq_new)
-            per_tf_map = evaluator(SequenceState(seq_new.copy()))
-            total_norm = float(sum(scorer.normalized_llr_components(seq_new)))
-            updated.append((seq_new, chain_id, draw_idx, total_norm, per_tf_map))
+            per_tf_map = evaluator(SequenceState(seq_new))
+            norm_map = _norm_map_for_elites(
+                seq_new,
+                per_tf_map,
+                scorer=scorer,
+                score_scale=sample_cfg.objective.score_scale,
+            )
+            min_norm = min(norm_map.values()) if norm_map else 0.0
+            sum_norm = float(sum(norm_map.values()))
+            combined_score = evaluator.combined_from_scores(
+                per_tf_map,
+                beta=beta_softmin_final,
+                length=seq_new.size,
+            )
+            updated.append(
+                _EliteCandidate(
+                    seq_arr=seq_new,
+                    chain_id=cand.chain_id,
+                    draw_idx=cand.draw_idx,
+                    combined_score=float(combined_score),
+                    min_norm=float(min_norm),
+                    sum_norm=float(sum_norm),
+                    per_tf_map=per_tf_map,
+                    norm_map=norm_map,
+                )
+            )
 
-        updated.sort(key=lambda t: t[3], reverse=True)
+        updated = _filter_elite_candidates(
+            updated,
+            min_per_tf_norm=min_per_tf_norm,
+            require_all_tfs_over_min_norm=require_all,
+            pwm_sum_min=pwm_sum_min,
+        )
+        passed_post_polish_filter = len(updated)
+        updated.sort(
+            key=lambda cand: _elite_rank_key(cand.combined_score, cand.min_norm, cand.sum_norm),
+            reverse=True,
+        )
         kept_elites = []
         kept_seqs = []
-        for tpl in updated:
-            seq_arr = tpl[0]
-            if all(hamming_distance(seq_arr, s) >= min_dist for s in kept_seqs):
-                kept_elites.append(tpl)
+        for cand in updated:
+            seq_arr = cand.seq_arr
+            if all(dist_fn(seq_arr, s) >= min_dist for s in kept_seqs):
+                kept_elites.append(cand)
                 kept_seqs.append(seq_arr)
+        kept_after_diversity_final = len(kept_elites)
+        if not kept_elites and (pwm_sum_min > 0 or min_per_tf_norm is not None):
+            logger.warning(
+                "Post-polish/trim filters removed all candidates; relax min_per_tf_norm/pwm_sum_min or min_hamming."
+            )
 
     # serialise elites
     elites: list[dict[str, object]] = []
     want_cons = bool(sample_cfg.output.include_consensus_in_elites)
 
-    for rank, (seq_arr, chain_id, draw_idx, total_norm, per_tf_map) in enumerate(kept_elites, 1):
+    want_canonical = bool(sample_cfg.elites.dsDNA_canonicalize)
+    for rank, cand in enumerate(kept_elites, 1):
+        seq_arr = cand.seq_arr
         seq_str = SequenceState(seq_arr).to_string()
+        canonical_seq = None
+        if want_canonical:
+            canonical_seq = SequenceState(canon_int(seq_arr)).to_string()
         per_tf_details: dict[str, dict[str, object]] = {}
-        norm_map = scorer.normalized_llr_map(seq_arr)
+        norm_map = cand.norm_map
+        per_tf_map = cand.per_tf_map
 
         for tf_name in scorer.tf_names:
             # best site in this *sequence*
@@ -1788,6 +2480,7 @@ def _run_sample_for_set(
                 "raw_llr": float(raw_llr),
                 "offset": offset,
                 "strand": strand,
+                "width": width,
                 "motif_diagram": motif_diag,
                 "scaled_score": float(per_tf_map[tf_name]),
                 "normalized_llr": float(norm_map.get(tf_name, 0.0)),
@@ -1795,25 +2488,34 @@ def _run_sample_for_set(
             if want_cons:
                 per_tf_details[tf_name]["consensus"] = consensus
 
-        elites.append(
-            {
-                "id": str(uuid.uuid4()),
-                "sequence": seq_str,
-                "rank": rank,
-                "norm_sum": total_norm,
-                "chain": chain_id,
-                "draw_idx": draw_idx,
-                "per_tf": per_tf_details,
-                "meta_type": "mcmc-elite",
-                "meta_source": out_dir.name,
-                "meta_date": datetime.now(timezone.utc).isoformat(),
-            }
-        )
+        entry = {
+            "id": str(uuid.uuid4()),
+            "sequence": seq_str,
+            "rank": rank,
+            "norm_sum": cand.sum_norm,
+            "min_norm": cand.min_norm,
+            "sum_norm": cand.sum_norm,
+            "combined_score_final": cand.combined_score,
+            "chain": cand.chain_id,
+            "chain_1based": cand.chain_id + 1,
+            "draw_idx": cand.draw_idx,
+            "draw_in_phase": cand.draw_idx - sample_cfg.budget.tune
+            if cand.draw_idx >= sample_cfg.budget.tune
+            else cand.draw_idx,
+            "per_tf": per_tf_details,
+            "meta_type": "mcmc-elite",
+            "meta_source": out_dir.name,
+            "meta_date": datetime.now(timezone.utc).isoformat(),
+        }
+        if want_canonical:
+            entry["canonical_sequence"] = canonical_seq
+        elites.append(entry)
 
     run_logger(
-        "Final elite count: %d (normalised-sum ≥ %.2f, min_dist ≥ %d)",
+        "Final elite count: %d (pwm_sum_min=%s, min_per_tf_norm=%s, min_dist=%d)",
         len(elites),
-        thr_norm,
+        f"{pwm_sum_min:.2f}" if pwm_sum_min else "off",
+        f"{min_per_tf_norm:.2f}" if min_per_tf_norm is not None else "off",
         min_dist,
     )
 
@@ -1833,7 +2535,8 @@ def _run_sample_for_set(
                     row[f"norm_{tf_name}"] = details.get("normalized_llr")
             yield row
 
-    _write_parquet_rows(parquet_path, _elite_rows(), chunk_size=2000)
+    elite_schema = _elite_parquet_schema(tfs, include_canonical=want_canonical)
+    _write_parquet_rows(parquet_path, _elite_rows(), chunk_size=2000, schema=elite_schema)
     logger.debug("Saved elites Parquet -> %s", parquet_path.relative_to(out_dir.parent))
 
     json_path = elites_json_path(out_dir)
@@ -1844,8 +2547,22 @@ def _run_sample_for_set(
     meta = {
         "generated": datetime.now(timezone.utc).isoformat(),
         "n_elites": len(elites),
-        "threshold_norm_sum": thr_norm,
+        "threshold_norm_sum": pwm_sum_min,
+        "min_per_tf_norm": min_per_tf_norm,
+        "require_all_tfs_over_min_norm": require_all,
         "min_hamming_dist": min_dist,
+        "dsdna_canonicalize": want_canonical,
+        "dsdna_hamming": use_dsdna_hamming,
+        "total_draws_seen": total_draws_seen,
+        "passed_pre_filter": len(raw_elites),
+        "kept_after_diversity_pre_polish": kept_after_diversity_pre_polish,
+        "passed_post_polish_filter": passed_post_polish_filter,
+        "kept_after_diversity_final": kept_after_diversity_final,
+        "objective_combine": combine_resolved,
+        "softmin_beta_final_resolved": beta_softmin_final,
+        "indexing_note": (
+            "chain is 0-based; chain_1based is 1-based; draw_idx is absolute sweep; draw_in_phase is phase-relative"
+        ),
         "tf_label": tf_label,
         "sequence_length": sample_cfg.init.length,
         #  you can inline the full cfg if you prefer – this keeps it concise
@@ -1911,14 +2628,17 @@ def _run_sample_for_set(
             "early_stop": sample_cfg.early_stop.model_dump(),
             "top_k": sample_cfg.elites.k,
             "min_dist": sample_cfg.elites.min_hamming,
+            "elites": sample_cfg.elites.model_dump(),
             "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
             "run_group": run_group,
             "run_kind": run_kind,
             "auto_opt": auto_opt_meta,
             "objective": {
                 "score_scale": sample_cfg.objective.score_scale,
+                "combine": combine_resolved,
                 "bidirectional": sample_cfg.objective.bidirectional,
                 "softmin": sample_cfg.objective.softmin.model_dump(),
+                "softmin_beta_final_resolved": beta_softmin_final,
             },
             "optimizer": {
                 "kind": optimizer_kind,
@@ -1926,6 +2646,9 @@ def _run_sample_for_set(
                 "pt": sample_cfg.optimizers.pt.model_dump(),
             },
             "optimizer_stats": optimizer.stats() if hasattr(optimizer, "stats") else {},
+            "objective_schedule_summary": optimizer.objective_schedule_summary()
+            if hasattr(optimizer, "objective_schedule_summary")
+            else {},
         },
     )
     manifest_path = write_manifest(out_dir, manifest)

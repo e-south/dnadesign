@@ -24,3 +24,4 @@ Each demo maps to a workspace: `demo_basics_two_tf`, `demo_campaigns_multi_tf`.
 #### For developers
 
 - [Package spec](internals/spec.md)
+- [Optimizer improvements plan](internals/optimizer_improvements_plan.md)

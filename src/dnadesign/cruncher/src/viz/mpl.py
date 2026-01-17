@@ -13,7 +13,12 @@ import logging
 import os
 from pathlib import Path
 
-_NOISY_FONT_LOGGERS = ("matplotlib.font_manager", "fontTools", "fontTools.subset")
+_NOISY_FONT_LOGGERS = (
+    "matplotlib.font_manager",
+    "matplotlib.category",
+    "fontTools",
+    "fontTools.subset",
+)
 
 
 def _quiet_font_logs() -> None:

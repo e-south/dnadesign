@@ -27,6 +27,7 @@ from dnadesign.cruncher.core.optimizers.policies import (
     move_probs_array,
     targeted_start,
 )
+from dnadesign.cruncher.core.sequence import dsdna_hamming, hamming_distance, revcomp_int
 from dnadesign.cruncher.core.state import SequenceState, make_seed
 from tqdm import tqdm
 
@@ -67,6 +68,8 @@ class GibbsOptimizer(Optimizer):
         self.chains = int(cfg["chains"])
         self.min_dist = int(cfg["min_dist"])
         self.top_k = int(cfg["top_k"])
+        self.bidirectional = bool(cfg.get("bidirectional", False))
+        self.dsdna_hamming = bool(cfg.get("dsdna_hamming", False))
         self.record_tune = bool(cfg.get("record_tune", False))
         self.progress_bar = bool(cfg.get("progress_bar", True))
         self.progress_every = int(cfg.get("progress_every", 0))
@@ -148,10 +151,24 @@ class GibbsOptimizer(Optimizer):
         # Keep references for seeding each chain
         self.init_cfg = init_cfg
         self.pwms = pwms
+        self.init_seeds: List[np.ndarray] = list(cfg.get("init_seeds") or [])
+
+        # Cache consensus and per-row probabilities for insertion moves
+        self._insertion_consensus: Dict[str, np.ndarray] = {}
+        self._insertion_row_probs: Dict[str, List[np.ndarray]] = {}
+        for name, pwm in self.pwms.items():
+            consensus = np.argmax(pwm.matrix, axis=1).astype(np.int8)
+            self._insertion_consensus[name] = consensus
+            row_probs = []
+            for row in pwm.matrix:
+                probs = row / row.sum()
+                row_probs.append(np.asarray(probs, dtype=float))
+            self._insertion_row_probs[name] = row_probs
 
         # Tally of which move‐types happened
         self.move_tally: Counter = Counter()
         self.accept_tally: Counter = Counter()
+        self.move_stats: List[Dict[str, object]] = []
 
         # STORAGE: sequences, metadata (chain, draw), and scores
         self.all_samples: List[np.ndarray] = []
@@ -192,12 +209,20 @@ class GibbsOptimizer(Optimizer):
         self.all_samples.clear()
         self.all_meta.clear()
         self.all_scores.clear()
+        self.move_stats.clear()
+        self.move_tally.clear()
+        self.accept_tally.clear()
 
         global_iter = 0
         for c in range(chains):
             # ─── 1) Create an independent seed for this chain ───
-            seed_state = make_seed(self.init_cfg, self.pwms, rng)
-            seq = seed_state.seq.copy()  # numpy array (L,)
+            if self.init_seeds:
+                seed_arr = np.asarray(self.init_seeds[c % len(self.init_seeds)], dtype=np.int8)
+                SequenceState(seed_arr)
+                seq = seed_arr.copy()
+            else:
+                seed_state = make_seed(self.init_cfg, self.pwms, rng)
+                seq = seed_state.seq.copy()  # numpy array (L,)
             chain_trace: List[float] = []
             best_local: float | None = None
             no_improve = 0
@@ -217,6 +242,12 @@ class GibbsOptimizer(Optimizer):
 
             logger.debug("Chain %d: starting burn‐in", c + 1)
             beta_draw = self.beta_of(max(self.tune - 1, 0)) if self.apply_during == "tune" else None
+            per_tf_map = evaluator(SequenceState(seq))
+            current_combined = evaluator.combined_from_scores(
+                per_tf_map,
+                beta=self.softmin_of(0) if self.softmin_of else None,
+                length=seq.size,
+            )
 
             # ─── Phase 1: Burn‐in (record each state; draw_i = 0..tune−1) ───
             for b in tqdm(
@@ -231,8 +262,31 @@ class GibbsOptimizer(Optimizer):
                 if beta_controller is not None:
                     beta_mcmc = beta_controller.beta(beta_mcmc)
                 move_probs = self.move_schedule.probs(chain_iter / max(self.sweeps_per_chain - 1, 1))
-                move_kind, accepted = self._perform_single_move(
-                    seq, beta_mcmc, beta_softmin, evaluator, move_cfg, rng, move_probs
+                current_combined = evaluator.combined_from_scores(
+                    per_tf_map,
+                    beta=beta_softmin,
+                    length=seq.size,
+                )
+                move_kind, accepted, per_tf_map, current_combined = self._perform_single_move(
+                    seq,
+                    current_combined,
+                    beta_mcmc,
+                    beta_softmin,
+                    evaluator,
+                    move_cfg,
+                    rng,
+                    move_probs,
+                    per_tf=per_tf_map,
+                )
+                self.move_stats.append(
+                    {
+                        "sweep_idx": int(chain_iter),
+                        "phase": "tune",
+                        "chain": int(c),
+                        "move_kind": move_kind,
+                        "attempted": 1,
+                        "accepted": int(bool(accepted)),
+                    }
                 )
                 if beta_controller is not None:
                     beta_controller.record(move_kind, accepted)
@@ -240,8 +294,6 @@ class GibbsOptimizer(Optimizer):
 
                 if self.record_tune:
                     # Record current state and per‐TF scores with draw index = b
-                    current_state = SequenceState(seq.copy())
-                    per_tf_map = evaluator(current_state)
                     draw_i = b  # 0 … tune−1
                     self.all_samples.append(seq.copy())
                     self.all_meta.append((c, draw_i))
@@ -275,16 +327,37 @@ class GibbsOptimizer(Optimizer):
                 if beta_controller is not None:
                     beta_mcmc = beta_controller.beta(beta_mcmc)
                 move_probs = self.move_schedule.probs(chain_iter / max(self.sweeps_per_chain - 1, 1))
-                move_kind, accepted = self._perform_single_move(
-                    seq, beta_mcmc, beta_softmin, evaluator, move_cfg, rng, move_probs
+                current_combined = evaluator.combined_from_scores(
+                    per_tf_map,
+                    beta=beta_softmin,
+                    length=seq.size,
+                )
+                move_kind, accepted, per_tf_map, current_combined = self._perform_single_move(
+                    seq,
+                    current_combined,
+                    beta_mcmc,
+                    beta_softmin,
+                    evaluator,
+                    move_cfg,
+                    rng,
+                    move_probs,
+                    per_tf=per_tf_map,
+                )
+                self.move_stats.append(
+                    {
+                        "sweep_idx": int(chain_iter),
+                        "phase": "draw",
+                        "chain": int(c),
+                        "move_kind": move_kind,
+                        "attempted": 1,
+                        "accepted": int(bool(accepted)),
+                    }
                 )
                 if beta_controller is not None and not stop_after_tune:
                     beta_controller.record(move_kind, accepted)
                     beta_controller.update_scale()
 
-                current_state = SequenceState(seq.copy())
-                per_tf_map = evaluator(current_state)
-                combined_scalar = evaluator.combined(current_state, beta=beta_softmin)
+                combined_scalar = current_combined
 
                 draw_i = tune + d  # tune … tune+draws−1
                 self._track_best_score(combined_scalar, chain=c, draw=draw_i)
@@ -354,11 +427,9 @@ class GibbsOptimizer(Optimizer):
         if chain_scores:
             max_len = max(len(trace) for trace in chain_scores)
             for trace in chain_scores:
-                if not trace:
-                    continue
                 if len(trace) < max_len:
-                    trace.extend([trace[-1]] * (max_len - len(trace)))
-        scores_arr = np.asarray(chain_scores)
+                    trace.extend([float("nan")] * (max_len - len(trace)))
+        scores_arr = np.asarray(chain_scores, dtype=float)
         if scores_arr.size == 0:
             raise RuntimeError(
                 f"GibbsOptimizer: cannot build trace_inference_data with empty scores_arr (shape={scores_arr.shape})"
@@ -375,9 +446,12 @@ class GibbsOptimizer(Optimizer):
             logger.debug("Ranking sequences at final β=%.3f (softmin=%.3f)", beta_final, beta_softmin_final)
 
         scored_list: List[Tuple[float, np.ndarray, int]] = []
-        for idx, seq_arr in enumerate(self.all_samples):
-            state = SequenceState(seq_arr.copy())
-            combined_val = evaluator.combined(state, beta=beta_softmin_final)
+        for idx, (seq_arr, per_tf_map) in enumerate(zip(self.all_samples, self.all_scores)):
+            combined_val = evaluator.combined_from_scores(
+                per_tf_map,
+                beta=beta_softmin_final,
+                length=int(seq_arr.size),
+            )
             scored_list.append((combined_val, seq_arr.copy(), idx))
 
         # Sort descending by combined_val
@@ -385,12 +459,13 @@ class GibbsOptimizer(Optimizer):
         logger.debug("Top combined scores: %s", [x[0] for x in scored_list[:10]])
 
         # Pick top_k, enforcing Hamming‐distance ≥ min_dist
+        dist_fn = dsdna_hamming if self.dsdna_hamming else hamming_distance
         elites: List[SequenceState] = []
         used_indices: List[int] = []
         for combined_val, seq_arr, idx in scored_list:
             if len(elites) >= top_k:
                 break
-            if any(np.sum(seq_arr != e.seq) < min_dist for e in elites):
+            if any(dist_fn(seq_arr, e.seq) < min_dist for e in elites):
                 continue
             elites.append(SequenceState(seq_arr.copy()))
             used_indices.append(idx)
@@ -408,22 +483,33 @@ class GibbsOptimizer(Optimizer):
     def _perform_single_move(
         self,
         seq: np.ndarray,
+        current_combined: float,
         beta: float,
         beta_softmin: float | None,
         evaluator: Any,
         move_cfg: Dict[str, Any],
         rng: np.random.Generator,
         move_probs: np.ndarray,
-    ) -> tuple[str, bool]:
+        *,
+        per_tf: Dict[str, float] | None = None,
+    ) -> tuple[str, bool, Dict[str, float], float]:
         """
         Choose one move based on move_probs, then apply it.
-        Uses evaluator.combined(state, beta=beta_softmin) with Metropolis acceptance scaled by beta.
+        Uses evaluator.evaluate(...) with Metropolis acceptance scaled by beta.
         """
         L = seq.size
+        if per_tf is None:
+            per_tf = evaluator(SequenceState(seq))
         move_kind = self._sample_move_kind(rng, move_probs)
         self.move_tally[move_kind] += 1
         accepted = False
-        target = self.targeting.maybe_target(seq_len=L, state=SequenceState(seq.copy()), evaluator=evaluator, rng=rng)
+        target = self.targeting.maybe_target(
+            seq_len=L,
+            state=SequenceState(seq),
+            evaluator=evaluator,
+            rng=rng,
+            per_tf=per_tf,
+        )
         target_tf = target[0] if target else None
         target_window = (target[1], target[2]) if target else None
 
@@ -435,11 +521,16 @@ class GibbsOptimizer(Optimizer):
                 i = rng.integers(L)
             old_base = seq[i]
             lods = np.empty(4, float)
+            combined_vals = np.empty(4, float)
+            per_tf_candidates: list[Dict[str, float]] = []
             logger.debug("Performing 'S' move at position %d", i)
 
             for b in range(4):
                 seq[i] = b
-                lods[b] = beta * evaluator.combined(SequenceState(seq.copy()), beta=beta_softmin)
+                per_tf_b, comb_b = evaluator.evaluate(SequenceState(seq), beta=beta_softmin, length=L)
+                per_tf_candidates.append(per_tf_b)
+                combined_vals[b] = comb_b
+                lods[b] = beta * comb_b
             seq[i] = old_base
 
             lods -= lods.max()
@@ -455,13 +546,14 @@ class GibbsOptimizer(Optimizer):
             seq[i] = new_base
             self.accept_tally[move_kind] += 1
             accepted = True
+            return move_kind, accepted, per_tf_candidates[int(new_base)], float(combined_vals[new_base])
 
         elif move_kind == "B":
             # Block replacement
             min_len, max_len = move_cfg["block_len_range"]
             length = rng.integers(min_len, max_len + 1)
             if length > L:
-                return move_kind, False
+                return move_kind, False, per_tf, current_combined
             start = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
             proposal = rng.integers(0, 4, size=length)
 
@@ -473,14 +565,12 @@ class GibbsOptimizer(Optimizer):
                 length,
             )
             _replace_block(seq, start, length, proposal)
-            new_comb = evaluator.combined(SequenceState(seq.copy()), beta=beta_softmin)
+            new_per_tf, new_comb = evaluator.evaluate(SequenceState(seq), beta=beta_softmin, length=L)
             _replace_block(seq, start, length, old_block)
-            old_comb = evaluator.combined(SequenceState(seq.copy()), beta=beta_softmin)
-
-            delta = beta * (new_comb - old_comb)
+            delta = beta * (new_comb - current_combined)
             logger.debug(
                 "    old_comb=%.6f, new_comb=%.6f, delta=%.6f",
-                old_comb,
+                current_combined,
                 new_comb,
                 delta,
             )
@@ -489,8 +579,10 @@ class GibbsOptimizer(Optimizer):
                 _replace_block(seq, start, length, proposal)
                 self.accept_tally[move_kind] += 1
                 accepted = True
+                return move_kind, accepted, new_per_tf, new_comb
             else:
                 logger.debug("    Rejecting 'B' move, reverting")
+                return move_kind, accepted, per_tf, current_combined
 
         elif move_kind == "M":
             # Multi‐site flips
@@ -506,15 +598,13 @@ class GibbsOptimizer(Optimizer):
             proposal = rng.integers(0, 4, size=k)
 
             seq[idxs] = proposal
-            new_comb = evaluator.combined(SequenceState(seq.copy()), beta=beta_softmin)
+            new_per_tf, new_comb = evaluator.evaluate(SequenceState(seq), beta=beta_softmin, length=L)
             seq[idxs] = old_bases
-            old_comb = evaluator.combined(SequenceState(seq.copy()), beta=beta_softmin)
-
-            delta = beta * (new_comb - old_comb)
+            delta = beta * (new_comb - current_combined)
             logger.debug(
                 "Performing 'M' move at idxs=%s: old_comb=%.6f, new_comb=%.6f, delta=%.6f",
                 idxs.tolist(),
-                old_comb,
+                current_combined,
                 new_comb,
                 delta,
             )
@@ -523,8 +613,10 @@ class GibbsOptimizer(Optimizer):
                 seq[idxs] = proposal
                 self.accept_tally[move_kind] += 1
                 accepted = True
+                return move_kind, accepted, new_per_tf, new_comb
             else:
                 logger.debug("    Rejecting 'M' move, reverting to old_bases")
+                return move_kind, accepted, per_tf, current_combined
 
         elif move_kind == "L":
             # Slide window
@@ -532,7 +624,7 @@ class GibbsOptimizer(Optimizer):
             length = rng.integers(min_len, max_len + 1)
             max_shift = int(move_cfg["slide_max_shift"])
             if max_shift < 1 or length >= L:
-                return move_kind, False
+                return move_kind, False, per_tf, current_combined
             shift = rng.integers(-max_shift, max_shift + 1)
             if shift == 0:
                 shift = 1 if rng.random() < 0.5 else -1
@@ -541,25 +633,26 @@ class GibbsOptimizer(Optimizer):
             else:
                 min_start, max_start = -shift, L - length
             if max_start < min_start:
-                return move_kind, False
+                return move_kind, False, per_tf, current_combined
             start = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
             start = max(min_start, min(max_start, start))
             slide_window(seq, start, length, int(shift))
-            new_comb = evaluator.combined(SequenceState(seq.copy()), beta=beta_softmin)
+            new_per_tf, new_comb = evaluator.evaluate(SequenceState(seq), beta=beta_softmin, length=L)
             slide_window(seq, start + int(shift), length, int(-shift))
-            old_comb = evaluator.combined(SequenceState(seq.copy()), beta=beta_softmin)
-            delta = beta * (new_comb - old_comb)
+            delta = beta * (new_comb - current_combined)
             if delta >= 0 or np.log(rng.random()) < delta:
                 slide_window(seq, start, length, int(shift))
                 self.accept_tally[move_kind] += 1
                 accepted = True
+                return move_kind, accepted, new_per_tf, new_comb
+            return move_kind, accepted, per_tf, current_combined
 
         elif move_kind == "W":
             # Swap two blocks
             min_len, max_len = move_cfg["swap_len_range"]
             length = rng.integers(min_len, max_len + 1)
             if length >= L:
-                return move_kind, False
+                return move_kind, False, per_tf, current_combined
             start_a = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
             max_tries = 10
             start_b = start_a
@@ -568,47 +661,48 @@ class GibbsOptimizer(Optimizer):
                 if abs(start_b - start_a) >= length:
                     break
             if abs(start_b - start_a) < length:
-                return move_kind, False
+                return move_kind, False, per_tf, current_combined
             swap_block(seq, start_a, start_b, length)
-            new_comb = evaluator.combined(SequenceState(seq.copy()), beta=beta_softmin)
+            new_per_tf, new_comb = evaluator.evaluate(SequenceState(seq), beta=beta_softmin, length=L)
             swap_block(seq, start_a, start_b, length)
-            old_comb = evaluator.combined(SequenceState(seq.copy()), beta=beta_softmin)
-            delta = beta * (new_comb - old_comb)
+            delta = beta * (new_comb - current_combined)
             if delta >= 0 or np.log(rng.random()) < delta:
                 swap_block(seq, start_a, start_b, length)
                 self.accept_tally[move_kind] += 1
                 accepted = True
+                return move_kind, accepted, new_per_tf, new_comb
+            return move_kind, accepted, per_tf, current_combined
 
         else:  # move_kind == "I"
             # Motif insertion proposal
             tf_names = list(self.pwms.keys())
             if not tf_names:
-                return move_kind, False
+                return move_kind, False, per_tf, current_combined
             tf_name = target_tf if target_tf in self.pwms else rng.choice(tf_names)
             pwm = self.pwms[tf_name]
             width = pwm.length
             if width > L:
-                return move_kind, False
+                return move_kind, False, per_tf, current_combined
             start = targeted_start(seq_len=L, block_len=width, target=target_window, rng=rng)
             if rng.random() < self.insertion_consensus_prob:
-                proposal = np.argmax(pwm.matrix, axis=1).astype(np.int8)
+                proposal = self._insertion_consensus[tf_name].copy()
             else:
-                proposal = np.array(
-                    [rng.choice(4, p=row / row.sum()) for row in pwm.matrix],
-                    dtype=np.int8,
-                )
+                row_probs = self._insertion_row_probs[tf_name]
+                proposal = np.array([rng.choice(4, p=row) for row in row_probs], dtype=np.int8)
+            if self.bidirectional and rng.random() < 0.5:
+                proposal = revcomp_int(proposal)
             old_block = seq[start : start + width].copy()
             _replace_block(seq, start, width, proposal)
-            new_comb = evaluator.combined(SequenceState(seq.copy()), beta=beta_softmin)
+            new_per_tf, new_comb = evaluator.evaluate(SequenceState(seq), beta=beta_softmin, length=L)
             _replace_block(seq, start, width, old_block)
-            old_comb = evaluator.combined(SequenceState(seq.copy()), beta=beta_softmin)
-            delta = beta * (new_comb - old_comb)
+            delta = beta * (new_comb - current_combined)
             if delta >= 0 or np.log(rng.random()) < delta:
                 _replace_block(seq, start, width, proposal)
                 self.accept_tally[move_kind] += 1
                 accepted = True
+                return move_kind, accepted, new_per_tf, new_comb
 
-        return move_kind, accepted
+        return move_kind, accepted, per_tf, current_combined
 
     def _sample_move_kind(self, rng: np.random.Generator, move_probs: np.ndarray) -> str:
         """
@@ -649,6 +743,13 @@ class GibbsOptimizer(Optimizer):
         accepted = dict(self.accept_tally)
         acceptance_rate = {k: (accepted.get(k, 0) / totals[k]) if totals.get(k, 0) else 0.0 for k in totals}
         acc_label = ", ".join(f"{k}={acceptance_rate[k]:.2f}" for k in sorted(acceptance_rate))
+        mh_kinds = [k for k in totals if k != "S"]
+        mh_total = sum(totals.get(k, 0) for k in mh_kinds)
+        mh_accept = sum(accepted.get(k, 0) for k in mh_kinds)
+        acceptance_rate_mh = (mh_accept / mh_total) if mh_total else 0.0
+        all_total = sum(totals.values())
+        all_accept = sum(accepted.values())
+        acceptance_rate_all = (all_accept / all_total) if all_total else 0.0
         pct = (step / total) * 100 if total else 100.0
         score_blob = ""
         if current_score is not None:
@@ -675,6 +776,8 @@ class GibbsOptimizer(Optimizer):
                 total=total,
                 progress_pct=round(pct, 2),
                 acceptance_rate=acceptance_rate,
+                acceptance_rate_mh=acceptance_rate_mh,
+                acceptance_rate_all=acceptance_rate_all,
                 beta=beta,
                 beta_softmin=beta_softmin,
                 current_score=current_score,
@@ -689,8 +792,35 @@ class GibbsOptimizer(Optimizer):
         totals = dict(self.move_tally)
         accepted = dict(self.accept_tally)
         acceptance_rate = {k: (accepted.get(k, 0) / totals[k]) if totals.get(k, 0) else 0.0 for k in totals}
+        mh_kinds = [k for k in totals if k != "S"]
+        mh_total = sum(totals.get(k, 0) for k in mh_kinds)
+        mh_accept = sum(accepted.get(k, 0) for k in mh_kinds)
+        acceptance_rate_mh = (mh_accept / mh_total) if mh_total else 0.0
+        all_total = sum(totals.values())
+        all_accept = sum(accepted.values())
+        acceptance_rate_all = (all_accept / all_total) if all_total else 0.0
         return {
             "moves": totals,
             "accepted": accepted,
             "acceptance_rate": acceptance_rate,
+            "acceptance_rate_mh": acceptance_rate_mh,
+            "acceptance_rate_all": acceptance_rate_all,
+            "move_stats": list(self.move_stats),
+            "final_softmin_beta": self.final_softmin_beta(),
+            "final_mcmc_beta": self.final_mcmc_beta(),
+        }
+
+    def final_softmin_beta(self) -> float | None:
+        if self.softmin_of is None:
+            return None
+        return float(self.softmin_of(self.total_sweeps - 1))
+
+    def final_mcmc_beta(self) -> float | None:
+        return float(self.beta_of(self.total_sweeps - 1))
+
+    def objective_schedule_summary(self) -> Dict[str, object]:
+        return {
+            "schedule_scope": self.schedule_scope,
+            "schedule_sweeps": self.schedule_sweeps,
+            "total_sweeps": self.total_sweeps,
         }

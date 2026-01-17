@@ -88,6 +88,18 @@ def test_unknown_top_level_key_is_rejected(tmp_path: Path) -> None:
     )
 
 
+def test_multi_tf_llr_requires_allow_unscaled(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["regulator_sets"] = [["lexA", "cpxR"]]
+    config["cruncher"]["sample"] = _sample_block(optimizer_name="gibbs")
+    config_path = _write_config(tmp_path, config)
+    with pytest.raises(ValidationError, match="allow_unscaled_llr"):
+        load_config(config_path)
+    config["cruncher"]["sample"]["objective"]["allow_unscaled_llr"] = True
+    config_path = _write_config(tmp_path, config)
+    load_config(config_path)
+
+
 def test_unknown_nested_key_is_rejected(tmp_path: Path) -> None:
     config = _base_config()
     config["cruncher"]["motif_store"]["bogus"] = "nope"

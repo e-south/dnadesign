@@ -53,7 +53,7 @@ cruncher:
 Notes:
 - Campaigns expand into explicit `regulator_sets`; they do not run automatically.
 - Run `cruncher campaign generate --campaign <name>` to materialize a derived config.
-- `allow_overlap=false` rejects TFs shared across categories.
+- `allow_overlap=false` rejects TFs shared across categories (campaign construction only; it does not constrain motif overlap in sequences).
 - `distinct_across_categories=true` prevents a single TF from satisfying multiple categories.
 - Selector filters require cached motifs/sites; fetch before generating if you use them.
 - `selectors.min_info_bits` requires PWMs to be buildable. For site-based sources
@@ -261,6 +261,8 @@ sample:
   objective:
     bidirectional: true
     score_scale: normalized-llr
+    combine: min
+    allow_unscaled_llr: false
     scoring:
       pwm_pseudocounts: 0.10
       log_odds_clip: null
@@ -268,11 +270,16 @@ sample:
       enabled: true
       kind: linear
       beta: [0.5, 10.0]
+    length_penalty_lambda: 0.0
   elites:
     k: 5
     min_hamming: 1
+    dsDNA_canonicalize: false
+    dsDNA_hamming: null
     filters:
       pwm_sum_min: 0.0
+      min_per_tf_norm: null
+      require_all_tfs_over_min_norm: true
   moves:
     profile: balanced
     overrides:
@@ -321,36 +328,26 @@ sample:
   auto_opt:
     enabled: true
     budget_levels: [200, 800]
-    eta: 3
     replicates: 1
     keep_pilots: ok
+    allow_trim_polish_in_pilots: false
     prefer_simpler_if_close: true
     tolerance:
       score: 0.01
     length:
       enabled: true
+      mode: grid
       min_length: null
       max_length: null
       step: 2
       max_candidates: 4
+      warm_start: true
+      ladder_budget_scale: 0.5
     policy:
       allow_warn: false
-      retry_on_warn: true
-      retry_draws_factor: 2.0
-      retry_tune_factor: 2.0
       cooling_boost: 5.0
-      max_rhat: 1.2
-      min_ess: 20
-      min_unique_fraction: 0.10
-      max_unique_fraction: null
       scorecard:
         top_k: 10
-        min_balance: 0.25
-        min_diversity: 0.10
-        acceptance_target: 0.40
-        acceptance_tolerance: 0.25
-        swap_target: 0.25
-        swap_tolerance: 0.20
   output:
     save_sequences: true
     include_consensus_in_elites: false
@@ -366,6 +363,8 @@ sample:
       enabled: true
       max_rounds: 2
       improvement_tol: 0.0
+      max_elites: 50
+      max_evals: null
   ui:
     progress_bar: true
     progress_every: 0
@@ -375,34 +374,48 @@ Notes:
 - `output.save_sequences=true` is required for `analyze` and `report`.
 - `output.trace.save=true` is required for trace-based plots and `report`.
 - `output.live_metrics=true` writes `live/metrics.jsonl` with progress snapshots (used by `cruncher runs watch`).
-- `output.trace.include_tune=true` includes burn-in samples in `trace.nc` and `sequences.parquet`.
+- `output.trace.include_tune=true` includes burn-in samples in `sequences.parquet` (trace.nc always contains draws only).
 - `objective.bidirectional=true` scores both strands (reverse complement) when scanning PWMs.
+- `objective.combine` controls how per-TF scores are combined (`min` for weakest-TF optimization, `sum` for sum-based).
+- `objective.allow_unscaled_llr=true` allows `score_scale=llr` in multi-TF runs (otherwise validation fails).
 - `elites.min_hamming` is the Hamming-distance filter for elites (0 disables). If `output.trim.enabled=true` yields variable lengths, the distance is computed over the shared prefix plus the length difference.
 - `elites.k` controls how many sequences are retained before diversity filtering.
+- `elites.dsDNA_canonicalize=true` treats reverse complements as identical when computing unique fractions and (optionally) stores `canonical_sequence` in elites.
+- `elites.dsDNA_hamming=true` computes diversity using min(hamming(seq, rc(seq))) per pair.
 - `objective.scoring.pwm_pseudocounts` smooths matrix-derived PWMs (set to 0 for raw matrices).
 - `objective.scoring.log_odds_clip` caps log-odds magnitudes (use to avoid extreme cliffs).
-- `elites.filters.pwm_sum_min` filters elites by summed normalized scores (0 keeps all).
+- `objective.length_penalty_lambda` subtracts `lambda * (L - L_ref)` from combined scores (mitigates length bias; `L_ref` defaults to auto_opt.length.min_length or max PWM length).
+- `elites.filters.pwm_sum_min` filters elites by summed normalized scores (0 keeps all; optional secondary gate).
+- `elites.filters.min_per_tf_norm` filters elites by per-TF normalized minimum. With `normalized-llr`,
+  0.0–1.0 corresponds to background‑like → consensus‑like; values around 0.05–0.2 are a common starting band.
+- `elites.filters.require_all_tfs_over_min_norm` controls whether the per‑TF threshold must be met by every TF.
 - `output.include_consensus_in_elites` adds per-TF PWM consensus strings to elites metadata.
 - `objective.softmin` controls the min-approximation hardness separately from MCMC temperature.
+- `optimizers.pt.beta_ladder.kind=geometric` uses geometric spacing in beta (via `beta_min`/`beta_max` or explicit `betas`).
 - `optimizers.gibbs.beta_schedule` sets the MCMC temperature schedule; use `apply_during: tune` to anneal only during burn-in.
 - `optimizers.gibbs.schedule_scope` controls whether the beta schedule is applied per chain (`per_chain`) or across all chains (`global`). Global schedules require `apply_during: all`.
 - `optimizers.pt.beta_ladder` defines the temperature ladder; PT does not support `budget.restarts>1` (use ladder size for chain count).
 - `adaptive_beta` tunes Gibbs acceptance (B/M moves) toward a target band; `ladder_adapt` tunes PT ladder scale.
-- `auto_opt` runs short Gibbs + PT pilots, compares balance/diversity/acceptance signals, logs the decision, and runs a final sample using the selected optimizer.
+- `auto_opt` runs short Gibbs + PT pilots, evaluates objective‑aligned scores from draw‑phase `combined_score_final`, logs the decision, and runs a final sample using the selected optimizer.
 - Auto-opt pilots always write `trace.nc` + `sequences.parquet` (required for diagnostics) and are stored under `runs/auto_opt/`.
 - The selected pilot is recorded in `runs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
 - Auto-opt is enabled by default when `optimizer.name=auto`; set `auto_opt.enabled: false` or pass `--no-auto-opt` to disable.
-- If no pilot meets the quality thresholds, auto-opt retries with cooler settings. By default it **fails fast**; set `auto_opt.policy.allow_warn: true` to proceed with the best available candidate (logging warnings). When a boosted-cooling retry wins, the final run uses that boosted schedule (recorded in `config_used.yaml` and auto-opt notes).
+- Auto‑opt is **thresholdless**: it escalates through `auto_opt.budget_levels` (and configured `auto_opt.replicates`) until a confidence‑separated winner emerges. With `auto_opt.policy.allow_warn: true`, it will always pick the best available candidate at the maximum budget (recording low‑confidence warnings). With `allow_warn: false`, it fails fast if no confident winner emerges and suggests increasing budgets/replicates.
 - `early_stop` halts sampling when the best score fails to improve by `min_delta` for `patience` draws (per chain for Gibbs, per sweep for PT).
 - Auto-opt selection details are stored in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/tables/auto_opt_pilots.csv` and `analysis/plots/auto_opt_tradeoffs.png`.
 - `sample.rng.deterministic=true` isolates a stable RNG stream per pilot config.
-- `auto_opt.length` searches candidate lengths; the shortest passing the scorecard is preferred, and length comparisons are ranked by normalized balance to reduce length bias.
-- `auto_opt.policy.scorecard.top_k` controls how many pilot elites are used for balance/diversity scoring.
-- `auto_opt.keep_pilots` controls pilot retention after selection: `all` keeps everything, `ok` keeps candidates that met thresholds (plus the selected pilot), and `best` keeps only the selected pilot.
+- `auto_opt.length` searches candidate lengths; compare lengths using the same objective‑aligned top‑K median score and use `auto_opt.length.prefer_shortest: true` to force the shortest winning length.
+- `auto_opt.length.mode=ladder` runs sequential lengths with warm starts; step must be 1.
+- `auto_opt.length.warm_start` seeds each length from the prior length's raw sequences (prefers `sequences.parquet`).
+- `auto_opt.length.ladder_budget_scale` scales pilot budgets for intermediate ladder steps.
+- `auto_opt.allow_trim_polish_in_pilots` preserves trim/polish in pilots (off by default to keep lengths intact).
+- Ladder mode writes `analysis/tables/length_ladder.csv` under the auto-opt pilot root.
+- `auto_opt.policy.scorecard.top_k` controls how many draw‑phase scores are used for the top‑K median metric.
+- `auto_opt.keep_pilots` controls pilot retention after selection: `all` keeps everything, `ok` keeps candidates that did not fail catastrophic checks (plus the selected pilot), and `best` keeps only the selected pilot.
 - `moves.overrides.move_schedule` interpolates between `moves.overrides.move_probs` (start) and `move_schedule.end` (end).
 - `moves.overrides.target_worst_tf_prob` biases proposals toward the current worst TF window (0 disables).
 - `moves.overrides.insertion_consensus_prob` controls whether insertion moves use consensus vs PWM sampling.
-- `output.trim` shrinks elites to the minimal best-hit window union; it fails fast if a trim would be shorter than the widest PWM. `output.polish` runs deterministic coordinate ascent.
+- `output.trim` shrinks elites to the minimal best-hit window union; it fails fast if a trim would be shorter than the widest PWM. `output.polish` runs deterministic coordinate ascent (caps via `output.polish.max_elites` / `max_evals`).
 PT starting point (optional; uses a beta ladder):
 ```yaml
 sample:
@@ -429,20 +442,18 @@ Diagnostics and plotting settings for existing sample runs.
 ```yaml
 analysis:
   runs: []
+  extra_plots: false
+  extra_tables: false
+  mcmc_diagnostics: false
   tf_pair: [lexA, cpxR]
   archive: false
   plots:
-    trace: true
-    autocorr: true
-    convergence: true
-    scatter_pwm: true
-    pair_pwm: true
-    parallel_pwm: true
-    score_hist: true
-    score_box: false
-    correlation_heatmap: true
-    pairgrid: false
-    parallel_coords: true
+    dashboard: true
+    worst_tf_trace: true
+    worst_tf_identity: true
+    elite_filter_waterfall: true
+    overlap_heatmap: true
+    overlap_bp_distribution: true
   scatter_scale: llr
   scatter_style: edges
   scatter_background: true
@@ -452,8 +463,17 @@ analysis:
 ```
 
 Notes:
-- `analysis.runs` lists sample run directory names. If empty, use `--run` or
-  `--latest` when calling `cruncher analyze`.
+- `analysis.runs` lists sample run directory names. If empty, `cruncher analyze`
+  defaults to the latest sample run (same as `--latest`); use `--run` to target
+  specific runs.
+- `extra_plots=true` enables non-Tier‑0 plots (scatter, pairwise, score histograms, overlap strand combos).
+- `extra_tables=true` enables optional tables like auto-opt pilots and per-PWM scatter tables.
+- `mcmc_diagnostics=true` enables trace-based diagnostics and move/pt swap plots/tables.
+- Tier‑0 plots (dashboard + worst‑TF + overlap summaries) default to `true`;
+  all other plot keys default to `false`. Use `cruncher analyze --plots all`
+  to generate the full plot suite.
+- The canonical artifact summary is `analysis/summary.json`. A detailed inventory
+  with reasons (default/extra/mcmc) is written to `analysis/manifest.json`.
 - `tf_pair` is required for pairwise plots.
 - `archive=true` moves the previous analysis into `analysis/_archive/<analysis_id>/`
   before writing the new one.
@@ -467,7 +487,9 @@ Notes:
 - `subsampling_epsilon` controls how per-PWM draws are subsampled for scatter plots; it is the minimum Euclidean change in per-TF score space required to keep a draw (must be > 0).
 - `cruncher analyze --list-plots` shows the registry and required inputs.
 - `pairgrid` produces a pairwise projection grid across TF scores (useful for N>2).
-- Analysis tables include `joint_metrics.csv`, summarizing joint score balance and Pareto-front size for elites.
+- Analysis tables include `score_summary.csv`, `joint_metrics.csv`, overlap summaries
+  (`overlap_summary.csv`, `elite_overlap.csv`), `objective_components.json`, and
+  optional move/ladder tables (`move_stats.csv`, `pt_swap_pairs.csv`).
 
 ### Inspect resolved config
 

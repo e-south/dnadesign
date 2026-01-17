@@ -20,13 +20,11 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     analysis_id = "20250101T000000Z_test"
     analysis_dir = run_dir / "analysis"
     analysis_dir.mkdir(parents=True)
-    meta_dir = analysis_dir / "meta"
-    meta_dir.mkdir(parents=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
-    (meta_dir / "summary.json").write_text(json.dumps({"tf_names": ["LexA"], "analysis_id": analysis_id}))
-    (meta_dir / "plot_manifest.json").write_text(json.dumps({"plots": []}))
+    (analysis_dir / "summary.json").write_text(json.dumps({"tf_names": ["LexA"], "analysis_id": analysis_id}))
+    (analysis_dir / "plot_manifest.json").write_text(json.dumps({"plots": []}))
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
@@ -47,8 +45,7 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
 
 def test_generate_notebook_strict_requires_summary(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
-    analysis_id = "20250101T000000Z_missing"
-    analysis_dir = run_dir / "analysis" / analysis_id
+    analysis_dir = run_dir / "analysis"
     analysis_dir.mkdir(parents=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
@@ -57,9 +54,9 @@ def test_generate_notebook_strict_requires_summary(tmp_path, monkeypatch) -> Non
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
     try:
-        notebook_service.generate_notebook(run_dir, analysis_id=analysis_id, strict=True)
+        notebook_service.generate_notebook(run_dir, latest=True, strict=True)
     except FileNotFoundError as exc:
-        assert "Missing analysis artifacts" in str(exc)
+        assert "Missing analysis summary" in str(exc)
     else:
         raise AssertionError("Expected strict notebook generation to fail when summary is missing.")
 
@@ -68,12 +65,10 @@ def test_generate_notebook_lenient_allows_missing_summary(tmp_path, monkeypatch)
     run_dir = tmp_path / "run"
     analysis_dir = run_dir / "analysis"
     analysis_dir.mkdir(parents=True)
-    meta_dir = analysis_dir / "meta"
-    meta_dir.mkdir(parents=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
-    (meta_dir / "plot_manifest.json").write_text(json.dumps({"plots": []}))
+    (analysis_dir / "plot_manifest.json").write_text(json.dumps({"plots": []}))
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 

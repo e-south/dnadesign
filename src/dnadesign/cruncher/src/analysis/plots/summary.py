@@ -120,10 +120,11 @@ def write_joint_metrics(elites_df: pd.DataFrame, tf_names: list[str], out_path: 
     with np.errstate(divide="ignore", invalid="ignore"):
         joint_hmean = scores.shape[1] / np.sum(1.0 / scores, axis=1)
     zero_mean = np.isfinite(joint_mean) & (joint_mean == 0)
-    if np.any(zero_mean):
-        logger.warning(
+    zero_mean_count = int(zero_mean.sum())
+    if zero_mean_count:
+        logger.debug(
             "Balance index undefined for %d rows with joint_mean=0; writing NaN.",
-            int(zero_mean.sum()),
+            zero_mean_count,
         )
     balance_index = np.divide(
         joint_min,
@@ -142,6 +143,7 @@ def write_joint_metrics(elites_df: pd.DataFrame, tf_names: list[str], out_path: 
         "joint_mean": _safe_max(joint_mean),
         "joint_hmean": _safe_max(joint_hmean),
         "balance_index": _safe_max(balance_index),
+        "joint_mean_zero_count": zero_mean_count,
         "pareto_front_size": pareto_front_size,
         "pareto_fraction": pareto_fraction,
     }
