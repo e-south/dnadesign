@@ -76,7 +76,7 @@ Exact fields may expand over time. For the canonical list and types, see
 DenseGen writes run-level JSON files under `outputs/meta/`:
 
 - `outputs/meta/run_state.json` — checkpointed progress for resumable runs (updated during execution).
-- `outputs/meta/run_manifest.json` — summary counts per input/plan plus solver settings (written on completion).
+- `outputs/meta/run_manifest.json` — summary counts per input/plan plus solver settings (written on completion). Includes a `leaderboard_latest` snapshot (top TF/TFBS usage, failure hotspots, diversity coverage).
 - `outputs/meta/inputs_manifest.json` — resolved input paths and PWM sampling settings used for the run.
 
 These are produced alongside Parquet/USR outputs and provide a compact audit trail.

@@ -11,6 +11,7 @@ Plots:
 - tf_coverage               : 1-nt bars, solid edges, tunable palette/edges
 - tfbs_length_density       : KDEs filled by default
 - tfbs_positional_frequency : line plot of TFBS positional frequency
+- tfbs_positional_histogram : overlaid histogram of TFBS positions
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -1170,6 +1171,94 @@ def plot_diversity_health(
     plt.close(fig)
 
 
+def plot_tfbs_positional_histogram(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    top_k: int = 10,
+    normalize: bool = True,
+    include_promoter_sites: bool = True,
+    alpha: float = 0.35,
+    edge_alpha: float = 0.8,
+    edge_width: float = 0.5,
+    cfg: Optional[dict] = None,
+    style: Optional[dict] = None,
+) -> None:
+    det_col = _dg("used_tfbs_detail")
+    if "length" in df.columns:
+        L = int(pd.to_numeric(df["length"], errors="coerce").dropna().max())
+    elif _dg("sequence_length") in df.columns:
+        L = int(pd.to_numeric(df[_dg("sequence_length")], errors="coerce").dropna().max())
+    elif "sequence" in df.columns:
+        L = int(df["sequence"].astype(str).map(len).max())
+    else:
+        raise ValueError("Cannot infer sequence length for tfbs_positional_histogram.")
+    details = df[det_col].dropna()
+    coverages: Dict[str, np.ndarray] = {}
+    n_seqs = len(details)
+    for row in details:
+        for d in _ensure_list_of_dicts(row):
+            tf = str(d.get("tf") or "").strip()
+            tfbs = str(d.get("tfbs") or "").strip()
+            label = tf or tfbs
+            if not label:
+                continue
+            start = int(float(d.get("offset", 0)))
+            span = int(d.get("length", len(tfbs)))
+            if span <= 0:
+                continue
+            start = max(0, min(start, L))
+            end = min(L, start + span)
+            if end <= start:
+                continue
+            coverages.setdefault(label, np.zeros(L, dtype=float))[start:end] += 1.0
+
+    if include_promoter_sites:
+        if cfg is None:
+            raise ValueError("tfbs_positional_histogram(include_promoter_sites=True) requires cfg.")
+        if "sequence" not in df.columns:
+            raise ValueError("tfbs_positional_histogram(include_promoter_sites=True) requires 'sequence'.")
+        seqs = df["sequence"].astype(str).tolist()
+        prom = _extract_promoter_site_motifs_from_cfg(cfg)
+        for label, motif_set in prom.items():
+            if motif_set:
+                arr = _scan_motif_coverage_top_strand(seqs, motif_set, L)
+                coverages[label] = coverages.get(label, np.zeros(L, dtype=float)) + arr
+        n_seqs = max(n_seqs, len(seqs))
+
+    if not coverages:
+        raise ValueError("No positional TFBS coverage available.")
+
+    order = sorted(coverages.items(), key=lambda kv: kv[1].sum(), reverse=True)[: max(1, int(top_k))]
+    style = _style(style)
+    fig, ax = _fig_ax(style)
+    colors = _palette(style, len(order))
+    xs = np.arange(L)
+    for (label, arr), color in zip(order, colors):
+        y = arr.astype(float)
+        if normalize and n_seqs > 0:
+            y = y / float(n_seqs)
+        edge = _with_alpha(_darker(color), float(edge_alpha))
+        ax.bar(
+            xs,
+            y,
+            width=1.0,
+            alpha=float(alpha),
+            color=color,
+            edgecolor=edge,
+            linewidth=float(edge_width),
+            label=label,
+        )
+    ax.set_xlabel("Position (nt)")
+    ax.set_ylabel("Frequency" + (" (normalized)" if normalize else ""))
+    ax.set_title("TFBS positional histogram")
+    ax.legend(loc="best", frameon=bool(style.get("legend_frame", False)))
+    _apply_style(ax, style)
+    fig.tight_layout()
+    fig.savefig(out_path)
+    plt.close(fig)
+
+
 AVAILABLE_PLOTS: Dict[str, Dict[str, object]] = {}
 for _name, _spec in PLOT_SPECS.items():
     _fn_name = _spec.get("fn")
@@ -1211,6 +1300,15 @@ _ALLOWED_OPTIONS = {
         "top_k",
         "normalize",
         "include_promoter_sites",
+        # 'cfg' and 'style' are injected, not read from options
+    },
+    "tfbs_positional_histogram": {
+        "top_k",
+        "normalize",
+        "include_promoter_sites",
+        "alpha",
+        "edge_alpha",
+        "edge_width",
         # 'cfg' and 'style' are injected, not read from options
     },
     "diversity_health": {
@@ -1271,6 +1369,11 @@ def _plot_required_columns(selected: Iterable[str], options: Dict[str, Dict[str,
             include_promoter = bool(raw.get("include_promoter_sites", True))
             if include_promoter:
                 cols.add("sequence")
+        elif name == "tfbs_positional_histogram":
+            cols.update({_dg("used_tfbs_detail"), _dg("length"), _dg("sequence_length")})
+            include_promoter = bool(raw.get("include_promoter_sites", True))
+            if include_promoter:
+                cols.add("sequence")
         elif name == "diversity_health":
             cols.add(_dg("used_tfbs_detail"))
             created_col = str(raw.get("created_at_col", _dg("created_at")))
@@ -1327,7 +1430,13 @@ def run_plots_from_config(root_cfg: RootConfig, cfg_path: Path, *, only: Optiona
         out_path = out_dir / f"{name}.{plot_format}"
         try:
             # pass cfg only to plots that need it
-            if name in {"tfbs_usage", "plan_counts", "tf_coverage", "tfbs_positional_frequency"}:
+            if name in {
+                "tfbs_usage",
+                "plan_counts",
+                "tf_coverage",
+                "tfbs_positional_frequency",
+                "tfbs_positional_histogram",
+            }:
                 fn(df, out_path, style=style, cfg=root_cfg.densegen.model_dump(), **kwargs)
             elif name == "tfbs_length_density":
                 attempts_df = None

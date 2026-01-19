@@ -253,16 +253,17 @@ Example output:
 │ plan_counts         │ Plan counts over time by promoter constraint bucket. │
 │ tf_coverage         │ Per-base TFBS coverage across sequences.             │
 │ tfbs_positional_frequency │ TFBS positional frequency (line plot).        │
+│ tfbs_positional_histogram │ Positional TFBS histogram (overlaid, per-nt).  │
 │ diversity_health    │ Diversity health over time (coverage + entropy).      │
 │ tfbs_length_density │ TFBS length distribution (histogram/KDE).            │
 │ tfbs_usage          │ TFBS usage by TF, ranked by occurrences.             │
 └─────────────────────┴──────────────────────────────────────────────────────┘
 ```
 
-Then render three plots:
+Then render four plots:
 
 ```bash
-uv run dense plot -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --only tf_usage,tf_coverage,tfbs_positional_frequency,diversity_health
+uv run dense plot -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --only tf_usage,tf_coverage,tfbs_positional_histogram,diversity_health
 ```
 
 Example output (abridged):
@@ -275,6 +276,7 @@ Output: /private/tmp/densegen-demo-20260115-1405/demo_press/outputs
 ┡━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
 │ tf_usage    │ /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/tf_usage.png    │ ok     │
 │ tf_coverage │ /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/tf_coverage.png │ ok     │
+│ tfbs_positional_histogram │ /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/tfbs_positional_histogram.png │ ok │
 │ diversity_health │ /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/diversity_health.png │ ok │
 └─────────────┴───────────────────────────────────────────────────────────────────────────┴────────┘
 📊 Plots written.

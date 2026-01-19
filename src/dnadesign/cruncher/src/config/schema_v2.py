@@ -967,6 +967,20 @@ class SampleConfig(StrictBaseModel):
             if self.auto_opt is not None and self.auto_opt.enabled:
                 raise ValueError("auto_opt.enabled must be false when optimizer.name is not 'auto'")
 
+        if self.auto_opt is not None and self.auto_opt.enabled:
+            ladder_sizes = list(self.auto_opt.pt_ladder_sizes or [])
+            if ladder_sizes:
+                ladder = self.optimizers.pt.beta_ladder
+                if isinstance(ladder, BetaLadderFixed):
+                    raise ValueError("auto_opt.pt_ladder_sizes requires beta_ladder.kind='geometric' (fixed ladder).")
+                if isinstance(ladder, BetaLadderGeometric) and ladder.betas is not None:
+                    max_size = max(ladder_sizes)
+                    if max_size > len(ladder.betas):
+                        raise ValueError(
+                            "auto_opt.pt_ladder_sizes exceeds available betas; "
+                            "provide a geometric beta_ladder with beta_min/beta_max/n_temps."
+                        )
+
         if self.optimizer.name == "pt" and self.budget.restarts != 1:
             raise ValueError("PT does not support budget.restarts > 1; set sample.budget.restarts=1.")
         return self

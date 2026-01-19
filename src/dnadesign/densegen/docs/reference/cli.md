@@ -131,7 +131,7 @@ uv run dense validate -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/conf
 uv run dense plan     -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
 uv run dense describe -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
 uv run dense run      -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-uv run dense plot     -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --only tf_usage,tf_coverage,tfbs_positional_frequency,diversity_health
+uv run dense plot     -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --only tf_usage,tf_coverage,tfbs_positional_histogram,diversity_health
 uv run dense summarize --run src/dnadesign/densegen/workspaces/demo_meme_two_tf
 uv run dense summarize --root src/dnadesign/densegen/workspaces
 uv run dense report   -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml

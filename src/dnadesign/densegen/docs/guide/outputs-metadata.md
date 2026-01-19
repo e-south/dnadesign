@@ -30,7 +30,9 @@ When multiple targets are configured, DenseGen asserts all targets are in sync b
 Each run writes `outputs/meta/run_manifest.json` with per-input/plan counts (generated,
 duplicates, failures, resamples, libraries built, stalls), plus solver settings, schema version,
 and the dense-arrays version source. The manifest also tracks constraint-filter failure reasons
-and duplicate-solution counts.
+and duplicate-solution counts. A compact `leaderboard_latest` snapshot is recorded per plan
+(top TF/TFBS usage, failure hotspots, and diversity coverage) for quick audits without loading
+the full outputs.
 Use the CLI to summarize a run:
 
 ```

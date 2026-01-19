@@ -1107,27 +1107,28 @@ def _assess_candidate_quality(
         notes.append(f"pilot draws={pilot_draws} < {pilot_min_draws}; diagnostics are directional at short budgets")
 
     quality = "ok"
-    if candidate.rhat is not None:
-        if candidate.rhat >= rhat_fail:
-            quality = "fail"
-            notes.append(f"rhat={candidate.rhat:.3f} >= {rhat_fail}")
-        elif candidate.rhat > rhat_ok and not pilot_short:
-            quality = "warn"
-            notes.append(f"rhat={candidate.rhat:.3f} > {rhat_ok}")
-    if candidate.ess is not None:
-        if candidate.ess < ess_fail:
-            quality = "fail"
-            notes.append(f"ess={candidate.ess:.1f} < {ess_fail}")
-        elif candidate.ess < ess_ok and quality != "fail" and not pilot_short:
-            quality = "warn"
-            notes.append(f"ess={candidate.ess:.1f} < {ess_ok}")
-    if candidate.unique_fraction is not None:
-        if candidate.unique_fraction <= unique_fail:
-            quality = "fail"
-            notes.append(f"unique_fraction={candidate.unique_fraction:.2f} <= {unique_fail:.2f}")
-        elif candidate.unique_fraction < unique_ok and quality != "fail" and not pilot_short:
-            quality = "warn"
-            notes.append(f"unique_fraction={candidate.unique_fraction:.2f} < {unique_ok:.2f}")
+    if not pilot_short:
+        if candidate.rhat is not None:
+            if candidate.rhat >= rhat_fail:
+                quality = "fail"
+                notes.append(f"rhat={candidate.rhat:.3f} >= {rhat_fail}")
+            elif candidate.rhat > rhat_ok:
+                quality = "warn"
+                notes.append(f"rhat={candidate.rhat:.3f} > {rhat_ok}")
+        if candidate.ess is not None:
+            if candidate.ess < ess_fail:
+                quality = "fail"
+                notes.append(f"ess={candidate.ess:.1f} < {ess_fail}")
+            elif candidate.ess < ess_ok and quality != "fail":
+                quality = "warn"
+                notes.append(f"ess={candidate.ess:.1f} < {ess_ok}")
+        if candidate.unique_fraction is not None:
+            if candidate.unique_fraction <= unique_fail:
+                quality = "fail"
+                notes.append(f"unique_fraction={candidate.unique_fraction:.2f} <= {unique_fail:.2f}")
+            elif candidate.unique_fraction < unique_ok and quality != "fail":
+                quality = "warn"
+                notes.append(f"unique_fraction={candidate.unique_fraction:.2f} < {unique_ok:.2f}")
 
     candidate.quality = quality
     if quality == "warn" and not pilot_short:
@@ -1379,7 +1380,11 @@ def _run_auto_optimize_for_set(
             f"{candidate.unique_fraction:.2f}" if candidate.unique_fraction is not None else "n/a",
         )
         if candidate.warnings:
-            log_fn = logger.warning if candidate.quality == "fail" else logger.info
+            is_pilot = label.startswith("pilot_")
+            if is_pilot:
+                log_fn = logger.info
+            else:
+                log_fn = logger.warning if candidate.quality == "fail" else logger.info
             log_fn("Auto-opt %s %s warnings: %s", label, candidate.kind, "; ".join(candidate.warnings))
 
     all_candidates: list[AutoOptCandidate] = []
@@ -3138,9 +3143,9 @@ def run_sample(
                 auto_cfg = None
                 if sample_cfg.optimizer.name == "auto":
                     fallback = "gibbs"
-                    logger.warning(
-                        "Auto-opt disabled by flag; using optimizer.name='%s' (sample.optimizer.name='auto'). "
-                        "Set sample.optimizer.name to gibbs/pt to avoid this fallback.",
+                    logger.info(
+                        "Auto-opt disabled by flag; using optimizer.name='%s' because sample.optimizer.name='auto'. "
+                        "Set sample.optimizer.name to gibbs/pt to avoid this override.",
                         fallback,
                     )
                     sample_cfg.optimizer.name = fallback

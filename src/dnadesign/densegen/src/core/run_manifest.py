@@ -33,9 +33,10 @@ class PlanManifest:
     failed_min_count_by_regulator: int = 0
     failed_min_required_regulators: int = 0
     duplicate_solutions: int = 0
+    leaderboard_latest: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "input_name": self.input_name,
             "plan_name": self.plan_name,
             "generated": int(self.generated),
@@ -50,6 +51,9 @@ class PlanManifest:
             "failed_min_required_regulators": int(self.failed_min_required_regulators),
             "duplicate_solutions": int(self.duplicate_solutions),
         }
+        if self.leaderboard_latest is not None:
+            payload["leaderboard_latest"] = self.leaderboard_latest
+        return payload
 
 
 @dataclass(frozen=True)
@@ -109,6 +113,7 @@ def load_run_manifest(path: Path) -> RunManifest:
             failed_min_count_by_regulator=int(item.get("failed_min_count_by_regulator", 0)),
             failed_min_required_regulators=int(item.get("failed_min_required_regulators", 0)),
             duplicate_solutions=int(item.get("duplicate_solutions", 0)),
+            leaderboard_latest=item.get("leaderboard_latest"),
         )
         for item in data.get("items", [])
     ]

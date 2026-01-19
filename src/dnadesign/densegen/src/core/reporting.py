@@ -250,6 +250,25 @@ def _summarize_failure_top_tfbs(attempts_df: pd.DataFrame, *, top: int = 5) -> l
     return summary
 
 
+def _summarize_top_tfs(tf_counts: dict[str, int], *, top: int = 5) -> list[dict]:
+    if not tf_counts:
+        return []
+    items = sorted(tf_counts.items(), key=lambda kv: kv[1], reverse=True)[: max(1, int(top))]
+    return [{"tf": tf, "count": int(count)} for tf, count in items]
+
+
+def _summarize_top_tfbs(used_df: pd.DataFrame, *, top: int = 5) -> list[dict]:
+    if used_df.empty or "tf" not in used_df.columns or "tfbs" not in used_df.columns:
+        return []
+    counts = used_df.groupby(["tf", "tfbs"]).size().reset_index(name="count")
+    if counts.empty:
+        return []
+    counts = counts.sort_values("count", ascending=False).head(max(1, int(top)))
+    return [
+        {"tf": str(row["tf"]), "tfbs": str(row["tfbs"]), "count": int(row["count"])} for _, row in counts.iterrows()
+    ]
+
+
 def _compute_cooccurrence(used_df: pd.DataFrame) -> pd.DataFrame:
     if used_df.empty:
         return pd.DataFrame(columns=["library_hash", "plan", "tf_left", "tf_right", "count"])
@@ -466,10 +485,29 @@ def collect_report_data(
     tf_counts = used_df["tf"].value_counts().to_dict() if not used_df.empty else {}
     tfbs_counts = used_df["tfbs"].value_counts().to_dict() if not used_df.empty else {}
     diversity_entropy_tfbs = _normalized_entropy_from_counts({str(k): int(v) for k, v in tfbs_counts.items()})
+    leaderboard_tf = _summarize_top_tfs({str(k): int(v) for k, v in tf_counts.items()}, top=5)
+    leaderboard_tfbs = _summarize_top_tfbs(used_df, top=5)
     failure_top_tfbs = _summarize_failure_top_tfbs(attempts_df, top=5)
     attempts_total = int(len(attempts_df)) if attempts_df is not None else 0
     attempts_success = int((attempts_df["status"] == "success").sum()) if "status" in attempts_df else 0
     attempts_failed = max(0, attempts_total - attempts_success)
+
+    lib_tf_total = int(offered_vs_used_tf["tf"].nunique()) if not offered_vs_used_tf.empty else 0
+    used_tf_total = (
+        int(offered_vs_used_tf[offered_vs_used_tf["used_sequences"] > 0]["tf"].nunique())
+        if not offered_vs_used_tf.empty
+        else 0
+    )
+    lib_tfbs_total = (
+        int(offered_vs_used_tfbs.drop_duplicates(["tf", "tfbs"]).shape[0]) if not offered_vs_used_tfbs.empty else 0
+    )
+    used_tfbs_total = (
+        int(offered_vs_used_tfbs[offered_vs_used_tfbs["used_sequences"] > 0].drop_duplicates(["tf", "tfbs"]).shape[0])
+        if not offered_vs_used_tfbs.empty
+        else 0
+    )
+    tf_coverage = used_tf_total / max(1, lib_tf_total) if lib_tf_total else None
+    tfbs_coverage = used_tfbs_total / max(1, lib_tfbs_total) if lib_tfbs_total else None
 
     run_report = {
         "run_root": str(run_root),
@@ -484,6 +522,20 @@ def collect_report_data(
         "diversity_unique_tfbs": int(len(tfbs_counts)),
         "diversity_entropy_tfbs": diversity_entropy_tfbs,
         "failure_top_tfbs": failure_top_tfbs,
+        "leaderboard_latest": {
+            "tf": leaderboard_tf,
+            "tfbs": leaderboard_tfbs,
+            "failed_tfbs": failure_top_tfbs,
+            "diversity": {
+                "tf_coverage": tf_coverage,
+                "tfbs_coverage": tfbs_coverage,
+                "tfbs_entropy": diversity_entropy_tfbs,
+                "used_tf_count": int(len(tf_counts)),
+                "library_tf_count": int(lib_tf_total),
+                "used_tfbs_count": int(len(tfbs_counts)),
+                "library_tfbs_count": int(lib_tfbs_total),
+            },
+        },
         "attempts_total": attempts_total,
         "attempts_success": attempts_success,
         "attempts_failed": attempts_failed,
@@ -544,6 +596,21 @@ def _write_report_md(path: Path, bundle: ReportBundle) -> None:
         "- outputs/dense_arrays.parquet",
         "- outputs/attempts.parquet",
     ]
+    leaderboard = report.get("leaderboard_latest") or {}
+    leader_tf = leaderboard.get("tf") or []
+    leader_tfbs = leaderboard.get("tfbs") or []
+    if leader_tf or leader_tfbs:
+        lines.extend(["", "## Leaderboards"])
+        if leader_tf:
+            lines.append("")
+            lines.append("Top TFs:")
+            for row in leader_tf:
+                lines.append(f"- {row.get('tf')}: {row.get('count')}")
+        if leader_tfbs:
+            lines.append("")
+            lines.append("Top TFBS:")
+            for row in leader_tfbs:
+                lines.append(f"- {row.get('tf')}:{row.get('tfbs')} ({row.get('count')})")
     failure_top = report.get("failure_top_tfbs") or []
     if failure_top:
         lines.extend(["", "## Failure hotspots (top TFBS)"])

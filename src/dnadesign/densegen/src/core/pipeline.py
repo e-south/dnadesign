@@ -573,6 +573,22 @@ def _summarize_leaderboard(counts: dict, *, top: int = 5) -> str:
     return ", ".join(parts) if parts else "-"
 
 
+def _leaderboard_items(counts: dict, *, top: int = 5) -> list[dict]:
+    if not counts:
+        return []
+    items = sorted(counts.items(), key=lambda x: (-x[1], str(x[0])))
+    items = items[: max(1, int(top))]
+    out: list[dict] = []
+    for key, val in items:
+        if isinstance(key, tuple):
+            tf = str(key[0])
+            tfbs = str(key[1])
+            out.append({"tf": tf, "tfbs": tfbs, "count": int(val)})
+        else:
+            out.append({"tf": str(key), "count": int(val)})
+    return out
+
+
 def _format_progress_bar(current: int, total: int, *, width: int = 24) -> str:
     if total <= 0:
         return "[?]"
@@ -642,6 +658,42 @@ def _summarize_failure_leaderboard(
     return ", ".join(parts) if parts else "-"
 
 
+def _failure_leaderboard_items(
+    failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]],
+    *,
+    input_name: str,
+    plan_name: str,
+    top: int = 5,
+) -> list[dict]:
+    if not failure_counts:
+        return []
+    totals: dict[tuple[str, str], int] = {}
+    reasons_by_key: dict[tuple[str, str], dict[str, int]] = {}
+    for (inp, plan, tf, tfbs, _site_id), reasons in failure_counts.items():
+        if inp != input_name or plan != plan_name:
+            continue
+        if not tfbs:
+            continue
+        count = sum(int(v) for v in (reasons or {}).values())
+        if count <= 0:
+            continue
+        key = (str(tf), str(tfbs))
+        totals[key] = totals.get(key, 0) + int(count)
+        reason_counts = reasons_by_key.setdefault(key, {})
+        for reason, n in (reasons or {}).items():
+            reason_counts[str(reason)] = reason_counts.get(str(reason), 0) + int(n)
+    if not totals:
+        return []
+    items = sorted(totals.items(), key=lambda x: (-x[1], x[0][0], x[0][1]))
+    items = items[: max(1, int(top))]
+    out: list[dict] = []
+    for (tf, tfbs), count in items:
+        reasons = reasons_by_key.get((tf, tfbs), {})
+        top_reason = max(reasons.items(), key=lambda kv: kv[1])[0] if reasons else ""
+        out.append({"tf": tf, "tfbs": tfbs, "failures": int(count), "top_reason": top_reason})
+    return out
+
+
 def _aggregate_failure_counts_for_sampling(
     failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]],
     *,
@@ -702,6 +754,58 @@ def _summarize_diversity(
         f"tfbs_coverage={tfbs_cov:.2f} ({used_tfbs_count}/{lib_tfbs_count}) | "
         f"tfbs_entropy={ent_label}"
     )
+
+
+def _diversity_snapshot(
+    usage_counts: dict[tuple[str, str], int],
+    tf_usage_counts: dict[str, int],
+    *,
+    library_tfs: list[str],
+    library_tfbs: list[str],
+) -> dict[str, object]:
+    lib_tf_count = len(set(library_tfs)) if library_tfs else 0
+    if library_tfs:
+        lib_tfbs_count = len(set(zip(library_tfs, library_tfbs)))
+    else:
+        lib_tfbs_count = len(set(library_tfbs))
+    used_tf_count = len(tf_usage_counts)
+    used_tfbs_count = len(usage_counts)
+    tf_cov = used_tf_count / max(1, lib_tf_count) if lib_tf_count else 0.0
+    tfbs_cov = used_tfbs_count / max(1, lib_tfbs_count) if lib_tfbs_count else 0.0
+    ent = _normalized_entropy(usage_counts)
+    return {
+        "tf_coverage": float(tf_cov),
+        "tfbs_coverage": float(tfbs_cov),
+        "tfbs_entropy": float(ent) if ent is not None else None,
+        "used_tf_count": int(used_tf_count),
+        "library_tf_count": int(lib_tf_count),
+        "used_tfbs_count": int(used_tfbs_count),
+        "library_tfbs_count": int(lib_tfbs_count),
+    }
+
+
+def _leaderboard_snapshot(
+    usage_counts: dict[tuple[str, str], int],
+    tf_usage_counts: dict[str, int],
+    failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]],
+    *,
+    input_name: str,
+    plan_name: str,
+    library_tfs: list[str],
+    library_tfbs: list[str],
+    top: int = 5,
+) -> dict[str, object]:
+    return {
+        "tf": _leaderboard_items(tf_usage_counts, top=top),
+        "tfbs": _leaderboard_items(usage_counts, top=top),
+        "failed_tfbs": _failure_leaderboard_items(failure_counts, input_name=input_name, plan_name=plan_name, top=top),
+        "diversity": _diversity_snapshot(
+            usage_counts,
+            tf_usage_counts,
+            library_tfs=library_tfs,
+            library_tfbs=library_tfbs,
+        ),
+    }
 
 
 def _apply_gap_fill_offsets(used_tfbs_detail: list[dict], gap_meta: dict) -> list[dict]:
@@ -1519,6 +1623,53 @@ def _process_plan_for_source(
             "(e.g., adjust PWM sampling length_range or fixed-element motifs)."
         )
 
+    def _current_leaderboard_snapshot() -> dict[str, object]:
+        return _leaderboard_snapshot(
+            usage_counts,
+            tf_usage_counts,
+            failure_counts,
+            input_name=source_label,
+            plan_name=plan_name,
+            library_tfs=library_tfs,
+            library_tfbs=library_tfbs,
+        )
+
+    def _log_leaderboard_snapshot() -> None:
+        log.info(
+            "[%s/%s] Leaderboard (TF): %s",
+            source_label,
+            plan_name,
+            _summarize_leaderboard(tf_usage_counts, top=5),
+        )
+        log.info(
+            "[%s/%s] Leaderboard (TFBS): %s",
+            source_label,
+            plan_name,
+            _summarize_leaderboard(usage_counts, top=5),
+        )
+        log.info(
+            "[%s/%s] Failed TFBS: %s",
+            source_label,
+            plan_name,
+            _summarize_failure_leaderboard(
+                failure_counts,
+                input_name=source_label,
+                plan_name=plan_name,
+                top=5,
+            ),
+        )
+        log.info(
+            "[%s/%s] Diversity: %s",
+            source_label,
+            plan_name,
+            _summarize_diversity(
+                usage_counts,
+                tf_usage_counts,
+                library_tfs=library_tfs,
+                library_tfbs=library_tfbs,
+            ),
+        )
+
     def _record_site_failures(reason: str) -> None:
         if not track_failures:
             return
@@ -2304,6 +2455,9 @@ def _process_plan_for_source(
                 state_counts[(source_label, plan_name)] = int(global_generated)
                 if write_state is not None:
                     write_state()
+            snapshot = _current_leaderboard_snapshot()
+            if global_generated >= quota and (usage_counts or tf_usage_counts or failure_counts):
+                _log_leaderboard_snapshot()
             return produced_total_this_call, {
                 "generated": produced_total_this_call,
                 "duplicates_skipped": duplicate_records,
@@ -2316,6 +2470,7 @@ def _process_plan_for_source(
                 "failed_min_count_by_regulator": failed_min_count_by_regulator,
                 "failed_min_required_regulators": failed_min_required_regulators,
                 "duplicate_solutions": duplicate_solutions,
+                "leaderboard_latest": snapshot,
             }
 
     _flush_attempts(outputs_root, attempts_buffer)
@@ -2324,6 +2479,9 @@ def _process_plan_for_source(
         state_counts[(source_label, plan_name)] = int(global_generated)
         if write_state is not None:
             write_state()
+    snapshot = _current_leaderboard_snapshot()
+    if usage_counts or tf_usage_counts or failure_counts:
+        _log_leaderboard_snapshot()
     return produced_total_this_call, {
         "generated": produced_total_this_call,
         "duplicates_skipped": duplicate_records,
@@ -2336,6 +2494,7 @@ def _process_plan_for_source(
         "failed_min_count_by_regulator": failed_min_count_by_regulator,
         "failed_min_required_regulators": failed_min_required_regulators,
         "duplicate_solutions": duplicate_solutions,
+        "leaderboard_latest": snapshot,
     }
 
 
@@ -2370,6 +2529,7 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
     per_plan: dict[tuple[str, str], int] = {}
     plan_stats: dict[tuple[str, str], dict[str, int]] = {}
     plan_order: list[tuple[str, str]] = []
+    plan_leaderboards: dict[tuple[str, str], dict] = {}
     inputs_manifest_entries: dict[str, dict] = {}
     outputs_root = run_outputs_root(run_root)
     outputs_root.mkdir(parents=True, exist_ok=True)
@@ -2553,6 +2713,9 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                 )
                 per_plan[(s.name, item.name)] = per_plan.get((s.name, item.name), 0) + produced
                 total += produced
+                leaderboard_latest = stats.get("leaderboard_latest")
+                if leaderboard_latest is not None:
+                    plan_leaderboards[(s.name, item.name)] = leaderboard_latest
                 _accumulate_stats((s.name, item.name), stats)
     else:
         produced_counts: dict[tuple[str, str], int] = dict(existing_counts)
@@ -2596,6 +2759,9 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                         site_failure_counts=site_failure_counts,
                     )
                     produced_counts[key] = current + produced
+                    leaderboard_latest = stats.get("leaderboard_latest")
+                    if leaderboard_latest is not None:
+                        plan_leaderboards[key] = leaderboard_latest
                     _accumulate_stats(key, stats)
         per_plan = produced_counts
         total = sum(per_plan.values())
@@ -2621,6 +2787,7 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
             failed_min_count_by_regulator=plan_stats[key]["failed_min_count_by_regulator"],
             failed_min_required_regulators=plan_stats[key]["failed_min_required_regulators"],
             duplicate_solutions=plan_stats[key]["duplicate_solutions"],
+            leaderboard_latest=plan_leaderboards.get(key),
         )
         for key in plan_order
     ]

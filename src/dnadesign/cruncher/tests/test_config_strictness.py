@@ -212,6 +212,33 @@ def test_pt_rejects_missing_ladder_params(tmp_path: Path) -> None:
     )
 
 
+def test_auto_opt_pt_ladder_sizes_requires_geometric_ladder(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["sample"] = _sample_block(
+        optimizer_name="auto",
+        pt_ladder={"kind": "fixed", "beta": 1.0},
+    )
+    config["cruncher"]["sample"]["auto_opt"]["pt_ladder_sizes"] = [2]
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+
+    assert any("requires beta_ladder.kind='geometric'" in str(err.get("msg")) for err in exc.value.errors())
+
+
+def test_auto_opt_pt_ladder_sizes_rejects_oversized_betas(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["sample"] = _sample_block(optimizer_name="auto")
+    config["cruncher"]["sample"]["auto_opt"]["pt_ladder_sizes"] = [3]
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+
+    assert any("auto_opt.pt_ladder_sizes exceeds available betas" in str(err.get("msg")) for err in exc.value.errors())
+
+
 def test_pt_requires_restarts_one(tmp_path: Path) -> None:
     config = _base_config()
     config["cruncher"]["sample"] = _sample_block(
