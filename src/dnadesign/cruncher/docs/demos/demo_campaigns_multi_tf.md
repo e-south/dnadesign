@@ -8,7 +8,7 @@ This demo walks through a process of running category-based sequence optimizatio
 
 - **Workspace**: `src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/`
 - **Config**: `config.yaml`
-- **Output root**: `runs/` (relative to the workspace; runs live under `runs/<stage>/<run_name>/`)
+- **Output root**: `outputs/` (relative to the workspace; runs live under `outputs/<stage>/<run_name>/`)
 - **Motif flow**: fetch sites → discover MEME/STREME motifs → lock/sample using those matrices
 
 ### Enter the demo workspace
@@ -271,7 +271,7 @@ created_at: 2026-01-10T21:13:55.663756+00:00
 motif_count: 3
 regulator_set: {'index': 1, 'tfs': ['lexA', 'cpxR', 'fur']}
 pwm_source: matrix
-run_dir: <workspace>/runs/sample/lexA-cpxR-fur_20260110_161355_df8fcb
+run_dir: <workspace>/outputs/sample/lexA-cpxR-fur_20260110_161355_df8fcb
 artifacts:
 ┏━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓
 ┃ Stage  ┃ Type     ┃ Label                                  ┃ Path              ┃
@@ -298,10 +298,10 @@ Rendered PWM logos
 ┏━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ TF   ┃ Source    ┃ Motif ID         ┃ Length ┃ Bits  ┃ Output                                                       ┃
 ┡━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ lexA │ regulondb │ RDBECOLITFC00214 │ 15     │ 10.36 │ /path/to/.../runs/logos/catalog/set1_lexA-cpxR-fur_20260110_161412_a1b2c3 │
-│ cpxR │ regulondb │ RDBECOLITFC00170 │ 11     │ 3.63  │ /path/to/.../runs/logos/catalog/set1_lexA-cpxR-fur_20260110_161412_a1b2c3 │
+│ lexA │ regulondb │ RDBECOLITFC00214 │ 15     │ 10.36 │ /path/to/.../outputs/logos/catalog/set1_lexA-cpxR-fur_20260110_161412_a1b2c3 │
+│ cpxR │ regulondb │ RDBECOLITFC00170 │ 11     │ 3.63  │ /path/to/.../outputs/logos/catalog/set1_lexA-cpxR-fur_20260110_161412_a1b2c3 │
 └──────┴───────────┴──────────────────┴────────┴───────┴──────────────────────────────────────────────────────────────────────┘
-Logos saved to /path/to/.../runs/logos/catalog/set1_lexA-cpxR-fur_20260110_161412_a1b2c3
+Logos saved to /path/to/.../outputs/logos/catalog/set1_lexA-cpxR-fur_20260110_161412_a1b2c3
 ```
 
 For live progress during sampling:
@@ -317,20 +317,20 @@ Pairwise plots require a TF pair. For the 3-TF demo run, pick a pair and pass `-
 
 ```bash
 cruncher analyze --latest --tf-pair lexA,cpxR -c "$CONFIG"
-cruncher report --latest -c "$CONFIG"
+cruncher analyze --summary -c "$CONFIG"
 ```
 
 Example output (analyze):
 
 ```bash
 Random baseline: 100%|██████████| 25/25 [00:00<00:00, 11676.79it/s]
-Analysis outputs → <workspace>/runs/sample/lexA-cpxR-fur_20260110_161355_df8fcb/analysis
-  summary: <workspace>/runs/sample/lexA-cpxR-fur_20260110_161355_df8fcb/analysis/summary.json
+Analysis outputs → <workspace>/outputs/sample/lexA-cpxR-fur_20260110_161355_df8fcb/analysis
+  summary: <workspace>/outputs/sample/lexA-cpxR-fur_20260110_161355_df8fcb/analysis/summary.json
   analysis_id: 20260110T211410Z_1febb3
 Next steps:
   cruncher runs show <workspace>/config.yaml 20260110_161355_df8fcb
-  cruncher notebook --latest <workspace>/runs/sample/lexA-cpxR-fur_20260110_161355_df8fcb
-  cruncher report --latest <workspace>/config.yaml
+  cruncher notebook --latest <workspace>/outputs/sample/lexA-cpxR-fur_20260110_161355_df8fcb
+  cruncher analyze --summary <workspace>/config.yaml
 ```
 
 If you're running via `pixi`, prefix those next-step commands with `pixi run cruncher --`.
@@ -341,7 +341,7 @@ For a compact diagnostics checklist and tuning guidance, see the
 ## Open the run notebook (optional, real-time exploration)
 
 ```bash
-cruncher notebook --latest <workspace>/runs/sample/lexA-cpxR-fur_20260110_161355_df8fcb
+cruncher notebook --latest <workspace>/outputs/sample/lexA-cpxR-fur_20260110_161355_df8fcb
 ```
 
 ## Optional: campaign-level summary
@@ -378,8 +378,8 @@ cruncher campaign notebook --campaign demo_categories_best -c "$DERIVED"
 
 ## Where outputs live
 
-- `<out_dir>/` - this demo writes to `runs/`.
-- Campaign summaries land under `runs/campaigns/<campaign_id>/`.
+- `<out_dir>/` - this demo writes to `outputs/`.
+- Campaign summaries land under `outputs/campaigns/<campaign_id>/`.
 
 ## See also
 

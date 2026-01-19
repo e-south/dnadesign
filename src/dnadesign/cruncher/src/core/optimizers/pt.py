@@ -29,6 +29,7 @@ from dnadesign.cruncher.core.optimizers.policies import (
     move_probs_array,
     targeted_start,
 )
+from dnadesign.cruncher.core.scoring import LocalScanCache
 from dnadesign.cruncher.core.sequence import dsdna_hamming, hamming_distance, revcomp_int
 from dnadesign.cruncher.core.state import SequenceState, make_seed
 
@@ -163,6 +164,18 @@ class PTGibbsOptimizer(Optimizer):
         self.best_meta: Tuple[int, int] | None = None
 
     # Public API
+    def _scaled_beta_ladder(self, scale: float) -> list[float]:
+        if not self.beta_ladder_base:
+            return []
+        beta_min = float(self.beta_ladder_base[0])
+        beta_max = float(self.beta_ladder_base[-1])
+        if beta_min <= 0:
+            return [float(b) * float(scale) for b in self.beta_ladder_base]
+        effective_beta_max = max(beta_min, beta_max * float(scale))
+        if self.chains <= 1:
+            return [beta_min]
+        return list(np.geomspace(beta_min, effective_beta_max, self.chains))
+
     def optimise(self) -> List[SequenceState]:  # noqa: C901  (long but readable)
         """Run PT-MCMC and return *k* diverse elite sequences."""
 
@@ -211,7 +224,15 @@ class PTGibbsOptimizer(Optimizer):
                 n_mutations = max(1, int(round(base_seed.size * 0.02)))
                 for c in range(1, C):
                     chain_states[c] = _perturb_seed(base_seed, n_mutations)
-        current_per_tf_maps: List[Dict[str, float]] = [evaluator(SequenceState(chain_states[c])) for c in range(C)]
+        chain_state_objs: List[SequenceState] = [SequenceState(chain_states[c]) for c in range(C)]
+        scan_caches: List[LocalScanCache | None] = []
+        scorer = getattr(evaluator, "scorer", None)
+        for c in range(C):
+            cache = None
+            if scorer is not None and getattr(scorer, "scale", None) in LocalScanCache.SUPPORTED_SCALES:
+                cache = scorer.make_local_cache(chain_states[c])
+            scan_caches.append(cache)
+        current_per_tf_maps: List[Dict[str, float]] = [evaluator(chain_state_objs[c]) for c in range(C)]
 
         # For trace: only *draw* phase (not tune) is stored per ArviZ convention.
         chain_scores: List[List[float]] = [[] for _ in range(C)]
@@ -231,7 +252,7 @@ class PTGibbsOptimizer(Optimizer):
             beta_softmin = self.softmin_of(sweep_idx) if self.softmin_of else None
             move_probs = self.move_schedule.probs(sweep_idx / max(self.total_sweeps - 1, 1))
             scale = self.swap_controller.scale if self.swap_controller else 1.0
-            self.beta_ladder = [b * scale for b in self.beta_ladder_base]
+            self.beta_ladder = self._scaled_beta_ladder(scale)
             current_scores: list[float] = []
             for c in range(C):
                 per_tf_map = current_per_tf_maps[c]
@@ -240,7 +261,7 @@ class PTGibbsOptimizer(Optimizer):
                     beta=beta_softmin,
                     length=chain_states[c].size,
                 )
-                move_kind, accepted, per_tf_map, new_score = self._single_chain_move(
+                move_kind, accepted, per_tf_map, new_score, move_detail = self._single_chain_move(
                     chain_states[c],
                     current_score,
                     self.beta_ladder[c],
@@ -248,6 +269,8 @@ class PTGibbsOptimizer(Optimizer):
                     evaluator,
                     rng,
                     move_probs,
+                    state=chain_state_objs[c],
+                    scan_cache=scan_caches[c],
                     per_tf=per_tf_map,
                 )
                 current_per_tf_maps[c] = per_tf_map
@@ -260,6 +283,9 @@ class PTGibbsOptimizer(Optimizer):
                         "move_kind": move_kind,
                         "attempted": 1,
                         "accepted": int(bool(accepted)),
+                        "delta": move_detail.get("delta"),
+                        "score_old": move_detail.get("score_old"),
+                        "score_new": move_detail.get("score_new"),
                     }
                 )
 
@@ -278,6 +304,11 @@ class PTGibbsOptimizer(Optimizer):
                     accepted = False
                     if Δ >= 0 or np.log(rng.random()) < Δ:
                         chain_states[c], chain_states[c + 1] = s1, s0
+                        chain_state_objs[c], chain_state_objs[c + 1] = (
+                            chain_state_objs[c + 1],
+                            chain_state_objs[c],
+                        )
+                        scan_caches[c], scan_caches[c + 1] = scan_caches[c + 1], scan_caches[c]
                         current_scores[c], current_scores[c + 1] = current_scores[c + 1], current_scores[c]
                         current_per_tf_maps[c], current_per_tf_maps[c + 1] = (
                             current_per_tf_maps[c + 1],
@@ -307,7 +338,7 @@ class PTGibbsOptimizer(Optimizer):
             beta_softmin = self.softmin_of(sweep_idx) if self.softmin_of else None
             move_probs = self.move_schedule.probs(sweep_idx / max(self.total_sweeps - 1, 1))
             scale = self.swap_controller.scale if self.swap_controller else 1.0
-            self.beta_ladder = [b * scale for b in self.beta_ladder_base]
+            self.beta_ladder = self._scaled_beta_ladder(scale)
 
             # Within‑chain proposals
             current_scores: list[float] = []
@@ -318,7 +349,7 @@ class PTGibbsOptimizer(Optimizer):
                     beta=beta_softmin,
                     length=chain_states[c].size,
                 )
-                move_kind, accepted, per_tf_map, new_score = self._single_chain_move(
+                move_kind, accepted, per_tf_map, new_score, move_detail = self._single_chain_move(
                     chain_states[c],
                     current_score,
                     self.beta_ladder[c],
@@ -326,6 +357,8 @@ class PTGibbsOptimizer(Optimizer):
                     evaluator,
                     rng,
                     move_probs,
+                    state=chain_state_objs[c],
+                    scan_cache=scan_caches[c],
                     per_tf=per_tf_map,
                 )
                 current_per_tf_maps[c] = per_tf_map
@@ -338,6 +371,9 @@ class PTGibbsOptimizer(Optimizer):
                         "move_kind": move_kind,
                         "attempted": 1,
                         "accepted": int(bool(accepted)),
+                        "delta": move_detail.get("delta"),
+                        "score_old": move_detail.get("score_old"),
+                        "score_new": move_detail.get("score_new"),
                     }
                 )
 
@@ -355,6 +391,11 @@ class PTGibbsOptimizer(Optimizer):
                 accepted = False
                 if Δ >= 0 or np.log(rng.random()) < Δ:
                     chain_states[c], chain_states[c + 1] = s1, s0  # swap in‑place
+                    chain_state_objs[c], chain_state_objs[c + 1] = (
+                        chain_state_objs[c + 1],
+                        chain_state_objs[c],
+                    )
+                    scan_caches[c], scan_caches[c + 1] = scan_caches[c + 1], scan_caches[c]
                     current_scores[c], current_scores[c + 1] = current_scores[c + 1], current_scores[c]
                     current_per_tf_maps[c], current_per_tf_maps[c + 1] = (
                         current_per_tf_maps[c + 1],
@@ -457,19 +498,30 @@ class PTGibbsOptimizer(Optimizer):
         rng: np.random.Generator,
         move_probs: np.ndarray,
         *,
+        state: SequenceState,
+        scan_cache: LocalScanCache | None = None,
         per_tf: Dict[str, float] | None = None,
-    ) -> tuple[str, bool, Dict[str, float], float]:
+    ) -> tuple[str, bool, Dict[str, float], float, Dict[str, float | None]]:
         """One Gibbs-style proposal/accept cycle at inverse-temperature β."""
 
         L = seq.size
         if per_tf is None:
-            per_tf = evaluator(SequenceState(seq))
+            per_tf = evaluator(state)
         move_kind = self._sample_move_kind(rng, move_probs)
         self.move_tally[move_kind] += 1
         accepted = False
+        score_old = float(current_combined)
+
+        def _detail(score_new: float) -> Dict[str, float | None]:
+            return {
+                "delta": float(score_new - score_old),
+                "score_old": score_old,
+                "score_new": float(score_new),
+            }
+
         target = self.targeting.maybe_target(
             seq_len=L,
-            state=SequenceState(seq),
+            state=state,
             evaluator=evaluator,
             rng=rng,
             per_tf=per_tf,
@@ -483,45 +535,64 @@ class PTGibbsOptimizer(Optimizer):
                 i = rng.integers(target_window[0], target_window[1])
             else:
                 i = rng.integers(L)
-            old = seq[i]
+            old = int(seq[i])
             lods = np.empty(4, float)
             combined_vals = np.empty(4, float)
             per_tf_candidates: list[Dict[str, float]] = []
-            for b in range(4):
-                seq[i] = b
-                per_tf_b, comb_b = evaluator.evaluate(SequenceState(seq), beta=beta_softmin, length=L)
-                per_tf_candidates.append(per_tf_b)
-                combined_vals[b] = comb_b
-                lods[b] = β * comb_b
-            seq[i] = old
+            if scan_cache is not None:
+                raw_candidates = scan_cache.candidate_raw_llr_maps(i, old)
+                for b in range(4):
+                    per_tf_b = evaluator.scorer.scaled_from_raw_llr(raw_candidates[b], L)
+                    per_tf_candidates.append(per_tf_b)
+                    comb_b = evaluator.combined_from_scores(per_tf_b, beta=beta_softmin, length=L)
+                    combined_vals[b] = comb_b
+                    lods[b] = β * comb_b
+            else:
+                for b in range(4):
+                    seq[i] = b
+                    per_tf_b, comb_b = evaluator.evaluate(state, beta=beta_softmin, length=L)
+                    per_tf_candidates.append(per_tf_b)
+                    combined_vals[b] = comb_b
+                    lods[b] = β * comb_b
+                seq[i] = old
             lods -= lods.max()
             probs = np.exp(lods)
             new_base = rng.choice(4, p=probs / probs.sum())
             seq[i] = new_base
+            if scan_cache is not None:
+                scan_cache.apply_base_change(i, old, int(new_base))
             self.accept_tally[move_kind] += 1
             accepted = True
-            return move_kind, accepted, per_tf_candidates[int(new_base)], float(combined_vals[new_base])
+            return (
+                move_kind,
+                accepted,
+                per_tf_candidates[int(new_base)],
+                float(combined_vals[new_base]),
+                _detail(float(combined_vals[new_base])),
+            )
 
         # Contiguous block replace
         if move_kind == "B":
             mn, mx = self.move_cfg["block_len_range"]
             length = rng.integers(mn, mx + 1)
             if length > L:
-                return move_kind, False, per_tf, current_combined
+                return move_kind, False, per_tf, current_combined, _detail(current_combined)
             start = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
             proposal = rng.integers(0, 4, size=length)
             old_block = seq[start : start + length].copy()
 
             _replace_block(seq, start, length, proposal)
-            new_per_tf, new_f = evaluator.evaluate(SequenceState(seq), beta=beta_softmin, length=L)
+            new_per_tf, new_f = evaluator.evaluate(state, beta=beta_softmin, length=L)
             _replace_block(seq, start, length, old_block)
             Δ = β * (new_f - current_combined)
             if Δ >= 0 or np.log(rng.random()) < Δ:
                 _replace_block(seq, start, length, proposal)
                 self.accept_tally[move_kind] += 1
                 accepted = True
-                return move_kind, accepted, new_per_tf, new_f
-            return move_kind, accepted, per_tf, current_combined
+                if scan_cache is not None:
+                    scan_cache.rebuild(seq)
+                return move_kind, accepted, new_per_tf, new_f, _detail(new_f)
+            return move_kind, accepted, per_tf, current_combined, _detail(new_f)
 
         # Multi‑site flip
         if move_kind == "M":
@@ -537,22 +608,24 @@ class PTGibbsOptimizer(Optimizer):
             proposal = rng.integers(0, 4, size=k)
 
             seq[idxs] = proposal
-            new_per_tf, new_f = evaluator.evaluate(SequenceState(seq), beta=beta_softmin, length=L)
+            new_per_tf, new_f = evaluator.evaluate(state, beta=beta_softmin, length=L)
             seq[idxs] = old_bases
             Δ = β * (new_f - current_combined)
             if Δ >= 0 or np.log(rng.random()) < Δ:
                 seq[idxs] = proposal
                 self.accept_tally[move_kind] += 1
                 accepted = True
-                return move_kind, accepted, new_per_tf, new_f
-            return move_kind, accepted, per_tf, current_combined
+                if scan_cache is not None:
+                    scan_cache.rebuild(seq)
+                return move_kind, accepted, new_per_tf, new_f, _detail(new_f)
+            return move_kind, accepted, per_tf, current_combined, _detail(new_f)
 
         if move_kind == "L":
             min_len, max_len = self.move_cfg["swap_len_range"]
             length = rng.integers(min_len, max_len + 1)
             max_shift = int(self.move_cfg["slide_max_shift"])
             if max_shift < 1 or length >= L:
-                return move_kind, False, per_tf, current_combined
+                return move_kind, False, per_tf, current_combined, _detail(current_combined)
             shift = rng.integers(-max_shift, max_shift + 1)
             if shift == 0:
                 shift = 1 if rng.random() < 0.5 else -1
@@ -561,25 +634,27 @@ class PTGibbsOptimizer(Optimizer):
             else:
                 min_start, max_start = -shift, L - length
             if max_start < min_start:
-                return move_kind, False, per_tf, current_combined
+                return move_kind, False, per_tf, current_combined, _detail(current_combined)
             start = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
             start = max(min_start, min(max_start, start))
             slide_window(seq, start, length, int(shift))
-            new_per_tf, new_f = evaluator.evaluate(SequenceState(seq), beta=beta_softmin, length=L)
+            new_per_tf, new_f = evaluator.evaluate(state, beta=beta_softmin, length=L)
             slide_window(seq, start + int(shift), length, int(-shift))
             Δ = β * (new_f - current_combined)
             if Δ >= 0 or np.log(rng.random()) < Δ:
                 slide_window(seq, start, length, int(shift))
                 self.accept_tally[move_kind] += 1
                 accepted = True
-                return move_kind, accepted, new_per_tf, new_f
-            return move_kind, accepted, per_tf, current_combined
+                if scan_cache is not None:
+                    scan_cache.rebuild(seq)
+                return move_kind, accepted, new_per_tf, new_f, _detail(new_f)
+            return move_kind, accepted, per_tf, current_combined, _detail(new_f)
 
         if move_kind == "W":
             min_len, max_len = self.move_cfg["swap_len_range"]
             length = rng.integers(min_len, max_len + 1)
             if length >= L:
-                return move_kind, False, per_tf, current_combined
+                return move_kind, False, per_tf, current_combined, _detail(current_combined)
             start_a = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
             max_tries = 10
             start_b = start_a
@@ -588,27 +663,29 @@ class PTGibbsOptimizer(Optimizer):
                 if abs(start_b - start_a) >= length:
                     break
             if abs(start_b - start_a) < length:
-                return move_kind, False, per_tf, current_combined
+                return move_kind, False, per_tf, current_combined, _detail(current_combined)
             swap_block(seq, start_a, start_b, length)
-            new_per_tf, new_f = evaluator.evaluate(SequenceState(seq), beta=beta_softmin, length=L)
+            new_per_tf, new_f = evaluator.evaluate(state, beta=beta_softmin, length=L)
             swap_block(seq, start_a, start_b, length)
             Δ = β * (new_f - current_combined)
             if Δ >= 0 or np.log(rng.random()) < Δ:
                 swap_block(seq, start_a, start_b, length)
                 self.accept_tally[move_kind] += 1
                 accepted = True
-                return move_kind, accepted, new_per_tf, new_f
-            return move_kind, accepted, per_tf, current_combined
+                if scan_cache is not None:
+                    scan_cache.rebuild(seq)
+                return move_kind, accepted, new_per_tf, new_f, _detail(new_f)
+            return move_kind, accepted, per_tf, current_combined, _detail(new_f)
 
         # Motif insertion proposal
         tf_names = list(self.pwms.keys())
         if not tf_names:
-            return move_kind, False, per_tf, current_combined
+            return move_kind, False, per_tf, current_combined, _detail(current_combined)
         tf_name = target_tf if target_tf in self.pwms else rng.choice(tf_names)
         pwm = self.pwms[tf_name]
         width = pwm.length
         if width > L:
-            return move_kind, False, per_tf, current_combined
+            return move_kind, False, per_tf, current_combined, _detail(current_combined)
         start = targeted_start(seq_len=L, block_len=width, target=target_window, rng=rng)
         if rng.random() < self.insertion_consensus_prob:
             proposal = self._insertion_consensus[tf_name].copy()
@@ -619,15 +696,17 @@ class PTGibbsOptimizer(Optimizer):
             proposal = revcomp_int(proposal)
         old_block = seq[start : start + width].copy()
         _replace_block(seq, start, width, proposal)
-        new_per_tf, new_f = evaluator.evaluate(SequenceState(seq), beta=beta_softmin, length=L)
+        new_per_tf, new_f = evaluator.evaluate(state, beta=beta_softmin, length=L)
         _replace_block(seq, start, width, old_block)
         Δ = β * (new_f - current_combined)
         if Δ >= 0 or np.log(rng.random()) < Δ:
             _replace_block(seq, start, width, proposal)
             self.accept_tally[move_kind] += 1
             accepted = True
-            return move_kind, accepted, new_per_tf, new_f
-        return move_kind, accepted, per_tf, current_combined
+            if scan_cache is not None:
+                scan_cache.rebuild(seq)
+            return move_kind, accepted, new_per_tf, new_f, _detail(new_f)
+        return move_kind, accepted, per_tf, current_combined, _detail(new_f)
 
     def _sample_move_kind(self, rng: np.random.Generator, move_probs: np.ndarray) -> str:
         return str(rng.choice(MOVE_KINDS, p=move_probs))
@@ -712,12 +791,32 @@ class PTGibbsOptimizer(Optimizer):
         all_accept = sum(accepted.values())
         acceptance_rate_all = (all_accept / all_total) if all_total else 0.0
         swap_rate = self.swap_accepts / self.swap_attempts if self.swap_attempts else 0.0
+        eps = 1.0e-12
+        mh_deltas = [
+            abs(float(ms.get("delta", 0.0)))
+            for ms in self.move_stats
+            if ms.get("move_kind") in mh_kinds and ms.get("delta") is not None
+        ]
+        if mh_deltas:
+            delta_abs_median_mh = float(np.median(mh_deltas))
+            delta_frac_zero_mh = float(np.mean([d <= eps for d in mh_deltas]))
+            score_change_rate_mh = float(np.mean([d > eps for d in mh_deltas]))
+        else:
+            delta_abs_median_mh = None
+            delta_frac_zero_mh = None
+            score_change_rate_mh = None
+        beta_min = float(self.beta_ladder_base[0]) if self.beta_ladder_base else None
+        beta_max_base = float(self.beta_ladder_base[-1]) if self.beta_ladder_base else None
+        beta_max_final = float(max(self.beta_ladder)) if self.beta_ladder else None
         return {
             "moves": totals,
             "accepted": accepted,
             "acceptance_rate": acceptance_rate,
             "acceptance_rate_mh": acceptance_rate_mh,
             "acceptance_rate_all": acceptance_rate_all,
+            "delta_abs_median_mh": delta_abs_median_mh,
+            "delta_frac_zero_mh": delta_frac_zero_mh,
+            "score_change_rate_mh": score_change_rate_mh,
             "swap_attempts": self.swap_attempts,
             "swap_accepts": self.swap_accepts,
             "swap_acceptance_rate": swap_rate,
@@ -726,6 +825,10 @@ class PTGibbsOptimizer(Optimizer):
             "beta_ladder_base": list(self.beta_ladder_base),
             "beta_ladder_final": list(self.beta_ladder),
             "beta_ladder_scale_final": float(self.swap_controller.scale) if self.swap_controller else 1.0,
+            "beta_ladder_scale_mode": "anchor_min_scale_max",
+            "beta_min": beta_min,
+            "beta_max_base": beta_max_base,
+            "beta_max_final": beta_max_final,
             "move_stats": list(self.move_stats),
             "final_softmin_beta": self.final_softmin_beta(),
             "final_mcmc_beta": self.final_mcmc_beta(),
@@ -747,4 +850,5 @@ class PTGibbsOptimizer(Optimizer):
             "beta_ladder_base": list(self.beta_ladder_base),
             "beta_ladder_final": list(self.beta_ladder),
             "beta_ladder_scale_final": float(self.swap_controller.scale) if self.swap_controller else 1.0,
+            "beta_ladder_scale_mode": "anchor_min_scale_max",
         }

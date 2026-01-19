@@ -9,9 +9,9 @@ Example:
 src/dnadesign/cruncher/workspaces/
   demo_basics_two_tf/
     config.yaml
-    data/                     # demo inputs
+    inputs/                   # demo inputs
     .cruncher/                # local cache + lockfiles (generated)
-    runs/                     # run outputs (parse/sample/analyze/report)
+    outputs/                  # run outputs (parse/sample/analyze/report)
 ```
 
 Tip: `cd` into a workspace and run cruncher commands without passing `--config`. You can also run from anywhere with `--workspace <name>` or inspect what is available via `cruncher workspaces list`.

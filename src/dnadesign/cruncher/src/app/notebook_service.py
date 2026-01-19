@@ -123,9 +123,7 @@ def generate_notebook(
     if strict:
         _validate_notebook_inputs(analysis_dir)
 
-    notebooks_dir = analysis_dir / "notebooks"
-    notebooks_dir.mkdir(parents=True, exist_ok=True)
-    notebook_path = notebooks_dir / "run_overview.py"
+    notebook_path = analysis_dir / "notebook__run_overview.py"
     if notebook_path.exists() and not force:
         _record_notebook_artifact(
             manifest,
@@ -166,15 +164,19 @@ def _():
 def _(Path, json, mo, refresh_button):
     _ = refresh_button.value
     notebook_path = Path(__file__).resolve()
-    analysis_root = notebook_path.parent.parent
+    analysis_dir = notebook_path.parent
+    analysis_root = analysis_dir
     if analysis_root.name != "analysis":
-        mo.stop(
-            True,
-            mo.md(
-                "Expected this notebook to live under `<run_dir>/analysis/notebooks/`.\n"
-                f"Found: {{notebook_path}}"
-            ),
-        )
+        if analysis_root.parent.name == "_archive" and analysis_root.parent.parent.name == "analysis":
+            analysis_root = analysis_root.parent.parent
+        else:
+            mo.stop(
+                True,
+                mo.md(
+                    "Expected this notebook to live under `<run_dir>/analysis/` (or analysis/_archive).\n"
+                    f"Found: {{notebook_path}}"
+                ),
+            )
     if not analysis_root.exists():
         mo.stop(True, mo.md(f"Analysis directory not found: {{analysis_root}}"))
     run_dir = analysis_root.parent
@@ -277,15 +279,27 @@ def _(mo, tf_names):
 
 
 @app.cell
-def _(analysis_dir, pd):
-    per_pwm_path = analysis_dir / "tables" / "gathered_per_pwm_everyN.csv"
-    per_pwm_df = pd.read_csv(per_pwm_path) if per_pwm_path.exists() else pd.DataFrame()
-    summary_table_path = analysis_dir / "tables" / "score_summary.csv"
-    summary_df = pd.read_csv(summary_table_path) if summary_table_path.exists() else pd.DataFrame()
-    joint_metrics_path = analysis_dir / "tables" / "joint_metrics.csv"
-    joint_metrics_df = pd.read_csv(joint_metrics_path) if joint_metrics_path.exists() else pd.DataFrame()
-    topk_path = analysis_dir / "tables" / "elite_topk.csv"
-    topk_df = pd.read_csv(topk_path) if topk_path.exists() else pd.DataFrame()
+def _(analysis_dir, pd, summary):
+    analysis_cfg = summary.get("analysis_config") if isinstance(summary, dict) else {{}}
+    table_format = "parquet"
+    if isinstance(analysis_cfg, dict):
+        table_format = analysis_cfg.get("table_format") or table_format
+
+    def _read_table(path):
+        if not path.exists():
+            return pd.DataFrame()
+        if path.suffix == ".parquet":
+            return pd.read_parquet(path)
+        return pd.read_csv(path)
+
+    per_pwm_path = analysis_dir / f"per_pwm_scores.{{table_format}}"
+    per_pwm_df = _read_table(per_pwm_path)
+    summary_table_path = analysis_dir / f"score_summary.{{table_format}}"
+    summary_df = _read_table(summary_table_path)
+    joint_metrics_path = analysis_dir / f"joint_metrics.{{table_format}}"
+    joint_metrics_df = _read_table(joint_metrics_path)
+    topk_path = analysis_dir / f"elite_topk.{{table_format}}"
+    topk_df = _read_table(topk_path)
     return (
         per_pwm_df,
         per_pwm_path,

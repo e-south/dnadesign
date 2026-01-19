@@ -172,7 +172,13 @@ class Scorer:
         )
         return neglogp
 
-    def _best_llr_and_location(self, seq: np.ndarray, info: _PWMInfo) -> Tuple[float, int, str]:
+    def _best_llr_and_location(
+        self,
+        seq: np.ndarray,
+        info: _PWMInfo,
+        *,
+        rev: np.ndarray | None = None,
+    ) -> Tuple[float, int, str]:
         """
         Scan a numeric‐encoded sequence to find the best raw LLR (and its offset & strand).
         """
@@ -190,7 +196,8 @@ class Scorer:
 
         best_llr, best_offset, best_strand = _scan(seq, "+")
         if self.bidirectional:
-            rev = (3 - seq)[::-1]
+            if rev is None:
+                rev = (3 - seq)[::-1]
             rev_llr, rev_offset, rev_strand = _scan(rev, "-")
             if rev_llr > best_llr:
                 best_llr, best_offset, best_strand = rev_llr, rev_offset, rev_strand
@@ -235,8 +242,9 @@ class Scorer:
 
     def normalized_llr_map(self, seq: np.ndarray) -> Dict[str, float]:
         out: Dict[str, float] = {}
+        rev = (3 - seq)[::-1] if self.bidirectional else None
         for tf, info in self._cache.items():
-            raw_llr, *_ = self._best_llr_and_location(seq, info)
+            raw_llr, *_ = self._best_llr_and_location(seq, info, rev=rev)
             num, denom = raw_llr - info.null_mean, info.consensus_llr - info.null_mean
             frac = 0.0 if denom <= 0 else max(0.0, num / denom)
             out[tf] = float(frac)
@@ -261,9 +269,9 @@ class Scorer:
         """
         out: Dict[str, float] = {}
         logger.debug("compute_all_per_pwm: seq_length=%d, scale=%s", seq_length, self.scale)
-
+        rev = (3 - seq)[::-1] if self.bidirectional else None
         for tf, info in self._cache.items():
-            raw_llr, offset, strand = self._best_llr_and_location(seq, info)
+            raw_llr, offset, strand = self._best_llr_and_location(seq, info, rev=rev)
 
             if self.scale == "llr":
                 out[tf] = float(raw_llr)
@@ -309,3 +317,182 @@ class Scorer:
 
         logger.debug("  Per-TF scaled map: %s", out)
         return out
+
+    def scaled_from_raw_llr(self, raw_llr_by_tf: Dict[str, float], seq_length: int) -> Dict[str, float]:
+        """
+        Compute per-TF scaled values given precomputed raw LLRs.
+        This mirrors compute_all_per_pwm without rescanning.
+        """
+        out: Dict[str, float] = {}
+        for tf, raw_llr in raw_llr_by_tf.items():
+            info = self._info(tf)
+            if self.scale == "llr":
+                out[tf] = float(raw_llr)
+                continue
+            if self.scale == "z":
+                z_val = (raw_llr - info.null_mean) / info.null_std
+                out[tf] = float(z_val)
+                continue
+            if self.scale == "normalized-llr":
+                num, denom = raw_llr - info.null_mean, info.consensus_llr - info.null_mean
+                frac = 0.0 if denom <= 0 else max(0.0, num / denom)
+                out[tf] = float(frac)
+                continue
+            neglogp_seq = self._per_pwm_neglogp(raw_llr, info, seq_length)
+            if self.scale == "logp":
+                out[tf] = float(neglogp_seq)
+                continue
+            neglogp_cons = info.consensus_neglogp_by_len.get(seq_length)
+            if neglogp_cons is None:
+                cons_llr = info.consensus_llr
+                neglogp_cons = self._per_pwm_neglogp(cons_llr, info, seq_length)
+                info.consensus_neglogp_by_len[seq_length] = neglogp_cons
+            if neglogp_cons > 0.0:
+                out[tf] = float(neglogp_seq / neglogp_cons)
+            else:
+                out[tf] = 0.0
+        return out
+
+    def make_local_cache(self, seq: np.ndarray) -> "LocalScanCache":
+        return LocalScanCache(self, seq)
+
+
+@dataclass(slots=True)
+class _ScanCacheEntry:
+    info: _PWMInfo
+    fwd_scores: np.ndarray
+    rev_scores: np.ndarray | None
+
+
+class LocalScanCache:
+    """
+    Incremental cache for single-base flips. Uses per-PWM window scores to
+    recompute best raw LLRs without full rescans.
+    """
+
+    SUPPORTED_SCALES = {"llr", "z", "logp", "normalized-llr", "consensus-neglop-sum"}
+
+    def __init__(self, scorer: Scorer, seq: np.ndarray) -> None:
+        self.scorer = scorer
+        self.entries: Dict[str, _ScanCacheEntry] = {}
+        self.seq = seq
+        self.L = int(seq.size)
+        self.bidirectional = bool(scorer.bidirectional)
+        self.rebuild(seq)
+
+    def rebuild(self, seq: np.ndarray) -> None:
+        self.seq = seq
+        self.L = int(seq.size)
+        rev = (3 - seq)[::-1] if self.bidirectional else None
+        self.entries = {}
+        for tf, info in self.scorer._cache.items():
+            fwd_scores = self._window_scores(seq, info.lom)
+            rev_scores = self._window_scores(rev, info.lom) if self.bidirectional and rev is not None else None
+            self.entries[tf] = _ScanCacheEntry(info=info, fwd_scores=fwd_scores, rev_scores=rev_scores)
+
+    @staticmethod
+    def _window_scores(seq: np.ndarray | None, lom: np.ndarray) -> np.ndarray:
+        if seq is None:
+            return np.array([], dtype=float)
+        w = int(lom.shape[0])
+        if seq.size < w:
+            return np.array([], dtype=float)
+        windows = np.lib.stride_tricks.sliding_window_view(seq, w)
+        scores = lom[np.arange(w)[:, None], windows.T].sum(axis=0)
+        return np.asarray(scores, dtype=float)
+
+    @staticmethod
+    def _max_outside(scores: np.ndarray, start: int, end: int) -> float:
+        if scores.size == 0:
+            return float("-inf")
+        max_val = float("-inf")
+        if start > 0:
+            max_val = max(max_val, float(np.max(scores[:start])))
+        if end + 1 < scores.size:
+            max_val = max(max_val, float(np.max(scores[end + 1 :])))
+        return max_val
+
+    def candidate_raw_llr_maps(self, pos: int, old_base: int) -> list[Dict[str, float]]:
+        """
+        Return per-base raw LLR maps for a single position change.
+        """
+        L = self.L
+        old_base_int = int(old_base)
+        maps = [dict() for _ in range(4)]
+        for tf, entry in self.entries.items():
+            info = entry.info
+            w = int(info.width)
+            nwin = L - w + 1
+            if nwin <= 0:
+                for b in range(4):
+                    maps[b][tf] = float("-inf")
+                continue
+            start = max(0, pos - w + 1)
+            end = min(pos, nwin - 1)
+            max_out_fwd = self._max_outside(entry.fwd_scores, start, end)
+
+            if self.bidirectional and entry.rev_scores is not None:
+                r = L - 1 - pos
+                start_r = max(0, r - w + 1)
+                end_r = min(r, nwin - 1)
+                max_out_rev = self._max_outside(entry.rev_scores, start_r, end_r)
+            else:
+                r = None
+                start_r = end_r = 0
+                max_out_rev = float("-inf")
+
+            for b in range(4):
+                max_in_fwd = float("-inf")
+                for o in range(start, end + 1):
+                    j = pos - o
+                    delta = info.lom[j, b] - info.lom[j, old_base_int]
+                    val = entry.fwd_scores[o] + delta
+                    if val > max_in_fwd:
+                        max_in_fwd = float(val)
+                best_fwd = max(max_out_fwd, max_in_fwd)
+
+                if r is not None and entry.rev_scores is not None:
+                    new_c = 3 - b
+                    old_c = 3 - old_base_int
+                    max_in_rev = float("-inf")
+                    for o in range(start_r, end_r + 1):
+                        j = r - o
+                        delta = info.lom[j, new_c] - info.lom[j, old_c]
+                        val = entry.rev_scores[o] + delta
+                        if val > max_in_rev:
+                            max_in_rev = float(val)
+                    best_rev = max(max_out_rev, max_in_rev)
+                    best_raw = max(best_fwd, best_rev)
+                else:
+                    best_raw = best_fwd
+                maps[b][tf] = float(best_raw)
+        return maps
+
+    def apply_base_change(self, pos: int, old_base: int, new_base: int) -> None:
+        if int(old_base) == int(new_base):
+            return
+        L = self.L
+        old_base_int = int(old_base)
+        new_base_int = int(new_base)
+        for entry in self.entries.values():
+            info = entry.info
+            w = int(info.width)
+            nwin = L - w + 1
+            if nwin <= 0:
+                continue
+            start = max(0, pos - w + 1)
+            end = min(pos, nwin - 1)
+            for o in range(start, end + 1):
+                j = pos - o
+                delta = info.lom[j, new_base_int] - info.lom[j, old_base_int]
+                entry.fwd_scores[o] += delta
+            if self.bidirectional and entry.rev_scores is not None:
+                r = L - 1 - pos
+                start_r = max(0, r - w + 1)
+                end_r = min(r, nwin - 1)
+                new_c = 3 - new_base_int
+                old_c = 3 - old_base_int
+                for o in range(start_r, end_r + 1):
+                    j = r - o
+                    delta = info.lom[j, new_c] - info.lom[j, old_c]
+                    entry.rev_scores[o] += delta

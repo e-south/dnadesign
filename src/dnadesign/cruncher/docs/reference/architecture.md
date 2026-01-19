@@ -9,8 +9,7 @@
 2. **lock** → resolve TFs to exact cached artifacts (`<workspace>/.cruncher/locks/<config>.lock.json`)
 3. **parse** *(optional)* → validate cached PWMs (no logo rendering)
 4. **sample** → run MCMC and write sequences/trace + manifests
-5. **analyze** → plots/tables from sample artifacts (offline)
-6. **report** → summary outputs from run artifacts (fails fast if missing inputs)
+5. **analyze** → plots/tables + report from sample artifacts (offline, written in analysis root)
 
 ---
 
@@ -21,7 +20,7 @@ Core contract:
 - **Network access is explicit** (fetch and remote inventory).
 - The **store** is the only persistence layer (project‑local).
 - The **core** (PWM scoring + optimizers) is pure compute (no I/O).
-- **Analyze/report** read run artifacts only and can run offline.
+- **Analyze** reads run artifacts only and can run offline.
 
 #### `core/` (pure compute)
 - PWM representation and validation
@@ -56,7 +55,7 @@ Core contract:
 - wrappers for external binaries (e.g., MEME Suite)
 
 #### `app/` (orchestration)
-- fetch / lock / parse / sample / analyze / report coordination
+- fetch / lock / parse / sample / analyze coordination
 - translates CLI intent + config into concrete runs and artifacts
 
 #### `cli/` (UX only)
@@ -77,7 +76,7 @@ Recommended workspace layout:
 <workspace>/
 config.yaml
 .cruncher/
-runs/
+outputs/
 ```
 
 In this repo, the bundled demo workspaces live at:
@@ -119,14 +118,14 @@ run_index.json
 - Numba JIT cache defaults to `<repo>/src/dnadesign/cruncher/.cruncher/numba_cache` (or `<repo>/.cruncher/numba_cache`)
   unless `NUMBA_CACHE_DIR` is set.
 
-#### Run outputs (`out_dir`, e.g. `runs/`)
+#### Run outputs (`out_dir`, e.g. `outputs/`)
 
 Each configured regulator set produces **separate** runs, grouped by stage. Run names include the TF slug (and a `setN_` prefix only when multiple regulator sets are configured):
 
-- `runs/parse/lexA-cpxR_20260101_143210_f3a9d2/`
-- `runs/sample/lexA-cpxR_20260101_143512_a91c0e/`
-- `runs/auto_opt/lexA-cpxR_20260101_143530_91acb1/` (auto-opt pilots)
-- `runs/logos/catalog/lexA-cpxR_20260101_143210_f3a9d2/` *(prefix `setN_` only when multiple regulator sets are configured)*
+- `outputs/parse/lexA-cpxR_20260101_143210_f3a9d2/`
+- `outputs/sample/lexA-cpxR_20260101_143512_a91c0e/`
+- `outputs/auto_opt/lexA-cpxR_20260101_143530_91acb1/` (auto-opt pilots)
+- `outputs/logos/catalog/lexA-cpxR_20260101_143210_f3a9d2/` *(prefix `setN_` only when multiple regulator sets are configured)*
 
 ---
 
@@ -138,7 +137,7 @@ A typical **sample** run directory contains:
 - `artifacts/` — sequences, trace (if enabled), elites exports
 - `analysis/` — plots, tables, and analysis metadata (plus optional notebooks/archive)
 - `live/` — streaming metrics (if enabled)
-- `report/` — summary outputs from `cruncher report`
+- `analysis/report.json` + `analysis/report.md` — analysis report outputs from `cruncher analyze`
 
 ---
 
@@ -147,7 +146,7 @@ A typical **sample** run directory contains:
 - **Lockfiles are mandatory** for `parse` and `sample`.
 - If you change inputs that affect TF resolution (e.g., PWM source, site filters, dataset selection),
   **re-lock** so the lockfile hash set matches reality.
-- `analyze` and `report` validate the lockfile recorded in the run manifest.
+- `analyze` validates the lockfile recorded in the run manifest.
 
 ---
 

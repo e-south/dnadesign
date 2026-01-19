@@ -383,12 +383,6 @@ def test_catalog_show_requires_args_with_hint() -> None:
     assert "Missing REF" in result.output
 
 
-def test_report_requires_args_with_hint() -> None:
-    result = invoke_cli(["report"])
-    assert result.exit_code != 0
-    assert "Missing RUN" in result.output
-
-
 def test_runs_show_requires_args_with_hint() -> None:
     result = invoke_cli(["runs", "show"])
     assert result.exit_code != 0

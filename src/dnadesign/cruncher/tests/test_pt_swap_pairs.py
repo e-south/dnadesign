@@ -30,10 +30,12 @@ class _DummyEvaluator:
 
 
 def test_pt_swap_pairs_tracked() -> None:
+    chains = 3
+    draws = 3
     cfg = {
-        "draws": 1,
+        "draws": draws,
         "tune": 0,
-        "chains": 3,
+        "chains": chains,
         "min_dist": 0,
         "top_k": 1,
         "swap_prob": 1.0,
@@ -63,5 +65,5 @@ def test_pt_swap_pairs_tracked() -> None:
     )
     optimizer.optimise()
     stats = optimizer.stats()
-    assert stats["swap_attempts_by_pair"] == [1, 1]
-    assert len(stats["swap_attempts_by_pair"]) == optimizer.chains - 1
+    assert stats["swap_attempts_by_pair"] == [draws] * (chains - 1)
+    assert len(stats["swap_attempts_by_pair"]) == chains - 1

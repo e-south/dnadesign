@@ -149,7 +149,6 @@ def workspace_search_roots(cwd: Path | None = None) -> list[Path]:
     git_root = _find_git_root(cwd_path)
     if git_root:
         roots.append(git_root / "workspaces")
-        roots.append(git_root / "workspace")
         roots.append(git_root / "src" / "dnadesign" / "cruncher" / "workspaces")
     unique: list[Path] = []
     seen: set[Path] = set()

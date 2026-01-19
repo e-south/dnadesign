@@ -19,11 +19,19 @@ import pandas as pd
 import seaborn as sns
 
 from dnadesign.cruncher.analysis.overlap import extract_elite_hits
+from dnadesign.cruncher.analysis.plots._savefig import savefig
 
 logger = logging.getLogger(__name__)
 
 
-def plot_overlap_heatmap(summary_df: pd.DataFrame, tf_names: Iterable[str], out_path: Path) -> None:
+def plot_overlap_heatmap(
+    summary_df: pd.DataFrame,
+    tf_names: Iterable[str],
+    out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+) -> None:
     tf_list = list(tf_names)
     if summary_df is None or summary_df.empty or not tf_list:
         logger.warning("Skipping overlap heatmap: missing overlap_summary or TF list.")
@@ -44,11 +52,17 @@ def plot_overlap_heatmap(summary_df: pd.DataFrame, tf_names: Iterable[str], out_
     ax.set_title("TF overlap rate (best-hit windows)")
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
 
 
-def plot_overlap_bp_distribution(elite_overlap_df: pd.DataFrame, out_path: Path) -> None:
+def plot_overlap_bp_distribution(
+    elite_overlap_df: pd.DataFrame,
+    out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+) -> None:
     if elite_overlap_df is None or elite_overlap_df.empty:
         logger.warning("Skipping overlap distribution: empty elite overlap table.")
         return
@@ -60,11 +74,17 @@ def plot_overlap_bp_distribution(elite_overlap_df: pd.DataFrame, out_path: Path)
     ax.set_ylabel("Count")
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
 
 
-def plot_overlap_strand_combos(summary_df: pd.DataFrame, out_path: Path) -> None:
+def plot_overlap_strand_combos(
+    summary_df: pd.DataFrame,
+    out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+) -> None:
     if summary_df is None or summary_df.empty:
         logger.warning("Skipping overlap strand combos: empty overlap summary.")
         return
@@ -91,7 +111,7 @@ def plot_overlap_strand_combos(summary_df: pd.DataFrame, out_path: Path) -> None
     fig.autofmt_xdate(rotation=45, ha="right")
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
 
 
@@ -101,6 +121,8 @@ def plot_motif_offset_rug(
     out_path: Path,
     *,
     pwm_widths: dict[str, int] | None = None,
+    dpi: int,
+    png_compress_level: int,
 ) -> None:
     hits_df = extract_elite_hits(elites_df, tf_names, pwm_widths=pwm_widths)
     if hits_df.empty:
@@ -141,5 +163,5 @@ def plot_motif_offset_rug(
         axes_list[j].axis("off")
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)

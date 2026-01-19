@@ -30,10 +30,12 @@ class _DummyEvaluator:
 
 
 def test_pt_swap_controller_records_each_attempt() -> None:
+    chains = 3
+    draws = 3
     cfg = {
-        "draws": 1,
+        "draws": draws,
         "tune": 0,
-        "chains": 3,
+        "chains": chains,
         "min_dist": 0,
         "top_k": 1,
         "swap_prob": 1.0,
@@ -65,4 +67,4 @@ def test_pt_swap_controller_records_each_attempt() -> None:
     optimizer.optimise()
     assert optimizer.swap_controller is not None
     assert optimizer.swap_attempts == optimizer.swap_controller.attempts
-    assert optimizer.swap_attempts == 2
+    assert optimizer.swap_attempts == draws * (chains - 1)

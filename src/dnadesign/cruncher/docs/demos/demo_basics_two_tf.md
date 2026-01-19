@@ -31,6 +31,7 @@
     - [Run artifacts + performance snapshot](#run-artifacts--performance-snapshot)
     - [Analyze + report](#analyze--report)
     - [Optional: live analysis notebook](#optional-live-analysis-notebook)
+  - [Bridge to DenseGen](#bridge-to-densegen)
 
 ---
 
@@ -42,8 +43,9 @@
 > cruncher lock   -c "$CONFIG"
 > cruncher parse  -c "$CONFIG"
 > cruncher sample -c "$CONFIG"
+> # For a quick run: cruncher sample --no-auto-opt -c "$CONFIG"
 > cruncher analyze -c "$CONFIG"
-> cruncher report --latest -c "$CONFIG"
+> cruncher analyze --summary -c "$CONFIG"
 > ```
 >
 > Continue below for a more in depth guide.
@@ -52,7 +54,7 @@
 
 - **Workspace**: `src/dnadesign/cruncher/workspaces/demo_basics_two_tf/`
 - **Config**: `config.yaml`
-- **Output root**: `runs/` (relative to the workspace)
+- **Output root**: `outputs/` (relative to the workspace)
 - **Catalog cache**: `src/dnadesign/cruncher/.cruncher/` (shared across workspaces by default)
 - **Motif flow**: fetch sites + local motifs → inspect/select → lock/sample using chosen matrices
 - **Path placeholders**: example outputs use `<workspace>` for the demo workspace root
@@ -80,7 +82,7 @@ If you plan to run **motif discovery** (`discover`), verify MEME Suite and exter
 cruncher doctor -c "$CONFIG"
 ```
 
-Sampling + analysis do **not** require MEME Suite, so you can still run the fast path above without it. If it reports missing tools, install MEME Suite (pixi or system install) or set `motif_discovery.tool_path`; see the [MEME Suite guide](../guides/meme_suite.md). Local demo motifs live at `data/local_motifs/` (DAP‑seq MEME files from [this](https://www.nature.com/articles/s41592-021-01312-2) study).
+Sampling + analysis do **not** require MEME Suite, so you can still run the fast path above without it. If it reports missing tools, install MEME Suite (pixi or system install) or set `motif_discovery.tool_path`; see the [MEME Suite guide](../guides/meme_suite.md). Local demo motifs live at `inputs/local_motifs/` (DAP‑seq MEME files from [this](https://www.nature.com/articles/s41592-021-01312-2) study).
 
 ---
 
@@ -106,7 +108,7 @@ If you’re debugging RegulonDB inventory size, `cruncher sources summary --sour
 
 ### Fetch local DAP-seq motifs + binding sites
 
-Local DAP-seq MEME files live under `data/local_motifs/` in the workspace. Fetch the motif matrices and the MEME BLOCKS training sites:
+Local DAP-seq MEME files live under `inputs/local_motifs/` in the workspace. Fetch the motif matrices and the MEME BLOCKS training sites:
 
 ```bash
 # Cache local motif matrices
@@ -258,7 +260,7 @@ How to read the summary:
 - **Length/Window**: confirm the width you intend to optimize against (use `pwm_window_lengths` if you want a shorter high‑information window).
 - **Sites (cached seq/total)** vs **Sites (matrix n)**: cached coverage vs the count embedded in the matrix metadata (e.g., discovery output).
 
-Logos are written under `runs/logos/catalog/<run_name>/` and include site counts (`n=...`) when available.
+Logos are written under `outputs/logos/catalog/<run_name>/` and include site counts (`n=...`) when available.
 
 ---
 
@@ -344,7 +346,7 @@ Parse is a cheap sanity check that validates the locked PWMs load correctly and 
 cruncher parse -c "$CONFIG"  # validate locked PWMs and write a parse manifest
 ```
 
-Re-running parse with the same config + lock fingerprint reuses existing outputs and reports the location. Parse outputs live under `runs/parse/<run_name>/meta/`.
+Re-running parse with the same config + lock fingerprint reuses existing outputs and reports the location. Parse outputs live under `outputs/parse/<run_name>/meta/`.
 
 ---
 
@@ -352,7 +354,7 @@ Re-running parse with the same config + lock fingerprint reuses existing outputs
 
 Each candidate dsDNA sequence is scored by scanning both strands for each PWM, taking the best match per TF, then optimizing the min/soft‑min across TFs (raise the weakest TF). The goal is not a single winner: **cruncher** returns a diverse elite set.
 
-**Auto‑opt** runs short Gibbs + parallel tempering pilots to pick a robust optimizer/temperature ladder/budget so the final run is more performant. The chosen pilot is recorded in `runs/auto_opt/best_<run_group>.json`, and the final effective config is written to `runs/sample/<run_name>/meta/config_used.yaml`. For diagnostics and tuning guidance, see the [sampling + analysis guide](../guides/sampling_and_analysis.md).
+**Auto‑opt** runs short Gibbs + parallel tempering pilots to pick a robust optimizer/temperature ladder/budget so the final run is more performant. The chosen pilot is recorded in `outputs/auto_opt/best_<run_group>.json`, and the final effective config is written to `outputs/sample/<run_name>/meta/config_used.yaml`. For diagnostics and tuning guidance, see the [sampling + analysis guide](../guides/sampling_and_analysis.md).
 
 This demo config sets `auto_opt.policy.allow_warn: true` so auto-opt will always pick a winner by the end of the configured budget levels, even if confidence is low (warnings are recorded). Set `allow_warn: false` to require a confidence-separated winner; if none emerges at the maximum configured budgets/replicates, auto-opt fails fast with guidance to increase `auto_opt.budget_levels` and/or `auto_opt.replicates`.
 
@@ -361,7 +363,7 @@ This demo config sets `auto_opt.policy.allow_warn: true` so auto-opt will always
 cruncher sample -c "$CONFIG"  # run sampling with auto-opt pilots
 
 # Run sampling without pilots
-cruncher sample --no-auto-opt -c "$CONFIG"  # run sampling with configured optimizer only
+cruncher sample --no-auto-opt -c "$CONFIG"  # skip pilots (forces gibbs if optimizer.name=auto)
 
 # Run sampling with verbose logs
 cruncher sample --verbose -c "$CONFIG"  # stream periodic status logs
@@ -441,10 +443,10 @@ cruncher analyze -c "$CONFIG"
 # cruncher analyze --run <run_name|run_dir> -c "$CONFIG"
 
 # Write report from latest run
-cruncher report --latest -c "$CONFIG"  # write report from latest run
+cruncher analyze --summary -c "$CONFIG"  # print a concise report from latest run
 ```
 
-Outputs land under `<workspace>/runs/sample/<run_name>/analysis/` with a
+Outputs land under `<workspace>/outputs/sample/<run_name>/analysis/` with a
 summary in `analysis/summary.json`.
 This demo enables a small Tier‑0 plot set by default; use
 `cruncher analyze --plots all` to generate the full suite.
@@ -461,10 +463,27 @@ For a compact diagnostics checklist and tuning guidance, see the
 Replace the run directory below with your own sample run (see `cruncher runs latest`).
 
 ```bash
-cruncher notebook <workspace>/runs/sample/lexA-cpxR_20260113_115749_e72283 --latest  # generate analysis notebook
+cruncher notebook <workspace>/outputs/sample/lexA-cpxR_20260113_115749_e72283 --latest  # generate analysis notebook
 ```
 
 Notebook files are written under `<run_dir>/analysis/notebooks/`.
+
+---
+
+#### Bridge to DenseGen
+
+Export the binding-site superset and the selected motifs for DenseGen runs:
+
+```bash
+# Export binding sites (CSV/Parquet) for DenseGen binding_sites inputs
+cruncher catalog export-sites --set 1 --out /tmp/densegen_sites.csv -c "$CONFIG"
+
+# Export per-motif JSON artifacts for DenseGen PWM artifact inputs
+cruncher catalog export-densegen --set 1 --out /tmp/densegen_pwms -c "$CONFIG"
+```
+
+Then point DenseGen configs at the exported files (`type: binding_sites`) or artifacts
+(`type: pwm_artifact_set`).
 
 ---
 

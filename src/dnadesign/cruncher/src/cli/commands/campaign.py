@@ -347,7 +347,7 @@ def notebook(
         None,
         "--out",
         "-o",
-        help="Campaign summary directory (defaults to runs/campaigns/<campaign_id>).",
+        help="Campaign summary directory (defaults to <out_dir>/campaigns/<campaign_id>).",
     ),
     force: bool = typer.Option(False, "--force", help="Overwrite the notebook if it already exists."),
     strict: bool = typer.Option(

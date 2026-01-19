@@ -26,7 +26,7 @@ cruncher workspaces list
 * **Validate motifs** → `parse`
 * **Render logos** → `catalog logos`
 * **Optimize** → `sample`
-* **Analyze/report** → `analyze`, `report`, `notebook`
+* **Analyze** → `analyze`, `notebook`
 * **Campaigns** → `campaign validate|generate|summarize|notebook`
 * **Run management** → `runs list/show/latest/best/watch/clean`
 * **Workspace health** → `status`
@@ -223,18 +223,19 @@ Network:
 
 Examples:
 
-* `cruncher campaign summarize --campaign regulators_v1 --runs runs/* --config <config>`
+* `cruncher campaign summarize --campaign regulators_v1 --runs outputs/* --config <config>`
 * `cruncher campaign summarize --campaign regulators_v1 --no-metrics <config>`
 
 Outputs:
 
 * `campaign_summary.csv`, `campaign_best.csv`
-* plots under `plots/` (including `best_jointscore_bar.png`, `tf_coverage_heatmap.png`,\n  `joint_trend.png`, and `pareto_projection.png`)
+* plots under the campaign output root (e.g., `plot__best_jointscore_bar.png`,
+  `plot__tf_coverage_heatmap.png`, `plot__joint_trend.png`, `plot__pareto_projection.png`)
 
 Notes:
 
 * `--metrics` requires a local catalog; fetch motifs/sites first.
-* `--skip-missing` skips runs missing `analysis/tables/joint_metrics.csv` or `score_summary.csv`.
+* `--skip-missing` skips runs missing `analysis/joint_metrics.parquet` or `analysis/score_summary.parquet`.
 * With site-derived PWMs, `--metrics` also requires `motif_store.site_window_lengths`
   for TFs with variable site lengths. Use `--no-metrics` if you haven't set them.
 
@@ -256,7 +257,7 @@ Network:
 Examples:
 
 * `cruncher campaign notebook --campaign regulators_v1 <config>`
-* `cruncher campaign notebook --campaign regulators_v1 --out runs/campaigns/<id> <config>`
+* `cruncher campaign notebook --campaign regulators_v1 --out outputs/campaigns/<id> <config>`
 
 Notes:
 
@@ -324,11 +325,13 @@ Precondition:
 
 Notes:
 
-* `sample.output.save_sequences: true` is required for later analysis/reporting.
+* `sample.output.save_sequences: true` is required for later analysis.
 * `sample.output.trace.save: true` enables trace-based diagnostics.
-* Auto-opt is enabled by default: it runs short Gibbs + PT pilots, evaluates objective-aligned scores from draw-phase `combined_score_final` (top-K median), logs diagnostics warnings, then runs the best candidate. Selection is thresholdless and confidence-based; `auto_opt.policy.allow_warn: true` will always pick a winner at the max budget (logging low-confidence warnings). Use `--no-auto-opt` to disable.
+* Auto-opt is enabled by default: it runs short Gibbs + PT pilots, evaluates objective-aligned scores from draw-phase `combined_score_final` (top-K median), records diagnostics (warnings suppressed for very short pilots), then runs the best candidate. Selection is thresholdless and confidence-based; `auto_opt.policy.allow_warn: true` will always pick a winner at the max budget (logging low-confidence warnings). Use `--no-auto-opt` to disable.
+* `--no-auto-opt` overrides `optimizer.name=auto` to `gibbs` with a warning; set `sample.optimizer.name` explicitly to silence the fallback.
+* Auto-opt can take minutes; use `--no-auto-opt` when you need a quick smoke test.
 * `--verbose` enables periodic progress logging; `--debug` enables very verbose debug logs.
-* Auto-opt selection details are recorded in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/tables/auto_opt_pilots.csv` for the latest run. The selected pilot is also recorded in `runs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
+* Auto-opt selection details are recorded in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/auto_opt_pilots.parquet` for the latest run. The selected pilot is also recorded in `outputs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
 
 ---
 
@@ -341,6 +344,7 @@ Inputs:
 * CONFIG (explicit or resolved)
 * runs via `analysis.runs` or `--run` (defaults to latest sample run if empty)
 * run artifacts: `artifacts/sequences.parquet` (required) and `artifacts/trace.nc` for trace-based plots
+* pairwise plots auto-select a deterministic `tf_pair` when omitted (override with `--tf-pair`)
 
 Network:
 
@@ -360,56 +364,21 @@ Preconditions:
 * provide runs via `analysis.runs`/`--run` or rely on the default latest run
 * trace-dependent plots require `artifacts/trace.nc`
 * if `analysis/` exists without `analysis/summary.json`, remove the incomplete analysis folder before re-running `cruncher analyze`
+* each sample run snapshots the lockfile under `meta/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
 
 Outputs:
 
-* tables: `analysis/tables/score_summary.csv`, `analysis/tables/elite_topk.csv`, `analysis/tables/joint_metrics.csv`,
-  `analysis/tables/diagnostics.json`
-* plots: `analysis/plots/score__pairgrid.png` (when `analysis.plots.pairgrid=true`)
+* tables: `analysis/score_summary.parquet`, `analysis/elite_topk.parquet`,
+  `analysis/joint_metrics.parquet`, `analysis/diagnostics.json`
+* plots: `analysis/plot__score__pairgrid.<plot_format>` (when `analysis.plots.pairgrid=true`)
+* reports: `analysis/report.json`, `analysis/report.md`
 * summaries: `analysis/summary.json`, `analysis/manifest.json`, `analysis/plot_manifest.json`, `analysis/table_manifest.json`
 
 Note:
 
 * Analyze is idempotent for identical inputs + analysis config; if the current summary signature matches,
   it reports that analysis is already up to date and skips re-running plots/tables.
-
----
-
-#### `cruncher report`
-
-Writes `report/report.json` and `report/report.md` for a sample run.
-
-Inputs:
-
-* CONFIG (explicit or resolved)
-* run name (sample run) or `--latest`
-* required artifacts: `artifacts/sequences.parquet` and `artifacts/trace.nc` (plus elites)
-
-Network:
-
-* no (run artifacts only)
-
-Example:
-
-* `cruncher report --latest <config>`
-* `cruncher report <run_name|run_dir> <config>`
-* `cruncher report <config> <run_name>`
-
-Preconditions:
-
-* required artifacts must exist in the run directory (commonly `artifacts/sequences.parquet`, `artifacts/elites.parquet`, and often `artifacts/trace.nc`)
-* if required artifacts are missing, reporting should fail fast rather than silently omitting sections
-
-Diagnostics note:
-
-* R-hat requires at least 2 chains.
-* ESS is not meaningful with too few draws.
-  When metrics cannot be computed, reports should record diagnostics warnings.
-* Reports also include a diagnostics summary (`report/report.json` → `diagnostics`) with
-  acceptance rates, mixing heuristics, and diversity warnings.
-
-Tip: if you are in a workspace with `config.yaml`, you can run `cruncher report --latest`
-directly (or pass `--config` when running elsewhere).
+* Use `cruncher analyze --summary` to print the highlights from `analysis/report.json`.
 
 ---
 
@@ -438,7 +407,7 @@ Notes:
 * when `analysis/summary.json` is missing, lenient mode falls back to `analysis/` as an unindexed entry
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
-* the notebook infers `run_dir` from its location; keep it under `<run_dir>/analysis/notebooks/` or regenerate it
+* the notebook infers `run_dir` from its location; keep it under `<run_dir>/analysis/` or regenerate it
 * text outputs (for example, `diag__convergence.txt`) render inline in the Plots tab
 * if running in lenient mode and `analysis/summary.json` lacks `tf_names`, scatter controls are disabled with an inline warning
 * the notebook includes:
@@ -491,10 +460,12 @@ Subcommands:
 * `catalog resolve` — resolve a TF name to cached candidates
 * `catalog show` — show metadata for a cached `<source>:<motif_id>`
 * `catalog pwms` — summarize or export resolved PWMs (matrix or site-derived)
+* `catalog export-densegen` — export DenseGen motif artifacts (one JSON per motif)
+* `catalog export-sites` — export cached binding sites as CSV/Parquet for DenseGen
 * `catalog logos` — render PWM logos for selected TFs or motif refs
 
 Note: `catalog logos` is idempotent for identical inputs. If matching logos already exist
-under `runs/logos/catalog/`, it reports the existing path instead of writing a new run.
+under `outputs/logos/catalog/`, it reports the existing path instead of writing a new run.
 
 Examples:
 
@@ -503,6 +474,8 @@ Examples:
 * `cruncher catalog show <config> regulondb:RDBECOLITFC00214`
 * `cruncher catalog pwms <config>`
 * `cruncher catalog pwms --set 1 <config>`
+* `cruncher catalog export-sites --set 1 --out densegen/sites.csv <config>`
+* `cruncher catalog export-densegen --set 1 --out densegen/pwms <config>`
 * `cruncher catalog logos --set 1 <config>`
 
 ---

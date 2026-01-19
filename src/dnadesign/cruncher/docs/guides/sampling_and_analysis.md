@@ -14,20 +14,21 @@ cruncher lock
 
 # Optimization (auto‑opt is on by default)
 cruncher sample
-# Optional: skip pilots (requires optimizer.name=gibbs|pt in config)
+# Optional: skip pilots (forces gibbs if optimizer.name=auto; set optimizer.name=gibbs|pt to choose)
 cruncher sample --no-auto-opt
 
-# Diagnostics + plots
+# Diagnostics + plots (writes analysis/report.json + analysis/report.md)
 cruncher analyze
 
-# Summarized report (JSON + Markdown)
-cruncher report --latest
+# Optional: print a concise summary to stdout
+cruncher analyze --summary
 ```
 
 If you run via pixi, prefix each command with `pixi run cruncher --`.
 
 Outputs are recorded under each run’s `analysis/` folder. The canonical summary
-is `analysis/summary.json`, which links to plot/table manifests. A detailed
+is `analysis/summary.json`, which links to plot/table manifests. The human‑readable
+entrypoint is `analysis/report.md` (machine‑readable `analysis/report.json`). A detailed
 inventory with “why” each artifact was generated is in `analysis/manifest.json`.
 
 ### Numba cache (required for fast diagnostics)
@@ -50,10 +51,10 @@ cruncher --log-level DEBUG analyze --latest
 
 ### Auto‑optimize (default)
 
-Auto‑opt runs short **Gibbs** and **parallel tempering (PT)** pilots, evaluates objective‑aligned metrics from the draw phase (`combined_score_final`), and selects the best candidate using the top‑K median score (with a secondary max score tie‑breaker). Pilot diagnostics (R‑hat/ESS, acceptance summaries, diversity) are still reported as warnings, but selection is **thresholdless** and driven by objective‑comparable metrics. Auto‑opt escalates through `budget_levels` (and the configured `replicates`) until a confidence‑separated winner emerges.
+Auto‑opt runs short **Gibbs** and **parallel tempering (PT)** pilots, evaluates objective‑aligned metrics from the draw phase (`combined_score_final`), and selects the best candidate using the top‑K median score (with a secondary max score tie‑breaker). Pilot diagnostics (R‑hat/ESS, acceptance summaries, diversity) are still recorded, but very short pilot budgets (<200 draws) suppress mixing warnings to avoid noise. Selection is **thresholdless** and driven by objective‑comparable metrics. Auto‑opt escalates through `budget_levels` (and the configured `replicates`) until a confidence‑separated winner emerges.
 
 `auto_opt.policy.allow_warn: true` means auto‑opt will always pick a winner by the end of the configured budgets and record low‑confidence warnings if the separation is unclear. Set `allow_warn: false` to require a confidence‑separated winner; if none emerges at the maximum budgets/replicates, auto‑opt fails fast with guidance to increase `auto_opt.budget_levels` and/or `auto_opt.replicates`. Pilots disable trim/polish by default to preserve length fidelity; override with `auto_opt.allow_trim_polish_in_pilots: true` if needed.
-Auto‑opt pilot runs are stored under `runs/auto_opt/`.
+Auto‑opt pilot runs are stored under `outputs/auto_opt/`.
 
 Disable auto‑opt when you want a single fixed optimizer (set `sample.optimizer.name`
 to `gibbs` or `pt` in your config):
@@ -61,11 +62,13 @@ to `gibbs` or `pt` in your config):
 ```bash
 cruncher sample --no-auto-opt
 ```
+If `optimizer.name=auto`, `--no-auto-opt` forces a Gibbs run and logs a warning; set
+`sample.optimizer.name` explicitly to choose the optimizer.
 
 Config knobs live under `sample.auto_opt` in `config.yaml` (see the config
 reference for full options). Auto‑opt also writes a pilot scorecard to
-`analysis/tables/auto_opt_pilots.csv` and a tradeoff plot to
-`analysis/plots/auto_opt_tradeoffs.png` when available.
+`analysis/auto_opt_pilots.parquet` and a tradeoff plot to
+`analysis/plot__auto_opt_tradeoffs.<plot_format>` when available.
 
 If enabled, `sample.auto_opt.length` probes multiple sequence lengths and
 compares them using the same objective‑aligned top‑K median score; use
@@ -103,7 +106,7 @@ sample:
     length_penalty_lambda: 0.25
 ```
 
-Ladder runs write `analysis/tables/length_ladder.csv` under the auto-opt pilot
+Ladder runs write `analysis/length_ladder.csv` under the auto-opt pilot
 root with per‑length summary metrics.
 
 ### Elites: filter → rank → diversify
@@ -132,11 +135,11 @@ and tune based on `normalized_min_median` in diagnostics.
 Overlap of TF motifs is expected and informative. Cruncher records overlap
 patterns from elites (best-hit windows per TF) and reports:
 
-- `analysis/tables/overlap_summary.csv` — TF-pair overlap rates, overlap bp stats,
+- `analysis/overlap_summary.parquet` — TF-pair overlap rates, overlap bp stats,
   strand-combo counts, and `overlap_bp_hist` (bins+counts).
-- `analysis/tables/elite_overlap.csv` — per-elite overlap totals and pair counts.
-- `analysis/plots/plot__overlap_heatmap.png` — heatmap of overlap rates.
-- `analysis/plots/plot__overlap_bp_distribution.png` — distribution of overlap bp.
+- `analysis/elite_overlap.parquet` — per-elite overlap totals and pair counts.
+- `analysis/plot__overlap_heatmap.<plot_format>` — heatmap of overlap rates.
+- `analysis/plot__overlap_bp_distribution.<plot_format>` — distribution of overlap bp.
 - Optional: `plot__overlap_strand_combos.png` + `plot__motif_offset_rug.png`.
 
 These are descriptive only; overlap is not penalized by default.
@@ -145,12 +148,12 @@ These are descriptive only; overlap is not penalized by default.
 
 Diagnostics are written to:
 
-- `analysis/tables/diagnostics.json`
-- `analysis/tables/score_summary.csv`
-- `analysis/tables/joint_metrics.csv`
-- `analysis/tables/objective_components.json`
-- `analysis/plots/plot__dashboard.png`
-- `analysis/plots/plot__worst_tf_trace.png` / `plot__worst_tf_identity.png`
+- `analysis/diagnostics.json`
+- `analysis/score_summary.parquet`
+- `analysis/joint_metrics.parquet`
+- `analysis/objective_components.json`
+- `analysis/plot__dashboard.<plot_format>`
+- `analysis/plot__worst_tf_trace.<plot_format>` / `plot__worst_tf_identity.<plot_format>`
 
 Key signals:
 
@@ -197,7 +200,7 @@ cruncher runs best --set-index 1
 Run artifacts live under:
 
 ```
-<workspace>/runs/sample/<run_name>/
+<workspace>/outputs/sample/<run_name>/
 ```
 
 `run_name` includes the TF slug; when multiple regulator sets are configured it is prefixed with `setN_`.

@@ -16,12 +16,9 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-ANALYSIS_LAYOUT_VERSION = "v5"
+ANALYSIS_LAYOUT_VERSION = "v7"
 ANALYSIS_DIR_NAME = "analysis"
 ARCHIVE_DIR_NAME = "_archive"
-PLOTS_DIR_NAME = "plots"
-TABLES_DIR_NAME = "tables"
-NOTEBOOKS_DIR_NAME = "notebooks"
 MANIFEST_FILE_NAME = "manifest.json"
 
 
@@ -35,6 +32,14 @@ def analysis_meta_root(analysis_root: Path) -> Path:
 
 def summary_path(analysis_root: Path) -> Path:
     return analysis_meta_root(analysis_root) / "summary.json"
+
+
+def report_json_path(analysis_root: Path) -> Path:
+    return analysis_meta_root(analysis_root) / "report.json"
+
+
+def report_md_path(analysis_root: Path) -> Path:
+    return analysis_meta_root(analysis_root) / "report.md"
 
 
 def analysis_used_path(analysis_root: Path) -> Path:
@@ -178,14 +183,15 @@ def list_analysis_entries_verbose(run_dir: Path) -> list[dict]:
         except Exception as exc:
             warnings.append(f"Failed to read analysis directory contents: {exc}")
             has_contents = False
-        if has_contents:
-            _append_entry(
-                analysis_id="unindexed",
-                path=root,
-                kind="unindexed",
-                label="analysis (unindexed)",
-                warnings=warnings,
-            )
+        if not has_contents:
+            warnings.append("analysis directory exists but summary.json is missing or empty")
+        _append_entry(
+            analysis_id="unindexed",
+            path=root,
+            kind="unindexed",
+            label="analysis (unindexed)",
+            warnings=warnings,
+        )
 
     archive_root = root / ARCHIVE_DIR_NAME
     if archive_root.exists():

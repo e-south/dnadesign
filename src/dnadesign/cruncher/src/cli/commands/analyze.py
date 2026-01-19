@@ -15,7 +15,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from dnadesign.cruncher.analysis.layout import load_summary, summary_path
+from dnadesign.cruncher.analysis.layout import load_summary, report_json_path, report_md_path, summary_path
 from dnadesign.cruncher.analysis.plot_registry import (
     plot_keys,
     plot_registry_rows,
@@ -101,6 +101,7 @@ def analyze(
         help="Seed for random baseline sequences (overrides analysis.scatter_background_seed).",
     ),
     list_plots: bool = typer.Option(False, "--list-plots", help="List which plots would run and exit."),
+    summary_flag: bool = typer.Option(False, "--summary", help="Print a concise analysis summary after analyze."),
 ) -> None:
     plot_keys_override: list[str] | None = None
     if plots:
@@ -134,6 +135,7 @@ def analyze(
         for row in plot_registry_rows(
             enabled=cfg.analysis.plots,
             pair_available=pair_required is not None,
+            plot_format=cfg.analysis.plot_format if cfg.analysis else None,
             overrides=plot_keys_override,
         ):
             plan_table.add_row(
@@ -145,7 +147,7 @@ def analyze(
             )
         console.print(plan_table)
         if not (tf_pair_override or cfg.analysis.tf_pair):
-            console.print("Hint: pairwise plots require analysis.tf_pair or --tf-pair TF1,TF2.")
+            console.print("Hint: pairwise plots auto-pick a tf_pair; override with --tf-pair TF1,TF2.")
         return
     try:
         ensure_numba_cache_dir(config_path.parent)
@@ -163,10 +165,13 @@ def analyze(
             scatter_background_seed_override=scatter_background_seed,
         )
         for analysis_dir in analysis_runs:
-            summary = load_summary(summary_path(analysis_dir), required=True)
-            analysis_id = summary.get("analysis_id")
+            summary_payload = load_summary(summary_path(analysis_dir), required=True)
+            analysis_id = summary_payload.get("analysis_id")
             console.print(f"Analysis outputs → {render_path(analysis_dir, base=config_path.parent)}")
             console.print(f"  summary: {render_path(summary_path(analysis_dir), base=config_path.parent)}")
+            report_path = report_md_path(analysis_dir)
+            if report_path.exists():
+                console.print(f"  report: {render_path(report_path, base=config_path.parent)}")
             console.print(f"  analysis_id: {analysis_id}")
             sample_dir = analysis_dir.parent
             run_name = sample_dir.name
@@ -174,10 +179,35 @@ def analyze(
             console.print("Next steps:")
             console.print(f"  cruncher runs show {run_name} -c {config_hint}")
             console.print(f"  cruncher notebook --latest {render_path(sample_dir, base=config_path.parent)}")
-            if latest and not runs:
-                console.print(f"  cruncher report --latest -c {config_hint}")
-            else:
-                console.print(f"  cruncher report {run_name} -c {config_hint}")
+            console.print(f"  open {render_path(report_path, base=config_path.parent)}")
+            if summary_flag:
+                report_json = report_json_path(analysis_dir)
+                if report_json.exists():
+                    payload = load_summary(report_json, required=True)
+                    status = payload.get("status", "unknown")
+                    warnings = payload.get("warnings", [])
+                    highlights = payload.get("highlights", {})
+                    objective = highlights.get("objective", {})
+                    diversity = highlights.get("diversity", {})
+                    overlap = highlights.get("overlap", {})
+                    sampling = highlights.get("sampling", {})
+                    console.print("Summary:")
+                    console.print(f"  status: {status}  warnings: {len(warnings) if isinstance(warnings, list) else 0}")
+                    console.print(
+                        f"  best_score_final: {objective.get('best_score_final')}  "
+                        f"top_k_median_final: {objective.get('top_k_median_final')}"
+                    )
+                    console.print(
+                        f"  unique_fraction: {diversity.get('unique_fraction')}  n_elites: {diversity.get('n_elites')}"
+                    )
+                    console.print(
+                        f"  overlap_rate_median: {overlap.get('overlap_rate_median')}  "
+                        f"overlap_total_bp_median: {overlap.get('overlap_total_bp_median')}"
+                    )
+                    console.print(
+                        f"  acceptance_rate_mh_tail: {sampling.get('acceptance_rate_mh_tail')}  "
+                        f"swap_acceptance_rate: {sampling.get('swap_acceptance_rate')}"
+                    )
     except (RuntimeError, ValueError, FileNotFoundError) as exc:
         message = str(exc)
         console.print(f"Error: {message}")

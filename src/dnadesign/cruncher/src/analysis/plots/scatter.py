@@ -22,6 +22,7 @@ from matplotlib.collections import LineCollection
 
 from dnadesign.cruncher.analysis.elites import find_elites_parquet
 from dnadesign.cruncher.analysis.parquet import read_parquet
+from dnadesign.cruncher.analysis.plots._savefig import savefig
 from dnadesign.cruncher.analysis.plots.scatter_utils import (
     compute_consensus_points,
     encode_sequence,
@@ -58,11 +59,16 @@ def plot_scatter(
     bidirectional: bool,
     pwm_sum_threshold: float,
     annotation: str,
+    output_format: str = "png",
+    elites_df: pd.DataFrame | None = None,
+    seq_len: int | None = None,
+    dpi: int = 150,
+    png_compress_level: int = 9,
     pseudocounts: float = 0.0,
     log_odds_clip: float | None = None,
 ) -> None:
     """
-    Orchestrator for pwm__scatter.{png,pdf} under the analysis plots directory.
+    Orchestrator for pwm__scatter.{png,pdf,svg} under the analysis plots directory.
     Robust to the case where there are zero elites.
     """
     # 1) Load per‐PWM scores
@@ -71,12 +77,16 @@ def plot_scatter(
         raise ValueError("plot_scatter: per-PWM score table is empty; check sequences.parquet and subsampling_epsilon.")
 
     # 2) Load elites parquet (may be empty)
-    elites_path = find_elites_parquet(run_dir)
-    df_elites = read_parquet(elites_path)
+    df_elites = elites_df
+    if df_elites is None:
+        elites_path = find_elites_parquet(run_dir)
+        df_elites = read_parquet(elites_path)
 
     # 3) Get sequence length from manifest (explicit)
     manifest = load_manifest(run_dir)
-    seq_len = int(manifest.get("sequence_length") or 0)
+    if seq_len is None:
+        manifest = load_manifest(run_dir)
+        seq_len = int(manifest.get("sequence_length") or 0)
     if seq_len < 1:
         raise ValueError("plot_scatter: sequence_length missing from meta/run_manifest.json")
 
@@ -152,9 +162,11 @@ def plot_scatter(
         raise AttributeError("plot_scatter: cannot find PWM.length attributes")
 
     # 10) Draw
-    out_pdf = out_dir / "pwm__scatter.pdf"
-    out_png = out_dir / "pwm__scatter.png"
-    out_pdf.parent.mkdir(exist_ok=True, parents=True)
+    output_format = output_format.lower().strip()
+    if output_format not in {"png", "pdf", "svg"}:
+        raise ValueError(f"plot_scatter: unsupported output_format '{output_format}'")
+    out_path = out_dir / f"pwm__scatter.{output_format}"
+    out_path.parent.mkdir(exist_ok=True, parents=True)
 
     _draw_scatter_figure(
         df_samples=df_sub,
@@ -173,26 +185,9 @@ def plot_scatter(
         log_odds_clip=log_odds_clip,
         pwm_sum_threshold=pwm_sum_threshold,
         annotation=annotation,
-        out_path=out_pdf,
-    )
-    _draw_scatter_figure(
-        df_samples=df_sub,
-        df_random=df_random,
-        consensus_pts=consensus_pts,
-        elite_coords=elite_coords,
-        x_tf=x_tf,
-        y_tf=y_tf,
-        seq_len=seq_len,
-        width_x=width_x,
-        width_y=width_y,
-        pwms=pwms,
-        cfg=cfg,
-        bidirectional=bidirectional,
-        pseudocounts=pseudocounts,
-        log_odds_clip=log_odds_clip,
-        pwm_sum_threshold=pwm_sum_threshold,
-        annotation=annotation,
-        out_path=out_png,
+        out_path=out_path,
+        dpi=dpi,
+        png_compress_level=png_compress_level,
     )
 
 
@@ -223,6 +218,9 @@ def _draw_scatter_figure(
     pwm_sum_threshold: float,
     annotation: str,
     out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
 ) -> None:
     sns.set_style("ticks", {"axes.grid": False})
     fig, ax = plt.subplots(figsize=(6, 6))
@@ -429,5 +427,5 @@ def _draw_scatter_figure(
         )
 
     sns.despine(ax=ax)
-    fig.savefig(out_path, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)

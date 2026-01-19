@@ -41,7 +41,7 @@ This document defines the end-to-end requirements and architecture for **crunche
 - **artifacts/** — run layout, manifest + status helpers.
 - **viz/** — plotting helpers + PWM logo rendering.
 - **integrations/** — external tool wrappers (e.g., MEME Suite).
-- **app/** — parse/sample/analyze/report orchestration + application services.
+- **app/** — parse/sample/analyze orchestration + application services.
 - **cli/** — Typer CLI, no business logic.
 
 #### Registries
@@ -113,7 +113,7 @@ Lockfiles pin TF names to exact source IDs and checksums. Lockfiles are **requir
 - parse
 - sample
 
-If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze/report operate on run artifacts and validate the lockfile recorded in the run manifest.
+If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze operates on run artifacts and validates the lockfile recorded in the run manifest.
 
 ---
 
@@ -163,19 +163,19 @@ Each run directory contains:
 - `artifacts/elites.parquet` — elite sequences (parquet)
 - `artifacts/elites.json` — elite sequences (JSON, human-readable)
 - `artifacts/elites.yaml` — elite metadata (YAML)
-- `analysis/` — latest analysis (plots/tables/notebooks)
+- `analysis/` — latest analysis (plots/tables/report in one directory)
 - `analysis/summary.json` — analysis provenance and artifacts
 - `analysis/manifest.json` — artifact inventory with generation reasons
 - `analysis/analysis_used.yaml` — analysis settings used
 - `analysis/plot_manifest.json` — plot registry and generated outputs
 - `analysis/table_manifest.json` — table registry and generated outputs
-- `analysis/tables/auto_opt_pilots.csv` — pilot scorecard (when auto-opt runs)
-- `analysis/plots/auto_opt_tradeoffs.png` — balance vs best-score tradeoffs (when auto-opt runs)
+- `analysis/auto_opt_pilots.parquet` — pilot scorecard (when auto-opt runs)
+- `analysis/plot__auto_opt_tradeoffs.<plot_format>` — balance vs best-score tradeoffs (when auto-opt runs)
 - `analysis/_archive/<analysis_id>/` — optional archived analyses (when enabled)
 - `live/metrics.jsonl` — live sampling progress (when enabled)
-- `report/report.json` + `report/report.md` — summary (from `cruncher report`)
+- `analysis/report.json` + `analysis/report.md` — summary (from `cruncher analyze`)
 
-`cruncher report` **fails** if required artifacts are missing.
+`cruncher analyze` warns when required analysis artifacts are missing and still writes the report stubs.
 
 ---
 
@@ -202,13 +202,13 @@ Defaults + automation:
 - `cruncher sample <config>`
 - `cruncher analyze --run <run_name|run_dir> <config>`
 - `cruncher analyze --latest <config>`
-- `cruncher report <config> <run_name>`
+- `cruncher analyze --summary <config>`
 - `cruncher runs list <config> [--stage sample]`
 - `cruncher runs show <config> <run_name>`
 - `cruncher runs rebuild-index <config>`
 - `cruncher notebook [--analysis-id <id>|--latest] <run_dir>`
 
-Pairwise plots only run when `analysis.tf_pair` is set; there is no implicit pairwise sweep.
+Pairwise plots auto-pick a deterministic `tf_pair` when missing; explicit `analysis.tf_pair` overrides the selection.
 
 Network access is explicit and opt-in. `cruncher fetch ...` and remote inventory commands (for example `cruncher sources summary --scope remote` or
 `cruncher sources datasets`) contact sources; other commands operate on local
@@ -233,7 +233,7 @@ Errors are explicit and actionable:
 
 - Missing lockfile → error (no implicit resolution)
 - Lockfile pwm_source mismatch → error (re-run lock)
-- Missing artifacts for analyze/report → error
+- Missing artifacts for analyze → warning + partial outputs
 - Invalid PWM / invalid sites → error
 - Ambiguous TF resolution → error
 - PWM-from-sites with low site count → error unless `allow_low_sites=true`
@@ -254,12 +254,12 @@ Integration tests:
 
 - fetch motifs/sites → catalog updates
 - lock → parse/sample with catalog
-- report generation with run artifacts
+- analysis report generation with run artifacts
 
 End-to-end:
 
 - LocalDir ingestion (offline, matrices only by default; MEME BLOCKS sites when extract_sites=true)
-- sample + analyze + report with small draws
+- sample + analyze with small draws
 
 ---
 

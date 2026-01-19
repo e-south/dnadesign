@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from dnadesign.cruncher.analysis.plots._savefig import savefig
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,7 +31,13 @@ def _tune_end_from_phase(df: pd.DataFrame) -> int | None:
     return int(tune_df["sweep_idx"].max())
 
 
-def plot_move_acceptance_time(move_df: pd.DataFrame, out_path: Path) -> None:
+def plot_move_acceptance_time(
+    move_df: pd.DataFrame,
+    out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+) -> None:
     if move_df is None or move_df.empty:
         logger.warning("Skipping move acceptance plot: empty move stats.")
         return
@@ -83,11 +91,17 @@ def plot_move_acceptance_time(move_df: pd.DataFrame, out_path: Path) -> None:
         ax.legend(frameon=False, fontsize=8, ncol=3)
         fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
 
 
-def plot_move_usage_time(move_df: pd.DataFrame, out_path: Path) -> None:
+def plot_move_usage_time(
+    move_df: pd.DataFrame,
+    out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+) -> None:
     if move_df is None or move_df.empty:
         logger.warning("Skipping move usage plot: empty move stats.")
         return
@@ -147,11 +161,17 @@ def plot_move_usage_time(move_df: pd.DataFrame, out_path: Path) -> None:
         ax.legend(frameon=False, fontsize=8, ncol=3)
         fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
 
 
-def plot_pt_swap_by_pair(pt_df: pd.DataFrame, out_path: Path) -> None:
+def plot_pt_swap_by_pair(
+    pt_df: pd.DataFrame,
+    out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+) -> None:
     if pt_df is None or pt_df.empty:
         logger.warning("Skipping PT swap plot: empty swap table.")
         return
@@ -166,5 +186,5 @@ def plot_pt_swap_by_pair(pt_df: pd.DataFrame, out_path: Path) -> None:
     ax.set_ylabel("Swap acceptance rate")
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)

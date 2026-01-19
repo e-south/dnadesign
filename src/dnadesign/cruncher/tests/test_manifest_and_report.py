@@ -16,10 +16,10 @@ import arviz as az
 import numpy as np
 import pandas as pd
 
-from dnadesign.cruncher.app.report_workflow import run_report
+from dnadesign.cruncher.analysis.layout import analysis_root, summary_path
+from dnadesign.cruncher.analysis.report import ensure_report
 from dnadesign.cruncher.artifacts.layout import (
     elites_path,
-    report_dir,
     sequences_path,
     trace_path,
 )
@@ -160,14 +160,23 @@ def test_build_manifest_and_report(tmp_path: Path) -> None:
         ]
     ).to_parquet(elites_path(run_dir), index=False)
 
-    run_report(cfg, config_path, "sample_test")
+    analysis_dir = analysis_root(run_dir)
+    analysis_dir.mkdir(parents=True, exist_ok=True)
+    summary_payload = {
+        "analysis_id": "analysis_test",
+        "run": "sample_test",
+        "tf_names": ["lexA"],
+        "diagnostics": {},
+        "objective_components": {},
+        "overlap_summary": {},
+    }
+    summary_path(analysis_dir).write_text(json.dumps(summary_payload))
 
-    report_root = report_dir(run_dir)
+    ensure_report(analysis_root=analysis_dir, summary_payload=summary_payload, refresh=True)
+
+    report_root = analysis_root(run_dir)
     assert (report_root / "report.json").exists()
     assert (report_root / "report.md").exists()
 
     report = json.loads((report_root / "report.json").read_text())
-    assert report["rhat"] is None
-    assert report["ess"] is None
-    assert report.get("diagnostics_warnings")
-    assert report.get("diagnostics")
+    assert report["run"]["run"] == "sample_test"

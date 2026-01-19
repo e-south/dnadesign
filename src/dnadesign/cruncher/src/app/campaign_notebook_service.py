@@ -160,16 +160,20 @@ def _(manifest_summary, mo, overview_block):
 
 @app.cell
 def _(summary_dir, mo):
-    plots_dir = summary_dir / "plots"
+    plots_dir = summary_dir
     images = []
-    for name in ["best_jointscore_bar.png", "tf_coverage_heatmap.png", "pairgrid_overview.png"]:
+    for name in [
+        "plot__best_jointscore_bar.png",
+        "plot__tf_coverage_heatmap.png",
+        "plot__pairgrid_overview.png",
+    ]:
         path = plots_dir / name
         if path.exists():
             images.append(mo.image(path))
     if images:
         plots_block = mo.vstack(images)
     else:
-        plots_block = mo.md("No campaign plots found under plots/")
+        plots_block = mo.md("No campaign plots found under the campaign output root.")
     return plots_block
 
 

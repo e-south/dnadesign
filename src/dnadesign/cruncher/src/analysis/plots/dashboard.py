@@ -18,6 +18,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from dnadesign.cruncher.analysis.plots._savefig import savefig
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,6 +39,9 @@ def plot_dashboard(
     overlap_summary_df: pd.DataFrame | None,
     elite_overlap_df: pd.DataFrame | None,
     out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
 ) -> None:
     tf_list = list(tf_names)
     sns.set_style("ticks", {"axes.grid": False})
@@ -106,5 +111,5 @@ def plot_dashboard(
 
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)

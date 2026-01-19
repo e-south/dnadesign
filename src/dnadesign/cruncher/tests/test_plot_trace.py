@@ -23,5 +23,5 @@ from dnadesign.cruncher.analysis.plots.diagnostics import plot_trace
 def test_plot_trace_constant_score(tmp_path: Path) -> None:
     idata = az.from_dict(posterior={"score": np.ones((2, 10))})
     out_dir = tmp_path / "plots"
-    plot_trace(idata, out_dir)
+    plot_trace(idata, out_dir, dpi=150, png_compress_level=9)
     assert (out_dir / "diag__trace_score.png").exists()

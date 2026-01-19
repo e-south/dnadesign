@@ -28,6 +28,7 @@ def gather_per_pwm_scores(
     scale: str,
     out_path: Path,
     *,
+    sequences_df: pd.DataFrame | None = None,
     pseudocounts: float = 0.0,
     log_odds_clip: float | None = None,
 ) -> None:
@@ -43,16 +44,17 @@ def gather_per_pwm_scores(
          c. If Euclidean distance between current per-TF vector and last-kept per-TF vector ≥ change_threshold,
             keep this draw.
          d. After finishing, also force-keep the very last draw of that chain.
-      4. Write out all kept rows (chain, draw, score_<tf>...) → gathered_per_pwm_everyN.csv
+      4. Write out all kept rows (chain, draw, score_<tf>...) → per_pwm_scores.<format>
     """
 
     seq_path = sequences_path(run_dir)
-    if not seq_path.exists():
-        raise FileNotFoundError(f"[gather] artifacts/sequences.parquet not found in '{run_dir}'")
+    if sequences_df is None:
+        if not seq_path.exists():
+            raise FileNotFoundError(f"[gather] artifacts/sequences.parquet not found in '{run_dir}'")
     if change_threshold <= 0:
         raise ValueError("gather_per_pwm_scores: change_threshold must be > 0")
 
-    df_all = read_parquet(seq_path)
+    df_all = sequences_df.copy() if sequences_df is not None else read_parquet(seq_path)
     if "phase" in df_all.columns:
         df_all = df_all[df_all["phase"] == "draw"].copy()
     if df_all.empty:
@@ -144,10 +146,13 @@ def gather_per_pwm_scores(
                 rec_final[f"score_{tf_name}"] = float(sc_val)
             records.append(rec_final)
 
-    # Build a DataFrame and write to CSV
+    # Build a DataFrame and write to disk
     out_df = pd.DataFrame(records)
     # Sort by chain then draw so the output is nicely ordered
     out_df = out_df.sort_values(["chain", "draw"]).reset_index(drop=True)
-
-    out_df.to_csv(out_path, index=False)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    if out_path.suffix == ".parquet":
+        out_df.to_parquet(out_path, engine="fastparquet", index=False)
+    else:
+        out_df.to_csv(out_path, index=False)
     logger.info("Wrote change-threshold per-PWM scores → %s", out_path)

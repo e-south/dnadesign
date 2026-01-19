@@ -33,7 +33,7 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     content = notebook_path.read_text()
     assert f"default_id_hint = {analysis_id!r}" in content
     assert "Path(__file__).resolve()" in content
-    assert "analysis_root = notebook_path.parent.parent" in content
+    assert "analysis_dir = notebook_path.parent" in content
     assert "Refresh analysis list" in content
     assert "plot_options" in content
     assert "Missing JSON at" in content
@@ -76,7 +76,7 @@ def test_generate_notebook_lenient_allows_missing_summary(tmp_path, monkeypatch)
     assert notebook_path.exists()
     content = notebook_path.read_text()
     assert "list_analysis_entries_verbose" in content
-    assert "analysis_root = notebook_path.parent.parent" in content
+    assert "analysis_dir = notebook_path.parent" in content
 
 
 def test_generate_notebook_rejects_latest_and_analysis_id(tmp_path, monkeypatch) -> None:

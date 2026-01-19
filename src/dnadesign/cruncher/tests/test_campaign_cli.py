@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pandas as pd
 import yaml
 from typer.testing import CliRunner
 
@@ -150,23 +151,37 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
         (run_a, ["A", "B"]),
         (run_b, ["C", "D"]),
     ):
-        (run_dir / "analysis" / "tables").mkdir(parents=True, exist_ok=True)
+        (run_dir / "analysis").mkdir(parents=True, exist_ok=True)
         (run_dir / "analysis" / "summary.json").write_text(json.dumps({"analysis_id": "analysis-1", "tf_names": tfs}))
-        score_summary = f"tf,mean,median,std,min,max\n{tfs[0]},1.0,1.0,0.1,0.8,1.2\n{tfs[1]},0.9,0.9,0.1,0.7,1.1\n"
-        (run_dir / "analysis" / "tables" / "score_summary.csv").write_text(score_summary)
-        joint_metrics = (
-            "tf_names,joint_min,joint_mean,joint_hmean,balance_index,pareto_front_size,pareto_fraction\n"
-            f"{','.join(tfs)},0.8,1.0,0.9,0.8,1,0.5\n"
+        score_summary_df = pd.DataFrame(
+            [
+                {"tf": tfs[0], "mean": 1.0, "median": 1.0, "std": 0.1, "min": 0.8, "max": 1.2},
+                {"tf": tfs[1], "mean": 0.9, "median": 0.9, "std": 0.1, "min": 0.7, "max": 1.1},
+            ]
         )
-        (run_dir / "analysis" / "tables" / "joint_metrics.csv").write_text(joint_metrics)
+        score_summary_df.to_parquet(run_dir / "analysis" / "score_summary.parquet", index=False)
+        joint_metrics_df = pd.DataFrame(
+            [
+                {
+                    "tf_names": ",".join(tfs),
+                    "joint_min": 0.8,
+                    "joint_mean": 1.0,
+                    "joint_hmean": 0.9,
+                    "balance_index": 0.8,
+                    "pareto_front_size": 1,
+                    "pareto_fraction": 0.5,
+                }
+            ]
+        )
+        joint_metrics_df.to_parquet(run_dir / "analysis" / "joint_metrics.parquet", index=False)
         manifest_path = run_dir / "meta" / "run_manifest.json"
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(
             json.dumps({"stage": "sample", "run_dir": str(run_dir), "regulator_set": {"tfs": tfs}})
         )
-        report_path = run_dir / "report" / "report.json"
+        report_path = run_dir / "analysis" / "report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.write_text(json.dumps({"n_sequences": 2, "n_elites": 1}))
+        report_path.write_text(json.dumps({"run": {"n_sequences": 2, "n_elites": 1}}))
 
     result = runner.invoke(
         app,
@@ -191,11 +206,11 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
     assert (out_dir / "campaign_summary.csv").exists()
     assert (out_dir / "campaign_best.csv").exists()
     assert (out_dir / "campaign_manifest.json").exists()
-    assert (out_dir / "plots" / "best_jointscore_bar.png").exists()
-    assert (out_dir / "plots" / "tf_coverage_heatmap.png").exists()
-    assert (out_dir / "plots" / "pairgrid_overview.png").exists()
-    assert (out_dir / "plots" / "joint_trend.png").exists()
-    assert (out_dir / "plots" / "pareto_projection.png").exists()
+    assert (out_dir / "plot__best_jointscore_bar.png").exists()
+    assert (out_dir / "plot__tf_coverage_heatmap.png").exists()
+    assert (out_dir / "plot__pairgrid_overview.png").exists()
+    assert (out_dir / "plot__joint_trend.png").exists()
+    assert (out_dir / "plot__pareto_projection.png").exists()
 
 
 def test_campaign_validate_cli_no_selectors(tmp_path: Path) -> None:

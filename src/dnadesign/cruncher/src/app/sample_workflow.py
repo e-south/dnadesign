@@ -49,6 +49,7 @@ from dnadesign.cruncher.artifacts.layout import (
     elites_yaml_path,
     ensure_run_dirs,
     live_metrics_path,
+    manifest_path,
     run_group_label,
     sequences_path,
     status_path,
@@ -112,6 +113,11 @@ class AutoOptCandidate:
     length: int | None
     budget: int | None
     cooling_boost: float
+    move_profile: str
+    swap_prob: float | None
+    ladder_size: int | None
+    move_probs: dict[str, float] | None
+    move_probs_label: str | None
     run_dir: Path
     run_dirs: list[Path]
     best_score: float | None
@@ -133,6 +139,18 @@ class AutoOptCandidate:
     quality: str
     warnings: list[str]
     diagnostics: dict[str, object]
+
+
+@dataclass(frozen=True)
+class AutoOptSpec:
+    kind: str
+    length: int
+    move_profile: str
+    cooling_boost: float
+    swap_prob: float | None = None
+    ladder_size: int | None = None
+    move_probs: dict[str, float] | None = None
+    move_probs_label: str | None = None
 
 
 def _store(cfg: CruncherConfig, config_path: Path):
@@ -605,9 +623,9 @@ class _EliteCandidate:
 
 
 def _write_length_ladder_table(rows: list[dict[str, object]], *, pilot_root: Path) -> Path:
-    tables_dir = pilot_root / "analysis" / "tables"
-    tables_dir.mkdir(parents=True, exist_ok=True)
-    out_path = tables_dir / "length_ladder.csv"
+    analysis_dir = pilot_root / "analysis"
+    analysis_dir.mkdir(parents=True, exist_ok=True)
+    out_path = analysis_dir / "length_ladder.csv"
     fieldnames = ["length", "best_score", "balance", "diversity", "unique_fraction", "runtime_sec"]
     with out_path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -805,6 +823,60 @@ def _boost_cooling(cooling: Any, factor: float) -> tuple[Any, list[str]]:
     return cooling, notes
 
 
+def _boost_beta_ladder(ladder: Any, factor: float) -> tuple[Any, list[str]]:
+    if factor <= 1:
+        return ladder, []
+    notes = [f"boosted PT beta ladder by x{factor:g} for stabilization"]
+    if isinstance(ladder, BetaLadderFixed):
+        return BetaLadderFixed(beta=float(ladder.beta) * factor), notes
+    if isinstance(ladder, BetaLadderGeometric):
+        if ladder.betas is not None:
+            betas = [float(b) * factor for b in ladder.betas]
+            return BetaLadderGeometric(betas=betas), notes
+        return BetaLadderGeometric(
+            beta_min=float(ladder.beta_min) * factor,
+            beta_max=float(ladder.beta_max) * factor,
+            n_temps=int(ladder.n_temps),
+        ), notes
+    return ladder, notes
+
+
+def _resize_beta_ladder(ladder: Any, n_temps: int | None) -> tuple[Any, list[str]]:
+    if n_temps is None:
+        return ladder, []
+    if n_temps < 2:
+        raise ValueError("auto_opt.pt_ladder_sizes entries must be >= 2")
+    notes = [f"set PT ladder size={n_temps} for pilots"]
+    if isinstance(ladder, BetaLadderFixed):
+        raise ValueError("auto_opt.pt_ladder_sizes requires beta_ladder.kind='geometric' (fixed ladder).")
+    if isinstance(ladder, BetaLadderGeometric):
+        if ladder.betas is not None:
+            betas = [float(b) for b in ladder.betas]
+            if n_temps > len(betas):
+                raise ValueError(
+                    "auto_opt.pt_ladder_sizes exceeds available betas; "
+                    "provide a geometric beta_ladder with beta_min/beta_max/n_temps."
+                )
+            if n_temps == len(betas):
+                return ladder, []
+            if n_temps == 2:
+                idx = [0, len(betas) - 1]
+            else:
+                idx = [int(round(x)) for x in np.linspace(0, len(betas) - 1, n_temps)]
+                idx = sorted(set(idx))
+                if len(idx) < n_temps:
+                    extras = [i for i in range(len(betas)) if i not in idx]
+                    idx.extend(extras[: n_temps - len(idx)])
+            resized = [betas[i] for i in idx[:n_temps]]
+            return BetaLadderGeometric(betas=resized), notes
+        return BetaLadderGeometric(
+            beta_min=float(ladder.beta_min),
+            beta_max=float(ladder.beta_max),
+            n_temps=int(n_temps),
+        ), notes
+    return ladder, notes
+
+
 def _pilot_budget_levels(base_cfg: SampleConfig, auto_cfg: AutoOptConfig) -> list[int]:
     base_total = base_cfg.budget.tune + base_cfg.budget.draws
     if base_total < 4:
@@ -835,6 +907,10 @@ def _build_pilot_sample_cfg(
     total_sweeps: int,
     cooling_boost: float = 1.0,
     length_override: int | None = None,
+    move_profile: str | None = None,
+    swap_prob: float | None = None,
+    ladder_size: int | None = None,
+    move_probs: dict[str, float] | None = None,
 ) -> tuple[SampleConfig, list[str]]:
     notes: list[str] = []
     pilot = base_cfg.model_copy(deep=True)
@@ -875,10 +951,70 @@ def _build_pilot_sample_cfg(
         pilot.budget.restarts = 1
         notes.append("forced budget.restarts=1 for PT pilots")
 
-    if kind == "gibbs" and cooling_boost > 1:
+    if kind == "gibbs":
+        adaptive = pilot.optimizers.gibbs.adaptive_beta
+        if not adaptive.enabled:
+            adaptive.enabled = True
+            notes.append("enabled optimizers.gibbs.adaptive_beta for pilots")
+        if adaptive.target_acceptance != 0.35:
+            adaptive.target_acceptance = 0.35
+            notes.append("set adaptive_beta.target_acceptance=0.35 for pilots")
+        if adaptive.window != 100:
+            adaptive.window = 100
+            notes.append("set adaptive_beta.window=100 for pilots")
+        if adaptive.k != 0.5:
+            adaptive.k = 0.5
+            notes.append("set adaptive_beta.k=0.5 for pilots")
+        if adaptive.max_beta != 100.0:
+            adaptive.max_beta = 100.0
+            notes.append("set adaptive_beta.max_beta=100.0 for pilots")
+        if tuple(adaptive.moves) != ("B", "M"):
+            adaptive.moves = ["B", "M"]
+            notes.append("set adaptive_beta.moves=[B,M] for pilots")
+
+    if move_profile is not None and pilot.moves.profile != move_profile:
+        pilot.moves.profile = move_profile
+        notes.append(f"set moves.profile={move_profile} for pilots")
+    if move_probs is not None:
+        pilot.moves.overrides.move_probs = dict(move_probs)
+        notes.append("set moves.overrides.move_probs for pilots")
+
+    if kind == "pt":
+        ladder = pilot.optimizers.pt.ladder_adapt
+        if not ladder.enabled:
+            ladder.enabled = True
+            notes.append("enabled optimizers.pt.ladder_adapt for pilots")
+        if ladder.target_swap != 0.25:
+            ladder.target_swap = 0.25
+            notes.append("set ladder_adapt.target_swap=0.25 for pilots")
+        if ladder.window != 50:
+            ladder.window = 50
+            notes.append("set ladder_adapt.window=50 for pilots")
+        if ladder.k != 0.5:
+            ladder.k = 0.5
+            notes.append("set ladder_adapt.k=0.5 for pilots")
+        if ladder.max_scale != 50.0:
+            ladder.max_scale = 50.0
+            notes.append("set ladder_adapt.max_scale=50.0 for pilots")
+        if swap_prob is not None and pilot.optimizers.pt.swap_prob != float(swap_prob):
+            pilot.optimizers.pt.swap_prob = float(swap_prob)
+            notes.append(f"set optimizers.pt.swap_prob={pilot.optimizers.pt.swap_prob:g} for pilots")
+        if ladder_size is not None:
+            current_ladder, _ = _resolve_beta_ladder(pilot.optimizers.pt)
+            if int(ladder_size) != len(current_ladder):
+                resized, resize_notes = _resize_beta_ladder(pilot.optimizers.pt.beta_ladder, int(ladder_size))
+                pilot.optimizers.pt.beta_ladder = resized
+                notes.extend(resize_notes)
+
+    if kind == "gibbs" and cooling_boost != 1:
         schedule = pilot.optimizers.gibbs.beta_schedule
         boosted, boost_notes = _boost_cooling(schedule, cooling_boost)
         pilot.optimizers.gibbs.beta_schedule = boosted
+        notes.extend(boost_notes)
+    if kind == "pt" and cooling_boost != 1:
+        ladder_cfg = pilot.optimizers.pt.beta_ladder
+        boosted, boost_notes = _boost_beta_ladder(ladder_cfg, cooling_boost)
+        pilot.optimizers.pt.beta_ladder = boosted
         notes.extend(boost_notes)
 
     return pilot, notes
@@ -890,6 +1026,10 @@ def _build_final_sample_cfg(
     kind: str,
     length_override: int | None = None,
     cooling_boost: float = 1.0,
+    move_profile: str | None = None,
+    swap_prob: float | None = None,
+    ladder_size: int | None = None,
+    move_probs: dict[str, float] | None = None,
 ) -> tuple[SampleConfig, list[str]]:
     notes: list[str] = []
     final_cfg = base_cfg.model_copy(deep=True)
@@ -900,11 +1040,32 @@ def _build_final_sample_cfg(
     if kind == "pt" and final_cfg.budget.restarts != 1:
         final_cfg.budget.restarts = 1
         notes.append("forced budget.restarts=1 for PT final run")
-    if kind == "gibbs" and cooling_boost > 1:
+    if kind == "gibbs" and cooling_boost != 1:
         schedule = final_cfg.optimizers.gibbs.beta_schedule
         boosted, boost_notes = _boost_cooling(schedule, cooling_boost)
         final_cfg.optimizers.gibbs.beta_schedule = boosted
         notes.extend(boost_notes)
+    if kind == "pt" and cooling_boost != 1:
+        ladder_cfg = final_cfg.optimizers.pt.beta_ladder
+        boosted, boost_notes = _boost_beta_ladder(ladder_cfg, cooling_boost)
+        final_cfg.optimizers.pt.beta_ladder = boosted
+        notes.extend(boost_notes)
+    if move_profile is not None and final_cfg.moves.profile != move_profile:
+        final_cfg.moves.profile = move_profile
+        notes.append(f"set moves.profile={move_profile} from auto-opt selection")
+    if move_probs is not None:
+        final_cfg.moves.overrides.move_probs = dict(move_probs)
+        notes.append("set moves.overrides.move_probs from auto-opt selection")
+    if kind == "pt":
+        if swap_prob is not None and final_cfg.optimizers.pt.swap_prob != float(swap_prob):
+            final_cfg.optimizers.pt.swap_prob = float(swap_prob)
+            notes.append(f"set optimizers.pt.swap_prob={final_cfg.optimizers.pt.swap_prob:g} from auto-opt selection")
+        if ladder_size is not None:
+            current_ladder, _ = _resolve_beta_ladder(final_cfg.optimizers.pt)
+            if int(ladder_size) != len(current_ladder):
+                resized, resize_notes = _resize_beta_ladder(final_cfg.optimizers.pt.beta_ladder, int(ladder_size))
+                final_cfg.optimizers.pt.beta_ladder = resized
+                notes.extend(resize_notes)
     return final_cfg, notes
 
 
@@ -914,13 +1075,63 @@ def _assess_candidate_quality(
     *,
     mode: str,
 ) -> list[str]:
-    _ = auto_cfg
-    _ = mode
     notes: list[str] = []
     if candidate.status == "fail":
         candidate.quality = "fail"
         return notes
-    candidate.quality = "ok"
+    if mode != "auto_opt":
+        candidate.quality = "ok"
+        return notes
+    rhat_ok = 1.15
+    rhat_fail = 1.30
+    ess_ok = 50
+    ess_fail = 10
+    unique_ok = 0.10
+    unique_fail = 0.0
+
+    pilot_draws = None
+    pilot_short = False
+    if isinstance(candidate.diagnostics, dict):
+        metrics = candidate.diagnostics.get("metrics")
+        if isinstance(metrics, dict):
+            trace = metrics.get("trace")
+            if isinstance(trace, dict):
+                pilot_draws = trace.get("draws")
+    try:
+        pilot_draws = int(pilot_draws) if pilot_draws is not None else None
+    except (TypeError, ValueError):
+        pilot_draws = None
+    pilot_min_draws = 200
+    if pilot_draws is not None and pilot_draws < pilot_min_draws:
+        pilot_short = True
+        notes.append(f"pilot draws={pilot_draws} < {pilot_min_draws}; diagnostics are directional at short budgets")
+
+    quality = "ok"
+    if candidate.rhat is not None:
+        if candidate.rhat >= rhat_fail:
+            quality = "fail"
+            notes.append(f"rhat={candidate.rhat:.3f} >= {rhat_fail}")
+        elif candidate.rhat > rhat_ok and not pilot_short:
+            quality = "warn"
+            notes.append(f"rhat={candidate.rhat:.3f} > {rhat_ok}")
+    if candidate.ess is not None:
+        if candidate.ess < ess_fail:
+            quality = "fail"
+            notes.append(f"ess={candidate.ess:.1f} < {ess_fail}")
+        elif candidate.ess < ess_ok and quality != "fail" and not pilot_short:
+            quality = "warn"
+            notes.append(f"ess={candidate.ess:.1f} < {ess_ok}")
+    if candidate.unique_fraction is not None:
+        if candidate.unique_fraction <= unique_fail:
+            quality = "fail"
+            notes.append(f"unique_fraction={candidate.unique_fraction:.2f} <= {unique_fail:.2f}")
+        elif candidate.unique_fraction < unique_ok and quality != "fail" and not pilot_short:
+            quality = "warn"
+            notes.append(f"unique_fraction={candidate.unique_fraction:.2f} < {unique_ok:.2f}")
+
+    candidate.quality = quality
+    if quality == "warn" and not pilot_short:
+        notes.append("pilot diagnostics are weak; consider increasing budgets or beta schedules")
     return notes
 
 
@@ -941,12 +1152,68 @@ def _run_auto_optimize_for_set(
     pwms = _load_pwms_for_set(cfg=cfg, config_path=config_path, tfs=tfs, lockmap=lockmap)
     lengths = _candidate_lengths(sample_cfg, auto_cfg, pwms)
     budgets = _pilot_budget_levels(sample_cfg, auto_cfg)
+    move_profiles = list(dict.fromkeys(auto_cfg.move_profiles or [sample_cfg.moves.profile]))
+    cooling_boosts = list(dict.fromkeys(auto_cfg.cooling_boosts or [1.0]))
+    beta_schedule_scales = list(dict.fromkeys(auto_cfg.beta_schedule_scales or []))
+    beta_ladder_scales = list(dict.fromkeys(auto_cfg.beta_ladder_scales or []))
+    pt_swap_probs = list(dict.fromkeys(auto_cfg.pt_swap_probs or [sample_cfg.optimizers.pt.swap_prob]))
+    pt_ladder_sizes = list(dict.fromkeys(auto_cfg.pt_ladder_sizes or []))
+    if not pt_ladder_sizes:
+        ladder, _ = _resolve_beta_ladder(sample_cfg.optimizers.pt)
+        pt_ladder_sizes = [len(ladder)]
+    gibbs_move_probs = list(auto_cfg.gibbs_move_probs or [])
+    gibbs_move_variants: list[tuple[dict[str, float] | None, str | None]] = [(None, None)]
+    if gibbs_move_probs:
+        gibbs_move_variants = [(dict(mp), f"mp{idx + 1}") for idx, mp in enumerate(gibbs_move_probs)]
+    gibbs_scales = sorted(set(cooling_boosts + (beta_schedule_scales or [])))
+    pt_scales = sorted(set(cooling_boosts + (beta_ladder_scales or [])))
     logger.info("Auto-opt length candidates: %s", ", ".join(str(L) for L in lengths))
     logger.info("Auto-opt budget levels: %s", ", ".join(str(b) for b in budgets))
+    logger.info("Auto-opt move profiles: %s", ", ".join(move_profiles))
+    logger.info("Auto-opt gibbs beta scales: %s", ", ".join(f"{b:g}" for b in gibbs_scales))
+    logger.info("Auto-opt pt beta scales: %s", ", ".join(f"{b:g}" for b in pt_scales))
+    logger.info("Auto-opt PT swap_probs: %s", ", ".join(f"{p:g}" for p in pt_swap_probs))
+    logger.info("Auto-opt PT ladder sizes: %s", ", ".join(str(n) for n in pt_ladder_sizes))
+    if gibbs_move_probs:
+        logger.info(
+            "Auto-opt gibbs move_probs variants: %s",
+            ", ".join(label or _format_move_probs(mp) for mp, label in gibbs_move_variants if mp),
+        )
     logger.info("Auto-opt keep_pilots: %s", auto_cfg.keep_pilots)
 
     length_cfg = auto_cfg.length
-    candidate_specs = [(kind, length) for length in lengths for kind in ("gibbs", "pt")]
+    candidate_specs: list[AutoOptSpec] = []
+    for length in lengths:
+        for kind in ("gibbs", "pt"):
+            scales = gibbs_scales if kind == "gibbs" else pt_scales
+            for move_profile in move_profiles:
+                if kind == "gibbs":
+                    for move_probs, move_label in gibbs_move_variants:
+                        for scale in scales:
+                            candidate_specs.append(
+                                AutoOptSpec(
+                                    kind=kind,
+                                    length=length,
+                                    move_profile=move_profile,
+                                    cooling_boost=scale,
+                                    move_probs=move_probs,
+                                    move_probs_label=move_label,
+                                )
+                            )
+                else:
+                    for swap_prob in pt_swap_probs:
+                        for ladder_size in pt_ladder_sizes:
+                            for scale in scales:
+                                candidate_specs.append(
+                                    AutoOptSpec(
+                                        kind=kind,
+                                        length=length,
+                                        move_profile=move_profile,
+                                        cooling_boost=scale,
+                                        swap_prob=swap_prob,
+                                        ladder_size=ladder_size,
+                                    )
+                                )
     seed_rng = np.random.default_rng(sample_cfg.rng.seed)
 
     def _run_candidate(
@@ -956,6 +1223,11 @@ def _run_auto_optimize_for_set(
         budget: int,
         label: str,
         cooling_boost: float,
+        move_profile: str,
+        swap_prob: float | None = None,
+        ladder_size: int | None = None,
+        move_probs: dict[str, float] | None = None,
+        move_probs_label: str | None = None,
         init_seeds: list[np.ndarray] | None = None,
     ) -> AutoOptCandidate:
         runs: list[AutoOptCandidate] = []
@@ -967,6 +1239,10 @@ def _run_auto_optimize_for_set(
                 total_sweeps=budget,
                 cooling_boost=cooling_boost,
                 length_override=length,
+                move_profile=move_profile,
+                swap_prob=swap_prob,
+                ladder_size=ladder_size,
+                move_probs=move_probs,
             )
             seed_label = f"{label}_R{rep + 1}"
             if sample_cfg.rng.deterministic:
@@ -997,6 +1273,11 @@ def _run_auto_optimize_for_set(
                 "budget": budget,
                 "replicate": rep + 1,
                 "cooling_boost": cooling_boost,
+                "beta_scale": cooling_boost,
+                "move_profile": move_profile,
+                "swap_prob": swap_prob,
+                "ladder_size": ladder_size,
+                "move_probs_label": move_probs_label,
             }
             pilot_run_dir = _run_sample_for_set(
                 cfg,
@@ -1020,6 +1301,11 @@ def _run_auto_optimize_for_set(
                     mode=sample_cfg.mode,
                     scorecard_top_k=auto_cfg.policy.scorecard.top_k,
                     cooling_boost=cooling_boost,
+                    move_profile=move_profile,
+                    swap_prob=swap_prob,
+                    ladder_size=ladder_size,
+                    move_probs=move_probs,
+                    move_probs_label=move_probs_label,
                 )
                 if candidate.length is None:
                     candidate.length = pilot_cfg.init.length
@@ -1030,6 +1316,11 @@ def _run_auto_optimize_for_set(
                     length=pilot_cfg.init.length,
                     budget=budget,
                     cooling_boost=cooling_boost,
+                    move_profile=move_profile,
+                    swap_prob=swap_prob,
+                    ladder_size=ladder_size,
+                    move_probs=move_probs,
+                    move_probs_label=move_probs_label,
                     run_dir=pilot_run_dir,
                     run_dirs=[pilot_run_dir],
                     best_score=None,
@@ -1059,16 +1350,24 @@ def _run_auto_optimize_for_set(
         diag_status = "n/a"
         if isinstance(candidate.diagnostics, dict):
             diag_status = candidate.diagnostics.get("status") or "n/a"
+        move_probs_label = "-"
+        if candidate.move_probs is not None:
+            move_probs_label = _format_move_probs(candidate.move_probs)
         logger.debug(
             (
-                "Auto-opt %s %s L=%s B=%s boost=%s: scorecard=%s diagnostics=%s top_k_median=%s best=%s "
-                "balance=%s diversity=%s rhat=%s ess=%s unique_fraction=%s"
+                "Auto-opt %s %s L=%s B=%s beta=%s move=%s swap=%s ladder=%s moveset=%s: "
+                "scorecard=%s diagnostics=%s top_k_median=%s best=%s balance=%s diversity=%s rhat=%s ess=%s "
+                "unique_fraction=%s"
             ),
             label,
             candidate.kind,
             candidate.length if candidate.length is not None else "n/a",
             candidate.budget if candidate.budget is not None else "n/a",
             f"{candidate.cooling_boost:g}",
+            candidate.move_profile,
+            f"{candidate.swap_prob:g}" if candidate.swap_prob is not None else "n/a",
+            str(candidate.ladder_size) if candidate.ladder_size is not None else "n/a",
+            move_probs_label,
             candidate.quality,
             diag_status,
             f"{candidate.top_k_median_final:.3f}" if candidate.top_k_median_final is not None else "n/a",
@@ -1080,7 +1379,8 @@ def _run_auto_optimize_for_set(
             f"{candidate.unique_fraction:.2f}" if candidate.unique_fraction is not None else "n/a",
         )
         if candidate.warnings:
-            logger.warning("Auto-opt %s %s warnings: %s", label, candidate.kind, "; ".join(candidate.warnings))
+            log_fn = logger.warning if candidate.quality == "fail" else logger.info
+            log_fn("Auto-opt %s %s warnings: %s", label, candidate.kind, "; ".join(candidate.warnings))
 
     all_candidates: list[AutoOptCandidate] = []
     final_level_candidates: list[AutoOptCandidate] = []
@@ -1089,6 +1389,16 @@ def _run_auto_optimize_for_set(
     def _scaled_budgets(base_budgets: list[int], *, scale: float) -> list[int]:
         base_total = sample_cfg.budget.tune + sample_cfg.budget.draws
         return [min(base_total, max(4, int(round(b * scale)))) for b in base_budgets]
+
+    def _spec_label(spec: AutoOptSpec, *, idx: int, budget: int) -> str:
+        label = f"pilot_{idx}_L{spec.length}_B{budget}_M{spec.move_profile}_C{spec.cooling_boost:g}"
+        if spec.kind == "pt":
+            swap_label = f"{spec.swap_prob:g}" if spec.swap_prob is not None else "n/a"
+            ladder_label = str(spec.ladder_size) if spec.ladder_size is not None else "n/a"
+            label = f"{label}_S{swap_label}_T{ladder_label}"
+        if spec.move_probs_label:
+            label = f"{label}_{spec.move_probs_label}"
+        return label
 
     if length_cfg.mode == "ladder":
         previous_best_run: Path | None = None
@@ -1116,30 +1426,38 @@ def _run_auto_optimize_for_set(
                     )
                 if not init_seeds:
                     logger.warning("Warm-start: no usable seeds for length %d; falling back to fresh init.", length)
-            current_specs = [("gibbs", length), ("pt", length)]
+            current_specs: list[AutoOptSpec] = []
+            for spec in candidate_specs:
+                if spec.length == length:
+                    current_specs.append(spec)
             level_candidates: list[AutoOptCandidate] = []
             length_final_candidates: list[AutoOptCandidate] = []
             start_time = time.perf_counter()
             for idx, budget in enumerate(length_budgets):
                 level_candidates = []
-                for kind, _ in current_specs:
-                    label = f"pilot_{idx + 1}_L{length}_B{budget}"
+                for spec in current_specs:
+                    label = _spec_label(spec, idx=idx + 1, budget=budget)
                     candidate = _run_candidate(
-                        kind=kind,
-                        length=length,
+                        kind=spec.kind,
+                        length=spec.length,
                         budget=budget,
                         label=label,
-                        cooling_boost=1.0,
+                        cooling_boost=spec.cooling_boost,
+                        move_profile=spec.move_profile,
+                        swap_prob=spec.swap_prob,
+                        ladder_size=spec.ladder_size,
+                        move_probs=spec.move_probs,
+                        move_probs_label=spec.move_probs_label,
                         init_seeds=init_seeds,
                     )
-                    candidate_notes = _assess_candidate_quality(candidate, auto_cfg, mode=sample_cfg.mode)
+                    candidate_notes = _assess_candidate_quality(candidate, auto_cfg, mode="auto_opt")
                     if candidate_notes:
                         candidate.warnings.extend(candidate_notes)
                     _log_candidate(candidate, label=label)
                     level_candidates.append(candidate)
                     all_candidates.append(candidate)
-                confident, _, _ = _confidence_from_candidates(level_candidates, auto_cfg)
-                if confident:
+                confidence_level, _, _ = _confidence_from_candidates(level_candidates, auto_cfg)
+                if confidence_level == "high":
                     length_final_candidates = level_candidates
                     if idx < len(length_budgets) - 1:
                         logger.info(
@@ -1150,7 +1468,19 @@ def _run_auto_optimize_for_set(
                     break
                 if idx < len(length_budgets) - 1:
                     ranked = _rank_auto_opt_candidates(level_candidates, auto_cfg)
-                    current_specs = [(c.kind, c.length) for c in ranked]
+                    current_specs = [
+                        AutoOptSpec(
+                            kind=c.kind,
+                            length=int(c.length) if c.length is not None else length,
+                            move_profile=c.move_profile,
+                            cooling_boost=c.cooling_boost,
+                            swap_prob=c.swap_prob,
+                            ladder_size=c.ladder_size,
+                            move_probs=c.move_probs,
+                            move_probs_label=c.move_probs_label,
+                        )
+                        for c in ranked
+                    ]
                 else:
                     length_final_candidates = level_candidates
             runtime_sec = time.perf_counter() - start_time
@@ -1175,24 +1505,29 @@ def _run_auto_optimize_for_set(
         current_specs = list(candidate_specs)
         for idx, budget in enumerate(budgets):
             level_candidates = []
-            for kind, length in current_specs:
-                label = f"pilot_{idx + 1}_L{length}_B{budget}"
+            for spec in current_specs:
+                label = _spec_label(spec, idx=idx + 1, budget=budget)
                 candidate = _run_candidate(
-                    kind=kind,
-                    length=length,
+                    kind=spec.kind,
+                    length=spec.length,
                     budget=budget,
                     label=label,
-                    cooling_boost=1.0,
+                    cooling_boost=spec.cooling_boost,
+                    move_profile=spec.move_profile,
+                    swap_prob=spec.swap_prob,
+                    ladder_size=spec.ladder_size,
+                    move_probs=spec.move_probs,
+                    move_probs_label=spec.move_probs_label,
                 )
-                candidate_notes = _assess_candidate_quality(candidate, auto_cfg, mode=sample_cfg.mode)
+                candidate_notes = _assess_candidate_quality(candidate, auto_cfg, mode="auto_opt")
                 if candidate_notes:
                     candidate.warnings.extend(candidate_notes)
                 _log_candidate(candidate, label=label)
                 level_candidates.append(candidate)
                 all_candidates.append(candidate)
 
-            confident, _, _ = _confidence_from_candidates(level_candidates, auto_cfg)
-            if confident:
+            confidence_level, _, _ = _confidence_from_candidates(level_candidates, auto_cfg)
+            if confidence_level == "high":
                 final_level_candidates = level_candidates
                 if idx < len(budgets) - 1:
                     logger.info(
@@ -1202,7 +1537,19 @@ def _run_auto_optimize_for_set(
                 break
             if idx < len(budgets) - 1:
                 ranked = _rank_auto_opt_candidates(level_candidates, auto_cfg)
-                current_specs = [(c.kind, c.length) for c in ranked]
+                current_specs = [
+                    AutoOptSpec(
+                        kind=c.kind,
+                        length=int(c.length) if c.length is not None else lengths[0],
+                        move_profile=c.move_profile,
+                        cooling_boost=c.cooling_boost,
+                        swap_prob=c.swap_prob,
+                        ladder_size=c.ladder_size,
+                        move_probs=c.move_probs,
+                        move_probs_label=c.move_probs_label,
+                    )
+                    for c in ranked
+                ]
             else:
                 final_level_candidates = level_candidates
 
@@ -1215,33 +1562,34 @@ def _run_auto_optimize_for_set(
         allow_warn=auto_cfg.policy.allow_warn,
     )
 
-    confident, _best_candidate, _second_candidate = _confidence_from_candidates(viable, auto_cfg)
-    selection_confident = bool(confident)
-    if selection_confident:
-        decision_notes.append("confidence=high")
-    else:
-        decision_notes.append("confidence=low")
-        if auto_cfg.policy.allow_warn:
-            logger.warning(
-                "Auto-optimize: could not confidently separate top candidates at max budget; "
-                "selecting best available candidate."
-            )
-        else:
-            raise ValueError(
-                "Auto-optimize failed: could not confidently separate top candidates at the maximum "
-                "configured budgets/replicates. Increase auto_opt.budget_levels and/or auto_opt.replicates."
-            )
+    confidence_level, _best_candidate, _second_candidate = _confidence_from_candidates(viable, auto_cfg)
+    selection_confident = confidence_level == "high"
+    decision_notes.append(f"confidence={confidence_level}")
+    if not selection_confident and auto_cfg.policy.allow_warn:
+        logger.warning(
+            "Auto-optimize: could not confidently separate top candidates at max budget; "
+            "selecting best available candidate."
+        )
+    elif not selection_confident:
+        raise ValueError(
+            "Auto-optimize failed: could not confidently separate top candidates at the maximum "
+            "configured budgets/replicates. Increase auto_opt.budget_levels and/or auto_opt.replicates."
+        )
 
     winner = _select_auto_opt_candidate(viable, auto_cfg, allow_fail=False)
 
     if winner.quality == "ok":
         logger.info(
             (
-                "Auto-optimize selected %s L=%s (top_k_median=%s, best=%s, "
+                "Auto-optimize selected %s L=%s move=%s beta=%s swap=%s ladder=%s (top_k_median=%s, best=%s, "
                 "balance=%s, rhat=%s, ess=%s, unique_fraction=%s)."
             ),
             winner.kind,
             winner.length if winner.length is not None else "n/a",
+            winner.move_profile,
+            f"{winner.cooling_boost:g}",
+            f"{winner.swap_prob:g}" if winner.swap_prob is not None else "n/a",
+            str(winner.ladder_size) if winner.ladder_size is not None else "n/a",
             f"{winner.top_k_median_final:.3f}" if winner.top_k_median_final is not None else "n/a",
             f"{winner.best_score_final:.3f}" if winner.best_score_final is not None else "n/a",
             f"{winner.balance_median:.3f}" if winner.balance_median is not None else "n/a",
@@ -1252,11 +1600,16 @@ def _run_auto_optimize_for_set(
     else:
         logger.warning(
             (
-                "Auto-optimize selected %s L=%s (quality=%s top_k_median=%s, best=%s, balance=%s, rhat=%s, "
+                "Auto-optimize selected %s L=%s move=%s beta=%s swap=%s ladder=%s "
+                "(quality=%s top_k_median=%s, best=%s, balance=%s, rhat=%s, "
                 "ess=%s, unique_fraction=%s)."
             ),
             winner.kind,
             winner.length if winner.length is not None else "n/a",
+            winner.move_profile,
+            f"{winner.cooling_boost:g}",
+            f"{winner.swap_prob:g}" if winner.swap_prob is not None else "n/a",
+            str(winner.ladder_size) if winner.ladder_size is not None else "n/a",
             winner.quality,
             f"{winner.top_k_median_final:.3f}" if winner.top_k_median_final is not None else "n/a",
             f"{winner.best_score_final:.3f}" if winner.best_score_final is not None else "n/a",
@@ -1267,6 +1620,17 @@ def _run_auto_optimize_for_set(
         )
     if winner.cooling_boost > 1:
         decision_notes.append(f"cooling_boost={winner.cooling_boost:g}")
+    if winner.move_profile != sample_cfg.moves.profile:
+        decision_notes.append(f"move_profile={winner.move_profile}")
+    if winner.move_probs is not None:
+        decision_notes.append(f"move_probs={_format_move_probs(winner.move_probs)}")
+    if winner.kind == "pt" and winner.swap_prob is not None:
+        if winner.swap_prob != sample_cfg.optimizers.pt.swap_prob:
+            decision_notes.append(f"swap_prob={winner.swap_prob:g}")
+        if winner.ladder_size is not None:
+            ladder, _ = _resolve_beta_ladder(sample_cfg.optimizers.pt)
+            if winner.ladder_size != len(ladder):
+                decision_notes.append(f"ladder_size={winner.ladder_size}")
     if decision_notes:
         logger.warning("Auto-opt notes: %s", ", ".join(decision_notes))
 
@@ -1275,6 +1639,10 @@ def _run_auto_optimize_for_set(
         kind=winner.kind,
         length_override=winner.length,
         cooling_boost=winner.cooling_boost,
+        move_profile=winner.move_profile,
+        swap_prob=winner.swap_prob,
+        ladder_size=winner.ladder_size,
+        move_probs=winner.move_probs,
     )
     if notes:
         logger.info("Auto-opt final overrides: %s", "; ".join(notes))
@@ -1306,9 +1674,16 @@ def _run_auto_optimize_for_set(
         "mode": "final",
         "selected": winner.kind,
         "selected_length": winner.length,
+        "selected_move_profile": winner.move_profile,
+        "selected_cooling_boost": winner.cooling_boost,
+        "selected_beta_scale": winner.cooling_boost,
+        "selected_swap_prob": winner.swap_prob,
+        "selected_ladder_size": winner.ladder_size,
+        "selected_move_probs": winner.move_probs,
+        "selected_move_probs_label": winner.move_probs_label,
         "selection_quality": winner.quality,
         "selection_confident": selection_confident,
-        "selection_confidence": "high" if selection_confident else "low",
+        "selection_confidence": confidence_level,
         "notes": decision_notes,
         "config_summary": _format_auto_opt_config_summary(final_cfg),
         "selected_config": _selected_config_payload(final_cfg),
@@ -1327,6 +1702,10 @@ def _run_auto_optimize_for_set(
             "prefer_simpler_if_close": auto_cfg.prefer_simpler_if_close,
             "tolerance": auto_cfg.tolerance.model_dump(),
             "scorecard_top_k": auto_cfg.policy.scorecard.top_k,
+            "move_profiles": auto_cfg.move_profiles,
+            "pt_swap_probs": auto_cfg.pt_swap_probs,
+            "pt_ladder_sizes": auto_cfg.pt_ladder_sizes,
+            "gibbs_move_probs": auto_cfg.gibbs_move_probs,
         },
         "pilot_root": str(pilot_root) if pilot_root is not None else None,
         "best_marker": str(best_marker_path) if best_marker_path is not None else None,
@@ -1336,6 +1715,10 @@ def _run_auto_optimize_for_set(
                 "length": candidate.length,
                 "budget": candidate.budget,
                 "cooling_boost": candidate.cooling_boost,
+                "move_profile": candidate.move_profile,
+                "swap_prob": candidate.swap_prob,
+                "ladder_size": candidate.ladder_size,
+                "move_probs_label": candidate.move_probs_label,
                 "runs": [path.name for path in candidate.run_dirs],
                 "status": candidate.status,
                 "quality": candidate.quality,
@@ -1378,6 +1761,10 @@ def _run_auto_optimize_for_set(
                 "kind": winner.kind,
                 "length": winner.length,
                 "cooling_boost": winner.cooling_boost,
+                "move_profile": winner.move_profile,
+                "swap_prob": winner.swap_prob,
+                "ladder_size": winner.ladder_size,
+                "move_probs_label": winner.move_probs_label,
                 "pilot_run": winner.run_dir.name,
             },
             "final_sample_run": final_run_dir.name,
@@ -1417,6 +1804,11 @@ def _evaluate_pilot_run(
     budget: int | None = None,
     mode: str | None = None,
     cooling_boost: float = 1.0,
+    move_profile: str = "balanced",
+    swap_prob: float | None = None,
+    ladder_size: int | None = None,
+    move_probs: dict[str, float] | None = None,
+    move_probs_label: str | None = None,
 ) -> AutoOptCandidate:
     manifest = load_manifest(run_dir)
     length = manifest.get("sequence_length")
@@ -1483,12 +1875,14 @@ def _evaluate_pilot_run(
     acceptance_b = None
     acceptance_m = None
     acceptance_mh = None
+    delta_frac_zero_mh = None
     if isinstance(optimizer_metrics, dict):
         acc = optimizer_metrics.get("acceptance_rate") or {}
         if isinstance(acc, dict):
             acceptance_b = acc.get("B")
             acceptance_m = acc.get("M")
         acceptance_mh = optimizer_metrics.get("acceptance_rate_mh")
+        delta_frac_zero_mh = optimizer_metrics.get("delta_frac_zero_mh")
     swap_rate = optimizer_metrics.get("swap_acceptance_rate") if isinstance(optimizer_metrics, dict) else None
     warnings = diagnostics.get("warnings", []) if isinstance(diagnostics, dict) else []
     status = "ok"
@@ -1533,11 +1927,29 @@ def _evaluate_pilot_run(
             warnings = list(warnings)
             warnings.append("PT pilot recorded swap_prob>0 but swap_attempts=0.")
 
+    if acceptance_mh is not None and acceptance_mh > 0.95 and delta_frac_zero_mh is not None:
+        warnings = list(warnings)
+        if delta_frac_zero_mh >= 0.8:
+            warnings.append(
+                "High MH acceptance likely due to hard-min plateaus (Δscore≈0). "
+                "Enable objective.softmin and/or increase target_worst_tf_prob."
+            )
+        elif delta_frac_zero_mh < 0.5:
+            warnings.append(
+                "High MH acceptance with nontrivial Δscore suggests beta too low or moves too conservative. "
+                "Increase beta schedule or move sizes."
+            )
+
     return AutoOptCandidate(
         kind=kind,
         length=int(length) if isinstance(length, (int, float)) else None,
         budget=budget,
         cooling_boost=cooling_boost,
+        move_profile=move_profile,
+        swap_prob=swap_prob,
+        ladder_size=ladder_size,
+        move_probs=move_probs,
+        move_probs_label=move_probs_label,
         run_dir=run_dir,
         run_dirs=[run_dir],
         best_score=best_score,
@@ -1579,6 +1991,11 @@ def _aggregate_candidate_runs(
 
     kind = runs[0].kind
     length = runs[0].length
+    move_profile = runs[0].move_profile
+    swap_prob = runs[0].swap_prob
+    ladder_size = runs[0].ladder_size
+    move_probs = runs[0].move_probs
+    move_probs_label = runs[0].move_probs_label
     run_dirs = [run.run_dir for run in runs]
     status = "ok"
     if all(run.status == "fail" for run in runs):
@@ -1656,6 +2073,11 @@ def _aggregate_candidate_runs(
         length=length,
         budget=budget,
         cooling_boost=float(np.median([run.cooling_boost for run in runs])),
+        move_profile=move_profile,
+        swap_prob=swap_prob,
+        ladder_size=ladder_size,
+        move_probs=move_probs,
+        move_probs_label=move_probs_label,
         run_dir=best_run.run_dir,
         run_dirs=run_dirs,
         best_score=best_score,
@@ -1716,17 +2138,24 @@ def _rank_auto_opt_candidates(
 def _confidence_from_candidates(
     candidates: list[AutoOptCandidate],
     auto_cfg: AutoOptConfig,
-) -> tuple[bool, AutoOptCandidate | None, AutoOptCandidate | None]:
+) -> tuple[str, AutoOptCandidate | None, AutoOptCandidate | None]:
     if not candidates:
-        return False, None, None
+        return "low", None, None
     ranked = _rank_auto_opt_candidates(candidates, auto_cfg)
     best = ranked[0]
     if len(ranked) == 1:
-        return True, best, None
+        return "high" if best.quality == "ok" else "medium", best, None
     second = ranked[1]
     if best.top_k_ci_low is None or second.top_k_ci_high is None:
-        return False, best, second
-    return best.top_k_ci_low > second.top_k_ci_high, best, second
+        ci_separated = False
+    else:
+        ci_separated = best.top_k_ci_low > second.top_k_ci_high
+    confidence_level = "high" if ci_separated else "low"
+    if best.quality == "warn" and confidence_level == "high":
+        confidence_level = "medium"
+    if best.quality != "ok" and confidence_level == "high":
+        confidence_level = "medium"
+    return confidence_level, best, second
 
 
 def _validate_auto_opt_candidates(
@@ -1867,6 +2296,7 @@ def _format_auto_opt_config_summary(cfg: SampleConfig) -> str:
     else:
         cooling = _format_beta_ladder_summary(cfg.optimizers.pt)
         chains = len(_resolve_beta_ladder(cfg.optimizers.pt)[0])
+        cooling = f"{cooling} swap_prob={cfg.optimizers.pt.swap_prob:g}"
     return (
         f"optimizer={kind} scorer={cfg.objective.score_scale} "
         f"combine={combine} length={cfg.init.length} chains={chains} tune={cfg.budget.tune} draws={cfg.budget.draws} "
@@ -1970,7 +2400,8 @@ def _run_sample_for_set(
         names = ", ".join(f"{tf}:{pwms[tf].length}" for tf in sorted(pwms))
         raise ValueError(
             f"init.length={sample_cfg.init.length} is shorter than the widest PWM (max={max_w}). "
-            f"Per-TF lengths: {names}. Increase sample.init.length."
+            f"Per-TF lengths: {names}. Increase sample.init.length or trim PWMs via "
+            "motif_store.pwm_window_lengths (with pwm_window_strategy=max_info)."
         )
 
     # 2) INSTANTIATE SCORER and SequenceEvaluator
@@ -2318,6 +2749,9 @@ def _run_sample_for_set(
         key=lambda cand: _elite_rank_key(cand.combined_score, cand.min_norm, cand.sum_norm),
         reverse=True,
     )
+    elite_k = int(sample_cfg.elites.k or 0)
+    if elite_k > 0 and len(raw_elites) > elite_k:
+        raw_elites = raw_elites[:elite_k]
 
     # -------- apply diversity filter ----------------------------------------
     kept_elites: list[_EliteCandidate] = []
@@ -2607,11 +3041,17 @@ def _run_sample_for_set(
     catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     catalog = CatalogIndex.load(catalog_root)
     lock_path = resolve_lock_path(config_path)
+    lock_snapshot_path = manifest_path(out_dir).parent / "lockfile.json"
+    lock_snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copy2(lock_path, lock_snapshot_path)
+    except Exception as exc:  # pragma: no cover - filesystem dependent
+        raise ValueError(f"Failed to snapshot lockfile for run: {lock_snapshot_path}") from exc
     manifest = build_run_manifest(
         stage=stage,
         cfg=cfg,
         config_path=config_path,
-        lock_path=lock_path,
+        lock_path=lock_snapshot_path,
         lockmap={tf: lockmap[tf] for tf in tfs},
         catalog=catalog,
         run_dir=out_dir,
@@ -2651,14 +3091,14 @@ def _run_sample_for_set(
             else {},
         },
     )
-    manifest_path = write_manifest(out_dir, manifest)
+    manifest_path_out = write_manifest(out_dir, manifest)
     update_run_index_from_manifest(
         config_path,
         out_dir,
         manifest,
         catalog_root=cfg.motif_store.catalog_root,
     )
-    logger.debug("Wrote run manifest -> %s", manifest_path.relative_to(out_dir.parent))
+    logger.debug("Wrote run manifest -> %s", manifest_path_out.relative_to(out_dir.parent))
     status_writer.finish(status="completed", artifacts=artifacts)
     update_run_index_from_status(
         config_path,
@@ -2697,9 +3137,13 @@ def run_sample(
             else:
                 auto_cfg = None
                 if sample_cfg.optimizer.name == "auto":
-                    raise ValueError(
-                        "auto-opt disabled but sample.optimizer.name='auto'; set optimizer.name to 'gibbs' or 'pt'."
+                    fallback = "gibbs"
+                    logger.warning(
+                        "Auto-opt disabled by flag; using optimizer.name='%s' (sample.optimizer.name='auto'). "
+                        "Set sample.optimizer.name to gibbs/pt to avoid this fallback.",
+                        fallback,
                     )
+                    sample_cfg.optimizer.name = fallback
         use_auto_opt = sample_cfg.optimizer.name == "auto" and auto_cfg is not None and auto_cfg.enabled
         groups = regulator_sets(cfg.regulator_sets)
         set_count = len(groups)

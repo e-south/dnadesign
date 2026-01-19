@@ -6,7 +6,7 @@ This page explains the `config.yaml` and how each block maps to the **cruncher**
 
 ```yaml
 cruncher:
-  out_dir: runs/
+  out_dir: outputs/
   regulator_sets:
     - [lexA, cpxR]
   regulator_categories: {}
@@ -15,7 +15,7 @@ cruncher:
 
 Notes:
 - `out_dir` is resolved relative to the config file and must be a relative path.
-- Each regulator set creates its own run folder under `runs/<stage>/`.
+- Each regulator set creates its own run folder under `outputs/<stage>/`.
 - Config parsing is strict: unknown keys are rejected to avoid silent typos.
 
 ### Categories and campaigns
@@ -332,6 +332,13 @@ sample:
     keep_pilots: ok
     allow_trim_polish_in_pilots: false
     prefer_simpler_if_close: true
+    cooling_boosts: [1.0, 2.0]
+    beta_schedule_scales: []
+    beta_ladder_scales: []
+    pt_swap_probs: []
+    pt_ladder_sizes: []
+    gibbs_move_probs: []
+    move_profiles: [balanced, aggressive]
     tolerance:
       score: 0.01
     length:
@@ -379,7 +386,7 @@ Notes:
 - `objective.combine` controls how per-TF scores are combined (`min` for weakest-TF optimization, `sum` for sum-based).
 - `objective.allow_unscaled_llr=true` allows `score_scale=llr` in multi-TF runs (otherwise validation fails).
 - `elites.min_hamming` is the Hamming-distance filter for elites (0 disables). If `output.trim.enabled=true` yields variable lengths, the distance is computed over the shared prefix plus the length difference.
-- `elites.k` controls how many sequences are retained before diversity filtering.
+- `elites.k` controls how many sequences are retained before diversity filtering (0 = keep all).
 - `elites.dsDNA_canonicalize=true` treats reverse complements as identical when computing unique fractions and (optionally) stores `canonical_sequence` in elites.
 - `elites.dsDNA_hamming=true` computes diversity using min(hamming(seq, rc(seq))) per pair.
 - `objective.scoring.pwm_pseudocounts` smooths matrix-derived PWMs (set to 0 for raw matrices).
@@ -397,19 +404,28 @@ Notes:
 - `optimizers.pt.beta_ladder` defines the temperature ladder; PT does not support `budget.restarts>1` (use ladder size for chain count).
 - `adaptive_beta` tunes Gibbs acceptance (B/M moves) toward a target band; `ladder_adapt` tunes PT ladder scale.
 - `auto_opt` runs short Gibbs + PT pilots, evaluates objective‑aligned scores from draw‑phase `combined_score_final`, logs the decision, and runs a final sample using the selected optimizer.
-- Auto-opt pilots always write `trace.nc` + `sequences.parquet` (required for diagnostics) and are stored under `runs/auto_opt/`.
-- The selected pilot is recorded in `runs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
+- Auto-opt pilots always write `trace.nc` + `sequences.parquet` (required for diagnostics) and are stored under `outputs/auto_opt/`.
+- The selected pilot is recorded in `outputs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
 - Auto-opt is enabled by default when `optimizer.name=auto`; set `auto_opt.enabled: false` or pass `--no-auto-opt` to disable.
+- `auto_opt.cooling_boosts` and `auto_opt.move_profiles` expand the pilot search space beyond length/kind
+- `auto_opt.pt_swap_probs` adds PT swap probability candidates (defaults to the configured `optimizers.pt.swap_prob`).
+- `auto_opt.pt_ladder_sizes` adds PT ladder size candidates (uses the current ladder size when unset; requires a geometric ladder if you want to grow beyond a fixed `betas` list).
+- `auto_opt.gibbs_move_probs` supplies explicit Gibbs move-probability variants (overrides `moves.overrides.move_probs` during pilots).
+  (cooling boosts scale beta schedules/ladders; move profiles switch mutation mixes).
+- `auto_opt.beta_schedule_scales` adds additional Gibbs beta schedule scale candidates (unioned with
+  `auto_opt.cooling_boosts`).
+- `auto_opt.beta_ladder_scales` adds additional PT beta ladder scale candidates (unioned with
+  `auto_opt.cooling_boosts`).
 - Auto‑opt is **thresholdless**: it escalates through `auto_opt.budget_levels` (and configured `auto_opt.replicates`) until a confidence‑separated winner emerges. With `auto_opt.policy.allow_warn: true`, it will always pick the best available candidate at the maximum budget (recording low‑confidence warnings). With `allow_warn: false`, it fails fast if no confident winner emerges and suggests increasing budgets/replicates.
 - `early_stop` halts sampling when the best score fails to improve by `min_delta` for `patience` draws (per chain for Gibbs, per sweep for PT).
-- Auto-opt selection details are stored in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/tables/auto_opt_pilots.csv` and `analysis/plots/auto_opt_tradeoffs.png`.
+- Auto-opt selection details are stored in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/auto_opt_pilots.parquet` and `analysis/plot__auto_opt_tradeoffs.<plot_format>`.
 - `sample.rng.deterministic=true` isolates a stable RNG stream per pilot config.
 - `auto_opt.length` searches candidate lengths; compare lengths using the same objective‑aligned top‑K median score and use `auto_opt.length.prefer_shortest: true` to force the shortest winning length.
 - `auto_opt.length.mode=ladder` runs sequential lengths with warm starts; step must be 1.
 - `auto_opt.length.warm_start` seeds each length from the prior length's raw sequences (prefers `sequences.parquet`).
 - `auto_opt.length.ladder_budget_scale` scales pilot budgets for intermediate ladder steps.
 - `auto_opt.allow_trim_polish_in_pilots` preserves trim/polish in pilots (off by default to keep lengths intact).
-- Ladder mode writes `analysis/tables/length_ladder.csv` under the auto-opt pilot root.
+- Ladder mode writes `analysis/length_ladder.csv` under the auto-opt pilot root.
 - `auto_opt.policy.scorecard.top_k` controls how many draw‑phase scores are used for the top‑K median metric.
 - `auto_opt.keep_pilots` controls pilot retention after selection: `all` keeps everything, `ok` keeps candidates that did not fail catastrophic checks (plus the selected pilot), and `best` keeps only the selected pilot.
 - `moves.overrides.move_schedule` interpolates between `moves.overrides.move_probs` (start) and `move_schedule.end` (end).
@@ -430,7 +446,7 @@ sample:
         betas: [0.2, 0.4, 0.7, 1.0]
       swap_prob: 0.20
 ```
-Tuning hints (use `analysis/tables/diagnostics.json` and `report/report.json`):
+Tuning hints (use `analysis/diagnostics.json` and `analysis/report.json`):
 - Low ESS / high R-hat → increase `budget.draws`/`budget.tune` first; PT can help but is not always better.
 - PT swap acceptance < ~0.05 → widen the beta ladder or increase `swap_prob`.
 - Very high/low block or multi-site acceptance → adjust move ranges or cooling strength.
@@ -445,6 +461,12 @@ analysis:
   extra_plots: false
   extra_tables: false
   mcmc_diagnostics: false
+  dashboard_only: true
+  table_format: parquet
+  plot_format: png
+  plot_dpi: 150
+  png_compress_level: 9
+  include_sequences_in_tables: false
   tf_pair: [lexA, cpxR]
   archive: false
   plots:
@@ -467,19 +489,28 @@ Notes:
   defaults to the latest sample run (same as `--latest`); use `--run` to target
   specific runs.
 - `extra_plots=true` enables non-Tier‑0 plots (scatter, pairwise, score histograms, overlap strand combos).
+- If any non‑Tier‑0 plot keys are explicitly set `true` under `analysis.plots`, cruncher
+  auto‑enables `extra_plots` and records the adjustment in `analysis_used.yaml`.
 - `extra_tables=true` enables optional tables like auto-opt pilots and per-PWM scatter tables.
 - `mcmc_diagnostics=true` enables trace-based diagnostics and move/pt swap plots/tables.
+- If any MCMC diagnostic plots are explicitly set `true`, cruncher auto‑enables
+  `mcmc_diagnostics` and records the adjustment in `analysis_used.yaml`.
 - Tier‑0 plots (dashboard + worst‑TF + overlap summaries) default to `true`;
   all other plot keys default to `false`. Use `cruncher analyze --plots all`
   to generate the full plot suite.
 - The canonical artifact summary is `analysis/summary.json`. A detailed inventory
   with reasons (default/extra/mcmc) is written to `analysis/manifest.json`.
-- `tf_pair` is required for pairwise plots.
+- Analysis reports live in `analysis/report.json` and `analysis/report.md`.
+- `tf_pair` is optional; if omitted, cruncher auto-selects a deterministic pair for pairwise plots.
 - `archive=true` moves the previous analysis into `analysis/_archive/<analysis_id>/`
   before writing the new one.
+- `dashboard_only=true` suppresses redundant component plots when the dashboard is enabled.
+- `table_format` defaults to `parquet` and controls analysis table extensions.
 - `scatter_scale` supports `llr`, `z`, `logp`, `normalized-llr`, or `consensus-neglop-sum`.
 - `scatter_style` toggles scatter styling (`edges` or `thresholds`).
 - `scatter_style=thresholds` requires `scatter_scale=llr` and uses `sample.elites.filters.pwm_sum_min` for the x+y cutoff.
+- `plot_format` selects the single output format for all plots (`png`, `pdf`, or `svg`).
+- `plot_dpi` and `png_compress_level` control plot output size.
 - Threshold plots normalize per-TF LLRs by each PWM's consensus LLR (axes are 0-1).
 - `scatter_background=true` adds a random-sequence baseline cloud to `pwm__scatter`.
 - `scatter_background_samples` controls how many random sequences to draw (defaults to the MCMC subsample size).
@@ -487,9 +518,9 @@ Notes:
 - `subsampling_epsilon` controls how per-PWM draws are subsampled for scatter plots; it is the minimum Euclidean change in per-TF score space required to keep a draw (must be > 0).
 - `cruncher analyze --list-plots` shows the registry and required inputs.
 - `pairgrid` produces a pairwise projection grid across TF scores (useful for N>2).
-- Analysis tables include `score_summary.csv`, `joint_metrics.csv`, overlap summaries
-  (`overlap_summary.csv`, `elite_overlap.csv`), `objective_components.json`, and
-  optional move/ladder tables (`move_stats.csv`, `pt_swap_pairs.csv`).
+- Analysis tables include `score_summary.parquet`, `joint_metrics.parquet`, overlap summaries
+  (`overlap_summary.parquet`, `elite_overlap.parquet`), `objective_components.json`, and
+  optional move/ladder tables (`move_stats_summary.parquet`, `pt_swap_pairs.parquet`).
 
 ### Inspect resolved config
 

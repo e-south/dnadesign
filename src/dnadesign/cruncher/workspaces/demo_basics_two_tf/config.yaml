@@ -1,5 +1,5 @@
 cruncher:
-  out_dir: runs/
+  out_dir: outputs
   regulator_sets:
     - [lexA, cpxR]
 
@@ -62,7 +62,7 @@ cruncher:
     local_sources:
       - source_id: demo_local_meme
         description: Demo DAP-seq motifs + sites (local MEME files)
-        root: data/local_motifs
+        root: inputs/local_motifs
         patterns: ["*.txt"]
         recursive: false
         format_map: {".txt": "MEME"}
@@ -104,6 +104,10 @@ cruncher:
       scoring:
         pwm_pseudocounts: 0.10
         log_odds_clip: null
+      softmin:
+        enabled: true
+        kind: linear
+        beta: [0.5, 10.0]
     elites:
       k: 10
       min_hamming: 1
@@ -121,21 +125,21 @@ cruncher:
         slide_max_shift: 4
         swap_len_range: [2, 8]
         move_probs:
-          S: 0.60
-          B: 0.20
-          M: 0.20
+          S: 0.35
+          B: 0.30
+          M: 0.35
     optimizer:
       name: auto
     optimizers:
       gibbs:
         beta_schedule:
           kind: linear
-          beta: [0.2, 1.0]
+          beta: [1.0, 20.0]
         apply_during: tune
       pt:
         beta_ladder:
           kind: geometric
-          betas: [0.2, 0.4, 0.8, 1.6]
+          betas: [0.2, 1.0, 5.0, 25.0]
         swap_prob: 0.10
     auto_opt:
       enabled: true

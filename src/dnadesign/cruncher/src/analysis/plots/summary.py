@@ -19,6 +19,7 @@ import pandas as pd
 import seaborn as sns
 
 from dnadesign.cruncher.analysis.parquet import read_parquet
+from dnadesign.cruncher.analysis.plots._savefig import savefig
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,10 @@ def write_score_summary(score_df: pd.DataFrame, tf_names: list[str], out_path: P
     summary.insert(0, "tf", [name.replace("score_", "") for name in summary.index])
     summary.reset_index(drop=True, inplace=True)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    summary.to_csv(out_path, index=False)
+    if out_path.suffix == ".parquet":
+        summary.to_parquet(out_path, engine="fastparquet", index=False)
+    else:
+        summary.to_csv(out_path, index=False)
 
 
 def write_elite_topk(elites_df: pd.DataFrame, tf_names: list[str], out_path: Path, top_k: int) -> None:
@@ -66,7 +70,10 @@ def write_elite_topk(elites_df: pd.DataFrame, tf_names: list[str], out_path: Pat
         df = df.head(top_k)
     keep_cols = ["sequence"] + [c for c in ("rank", "norm_sum") if c in df.columns] + cols
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    df[keep_cols].to_csv(out_path, index=False)
+    if out_path.suffix == ".parquet":
+        df[keep_cols].to_parquet(out_path, engine="fastparquet", index=False)
+    else:
+        df[keep_cols].to_csv(out_path, index=False)
 
 
 def _safe_max(values: np.ndarray) -> float | None:
@@ -111,7 +118,11 @@ def write_joint_metrics(elites_df: pd.DataFrame, tf_names: list[str], out_path: 
             "pareto_front_size": 0,
             "pareto_fraction": 0.0,
         }
-        pd.DataFrame([payload]).to_csv(out_path, index=False)
+        df = pd.DataFrame([payload])
+        if out_path.suffix == ".parquet":
+            df.to_parquet(out_path, engine="fastparquet", index=False)
+        else:
+            df.to_csv(out_path, index=False)
         return
 
     scores = elites_df[cols].to_numpy(dtype=float)
@@ -147,10 +158,21 @@ def write_joint_metrics(elites_df: pd.DataFrame, tf_names: list[str], out_path: 
         "pareto_front_size": pareto_front_size,
         "pareto_fraction": pareto_fraction,
     }
-    pd.DataFrame([payload]).to_csv(out_path, index=False)
+    df = pd.DataFrame([payload])
+    if out_path.suffix == ".parquet":
+        df.to_parquet(out_path, engine="fastparquet", index=False)
+    else:
+        df.to_csv(out_path, index=False)
 
 
-def plot_score_hist(score_df: pd.DataFrame, tf_names: list[str], out_path: Path) -> None:
+def plot_score_hist(
+    score_df: pd.DataFrame,
+    tf_names: list[str],
+    out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+) -> None:
     sns.set_style("ticks", {"axes.grid": False})
     n = len(tf_names)
     ncols = 2 if n > 1 else 1
@@ -167,11 +189,18 @@ def plot_score_hist(score_df: pd.DataFrame, tf_names: list[str], out_path: Path)
         axes_list[j].axis("off")
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
 
 
-def plot_score_box(score_df: pd.DataFrame, tf_names: list[str], out_path: Path) -> None:
+def plot_score_box(
+    score_df: pd.DataFrame,
+    tf_names: list[str],
+    out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+) -> None:
     melted = score_df.melt(var_name="tf", value_name="score")
     melted["tf"] = melted["tf"].str.replace("score_", "", regex=False)
     sns.set_style("ticks", {"axes.grid": False})
@@ -182,11 +211,18 @@ def plot_score_box(score_df: pd.DataFrame, tf_names: list[str], out_path: Path) 
     ax.set_ylabel("Score")
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
 
 
-def plot_correlation_heatmap(score_df: pd.DataFrame, tf_names: list[str], out_path: Path) -> None:
+def plot_correlation_heatmap(
+    score_df: pd.DataFrame,
+    tf_names: list[str],
+    out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+) -> None:
     corr = score_df.corr()
     corr.index = [name.replace("score_", "") for name in corr.index]
     corr.columns = [name.replace("score_", "") for name in corr.columns]
@@ -196,11 +232,18 @@ def plot_correlation_heatmap(score_df: pd.DataFrame, tf_names: list[str], out_pa
     ax.set_title("TF score correlation")
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
 
 
-def plot_parallel_coords(elites_df: pd.DataFrame, tf_names: list[str], out_path: Path) -> None:
+def plot_parallel_coords(
+    elites_df: pd.DataFrame,
+    tf_names: list[str],
+    out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+) -> None:
     cols = _score_columns(tf_names)
     missing = [col for col in cols if col not in elites_df.columns]
     if missing:
@@ -225,7 +268,7 @@ def plot_parallel_coords(elites_df: pd.DataFrame, tf_names: list[str], out_path:
     ax.set_title("Parallel coordinates (top elites)")
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
 
 
@@ -234,6 +277,8 @@ def plot_score_pairgrid(
     tf_names: list[str],
     out_path: Path,
     *,
+    dpi: int,
+    png_compress_level: int,
     max_points: int = 2000,
 ) -> None:
     if len(tf_names) < 2:
@@ -247,7 +292,7 @@ def plot_score_pairgrid(
         )
         ax.axis("off")
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_path, dpi=300, bbox_inches="tight")
+        savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
         plt.close(fig)
         return
     if score_df.empty:
@@ -261,7 +306,7 @@ def plot_score_pairgrid(
         )
         ax.axis("off")
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_path, dpi=300, bbox_inches="tight")
+        savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
         plt.close(fig)
         return
     cols = _score_columns(tf_names)
@@ -279,5 +324,5 @@ def plot_score_pairgrid(
     grid.fig.suptitle("TF score pairgrid (pairwise projections)", y=1.02)
     grid.fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    grid.fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(grid.fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(grid.fig)

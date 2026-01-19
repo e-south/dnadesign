@@ -27,6 +27,8 @@ from dnadesign.cruncher.analysis.layout import (
     analysis_meta_root,
     analysis_used_path,
     plot_manifest_path,
+    report_json_path,
+    report_md_path,
     summary_path,
     table_manifest_path,
 )
@@ -34,6 +36,7 @@ from dnadesign.cruncher.analysis.objective import compute_objective_components
 from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
 from dnadesign.cruncher.analysis.parquet import read_parquet
 from dnadesign.cruncher.analysis.plot_registry import PLOT_SPECS
+from dnadesign.cruncher.analysis.report import ensure_report
 from dnadesign.cruncher.app.run_service import list_runs
 from dnadesign.cruncher.artifacts.entries import (
     append_artifacts,
@@ -58,18 +61,19 @@ logger = logging.getLogger(__name__)
 
 _ANALYSIS_ITEMS = (
     "summary.json",
+    "report.json",
+    "report.md",
     "analysis_used.yaml",
     "plot_manifest.json",
     "table_manifest.json",
     "manifest.json",
-    "plots",
-    "tables",
-    "notebooks",
 )
 
 
 def _analysis_item_paths(analysis_root: Path) -> list[Path]:
-    return [analysis_root / name for name in _ANALYSIS_ITEMS]
+    if not analysis_root.exists():
+        return []
+    return [p for p in analysis_root.iterdir() if p.name != "_archive"]
 
 
 def _prune_latest_analysis_artifacts(manifest: dict) -> None:
@@ -443,6 +447,55 @@ def _resolve_tf_pair(
     return x_tf, y_tf
 
 
+def _auto_select_tf_pair(
+    score_df: pd.DataFrame,
+    tf_names: list[str],
+) -> tuple[tuple[str, str] | None, str | None]:
+    if len(tf_names) < 2 or score_df.empty:
+        return None, "fewer than two TFs or empty score table"
+    cols = [f"score_{tf}" for tf in tf_names if f"score_{tf}" in score_df.columns]
+    if len(cols) < 2:
+        return None, "missing per-TF score columns"
+    medians = {tf: float(score_df[f"score_{tf}"].median()) for tf in tf_names if f"score_{tf}" in score_df.columns}
+    if len(medians) < 2:
+        return None, "insufficient score medians"
+    worst_tf = sorted(medians.items(), key=lambda item: (item[1], item[0]))[0][0]
+    corr = score_df[cols].corr()
+    corr_col = corr.get(f"score_{worst_tf}") if hasattr(corr, "get") else None
+    if corr_col is not None:
+        candidates = {}
+        for tf in tf_names:
+            if tf == worst_tf:
+                continue
+            key = f"score_{tf}"
+            if key not in corr_col.index:
+                continue
+            value = corr_col.get(key)
+            if value is None or not np.isfinite(value):
+                continue
+            candidates[tf] = float(value)
+        if candidates:
+            tradeoff_tf = sorted(candidates.items(), key=lambda item: (item[1], item[0]))[0][0]
+            return (worst_tf, tradeoff_tf), "worst-median TF paired with lowest correlation partner"
+    sorted_tfs = [tf for tf, _ in sorted(medians.items(), key=lambda item: (item[1], item[0]))]
+    if len(sorted_tfs) >= 2:
+        return (sorted_tfs[0], sorted_tfs[1]), "fallback to two lowest medians"
+    return None, "unable to select pair"
+
+
+def _summarize_move_stats(move_stats: list[dict[str, object]]) -> pd.DataFrame:
+    if not move_stats:
+        return pd.DataFrame()
+    df = pd.DataFrame(move_stats)
+    required = {"move_kind", "attempted", "accepted"}
+    if not required.issubset(df.columns):
+        return pd.DataFrame()
+    grouped = df.groupby("move_kind", as_index=False)[["attempted", "accepted"]].sum()
+    grouped["acceptance_rate"] = grouped["accepted"] / grouped["attempted"].replace(0, np.nan)
+    grouped["usage_fraction"] = grouped["attempted"] / grouped["attempted"].sum() if not grouped.empty else 0.0
+    return grouped
+
+
 def run_analyze(
     cfg: CruncherConfig,
     config_path: Path,
@@ -467,6 +520,7 @@ def run_analyze(
 
     from dnadesign.cruncher.analysis.diagnostics import summarize_sampling_diagnostics
     from dnadesign.cruncher.analysis.per_pwm import gather_per_pwm_scores
+    from dnadesign.cruncher.analysis.plots._savefig import savefig
     from dnadesign.cruncher.analysis.plots.dashboard import plot_dashboard
     from dnadesign.cruncher.analysis.plots.diagnostics import (
         make_pair_idata,
@@ -493,6 +547,10 @@ def run_analyze(
         plot_overlap_bp_distribution,
         plot_overlap_heatmap,
         plot_overlap_strand_combos,
+    )
+    from dnadesign.cruncher.analysis.plots.placeholders import (
+        write_placeholder_plot,
+        write_placeholder_text,
     )
     from dnadesign.cruncher.analysis.plots.scatter import plot_scatter
     from dnadesign.cruncher.analysis.plots.summary import (
@@ -529,6 +587,7 @@ def run_analyze(
     extra_plots = analysis_cfg.extra_plots
     mcmc_diagnostics = analysis_cfg.mcmc_diagnostics
     override_payload: dict[str, object] = {}
+    auto_adjustments: dict[str, object] = {}
     if plot_keys_override:
         requested = [key for key in plot_keys_override if key]
         if "all" in requested and len(requested) > 1:
@@ -568,6 +627,29 @@ def run_analyze(
                 raise ValueError("--scatter-background-samples must be >= 0.")
             analysis_cfg.scatter_background_samples = scatter_background_samples_override
             override_payload["scatter_background_samples"] = scatter_background_samples_override
+
+    explicit_extra = [key for key in extra_plot_keys if getattr(analysis_cfg.plots, key, False)]
+    if explicit_extra and not analysis_cfg.extra_plots:
+        if analysis_cfg is cfg.analysis:
+            analysis_cfg = analysis_cfg.model_copy(deep=True)
+        analysis_cfg.extra_plots = True
+        extra_plots = True
+        auto_adjustments["extra_plots_forced"] = explicit_extra
+        logger.info(
+            "Extra plots enabled in config; forcing analysis.extra_plots=true for: %s",
+            ", ".join(explicit_extra),
+        )
+    explicit_mcmc = [key for key in mcmc_plot_keys if getattr(analysis_cfg.plots, key, False)]
+    if explicit_mcmc and not analysis_cfg.mcmc_diagnostics:
+        if analysis_cfg is cfg.analysis:
+            analysis_cfg = analysis_cfg.model_copy(deep=True)
+        analysis_cfg.mcmc_diagnostics = True
+        mcmc_diagnostics = True
+        auto_adjustments["mcmc_diagnostics_forced"] = explicit_mcmc
+        logger.info(
+            "MCMC diagnostics plots enabled in config; forcing analysis.mcmc_diagnostics=true for: %s",
+            ", ".join(explicit_mcmc),
+        )
     if scatter_background_seed_override is not None:
         if scatter_background_seed_override < 0:
             raise ValueError("--scatter-background-seed must be >= 0.")
@@ -608,6 +690,30 @@ def run_analyze(
                 "Disabled MCMC diagnostics plots (analysis.mcmc_diagnostics=false): %s",
                 ", ".join(disabled_mcmc_plots),
             )
+    explicit_overrides = set(plot_keys_override or [])
+    override_all = "all" in explicit_overrides
+    if analysis_cfg.dashboard_only and analysis_cfg.plots.dashboard:
+        dashboard_components = {
+            "worst_tf_trace",
+            "worst_tf_identity",
+            "overlap_heatmap",
+            "overlap_bp_distribution",
+        }
+        disabled_dashboard: list[str] = []
+        if analysis_cfg is cfg.analysis:
+            analysis_cfg = analysis_cfg.model_copy(deep=True)
+        for key in sorted(dashboard_components):
+            if override_all or key in explicit_overrides:
+                continue
+            if getattr(analysis_cfg.plots, key, False):
+                setattr(analysis_cfg.plots, key, False)
+                disabled_dashboard.append(key)
+        if disabled_dashboard:
+            auto_adjustments["dashboard_only_disabled"] = disabled_dashboard
+            logger.info(
+                "Dashboard-only enabled; disabled redundant plots: %s",
+                ", ".join(disabled_dashboard),
+            )
 
     override_payload = override_payload or None
 
@@ -615,6 +721,9 @@ def run_analyze(
     if analysis_cfg is not cfg.analysis:
         cfg_effective = cfg.model_copy(deep=True)
         cfg_effective.analysis = analysis_cfg
+    plot_dpi = analysis_cfg.plot_dpi
+    png_compress_level = analysis_cfg.png_compress_level
+    plot_format = analysis_cfg.plot_format
 
     runs = runs_override if runs_override else (analysis_cfg.runs or [])
     if not runs:
@@ -694,23 +803,15 @@ def run_analyze(
                 "Re-run `cruncher sample` with sample.output.save_sequences=true."
             )
         plots = analysis_cfg.plots
-        needs_trace = (
-            analysis_cfg.mcmc_diagnostics
-            or plots.trace
-            or plots.autocorr
-            or plots.convergence
-            or plots.pair_pwm
-            or plots.parallel_pwm
-        )
+        needs_trace = analysis_cfg.mcmc_diagnostics or plots.trace or plots.autocorr or plots.convergence
         trace_idata = None
         if trace_file.exists() and needs_trace:
             trace_idata = az.from_netcdf(trace_file)
         elif needs_trace:
-            msg = (
-                f"Missing artifacts/trace.nc in {sample_dir}. "
-                "Re-run `cruncher sample` with sample.output.trace.save=true."
+            logger.warning(
+                "Missing artifacts/trace.nc in %s; trace-based diagnostics will be skipped.",
+                sample_dir,
             )
-            raise FileNotFoundError(msg)
 
         analysis_root = sample_dir / "analysis"
         analysis_root.mkdir(parents=True, exist_ok=True)
@@ -725,6 +826,83 @@ def run_analyze(
         existing_summary = _load_summary_payload(analysis_root)
         if existing_summary and existing_summary.get("signature") == analysis_signature:
             logger.info("Analysis already up to date: %s", analysis_root)
+            report_json = report_json_path(analysis_root)
+            report_md = report_md_path(analysis_root)
+            if not report_json.exists() or not report_md.exists():
+                analysis_used_payload = None
+                analysis_used_file = analysis_used_path(analysis_root)
+                if analysis_used_file.exists():
+                    try:
+                        analysis_used_payload = yaml.safe_load(analysis_used_file.read_text()) or {}
+                    except Exception as exc:
+                        logger.warning("Failed to read %s: %s", analysis_used_file, exc)
+                ensure_report(
+                    analysis_root=analysis_root,
+                    summary_payload=existing_summary,
+                    analysis_used_payload=analysis_used_payload,
+                )
+                summary_file = summary_path(analysis_root)
+                if summary_file.exists():
+                    if "report_json" not in existing_summary or "report_md" not in existing_summary:
+                        existing_summary["report_json"] = str(report_json.relative_to(sample_dir))
+                        existing_summary["report_md"] = str(report_md.relative_to(sample_dir))
+                        summary_file.write_text(json.dumps(existing_summary, indent=2))
+                analysis_manifest_file = analysis_manifest_path(analysis_root)
+                if analysis_manifest_file.exists():
+                    manifest_payload = json.loads(analysis_manifest_file.read_text())
+                    artifacts = manifest_payload.get("artifacts") or []
+                    report_entries = [
+                        {
+                            "path": str(report_json.relative_to(sample_dir)),
+                            "kind": "report",
+                            "label": "Analysis report (JSON)",
+                            "reason": "default",
+                            "exists": report_json.exists(),
+                            "key": "report_json",
+                        },
+                        {
+                            "path": str(report_md.relative_to(sample_dir)),
+                            "kind": "report",
+                            "label": "Analysis report (Markdown)",
+                            "reason": "default",
+                            "exists": report_md.exists(),
+                            "key": "report_md",
+                        },
+                    ]
+                    seen = {item.get("path") for item in artifacts if isinstance(item, dict)}
+                    for entry in report_entries:
+                        if entry["path"] in seen:
+                            continue
+                        artifacts.append(entry)
+                    manifest_payload["artifacts"] = artifacts
+                    analysis_manifest_file.write_text(json.dumps(manifest_payload, indent=2))
+                report_artifacts = [
+                    artifact_entry(
+                        report_json,
+                        sample_dir,
+                        kind="json",
+                        label="Analysis report (JSON)",
+                        stage="analysis",
+                    ),
+                    artifact_entry(
+                        report_md,
+                        sample_dir,
+                        kind="text",
+                        label="Analysis report (Markdown)",
+                        stage="analysis",
+                    ),
+                ]
+                append_artifacts(manifest, report_artifacts)
+                from dnadesign.cruncher.app.run_service import update_run_index_from_manifest
+                from dnadesign.cruncher.artifacts.manifest import write_manifest
+
+                write_manifest(sample_dir, manifest)
+                update_run_index_from_manifest(
+                    config_path,
+                    sample_dir,
+                    manifest,
+                    catalog_root=cfg.motif_store.catalog_root,
+                )
             analysis_runs.append(analysis_root)
             continue
         analysis_id = _analysis_id()
@@ -743,12 +921,11 @@ def run_analyze(
                 _prune_latest_analysis_artifacts(manifest)
         analysis_meta = analysis_meta_root(analysis_root)
         analysis_meta.mkdir(parents=True, exist_ok=True)
-        plots_dir = analysis_root / "plots"
-        tables_dir = analysis_root / "tables"
-        notebooks_dir = analysis_root / "notebooks"
-        plots_dir.mkdir(parents=True, exist_ok=True)
-        tables_dir.mkdir(parents=True, exist_ok=True)
-        notebooks_dir.mkdir(parents=True, exist_ok=True)
+        plots_dir = analysis_root
+        tables_dir = analysis_root
+
+        def _plot_path(stem: str) -> Path:
+            return plots_dir / f"{stem}.{plot_format}"
 
         analysis_used_file = analysis_used_path(analysis_root)
         analysis_used_payload = {
@@ -760,13 +937,14 @@ def run_analyze(
         if override_payload:
             analysis_used_payload["analysis_overrides"] = override_payload
             analysis_used_payload["analysis_base"] = cfg.analysis.model_dump()
-        analysis_used_file.parent.mkdir(parents=True, exist_ok=True)
-        analysis_used_file.write_text(yaml.safe_dump(analysis_used_payload, sort_keys=False))
+
+        seq_df = read_parquet(seq_path)
+        score_df = score_frame_from_df(seq_df, tf_names)
 
         # gather per-PWM scores (scatter plot only)
         per_pwm_path: Path | None = None
         if plots.scatter_pwm:
-            per_pwm_path = tables_dir / "gathered_per_pwm_everyN.csv"
+            per_pwm_path = tables_dir / f"per_pwm_scores.{analysis_cfg.table_format}"
             gather_per_pwm_scores(
                 sample_dir,
                 analysis_cfg.subsampling_epsilon,
@@ -774,20 +952,19 @@ def run_analyze(
                 bidirectional=bidirectional,
                 scale=analysis_cfg.scatter_scale,
                 out_path=per_pwm_path,
+                sequences_df=seq_df,
                 pseudocounts=scoring_pseudocounts,
                 log_odds_clip=scoring_log_odds_clip,
             )
             logger.info("Wrote per-PWM score table → %s", per_pwm_path.relative_to(sample_dir))
-
-        seq_df = read_parquet(seq_path)
-        score_df = score_frame_from_df(seq_df, tf_names)
-        score_summary_path = tables_dir / "score_summary.csv"
+        table_ext = analysis_cfg.table_format
+        score_summary_path = tables_dir / f"score_summary.{table_ext}"
         write_score_summary(score_df, tf_names, score_summary_path)
 
-        topk_path = tables_dir / "elite_topk.csv"
+        topk_path = tables_dir / f"elite_topk.{table_ext}"
         write_elite_topk(elites_df, tf_names, topk_path, top_k=sample_meta.top_k)
 
-        joint_metrics_path = tables_dir / "joint_metrics.csv"
+        joint_metrics_path = tables_dir / f"joint_metrics.{table_ext}"
         write_joint_metrics(elites_df, tf_names, joint_metrics_path)
 
         pwm_widths = {tf: pwm.length for tf, pwm in pwms.items()}
@@ -795,11 +972,16 @@ def run_analyze(
             elites_df,
             tf_names,
             pwm_widths=pwm_widths,
+            include_sequences=analysis_cfg.include_sequences_in_tables,
         )
-        overlap_summary_path = tables_dir / "overlap_summary.csv"
-        elite_overlap_path = tables_dir / "elite_overlap.csv"
-        overlap_summary_df.to_csv(overlap_summary_path, index=False)
-        elite_overlap_df.to_csv(elite_overlap_path, index=False)
+        overlap_summary_path = tables_dir / f"overlap_summary.{table_ext}"
+        elite_overlap_path = tables_dir / f"elite_overlap.{table_ext}"
+        if table_ext == "parquet":
+            overlap_summary_df.to_parquet(overlap_summary_path, engine="fastparquet", index=False)
+            elite_overlap_df.to_parquet(elite_overlap_path, engine="fastparquet", index=False)
+        else:
+            overlap_summary_df.to_csv(overlap_summary_path, index=False)
+            elite_overlap_df.to_csv(elite_overlap_path, index=False)
 
         sample_meta_payload = {
             "mode": sample_meta.mode,
@@ -826,6 +1008,7 @@ def run_analyze(
             optimizer_kind=sample_meta.optimizer_kind,
             sample_meta=sample_meta_payload,
             trace_required=analysis_cfg.mcmc_diagnostics,
+            overlap_summary=overlap_summary,
         )
         diagnostics_path = tables_dir / "diagnostics.json"
         diagnostics_path.write_text(json.dumps(diagnostics_summary, indent=2))
@@ -848,13 +1031,25 @@ def run_analyze(
 
         move_stats_path = None
         move_stats_df = None
+        move_stats_summary_path = None
+        move_stats_summary_df = None
         optimizer_stats = manifest.get("optimizer_stats", {})
-        if analysis_cfg.mcmc_diagnostics and isinstance(optimizer_stats, dict):
-            move_stats = optimizer_stats.get("move_stats")
-            if isinstance(move_stats, list) and move_stats:
-                move_stats_df = pd.DataFrame(move_stats)
-                move_stats_path = tables_dir / "move_stats.csv"
-                move_stats_df.to_csv(move_stats_path, index=False)
+        move_stats = optimizer_stats.get("move_stats") if isinstance(optimizer_stats, dict) else None
+        if isinstance(move_stats, list) and move_stats:
+            move_stats_df = pd.DataFrame(move_stats) if analysis_cfg.mcmc_diagnostics else None
+            move_stats_summary_df = _summarize_move_stats(move_stats)
+            if move_stats_summary_df is not None and not move_stats_summary_df.empty:
+                move_stats_summary_path = tables_dir / f"move_stats_summary.{table_ext}"
+                if table_ext == "parquet":
+                    move_stats_summary_df.to_parquet(move_stats_summary_path, engine="fastparquet", index=False)
+                else:
+                    move_stats_summary_df.to_csv(move_stats_summary_path, index=False)
+            if analysis_cfg.extra_tables and move_stats_df is not None:
+                move_stats_path = tables_dir / f"move_stats.{table_ext}"
+                if table_ext == "parquet":
+                    move_stats_df.to_parquet(move_stats_path, engine="fastparquet", index=False)
+                else:
+                    move_stats_df.to_csv(move_stats_path, index=False)
 
         pt_swap_pairs_path = None
         pt_swap_pairs_df = None
@@ -886,8 +1081,11 @@ def run_analyze(
                     )
                 if rows:
                     pt_swap_pairs_df = pd.DataFrame(rows)
-                    pt_swap_pairs_path = tables_dir / "pt_swap_pairs.csv"
-                    pt_swap_pairs_df.to_csv(pt_swap_pairs_path, index=False)
+                    pt_swap_pairs_path = tables_dir / f"pt_swap_pairs.{table_ext}"
+                    if table_ext == "parquet":
+                        pt_swap_pairs_df.to_parquet(pt_swap_pairs_path, engine="fastparquet", index=False)
+                    else:
+                        pt_swap_pairs_df.to_csv(pt_swap_pairs_path, index=False)
 
         auto_opt_table_path = None
         auto_opt_plot_path = None
@@ -896,8 +1094,12 @@ def run_analyze(
             candidates = auto_opt_payload.get("candidates")
             if isinstance(candidates, list) and candidates:
                 if analysis_cfg.extra_tables:
-                    auto_opt_table_path = tables_dir / "auto_opt_pilots.csv"
-                    pd.DataFrame(candidates).to_csv(auto_opt_table_path, index=False)
+                    auto_opt_table_path = tables_dir / f"auto_opt_pilots.{table_ext}"
+                    df_auto_table = pd.DataFrame(candidates)
+                    if table_ext == "parquet":
+                        df_auto_table.to_parquet(auto_opt_table_path, engine="fastparquet", index=False)
+                    else:
+                        df_auto_table.to_csv(auto_opt_table_path, index=False)
                 if analysis_cfg.extra_plots:
                     df_auto = pd.DataFrame(candidates)
                     score_col = "top_k_median_final" if "top_k_median_final" in df_auto.columns else "best_score"
@@ -907,7 +1109,7 @@ def run_analyze(
                         if not df_auto.empty:
                             import matplotlib.pyplot as plt
 
-                            auto_opt_plot_path = plots_dir / "auto_opt_tradeoffs.png"
+                            auto_opt_plot_path = _plot_path("auto_opt_tradeoffs")
                             fig, ax = plt.subplots(figsize=(6, 4))
                             lengths = df_auto.get("length")
                             colors = None
@@ -927,7 +1129,7 @@ def run_analyze(
                             if colors is not None:
                                 fig.colorbar(scatter, ax=ax, label="Length")
                             fig.tight_layout()
-                            fig.savefig(auto_opt_plot_path, dpi=150)
+                            savefig(fig, auto_opt_plot_path, dpi=plot_dpi, png_compress_level=png_compress_level)
                             plt.close(fig)
 
         enabled_specs = [spec for spec in PLOT_SPECS if getattr(plots, spec.key, False)]
@@ -935,14 +1137,69 @@ def run_analyze(
             logger.debug("Enabled plots: %s", ", ".join(spec.key for spec in enabled_specs))
         tf_pair = _resolve_tf_pair(analysis_cfg, tf_names, tf_pair_override=tf_pair_override)
         pairwise_requested = any("tf_pair" in spec.requires for spec in enabled_specs)
+        autopick_payload = None
+        pairwise_placeholder_reason = None
+        pairwise_placeholder_keys: list[str] = []
         if pairwise_requested and tf_pair is None:
-            raise ValueError("analysis.tf_pair is required when pairwise plots are enabled.")
+            tf_pair, reason = _auto_select_tf_pair(score_df, tf_names)
+            if tf_pair is not None:
+                autopick_payload = {"tf_pair": list(tf_pair), "reason": reason}
+                logger.info("Auto-selected tf_pair=%s (%s)", tf_pair, reason)
+            else:
+                pairwise_placeholder_reason = reason
+                pairwise_placeholder_keys = [
+                    key
+                    for key in ("pair_pwm", "parallel_pwm", "scatter_pwm")
+                    if getattr(analysis_cfg.plots, key, False)
+                ]
+                logger.warning("Pairwise plots will be placeholders: %s", reason)
+                tf_pair = None
+        if pairwise_placeholder_keys:
+            auto_adjustments["pairwise_placeholders"] = {
+                "plots": pairwise_placeholder_keys,
+                "reason": pairwise_placeholder_reason,
+            }
+
+        if autopick_payload:
+            analysis_used_payload["analysis_autopicks"] = autopick_payload
+        if auto_adjustments:
+            analysis_used_payload["analysis_auto_adjustments"] = auto_adjustments
+        analysis_used_file.parent.mkdir(parents=True, exist_ok=True)
+        analysis_used_file.write_text(yaml.safe_dump(analysis_used_payload, sort_keys=False))
 
         # ── diagnostics ───────────────────────────────────────────────────────
         if plots.trace:
-            plot_trace(trace_idata, plots_dir)
+            if trace_idata is not None:
+                plot_trace(
+                    trace_idata,
+                    plots_dir,
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                    plot_format=plot_format,
+                )
+            else:
+                write_placeholder_plot(
+                    _plot_path("diag__trace_score"),
+                    "Trace missing: trace-based diagnostics unavailable.",
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                )
         if plots.autocorr:
-            plot_autocorr(trace_idata, plots_dir)
+            if trace_idata is not None:
+                plot_autocorr(
+                    trace_idata,
+                    plots_dir,
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                    plot_format=plot_format,
+                )
+            else:
+                write_placeholder_plot(
+                    _plot_path("diag__autocorr_score"),
+                    "Trace missing: autocorrelation unavailable.",
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                )
         if plots.convergence:
             idata_for_convergence = trace_idata
             if sample_meta.optimizer_kind == "pt" and trace_idata is not None:
@@ -951,21 +1208,95 @@ def run_analyze(
                     values = np.asarray(score)
                     if values.ndim >= 2 and values.shape[0] > 0:
                         idata_for_convergence = az.from_dict(posterior={"score": values[-1:, :]})
-            report_convergence(idata_for_convergence, plots_dir)
-            plot_rank_diagnostic(idata_for_convergence, plots_dir)
-            plot_ess(idata_for_convergence, plots_dir)
+            if idata_for_convergence is not None:
+                report_convergence(idata_for_convergence, plots_dir)
+                plot_rank_diagnostic(
+                    idata_for_convergence,
+                    plots_dir,
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                    plot_format=plot_format,
+                )
+                plot_ess(
+                    idata_for_convergence,
+                    plots_dir,
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                    plot_format=plot_format,
+                )
+            else:
+                write_placeholder_text(plots_dir / "diag__convergence.txt", "Trace missing: convergence unavailable.")
+                write_placeholder_plot(
+                    _plot_path("diag__rank_plot_score"),
+                    "Trace missing: rank plot unavailable.",
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                )
+                write_placeholder_plot(
+                    _plot_path("diag__ess_evolution_score"),
+                    "Trace missing: ESS evolution unavailable.",
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                )
         if plots.pair_pwm or plots.parallel_pwm:
-            idata_pair = make_pair_idata(sample_dir, tf_pair=tf_pair)
-            if plots.pair_pwm:
-                plot_pair_pwm_scores(idata_pair, plots_dir, tf_pair=tf_pair)
-            if plots.parallel_pwm:
-                plot_parallel_pwm_scores(idata_pair, plots_dir, tf_pair=tf_pair)
+            if tf_pair is None and pairwise_placeholder_keys:
+                if plots.pair_pwm:
+                    write_placeholder_plot(
+                        _plot_path("pwm__pair_scores"),
+                        "Pairwise plot unavailable: tf_pair not resolved.",
+                        dpi=plot_dpi,
+                        png_compress_level=png_compress_level,
+                    )
+                if plots.parallel_pwm:
+                    write_placeholder_plot(
+                        _plot_path("pwm__parallel_scores"),
+                        "Pairwise plot unavailable: tf_pair not resolved.",
+                        dpi=plot_dpi,
+                        png_compress_level=png_compress_level,
+                    )
+            else:
+                idata_pair = make_pair_idata(sample_dir, tf_pair=tf_pair, sequences_df=seq_df)
+                if plots.pair_pwm:
+                    plot_pair_pwm_scores(
+                        idata_pair,
+                        plots_dir,
+                        tf_pair=tf_pair,
+                        dpi=plot_dpi,
+                        png_compress_level=png_compress_level,
+                        plot_format=plot_format,
+                    )
+                if plots.parallel_pwm:
+                    plot_parallel_pwm_scores(
+                        idata_pair,
+                        plots_dir,
+                        tf_pair=tf_pair,
+                        dpi=plot_dpi,
+                        png_compress_level=png_compress_level,
+                        plot_format=plot_format,
+                    )
         if plots.worst_tf_trace:
-            plot_worst_tf_trace(seq_df, tf_names, plots_dir / "plot__worst_tf_trace.png")
+            plot_worst_tf_trace(
+                seq_df,
+                tf_names,
+                _plot_path("plot__worst_tf_trace"),
+                dpi=plot_dpi,
+                png_compress_level=png_compress_level,
+            )
         if plots.worst_tf_identity:
-            plot_worst_tf_identity(seq_df, tf_names, plots_dir / "plot__worst_tf_identity.png")
+            plot_worst_tf_identity(
+                seq_df,
+                tf_names,
+                _plot_path("plot__worst_tf_identity"),
+                dpi=plot_dpi,
+                png_compress_level=png_compress_level,
+            )
         if plots.elite_filter_waterfall:
-            plot_elite_filter_waterfall(elites_meta, plots_dir / "plot__elite_filter_waterfall.png")
+            plot_elite_filter_waterfall(
+                elites_meta,
+                _plot_path("plot__elite_filter_waterfall"),
+                dpi=plot_dpi,
+                png_compress_level=png_compress_level,
+            )
         if plots.dashboard:
             plot_dashboard(
                 seq_df,
@@ -973,77 +1304,183 @@ def run_analyze(
                 tf_names,
                 overlap_summary_df,
                 elite_overlap_df,
-                plots_dir / "plot__dashboard.png",
+                _plot_path("plot__dashboard"),
+                dpi=plot_dpi,
+                png_compress_level=png_compress_level,
             )
 
         # ── scatter plot ──────────────────────────────────────────────────────
         if plots.scatter_pwm:
-            if per_pwm_path is None or not per_pwm_path.exists():
-                raise FileNotFoundError(f"Missing gathered_per_pwm_everyN.csv in {tables_dir}")
-            annotation = (
-                f"chains = {sample_meta.chains}\n"
-                f"iters  = {sample_meta.tune + sample_meta.draws}\n"
-                f"S/B/M   = {sample_meta.move_probs['S']:.2f}/"
-                f"{sample_meta.move_probs['B']:.2f}/"
-                f"{sample_meta.move_probs['M']:.2f}\n"
-                f"cooling = {sample_meta.cooling_kind}"
-            )
-            if any(sample_meta.move_probs.get(k, 0.0) > 0 for k in ("L", "W", "I")):
-                annotation = (
-                    annotation
-                    + "\n"
-                    + f"L/W/I   = {sample_meta.move_probs.get('L', 0.0):.2f}/"
-                    + f"{sample_meta.move_probs.get('W', 0.0):.2f}/"
-                    + f"{sample_meta.move_probs.get('I', 0.0):.2f}"
+            if tf_pair is None and pairwise_placeholder_keys:
+                write_placeholder_plot(
+                    _plot_path("pwm__scatter"),
+                    "Scatter plot unavailable: tf_pair not resolved.",
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
                 )
-            plot_scatter(
-                sample_dir,
-                pwms,
-                cfg_effective,
-                tf_pair=tf_pair,
-                per_pwm_path=per_pwm_path,
-                out_dir=plots_dir,
-                bidirectional=bidirectional,
-                pwm_sum_threshold=sample_meta.pwm_sum_threshold,
-                annotation=annotation,
-                pseudocounts=scoring_pseudocounts,
-                log_odds_clip=scoring_log_odds_clip,
-            )
-            logger.debug("Wrote pwm__scatter.pdf")
+            else:
+                if per_pwm_path is None or not per_pwm_path.exists():
+                    raise FileNotFoundError(f"Missing per-PWM score table in {tables_dir}")
+                annotation = (
+                    f"chains = {sample_meta.chains}\n"
+                    f"iters  = {sample_meta.tune + sample_meta.draws}\n"
+                    f"S/B/M   = {sample_meta.move_probs['S']:.2f}/"
+                    f"{sample_meta.move_probs['B']:.2f}/"
+                    f"{sample_meta.move_probs['M']:.2f}\n"
+                    f"cooling = {sample_meta.cooling_kind}"
+                )
+                if any(sample_meta.move_probs.get(k, 0.0) > 0 for k in ("L", "W", "I")):
+                    annotation = (
+                        annotation
+                        + "\n"
+                        + f"L/W/I   = {sample_meta.move_probs.get('L', 0.0):.2f}/"
+                        + f"{sample_meta.move_probs.get('W', 0.0):.2f}/"
+                        + f"{sample_meta.move_probs.get('I', 0.0):.2f}"
+                    )
+                plot_scatter(
+                    sample_dir,
+                    pwms,
+                    cfg_effective,
+                    tf_pair=tf_pair,
+                    per_pwm_path=per_pwm_path,
+                    out_dir=plots_dir,
+                    bidirectional=bidirectional,
+                    pwm_sum_threshold=sample_meta.pwm_sum_threshold,
+                    annotation=annotation,
+                    output_format=plot_format,
+                    elites_df=elites_df,
+                    seq_len=int(manifest.get("sequence_length") or 0),
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                    pseudocounts=scoring_pseudocounts,
+                    log_odds_clip=scoring_log_odds_clip,
+                )
 
         if plots.score_hist:
-            plot_score_hist(score_df, tf_names, plots_dir / "score__hist.png")
+            plot_score_hist(
+                score_df,
+                tf_names,
+                _plot_path("score__hist"),
+                dpi=plot_dpi,
+                png_compress_level=png_compress_level,
+            )
         if plots.score_box:
-            plot_score_box(score_df, tf_names, plots_dir / "score__box.png")
+            plot_score_box(
+                score_df,
+                tf_names,
+                _plot_path("score__box"),
+                dpi=plot_dpi,
+                png_compress_level=png_compress_level,
+            )
         if plots.correlation_heatmap:
-            plot_correlation_heatmap(score_df, tf_names, plots_dir / "score__correlation.png")
+            plot_correlation_heatmap(
+                score_df,
+                tf_names,
+                _plot_path("score__correlation"),
+                dpi=plot_dpi,
+                png_compress_level=png_compress_level,
+            )
         if plots.pairgrid:
-            plot_score_pairgrid(score_df, tf_names, plots_dir / "score__pairgrid.png")
+            plot_score_pairgrid(
+                score_df,
+                tf_names,
+                _plot_path("score__pairgrid"),
+                dpi=plot_dpi,
+                png_compress_level=png_compress_level,
+            )
         if plots.parallel_coords:
             if elites_df.empty:
-                logger.warning("Skipping parallel coordinates: no elites available.")
+                write_placeholder_plot(
+                    _plot_path("elites__parallel_coords"),
+                    "Parallel coordinates unavailable: no elites.",
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                )
             else:
-                plot_parallel_coords(elites_df, tf_names, plots_dir / "elites__parallel_coords.png")
+                plot_parallel_coords(
+                    elites_df,
+                    tf_names,
+                    _plot_path("elites__parallel_coords"),
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                )
 
         if plots.overlap_heatmap:
-            plot_overlap_heatmap(overlap_summary_df, tf_names, plots_dir / "plot__overlap_heatmap.png")
+            if overlap_summary_df is None or overlap_summary_df.empty:
+                write_placeholder_plot(
+                    _plot_path("plot__overlap_heatmap"),
+                    "Overlap heatmap unavailable: no elite overlap summary.",
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                )
+            else:
+                plot_overlap_heatmap(
+                    overlap_summary_df,
+                    tf_names,
+                    _plot_path("plot__overlap_heatmap"),
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                )
         if plots.overlap_bp_distribution:
-            plot_overlap_bp_distribution(elite_overlap_df, plots_dir / "plot__overlap_bp_distribution.png")
+            if elite_overlap_df is None or elite_overlap_df.empty:
+                write_placeholder_plot(
+                    _plot_path("plot__overlap_bp_distribution"),
+                    "Overlap distribution unavailable: no elite overlap rows.",
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                )
+            else:
+                plot_overlap_bp_distribution(
+                    elite_overlap_df,
+                    _plot_path("plot__overlap_bp_distribution"),
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                )
         if plots.overlap_strand_combos:
-            plot_overlap_strand_combos(overlap_summary_df, plots_dir / "plot__overlap_strand_combos.png")
+            if overlap_summary_df is None or overlap_summary_df.empty:
+                write_placeholder_plot(
+                    _plot_path("plot__overlap_strand_combos"),
+                    "Overlap strand combos unavailable: no overlap summary.",
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                )
+            else:
+                plot_overlap_strand_combos(
+                    overlap_summary_df,
+                    _plot_path("plot__overlap_strand_combos"),
+                    dpi=plot_dpi,
+                    png_compress_level=png_compress_level,
+                )
         if plots.motif_offset_rug:
             plot_motif_offset_rug(
                 elites_df,
                 tf_names,
-                plots_dir / "plot__motif_offset_rug.png",
+                _plot_path("plot__motif_offset_rug"),
                 pwm_widths=pwm_widths,
+                dpi=plot_dpi,
+                png_compress_level=png_compress_level,
             )
         if plots.pt_swap_by_pair and pt_swap_pairs_df is not None:
-            plot_pt_swap_by_pair(pt_swap_pairs_df, plots_dir / "plot__pt_swap_by_pair.png")
+            plot_pt_swap_by_pair(
+                pt_swap_pairs_df,
+                _plot_path("plot__pt_swap_by_pair"),
+                dpi=plot_dpi,
+                png_compress_level=png_compress_level,
+            )
         if plots.move_acceptance_time and move_stats_df is not None:
-            plot_move_acceptance_time(move_stats_df, plots_dir / "plot__move_acceptance_time.png")
+            plot_move_acceptance_time(
+                move_stats_df,
+                _plot_path("plot__move_acceptance_time"),
+                dpi=plot_dpi,
+                png_compress_level=png_compress_level,
+            )
         if plots.move_usage_time and move_stats_df is not None:
-            plot_move_usage_time(move_stats_df, plots_dir / "plot__move_usage_time.png")
+            plot_move_usage_time(
+                move_stats_df,
+                _plot_path("plot__move_usage_time"),
+                dpi=plot_dpi,
+                png_compress_level=png_compress_level,
+            )
 
         # ── top-5 tabular summary (unchanged logic – dynamic TF names) ────────
         if not elites_df.empty:
@@ -1109,16 +1546,17 @@ def run_analyze(
         plot_artifacts: list[dict[str, object]] = []
         for spec in PLOT_SPECS:
             enabled_flag = getattr(plots, spec.key, False)
+            spec_outputs = [out.replace("{ext}", plot_format) for out in spec.outputs]
             outputs = []
             missing = []
-            for output in spec.outputs:
+            for output in spec_outputs:
                 out_path = analysis_root / output
                 exists = out_path.exists()
                 outputs.append({"path": output, "exists": exists})
                 if enabled_flag and not exists:
                     missing.append(output)
                 elif enabled_flag:
-                    kind = "plot" if out_path.suffix.lower() in {".png", ".pdf"} else "text"
+                    kind = "plot" if out_path.suffix.lower() in {".png", ".pdf", ".svg"} else "text"
                     plot_artifacts.append(
                         artifact_entry(
                             out_path,
@@ -1145,15 +1583,20 @@ def run_analyze(
             plot_manifest["plots"].append(
                 {
                     "key": "auto_opt_tradeoffs",
-                    "label": "Auto-opt tradeoffs (PNG)",
+                    "label": f"Auto-opt tradeoffs ({plot_format.upper()})",
                     "group": "auto_opt",
                     "description": "Balance vs top-K median score across auto-opt pilots.",
                     "requires": [],
                     "enabled": True,
                     "outputs": [
-                        {"path": str(auto_opt_plot_path.relative_to(sample_dir)), "exists": auto_opt_plot_path.exists()}
+                        {
+                            "path": str(auto_opt_plot_path.relative_to(sample_dir)),
+                            "exists": auto_opt_plot_path.exists(),
+                        }
                     ],
-                    "missing_outputs": [] if auto_opt_plot_path.exists() else ["plots/auto_opt_tradeoffs.png"],
+                    "missing_outputs": []
+                    if auto_opt_plot_path.exists()
+                    else [str(auto_opt_plot_path.relative_to(sample_dir))],
                     "generated": auto_opt_plot_path.exists(),
                 }
             )
@@ -1162,7 +1605,7 @@ def run_analyze(
                     auto_opt_plot_path,
                     sample_dir,
                     kind="plot",
-                    label="Auto-opt tradeoffs (PNG)",
+                    label=f"Auto-opt tradeoffs ({plot_format.upper()})",
                     stage="analysis",
                 )
             )
@@ -1171,12 +1614,13 @@ def run_analyze(
         plot_manifest_file.parent.mkdir(parents=True, exist_ok=True)
         plot_manifest_file.write_text(json.dumps(plot_manifest, indent=2))
 
+        table_label_suffix = "Parquet" if table_ext == "parquet" else "CSV"
         tables_manifest_entries: list[dict[str, object]] = []
         if per_pwm_path is not None:
             tables_manifest_entries.append(
                 {
                     "key": "per_pwm",
-                    "label": "Per-PWM scores (CSV)",
+                    "label": f"Per-PWM scores ({table_label_suffix})",
                     "path": str(per_pwm_path.relative_to(sample_dir)),
                     "exists": per_pwm_path.exists(),
                 }
@@ -1185,31 +1629,31 @@ def run_analyze(
             [
                 {
                     "key": "score_summary",
-                    "label": "Per-TF summary (CSV)",
+                    "label": f"Per-TF summary ({table_label_suffix})",
                     "path": str(score_summary_path.relative_to(sample_dir)),
                     "exists": score_summary_path.exists(),
                 },
                 {
                     "key": "elite_topk",
-                    "label": "Elite top-K (CSV)",
+                    "label": f"Elite top-K ({table_label_suffix})",
                     "path": str(topk_path.relative_to(sample_dir)),
                     "exists": topk_path.exists(),
                 },
                 {
                     "key": "joint_metrics",
-                    "label": "Joint score metrics (CSV)",
+                    "label": f"Joint score metrics ({table_label_suffix})",
                     "path": str(joint_metrics_path.relative_to(sample_dir)),
                     "exists": joint_metrics_path.exists(),
                 },
                 {
                     "key": "overlap_summary",
-                    "label": "Overlap summary (CSV)",
+                    "label": f"Overlap summary ({table_label_suffix})",
                     "path": str(overlap_summary_path.relative_to(sample_dir)),
                     "exists": overlap_summary_path.exists(),
                 },
                 {
                     "key": "elite_overlap",
-                    "label": "Elite overlap details (CSV)",
+                    "label": f"Elite overlap details ({table_label_suffix})",
                     "path": str(elite_overlap_path.relative_to(sample_dir)),
                     "exists": elite_overlap_path.exists(),
                 },
@@ -1232,11 +1676,20 @@ def run_analyze(
             "created_at": datetime.now(timezone.utc).isoformat(),
             "tables": tables_manifest_entries,
         }
+        if move_stats_summary_path is not None:
+            table_manifest["tables"].append(
+                {
+                    "key": "move_stats_summary",
+                    "label": f"Move stats summary ({table_label_suffix})",
+                    "path": str(move_stats_summary_path.relative_to(sample_dir)),
+                    "exists": move_stats_summary_path.exists(),
+                }
+            )
         if move_stats_path is not None:
             table_manifest["tables"].append(
                 {
                     "key": "move_stats",
-                    "label": "Move stats (CSV)",
+                    "label": f"Move stats ({table_label_suffix})",
                     "path": str(move_stats_path.relative_to(sample_dir)),
                     "exists": move_stats_path.exists(),
                 }
@@ -1245,7 +1698,7 @@ def run_analyze(
             table_manifest["tables"].append(
                 {
                     "key": "pt_swap_pairs",
-                    "label": "PT swap by pair (CSV)",
+                    "label": f"PT swap by pair ({table_label_suffix})",
                     "path": str(pt_swap_pairs_path.relative_to(sample_dir)),
                     "exists": pt_swap_pairs_path.exists(),
                 }
@@ -1254,7 +1707,7 @@ def run_analyze(
             table_manifest["tables"].append(
                 {
                     "key": "auto_opt_pilots",
-                    "label": "Auto-opt pilot scorecard (CSV)",
+                    "label": f"Auto-opt pilot scorecard ({table_label_suffix})",
                     "path": str(auto_opt_table_path.relative_to(sample_dir)),
                     "exists": auto_opt_table_path.exists(),
                 }
@@ -1273,6 +1726,8 @@ def run_analyze(
         def _table_reason(key: str) -> str:
             if key in {"move_stats", "pt_swap_pairs"}:
                 return "mcmc_diagnostics"
+            if key in {"move_stats_summary"}:
+                return "default"
             if key in {"auto_opt_pilots"}:
                 return "extra_tables"
             if key in {"per_pwm"}:
@@ -1364,7 +1819,7 @@ def run_analyze(
                     per_pwm_path,
                     sample_dir,
                     kind="table",
-                    label="Per-PWM scores (CSV)",
+                    label=f"Per-PWM scores ({table_label_suffix})",
                     stage="analysis",
                 )
             )
@@ -1374,35 +1829,35 @@ def run_analyze(
                     score_summary_path,
                     sample_dir,
                     kind="table",
-                    label="Per-TF summary (CSV)",
+                    label=f"Per-TF summary ({table_label_suffix})",
                     stage="analysis",
                 ),
                 artifact_entry(
                     topk_path,
                     sample_dir,
                     kind="table",
-                    label="Elite top-K (CSV)",
+                    label=f"Elite top-K ({table_label_suffix})",
                     stage="analysis",
                 ),
                 artifact_entry(
                     joint_metrics_path,
                     sample_dir,
                     kind="table",
-                    label="Joint score metrics (CSV)",
+                    label=f"Joint score metrics ({table_label_suffix})",
                     stage="analysis",
                 ),
                 artifact_entry(
                     overlap_summary_path,
                     sample_dir,
                     kind="table",
-                    label="Overlap summary (CSV)",
+                    label=f"Overlap summary ({table_label_suffix})",
                     stage="analysis",
                 ),
                 artifact_entry(
                     elite_overlap_path,
                     sample_dir,
                     kind="table",
-                    label="Elite overlap details (CSV)",
+                    label=f"Elite overlap details ({table_label_suffix})",
                     stage="analysis",
                 ),
                 artifact_entry(
@@ -1421,13 +1876,23 @@ def run_analyze(
                 ),
             ]
         )
+        if move_stats_summary_path is not None:
+            artifacts.append(
+                artifact_entry(
+                    move_stats_summary_path,
+                    sample_dir,
+                    kind="table",
+                    label=f"Move stats summary ({table_label_suffix})",
+                    stage="analysis",
+                )
+            )
         if move_stats_path is not None:
             artifacts.append(
                 artifact_entry(
                     move_stats_path,
                     sample_dir,
                     kind="table",
-                    label="Move stats (CSV)",
+                    label=f"Move stats ({table_label_suffix})",
                     stage="analysis",
                 )
             )
@@ -1437,7 +1902,7 @@ def run_analyze(
                     pt_swap_pairs_path,
                     sample_dir,
                     kind="table",
-                    label="PT swap by pair (CSV)",
+                    label=f"PT swap by pair ({table_label_suffix})",
                     stage="analysis",
                 )
             )
@@ -1447,7 +1912,7 @@ def run_analyze(
                     auto_opt_table_path,
                     sample_dir,
                     kind="table",
-                    label="Auto-opt pilot scorecard (CSV)",
+                    label=f"Auto-opt pilot scorecard ({table_label_suffix})",
                     stage="analysis",
                 )
             )
@@ -1533,6 +1998,17 @@ def run_analyze(
         }
         summary_file = summary_path(analysis_root)
         summary_file.parent.mkdir(parents=True, exist_ok=True)
+        report_json, report_md = ensure_report(
+            analysis_root=analysis_root,
+            summary_payload=summary_payload,
+            diagnostics_payload=diagnostics_summary,
+            objective_components=objective_components,
+            overlap_summary=overlap_summary,
+            analysis_used_payload=analysis_used_payload,
+            refresh=True,
+        )
+        summary_payload["report_json"] = str(report_json.relative_to(sample_dir))
+        summary_payload["report_md"] = str(report_md.relative_to(sample_dir))
         summary_file.write_text(json.dumps(summary_payload, indent=2))
         analysis_manifest_entries.append(
             {
@@ -1542,6 +2018,26 @@ def run_analyze(
                 "reason": "default",
                 "exists": summary_file.exists(),
             }
+        )
+        analysis_manifest_entries.extend(
+            [
+                {
+                    "path": str(report_json.relative_to(sample_dir)),
+                    "kind": "report",
+                    "label": "Analysis report (JSON)",
+                    "reason": "default",
+                    "exists": report_json.exists(),
+                    "key": "report_json",
+                },
+                {
+                    "path": str(report_md.relative_to(sample_dir)),
+                    "kind": "report",
+                    "label": "Analysis report (Markdown)",
+                    "reason": "default",
+                    "exists": report_md.exists(),
+                    "key": "report_md",
+                },
+            ]
         )
         analysis_manifest_payload["artifacts"] = analysis_manifest_entries
         analysis_manifest_file.write_text(json.dumps(analysis_manifest_payload, indent=2))
@@ -1553,6 +2049,24 @@ def run_analyze(
                 label="Analysis summary",
                 stage="analysis",
             )
+        )
+        artifacts.extend(
+            [
+                artifact_entry(
+                    report_json,
+                    sample_dir,
+                    kind="json",
+                    label="Analysis report (JSON)",
+                    stage="analysis",
+                ),
+                artifact_entry(
+                    report_md,
+                    sample_dir,
+                    kind="text",
+                    label="Analysis report (Markdown)",
+                    stage="analysis",
+                ),
+            ]
         )
 
         append_artifacts(manifest, artifacts)

@@ -67,9 +67,10 @@ def test_gibbs_block_move_calls_combined_once_for_proposal() -> None:
         pwms={},
     )
     seq = np.array([0, 1, 2, 3], dtype=np.int8)
-    current = evaluator.combined(SequenceState(seq), beta=None)
+    state = SequenceState(seq)
+    current = evaluator.combined(state, beta=None)
     before = evaluator.evaluate_calls
-    _, _, _, _ = optimizer._perform_single_move(
+    _, _, _, _, _ = optimizer._perform_single_move(
         seq,
         current,
         1.0,
@@ -78,6 +79,8 @@ def test_gibbs_block_move_calls_combined_once_for_proposal() -> None:
         cfg,
         rng,
         np.array([0.0, 1.0, 0.0, 0.0, 0.0, 0.0]),
+        state=state,
+        scan_cache=None,
     )
     after = evaluator.evaluate_calls
     assert after - before == 1
@@ -147,7 +150,8 @@ def test_pt_block_move_calls_evaluate_once_for_proposal() -> None:
         init_cfg=init_cfg,
     )
     seq = np.array([0, 1, 2, 3], dtype=np.int8)
-    current = evaluator.combined(SequenceState(seq), beta=None)
+    state = SequenceState(seq)
+    current = evaluator.combined(state, beta=None)
     before = evaluator.evaluate_calls
     optimizer._single_chain_move(
         seq,
@@ -157,6 +161,8 @@ def test_pt_block_move_calls_evaluate_once_for_proposal() -> None:
         evaluator,
         rng,
         np.array([0.0, 1.0, 0.0, 0.0, 0.0, 0.0]),
+        state=state,
+        scan_cache=None,
     )
     after = evaluator.evaluate_calls
     assert after - before == 1
