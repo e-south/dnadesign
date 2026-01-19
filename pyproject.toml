@@ -11,7 +11,7 @@ readme          = "README.md"
 requires-python = ">=3.12,<3.13"
 
 dependencies = [
-  "arviz",
+  "arviz>=0.23.0",
   "biopython",
   "igraph",
   "leidenalg",
@@ -19,6 +19,7 @@ dependencies = [
   "matplotlib",
   "numpy",
   "openpyxl",
+  "ortools>=9.15.6755",
   "pandas",
   "pyarrow>=16",
   "pydantic",
@@ -105,6 +106,12 @@ testpaths = ["src/dnadesign"]
 pythonpath = ["src"]
 norecursedirs = ["*/archived/*", ".venv", "venv", "build", "dist", "*.egg-info"]
 markers = ["slow: sampling-heavy tests (>10 s)"]
+filterwarnings = [
+  "ignore:ArviZ is undergoing a major refactor.*:FutureWarning",
+  "ignore:builtin type SwigPyPacked has no __module__ attribute:DeprecationWarning",
+  "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",
+  "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 120

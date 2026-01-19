@@ -48,6 +48,11 @@ def _candidate(tmp_path: Path, name: str, **overrides) -> AutoOptCandidate:
         "length": 10,
         "budget": 200,
         "cooling_boost": 1.0,
+        "move_profile": "balanced",
+        "swap_prob": None,
+        "ladder_size": None,
+        "move_probs": None,
+        "move_probs_label": None,
         "run_dir": run_dir,
         "run_dirs": [run_dir],
         "best_score": 1.0,
@@ -189,7 +194,7 @@ def test_auto_opt_final_applies_cooling_boost() -> None:
     )
 
     final_cfg, notes = _build_final_sample_cfg(sample_cfg, kind="gibbs", cooling_boost=2.0)
-    assert final_cfg.optimizers.gibbs.beta_schedule.beta == (0.1, 1.0)
+    assert final_cfg.optimizers.gibbs.beta_schedule.beta == (2.0, 40.0)
     assert any("boosted cooling" in note for note in notes)
 
 

@@ -15,12 +15,15 @@ def test_binding_sites_rejects_empty_values(tmp_path: Path) -> None:
         ds.load_data()
 
 
-def test_binding_sites_rejects_duplicates(tmp_path: Path) -> None:
+def test_binding_sites_allows_duplicates(tmp_path: Path, caplog) -> None:
     csv_path = tmp_path / "tfbs.csv"
     csv_path.write_text("tf,tfbs\nLexA,AAA\nLexA,AAA\n")
     ds = BindingSitesDataSource(path=str(csv_path), cfg_path=tmp_path / "config.yaml")
-    with pytest.raises(ValueError, match="Duplicate regulator/binding-site"):
-        ds.load_data()
+    with caplog.at_level("WARNING"):
+        entries, df = ds.load_data()
+    assert len(entries) == 2
+    assert df.shape[0] == 2
+    assert "duplicate regulator/binding-site pairs" in caplog.text.lower()
 
 
 def test_binding_sites_rejects_invalid_bases(tmp_path: Path) -> None:

@@ -26,6 +26,12 @@ from dnadesign.cruncher.app.catalog_service import (
     list_catalog,
     search_catalog,
 )
+from dnadesign.cruncher.app.motif_artifacts import (
+    artifact_filename,
+    build_densegen_artifact,
+    build_manifest,
+    load_motif_payload,
+)
 from dnadesign.cruncher.artifacts.layout import RUN_META_DIR, logos_dir_for_run, logos_root, out_root
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
@@ -62,6 +68,20 @@ LOGO_MANIFEST_NAME = "logo_manifest.json"
 def _safe_stem(label: str) -> str:
     cleaned = _SAFE_RE.sub("_", label).strip("_")
     return cleaned or "motif"
+
+
+def _resolve_export_format(out_path: Path, fmt: str | None, *, label: str) -> str:
+    resolved = (fmt or "").strip().lower() if fmt is not None else ""
+    if resolved:
+        if resolved not in {"csv", "parquet"}:
+            raise typer.BadParameter(f"{label} must be 'csv' or 'parquet', got: {fmt!r}.")
+        return resolved
+    suffix = out_path.suffix.lower()
+    if suffix == ".csv":
+        return "csv"
+    if suffix in {".parquet", ".pq"}:
+        return "parquet"
+    raise typer.BadParameter(f"{label} is required when output extension is not .csv/.parquet (got {out_path}).")
 
 
 def _dedupe(values: Sequence[str]) -> list[str]:
@@ -332,6 +352,120 @@ def _resolve_targets(
                         f"No cached site entries available for '{tf_name}' "
                         f"with site_kinds={cfg.motif_store.site_kinds}."
                     )
+            key = entry.key
+            if key in seen_keys:
+                continue
+            targets.append(
+                ResolvedTarget(
+                    tf_name=tf_name,
+                    ref=MotifRef(source=entry.source, motif_id=entry.motif_id),
+                    entry=entry,
+                    site_entries=site_entries,
+                )
+            )
+            seen_keys.add(key)
+
+    if not targets:
+        raise typer.BadParameter("No catalog entries matched the requested targets.")
+    return targets, catalog
+
+
+def _resolve_site_targets(
+    *,
+    cfg,
+    config_path: Path,
+    tfs: Sequence[str],
+    refs: Sequence[str],
+    set_index: int | None,
+    source_filter: str | None,
+) -> tuple[list[ResolvedTarget], CatalogIndex]:
+    if set_index is not None and (tfs or refs):
+        raise typer.BadParameter("--set cannot be combined with --tf or --ref.")
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog = CatalogIndex.load(catalog_root)
+    tf_names = list(tfs)
+    if set_index is not None:
+        tf_names = _resolve_set_tfs(cfg, set_index)
+        if not tf_names and not refs:
+            raise typer.BadParameter(f"regulator_sets[{set_index}] is empty.")
+    if not tf_names and not refs:
+        tf_names = [tf for group in cfg.regulator_sets for tf in group]
+    tf_names = _dedupe(tf_names)
+    refs = _dedupe(refs)
+    if not tf_names and not refs:
+        raise typer.BadParameter("No targets resolved. Provide --tf, --ref, or --set.")
+
+    targets: list[ResolvedTarget] = []
+    seen_keys: set[str] = set()
+
+    for ref in refs:
+        source, motif_id = _parse_ref(ref)
+        if source_filter and source_filter != source:
+            raise typer.BadParameter(f"--source {source_filter} does not match explicit ref {ref}.")
+        entry = catalog.entries.get(f"{source}:{motif_id}")
+        if entry is None:
+            raise ValueError(f"No catalog entry found for {ref}.")
+        _ensure_entry_matches_pwm_source(
+            entry,
+            "sites",
+            cfg.motif_store.site_kinds,
+            tf_name=entry.tf_name,
+            ref=ref,
+        )
+        site_entries = site_entries_for_logo(
+            catalog=catalog,
+            entry=entry,
+            combine_sites=cfg.motif_store.combine_sites,
+            site_kinds=cfg.motif_store.site_kinds,
+        )
+        if not site_entries:
+            raise ValueError(
+                f"No cached site entries available for '{entry.tf_name}' with site_kinds={cfg.motif_store.site_kinds}."
+            )
+        key = entry.key
+        if key in seen_keys:
+            continue
+        targets.append(
+            ResolvedTarget(
+                tf_name=entry.tf_name,
+                ref=MotifRef(source=entry.source, motif_id=entry.motif_id),
+                entry=entry,
+                site_entries=site_entries,
+            )
+        )
+        seen_keys.add(key)
+
+    if tf_names:
+        catalog_for_select = catalog
+        if source_filter:
+            filtered = {k: v for k, v in catalog.entries.items() if v.source == source_filter}
+            catalog_for_select = CatalogIndex(entries=filtered)
+        for tf_name in tf_names:
+            if source_filter:
+                all_candidates = catalog.list(tf_name=tf_name, include_synonyms=True)
+                if not any(candidate.source == source_filter for candidate in all_candidates):
+                    raise ValueError(f"No cached entries for '{tf_name}' in source '{source_filter}'.")
+            entry = select_catalog_entry(
+                catalog=catalog_for_select,
+                tf_name=tf_name,
+                pwm_source="sites",
+                site_kinds=cfg.motif_store.site_kinds,
+                combine_sites=cfg.motif_store.combine_sites,
+                source_preference=cfg.motif_store.source_preference,
+                dataset_preference=cfg.motif_store.dataset_preference,
+                dataset_map=cfg.motif_store.dataset_map,
+                allow_ambiguous=cfg.motif_store.allow_ambiguous,
+            )
+            site_entries = site_entries_for_logo(
+                catalog=catalog,
+                entry=entry,
+                combine_sites=cfg.motif_store.combine_sites,
+                site_kinds=cfg.motif_store.site_kinds,
+            )
+            if not site_entries:
+                raise ValueError(
+                    f"No cached site entries available for '{tf_name}' with site_kinds={cfg.motif_store.site_kinds}."
+                )
             key = entry.key
             if key in seen_keys:
                 continue
@@ -733,7 +867,7 @@ def pwms(
     if log_odds and output_format == "table" and not matrix:
         raise typer.BadParameter("--log-odds requires --matrix for table output.")
     try:
-        targets, catalog = _resolve_targets(
+        targets, _catalog = _resolve_targets(
             cfg=cfg,
             config_path=config_path,
             tfs=tf,
@@ -825,6 +959,266 @@ def pwms(
             console.print(_render_pwm_matrix(f"PWM: {label}", pwm.matrix.tolist()))
             if log_odds:
                 console.print(_render_pwm_matrix(f"Log-odds: {label}", pwm.log_odds().tolist()))
+
+
+@app.command("export-densegen", help="Export DenseGen motif artifacts (one file per motif).")
+def export_densegen(
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
+    config_option: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to cruncher config.yaml (overrides positional CONFIG).",
+    ),
+    tf: list[str] = typer.Option([], "--tf", help="TF name to include (repeatable)."),
+    ref: list[str] = typer.Option([], "--ref", help="Catalog reference (<source>:<motif_id>, repeatable)."),
+    set_index: int | None = typer.Option(
+        None,
+        "--set",
+        help="Regulator set index from config (1-based).",
+    ),
+    source: str | None = typer.Option(
+        None,
+        "--source",
+        help="Limit TF resolution to a single source adapter.",
+    ),
+    out_dir: Path = typer.Option(
+        ...,
+        "--out",
+        "-o",
+        help="Directory to write DenseGen motif artifacts.",
+    ),
+    background: str = typer.Option(
+        "record",
+        "--background",
+        help="Background policy: record | uniform | matrix.",
+    ),
+    pseudocount: float | None = typer.Option(
+        None,
+        "--pseudocount",
+        help="Optional pseudocount for log-odds (>= 0).",
+    ),
+    producer: str = typer.Option(
+        "cruncher",
+        "--producer",
+        help="Producer label for DenseGen artifacts.",
+    ),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Allow overwriting existing files."),
+) -> None:
+    try:
+        config_path = resolve_config_path(config_option or config)
+    except ConfigResolutionError as exc:
+        console.print(str(exc))
+        raise typer.Exit(code=1)
+    cfg = load_config(config_path)
+    if background not in {"record", "uniform", "matrix"}:
+        raise typer.BadParameter("--background must be 'record', 'uniform', or 'matrix'.")
+    if not producer.strip():
+        raise typer.BadParameter("--producer must be a non-empty string.")
+
+    try:
+        targets, catalog = _resolve_targets(
+            cfg=cfg,
+            config_path=config_path,
+            tfs=tf,
+            refs=ref,
+            set_index=set_index,
+            source_filter=source,
+        )
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"Error: {exc}")
+        console.print("Hint: run cruncher fetch motifs/sites before catalog export-densegen.")
+        raise typer.Exit(code=1)
+
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    out_dir = out_dir.resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    manifest_entries: list[dict[str, object]] = []
+    table = Table(title="DenseGen motif artifacts", header_style="bold")
+    table.add_column("TF")
+    table.add_column("Source")
+    table.add_column("Motif ID")
+    table.add_column("Artifact")
+
+    for target in sorted(targets, key=lambda t: (t.entry.source, t.entry.motif_id)):
+        motif_path = catalog_root / "normalized" / "motifs" / target.entry.source / f"{target.entry.motif_id}.json"
+        if not motif_path.exists():
+            console.print(f"[red]Missing motif file:[/] {motif_path}")
+            raise typer.Exit(code=1)
+        payload = load_motif_payload(motif_path)
+        artifact = build_densegen_artifact(
+            payload,
+            producer=producer.strip(),
+            background_policy=background,
+            pseudocount=pseudocount,
+        )
+        filename = artifact_filename(
+            tf_name=target.tf_name,
+            source=target.entry.source,
+            motif_id=target.entry.motif_id,
+        )
+        dest = out_dir / filename
+        if dest.exists() and not overwrite:
+            console.print(f"[red]Artifact already exists:[/] {dest}")
+            raise typer.Exit(code=1)
+        dest.write_text(json.dumps(artifact, indent=2, sort_keys=True))
+        table.add_row(target.tf_name, target.entry.source, target.entry.motif_id, str(dest))
+        manifest_entries.append(
+            {
+                "tf_name": target.tf_name,
+                "source": target.entry.source,
+                "motif_id": target.entry.motif_id,
+                "path": str(dest),
+            }
+        )
+
+    manifest = build_manifest(
+        producer=producer.strip(),
+        entries=manifest_entries,
+        config_path=config_path,
+        catalog_root=catalog_root,
+        background_policy=background,
+        pseudocount=pseudocount,
+    )
+    manifest["created_at"] = datetime.now(timezone.utc).isoformat()
+    manifest_path = out_dir / "artifact_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
+    console.print(table)
+    console.print(f"[green]Wrote manifest:[/] {manifest_path}")
+
+
+@app.command("export-sites", help="Export cached binding sites for DenseGen (CSV/Parquet).")
+def export_sites(
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
+    config_option: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to cruncher config.yaml (overrides positional CONFIG).",
+    ),
+    tf: list[str] = typer.Option([], "--tf", help="TF name to include (repeatable)."),
+    ref: list[str] = typer.Option([], "--ref", help="Catalog reference (<source>:<motif_id>, repeatable)."),
+    set_index: int | None = typer.Option(
+        None,
+        "--set",
+        help="Regulator set index from config (1-based).",
+    ),
+    source: str | None = typer.Option(
+        None,
+        "--source",
+        help="Limit TF resolution to a single source adapter.",
+    ),
+    out_path: Path = typer.Option(
+        ...,
+        "--out",
+        "-o",
+        help="Output file path (.csv or .parquet).",
+    ),
+    fmt: str | None = typer.Option(
+        None,
+        "--format",
+        help="Output format: csv | parquet (inferred from --out if omitted).",
+    ),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Allow overwriting existing file."),
+) -> None:
+    try:
+        config_path = resolve_config_path(config_option or config)
+    except ConfigResolutionError as exc:
+        console.print(str(exc))
+        raise typer.Exit(code=1)
+    cfg = load_config(config_path)
+
+    try:
+        targets, catalog = _resolve_site_targets(
+            cfg=cfg,
+            config_path=config_path,
+            tfs=tf,
+            refs=ref,
+            set_index=set_index,
+            source_filter=source,
+        )
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"Error: {exc}")
+        console.print("Hint: run cruncher fetch sites --hydrate before export-sites.")
+        raise typer.Exit(code=1)
+
+    out_path = out_path.resolve()
+    if out_path.exists():
+        if out_path.is_dir():
+            console.print(f"[red]Output path is a directory:[/] {out_path}")
+            raise typer.Exit(code=1)
+        if not overwrite:
+            console.print(f"[red]Output file already exists:[/] {out_path}")
+            raise typer.Exit(code=1)
+
+    fmt = _resolve_export_format(out_path, fmt, label="--format")
+    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+
+    rows: list[dict[str, object]] = []
+    table = Table(title="DenseGen binding-site export", header_style="bold")
+    table.add_column("TF")
+    table.add_column("Source")
+    table.add_column("Motif ID")
+    table.add_column("Sites")
+
+    for target in sorted(targets, key=lambda t: (t.tf_name, t.entry.source, t.entry.motif_id)):
+        site_entries = target.site_entries or [target.entry]
+        for entry in site_entries:
+            sites_path = catalog_root / "normalized" / "sites" / entry.source / f"{entry.motif_id}.jsonl"
+            if not sites_path.exists():
+                console.print(f"[red]Missing sites file:[/] {sites_path}")
+                raise typer.Exit(code=1)
+            count = 0
+            with sites_path.open() as fh:
+                for line in fh:
+                    if not line.strip():
+                        continue
+                    payload = json.loads(line)
+                    seq = payload.get("sequence")
+                    if not seq:
+                        site_id = payload.get("site_id") or "unknown"
+                        motif_ref = payload.get("motif_ref") or f"{entry.source}:{entry.motif_id}"
+                        console.print(f"[red]Missing sequence for site {site_id} in {motif_ref}.[/]")
+                        console.print("Hint: re-fetch with `cruncher fetch sites --hydrate` or provide genome FASTA.")
+                        raise typer.Exit(code=1)
+                    rows.append(
+                        {
+                            "tf": target.tf_name,
+                            "tfbs": seq,
+                            "site_id": payload.get("site_id"),
+                            "source": payload.get("motif_ref") or f"{entry.source}:{entry.motif_id}",
+                        }
+                    )
+                    count += 1
+            table.add_row(target.tf_name, entry.source, entry.motif_id, str(count))
+
+    if not rows:
+        console.print("[red]No binding sites found for selected targets.[/]")
+        raise typer.Exit(code=1)
+
+    import pandas as pd
+
+    df = pd.DataFrame(rows)
+    try:
+        if fmt == "csv":
+            df.to_csv(out_path, index=False)
+        else:
+            df.to_parquet(out_path, index=False)
+    except Exception as exc:
+        console.print(f"[red]Failed to write export:[/] {exc}")
+        raise typer.Exit(code=1)
+
+    console.print(table)
+    console.print(f"[green]Wrote binding sites:[/] {out_path} ({len(df)} rows)")
 
 
 @app.command("logos", help="Render PWM logos for selected TFs or motif refs.")

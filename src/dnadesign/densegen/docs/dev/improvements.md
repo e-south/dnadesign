@@ -114,14 +114,14 @@ Implement in phases aligned with impact and merge risk.
 
 ### Phase 3 - UX: run manifest (and small CLI upgrades)
 
-9. Emit a run-level JSON manifest, e.g., run_manifest.json, containing:
+9. Emit a run-level JSON manifest, e.g., outputs/meta/run_manifest.json, containing:
    - config hash, run_id, timestamp
    - per input + plan: generated, duplicates rejected, failed solutions, resamples, libraries_built,
      stall events
    - solver backend/strategy/options summary
    - optional histograms (compression_ratio, gc_total)
 
-10. Add a CLI command like dense summarize (or extend ls-runs) to read and pretty-print the manifest.
+10. Add a CLI command like dense summarize (or extend workspace listing) to read and pretty-print the manifest.
 
 ### Phase 4 - Performance / resilience (optional but worthwhile)
 
@@ -347,12 +347,12 @@ Implementation:
   - per (input_name, plan_name): generated, duplicates_skipped, failed_solutions, total_resamples, libraries_built, stall_events
 - In core/pipeline.py:
   - accumulate these stats during _process_plan_for_source
-  - write manifest at the end of run_pipeline to run_root / "run_manifest.json"
+  - write manifest at the end of run_pipeline to outputs/meta/run_manifest.json
 - In cli.py:
-  - add a summarize command that loads and prints run_manifest.json in a Rich table
+  - add a summarize command that loads and prints outputs/meta/run_manifest.json in a Rich table
 
 Acceptance:
-- Running a pipeline produces run_manifest.json.
+- Running a pipeline produces outputs/meta/run_manifest.json.
 - summarize prints a readable table without needing parquet/usr outputs.
 - Manifest writing is atomic (write temp then rename).
 ```

@@ -10,6 +10,7 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 import os
+import warnings
 from pathlib import Path
 
 import typer
@@ -26,7 +27,6 @@ from dnadesign.cruncher.cli.commands.lock import lock as lock_cmd
 from dnadesign.cruncher.cli.commands.notebook import notebook as notebook_cmd
 from dnadesign.cruncher.cli.commands.optimizers import app as optimizers_app
 from dnadesign.cruncher.cli.commands.parse import parse as parse_cmd
-from dnadesign.cruncher.cli.commands.report import report as report_cmd
 from dnadesign.cruncher.cli.commands.runs import app as runs_app
 from dnadesign.cruncher.cli.commands.sample import sample as sample_cmd
 from dnadesign.cruncher.cli.commands.sources import app as sources_app
@@ -67,6 +67,7 @@ def main(
     ),
 ) -> None:
     """Design short DNA sequences that score highly across multiple TF motifs."""
+    warnings.filterwarnings("ignore", category=FutureWarning, module=r"arviz(\..*)?")
     configure_logging(log_level)
     if config:
         os.environ[CONFIG_ENV_VAR] = str(config)
@@ -89,11 +90,6 @@ app.command(
     help="Generate diagnostics and plots from previous runs.",
     short_help="Plot diagnostics for a run.",
 )(analyze_cmd)
-app.command(
-    "report",
-    help="Summarize a completed sample run into report.json/md.",
-    short_help="Summarize a run.",
-)(report_cmd)
 app.command(
     "notebook",
     help="Generate an optional marimo notebook for analysis.",

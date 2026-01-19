@@ -17,7 +17,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Optional
 
 from dnadesign.cruncher.analysis.elites import find_elites_parquet
-from dnadesign.cruncher.analysis.layout import load_summary, resolve_analysis_dir, summary_path
+from dnadesign.cruncher.analysis.layout import (
+    analysis_root,
+    load_summary,
+    report_json_path,
+    resolve_analysis_dir,
+    summary_path,
+)
 from dnadesign.cruncher.analysis.parquet import read_parquet
 from dnadesign.cruncher.app.campaign_service import (
     CampaignExpansion,
@@ -26,7 +32,7 @@ from dnadesign.cruncher.app.campaign_service import (
     expand_campaign,
 )
 from dnadesign.cruncher.app.run_service import list_runs
-from dnadesign.cruncher.artifacts.layout import report_dir, sequences_path
+from dnadesign.cruncher.artifacts.layout import sequences_path
 from dnadesign.cruncher.artifacts.manifest import load_manifest
 from dnadesign.cruncher.config.schema_v2 import CampaignConfig, CruncherConfig
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
@@ -134,8 +140,6 @@ def summarize_campaign(
 
     output_root = out_dir or (runs_root / "campaigns" / expansion.campaign_id)
     output_root.mkdir(parents=True, exist_ok=True)
-    plots_dir = output_root / "plots"
-    plots_dir.mkdir(parents=True, exist_ok=True)
 
     manifest = build_campaign_manifest(expansion=expansion, config_path=config_path)
     if include_metrics and metrics:
@@ -161,11 +165,11 @@ def summarize_campaign(
     best_df.to_csv(best_path, index=False)
 
     plot_paths = [
-        _plot_best_jointscore(best_df, plots_dir / "best_jointscore_bar.png"),
-        _plot_tf_coverage(expansion, plots_dir / "tf_coverage_heatmap.png"),
-        _plot_pairgrid_overview(summary_df, plots_dir / "pairgrid_overview.png"),
-        _plot_joint_trend(summary_df, plots_dir / "joint_trend.png"),
-        _plot_pareto_projection(summary_df, plots_dir / "pareto_projection.png"),
+        _plot_best_jointscore(best_df, output_root / "plot__best_jointscore_bar.png"),
+        _plot_tf_coverage(expansion, output_root / "plot__tf_coverage_heatmap.png"),
+        _plot_pairgrid_overview(summary_df, output_root / "plot__pairgrid_overview.png"),
+        _plot_joint_trend(summary_df, output_root / "plot__joint_trend.png"),
+        _plot_pareto_projection(summary_df, output_root / "plot__pareto_projection.png"),
     ]
 
     return CampaignSummaryResult(
@@ -292,8 +296,12 @@ def _summarize_run(
                 f"Run '{run_dir.name}' analysis tf_names do not match regulator_set ({tf_names} vs {tfs})."
             )
 
-    score_summary_path = analysis_dir / "tables" / "score_summary.csv"
-    joint_metrics_path = analysis_dir / "tables" / "joint_metrics.csv"
+    analysis_cfg = summary.get("analysis_config") if isinstance(summary, dict) else {}
+    table_format = "parquet"
+    if isinstance(analysis_cfg, dict):
+        table_format = analysis_cfg.get("table_format") or table_format
+    score_summary_path = analysis_dir / f"score_summary.{table_format}"
+    joint_metrics_path = analysis_dir / f"joint_metrics.{table_format}"
     if not score_summary_path.exists() or not joint_metrics_path.exists():
         missing = []
         if not score_summary_path.exists():
@@ -305,8 +313,14 @@ def _summarize_run(
             return None, message
         raise FileNotFoundError(message)
 
-    score_df = pd.read_csv(score_summary_path)
-    joint_df = pd.read_csv(joint_metrics_path)
+    if score_summary_path.suffix == ".parquet":
+        score_df = read_parquet(score_summary_path)
+    else:
+        score_df = pd.read_csv(score_summary_path)
+    if joint_metrics_path.suffix == ".parquet":
+        joint_df = read_parquet(joint_metrics_path)
+    else:
+        joint_df = pd.read_csv(joint_metrics_path)
     score_stats = _score_stats(score_df, run_dir.name)
     joint_stats = _joint_stats(joint_df, run_dir.name)
     n_sequences, n_elites = _load_counts(run_dir)
@@ -335,13 +349,15 @@ def _summarize_run(
 
 
 def _load_counts(run_dir: Path) -> tuple[int, int]:
-    report_path = report_dir(run_dir) / "report.json"
+    report_path = report_json_path(analysis_root(run_dir))
     if report_path.exists():
         payload = json.loads(report_path.read_text())
-        n_sequences = payload.get("n_sequences")
-        n_elites = payload.get("n_elites")
-        if isinstance(n_sequences, int) and isinstance(n_elites, int):
-            return n_sequences, n_elites
+        run_payload = payload.get("run") if isinstance(payload, dict) else None
+        if isinstance(run_payload, dict):
+            n_sequences = run_payload.get("n_sequences")
+            n_elites = run_payload.get("n_elites")
+            if isinstance(n_sequences, int) and isinstance(n_elites, int):
+                return n_sequences, n_elites
     seq_path = sequences_path(run_dir)
     elite_path = find_elites_parquet(run_dir)
     if not seq_path.exists():
@@ -378,7 +394,7 @@ def _score_stats(score_df: pd.DataFrame, run_name: str) -> dict[str, object]:
 
 def _joint_stats(joint_df: pd.DataFrame, run_name: str) -> dict[str, object]:
     if joint_df.empty:
-        raise ValueError(f"Run '{run_name}' joint_metrics.csv is empty.")
+        raise ValueError(f"Run '{run_name}' joint_metrics table is empty.")
     row = joint_df.iloc[0]
     return {
         "joint_min_best": _safe_stat(row.get("joint_min")),

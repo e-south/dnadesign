@@ -28,7 +28,7 @@ def _write_min_config(path: Path) -> None:
                   bio_type: dna
                   alphabet: dna_4
                 parquet:
-                  path: outputs/parquet
+                  path: outputs/dense_arrays.parquet
 
               generation:
                 sequence_length: 10

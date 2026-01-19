@@ -23,7 +23,7 @@ MIN_CONFIG = {
             "targets": ["parquet"],
             "schema": {"bio_type": "dna", "alphabet": "dna_4"},
             "parquet": {
-                "path": "outputs/parquet",
+                "path": "outputs/dense_arrays.parquet",
                 "deduplicate": True,
                 "chunk_size": 128,
             },
@@ -98,7 +98,7 @@ def test_usr_sequences_requires_root(tmp_path: Path) -> None:
 
 def test_output_kind_is_rejected(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
-    cfg["densegen"]["output"] = {"kind": "parquet", "parquet": {"path": "outputs/demo_parquet"}}
+    cfg["densegen"]["output"] = {"kind": "parquet", "parquet": {"path": "outputs/demo_parquet.parquet"}}
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     with pytest.raises(ConfigError):
         load_config(cfg_path)
@@ -185,7 +185,7 @@ def test_plots_source_required_for_multi_sink(tmp_path: Path) -> None:
         "targets": ["usr", "parquet"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
         "usr": {"dataset": "demo", "root": "usr_root", "chunk_size": 10, "allow_overwrite": False},
-        "parquet": {"path": "outputs/demo_parquet", "deduplicate": True, "chunk_size": 128},
+        "parquet": {"path": "outputs/demo_parquet.parquet", "deduplicate": True, "chunk_size": 128},
     }
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     with pytest.raises(ConfigError):
@@ -198,7 +198,7 @@ def test_plots_source_must_be_target(tmp_path: Path) -> None:
         "targets": ["usr", "parquet"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
         "usr": {"dataset": "demo", "root": "usr_root", "chunk_size": 10, "allow_overwrite": False},
-        "parquet": {"path": "outputs/demo_parquet", "deduplicate": True, "chunk_size": 128},
+        "parquet": {"path": "outputs/demo_parquet.parquet", "deduplicate": True, "chunk_size": 128},
     }
     cfg["plots"] = {"source": "csv", "out_dir": "plots"}
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")

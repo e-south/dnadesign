@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dnadesign.densegen.src.core.run_manifest import PlanManifest, RunManifest, load_run_manifest
+from dnadesign.densegen.src.core.run_paths import ensure_run_meta_dir, run_manifest_path
 
 
 def test_run_manifest_roundtrip(tmp_path) -> None:
@@ -19,6 +20,12 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
             failed_min_count_by_regulator=1,
             failed_min_required_regulators=0,
             duplicate_solutions=3,
+            leaderboard_latest={
+                "tf": [{"tf": "lexA", "count": 3}],
+                "tfbs": [{"tf": "lexA", "tfbs": "TTAC", "count": 3}],
+                "failed_tfbs": [],
+                "diversity": {"tf_coverage": 1.0, "tfbs_coverage": 1.0, "tfbs_entropy": 0.0},
+            },
         )
     ]
     manifest = RunManifest(
@@ -35,7 +42,8 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
         dense_arrays_version_source="lock",
         items=items,
     )
-    path = tmp_path / "run_manifest.json"
+    ensure_run_meta_dir(tmp_path)
+    path = run_manifest_path(tmp_path)
     manifest.write_json(path)
     loaded = load_run_manifest(path)
     assert loaded.schema_version == "2.1"
@@ -43,3 +51,4 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
     assert loaded.dense_arrays_version_source == "lock"
     assert loaded.items[0].failed_min_count_per_tf == 1
     assert loaded.items[0].duplicate_solutions == 3
+    assert loaded.items[0].leaderboard_latest is not None

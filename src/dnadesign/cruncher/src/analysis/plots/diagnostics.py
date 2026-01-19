@@ -16,13 +16,19 @@ from typing import Tuple
 import arviz as az
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import xarray as xr
 
 from dnadesign.cruncher.analysis.parquet import read_parquet
+from dnadesign.cruncher.analysis.plots._savefig import savefig
 from dnadesign.cruncher.artifacts.layout import sequences_path
 
 logger = logging.getLogger(__name__)
+
+
+def _plot_path(out_dir: Path, stem: str, plot_format: str) -> Path:
+    return out_dir / f"{stem}.{plot_format}"
 
 
 def _score_stats(idata: az.InferenceData) -> tuple[xr.DataArray | None, int, int]:
@@ -95,7 +101,7 @@ def _flatten_axes(obj: object) -> list[plt.Axes]:
     return flat
 
 
-def _plot_trace_only(score_values: np.ndarray, out: Path) -> None:
+def _plot_trace_only(score_values: np.ndarray, out: Path, *, dpi: int, png_compress_level: int) -> None:
     values = np.asarray(score_values, dtype=float)
     if values.ndim == 1:
         values = values[None, :]
@@ -108,18 +114,25 @@ def _plot_trace_only(score_values: np.ndarray, out: Path) -> None:
     if values.shape[0] > 1:
         ax.legend(loc="best", frameon=False, fontsize=8)
     sns.despine(ax=ax)
-    fig.savefig(out, dpi=300, bbox_inches="tight")
+    savefig(fig, out, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
 
 
-def plot_trace(idata: az.InferenceData, out_dir: Path) -> None:
+def plot_trace(
+    idata: az.InferenceData,
+    out_dir: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+    plot_format: str = "png",
+) -> None:
     """
     Overlay all chains' score-traces + posterior density → trace_score.png.
 
     • Left panel: Posterior density of “score”
     • Right panel: Trace of “score” versus iteration
     """
-    out = out_dir / "diag__trace_score.png"
+    out = _plot_path(out_dir, "diag__trace_score", plot_format)
     out_dir.mkdir(exist_ok=True, parents=True)
 
     idata_clean, score, _, _ = _clean_idata_for_score(idata)
@@ -135,7 +148,7 @@ def plot_trace(idata: az.InferenceData, out_dir: Path) -> None:
         spread = np.nanmax(values) - np.nanmin(values)
     if not np.isfinite(spread) or spread <= 0:
         logger.warning("Trace plot: score is constant or non-finite; rendering trace-only plot.")
-        _plot_trace_only(values, out)
+        _plot_trace_only(values, out, dpi=dpi, png_compress_level=png_compress_level)
         return
 
     sns.set_style("ticks", {"axes.grid": False})
@@ -146,7 +159,7 @@ def plot_trace(idata: az.InferenceData, out_dir: Path) -> None:
             axes = az.plot_trace(idata, var_names=["score"], combined=False)
         except Exception as exc:
             logger.warning("Trace plot failed (%s); rendering trace-only plot.", exc)
-            _plot_trace_only(values, out)
+            _plot_trace_only(values, out, dpi=dpi, png_compress_level=png_compress_level)
             return
 
         # Figure‐level title
@@ -187,15 +200,23 @@ def plot_trace(idata: az.InferenceData, out_dir: Path) -> None:
             sns.despine(ax=ax_trace)
 
         # Save with tight bounding box to avoid clipping
-        fig.savefig(out, dpi=300, bbox_inches="tight")
+        savefig(fig, out, dpi=dpi, png_compress_level=png_compress_level)
         plt.close(fig)
 
 
-def plot_autocorr(idata: az.InferenceData, out_dir: Path, max_lag: int = 100) -> None:
+def plot_autocorr(
+    idata: az.InferenceData,
+    out_dir: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+    plot_format: str = "png",
+    max_lag: int = 100,
+) -> None:
     """
     Plot autocorrelation of “score” up to lag=max_lag → autocorr_score.png.
     """
-    out = out_dir / "diag__autocorr_score.png"
+    out = _plot_path(out_dir, "diag__autocorr_score", plot_format)
     out_dir.mkdir(exist_ok=True, parents=True)
 
     idata_clean, score, _, n_draws = _clean_idata_for_score(idata)
@@ -222,8 +243,8 @@ def plot_autocorr(idata: az.InferenceData, out_dir: Path, max_lag: int = 100) ->
         ax.grid(True, linestyle="--", alpha=0.5)
         sns.despine(ax=ax)
 
-        fig.savefig(out, dpi=300, bbox_inches="tight")
-        plt.close(fig)
+    savefig(fig, out, dpi=dpi, png_compress_level=png_compress_level)
+    plt.close(fig)
 
 
 def report_convergence(idata: az.InferenceData, out_dir: Path) -> None:
@@ -260,11 +281,18 @@ def report_convergence(idata: az.InferenceData, out_dir: Path) -> None:
         fh.write(f"ess:  {ess:.1f}\n")
 
 
-def plot_rank_diagnostic(idata: az.InferenceData, out_dir: Path) -> None:
+def plot_rank_diagnostic(
+    idata: az.InferenceData,
+    out_dir: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+    plot_format: str = "png",
+) -> None:
     """
     Draw a rank-plot for “score” across chains → rank_plot_score.png.
     """
-    out = out_dir / "diag__rank_plot_score.png"
+    out = _plot_path(out_dir, "diag__rank_plot_score", plot_format)
     out_dir.mkdir(exist_ok=True, parents=True)
 
     idata_clean, score, n_chains, n_draws = _clean_idata_for_score(idata)
@@ -294,15 +322,22 @@ def plot_rank_diagnostic(idata: az.InferenceData, out_dir: Path) -> None:
         ax.grid(True, linestyle="--", alpha=0.3)
         sns.despine(ax=ax)
 
-        fig.savefig(out, dpi=300, bbox_inches="tight")
-        plt.close(fig)
+    savefig(fig, out, dpi=dpi, png_compress_level=png_compress_level)
+    plt.close(fig)
 
 
-def plot_ess(idata: az.InferenceData, out_dir: Path) -> None:
+def plot_ess(
+    idata: az.InferenceData,
+    out_dir: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+    plot_format: str = "png",
+) -> None:
     """
     Plot how the Effective Sample Size (ESS) for “score” evolves → ess_evolution_score.png.
     """
-    out = out_dir / "diag__ess_evolution_score.png"
+    out = _plot_path(out_dir, "diag__ess_evolution_score", plot_format)
     out_dir.mkdir(exist_ok=True, parents=True)
 
     idata_clean, score, n_chains, n_draws = _clean_idata_for_score(idata)
@@ -328,18 +363,25 @@ def plot_ess(idata: az.InferenceData, out_dir: Path) -> None:
         ax.grid(True, linestyle="--", alpha=0.4)
         sns.despine(ax=ax)
 
-        fig.savefig(out, dpi=300, bbox_inches="tight")
+        savefig(fig, out, dpi=dpi, png_compress_level=png_compress_level)
         plt.close(fig)
 
 
-def plot_ess_local_and_quantile(idata: az.InferenceData, out_dir: Path) -> None:
+def plot_ess_local_and_quantile(
+    idata: az.InferenceData,
+    out_dir: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+    plot_format: str = "png",
+) -> None:
     """
     Plot both:
       1) Local ESS (sliding window) → ess_local_score.png
       2) ESS by quantile → ess_quantile_score.png
     """
-    out1 = out_dir / "diag__ess_local_score.png"
-    out2 = out_dir / "diag__ess_quantile_score.png"
+    out1 = _plot_path(out_dir, "diag__ess_local_score", plot_format)
+    out2 = _plot_path(out_dir, "diag__ess_quantile_score", plot_format)
     out_dir.mkdir(exist_ok=True, parents=True)
 
     idata_clean, score, n_chains, n_draws = _clean_idata_for_score(idata)
@@ -364,7 +406,7 @@ def plot_ess_local_and_quantile(idata: az.InferenceData, out_dir: Path) -> None:
         ax1.set_ylabel("ESS in Window")
         ax1.grid(True, linestyle="--", alpha=0.4)
         sns.despine(ax=ax1)
-        fig1.savefig(out1, dpi=300, bbox_inches="tight")
+        savefig(fig1, out1, dpi=dpi, png_compress_level=png_compress_level)
         plt.close(fig1)
 
         # 2) ESS by quantile
@@ -376,18 +418,23 @@ def plot_ess_local_and_quantile(idata: az.InferenceData, out_dir: Path) -> None:
         ax2.set_ylabel("ESS")
         ax2.grid(True, linestyle="--", alpha=0.4)
         sns.despine(ax=ax2)
-        fig2.savefig(out2, dpi=300, bbox_inches="tight")
+        savefig(fig2, out2, dpi=dpi, png_compress_level=png_compress_level)
         plt.close(fig2)
 
 
-def make_pair_idata(sample_dir: Path, tf_pair: tuple[str, str]) -> az.InferenceData:
+def make_pair_idata(
+    sample_dir: Path,
+    tf_pair: tuple[str, str],
+    *,
+    sequences_df: pd.DataFrame | None = None,
+) -> az.InferenceData:
     """
     Build an ArviZ InferenceData with two DataArrays: score_<TF1>, score_<TF2>.
     The TFs are taken from the provided tf_pair tuple.
     """
     x_tf, y_tf = _tf_pair(tf_pair)
 
-    df = read_parquet(sequences_path(sample_dir))
+    df = sequences_df if sequences_df is not None else read_parquet(sequences_path(sample_dir))
     required = {"chain", "draw", f"score_{x_tf}", f"score_{y_tf}"}
     missing = [col for col in required if col not in df.columns]
     if missing:
@@ -434,12 +481,16 @@ def plot_pair_pwm_scores(
     idata_pair: az.InferenceData,
     out_dir: Path,
     tf_pair: tuple[str, str],
+    *,
+    dpi: int,
+    png_compress_level: int,
+    plot_format: str = "png",
 ) -> None:
     """
     2-D KDE + marginals for the selected TF pair.
     """
     x_tf, y_tf = _tf_pair(tf_pair)
-    out = out_dir / "pwm__pair_scores.png"
+    out = _plot_path(out_dir, "pwm__pair_scores", plot_format)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     sns.set_style("ticks", {"axes.grid": False})
@@ -454,7 +505,7 @@ def plot_pair_pwm_scores(
             point_estimate=None,
         )
         plt.gcf().suptitle(f"Joint & Marginal KDE of PWM Scores ({x_tf} vs {y_tf})", fontsize=14)
-        plt.savefig(out, dpi=300, bbox_inches="tight")
+        savefig(plt.gcf(), out, dpi=dpi, png_compress_level=png_compress_level)
         plt.close()
 
 
@@ -462,13 +513,17 @@ def plot_parallel_pwm_scores(
     idata_pair: az.InferenceData,
     out_dir: Path,
     tf_pair: tuple[str, str],
+    *,
+    dpi: int,
+    png_compress_level: int,
+    plot_format: str = "png",
 ) -> None:
     """
     Parallel-coordinates line plot for the selected TF pair.
     """
 
     x_tf, y_tf = _tf_pair(tf_pair)
-    out = out_dir / "pwm__parallel_scores.png"
+    out = _plot_path(out_dir, "pwm__parallel_scores", plot_format)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     df = idata_pair.posterior.to_dataframe().reset_index()
@@ -494,5 +549,5 @@ def plot_parallel_pwm_scores(
     ax.set_title("Parallel Coordinates of PWM Scores", fontsize=14)
     sns.despine(ax=ax)
 
-    fig.savefig(out, dpi=300, bbox_inches="tight")
+    savefig(fig, out, dpi=dpi, png_compress_level=png_compress_level)
     plt.close()

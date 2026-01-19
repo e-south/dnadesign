@@ -31,10 +31,12 @@ class _SwapEvaluator:
 def test_pt_records_post_swap(monkeypatch) -> None:
     rng = np.random.default_rng(0)
     evaluator = _SwapEvaluator()
+    chains = 2
+    draws = 2
     cfg = {
-        "draws": 1,
+        "draws": draws,
         "tune": 0,
-        "chains": 2,
+        "chains": chains,
         "min_dist": 0,
         "top_k": 1,
         "swap_prob": 1.0,
@@ -64,13 +66,36 @@ def test_pt_records_post_swap(monkeypatch) -> None:
         init_cfg=type("Init", (), {"kind": "random", "length": 1, "pad_with": "background", "regulator": None})(),
     )
 
-    def _noop_move(self, seq, current_combined, beta, beta_softmin, evaluator, rng, move_probs, *, per_tf=None):
+    def _noop_move(
+        self,
+        seq,
+        current_combined,
+        beta,
+        beta_softmin,
+        evaluator,
+        rng,
+        move_probs,
+        *,
+        state=None,
+        scan_cache=None,
+        per_tf=None,
+    ):
         if per_tf is None:
             per_tf = evaluator(SequenceState(seq))
-        return "S", True, per_tf, current_combined
+        return (
+            "S",
+            True,
+            per_tf,
+            current_combined,
+            {
+                "delta": 0.0,
+                "score_old": current_combined,
+                "score_new": current_combined,
+            },
+        )
 
     monkeypatch.setattr(opt, "_single_chain_move", _noop_move.__get__(opt, PTGibbsOptimizer))
     opt.optimise()
 
-    recorded = {chain: seq for (chain, _), seq in zip(opt.all_meta, opt.all_samples)}
-    assert recorded[0][0] == 3  # chain 0 should contain swapped-in state
+    first_draw = {chain: seq for (chain, draw_idx), seq in zip(opt.all_meta, opt.all_samples) if draw_idx == 0}
+    assert first_draw[0][0] == 3  # chain 0 should contain swapped-in state after first swap

@@ -111,7 +111,7 @@ def test_parse_config_and_value_single_config_path_errors(tmp_path: Path) -> Non
             [str(config_path)],
             None,
             value_label="RUN",
-            command_hint="cruncher report <run_name>",
+            command_hint="cruncher analyze --run <run_name>",
             cwd=tmp_path,
         )
     message = str(excinfo.value)
@@ -127,7 +127,7 @@ def test_parse_config_and_value_single_value_uses_cwd_config(tmp_path: Path) -> 
         ["sample_run_1"],
         None,
         value_label="RUN",
-        command_hint="cruncher report <run_name>",
+        command_hint="cruncher analyze --run <run_name>",
         cwd=tmp_path,
     )
 

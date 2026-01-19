@@ -25,7 +25,7 @@ def test_move_plots_with_chains(tmp_path) -> None:
     )
     acceptance_path = tmp_path / "plot__move_acceptance_time.png"
     usage_path = tmp_path / "plot__move_usage_time.png"
-    plot_move_acceptance_time(df, acceptance_path)
-    plot_move_usage_time(df, usage_path)
+    plot_move_acceptance_time(df, acceptance_path, dpi=150, png_compress_level=9)
+    plot_move_usage_time(df, usage_path, dpi=150, png_compress_level=9)
     assert acceptance_path.exists()
     assert usage_path.exists()

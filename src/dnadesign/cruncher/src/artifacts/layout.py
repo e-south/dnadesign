@@ -17,7 +17,6 @@ from dnadesign.cruncher.core.labels import build_run_name, format_regulator_slug
 RUN_META_DIR = "meta"
 RUN_ARTIFACTS_DIR = "artifacts"
 RUN_LIVE_DIR = "live"
-RUN_REPORT_DIR = "report"
 LOGOS_ROOT_DIR = "logos"
 
 
@@ -76,7 +75,6 @@ def ensure_run_dirs(
     meta: bool = True,
     artifacts: bool = False,
     live: bool = False,
-    report: bool = False,
 ) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
     if meta:
@@ -85,8 +83,6 @@ def ensure_run_dirs(
         (run_dir / RUN_ARTIFACTS_DIR).mkdir(parents=True, exist_ok=True)
     if live:
         (run_dir / RUN_LIVE_DIR).mkdir(parents=True, exist_ok=True)
-    if report:
-        (run_dir / RUN_REPORT_DIR).mkdir(parents=True, exist_ok=True)
 
 
 def manifest_path(run_dir: Path) -> Path:
@@ -131,7 +127,3 @@ def logos_root(out_root_path: Path) -> Path:
 
 def logos_dir_for_run(out_root_path: Path, stage: str, run_name: str) -> Path:
     return logos_root(out_root_path) / stage / run_name
-
-
-def report_dir(run_dir: Path) -> Path:
-    return run_dir / RUN_REPORT_DIR

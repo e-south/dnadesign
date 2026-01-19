@@ -103,5 +103,16 @@ def write_manifest(run_dir: Path, manifest: Dict[str, Any]) -> Path:
 def load_manifest(run_dir: Path) -> Dict[str, Any]:
     path = manifest_path(run_dir)
     if not path.exists():
-        raise FileNotFoundError(f"meta/run_manifest.json not found in {run_dir}")
+        meta_dir = path.parent
+        existing = []
+        if meta_dir.exists() and meta_dir.is_dir():
+            existing = sorted([p.name for p in meta_dir.iterdir() if p.is_file()])
+        hint = (
+            "meta/run_manifest.json not found. This often means the sample run was interrupted "
+            "before metadata was written."
+        )
+        if existing:
+            hint += f" Existing meta files: {', '.join(existing[:10])}."
+        hint += " Re-run sampling (fast path): `cruncher sample --no-auto-opt -c <CONFIG>`."
+        raise FileNotFoundError(f"{hint} (run: {run_dir})")
     return json.loads(path.read_text())

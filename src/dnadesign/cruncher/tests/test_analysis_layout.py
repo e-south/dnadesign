@@ -15,7 +15,7 @@ from dnadesign.cruncher.analysis.layout import list_analysis_entries_verbose
 def test_analysis_entries_verbose_marks_unindexed_when_summary_missing(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     analysis_dir = run_dir / "analysis"
-    (analysis_dir / "plots").mkdir(parents=True)
+    analysis_dir.mkdir(parents=True)
 
     entries = list_analysis_entries_verbose(run_dir)
     assert entries

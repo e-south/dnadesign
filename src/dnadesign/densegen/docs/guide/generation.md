@@ -32,6 +32,8 @@ plan:
           downstream: "TATAAT"
           spacer_length: [16, 18]
 ```
+Note: `generation.sequence_length` must be at least as long as the widest motif in the library
+or fixed elements; DenseGen fails fast if a motif cannot fit.
 
 ---
 
@@ -93,13 +95,21 @@ uniqueness, caps, and relaxation). DenseGen records sampling policy and outcomes
 Key fields:
 - `pool_strategy`: `full | subsample | iterative_subsample`
 - `library_size` (used for subsample strategies)
+- `library_sampling_strategy` (`tf_balanced | uniform_over_pairs | coverage_weighted`)
+- `coverage_boost_alpha`, `coverage_boost_power` (used with `coverage_weighted`)
+- `avoid_failed_motifs`, `failure_penalty_alpha`, `failure_penalty_power` (optional penalties for motifs tied to failed solves)
 - `cover_all_regulators`, `unique_binding_sites`, `max_sites_per_regulator`
 - `iterative_max_libraries`, `iterative_min_new_solutions`
 
 Notes:
-- `pool_strategy: full` and `subsample` use a single library (no resampling).
-- Use `iterative_subsample` when you want multiple libraries or adaptive retries.
+- `pool_strategy: full` uses a single library (no resampling) and ignores `library_size`, `subsample_over_length_budget_by`,
+  and related sampling caps/strategies (DenseGen warns in `dense validate`/`dense plan`).
+- Under schema `2.2+`, `subsample` can resample reactively on stalls/duplicate guards.
+- `iterative_subsample` resamples proactively after `arrays_generated_before_resample` or when a
+  library under-produces.
 - `unique_binding_sites` enforces uniqueness at the regulator+sequence pair level.
+- `coverage_weighted` dynamically boosts underused TFBS based on the run’s usage counts.
+- `avoid_failed_motifs: true` down-weights TFBS that repeatedly appear in failed solve attempts (tracked in attempts.parquet).
 
 ---
 
@@ -107,8 +117,11 @@ Notes:
 
 DenseGen supports three regulator constraint modes per plan item:
 
-- `required_regulators`: enforce at least one site per listed regulator.
-- `min_required_regulators`: enforce at least K distinct regulators (k-of-n).
+- `required_regulators`: when `min_required_regulators` is **unset**, enforce at least one site
+  per listed regulator (**all-of**, applied to final sequences).
+- `min_required_regulators`: when set, enforce at least K distinct regulators in the **final
+  sequence**. If `required_regulators` is provided, it becomes the candidate set (k-of-n).
+  If `required_regulators` is empty, the constraint applies to the full regulator pool.
 - `min_count_by_regulator`: enforce per-regulator minimum counts.
 
 Solver strategies (`iterate|diverse|optimal`) enforce these constraints at the solver level;

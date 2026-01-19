@@ -60,11 +60,14 @@ cruncher parse
 # Optimization (auto-optimize is enabled by default)
 cruncher sample
 
+# Auto-opt can take minutes; for a quick demo run:
+# cruncher sample --no-auto-opt  # forces gibbs if optimizer.name=auto
+
 # Diagnostics + plots (defaults to latest run)
 cruncher analyze
 
-# Report (JSON + Markdown)
-cruncher report --latest
+# Optional: print a concise summary to stdout
+cruncher analyze --summary
 
 # Optional: generate all plots
 # cruncher analyze --plots all
@@ -73,8 +76,9 @@ cruncher report --latest
 ---
 
 Notes:
-- Analysis writes a canonical summary to `analysis/summary.json` and a detailed
-  artifact manifest to `analysis/manifest.json`.
+- Analysis writes a canonical summary to `analysis/summary.json`, a human‑readable
+  entrypoint to `analysis/report.md`, and a detailed artifact manifest to
+  `analysis/manifest.json`.
 - `trace.nc` contains draw phase only; `sample.output.trace.include_tune` controls
   whether tune samples appear in `sequences.parquet`.
 - Motif overlap is a feature, not a failure; overlap plots are descriptive only.

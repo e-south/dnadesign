@@ -12,6 +12,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -19,6 +20,8 @@ from typing import Optional
 import pandas as pd
 
 from .base import BaseDataSource, infer_format, resolve_path
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -31,13 +34,15 @@ class BindingSitesDataSource(BaseDataSource):
     def _resolve_format(self, path: Path) -> str:
         fmt = (self.fmt or "").strip().lower() if self.fmt is not None else None
         if fmt:
-            if fmt not in {"csv", "parquet"}:
-                raise ValueError(f"binding_sites.format must be 'csv' or 'parquet', got: {fmt!r}")
+            if fmt not in {"csv", "parquet", "xlsx"}:
+                raise ValueError(f"binding_sites.format must be 'csv', 'parquet', or 'xlsx', got: {fmt!r}")
             return fmt
         inferred = infer_format(path)
+        if inferred is None and path.suffix.lower() in {".xlsx", ".xls"}:
+            inferred = "xlsx"
         if inferred is None:
             raise ValueError(
-                f"binding_sites.format is required when file extension is not .csv/.parquet. Got path: {path}"
+                f"binding_sites.format is required when file extension is not .csv/.parquet/.xlsx. Got path: {path}"
             )
         return inferred
 
@@ -48,6 +53,8 @@ class BindingSitesDataSource(BaseDataSource):
             import pyarrow.parquet as pq
 
             return pq.read_table(path).to_pandas()
+        if fmt == "xlsx":
+            return pd.read_excel(path)
         raise ValueError(f"Unsupported binding_sites.format: {fmt}")
 
     def load_data(self, *, rng=None):
@@ -96,11 +103,12 @@ class BindingSitesDataSource(BaseDataSource):
 
         dup_mask = pd.DataFrame({"tf": tf_clean, "tfbs": seq_clean}).duplicated()
         if dup_mask.any():
-            bad_rows = df[dup_mask].index.tolist()
-            preview = ", ".join(str(i) for i in bad_rows[:10])
-            raise ValueError(
-                f"Duplicate regulator/binding-site pairs found in {data_path} (rows: {preview}). "
-                "Remove duplicates or pre-aggregate before running DenseGen."
+            dup_count = int(dup_mask.sum())
+            log.warning(
+                "Binding sites input contains %d duplicate regulator/binding-site pairs in %s. "
+                "Duplicates are retained; set generation.sampling.unique_binding_sites=true to dedupe at sampling.",
+                dup_count,
+                data_path,
             )
 
         invalid_mask = ~seq_clean.str.fullmatch(r"[ACGT]+")

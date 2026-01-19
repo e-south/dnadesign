@@ -18,6 +18,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from dnadesign.cruncher.analysis.plots._savefig import savefig
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,7 +27,14 @@ def _score_columns(tf_names: Iterable[str]) -> list[str]:
     return [f"score_{tf}" for tf in tf_names]
 
 
-def plot_worst_tf_trace(sequences_df: pd.DataFrame, tf_names: Iterable[str], out_path: Path) -> None:
+def plot_worst_tf_trace(
+    sequences_df: pd.DataFrame,
+    tf_names: Iterable[str],
+    out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+) -> None:
     df = sequences_df.copy()
     if "phase" in df.columns:
         df = df[df["phase"] == "draw"]
@@ -53,11 +62,18 @@ def plot_worst_tf_trace(sequences_df: pd.DataFrame, tf_names: Iterable[str], out
     ax.legend(frameon=False, fontsize=8)
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
 
 
-def plot_worst_tf_identity(sequences_df: pd.DataFrame, tf_names: Iterable[str], out_path: Path) -> None:
+def plot_worst_tf_identity(
+    sequences_df: pd.DataFrame,
+    tf_names: Iterable[str],
+    out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+) -> None:
     tf_list = list(tf_names)
     df = sequences_df.copy()
     if "phase" in df.columns:
@@ -102,11 +118,17 @@ def plot_worst_tf_identity(sequences_df: pd.DataFrame, tf_names: Iterable[str], 
     ax.legend(frameon=False, fontsize=8, ncol=min(4, len(tf_list)))
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
 
 
-def plot_elite_filter_waterfall(counts: dict[str, int], out_path: Path) -> None:
+def plot_elite_filter_waterfall(
+    counts: dict[str, int],
+    out_path: Path,
+    *,
+    dpi: int,
+    png_compress_level: int,
+) -> None:
     stages = [
         ("total_draws_seen", "Total draws"),
         ("passed_pre_filter", "Filter pass"),
@@ -135,5 +157,5 @@ def plot_elite_filter_waterfall(counts: dict[str, int], out_path: Path) -> None:
         ax.text(idx, val, str(val), ha="center", va="bottom", fontsize=8)
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)

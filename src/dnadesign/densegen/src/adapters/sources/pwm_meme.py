@@ -16,104 +16,37 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
+from dnadesign.cruncher.io.parsers.meme import MemeMotif, parse_meme_file
+
 from .base import BaseDataSource, resolve_path
 from .pwm_sampling import PWMMotif, normalize_background, sample_pwm_sites
 
 
-def _parse_background(line: str) -> dict[str, float]:
-    parts = line.strip().split()
-    if len(parts) % 2 != 0:
-        raise ValueError("Invalid background frequency line (expected pairs).")
-    bg: dict[str, float] = {}
-    for i in range(0, len(parts), 2):
-        base = parts[i].upper()
-        try:
-            val = float(parts[i + 1])
-        except ValueError as e:
-            raise ValueError(f"Invalid background frequency: {parts[i + 1]}") from e
-        bg[base] = val
-    for base in ("A", "C", "G", "T"):
-        if base not in bg:
-            raise ValueError("Background frequencies must include A/C/G/T.")
-    return bg
+def _background_from_meta(meta) -> dict[str, float]:
+    freqs = getattr(meta, "background_freqs", None)
+    if freqs is None:
+        return normalize_background(None)
+    try:
+        a, c, g, t = freqs
+    except Exception as exc:
+        raise ValueError("MEME background frequencies must include A/C/G/T.") from exc
+    return normalize_background({"A": float(a), "C": float(c), "G": float(g), "T": float(t)})
 
 
-def _parse_meme(path: Path) -> List[PWMMotif]:
-    text = path.read_text().splitlines()
-    alphabet_ok = False
-    background: Optional[dict[str, float]] = None
-    motifs: List[PWMMotif] = []
-    i = 0
-    while i < len(text):
-        line = text[i].strip()
-        if not line:
-            i += 1
-            continue
-        if line.startswith("ALPHABET="):
-            alphabet = line.split("=", 1)[1].strip().upper()
-            if alphabet != "ACGT":
-                raise ValueError(f"MEME alphabet must be ACGT, got {alphabet!r}")
-            alphabet_ok = True
-            i += 1
-            continue
-        if line.startswith("Background letter frequencies"):
-            if i + 1 >= len(text):
-                raise ValueError("MEME background frequencies are missing values.")
-            background = _parse_background(text[i + 1])
-            i += 2
-            continue
-        if line.startswith("MOTIF"):
-            parts = line.split()
-            if len(parts) < 2:
-                raise ValueError("MOTIF line missing motif id.")
-            motif_id = parts[1].strip()
-            i += 1
-            # find letter-probability matrix header
-            while i < len(text) and "letter-probability matrix" not in text[i]:
-                i += 1
-            if i >= len(text):
-                raise ValueError(f"Missing letter-probability matrix for motif {motif_id}")
-            header = text[i]
-            # parse width
-            tokens = header.replace("=", " ").split()
-            if "w" not in tokens:
-                raise ValueError(f"PWM header missing width for motif {motif_id}")
-            w_idx = tokens.index("w") + 1
-            try:
-                width = int(float(tokens[w_idx]))
-            except Exception as e:
-                raise ValueError(f"Invalid PWM width for motif {motif_id}") from e
-            i += 1
-            rows: List[dict[str, float]] = []
-            for _ in range(width):
-                if i >= len(text):
-                    raise ValueError(f"PWM rows truncated for motif {motif_id}")
-                row = text[i].strip()
-                i += 1
-                if not row:
-                    raise ValueError(f"Empty PWM row for motif {motif_id}")
-                parts = row.split()
-                if len(parts) < 4:
-                    raise ValueError(f"PWM row must have 4 columns for motif {motif_id}")
-                try:
-                    probs = [float(p) for p in parts[:4]]
-                except ValueError as e:
-                    raise ValueError(f"Invalid PWM probabilities for motif {motif_id}") from e
-                row_map = {"A": probs[0], "C": probs[1], "G": probs[2], "T": probs[3]}
-                s = sum(row_map.values())
-                if s <= 0:
-                    raise ValueError(f"PWM row sums to 0 for motif {motif_id}")
-                row_map = {k: v / s for k, v in row_map.items()}
-                rows.append(row_map)
-            motifs.append(PWMMotif(motif_id=motif_id, matrix=rows, background=normalize_background(background)))
-            continue
-        i += 1
-
-    if not alphabet_ok:
-        raise ValueError("MEME file missing ALPHABET=ACGT header.")
-    if not motifs:
-        raise ValueError("No motifs found in MEME file.")
-    return motifs
+def _motif_to_pwm(motif: MemeMotif, background: dict[str, float]) -> PWMMotif:
+    rows: List[dict[str, float]] = []
+    for row in motif.prob_matrix:
+        if len(row) != 4:
+            raise ValueError(f"MEME motif {motif.motif_id} row must have 4 probabilities.")
+        rows.append({"A": float(row[0]), "C": float(row[1]), "G": float(row[2]), "T": float(row[3])})
+    log_odds = None
+    if motif.log_odds_matrix is not None:
+        log_odds = []
+        for row in motif.log_odds_matrix:
+            if len(row) != 4:
+                raise ValueError(f"MEME motif {motif.motif_id} log-odds row must have 4 values.")
+            log_odds.append({"A": float(row[0]), "C": float(row[1]), "G": float(row[2]), "T": float(row[3])})
+    return PWMMotif(motif_id=str(motif.motif_id), matrix=rows, background=background, log_odds=log_odds)
 
 
 @dataclass
@@ -130,36 +63,58 @@ class PWMMemeDataSource(BaseDataSource):
         if not (meme_path.exists() and meme_path.is_file()):
             raise FileNotFoundError(f"PWM MEME file not found. Looked here:\n  - {meme_path}")
 
-        motifs = _parse_meme(meme_path)
+        result = parse_meme_file(meme_path)
+        background = _background_from_meta(result.meta)
+        motifs = result.motifs
         if self.motif_ids:
-            keep = set(self.motif_ids)
-            motifs = [m for m in motifs if m.motif_id in keep]
+            keep = {m.strip().lower() for m in self.motif_ids if m}
+            filtered: list[MemeMotif] = []
+            for motif in motifs:
+                cand = {motif.motif_id, motif.motif_name, motif.motif_label}
+                cand = {str(x).strip().lower() for x in cand if x}
+                if cand & keep:
+                    filtered.append(motif)
+            motifs = filtered
             if not motifs:
-                raise ValueError(f"No motifs matched motif_ids in {meme_path}")
+                available = ", ".join(sorted({m.motif_id for m in result.motifs if m.motif_id}))
+                raise ValueError(f"No motifs matched motif_ids in {meme_path}. Available: {available}")
 
         sampling = dict(self.sampling or {})
         strategy = str(sampling.get("strategy", "stochastic"))
         n_sites = int(sampling.get("n_sites"))
         oversample_factor = int(sampling.get("oversample_factor", 10))
+        max_candidates = sampling.get("max_candidates")
+        max_seconds = sampling.get("max_seconds")
         threshold = sampling.get("score_threshold")
         percentile = sampling.get("score_percentile")
+        length_policy = str(sampling.get("length_policy", "exact"))
+        length_range = sampling.get("length_range")
+        trim_window_length = sampling.get("trim_window_length")
+        trim_window_strategy = sampling.get("trim_window_strategy", "max_info")
 
         entries = []
         all_rows = []
         for motif in motifs:
+            pwm = _motif_to_pwm(motif, background)
             selected = sample_pwm_sites(
                 rng,
-                motif,
+                pwm,
                 strategy=strategy,
                 n_sites=n_sites,
                 oversample_factor=oversample_factor,
+                max_candidates=max_candidates,
+                max_seconds=max_seconds,
                 score_threshold=threshold,
                 score_percentile=percentile,
+                length_policy=length_policy,
+                length_range=length_range,
+                trim_window_length=trim_window_length,
+                trim_window_strategy=str(trim_window_strategy),
             )
 
             for seq in selected:
-                entries.append((motif.motif_id, seq, str(meme_path)))
-                all_rows.append({"tf": motif.motif_id, "tfbs": seq})
+                entries.append((pwm.motif_id, seq, str(meme_path)))
+                all_rows.append({"tf": pwm.motif_id, "tfbs": seq, "source": str(meme_path)})
 
         import pandas as pd
 

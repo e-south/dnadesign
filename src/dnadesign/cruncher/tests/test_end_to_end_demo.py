@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
 import pytest
 import yaml
 from typer.testing import CliRunner
@@ -21,6 +22,7 @@ from dnadesign.cruncher.app.parse_workflow import run_parse
 from dnadesign.cruncher.app.sample_workflow import run_sample
 from dnadesign.cruncher.artifacts.layout import (
     config_used_path,
+    elites_path,
     logos_root,
     manifest_path,
     out_root,
@@ -171,6 +173,8 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
 
     result = runner.invoke(app, ["catalog", "logos", "--set", "1", "-c", str(config_path)])
     assert result.exit_code == 0
+    elites_df = pd.read_parquet(elites_path(sample_dir), engine="fastparquet")
+    assert len(elites_df) <= config["cruncher"]["sample"]["elites"]["k"]
     logo_root = logos_root(out_root(config_path, cfg.out_dir)) / "catalog"
     logos = list(logo_root.glob("**/*_logo.png"))
     assert any("lexA" in path.name for path in logos)

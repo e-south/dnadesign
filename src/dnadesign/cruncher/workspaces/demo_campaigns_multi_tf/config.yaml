@@ -1,5 +1,5 @@
 cruncher:
-  out_dir: runs/
+  out_dir: outputs
   regulator_sets:
     - [lexA, cpxR, fur]
   regulator_categories:
@@ -112,7 +112,7 @@ cruncher:
     local_sources:
       - source_id: demo_local_meme
         description: Demo DAP-seq motifs + sites (local MEME files)
-        root: data/local_motifs
+        root: inputs/local_motifs
         patterns: ["*.txt"]
         recursive: false
         format_map: {".txt": "MEME"}
@@ -148,10 +148,14 @@ cruncher:
       pad_with: background
     objective:
       bidirectional: true
-      score_scale: llr
+      score_scale: normalized-llr
       scoring:
         pwm_pseudocounts: 0.10
         log_odds_clip: null
+      softmin:
+        enabled: true
+        kind: linear
+        beta: [0.5, 10.0]
     elites:
       k: 5
       min_hamming: 1
@@ -165,21 +169,21 @@ cruncher:
         slide_max_shift: 4
         swap_len_range: [2, 8]
         move_probs:
-          S: 0.80
-          B: 0.10
-          M: 0.10
+          S: 0.35
+          B: 0.30
+          M: 0.35
     optimizer:
       name: auto
     optimizers:
       gibbs:
         beta_schedule:
           kind: linear
-          beta: [0.05, 0.5]
+          beta: [1.0, 20.0]
         apply_during: tune
       pt:
         beta_ladder:
           kind: geometric
-          betas: [0.05, 0.1, 0.2, 0.4]
+          betas: [0.2, 1.0, 5.0, 25.0]
         swap_prob: 0.10
     auto_opt:
       enabled: true
@@ -210,5 +214,5 @@ cruncher:
       score_box: false
       correlation_heatmap: true
       parallel_coords: true
-    scatter_scale: llr
+    scatter_scale: normalized-llr
     subsampling_epsilon: 10.0

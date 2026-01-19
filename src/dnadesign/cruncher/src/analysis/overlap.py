@@ -9,6 +9,7 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections import Counter
@@ -86,6 +87,8 @@ def compute_overlap_tables(
     tf_names: Iterable[str],
     pwm_widths: dict[str, int] | None = None,
     hist_bins: list[int] | None = None,
+    *,
+    include_sequences: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, float | None]]:
     tf_list = list(tf_names)
     pair_keys: list[tuple[str, str]] = []
@@ -125,7 +128,10 @@ def compute_overlap_tables(
                 for tf_i, tf_j in pair_keys
             ]
         )
-        elite_df = pd.DataFrame(columns=["id", "rank", "sequence", "overlap_total_bp", "overlap_pair_count"])
+        elite_cols = ["id", "rank", "sequence_hash", "overlap_total_bp", "overlap_pair_count"]
+        if include_sequences:
+            elite_cols.append("sequence")
+        elite_df = pd.DataFrame(columns=elite_cols)
         return pair_df, elite_df, {"overlap_rate_median": None, "overlap_total_bp_median": None}
 
     for _, row in elites_df.iterrows():
@@ -157,15 +163,20 @@ def compute_overlap_tables(
                 overlap_total += overlap_bp
                 overlap_pairs += 1
 
-        elite_rows.append(
-            {
-                "id": row.get("id") if "id" in row else None,
-                "rank": row.get("rank") if "rank" in row else None,
-                "sequence": row.get("sequence") if "sequence" in row else None,
-                "overlap_total_bp": overlap_total,
-                "overlap_pair_count": overlap_pairs,
-            }
-        )
+        seq_val = row.get("sequence") if "sequence" in row else None
+        seq_hash = None
+        if isinstance(seq_val, str):
+            seq_hash = hashlib.sha256(seq_val.encode("utf-8")).hexdigest()[:12]
+        row_payload = {
+            "id": row.get("id") if "id" in row else None,
+            "rank": row.get("rank") if "rank" in row else None,
+            "sequence_hash": seq_hash,
+            "overlap_total_bp": overlap_total,
+            "overlap_pair_count": overlap_pairs,
+        }
+        if include_sequences:
+            row_payload["sequence"] = seq_val
+        elite_rows.append(row_payload)
 
     pair_rows: list[dict[str, object]] = []
     for tf_i, tf_j in pair_keys:

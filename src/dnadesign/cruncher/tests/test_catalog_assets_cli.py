@@ -126,3 +126,33 @@ def test_catalog_logos_writes_pngs(tmp_path: Path) -> None:
     )
     assert repeat.exit_code == 0
     assert "already rendered" in repeat.output
+
+
+def test_export_sites_ignores_pwm_source_for_selection(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    entry = CatalogEntry(
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="sites",
+        has_matrix=False,
+        has_sites=True,
+        site_count=1,
+        site_total=1,
+        site_kind="curated",
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+    sites_path = catalog_root / "normalized" / "sites" / "regulondb" / "RBM1.jsonl"
+    sites_path.parent.mkdir(parents=True, exist_ok=True)
+    sites_path.write_text(json.dumps({"sequence": "ACGT", "site_id": "s1", "motif_ref": entry.key}) + "\n")
+
+    config_path = _write_config(tmp_path, pwm_source="matrix")
+    out_path = tmp_path / "densegen_sites.csv"
+    result = runner.invoke(
+        app,
+        ["catalog", "export-sites", "--tf", "lexA", "--out", str(out_path), str(config_path)],
+        color=False,
+    )
+    assert result.exit_code == 0
+    assert "DenseGen binding-site export" in result.output
+    assert out_path.exists()

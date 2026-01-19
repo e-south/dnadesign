@@ -62,6 +62,15 @@ def _normalize_regulator_labels(labels: list[str]) -> list[str]:
     return cleaned
 
 
+def _normalize_motif(motif: str, *, label: str) -> str:
+    s = str(motif).strip().upper()
+    if not s:
+        raise ValueError(f"{label} motifs must be non-empty strings")
+    if not set(s).issubset({"A", "C", "G", "T"}):
+        raise ValueError(f"{label} motifs must contain only A/C/G/T characters")
+    return s
+
+
 def _apply_regulator_constraints(
     opt: da.Optimizer,
     *,
@@ -265,16 +274,18 @@ class DenseArrayOptimizer:
                 if unknown:
                     raise ValueError(f"Unknown promoter constraint keys: {sorted(unknown)}")
                 # Ensure motifs in library
+                clean: dict[str, object] = {}
                 for mkey in ("upstream", "downstream"):
                     mv = pc.get(mkey)
-                    if mv and mv not in lib:
-                        lib.append(mv)
-                clean = {
-                    k: v
-                    for k, v in pc.items()
-                    if k in {"upstream", "downstream", "spacer_length", "upstream_pos", "downstream_pos"}
-                    and v is not None
-                }
+                    if mv is None:
+                        continue
+                    mv_norm = _normalize_motif(mv, label=f"promoter_constraints.{mkey}")
+                    if mv_norm not in lib:
+                        lib.append(mv_norm)
+                    clean[mkey] = mv_norm
+                for k in ("spacer_length", "upstream_pos", "downstream_pos"):
+                    if k in pc and pc[k] is not None:
+                        clean[k] = pc[k]
                 if clean:
                     converted.append(clean)
 
@@ -287,7 +298,9 @@ class DenseArrayOptimizer:
             opt.add_promoter_constraints(**c)
 
         sb = (self.fixed_elements or {}).get("side_biases") or {}
-        left, right = sb.get("left"), sb.get("right")
+        left_raw, right_raw = sb.get("left"), sb.get("right")
+        left = [_normalize_motif(m, label="side_biases.left") for m in (left_raw or []) if m is not None]
+        right = [_normalize_motif(m, label="side_biases.right") for m in (right_raw or []) if m is not None]
         if (left and any(left)) or (right and any(right)):
             missing = [m for m in (left or []) + (right or []) if m not in lib]
             if missing:

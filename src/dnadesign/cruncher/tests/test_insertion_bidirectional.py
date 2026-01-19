@@ -73,7 +73,8 @@ def test_insertion_can_reverse_complement() -> None:
         pwms=pwms,
     )
     seq = np.array([0, 0], dtype=np.int8)
-    current = evaluator.combined(SequenceState(seq), beta=None)
+    state = SequenceState(seq)
+    current = evaluator.combined(state, beta=None)
     rng = _FixedRNG()
     optimizer._perform_single_move(
         seq,
@@ -84,6 +85,8 @@ def test_insertion_can_reverse_complement() -> None:
         cfg,
         rng,
         np.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0]),
+        state=state,
+        scan_cache=None,
         per_tf={"tfA": float(seq.sum())},
     )
     assert seq.tolist() == [2, 3]

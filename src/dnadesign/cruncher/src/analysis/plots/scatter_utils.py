@@ -52,15 +52,18 @@ def encode_sequence(seq: str, *, context: str) -> np.ndarray:
 
 def load_per_pwm(path: Path) -> pd.DataFrame:
     """
-    Read gathered_per_pwm_everyN.csv into a DataFrame.
+    Read per-PWM score table into a DataFrame.
     Raises FileNotFoundError if missing.
     Expects columns: 'chain', 'draw', 'score_<TF>' for each TF.
     """
     if not path.exists():
         raise FileNotFoundError(f"load_per_pwm: '{path}' not found")
-    df = pd.read_csv(path)
+    if path.suffix == ".parquet":
+        df = read_parquet(path)
+    else:
+        df = pd.read_csv(path)
     if "chain" not in df.columns or "draw" not in df.columns:
-        raise ValueError("load_per_pwm: expected 'chain' and 'draw' columns in gathered_per_pwm_everyN.csv")
+        raise ValueError("load_per_pwm: expected 'chain' and 'draw' columns in per-PWM table")
     return df
 
 

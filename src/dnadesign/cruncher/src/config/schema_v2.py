@@ -280,7 +280,7 @@ class AdaptiveBetaConfig(StrictBaseModel):
     window: int = 100
     k: float = 0.50
     min_beta: float = 1.0e-3
-    max_beta: float = 10.0
+    max_beta: float = 100.0
     moves: List[Literal["S", "B", "M", "L", "W", "I"]] = Field(default_factory=lambda: ["B", "M"])
     stop_after_tune: bool = True
 
@@ -320,7 +320,7 @@ class AdaptiveSwapConfig(StrictBaseModel):
     window: int = 50
     k: float = 0.50
     min_scale: float = 0.25
-    max_scale: float = 4.0
+    max_scale: float = 50.0
     stop_after_tune: bool = True
 
     @field_validator("target_swap")
@@ -418,7 +418,7 @@ BetaLadderConfig = Union[BetaLadderFixed, BetaLadderGeometric]
 
 
 class GibbsOptimizerConfig(StrictBaseModel):
-    beta_schedule: CoolingConfig = Field(default_factory=lambda: CoolingLinear(beta=[0.05, 0.5]))
+    beta_schedule: CoolingConfig = Field(default_factory=lambda: CoolingLinear(beta=[1.0, 20.0]))
     apply_during: Literal["tune", "all"] = "tune"
     schedule_scope: Literal["per_chain", "global"] = "per_chain"
     adaptive_beta: AdaptiveBetaConfig = AdaptiveBetaConfig()
@@ -436,7 +436,7 @@ class GibbsOptimizerConfig(StrictBaseModel):
 
 
 class PTOptimizerConfig(StrictBaseModel):
-    beta_ladder: BetaLadderConfig = Field(default_factory=lambda: BetaLadderGeometric(betas=[0.05, 0.1, 0.2, 0.4]))
+    beta_ladder: BetaLadderConfig = Field(default_factory=lambda: BetaLadderGeometric(betas=[0.2, 1.0, 5.0, 25.0]))
     swap_prob: float = 0.10
     ladder_adapt: AdaptiveSwapConfig = AdaptiveSwapConfig()
 
@@ -540,6 +540,15 @@ class AutoOptConfig(StrictBaseModel):
     keep_pilots: Literal["all", "ok", "best"] = "ok"
     allow_trim_polish_in_pilots: bool = False
     prefer_simpler_if_close: bool = True
+    cooling_boosts: List[float] = Field(default_factory=lambda: [1.0, 2.0])
+    beta_schedule_scales: List[float] = Field(default_factory=list)
+    beta_ladder_scales: List[float] = Field(default_factory=list)
+    pt_swap_probs: List[float] = Field(default_factory=list)
+    pt_ladder_sizes: List[int] = Field(default_factory=list)
+    gibbs_move_probs: List[Dict[Literal["S", "B", "M", "L", "W", "I"], float]] = Field(default_factory=list)
+    move_profiles: List[Literal["balanced", "local", "global", "aggressive"]] = Field(
+        default_factory=lambda: ["balanced", "aggressive"]
+    )
     tolerance: AutoOptToleranceConfig = AutoOptToleranceConfig()
     length: AutoOptLengthConfig = Field(default_factory=AutoOptLengthConfig)
     policy: AutoOptPolicyConfig = AutoOptPolicyConfig()
@@ -555,6 +564,75 @@ class AutoOptConfig(StrictBaseModel):
                 raise ValueError("auto_opt.budget_levels entries must be >= 4")
             cleaned.append(item)
         return cleaned
+
+    @field_validator("cooling_boosts")
+    @classmethod
+    def _check_cooling_boosts(cls, v: List[float]) -> List[float]:
+        if not isinstance(v, list) or not v:
+            raise ValueError("auto_opt.cooling_boosts must be a non-empty list of numbers")
+        cleaned: list[float] = []
+        for item in v:
+            if not isinstance(item, (int, float)) or float(item) <= 0:
+                raise ValueError("auto_opt.cooling_boosts entries must be > 0")
+            cleaned.append(float(item))
+        return cleaned
+
+    @field_validator("pt_swap_probs")
+    @classmethod
+    def _check_pt_swap_probs(cls, v: List[float]) -> List[float]:
+        if not isinstance(v, list):
+            raise ValueError("auto_opt.pt_swap_probs must be a list of numbers")
+        cleaned: list[float] = []
+        for item in v:
+            if not isinstance(item, (int, float)) or float(item) < 0 or float(item) > 1:
+                raise ValueError("auto_opt.pt_swap_probs entries must be between 0 and 1")
+            cleaned.append(float(item))
+        return cleaned
+
+    @field_validator("pt_ladder_sizes")
+    @classmethod
+    def _check_pt_ladder_sizes(cls, v: List[int]) -> List[int]:
+        if not isinstance(v, list):
+            raise ValueError("auto_opt.pt_ladder_sizes must be a list of integers")
+        cleaned: list[int] = []
+        for item in v:
+            if not isinstance(item, int) or item < 2:
+                raise ValueError("auto_opt.pt_ladder_sizes entries must be >= 2")
+            cleaned.append(int(item))
+        return cleaned
+
+    @field_validator("gibbs_move_probs")
+    @classmethod
+    def _check_gibbs_move_probs(cls, v: List[Dict[str, float]]) -> List[Dict[str, float]]:
+        if not isinstance(v, list):
+            raise ValueError("auto_opt.gibbs_move_probs must be a list of move-prob maps")
+        cleaned: list[Dict[str, float]] = []
+        for idx, item in enumerate(v):
+            if not isinstance(item, dict):
+                raise ValueError("auto_opt.gibbs_move_probs entries must be move-prob maps")
+            cleaned.append(MoveConfig._normalize_move_probs(item, label=f"auto_opt.gibbs_move_probs[{idx}]"))
+        return cleaned
+
+    @field_validator("beta_schedule_scales", "beta_ladder_scales")
+    @classmethod
+    def _check_beta_scales(cls, v: List[float], info) -> List[float]:
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            raise ValueError(f"auto_opt.{info.field_name} must be a list of numbers")
+        cleaned: list[float] = []
+        for item in v:
+            if not isinstance(item, (int, float)) or float(item) <= 0:
+                raise ValueError(f"auto_opt.{info.field_name} entries must be > 0")
+            cleaned.append(float(item))
+        return cleaned
+
+    @field_validator("move_profiles")
+    @classmethod
+    def _check_move_profiles(cls, v: List[str]) -> List[str]:
+        if not isinstance(v, list) or not v:
+            raise ValueError("auto_opt.move_profiles must be a non-empty list")
+        return v
 
     @field_validator("replicates")
     @classmethod
@@ -889,6 +967,20 @@ class SampleConfig(StrictBaseModel):
             if self.auto_opt is not None and self.auto_opt.enabled:
                 raise ValueError("auto_opt.enabled must be false when optimizer.name is not 'auto'")
 
+        if self.auto_opt is not None and self.auto_opt.enabled:
+            ladder_sizes = list(self.auto_opt.pt_ladder_sizes or [])
+            if ladder_sizes:
+                ladder = self.optimizers.pt.beta_ladder
+                if isinstance(ladder, BetaLadderFixed):
+                    raise ValueError("auto_opt.pt_ladder_sizes requires beta_ladder.kind='geometric' (fixed ladder).")
+                if isinstance(ladder, BetaLadderGeometric) and ladder.betas is not None:
+                    max_size = max(ladder_sizes)
+                    if max_size > len(ladder.betas):
+                        raise ValueError(
+                            "auto_opt.pt_ladder_sizes exceeds available betas; "
+                            "provide a geometric beta_ladder with beta_min/beta_max/n_temps."
+                        )
+
         if self.optimizer.name == "pt" and self.budget.restarts != 1:
             raise ValueError("PT does not support budget.restarts > 1; set sample.budget.restarts=1.")
         return self
@@ -924,14 +1016,20 @@ class AnalysisConfig(StrictBaseModel):
     extra_plots: bool = False
     extra_tables: bool = False
     mcmc_diagnostics: bool = False
+    dashboard_only: bool = True
     plots: AnalysisPlotConfig = AnalysisPlotConfig()
+    table_format: Literal["parquet", "csv"] = "parquet"
+    plot_format: Literal["png", "pdf", "svg"] = "png"
     scatter_scale: Literal["llr", "z", "logp", "consensus-neglop-sum", "normalized-llr"]
     subsampling_epsilon: float
+    plot_dpi: int = 150
+    png_compress_level: int = 9
     scatter_style: Literal["edges", "thresholds"] = "edges"
     scatter_background: bool = True
     scatter_background_samples: Optional[int] = None
     scatter_background_seed: int = 0
     tf_pair: Optional[List[str]] = None
+    include_sequences_in_tables: bool = False
     archive: bool = Field(
         False,
         description=(
@@ -946,6 +1044,20 @@ class AnalysisConfig(StrictBaseModel):
         if not isinstance(v, (int, float)) or v <= 0.0:
             raise ValueError("subsampling_epsilon must be a positive number (float or int)")
         return float(v)
+
+    @field_validator("plot_dpi")
+    @classmethod
+    def _check_plot_dpi(cls, v: int) -> int:
+        if not isinstance(v, int) or v <= 0:
+            raise ValueError("analysis.plot_dpi must be a positive integer")
+        return v
+
+    @field_validator("png_compress_level")
+    @classmethod
+    def _check_png_compress_level(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 0 or v > 9:
+            raise ValueError("analysis.png_compress_level must be an integer in [0, 9]")
+        return v
 
     @field_validator("tf_pair")
     @classmethod
