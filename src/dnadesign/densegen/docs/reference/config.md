@@ -23,7 +23,7 @@ for conceptual flow.
 ### Top-level
 
 - `densegen` (required)
-- `densegen.schema_version` (required; supported: `2.1`)
+- `densegen.schema_version` (required; supported: `2.1`, `2.2`, `2.3`)
 - `densegen.run` (required; run-scoped I/O root)
 - `plots` (optional; required `source` when `output.targets` has multiple sinks)
 
@@ -33,14 +33,19 @@ for conceptual flow.
 
 Choose one input type per entry:
 
+PWM inputs perform **input sampling** (sampling sites from PWMs) via
+`densegen.inputs[].sampling`. This is distinct from **library sampling**
+(`densegen.generation.sampling`), which selects a solver library from the realized TFBS pool.
+
 - `type: binding_sites`
-  - `path` - CSV or Parquet file
-  - `format` - `csv | parquet` (optional if extension is `.csv`/`.parquet`)
+  - `path` - CSV, Parquet, or XLSX file
+  - `format` - `csv | parquet | xlsx` (optional if extension is `.csv`/`.parquet`/`.xlsx`)
   - `columns.regulator` (default: `tf`)
   - `columns.sequence` (default: `tfbs`)
   - `columns.site_id` (optional)
   - `columns.source` (optional)
-  - Empty/duplicate regulator+sequence rows are errors
+  - Empty regulator/sequence rows are errors
+  - Duplicate regulator+sequence rows are allowed (use `generation.sampling.unique_binding_sites` to dedupe)
   - Sequences must be A/C/G/T only
 - `type: sequence_library`
   - `path` - CSV or Parquet file
@@ -55,9 +60,19 @@ Choose one input type per entry:
     - `strategy`: `consensus | stochastic | background`
     - `n_sites` (int > 0)
     - `oversample_factor` (int > 0)
+    - `max_candidates` (optional int > 0; caps candidate generation)
+    - `max_seconds` (optional float > 0; time limit for candidate generation)
     - `score_threshold` or `score_percentile` (exactly one)
+    - `length_policy`: `exact | range` (default: `exact`)
+    - `length_range`: `[min, max]` (required when `length_policy=range`; `min` >= motif length)
+    - `trim_window_length` (optional int > 0; trims PWM to a max‑information window before sampling)
+    - `trim_window_strategy`: `max_info` (window selection strategy)
     - `consensus` requires `n_sites: 1`
     - `background` selects low-scoring sequences (<= threshold/percentile)
+- `type: pwm_meme_set`
+  - `paths` - list of MEME PWM files (merged into a single TF pool)
+  - `motif_ids` (optional list) - choose motifs by ID across files
+  - `sampling` (required) - same fields as `pwm_meme`
 - `type: pwm_jaspar`
   - `path` - JASPAR PFM file
   - `motif_ids` (optional list) - choose motifs by ID
@@ -67,6 +82,13 @@ Choose one input type per entry:
   - `motif_id` (required) - single motif ID label
   - `columns` (optional) - map columns to `A/C/G/T` (defaults to literal column names)
   - `sampling` (required) - same fields as `pwm_meme`
+- `type: pwm_artifact`
+  - `path` - per-motif JSON artifact (contract-first; see `docs/reference/motif_artifacts.md`)
+  - `sampling` (required) - same fields as `pwm_meme`
+- `type: pwm_artifact_set`
+  - `paths` - list of per-motif JSON artifacts (one file per motif)
+  - `sampling` (required) - same fields as `pwm_meme`
+  - `overrides_by_motif_id` (optional dict) - per-motif sampling overrides
 - `type: usr_sequences`
   - `dataset` - USR dataset name
   - `root` - USR root path (required; no fallback)
@@ -93,8 +115,8 @@ Output, logs, and plots must resolve inside `densegen.run.root`.
 - `usr` (required when `targets` includes `usr`)
   - `dataset`, `root`, `chunk_size`, `allow_overwrite`
 - `parquet` (required when `targets` includes `parquet`)
-  - `path` (directory), `deduplicate`, `chunk_size`
-  - `path` must be a directory (DenseGen writes `part-*.parquet` files)
+  - `path` (file), `deduplicate`, `chunk_size`
+  - `path` must be a `.parquet` file (single-file output)
 - `output.usr.root` and `output.parquet.path` must be inside `densegen.run.root`
 
 ---
@@ -102,6 +124,7 @@ Output, logs, and plots must resolve inside `densegen.run.root`.
 ### `densegen.generation`
 
 - `sequence_length` (int > 0)
+- `sequence_length` must be >= the widest required motif (library TFBS or fixed elements)
 - `quota` (int > 0)
 - `sampling` (see below)
 - `plan` (required, non-empty)
@@ -114,8 +137,12 @@ Output, logs, and plots must resolve inside `densegen.run.root`.
     - `left`: list of motifs biased toward the 5prime side
     - `right`: list of motifs biased toward the 3prime side
     - Motifs must be A/C/G/T and must exist in the sampled library
-  - `required_regulators` (list) - regulators that must appear in each solution
+  - `required_regulators` (list) - regulators that must appear in each solution when
+    `min_required_regulators` is unset (**all-of**).
   - `min_required_regulators` (int > 0, optional) - require at least K distinct regulators
+    **in the final sequence**. When set alongside `required_regulators`, those regulators
+    become the candidate set (k-of-n). If `required_regulators` is empty, the requirement
+    applies to the full regulator pool.
   - `min_count_by_regulator` (dict, optional) - per-regulator minimum counts
     - For regulators listed here, DenseGen uses the maximum of this value and
       `runtime.min_count_per_tf`.
@@ -124,9 +151,19 @@ Output, logs, and plots must resolve inside `densegen.run.root`.
 
 ### `densegen.generation.sampling`
 
+These controls apply after PWM input sampling. `library_size` does not change PWM sampling counts.
+Under schema `2.2+`, `library_size` also bounds the motif count offered to the solver for
+binding-site and PWM-sampled inputs.
+
 - `pool_strategy`: `full | subsample | iterative_subsample`
 - `library_size` (int > 0; used for subsample strategies)
-- `subsample_over_length_budget_by` (>= 0)
+- `library_sampling_strategy`: `tf_balanced | uniform_over_pairs | coverage_weighted` (schema `2.2+`)
+- `coverage_boost_alpha` (float >= 0; used when `library_sampling_strategy=coverage_weighted`)
+- `coverage_boost_power` (float > 0; used when `library_sampling_strategy=coverage_weighted`)
+- `avoid_failed_motifs` (bool; when true, down-weight TFBS that frequently fail solves)
+- `failure_penalty_alpha` (float >= 0; penalty strength for failed motifs)
+- `failure_penalty_power` (float > 0; penalty exponent for failed motifs)
+- `subsample_over_length_budget_by` (>= 0; reported as a target bp length)
 - `cover_all_regulators` (bool)
 - `unique_binding_sites` (bool)
 - `max_sites_per_regulator` (int > 0 or null)
@@ -155,6 +192,8 @@ Output, logs, and plots must resolve inside `densegen.run.root`.
 - `min_count_per_tf` (int >= 0)
 - `max_duplicate_solutions`, `stall_seconds_before_resample`, `stall_warning_every_seconds`
 - `max_resample_attempts`, `max_total_resamples`, `max_seconds_per_plan`, `max_failed_solutions`
+- `leaderboard_every` (int >= 0; 0 disables periodic leaderboard logs)
+- `checkpoint_every` (int >= 0; 0 disables run_state checkpoints)
 - `random_seed` (int)
 
 ---
@@ -180,7 +219,8 @@ Output, logs, and plots must resolve inside `densegen.run.root`.
 ### `plots`
 
 - `source`: `usr | parquet` (required if `output.targets` has multiple sinks)
-- `out_dir` (optional; default `plots`; must be inside `densegen.run.root`)
+- `out_dir` (optional; default `outputs`; must be inside `densegen.run.root`)
+- `format` (optional; `png | pdf | svg`, default `png`)
 - `default`: list of plot names to run when `dense plot` is invoked (defaults to all)
 - `options`: dict keyed by plot name (strict; unknown options error)
 - `style`: global style dict applied to every plot (can be overridden per plot)
@@ -193,14 +233,15 @@ Output, logs, and plots must resolve inside `densegen.run.root`.
 
 ```yaml
 densegen:
-  schema_version: "2.1"
+  schema_version: "2.3"
   run:
     id: demo
     root: "."
   inputs:
     - name: demo
       type: binding_sites
-      path: inputs/tf2tfbs_mapping_cpxR_LexA.csv
+      # Provide a TF/TFBS table (CSV/Parquet) in your run inputs directory.
+      path: inputs/binding_sites.csv
       format: csv
 
   output:
@@ -209,7 +250,7 @@ densegen:
       bio_type: dna
       alphabet: dna_4
     parquet:
-      path: outputs/parquet
+      path: outputs/dense_arrays.parquet
       deduplicate: true
       chunk_size: 128
 
@@ -237,6 +278,7 @@ densegen:
     max_total_resamples: 500
     max_seconds_per_plan: 0
     max_failed_solutions: 0
+    leaderboard_every: 50
     random_seed: 42
 
   postprocess:
@@ -248,7 +290,7 @@ densegen:
       max_tries: 2000
 
   logging:
-    log_dir: logs
+    log_dir: outputs/logs
     level: INFO
     suppress_solver_stderr: true
     print_visual: true

@@ -87,7 +87,7 @@ def test_required_regulators_filtering(tmp_path: Path) -> None:
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": str(tmp_path / "out")},
+                "parquet": {"path": str(tmp_path / "out.parquet")},
             },
             "generation": {
                 "sequence_length": 3,
@@ -144,3 +144,81 @@ def test_required_regulators_filtering(tmp_path: Path) -> None:
     assert summary.total_generated == 1
     assert len(sink.records) == 1
     assert sink.records[0].sequence == "CCC"
+
+
+def test_required_regulators_k_of_n(tmp_path: Path) -> None:
+    csv_path = tmp_path / "sites.csv"
+    csv_path.write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
+    cfg = {
+        "densegen": {
+            "schema_version": "2.3",
+            "run": {"id": "demo", "root": "."},
+            "inputs": [
+                {
+                    "name": "demo",
+                    "type": "binding_sites",
+                    "path": str(csv_path),
+                    "format": "csv",
+                }
+            ],
+            "output": {
+                "targets": ["parquet"],
+                "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+                "parquet": {"path": str(tmp_path / "out.parquet")},
+            },
+            "generation": {
+                "sequence_length": 3,
+                "quota": 1,
+                "sampling": {
+                    "pool_strategy": "full",
+                    "library_size": 2,
+                    "subsample_over_length_budget_by": 0,
+                    "cover_all_regulators": True,
+                    "unique_binding_sites": True,
+                    "max_sites_per_regulator": None,
+                    "relax_on_exhaustion": False,
+                    "allow_incomplete_coverage": False,
+                    "iterative_max_libraries": 1,
+                    "iterative_min_new_solutions": 0,
+                },
+                "plan": [
+                    {
+                        "name": "default",
+                        "quota": 1,
+                        "required_regulators": ["TF1", "TF2"],
+                        "min_required_regulators": 1,
+                    }
+                ],
+            },
+            "solver": {"backend": "CBC", "strategy": "iterate", "options": []},
+            "runtime": {
+                "round_robin": False,
+                "arrays_generated_before_resample": 10,
+                "min_count_per_tf": 0,
+                "max_duplicate_solutions": 5,
+                "stall_seconds_before_resample": 10,
+                "stall_warning_every_seconds": 10,
+                "max_resample_attempts": 1,
+                "max_total_resamples": 1,
+                "max_seconds_per_plan": 0,
+                "max_failed_solutions": 0,
+                "random_seed": 1,
+            },
+            "postprocess": {"gap_fill": {"mode": "off", "end": "5prime", "gc_min": 0.4, "gc_max": 0.6}},
+            "logging": {"log_dir": str(tmp_path / "logs"), "level": "INFO"},
+        }
+    }
+    cfg_path = tmp_path / "cfg.yaml"
+    cfg_path.write_text(yaml.safe_dump(cfg))
+    loaded = load_config(cfg_path)
+    sink = _DummySink()
+    deps = PipelineDeps(
+        source_factory=data_source_factory,
+        sink_factory=lambda _cfg, _path: [sink],
+        optimizer=_DummyAdapter(),
+        gap_fill=lambda *args, **kwargs: "",
+    )
+    summary = run_pipeline(loaded, deps=deps)
+    assert summary.total_generated == 1
+    assert len(sink.records) == 1
+    assert sink.records[0].sequence == "AAA"

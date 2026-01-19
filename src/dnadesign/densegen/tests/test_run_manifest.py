@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dnadesign.densegen.src.core.run_manifest import PlanManifest, RunManifest, load_run_manifest
+from dnadesign.densegen.src.core.run_paths import ensure_run_meta_dir, run_manifest_path
 
 
 def test_run_manifest_roundtrip(tmp_path) -> None:
@@ -35,7 +36,8 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
         dense_arrays_version_source="lock",
         items=items,
     )
-    path = tmp_path / "run_manifest.json"
+    ensure_run_meta_dir(tmp_path)
+    path = run_manifest_path(tmp_path)
     manifest.write_json(path)
     loaded = load_run_manifest(path)
     assert loaded.schema_version == "2.1"

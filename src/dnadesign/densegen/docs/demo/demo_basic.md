@@ -1,20 +1,22 @@
 # DenseGen demo (end-to-end)
 
-This is the canonical DenseGen demo. It stages a run directory, validates config, plans
+This is the canonical DenseGen demo. It stages a workspace, validates config, plans
 constraints, generates sequences, inspects outputs, and renders plots. The demo is Parquet-only
 and uses the dense-arrays CBC backend. All paths are explicit; missing files fail fast.
 
 ## Contents
 - [0) Prereqs](#0-prereqs) - sync deps and set a run root.
 - [1) Inspect demo inputs](#1-inspect-demo-inputs) - confirm the input files used by the demo.
-- [2) Stage a run directory](#2-stage-a-run-directory) - copy inputs and rewrite paths.
+- [1b) (Optional) Rebuild inputs from Cruncher](#1b-optional-rebuild-inputs-from-cruncher) - cross-tool flow.
+- [2) Stage a workspace](#2-stage-a-workspace) - copy inputs and rewrite paths.
 - [3) Validate config](#3-validate-config) - schema and sanity checks.
 - [4) Plan constraints](#4-plan-constraints) - see resolved quotas and constraint buckets.
 - [5) Describe the resolved run](#5-describe-the-resolved-run) - verify inputs, outputs, solver.
 - [6) Run generation](#6-run-generation) - produce sequences and metadata.
 - [7) Summarize the run](#7-summarize-the-run) - review run-level counts.
-- [8) Inspect outputs](#8-inspect-outputs) - list Parquet artifacts.
-- [9) Plot analysis](#9-plot-analysis) - render tf_usage and tf_coverage.
+- [8) Audit report](#8-audit-report) - build offered-vs-used tables.
+- [9) Inspect outputs](#9-inspect-outputs) - list Parquet artifacts.
+- [10) Plot analysis](#10-plot-analysis) - render tf_usage and tf_coverage.
 - [Appendix (optional)](#appendix-optional) - PWM sampling + USR output.
 
 ## 0) Prereqs
@@ -37,25 +39,47 @@ Pick any writable scratch path; the example outputs below match this path.
 
 ## 1) Inspect demo inputs
 
-The canonical demo inputs live here:
+The canonical demo inputs live in the DenseGen demo folder (copied from the Cruncher
+basic demo so the run is self‑contained). They are merged into one TF pool via
+`pwm_meme_set`:
 
 ```
-src/dnadesign/densegen/runs/demo/inputs/tf2tfbs_mapping_cpxR_LexA.csv
-src/dnadesign/densegen/runs/demo/inputs/pwm_demo.jaspar
-src/dnadesign/densegen/runs/demo/inputs/pwm_demo.meme
-src/dnadesign/densegen/runs/demo/inputs/pwm_matrix_demo.csv
+src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/lexA.txt
+src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/cpxR.txt
 ```
 
-The demo uses the binding sites CSV by default.
+These are MEME files parsed with Cruncher’s MEME parser (DenseGen reuses the same parsing
+logic for DRY). The demo uses LexA + CpxR motifs and exercises PWM sampling bounds.
 
-## 2) Stage a run directory
+### 1b) (Optional) Rebuild inputs from Cruncher
 
-Stage a self-contained run directory from the demo template (this copies inputs and rewrites
+If you want to see the cross‑tool flow (DAP‑seq/RegulonDB → MEME → DenseGen), regenerate
+inputs from the Cruncher demo workspace:
+
+```bash
+CRUNCHER_CFG=src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml
+
+# Fetch cached sites + motifs (local MEME demo source)
+uv run cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CRUNCHER_CFG"
+uv run cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR --update -c "$CRUNCHER_CFG"
+uv run cruncher lock -c "$CRUNCHER_CFG"
+
+# Export DenseGen inputs
+uv run cruncher catalog export-sites --set 1 --out /tmp/densegen_sites.csv -c "$CRUNCHER_CFG"
+uv run cruncher catalog export-densegen --set 1 --out /tmp/densegen_pwms -c "$CRUNCHER_CFG"
+```
+
+Then point DenseGen `inputs` to `/tmp/densegen_sites.csv` (binding‑sites mode) or to the
+artifact directory `/tmp/densegen_pwms` (PWM artifact mode).
+
+## 2) Stage a workspace
+
+Stage a self-contained workspace from the demo template (this copies inputs and rewrites
 paths):
 
 ```bash
 uv run dense stage --id demo_press --root "$RUN_ROOT" \
-  --template src/dnadesign/densegen/runs/demo/config.yaml \
+  --template src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml \
   --copy-inputs
 ```
 
@@ -89,13 +113,13 @@ Example output:
 ┏━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ name ┃ quota ┃ has promoter_constraints ┃
 ┡━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ demo │ 5     │ yes                      │
+│ meme_demo │ 6 │ no                       │
 └──────┴───────┴──────────────────────────┘
 ```
 
 ## 5) Describe the resolved run
 
-This step shows the resolved inputs, outputs, and the dense-arrays solver selection.
+This step shows the resolved inputs, outputs, solver selection, and the two-stage sampling knobs.
 
 ```bash
 uv run dense describe -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
@@ -106,16 +130,20 @@ Example output (abridged):
 ```text
 Config: /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
 Run: id=demo_press root=/private/tmp/densegen-demo-20260115-1405/demo_press
-┏━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ name ┃ type          ┃ source                                                                                   ┃
-┡━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ demo │ binding_sites │ /private/tmp/densegen-demo-20260115-1405/demo_press/inputs/tf2tfbs_mapping_cpxR_LexA.csv │
-└──────┴───────────────┴──────────────────────────────────────────────────────────────────────────────────────────┘
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ name           ┃ type          ┃ source                                                       ┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ lexA_cpxR_meme │ pwm_meme_set  │ 2 files (/private/tmp/densegen-demo-20260115-1405/demo_press… │
+└────────────────┴───────────────┴──────────────────────────────────────────────────────────────┘
 ┏━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
 ┃ backend ┃ strategy ┃ options ┃ strands ┃
 ┡━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
 │ CBC     │ iterate  │ 0       │ double  │
 └─────────┴──────────┴─────────┴─────────┘
+Input-stage PWM sampling
+... (PWM sampling settings + candidate caps shown here)
+Solver-stage library sampling
+...
 ```
 
 ## 6) Run generation
@@ -128,9 +156,10 @@ Example output (abridged):
 
 ```text
 2026-01-15 14:02:02 | INFO | dnadesign.densegen.src.utils.logging_utils | Logging initialized (level=INFO)
-Quota plan: demo=5
+Quota plan: meme_demo=6
 2026-01-15 14:02:02 | INFO | dnadesign.densegen.src.adapters.optimizer.dense_arrays | Solver selected: CBC
 2026-01-15 14:02:05 | INFO | dnadesign.densegen.src.core.pipeline | [demo/demo] 5/5 (100.00%) (local 5/5) CR=1.050 | seq ATTGACAGTAAACCTGCGGGAAATATAATTTACTCCGTATTTGCACATGGTTATCCACAG
+2026-01-15 14:02:05 | INFO | dnadesign.densegen.src.core.pipeline | Inputs manifest written: /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/meta/inputs_manifest.json
 🎉 Run complete.
 ```
 
@@ -139,7 +168,8 @@ not indicate a DenseGen failure.
 
 ## 7) Summarize the run
 
-DenseGen writes a `run_manifest.json` in the run root. Summarize it:
+DenseGen writes `outputs/meta/run_manifest.json` and `outputs/meta/inputs_manifest.json`. Summarize the
+run manifest:
 
 ```bash
 uv run dense summarize --run /private/tmp/densegen-demo-20260115-1405/demo_press
@@ -148,25 +178,40 @@ uv run dense summarize --run /private/tmp/densegen-demo-20260115-1405/demo_press
 Example output:
 
 ```text
-Run: demo_press  Root: /private/tmp/densegen-demo-20260115-1405/demo_press  Schema: 2.1  dense-arrays: <version> (<source>)
-┏━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┓
-┃ input ┃ plan ┃ generated ┃ duplica… ┃ failed ┃ resamples ┃ librari… ┃ stalls ┃
-┡━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━┩
-│ demo  │ demo │ 5         │ 0        │ 0      │ 0         │ 1        │ 0      │
-└───────┴──────┴───────────┴──────────┴────────┴───────────┴──────────┴────────┘
+Run: demo_press  Root: /private/tmp/densegen-demo-20260115-1405/demo_press  Schema: 2.3  dense-arrays: <version> (<source>)
+┏━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┓
+┃ input        ┃ plan ┃ generated ┃ duplica… ┃ failed ┃ resamples ┃ librari… ┃ stalls ┃
+┡━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━┩
+│ lexA_cpxR_meme │ meme_demo │ 6   │ 0        │ 0      │ 0         │ 3        │ 0      │
+└──────────────┴──────┴───────────┴──────────┴────────┴───────────┴──────────┴────────┘
 ```
 
 Use `--verbose` for constraint-failure breakdowns and duplicate-solution counts.
+Use `--library` to print offered-vs-used summaries for quick debugging:
 
-If any solutions are rejected, DenseGen writes them to `rejections/part-*.parquet` in the run
-root.
+```bash
+uv run dense summarize --run /private/tmp/densegen-demo-20260115-1405/demo_press --library
+```
 
-## 8) Inspect outputs
+If any solutions are rejected, DenseGen writes them to
+`outputs/attempts.parquet` in the run root.
+
+## 8) Audit report
+
+Generate an audit-grade summary of the run:
+
+```bash
+uv run dense report -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
+```
+
+This writes `outputs/report.json` and `outputs/report.md`.
+
+## 9) Inspect outputs
 
 List the generated Parquet artifacts:
 
 ```bash
-ls /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/parquet
+ls /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/dense_arrays.parquet
 ```
 
 Example output:
@@ -176,7 +221,19 @@ _densegen_ids.sqlite
 part-10ca57ae0c1d410d8b88206d194a2ff1.parquet
 ```
 
-## 9) Plot analysis
+Inspect the library manifests:
+
+```bash
+ls /private/tmp/densegen-demo-20260115-1405/demo_press/outputs
+```
+
+Example output:
+
+```text
+attempts.parquet
+```
+
+## 10) Plot analysis
 
 First, list the available plots:
 
@@ -195,27 +252,30 @@ Example output:
 │ gap_fill_gc         │ GC content target vs actual for gap-fill pads.       │
 │ plan_counts         │ Plan counts over time by promoter constraint bucket. │
 │ tf_coverage         │ Per-base TFBS coverage across sequences.             │
+│ tfbs_positional_frequency │ TFBS positional frequency (line plot).        │
+│ diversity_health    │ Diversity health over time (coverage + entropy).      │
 │ tfbs_length_density │ TFBS length distribution (histogram/KDE).            │
 │ tfbs_usage          │ TFBS usage by TF, ranked by occurrences.             │
 └─────────────────────┴──────────────────────────────────────────────────────┘
 ```
 
-Then render two plots:
+Then render three plots:
 
 ```bash
-uv run dense plot -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --only tf_usage,tf_coverage
+uv run dense plot -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --only tf_usage,tf_coverage,tfbs_positional_frequency,diversity_health
 ```
 
 Example output (abridged):
 
 ```text
-DenseGen plotting • source: parquet:/private/tmp/densegen-demo-20260115-1405/demo_press/outputs/parquet • rows: 5
-Output: /private/tmp/densegen-demo-20260115-1405/demo_press/plots
+DenseGen plotting • source: parquet:/private/tmp/densegen-demo-20260115-1405/demo_press/outputs/dense_arrays.parquet • rows: 5
+Output: /private/tmp/densegen-demo-20260115-1405/demo_press/outputs
 ┏━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
 ┃ plot        ┃ saved to                                                                  ┃ status ┃
 ┡━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
-│ tf_usage    │ /private/tmp/densegen-demo-20260115-1405/demo_press/plots/tf_usage.pdf    │ ok     │
-│ tf_coverage │ /private/tmp/densegen-demo-20260115-1405/demo_press/plots/tf_coverage.pdf │ ok     │
+│ tf_usage    │ /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/tf_usage.png    │ ok     │
+│ tf_coverage │ /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/tf_coverage.png │ ok     │
+│ diversity_health │ /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/diversity_health.png │ ok │
 └─────────────┴───────────────────────────────────────────────────────────────────────────┴────────┘
 📊 Plots written.
 ```
@@ -229,29 +289,30 @@ export MPLCONFIGDIR=/tmp/matplotlib
 List the generated plots:
 
 ```bash
-ls /private/tmp/densegen-demo-20260115-1405/demo_press/plots
+ls /private/tmp/densegen-demo-20260115-1405/demo_press/outputs
 ```
 
 Example output:
 
 ```text
-tf_coverage.pdf
-tf_usage.pdf
+tf_coverage.png
+tf_usage.png
 ```
 
 ## Appendix (optional)
 
 ### PWM sampling input
 
-DenseGen can sample binding sites directly from PWM files. The example below uses a
+DenseGen can sample binding sites directly from PWM files. The example below uses the
+LexA MEME motif (copied from the Cruncher demo so it is self-contained) and a
 low-percentile (background-like) sampling strategy:
 
 ```yaml
 inputs:
-  - name: pwm_demo
-    type: pwm_jaspar
-    path: inputs/pwm_demo.jaspar
-    motif_ids: [DemoTF]
+  - name: lexA_meme
+    type: pwm_meme
+    path: inputs/lexA.txt
+    motif_ids: [lexA]
     sampling:
       strategy: background
       n_sites: 200
@@ -259,7 +320,7 @@ inputs:
       score_percentile: 10
 ```
 
-Swap `type` and `path` to `pwm_meme` or `pwm_matrix_csv` with the same `sampling` block.
+Swap `type` and `path` to `pwm_jaspar` or `pwm_matrix_csv` with the same `sampling` block.
 
 ### Add USR output
 
@@ -276,7 +337,7 @@ output:
     root: /path/to/usr/datasets
     allow_overwrite: false
   parquet:
-    path: outputs/parquet
+    path: outputs/dense_arrays.parquet
     deduplicate: true
 ```
 

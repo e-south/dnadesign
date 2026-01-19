@@ -69,8 +69,14 @@ class PWMMatrixCSVDataSource(BaseDataSource):
         strategy = str(sampling.get("strategy", "stochastic"))
         n_sites = int(sampling.get("n_sites"))
         oversample_factor = int(sampling.get("oversample_factor", 10))
+        max_candidates = sampling.get("max_candidates")
+        max_seconds = sampling.get("max_seconds")
         threshold = sampling.get("score_threshold")
         percentile = sampling.get("score_percentile")
+        length_policy = str(sampling.get("length_policy", "exact"))
+        length_range = sampling.get("length_range")
+        trim_window_length = sampling.get("trim_window_length")
+        trim_window_strategy = sampling.get("trim_window_strategy", "max_info")
 
         selected = sample_pwm_sites(
             rng,
@@ -78,10 +84,18 @@ class PWMMatrixCSVDataSource(BaseDataSource):
             strategy=strategy,
             n_sites=n_sites,
             oversample_factor=oversample_factor,
+            max_candidates=max_candidates,
+            max_seconds=max_seconds,
             score_threshold=threshold,
             score_percentile=percentile,
+            length_policy=length_policy,
+            length_range=length_range,
+            trim_window_length=trim_window_length,
+            trim_window_strategy=str(trim_window_strategy),
         )
 
         entries = [(motif.motif_id, seq, str(csv_path)) for seq in selected]
-        df_out = pd.DataFrame({"tf": [motif.motif_id] * len(selected), "tfbs": selected})
+        df_out = pd.DataFrame(
+            {"tf": [motif.motif_id] * len(selected), "tfbs": selected, "source": [str(csv_path)] * len(selected)}
+        )
         return entries, df_out

@@ -40,7 +40,24 @@ def _construct_mapping(loader, node, deep: bool = False):
 _StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
 
 
-SUPPORTED_SCHEMA_VERSIONS = {"2.1"}
+LATEST_SCHEMA_VERSION = "2.3"
+SUPPORTED_SCHEMA_VERSIONS = {"2.1", "2.2", LATEST_SCHEMA_VERSION}
+
+
+def parse_schema_version(value: str) -> tuple[int, int]:
+    parts = str(value).strip().split(".")
+    if len(parts) != 2:
+        raise ValueError(f"Invalid schema_version format: {value!r}")
+    try:
+        major = int(parts[0])
+        minor = int(parts[1])
+    except Exception as exc:
+        raise ValueError(f"Invalid schema_version format: {value!r}") from exc
+    return major, minor
+
+
+def schema_version_at_least(value: str, *, major: int, minor: int) -> bool:
+    return parse_schema_version(value) >= (major, minor)
 
 
 class ConfigError(ValueError):
@@ -122,7 +139,7 @@ class BindingSitesInput(BaseModel):
     name: str
     type: Literal["binding_sites"]
     path: str
-    format: Optional[Literal["csv", "parquet"]] = None
+    format: Optional[Literal["csv", "parquet", "xlsx"]] = None
     columns: BindingSitesColumns = Field(default_factory=BindingSitesColumns)
 
 
@@ -140,8 +157,14 @@ class PWMSamplingConfig(BaseModel):
     strategy: Literal["consensus", "stochastic", "background"] = "stochastic"
     n_sites: int
     oversample_factor: int = 10
+    max_candidates: Optional[int] = 100000
+    max_seconds: Optional[float] = None
     score_threshold: Optional[float] = None
     score_percentile: Optional[float] = None
+    length_policy: Literal["exact", "range"] = "exact"
+    length_range: Optional[tuple[int, int]] = None
+    trim_window_length: Optional[int] = None
+    trim_window_strategy: Literal["max_info"] = "max_info"
 
     @field_validator("n_sites")
     @classmethod
@@ -157,6 +180,45 @@ class PWMSamplingConfig(BaseModel):
             raise ValueError("pwm.sampling.oversample_factor must be > 0")
         return v
 
+    @field_validator("max_candidates")
+    @classmethod
+    def _max_candidates_ok(cls, v: Optional[int]):
+        if v is not None and v <= 0:
+            raise ValueError("pwm.sampling.max_candidates must be > 0 when set")
+        return v
+
+    @field_validator("max_seconds")
+    @classmethod
+    def _max_seconds_ok(cls, v: Optional[float]):
+        if v is None:
+            return v
+        if not isinstance(v, (int, float)) or float(v) <= 0:
+            raise ValueError("pwm.sampling.max_seconds must be > 0 when set")
+        return float(v)
+
+    @field_validator("length_range")
+    @classmethod
+    def _length_range_ok(cls, v: Optional[tuple[int, int]]):
+        if v is None:
+            return v
+        if len(v) != 2:
+            raise ValueError("pwm.sampling.length_range must be a 2-tuple (min, max)")
+        lo, hi = v
+        if lo <= 0 or hi <= 0:
+            raise ValueError("pwm.sampling.length_range values must be > 0")
+        if lo > hi:
+            raise ValueError("pwm.sampling.length_range must be min <= max")
+        return v
+
+    @field_validator("trim_window_length")
+    @classmethod
+    def _trim_length_ok(cls, v: Optional[int]):
+        if v is None:
+            return v
+        if not isinstance(v, int) or v <= 0:
+            raise ValueError("pwm.sampling.trim_window_length must be a positive integer")
+        return v
+
     @model_validator(mode="after")
     def _score_mode(self):
         has_thresh = self.score_threshold is not None
@@ -168,6 +230,10 @@ class PWMSamplingConfig(BaseModel):
         if self.score_percentile is not None:
             if not (0.0 < float(self.score_percentile) < 100.0):
                 raise ValueError("pwm.sampling.score_percentile must be between 0 and 100")
+        if self.length_policy == "exact" and self.length_range is not None:
+            raise ValueError("pwm.sampling.length_range is not allowed when length_policy=exact")
+        if self.length_policy == "range" and self.length_range is None:
+            raise ValueError("pwm.sampling.length_range is required when length_policy=range")
         return self
 
 
@@ -191,6 +257,43 @@ class PWMMemeInput(BaseModel):
             cleaned.append(m.strip())
         if len(set(cleaned)) != len(cleaned):
             raise ValueError("pwm.motif_ids must be unique")
+        return cleaned
+
+
+class PWMMemeSetInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    type: Literal["pwm_meme_set"]
+    paths: List[str]
+    motif_ids: Optional[List[str]] = None
+    sampling: PWMSamplingConfig
+
+    @field_validator("paths")
+    @classmethod
+    def _paths_ok(cls, v: List[str]):
+        if not v:
+            raise ValueError("pwm_meme_set.paths must be a non-empty list")
+        cleaned = []
+        for path in v:
+            if not isinstance(path, str) or not path.strip():
+                raise ValueError("pwm_meme_set.paths must contain non-empty strings")
+            cleaned.append(path.strip())
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("pwm_meme_set.paths must be unique")
+        return cleaned
+
+    @field_validator("motif_ids")
+    @classmethod
+    def _motif_ids_ok(cls, v: Optional[List[str]]):
+        if v is None:
+            return v
+        cleaned = []
+        for m in v:
+            if not isinstance(m, str) or not m.strip():
+                raise ValueError("pwm_meme_set.motif_ids must contain non-empty strings")
+            cleaned.append(m.strip())
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("pwm_meme_set.motif_ids must be unique")
         return cleaned
 
 
@@ -251,13 +354,60 @@ class USRSequencesInput(BaseModel):
     limit: Optional[int] = None
 
 
+class PWMArtifactInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    type: Literal["pwm_artifact"]
+    path: str
+    sampling: PWMSamplingConfig
+
+
+class PWMArtifactSetInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    type: Literal["pwm_artifact_set"]
+    paths: List[str]
+    sampling: PWMSamplingConfig
+    overrides_by_motif_id: Dict[str, PWMSamplingConfig] = Field(default_factory=dict)
+
+    @field_validator("paths")
+    @classmethod
+    def _paths_ok(cls, v: List[str]):
+        if not v:
+            raise ValueError("pwm_artifact_set.paths must be a non-empty list")
+        cleaned = []
+        for path in v:
+            if not isinstance(path, str) or not path.strip():
+                raise ValueError("pwm_artifact_set.paths must contain non-empty strings")
+            cleaned.append(path.strip())
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("pwm_artifact_set.paths must be unique")
+        return cleaned
+
+    @field_validator("overrides_by_motif_id")
+    @classmethod
+    def _overrides_ok(cls, v: Dict[str, PWMSamplingConfig]):
+        cleaned: Dict[str, PWMSamplingConfig] = {}
+        for key, val in (v or {}).items():
+            name = str(key).strip()
+            if not name:
+                raise ValueError("pwm_artifact_set.overrides_by_motif_id keys must be non-empty strings")
+            if name in cleaned:
+                raise ValueError("pwm_artifact_set.overrides_by_motif_id keys must be unique")
+            cleaned[name] = val
+        return cleaned
+
+
 InputConfig = Annotated[
     Union[
         BindingSitesInput,
         SequenceLibraryInput,
         PWMMemeInput,
+        PWMMemeSetInput,
         PWMJasparInput,
         PWMMatrixCSVInput,
+        PWMArtifactInput,
+        PWMArtifactSetInput,
         USRSequencesInput,
     ],
     Field(discriminator="type"),
@@ -397,12 +547,32 @@ class PlanItem(BaseModel):
             raise ValueError("Plan item fraction must be > 0")
         return self
 
+    @model_validator(mode="after")
+    def _required_regulator_k_ok(self):
+        if self.min_required_regulators is not None and self.required_regulators:
+            if int(self.min_required_regulators) > len(self.required_regulators):
+                raise ValueError(
+                    "min_required_regulators cannot exceed required_regulators size "
+                    f"({self.min_required_regulators} > {len(self.required_regulators)})."
+                )
+        return self
+
 
 class SamplingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     pool_strategy: Literal["full", "subsample", "iterative_subsample"] = "subsample"
     library_size: int = 16
     subsample_over_length_budget_by: int = 30
+    library_sampling_strategy: Literal[
+        "tf_balanced",
+        "uniform_over_pairs",
+        "coverage_weighted",
+    ] = "tf_balanced"
+    coverage_boost_alpha: float = 0.15
+    coverage_boost_power: float = 1.0
+    avoid_failed_motifs: bool = False
+    failure_penalty_alpha: float = 0.5
+    failure_penalty_power: float = 1.0
     cover_all_regulators: bool = True
     unique_binding_sites: bool = True
     max_sites_per_regulator: Optional[int] = None
@@ -437,6 +607,15 @@ class SamplingConfig(BaseModel):
     def _iter_min_new_ok(cls, v: int):
         if v < 0:
             raise ValueError("iterative_min_new_solutions must be >= 0")
+        return v
+
+    @field_validator("coverage_boost_alpha", "coverage_boost_power", "failure_penalty_alpha", "failure_penalty_power")
+    @classmethod
+    def _coverage_boost_ok(cls, v: float, info):
+        if v < 0:
+            raise ValueError(f"{info.field_name} must be >= 0")
+        if info.field_name in {"coverage_boost_power", "failure_penalty_power"} and v == 0:
+            raise ValueError(f"{info.field_name} must be > 0")
         return v
 
     @model_validator(mode="after")
@@ -553,6 +732,15 @@ class OutputParquetConfig(BaseModel):
     deduplicate: bool = True
     chunk_size: int = 2048
 
+    @field_validator("path")
+    @classmethod
+    def _path_is_file(cls, v: str):
+        if not v or not str(v).strip():
+            raise ValueError("output.parquet.path must be a non-empty string")
+        if not str(v).endswith(".parquet"):
+            raise ValueError("output.parquet.path must point to a .parquet file")
+        return v
+
     @field_validator("chunk_size")
     @classmethod
     def _chunk_size_ok(cls, v: int):
@@ -620,6 +808,8 @@ class RuntimeConfig(BaseModel):
     max_total_resamples: int = 500
     max_seconds_per_plan: int = 0
     max_failed_solutions: int = 0
+    leaderboard_every: int = 50
+    checkpoint_every: int = 50
     random_seed: int = 1337
 
     @field_validator(
@@ -632,6 +822,8 @@ class RuntimeConfig(BaseModel):
         "max_total_resamples",
         "max_seconds_per_plan",
         "max_failed_solutions",
+        "leaderboard_every",
+        "checkpoint_every",
     )
     @classmethod
     def _non_negative(cls, v: int, info):
@@ -703,7 +895,8 @@ class LoggingConfig(BaseModel):
 # ---- Plots ----
 class PlotConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    out_dir: str = "plots"
+    out_dir: str = "outputs"
+    format: Literal["png", "pdf", "svg"] = "png"
     source: Optional[Literal["usr", "parquet"]] = None
     default: List[str] = Field(default_factory=list)
     options: Dict[str, Dict[str, Any]] = Field(default_factory=dict)

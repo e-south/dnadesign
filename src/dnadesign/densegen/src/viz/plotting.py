@@ -10,6 +10,7 @@ Plots:
 - plan_counts               : stacked by day with UP-DN label
 - tf_coverage               : 1-nt bars, solid edges, tunable palette/edges
 - tfbs_length_density       : KDEs filled by default
+- tfbs_positional_frequency : line plot of TFBS positional frequency
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -18,6 +19,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Dict, Iterable, Optional
 
@@ -269,7 +271,7 @@ def _plan_to_pair_label_map(cfg: dict) -> dict[str, str]:
 
 
 def _ensure_out_dir(plots_cfg, cfg_path: Path, run_root: Path) -> Path:
-    out_dir = plots_cfg.out_dir if plots_cfg else "plots"
+    out_dir = plots_cfg.out_dir if plots_cfg else "outputs"
     out = resolve_run_scoped_path(cfg_path, run_root, out_dir, label="plots.out_dir")
     out.mkdir(parents=True, exist_ok=True)
     return out
@@ -751,10 +753,29 @@ def _kde_gaussian(x: np.ndarray, grid: np.ndarray, bandwidth: Optional[float] = 
     return dens.sum(axis=1) / (n * bandwidth)
 
 
+def _ensure_list(val) -> list:
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return []
+    if isinstance(val, str):
+        s = val.strip()
+        if (s.startswith("[") and s.endswith("]")) or (s.startswith("{") and s.endswith("}")):
+            try:
+                parsed = json.loads(s)
+                if isinstance(parsed, list):
+                    return list(parsed)
+            except Exception:
+                return []
+        return []
+    if isinstance(val, (list, tuple, np.ndarray)):
+        return list(val)
+    return []
+
+
 def plot_tfbs_length_density(
     df: pd.DataFrame,
     out_path: Path,
     *,
+    attempts_df: Optional[pd.DataFrame] = None,
     bins: int | str = "auto",
     kde: bool = True,
     kde_bandwidth: Optional[float] = None,
@@ -764,15 +785,27 @@ def plot_tfbs_length_density(
     promoter_site_motifs: Optional[Dict[str, set[str]]] = None,  # optional explicit overlay sets
     style: Optional[dict] = None,
 ) -> None:
-    det_col = _dg("used_tfbs_detail")
     by_tf: Dict[str, list[int]] = {}
-    for row in df[det_col].dropna():
-        for d in _ensure_list_of_dicts(row):
-            tf = str(d.get("tf") or "").strip()
-            tfbs = str(d.get("tfbs") or "")
-            if tf and tfbs:
-                by_tf.setdefault(tf, []).append(len(tfbs))
-
+    if attempts_df is None or attempts_df.empty:
+        raise ValueError(
+            "outputs/attempts.parquet is required for tfbs_length_density. "
+            "Run `dense run -c <config.yaml>` to generate attempts."
+        )
+    if attempts_df is not None and not attempts_df.empty:
+        seen_libs: set[tuple[str, int]] = set()
+        for _, row in attempts_df.iterrows():
+            lib_hash = str(row.get("sampling_library_hash") or "")
+            lib_idx = int(row.get("sampling_library_index") or 0)
+            key = (lib_hash, lib_idx)
+            if key in seen_libs:
+                continue
+            seen_libs.add(key)
+            tfbs_list = _ensure_list(row.get("library_tfbs"))
+            tf_list = _ensure_list(row.get("library_tfs"))
+            for idx, tfbs in enumerate(tfbs_list):
+                tf = str(tf_list[idx]) if idx < len(tf_list) else ""
+                if tf and tfbs:
+                    by_tf.setdefault(tf, []).append(len(str(tfbs)))
     # Optional: if explicit promoter_site_motifs provided, include their motif lengths
     if include_promoter_sites and promoter_site_motifs:
         for label, motif_set in (promoter_site_motifs or {}).items():
@@ -823,7 +856,81 @@ def plot_tfbs_length_density(
             )
     ax.set_xlabel("Motif length (nt)")
     ax.set_ylabel("Density")
-    ax.set_title("Length of fetched motifs")
+    ax.set_title("Library TFBS length distribution")
+    ax.legend(loc="best", frameon=bool(style.get("legend_frame", False)))
+    _apply_style(ax, style)
+    fig.tight_layout()
+    fig.savefig(out_path)
+    plt.close(fig)
+
+
+def plot_tfbs_positional_frequency(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    top_k: int = 10,
+    normalize: bool = True,
+    include_promoter_sites: bool = True,
+    cfg: Optional[dict] = None,
+    style: Optional[dict] = None,
+) -> None:
+    det_col = _dg("used_tfbs_detail")
+    if "length" in df.columns:
+        L = int(pd.to_numeric(df["length"], errors="coerce").dropna().max())
+    elif _dg("sequence_length") in df.columns:
+        L = int(pd.to_numeric(df[_dg("sequence_length")], errors="coerce").dropna().max())
+    elif "sequence" in df.columns:
+        L = int(df["sequence"].astype(str).map(len).max())
+    else:
+        raise ValueError("Cannot infer sequence length for tfbs_positional_frequency.")
+    details = df[det_col].dropna()
+    coverages: Dict[str, np.ndarray] = {}
+    n_seqs = len(details)
+    for row in details:
+        for d in _ensure_list_of_dicts(row):
+            tf = str(d.get("tf") or "").strip()
+            tfbs = str(d.get("tfbs") or "")
+            if not tf or not tfbs:
+                continue
+            start = int(float(d.get("offset", 0)))
+            span = len(tfbs)
+            if span <= 0:
+                continue
+            start = max(0, min(start, L))
+            end = min(L, start + span)
+            if end <= start:
+                continue
+            coverages.setdefault(tf, np.zeros(L, dtype=float))[start:end] += 1.0
+
+    if include_promoter_sites:
+        if cfg is None:
+            raise ValueError("tfbs_positional_frequency(include_promoter_sites=True) requires cfg.")
+        if "sequence" not in df.columns:
+            raise ValueError("tfbs_positional_frequency(include_promoter_sites=True) requires 'sequence'.")
+        seqs = df["sequence"].astype(str).tolist()
+        prom = _extract_promoter_site_motifs_from_cfg(cfg)
+        for label, motif_set in prom.items():
+            if motif_set:
+                arr = _scan_motif_coverage_top_strand(seqs, motif_set, L)
+                coverages[label] = coverages.get(label, np.zeros(L, dtype=float)) + arr
+        n_seqs = max(n_seqs, len(seqs))
+
+    if not coverages:
+        raise ValueError("No positional TFBS coverage available.")
+
+    order = sorted(coverages.items(), key=lambda kv: kv[1].sum(), reverse=True)[: max(1, int(top_k))]
+    style = _style(style)
+    fig, ax = _fig_ax(style)
+    colors = _palette(style, len(order))
+    xs = np.arange(L)
+    for (tf, arr), color in zip(order, colors):
+        y = arr.astype(float)
+        if normalize and n_seqs > 0:
+            y = y / float(n_seqs)
+        ax.plot(xs, y, linewidth=2.0, label=tf, color=color)
+    ax.set_xlabel("Position (nt)")
+    ax.set_ylabel("Frequency" + (" (normalized)" if normalize else ""))
+    ax.set_title("TFBS positional frequency")
     ax.legend(loc="best", frameon=bool(style.get("legend_frame", False)))
     _apply_style(ax, style)
     fig.tight_layout()
@@ -962,6 +1069,107 @@ def plot_tfbs_usage(
     plt.close(fig)
 
 
+def _normalized_entropy(counts: dict[str, int]) -> float:
+    total = float(sum(counts.values()))
+    if total <= 0 or len(counts) <= 1:
+        return 0.0
+    ent = 0.0
+    for val in counts.values():
+        p = float(val) / total
+        if p <= 0:
+            continue
+        ent -= p * np.log(p)
+    return float(ent / np.log(len(counts)))
+
+
+def plot_diversity_health(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    created_at_col: Optional[str] = None,
+    normalize: bool = True,
+    show_unique_tfs: bool = True,
+    show_unique_tfbs: bool = True,
+    show_entropy: bool = True,
+    style: Optional[dict] = None,
+) -> None:
+    det_col = _dg("used_tfbs_detail")
+    if det_col not in df.columns:
+        raise ValueError("diversity_health requires used_tfbs_detail.")
+    created_col = created_at_col or _dg("created_at")
+    ordered = df
+    if created_col in df.columns:
+        ordered = df.sort_values(created_col, kind="mergesort")
+
+    counts_tf: dict[str, int] = {}
+    counts_tfbs: dict[str, int] = {}
+    uniq_tf: list[float] = []
+    uniq_tfbs: list[float] = []
+    entropy: list[float] = []
+
+    def _is_missing(value) -> bool:
+        if value is None:
+            return True
+        if isinstance(value, float):
+            return bool(np.isnan(value))
+        return False
+
+    for row in ordered[det_col]:
+        if _is_missing(row):
+            continue
+        for entry in _ensure_list_of_dicts(row):
+            tf = str(entry.get("tf") or "").strip()
+            tfbs = str(entry.get("tfbs") or "").strip()
+            if tf:
+                counts_tf[tf] = counts_tf.get(tf, 0) + 1
+            if tfbs:
+                counts_tfbs[tfbs] = counts_tfbs.get(tfbs, 0) + 1
+        uniq_tf.append(float(len(counts_tf)))
+        uniq_tfbs.append(float(len(counts_tfbs)))
+        entropy.append(_normalized_entropy(counts_tfbs))
+
+    if not uniq_tfbs:
+        raise ValueError("No TFBS placements found for diversity_health.")
+
+    if normalize:
+        tf_denom = max(1.0, uniq_tf[-1] if uniq_tf else 1.0)
+        tfbs_denom = max(1.0, uniq_tfbs[-1])
+        uniq_tf = [val / tf_denom for val in uniq_tf]
+        uniq_tfbs = [val / tfbs_denom for val in uniq_tfbs]
+
+    style = _style(style)
+    fig, ax = _fig_ax(style)
+    x = np.arange(1, len(uniq_tfbs) + 1)
+    colors = _palette(style, 3)
+    handles = []
+    if show_unique_tfs:
+        handles.append(ax.plot(x, uniq_tf, label="unique TFs", color=colors[0], linewidth=2)[0])
+    if show_unique_tfbs:
+        handles.append(ax.plot(x, uniq_tfbs, label="unique TFBS", color=colors[1], linewidth=2)[0])
+    ax.set_xlabel("Sequence index")
+    ax.set_ylabel("Coverage (normalized)" if normalize else "Unique count")
+    ax.set_title("Diversity health")
+
+    if show_entropy:
+        ax2 = ax.twinx()
+        handles.append(
+            ax2.plot(
+                x,
+                entropy,
+                label="TFBS entropy",
+                color=colors[2],
+                linewidth=2,
+                linestyle="--",
+            )[0]
+        )
+        ax2.set_ylabel("Normalized entropy")
+    ax.legend(handles=handles, loc="best", frameon=bool(style.get("legend_frame", False)))
+    _apply_style(ax, style)
+    fig.tight_layout()
+    fig.savefig(out_path)
+    plt.close(fig)
+
+
 AVAILABLE_PLOTS: Dict[str, Dict[str, object]] = {}
 for _name, _spec in PLOT_SPECS.items():
     _fn_name = _spec.get("fn")
@@ -999,6 +1207,19 @@ _ALLOWED_OPTIONS = {
         "edge_dark_factor",
         # 'cfg' and 'style' are injected, not read from options
     },
+    "tfbs_positional_frequency": {
+        "top_k",
+        "normalize",
+        "include_promoter_sites",
+        # 'cfg' and 'style' are injected, not read from options
+    },
+    "diversity_health": {
+        "created_at_col",
+        "normalize",
+        "show_unique_tfs",
+        "show_unique_tfbs",
+        "show_entropy",
+    },
     "tfbs_length_density": {
         "bins",
         "kde",
@@ -1019,7 +1240,7 @@ def _filter_kwargs(name: str, kwargs: dict) -> dict:
     unknown = [
         k
         for k in list(kwargs.keys())
-        if k not in allowed and k not in {"dims", "palette", "palette_no_repeat", "style"}
+        if k not in allowed and k not in {"dims", "palette", "palette_no_repeat", "style", "attempts_df"}
     ]
     if unknown:
         raise ValueError(f"Unknown options for plot '{name}': {unknown}")
@@ -1045,6 +1266,15 @@ def _plot_required_columns(selected: Iterable[str], options: Dict[str, Dict[str,
             include_promoter = bool(raw.get("include_promoter_sites", True))
             if include_promoter:
                 cols.add("sequence")
+        elif name == "tfbs_positional_frequency":
+            cols.update({_dg("used_tfbs_detail"), _dg("length"), _dg("sequence_length")})
+            include_promoter = bool(raw.get("include_promoter_sites", True))
+            if include_promoter:
+                cols.add("sequence")
+        elif name == "diversity_health":
+            cols.add(_dg("used_tfbs_detail"))
+            created_col = str(raw.get("created_at_col", _dg("created_at")))
+            cols.add(created_col)
         elif name == "tfbs_length_density":
             cols.add(_dg("used_tfbs_detail"))
         elif name == "tfbs_usage":
@@ -1056,6 +1286,7 @@ def run_plots_from_config(root_cfg: RootConfig, cfg_path: Path, *, only: Optiona
     plots_cfg = root_cfg.plots
     run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
     out_dir = _ensure_out_dir(plots_cfg, cfg_path, run_root)
+    plot_format = plots_cfg.format if plots_cfg and getattr(plots_cfg, "format", None) else "png"
     default_list = plots_cfg.default if (plots_cfg and plots_cfg.default) else list(AVAILABLE_PLOTS.keys())
     selected = [p.strip() for p in (only.split(",") if only else default_list)]
     options = plots_cfg.options if plots_cfg else {}
@@ -1093,11 +1324,17 @@ def run_plots_from_config(root_cfg: RootConfig, cfg_path: Path, *, only: Optiona
         # drop unknown/retired options (e.g., promoter_scan_revcomp)
         kwargs = _filter_kwargs(name, raw)
 
-        out_path = out_dir / f"{name}.pdf"
+        out_path = out_dir / f"{name}.{plot_format}"
         try:
             # pass cfg only to plots that need it
-            if name in {"tfbs_usage", "plan_counts", "tf_coverage"}:
+            if name in {"tfbs_usage", "plan_counts", "tf_coverage", "tfbs_positional_frequency"}:
                 fn(df, out_path, style=style, cfg=root_cfg.densegen.model_dump(), **kwargs)
+            elif name == "tfbs_length_density":
+                attempts_df = None
+                attempts_path = run_root / "outputs" / "attempts.parquet"
+                if attempts_path.exists():
+                    attempts_df = pd.read_parquet(attempts_path)
+                fn(df, out_path, style=style, attempts_df=attempts_df, **kwargs)
             else:
                 fn(df, out_path, style=style, **kwargs)
             summary.add_row(name, str(out_path), "[green]ok[/]")

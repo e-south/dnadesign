@@ -1,7 +1,7 @@
 ## Workspace layout
 
 DenseGen is most ergonomic when each run is self-contained and uses config-relative paths. That
-keeps inputs, outputs, logs, and plots together and makes runs easy to archive or move.
+keeps inputs, outputs, and logs together and makes runs easy to archive or move.
 
 ### Contents
 - [Suggested directory layout](#suggested-directory-layout) - a run-scoped structure.
@@ -14,28 +14,28 @@ keeps inputs, outputs, logs, and plots together and makes runs easy to archive o
 
 ```
 densegen/
-  runs/
-    demo/                   # canonical demo config + inputs
+  workspaces/
+    demo_meme_two_tf/        # canonical demo config + inputs
     2026-01-14_sigma70_demo/
       config.yaml
       inputs/                # optional local copies
-      outputs/
-        parquet/             # part-*.parquet
-        usr/                 # USR datasets (if used)
-      plots/
-      logs/
+      outputs/               # data parquet, reports, plots, library artifacts
+        logs/
+        meta/
     _archive/
-      legacy_run_name/       # older runs or artifacts kept out of the active list
+      legacy_run_name/       # older workspaces or artifacts kept out of the active list
 ```
 
 ---
 
 ### Why this layout
 
-- **Decoupled**: moving a run directory preserves everything needed to reproduce it.
+- **Decoupled**: moving a workspace preserves everything needed to reproduce it.
 - **No fallbacks**: all paths are explicit and resolve relative to `config.yaml`.
 - **Scalable**: large runs do not collide in shared output directories.
-- **Predictable logs**: default logs land in `logs/<run_id>.log` within the run directory.
+- **Predictable logs**: default logs land in `outputs/logs/<run_id>.log` within the workspace.
+- **Resume‑safe**: if `outputs/dense_arrays.parquet` already exists, DenseGen resumes from existing sequences
+  (only when the config hash and run_id match), so interrupted runs can continue without manual cleanup.
 
 ## Config snippet (run-scoped paths)
 
@@ -51,19 +51,19 @@ output:
     bio_type: dna
     alphabet: dna_4
   parquet:
-    path: outputs/parquet
+    path: outputs/dense_arrays.parquet
     deduplicate: true
 
 logging:
-  log_dir: logs
+  log_dir: outputs/logs
 
 plots:
-  out_dir: plots
+  out_dir: outputs
 ```
 
-When a run is complete, archive or sync the run directory as a unit.
+When a run is complete, archive or sync the workspace as a unit.
 
-Tip: use `dense stage --id <run_name>` to scaffold a new run directory. Use
-`dense summarize --root runs/_archive` to inspect archived runs.
+Tip: use `dense stage --id <run_name>` to scaffold a new workspace. Use
+`dense summarize --root workspaces/_archive` to inspect archived workspaces.
 
 @e-south

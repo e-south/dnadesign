@@ -1,0 +1,69 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from dnadesign.densegen.src.adapters.sources import PWMMemeSetDataSource
+
+
+def _meme_text(motif_id: str) -> str:
+    return f"""MEME version 4
+
+ALPHABET= ACGT
+
+Background letter frequencies
+A 0.25 C 0.25 G 0.25 T 0.25
+
+MOTIF {motif_id}
+letter-probability matrix: alength= 4 w= 3 nsites= 20 E= 0
+0.8 0.1 0.05 0.05
+0.1 0.7 0.1 0.1
+0.1 0.1 0.7 0.1
+"""
+
+
+def test_pwm_meme_set_sampling(tmp_path: Path) -> None:
+    meme_a = tmp_path / "lexA.meme"
+    meme_b = tmp_path / "cpxR.meme"
+    meme_a.write_text(_meme_text("lexA"))
+    meme_b.write_text(_meme_text("cpxR"))
+
+    ds = PWMMemeSetDataSource(
+        paths=[str(meme_a), str(meme_b)],
+        cfg_path=tmp_path / "config.yaml",
+        motif_ids=["lexA", "cpxR"],
+        sampling={
+            "strategy": "stochastic",
+            "n_sites": 3,
+            "oversample_factor": 3,
+            "score_threshold": -10.0,
+            "score_percentile": None,
+        },
+    )
+    entries, df = ds.load_data(rng=np.random.default_rng(0))
+    assert len(entries) == 6
+    assert set(df["tf"].tolist()) == {"lexA", "cpxR"}
+
+
+def test_pwm_meme_set_duplicate_motif_ids(tmp_path: Path) -> None:
+    meme_a = tmp_path / "motif_a.meme"
+    meme_b = tmp_path / "motif_b.meme"
+    meme_a.write_text(_meme_text("dup"))
+    meme_b.write_text(_meme_text("dup"))
+
+    ds = PWMMemeSetDataSource(
+        paths=[str(meme_a), str(meme_b)],
+        cfg_path=tmp_path / "config.yaml",
+        motif_ids=None,
+        sampling={
+            "strategy": "stochastic",
+            "n_sites": 1,
+            "oversample_factor": 2,
+            "score_threshold": -10.0,
+            "score_percentile": None,
+        },
+    )
+    with pytest.raises(ValueError, match="Duplicate motif_id"):
+        ds.load_data(rng=np.random.default_rng(1))

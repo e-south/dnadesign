@@ -13,6 +13,7 @@ Dunlop Lab
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Tuple
 
@@ -87,24 +88,38 @@ def load_records_from_config(
         if pq_cfg is None:
             raise ValueError("output.parquet is required when source='parquet'")
         root = resolve_run_scoped_path(cfg_path, run_root, pq_cfg.path, label="output.parquet.path")
-        if not root.exists():
-            raise FileNotFoundError(f"Parquet path does not exist: {root}")
-        if root.is_file():
-            raise ValueError(f"Parquet path must be a directory, got file: {root}")
-        if not any(root.glob("*.parquet")):
-            raise RuntimeError(f"Parquet dataset has no files: {root}")
-        import pyarrow.dataset as ds
+        if root.exists() and root.is_dir():
+            raise ValueError(f"Parquet path must be a file, got directory: {root}")
 
-        validate_parquet_schema(root, namespace=DEFAULT_NAMESPACE)
-        dataset = ds.dataset(root, format="parquet")
-        if dataset.count_rows() == 0:
-            raise RuntimeError(f"Parquet dataset has no rows: {root}")
-        if max_rows is not None:
-            tbl = dataset.head(max_rows, columns=list(columns) if columns else None)
-        else:
-            scanner = ds.Scanner.from_dataset(dataset, columns=list(columns) if columns else None)
-            tbl = scanner.to_table()
-        df = tbl.to_pandas()
-        return df, f"parquet:{root}"
+        warnings.filterwarnings("ignore", message=".*sysctlbyname.*", category=UserWarning)
+
+        if root.exists():
+            import pyarrow.parquet as pq
+
+            validate_parquet_schema(root, namespace=DEFAULT_NAMESPACE)
+            tbl = pq.read_table(root, columns=list(columns) if columns else None)
+            if tbl.num_rows == 0:
+                raise RuntimeError(f"Parquet output has no rows: {root}")
+            if max_rows is not None and tbl.num_rows > max_rows:
+                tbl = tbl.slice(0, max_rows)
+            df = tbl.to_pandas()
+            return df, f"parquet:{root}"
+
+        parts = sorted(root.parent.glob(f"{root.stem}__part-*.parquet"))
+        if parts:
+            import pyarrow.dataset as ds
+
+            dataset = ds.dataset([str(p) for p in parts], format="parquet")
+            if dataset.count_rows() == 0:
+                raise RuntimeError(f"Parquet parts have no rows: {root.parent}")
+            if max_rows is not None:
+                tbl = dataset.head(max_rows, columns=list(columns) if columns else None)
+            else:
+                scanner = ds.Scanner.from_dataset(dataset, columns=list(columns) if columns else None)
+                tbl = scanner.to_table()
+            df = tbl.to_pandas()
+            return df, f"parquet:{root} (parts)"
+
+        raise FileNotFoundError(f"Parquet output not found: {root}")
 
     raise ValueError(f"Unknown plot source: {source}")

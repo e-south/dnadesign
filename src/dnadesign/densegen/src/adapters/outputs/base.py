@@ -32,6 +32,9 @@ class SinkBase:
     def flush(self) -> None:  # pragma: no cover - abstract
         raise NotImplementedError
 
+    def finalize(self) -> None:  # pragma: no cover - default
+        self.flush()
+
     def existing_ids(self) -> set[str]:  # pragma: no cover - default
         return set()
 

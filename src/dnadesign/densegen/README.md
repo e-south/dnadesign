@@ -14,13 +14,15 @@
 
 Prerequisites include Python, dense-arrays, and a MILP solver. CBC is open-source; [GUROBI](https://www.gurobi.com/) is supported if installed and licensed.
 
-Use the canonical demo config (small, Parquet-only):
+Use the canonical demo config (small, Parquet-only). The demo uses MEME motif files
+copied from the Cruncher basic demo workspace (`inputs/local_motifs`) and parsed with
+Cruncher’s MEME parser for DRY, consistent parsing.
 
 ```bash
-uv run dense validate -c src/dnadesign/densegen/runs/demo/config.yaml
-uv run dense describe -c src/dnadesign/densegen/runs/demo/config.yaml
-uv run dense run -c src/dnadesign/densegen/runs/demo/config.yaml --no-plot
-uv run dense plot -c src/dnadesign/densegen/runs/demo/config.yaml --only tf_usage,tf_coverage
+uv run dense validate -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
+uv run dense describe -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
+uv run dense run -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --no-plot
+uv run dense plot -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --only tf_usage,tf_coverage
 ```
 
 For a full end-to-end walkthrough with expected outputs, see

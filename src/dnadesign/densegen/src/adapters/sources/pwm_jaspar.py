@@ -105,8 +105,14 @@ class PWMJasparDataSource(BaseDataSource):
         strategy = str(sampling.get("strategy", "stochastic"))
         n_sites = int(sampling.get("n_sites"))
         oversample_factor = int(sampling.get("oversample_factor", 10))
+        max_candidates = sampling.get("max_candidates")
+        max_seconds = sampling.get("max_seconds")
         threshold = sampling.get("score_threshold")
         percentile = sampling.get("score_percentile")
+        length_policy = str(sampling.get("length_policy", "exact"))
+        length_range = sampling.get("length_range")
+        trim_window_length = sampling.get("trim_window_length")
+        trim_window_strategy = sampling.get("trim_window_strategy", "max_info")
 
         entries = []
         all_rows = []
@@ -117,12 +123,18 @@ class PWMJasparDataSource(BaseDataSource):
                 strategy=strategy,
                 n_sites=n_sites,
                 oversample_factor=oversample_factor,
+                max_candidates=max_candidates,
+                max_seconds=max_seconds,
                 score_threshold=threshold,
                 score_percentile=percentile,
+                length_policy=length_policy,
+                length_range=length_range,
+                trim_window_length=trim_window_length,
+                trim_window_strategy=str(trim_window_strategy),
             )
             for seq in selected:
                 entries.append((motif.motif_id, seq, str(jaspar_path)))
-                all_rows.append({"tf": motif.motif_id, "tfbs": seq})
+                all_rows.append({"tf": motif.motif_id, "tfbs": seq, "source": str(jaspar_path)})
 
         import pandas as pd
 

@@ -33,6 +33,14 @@ PLOT_SPECS = {
         "fn": "plot_tf_coverage",
         "description": "Per-base TFBS coverage across sequences.",
     },
+    "tfbs_positional_frequency": {
+        "fn": "plot_tfbs_positional_frequency",
+        "description": "Positional frequency of TFBS placements (line plot).",
+    },
+    "diversity_health": {
+        "fn": "plot_diversity_health",
+        "description": "Diversity health over time (unique TF/TFBS coverage and entropy).",
+    },
     "tfbs_length_density": {
         "fn": "plot_tfbs_length_density",
         "description": "TFBS length distribution (histogram/KDE).",

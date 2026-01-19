@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pyarrow as pa
-import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 import pytest
 
@@ -12,7 +11,7 @@ from dnadesign.densegen.src.adapters.outputs import OutputRecord, ParquetSink
 
 def _dummy_meta() -> dict:
     return {
-        "schema_version": "2.1",
+        "schema_version": "2.3",
         "run_id": "demo",
         "run_root": ".",
         "run_config_path": "config.yaml",
@@ -51,7 +50,9 @@ def _dummy_meta() -> dict:
         "input_row_count": 0,
         "input_tf_count": 0,
         "input_tfbs_count": 0,
+        "input_tf_tfbs_pair_count": 1,
         "sampling_fraction": None,
+        "sampling_fraction_pairs": 0.5,
         "input_pwm_strategy": None,
         "input_pwm_score_threshold": None,
         "input_pwm_score_percentile": None,
@@ -71,6 +72,7 @@ def _dummy_meta() -> dict:
         "sampling_final_cap": None,
         "sampling_pool_strategy": "subsample",
         "sampling_library_size": 0,
+        "sampling_library_strategy": None,
         "sampling_iterative_max_libraries": 0,
         "sampling_iterative_min_new_solutions": 0,
         "sampling_library_index": 1,
@@ -95,13 +97,13 @@ def _dummy_meta() -> dict:
 
 
 def _count_rows(path: Path) -> int:
-    dataset = ds.dataset(path, format="parquet")
-    return dataset.count_rows()
+    table = pq.read_table(path)
+    return table.num_rows
 
 
-def test_parquet_sink_writes_dataset(tmp_path: Path) -> None:
-    out_dir = tmp_path / "pq"
-    sink = ParquetSink(path=str(out_dir), chunk_size=2)
+def test_parquet_sink_writes_file(tmp_path: Path) -> None:
+    out_file = tmp_path / "dense_arrays.parquet"
+    sink = ParquetSink(path=str(out_file), chunk_size=2)
     rec = OutputRecord.from_sequence(
         sequence="ATGC",
         meta=_dummy_meta(),
@@ -110,13 +112,13 @@ def test_parquet_sink_writes_dataset(tmp_path: Path) -> None:
         alphabet="dna_4",
     )
     assert sink.add(rec) is True
-    sink.flush()
-    assert _count_rows(out_dir) == 1
+    sink.finalize()
+    assert _count_rows(out_file) == 1
 
 
 def test_parquet_sink_deduplicates(tmp_path: Path) -> None:
-    out_dir = tmp_path / "pq"
-    sink = ParquetSink(path=str(out_dir), deduplicate=True, chunk_size=1)
+    out_file = tmp_path / "dense_arrays.parquet"
+    sink = ParquetSink(path=str(out_file), deduplicate=True, chunk_size=1)
     rec = OutputRecord.from_sequence(
         sequence="ATGC",
         meta=_dummy_meta(),
@@ -126,13 +128,13 @@ def test_parquet_sink_deduplicates(tmp_path: Path) -> None:
     )
     assert sink.add(rec) is True
     assert sink.add(rec) is False
-    sink.flush()
-    assert _count_rows(out_dir) == 1
+    sink.finalize()
+    assert _count_rows(out_file) == 1
 
 
 def test_parquet_index_created(tmp_path: Path) -> None:
-    out_dir = tmp_path / "pq"
-    sink = ParquetSink(path=str(out_dir), deduplicate=True, chunk_size=1)
+    out_file = tmp_path / "dense_arrays.parquet"
+    sink = ParquetSink(path=str(out_file), deduplicate=True, chunk_size=1)
     rec = OutputRecord.from_sequence(
         sequence="ATGC",
         meta=_dummy_meta(),
@@ -141,21 +143,21 @@ def test_parquet_index_created(tmp_path: Path) -> None:
         alphabet="dna_4",
     )
     assert sink.add(rec) is True
-    sink.flush()
-    assert (out_dir / "_densegen_ids.sqlite").exists()
+    sink.finalize()
+    assert (out_file.parent / "_densegen_ids.sqlite").exists()
     digest = sink.alignment_digest()
     assert digest is not None
     assert digest.id_count == 1
 
 
-def test_parquet_sink_rejects_file_path(tmp_path: Path) -> None:
-    file_path = tmp_path / "out.parquet"
-    file_path.write_text("not parquet")
+def test_parquet_sink_rejects_directory_path(tmp_path: Path) -> None:
+    dir_path = tmp_path / "out_dir"
+    dir_path.mkdir(parents=True, exist_ok=True)
     try:
-        ParquetSink(path=str(file_path))
+        ParquetSink(path=str(dir_path))
     except ValueError:
         return
-    raise AssertionError("Expected ValueError for file path")
+    raise AssertionError("Expected ValueError for directory path")
 
 
 def test_parquet_sink_rejects_mismatched_bio_type(tmp_path: Path) -> None:
@@ -176,8 +178,7 @@ def test_parquet_sink_rejects_mismatched_bio_type(tmp_path: Path) -> None:
 
 
 def test_parquet_schema_mismatch_rejected(tmp_path: Path) -> None:
-    out_dir = tmp_path / "pq"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_file = tmp_path / "dense_arrays.parquet"
     table = pa.table(
         {
             "id": ["x"],
@@ -187,14 +188,14 @@ def test_parquet_schema_mismatch_rejected(tmp_path: Path) -> None:
             "source": ["src"],
         }
     )
-    pq.write_table(table, out_dir / "part-000.parquet")
+    pq.write_table(table, out_file)
     with pytest.raises(RuntimeError, match="schema"):
-        ParquetSink(path=str(out_dir))
+        ParquetSink(path=str(out_file))
 
 
 def test_parquet_existing_ids_loaded_without_dedup(tmp_path: Path) -> None:
-    out_dir = tmp_path / "pq"
-    sink = ParquetSink(path=str(out_dir), deduplicate=True, chunk_size=1)
+    out_file = tmp_path / "dense_arrays.parquet"
+    sink = ParquetSink(path=str(out_file), deduplicate=True, chunk_size=1)
     rec = OutputRecord.from_sequence(
         sequence="ATGC",
         meta=_dummy_meta(),
@@ -203,8 +204,8 @@ def test_parquet_existing_ids_loaded_without_dedup(tmp_path: Path) -> None:
         alphabet="dna_4",
     )
     assert sink.add(rec) is True
-    sink.flush()
+    sink.finalize()
 
-    sink2 = ParquetSink(path=str(out_dir), deduplicate=False, chunk_size=1)
+    sink2 = ParquetSink(path=str(out_file), deduplicate=False, chunk_size=1)
     existing = sink2.existing_ids()
     assert rec.id in existing
