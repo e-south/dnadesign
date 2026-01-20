@@ -20,6 +20,14 @@ A typical workflow looks like:
 3. Generate synthetic sequences (e.g., via [MCMC](https://en.wikipedia.org/wiki/Markov_chain_Monte_Carlo)) using the locked motifs.
 4. Analyze / visualize / report from run artifacts.
 
+Scoring is **FIMO-like**: cruncher builds log-odds PWMs against a 0‑order
+background, scans each candidate sequence to find the best window per TF
+(optionally bidirectional), and can scale that best hit to a p‑value using a
+DP‑derived null distribution (`score_scale: logp`). For `logp`, the tail
+probability for the best window is converted to a sequence‑level p via
+`p_seq = 1 − (1 − p_win)^n_windows`. This is an internal implementation; cruncher
+does not call the FIMO binary.
+
 ---
 
 ### Quickstart (happy path)

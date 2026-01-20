@@ -4,6 +4,11 @@
 
 This demo walks through a process of running category-based sequence optimization campaigns, with a focus on campaign selection (site counts + PWM quality), derived configs, and multi-TF runs.
 
+Scoring is **FIMO-like** (internal implementation): cruncher uses PWM log‑odds
+scanning against a 0‑order background, takes the best window per TF (optionally
+both strands), and can convert that best hit to a p‑value via a DP‑derived null
+distribution (`score_scale: logp`, with `p_seq = 1 − (1 − p_win)^n_windows`).
+
 ### Demo instance
 
 - **Workspace**: `src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/`

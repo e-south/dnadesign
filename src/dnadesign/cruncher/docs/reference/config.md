@@ -385,6 +385,10 @@ Notes:
 - `objective.bidirectional=true` scores both strands (reverse complement) when scanning PWMs.
 - `objective.combine` controls how per-TF scores are combined (`min` for weakest-TF optimization, `sum` for sum-based).
 - `objective.allow_unscaled_llr=true` allows `score_scale=llr` in multi-TF runs (otherwise validation fails).
+- `objective.score_scale=logp` is FIMO‑like: it uses a DP‑derived null
+  distribution under a 0‑order background to compute a tail p‑value for the
+  best window, then converts to a sequence‑level p via
+  `p_seq = 1 − (1 − p_win)^n_windows` before reporting `−log10(p_seq)`.
 - `elites.min_hamming` is the Hamming-distance filter for elites (0 disables). If `output.trim.enabled=true` yields variable lengths, the distance is computed over the shared prefix plus the length difference.
 - `elites.k` controls how many sequences are retained before diversity filtering (0 = keep all).
 - `elites.dsDNA_canonicalize=true` treats reverse complements as identical when computing unique fractions and (optionally) stores `canonical_sequence` in elites.
