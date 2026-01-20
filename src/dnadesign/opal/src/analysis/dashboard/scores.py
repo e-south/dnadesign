@@ -90,7 +90,8 @@ def apply_score_overlay(
         if "opal__transient__run_id" in df.columns:
             run_id_expr = pl.col("opal__transient__run_id")
         else:
-            run_id_expr = pl.lit("notebook-transient")
+            warnings.append("Transient score source missing opal__transient__run_id; provenance unavailable.")
+            run_id_expr = pl.lit(None).cast(pl.Utf8)
     else:
         run_id_expr = pl.lit(None).cast(pl.Utf8)
 
@@ -102,7 +103,8 @@ def apply_score_overlay(
         if "opal__transient__round" in df.columns:
             round_expr = pl.col("opal__transient__round")
         else:
-            round_expr = pl.lit(selected_round)
+            warnings.append("Transient score source missing opal__transient__round; round provenance unavailable.")
+            round_expr = pl.lit(None).cast(pl.Int64)
     else:
         round_expr = pl.lit(None).cast(pl.Int64)
 

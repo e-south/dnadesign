@@ -352,10 +352,22 @@ def compute_transient_overlay(
     if effective_round is None:
         effective_round = 0
         _note("No round selection; defaulting transient overlay round to 0.")
+
+    run_id_value = run_id if use_artifact else "notebook-transient"
+    source_value = "artifact" if use_artifact else "transient"
+
+    def _with_transient_provenance(frame: pl.DataFrame) -> pl.DataFrame:
+        return frame.with_columns(
+            pl.lit(source_value).alias("opal__transient__source"),
+            pl.lit(campaign_slug).alias("opal__transient__campaign_slug"),
+            pl.lit(run_id_value).alias("opal__transient__run_id"),
+            pl.lit(effective_round).alias("opal__transient__round"),
+        )
+
     if x_col is None or x_col not in df_base.columns:
         _warn(f"Missing X column: `{x_col}`.")
         return TransientOverlayResult(
-            df_overlay=df_overlay,
+            df_overlay=_with_transient_provenance(df_overlay),
             df_pred_scored=df_pred_scored,
             diagnostics=diagnostics,
             feature_chart=feature_chart,
@@ -365,7 +377,7 @@ def compute_transient_overlay(
     if labels_asof_df.is_empty():
         _warn("No labels available for transient model training.")
         return TransientOverlayResult(
-            df_overlay=df_overlay,
+            df_overlay=_with_transient_provenance(df_overlay),
             df_pred_scored=df_pred_scored,
             diagnostics=diagnostics,
             feature_chart=feature_chart,
@@ -375,7 +387,7 @@ def compute_transient_overlay(
     if y_col is None or y_col not in labels_asof_df.columns:
         _warn(f"Missing label column `{y_col}` for training.")
         return TransientOverlayResult(
-            df_overlay=df_overlay,
+            df_overlay=_with_transient_provenance(df_overlay),
             df_pred_scored=df_pred_scored,
             diagnostics=diagnostics,
             feature_chart=feature_chart,
@@ -389,7 +401,7 @@ def compute_transient_overlay(
     if df_train.is_empty():
         _warn("No valid training labels after filtering.")
         return TransientOverlayResult(
-            df_overlay=df_overlay,
+            df_overlay=_with_transient_provenance(df_overlay),
             df_pred_scored=df_pred_scored,
             diagnostics=diagnostics,
             feature_chart=feature_chart,
@@ -405,7 +417,7 @@ def compute_transient_overlay(
     if min_len is None or max_len is None or int(min_len) != int(max_len):
         _warn("X vectors must be fixed-length for transient RF training.")
         return TransientOverlayResult(
-            df_overlay=df_overlay,
+            df_overlay=_with_transient_provenance(df_overlay),
             df_pred_scored=df_pred_scored,
             diagnostics=diagnostics,
             feature_chart=feature_chart,
@@ -419,7 +431,7 @@ def compute_transient_overlay(
     if x_train is None or y_train is None or y_train.size == 0:
         _warn("Unable to build training arrays from label data.")
         return TransientOverlayResult(
-            df_overlay=df_overlay,
+            df_overlay=_with_transient_provenance(df_overlay),
             df_pred_scored=df_pred_scored,
             diagnostics=diagnostics,
             feature_chart=feature_chart,
@@ -476,7 +488,7 @@ def compute_transient_overlay(
 
     if not model_ready:
         return TransientOverlayResult(
-            df_overlay=df_overlay,
+            df_overlay=_with_transient_provenance(df_overlay),
             df_pred_scored=df_pred_scored,
             diagnostics=diagnostics,
             feature_chart=feature_chart,
@@ -499,7 +511,7 @@ def compute_transient_overlay(
     if df_x_valid.is_empty():
         _warn("No candidate X vectors available for prediction.")
         return TransientOverlayResult(
-            df_overlay=df_overlay,
+            df_overlay=_with_transient_provenance(df_overlay),
             df_pred_scored=df_pred_scored,
             diagnostics=diagnostics,
             feature_chart=feature_chart,
@@ -525,7 +537,7 @@ def compute_transient_overlay(
     if failed_chunk or not pred_chunks:
         _warn("Unable to build feature matrix for full pool.")
         return TransientOverlayResult(
-            df_overlay=df_overlay,
+            df_overlay=_with_transient_provenance(df_overlay),
             df_pred_scored=df_pred_scored,
             diagnostics=diagnostics,
             feature_chart=feature_chart,
@@ -563,7 +575,7 @@ def compute_transient_overlay(
 
     if pred_result is None:
         return TransientOverlayResult(
-            df_overlay=df_overlay,
+            df_overlay=_with_transient_provenance(df_overlay),
             df_pred_scored=df_pred_scored,
             diagnostics=diagnostics,
             feature_chart=feature_chart,
@@ -575,7 +587,7 @@ def compute_transient_overlay(
     if df_pred_scored.is_empty():
         _warn("No valid predictions after SFXI scoring.")
         return TransientOverlayResult(
-            df_overlay=df_overlay,
+            df_overlay=_with_transient_provenance(df_overlay),
             df_pred_scored=df_pred_scored,
             diagnostics=diagnostics,
             feature_chart=feature_chart,
@@ -583,12 +595,11 @@ def compute_transient_overlay(
             hist_note=hist_note,
         )
 
-    run_id_value = run_id if use_artifact else "notebook-transient"
     df_pred_scored = df_pred_scored.with_columns(
         pl.col("logic_fidelity").alias("opal__transient__logic_fidelity").cast(pl.Float64),
         pl.col("effect_scaled").alias("opal__transient__effect_scaled").cast(pl.Float64),
         pl.col("score").alias("opal__transient__score").cast(pl.Float64),
-        pl.lit("artifact" if use_artifact else "transient").alias("opal__transient__source"),
+        pl.lit(source_value).alias("opal__transient__source"),
         pl.lit(campaign_slug).alias("opal__transient__campaign_slug"),
         pl.lit(run_id_value).alias("opal__transient__run_id"),
         pl.lit(effective_round).alias("opal__transient__round"),

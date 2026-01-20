@@ -495,6 +495,25 @@ def test_apply_score_overlay_transient_round() -> None:
     assert diag.source_key == "transient"
 
 
+def test_apply_score_overlay_transient_missing_provenance() -> None:
+    df = pl.DataFrame(
+        {
+            "id": ["a"],
+            "opal__transient__score": [0.2],
+        }
+    )
+    out, diag = scores.apply_score_overlay(
+        df,
+        score_source_value="Transient overlay (RF)",
+        campaign_slug="demo",
+        selected_round=None,
+    )
+    assert out["opal__score__run_id"].to_list() == [None]
+    assert out["opal__score__round"].to_list() == [None]
+    assert any("opal__transient__run_id" in msg for msg in diag.warnings)
+    assert any("opal__transient__round" in msg for msg in diag.warnings)
+
+
 def test_mismatch_helper(tmp_path: Path) -> None:
     ledger = pl.DataFrame(
         {
