@@ -25,7 +25,7 @@ class _DummyWorkspace:
 
 
 def test_fold_change_plot_does_not_request_setpoint_column(tmp_path, monkeypatch):
-    def _stub_load_events_with_setpoint(outputs_dir, base_columns, round_selector=None):
+    def _stub_load_events_with_setpoint(outputs_dir, base_columns, round_selector=None, run_id=None):
         assert "obj__diag__setpoint" not in base_columns
         return pd.DataFrame(
             {
@@ -45,6 +45,7 @@ def test_fold_change_plot_does_not_request_setpoint_column(tmp_path, monkeypatch
         campaign_dir=tmp_path,
         workspace=_DummyWorkspace(tmp_path),
         rounds="unspecified",
+        run_id=None,
         data_paths={},
         output_dir=tmp_path / "plots",
         filename="fold_change.png",

@@ -344,6 +344,11 @@ def cmd_plot(
         "-r",
         help="Round selector: latest | all | 3 | 1,3,7 | 2-5 (omitted = unspecified).",
     ),
+    run_id: Optional[str] = typer.Option(
+        None,
+        "--run-id",
+        help="Explicit run_id to disambiguate ledger predictions (required if multiple runs per round).",
+    ),
     name: Optional[str] = typer.Option(None, "--name", "-n", help="Run a single plot by its 'name' in the YAML."),
     tag: Optional[List[str]] = typer.Option(
         None,
@@ -642,6 +647,7 @@ def cmd_plot(
             campaign_dir=campaign_dir,
             workspace=ws,
             rounds=rounds_sel,
+            run_id=run_id,
             data_paths=data_paths,
             output_dir=Path(out_dir),
             filename=fname,

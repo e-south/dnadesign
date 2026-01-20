@@ -43,6 +43,25 @@ def test_record_show_reads_ledger_predictions_dir(tmp_path):
     )
     ev.to_parquet(pred_dir / "part-000.parquet", index=False)
 
+    # Minimal runs ledger to satisfy run_id disambiguation.
+    runs_path = workdir / "outputs" / "ledger.runs.parquet"
+    runs_path.parent.mkdir(parents=True, exist_ok=True)
+    runs = pd.DataFrame(
+        {
+            "event": ["run_meta"],
+            "run_id": ["r0-..."],
+            "as_of_round": [0],
+            "model__name": ["random_forest"],
+            "model__params": [{"n_estimators": 1}],
+            "objective__name": ["demo"],
+            "selection__name": ["top_n"],
+            "selection__params": [{"top_k": 1}],
+            "schema__version": [1],
+            "opal__version": ["dev"],
+        }
+    )
+    runs.to_parquet(runs_path, index=False)
+
     ws = CampaignWorkspace(config_path=workdir / "campaign.yaml", workdir=workdir)
     reader = LedgerReader(ws)
     report = build_record_report(rec, "demo", id_="x", ledger_reader=reader)

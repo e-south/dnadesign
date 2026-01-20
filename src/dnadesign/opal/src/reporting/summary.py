@@ -57,6 +57,8 @@ def select_run_meta(
     sel = df_runs[df_runs["as_of_round"] == int(round_sel)]
     if sel.empty:
         raise OpalError(f"No runs found for as_of_round={int(round_sel)}.")
+    if sel["run_id"].nunique() > 1:
+        raise OpalError(f"Multiple run_id values found for round {int(round_sel)}. Specify run_id to disambiguate.")
     return sel.sort_values(["run_id"]).tail(1).iloc[0]
 
 

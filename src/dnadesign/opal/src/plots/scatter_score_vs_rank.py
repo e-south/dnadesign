@@ -87,7 +87,7 @@ def render(context, params: dict) -> None:
     }
     # Ensure optional hue/size columns are loaded if they refer to ledger columns
     need |= event_columns_for(hue_field, size_by)
-    df = load_events(outputs_dir, need, round_selector=context.rounds)
+    df = load_events(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
     if df.empty:
         raise ValueError("ledger.predictions had zero rows for requested columns.")
 

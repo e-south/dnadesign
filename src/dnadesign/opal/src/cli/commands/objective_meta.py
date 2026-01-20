@@ -42,6 +42,7 @@ def cmd_objective_meta(
         "-r",
         help="Round selector: integer or 'latest' (default: latest)",
     ),
+    run_id: Optional[str] = typer.Option(None, "--run-id", help="Explicit run_id to inspect."),
     json: bool = typer.Option(False, "--json/--human", help="Output as JSON"),
     profile: bool = typer.Option(
         False,
@@ -82,13 +83,27 @@ def cmd_objective_meta(
         if rtab.empty:
             raise OpalError("No runs found in ledger.runs.parquet. Run `opal run ...` first.")
 
-        # Pick round (supports 'latest' or an integer)
-        as_of = resolve_round_index_from_runs(rtab, round)
-        rsel = rtab[rtab["as_of_round"] == int(as_of)]
-        if rsel.empty:
-            raise OpalError(f"No runs found for as_of_round={int(as_of)}.")
-        # Use last (most recent) run_id at that round
-        rsel = rsel.sort_values(["run_id"]).tail(1).iloc[0]
+        if round and run_id:
+            raise OpalError("Provide only one of --round or --run-id.")
+
+        if run_id:
+            rsel = rtab[rtab["run_id"].astype(str) == str(run_id)]
+            if rsel.empty:
+                raise OpalError(f"run_id not found in ledger: {run_id}")
+            rsel = rsel.iloc[0]
+            as_of = int(rsel["as_of_round"])
+        else:
+            # Pick round (supports 'latest' or an integer)
+            as_of = resolve_round_index_from_runs(rtab, round)
+            rsel = rtab[rtab["as_of_round"] == int(as_of)]
+            if rsel.empty:
+                raise OpalError(f"No runs found for as_of_round={int(as_of)}.")
+            if rsel["run_id"].nunique() > 1:
+                raise OpalError(
+                    f"Multiple run_id values found for round {int(as_of)}. Specify --run-id to disambiguate."
+                )
+            # Use last (most recent) run_id at that round
+            rsel = rsel.sort_values(["run_id"]).tail(1).iloc[0]
 
         # Row-level diagnostic schema from predictions
         if not pred_dir.exists():

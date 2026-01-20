@@ -126,7 +126,7 @@ def render(context, params: dict) -> None:
     # If hue/size/y ask for objective/pred/sel columns, load them from predictions
     # (fold_change is derived locally and won't be added here)
     need |= event_columns_for(hue_field, size_by, y_axis)
-    df = load_events_with_setpoint(outputs_dir, need, round_selector=context.rounds)
+    df = load_events_with_setpoint(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
 
     # Round selection: single round (default latest)
     rsel = context.rounds

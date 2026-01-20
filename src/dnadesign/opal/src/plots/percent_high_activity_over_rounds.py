@@ -68,7 +68,7 @@ def render(context, params: dict) -> None:
     # Always read from typed sinks (predictions + runs).
     need = {"as_of_round", "pred__y_obj_scalar"}
     need |= event_columns_for(hue_field, size_by)
-    df = load_events(outputs_dir, need, round_selector=context.rounds)
+    df = load_events(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
     if df.empty:
         raise ValueError("Ledger predictions contained zero rows after projection.")
 
