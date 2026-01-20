@@ -120,8 +120,8 @@ def _():
     build_label_events = dash_labels.build_label_events
     build_label_events_from_ledger = dash_labels.build_label_events_from_ledger
     build_label_sfxi_view = dash_sfxi.build_label_sfxi_view
+    apply_transient_label_flags = dash_sfxi.apply_transient_label_flags
     build_umap_controls = dash_ui.build_umap_controls
-    observed_event_ids = dash_labels.observed_event_ids
     campaign_label_from_path = dash_datasets.campaign_label_from_path
     compute_sfxi_params = dash_sfxi.compute_sfxi_params
     ensure_selection_columns = dash_selection.ensure_selection_columns
@@ -166,6 +166,7 @@ def _():
         build_label_events,
         build_label_events_from_ledger,
         build_label_sfxi_view,
+        apply_transient_label_flags,
         build_umap_controls,
         campaign_label_from_path,
         coerce_selection_dataframe,
@@ -191,7 +192,6 @@ def _():
         resolve_artifact_state,
         missingness_summary,
         namespace_summary,
-        observed_event_ids,
         parse_campaign_info,
         resolve_objective_mode,
         resolve_brush_selection,
@@ -1318,17 +1318,19 @@ def _(
 def _(
     export_button,
     export_format_dropdown,
+    export_note_md,
     export_source_dropdown,
     export_status_md,
     mo,
 ):
     _export_label = export_source_dropdown.value
-    export_note_md = mo.md(
+    export_header_md = mo.md(
         "## Export a dataframe\nDestination: `src/dnadesign/opal/notebooks/_outputs/promoter_eda_export.<format>`"
     )
     mo.vstack(
         [
-            export_note_md,
+            export_header_md,
+            export_note_md if export_note_md is not None else mo.md(""),
             export_source_dropdown,
             export_format_dropdown,
             export_button,
@@ -1381,6 +1383,7 @@ def _(
 @app.cell
 def _(
     alt,
+    apply_transient_label_flags,
     apply_score_overlay,
     build_umap_overlay_charts,
     build_label_sfxi_view,
@@ -1397,7 +1400,6 @@ def _(
     opal_labels_asof_df,
     opal_labels_current_df,
     opal_labels_view_df,
-    observed_event_ids,
     opal_selected_round,
     opal_pred_selected_run_id,
     pl,
@@ -1557,22 +1559,6 @@ def _(
                 fill_exprs.append(pl.lit(None, dtype=pl.Float64).alias(_col))
         df_umap_overlay = df_umap_overlay.with_columns(fill_exprs)
 
-    _observed_col = "opal__transient__observed_event"
-    observed_ids = observed_event_ids(opal_labels_view_df, label_src="ingest_y")
-    if observed_ids and "id" in df_umap_overlay.columns:
-        df_umap_overlay = df_umap_overlay.with_columns(
-            pl.col("id").cast(pl.Utf8).is_in(observed_ids).alias(_observed_col)
-        )
-    elif _observed_col not in df_umap_overlay.columns:
-        df_umap_overlay = df_umap_overlay.with_columns(pl.lit(False).alias(_observed_col))
-
-    _sfxi_scored_col = "opal__transient__sfxi_scored_label"
-    if "__row_id" in df_umap_overlay.columns and "__row_id" in df_sfxi.columns and not df_sfxi.is_empty():
-        _sfxi_ids = df_sfxi.select(pl.col("__row_id").drop_nulls().unique()).to_series().to_list()
-        df_umap_overlay = df_umap_overlay.with_columns(pl.col("__row_id").is_in(_sfxi_ids).alias(_sfxi_scored_col))
-    elif _sfxi_scored_col not in df_umap_overlay.columns:
-        df_umap_overlay = df_umap_overlay.with_columns(pl.lit(False).alias(_sfxi_scored_col))
-
     score_source_value = score_source_dropdown.value if score_source_dropdown is not None else "Transient overlay (RF)"
     df_umap_overlay, score_diag = apply_score_overlay(
         df_umap_overlay,
@@ -1583,6 +1569,14 @@ def _(
     transient_diag = transient_diag.merge(score_diag.diagnostics)
     transient_lines = diagnostics_to_lines(transient_diag)
     transient_md = mo.md("\n".join(transient_lines)) if transient_lines else None
+
+    df_umap_overlay = apply_transient_label_flags(
+        df_overlay=df_umap_overlay,
+        labels_view_df=opal_labels_view_df,
+        df_sfxi=df_sfxi,
+        label_src="ingest_y",
+        id_col="id",
+    )
 
     rf_umap_cluster_chart = None
     rf_umap_score_chart = None
@@ -1783,6 +1777,7 @@ def _(
     repo_root,
 ):
     export_status_md = None
+    export_note_md = mo.md("")
 
     if export_button.value:
         source_label = export_source_dropdown.value
@@ -1800,6 +1795,20 @@ def _(
         else:
             df_export = df_active
 
+        if df_export is not None and not df_export.is_empty():
+            _transient_cols = [c for c in df_export.columns if c.startswith("opal__transient__")]
+            _score_cols = [c for c in df_export.columns if c.startswith("opal__score__")]
+            if _transient_cols and _score_cols:
+                export_note_md = mo.md(
+                    "**Export note**: this export mixes transient overlay columns with canonical/cache score columns. "
+                    "Transient columns are ephemeral and not persisted."
+                )
+            elif _transient_cols:
+                export_note_md = mo.md(
+                    "**Export note**: this export includes transient overlay columns only. "
+                    "Transient results are ephemeral and not persisted."
+                )
+
         if df_export is None or df_export.is_empty():
             export_status_md = mo.md("Nothing to export.")
         else:
@@ -1814,7 +1823,7 @@ def _(
             export_status_md = mo.md(
                 f"Saved `{out_path}` from `{source_label}` ({df_export.height} rows × {len(df_export.columns)} cols)."
             )
-    return (export_status_md,)
+    return export_note_md, export_status_md
 
 
 @app.cell(column=4)
@@ -2388,6 +2397,9 @@ def _(
         lines.append(f"- Cache warning: {cache_warning}")
     if ledger_warning:
         lines.append(f"- Ledger warning: {ledger_warning}")
+    lines.append(
+        "- Transient note: `opal__transient__run_id` is a local label for notebook overlays; it is not a ledger run_id."
+    )
     lines.append(
         "- Note: running rounds does not create labels. Labels come from ingest-y / attach / external measurements."
     )

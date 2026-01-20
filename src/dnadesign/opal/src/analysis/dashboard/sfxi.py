@@ -10,6 +10,7 @@ import numpy as np
 import polars as pl
 
 from .datasets import CampaignInfo
+from .labels import observed_event_ids
 
 
 def fit_intensity_median_iqr(y, *, min_labels: int, eps: float):
@@ -357,3 +358,33 @@ def build_label_sfxi_view(
         y_col=readiness.y_col,
         params=params,
     )
+
+
+def apply_transient_label_flags(
+    *,
+    df_overlay: pl.DataFrame,
+    labels_view_df: pl.DataFrame,
+    df_sfxi: pl.DataFrame,
+    label_src: str = "ingest_y",
+    id_col: str = "id",
+) -> pl.DataFrame:
+    if df_overlay.is_empty():
+        return df_overlay
+
+    observed_ids = []
+    if labels_view_df is not None and not labels_view_df.is_empty():
+        observed_ids = observed_event_ids(labels_view_df, label_src=label_src)
+    if observed_ids and id_col in df_overlay.columns:
+        df_overlay = df_overlay.with_columns(
+            pl.col(id_col).cast(pl.Utf8).is_in(observed_ids).alias("opal__transient__observed_event")
+        )
+    elif "opal__transient__observed_event" not in df_overlay.columns:
+        df_overlay = df_overlay.with_columns(pl.lit(False).alias("opal__transient__observed_event"))
+
+    sfxi_scored_col = "opal__transient__sfxi_scored_label"
+    if "__row_id" in df_overlay.columns and "__row_id" in df_sfxi.columns and not df_sfxi.is_empty():
+        sfxi_ids = df_sfxi.select(pl.col("__row_id").drop_nulls().unique()).to_series().to_list()
+        df_overlay = df_overlay.with_columns(pl.col("__row_id").is_in(sfxi_ids).alias(sfxi_scored_col))
+    elif sfxi_scored_col not in df_overlay.columns:
+        df_overlay = df_overlay.with_columns(pl.lit(False).alias(sfxi_scored_col))
+    return df_overlay

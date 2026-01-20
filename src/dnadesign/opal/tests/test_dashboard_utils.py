@@ -231,6 +231,21 @@ def test_build_umap_explorer_chart_cases() -> None:
     assert no_non_null.note is not None and "no non-null values" in no_non_null.note
 
 
+def test_apply_transient_label_flags() -> None:
+    df_overlay = pl.DataFrame({"id": ["a", "b"], "__row_id": [1, 2]})
+    labels_view = pl.DataFrame({"id": ["a"], "label_src": ["ingest_y"]})
+    df_sfxi = pl.DataFrame({"__row_id": [2]})
+    out = sfxi.apply_transient_label_flags(
+        df_overlay=df_overlay,
+        labels_view_df=labels_view,
+        df_sfxi=df_sfxi,
+        label_src="ingest_y",
+        id_col="id",
+    )
+    assert out["opal__transient__observed_event"].to_list() == [True, False]
+    assert out["opal__transient__sfxi_scored_label"].to_list() == [False, True]
+
+
 def test_diagnostics_notes_merge() -> None:
     diag = diagnostics.Diagnostics().add_note("n1").add_warning("w1").add_error("e1")
     other = diagnostics.Diagnostics().add_note("n2").add_warning("w2")
