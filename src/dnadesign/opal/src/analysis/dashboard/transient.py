@@ -339,12 +339,6 @@ def compute_transient_overlay(
                 effective_round = int(runs_df.select(pl.col("as_of_round").max()).item())
             except Exception:
                 effective_round = None
-    if effective_round is None:
-        _error(
-            "Transient overlay requires a round context. Select a round or attach label events "
-            "so the round can be inferred."
-        )
-
     run_id_value = run_id if use_artifact else "notebook-transient"
     source_value = "artifact" if use_artifact else "transient"
 
@@ -354,6 +348,20 @@ def compute_transient_overlay(
             pl.lit(campaign_slug).alias("opal__transient__campaign_slug"),
             pl.lit(run_id_value).alias("opal__transient__run_id"),
             pl.lit(effective_round).alias("opal__transient__round"),
+        )
+
+    if effective_round is None:
+        _error(
+            "Transient overlay requires a round context. Select a round or attach label events "
+            "so the round can be inferred."
+        )
+        return TransientOverlayResult(
+            df_overlay=_with_transient_provenance(df_overlay),
+            df_pred_scored=df_pred_scored,
+            diagnostics=diagnostics,
+            feature_chart=feature_chart,
+            hist_chart=hist_chart,
+            hist_note=hist_note,
         )
 
     if campaign_info is None:
