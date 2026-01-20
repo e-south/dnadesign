@@ -120,6 +120,29 @@ def test_promoter_constraint_motif_validation(tmp_path: Path) -> None:
         load_config(cfg_path)
 
 
+def test_fimo_rejects_max_candidates(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["inputs"] = [
+        {
+            "name": "motifs",
+            "type": "pwm_meme",
+            "path": "inputs.meme",
+            "sampling": {
+                "strategy": "stochastic",
+                "n_sites": 2,
+                "oversample_factor": 2,
+                "scoring_backend": "fimo",
+                "pvalue_threshold": 1e-4,
+                "max_candidates": 100,
+                "mining": {"batch_size": 10},
+            },
+        }
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="max_candidates is not used"):
+        load_config(cfg_path)
+
+
 def test_promoter_constraint_range_non_negative(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["generation"]["plan"] = [

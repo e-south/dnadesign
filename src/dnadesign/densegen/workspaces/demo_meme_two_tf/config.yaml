@@ -22,12 +22,12 @@ densegen:
         strategy: stochastic
         n_sites: 80
         oversample_factor: 200
-        max_candidates: 20000  # bounded candidate generation (cap across mining batches)
         scoring_backend: fimo
         pvalue_threshold: 1e-4
         selection_policy: stratified
         mining:
           batch_size: 5000
+          max_candidates: 20000
           max_batches: 4
           retain_bin_ids: [0, 1, 2, 3]
           log_every_batches: 1

@@ -36,7 +36,6 @@ def _meta_arrow_type(name: str, pa):
         "input_pwm_pvalue_bins",
     }
     list_int = {
-        "input_pwm_pvalue_bin_ids",
         "input_pwm_mining_retain_bin_ids",
     }
     int_fields = {
@@ -48,6 +47,7 @@ def _meta_arrow_type(name: str, pa):
         "input_pwm_oversample_factor",
         "input_pwm_mining_batch_size",
         "input_pwm_mining_max_batches",
+        "input_pwm_mining_max_candidates",
         "input_pwm_mining_log_every_batches",
         "input_row_count",
         "input_tf_count",

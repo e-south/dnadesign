@@ -565,20 +565,29 @@ def write_report(
     *,
     out_dir: str | Path = "outputs",
     include_combinatorics: bool = False,
+    formats: set[str] | None = None,
 ) -> ReportBundle:
     run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
     out_path = resolve_run_scoped_path(cfg_path, run_root, str(out_dir), label="report.out")
     out_path.mkdir(parents=True, exist_ok=True)
 
     bundle = collect_report_data(root_cfg, cfg_path, include_combinatorics=include_combinatorics)
-    report_path = out_path / "report.json"
-    report_path.write_text(json.dumps(bundle.run_report, indent=2, sort_keys=True))
-    report_md = out_path / "report.md"
-    _write_report_md(report_md, bundle)
+    formats = {f.lower() for f in (formats or {"json", "md"})}
+    if "all" in formats:
+        formats = {"json", "md", "html"}
+    if "json" in formats:
+        report_path = out_path / "report.json"
+        report_path.write_text(json.dumps(bundle.run_report, indent=2, sort_keys=True))
+    if "md" in formats:
+        report_md = out_path / "report.md"
+        _write_report_md(report_md, bundle)
+    if "html" in formats:
+        report_html = out_path / "report.html"
+        _write_report_html(report_html, bundle)
     return bundle
 
 
-def _write_report_md(path: Path, bundle: ReportBundle) -> None:
+def _render_report_md(bundle: ReportBundle) -> str:
     report = bundle.run_report
     lines = [
         "# DenseGen Report",
@@ -622,4 +631,32 @@ def _write_report_md(path: Path, bundle: ReportBundle) -> None:
             label = f"{tf}:{tfbs}" if tf else tfbs
             reason_suffix = f" (top reason: {reason})" if reason else ""
             lines.append(f"- {label} — failures={failures}{reason_suffix}")
-    path.write_text("\n".join(lines) + "\n")
+    return "\n".join(lines) + "\n"
+
+
+def _write_report_md(path: Path, bundle: ReportBundle) -> None:
+    path.write_text(_render_report_md(bundle))
+
+
+def _write_report_html(path: Path, bundle: ReportBundle) -> None:
+    md = _render_report_md(bundle)
+    body = md.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    html = "\n".join(
+        [
+            "<!DOCTYPE html>",
+            "<html>",
+            "<head>",
+            '<meta charset="utf-8"/>',
+            "<title>DenseGen Report</title>",
+            "<style>body{font-family:ui-monospace,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;"
+            "padding:24px;background:#fafafa;color:#111;}pre{white-space:pre-wrap;}</style>",
+            "</head>",
+            "<body>",
+            "<pre>",
+            body,
+            "</pre>",
+            "</body>",
+            "</html>",
+        ]
+    )
+    path.write_text(html)

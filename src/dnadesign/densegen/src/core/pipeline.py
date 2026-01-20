@@ -198,28 +198,39 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
     requested = None
     generated = None
     capped = False
+    backend = str(_sampling_attr(sampling, "scoring_backend") or "densegen").lower()
     if isinstance(n_sites, int) and isinstance(oversample, int):
         requested = int(n_sites) * int(oversample)
         generated = requested
-        if max_candidates is not None:
-            try:
-                cap_val = int(max_candidates)
-            except Exception:
-                cap_val = None
-            if cap_val is not None:
-                generated = min(requested, cap_val)
-                capped = generated < requested
+        if backend == "fimo":
+            mining_cfg = _sampling_attr(sampling, "mining")
+            mining_max_candidates = _mining_attr(mining_cfg, "max_candidates")
+            if mining_max_candidates is not None:
+                try:
+                    cap_val = int(mining_max_candidates)
+                except Exception:
+                    cap_val = None
+                if cap_val is not None:
+                    generated = min(requested, cap_val)
+                    capped = generated < requested
+        else:
+            if max_candidates is not None:
+                try:
+                    cap_val = int(max_candidates)
+                except Exception:
+                    cap_val = None
+                if cap_val is not None:
+                    generated = min(requested, cap_val)
+                    capped = generated < requested
     length_range = _sampling_attr(sampling, "length_range")
     if length_range is not None:
         length_range = list(length_range)
     mining = _sampling_attr(sampling, "mining")
     mining_batch_size = _mining_attr(mining, "batch_size")
     mining_max_batches = _mining_attr(mining, "max_batches")
+    mining_max_candidates = _mining_attr(mining, "max_candidates")
     mining_max_seconds = _mining_attr(mining, "max_seconds")
     mining_retain_bin_ids = _mining_attr(mining, "retain_bin_ids")
-    legacy_bin_ids = _sampling_attr(sampling, "pvalue_bin_ids")
-    if mining_retain_bin_ids is None:
-        mining_retain_bin_ids = legacy_bin_ids
     mining_log_every_batches = _mining_attr(mining, "log_every_batches")
     return {
         "strategy": _sampling_attr(sampling, "strategy"),
@@ -235,7 +246,6 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
         "score_percentile": _sampling_attr(sampling, "score_percentile"),
         "pvalue_threshold": _sampling_attr(sampling, "pvalue_threshold"),
         "pvalue_bins": _resolve_pvalue_bins_meta(sampling),
-        "pvalue_bin_ids": legacy_bin_ids,
         "selection_policy": _sampling_attr(sampling, "selection_policy"),
         "bgfile": _sampling_attr(sampling, "bgfile"),
         "keep_all_candidates_debug": _sampling_attr(sampling, "keep_all_candidates_debug"),
@@ -244,6 +254,7 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
         "mining": {
             "batch_size": mining_batch_size,
             "max_batches": mining_max_batches,
+            "max_candidates": mining_max_candidates,
             "max_seconds": mining_max_seconds,
             "retain_bin_ids": mining_retain_bin_ids,
             "log_every_batches": mining_log_every_batches,
@@ -508,10 +519,9 @@ def _input_metadata(source_cfg, cfg_path: Path) -> dict:
             meta["input_pwm_pvalue_bins"] = _resolve_pvalue_bins_meta(sampling)
             mining_cfg = getattr(sampling, "mining", None)
             retained_bins = _mining_attr(mining_cfg, "retain_bin_ids")
-            legacy_bin_ids = getattr(sampling, "pvalue_bin_ids", None)
-            meta["input_pwm_pvalue_bin_ids"] = legacy_bin_ids if legacy_bin_ids is not None else retained_bins
             meta["input_pwm_mining_batch_size"] = _mining_attr(mining_cfg, "batch_size")
             meta["input_pwm_mining_max_batches"] = _mining_attr(mining_cfg, "max_batches")
+            meta["input_pwm_mining_max_candidates"] = _mining_attr(mining_cfg, "max_candidates")
             meta["input_pwm_mining_max_seconds"] = _mining_attr(mining_cfg, "max_seconds")
             meta["input_pwm_mining_retain_bin_ids"] = retained_bins
             meta["input_pwm_mining_log_every_batches"] = _mining_attr(mining_cfg, "log_every_batches")
@@ -521,7 +531,6 @@ def _input_metadata(source_cfg, cfg_path: Path) -> dict:
             meta["input_pwm_include_matched_sequence"] = getattr(sampling, "include_matched_sequence", None)
             meta["input_pwm_n_sites"] = getattr(sampling, "n_sites", None)
             meta["input_pwm_oversample_factor"] = getattr(sampling, "oversample_factor", None)
-            meta["input_pwm_max_candidates"] = getattr(sampling, "max_candidates", None)
     else:
         meta["input_mode"] = source_type
         meta["input_pwm_ids"] = []
@@ -919,6 +928,264 @@ def _hash_library(
     return digest
 
 
+def build_library_for_plan(
+    *,
+    source_label: str,
+    plan_item: ResolvedPlanItem,
+    data_entries: list,
+    meta_df: pd.DataFrame | None,
+    sampling_cfg: object,
+    seq_len: int,
+    min_count_per_tf: int,
+    usage_counts: dict[tuple[str, str], int],
+    failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] | None,
+    rng: random.Random,
+    np_rng: np.random.Generator,
+    schema_is_22: bool,
+    library_index_start: int,
+) -> tuple[list[str], list[str], list[str], dict]:
+    pool_strategy = str(getattr(sampling_cfg, "pool_strategy", "subsample"))
+    library_size = int(getattr(sampling_cfg, "library_size", 0))
+    subsample_over = int(getattr(sampling_cfg, "subsample_over_length_budget_by", 0))
+    library_sampling_strategy = str(getattr(sampling_cfg, "library_sampling_strategy", "tf_balanced"))
+    cover_all_tfs = bool(getattr(sampling_cfg, "cover_all_regulators", True))
+    unique_binding_sites = bool(getattr(sampling_cfg, "unique_binding_sites", True))
+    max_sites_per_tf = getattr(sampling_cfg, "max_sites_per_regulator", None)
+    relax_on_exhaustion = bool(getattr(sampling_cfg, "relax_on_exhaustion", False))
+    allow_incomplete_coverage = bool(getattr(sampling_cfg, "allow_incomplete_coverage", False))
+    iterative_max_libraries = int(getattr(sampling_cfg, "iterative_max_libraries", 0))
+    iterative_min_new_solutions = int(getattr(sampling_cfg, "iterative_min_new_solutions", 0))
+
+    fixed_elements = plan_item.fixed_elements
+    required_regulators = list(dict.fromkeys(plan_item.required_regulators or []))
+    min_required_regulators = plan_item.min_required_regulators
+    plan_min_count_by_regulator = dict(plan_item.min_count_by_regulator or {})
+    k_required = int(min_required_regulators) if min_required_regulators is not None else None
+    k_of_required = bool(required_regulators) and k_required is not None
+    if k_of_required and k_required > len(required_regulators):
+        raise ValueError(
+            "min_required_regulators cannot exceed required_regulators size "
+            f"({k_required} > {len(required_regulators)})."
+        )
+    side_left, side_right = _extract_side_biases(fixed_elements)
+    required_bias_motifs = list(dict.fromkeys([*side_left, *side_right]))
+
+    libraries_built = int(library_index_start)
+
+    def _finalize(
+        library: list[str],
+        parts: list[str],
+        reg_labels: list[str],
+        info: dict,
+        *,
+        site_id_by_index: list[str | None] | None,
+        source_by_index: list[str | None] | None,
+    ) -> tuple[list[str], list[str], list[str], dict]:
+        nonlocal libraries_built
+        libraries_built += 1
+        info["library_index"] = libraries_built
+        info["library_hash"] = _hash_library(library, reg_labels, site_id_by_index, source_by_index)
+        info["site_id_by_index"] = site_id_by_index
+        info["source_by_index"] = source_by_index
+        return library, parts, reg_labels, info
+
+    if meta_df is not None and isinstance(meta_df, pd.DataFrame):
+        available_tfs = set(meta_df["tf"].tolist())
+        missing = [t for t in required_regulators if t not in available_tfs]
+        if missing:
+            preview = ", ".join(missing[:10])
+            raise ValueError(f"Required regulators not found in input: {preview}")
+        if plan_min_count_by_regulator:
+            missing_counts = [t for t in plan_min_count_by_regulator if t not in available_tfs]
+            if missing_counts:
+                preview = ", ".join(missing_counts[:10])
+                raise ValueError(f"min_count_by_regulator TFs not found in input: {preview}")
+        if min_required_regulators is not None:
+            if not required_regulators and min_required_regulators > len(available_tfs):
+                raise ValueError(
+                    f"min_required_regulators={min_required_regulators} exceeds available regulators "
+                    f"({len(available_tfs)})."
+                )
+
+        if pool_strategy == "full":
+            lib_df = meta_df.copy()
+            if unique_binding_sites:
+                lib_df = lib_df.drop_duplicates(["tf", "tfbs"])
+            if required_bias_motifs:
+                missing_bias = [m for m in required_bias_motifs if m not in set(lib_df["tfbs"])]
+                if missing_bias:
+                    preview = ", ".join(missing_bias[:10])
+                    raise ValueError(f"Required side-bias motifs not found in input: {preview}")
+            lib_df = lib_df.reset_index(drop=True)
+            library = lib_df["tfbs"].tolist()
+            reg_labels = lib_df["tf"].tolist()
+            parts = [f"{tf}:{tfbs}" for tf, tfbs in zip(reg_labels, lib_df["tfbs"].tolist())]
+            site_id_by_index = lib_df["site_id"].tolist() if "site_id" in lib_df.columns else None
+            source_by_index = lib_df["source"].tolist() if "source" in lib_df.columns else None
+            info = {
+                "target_length": seq_len + subsample_over,
+                "achieved_length": sum(len(s) for s in library),
+                "relaxed_cap": False,
+                "final_cap": None,
+                "pool_strategy": pool_strategy,
+                "library_size": len(library),
+                "iterative_max_libraries": iterative_max_libraries,
+                "iterative_min_new_solutions": iterative_min_new_solutions,
+            }
+            return _finalize(
+                library,
+                parts,
+                reg_labels,
+                info,
+                site_id_by_index=site_id_by_index,
+                source_by_index=source_by_index,
+            )
+
+        sampler = TFSampler(meta_df, np_rng)
+        required_regulators_selected = required_regulators
+        if k_of_required:
+            candidates = sorted(required_regulators)
+            if k_required is not None and k_required < len(candidates):
+                chosen = np_rng.choice(len(candidates), size=k_required, replace=False)
+                required_regulators_selected = sorted([candidates[int(i)] for i in chosen])
+            else:
+                required_regulators_selected = candidates
+        required_tfs_for_library = list(
+            dict.fromkeys([*required_regulators_selected, *plan_min_count_by_regulator.keys()])
+        )
+        if min_required_regulators is not None and not required_regulators:
+            if pool_strategy in {"subsample", "iterative_subsample"}:
+                if library_size < int(min_required_regulators):
+                    raise ValueError(
+                        "library_size is too small to satisfy min_required_regulators when "
+                        f"required_regulators is empty. library_size={library_size} "
+                        f"min_required_regulators={min_required_regulators}. "
+                        "Increase library_size or lower min_required_regulators."
+                    )
+        if pool_strategy in {"subsample", "iterative_subsample"}:
+            required_slots = len(required_bias_motifs) + len(required_tfs_for_library)
+            if library_size < required_slots:
+                raise ValueError(
+                    "library_size is too small for required motifs. "
+                    f"library_size={library_size} but required_tfbs={len(required_bias_motifs)} "
+                    f"+ required_tfs={len(required_tfs_for_library)} "
+                    f"(min_required_regulators={min_required_regulators}). "
+                    "Increase library_size or relax required constraints."
+                )
+        if schema_is_22 and pool_strategy in {"subsample", "iterative_subsample"}:
+            failure_counts_by_tfbs: dict[tuple[str, str], int] | None = None
+            if library_sampling_strategy == "coverage_weighted" and getattr(sampling_cfg, "avoid_failed_motifs", False):
+                failure_counts_by_tfbs = _aggregate_failure_counts_for_sampling(
+                    failure_counts,
+                    input_name=source_label,
+                    plan_name=plan_item.name,
+                )
+            library, parts, reg_labels, info = sampler.generate_binding_site_library(
+                library_size,
+                sequence_length=seq_len,
+                budget_overhead=subsample_over,
+                required_tfbs=required_bias_motifs,
+                required_tfs=required_tfs_for_library,
+                cover_all_tfs=cover_all_tfs,
+                unique_binding_sites=unique_binding_sites,
+                max_sites_per_tf=max_sites_per_tf,
+                relax_on_exhaustion=relax_on_exhaustion,
+                allow_incomplete_coverage=allow_incomplete_coverage,
+                sampling_strategy=library_sampling_strategy,
+                usage_counts=usage_counts if library_sampling_strategy == "coverage_weighted" else None,
+                coverage_boost_alpha=float(getattr(sampling_cfg, "coverage_boost_alpha", 0.15)),
+                coverage_boost_power=float(getattr(sampling_cfg, "coverage_boost_power", 1.0)),
+                failure_counts=failure_counts_by_tfbs,
+                avoid_failed_motifs=bool(getattr(sampling_cfg, "avoid_failed_motifs", False)),
+                failure_penalty_alpha=float(getattr(sampling_cfg, "failure_penalty_alpha", 0.5)),
+                failure_penalty_power=float(getattr(sampling_cfg, "failure_penalty_power", 1.0)),
+            )
+        else:
+            library, parts, reg_labels, info = sampler.generate_binding_site_subsample(
+                seq_len,
+                subsample_over,
+                required_tfbs=required_bias_motifs,
+                required_tfs=required_tfs_for_library,
+                cover_all_tfs=cover_all_tfs,
+                unique_binding_sites=unique_binding_sites,
+                max_sites_per_tf=max_sites_per_tf,
+                relax_on_exhaustion=relax_on_exhaustion,
+                allow_incomplete_coverage=allow_incomplete_coverage,
+            )
+        info.update(
+            {
+                "pool_strategy": pool_strategy,
+                "library_size": library_size,
+                "library_sampling_strategy": library_sampling_strategy,
+                "coverage_boost_alpha": float(getattr(sampling_cfg, "coverage_boost_alpha", 0.15)),
+                "coverage_boost_power": float(getattr(sampling_cfg, "coverage_boost_power", 1.0)),
+                "iterative_max_libraries": iterative_max_libraries,
+                "iterative_min_new_solutions": iterative_min_new_solutions,
+                "required_regulators_selected": required_regulators_selected if k_of_required else None,
+            }
+        )
+        site_id_by_index = info.get("site_id_by_index")
+        source_by_index = info.get("source_by_index")
+        return _finalize(
+            library,
+            parts,
+            reg_labels,
+            info,
+            site_id_by_index=site_id_by_index,
+            source_by_index=source_by_index,
+        )
+
+    if required_regulators or plan_min_count_by_regulator or min_required_regulators is not None:
+        preview = ", ".join(required_regulators[:10]) if required_regulators else "n/a"
+        raise ValueError(
+            "Regulator constraints are set (required/min_count/min_required) "
+            "but the input does not provide regulators. "
+            f"required_regulators={preview}."
+        )
+    all_sequences = [s for s in data_entries]
+    if not all_sequences:
+        raise ValueError(f"No sequences found for source {source_label}")
+    pool = list(dict.fromkeys(all_sequences)) if unique_binding_sites else list(all_sequences)
+    if pool_strategy == "full":
+        if required_bias_motifs:
+            missing = [m for m in required_bias_motifs if m not in pool]
+            if missing:
+                preview = ", ".join(missing[:10])
+                raise ValueError(f"Required side-bias motifs not found in sequences input: {preview}")
+        library = pool
+    else:
+        if library_size > len(pool):
+            raise ValueError(f"library_size={library_size} exceeds available unique sequences ({len(pool)}).")
+        take = min(max(1, int(library_size)), len(pool))
+        if required_bias_motifs:
+            missing = [m for m in required_bias_motifs if m not in pool]
+            if missing:
+                preview = ", ".join(missing[:10])
+                raise ValueError(f"Required side-bias motifs not found in sequences input: {preview}")
+            if take < len(required_bias_motifs):
+                raise ValueError(
+                    f"library_size={take} is smaller than required side_biases ({len(required_bias_motifs)})."
+                )
+            required_set = set(required_bias_motifs)
+            remaining = [s for s in pool if s not in required_set]
+            library = list(required_bias_motifs) + rng.sample(remaining, take - len(required_bias_motifs))
+        else:
+            library = rng.sample(pool, take)
+    tf_parts: list[str] = []
+    reg_labels: list[str] = []
+    info = {
+        "target_length": seq_len + subsample_over,
+        "achieved_length": sum(len(s) for s in library),
+        "relaxed_cap": False,
+        "final_cap": None,
+        "pool_strategy": pool_strategy,
+        "library_size": len(library) if pool_strategy == "full" else library_size,
+        "iterative_max_libraries": iterative_max_libraries,
+        "iterative_min_new_solutions": iterative_min_new_solutions,
+    }
+    return _finalize(library, tf_parts, reg_labels, info, site_id_by_index=None, source_by_index=None)
+
+
 def _compute_sampling_fraction(
     library: list[str],
     *,
@@ -1294,14 +1561,7 @@ def _process_plan_for_source(
     sampling_cfg = gen.sampling
 
     pool_strategy = str(sampling_cfg.pool_strategy)
-    library_size = int(sampling_cfg.library_size)
-    subsample_over = int(sampling_cfg.subsample_over_length_budget_by)
     library_sampling_strategy = str(sampling_cfg.library_sampling_strategy)
-    cover_all_tfs = bool(sampling_cfg.cover_all_regulators)
-    unique_binding_sites = bool(sampling_cfg.unique_binding_sites)
-    max_sites_per_tf = sampling_cfg.max_sites_per_regulator
-    relax_on_exhaustion = bool(sampling_cfg.relax_on_exhaustion)
-    allow_incomplete_coverage = bool(sampling_cfg.allow_incomplete_coverage)
     iterative_max_libraries = int(sampling_cfg.iterative_max_libraries)
     iterative_min_new_solutions = int(sampling_cfg.iterative_min_new_solutions)
     schema_is_22 = schema_version_at_least(global_cfg.schema_version, major=2, minor=2)
@@ -1431,6 +1691,7 @@ def _process_plan_for_source(
             mining_cfg = _sampling_attr(input_sampling_cfg, "mining")
             mining_batch_size = _mining_attr(mining_cfg, "batch_size")
             mining_max_batches = _mining_attr(mining_cfg, "max_batches")
+            mining_max_candidates = _mining_attr(mining_cfg, "max_candidates")
             mining_max_seconds = _mining_attr(mining_cfg, "max_seconds")
             mining_retain_bins = _mining_attr(mining_cfg, "retain_bin_ids")
             if length_range is not None:
@@ -1446,11 +1707,7 @@ def _process_plan_for_source(
             bins_label = "-"
             if scoring_backend == "fimo":
                 bins_label = "canonical" if _sampling_attr(input_sampling_cfg, "pvalue_bins") is None else "custom"
-                bin_ids = (
-                    mining_retain_bins
-                    if mining_retain_bins is not None
-                    else _sampling_attr(input_sampling_cfg, "pvalue_bin_ids")
-                )
+                bin_ids = mining_retain_bins
                 if bin_ids:
                     bins_label = f"{bins_label} retain={sorted(list(bin_ids))}"
             length_label = str(length_policy)
@@ -1459,10 +1716,20 @@ def _process_plan_for_source(
             cap_label = "-"
             if isinstance(n_sites, int) and isinstance(oversample, int):
                 requested = n_sites * oversample
-                if max_candidates is not None:
-                    cap_label = f"{max_candidates} (requested={requested})"
-            if max_seconds is not None:
-                cap_label = f"{cap_label}; max_seconds={max_seconds}" if cap_label != "-" else f"{max_seconds}s"
+                if scoring_backend == "fimo":
+                    if mining_max_candidates is not None:
+                        cap_label = f"{mining_max_candidates} (requested={requested})"
+                    if mining_max_seconds is not None:
+                        cap_label = (
+                            f"{cap_label}; max_seconds={mining_max_seconds}s"
+                            if cap_label != "-"
+                            else f"{mining_max_seconds}s"
+                        )
+                else:
+                    if max_candidates is not None:
+                        cap_label = f"{max_candidates} (requested={requested})"
+                    if max_seconds is not None:
+                        cap_label = f"{cap_label}; max_seconds={max_seconds}" if cap_label != "-" else f"{max_seconds}s"
             counts_label = _summarize_tf_counts(meta_df["tf"].tolist())
             selection_label = selection_policy if scoring_backend == "fimo" else "-"
             mining_label = "-"
@@ -1472,6 +1739,8 @@ def _process_plan_for_source(
                     parts.append(f"batch={mining_batch_size}")
                 if mining_max_batches is not None:
                     parts.append(f"max_batches={mining_max_batches}")
+                if mining_max_candidates is not None:
+                    parts.append(f"max_candidates={mining_max_candidates}")
                 if mining_max_seconds is not None:
                     parts.append(f"max_seconds={mining_max_seconds}s")
                 mining_label = ", ".join(parts) if parts else "enabled"
@@ -1524,8 +1793,6 @@ def _process_plan_for_source(
             f"({k_required} > {len(required_regulators)})."
         )
     metadata_min_counts = {tf: max(min_count_per_tf, int(val)) for tf, val in plan_min_count_by_regulator.items()}
-    side_left, side_right = _extract_side_biases(fixed_elements)
-    required_bias_motifs = list(dict.fromkeys([*side_left, *side_right]))
     fixed_elements_dump = _fixed_elements_dump(fixed_elements)
     fixed_elements_max_len = _max_fixed_element_len(fixed_elements_dump)
 
@@ -1537,207 +1804,22 @@ def _process_plan_for_source(
 
     if pool_strategy != "iterative_subsample" and not one_subsample_only:
         max_per_subsample = quota
-
-    def _build_library() -> tuple[list[str], list[str], list[str], dict]:
-        nonlocal libraries_built
-        if meta_df is not None and isinstance(meta_df, pd.DataFrame):
-            available_tfs = set(meta_df["tf"].tolist())
-            missing = [t for t in required_regulators if t not in available_tfs]
-            if missing:
-                preview = ", ".join(missing[:10])
-                raise ValueError(f"Required regulators not found in input: {preview}")
-            if plan_min_count_by_regulator:
-                missing_counts = [t for t in plan_min_count_by_regulator if t not in available_tfs]
-                if missing_counts:
-                    preview = ", ".join(missing_counts[:10])
-                    raise ValueError(f"min_count_by_regulator TFs not found in input: {preview}")
-            if min_required_regulators is not None:
-                if not required_regulators and min_required_regulators > len(available_tfs):
-                    raise ValueError(
-                        f"min_required_regulators={min_required_regulators} exceeds available regulators "
-                        f"({len(available_tfs)})."
-                    )
-
-            if pool_strategy == "full":
-                lib_df = meta_df.copy()
-                if unique_binding_sites:
-                    lib_df = lib_df.drop_duplicates(["tf", "tfbs"])
-                if required_bias_motifs:
-                    missing_bias = [m for m in required_bias_motifs if m not in set(lib_df["tfbs"])]
-                    if missing_bias:
-                        preview = ", ".join(missing_bias[:10])
-                        raise ValueError(f"Required side-bias motifs not found in input: {preview}")
-                lib_df = lib_df.reset_index(drop=True)
-                library = lib_df["tfbs"].tolist()
-                reg_labels = lib_df["tf"].tolist()
-                parts = [f"{tf}:{tfbs}" for tf, tfbs in zip(reg_labels, lib_df["tfbs"].tolist())]
-                site_id_by_index = lib_df["site_id"].tolist() if "site_id" in lib_df.columns else None
-                source_by_index = lib_df["source"].tolist() if "source" in lib_df.columns else None
-                info = {
-                    "target_length": seq_len + subsample_over,
-                    "achieved_length": sum(len(s) for s in library),
-                    "relaxed_cap": False,
-                    "final_cap": None,
-                    "pool_strategy": pool_strategy,
-                    "library_size": len(library),
-                    "iterative_max_libraries": iterative_max_libraries,
-                    "iterative_min_new_solutions": iterative_min_new_solutions,
-                }
-                libraries_built += 1
-                info["library_index"] = libraries_built
-                info["library_hash"] = _hash_library(library, reg_labels, site_id_by_index, source_by_index)
-                info["site_id_by_index"] = site_id_by_index
-                info["source_by_index"] = source_by_index
-                return library, parts, reg_labels, info
-
-            sampler = TFSampler(meta_df, np_rng)
-            required_regulators_selected = required_regulators
-            if k_of_required:
-                candidates = sorted(required_regulators)
-                if k_required is not None and k_required < len(candidates):
-                    chosen = np_rng.choice(len(candidates), size=k_required, replace=False)
-                    required_regulators_selected = sorted([candidates[int(i)] for i in chosen])
-                else:
-                    required_regulators_selected = candidates
-            required_tfs_for_library = list(
-                dict.fromkeys([*required_regulators_selected, *plan_min_count_by_regulator.keys()])
-            )
-            if min_required_regulators is not None and not required_regulators:
-                if pool_strategy in {"subsample", "iterative_subsample"}:
-                    if library_size < int(min_required_regulators):
-                        raise ValueError(
-                            "library_size is too small to satisfy min_required_regulators when "
-                            f"required_regulators is empty. library_size={library_size} "
-                            f"min_required_regulators={min_required_regulators}. "
-                            "Increase library_size or lower min_required_regulators."
-                        )
-            if pool_strategy in {"subsample", "iterative_subsample"}:
-                required_slots = len(required_bias_motifs) + len(required_tfs_for_library)
-                if library_size < required_slots:
-                    raise ValueError(
-                        "library_size is too small for required motifs. "
-                        f"library_size={library_size} but required_tfbs={len(required_bias_motifs)} "
-                        f"+ required_tfs={len(required_tfs_for_library)} "
-                        f"(min_required_regulators={min_required_regulators}). "
-                        "Increase library_size or relax required constraints."
-                    )
-            # Alignment (1,4): count-based library sizing with explicit sampling strategy under schema>=2.2.
-            if schema_is_22 and pool_strategy in {"subsample", "iterative_subsample"}:
-                failure_counts_by_tfbs: dict[tuple[str, str], int] | None = None
-                if library_sampling_strategy == "coverage_weighted" and sampling_cfg.avoid_failed_motifs:
-                    failure_counts_by_tfbs = _aggregate_failure_counts_for_sampling(
-                        failure_counts,
-                        input_name=source_label,
-                        plan_name=plan_name,
-                    )
-                library, parts, reg_labels, info = sampler.generate_binding_site_library(
-                    library_size,
-                    sequence_length=seq_len,
-                    budget_overhead=subsample_over,
-                    required_tfbs=required_bias_motifs,
-                    required_tfs=required_tfs_for_library,
-                    cover_all_tfs=cover_all_tfs,
-                    unique_binding_sites=unique_binding_sites,
-                    max_sites_per_tf=max_sites_per_tf,
-                    relax_on_exhaustion=relax_on_exhaustion,
-                    allow_incomplete_coverage=allow_incomplete_coverage,
-                    sampling_strategy=library_sampling_strategy,
-                    usage_counts=usage_counts if library_sampling_strategy == "coverage_weighted" else None,
-                    coverage_boost_alpha=float(sampling_cfg.coverage_boost_alpha),
-                    coverage_boost_power=float(sampling_cfg.coverage_boost_power),
-                    failure_counts=failure_counts_by_tfbs,
-                    avoid_failed_motifs=bool(sampling_cfg.avoid_failed_motifs),
-                    failure_penalty_alpha=float(sampling_cfg.failure_penalty_alpha),
-                    failure_penalty_power=float(sampling_cfg.failure_penalty_power),
-                )
-            else:
-                library, parts, reg_labels, info = sampler.generate_binding_site_subsample(
-                    seq_len,
-                    subsample_over,
-                    required_tfbs=required_bias_motifs,
-                    required_tfs=required_tfs_for_library,
-                    cover_all_tfs=cover_all_tfs,
-                    unique_binding_sites=unique_binding_sites,
-                    max_sites_per_tf=max_sites_per_tf,
-                    relax_on_exhaustion=relax_on_exhaustion,
-                    allow_incomplete_coverage=allow_incomplete_coverage,
-                )
-            info.update(
-                {
-                    "pool_strategy": pool_strategy,
-                    "library_size": library_size,
-                    "library_sampling_strategy": library_sampling_strategy,
-                    "coverage_boost_alpha": float(sampling_cfg.coverage_boost_alpha),
-                    "coverage_boost_power": float(sampling_cfg.coverage_boost_power),
-                    "iterative_max_libraries": iterative_max_libraries,
-                    "iterative_min_new_solutions": iterative_min_new_solutions,
-                    "required_regulators_selected": required_regulators_selected if k_of_required else None,
-                }
-            )
-            libraries_built += 1
-            info["library_index"] = libraries_built
-            site_id_by_index = info.get("site_id_by_index")
-            source_by_index = info.get("source_by_index")
-            info["library_hash"] = _hash_library(library, reg_labels, site_id_by_index, source_by_index)
-            return library, parts, reg_labels, info
-
-        # Sequence library (no regulators)
-        if required_regulators or plan_min_count_by_regulator or min_required_regulators is not None:
-            preview = ", ".join(required_regulators[:10]) if required_regulators else "n/a"
-            raise ValueError(
-                "Regulator constraints are set (required/min_count/min_required) "
-                "but the input does not provide regulators. "
-                f"required_regulators={preview}."
-            )
-        all_sequences = [s for s in data_entries]
-        if not all_sequences:
-            raise ValueError(f"No sequences found for source {source_label}")
-        pool = list(dict.fromkeys(all_sequences)) if unique_binding_sites else list(all_sequences)
-        if pool_strategy == "full":
-            if required_bias_motifs:
-                missing = [m for m in required_bias_motifs if m not in pool]
-                if missing:
-                    preview = ", ".join(missing[:10])
-                    raise ValueError(f"Required side-bias motifs not found in sequences input: {preview}")
-            library = pool
-        else:
-            if library_size > len(pool):
-                raise ValueError(f"library_size={library_size} exceeds available unique sequences ({len(pool)}).")
-            take = min(max(1, int(library_size)), len(pool))
-            if required_bias_motifs:
-                missing = [m for m in required_bias_motifs if m not in pool]
-                if missing:
-                    preview = ", ".join(missing[:10])
-                    raise ValueError(f"Required side-bias motifs not found in sequences input: {preview}")
-                if take < len(required_bias_motifs):
-                    raise ValueError(
-                        f"library_size={take} is smaller than required side_biases ({len(required_bias_motifs)})."
-                    )
-                required_set = set(required_bias_motifs)
-                remaining = [s for s in pool if s not in required_set]
-                library = list(required_bias_motifs) + rng.sample(remaining, take - len(required_bias_motifs))
-            else:
-                library = rng.sample(pool, take)
-        tf_parts: list[str] = []
-        reg_labels: list[str] = []
-        info = {
-            "target_length": seq_len + subsample_over,
-            "achieved_length": sum(len(s) for s in library),
-            "relaxed_cap": False,
-            "final_cap": None,
-            "pool_strategy": pool_strategy,
-            "library_size": len(library) if pool_strategy == "full" else library_size,
-            "iterative_max_libraries": iterative_max_libraries,
-            "iterative_min_new_solutions": iterative_min_new_solutions,
-        }
-        libraries_built += 1
-        info["library_index"] = libraries_built
-        info["library_hash"] = _hash_library(library, reg_labels, None, None)
-        info["site_id_by_index"] = None
-        info["source_by_index"] = None
-        return library, tf_parts, reg_labels, info
-
-    library_for_opt, tfbs_parts, regulator_labels, sampling_info = _build_library()
+    library_for_opt, tfbs_parts, regulator_labels, sampling_info = build_library_for_plan(
+        source_label=source_label,
+        plan_item=plan_item,
+        data_entries=data_entries,
+        meta_df=meta_df,
+        sampling_cfg=sampling_cfg,
+        seq_len=seq_len,
+        min_count_per_tf=min_count_per_tf,
+        usage_counts=usage_counts,
+        failure_counts=failure_counts if failure_counts else None,
+        rng=rng,
+        np_rng=np_rng,
+        schema_is_22=schema_is_22,
+        library_index_start=libraries_built,
+    )
+    libraries_built = int(sampling_info.get("library_index", libraries_built))
     site_id_by_index = sampling_info.get("site_id_by_index")
     source_by_index = sampling_info.get("source_by_index")
     sampling_library_index = sampling_info.get("library_index", 0)
@@ -2583,7 +2665,22 @@ def _process_plan_for_source(
                 )
 
             # New library
-            library_for_opt, tfbs_parts, regulator_labels, sampling_info = _build_library()
+            library_for_opt, tfbs_parts, regulator_labels, sampling_info = build_library_for_plan(
+                source_label=source_label,
+                plan_item=plan_item,
+                data_entries=data_entries,
+                meta_df=meta_df,
+                sampling_cfg=sampling_cfg,
+                seq_len=seq_len,
+                min_count_per_tf=min_count_per_tf,
+                usage_counts=usage_counts,
+                failure_counts=failure_counts if failure_counts else None,
+                rng=rng,
+                np_rng=np_rng,
+                schema_is_22=schema_is_22,
+                library_index_start=libraries_built,
+            )
+            libraries_built = int(sampling_info.get("library_index", libraries_built))
             site_id_by_index = sampling_info.get("site_id_by_index")
             source_by_index = sampling_info.get("source_by_index")
             sampling_library_index = sampling_info.get("library_index", sampling_library_index)

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from dnadesign.densegen.src.adapters.sources import pwm_fimo
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import PWMMotif, sample_pwm_sites
@@ -78,3 +79,31 @@ def test_pwm_sampling_fimo_mining_retain_bins(monkeypatch) -> None:
         info = meta[seq]
         assert info["fimo_bin_id"] == 0
         assert info["fimo_matched_sequence"] == "AAA"
+
+
+def test_pwm_sampling_fimo_mining_max_candidates_guard() -> None:
+    motif = PWMMotif(
+        motif_id="M2",
+        matrix=[
+            {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+            {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        ],
+        background={"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    )
+    rng = np.random.default_rng(0)
+    with pytest.raises(ValueError, match="mining.max_candidates must be >= n_sites"):
+        sample_pwm_sites(
+            rng,
+            motif,
+            strategy="stochastic",
+            n_sites=5,
+            oversample_factor=1,
+            max_candidates=None,
+            max_seconds=None,
+            score_threshold=None,
+            score_percentile=None,
+            scoring_backend="fimo",
+            pvalue_threshold=1e-2,
+            mining={"batch_size": 2, "max_candidates": 2},
+            selection_policy="random_uniform",
+        )

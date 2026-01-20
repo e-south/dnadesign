@@ -98,14 +98,9 @@ META_FIELDS: list[MetaField] = [
     MetaField("input_pwm_score_percentile", (numbers.Real,), "PWM score percentile.", allow_none=True),
     MetaField("input_pwm_pvalue_threshold", (numbers.Real,), "PWM p-value threshold (FIMO).", allow_none=True),
     MetaField("input_pwm_pvalue_bins", (list,), "PWM p-value bins (FIMO).", allow_none=True),
-    MetaField(
-        "input_pwm_pvalue_bin_ids",
-        (list,),
-        "Deprecated: selected p-value bin indices (use input_pwm_mining_retain_bin_ids).",
-        allow_none=True,
-    ),
     MetaField("input_pwm_mining_batch_size", (int,), "PWM mining batch size (FIMO).", allow_none=True),
     MetaField("input_pwm_mining_max_batches", (int,), "PWM mining max batches (FIMO).", allow_none=True),
+    MetaField("input_pwm_mining_max_candidates", (int,), "PWM mining max candidates (FIMO).", allow_none=True),
     MetaField("input_pwm_mining_max_seconds", (numbers.Real,), "PWM mining max seconds (FIMO).", allow_none=True),
     MetaField(
         "input_pwm_mining_retain_bin_ids",
@@ -235,15 +230,6 @@ def _validate_list_fields(meta: Mapping[str, Any]) -> None:
             for item in vals:
                 if not isinstance(item, numbers.Real):
                     raise TypeError("Metadata field 'input_pwm_pvalue_bins' must contain only numbers")
-
-    if "input_pwm_pvalue_bin_ids" in meta:
-        vals = meta["input_pwm_pvalue_bin_ids"]
-        if vals is not None:
-            if isinstance(vals, (str, bytes)) or not isinstance(vals, Sequence):
-                raise TypeError("Metadata field 'input_pwm_pvalue_bin_ids' must be a list of integers")
-            for item in vals:
-                if not isinstance(item, int):
-                    raise TypeError("Metadata field 'input_pwm_pvalue_bin_ids' must contain only integers")
 
     if "input_pwm_mining_retain_bin_ids" in meta:
         vals = meta["input_pwm_mining_retain_bin_ids"]

@@ -13,7 +13,6 @@ Dunlop Lab
 from __future__ import annotations
 
 import os
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Optional, Union
@@ -159,7 +158,8 @@ class PWMMiningConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     batch_size: int = 100000
     max_batches: Optional[int] = None
-    max_seconds: Optional[float] = None
+    max_candidates: Optional[int] = None
+    max_seconds: Optional[float] = 60.0
     retain_bin_ids: Optional[List[int]] = None
     log_every_batches: int = 1
 
@@ -175,6 +175,13 @@ class PWMMiningConfig(BaseModel):
     def _max_batches_ok(cls, v: Optional[int]):
         if v is not None and v <= 0:
             raise ValueError("pwm.sampling.mining.max_batches must be > 0 when set")
+        return v
+
+    @field_validator("max_candidates")
+    @classmethod
+    def _max_candidates_ok(cls, v: Optional[int]):
+        if v is not None and v <= 0:
+            raise ValueError("pwm.sampling.mining.max_candidates must be > 0 when set")
         return v
 
     @field_validator("max_seconds")
@@ -220,7 +227,6 @@ class PWMSamplingConfig(BaseModel):
     scoring_backend: Literal["densegen", "fimo"] = "densegen"
     pvalue_threshold: Optional[float] = None
     pvalue_bins: Optional[List[float]] = None
-    pvalue_bin_ids: Optional[List[int]] = None
     mining: Optional[PWMMiningConfig] = None
     bgfile: Optional[str] = None
     selection_policy: Literal["random_uniform", "top_n", "stratified"] = "random_uniform"
@@ -312,20 +318,6 @@ class PWMSamplingConfig(BaseModel):
             raise ValueError("pwm.sampling.pvalue_bins must end with 1.0")
         return bins
 
-    @field_validator("pvalue_bin_ids")
-    @classmethod
-    def _pvalue_bin_ids_ok(cls, v: Optional[List[int]]):
-        if v is None:
-            return v
-        if not v:
-            raise ValueError("pwm.sampling.pvalue_bin_ids must be non-empty when set")
-        ids = [int(x) for x in v]
-        if any(idx < 0 for idx in ids):
-            raise ValueError("pwm.sampling.pvalue_bin_ids values must be >= 0")
-        if len(set(ids)) != len(ids):
-            raise ValueError("pwm.sampling.pvalue_bin_ids must be unique")
-        return ids
-
     @model_validator(mode="after")
     def _score_mode(self):
         has_thresh = self.score_threshold is not None
@@ -337,8 +329,6 @@ class PWMSamplingConfig(BaseModel):
                 raise ValueError("pwm.sampling.pvalue_threshold is only valid when scoring_backend='fimo'")
             if self.pvalue_bins is not None:
                 raise ValueError("pwm.sampling.pvalue_bins is only valid when scoring_backend='fimo'")
-            if self.pvalue_bin_ids is not None:
-                raise ValueError("pwm.sampling.pvalue_bin_ids is only valid when scoring_backend='fimo'")
             if self.mining is not None:
                 raise ValueError("pwm.sampling.mining is only valid when scoring_backend='fimo'")
             if self.include_matched_sequence:
@@ -348,25 +338,28 @@ class PWMSamplingConfig(BaseModel):
                 raise ValueError("pwm.sampling.pvalue_threshold is required when scoring_backend='fimo'")
             if not (0.0 < float(self.pvalue_threshold) <= 1.0):
                 raise ValueError("pwm.sampling.pvalue_threshold must be between 0 and 1")
-            if self.pvalue_bin_ids is not None and self.mining is not None:
+            if "max_candidates" in self.model_fields_set and self.max_candidates is not None:
                 raise ValueError(
-                    "pwm.sampling.pvalue_bin_ids is deprecated; use pwm.sampling.mining.retain_bin_ids instead."
+                    "pwm.sampling.max_candidates is not used with scoring_backend='fimo'. "
+                    "Use pwm.sampling.mining.max_candidates instead."
                 )
-            if self.pvalue_bin_ids is not None and self.mining is None:
-                warnings.warn(
-                    "pwm.sampling.pvalue_bin_ids is deprecated; use pwm.sampling.mining.retain_bin_ids.",
-                    stacklevel=2,
+            if "max_seconds" in self.model_fields_set and self.max_seconds is not None:
+                raise ValueError(
+                    "pwm.sampling.max_seconds is not used with scoring_backend='fimo'. "
+                    "Use pwm.sampling.mining.max_seconds instead."
                 )
-                self.mining = PWMMiningConfig(retain_bin_ids=list(self.pvalue_bin_ids))
-            bin_ids = None
+            if "max_candidates" not in self.model_fields_set:
+                self.max_candidates = None
+            if "max_seconds" not in self.model_fields_set:
+                self.max_seconds = None
+            if self.mining is None:
+                self.mining = PWMMiningConfig()
+            if self.pvalue_bins is None:
+                self.pvalue_bins = list(CANONICAL_PVALUE_BINS)
             if self.mining is not None and self.mining.retain_bin_ids is not None:
-                bin_ids = list(self.mining.retain_bin_ids)
-            elif self.pvalue_bin_ids is not None:
-                bin_ids = list(self.pvalue_bin_ids)
-            if bin_ids is not None:
                 bins = list(self.pvalue_bins) if self.pvalue_bins is not None else list(CANONICAL_PVALUE_BINS)
                 max_idx = len(bins) - 1
-                if any(idx > max_idx for idx in bin_ids):
+                if any(idx > max_idx for idx in self.mining.retain_bin_ids):
                     raise ValueError("pwm.sampling.mining.retain_bin_ids contains an index outside the available bins")
         if self.strategy == "consensus" and int(self.n_sites) != 1:
             raise ValueError("pwm.sampling.strategy=consensus requires n_sites=1")

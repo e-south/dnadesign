@@ -249,7 +249,10 @@ def select_by_score(
             "increase oversample_factor",
         ]
         if context.get("cap_applied"):
-            suggestions.append("increase max_candidates (cap was hit)")
+            if context.get("mining_max_candidates") is not None:
+                suggestions.append("increase mining.max_candidates (cap was hit)")
+            else:
+                suggestions.append("increase max_candidates (cap was hit)")
         if context.get("time_limited"):
             suggestions.append("increase max_seconds (time limit was hit)")
         if context.get("width") is not None and int(context.get("width")) <= 6:
@@ -378,19 +381,21 @@ def _select_fimo_candidates(
             msg_lines.append(f"Observed candidate lengths={context.get('length_observed')}.")
         if context.get("pvalue_bins_label") is not None:
             msg_lines.append(f"P-value bins={context.get('pvalue_bins_label')}.")
-        if context.get("pvalue_bin_ids") is not None:
-            msg_lines.append(f"Retained bins={context.get('pvalue_bin_ids')}.")
+        if context.get("retain_bin_ids") is not None:
+            msg_lines.append(f"Retained bins={context.get('retain_bin_ids')}.")
         suggestions = [
             "reduce n_sites",
             "relax pvalue_threshold (e.g., 1e-4 → 1e-3)",
             "increase oversample_factor",
         ]
-        if context.get("pvalue_bin_ids") is not None:
+        if context.get("retain_bin_ids") is not None:
             suggestions.append("broaden mining.retain_bin_ids (or remove bin filtering)")
         if context.get("cap_applied"):
             suggestions.append("increase max_candidates (cap was hit)")
         if context.get("time_limited"):
             suggestions.append("increase max_seconds (time limit was hit)")
+        if context.get("mining_max_candidates") is not None and context.get("mining_candidates_limited"):
+            suggestions.append("increase mining.max_candidates")
         if context.get("mining_max_batches") is not None and context.get("mining_batches_limited"):
             suggestions.append("increase mining.max_batches")
         if context.get("mining_max_seconds") is not None and context.get("mining_time_limited"):
@@ -434,7 +439,6 @@ def sample_pwm_sites(
     scoring_backend: str = "densegen",
     pvalue_threshold: Optional[float] = None,
     pvalue_bins: Optional[Sequence[float]] = None,
-    pvalue_bin_ids: Optional[Sequence[int]] = None,
     mining: Optional[object] = None,
     bgfile: Optional[str | Path] = None,
     selection_policy: str = "random_uniform",
@@ -462,8 +466,6 @@ def sample_pwm_sites(
             raise ValueError("PWM sampling requires exactly one of score_threshold or score_percentile")
         if pvalue_bins is not None:
             raise ValueError("pvalue_bins is only valid when scoring_backend='fimo'")
-        if pvalue_bin_ids is not None:
-            raise ValueError("pvalue_bin_ids is only valid when scoring_backend='fimo'")
         if mining is not None:
             raise ValueError("mining is only valid when scoring_backend='fimo'")
         if include_matched_sequence:
@@ -474,12 +476,13 @@ def sample_pwm_sites(
         pvalue_threshold = float(pvalue_threshold)
         if not (0.0 < pvalue_threshold <= 1.0):
             raise ValueError("pwm.sampling.pvalue_threshold must be between 0 and 1")
+        if max_candidates is not None or max_seconds is not None:
+            raise ValueError(
+                "max_candidates/max_seconds are only supported for densegen scoring; "
+                "use mining.max_candidates or mining.max_seconds for fimo."
+            )
         if selection_policy not in {"random_uniform", "top_n", "stratified"}:
             raise ValueError(f"Unsupported pwm selection_policy: {selection_policy}")
-        if mining is not None:
-            retain_bins = _mining_attr(mining, "retain_bin_ids")
-            if retain_bins is not None and pvalue_bin_ids is not None:
-                raise ValueError("Provide retain_bin_ids in mining or pvalue_bin_ids, not both.")
         if score_threshold is not None or score_percentile is not None:
             log.warning(
                 "PWM sampling scoring_backend=fimo ignores score_threshold/score_percentile for motif %s.",
@@ -524,16 +527,25 @@ def sample_pwm_sites(
     if length_policy == "range" and length_range is not None and len(length_range) == 2:
         length_label = f"{length_policy}({length_range[0]}..{length_range[1]})"
 
-    def _cap_label(cap_applied: bool, time_limited: bool) -> str:
+    def _cap_label(
+        cap_applied: bool,
+        time_limited: bool,
+        *,
+        mining_max_candidates: Optional[int] = None,
+    ) -> str:
         cap_label = ""
-        if cap_applied and max_candidates is not None:
-            cap_label = f" (capped by max_candidates={max_candidates})"
+        if cap_applied:
+            if mining_max_candidates is not None:
+                cap_label = f" (capped by mining.max_candidates={mining_max_candidates})"
+            elif max_candidates is not None:
+                cap_label = f" (capped by max_candidates={max_candidates})"
         if time_limited and max_seconds is not None:
             cap_label = f"{cap_label}; max_seconds={max_seconds}" if cap_label else f" (max_seconds={max_seconds})"
         return cap_label
 
     def _context(length_obs: str, cap_applied: bool, requested: int, generated: int, time_limited: bool) -> dict:
         mining_cfg = mining
+        mining_max_candidates = _mining_attr(mining_cfg, "max_candidates")
         return {
             "motif_id": motif.motif_id,
             "width": width,
@@ -548,13 +560,14 @@ def sample_pwm_sites(
             "requested_candidates": requested,
             "generated_candidates": generated,
             "cap_applied": cap_applied,
-            "cap_label": _cap_label(cap_applied, time_limited),
+            "cap_label": _cap_label(cap_applied, time_limited, mining_max_candidates=mining_max_candidates),
             "time_limited": time_limited,
             "mining_batch_size": _mining_attr(mining_cfg, "batch_size"),
             "mining_max_batches": _mining_attr(mining_cfg, "max_batches"),
             "mining_max_seconds": _mining_attr(mining_cfg, "max_seconds"),
             "mining_log_every_batches": _mining_attr(mining_cfg, "log_every_batches"),
             "mining_retain_bin_ids": _mining_attr(mining_cfg, "retain_bin_ids"),
+            "mining_max_candidates": mining_max_candidates,
         }
 
     def _select(
@@ -620,8 +633,6 @@ def sample_pwm_sites(
             raise ValueError("pvalue_threshold required for fimo backend")
         resolved_bins = _resolve_pvalue_edges(pvalue_bins)
         retain_bins = _mining_attr(mining, "retain_bin_ids")
-        if retain_bins is None and pvalue_bin_ids is not None:
-            retain_bins = list(pvalue_bin_ids)
         allowed_bins: Optional[set[int]] = None
         if retain_bins is not None:
             allowed_bins = {int(idx) for idx in retain_bins}
@@ -631,8 +642,20 @@ def sample_pwm_sites(
         keep_weak = keep_low
         mining_batch_size = int(_mining_attr(mining, "batch_size", n_candidates))
         mining_max_batches = _mining_attr(mining, "max_batches")
+        mining_max_candidates = _mining_attr(mining, "max_candidates")
         mining_max_seconds = _mining_attr(mining, "max_seconds")
         mining_log_every = int(_mining_attr(mining, "log_every_batches", 1))
+        log.info(
+            "FIMO mining config for %s: target=%d batch=%d "
+            "max_batches=%s max_candidates=%s max_seconds=%s retain_bins=%s",
+            motif.motif_id,
+            n_candidates,
+            mining_batch_size,
+            str(mining_max_batches) if mining_max_batches is not None else "-",
+            str(mining_max_candidates) if mining_max_candidates is not None else "-",
+            str(mining_max_seconds) if mining_max_seconds is not None else "-",
+            str(sorted(allowed_bins)) if allowed_bins is not None else "all",
+        )
         debug_path: Optional[Path] = None
         debug_dir = debug_output_dir
         if keep_all_candidates_debug:
@@ -693,6 +716,7 @@ def sample_pwm_sites(
         time_limited = False
         mining_time_limited = False
         mining_batches_limited = False
+        mining_candidates_limited = False
         batches = 0
         tsv_lines: list[str] = []
         provided_sequences = sequences
@@ -758,6 +782,9 @@ def sample_pwm_sites(
                 while generated_total < n_candidates:
                     if mining_max_batches is not None and batches >= int(mining_max_batches):
                         mining_batches_limited = True
+                        break
+                    if mining_max_candidates is not None and generated_total >= int(mining_max_candidates):
+                        mining_candidates_limited = True
                         break
                     if mining_max_seconds is not None and (time.monotonic() - mining_start) >= float(
                         mining_max_seconds
@@ -827,11 +854,12 @@ def sample_pwm_sites(
                         bins_label = _format_pvalue_bins(resolved_bins, total_bin_counts, only_bins=retain_bins)
                         accepted_label = _format_pvalue_bins(resolved_bins, accepted_bin_counts, only_bins=retain_bins)
                         log.info(
-                            "FIMO mining %s batch %d/%s: generated=%d accepted=%d bins=%s accepted_bins=%s",
+                            "FIMO mining %s batch %d/%s: generated=%d/%d accepted=%d bins=%s accepted_bins=%s",
                             motif.motif_id,
                             batches,
                             str(mining_max_batches) if mining_max_batches is not None else "-",
                             generated_total,
+                            n_candidates,
                             len(candidates),
                             bins_label,
                             accepted_label,
@@ -855,12 +883,14 @@ def sample_pwm_sites(
 
         context = _context(length_obs, cap_applied, requested, generated_total, time_limited)
         context["pvalue_bins_label"] = bins_label
-        context["pvalue_bin_ids"] = sorted(allowed_bins) if allowed_bins is not None else None
+        context["retain_bin_ids"] = sorted(allowed_bins) if allowed_bins is not None else None
         context["mining_batch_size"] = mining_batch_size
         context["mining_max_batches"] = mining_max_batches
+        context["mining_max_candidates"] = mining_max_candidates
         context["mining_max_seconds"] = mining_max_seconds
         context["mining_time_limited"] = mining_time_limited
         context["mining_batches_limited"] = mining_batches_limited
+        context["mining_candidates_limited"] = mining_candidates_limited
         picked = _select_fimo_candidates(
             candidates,
             n_sites=n_sites,
@@ -929,19 +959,35 @@ def sample_pwm_sites(
     requested_candidates = max(1, n_sites * oversample_factor)
     n_candidates = requested_candidates
     cap_applied = False
-    if max_candidates is not None:
-        cap_val = int(max_candidates)
-        if cap_val <= 0:
-            raise ValueError("max_candidates must be > 0 when set")
-        if requested_candidates > cap_val:
-            n_candidates = cap_val
-            cap_applied = True
-            log.warning(
-                "PWM sampling capped candidate generation for motif %s: requested=%d max_candidates=%d",
-                motif.motif_id,
-                requested_candidates,
-                cap_val,
-            )
+    mining_max_candidates = _mining_attr(mining, "max_candidates")
+    if scoring_backend == "densegen":
+        if max_candidates is not None:
+            cap_val = int(max_candidates)
+            if cap_val <= 0:
+                raise ValueError("max_candidates must be > 0 when set")
+            if requested_candidates > cap_val:
+                n_candidates = cap_val
+                cap_applied = True
+                log.warning(
+                    "PWM sampling capped candidate generation for motif %s: requested=%d max_candidates=%d",
+                    motif.motif_id,
+                    requested_candidates,
+                    cap_val,
+                )
+    else:
+        if mining_max_candidates is not None:
+            mining_cap = int(mining_max_candidates)
+            if mining_cap < n_sites:
+                raise ValueError("pwm.sampling.mining.max_candidates must be >= n_sites")
+            if mining_cap != requested_candidates:
+                cap_applied = mining_cap < requested_candidates
+                n_candidates = mining_cap
+                log.info(
+                    "PWM mining candidate target for motif %s: requested=%d mining.max_candidates=%d",
+                    motif.motif_id,
+                    requested_candidates,
+                    mining_cap,
+                )
     n_candidates = max(1, n_candidates)
     if scoring_backend == "densegen":
         candidates: List[Tuple[str, str]] = []
