@@ -83,12 +83,24 @@ These are produced alongside Parquet/USR outputs and provide a compact audit tra
 
 ---
 
-### Library provenance (attempts log)
+### Events log
 
-DenseGen now records solver library provenance exclusively in `outputs/attempts.parquet`.
+DenseGen writes `outputs/meta/events.jsonl` (JSON lines) with structured events
+for pool builds, library builds, stalls, and resamples. This is a lightweight
+machine-readable trace of runtime control flow.
+
+---
+
+### Library provenance (library artifacts + attempts)
+
+DenseGen records solver library provenance in two places:
+
+- `outputs/libraries/library_builds.parquet` + `library_members.parquet` (canonical library artifacts).
+- `outputs/attempts.parquet` (attempt-level audit log with offered library lists).
+
 Each attempt row stores the full library offered to the solver (`library_tfbs`, `library_tfs`,
 `library_site_ids`, `library_sources`) along with the library hash/index and solver status.
-Output records carry `densegen__sampling_library_hash` so you can join placements to attempts.
+Output records carry `densegen__sampling_library_hash` so you can join placements to libraries.
 
 ---
 
@@ -115,9 +127,11 @@ DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solve
   - `outputs/pools/<input>__pool.parquet`
 - `dense stage-b build-libraries` writes:
   - `outputs/libraries/library_builds.parquet`
+  - `outputs/libraries/library_members.parquet`
   - `outputs/libraries/library_manifest.json`
 
-These are optional inspection artifacts and are not required for a normal `dense run`.
+Stage‑B expects Stage‑A pools (default `outputs/pools`). These are optional inspection artifacts
+and are not required for a normal `dense run`.
 
 ---
 
@@ -130,7 +144,8 @@ densegen:{input_name}:{plan_name}
 ```
 
 Per-placement provenance (TFBS, offsets, orientations) is recorded in
-`densegen__used_tfbs_detail` and the attempts log.
+`densegen__used_tfbs_detail` (including `motif_id`/`tfbs_id`), `outputs/composition.parquet`,
+and the attempts log.
 
 ---
 

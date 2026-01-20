@@ -43,7 +43,7 @@ python -m dnadesign.densegen --help
 
 Input paths resolve against the config file directory. Outputs and logs must resolve
 inside `densegen.run.root` (run-scoped I/O). Config files must include `densegen.schema_version`
-(currently `2.3`) and `densegen.run`.
+(currently `2.4`) and `densegen.run`.
 
 ---
 
@@ -112,17 +112,18 @@ Outputs:
 ---
 
 #### `dense stage-b build-libraries`
-Build Stage‑B libraries (one per input + plan) from pools or inputs.
+Build Stage‑B libraries (one per input + plan) from Stage‑A pools.
 
 Options:
 - `--out` - output directory relative to run root (default: `outputs/libraries`).
-- `--pool` - optional pool directory from `stage-a build-pool` (defaults to reading inputs).
+- `--pool` - pool directory from `stage-a build-pool` (defaults to `outputs/pools` in the workspace).
 - `--input/-i` - input name(s) to build (defaults to all).
 - `--plan/-p` - plan item name(s) to build (defaults to all).
-- `--overwrite` - overwrite existing `library_builds.parquet`.
+- `--overwrite` - overwrite existing library artifacts.
 
 Outputs:
 - `library_builds.parquet`
+- `library_members.parquet`
 - `library_manifest.json`
 
 ---
@@ -178,15 +179,21 @@ Options:
 ### Examples
 
 ```bash
-pixi run dense validate-config -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-uv run dense inspect inputs -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-uv run dense inspect plan   -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-uv run dense inspect config -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-uv run dense run            -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-uv run dense plot           -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --only tf_usage,tf_coverage,tfbs_positional_histogram,diversity_health
-uv run dense inspect run     --run src/dnadesign/densegen/workspaces/demo_meme_two_tf
-uv run dense inspect run     --root src/dnadesign/densegen/workspaces
-uv run dense report          -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --format all
+RUN_ROOT=/tmp/densegen-demo-$(date +%Y%m%d-%H%M)
+uv run dense workspace init --id demo_press --root "$RUN_ROOT" \
+  --template src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml \
+  --copy-inputs
+CFG="$RUN_ROOT/demo_press/config.yaml"
+
+pixi run dense validate-config -c "$CFG"
+uv run dense inspect inputs -c "$CFG"
+uv run dense inspect plan   -c "$CFG"
+uv run dense inspect config -c "$CFG"
+uv run dense run            -c "$CFG"
+uv run dense plot           -c "$CFG" --only tf_usage,tf_coverage,tfbs_positional_histogram,diversity_health
+uv run dense inspect run     --run "$RUN_ROOT/demo_press"
+uv run dense inspect run     --root "$RUN_ROOT"
+uv run dense report          -c "$CFG" --format all
 ```
 
 Demo run (small, Parquet-only config):

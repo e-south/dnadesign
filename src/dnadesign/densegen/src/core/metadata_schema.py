@@ -27,7 +27,7 @@ class MetaField:
 
 
 META_FIELDS: list[MetaField] = [
-    MetaField("schema_version", (str,), "DenseGen schema version (e.g., 2.1)."),
+    MetaField("schema_version", (str,), "DenseGen schema version (e.g., 2.4)."),
     MetaField("created_at", (str,), "UTC ISO8601 timestamp for record creation."),
     MetaField("run_id", (str,), "Run identifier (densegen.run.id)."),
     MetaField("run_root", (str,), "Resolved run root path (densegen.run.root)."),
@@ -54,7 +54,7 @@ META_FIELDS: list[MetaField] = [
     MetaField(
         "used_tfbs_detail",
         (list,),
-        "Per-placement detail: tf/tfbs/orientation/offset (offset uses final sequence coordinates).",
+        "Per-placement detail: tf/tfbs/motif_id/tfbs_id/orientation/offset (offset uses final coordinates).",
     ),
     MetaField("used_tf_counts", (list,), "Per-TF placement counts ({tf, count})."),
     MetaField("used_tf_list", (list,), "TFs used in the final sequence."),

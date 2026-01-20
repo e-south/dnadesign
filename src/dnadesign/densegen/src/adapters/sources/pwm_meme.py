@@ -18,6 +18,7 @@ from typing import List, Optional
 
 from dnadesign.cruncher.io.parsers.meme import MemeMotif, parse_meme_file
 
+from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
 from .base import BaseDataSource, resolve_path
 from .pwm_sampling import PWMMotif, normalize_background, sample_pwm_sites
 
@@ -112,6 +113,12 @@ class PWMMemeDataSource(BaseDataSource):
         all_rows = []
         for motif in motifs:
             pwm = _motif_to_pwm(motif, background)
+            motif_hash = hash_pwm_motif(
+                motif_label=pwm.motif_id,
+                matrix=pwm.matrix,
+                background=pwm.background,
+                source_kind="pwm_meme",
+            )
             return_meta = scoring_backend == "fimo"
             result = sample_pwm_sites(
                 rng,
@@ -147,9 +154,27 @@ class PWMMemeDataSource(BaseDataSource):
 
             for seq in selected:
                 entries.append((pwm.motif_id, seq, str(meme_path)))
-                row = {"tf": pwm.motif_id, "tfbs": seq, "source": str(meme_path)}
-                if meta_by_seq:
-                    row.update(meta_by_seq.get(seq, {}))
+                meta = meta_by_seq.get(seq, {}) if meta_by_seq else {}
+                start = meta.get("fimo_start")
+                stop = meta.get("fimo_stop")
+                strand = meta.get("fimo_strand")
+                tfbs_id = hash_tfbs_id(
+                    motif_id=motif_hash,
+                    sequence=seq,
+                    scoring_backend=scoring_backend,
+                    matched_start=int(start) if start is not None else None,
+                    matched_stop=int(stop) if stop is not None else None,
+                    matched_strand=str(strand) if strand is not None else None,
+                )
+                row = {
+                    "tf": pwm.motif_id,
+                    "tfbs": seq,
+                    "source": str(meme_path),
+                    "motif_id": motif_hash,
+                    "tfbs_id": tfbs_id,
+                }
+                if meta:
+                    row.update(meta)
                 all_rows.append(row)
 
         import pandas as pd

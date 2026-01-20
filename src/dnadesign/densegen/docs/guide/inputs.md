@@ -124,6 +124,9 @@ Notes:
 - `selection_policy: stratified` uses fixed p‑value bins to balance strong/weak matches.
 - Canonical p‑value bins (default): `[1e-10, 1e-8, 1e-6, 1e-4, 1e-3, 1e-2, 1e-1, 1.0]`.
   Bin 0 is `(0, 1e-10]`, bin 1 is `(1e-10, 1e-8]`, etc.
+- For FIMO, the candidate target is `n_sites * oversample_factor`, but mining caps or time limits
+  can stop early. Expect fewer candidates if `mining.max_seconds`, `mining.max_batches`, or
+  `mining.max_candidates` are binding.
 - FIMO mining defaults to **time-based** limits (`mining.max_seconds: 60`). To switch to a quota,
   set `mining.max_seconds: null` and use `mining.max_candidates` or `mining.max_batches`
   (with `mining.batch_size`) as the primary cap.

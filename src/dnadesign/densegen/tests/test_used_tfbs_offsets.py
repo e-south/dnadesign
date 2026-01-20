@@ -22,6 +22,8 @@ def test_used_tfbs_offsets_shift_with_5prime_padding() -> None:
         None,
         None,
         None,
+        None,
+        None,
     )
     assert used_tfbs == ["TF1:TT", "TF2:GG"]
     assert used_counts == {"TF1": 1, "TF2": 1}

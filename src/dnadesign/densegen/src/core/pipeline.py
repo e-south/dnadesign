@@ -43,6 +43,10 @@ from ..config import (
     resolve_run_root,
     schema_version_at_least,
 )
+from ..utils.logging_utils import install_native_stderr_filters
+from .artifacts.ids import hash_tfbs_id
+from .artifacts.library import write_library_artifact
+from .artifacts.pool import build_pool_artifact
 from .metadata import build_metadata
 from .postprocess import random_fill
 from .pvalue_bins import resolve_pvalue_bins
@@ -537,7 +541,16 @@ def _input_metadata(source_cfg, cfg_path: Path) -> dict:
     return meta
 
 
-def _compute_used_tf_info(sol, library_for_opt, regulator_labels, fixed_elements, site_id_by_index, source_by_index):
+def _compute_used_tf_info(
+    sol,
+    library_for_opt,
+    regulator_labels,
+    fixed_elements,
+    site_id_by_index,
+    source_by_index,
+    tfbs_id_by_index,
+    motif_id_by_index,
+):
     promoter_motifs = set()
     if fixed_elements is not None:
         if hasattr(fixed_elements, "promoter_constraints"):
@@ -593,6 +606,14 @@ def _compute_used_tf_info(sol, library_for_opt, regulator_labels, fixed_elements
             source = source_by_index[base_idx]
             if source is not None:
                 entry["source"] = source
+        if tfbs_id_by_index is not None and base_idx < len(tfbs_id_by_index):
+            tfbs_id = tfbs_id_by_index[base_idx]
+            if tfbs_id is not None:
+                entry["tfbs_id"] = tfbs_id
+        if motif_id_by_index is not None and base_idx < len(motif_id_by_index):
+            motif_id = motif_id_by_index[base_idx]
+            if motif_id is not None:
+                entry["motif_id"] = motif_id
         used_detail.append(entry)
         if tf_label:
             counts[tf_label] = counts.get(tf_label, 0) + 1
@@ -980,6 +1001,8 @@ def build_library_for_plan(
         *,
         site_id_by_index: list[str | None] | None,
         source_by_index: list[str | None] | None,
+        tfbs_id_by_index: list[str | None] | None,
+        motif_id_by_index: list[str | None] | None,
     ) -> tuple[list[str], list[str], list[str], dict]:
         nonlocal libraries_built
         libraries_built += 1
@@ -987,6 +1010,8 @@ def build_library_for_plan(
         info["library_hash"] = _hash_library(library, reg_labels, site_id_by_index, source_by_index)
         info["site_id_by_index"] = site_id_by_index
         info["source_by_index"] = source_by_index
+        info["tfbs_id_by_index"] = tfbs_id_by_index
+        info["motif_id_by_index"] = motif_id_by_index
         return library, parts, reg_labels, info
 
     if meta_df is not None and isinstance(meta_df, pd.DataFrame):
@@ -1022,6 +1047,8 @@ def build_library_for_plan(
             parts = [f"{tf}:{tfbs}" for tf, tfbs in zip(reg_labels, lib_df["tfbs"].tolist())]
             site_id_by_index = lib_df["site_id"].tolist() if "site_id" in lib_df.columns else None
             source_by_index = lib_df["source"].tolist() if "source" in lib_df.columns else None
+            tfbs_id_by_index = lib_df["tfbs_id"].tolist() if "tfbs_id" in lib_df.columns else None
+            motif_id_by_index = lib_df["motif_id"].tolist() if "motif_id" in lib_df.columns else None
             info = {
                 "target_length": seq_len + subsample_over,
                 "achieved_length": sum(len(s) for s in library),
@@ -1039,6 +1066,8 @@ def build_library_for_plan(
                 info,
                 site_id_by_index=site_id_by_index,
                 source_by_index=source_by_index,
+                tfbs_id_by_index=tfbs_id_by_index,
+                motif_id_by_index=motif_id_by_index,
             )
 
         sampler = TFSampler(meta_df, np_rng)
@@ -1126,6 +1155,8 @@ def build_library_for_plan(
         )
         site_id_by_index = info.get("site_id_by_index")
         source_by_index = info.get("source_by_index")
+        tfbs_id_by_index = info.get("tfbs_id_by_index")
+        motif_id_by_index = info.get("motif_id_by_index")
         return _finalize(
             library,
             parts,
@@ -1133,6 +1164,8 @@ def build_library_for_plan(
             info,
             site_id_by_index=site_id_by_index,
             source_by_index=source_by_index,
+            tfbs_id_by_index=tfbs_id_by_index,
+            motif_id_by_index=motif_id_by_index,
         )
 
     if required_regulators or plan_min_count_by_regulator or min_required_regulators is not None:
@@ -1183,7 +1216,19 @@ def build_library_for_plan(
         "iterative_max_libraries": iterative_max_libraries,
         "iterative_min_new_solutions": iterative_min_new_solutions,
     }
-    return _finalize(library, tf_parts, reg_labels, info, site_id_by_index=None, source_by_index=None)
+    tfbs_id_by_index = [
+        hash_tfbs_id(motif_id=None, sequence=seq, scoring_backend="sequence_library") for seq in library
+    ]
+    return _finalize(
+        library,
+        tf_parts,
+        reg_labels,
+        info,
+        site_id_by_index=None,
+        source_by_index=None,
+        tfbs_id_by_index=tfbs_id_by_index,
+        motif_id_by_index=None,
+    )
 
 
 def _compute_sampling_fraction(
@@ -1243,6 +1288,14 @@ def _consolidate_parts(outputs_root: Path, *, part_glob: str, final_name: str) -
     for part in parts:
         part.unlink()
     return True
+
+
+def _emit_event(events_path: Path, *, event: str, payload: dict) -> None:
+    record = {"event": event, "created_at": datetime.now(timezone.utc).isoformat()}
+    record.update(payload)
+    events_path.parent.mkdir(parents=True, exist_ok=True)
+    with events_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
 
 
 ATTEMPTS_CHUNK_SIZE = 256
@@ -1551,6 +1604,10 @@ def _process_plan_for_source(
     write_state: Callable[[], None] | None = None,
     site_failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] | None = None,
     source_cache: dict[str, tuple[list, pd.DataFrame | None]] | None = None,
+    library_build_rows: list[dict] | None = None,
+    library_member_rows: list[dict] | None = None,
+    composition_rows: list[dict] | None = None,
+    events_path: Path | None = None,
 ) -> tuple[int, dict]:
     source_label = source_cfg.name
     plan_name = plan_item.name
@@ -1559,6 +1616,73 @@ def _process_plan_for_source(
     gen = global_cfg.generation
     seq_len = int(gen.sequence_length)
     sampling_cfg = gen.sampling
+
+    def _record_library_build(
+        *,
+        sampling_info: dict,
+        library_tfbs: list[str],
+        library_tfs: list[str],
+        library_tfbs_ids: list[str],
+        library_motif_ids: list[str],
+        library_site_ids: list[str | None],
+        library_sources: list[str | None],
+    ) -> None:
+        if library_build_rows is None or library_member_rows is None:
+            return
+        library_index = int(sampling_info.get("library_index") or 0)
+        library_hash = str(sampling_info.get("library_hash") or "")
+        library_id = library_hash or f"{source_label}:{plan_name}:{library_index}"
+        row = {
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "input_name": source_label,
+            "plan_name": plan_name,
+            "library_index": library_index,
+            "library_id": library_id,
+            "library_hash": library_hash,
+            "pool_strategy": sampling_info.get("pool_strategy"),
+            "library_sampling_strategy": sampling_info.get("library_sampling_strategy"),
+            "library_size": int(sampling_info.get("library_size") or len(library_tfbs)),
+            "target_length": sampling_info.get("target_length"),
+            "achieved_length": sampling_info.get("achieved_length"),
+            "relaxed_cap": sampling_info.get("relaxed_cap"),
+            "final_cap": sampling_info.get("final_cap"),
+            "iterative_max_libraries": sampling_info.get("iterative_max_libraries"),
+            "iterative_min_new_solutions": sampling_info.get("iterative_min_new_solutions"),
+            "required_regulators_selected": sampling_info.get("required_regulators_selected"),
+        }
+        library_build_rows.append(row)
+        if events_path is not None:
+            try:
+                _emit_event(
+                    events_path,
+                    event="LIBRARY_BUILT",
+                    payload={
+                        "input_name": source_label,
+                        "plan_name": plan_name,
+                        "library_index": library_index,
+                        "library_hash": library_hash,
+                        "library_size": int(row.get("library_size") or len(library_tfbs)),
+                    },
+                )
+            except Exception:
+                log.debug("Failed to emit LIBRARY_BUILT event.", exc_info=True)
+        for idx, tfbs in enumerate(library_tfbs):
+            library_member_rows.append(
+                {
+                    "library_id": library_id,
+                    "library_hash": library_hash,
+                    "library_index": library_index,
+                    "input_name": source_label,
+                    "plan_name": plan_name,
+                    "position": int(idx),
+                    "tf": library_tfs[idx] if idx < len(library_tfs) else "",
+                    "tfbs": tfbs,
+                    "tfbs_id": library_tfbs_ids[idx] if idx < len(library_tfbs_ids) else None,
+                    "motif_id": library_motif_ids[idx] if idx < len(library_motif_ids) else None,
+                    "site_id": library_site_ids[idx] if idx < len(library_site_ids) else None,
+                    "source": library_sources[idx] if idx < len(library_sources) else None,
+                }
+            )
 
     pool_strategy = str(sampling_cfg.pool_strategy)
     library_sampling_strategy = str(sampling_cfg.library_sampling_strategy)
@@ -1822,12 +1946,25 @@ def _process_plan_for_source(
     libraries_built = int(sampling_info.get("library_index", libraries_built))
     site_id_by_index = sampling_info.get("site_id_by_index")
     source_by_index = sampling_info.get("source_by_index")
+    tfbs_id_by_index = sampling_info.get("tfbs_id_by_index")
+    motif_id_by_index = sampling_info.get("motif_id_by_index")
     sampling_library_index = sampling_info.get("library_index", 0)
     sampling_library_hash = sampling_info.get("library_hash", "")
     library_tfbs = list(library_for_opt)
     library_tfs = list(regulator_labels) if regulator_labels else []
     library_site_ids = list(site_id_by_index) if site_id_by_index else []
     library_sources = list(source_by_index) if source_by_index else []
+    library_tfbs_ids = list(tfbs_id_by_index) if tfbs_id_by_index else []
+    library_motif_ids = list(motif_id_by_index) if motif_id_by_index else []
+    _record_library_build(
+        sampling_info=sampling_info,
+        library_tfbs=library_tfbs,
+        library_tfs=library_tfs,
+        library_tfbs_ids=library_tfbs_ids,
+        library_motif_ids=library_motif_ids,
+        library_site_ids=library_site_ids,
+        library_sources=library_sources,
+    )
     max_tfbs_len = max((len(str(m)) for m in library_tfbs), default=0)
     required_len = max(max_tfbs_len, fixed_elements_max_len)
     if seq_len < required_len:
@@ -2015,6 +2152,21 @@ def _process_plan_for_source(
                         stall_seconds,
                     )
                     stall_events += 1
+                    if events_path is not None:
+                        try:
+                            _emit_event(
+                                events_path,
+                                event="STALL_DETECTED",
+                                payload={
+                                    "input_name": source_label,
+                                    "plan_name": plan_name,
+                                    "stall_seconds": float(now - subsample_started),
+                                    "library_index": int(sampling_library_index),
+                                    "library_hash": str(sampling_library_hash),
+                                },
+                            )
+                        except Exception:
+                            log.debug("Failed to emit STALL_DETECTED event.", exc_info=True)
                     stall_triggered = True
                     break
                 if (now - last_log_warn >= stall_warn_every) and (produced_this_library == 0):
@@ -2051,6 +2203,8 @@ def _process_plan_for_source(
                     fixed_elements,
                     site_id_by_index,
                     source_by_index,
+                    tfbs_id_by_index,
+                    motif_id_by_index,
                 )
                 tf_list_from_library = sorted(set(regulator_labels)) if regulator_labels else []
                 solver_status = getattr(sol, "status", None)
@@ -2412,6 +2566,30 @@ def _process_plan_for_source(
                     )
                     continue
 
+                if composition_rows is not None:
+                    for placement_index, entry in enumerate(used_tfbs_detail or []):
+                        composition_rows.append(
+                            {
+                                "sequence_id": record.id,
+                                "input_name": source_label,
+                                "plan_name": plan_name,
+                                "library_index": int(sampling_library_index),
+                                "library_hash": str(sampling_library_hash),
+                                "placement_index": int(placement_index),
+                                "tf": entry.get("tf"),
+                                "tfbs": entry.get("tfbs"),
+                                "motif_id": entry.get("motif_id"),
+                                "tfbs_id": entry.get("tfbs_id"),
+                                "orientation": entry.get("orientation"),
+                                "offset": entry.get("offset"),
+                                "length": entry.get("length"),
+                                "end": entry.get("end"),
+                                "pad_left": entry.get("pad_left"),
+                                "site_id": entry.get("site_id"),
+                                "source": entry.get("source"),
+                            }
+                        )
+
                 _append_attempt(
                     outputs_root,
                     run_id=run_id,
@@ -2634,6 +2812,13 @@ def _process_plan_for_source(
                         iterative_min_new_solutions,
                     )
 
+            resample_reason = "resample"
+            if produced_this_library == 0:
+                resample_reason = "stall_no_solution" if stall_triggered else "no_solution"
+            elif pool_strategy == "iterative_subsample" and iterative_min_new_solutions > 0:
+                if produced_this_library < iterative_min_new_solutions:
+                    resample_reason = "min_new_solutions"
+
             # Resample
             # Alignment (2): allow reactive resampling for subsample under schema>=2.2.
             allow_resample = pool_strategy == "iterative_subsample" or (schema_is_22 and pool_strategy == "subsample")
@@ -2645,6 +2830,22 @@ def _process_plan_for_source(
                 )
             resamples_in_try += 1
             total_resamples += 1
+            if events_path is not None:
+                try:
+                    _emit_event(
+                        events_path,
+                        event="RESAMPLE_TRIGGERED",
+                        payload={
+                            "input_name": source_label,
+                            "plan_name": plan_name,
+                            "reason": resample_reason,
+                            "produced_this_library": int(produced_this_library),
+                            "library_index": int(sampling_library_index),
+                            "library_hash": str(sampling_library_hash),
+                        },
+                    )
+                except Exception:
+                    log.debug("Failed to emit RESAMPLE_TRIGGERED event.", exc_info=True)
             if max_total_resamples > 0 and total_resamples > max_total_resamples:
                 raise RuntimeError(f"[{source_label}/{plan_name}] Exceeded max_total_resamples={max_total_resamples}.")
             if resamples_in_try > max_resample_attempts:
@@ -2683,12 +2884,25 @@ def _process_plan_for_source(
             libraries_built = int(sampling_info.get("library_index", libraries_built))
             site_id_by_index = sampling_info.get("site_id_by_index")
             source_by_index = sampling_info.get("source_by_index")
+            tfbs_id_by_index = sampling_info.get("tfbs_id_by_index")
+            motif_id_by_index = sampling_info.get("motif_id_by_index")
             sampling_library_index = sampling_info.get("library_index", sampling_library_index)
             sampling_library_hash = sampling_info.get("library_hash", sampling_library_hash)
             library_tfbs = list(library_for_opt)
             library_tfs = list(regulator_labels) if regulator_labels else []
             library_site_ids = list(site_id_by_index) if site_id_by_index else []
             library_sources = list(source_by_index) if source_by_index else []
+            library_tfbs_ids = list(tfbs_id_by_index) if tfbs_id_by_index else []
+            library_motif_ids = list(motif_id_by_index) if motif_id_by_index else []
+            _record_library_build(
+                sampling_info=sampling_info,
+                library_tfbs=library_tfbs,
+                library_tfs=library_tfs,
+                library_tfbs_ids=library_tfbs_ids,
+                library_motif_ids=library_motif_ids,
+                library_site_ids=library_site_ids,
+                library_sources=library_sources,
+            )
             # Alignment (7): sampling_fraction uses unique TFBS strings and is bounded.
             sampling_fraction = _compute_sampling_fraction(
                 library_for_opt,
@@ -2779,6 +2993,7 @@ def _process_plan_for_source(
 
 def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> RunSummary:
     deps = deps or default_deps()
+    install_native_stderr_filters()
     cfg = loaded.root.densegen
     run_root = resolve_run_root(loaded.path, cfg.run.root)
     run_root_str = str(run_root)
@@ -2811,8 +3026,45 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
     plan_leaderboards: dict[tuple[str, str], dict] = {}
     inputs_manifest_entries: dict[str, dict] = {}
     source_cache: dict[str, tuple[list, pd.DataFrame | None]] = {}
+    library_build_rows: list[dict] = []
+    library_member_rows: list[dict] = []
+    composition_rows: list[dict] = []
     outputs_root = run_outputs_root(run_root)
     outputs_root.mkdir(parents=True, exist_ok=True)
+    events_path = outputs_root / "meta" / "events.jsonl"
+    pool_dir = outputs_root / "pools"
+    try:
+        _pool_artifact, pool_data = build_pool_artifact(
+            cfg=cfg,
+            cfg_path=loaded.path,
+            deps=deps,
+            rng=np_rng,
+            outputs_root=outputs_root,
+            out_dir=pool_dir,
+            overwrite=True,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Failed to build Stage-A TFBS pools: {exc}") from exc
+    try:
+        _emit_event(
+            events_path,
+            event="POOL_BUILT",
+            payload={
+                "inputs": [
+                    {
+                        "name": pool.name,
+                        "input_type": pool.input_type,
+                        "pool_mode": pool.pool_mode,
+                        "rows": int(pool.df.shape[0]) if pool.df is not None else int(len(pool.sequences)),
+                    }
+                    for pool in pool_data.values()
+                ]
+            },
+        )
+    except Exception:
+        log.debug("Failed to emit POOL_BUILT event.", exc_info=True)
+    for name, pool in pool_data.items():
+        source_cache[name] = (pool.sequences, pool.df)
     ensure_run_meta_dir(run_root)
     state_path = run_state_path(run_root)
     state_created_at = datetime.now(timezone.utc).isoformat()
@@ -2996,6 +3248,10 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                     write_state=_write_state,
                     site_failure_counts=site_failure_counts,
                     source_cache=source_cache,
+                    library_build_rows=library_build_rows,
+                    library_member_rows=library_member_rows,
+                    composition_rows=composition_rows,
+                    events_path=events_path,
                 )
                 per_plan[(s.name, item.name)] = per_plan.get((s.name, item.name), 0) + produced
                 total += produced
@@ -3044,6 +3300,10 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                         write_state=_write_state,
                         site_failure_counts=site_failure_counts,
                         source_cache=source_cache,
+                        library_build_rows=library_build_rows,
+                        library_member_rows=library_member_rows,
+                        composition_rows=composition_rows,
+                        events_path=events_path,
                     )
                     produced_counts[key] = current + produced
                     leaderboard_latest = stats.get("leaderboard_latest")
@@ -3058,6 +3318,77 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
 
     outputs_root = run_outputs_root(run_root)
     _consolidate_parts(outputs_root, part_glob="attempts_part-*.parquet", final_name="attempts.parquet")
+
+    if library_build_rows:
+        libraries_dir = outputs_root / "libraries"
+        existing_builds: list[dict] = []
+        existing_members: list[dict] = []
+        builds_path = libraries_dir / "library_builds.parquet"
+        members_path = libraries_dir / "library_members.parquet"
+        if builds_path.exists():
+            try:
+                existing_builds = pd.read_parquet(builds_path).to_dict("records")
+            except Exception:
+                log.warning("Failed to read existing library_builds.parquet; overwriting.", exc_info=True)
+                existing_builds = []
+        if members_path.exists():
+            try:
+                existing_members = pd.read_parquet(members_path).to_dict("records")
+            except Exception:
+                log.warning("Failed to read existing library_members.parquet; overwriting.", exc_info=True)
+                existing_members = []
+
+        existing_indices = {
+            int(row.get("library_index") or 0) for row in existing_builds if row.get("library_index") is not None
+        }
+        new_builds = [row for row in library_build_rows if int(row.get("library_index") or 0) not in existing_indices]
+        build_rows = existing_builds + new_builds
+
+        existing_member_keys = {
+            (
+                int(row.get("library_index") or 0),
+                int(row.get("position") or 0),
+            )
+            for row in existing_members
+        }
+        new_members = [
+            row
+            for row in library_member_rows
+            if (int(row.get("library_index") or 0), int(row.get("position") or 0)) not in existing_member_keys
+        ]
+        member_rows = existing_members + new_members
+
+        try:
+            write_library_artifact(
+                out_dir=libraries_dir,
+                builds=build_rows,
+                members=member_rows,
+                cfg_path=loaded.path,
+                run_id=str(cfg.run.id),
+                run_root=run_root,
+                overwrite=True,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed to write library artifacts: {exc}") from exc
+
+    if composition_rows:
+        composition_path = outputs_root / "composition.parquet"
+        existing_rows: list[dict] = []
+        if composition_path.exists():
+            try:
+                existing_rows = pd.read_parquet(composition_path).to_dict("records")
+            except Exception:
+                log.warning("Failed to read existing composition.parquet; overwriting.", exc_info=True)
+                existing_rows = []
+        existing_keys = {
+            (str(row.get("sequence_id") or ""), int(row.get("placement_index") or 0)) for row in existing_rows
+        }
+        new_rows = [
+            row
+            for row in composition_rows
+            if (str(row.get("sequence_id") or ""), int(row.get("placement_index") or 0)) not in existing_keys
+        ]
+        pd.DataFrame(existing_rows + new_rows).to_parquet(composition_path, index=False)
 
     manifest_items = [
         PlanManifest(

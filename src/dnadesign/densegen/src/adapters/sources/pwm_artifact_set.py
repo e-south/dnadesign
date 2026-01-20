@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
+from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
 from .base import BaseDataSource, resolve_path
 from .pwm_artifact import load_artifact
 from .pwm_sampling import sample_pwm_sites
@@ -54,6 +55,12 @@ class PWMArtifactSetDataSource(BaseDataSource):
         entries = []
         all_rows = []
         for motif, path in zip(motifs, resolved):
+            motif_hash = hash_pwm_motif(
+                motif_label=motif.motif_id,
+                matrix=motif.matrix,
+                background=motif.background,
+                source_kind="pwm_artifact_set",
+            )
             sampling_cfg = sampling
             override = overrides.get(motif.motif_id)
             if override:
@@ -120,9 +127,27 @@ class PWMArtifactSetDataSource(BaseDataSource):
 
             for seq in selected:
                 entries.append((motif.motif_id, seq, str(path)))
-                row = {"tf": motif.motif_id, "tfbs": seq, "source": str(path)}
-                if meta_by_seq:
-                    row.update(meta_by_seq.get(seq, {}))
+                meta = meta_by_seq.get(seq, {}) if meta_by_seq else {}
+                start = meta.get("fimo_start")
+                stop = meta.get("fimo_stop")
+                strand = meta.get("fimo_strand")
+                tfbs_id = hash_tfbs_id(
+                    motif_id=motif_hash,
+                    sequence=seq,
+                    scoring_backend=scoring_backend,
+                    matched_start=int(start) if start is not None else None,
+                    matched_stop=int(stop) if stop is not None else None,
+                    matched_strand=str(strand) if strand is not None else None,
+                )
+                row = {
+                    "tf": motif.motif_id,
+                    "tfbs": seq,
+                    "source": str(path),
+                    "motif_id": motif_hash,
+                    "tfbs_id": tfbs_id,
+                }
+                if meta:
+                    row.update(meta)
                 all_rows.append(row)
 
         import pandas as pd

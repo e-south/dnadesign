@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import contextlib
 import io
-import json
 import logging
 import os
 import platform
@@ -61,6 +60,13 @@ from .config import (
     resolve_run_scoped_path,
     schema_version_at_least,
 )
+from .core.artifacts.library import write_library_artifact
+from .core.artifacts.pool import (
+    POOL_MODE_SEQUENCE,
+    POOL_MODE_TFBS,
+    build_pool_artifact,
+    load_pool_artifact,
+)
 from .core.pipeline import (
     _load_existing_library_index,
     _load_failure_counts_from_attempts,
@@ -80,6 +86,7 @@ rich_traceback(show_locals=False)
 console = Console()
 _PYARROW_SYSCTL_PATTERN = re.compile(r"sysctlbyname failed for 'hw\.")
 log = logging.getLogger(__name__)
+install_native_stderr_filters()
 
 
 @contextlib.contextmanager
@@ -353,17 +360,6 @@ def _print_inputs_summary(loaded) -> None:
     )
 
 
-def _pool_manifest_path(out_dir: Path) -> Path:
-    return out_dir / "pool_manifest.json"
-
-
-def _load_pool_manifest(out_dir: Path) -> dict:
-    manifest_path = _pool_manifest_path(out_dir)
-    if not manifest_path.exists():
-        raise FileNotFoundError(f"Pool manifest not found: {manifest_path}")
-    return json.loads(manifest_path.read_text())
-
-
 def _list_dir_entries(path: Path, *, limit: int = 10) -> list[str]:
     if not path.exists() or not path.is_dir():
         return []
@@ -391,6 +387,25 @@ def _collect_missing_input_paths(loaded, cfg_path: Path) -> list[Path]:
                         if not resolved.exists():
                             missing.append(resolved)
     return missing
+
+
+def _collect_relative_input_paths_from_raw(dense_cfg: dict) -> list[str]:
+    rel_paths: list[str] = []
+    inputs_cfg = dense_cfg.get("inputs") or []
+    for inp in inputs_cfg:
+        if not isinstance(inp, dict):
+            continue
+        raw_path = inp.get("path")
+        if isinstance(raw_path, str) and raw_path.strip():
+            if not Path(raw_path).is_absolute():
+                rel_paths.append(raw_path)
+        raw_paths = inp.get("paths")
+        if isinstance(raw_paths, list):
+            for path in raw_paths:
+                if isinstance(path, str) and path.strip():
+                    if not Path(path).is_absolute():
+                        rel_paths.append(path)
+    return rel_paths
 
 
 def _render_missing_input_hint(cfg_path: Path, loaded, exc: Exception) -> None:
@@ -753,6 +768,16 @@ def workspace_init(
 
     config_path = run_dir / "config.yaml"
     config_path.write_text(yaml.safe_dump(raw, sort_keys=False))
+    if not copy_inputs:
+        rel_paths = _collect_relative_input_paths_from_raw(dense)
+        if rel_paths:
+            console.print(
+                "[yellow]Workspace uses file-based inputs with relative paths.[/]"
+                " They will resolve relative to the new workspace."
+            )
+            for rel_path in rel_paths[:6]:
+                console.print(f"  - {rel_path}")
+            console.print("[yellow]Tip[/]: re-run with --copy-inputs or update paths in config.yaml.")
     console.print(f":sparkles: [bold green]Workspace staged[/]: {config_path}")
 
 
@@ -1323,24 +1348,26 @@ def stage_a_build_pool(
     outputs_root = run_root / "outputs"
     outputs_root.mkdir(parents=True, exist_ok=True)
 
-    rows = []
-    manifest_inputs: list[dict] = []
-    for inp in cfg.inputs:
-        if selected and inp.name not in selected:
-            continue
-        src = deps.source_factory(inp, cfg_path)
-        data_entries, meta_df = src.load_data(rng=rng, outputs_root=outputs_root)
-        if meta_df is None:
-            df = pd.DataFrame({"sequence": [str(s) for s in data_entries]})
-        else:
-            df = meta_df.copy()
-        df.insert(0, "input_name", inp.name)
-        filename = f"{_sanitize_filename(inp.name)}__pool.parquet"
-        dest = out_dir / filename
-        if dest.exists() and not overwrite:
-            console.print(f"[bold red]Pool already exists:[/] {dest}")
+    with _suppress_pyarrow_sysctl_warnings():
+        try:
+            artifact, pool_data = build_pool_artifact(
+                cfg=cfg,
+                cfg_path=cfg_path,
+                deps=deps,
+                rng=rng,
+                outputs_root=outputs_root,
+                out_dir=out_dir,
+                overwrite=overwrite,
+                selected_inputs=selected if selected else None,
+            )
+        except FileExistsError as exc:
+            console.print(f"[bold red]{exc}[/]")
             raise typer.Exit(code=1)
-        df.to_parquet(dest, index=False)
+
+    for pool in pool_data.values():
+        if pool.df is None:
+            continue
+        df = pool.df
         if "fimo_bin_id" in df.columns:
             bin_counts = df["fimo_bin_id"].value_counts().sort_index()
             bin_table = Table("bin_id", "pvalue_range", "count")
@@ -1360,39 +1387,14 @@ def stage_a_build_pool(
                 else:
                     range_label = "-"
                 bin_table.add_row(str(bin_id), range_label, str(int(count)))
-            console.print(f"[bold]FIMO p-value bins for {inp.name}[/]")
+            console.print(f"[bold]FIMO p-value bins for {pool.name}[/]")
             console.print(bin_table)
-        manifest_inputs.append(
-            {
-                "name": inp.name,
-                "type": inp.type,
-                "pool_path": dest.name,
-                "rows": int(len(df)),
-                "columns": list(df.columns),
-            }
-        )
-        rows.append((inp.name, inp.type, str(len(df)), dest.name))
-
-    if not rows:
-        console.print("[yellow]No pools built (no matching inputs).[/]")
-        raise typer.Exit(code=1)
-
-    manifest = {
-        "schema_version": "1.0",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "run_id": cfg.run.id,
-        "run_root": str(run_root),
-        "config_path": str(cfg_path),
-        "inputs": manifest_inputs,
-    }
-    manifest_path = _pool_manifest_path(out_dir)
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
 
     table = Table("input", "type", "rows", "pool_file")
-    for row in rows:
-        table.add_row(*row)
+    for entry in artifact.inputs.values():
+        table.add_row(entry.name, entry.input_type, str(entry.rows), entry.pool_path.name)
     console.print(table)
-    console.print(f":sparkles: [bold green]Pool manifest written[/]: {manifest_path}")
+    console.print(f":sparkles: [bold green]Pool manifest written[/]: {artifact.manifest_path}")
 
 
 @stage_b_app.command("build-libraries", help="Build Stage-B libraries from pools or inputs.")
@@ -1402,7 +1404,7 @@ def stage_b_build_libraries(
     pool: Optional[Path] = typer.Option(
         None,
         "--pool",
-        help="Optional pool directory from `stage-a build-pool` (defaults to reading inputs).",
+        help="Pool directory from `stage-a build-pool` (defaults to outputs/pools for this workspace).",
     ),
     input_name: Optional[list[str]] = typer.Option(
         None,
@@ -1422,15 +1424,9 @@ def stage_b_build_libraries(
     cfg_path = _resolve_config_path(ctx, config)
     loaded = _load_config_or_exit(cfg_path)
     cfg = loaded.root.densegen
-    if pool is None:
-        _ensure_fimo_available(cfg, strict=True)
     run_root = _run_root_for(loaded)
     out_dir = resolve_run_scoped_path(cfg_path, run_root, out, label="stage-b.out")
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / "library_builds.parquet"
-    if out_path.exists() and not overwrite:
-        console.print(f"[bold red]library_builds.parquet already exists:[/] {out_path}")
-        raise typer.Exit(code=1)
 
     selected_inputs = {name for name in (input_name or [])}
     if selected_inputs:
@@ -1447,7 +1443,6 @@ def stage_b_build_libraries(
         if missing:
             raise typer.BadParameter(f"Unknown plan name(s): {', '.join(missing)}")
 
-    deps = default_deps()
     seed = int(cfg.runtime.random_seed)
     rng = random.Random(seed)
     np_rng = np.random.default_rng(seed)
@@ -1457,117 +1452,147 @@ def stage_b_build_libraries(
     failure_counts = _load_failure_counts_from_attempts(outputs_root)
     libraries_built = _load_existing_library_index(outputs_root) if outputs_root.exists() else 0
 
-    pool_manifest = None
-    pool_dir = None
-    if pool is not None:
-        pool_dir = resolve_relative_path(cfg_path, pool)
-        if not pool_dir.exists() or not pool_dir.is_dir():
-            raise typer.BadParameter(f"Pool directory not found: {pool_dir}")
-        pool_manifest = _load_pool_manifest(pool_dir)
+    pool_dir = resolve_relative_path(cfg_path, pool) if pool is not None else (run_root / "outputs" / "pools")
+    if not pool_dir.exists() or not pool_dir.is_dir():
+        raise typer.BadParameter(f"Pool directory not found: {pool_dir}")
+    try:
+        pool_artifact = load_pool_artifact(pool_dir)
+    except FileNotFoundError as exc:
+        console.print(f"[bold red]{exc}[/]")
+        entries = _list_dir_entries(pool_dir, limit=10)
+        if entries:
+            console.print(f"[bold]Pool directory contents[/]: {', '.join(entries)}")
+        console.print("[bold]Next steps[/]:")
+        console.print(f"  - dense stage-a build-pool -c {cfg_path}")
+        console.print("  - ensure --pool points to the outputs/pools directory for this workspace")
+        raise typer.Exit(code=1)
 
-    rows = []
+    build_rows = []
+    member_rows = []
     table = Table("input", "plan", "library_index", "library_hash", "size", "achieved/target", "pool", "sampling")
-    for inp in cfg.inputs:
-        if selected_inputs and inp.name not in selected_inputs:
-            continue
-        if pool_manifest is not None and pool_dir is not None:
-            entry = next((e for e in pool_manifest.get("inputs", []) if e.get("name") == inp.name), None)
-            if entry is None:
-                raise typer.BadParameter(f"Pool manifest missing input: {inp.name}")
-            pool_path = pool_dir / str(entry.get("pool_path") or "")
+    with _suppress_pyarrow_sysctl_warnings():
+        for inp in cfg.inputs:
+            if selected_inputs and inp.name not in selected_inputs:
+                continue
+            entry = pool_artifact.entry_for(inp.name)
+            pool_path = pool_dir / entry.pool_path
             if not pool_path.exists():
                 raise typer.BadParameter(f"Pool file not found for input {inp.name}: {pool_path}")
             df = pd.read_parquet(pool_path)
-            if "tf" in df.columns and "tfbs" in df.columns:
+            if entry.pool_mode == POOL_MODE_TFBS:
                 meta_df = df
-                data_entries = df["tfbs"].tolist()
-            elif "sequence" in df.columns:
+                data_entries = df["tfbs"].tolist() if "tfbs" in df.columns else []
+            elif entry.pool_mode == POOL_MODE_SEQUENCE:
                 meta_df = None
                 data_entries = df["sequence"].tolist()
             else:
-                raise typer.BadParameter(
-                    f"Pool file for {inp.name} must contain tf/tfbs or sequence columns: {pool_path}"
+                raise typer.BadParameter(f"Unsupported pool_mode for input {inp.name}: {entry.pool_mode}")
+
+            for plan_item in resolved_plan:
+                if selected_plans and plan_item.name not in selected_plans:
+                    continue
+                library, _parts, reg_labels, info = build_library_for_plan(
+                    source_label=inp.name,
+                    plan_item=plan_item,
+                    data_entries=data_entries,
+                    meta_df=meta_df,
+                    sampling_cfg=sampling_cfg,
+                    seq_len=int(cfg.generation.sequence_length),
+                    min_count_per_tf=int(cfg.runtime.min_count_per_tf),
+                    usage_counts={},
+                    failure_counts=failure_counts if failure_counts else None,
+                    rng=rng,
+                    np_rng=np_rng,
+                    schema_is_22=schema_is_22,
+                    library_index_start=libraries_built,
                 )
-        else:
-            src = deps.source_factory(inp, cfg_path)
-            data_entries, meta_df = src.load_data(rng=np_rng, outputs_root=outputs_root)
+                libraries_built = int(info.get("library_index", libraries_built))
+                library_hash = str(info.get("library_hash") or "")
+                target_len = int(info.get("target_length") or 0)
+                achieved_len = int(info.get("achieved_length") or 0)
+                pool_strategy = str(info.get("pool_strategy") or sampling_cfg.pool_strategy)
+                sampling_strategy = str(info.get("library_sampling_strategy") or sampling_cfg.library_sampling_strategy)
+                library_id = library_hash
+                tfbs_id_by_index = info.get("tfbs_id_by_index") or []
+                motif_id_by_index = info.get("motif_id_by_index") or []
+                row = {
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "input_name": inp.name,
+                    "input_type": inp.type,
+                    "plan_name": plan_item.name,
+                    "library_index": int(info.get("library_index") or 0),
+                    "library_id": library_id,
+                    "library_hash": library_hash,
+                    "library_tfbs": list(library),
+                    "library_tfs": list(reg_labels) if reg_labels else [],
+                    "library_site_ids": list(info.get("site_id_by_index") or []),
+                    "library_sources": list(info.get("source_by_index") or []),
+                    "library_tfbs_ids": list(tfbs_id_by_index),
+                    "library_motif_ids": list(motif_id_by_index),
+                    "pool_strategy": pool_strategy,
+                    "library_sampling_strategy": sampling_strategy,
+                    "library_size": int(info.get("library_size") or len(library)),
+                    "target_length": target_len,
+                    "achieved_length": achieved_len,
+                    "relaxed_cap": bool(info.get("relaxed_cap") or False),
+                    "final_cap": info.get("final_cap"),
+                    "iterative_max_libraries": int(info.get("iterative_max_libraries") or 0),
+                    "iterative_min_new_solutions": int(info.get("iterative_min_new_solutions") or 0),
+                    "required_regulators_selected": info.get("required_regulators_selected"),
+                }
+                build_rows.append(row)
+                for idx, tfbs in enumerate(list(library)):
+                    member_rows.append(
+                        {
+                            "library_id": library_id,
+                            "library_hash": library_hash,
+                            "library_index": int(info.get("library_index") or 0),
+                            "input_name": inp.name,
+                            "plan_name": plan_item.name,
+                            "position": int(idx),
+                            "tf": reg_labels[idx] if idx < len(reg_labels or []) else "",
+                            "tfbs": tfbs,
+                            "tfbs_id": tfbs_id_by_index[idx] if idx < len(tfbs_id_by_index) else None,
+                            "motif_id": motif_id_by_index[idx] if idx < len(motif_id_by_index) else None,
+                            "site_id": (info.get("site_id_by_index") or [None])[idx]
+                            if idx < len(info.get("site_id_by_index") or [])
+                            else None,
+                            "source": (info.get("source_by_index") or [None])[idx]
+                            if idx < len(info.get("source_by_index") or [])
+                            else None,
+                        }
+                    )
+                table.add_row(
+                    inp.name,
+                    plan_item.name,
+                    str(row["library_index"]),
+                    _short_hash(library_hash),
+                    str(len(library)),
+                    f"{achieved_len}/{target_len}",
+                    pool_strategy,
+                    sampling_strategy,
+                )
 
-        for plan_item in resolved_plan:
-            if selected_plans and plan_item.name not in selected_plans:
-                continue
-            library, _parts, reg_labels, info = build_library_for_plan(
-                source_label=inp.name,
-                plan_item=plan_item,
-                data_entries=data_entries,
-                meta_df=meta_df,
-                sampling_cfg=sampling_cfg,
-                seq_len=int(cfg.generation.sequence_length),
-                min_count_per_tf=int(cfg.runtime.min_count_per_tf),
-                usage_counts={},
-                failure_counts=failure_counts if failure_counts else None,
-                rng=rng,
-                np_rng=np_rng,
-                schema_is_22=schema_is_22,
-                library_index_start=libraries_built,
+        if not build_rows:
+            console.print("[yellow]No libraries built (no matching inputs/plans).[/]")
+            raise typer.Exit(code=1)
+
+        try:
+            artifact = write_library_artifact(
+                out_dir=out_dir,
+                builds=build_rows,
+                members=member_rows,
+                cfg_path=cfg_path,
+                run_id=str(cfg.run.id),
+                run_root=run_root,
+                overwrite=overwrite,
             )
-            libraries_built = int(info.get("library_index", libraries_built))
-            library_hash = str(info.get("library_hash") or "")
-            target_len = int(info.get("target_length") or 0)
-            achieved_len = int(info.get("achieved_length") or 0)
-            pool_strategy = str(info.get("pool_strategy") or sampling_cfg.pool_strategy)
-            sampling_strategy = str(info.get("library_sampling_strategy") or sampling_cfg.library_sampling_strategy)
-            row = {
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "input_name": inp.name,
-                "input_type": inp.type,
-                "plan_name": plan_item.name,
-                "library_index": int(info.get("library_index") or 0),
-                "library_hash": library_hash,
-                "library_tfbs": list(library),
-                "library_tfs": list(reg_labels) if reg_labels else [],
-                "library_site_ids": list(info.get("site_id_by_index") or []),
-                "library_sources": list(info.get("source_by_index") or []),
-                "pool_strategy": pool_strategy,
-                "library_sampling_strategy": sampling_strategy,
-                "library_size": int(info.get("library_size") or len(library)),
-                "target_length": target_len,
-                "achieved_length": achieved_len,
-                "relaxed_cap": bool(info.get("relaxed_cap") or False),
-                "final_cap": info.get("final_cap"),
-                "iterative_max_libraries": int(info.get("iterative_max_libraries") or 0),
-                "iterative_min_new_solutions": int(info.get("iterative_min_new_solutions") or 0),
-                "required_regulators_selected": info.get("required_regulators_selected"),
-            }
-            rows.append(row)
-            table.add_row(
-                inp.name,
-                plan_item.name,
-                str(row["library_index"]),
-                _short_hash(library_hash),
-                str(len(library)),
-                f"{achieved_len}/{target_len}",
-                pool_strategy,
-                sampling_strategy,
-            )
-
-    if not rows:
-        console.print("[yellow]No libraries built (no matching inputs/plans).[/]")
-        raise typer.Exit(code=1)
-
-    df_out = pd.DataFrame(rows)
-    df_out.to_parquet(out_path, index=False)
-    manifest = {
-        "schema_version": "1.0",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "run_id": cfg.run.id,
-        "run_root": str(run_root),
-        "config_path": str(cfg_path),
-        "library_builds_path": str(out_path),
-    }
-    manifest_path = out_dir / "library_manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
+        except FileExistsError as exc:
+            console.print(f"[bold red]{exc}[/]")
+            raise typer.Exit(code=1)
     console.print(table)
-    console.print(f":sparkles: [bold green]Library builds written[/]: {out_path}")
+    console.print(f":sparkles: [bold green]Library builds written[/]: {artifact.builds_path}")
+    console.print(f":sparkles: [bold green]Library members written[/]: {artifact.members_path}")
 
 
 @app.command(help="Run generation for the job. Optionally auto-run plots declared in YAML.")
@@ -1582,6 +1607,7 @@ def run(
     root = loaded.root
     cfg = root.densegen
     run_root = _run_root_for(loaded)
+    _ensure_fimo_available(cfg, strict=True)
 
     # Logging setup
     log_cfg = cfg.logging

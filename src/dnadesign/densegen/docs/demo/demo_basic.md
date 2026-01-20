@@ -99,7 +99,7 @@ uv run dense workspace init --id demo_press --root "$RUN_ROOT" \
 Example output:
 
 ```text
-✨ Run staged: /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
+✨ Workspace staged: /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
 ```
 
 If you re-run the demo in the same run root and DenseGen’s schema has changed, you may see a
@@ -215,7 +215,7 @@ uv run dense inspect run --run /private/tmp/densegen-demo-20260115-1405/demo_pre
 Example output:
 
 ```text
-Run: demo_press  Root: /private/tmp/densegen-demo-20260115-1405/demo_press  Schema: 2.3  dense-arrays: <version> (<source>)
+Run: demo_press  Root: /private/tmp/densegen-demo-20260115-1405/demo_press  Schema: 2.4  dense-arrays: <version> (<source>)
 ┏━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┓
 ┃ input        ┃ plan ┃ generated ┃ duplica… ┃ failed ┃ resamples ┃ librari… ┃ stalls ┃
 ┡━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━┩
@@ -248,20 +248,7 @@ This writes `outputs/report.json`, `outputs/report.md`, and `outputs/report.html
 
 ## 10) Inspect outputs
 
-List the generated Parquet artifacts:
-
-```bash
-ls /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/dense_arrays.parquet
-```
-
-Example output:
-
-```text
-_densegen_ids.sqlite
-part-10ca57ae0c1d410d8b88206d194a2ff1.parquet
-```
-
-Inspect the library manifests:
+List the generated Parquet artifacts and manifests:
 
 ```bash
 ls /private/tmp/densegen-demo-20260115-1405/demo_press/outputs
@@ -271,6 +258,20 @@ Example output:
 
 ```text
 attempts.parquet
+composition.parquet
+dense_arrays.parquet
+libraries
+pools
+report.html
+report.json
+report.md
+```
+
+Inspect Stage‑A pools and Stage‑B libraries:
+
+```bash
+ls /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/pools
+ls /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/libraries
 ```
 
 ## 11) Plot analysis

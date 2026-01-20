@@ -65,5 +65,7 @@ When a run is complete, archive or sync the workspace as a unit.
 
 Tip: use `dense workspace init --id <run_name>` to scaffold a new workspace. Use
 `dense inspect run --root workspaces/_archive` to inspect archived workspaces.
+If your config references local motif files, add `--copy-inputs` so the workspace
+remains self-contained (or update paths in `config.yaml` after staging).
 
 @e-south

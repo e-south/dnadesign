@@ -19,6 +19,7 @@ from typing import Optional
 
 import pandas as pd
 
+from ...core.artifacts.ids import hash_label_motif, hash_tfbs_id
 from .base import BaseDataSource, infer_format, resolve_path
 
 log = logging.getLogger(__name__)
@@ -124,6 +125,17 @@ class BindingSitesDataSource(BaseDataSource):
             out["site_id"] = df[site_id_col].astype(str).str.strip()
         if source_col:
             out["source"] = df[source_col].astype(str).str.strip()
+
+        motif_id_map = {tf: hash_label_motif(label=tf, source_kind="binding_sites") for tf in tf_clean.unique()}
+        out["motif_id"] = tf_clean.map(motif_id_map)
+        out["tfbs_id"] = [
+            hash_tfbs_id(
+                motif_id=motif_id_map[tf],
+                sequence=seq,
+                scoring_backend="binding_sites",
+            )
+            for tf, seq in zip(tf_clean.tolist(), seq_clean.tolist())
+        ]
 
         out = out.reset_index(drop=True)
         source_default = str(data_path)

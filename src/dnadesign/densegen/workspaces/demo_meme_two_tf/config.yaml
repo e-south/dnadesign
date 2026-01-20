@@ -4,7 +4,7 @@
 # Motif widths: lexA=22, cpxR=21.
 
 densegen:
-  schema_version: "2.3"
+  schema_version: "2.4"
   run:
     id: demo_meme_two_tf
     root: "."
