@@ -39,3 +39,13 @@ def resolve_executable(tool: str, *, tool_path: Path | None = None) -> Path | No
             return candidate
     found = shutil.which(tool)
     return Path(found) if found else None
+
+
+def require_executable(tool: str, *, tool_path: Path | None = None) -> Path:
+    exe = resolve_executable(tool, tool_path=tool_path)
+    if exe is None:
+        raise FileNotFoundError(
+            f"{tool} executable not found. Install MEME Suite and ensure `{tool}` is on PATH, "
+            "or set MEME_BIN to the MEME bin directory (pixi users: `pixi run dense ...`)."
+        )
+    return exe

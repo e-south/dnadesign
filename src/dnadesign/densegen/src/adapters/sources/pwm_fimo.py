@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from ...integrations.meme_suite import resolve_executable
+from ...integrations.meme_suite import require_executable
 from .pwm_sampling import PWMMotif, normalize_background
 
 _HEADER_RE = re.compile(r"[\s\-]+")
@@ -158,12 +158,7 @@ def run_fimo(
     include_matched_sequence: bool = False,
     return_tsv: bool = False,
 ) -> tuple[list[dict], str | None]:
-    exe = resolve_executable("fimo", tool_path=None)
-    if exe is None:
-        raise FileNotFoundError(
-            "FIMO executable not found. Install MEME Suite and ensure `fimo` is on PATH, "
-            "or set MEME_BIN to the MEME bin directory (pixi users: `pixi run dense ...`)."
-        )
+    exe = require_executable("fimo", tool_path=None)
     cmd = [str(exe), "--text"]
     if not include_matched_sequence:
         cmd.append("--skip-matched-sequence")

@@ -64,9 +64,9 @@ def _base_meta(library_hash: str, library_index: int) -> dict:
         "input_pwm_score_percentile": None,
         "input_pwm_pvalue_threshold": None,
         "input_pwm_pvalue_bins": None,
-        "input_pwm_pvalue_bin_ids": None,
         "input_pwm_mining_batch_size": None,
         "input_pwm_mining_max_batches": None,
+        "input_pwm_mining_max_candidates": None,
         "input_pwm_mining_max_seconds": None,
         "input_pwm_mining_retain_bin_ids": None,
         "input_pwm_mining_log_every_batches": None,
@@ -234,7 +234,7 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
     manifest.write_json(run_manifest_path(run_root))
 
     runner = CliRunner()
-    result = runner.invoke(app, ["summarize", "--run", str(run_root), "--library"])
+    result = runner.invoke(app, ["inspect", "run", "--run", str(run_root), "--library"])
     assert result.exit_code == 0, result.output
     assert "Library build summary" in result.output
     assert "abc123" in result.output

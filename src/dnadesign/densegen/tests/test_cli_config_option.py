@@ -53,7 +53,7 @@ def test_validate_accepts_config_after_command(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.yaml"
     _write_min_config(cfg_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["validate", "-c", str(cfg_path)])
+    result = runner.invoke(app, ["validate-config", "-c", str(cfg_path)])
     assert result.exit_code == 0, result.output
     assert "Config is valid" in result.output
 
@@ -62,6 +62,6 @@ def test_validate_reports_invalid_config(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.yaml"
     cfg_path.write_text("densegen:\n  inputs: []\n")
     runner = CliRunner()
-    result = runner.invoke(app, ["validate", "-c", str(cfg_path)])
+    result = runner.invoke(app, ["validate-config", "-c", str(cfg_path)])
     assert result.exit_code != 0, result.output
     assert "Config error" in result.output

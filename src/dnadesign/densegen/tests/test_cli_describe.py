@@ -53,7 +53,7 @@ def test_describe_outputs_summary(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.yaml"
     _write_min_config(cfg_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["describe", "-c", str(cfg_path)])
+    result = runner.invoke(app, ["inspect", "config", "-c", str(cfg_path)])
     assert result.exit_code == 0, result.output
     assert "Config" in result.output
     assert "Gap fill" in result.output

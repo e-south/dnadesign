@@ -70,7 +70,10 @@ def test_parse_fimo_tsv_and_best_hits() -> None:
     assert best["cand1"].pvalue == pytest.approx(0.5)
 
 
-@pytest.mark.skipif(resolve_executable("fimo", tool_path=None) is None, reason="fimo executable not available")
+@pytest.mark.skipif(
+    resolve_executable("fimo", tool_path=None) is None,
+    reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
+)
 def test_run_fimo_smoke(tmp_path: Path) -> None:
     motif = PWMMotif(
         motif_id="M1",

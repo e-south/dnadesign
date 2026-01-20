@@ -72,7 +72,6 @@ class PWMArtifactSetDataSource(BaseDataSource):
             scoring_backend = str(sampling_cfg.get("scoring_backend", "densegen")).lower()
             pvalue_threshold = sampling_cfg.get("pvalue_threshold")
             pvalue_bins = sampling_cfg.get("pvalue_bins")
-            pvalue_bin_ids = sampling_cfg.get("pvalue_bin_ids")
             mining = sampling_cfg.get("mining")
             bgfile = sampling_cfg.get("bgfile")
             selection_policy = str(sampling_cfg.get("selection_policy", "random_uniform"))
@@ -100,7 +99,6 @@ class PWMArtifactSetDataSource(BaseDataSource):
                 scoring_backend=scoring_backend,
                 pvalue_threshold=pvalue_threshold,
                 pvalue_bins=pvalue_bins,
-                pvalue_bin_ids=pvalue_bin_ids,
                 mining=mining,
                 bgfile=bgfile_path,
                 selection_policy=selection_policy,
