@@ -6,6 +6,7 @@ platforms = ["osx-arm64", "osx-64", "linux-64"]
 
 [tasks]
 cruncher = "uv run cruncher"
+dense = "uv run dense"
 
 [dependencies]
 meme = "*"
