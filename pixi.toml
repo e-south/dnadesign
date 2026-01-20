@@ -7,6 +7,7 @@ platforms = ["osx-arm64", "osx-64", "linux-64"]
 [tasks]
 cruncher = "uv run cruncher"
 dense = "uv run dense"
+pytest = "uv run pytest -q"
 
 [dependencies]
 meme = "*"
