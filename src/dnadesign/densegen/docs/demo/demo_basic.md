@@ -11,12 +11,13 @@ and uses the dense-arrays CBC backend. All paths are explicit; missing files fai
 - [2) Stage a workspace](#2-stage-a-workspace) - copy inputs and rewrite paths.
 - [3) Validate config](#3-validate-config) - schema and sanity checks.
 - [4) Plan constraints](#4-plan-constraints) - see resolved quotas and constraint buckets.
-- [5) Describe the resolved run](#5-describe-the-resolved-run) - verify inputs, outputs, solver.
-- [6) Run generation](#6-run-generation) - produce sequences and metadata.
-- [7) Summarize the run](#7-summarize-the-run) - review run-level counts.
-- [8) Audit report](#8-audit-report) - build offered-vs-used tables.
-- [9) Inspect outputs](#9-inspect-outputs) - list Parquet artifacts.
-- [10) Plot analysis](#10-plot-analysis) - render tf_usage and tf_coverage.
+- [5) Inspect the resolved run config](#5-inspect-the-resolved-run-config) - verify inputs, outputs, solver.
+- [6) (Optional) Stage‑A + Stage‑B previews](#6-optional-stagea--stageb-previews) - preview pools and libraries.
+- [7) Run generation](#7-run-generation) - produce sequences and metadata.
+- [8) Inspect run summary](#8-inspect-run-summary) - review run-level counts.
+- [9) Audit report](#9-audit-report) - build offered-vs-used tables.
+- [10) Inspect outputs](#10-inspect-outputs) - list Parquet artifacts.
+- [11) Plot analysis](#11-plot-analysis) - render tf_usage and tf_coverage.
 - [Appendix (optional)](#appendix-optional) - PWM sampling + USR output.
 
 ## 0) Prereqs
@@ -29,7 +30,7 @@ uv sync --locked
 
 This demo uses **FIMO** (MEME Suite) to adjudicate strong motif matches. Ensure `fimo` is on PATH
 or set `MEME_BIN` to the MEME bin directory. If you use pixi, run commands via
-`pixi run dense ...` so MEME tools are available (recommended for the run step).
+`pixi run dense ...` so MEME tools are available (recommended for validation + run steps).
 
 All commands below assume you are at the repo root. We will write the demo run to a scratch
 directory; set a run root:
@@ -55,7 +56,13 @@ src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/cpxR.txt
 These are MEME files parsed with Cruncher’s MEME parser (DenseGen reuses the same parsing
 logic for DRY). The demo uses LexA + CpxR motifs and exercises PWM sampling bounds. Sampling
 uses FIMO p-values to define “strong” matches and `selection_policy: stratified` to balance
-across canonical p‑value bins (see the input-stage sampling table in `dense describe`).
+across canonical p‑value bins (see the input-stage sampling table in `dense inspect inputs`).
+
+Inspect the resolved inputs + Stage‑A sampling table:
+
+```bash
+pixi run dense inspect inputs -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
+```
 
 ### 1b) (Optional) Rebuild inputs from Cruncher
 
@@ -84,7 +91,7 @@ Stage a self-contained workspace from the demo template (this copies inputs and 
 paths):
 
 ```bash
-uv run dense stage --id demo_press --root "$RUN_ROOT" \
+uv run dense workspace init --id demo_press --root "$RUN_ROOT" \
   --template src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml \
   --copy-inputs
 ```
@@ -102,7 +109,7 @@ Parquet schema mismatch. Either delete `outputs/dense_arrays.parquet` +
 ## 3) Validate config
 
 ```bash
-uv run dense validate -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
+pixi run dense validate-config -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
 ```
 
 Example output:
@@ -114,7 +121,7 @@ Example output:
 ## 4) Plan constraints
 
 ```bash
-uv run dense plan -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
+uv run dense inspect plan -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
 ```
 
 Example output:
@@ -127,12 +134,12 @@ Example output:
 └──────┴───────┴──────────────────────────┘
 ```
 
-## 5) Describe the resolved run
+## 5) Inspect the resolved run config
 
 This step shows the resolved inputs, outputs, solver selection, and the two-stage sampling knobs.
 
 ```bash
-uv run dense describe -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
+uv run dense inspect config -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
 ```
 
 Example output (abridged):
@@ -156,7 +163,22 @@ Solver-stage library sampling
 ...
 ```
 
-## 6) Run generation
+## 6) (Optional) Stage‑A + Stage‑B previews
+
+Stage‑A: materialize the TFBS pool (FIMO mining + stratified selection). This is useful when
+you want to inspect mining yields per p‑value bin before running the solver:
+
+```bash
+pixi run dense stage-a build-pool -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
+```
+
+Stage‑B: build a solver library from the pool without running the solver:
+
+```bash
+pixi run dense stage-b build-libraries -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
+```
+
+## 7) Run generation
 
 ```bash
 pixi run dense run -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --no-plot
@@ -172,7 +194,7 @@ Example output (abridged):
 2026-01-15 14:02:02 | INFO | dnadesign.densegen.src.utils.logging_utils | Logging initialized (level=INFO)
 Quota plan: meme_demo=50
 2026-01-15 14:02:02 | INFO | dnadesign.densegen.src.adapters.optimizer.dense_arrays | Solver selected: CBC
-2026-01-15 14:02:05 | INFO | dnadesign.densegen.src.adapters.sources.pwm_sampling | FIMO yield for motif lexA: hits=960 accepted=120 selected=80 bins=(0e+00,1e-10]:0 ... selected_bins=(0e+00,1e-10]:0 ...
+2026-01-15 14:02:05 | INFO | dnadesign.densegen.src.adapters.sources.pwm_sampling | FIMO yield for motif lexA: hits=120 accepted=120 selected=80 bins=(0e+00,1e-10]:40 (1e-10,1e-08]:35 ... selected_bins=(0e+00,1e-10]:26 ...
 2026-01-15 14:02:06 | INFO | dnadesign.densegen.src.core.pipeline | [demo/demo] 2/50 (4.00%) (local 2/2) CR=1.050 | seq ATTGACAGTAAACCTGCGGGAAATATAATTTACTCCGTATTTGCACATGGTTATCCACAG
 2026-01-15 14:02:05 | INFO | dnadesign.densegen.src.core.pipeline | Inputs manifest written: /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/meta/inputs_manifest.json
 🎉 Run complete.
@@ -181,13 +203,13 @@ Quota plan: meme_demo=50
 On macOS you may see Arrow sysctl warnings after generation; they are emitted by pyarrow and do
 not indicate a DenseGen failure.
 
-## 7) Summarize the run
+## 8) Inspect run summary
 
 DenseGen writes `outputs/meta/run_manifest.json` and `outputs/meta/inputs_manifest.json`. Summarize the
 run manifest:
 
 ```bash
-uv run dense summarize --run /private/tmp/densegen-demo-20260115-1405/demo_press
+uv run dense inspect run --run /private/tmp/densegen-demo-20260115-1405/demo_press
 ```
 
 Example output:
@@ -205,7 +227,7 @@ Use `--verbose` for constraint-failure breakdowns and duplicate-solution counts.
 Use `--library` to print offered-vs-used summaries for quick debugging:
 
 ```bash
-uv run dense summarize --run /private/tmp/densegen-demo-20260115-1405/demo_press --library --top-per-tf 5
+uv run dense inspect run --run /private/tmp/densegen-demo-20260115-1405/demo_press --library --top-per-tf 5
 ```
 
 This library summary is the quickest way to audit which TFBS were offered vs
@@ -214,17 +236,17 @@ used in the solver stage (Stage‑B sampling).
 If any solutions are rejected, DenseGen writes them to
 `outputs/attempts.parquet` in the run root.
 
-## 8) Audit report
+## 9) Audit report
 
 Generate an audit-grade summary of the run:
 
 ```bash
-uv run dense report -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
+uv run dense report -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --format all
 ```
 
-This writes `outputs/report.json` and `outputs/report.md`.
+This writes `outputs/report.json`, `outputs/report.md`, and `outputs/report.html`.
 
-## 9) Inspect outputs
+## 10) Inspect outputs
 
 List the generated Parquet artifacts:
 
@@ -251,7 +273,7 @@ Example output:
 attempts.parquet
 ```
 
-## 10) Plot analysis
+## 11) Plot analysis
 
 First, list the available plots:
 

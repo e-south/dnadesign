@@ -52,8 +52,8 @@ after `arrays_generated_before_resample` or when a library under-produces.
 ### 4) Run DenseGen
 
 ```bash
-uv run dense validate -c path/to/config.yaml
-uv run dense describe -c path/to/config.yaml
+pixi run dense validate-config -c path/to/config.yaml
+uv run dense inspect config -c path/to/config.yaml
 uv run dense run -c path/to/config.yaml --no-plot
 ```
 

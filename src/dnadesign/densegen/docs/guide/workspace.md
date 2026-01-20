@@ -63,7 +63,7 @@ plots:
 
 When a run is complete, archive or sync the workspace as a unit.
 
-Tip: use `dense stage --id <run_name>` to scaffold a new workspace. Use
-`dense summarize --root workspaces/_archive` to inspect archived workspaces.
+Tip: use `dense workspace init --id <run_name>` to scaffold a new workspace. Use
+`dense inspect run --root workspaces/_archive` to inspect archived workspaces.
 
 @e-south

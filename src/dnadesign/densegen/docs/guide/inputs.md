@@ -99,15 +99,15 @@ Required sampling fields:
 - `score_threshold` or `score_percentile` (exactly one; densegen backend only)
 - `pvalue_threshold` (float in (0, 1]; fimo backend only)
 - `oversample_factor`: oversampling multiplier for candidate generation
-- `max_candidates` (optional): cap on candidate generation; helps bound long motifs
-- `max_seconds` (optional): time limit for candidate generation per batch (best-effort cap)
+- `max_candidates` (optional): cap on candidate generation; helps bound long motifs (**densegen** backend only)
+- `max_seconds` (optional): time limit for candidate generation per batch (best-effort cap; **densegen** backend only)
 - `selection_policy`: `random_uniform | top_n | stratified` (default: `random_uniform`; fimo only)
 - `pvalue_bins` (optional): list of p‑value bin edges (strictly increasing; must end with `1.0`)
-- `pvalue_bin_ids` (deprecated; use `mining.retain_bin_ids`)
-- `mining` (optional; fimo only): batch/time controls for mining with FIMO
+- `mining` (fimo only): batch/time controls for mining with FIMO
   - `batch_size` (int > 0): candidates per batch
-  - `max_batches` (optional int > 0): limit batches per motif
-  - `max_seconds` (optional float > 0): limit total mining time per motif
+  - `max_batches` (optional int > 0): limit batches per motif (quota-style)
+  - `max_candidates` (optional int > 0): total candidates per motif (quota-style)
+  - `max_seconds` (optional float > 0; default 60s): limit total mining time per motif
   - `retain_bin_ids` (optional list of ints): keep only specific p‑value bins
   - `log_every_batches` (int > 0): log yield summaries every N batches
 - `bgfile` (optional): MEME bfile-format background model for FIMO
@@ -124,6 +124,12 @@ Notes:
 - `selection_policy: stratified` uses fixed p‑value bins to balance strong/weak matches.
 - Canonical p‑value bins (default): `[1e-10, 1e-8, 1e-6, 1e-4, 1e-3, 1e-2, 1e-1, 1.0]`.
   Bin 0 is `(0, 1e-10]`, bin 1 is `(1e-10, 1e-8]`, etc.
+- FIMO mining defaults to **time-based** limits (`mining.max_seconds: 60`). To switch to a quota,
+  set `mining.max_seconds: null` and use `mining.max_candidates` or `mining.max_batches`
+  (with `mining.batch_size`) as the primary cap.
+- `mining.max_candidates` must be >= `n_sites`; DenseGen fails fast otherwise.
+- If you omit `mining` entirely, DenseGen uses the default mining settings (batch size + time cap)
+  for FIMO-backed sampling.
 
 #### FIMO p-values (beginner-friendly)
 - A **p-value** is the probability that a random sequence (under the background model)
@@ -136,7 +142,7 @@ Notes:
   specific affinity ranges).
 - FIMO adds per‑TFBS metadata columns: `fimo_score`, `fimo_pvalue`, `fimo_start`, `fimo_stop`,
   `fimo_strand`, `fimo_bin_id`, `fimo_bin_low`, `fimo_bin_high`, and (optionally)
-  `fimo_matched_sequence` (the best‑hit window within the TFBS).
+  `fimo_matched_sequence` (the best‑hit window within the TFBS; includes strand-aware match).
 - `length_policy` defaults to `exact`. Use `length_policy: range` with `length_range: [min, max]`
   to sample variable lengths (min must be >= motif length).
 - `trim_window_length` optionally trims the PWM to a max‑information window before sampling (useful
@@ -177,9 +183,9 @@ inputs:
       selection_policy: top_n
       n_sites: 80
       oversample_factor: 200
-      max_candidates: 20000
       mining:
         batch_size: 5000
+        max_candidates: 20000
         max_batches: 4
         retain_bin_ids: [0, 1, 2, 3]
         log_every_batches: 1
@@ -189,13 +195,16 @@ inputs:
 If you want to **mine** sequences across affinity strata, use `selection_policy: stratified` plus
 canonical p‑value bins and the `mining` block. A typical workflow:
 
-1) Oversample candidates (`oversample_factor`, `max_candidates`) and score with FIMO in batches
-   (`mining.batch_size`).
+1) Oversample candidates (`oversample_factor`) or set a direct quota (`mining.max_candidates`),
+   then score with FIMO in batches (`mining.batch_size`).
 2) Accept candidates using `pvalue_threshold` (global strength cutoff).
 3) Use `mining.retain_bin_ids` to select one or more bins (e.g., moderate matches only).
-4) Repeat runs (or increase `mining.max_batches` / `mining.max_seconds`) to accumulate a deduplicated
-   reservoir of sequences per bin.
-5) Use `dense summarize --library` to inspect which TFBS were offered vs used in Stage‑B sampling.
+4) Repeat runs (or increase `mining.max_candidates` / `mining.max_batches` / `mining.max_seconds`)
+   to accumulate a deduplicated reservoir of sequences per bin. By default mining runs for 60
+   seconds per motif; set `mining.max_seconds: null` to make quotas the primary cap.
+5) Use `dense stage-a build-pool` to materialize the pool, then `dense stage-b build-libraries`
+   to preview Stage‑B library sampling without running the solver.
+6) Use `dense inspect run --library` to inspect which TFBS were offered vs used in Stage‑B sampling.
 
 DenseGen reports per‑bin yield summaries (hits, accepted, selected) for retained bins only (or all
 bins if `retain_bin_ids` is unset), so you can track how many candidates land in each stratum and

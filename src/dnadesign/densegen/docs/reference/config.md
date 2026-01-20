@@ -60,18 +60,19 @@ PWM inputs perform **input sampling** (sampling sites from PWMs) via
     - `strategy`: `consensus | stochastic | background`
     - `n_sites` (int > 0)
     - `oversample_factor` (int > 0)
-    - `max_candidates` (optional int > 0; caps candidate generation)
-    - `max_seconds` (optional float > 0; time limit for candidate generation)
+    - `max_candidates` (optional int > 0; caps candidate generation; **densegen** backend only)
+    - `max_seconds` (optional float > 0; time limit for candidate generation; **densegen** backend only)
     - `scoring_backend`: `densegen | fimo` (default: `densegen`)
     - `score_threshold` or `score_percentile` (exactly one; **densegen** backend only)
     - `pvalue_threshold` (float in (0, 1]; **fimo** backend only)
     - `selection_policy`: `random_uniform | top_n | stratified` (default: `random_uniform`; fimo only)
     - `pvalue_bins` (optional list of floats; must end with `1.0`) - p‑value bin edges for stratified sampling
-    - `pvalue_bin_ids` (deprecated; use `mining.retain_bin_ids`)
-    - `mining` (optional; fimo only) - batch/time controls for mining via FIMO:
+    - `mining` (fimo only) - batch/time controls for mining via FIMO:
       - `batch_size` (int > 0; default 100000) - candidates per FIMO batch
       - `max_batches` (optional int > 0) - max batches per motif
-      - `max_seconds` (optional float > 0) - max seconds per motif mining loop
+      - `max_candidates` (optional int > 0) - total candidates to generate per motif (quota mode)
+        (must be >= `n_sites`)
+      - `max_seconds` (optional float > 0; default 60s) - max seconds per motif mining loop
       - `retain_bin_ids` (optional list of ints) - select p‑value bins to retain (0‑based indices);
         retained bins are the only bins reported in yield summaries
       - `log_every_batches` (int > 0; default 1) - log per‑bin yield summaries every N batches
@@ -90,8 +91,9 @@ PWM inputs perform **input sampling** (sampling sites from PWMs) via
     - FIMO runs log per‑bin yield summaries (hits, accepted, selected). If `retain_bin_ids` is set,
       only those bins are reported; otherwise all bins are reported. `selection_policy: stratified`
       makes the selected‑bin distribution explicit for mining workflows.
-    - When `mining` is enabled, `max_seconds` caps per‑batch candidate generation while
-      `mining.max_seconds` caps the overall mining loop.
+    - For `scoring_backend: fimo`, use `mining.max_seconds` (time mode) or
+      `mining.max_candidates`/`mining.max_batches` (quota mode). The default is
+      `mining.max_seconds: 60`. Set `mining.max_seconds: null` to make quotas the primary cap.
 - `type: pwm_meme_set`
   - `paths` - list of MEME PWM files (merged into a single TF pool)
   - `motif_ids` (optional list) - choose motifs by ID across files

@@ -121,7 +121,7 @@ Implement in phases aligned with impact and merge risk.
    - solver backend/strategy/options summary
    - optional histograms (compression_ratio, gc_total)
 
-10. Add a CLI command like dense summarize (or extend workspace listing) to read and pretty-print the manifest.
+10. Add a CLI command like dense inspect run (or extend workspace listing) to read and pretty-print the manifest.
 
 ### Phase 4 - Performance / resilience (optional but worthwhile)
 
