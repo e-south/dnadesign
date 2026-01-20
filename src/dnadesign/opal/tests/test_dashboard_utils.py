@@ -546,7 +546,8 @@ def test_transient_overlay_provenance_on_early_exit() -> None:
         dataset_name="demo",
     )
     assert "opal__transient__round" in result.df_overlay.columns
-    assert result.df_overlay["opal__transient__round"].to_list() == [0]
+    assert result.df_overlay["opal__transient__round"].to_list() == [None]
+    assert result.diagnostics.errors
 
 
 def test_mismatch_helper(tmp_path: Path) -> None:

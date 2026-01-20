@@ -340,8 +340,10 @@ def compute_transient_overlay(
             except Exception:
                 effective_round = None
     if effective_round is None:
-        effective_round = 0
-        _note("No round selection; defaulting transient overlay round to 0.")
+        _error(
+            "Transient overlay requires a round context. Select a round or attach label events "
+            "so the round can be inferred."
+        )
 
     run_id_value = run_id if use_artifact else "notebook-transient"
     source_value = "artifact" if use_artifact else "transient"
