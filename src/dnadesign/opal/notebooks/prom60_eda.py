@@ -1729,6 +1729,17 @@ def _(
             else:
                 transient_hist_chart = hist_element
 
+    _required_transient_cols = ["opal__transient__run_id", "opal__transient__round"]
+    _missing_transient = [col for col in _required_transient_cols if col not in df_umap_overlay.columns]
+    if _missing_transient:
+        mo.stop(
+            True,
+            mo.md(
+                "Transient provenance contract violated; missing required columns: "
+                f"{_missing_transient}. This is a bug — please report."
+            ),
+        )
+
     missing_transient_cols = [c for c in transient_cols if c not in df_umap_overlay.columns]
     if missing_transient_cols:
         fill_exprs = []
@@ -3369,7 +3380,9 @@ def _(
             "(e.g., `outputs/round_<k>/...` and `outputs/ledger.*`).\n"
             "In contrast, this notebook view uses a reactive, session-scoped (ephemeral) surrogate model "
             "that is refit in memory on each UI-driven change and is not persisted as an artifact. "
-            "Notebook predictions are exploratory overlays; ledger-backed outputs require running OPAL."
+            "Notebook predictions are exploratory overlays; ledger-backed outputs require running OPAL.\n"
+            "**Setpoint changes update SFXI scoring/ranking only; RF training still uses the same 8‑vector labels** "
+            "(retrain only if the labels themselves change)."
         ),
         feature_panel,
         mo.md(
