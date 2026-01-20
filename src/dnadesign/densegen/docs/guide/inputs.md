@@ -95,21 +95,47 @@ Use a MEME-format PWM file and explicitly sample binding sites.
 Required sampling fields:
 - `strategy`: `consensus | stochastic | background`
 - `n_sites`: number of binding sites to generate per motif
-- `score_threshold` or `score_percentile` (exactly one)
+- `scoring_backend`: `densegen | fimo` (default: `densegen`)
+- `score_threshold` or `score_percentile` (exactly one; densegen backend only)
+- `pvalue_threshold` (float in (0, 1]; fimo backend only)
 - `oversample_factor`: oversampling multiplier for candidate generation
 - `max_candidates` (optional): cap on candidate generation; helps bound long motifs
 - `max_seconds` (optional): time limit for candidate generation (best-effort cap)
+- `selection_policy`: `random_uniform | top_n | stratified` (default: `random_uniform`; fimo only)
+- `pvalue_bins` (optional): list of p‑value bin edges (strictly increasing; must end with `1.0`)
+- `pvalue_bin_ids` (optional): list of bin indices to keep (0‑based, using `pvalue_bins`)
+- `bgfile` (optional): MEME bfile-format background model for FIMO
+- `keep_all_candidates_debug` (optional): write raw FIMO TSVs to `outputs/meta/fimo/` for inspection
+- `include_matched_sequence` (optional): include `fimo_matched_sequence` column in the TFBS table
 
 Notes:
-- Sampling scores use PWM log-odds with the motif background (from MEME when available).
-- `score_threshold` / `score_percentile` controls similarity to the PWM consensus
-  (higher percentiles or thresholds yield stronger matches).
+- `densegen` scoring uses PWM log-odds with the motif background (from MEME when available).
+- `fimo` scoring scans the entire emitted TFBS and uses a model-based p-value threshold.
+  `pvalue_threshold` controls match strength (smaller values are stronger).
+- `fimo` backend requires the `fimo` executable on PATH (run via pixi).
+- If `bgfile` is omitted, FIMO uses the motif background (or uniform if none provided).
+- `background` selects low-scoring sequences (<= threshold/percentile; or pvalue >= threshold for fimo).
+- `selection_policy: stratified` uses fixed p‑value bins to balance strong/weak matches.
+- Canonical p‑value bins (default): `[1e-10, 1e-8, 1e-6, 1e-4, 1e-3, 1e-2, 1e-1, 1.0]`.
+  Bin 0 is `(0, 1e-10]`, bin 1 is `(1e-10, 1e-8]`, etc.
+
+#### FIMO p-values (beginner-friendly)
+- A **p-value** is the probability that a random sequence (under the background model)
+  would score **at least as well** as the observed match.
+- Smaller p-values mean **stronger** motif matches; larger p-values mean **weaker** matches.
+- As a rule of thumb: `1e-4` is a strong match, `1e-3` is moderate, `1e-2` is weak.
+- DenseGen accepts a candidate if its **best hit** within the emitted TFBS passes the threshold.
+- For `strategy: background`, DenseGen keeps **weak** matches where `pvalue >= pvalue_threshold`.
+- If you set `pvalue_bin_ids`, DenseGen only keeps candidates in those bins (useful for mining
+  specific affinity ranges).
+- FIMO adds per‑TFBS metadata columns: `fimo_score`, `fimo_pvalue`, `fimo_start`, `fimo_stop`,
+  `fimo_strand`, `fimo_bin_id`, `fimo_bin_low`, `fimo_bin_high`, and (optionally)
+  `fimo_matched_sequence`.
 - `length_policy` defaults to `exact`. Use `length_policy: range` with `length_range: [min, max]`
   to sample variable lengths (min must be >= motif length).
 - `trim_window_length` optionally trims the PWM to a max‑information window before sampling (useful
   for long motifs when you want shorter cores); `trim_window_strategy` currently supports `max_info`.
 - `consensus` requires `n_sites: 1`.
-- `background` selects low-scoring sequences from the PWM.
 
 Example:
 
@@ -129,6 +155,39 @@ inputs:
       length_policy: range
       length_range: [22, 28]
 ```
+
+FIMO-backed example:
+
+```yaml
+inputs:
+  - name: lexA_meme
+    type: pwm_meme
+    path: inputs/lexA.txt
+    motif_ids: [lexA]
+    sampling:
+      strategy: stochastic
+      scoring_backend: fimo
+      pvalue_threshold: 1e-4
+      selection_policy: top_n
+      n_sites: 80
+      oversample_factor: 12
+      max_candidates: 50000
+      max_seconds: 5
+```
+
+#### Mining workflow (p‑value strata)
+If you want to **mine** sequences across affinity strata, use `selection_policy: stratified` plus
+canonical p‑value bins. A typical workflow:
+
+1) Oversample candidates (`oversample_factor`, `max_candidates`) and score with FIMO.
+2) Accept candidates using `pvalue_threshold` (global strength cutoff).
+3) Use `pvalue_bin_ids` to select one or more bins (e.g., moderate matches only).
+4) Repeat runs to accumulate a deduplicated reservoir of sequences per bin.
+5) Use `dense summarize --library` to inspect which TFBS were offered vs used in Stage‑B sampling.
+
+DenseGen reports per‑bin yield summaries (hits, accepted, selected) for every FIMO run, so you can
+track how many candidates land in each bin and adjust thresholds or oversampling accordingly. With
+`selection_policy: stratified`, the selected‑bin counts show how evenly the final pool spans strata.
 
 ---
 

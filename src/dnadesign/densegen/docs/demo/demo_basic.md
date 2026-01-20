@@ -27,6 +27,10 @@ If you have not synced dependencies yet:
 uv sync --locked
 ```
 
+This demo uses **FIMO** (MEME Suite) to adjudicate strong motif matches. Ensure `fimo` is on PATH
+or set `MEME_BIN` to the MEME bin directory. If you use pixi, run commands via
+`pixi run dense ...` so MEME tools are available (recommended for the run step).
+
 All commands below assume you are at the repo root. We will write the demo run to a scratch
 directory; set a run root:
 
@@ -49,7 +53,9 @@ src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/cpxR.txt
 ```
 
 These are MEME files parsed with Cruncher’s MEME parser (DenseGen reuses the same parsing
-logic for DRY). The demo uses LexA + CpxR motifs and exercises PWM sampling bounds.
+logic for DRY). The demo uses LexA + CpxR motifs and exercises PWM sampling bounds. Sampling
+uses FIMO p-values to define “strong” matches and `selection_policy: stratified` to balance
+across canonical p‑value bins (see the input-stage sampling table in `dense describe`).
 
 ### 1b) (Optional) Rebuild inputs from Cruncher
 
@@ -113,7 +119,7 @@ Example output:
 ┏━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ name ┃ quota ┃ has promoter_constraints ┃
 ┡━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ meme_demo │ 6 │ no                       │
+│ meme_demo │ 50 │ no                      │
 └──────┴───────┴──────────────────────────┘
 ```
 
@@ -149,16 +155,17 @@ Solver-stage library sampling
 ## 6) Run generation
 
 ```bash
-uv run dense run -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --no-plot
+pixi run dense run -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --no-plot
 ```
 
 Example output (abridged):
 
 ```text
 2026-01-15 14:02:02 | INFO | dnadesign.densegen.src.utils.logging_utils | Logging initialized (level=INFO)
-Quota plan: meme_demo=6
+Quota plan: meme_demo=50
 2026-01-15 14:02:02 | INFO | dnadesign.densegen.src.adapters.optimizer.dense_arrays | Solver selected: CBC
-2026-01-15 14:02:05 | INFO | dnadesign.densegen.src.core.pipeline | [demo/demo] 5/5 (100.00%) (local 5/5) CR=1.050 | seq ATTGACAGTAAACCTGCGGGAAATATAATTTACTCCGTATTTGCACATGGTTATCCACAG
+2026-01-15 14:02:05 | INFO | dnadesign.densegen.src.adapters.sources.pwm_sampling | FIMO yield for motif lexA: hits=960 accepted=120 selected=80 bins=(0e+00,1e-10]:0 ... selected_bins=(0e+00,1e-10]:0 ...
+2026-01-15 14:02:06 | INFO | dnadesign.densegen.src.core.pipeline | [demo/demo] 2/50 (4.00%) (local 2/2) CR=1.050 | seq ATTGACAGTAAACCTGCGGGAAATATAATTTACTCCGTATTTGCACATGGTTATCCACAG
 2026-01-15 14:02:05 | INFO | dnadesign.densegen.src.core.pipeline | Inputs manifest written: /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/meta/inputs_manifest.json
 🎉 Run complete.
 ```
@@ -182,7 +189,7 @@ Run: demo_press  Root: /private/tmp/densegen-demo-20260115-1405/demo_press  Sche
 ┏━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┓
 ┃ input        ┃ plan ┃ generated ┃ duplica… ┃ failed ┃ resamples ┃ librari… ┃ stalls ┃
 ┡━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━┩
-│ lexA_cpxR_meme │ meme_demo │ 6   │ 0        │ 0      │ 0         │ 3        │ 0      │
+│ lexA_cpxR_meme │ meme_demo │ 50  │ 0        │ 0      │ 0         │ 3        │ 0      │
 └──────────────┴──────┴───────────┴──────────┴────────┴───────────┴──────────┴────────┘
 ```
 
@@ -190,8 +197,11 @@ Use `--verbose` for constraint-failure breakdowns and duplicate-solution counts.
 Use `--library` to print offered-vs-used summaries for quick debugging:
 
 ```bash
-uv run dense summarize --run /private/tmp/densegen-demo-20260115-1405/demo_press --library
+uv run dense summarize --run /private/tmp/densegen-demo-20260115-1405/demo_press --library --top-per-tf 5
 ```
+
+This library summary is the quickest way to audit which TFBS were offered vs
+used in the solver stage (Stage‑B sampling).
 
 If any solutions are rejected, DenseGen writes them to
 `outputs/attempts.parquet` in the run root.
@@ -317,12 +327,41 @@ inputs:
     motif_ids: [lexA]
     sampling:
       strategy: background
+      scoring_backend: densegen
       n_sites: 200
       oversample_factor: 5
       score_percentile: 10
 ```
 
 Swap `type` and `path` to `pwm_jaspar` or `pwm_matrix_csv` with the same `sampling` block.
+
+For **strong match** sampling with FIMO p-values:
+
+```yaml
+inputs:
+  - name: lexA_meme
+    type: pwm_meme
+    path: inputs/lexA.txt
+    motif_ids: [lexA]
+    sampling:
+      strategy: stochastic
+      scoring_backend: fimo
+      pvalue_threshold: 1e-4
+      selection_policy: top_n
+      n_sites: 80
+      oversample_factor: 10
+```
+
+To mine specific affinity strata, add canonical p‑value bins and select bins by index:
+
+```yaml
+    sampling:
+      scoring_backend: fimo
+      pvalue_threshold: 1e-3
+      selection_policy: stratified
+      pvalue_bins: [1e-6, 1e-4, 1e-3, 1e-2, 1e-1, 1.0]
+      pvalue_bin_ids: [1, 2]  # (1e-6..1e-4] and (1e-4..1e-3]
+```
 
 ### Add USR output
 
