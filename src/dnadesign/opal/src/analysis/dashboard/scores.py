@@ -87,7 +87,10 @@ def apply_score_overlay(
     elif source_key == "cache" and "opal__cache__run_id" in df.columns:
         run_id_expr = pl.col("opal__cache__run_id")
     elif source_key == "transient":
-        run_id_expr = pl.lit("notebook-transient")
+        if "opal__transient__run_id" in df.columns:
+            run_id_expr = pl.col("opal__transient__run_id")
+        else:
+            run_id_expr = pl.lit("notebook-transient")
     else:
         run_id_expr = pl.lit(None).cast(pl.Utf8)
 
@@ -96,7 +99,10 @@ def apply_score_overlay(
     elif source_key == "cache" and "opal__cache__round" in df.columns:
         round_expr = pl.col("opal__cache__round")
     elif source_key == "transient":
-        round_expr = pl.lit(selected_round)
+        if "opal__transient__round" in df.columns:
+            round_expr = pl.col("opal__transient__round")
+        else:
+            round_expr = pl.lit(selected_round)
     else:
         round_expr = pl.lit(None).cast(pl.Int64)
 

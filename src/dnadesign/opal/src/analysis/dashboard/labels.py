@@ -447,3 +447,17 @@ def observed_event_ids(df_labels: pl.DataFrame, *, label_src: str = "ingest_y") 
         .to_series()
         .to_list()
     )
+
+
+def infer_round_from_labels(df_labels: pl.DataFrame, *, round_col: str = "observed_round") -> int | None:
+    if df_labels is None or df_labels.is_empty():
+        return None
+    if round_col not in df_labels.columns:
+        return None
+    try:
+        value = df_labels.select(pl.col(round_col).drop_nulls().max()).item()
+    except Exception:
+        return None
+    if value is None:
+        return None
+    return int(value)

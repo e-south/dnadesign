@@ -14,6 +14,7 @@ import polars as pl
 from ...models.random_forest import RandomForestModel
 from .datasets import CampaignInfo
 from .diagnostics import Diagnostics
+from .labels import infer_round_from_labels
 from .models import get_feature_importances, load_round_ctx_from_dir
 from .selection import compute_selection_overlay
 from .sfxi import SFXIParams, compute_sfxi_metrics, valid_vec8_mask_expr
@@ -338,6 +339,19 @@ def compute_transient_overlay(
             hist_chart=hist_chart,
             hist_note=hist_note,
         )
+    effective_round = selected_round
+    if effective_round is None:
+        effective_round = infer_round_from_labels(labels_current_df) or infer_round_from_labels(labels_asof_df)
+    if effective_round is None and context is not None:
+        runs_df = getattr(context, "ledger_runs_df", None)
+        if runs_df is not None and not runs_df.is_empty() and "as_of_round" in runs_df.columns:
+            try:
+                effective_round = int(runs_df.select(pl.col("as_of_round").max()).item())
+            except Exception:
+                effective_round = None
+    if effective_round is None:
+        effective_round = 0
+        _note("No round selection; defaulting transient overlay round to 0.")
     if x_col is None or x_col not in df_base.columns:
         _warn(f"Missing X column: `{x_col}`.")
         return TransientOverlayResult(
@@ -435,7 +449,7 @@ def compute_transient_overlay(
         yops_ctx = build_round_ctx_for_notebook(
             info=campaign_info,
             run_id="notebook-transient",
-            round_index=int(selected_round or 0),
+            round_index=int(effective_round),
             y_dim=int(y_train.shape[1]),
             n_train=int(df_train.height),
         )
@@ -473,7 +487,7 @@ def compute_transient_overlay(
     feature_chart = _build_feature_importance_chart(
         feature_importances=get_feature_importances(model),
         dataset_name=dataset_name,
-        selected_round=selected_round,
+        selected_round=effective_round,
         n_labels=int(df_train.height),
         x_dim=int(x_train.shape[1]),
         model_params=dict(campaign_info.model_params or {}),
@@ -577,7 +591,7 @@ def compute_transient_overlay(
         pl.lit("artifact" if use_artifact else "transient").alias("opal__transient__source"),
         pl.lit(campaign_slug).alias("opal__transient__campaign_slug"),
         pl.lit(run_id_value).alias("opal__transient__run_id"),
-        pl.lit(selected_round).alias("opal__transient__round"),
+        pl.lit(effective_round).alias("opal__transient__round"),
     )
 
     sel_params = dict(campaign_info.selection_params or {})

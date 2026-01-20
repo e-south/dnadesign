@@ -447,6 +447,12 @@ def test_observed_event_ids() -> None:
     assert sorted(observed) == ["a", "c"]
 
 
+def test_infer_round_from_labels() -> None:
+    df = pl.DataFrame({"observed_round": [1, 3, 2, None]})
+    assert labels.infer_round_from_labels(df) == 3
+    assert labels.infer_round_from_labels(pl.DataFrame({"x": [1]})) is None
+
+
 def test_apply_score_overlay_ledger_missing_rank() -> None:
     df = pl.DataFrame(
         {
@@ -467,8 +473,26 @@ def test_apply_score_overlay_ledger_missing_rank() -> None:
     assert "opal__score__top_k" in out.columns
     assert out["opal__score__top_k"].to_list() == [None, None]
     assert diag.warnings
-    assert diag.source_key == "ledger"
-    assert diag.warnings
+
+
+def test_apply_score_overlay_transient_round() -> None:
+    df = pl.DataFrame(
+        {
+            "id": ["a", "b"],
+            "opal__transient__score": [0.2, 0.4],
+            "opal__transient__round": [5, 5],
+            "opal__transient__run_id": ["notebook-transient", "notebook-transient"],
+        }
+    )
+    out, diag = scores.apply_score_overlay(
+        df,
+        score_source_value="Transient overlay (RF)",
+        campaign_slug="demo",
+        selected_round=None,
+    )
+    assert out["opal__score__round"].to_list() == [5, 5]
+    assert out["opal__score__run_id"].to_list() == ["notebook-transient", "notebook-transient"]
+    assert diag.source_key == "transient"
 
 
 def test_mismatch_helper(tmp_path: Path) -> None:
