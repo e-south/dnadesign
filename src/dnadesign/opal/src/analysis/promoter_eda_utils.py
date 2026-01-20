@@ -1188,10 +1188,14 @@ def load_ledger_predictions(
         diag["status"] = "missing_run_id"
         diag["error"] = "run_id is required to read ledger predictions without ambiguity."
         return pl.DataFrame(), diag
+    runs_path = paths["runs"]
+    if runs_path is None or not runs_path.exists():
+        diag["status"] = "missing_runs"
+        diag["error"] = "ledger.runs.parquet is required to resolve run_id → as_of_round."
+        return pl.DataFrame(), diag
 
     try:
-        runs_path = paths["runs"]
-        runs_df = read_runs(runs_path) if runs_path is not None and runs_path.exists() else None
+        runs_df = read_runs(runs_path)
         df = read_predictions(
             preds_dir,
             round_selector=as_of_round,

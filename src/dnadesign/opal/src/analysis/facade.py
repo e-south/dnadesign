@@ -277,25 +277,24 @@ def read_predictions(
     lf = scan_predictions(pred_dir)
     if run_id is not None:
         if runs_df is None or runs_df.is_empty():
-            if round_selector in (None, "unspecified", "latest"):
+            raise OpalError(
+                "run_id was provided but ledger.runs context is missing or empty. "
+                "Pass runs_df (ledger.runs) or call CampaignAnalysis.read_predictions "
+                "so OPAL can resolve run_id → as_of_round. "
+                "Use `opal runs list` or `opal status --with-ledger` to find valid run_id values.",
+                ExitCodes.BAD_ARGS,
+            )
+        run_round = _resolve_round_for_run_id(str(run_id), runs_df)
+        if round_selector in (None, "unspecified", "latest"):
+            round_selector = [run_round]
+        elif round_selector != "all":
+            selected = _selected_rounds(round_selector, runs_df)
+            if run_round not in selected:
                 raise OpalError(
-                    "run_id was provided without ledger.runs context. "
-                    "Pass runs_df or set round_selector explicitly (e.g., --round all) "
-                    "to avoid implicit 'latest' filtering.",
+                    f"run_id {run_id!r} belongs to as_of_round={run_round}, "
+                    f"but round_selector={round_selector!r} excludes it.",
                     ExitCodes.BAD_ARGS,
                 )
-        else:
-            run_round = _resolve_round_for_run_id(str(run_id), runs_df)
-            if round_selector in (None, "unspecified", "latest"):
-                round_selector = [run_round]
-            elif round_selector != "all":
-                selected = _selected_rounds(round_selector, runs_df)
-                if run_round not in selected:
-                    raise OpalError(
-                        f"run_id {run_id!r} belongs to as_of_round={run_round}, "
-                        f"but round_selector={round_selector!r} excludes it.",
-                        ExitCodes.BAD_ARGS,
-                    )
     _require_run_id_if_ambiguous(
         runs_df=runs_df,
         round_selector=round_selector,

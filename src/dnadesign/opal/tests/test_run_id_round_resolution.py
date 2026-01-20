@@ -65,6 +65,20 @@ def test_facade_read_predictions_run_id_round_mismatch_raises(tmp_path: Path) ->
         )
 
 
+def test_facade_read_predictions_requires_runs_df(tmp_path: Path) -> None:
+    pred_dir = tmp_path / "ledger.predictions"
+    _write_pred_parts(pred_dir)
+
+    with pytest.raises(OpalError):
+        read_predictions(
+            pred_dir,
+            columns=["run_id", "as_of_round", "id"],
+            run_id="run-a",
+            runs_df=None,
+            round_selector="all",
+        )
+
+
 def test_ledger_reader_run_id_resolves_round(tmp_path: Path) -> None:
     ws = CampaignWorkspace(config_path=tmp_path / "campaign.yaml", workdir=tmp_path)
     _write_pred_parts(ws.ledger_predictions_dir)
