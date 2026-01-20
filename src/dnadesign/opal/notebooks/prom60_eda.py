@@ -113,6 +113,7 @@ def _():
     apply_score_overlay = dash_scores.apply_score_overlay
     build_umap_chart = dash_plots.build_umap_chart
     build_cluster_chart = dash_plots.build_cluster_chart
+    build_umap_explorer_chart = dash_plots.build_umap_explorer_chart
     build_umap_overlay_charts = dash_plots.build_umap_overlay_charts
     build_color_dropdown_options = dash_util.build_color_dropdown_options
     build_friendly_column_labels = dash_util.build_friendly_column_labels
@@ -157,6 +158,7 @@ def _():
         apply_score_overlay,
         build_umap_chart,
         build_cluster_chart,
+        build_umap_explorer_chart,
         build_umap_overlay_charts,
         build_color_dropdown_options,
         build_friendly_column_labels,
@@ -1246,225 +1248,43 @@ def _(alt, pl):
 @app.cell
 def _(
     alt,
+    build_umap_explorer_chart,
     dataset_name,
-    dedupe_columns,
     df_active,
     df_umap_overlay,
     mo,
-    np,
-    opal_campaign_info,
-    pl,
-    safe_is_numeric,
     umap_color_dropdown,
     umap_color_label_map,
     umap_opacity_slider,
     umap_size_slider,
     umap_x_input,
     umap_y_input,
-    with_title,
 ):
     _x_col = umap_x_input.value.strip()
     _y_col = umap_y_input.value.strip()
-    umap_valid = False
-    _x_name = _x_col or "umap_x"
-    _y_name = _y_col or "umap_y"
-    umap_note = None
     if not hasattr(alt, "_DNAD_PLOT_SIZE"):
         alt._DNAD_PLOT_SIZE = 420
     _plot_size = alt._DNAD_PLOT_SIZE
-    _okabe_ito = [
-        "#E69F00",
-        "#56B4E9",
-        "#009E73",
-        "#F0E442",
-        "#0072B2",
-        "#D55E00",
-        "#CC79A7",
-        "#000000",
-    ]
-    _fallback_scheme = "tableau20"
 
     df_umap_source = df_umap_overlay if df_umap_overlay is not None else df_active
-    _color_title = None
+    _color_label = umap_color_dropdown.value
+    _color_value = umap_color_label_map.get(_color_label, _color_label)
 
-    if "id" not in df_umap_source.columns:
-        umap_note = mo.md("UMAP missing: required column `id` is absent.")
-    elif not _x_col or not _y_col:
-        umap_note = mo.md(
-            "UMAP missing: provide x/y columns. "
-            "To attach coords: `uv run cluster umap --dataset <dataset> "
-            "--name ldn_v1 --attach-coords --write --allow-overwrite`"
-        )
-    elif _x_col not in df_umap_source.columns or _y_col not in df_umap_source.columns:
-        umap_note = mo.md(
-            "UMAP missing: x/y columns must exist. "
-            "To attach coords: `uv run cluster umap --dataset <dataset> "
-            "--name ldn_v1 --attach-coords --write --allow-overwrite`"
-        )
-    elif not (safe_is_numeric(df_umap_source.schema[_x_col]) and safe_is_numeric(df_umap_source.schema[_y_col])):
-        umap_note = mo.md(
-            "UMAP missing: x/y columns must be numeric. "
-            "To attach coords: `uv run cluster umap --dataset <dataset> "
-            "--name ldn_v1 --attach-coords --write --allow-overwrite`"
-        )
-    else:
-        umap_valid = True
-
-    df_umap_plot = df_umap_source
-    if not umap_valid:
-        df_umap_chart = pl.DataFrame(
-            schema={
-                "__row_id": pl.Int64,
-                "id": pl.Utf8,
-                _x_name: pl.Float64,
-                _y_name: pl.Float64,
-            }
-        )
-        _chart = (
-            alt.Chart(df_umap_chart)
-            .mark_circle(stroke=None, strokeWidth=0)
-            .encode(
-                x=alt.X(_x_name),
-                y=alt.Y(_y_name),
-                tooltip=[c for c in ["id", "__row_id", _x_name, _y_name] if c in df_umap_chart.columns],
-            )
-            .properties(width=_plot_size, height=_plot_size)
-        )
-        umap_chart_note_md = umap_note
-    else:
-        umap_chart_note_md = mo.md(f"Plotting full dataset: `{df_umap_plot.height}` points.")
-
-        _color_label = umap_color_dropdown.value
-        _color_value = umap_color_label_map.get(_color_label, _color_label)
-        _color_encoding = alt.Undefined
-        _color_field = None
-        _color_title = None
-        _color_tooltip = None
-        plot_cols = dedupe_columns([col for col in ["__row_id", "id", _x_col, _y_col] if col in df_umap_source.columns])
-        if _color_value and _color_value != "(none)" and _color_value in df_umap_source.columns:
-            if _color_value not in plot_cols:
-                plot_cols.append(_color_value)
-        df_umap_chart = df_umap_source.select(plot_cols)
-
-        if _color_value and _color_value != "(none)" and _color_value in df_umap_chart.columns:
-            _dtype = df_umap_source.schema[_color_value]
-            _color_field = _color_value
-            _color_title = _color_label
-            _color_tooltip = _color_value
-            _non_null_count = df_umap_chart.select(pl.col(_color_value).count()).item() if df_umap_chart.height else 0
-            if _non_null_count == 0:
-                umap_chart_note_md = mo.md(
-                    f"Plotting full dataset: `{df_umap_plot.height}` points. "
-                    f"Color `{_color_value}` has no non-null values; rendering without color."
-                )
-                _color_field = None
-                _color_title = None
-                _color_tooltip = None
-                _color_encoding = alt.Undefined
-            elif _color_value == "opal__transient__observed_event":
-                _label_col = f"{_color_value}__label"
-                df_umap_chart = df_umap_chart.with_columns(
-                    pl.when(pl.col(_color_value))
-                    .then(pl.lit("Observed"))
-                    .otherwise(pl.lit("Not observed"))
-                    .alias(_label_col)
-                )
-                _color_field = _label_col
-                _color_title = _color_label
-                _color_tooltip = _label_col
-                _color_scale = alt.Scale(
-                    domain=["Observed", "Not observed"],
-                    range=[_okabe_ito[2], "#B0B0B0"],
-                )
-                _color_encoding = alt.Color(
-                    f"{_color_field}:N",
-                    title=_color_title,
-                    scale=_color_scale,
-                    legend=alt.Legend(title=_color_title),
-                )
-            elif _color_value == "opal__score__top_k":
-                _label_col = f"{_color_value}__label"
-                df_umap_chart = df_umap_chart.with_columns(
-                    pl.when(pl.col(_color_value)).then(pl.lit("Top-K")).otherwise(pl.lit("Not Top-K")).alias(_label_col)
-                )
-                _color_field = _label_col
-                _color_title = _color_label
-                _color_tooltip = _label_col
-                _color_scale = alt.Scale(
-                    domain=["Top-K", "Not Top-K"],
-                    range=[_okabe_ito[5], "#B0B0B0"],
-                )
-                _color_encoding = alt.Color(
-                    f"{_color_field}:N",
-                    title=_color_title,
-                    scale=_color_scale,
-                    legend=alt.Legend(title=_color_title),
-                )
-            elif safe_is_numeric(_dtype):
-                _color_encoding = alt.Color(
-                    f"{_color_field}:Q",
-                    title=_color_title,
-                    legend=alt.Legend(title=_color_title, format=".2f", tickCount=5),
-                )
-            else:
-                _n_unique = df_umap_chart.select(pl.col(_color_value).n_unique()).item() if df_umap_chart.height else 0
-                if _n_unique <= len(_okabe_ito):
-                    _color_scale = alt.Scale(range=_okabe_ito)
-                else:
-                    _color_scale = alt.Scale(scheme=_fallback_scheme)
-                _color_encoding = alt.Color(
-                    f"{_color_field}:N",
-                    title=_color_title,
-                    scale=_color_scale,
-                    legend=alt.Legend(title=_color_title),
-                )
-
-        _brush = alt.selection_interval(name="umap_brush", encodings=["x", "y"])
-        _tooltip_cols = [c for c in ["id", "__row_id", _x_col, _y_col] if c in df_umap_chart.columns]
-        if _color_tooltip and _color_tooltip in df_umap_chart.columns and _color_tooltip not in _tooltip_cols:
-            _tooltip_cols.append(_color_tooltip)
-        _chart = (
-            alt.Chart(df_umap_chart)
-            .mark_circle(
-                size=umap_size_slider.value,
-                opacity=umap_opacity_slider.value,
-                stroke=None,
-                strokeWidth=0,
-            )
-            .encode(
-                x=alt.X(_x_col, title=_x_col),
-                y=alt.Y(_y_col, title=_y_col),
-                color=_color_encoding,
-                tooltip=_tooltip_cols,
-            )
-            .add_params(_brush)
-            .properties(width=_plot_size, height=_plot_size)
-        )
-        if "opal__score__top_k" in df_umap_chart.columns:
-            _df_top = df_umap_chart.filter(pl.col("opal__score__top_k"))
-            if _df_top.height:
-                _top_layer = (
-                    alt.Chart(_df_top)
-                    .mark_circle(
-                        size=umap_size_slider.value * 1.8,
-                        stroke="#000000",
-                        strokeWidth=1.5,
-                        fillOpacity=0.0,
-                        opacity=1.0,
-                    )
-                    .encode(
-                        x=alt.X(_x_col, title=_x_col),
-                        y=alt.Y(_y_col, title=_y_col),
-                        tooltip=_tooltip_cols,
-                    )
-                )
-                _chart = _chart + _top_layer
-
-    _color_context = _color_title or "none"
-    _subtitle = f"{dataset_name or 'dataset'} · color={_color_context}"
-    _chart = with_title(_chart, "UMAP explorer (Evo2 embedding)", _subtitle)
-
-    umap_chart_ui = mo.ui.altair_chart(_chart)
+    _result = build_umap_explorer_chart(
+        df=df_umap_source,
+        x_col=_x_col,
+        y_col=_y_col,
+        color_value=_color_value,
+        color_label=_color_label,
+        point_size=umap_size_slider.value,
+        opacity=umap_opacity_slider.value,
+        plot_size=_plot_size,
+        dataset_name=dataset_name,
+    )
+    df_umap_plot = _result.df_plot
+    umap_valid = _result.valid
+    umap_chart_note_md = mo.md(_result.note) if _result.note else mo.md("")
+    umap_chart_ui = mo.ui.altair_chart(_result.chart)
     return df_umap_plot, umap_chart_note_md, umap_chart_ui, umap_valid
 
 
@@ -3323,6 +3143,10 @@ def _(
                 "The **setpoint** defines the desired logic profile `p ∈ [0,1]^4` in state order "
                 "`[00, 10, 01, 11]`. Adjusting `p` changes what “good” logic looks like and how intensity is "
                 "weighted across states. Exponents β/γ tune the trade-off between logic fidelity and intensity."
+            ),
+            mo.md(
+                "**Setpoint changes update SFXI scoring/ranking only; RF training still uses the same 8‑vector "
+                "labels** (retrain only if the labels themselves change)."
             ),
             sfxi_controls,
             sfxi_notice_md,

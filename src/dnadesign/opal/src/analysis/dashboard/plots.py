@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Iterable
 
 import altair as alt
@@ -42,6 +43,208 @@ def _dedupe(cols: Iterable[str]) -> list[str]:
         seen.add(col)
         out.append(col)
     return out
+
+
+@dataclass(frozen=True)
+class UmapExplorerResult:
+    chart: alt.Chart
+    df_plot: pl.DataFrame
+    valid: bool
+    note: str | None
+
+
+def build_umap_explorer_chart(
+    *,
+    df: pl.DataFrame,
+    x_col: str | None,
+    y_col: str | None,
+    color_value: str | None,
+    color_label: str | None,
+    point_size: float,
+    opacity: float,
+    plot_size: int,
+    dataset_name: str | None,
+) -> UmapExplorerResult:
+    _x_col = (x_col or "").strip()
+    _y_col = (y_col or "").strip()
+    x_name = _x_col or "umap_x"
+    y_name = _y_col or "umap_y"
+    valid = True
+    note: str | None = None
+
+    if "id" not in df.columns:
+        note = "UMAP missing: required column `id` is absent."
+        valid = False
+    elif not _x_col or not _y_col:
+        note = (
+            "UMAP missing: provide x/y columns. "
+            "To attach coords: `uv run cluster umap --dataset <dataset> "
+            "--name ldn_v1 --attach-coords --write --allow-overwrite`"
+        )
+        valid = False
+    elif _x_col not in df.columns or _y_col not in df.columns:
+        note = (
+            "UMAP missing: x/y columns must exist. "
+            "To attach coords: `uv run cluster umap --dataset <dataset> "
+            "--name ldn_v1 --attach-coords --write --allow-overwrite`"
+        )
+        valid = False
+    elif not (safe_is_numeric(df.schema[_x_col]) and safe_is_numeric(df.schema[_y_col])):
+        note = (
+            "UMAP missing: x/y columns must be numeric. "
+            "To attach coords: `uv run cluster umap --dataset <dataset> "
+            "--name ldn_v1 --attach-coords --write --allow-overwrite`"
+        )
+        valid = False
+
+    if not valid:
+        df_chart = pl.DataFrame(
+            schema={
+                "__row_id": pl.Int64,
+                "id": pl.Utf8,
+                x_name: pl.Float64,
+                y_name: pl.Float64,
+            }
+        )
+        chart = (
+            alt.Chart(df_chart)
+            .mark_circle(stroke=None, strokeWidth=0)
+            .encode(
+                x=alt.X(x_name),
+                y=alt.Y(y_name),
+                tooltip=[c for c in ["id", "__row_id", x_name, y_name] if c in df_chart.columns],
+            )
+            .properties(width=plot_size, height=plot_size)
+        )
+        chart = with_title(chart, "UMAP explorer (Evo2 embedding)", f"{dataset_name or 'dataset'} · color=none")
+        return UmapExplorerResult(chart=chart, df_plot=df, valid=False, note=note)
+
+    note = f"Plotting full dataset: `{df.height}` points."
+    okabe_ito = [
+        "#E69F00",
+        "#56B4E9",
+        "#009E73",
+        "#F0E442",
+        "#0072B2",
+        "#D55E00",
+        "#CC79A7",
+        "#000000",
+    ]
+    fallback_scheme = "tableau20"
+
+    color_encoding = alt.Undefined
+    color_field = None
+    color_title = None
+    color_tooltip = None
+    plot_cols = _dedupe([col for col in ["__row_id", "id", _x_col, _y_col] if col in df.columns])
+    if color_value and color_value != "(none)" and color_value in df.columns:
+        if color_value not in plot_cols:
+            plot_cols.append(color_value)
+    df_chart = df.select(plot_cols)
+
+    if color_value and color_value != "(none)" and color_value in df_chart.columns:
+        dtype = df.schema[color_value]
+        color_field = color_value
+        color_title = color_label
+        color_tooltip = color_value
+        non_null_count = df_chart.select(pl.col(color_value).count()).item() if df_chart.height else 0
+        if non_null_count == 0:
+            note = (
+                f"Plotting full dataset: `{df.height}` points. "
+                f"Color `{color_value}` has no non-null values; rendering without color."
+            )
+            color_field = None
+            color_title = None
+            color_tooltip = None
+            color_encoding = alt.Undefined
+        elif color_value == "opal__transient__observed_event":
+            label_col = f"{color_value}__label"
+            df_chart = df_chart.with_columns(
+                pl.when(pl.col(color_value)).then(pl.lit("Observed")).otherwise(pl.lit("Not observed")).alias(label_col)
+            )
+            color_field = label_col
+            color_title = color_label
+            color_tooltip = label_col
+            color_scale = alt.Scale(domain=["Observed", "Not observed"], range=[okabe_ito[2], "#B0B0B0"])
+            color_encoding = alt.Color(
+                f"{color_field}:N",
+                title=color_title,
+                scale=color_scale,
+                legend=alt.Legend(title=color_title),
+            )
+        elif color_value == "opal__score__top_k":
+            label_col = f"{color_value}__label"
+            df_chart = df_chart.with_columns(
+                pl.when(pl.col(color_value)).then(pl.lit("Top-K")).otherwise(pl.lit("Not Top-K")).alias(label_col)
+            )
+            color_field = label_col
+            color_title = color_label
+            color_tooltip = label_col
+            color_scale = alt.Scale(domain=["Top-K", "Not Top-K"], range=[okabe_ito[5], "#B0B0B0"])
+            color_encoding = alt.Color(
+                f"{color_field}:N",
+                title=color_title,
+                scale=color_scale,
+                legend=alt.Legend(title=color_title),
+            )
+        elif safe_is_numeric(dtype):
+            color_encoding = alt.Color(
+                f"{color_field}:Q",
+                title=color_title,
+                legend=alt.Legend(title=color_title, format=".2f", tickCount=5),
+            )
+        else:
+            n_unique = df_chart.select(pl.col(color_value).n_unique()).item() if df_chart.height else 0
+            if n_unique <= len(okabe_ito):
+                color_scale = alt.Scale(range=okabe_ito)
+            else:
+                color_scale = alt.Scale(scheme=fallback_scheme)
+            color_encoding = alt.Color(
+                f"{color_field}:N",
+                title=color_title,
+                scale=color_scale,
+                legend=alt.Legend(title=color_title),
+            )
+
+    brush = alt.selection_interval(name="umap_brush", encodings=["x", "y"])
+    tooltip_cols = [c for c in ["id", "__row_id", _x_col, _y_col] if c in df_chart.columns]
+    if color_tooltip and color_tooltip in df_chart.columns and color_tooltip not in tooltip_cols:
+        tooltip_cols.append(color_tooltip)
+    chart = (
+        alt.Chart(df_chart)
+        .mark_circle(size=point_size, opacity=opacity, stroke=None, strokeWidth=0)
+        .encode(
+            x=alt.X(_x_col, title=_x_col),
+            y=alt.Y(_y_col, title=_y_col),
+            color=color_encoding,
+            tooltip=tooltip_cols,
+        )
+        .add_params(brush)
+        .properties(width=plot_size, height=plot_size)
+    )
+    if "opal__score__top_k" in df_chart.columns:
+        df_top = df_chart.filter(pl.col("opal__score__top_k"))
+        if df_top.height:
+            top_layer = (
+                alt.Chart(df_top)
+                .mark_circle(
+                    size=point_size * 1.8,
+                    stroke="#000000",
+                    strokeWidth=1.5,
+                    fillOpacity=0.0,
+                    opacity=1.0,
+                )
+                .encode(
+                    x=alt.X(_x_col, title=_x_col),
+                    y=alt.Y(_y_col, title=_y_col),
+                    tooltip=tooltip_cols,
+                )
+            )
+            chart = chart + top_layer
+
+    color_context = color_title or "none"
+    chart = with_title(chart, "UMAP explorer (Evo2 embedding)", f"{dataset_name or 'dataset'} · color={color_context}")
+    return UmapExplorerResult(chart=chart, df_plot=df, valid=True, note=note)
 
 
 def build_umap_chart(
