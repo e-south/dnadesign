@@ -200,13 +200,12 @@ Quota plan: meme_demo=50
 🎉 Run complete.
 ```
 
-On macOS you may see Arrow sysctl warnings after generation; they are emitted by pyarrow and do
-not indicate a DenseGen failure.
+DenseGen suppresses noisy pyarrow sysctl warnings to keep stdout clean during long runs.
 
 ## 8) Inspect run summary
 
-DenseGen writes `outputs/meta/run_manifest.json` and `outputs/meta/inputs_manifest.json`. Summarize the
-run manifest:
+DenseGen writes `outputs/meta/run_manifest.json`, `outputs/meta/inputs_manifest.json`, and
+`outputs/meta/effective_config.json`. Summarize the run manifest:
 
 ```bash
 uv run dense inspect run --run /private/tmp/densegen-demo-20260115-1405/demo_press
@@ -244,7 +243,7 @@ Generate an audit-grade summary of the run:
 uv run dense report -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --format all
 ```
 
-This writes `outputs/report.json`, `outputs/report.md`, and `outputs/report.html`.
+This writes `outputs/report.json`, `outputs/report.md`, `outputs/report.html`, and `outputs/report_assets/`.
 
 ## 10) Inspect outputs
 
@@ -265,6 +264,7 @@ pools
 report.html
 report.json
 report.md
+report_assets
 ```
 
 Inspect Stage‑A pools and Stage‑B libraries:

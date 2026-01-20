@@ -76,6 +76,7 @@ DenseGen exposes dense-arrays solution modes via `solver.strategy`:
 - `optimal` - only the best solution per library.
 - `approximate` - heuristic solution per library (no solver options; backend optional).
 - `strands` - `single | double` (default: `double`).
+Use `solver.fallback_to_cbc` to allow a CBC fallback if the preferred solver is not available.
 
 ```yaml
 solver:
@@ -83,7 +84,12 @@ solver:
   strategy: diverse
   options: ["Threads=8", "TimeLimit=10"]
   strands: double
+  fallback_to_cbc: false
+  allow_unknown_options: false
 ```
+
+DenseGen validates solver option keys for known backends and fails fast on unknown options. If you
+need to pass custom solver flags, set `solver.allow_unknown_options: true` explicitly.
 
 ---
 

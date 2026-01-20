@@ -207,6 +207,11 @@ binding-site and PWM-sampled inputs.
 - `options` (list of solver option strings)
   - `options` must be empty when `strategy: approximate`
 - `strands`: `single | double` (default: `double`)
+- `fallback_to_cbc` (bool; default `false`)
+  - If the requested solver probe fails, fall back to CBC instead of aborting.
+- `allow_unknown_options` (bool; default `false`)
+  - DenseGen validates solver option keys for known backends. Set to `true` to bypass validation.
+  - Known keys (case-insensitive): `Threads`, `TimeLimit`, `MIPGap`, `Seed`, `LogLevel`, `MaxSeconds`.
 
 ---
 
@@ -301,6 +306,8 @@ densegen:
     strategy: diverse
     options: []
     strands: double
+    fallback_to_cbc: false
+    allow_unknown_options: false
 
   runtime:
     round_robin: true

@@ -45,6 +45,31 @@ _StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _c
 LATEST_SCHEMA_VERSION = "2.4"
 SUPPORTED_SCHEMA_VERSIONS = {"2.1", "2.2", "2.3", LATEST_SCHEMA_VERSION}
 
+KNOWN_SOLVER_OPTION_KEYS = {
+    "CBC": {
+        "threads",
+        "timelimit",
+        "timelimitseconds",
+        "maxseconds",
+        "seconds",
+        "ratiogap",
+        "mipgap",
+        "seed",
+        "randomseed",
+        "loglevel",
+    },
+    "GUROBI": {
+        "threads",
+        "timelimit",
+        "mipgap",
+        "seed",
+        "logtoconsole",
+        "logfile",
+        "method",
+        "presolve",
+    },
+}
+
 
 def parse_schema_version(value: str) -> tuple[int, int]:
     parts = str(value).strip().split(".")
@@ -915,6 +940,8 @@ class SolverConfig(BaseModel):
     strategy: Literal["iterate", "diverse", "optimal", "approximate"]
     options: List[str] = Field(default_factory=list)
     strands: Literal["single", "double"] = "double"
+    fallback_to_cbc: bool = False
+    allow_unknown_options: bool = False
 
     @field_validator("backend")
     @classmethod
@@ -931,6 +958,32 @@ class SolverConfig(BaseModel):
             raise ValueError("solver.backend is required unless strategy=approximate")
         if self.strategy == "approximate" and self.options:
             raise ValueError("solver.options must be empty when strategy=approximate")
+        if self.options:
+            cleaned: list[str] = []
+            for opt in self.options:
+                if not isinstance(opt, str) or not opt.strip():
+                    raise ValueError("solver.options entries must be non-empty strings")
+                cleaned.append(opt.strip())
+            self.options = cleaned
+            if not self.allow_unknown_options:
+                backend = (self.backend or "").strip().upper()
+                allowed = KNOWN_SOLVER_OPTION_KEYS.get(backend)
+                if allowed is None:
+                    raise ValueError(
+                        f"solver.options provided but backend '{backend}' has no known option list. "
+                        "Set solver.allow_unknown_options: true to bypass validation."
+                    )
+                unknown: list[str] = []
+                for opt in self.options:
+                    key = opt.split("=", 1)[0].split()[0].strip().lower()
+                    if key not in allowed:
+                        unknown.append(opt)
+                if unknown:
+                    preview = ", ".join(unknown[:5])
+                    raise ValueError(
+                        f"Unknown solver.options for backend '{backend}': {preview}. "
+                        "Set solver.allow_unknown_options: true to bypass validation."
+                    )
         return self
 
 

@@ -25,6 +25,7 @@ import pandas as pd
 
 from ..adapters.outputs import load_records_from_config
 from ..config import RootConfig, resolve_run_root, resolve_run_scoped_path
+from ..utils.mpl_utils import ensure_mpl_cache_dir
 from .artifacts.pool import POOL_MODE_TFBS, load_pool_artifact
 from .run_manifest import load_run_manifest
 from .run_paths import run_manifest_path, run_outputs_root
@@ -339,10 +340,11 @@ def _compute_adjacency(used_df: pd.DataFrame) -> pd.DataFrame:
     return agg
 
 
-@dataclass(frozen=True)
+@dataclass
 class ReportBundle:
     run_report: dict
     tables: Dict[str, pd.DataFrame]
+    plots: dict[str, list[str]] | None = None
 
 
 def collect_report_data(
@@ -449,6 +451,39 @@ def collect_report_data(
         library_summary["outputs"] = 0
 
     tables["library_summary"] = library_summary
+
+    library_usage = pd.DataFrame(
+        columns=[
+            "library_hash",
+            "library_index",
+            "input_name",
+            "plan_name",
+            "attempts",
+            "successes",
+            "outputs",
+        ]
+    )
+    if not attempts_df.empty:
+        attempts_by_lib = (
+            attempts_df.groupby(["sampling_library_hash", "sampling_library_index", "input_name", "plan_name"])
+            .agg(
+                attempts=("status", "size"),
+                successes=("status", lambda x: int((x == "success").sum())),
+            )
+            .reset_index()
+            .rename(
+                columns={
+                    "sampling_library_hash": "library_hash",
+                    "sampling_library_index": "library_index",
+                }
+            )
+        )
+        library_usage = attempts_by_lib
+        if not outputs_by_lib.empty:
+            library_usage = library_usage.merge(outputs_by_lib, on="library_index", how="left")
+        if "outputs" not in library_usage.columns:
+            library_usage["outputs"] = 0
+    tables["library_usage"] = library_usage
 
     offered_tf = pd.DataFrame(columns=["library_hash", "tf", "offered_instances", "offered_unique_tfbs"])
     offered_tfbs = pd.DataFrame(columns=["library_hash", "tf", "tfbs", "offered_instances"])
@@ -593,6 +628,9 @@ def collect_report_data(
         "attempts_failed": attempts_failed,
         "attempts_path": str(attempts_path) if attempts_path.exists() else None,
         "outputs_path": str(outputs_root / "dense_arrays.parquet"),
+        "effective_config_path": str(outputs_root / "meta" / "effective_config.json")
+        if (outputs_root / "meta" / "effective_config.json").exists()
+        else None,
     }
     manifest_path = run_manifest_path(run_root)
     if manifest_path.exists():
@@ -608,7 +646,111 @@ def collect_report_data(
         except Exception:
             log.warning("Failed to read run_manifest.json for report metadata.", exc_info=True)
 
-    return ReportBundle(run_report=run_report, tables=tables)
+    return ReportBundle(run_report=run_report, tables=tables, plots={})
+
+
+def _plot_available() -> bool:
+    try:
+        ensure_mpl_cache_dir()
+        import matplotlib  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
+def _safe_filename(text: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in {"-", "_", "."} else "_" for ch in text) or "densegen"
+
+
+def _generate_report_plots(bundle: ReportBundle, *, cfg_path: Path, out_dir: Path) -> dict[str, list[str]]:
+    if not _plot_available():
+        log.info("matplotlib not available; skipping report plots.")
+        return {}
+    import matplotlib.pyplot as plt
+
+    plots: dict[str, list[str]] = {}
+    assets_dir = out_dir / "report_assets"
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    run_root = resolve_run_root(cfg_path, bundle.run_report.get("run_root", ""))
+    outputs_root = run_outputs_root(run_root)
+
+    # Stage-A p-value histograms per input/TF (FIMO)
+    pool_dir = outputs_root / "pools"
+    if pool_dir.exists():
+        try:
+            pool_artifact = load_pool_artifact(pool_dir)
+            for entry in pool_artifact.inputs.values():
+                if entry.pool_mode != POOL_MODE_TFBS:
+                    continue
+                pool_path = pool_dir / entry.pool_path
+                if not pool_path.exists():
+                    continue
+                df_pool = pd.read_parquet(pool_path)
+                if "fimo_pvalue" not in df_pool.columns or "tf" not in df_pool.columns:
+                    continue
+                for tf, sub in df_pool.groupby("tf"):
+                    if sub.empty:
+                        continue
+                    pvals = sub["fimo_pvalue"].astype(float).replace(0, np.nan).dropna()
+                    if pvals.empty:
+                        continue
+                    fig, ax = plt.subplots(figsize=(6, 4))
+                    ax.hist(np.log10(pvals), bins=30, color="#4c78a8", edgecolor="white")
+                    ax.set_title(f"Stage-A p-value histogram: {entry.name}/{tf}")
+                    ax.set_xlabel("log10(p-value)")
+                    ax.set_ylabel("count")
+                    fname = f"stage_a_pvalue_hist__{_safe_filename(entry.name)}__{_safe_filename(str(tf))}.png"
+                    path = assets_dir / fname
+                    fig.tight_layout()
+                    fig.savefig(path)
+                    plt.close(fig)
+                    plots.setdefault("stage_a_pvalue_hist", []).append(str(path.relative_to(out_dir)))
+        except Exception:
+            log.warning("Failed to generate Stage-A p-value histograms.", exc_info=True)
+
+    # Stage-A bin occupancy bar charts (per input)
+    stage_a_bins = bundle.tables.get("stage_a_bins")
+    if stage_a_bins is not None and not stage_a_bins.empty:
+        try:
+            for input_name, sub in stage_a_bins.groupby("input_name"):
+                fig, ax = plt.subplots(figsize=(6, 4))
+                sub = sub.sort_values(["tf", "bin_id"])
+                labels = [f"{row['tf']}:{int(row['bin_id'])}" for _, row in sub.iterrows()]
+                counts = sub["count"].astype(int).tolist()
+                ax.bar(labels, counts, color="#f58518")
+                ax.set_title(f"Stage-A bin occupancy: {input_name}")
+                ax.set_ylabel("count")
+                ax.tick_params(axis="x", labelrotation=45, labelsize=8)
+                fname = f"stage_a_bin_counts__{_safe_filename(str(input_name))}.png"
+                path = assets_dir / fname
+                fig.tight_layout()
+                fig.savefig(path)
+                plt.close(fig)
+                plots.setdefault("stage_a_bin_counts", []).append(str(path.relative_to(out_dir)))
+        except Exception:
+            log.warning("Failed to generate Stage-A bin occupancy plots.", exc_info=True)
+
+    # Stage-B TF utilization (offered vs used)
+    offered_vs_used = bundle.tables.get("offered_vs_used_tf")
+    if offered_vs_used is not None and not offered_vs_used.empty:
+        try:
+            for lib_hash, sub in offered_vs_used.groupby("library_hash"):
+                sub = sub.sort_values("tf")
+                fig, ax = plt.subplots(figsize=(7, 4))
+                ax.bar(sub["tf"], sub["used_sequences"], color="#54a24b", label="used sequences")
+                ax.set_title(f"Stage-B TF utilization: {lib_hash[:8]}")
+                ax.set_ylabel("used sequences")
+                ax.tick_params(axis="x", labelrotation=45, labelsize=8)
+                fname = f"stage_b_tf_util__{_safe_filename(str(lib_hash))}.png"
+                path = assets_dir / fname
+                fig.tight_layout()
+                fig.savefig(path)
+                plt.close(fig)
+                plots.setdefault("stage_b_tf_utilization", []).append(str(path.relative_to(out_dir)))
+        except Exception:
+            log.warning("Failed to generate Stage-B utilization plots.", exc_info=True)
+
+    return plots
 
 
 def write_report(
@@ -624,6 +766,13 @@ def write_report(
     out_path.mkdir(parents=True, exist_ok=True)
 
     bundle = collect_report_data(root_cfg, cfg_path, include_combinatorics=include_combinatorics)
+    try:
+        plots = _generate_report_plots(bundle, cfg_path=cfg_path, out_dir=out_path)
+        bundle.plots = plots
+        if plots:
+            bundle.run_report["report_plots"] = plots
+    except Exception:
+        log.debug("Failed to generate report plots.", exc_info=True)
     formats = {f.lower() for f in (formats or {"json", "md"})}
     if "all" in formats:
         formats = {"json", "md", "html"}
@@ -660,6 +809,7 @@ def _render_report_md(bundle: ReportBundle) -> str:
         "- outputs/libraries/library_builds.parquet",
         "- outputs/libraries/library_members.parquet",
         "- outputs/pools/pool_manifest.json",
+        "- outputs/meta/effective_config.json",
     ]
     stage_a_bins = bundle.tables.get("stage_a_bins")
     if stage_a_bins is not None and not stage_a_bins.empty:
@@ -678,6 +828,16 @@ def _render_report_md(bundle: ReportBundle) -> str:
                     label = f"bin{bin_id}"
                 parts.append(f"{label}:{count}")
             lines.append(f"- {input_name}/{tf}: " + " ".join(parts))
+    library_usage = bundle.tables.get("library_usage")
+    if library_usage is not None and not library_usage.empty:
+        lines.extend(["", "## Library usage (top 5)"])
+        top_usage = library_usage.sort_values(["attempts", "outputs"], ascending=False).head(5)
+        for _, row in top_usage.iterrows():
+            lib_hash = str(row.get("library_hash") or "")[:8]
+            attempts = int(row.get("attempts") or 0)
+            outputs = int(row.get("outputs") or 0)
+            plan_name = str(row.get("plan_name") or "")
+            lines.append(f"- {plan_name}/{lib_hash}: attempts={attempts} outputs={outputs}")
     leaderboard = report.get("leaderboard_latest") or {}
     leader_tf = leaderboard.get("tf") or []
     leader_tfbs = leaderboard.get("tfbs") or []
@@ -704,6 +864,12 @@ def _render_report_md(bundle: ReportBundle) -> str:
             label = f"{tf}:{tfbs}" if tf else tfbs
             reason_suffix = f" (top reason: {reason})" if reason else ""
             lines.append(f"- {label} — failures={failures}{reason_suffix}")
+    if bundle.plots:
+        lines.extend(["", "## Report plots"])
+        for plot_name, paths in bundle.plots.items():
+            lines.append(f"- {plot_name}:")
+            for rel_path in paths:
+                lines.append(f"  - {rel_path}")
     return "\n".join(lines) + "\n"
 
 
@@ -714,6 +880,15 @@ def _write_report_md(path: Path, bundle: ReportBundle) -> None:
 def _write_report_html(path: Path, bundle: ReportBundle) -> None:
     md = _render_report_md(bundle)
     body = md.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    img_sections: list[str] = []
+    if bundle.plots:
+        for plot_name, paths in bundle.plots.items():
+            for rel_path in paths:
+                img_sections.append(
+                    f'<div><h3>{plot_name}</h3><img src="{rel_path}" '
+                    'style="max-width:100%;height:auto;border:1px solid #ddd;"/></div>'
+                )
+    img_html = "\n".join(img_sections)
     html = "\n".join(
         [
             "<!DOCTYPE html>",
@@ -728,6 +903,7 @@ def _write_report_html(path: Path, bundle: ReportBundle) -> None:
             "<pre>",
             body,
             "</pre>",
+            img_html,
             "</body>",
             "</html>",
         ]

@@ -111,7 +111,8 @@ Required sampling fields:
   - `retain_bin_ids` (optional list of ints): keep only specific p‑value bins
   - `log_every_batches` (int > 0): log yield summaries every N batches
 - `bgfile` (optional): MEME bfile-format background model for FIMO
-- `keep_all_candidates_debug` (optional): write raw FIMO TSVs to `outputs/meta/fimo/` for inspection
+- `keep_all_candidates_debug` (optional): write raw FIMO TSVs and candidate-level Parquet
+  (`candidates__<label>.parquet`) to `outputs/meta/fimo/` for inspection
 - `include_matched_sequence` (optional): include `fimo_matched_sequence` column in the TFBS table
 
 Notes:
