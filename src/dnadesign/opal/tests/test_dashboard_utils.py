@@ -25,6 +25,7 @@ from dnadesign.opal.src.analysis.dashboard import (
     scores,
     selection,
     sfxi,
+    transient,
     util,
 )
 
@@ -512,6 +513,40 @@ def test_apply_score_overlay_transient_missing_provenance() -> None:
     assert out["opal__score__round"].to_list() == [None]
     assert any("opal__transient__run_id" in msg for msg in diag.warnings)
     assert any("opal__transient__round" in msg for msg in diag.warnings)
+
+
+def test_transient_overlay_provenance_on_early_exit() -> None:
+    df_base = pl.DataFrame({"id": ["a"], "__row_id": [0], "x_vec": [[1.0, 2.0]]})
+    params = sfxi.compute_sfxi_params(
+        setpoint=[0.25, 0.25, 0.25, 0.25],
+        beta=1.0,
+        gamma=1.0,
+        delta=0.0,
+        p=95.0,
+        fallback_p=75.0,
+        min_n=1,
+        eps=1e-6,
+    )
+    result = transient.compute_transient_overlay(
+        df_base=df_base,
+        labels_asof_df=pl.DataFrame(),
+        labels_current_df=pl.DataFrame(),
+        df_sfxi=pl.DataFrame(),
+        campaign_info=None,
+        campaign_slug=None,
+        x_col="x_vec",
+        y_col="y_vec",
+        sfxi_params=params,
+        selected_round=None,
+        use_artifact=False,
+        artifact_model=None,
+        artifact_round_dir=None,
+        run_id=None,
+        rf_random_state=None,
+        dataset_name="demo",
+    )
+    assert "opal__transient__round" in result.df_overlay.columns
+    assert result.df_overlay["opal__transient__round"].to_list() == [0]
 
 
 def test_mismatch_helper(tmp_path: Path) -> None:

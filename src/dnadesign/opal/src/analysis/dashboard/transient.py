@@ -329,16 +329,6 @@ def compute_transient_overlay(
     if dataset_name is None and context is not None:
         dataset_name = getattr(context, "dataset_name", None)
 
-    if campaign_info is None:
-        _warn("Transient predictions unavailable (campaign unsupported).")
-        return TransientOverlayResult(
-            df_overlay=df_overlay,
-            df_pred_scored=df_pred_scored,
-            diagnostics=diagnostics,
-            feature_chart=feature_chart,
-            hist_chart=hist_chart,
-            hist_note=hist_note,
-        )
     effective_round = selected_round
     if effective_round is None:
         effective_round = infer_round_from_labels(labels_current_df) or infer_round_from_labels(labels_asof_df)
@@ -362,6 +352,17 @@ def compute_transient_overlay(
             pl.lit(campaign_slug).alias("opal__transient__campaign_slug"),
             pl.lit(run_id_value).alias("opal__transient__run_id"),
             pl.lit(effective_round).alias("opal__transient__round"),
+        )
+
+    if campaign_info is None:
+        _warn("Transient predictions unavailable (campaign unsupported).")
+        return TransientOverlayResult(
+            df_overlay=_with_transient_provenance(df_overlay),
+            df_pred_scored=df_pred_scored,
+            diagnostics=diagnostics,
+            feature_chart=feature_chart,
+            hist_chart=hist_chart,
+            hist_note=hist_note,
         )
 
     if x_col is None or x_col not in df_base.columns:
