@@ -74,6 +74,8 @@ Options:
 - `--log-file PATH` - override the log file path. Otherwise DenseGen writes
   to `logging.log_dir/<run_id>.log` inside the workspace. The override path
   must still resolve inside `densegen.run.root`.
+Notes:
+- If you enable `scoring_backend: fimo`, run via `pixi run dense ...` (or ensure `fimo` is on PATH).
 
 ---
 
@@ -114,6 +116,8 @@ Options:
 - `--by-library/--no-by-library` - group library summaries per build attempt.
 - `--top-per-tf` - limit TFBS rows per TF when summarizing.
 - `--show-library-hash/--short-library-hash` - toggle full vs short library hashes.
+Tip:
+- For large runs, prefer `--no-by-library` or lower `--top`/`--top-per-tf` to keep output readable.
 
 ---
 
@@ -141,6 +145,12 @@ Demo run (small, Parquet-only config):
 
 ```bash
 uv run dense run -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --no-plot
+```
+
+FIMO-backed sampling (pixi):
+
+```bash
+pixi run dense run -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --no-plot
 ```
 
 ---
