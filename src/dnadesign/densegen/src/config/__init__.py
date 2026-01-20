@@ -42,8 +42,8 @@ def _construct_mapping(loader, node, deep: bool = False):
 _StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
 
 
-LATEST_SCHEMA_VERSION = "2.3"
-SUPPORTED_SCHEMA_VERSIONS = {"2.1", "2.2", LATEST_SCHEMA_VERSION}
+LATEST_SCHEMA_VERSION = "2.4"
+SUPPORTED_SCHEMA_VERSIONS = {"2.1", "2.2", "2.3", LATEST_SCHEMA_VERSION}
 
 
 def parse_schema_version(value: str) -> tuple[int, int]:
@@ -356,6 +356,9 @@ class PWMSamplingConfig(BaseModel):
                 self.mining = PWMMiningConfig()
             if self.pvalue_bins is None:
                 self.pvalue_bins = list(CANONICAL_PVALUE_BINS)
+            if self.mining is not None and self.mining.max_candidates is not None:
+                if int(self.mining.max_candidates) < int(self.n_sites):
+                    raise ValueError("pwm.sampling.mining.max_candidates must be >= n_sites")
             if self.mining is not None and self.mining.retain_bin_ids is not None:
                 bins = list(self.pvalue_bins) if self.pvalue_bins is not None else list(CANONICAL_PVALUE_BINS)
                 max_idx = len(bins) - 1

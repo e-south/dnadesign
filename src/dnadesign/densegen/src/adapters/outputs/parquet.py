@@ -107,6 +107,8 @@ def _meta_arrow_type(name: str, pa):
                 [
                     pa.field("tf", pa.string()),
                     pa.field("tfbs", pa.string()),
+                    pa.field("motif_id", pa.string()),
+                    pa.field("tfbs_id", pa.string()),
                     pa.field("orientation", pa.string()),
                     pa.field("offset", pa.int64()),
                     pa.field("offset_raw", pa.int64()),

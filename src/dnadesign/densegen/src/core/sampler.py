@@ -99,15 +99,21 @@ class TFSampler:
         labels: list[str] = []
         site_ids: list[str | None] = []
         sources: list[str | None] = []
+        tfbs_ids: list[str | None] = []
+        motif_ids: list[str | None] = []
         seen_tfbs = set()  # for unique_binding_sites (tf, tfbs)
         used_per_tf: dict[str, int] = {}
 
         has_site_id = "site_id" in self.df.columns
         has_source = "source" in self.df.columns
+        has_tfbs_id = "tfbs_id" in self.df.columns
+        has_motif_id = "motif_id" in self.df.columns
 
         def _append_provenance(row) -> None:
             site_ids.append(str(row["site_id"]) if has_site_id else None)
             sources.append(str(row["source"]) if has_source else None)
+            tfbs_ids.append(str(row["tfbs_id"]) if has_tfbs_id else None)
+            motif_ids.append(str(row["motif_id"]) if has_motif_id else None)
 
         unique_tfs = self.df["tf"].unique().tolist()
         self.rng.shuffle(unique_tfs)
@@ -235,6 +241,8 @@ class TFSampler:
             "final_cap": cap,
             "site_id_by_index": site_ids if has_site_id else None,
             "source_by_index": sources if has_source else None,
+            "tfbs_id_by_index": tfbs_ids if has_tfbs_id else None,
+            "motif_id_by_index": motif_ids if has_motif_id else None,
         }
 
         return sites, meta, labels, info
@@ -278,6 +286,8 @@ class TFSampler:
 
         has_site_id = "site_id" in df.columns
         has_source = "source" in df.columns
+        has_tfbs_id = "tfbs_id" in df.columns
+        has_motif_id = "motif_id" in df.columns
         total_unique_tfbs = len(df.drop_duplicates(["tf", "tfbs"]))
 
         unique_tfs = sorted(df["tf"].unique().tolist())
@@ -313,6 +323,8 @@ class TFSampler:
         reasons: list[str] = []
         site_ids: list[str | None] = []
         sources: list[str | None] = []
+        tfbs_ids: list[str | None] = []
+        motif_ids: list[str | None] = []
         seen_tfbs = set()
         used_per_tf: dict[str, int] = {}
 
@@ -330,6 +342,8 @@ class TFSampler:
             used_per_tf[tf] = used_per_tf.get(tf, 0) + 1
             site_ids.append(str(row["site_id"]) if has_site_id else None)
             sources.append(str(row["source"]) if has_source else None)
+            tfbs_ids.append(str(row["tfbs_id"]) if has_tfbs_id else None)
+            motif_ids.append(str(row["motif_id"]) if has_motif_id else None)
             return True
 
         def _pick_for_tf(tf: str, *, reason: str, cap_override: int | None = None) -> bool:
@@ -528,6 +542,8 @@ class TFSampler:
             "final_cap": cap,
             "site_id_by_index": site_ids if has_site_id else None,
             "source_by_index": sources if has_source else None,
+            "tfbs_id_by_index": tfbs_ids if has_tfbs_id else None,
+            "motif_id_by_index": motif_ids if has_motif_id else None,
             "selection_reason_by_index": reasons,
         }
         return sites, meta, labels, info

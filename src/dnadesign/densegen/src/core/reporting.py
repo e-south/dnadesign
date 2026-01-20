@@ -25,6 +25,7 @@ import pandas as pd
 
 from ..adapters.outputs import load_records_from_config
 from ..config import RootConfig, resolve_run_root, resolve_run_scoped_path
+from .artifacts.pool import POOL_MODE_TFBS, load_pool_artifact
 from .run_manifest import load_run_manifest
 from .run_paths import run_manifest_path, run_outputs_root
 
@@ -119,6 +120,8 @@ def _explode_used(df: pd.DataFrame) -> pd.DataFrame:
                     "input_name": str(row.get(input_col) or ""),
                     "tf": tf,
                     "tfbs": tfbs,
+                    "motif_id": entry.get("motif_id"),
+                    "tfbs_id": entry.get("tfbs_id"),
                     "orientation": entry.get("orientation"),
                     "offset": entry.get("offset"),
                     "length": entry.get("length"),
@@ -376,6 +379,48 @@ def collect_report_data(
 
     tables: Dict[str, pd.DataFrame] = {}
 
+    stage_a_bins = pd.DataFrame(columns=["input_name", "tf", "bin_id", "bin_low", "bin_high", "count", "total"])
+    pool_dir = outputs_root / "pools"
+    if pool_dir.exists():
+        try:
+            pool_artifact = load_pool_artifact(pool_dir)
+            rows: list[dict[str, Any]] = []
+            for entry in pool_artifact.inputs.values():
+                if entry.pool_mode != POOL_MODE_TFBS:
+                    continue
+                pool_path = pool_dir / entry.pool_path
+                if not pool_path.exists():
+                    continue
+                df_pool = pd.read_parquet(pool_path)
+                if "fimo_bin_id" not in df_pool.columns or "tf" not in df_pool.columns:
+                    continue
+                total_counts = df_pool.groupby("tf").size().to_dict()
+                grouped = df_pool.groupby(["tf", "fimo_bin_id"])
+                for (tf, bin_id), group in grouped:
+                    bin_low = None
+                    bin_high = None
+                    if "fimo_bin_low" in group.columns and not group["fimo_bin_low"].empty:
+                        bin_low = float(group["fimo_bin_low"].iloc[0])
+                    if "fimo_bin_high" in group.columns and not group["fimo_bin_high"].empty:
+                        bin_high = float(group["fimo_bin_high"].iloc[0])
+                    rows.append(
+                        {
+                            "input_name": entry.name,
+                            "tf": tf,
+                            "bin_id": int(bin_id),
+                            "bin_low": bin_low,
+                            "bin_high": bin_high,
+                            "count": int(len(group)),
+                            "total": int(total_counts.get(tf, len(group))),
+                        }
+                    )
+            if rows:
+                stage_a_bins = pd.DataFrame(rows)
+        except Exception:
+            log.warning("Failed to load Stage-A pool bins for report.", exc_info=True)
+
+    tables["stage_a_bins"] = stage_a_bins
+
     library_summary = pd.DataFrame(
         columns=["library_hash", "library_index", "input_name", "plan_name", "size", "total_bp", "outputs"]
     )
@@ -480,6 +525,13 @@ def collect_report_data(
     if include_combinatorics:
         tables["tf_cooccurrence"] = _compute_cooccurrence(used_df)
         tables["tf_adjacency"] = _compute_adjacency(used_df)
+
+    composition_path = outputs_root / "composition.parquet"
+    if composition_path.exists():
+        try:
+            tables["composition"] = pd.read_parquet(composition_path)
+        except Exception:
+            log.warning("Failed to load composition.parquet for report tables.", exc_info=True)
 
     library_hashes = df[_dg("sampling_library_hash")].dropna().unique().tolist()
     tf_counts = used_df["tf"].value_counts().to_dict() if not used_df.empty else {}
@@ -604,7 +656,28 @@ def _render_report_md(bundle: ReportBundle) -> str:
         "## Outputs",
         "- outputs/dense_arrays.parquet",
         "- outputs/attempts.parquet",
+        "- outputs/composition.parquet",
+        "- outputs/libraries/library_builds.parquet",
+        "- outputs/libraries/library_members.parquet",
+        "- outputs/pools/pool_manifest.json",
     ]
+    stage_a_bins = bundle.tables.get("stage_a_bins")
+    if stage_a_bins is not None and not stage_a_bins.empty:
+        lines.extend(["", "## Stage-A p-value bins"])
+        for (input_name, tf), sub in stage_a_bins.groupby(["input_name", "tf"]):
+            sub = sub.sort_values("bin_id")
+            parts = []
+            for _, row in sub.iterrows():
+                bin_id = int(row.get("bin_id") or 0)
+                count = int(row.get("count") or 0)
+                low = row.get("bin_low")
+                high = row.get("bin_high")
+                if low is not None and high is not None:
+                    label = f"({float(low):.0e},{float(high):.0e}]"
+                else:
+                    label = f"bin{bin_id}"
+                parts.append(f"{label}:{count}")
+            lines.append(f"- {input_name}/{tf}: " + " ".join(parts))
     leaderboard = report.get("leaderboard_latest") or {}
     leader_tf = leaderboard.get("tf") or []
     leader_tfbs = leaderboard.get("tfbs") or []

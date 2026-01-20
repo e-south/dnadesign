@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List
 
+from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
 from .base import BaseDataSource, resolve_path
 from .pwm_sampling import PWMMotif, normalize_background, sample_pwm_sites
 
@@ -160,6 +161,12 @@ class PWMArtifactDataSource(BaseDataSource):
             raise FileNotFoundError(f"PWM artifact not found. Looked here:\n  - {artifact_path}")
 
         motif = _load_artifact(artifact_path)
+        motif_hash = hash_pwm_motif(
+            motif_label=motif.motif_id,
+            matrix=motif.matrix,
+            background=motif.background,
+            source_kind="pwm_artifact",
+        )
 
         sampling = dict(self.sampling or {})
         strategy = str(sampling.get("strategy", "stochastic"))
@@ -228,9 +235,27 @@ class PWMArtifactDataSource(BaseDataSource):
 
         rows = []
         for seq in selected:
-            row = {"tf": motif.motif_id, "tfbs": seq, "source": str(artifact_path)}
-            if meta_by_seq:
-                row.update(meta_by_seq.get(seq, {}))
+            meta = meta_by_seq.get(seq, {}) if meta_by_seq else {}
+            start = meta.get("fimo_start")
+            stop = meta.get("fimo_stop")
+            strand = meta.get("fimo_strand")
+            tfbs_id = hash_tfbs_id(
+                motif_id=motif_hash,
+                sequence=seq,
+                scoring_backend=scoring_backend,
+                matched_start=int(start) if start is not None else None,
+                matched_stop=int(stop) if stop is not None else None,
+                matched_strand=str(strand) if strand is not None else None,
+            )
+            row = {
+                "tf": motif.motif_id,
+                "tfbs": seq,
+                "source": str(artifact_path),
+                "motif_id": motif_hash,
+                "tfbs_id": tfbs_id,
+            }
+            if meta:
+                row.update(meta)
             rows.append(row)
         df_out = pd.DataFrame(rows)
         return entries, df_out

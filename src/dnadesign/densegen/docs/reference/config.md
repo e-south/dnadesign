@@ -23,7 +23,7 @@ for conceptual flow.
 ### Top-level
 
 - `densegen` (required)
-- `densegen.schema_version` (required; supported: `2.1`, `2.2`, `2.3`)
+- `densegen.schema_version` (required; supported: `2.1`, `2.2`, `2.3`, `2.4`)
 - `densegen.run` (required; run-scoped I/O root)
 - `plots` (optional; required `source` when `output.targets` has multiple sinks)
 
@@ -268,7 +268,7 @@ binding-site and PWM-sampled inputs.
 
 ```yaml
 densegen:
-  schema_version: "2.3"
+  schema_version: "2.4"
   run:
     id: demo
     root: "."

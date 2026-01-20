@@ -50,10 +50,50 @@ per-motif site counts to make sampling behavior explicit.
 
 ---
 
+### Stage‑A pools (TFBS pool artifacts)
+
+DenseGen materializes Stage‑A pools under `outputs/pools/`:
+
+- `outputs/pools/pool_manifest.json` — manifest of pool files by input.
+- `outputs/pools/<input>__pool.parquet` — TFBS pools (or sequence pools).
+
+TFBS pools include stable `motif_id` and `tfbs_id` hashes plus optional FIMO metadata
+(`fimo_pvalue`, `fimo_bin_id`, etc.). Sequence pools include `tfbs_id` for joinability.
+
+---
+
+### Library artifacts (Stage‑B)
+
+DenseGen writes Stage‑B libraries under `outputs/libraries/`:
+
+- `library_builds.parquet` — one row per library build (index, hash, size, strategy).
+- `library_members.parquet` — normalized membership table (one row per TFBS in each library).
+- `library_manifest.json` — manifest + schema version.
+
+These artifacts provide a stable join path from solver attempts to the exact library contents.
+
+---
+
+### Composition table
+
+DenseGen writes `outputs/composition.parquet`, one row per TFBS placement in each accepted
+sequence. Columns include `sequence_id`, `input_name`, `plan_name`, `library_index`,
+`tf`, `tfbs`, `motif_id`, `tfbs_id`, and placement offsets.
+
+---
+
 ### Run state (checkpoint)
 
 DenseGen writes `outputs/meta/run_state.json` during execution. This checkpoint captures
 per-input/plan progress so long runs can resume safely after interruption.
+
+---
+
+### Events log
+
+DenseGen writes `outputs/meta/events.jsonl` (JSON lines) with structured events:
+`POOL_BUILT`, `LIBRARY_BUILT`, `STALL_DETECTED`, and `RESAMPLE_TRIGGERED`.
+This is a lightweight, machine-readable trace of the run’s control flow.
 
 ---
 
@@ -85,6 +125,7 @@ source = densegen:{input_name}:{plan_name}
 This is always present and is separate from metadata.
 Detailed placement provenance lives in `densegen__used_tfbs_detail` and the
 run-scoped library manifests.
+`densegen__used_tfbs_detail` includes `motif_id` and `tfbs_id` when available.
 
 ---
 
