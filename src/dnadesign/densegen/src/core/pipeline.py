@@ -41,7 +41,6 @@ from ..config import (
     ResolvedPlanItem,
     resolve_relative_path,
     resolve_run_root,
-    schema_version_at_least,
 )
 from ..utils.logging_utils import install_native_stderr_filters
 from .artifacts.ids import hash_tfbs_id
@@ -976,7 +975,6 @@ def build_library_for_plan(
     failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] | None,
     rng: random.Random,
     np_rng: np.random.Generator,
-    schema_is_22: bool,
     library_index_start: int,
 ) -> tuple[list[str], list[str], list[str], dict]:
     pool_strategy = str(getattr(sampling_cfg, "pool_strategy", "subsample"))
@@ -1139,46 +1137,33 @@ def build_library_for_plan(
                     f"(min_required_regulators={min_required_regulators}). "
                     "Increase library_size or relax required constraints."
                 )
-        if schema_is_22 and pool_strategy in {"subsample", "iterative_subsample"}:
-            failure_counts_by_tfbs: dict[tuple[str, str], int] | None = None
-            if library_sampling_strategy == "coverage_weighted" and getattr(sampling_cfg, "avoid_failed_motifs", False):
-                failure_counts_by_tfbs = _aggregate_failure_counts_for_sampling(
-                    failure_counts,
-                    input_name=source_label,
-                    plan_name=plan_item.name,
-                )
-            library, parts, reg_labels, info = sampler.generate_binding_site_library(
-                library_size,
-                sequence_length=seq_len,
-                budget_overhead=subsample_over,
-                required_tfbs=required_bias_motifs,
-                required_tfs=required_tfs_for_library,
-                cover_all_tfs=cover_all_tfs,
-                unique_binding_sites=unique_binding_sites,
-                max_sites_per_tf=max_sites_per_tf,
-                relax_on_exhaustion=relax_on_exhaustion,
-                allow_incomplete_coverage=allow_incomplete_coverage,
-                sampling_strategy=library_sampling_strategy,
-                usage_counts=usage_counts if library_sampling_strategy == "coverage_weighted" else None,
-                coverage_boost_alpha=float(getattr(sampling_cfg, "coverage_boost_alpha", 0.15)),
-                coverage_boost_power=float(getattr(sampling_cfg, "coverage_boost_power", 1.0)),
-                failure_counts=failure_counts_by_tfbs,
-                avoid_failed_motifs=bool(getattr(sampling_cfg, "avoid_failed_motifs", False)),
-                failure_penalty_alpha=float(getattr(sampling_cfg, "failure_penalty_alpha", 0.5)),
-                failure_penalty_power=float(getattr(sampling_cfg, "failure_penalty_power", 1.0)),
+        failure_counts_by_tfbs: dict[tuple[str, str], int] | None = None
+        if library_sampling_strategy == "coverage_weighted" and getattr(sampling_cfg, "avoid_failed_motifs", False):
+            failure_counts_by_tfbs = _aggregate_failure_counts_for_sampling(
+                failure_counts,
+                input_name=source_label,
+                plan_name=plan_item.name,
             )
-        else:
-            library, parts, reg_labels, info = sampler.generate_binding_site_subsample(
-                seq_len,
-                subsample_over,
-                required_tfbs=required_bias_motifs,
-                required_tfs=required_tfs_for_library,
-                cover_all_tfs=cover_all_tfs,
-                unique_binding_sites=unique_binding_sites,
-                max_sites_per_tf=max_sites_per_tf,
-                relax_on_exhaustion=relax_on_exhaustion,
-                allow_incomplete_coverage=allow_incomplete_coverage,
-            )
+        library, parts, reg_labels, info = sampler.generate_binding_site_library(
+            library_size,
+            sequence_length=seq_len,
+            budget_overhead=subsample_over,
+            required_tfbs=required_bias_motifs,
+            required_tfs=required_tfs_for_library,
+            cover_all_tfs=cover_all_tfs,
+            unique_binding_sites=unique_binding_sites,
+            max_sites_per_tf=max_sites_per_tf,
+            relax_on_exhaustion=relax_on_exhaustion,
+            allow_incomplete_coverage=allow_incomplete_coverage,
+            sampling_strategy=library_sampling_strategy,
+            usage_counts=usage_counts if library_sampling_strategy == "coverage_weighted" else None,
+            coverage_boost_alpha=float(getattr(sampling_cfg, "coverage_boost_alpha", 0.15)),
+            coverage_boost_power=float(getattr(sampling_cfg, "coverage_boost_power", 1.0)),
+            failure_counts=failure_counts_by_tfbs,
+            avoid_failed_motifs=bool(getattr(sampling_cfg, "avoid_failed_motifs", False)),
+            failure_penalty_alpha=float(getattr(sampling_cfg, "failure_penalty_alpha", 0.5)),
+            failure_penalty_power=float(getattr(sampling_cfg, "failure_penalty_power", 1.0)),
+        )
         info.update(
             {
                 "pool_strategy": pool_strategy,
@@ -1795,7 +1780,6 @@ def _process_plan_for_source(
     library_sampling_strategy = str(sampling_cfg.library_sampling_strategy)
     iterative_max_libraries = int(sampling_cfg.iterative_max_libraries)
     iterative_min_new_solutions = int(sampling_cfg.iterative_min_new_solutions)
-    schema_is_22 = schema_version_at_least(global_cfg.schema_version, major=2, minor=2)
 
     runtime_cfg = global_cfg.runtime
     max_per_subsample = int(runtime_cfg.arrays_generated_before_resample)
@@ -1812,7 +1796,6 @@ def _process_plan_for_source(
 
     policy = RuntimePolicy(
         pool_strategy=pool_strategy,
-        schema_is_22=schema_is_22,
         arrays_generated_before_resample=max_per_subsample,
         stall_seconds_before_resample=stall_seconds,
         stall_warning_every_seconds=stall_warn_every,
@@ -2078,7 +2061,6 @@ def _process_plan_for_source(
         failure_counts=failure_counts if failure_counts else None,
         rng=rng,
         np_rng=np_rng,
-        schema_is_22=schema_is_22,
         library_index_start=libraries_built,
     )
     libraries_built = int(sampling_info.get("library_index", libraries_built))
@@ -2966,11 +2948,9 @@ def _process_plan_for_source(
                     resample_reason = "min_new_solutions"
 
             # Resample
-            # Alignment (2): allow reactive resampling for subsample under schema>=2.2.
             if not policy.allow_resample():
                 raise RuntimeError(
-                    f"[{source_label}/{plan_name}] pool_strategy={pool_strategy!r} does not allow resampling "
-                    f"under schema_version={global_cfg.schema_version}. "
+                    f"[{source_label}/{plan_name}] pool_strategy={pool_strategy!r} does not allow resampling. "
                     "Reduce quota or use iterative_subsample."
                 )
             resamples_in_try += 1
@@ -3022,7 +3002,6 @@ def _process_plan_for_source(
                 failure_counts=failure_counts if failure_counts else None,
                 rng=rng,
                 np_rng=np_rng,
-                schema_is_22=schema_is_22,
                 library_index_start=libraries_built,
             )
             libraries_built = int(sampling_info.get("library_index", libraries_built))
@@ -3588,7 +3567,7 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
 
     if inputs_manifest_entries:
         payload = {
-            "schema_version": "1.0",
+            "schema_version": str(cfg.schema_version),
             "run_id": cfg.run.id,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "config_sha256": config_sha,

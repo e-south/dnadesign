@@ -73,7 +73,7 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
     csv_path.write_text("tf,tfbs\nTF1,AAAAA\n")
     cfg = {
         "densegen": {
-            "schema_version": "2.3",
+            "schema_version": "2.4",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {

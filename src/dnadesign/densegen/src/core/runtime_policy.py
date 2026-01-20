@@ -10,7 +10,6 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class RuntimePolicy:
     pool_strategy: str
-    schema_is_22: bool
     arrays_generated_before_resample: int
     stall_seconds_before_resample: int
     stall_warning_every_seconds: int
@@ -19,7 +18,7 @@ class RuntimePolicy:
     max_seconds_per_plan: int
 
     def allow_resample(self) -> bool:
-        return self.pool_strategy == "iterative_subsample" or (self.schema_is_22 and self.pool_strategy == "subsample")
+        return self.pool_strategy in {"iterative_subsample", "subsample"}
 
     def should_trigger_stall(self, *, now: float, subsample_started: float, produced_this_library: int) -> bool:
         if self.stall_seconds_before_resample <= 0:

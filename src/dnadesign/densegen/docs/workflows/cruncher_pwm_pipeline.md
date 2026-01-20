@@ -45,7 +45,7 @@ inputs:
         length_policy: exact
 ```
 
-PWM sampling is stochastic. Under schema `2.2+`, `pool_strategy: subsample` will resample
+PWM sampling is stochastic. `pool_strategy: subsample` will resample
 reactively on stalls/duplicate guards, while `iterative_subsample` resamples proactively
 after `arrays_generated_before_resample` or when a library under-produces.
 

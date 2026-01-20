@@ -8,7 +8,7 @@ def test_run_state_roundtrip(tmp_path) -> None:
     counts = {("input", "plan"): 3, ("input", "plan2"): 1}
     state = RunState.from_counts(
         run_id="demo",
-        schema_version="2.3",
+        schema_version="2.4",
         config_sha256="abc123",
         run_root="/tmp/demo",
         counts=counts,
@@ -20,5 +20,5 @@ def test_run_state_roundtrip(tmp_path) -> None:
     state.write_json(path)
     loaded = load_run_state(path)
     assert loaded.run_id == "demo"
-    assert loaded.schema_version == "2.3"
+    assert loaded.schema_version == "2.4"
     assert loaded.items[0].generated >= 0

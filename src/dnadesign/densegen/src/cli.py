@@ -58,7 +58,6 @@ from .config import (
     resolve_relative_path,
     resolve_run_root,
     resolve_run_scoped_path,
-    schema_version_at_least,
 )
 from .core.artifacts.library import write_library_artifact
 from .core.artifacts.pool import (
@@ -1446,12 +1445,13 @@ def stage_b_build_libraries(
     rng = random.Random(seeds["stage_b"])
     np_rng = np.random.default_rng(seeds["stage_b"])
     sampling_cfg = cfg.generation.sampling
-    schema_is_22 = schema_version_at_least(cfg.schema_version, major=2, minor=2)
     outputs_root = run_root / "outputs"
     failure_counts = _load_failure_counts_from_attempts(outputs_root)
     libraries_built = _load_existing_library_index(outputs_root) if outputs_root.exists() else 0
 
     pool_dir = resolve_relative_path(cfg_path, pool) if pool is not None else (run_root / "outputs" / "pools")
+    if pool_dir.exists() and pool_dir.is_file():
+        raise typer.BadParameter(f"Pool path must be a directory from `stage-a build-pool`, not a file: {pool_dir}")
     if not pool_dir.exists() or not pool_dir.is_dir():
         raise typer.BadParameter(f"Pool directory not found: {pool_dir}")
     try:
@@ -1509,7 +1509,6 @@ def stage_b_build_libraries(
                     failure_counts=failure_counts if failure_counts else None,
                     rng=rng,
                     np_rng=np_rng,
-                    schema_is_22=schema_is_22,
                     library_index_start=libraries_built,
                 )
                 libraries_built = int(info.get("library_index", libraries_built))

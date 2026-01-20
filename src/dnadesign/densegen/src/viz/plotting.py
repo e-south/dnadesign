@@ -651,11 +651,6 @@ def plot_tf_coverage(
         pc = style.get("promoter_colors") or {}
         if label in pc:
             return pc[label]
-        # backward-compatible keys:
-        if label == "35 site":
-            return pc.get("-35 site", default)
-        if label == "10 site":
-            return pc.get("-10 site", default)
         return default
 
     for key, default in default_promoter_colors.items():
