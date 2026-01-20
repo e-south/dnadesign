@@ -104,9 +104,11 @@ def _():
     # - Clusters: stable numeric ordering for distribution views.
     from dnadesign.opal.src.analysis import promoter_eda_utils as eda_utils
 
-    apply_intensity_median_iqr = eda_utils.apply_intensity_median_iqr
+    apply_y_ops_fit_transform = eda_utils.apply_y_ops_fit_transform
+    apply_y_ops_inverse = eda_utils.apply_y_ops_inverse
     build_color_dropdown_options = eda_utils.build_color_dropdown_options
     build_label_events = eda_utils.build_label_events
+    build_round_ctx_for_notebook = eda_utils.build_round_ctx_for_notebook
     campaign_label_from_path = eda_utils.campaign_label_from_path
     compute_sfxi_metrics = eda_utils.compute_sfxi_metrics
     compute_sfxi_params = eda_utils.compute_sfxi_params
@@ -116,28 +118,35 @@ def _():
     dedup_latest_labels = eda_utils.dedup_latest_labels
     find_latest_model_artifact = eda_utils.find_latest_model_artifact
     find_repo_root = eda_utils.find_repo_root
-    fit_intensity_median_iqr = eda_utils.fit_intensity_median_iqr
     get_feature_importances = eda_utils.get_feature_importances
-    invert_intensity_median_iqr = eda_utils.invert_intensity_median_iqr
     is_altair_undefined = eda_utils.is_altair_undefined
     list_campaign_paths = eda_utils.list_campaign_paths
     list_series_to_numpy = eda_utils.list_series_to_numpy
     list_usr_datasets = eda_utils.list_usr_datasets
     load_campaign_yaml = eda_utils.load_campaign_yaml
-    load_intensity_params_from_round_ctx = eda_utils.load_intensity_params_from_round_ctx
+    list_campaign_dataset_refs = eda_utils.list_campaign_dataset_refs
+    load_ledger_labels = eda_utils.load_ledger_labels
+    load_ledger_predictions = eda_utils.load_ledger_predictions
+    load_ledger_runs = eda_utils.load_ledger_runs
     load_model_artifact = eda_utils.load_model_artifact
+    load_round_ctx_from_dir = eda_utils.load_round_ctx_from_dir
     missingness_summary = eda_utils.missingness_summary
     namespace_summary = eda_utils.namespace_summary
     parse_campaign_info = eda_utils.parse_campaign_info
+    resolve_objective_mode = eda_utils.resolve_objective_mode
+    resolve_campaign_workdir = eda_utils.resolve_campaign_workdir
     resolve_dataset_path = eda_utils.resolve_dataset_path
+    resolve_run_artifacts = eda_utils.resolve_run_artifacts
     resolve_usr_root = eda_utils.resolve_usr_root
     safe_is_numeric = eda_utils.safe_is_numeric
     unwrap_artifact_model = eda_utils.unwrap_artifact_model
     valid_vec8_mask_expr = eda_utils.valid_vec8_mask_expr
     return (
-        apply_intensity_median_iqr,
+        apply_y_ops_fit_transform,
+        apply_y_ops_inverse,
         build_color_dropdown_options,
         build_label_events,
+        build_round_ctx_for_notebook,
         campaign_label_from_path,
         coerce_selection_dataframe,
         compute_sfxi_metrics,
@@ -147,20 +156,25 @@ def _():
         dedupe_exprs,
         find_latest_model_artifact,
         find_repo_root,
-        fit_intensity_median_iqr,
         get_feature_importances,
-        invert_intensity_median_iqr,
         is_altair_undefined,
         list_campaign_paths,
+        list_campaign_dataset_refs,
         list_series_to_numpy,
         list_usr_datasets,
         load_campaign_yaml,
-        load_intensity_params_from_round_ctx,
+        load_ledger_labels,
+        load_ledger_predictions,
+        load_ledger_runs,
         load_model_artifact,
+        load_round_ctx_from_dir,
         missingness_summary,
         namespace_summary,
         parse_campaign_info,
+        resolve_objective_mode,
+        resolve_campaign_workdir,
         resolve_dataset_path,
+        resolve_run_artifacts,
         resolve_usr_root,
         safe_is_numeric,
         unwrap_artifact_model,
@@ -217,6 +231,24 @@ def _(Path, find_repo_root):
 
 
 @app.cell
+def _(campaign_label_from_path, list_campaign_paths, repo_root):
+    campaign_paths = list_campaign_paths(repo_root)
+    campaign_labels = [campaign_label_from_path(path, repo_root) for path in campaign_paths]
+    campaign_path_map = dict(zip(campaign_labels, campaign_paths))
+    default_campaign_label = None
+    for label in campaign_labels:
+        if "prom60-etoh-cipro-andgate/campaign.yaml" in label.replace("\\", "/"):
+            default_campaign_label = label
+            break
+    if default_campaign_label is None and campaign_labels:
+        default_campaign_label = campaign_labels[0]
+    if not campaign_labels:
+        campaign_labels = ["(no campaigns found)"]
+        default_campaign_label = campaign_labels[0]
+    return campaign_labels, campaign_path_map, default_campaign_label
+
+
+@app.cell
 def _(list_usr_datasets, os, repo_root, resolve_usr_root):
     usr_root = None
     usr_root_error = None
@@ -235,10 +267,37 @@ def _(list_usr_datasets, os, repo_root, resolve_usr_root):
 
 
 @app.cell
-def _(mo, usr_datasets):
+def _(default_campaign_label, list_campaign_dataset_refs, repo_root):
+    campaign_dataset_refs = list_campaign_dataset_refs(repo_root)
+    campaign_dataset_names = sorted({ref.dataset_name for ref in campaign_dataset_refs if ref.dataset_name})
+    default_campaign_dataset_name = None
+    for _ref in campaign_dataset_refs:
+        if _ref.campaign_label == default_campaign_label:
+            if _ref.dataset_name:
+                default_campaign_dataset_name = _ref.dataset_name
+            elif _ref.records_path and _ref.records_path.name == "records.parquet":
+                default_campaign_dataset_name = _ref.records_path.parent.name
+            break
+    return campaign_dataset_names, campaign_dataset_refs, default_campaign_dataset_name
+
+
+@app.cell
+def _(campaign_dataset_names, default_campaign_dataset_name, mo, usr_datasets):
+    dataset_options = list(usr_datasets or [])
+    for _name in campaign_dataset_names:
+        if _name not in dataset_options:
+            dataset_options.append(_name)
+    if not dataset_options:
+        dataset_options = ["(none found)"]
+    if usr_datasets:
+        default_value = usr_datasets[0]
+    elif default_campaign_dataset_name and default_campaign_dataset_name in dataset_options:
+        default_value = default_campaign_dataset_name
+    else:
+        default_value = dataset_options[0]
     dataset_dropdown = mo.ui.dropdown(
-        options=usr_datasets or ["(none found)"],
-        value=usr_datasets[0] if usr_datasets else "(none found)",
+        options=dataset_options,
+        value=default_value,
         label="USR dataset",
         full_width=True,
     )
@@ -257,6 +316,7 @@ def _(mo, usr_datasets):
 
 @app.cell
 def _(
+    campaign_dataset_refs,
     custom_path_input,
     dataset_dropdown,
     dataset_form,
@@ -279,22 +339,48 @@ def _(
     if not custom_path_text and not _dataset_choice:
         mo.stop(True, mo.md("No datasets found. Provide a custom path or set `DNADESIGN_USR_ROOT`."))
 
-    try:
-        dataset_path, dataset_mode = resolve_dataset_path(
-            repo_root=repo_root,
-            usr_root=usr_root,
-            dataset_name=_dataset_choice,
-            custom_path=custom_path_input.value,
-        )
-    except ValueError as exc:
-        mo.stop(True, mo.md(f"Dataset path error: {exc}"))
+    dataset_path = None
+    dataset_mode = None
+    if not custom_path_text and _dataset_choice:
+        for _ref in campaign_dataset_refs:
+            if _ref.dataset_name == _dataset_choice and _ref.records_path is not None:
+                dataset_path = _ref.records_path
+                dataset_mode = "campaign"
+                break
+
+    if dataset_path is None:
+        try:
+            dataset_path, dataset_mode = resolve_dataset_path(
+                repo_root=repo_root,
+                usr_root=usr_root,
+                dataset_name=_dataset_choice,
+                custom_path=custom_path_input.value,
+            )
+        except ValueError as exc:
+            mo.stop(True, mo.md(f"Dataset path error: {exc}"))
+
+    if (
+        dataset_path is not None
+        and not dataset_path.exists()
+        and dataset_mode in {"campaign", "usr"}
+        and _dataset_choice
+        and repo_root is not None
+    ):
+        _fallback_root = repo_root.parent / "dnadesign" / "src" / "dnadesign" / "usr" / "datasets"
+        _fallback_path = _fallback_root / str(_dataset_choice) / "records.parquet"
+        if _fallback_path.exists():
+            dataset_path = _fallback_path
+            dataset_mode = "usr-fallback"
 
     if not dataset_path.exists():
-        hint = (
-            "Did you mean `src/dnadesign/usr/datasets/<name>/records.parquet`?"
-            if dataset_mode == "usr"
-            else "Provide an absolute path or a repo-root-relative path."
-        )
+        if dataset_mode == "usr":
+            hint = "Did you mean `src/dnadesign/usr/datasets/<name>/records.parquet`?"
+        elif dataset_mode == "campaign":
+            hint = "Resolved from campaign.yaml; ensure the dataset exists or set `DNADESIGN_USR_ROOT`."
+        elif dataset_mode == "usr-fallback":
+            hint = "Resolved from sibling dnadesign repo; ensure the dataset exists or set `DNADESIGN_USR_ROOT`."
+        else:
+            hint = "Provide an absolute path or a repo-root-relative path."
         mo.stop(
             True,
             mo.md(
@@ -325,7 +411,7 @@ def _(
             ),
         )
 
-    dataset_name = dataset_path.parent.name if dataset_mode == "usr" else dataset_path.stem
+    dataset_name = dataset_path.parent.name if dataset_mode in {"usr", "usr-fallback"} else dataset_path.stem
     dataset_status_md = mo.md(
         "\n".join(
             [
@@ -344,6 +430,8 @@ def _(df_raw):
         df_prelim = df_raw
     else:
         df_prelim = df_raw.with_row_index("__row_id")
+    if "id" in df_prelim.columns:
+        df_prelim = df_prelim.with_columns(df_prelim["id"].cast(str))
     return (df_prelim,)
 
 
@@ -409,6 +497,7 @@ def _(
     df_umap_overlay,
     mo,
     rf_model_source,
+    score_source_dropdown,
     safe_is_numeric,
 ):
     numeric_cols = [name for name, dtype in df_prelim.schema.items() if safe_is_numeric(dtype)]
@@ -466,6 +555,13 @@ def _(
         full_width=True,
     )
     _extra_color_cols = [
+        "opal__score__scalar",
+        "opal__score__rank",
+        "opal__score__top_k",
+        "opal__ledger__score",
+        "opal__ledger__top_k",
+        "opal__cache__score",
+        "opal__cache__top_k",
         "opal__transient__score",
         "opal__transient__logic_fidelity",
         "opal__transient__effect_scaled",
@@ -482,7 +578,15 @@ def _(
         include_none=True,
     )
     _color_options = [_name for _name in _color_options if _name != "id_right"]
+    _score_source_label = score_source_dropdown.value if score_source_dropdown is not None else "Selected"
     _friendly_color_labels = {
+        "opal__score__scalar": f"{_score_source_label} score (selected source)",
+        "opal__score__rank": f"{_score_source_label} rank (selected source)",
+        "opal__score__top_k": f"{_score_source_label} Top-K (selected source)",
+        "opal__ledger__score": "Ledger score (pred__y_obj_scalar)",
+        "opal__ledger__top_k": "Ledger Top-K (sel__is_selected)",
+        "opal__cache__score": "Records cache score (latest_pred_scalar)",
+        "opal__cache__top_k": "Records cache Top-K",
         "opal__transient__score": f"{_rf_prefix} score (SFXI)",
         "opal__transient__logic_fidelity": f"{_rf_prefix} logic fidelity (SFXI)",
         "opal__transient__effect_scaled": f"{_rf_prefix} effect scaled (SFXI)",
@@ -534,6 +638,7 @@ def _(
     opal_campaign_info,
     pl,
     plot_type_dropdown,
+    resolve_objective_mode,
     safe_is_numeric,
     with_title,
     x_dropdown,
@@ -567,38 +672,15 @@ def _(
     _fallback_scheme = "tableau20"
     _selected_ids = None
     _selected_id_col = None
-    if (
-        _color_value == "opal__transient__top_k"
-        and opal_campaign_info is not None
-        and "opal__transient__score" in _df_explorer_source.columns
-    ):
-        _sel_params = dict(opal_campaign_info.selection_params or {})
-        try:
-            _top_k = int(_sel_params.get("top_k", 10))
-        except Exception:
-            _top_k = 10
-        _sel_objective = str(_sel_params.get("objective", "maximize"))
-        _sel_tie = str(_sel_params.get("tie_handling", "competition_rank"))
+    if _color_value == "opal__score__top_k" and "opal__score__top_k" in _df_explorer_source.columns:
         _selected_id_col = "id" if "id" in _df_explorer_source.columns else "__row_id"
         if _selected_id_col in _df_explorer_source.columns:
-            _sel_ids = np.asarray(
-                _df_explorer_source.get_column(_selected_id_col).cast(pl.Utf8).to_list(),
-                dtype=str,
+            _selected_ids = (
+                _df_explorer_source.filter(pl.col("opal__score__top_k").fill_null(False))
+                .select(pl.col(_selected_id_col).cast(pl.Utf8))
+                .to_series()
+                .to_list()
             )
-            _sel_scores = (
-                _df_explorer_source.select(pl.col("opal__transient__score").fill_null(float("nan")).cast(pl.Float64))
-                .to_numpy()
-                .ravel()
-            )
-            _sel_result = normalize_selection_result(
-                {},
-                ids=_sel_ids,
-                scores=_sel_scores,
-                top_k=_top_k,
-                tie_handling=_sel_tie,
-                objective=_sel_objective,
-            )
-            _selected_ids = np.asarray(_sel_ids)[_sel_result["selected_bool"]].tolist()
     if plot_type == "scatter":
         if x_col not in _df_explorer_source.columns or y_col not in _df_explorer_source.columns:
             _note_lines.append("Select numeric X and Y columns for scatter.")
@@ -645,12 +727,12 @@ def _(
                 _select_exprs.append(pl.col(_color_value))
             df_plot = _df_explorer_source.select(dedupe_exprs(_select_exprs))
             if (
-                _color_value == "opal__transient__top_k"
+                _color_value == "opal__score__top_k"
                 and _selected_ids is not None
                 and _selected_id_col in df_plot.columns
             ):
                 df_plot = df_plot.with_columns(
-                    pl.col(_selected_id_col).cast(pl.Utf8).is_in(_selected_ids).alias("opal__transient__top_k")
+                    pl.col(_selected_id_col).cast(pl.Utf8).is_in(_selected_ids).alias("opal__score__top_k")
                 )
             if _color_value and _color_value != "(none)":
                 if _color_value not in df_plot.columns:
@@ -687,7 +769,7 @@ def _(
                             ),
                             legend=alt.Legend(title=_color_title),
                         )
-                    elif _color_value == "opal__transient__top_k":
+                    elif _color_value == "opal__score__top_k":
                         _label_col = f"{_color_value}__label"
                         df_plot = df_plot.with_columns(
                             pl.when(pl.col(_color_value))
@@ -863,6 +945,7 @@ def _(
     opal_campaign_info,
     pl,
     rf_model_source,
+    score_source_dropdown,
     safe_is_numeric,
     transient_cluster_hue_state,
     transient_cluster_metric_state,
@@ -872,10 +955,12 @@ def _(
         name for name, dtype in df_metric_source.schema.items() if safe_is_numeric(dtype) and dtype != pl.Boolean
     ]
     metric_cols = [_name for _name in metric_cols if not _name.startswith("opal__transient__y_hat_")]
-    slug = opal_campaign_info.slug if opal_campaign_info is not None else None
+    _slug = opal_campaign_info.slug if opal_campaign_info is not None else None
     preferred_cols = []
-    if slug:
-        preferred_cols.append(f"opal__{slug}__latest_pred_scalar")
+    if _slug:
+        preferred_cols.append(f"opal__{_slug}__latest_pred_scalar")
+    preferred_cols.append("opal__score__scalar")
+    preferred_cols.append("opal__score__rank")
     preferred_cols.append("opal__transient__score")
     preferred_cols.append("opal__transient__logic_fidelity")
     preferred_cols.append("opal__transient__effect_scaled")
@@ -886,20 +971,25 @@ def _(
     if not metric_cols:
         metric_cols = ["opal__transient__score"]
     default_metric = metric_cols[0]
-    if slug and f"opal__{slug}__latest_pred_scalar" in metric_cols:
-        default_metric = f"opal__{slug}__latest_pred_scalar"
+    if "opal__score__scalar" in metric_cols:
+        default_metric = "opal__score__scalar"
+    elif _slug and f"opal__{_slug}__latest_pred_scalar" in metric_cols:
+        default_metric = f"opal__{_slug}__latest_pred_scalar"
     elif "opal__transient__score" in metric_cols:
         default_metric = "opal__transient__score"
     _rf_source_value = rf_model_source.value if rf_model_source is not None else "Ephemeral (refit in notebook)"
     _rf_prefix = "OPAL artifact" if _rf_source_value == "OPAL artifact (model.joblib)" else "Transient"
+    _score_source_label = score_source_dropdown.value if score_source_dropdown is not None else "Selected"
     _friendly_metric_labels = {
+        "opal__score__scalar": f"{_score_source_label} score (selected source)",
+        "opal__score__rank": f"{_score_source_label} rank (selected source)",
         "opal__transient__score": f"{_rf_prefix} score (SFXI)",
         "opal__transient__logic_fidelity": f"{_rf_prefix} logic fidelity (SFXI)",
         "opal__transient__effect_scaled": f"{_rf_prefix} effect scaled (SFXI)",
         "opal__transient__rank": f"{_rf_prefix} rank",
     }
-    if slug:
-        _friendly_metric_labels[f"opal__{slug}__latest_pred_scalar"] = "OPAL latest predicted scalar"
+    if _slug:
+        _friendly_metric_labels[f"opal__{_slug}__latest_pred_scalar"] = "OPAL latest predicted scalar"
     transient_cluster_metric_label_map = {}
     metric_options = []
     for _col in metric_cols:
@@ -938,6 +1028,9 @@ def _(
     _raw_hue_values = [
         "(none)",
         "Leiden cluster",
+        "opal__score__scalar",
+        "opal__score__rank",
+        "opal__score__top_k",
         "opal__transient__score",
         "opal__transient__logic_fidelity",
         "opal__transient__effect_scaled",
@@ -948,6 +1041,9 @@ def _(
     _hue_raw_to_label = {
         "(none)": "(none)",
         "Leiden cluster": "Leiden cluster",
+        "opal__score__scalar": f"{_score_source_label} score (selected source)",
+        "opal__score__rank": f"{_score_source_label} rank (selected source)",
+        "opal__score__top_k": f"{_score_source_label} Top-K (selected source)",
         "opal__transient__score": f"{_rf_prefix} score (SFXI)",
         "opal__transient__logic_fidelity": f"{_rf_prefix} logic fidelity (SFXI)",
         "opal__transient__effect_scaled": f"{_rf_prefix} effect scaled (SFXI)",
@@ -1012,6 +1108,21 @@ def _(mo):
 
 
 @app.cell
+def _(mo, opal_campaign_info):
+    default_seed = None
+    if opal_campaign_info is not None:
+        default_seed = opal_campaign_info.model_params.get("random_state")
+    if default_seed is None:
+        default_seed = 0
+    rf_random_state_input = mo.ui.text(
+        value=str(default_seed),
+        label="Transient RF random_state (seed)",
+        full_width=True,
+    )
+    return (rf_random_state_input,)
+
+
+@app.cell
 def _(
     set_transient_cluster_hue_state,
     set_transient_cluster_metric_state,
@@ -1035,9 +1146,11 @@ def _(
 
 @app.cell(column=1)
 def _(
+    campaign_dataset_names,
     dataset_form,
     dataset_preview_md,
     mo,
+    usr_datasets,
     usr_root,
     usr_root_error,
     usr_root_mode,
@@ -1051,7 +1164,13 @@ def _(
     if usr_root_error:
         usr_status = mo.md(f"USR root error: {usr_root_error}")
     elif usr_root:
-        usr_status = mo.md(f"USR root ({usr_root_mode}): `{usr_root}`")
+        if not usr_datasets and campaign_dataset_names:
+            usr_status = mo.md(
+                f"USR root ({usr_root_mode}): `{usr_root}` · no datasets found; "
+                "showing dataset names referenced by campaigns."
+            )
+        else:
+            usr_status = mo.md(f"USR root ({usr_root_mode}): `{usr_root}`")
     mo.vstack([header, intro, usr_status, dataset_form, dataset_preview_md])
     return
 
@@ -1079,7 +1198,7 @@ def _(missingness_table, mo, namespace_table, schema_table):
 
 
 @app.cell
-def _(build_color_dropdown_options, df_active, mo, rf_model_source):
+def _(build_color_dropdown_options, df_active, mo, rf_model_source, score_source_dropdown):
     default_x = None
     default_y = None
     for name in df_active.columns:
@@ -1106,6 +1225,13 @@ def _(build_color_dropdown_options, df_active, mo, rf_model_source):
         full_width=True,
     )
     extra_color_options = [
+        "opal__score__scalar",
+        "opal__score__rank",
+        "opal__score__top_k",
+        "opal__ledger__score",
+        "opal__ledger__top_k",
+        "opal__cache__score",
+        "opal__cache__top_k",
         "opal__transient__score",
         "opal__transient__logic_fidelity",
         "opal__transient__effect_scaled",
@@ -1121,7 +1247,15 @@ def _(build_color_dropdown_options, df_active, mo, rf_model_source):
     umap_color_default = "cluster__ldn_v1" if "cluster__ldn_v1" in umap_color_cols else "(none)"
     _rf_source_value = rf_model_source.value if rf_model_source is not None else "Ephemeral (refit in notebook)"
     _rf_prefix = "OPAL artifact" if _rf_source_value == "OPAL artifact (model.joblib)" else "Transient"
+    _score_source_label = score_source_dropdown.value if score_source_dropdown is not None else "Selected"
     _friendly_umap_labels = {
+        "opal__score__scalar": f"{_score_source_label} score (selected source)",
+        "opal__score__rank": f"{_score_source_label} rank (selected source)",
+        "opal__score__top_k": f"{_score_source_label} Top-K (selected source)",
+        "opal__ledger__score": "Ledger score (pred__y_obj_scalar)",
+        "opal__ledger__top_k": "Ledger Top-K (sel__is_selected)",
+        "opal__cache__score": "Records cache score (latest_pred_scalar)",
+        "opal__cache__top_k": "Records cache Top-K",
         "opal__transient__score": f"{_rf_prefix} score (SFXI)",
         "opal__transient__logic_fidelity": f"{_rf_prefix} logic fidelity (SFXI)",
         "opal__transient__effect_scaled": f"{_rf_prefix} effect scaled (SFXI)",
@@ -1307,40 +1441,7 @@ def _(
                     scale=_color_scale,
                     legend=alt.Legend(title=_color_title),
                 )
-            elif _color_value == "opal__transient__top_k":
-                if opal_campaign_info is not None and "opal__transient__score" in df_umap_source.columns:
-                    _sel_params = dict(opal_campaign_info.selection_params or {})
-                    try:
-                        _top_k = int(_sel_params.get("top_k", 10))
-                    except Exception:
-                        _top_k = 10
-                    _sel_objective = str(_sel_params.get("objective", "maximize"))
-                    _sel_tie = str(_sel_params.get("tie_handling", "competition_rank"))
-                    _id_col = "id" if "id" in df_umap_source.columns else "__row_id"
-                    if _id_col in df_umap_source.columns and _id_col in df_umap_chart.columns:
-                        _sel_ids = np.asarray(
-                            df_umap_source.get_column(_id_col).cast(pl.Utf8).to_list(),
-                            dtype=str,
-                        )
-                        _sel_scores = (
-                            df_umap_source.select(
-                                pl.col("opal__transient__score").fill_null(float("nan")).cast(pl.Float64)
-                            )
-                            .to_numpy()
-                            .ravel()
-                        )
-                        _sel_result = normalize_selection_result(
-                            {},
-                            ids=_sel_ids,
-                            scores=_sel_scores,
-                            top_k=_top_k,
-                            tie_handling=_sel_tie,
-                            objective=_sel_objective,
-                        )
-                        _selected_ids = np.asarray(_sel_ids)[_sel_result["selected_bool"]].tolist()
-                        df_umap_chart = df_umap_chart.with_columns(
-                            pl.col(_id_col).cast(pl.Utf8).is_in(_selected_ids).alias("opal__transient__top_k")
-                        )
+            elif _color_value == "opal__score__top_k":
                 _label_col = f"{_color_value}__label"
                 df_umap_chart = df_umap_chart.with_columns(
                     pl.when(pl.col(_color_value)).then(pl.lit("Top-K")).otherwise(pl.lit("Not Top-K")).alias(_label_col)
@@ -1398,8 +1499,8 @@ def _(
             .add_params(_brush)
             .properties(width=_plot_size, height=_plot_size)
         )
-        if "opal__transient__top_k" in df_umap_chart.columns:
-            _df_top = df_umap_chart.filter(pl.col("opal__transient__top_k"))
+        if "opal__score__top_k" in df_umap_chart.columns:
+            _df_top = df_umap_chart.filter(pl.col("opal__score__top_k"))
             if _df_top.height:
                 _top_layer = (
                     alt.Chart(_df_top)
@@ -1533,20 +1634,22 @@ def _(
 
 @app.cell
 def _(
+    Path,
     RandomForestModel,
     alt,
-    apply_intensity_median_iqr,
+    apply_y_ops_fit_transform,
+    apply_y_ops_inverse,
+    build_round_ctx_for_notebook,
     compute_sfxi_metrics,
     compute_sfxi_params,
     dataset_name,
     dedupe_columns,
-    df_active,
+    df_opal_overlay_base,
     find_latest_model_artifact,
-    fit_intensity_median_iqr,
     get_feature_importances,
-    invert_intensity_median_iqr,
+    ledger_runs_df,
     list_series_to_numpy,
-    load_intensity_params_from_round_ctx,
+    load_round_ctx_from_dir,
     load_model_artifact,
     math,
     mo,
@@ -1557,8 +1660,14 @@ def _(
     opal_labels_current_df,
     opal_labels_view_df,
     opal_selected_round,
+    opal_pred_selected_round,
+    opal_pred_selected_run_id,
     pl,
     rf_model_source,
+    rf_random_state_input,
+    resolve_run_artifacts,
+    resolve_objective_mode,
+    score_source_dropdown,
     sfxi_beta_input,
     sfxi_fixed_params,
     sfxi_gamma_input,
@@ -1570,8 +1679,8 @@ def _(
     valid_vec8_mask_expr,
     with_title,
 ):
-    df_sfxi = df_active.head(0)
-    df_umap_overlay = df_active
+    df_sfxi = df_opal_overlay_base.head(0)
+    df_umap_overlay = df_opal_overlay_base
     sfxi_meta_md = mo.md("")
     sfxi_notice_md = mo.md("")
     transient_lines = []
@@ -1598,15 +1707,27 @@ def _(
         _use_artifact = False
         rf_model_source_note_md = mo.md("No campaign selected; using ephemeral RF.")
     elif _use_artifact:
-        try:
-            _artifact_model_path, _artifact_round_dir = find_latest_model_artifact(opal_campaign_info)
-        except Exception as exc:
-            _use_artifact = False
-            rf_model_source_note_md = mo.md(f"Artifact lookup failed: {exc}; using ephemeral RF.")
-        else:
-            if _artifact_model_path is None:
+        _artifacts = None
+        artifact_warning = None
+        if opal_pred_selected_run_id:
+            _artifacts, artifact_warning = resolve_run_artifacts(
+                ledger_runs_df,
+                run_id=opal_pred_selected_run_id,
+            )
+            if _artifacts and "model.joblib" not in _artifacts:
+                artifact_warning = "Artifacts missing model.joblib entry for selected run_id."
+        if _artifacts and "model.joblib" in _artifacts:
+            _artifact_model_path = Path(_artifacts["model.joblib"])
+            round_ctx_path = _artifacts.get("round_ctx.json")
+            if round_ctx_path:
+                _artifact_round_dir = Path(round_ctx_path).parent
+            else:
+                _artifact_round_dir = _artifact_model_path.parent
+            if not _artifact_model_path.exists():
                 _use_artifact = False
-                rf_model_source_note_md = mo.md("No model.joblib found for this campaign; using ephemeral RF.")
+                rf_model_source_note_md = mo.md(
+                    f"Artifact path missing on disk: `{_artifact_model_path}`; using ephemeral RF."
+                )
             else:
                 _artifact_obj, _artifact_err = load_model_artifact(_artifact_model_path)
                 _artifact_model = unwrap_artifact_model(_artifact_obj)
@@ -1615,7 +1736,32 @@ def _(
                     _err_msg = _artifact_err or "Unsupported artifact format"
                     rf_model_source_note_md = mo.md(f"Artifact load failed: {_err_msg}; using ephemeral RF.")
                 else:
-                    rf_model_source_note_md = mo.md(f"Loaded artifact: `{_artifact_model_path}`")
+                    _note = f"Loaded artifact for run_id `{opal_pred_selected_run_id}`: `{_artifact_model_path}`"
+                    if artifact_warning:
+                        _note += f" (note: {artifact_warning})"
+                    rf_model_source_note_md = mo.md(_note)
+        else:
+            try:
+                _artifact_model_path, _artifact_round_dir = find_latest_model_artifact(opal_campaign_info)
+            except Exception as exc:
+                _use_artifact = False
+                rf_model_source_note_md = mo.md(f"Artifact lookup failed: {exc}; using ephemeral RF.")
+            else:
+                if _artifact_model_path is None:
+                    _use_artifact = False
+                    rf_model_source_note_md = mo.md("No model.joblib found for this campaign; using ephemeral RF.")
+                else:
+                    _artifact_obj, _artifact_err = load_model_artifact(_artifact_model_path)
+                    _artifact_model = unwrap_artifact_model(_artifact_obj)
+                    if _artifact_model is None:
+                        _use_artifact = False
+                        _err_msg = _artifact_err or "Unsupported artifact format"
+                        rf_model_source_note_md = mo.md(f"Artifact load failed: {_err_msg}; using ephemeral RF.")
+                    else:
+                        _note = f"Loaded artifact (latest round, not run-aware): `{_artifact_model_path}`"
+                        if artifact_warning:
+                            _note += f" (note: {artifact_warning})"
+                        rf_model_source_note_md = mo.md(_note)
     _y_col = opal_campaign_info.y_column if opal_campaign_info is not None else None
     _x_col = opal_campaign_info.x_column if opal_campaign_info is not None else None
 
@@ -1723,7 +1869,7 @@ def _(
 
     if not labels_ready:
         transient_lines.append("Transient predictions unavailable (campaign unsupported).")
-    elif _x_col is None or _x_col not in df_active.columns:
+    elif _x_col is None or _x_col not in df_opal_overlay_base.columns:
         transient_lines.append(f"Missing X column: `{_x_col}`.")
     elif opal_labels_asof_df.is_empty():
         transient_lines.append("No labels available for transient model training.")
@@ -1756,67 +1902,55 @@ def _(
                 if x_train is None or y_train is None or y_train.size == 0:
                     transient_lines.append("Unable to build training arrays from label data.")
                 else:
-                    intensity_params = None
-                    for op in opal_campaign_info.y_ops:
-                        if op.get("name") == "intensity_median_iqr":
-                            intensity_params = dict(op.get("params") or {})
-                            break
-                    y_train_scaled = y_train
-                    y_iqr_eps = float(eps)
-                    y_med = np.zeros(4, dtype=float)
-                    y_iqr = np.ones(4, dtype=float)
-                    y_scale_enabled = False
+                    y_ops = list(opal_campaign_info.y_ops or [])
+                    y_train_fit = y_train
+                    yops_ctx = None
+                    yops_inverse_ready = True
                     if _use_artifact and _artifact_model is not None:
-                        _loaded_params = None
-                        if _artifact_round_dir is not None:
-                            _loaded_params = load_intensity_params_from_round_ctx(_artifact_round_dir, eps_default=eps)
-                        if _loaded_params is not None:
-                            y_med, y_iqr, y_scale_enabled, y_iqr_eps = _loaded_params
-                        elif intensity_params is not None:
-                            y_iqr_eps = float(intensity_params.get("eps", eps))
-                            _min_labels = int(intensity_params.get("min_labels", min_n))
-                            try:
-                                y_med, y_iqr, y_scale_enabled = fit_intensity_median_iqr(
-                                    y_train,
-                                    min_labels=_min_labels,
-                                    eps=y_iqr_eps,
-                                )
-                            except Exception as exc:
-                                transient_lines.append(f"Y-op intensity_median_iqr failed: {exc}")
-                                y_scale_enabled = False
                         model = _artifact_model
                         model_ready = model is not None
+                        if _artifact_round_dir is not None:
+                            yops_ctx, yops_err = load_round_ctx_from_dir(_artifact_round_dir)
+                            if yops_err:
+                                transient_lines.append(f"Round context load failed: {yops_err}")
+                        if yops_ctx is None and y_ops:
+                            transient_lines.append(
+                                "No round_ctx.json available; cannot invert Y-ops for artifact predictions."
+                            )
+                            yops_inverse_ready = False
                         if model_ready:
                             transient_lines.append("Using OPAL artifact model for predictions.")
                     else:
-                        if intensity_params is not None:
-                            y_iqr_eps = float(intensity_params.get("eps", eps))
-                            _min_labels = int(intensity_params.get("min_labels", min_n))
-                            try:
-                                y_med, y_iqr, y_scale_enabled = fit_intensity_median_iqr(
-                                    y_train,
-                                    min_labels=_min_labels,
-                                    eps=y_iqr_eps,
-                                )
-                                y_train_scaled = apply_intensity_median_iqr(
-                                    y_train,
-                                    y_med,
-                                    y_iqr,
-                                    eps=y_iqr_eps,
-                                    enabled=y_scale_enabled,
-                                )
-                            except Exception as exc:
-                                transient_lines.append(f"Y-op intensity_median_iqr failed: {exc}")
-                                y_train_scaled = y_train
-                                y_scale_enabled = False
-
+                        yops_ctx = build_round_ctx_for_notebook(
+                            info=opal_campaign_info,
+                            run_id="notebook-transient",
+                            round_index=int(opal_selected_round or 0),
+                            y_dim=int(y_train.shape[1]),
+                            n_train=int(df_train.height),
+                        )
+                        try:
+                            y_train_fit = apply_y_ops_fit_transform(y_ops=y_ops, y=y_train, ctx=yops_ctx)
+                        except Exception as exc:
+                            transient_lines.append(f"Y-ops fit/transform failed: {exc}")
+                            y_train_fit = y_train
+                            yops_inverse_ready = False
                         transient_lines.append(
                             f"Transient RF: training started (n_labels={df_train.height}, x_dim={x_train.shape[1]})"
                         )
-                        model = RandomForestModel(params=opal_campaign_info.model_params)
+                        model_params = dict(opal_campaign_info.model_params or {})
+                        seed = None
+                        if rf_random_state_input is not None:
+                            try:
+                                seed = int(str(rf_random_state_input.value).strip())
+                            except Exception:
+                                seed = None
+                        if seed is not None:
+                            model_params["random_state"] = seed
+                        transient_lines.append(f"Transient RF random_state={model_params.get('random_state')}")
+                        model = RandomForestModel(params=model_params)
                         model_ready = False
                         try:
-                            fit_metrics = model.fit(x_train, y_train_scaled)
+                            fit_metrics = model.fit(x_train, y_train_fit)
                         except Exception as exc:
                             transient_lines.append(f"Model fit failed: {exc}")
                         else:
@@ -1883,7 +2017,7 @@ def _(
                                 transient_feature_chart = mo.ui.altair_chart(_imp_chart)
 
                         transient_lines.append("Transient RF: predicting over full pool ...")
-                        df_x_all = df_active.select(dedupe_columns(["__row_id", "id", _x_col]))
+                        df_x_all = df_opal_overlay_base.select(dedupe_columns(["__row_id", "id", _x_col]))
                         df_x_valid = df_x_all.filter(
                             pl.col(_x_col).is_not_null() & (pl.col(_x_col).list.len() == x_dim)
                         )
@@ -1912,22 +2046,33 @@ def _(
                                 transient_lines.append("Unable to build feature matrix for full pool.")
                             else:
                                 y_pred = np.vstack(pred_chunks)
-                                if y_scale_enabled:
-                                    y_pred = invert_intensity_median_iqr(y_pred, y_med, y_iqr, enabled=y_scale_enabled)
+                                if yops_ctx is not None:
+                                    try:
+                                        y_pred = apply_y_ops_inverse(y_ops=y_ops, y=y_pred, ctx=yops_ctx)
+                                    except Exception as exc:
+                                        transient_lines.append(f"Y-ops inverse failed: {exc}")
+                                        yops_inverse_ready = False
+                                elif y_ops:
+                                    yops_inverse_ready = False
                                 df_pred = df_x_valid.with_columns(pl.Series("opal__transient__y_vec", y_pred.tolist()))
                                 denom_pool = opal_labels_current_df.select(
                                     pl.col(_y_col).alias("opal__transient__y_vec")
                                 )
                                 pred_result = None
-                                try:
-                                    pred_result = compute_sfxi_metrics(
-                                        df=df_pred,
-                                        vec_col="opal__transient__y_vec",
-                                        params=params,
-                                        denom_pool_df=denom_pool,
-                                    )
-                                except ValueError as exc:
-                                    transient_lines.append(f"SFXI scoring failed: {exc}")
+                                if y_ops and not yops_inverse_ready:
+                                    transient_lines.append("Y-ops inverse unavailable; SFXI scoring disabled.")
+                                else:
+                                    if y_ops:
+                                        transient_lines.append("Y-ops inverse applied; scoring in objective space.")
+                                    try:
+                                        pred_result = compute_sfxi_metrics(
+                                            df=df_pred,
+                                            vec_col="opal__transient__y_vec",
+                                            params=params,
+                                            denom_pool_df=denom_pool,
+                                        )
+                                    except ValueError as exc:
+                                        transient_lines.append(f"SFXI scoring failed: {exc}")
 
                                 if pred_result is None:
                                     pass
@@ -1947,11 +2092,19 @@ def _(
                                         )
                                     _sel_params = dict(opal_campaign_info.selection_params or {})
                                     try:
-                                        top_k = int(_sel_params.get("top_k", 10))
+                                        _top_k = int(_sel_params.get("top_k", 10))
                                     except Exception:
-                                        top_k = 10
+                                        _top_k = 10
                                         transient_lines.append("Invalid top_k in campaign config; using 10.")
-                                    _sel_objective = str(_sel_params.get("objective", "maximize"))
+                                    try:
+                                        _sel_objective, _sel_warnings = resolve_objective_mode(_sel_params)
+                                        if _sel_warnings:
+                                            transient_lines.append(
+                                                "Selection objective warning: " + "; ".join(_sel_warnings)
+                                            )
+                                    except Exception as exc:
+                                        transient_lines.append(f"Selection objective error: {exc}; using maximize.")
+                                        _sel_objective = "maximize"
                                     _sel_tie = str(_sel_params.get("tie_handling", "competition_rank"))
                                     _id_col = "id" if "id" in df_pred_scored.columns else "__row_id"
                                     _sel_ids = np.asarray(df_pred_scored.get_column(_id_col).to_list(), dtype=str)
@@ -1966,7 +2119,7 @@ def _(
                                         {},
                                         ids=_sel_ids,
                                         scores=_sel_scores,
-                                        top_k=top_k,
+                                        top_k=_top_k,
                                         tie_handling=_sel_tie,
                                         objective=_sel_objective,
                                     )
@@ -1987,10 +2140,12 @@ def _(
                                     _overlay_drop_cols = [
                                         col
                                         for col in pred_cols
-                                        if col in df_active.columns and col not in {"__row_id", "id"}
+                                        if col in df_opal_overlay_base.columns and col not in {"__row_id", "id"}
                                     ]
                                     df_overlay_base = (
-                                        df_active.drop(_overlay_drop_cols) if _overlay_drop_cols else df_active
+                                        df_opal_overlay_base.drop(_overlay_drop_cols)
+                                        if _overlay_drop_cols
+                                        else df_opal_overlay_base
                                     )
                                     df_umap_overlay = df_overlay_base.join(
                                         df_pred_scored.select(pred_cols),
@@ -2194,13 +2349,13 @@ def _(
     missing_transient_cols = [c for c in transient_cols if c not in df_umap_overlay.columns]
     if missing_transient_cols:
         fill_exprs = []
-        for col in missing_transient_cols:
-            if col == "opal__transient__top_k":
-                fill_exprs.append(pl.lit(False).alias(col))
-            elif col == "opal__transient__rank":
-                fill_exprs.append(pl.lit(None, dtype=pl.Int64).alias(col))
+        for _col in missing_transient_cols:
+            if _col == "opal__transient__top_k":
+                fill_exprs.append(pl.lit(False).alias(_col))
+            elif _col == "opal__transient__rank":
+                fill_exprs.append(pl.lit(None, dtype=pl.Int64).alias(_col))
             else:
-                fill_exprs.append(pl.lit(None, dtype=pl.Float64).alias(col))
+                fill_exprs.append(pl.lit(None, dtype=pl.Float64).alias(_col))
         df_umap_overlay = df_umap_overlay.with_columns(fill_exprs)
 
     _observed_col = "opal__transient__observed_event"
@@ -2227,6 +2382,66 @@ def _(
         df_umap_overlay = df_umap_overlay.with_columns(pl.col("__row_id").is_in(_sfxi_ids).alias(_sfxi_scored_col))
     elif _sfxi_scored_col not in df_umap_overlay.columns:
         df_umap_overlay = df_umap_overlay.with_columns(pl.lit(False).alias(_sfxi_scored_col))
+
+    score_source_value = score_source_dropdown.value if score_source_dropdown is not None else "Transient overlay (RF)"
+    score_scalar_col = None
+    score_rank_col = None
+    score_top_k_col = None
+    score_source_key = "transient"
+    if score_source_value.startswith("Ledger"):
+        score_source_key = "ledger"
+        score_scalar_col = "opal__ledger__score"
+        score_rank_col = "opal__ledger__rank"
+        score_top_k_col = "opal__ledger__top_k"
+    elif score_source_value.startswith("Records cache"):
+        score_source_key = "cache"
+        score_scalar_col = "opal__cache__score"
+        score_rank_col = "opal__cache__rank"
+        score_top_k_col = "opal__cache__top_k"
+    else:
+        score_source_key = "transient"
+        score_scalar_col = "opal__transient__score"
+        score_rank_col = "opal__transient__rank"
+        score_top_k_col = "opal__transient__top_k"
+
+    if score_scalar_col not in df_umap_overlay.columns:
+        transient_lines.append(f"Score source `{score_source_value}` missing `{score_scalar_col}`.")
+        score_scalar_col = None
+    if score_top_k_col not in df_umap_overlay.columns:
+        score_top_k_col = None
+    if score_rank_col not in df_umap_overlay.columns:
+        score_rank_col = None
+
+    if score_source_key == "ledger" and "opal__ledger__run_id" in df_umap_overlay.columns:
+        run_id_expr = pl.col("opal__ledger__run_id")
+    elif score_source_key == "cache" and "opal__cache__run_id" in df_umap_overlay.columns:
+        run_id_expr = pl.col("opal__cache__run_id")
+    elif score_source_key == "transient":
+        run_id_expr = pl.lit("notebook-transient")
+    else:
+        run_id_expr = pl.lit(None).cast(pl.Utf8)
+
+    if score_source_key == "ledger" and "opal__ledger__round" in df_umap_overlay.columns:
+        round_expr = pl.col("opal__ledger__round")
+    elif score_source_key == "cache" and "opal__cache__round" in df_umap_overlay.columns:
+        round_expr = pl.col("opal__cache__round")
+    elif score_source_key == "transient":
+        round_expr = pl.lit(opal_selected_round)
+    else:
+        round_expr = pl.lit(None).cast(pl.Int64)
+
+    _campaign_slug = opal_campaign_info.slug if opal_campaign_info is not None else None
+    df_umap_overlay = df_umap_overlay.with_columns(
+        [
+            (pl.col(score_scalar_col) if score_scalar_col else pl.lit(None)).alias("opal__score__scalar"),
+            (pl.col(score_rank_col) if score_rank_col else pl.lit(None)).alias("opal__score__rank"),
+            (pl.col(score_top_k_col) if score_top_k_col else pl.lit(False)).alias("opal__score__top_k"),
+            pl.lit(score_source_value).alias("opal__score__source"),
+            run_id_expr.alias("opal__score__run_id"),
+            round_expr.alias("opal__score__round"),
+            pl.lit(_campaign_slug).alias("opal__score__campaign_slug"),
+        ]
+    )
 
     transient_md = mo.md("\n".join(transient_lines)) if transient_lines else None
 
@@ -2266,7 +2481,11 @@ def _(
         _score_col = None
         _score_title = None
         _score_chart_title = None
-        if opal_campaign_info is not None:
+        if "opal__score__scalar" in df_umap_overlay.columns:
+            _score_col = "opal__score__scalar"
+            _score_title = "Selected score source (scalar)"
+            _score_chart_title = "UMAP colored by selected score source"
+        elif opal_campaign_info is not None:
             _opal_latest_pred_col = f"opal__{opal_campaign_info.slug}__latest_pred_scalar"
             if _opal_latest_pred_col in df_umap_overlay.columns:
                 _score_col = _opal_latest_pred_col
@@ -2323,11 +2542,9 @@ def _(
     dedupe_columns,
     df_umap_overlay,
     mo,
-    normalize_selection_result,
-    np,
-    opal_campaign_info,
     pl,
     rf_model_source,
+    score_source_dropdown,
     safe_is_numeric,
     transient_cluster_hue_dropdown,
     transient_cluster_hue_label_map,
@@ -2391,46 +2608,13 @@ def _(
             _top_k_mode = False
             _rf_source_value = rf_model_source.value if rf_model_source is not None else "Ephemeral (refit in notebook)"
             _rf_prefix = "OPAL artifact" if _rf_source_value == "OPAL artifact (model.joblib)" else "Transient"
+            _score_source_label = score_source_dropdown.value if score_source_dropdown is not None else "Selected"
             _label_map = {
+                "opal__score__top_k": ("Top-K", "Not Top-K", f"{_score_source_label} Top-K"),
                 "opal__transient__top_k": ("Top-K", "Not Top-K", f"{_rf_prefix} Top-K"),
                 "opal__transient__observed_event": ("Observed", "Not observed", "Observed events (ingest_y)"),
                 "opal__transient__sfxi_scored_label": ("SFXI label", "Not label", "SFXI scored label"),
             }
-            if (
-                _hue_value == "opal__transient__top_k"
-                and opal_campaign_info is not None
-                and "opal__transient__score" in df_umap_overlay.columns
-                and _id_col in df_umap_overlay.columns
-            ):
-                _sel_params = dict(opal_campaign_info.selection_params or {})
-                try:
-                    _top_k = int(_sel_params.get("top_k", 10))
-                except Exception:
-                    _top_k = 10
-                _sel_objective = str(_sel_params.get("objective", "maximize"))
-                _sel_tie = str(_sel_params.get("tie_handling", "competition_rank"))
-                _sel_ids = np.asarray(
-                    df_umap_overlay.get_column(_id_col).cast(pl.Utf8).to_list(),
-                    dtype=str,
-                )
-                _sel_scores = (
-                    df_umap_overlay.select(pl.col("opal__transient__score").fill_null(float("nan")).cast(pl.Float64))
-                    .to_numpy()
-                    .ravel()
-                )
-                _sel_result = normalize_selection_result(
-                    {},
-                    ids=_sel_ids,
-                    scores=_sel_scores,
-                    top_k=_top_k,
-                    tie_handling=_sel_tie,
-                    objective=_sel_objective,
-                )
-                _selected_ids = np.asarray(_sel_ids)[_sel_result["selected_bool"]].tolist()
-                if _id_col in df_cluster_points.columns:
-                    df_cluster_points = df_cluster_points.with_columns(
-                        pl.col(_id_col).cast(pl.Utf8).is_in(_selected_ids).alias("opal__transient__top_k")
-                    )
             if _hue_value == "Leiden cluster":
                 _hue_label = "Leiden cluster"
                 _color_tooltip = "cluster__ldn_v1"
@@ -2443,7 +2627,7 @@ def _(
             elif _hue_value in _label_map and _hue_value in df_cluster_points.columns:
                 _label_col = f"{_hue_value}__label"
                 _yes_label, _no_label, _hue_label = _label_map[_hue_value]
-                _top_k_mode = _hue_value == "opal__transient__top_k"
+                _top_k_mode = _hue_value in {"opal__transient__top_k", "opal__score__top_k"}
                 df_cluster_points = df_cluster_points.with_columns(
                     pl.when(pl.col(_hue_value)).then(pl.lit(_yes_label)).otherwise(pl.lit(_no_label)).alias(_label_col)
                 )
@@ -2639,6 +2823,8 @@ def _(mo):
         "Full dataset (all rows)": "df_active",
         "UMAP brush selection": "df_umap_selected",
         "SFXI scored labels (current view)": "df_sfxi_selected",
+        "Selected score Top-K": "df_score_top_k_pool",
+        "Transient surrogate Top-K": "df_transient_top_k_pool",
         "Current inspected record (single row)": "active_record",
     }
     export_source_dropdown = mo.ui.dropdown(
@@ -2665,7 +2851,9 @@ def _(mo):
 def _(
     active_record,
     df_active,
+    df_score_top_k_pool,
     df_sfxi_selected,
+    df_transient_top_k_pool,
     df_umap_selected,
     export_button,
     export_format_dropdown,
@@ -2683,6 +2871,10 @@ def _(
             df_export = df_umap_selected
         elif source == "df_sfxi_selected":
             df_export = df_sfxi_selected
+        elif source == "df_score_top_k_pool":
+            df_export = df_score_top_k_pool
+        elif source == "df_transient_top_k_pool":
+            df_export = df_transient_top_k_pool
         elif source == "active_record":
             df_export = active_record if active_record is not None else df_active.head(0)
         else:
@@ -2740,28 +2932,15 @@ def _(
 
 
 @app.cell
-def _(campaign_label_from_path, df_active, list_campaign_paths, mo, repo_root):
+def _(campaign_labels, campaign_path_map, default_campaign_label, df_active, mo):
     _unused = (df_active,)
-    campaign_paths = list_campaign_paths(repo_root)
-    campaign_labels = [campaign_label_from_path(path, repo_root) for path in campaign_paths]
-    campaign_path_map = dict(zip(campaign_labels, campaign_paths))
-    default_label = None
-    for label in campaign_labels:
-        if "prom60-etoh-cipro-andgate/campaign.yaml" in label.replace("\\", "/"):
-            default_label = label
-            break
-    if default_label is None and campaign_labels:
-        default_label = campaign_labels[0]
-    if not campaign_labels:
-        campaign_labels = ["(no campaigns found)"]
-        default_label = campaign_labels[0]
     opal_panel_prefix_dropdown = mo.ui.dropdown(
         options=campaign_labels,
-        value=default_label,
+        value=default_campaign_label,
         label="Campaign config",
         full_width=True,
     )
-    opal_panel_prefix_default = default_label
+    opal_panel_prefix_default = default_campaign_label
     return (
         campaign_path_map,
         opal_panel_prefix_default,
@@ -2783,9 +2962,9 @@ def _(
 ):
     opal_campaign_info = None
     opal_label_events_df = df_active.head(0)
-    opal_round_dropdown = None
-    opal_round_value_map = {}
+    opal_label_diag = None
     opal_label_hist_col = None
+    opal_campaign_path = None
 
     if opal_panel_prefix_dropdown is not None:
         campaign_label = opal_panel_prefix_dropdown.value or opal_panel_prefix_default
@@ -2798,45 +2977,676 @@ def _(
                     path=campaign_path,
                     label=campaign_label,
                 )
+                opal_campaign_path = campaign_path
             except Exception:
                 opal_campaign_info = None
 
     if opal_campaign_info is not None:
         opal_label_hist_col = f"opal__{opal_campaign_info.slug}__label_hist"
-        opal_label_events_df = build_label_events(
+        opal_label_events_df, opal_label_diag = build_label_events(
             df=df_active,
             label_hist_col=opal_label_hist_col,
             y_col_name=opal_campaign_info.y_column,
         )
-
-        rounds = []
-        if not opal_label_events_df.is_empty() and "observed_round" in opal_label_events_df.columns:
-            rounds = opal_label_events_df.select(pl.col("observed_round").drop_nulls().unique()).to_series().to_list()
-            rounds = sorted({int(r) for r in rounds})
-        if rounds:
-            latest_round = rounds[-1]
-            latest_label = f"latest (R={latest_round})"
-            opal_round_value_map = {latest_label: latest_round}
-            for r in rounds:
-                opal_round_value_map[f"R={r}"] = r
-            round_options = [latest_label] + [f"R={r}" for r in rounds]
-            round_default = latest_label
-        else:
-            round_options = ["latest (R=none)"]
-            round_default = round_options[0]
-            opal_round_value_map = {round_default: None}
-        opal_round_dropdown = mo.ui.dropdown(
-            options=round_options,
-            value=round_default,
-            label="Labels as of round",
-            full_width=True,
-        )
     return (
         opal_campaign_info,
         opal_label_events_df,
-        opal_round_dropdown,
-        opal_round_value_map,
+        opal_label_diag,
+        opal_label_hist_col,
+        opal_campaign_path,
     )
+
+
+@app.cell
+def _(
+    load_ledger_labels,
+    load_ledger_runs,
+    opal_campaign_info,
+    resolve_campaign_workdir,
+):
+    opal_workdir = None
+    ledger_runs_df = None
+    ledger_runs_diag = None
+    ledger_labels_df = None
+    ledger_labels_diag = None
+    if opal_campaign_info is not None:
+        opal_workdir = resolve_campaign_workdir(opal_campaign_info)
+        ledger_runs_df, ledger_runs_diag = load_ledger_runs(opal_workdir)
+        ledger_labels_df, ledger_labels_diag = load_ledger_labels(opal_workdir)
+    return (
+        ledger_labels_df,
+        ledger_labels_diag,
+        ledger_runs_df,
+        ledger_runs_diag,
+        opal_workdir,
+    )
+
+
+@app.cell
+def _(
+    df_active,
+    ledger_runs_df,
+    mo,
+    opal_campaign_info,
+    pl,
+):
+    opal_pred_round_dropdown = None
+    opal_run_id_dropdown = None
+    opal_pred_round_value_map = {}
+    opal_pred_selected_round = None
+    opal_pred_selected_run_id = None
+
+    if ledger_runs_df is not None and not ledger_runs_df.is_empty() and "as_of_round" in ledger_runs_df.columns:
+        _rounds = ledger_runs_df.select(pl.col("as_of_round").drop_nulls().unique()).to_series().to_list()
+        _rounds = sorted({int(_r) for _r in _rounds})
+        if _rounds:
+            _latest_round = _rounds[-1]
+            _latest_label = f"latest (R={_latest_round})"
+            opal_pred_round_value_map = {_latest_label: _latest_round}
+            for _r in _rounds:
+                opal_pred_round_value_map[f"R={_r}"] = _r
+            _round_options = [_latest_label] + [f"R={_r}" for _r in _rounds]
+            _round_default = _latest_label
+        else:
+            _round_options = ["latest (R=none)"]
+            _round_default = _round_options[0]
+            opal_pred_round_value_map = {_round_default: None}
+        opal_pred_round_dropdown = mo.ui.dropdown(
+            options=_round_options,
+            value=_round_default,
+            label="Prediction round (ledger)",
+            full_width=True,
+        )
+        _selected_label = opal_pred_round_dropdown.value
+        opal_pred_selected_round = opal_pred_round_value_map.get(_selected_label)
+
+        run_ids = []
+        if opal_pred_selected_round is not None and "run_id" in ledger_runs_df.columns:
+            run_ids = (
+                ledger_runs_df.filter(pl.col("as_of_round") == int(opal_pred_selected_round))
+                .select(pl.col("run_id").drop_nulls().unique())
+                .to_series()
+                .to_list()
+            )
+        if not run_ids and "run_id" in ledger_runs_df.columns:
+            run_ids = ledger_runs_df.select(pl.col("run_id").drop_nulls().unique()).to_series().to_list()
+        run_ids = sorted({str(_r) for _r in run_ids})
+        if run_ids:
+            _run_id_options = run_ids
+            _run_id_default = run_ids[-1]
+            _run_id_prompt = "(select run_id)"
+            if len(run_ids) > 1:
+                _run_id_options = [_run_id_prompt] + run_ids
+                _run_id_default = _run_id_prompt
+            opal_run_id_dropdown = mo.ui.dropdown(
+                options=_run_id_options,
+                value=_run_id_default,
+                label="Run ID (ledger)",
+                full_width=True,
+            )
+            _selected_run = opal_run_id_dropdown.value
+            opal_pred_selected_run_id = None if _selected_run == _run_id_prompt else _selected_run
+
+    _slug = opal_campaign_info.slug if opal_campaign_info is not None else None
+    _cache_col = f"opal__{_slug}__latest_pred_scalar" if _slug else None
+    score_source_options = []
+    if ledger_runs_df is not None and not ledger_runs_df.is_empty():
+        score_source_options.append("Ledger predictions (run-aware)")
+    if _cache_col and _cache_col in df_active.columns:
+        score_source_options.append("Records cache (latest_pred_scalar)")
+    score_source_options.append("Transient overlay (RF)")
+    score_source_default = score_source_options[0] if score_source_options else "Transient overlay (RF)"
+    score_source_dropdown = mo.ui.dropdown(
+        options=score_source_options,
+        value=score_source_default,
+        label="Score source",
+        full_width=True,
+    )
+    return (
+        opal_pred_round_dropdown,
+        opal_run_id_dropdown,
+        opal_pred_selected_round,
+        opal_pred_selected_run_id,
+        score_source_dropdown,
+    )
+
+
+@app.cell
+def _(
+    df_active,
+    ledger_labels_df,
+    opal_campaign_info,
+    pl,
+):
+    opal_label_events_ledger = pl.DataFrame()
+    if ledger_labels_df is not None and not ledger_labels_df.is_empty():
+        _y_col = opal_campaign_info.y_column if opal_campaign_info is not None else "y_obs"
+        join_cols = ["id"]
+        candidate_cols = [
+            "__row_id",
+            "sequence",
+            "cluster__ldn_v1",
+            "cluster__ldn_v1__umap_x",
+            "cluster__ldn_v1__umap_y",
+        ]
+        if opal_campaign_info is not None:
+            candidate_cols.insert(1, opal_campaign_info.x_column)
+        for _col in candidate_cols:
+            if _col and _col in df_active.columns and _col not in ledger_labels_df.columns:
+                join_cols.append(_col)
+        _df_labels = ledger_labels_df.with_columns(pl.col("id").cast(pl.Utf8))
+        df_active_join = df_active.select(join_cols).with_columns(pl.col("id").cast(pl.Utf8))
+        _df_join = _df_labels.join(df_active_join, on="id", how="left")
+        opal_label_events_ledger = _df_join.with_columns(
+            [
+                pl.col("y_obs").alias(_y_col),
+                pl.col("src").alias("label_src"),
+                pl.lit(None).cast(pl.Utf8).alias("label_ts"),
+            ]
+        )
+    return (opal_label_events_ledger,)
+
+
+@app.cell
+def _(
+    mo,
+    opal_label_events_df,
+    opal_label_events_ledger,
+    opal_label_diag,
+):
+    label_source_dropdown = None
+    label_source_notice_md = mo.md("")
+
+    label_sources = []
+    if opal_label_events_ledger is not None and not opal_label_events_ledger.is_empty():
+        label_sources.append("Ledger labels (canonical)")
+    if opal_label_events_df is not None and not opal_label_events_df.is_empty():
+        label_sources.append("Records label_hist (cache)")
+    if not label_sources:
+        label_sources = ["(no label sources available)"]
+
+    label_source_dropdown = mo.ui.dropdown(
+        options=label_sources,
+        value=label_sources[0],
+        label="Label data source",
+        full_width=True,
+    )
+
+    if opal_label_diag and opal_label_diag.get("status") in {
+        "parse_warning",
+        "missing_column",
+        "error",
+        "empty_df",
+    }:
+        err_preview = ""
+        if opal_label_diag.get("errors"):
+            err_preview = f"Errors: `{opal_label_diag.get('errors')}`"
+        schema_text = ""
+        schema_val = opal_label_diag.get("schema")
+        if schema_val:
+            schema_text = str(schema_val)
+            if len(schema_text) > 400:
+                schema_text = schema_text[:397] + "..."
+        exception_text = opal_label_diag.get("exception")
+        label_source_notice_md = mo.md(
+            "\n".join(
+                [
+                    "**Label history warning**",
+                    f"Status: `{opal_label_diag.get('status')}`",
+                    f"Column: `{opal_label_diag.get('label_hist_col')}`",
+                    f"Dtype: `{opal_label_diag.get('dtype')}`",
+                    f"Schema: `{schema_text}`" if schema_text else "Schema: `(unavailable)`",
+                    f"Sample: `{opal_label_diag.get('sample')}`",
+                    f"Message: {opal_label_diag.get('message', '')}",
+                    f"Exception: `{exception_text}`" if exception_text else "",
+                    f"Remediation: {opal_label_diag.get('suggested_remediation', '')}",
+                    err_preview,
+                ]
+            )
+        )
+
+    return (
+        label_source_dropdown,
+        label_source_notice_md,
+        label_sources,
+    )
+
+
+@app.cell
+def _(
+    label_source_dropdown,
+    label_sources,
+    opal_label_events_df,
+    opal_label_events_ledger,
+    mo,
+    pl,
+):
+    df_labels = pl.DataFrame()
+    label_src_multiselect = None
+
+    if label_source_dropdown is not None and label_sources != ["(no label sources available)"]:
+        selected_source = label_source_dropdown.value
+        if selected_source == "Ledger labels (canonical)":
+            df_labels = opal_label_events_ledger
+        elif selected_source == "Records label_hist (cache)":
+            df_labels = opal_label_events_df
+
+    label_src_values = []
+    if df_labels is not None and not df_labels.is_empty() and "label_src" in df_labels.columns:
+        label_src_values = df_labels.select(pl.col("label_src").drop_nulls().unique()).to_series().to_list()
+    label_src_values = sorted({str(x) for x in label_src_values if x is not None})
+    if label_src_values:
+        label_src_multiselect = mo.ui.multiselect(
+            options=label_src_values,
+            value=label_src_values,
+            label="Label sources (filter; default ALL)",
+            full_width=True,
+        )
+
+    return df_labels, label_src_multiselect
+
+
+@app.cell
+def _(
+    df_labels,
+    label_src_multiselect,
+    mo,
+    pl,
+):
+    opal_round_dropdown = None
+    opal_round_value_map = {}
+
+    df_labels_filtered = df_labels
+    if (
+        df_labels_filtered is not None
+        and not df_labels_filtered.is_empty()
+        and label_src_multiselect is not None
+        and "label_src" in df_labels_filtered.columns
+    ):
+        selected_sources = label_src_multiselect.value
+        if selected_sources:
+            df_labels_filtered = df_labels_filtered.filter(pl.col("label_src").is_in(selected_sources))
+
+    _rounds = []
+    if (
+        df_labels_filtered is not None
+        and not df_labels_filtered.is_empty()
+        and "observed_round" in df_labels_filtered.columns
+    ):
+        _rounds = df_labels_filtered.select(pl.col("observed_round").drop_nulls().unique()).to_series().to_list()
+        _rounds = sorted({int(_r) for _r in _rounds})
+    if _rounds:
+        _latest_round = _rounds[-1]
+        _latest_label = f"latest (R={_latest_round})"
+        opal_round_value_map = {_latest_label: _latest_round}
+        for _r in _rounds:
+            opal_round_value_map[f"R={_r}"] = _r
+        _round_options = [_latest_label] + [f"R={_r}" for _r in _rounds]
+        _round_default = _latest_label
+    else:
+        _round_options = ["latest (R=none)"]
+        _round_default = _round_options[0]
+        opal_round_value_map = {_round_default: None}
+    opal_round_dropdown = mo.ui.dropdown(
+        options=_round_options,
+        value=_round_default,
+        label="Labels as of round",
+        full_width=True,
+    )
+    return df_labels_filtered, opal_round_dropdown, opal_round_value_map
+
+
+@app.cell
+def _(
+    load_ledger_predictions,
+    opal_pred_selected_round,
+    opal_pred_selected_run_id,
+    opal_workdir,
+    pl,
+):
+    ledger_preds_df = pl.DataFrame()
+    ledger_preds_diag = None
+    if opal_workdir is not None and opal_pred_selected_run_id:
+        ledger_preds_df, ledger_preds_diag = load_ledger_predictions(
+            opal_workdir,
+            run_id=opal_pred_selected_run_id,
+            as_of_round=opal_pred_selected_round,
+        )
+        if ledger_preds_df is not None and not ledger_preds_df.is_empty() and "id" in ledger_preds_df.columns:
+            ledger_preds_df = ledger_preds_df.with_columns(pl.col("id").cast(pl.Utf8))
+    elif opal_workdir is not None and not opal_pred_selected_run_id:
+        ledger_preds_diag = {
+            "status": "missing_run_id",
+            "path": str(opal_workdir / "outputs" / "ledger.predictions"),
+            "rows": 0,
+            "error": "Select a run_id to load ledger predictions.",
+            "run_id": None,
+            "as_of_round": opal_pred_selected_round,
+        }
+    return ledger_preds_df, ledger_preds_diag
+
+
+@app.cell
+def _(
+    cache_pred_meta,
+    cache_warning,
+    dataset_path,
+    ledger_labels_diag,
+    ledger_preds_diag,
+    ledger_runs_df,
+    ledger_runs_diag,
+    mo,
+    opal_campaign_info,
+    opal_campaign_path,
+    opal_pred_selected_round,
+    opal_pred_selected_run_id,
+    opal_workdir,
+    score_source_dropdown,
+):
+    lines = ["### Provenance / Status"]
+    if dataset_path is not None:
+        lines.append(f"- Dataset path: `{dataset_path}`")
+    if opal_campaign_path is not None:
+        lines.append(f"- Campaign config: `{opal_campaign_path}`")
+    if opal_campaign_info is not None:
+        lines.append(f"- Campaign slug: `{opal_campaign_info.slug}`")
+    if opal_workdir is not None:
+        outputs_dir = opal_workdir / "outputs"
+        lines.append(f"- Workdir: `{opal_workdir}`")
+        lines.append(f"- Outputs dir: `{outputs_dir}`")
+
+    if ledger_runs_diag:
+        lines.append(f"- Ledger runs: status=`{ledger_runs_diag.get('status')}` rows={ledger_runs_diag.get('rows')}")
+    if ledger_labels_diag:
+        lines.append(
+            f"- Ledger labels: status=`{ledger_labels_diag.get('status')}` rows={ledger_labels_diag.get('rows')}"
+        )
+    if ledger_preds_diag:
+        lines.append(f"- Ledger preds: status=`{ledger_preds_diag.get('status')}` rows={ledger_preds_diag.get('rows')}")
+
+    if opal_pred_selected_round is not None:
+        lines.append(f"- Selected round: `{opal_pred_selected_round}`")
+    else:
+        lines.append("- Selected round: `(none)`")
+    lines.append(f"- Selected run_id: `{opal_pred_selected_run_id}`")
+    if (
+        ledger_runs_df is not None
+        and not ledger_runs_df.is_empty()
+        and opal_pred_selected_round is not None
+        and "as_of_round" in ledger_runs_df.columns
+        and "run_id" in ledger_runs_df.columns
+    ):
+        _df_round = ledger_runs_df.filter(ledger_runs_df["as_of_round"] == int(opal_pred_selected_round))
+        _n_runs = int(_df_round["run_id"].n_unique()) if not _df_round.is_empty() else 0
+        if _n_runs > 1:
+            lines.append(
+                f"- Run warning: {int(_n_runs)} run_id values exist for round {opal_pred_selected_round}. "
+                "Select a run_id explicitly to avoid mixing reruns."
+            )
+            if opal_pred_selected_run_id is None:
+                lines.append("- Run warning: run_id not selected; ledger predictions are disabled.")
+    if score_source_dropdown is not None:
+        lines.append(f"- Score source: `{score_source_dropdown.value}`")
+        if score_source_dropdown.value.startswith("Records cache"):
+            lines.append("- Cache note: latest_pred_scalar is not run-aware; compare with caution.")
+            if cache_pred_meta:
+                cache_run = cache_pred_meta.get("run_id")
+                cache_round = cache_pred_meta.get("as_of_round")
+                cache_ts = cache_pred_meta.get("written_at")
+                lines.append(f"- Cache provenance: run_id=`{cache_run}` round=`{cache_round}` written_at=`{cache_ts}`")
+                if not cache_run or cache_round is None:
+                    lines.append(
+                        "- Cache warning: cache provenance missing run_id/round; comparisons are not run-aware."
+                    )
+                elif opal_pred_selected_run_id and str(cache_run) != str(opal_pred_selected_run_id):
+                    lines.append(
+                        f"- Cache warning: cache run_id {cache_run} != selected run_id {opal_pred_selected_run_id}"
+                    )
+            else:
+                lines.append("- Cache warning: cache provenance columns missing; comparisons are not run-aware.")
+    if cache_warning:
+        lines.append(f"- Cache warning: {cache_warning}")
+    lines.append(
+        "- Note: running rounds does not create labels. Labels come from ingest-y / attach / external measurements."
+    )
+
+    opal_provenance_md = mo.md("\n".join(lines))
+    return (opal_provenance_md,)
+
+
+@app.cell
+def _(
+    ledger_runs_df,
+    mo,
+    opal_pred_selected_run_id,
+    pl,
+):
+    default_selection_csv = ""
+    if (
+        ledger_runs_df is not None
+        and not ledger_runs_df.is_empty()
+        and opal_pred_selected_run_id
+        and "run_id" in ledger_runs_df.columns
+        and "artifacts" in ledger_runs_df.columns
+    ):
+        rows = (
+            ledger_runs_df.filter(pl.col("run_id") == str(opal_pred_selected_run_id))
+            .select(pl.col("artifacts"))
+            .to_series()
+            .to_list()
+        )
+        if rows:
+            _artifacts = rows[0]
+            if isinstance(_artifacts, dict):
+                preferred_keys = [
+                    f"selection_top_k__run_{opal_pred_selected_run_id}.csv",
+                    "selection_top_k.csv",
+                ]
+                for key in preferred_keys:
+                    if key not in _artifacts:
+                        continue
+                    sel_entry = _artifacts.get(key)
+                    if isinstance(sel_entry, (list, tuple)) and len(sel_entry) >= 2:
+                        default_selection_csv = str(sel_entry[1])
+                        break
+                    if isinstance(sel_entry, str):
+                        default_selection_csv = sel_entry
+                        break
+    selection_csv_input = mo.ui.text(
+        value=default_selection_csv,
+        label="selection_top_k.csv path (for mismatch debugger)",
+        full_width=True,
+    )
+    return default_selection_csv, selection_csv_input
+
+
+@app.cell
+def _(
+    ledger_preds_df,
+    mo,
+    opal_pred_selected_run_id,
+    pl,
+    selection_csv_input,
+):
+    mismatch_md = mo.md("")
+    mismatch_table = mo.ui.table(pl.DataFrame(), page_size=5)
+    csv_path = selection_csv_input.value.strip() if selection_csv_input is not None else ""
+    if not csv_path:
+        mismatch_md = mo.md("No selection CSV path provided.")
+    elif ledger_preds_df is None or ledger_preds_df.is_empty():
+        mismatch_md = mo.md("Ledger predictions unavailable; cannot compare.")
+    else:
+        df_csv = None
+        try:
+            lower_path = csv_path.lower()
+            if lower_path.endswith(".parquet") or lower_path.endswith(".pq"):
+                df_csv = pl.read_parquet(csv_path)
+            else:
+                df_csv = pl.read_csv(csv_path)
+        except Exception as exc:
+            mismatch_md = mo.md(f"Failed to read selection file: {exc}")
+        if df_csv is not None:
+            if "id" not in df_csv.columns:
+                mismatch_md = mo.md("CSV missing `id` column.")
+            else:
+                csv_score_col = "pred__y_obj_scalar" if "pred__y_obj_scalar" in df_csv.columns else None
+                if csv_score_col is None and "selection_score" in df_csv.columns:
+                    csv_score_col = "selection_score"
+                if csv_score_col is None:
+                    mismatch_md = mo.md("CSV missing score column (pred__y_obj_scalar or selection_score).")
+                else:
+                    df_csv = df_csv.with_columns(
+                        pl.col("id").cast(pl.Utf8).alias("id"),
+                        pl.col(csv_score_col).cast(pl.Float64),
+                    )
+                    csv_run_ids = []
+                    if "run_id" in df_csv.columns:
+                        csv_run_ids = df_csv.select(pl.col("run_id").drop_nulls().unique()).to_series().to_list()
+                        csv_run_ids = [str(x) for x in csv_run_ids]
+                    _df_ledger = ledger_preds_df.select(
+                        [
+                            pl.col("id").cast(pl.Utf8).alias("id"),
+                            pl.col("pred__y_obj_scalar").cast(pl.Float64).alias("ledger_score"),
+                        ]
+                    )
+                    _df_join = df_csv.join(_df_ledger, on="id", how="inner")
+                    if _df_join.is_empty():
+                        mismatch_md = mo.md("No overlapping IDs between CSV and ledger predictions.")
+                    else:
+                        _eps = 1.0e-6
+                        _df_join = _df_join.with_columns(
+                            (pl.col(csv_score_col) - pl.col("ledger_score")).abs().alias("abs_diff"),
+                            (pl.col(csv_score_col) - pl.col("ledger_score")).alias("diff"),
+                        )
+                        mismatch_count = _df_join.filter(pl.col("abs_diff") > _eps).height
+                        _lines = [
+                            f"Compared `{_df_join.height}` rows (CSV vs ledger).",
+                            f"Mismatches (abs diff > {_eps:g}): `{mismatch_count}`",
+                            f"Max abs diff: `{_df_join.select(pl.col('abs_diff').max()).item():.6g}`",
+                        ]
+                        if csv_run_ids:
+                            _lines.append(f"CSV run_id(s): `{csv_run_ids}`")
+                            if opal_pred_selected_run_id and str(opal_pred_selected_run_id) not in csv_run_ids:
+                                _lines.append(
+                                    "Warning: CSV run_id does not match selected ledger run_id "
+                                    f"`{opal_pred_selected_run_id}`."
+                                )
+                        else:
+                            _lines.append("Warning: CSV missing run_id; comparison may be run-agnostic.")
+                        mismatch_md = mo.md("\n".join(_lines))
+                        _df_top = _df_join.sort("abs_diff", descending=True).head(10)
+                        mismatch_table = mo.ui.table(_df_top, page_size=10)
+    return mismatch_md, mismatch_table
+
+
+@app.cell
+def _(
+    df_active,
+    ledger_preds_df,
+    normalize_selection_result,
+    np,
+    opal_campaign_info,
+    pl,
+    resolve_objective_mode,
+):
+    df_opal_overlay_base = df_active
+    _cache_col = None
+    cache_warning = None
+    cache_pred_meta = {}
+
+    if ledger_preds_df is not None and not ledger_preds_df.is_empty() and "id" in ledger_preds_df.columns:
+        ledger_cols = ["id"]
+        for _col in ["pred__y_obj_scalar", "sel__rank_competition", "sel__is_selected", "run_id", "as_of_round"]:
+            if _col in ledger_preds_df.columns:
+                ledger_cols.append(_col)
+        df_ledger = ledger_preds_df.select(ledger_cols).with_columns(pl.col("id").cast(pl.Utf8))
+        df_ledger = df_ledger.rename(
+            {
+                "pred__y_obj_scalar": "opal__ledger__score",
+                "sel__rank_competition": "opal__ledger__rank",
+                "sel__is_selected": "opal__ledger__top_k",
+                "run_id": "opal__ledger__run_id",
+                "as_of_round": "opal__ledger__round",
+            }
+        )
+        df_opal_overlay_base = df_opal_overlay_base.join(df_ledger, on="id", how="left")
+
+    if opal_campaign_info is not None:
+        _cache_col = f"opal__{opal_campaign_info.slug}__latest_pred_scalar"
+        cache_run_col = f"opal__{opal_campaign_info.slug}__latest_pred_run_id"
+        cache_round_col = f"opal__{opal_campaign_info.slug}__latest_pred_as_of_round"
+        cache_ts_col = f"opal__{opal_campaign_info.slug}__latest_pred_written_at"
+    else:
+        cache_run_col = None
+        cache_round_col = None
+        cache_ts_col = None
+    if _cache_col and _cache_col in df_opal_overlay_base.columns:
+        df_opal_overlay_base = df_opal_overlay_base.with_columns(
+            pl.col(_cache_col).cast(pl.Float64).alias("opal__cache__score")
+        )
+        if cache_run_col and cache_run_col in df_opal_overlay_base.columns:
+            df_opal_overlay_base = df_opal_overlay_base.with_columns(
+                pl.col(cache_run_col).cast(pl.Utf8).alias("opal__cache__run_id")
+            )
+        if cache_round_col and cache_round_col in df_opal_overlay_base.columns:
+            df_opal_overlay_base = df_opal_overlay_base.with_columns(
+                pl.col(cache_round_col).cast(pl.Int64).alias("opal__cache__round")
+            )
+        if cache_ts_col and cache_ts_col in df_opal_overlay_base.columns:
+            df_opal_overlay_base = df_opal_overlay_base.with_columns(
+                pl.col(cache_ts_col).cast(pl.Utf8).alias("opal__cache__written_at")
+            )
+
+        def _first_non_null(col: str) -> str | None:
+            try:
+                series = df_opal_overlay_base.select(pl.col(col).drop_nulls().head(1)).to_series()
+            except Exception:
+                return None
+            if series.len() == 0:
+                return None
+            return str(series[0])
+
+        if "opal__cache__run_id" in df_opal_overlay_base.columns:
+            cache_pred_meta["run_id"] = _first_non_null("opal__cache__run_id")
+        if "opal__cache__round" in df_opal_overlay_base.columns:
+            cache_pred_meta["as_of_round"] = _first_non_null("opal__cache__round")
+        if "opal__cache__written_at" in df_opal_overlay_base.columns:
+            cache_pred_meta["written_at"] = _first_non_null("opal__cache__written_at")
+        _sel_params = dict(opal_campaign_info.selection_params or {}) if opal_campaign_info is not None else {}
+        try:
+            _objective_mode, _warnings = resolve_objective_mode(_sel_params)
+            if _warnings:
+                cache_warning = "; ".join(_warnings)
+        except Exception as exc:
+            _objective_mode = "maximize"
+            cache_warning = f"Objective mode fallback: {exc}"
+        try:
+            _top_k = int(_sel_params.get("top_k", 10))
+        except Exception:
+            _top_k = 10
+        tie_handling = str(_sel_params.get("tie_handling", "competition_rank"))
+        _id_col = "id" if "id" in df_opal_overlay_base.columns else "__row_id"
+        _sel_ids = np.asarray(df_opal_overlay_base.get_column(_id_col).cast(pl.Utf8).to_list(), dtype=str)
+        _sel_scores = (
+            df_opal_overlay_base.select(pl.col("opal__cache__score").fill_null(float("nan")).cast(pl.Float64))
+            .to_numpy()
+            .ravel()
+        )
+        _sel_result = normalize_selection_result(
+            {},
+            ids=_sel_ids,
+            scores=_sel_scores,
+            top_k=_top_k,
+            tie_handling=tie_handling,
+            objective=_objective_mode,
+        )
+        df_opal_overlay_base = df_opal_overlay_base.with_columns(
+            pl.Series("opal__cache__rank", _sel_result["ranks"]),
+            pl.Series("opal__cache__top_k", _sel_result["selected_bool"]),
+        )
+
+    cache_col = _cache_col
+    return df_opal_overlay_base, cache_col, cache_warning, cache_pred_meta
 
 
 @app.cell
@@ -2858,42 +3668,35 @@ def _(mo):
 @app.cell
 def _(
     dedup_latest_labels,
+    label_source_dropdown,
     mo,
     opal_campaign_info,
-    opal_label_events_df,
+    df_labels_filtered,
     opal_label_view_dropdown,
     opal_round_dropdown,
     opal_round_value_map,
+    opal_pred_selected_run_id,
     pl,
 ):
     opal_selected_round = None
     if opal_round_dropdown is not None:
-        selected_label = opal_round_dropdown.value
-        opal_selected_round = opal_round_value_map.get(selected_label) if selected_label else None
+        _selected_label = opal_round_dropdown.value
+        opal_selected_round = opal_round_value_map.get(_selected_label) if _selected_label else None
 
-    opal_labels_view_df = opal_label_events_df.head(0)
-    opal_labels_current_df = opal_label_events_df.head(0)
-    opal_labels_asof_df = opal_label_events_df.head(0)
+    opal_labels_view_df = df_labels_filtered.head(0) if df_labels_filtered is not None else pl.DataFrame()
+    opal_labels_current_df = opal_labels_view_df.head(0)
+    opal_labels_asof_df = opal_labels_view_df.head(0)
     opal_labels_table_ui = mo.ui.table(opal_labels_view_df, page_size=5)
 
     if opal_campaign_info is None:
         pass
-    elif opal_label_events_df.is_empty():
+    elif df_labels_filtered is None or df_labels_filtered.is_empty():
         pass
     else:
-        df_labels = opal_label_events_df
-        if "label_src" in df_labels.columns:
-            if df_labels.filter(pl.col("label_src") == "ingest_y").height > 0:
-                df_labels = df_labels.filter(pl.col("label_src") == "ingest_y")
-            else:
-                pass
-        else:
-            pass
-
-        df_round_scope = df_labels
-        if opal_selected_round is not None and "observed_round" in df_labels.columns:
-            df_round_scope = df_labels.filter(pl.col("observed_round") <= int(opal_selected_round))
-            opal_labels_current_df = df_labels.filter(pl.col("observed_round") == int(opal_selected_round))
+        df_round_scope = df_labels_filtered
+        if opal_selected_round is not None and "observed_round" in df_labels_filtered.columns:
+            df_round_scope = df_labels_filtered.filter(pl.col("observed_round") <= int(opal_selected_round))
+            opal_labels_current_df = df_labels_filtered.filter(pl.col("observed_round") == int(opal_selected_round))
             cumulative = bool(opal_campaign_info.training_policy.get("cumulative_training", True))
             opal_labels_asof_df = df_round_scope if cumulative else opal_labels_current_df
             policy = str(
@@ -2921,7 +3724,7 @@ def _(
         if sort_cols:
             opal_labels_view_df = opal_labels_view_df.sort(sort_cols)
 
-        _y_col_name = opal_campaign_info.y_column
+        _y_col_name = opal_campaign_info.y_column if opal_campaign_info is not None else "y_obs"
         _y_display_col = _y_col_name
         if _y_col_name and _y_col_name in opal_labels_view_df.columns:
             _preview_col = f"{_y_col_name}_preview"
@@ -2950,6 +3753,14 @@ def _(
             )
         else:
             opal_labels_table_ui = mo.ui.table(opal_labels_view_df, page_size=5)
+    label_source_value = label_source_dropdown.value if label_source_dropdown is not None else None
+    _campaign_slug = opal_campaign_info.slug if opal_campaign_info is not None else None
+    opal_labels_view_df = opal_labels_view_df.with_columns(
+        pl.lit(_campaign_slug).alias("opal__label__campaign_slug"),
+        pl.lit(opal_selected_round).alias("opal__label__as_of_round_view"),
+        pl.lit(opal_pred_selected_run_id).alias("opal__label__run_id"),
+        pl.lit(label_source_value).alias("opal__label__score_source"),
+    )
     return (
         opal_labels_asof_df,
         opal_labels_current_df,
@@ -3201,12 +4012,12 @@ def _(
                 _color_note = f"Color `{_color_value}` has no non-null values; rendering without color."
             elif _is_nested:
                 _color_note = f"Color `{_color_value}` is nested; rendering without color."
-            elif _color_value == "opal__transient__top_k":
+            elif _color_value in {"opal__transient__top_k", "opal__score__top_k"}:
                 _label_col = f"{_color_value}__label"
                 df_sfxi_plot = df_sfxi_plot.with_columns(
                     pl.when(pl.col(_color_value)).then(pl.lit("Top-K")).otherwise(pl.lit("Not Top-K")).alias(_label_col)
                 )
-                _color_title = "Transient Top-K"
+                _color_title = "Top-K"
                 _color_tooltip = _label_col
                 _color_encoding = alt.Color(
                     f"{_label_col}:N",
@@ -3285,22 +4096,20 @@ def _(df_sfxi, opal_campaign_info, pl, sfxi_chart_ui):
 @app.cell(column=5)
 def _(
     mo,
+    label_source_dropdown,
+    label_source_notice_md,
+    label_src_multiselect,
+    mismatch_md,
+    mismatch_table,
     opal_label_view_dropdown,
     opal_labels_table_ui,
     opal_panel_prefix_dropdown,
+    opal_pred_round_dropdown,
+    opal_provenance_md,
     opal_round_dropdown,
-    sfxi_beta_input,
-    sfxi_chart_note_md,
-    sfxi_chart_ui,
-    sfxi_color_dropdown,
-    sfxi_gamma_input,
-    sfxi_meta_md,
-    sfxi_notice_md,
-    sfxi_p00_slider,
-    sfxi_p01_slider,
-    sfxi_p10_slider,
-    sfxi_p11_slider,
-    sfxi_setpoint_md,
+    opal_run_id_dropdown,
+    score_source_dropdown,
+    selection_csv_input,
 ):
     _opal_references_md = mo.Html(
         """
@@ -3312,21 +4121,26 @@ def _(
         </ul>
         """
     )
-    setpoint_row_top = mo.hstack([sfxi_p00_slider, sfxi_p10_slider, sfxi_p01_slider, sfxi_p11_slider])
-    exponent_row = mo.hstack([sfxi_beta_input, sfxi_gamma_input])
-    sfxi_controls = mo.vstack([setpoint_row_top, exponent_row])
-    sfxi_defs_md = mo.md(
-        "- **logic_fidelity**: proximity to the setpoint logic vector.\n"
-        "- **effect_scaled**: intensity normalized by the current scaling denom.\n"
-        "- **score** = (logic_fidelity ** beta) * (effect_scaled ** gamma)"
-    )
 
     opal_controls = []
     if opal_panel_prefix_dropdown is not None:
         opal_controls = [opal_panel_prefix_dropdown]
 
-    opal_label_controls = [c for c in [opal_round_dropdown, opal_label_view_dropdown] if c is not None]
+    opal_label_controls = [
+        c
+        for c in [
+            label_source_dropdown,
+            label_src_multiselect,
+            opal_round_dropdown,
+            opal_label_view_dropdown,
+        ]
+        if c is not None
+    ]
     opal_label_controls_row = mo.hstack(opal_label_controls) if opal_label_controls else mo.md("")
+    opal_pred_controls = [
+        c for c in [opal_pred_round_dropdown, opal_run_id_dropdown, score_source_dropdown] if c is not None
+    ]
+    opal_pred_controls_row = mo.hstack(opal_pred_controls) if opal_pred_controls else mo.md("")
 
     sfxi_panel = mo.vstack(
         [
@@ -3344,9 +4158,56 @@ def _(
                 "(e.g., via `opal ingest-y`). The **as-of round** view defines the training cutoff "
                 "for active learning."
             ),
+            opal_provenance_md,
             opal_label_controls_row,
+            label_source_notice_md,
             opal_labels_table_ui,
-            mo.md("### SFXI: setpoint + exponents"),
+            mo.md("### Predictions (canonical vs cache vs transient)"),
+            mo.md(
+                "- **Canonical (ledger)**: append-only, run-aware scores from `outputs/ledger.*`.\n"
+                "- **Cache (records)**: latest_pred_* columns in `records.parquet` (convenience only; may be stale or "
+                "not run-aware).\n"
+                "- **Transient (notebook)**: in-memory RF overlay for exploration; never persisted.\n"
+                "- **Y-ops gating**: SFXI scoring runs only when predictions are in objective space (Y-ops inverse "
+                "applied)."
+            ),
+            opal_pred_controls_row,
+            selection_csv_input,
+            mismatch_md,
+            mismatch_table,
+        ]
+    )
+    sfxi_panel
+    return
+
+
+@app.cell(column=6)
+def _(
+    mo,
+    sfxi_beta_input,
+    sfxi_chart_note_md,
+    sfxi_chart_ui,
+    sfxi_color_dropdown,
+    sfxi_gamma_input,
+    sfxi_meta_md,
+    sfxi_notice_md,
+    sfxi_p00_slider,
+    sfxi_p01_slider,
+    sfxi_p10_slider,
+    sfxi_p11_slider,
+    sfxi_setpoint_md,
+):
+    setpoint_row_top = mo.hstack([sfxi_p00_slider, sfxi_p10_slider, sfxi_p01_slider, sfxi_p11_slider])
+    exponent_row = mo.hstack([sfxi_beta_input, sfxi_gamma_input])
+    sfxi_controls = mo.vstack([setpoint_row_top, exponent_row])
+    sfxi_defs_md = mo.md(
+        "- **logic_fidelity**: proximity to the setpoint logic vector.\n"
+        "- **effect_scaled**: intensity normalized by the current scaling denom.\n"
+        "- **score** = (logic_fidelity ** beta) * (effect_scaled ** gamma)"
+    )
+    mo.vstack(
+        [
+            mo.md("## SFXI: setpoint + exponents"),
             mo.md(
                 "The **setpoint** defines the desired logic profile `p ∈ [0,1]^4` in state order "
                 "`[00, 10, 01, 11]`. Adjusting `p` changes what “good” logic looks like and how intensity is "
@@ -3362,15 +4223,15 @@ def _(
             sfxi_meta_md,
         ]
     )
-    sfxi_panel
     return
 
 
-@app.cell(column=6)
+@app.cell(column=7)
 def _(
     mo,
     rf_model_source,
     rf_model_source_note_md,
+    rf_random_state_input,
     transient_cluster_chart,
     transient_cluster_hue_dropdown,
     transient_cluster_metric_dropdown,
@@ -3378,7 +4239,6 @@ def _(
     transient_hist_chart,
     transient_md,
 ):
-    _unused = (transient_md,)
     _rf_source_value = rf_model_source.value if rf_model_source is not None else "Ephemeral (refit in notebook)"
     if _rf_source_value == "OPAL artifact (model.joblib)":
         rf_header = "## OPAL artifact model with notebook overlay"
@@ -3398,7 +4258,9 @@ def _(
     rf_blocks = [
         mo.md(rf_header),
         rf_model_source,
+        rf_random_state_input,
         rf_model_source_note_md,
+        transient_md if transient_md is not None else mo.md(""),
         mo.md(
             "**OPAL runs** produce round-scoped, versioned model artifacts (e.g., `model.joblib`) "
             "and write an append-only ledger for auditability and reproducibility "
@@ -3428,9 +4290,12 @@ def _(
 @app.cell
 def _(df_umap_overlay, pl):
     df_transient_top_k_pool = df_umap_overlay.head(0)
+    df_score_top_k_pool = df_umap_overlay.head(0)
     if "opal__transient__top_k" in df_umap_overlay.columns:
         df_transient_top_k_pool = df_umap_overlay.filter(pl.col("opal__transient__top_k").fill_null(False))
-    return (df_transient_top_k_pool,)
+    if "opal__score__top_k" in df_umap_overlay.columns:
+        df_score_top_k_pool = df_umap_overlay.filter(pl.col("opal__score__top_k").fill_null(False))
+    return df_transient_top_k_pool, df_score_top_k_pool
 
 
 @app.cell
@@ -3439,6 +4304,7 @@ def _(mo):
         "Full dataset (all rows)": "df_active",
         "UMAP brush selection": "df_umap_selected",
         "SFXI scored labels (current view)": "df_sfxi_selected",
+        "Selected score Top-K": "df_score_top_k_pool",
         "Transient surrogate Top-K": "df_transient_top_k_pool",
     }
     inspect_pool_dropdown = mo.ui.dropdown(
@@ -3454,6 +4320,7 @@ def _(mo):
 def _(
     df_active,
     df_sfxi_selected,
+    df_score_top_k_pool,
     df_transient_top_k_pool,
     df_umap_selected,
     inspect_pool_dropdown,
@@ -3466,6 +4333,8 @@ def _(
         df_pool = df_sfxi_selected
     elif pool_choice == "df_transient_top_k_pool":
         df_pool = df_transient_top_k_pool
+    elif pool_choice == "df_score_top_k_pool":
+        df_pool = df_score_top_k_pool
     else:
         df_pool = df_active
     return (df_pool,)

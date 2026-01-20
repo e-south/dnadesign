@@ -13,11 +13,15 @@ import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Mapping, Sequence
 
 import numpy as np
 import polars as pl
 import yaml
+
+from ..core.round_context import PluginRegistryView, RoundCtx
+from ..registries.transforms_y import run_y_ops_pipeline
+from .facade import read_predictions, read_runs
 
 
 @dataclass(frozen=True)
@@ -29,6 +33,35 @@ class NumericRule:
 
 
 SUPPORTED_NUMERIC_OPS = {">=", "<=", "is null", "is not null"}
+_OBJECTIVE_MODES = {"maximize", "minimize"}
+
+
+def resolve_objective_mode(selection_params: Mapping[str, Any]) -> tuple[str, list[str]]:
+    """
+    Resolve objective_mode with legacy alias support and warnings.
+    Returns (mode, warnings).
+    """
+    warnings: list[str] = []
+    mode_raw = selection_params.get("objective_mode")
+    legacy_raw = selection_params.get("objective")
+    if mode_raw is not None and legacy_raw is not None:
+        mode_str = str(mode_raw).strip().lower()
+        legacy_str = str(legacy_raw).strip().lower()
+        if mode_str != legacy_str:
+            raise ValueError(
+                "selection.params has both 'objective_mode' and legacy 'objective' with conflicting values "
+                f"({mode_str!r} vs {legacy_str!r})"
+            )
+    if mode_raw is None and legacy_raw is not None:
+        warnings.append("selection.params.objective is deprecated; prefer selection.params.objective_mode.")
+        mode_raw = legacy_raw
+    if mode_raw is None:
+        mode_raw = "maximize"
+    mode = str(mode_raw).strip().lower()
+    if mode not in _OBJECTIVE_MODES:
+        warnings.append(f"Unknown objective mode {mode!r}; defaulting to 'maximize'.")
+        mode = "maximize"
+    return mode, warnings
 
 
 def find_repo_root(start: Path) -> Path | None:
@@ -175,9 +208,92 @@ class CampaignInfo:
     model_params: dict
     objective_name: str
     objective_params: dict
+    selection_name: str
     selection_params: dict
     training_policy: dict
     y_ops: list[dict]
+
+
+@dataclass(frozen=True)
+class CampaignDatasetRef:
+    campaign_label: str
+    campaign_path: Path
+    kind: str | None
+    dataset_name: str | None
+    records_path: Path | None
+
+
+@dataclass(frozen=True)
+class YOpEntry:
+    name: str
+    params: dict
+
+
+def normalize_y_ops_config(y_ops: Sequence[Mapping[str, Any]]) -> list[YOpEntry]:
+    out: list[YOpEntry] = []
+    for entry in y_ops or []:
+        if not isinstance(entry, Mapping):
+            continue
+        name = entry.get("name")
+        if not name:
+            continue
+        params = dict(entry.get("params") or {})
+        out.append(YOpEntry(name=str(name), params=params))
+    return out
+
+
+def build_round_ctx_for_notebook(
+    *,
+    info: CampaignInfo,
+    run_id: str,
+    round_index: int,
+    y_dim: int,
+    n_train: int,
+) -> RoundCtx:
+    registry = PluginRegistryView(
+        model=info.model_name,
+        objective=info.objective_name,
+        selection=info.selection_name,
+        transform_x="unknown",
+        transform_y="unknown",
+    )
+    ctx = RoundCtx(
+        core={
+            "core/run_id": str(run_id),
+            "core/round_index": int(round_index),
+            "core/campaign_slug": info.slug,
+            "core/labels_as_of_round": int(round_index),
+            "core/plugins/transforms_x/name": registry.transform_x,
+            "core/plugins/transforms_y/name": registry.transform_y,
+            "core/plugins/model/name": registry.model,
+            "core/plugins/objective/name": registry.objective,
+            "core/plugins/selection/name": registry.selection,
+            "core/data/y_dim": int(y_dim),
+            "core/data/n_train": int(n_train),
+        },
+        registry=registry,
+    )
+    return ctx
+
+
+def apply_y_ops_fit_transform(
+    *,
+    y_ops: Sequence[Mapping[str, Any]],
+    y: np.ndarray,
+    ctx: RoundCtx,
+) -> np.ndarray:
+    entries = normalize_y_ops_config(y_ops)
+    return run_y_ops_pipeline(stage="fit_transform", y_ops=entries, Y=y, ctx=ctx)
+
+
+def apply_y_ops_inverse(
+    *,
+    y_ops: Sequence[Mapping[str, Any]],
+    y: np.ndarray,
+    ctx: RoundCtx,
+) -> np.ndarray:
+    entries = normalize_y_ops_config(y_ops)
+    return run_y_ops_pipeline(stage="inverse", y_ops=entries, Y=y, ctx=ctx)
 
 
 def list_campaign_paths(repo_root: Path | None) -> list[Path]:
@@ -187,6 +303,46 @@ def list_campaign_paths(repo_root: Path | None) -> list[Path]:
     if not campaigns_root.exists():
         return []
     return sorted(campaigns_root.rglob("campaign.yaml"))
+
+
+def list_campaign_dataset_refs(repo_root: Path | None) -> list[CampaignDatasetRef]:
+    refs: list[CampaignDatasetRef] = []
+    for campaign_path in list_campaign_paths(repo_root):
+        campaign_label = campaign_label_from_path(campaign_path, repo_root)
+        try:
+            raw = load_campaign_yaml(campaign_path)
+        except Exception:
+            continue
+        data = raw.get("data") or {}
+        location = data.get("location") or {}
+        kind = str(location.get("kind")) if location.get("kind") is not None else None
+        dataset_name = None
+        records_path = None
+        if kind == "usr":
+            dataset_name = location.get("dataset")
+            base_path_raw = location.get("path")
+            base_path = Path(str(base_path_raw)) if base_path_raw else None
+            if base_path is not None and not base_path.is_absolute():
+                base_path = (campaign_path.parent / base_path).resolve()
+            if base_path is not None and dataset_name:
+                records_path = (base_path / str(dataset_name) / "records.parquet").resolve()
+        elif kind == "local":
+            local_path_raw = location.get("path")
+            if local_path_raw:
+                local_path = Path(str(local_path_raw))
+                if not local_path.is_absolute():
+                    local_path = (campaign_path.parent / local_path).resolve()
+                records_path = local_path
+        refs.append(
+            CampaignDatasetRef(
+                campaign_label=campaign_label,
+                campaign_path=campaign_path,
+                kind=kind,
+                dataset_name=str(dataset_name) if dataset_name else None,
+                records_path=records_path,
+            )
+        )
+    return refs
 
 
 def campaign_label_from_path(path: Path, repo_root: Path | None) -> str:
@@ -235,6 +391,7 @@ def parse_campaign_info(*, raw: dict, path: Path, label: str) -> CampaignInfo:
     objective_params = dict(objective_block.get("params") or {})
 
     selection_block = raw.get("selection") or {}
+    selection_name = selection_block.get("name") or "top_k"
     selection_params = dict(selection_block.get("params") or {})
 
     training_block = raw.get("training") or {}
@@ -253,6 +410,7 @@ def parse_campaign_info(*, raw: dict, path: Path, label: str) -> CampaignInfo:
         model_params=model_params,
         objective_name=str(objective_name),
         objective_params=objective_params,
+        selection_name=str(selection_name),
         selection_params=selection_params,
         training_policy=training_policy,
         y_ops=y_ops,
@@ -344,29 +502,241 @@ def load_intensity_params_from_round_ctx(round_dir: Path, *, eps_default: float)
     return med_arr, scale_arr, enabled, eps_val
 
 
+def load_round_ctx_from_dir(round_dir: Path) -> tuple[RoundCtx | None, str | None]:
+    ctx_path = round_dir / "round_ctx.json"
+    if not ctx_path.is_file():
+        return None, f"round_ctx.json not found under {round_dir}"
+    try:
+        snapshot = json.loads(ctx_path.read_text())
+    except Exception as exc:
+        return None, f"round_ctx.json read failed: {exc}"
+    try:
+        return RoundCtx.from_snapshot(snapshot), None
+    except Exception as exc:
+        return None, f"round_ctx.json parse failed: {exc}"
+
+
+def _label_hist_sample_value(df: pl.DataFrame, label_hist_col: str) -> str | None:
+    try:
+        series = df.select(pl.col(label_hist_col).drop_nulls()).to_series()
+    except Exception:
+        return None
+    if series.is_empty():
+        return None
+    sample = series.head(1).to_list()
+    if not sample:
+        return None
+    try:
+        return json.dumps(sample[0])
+    except Exception:
+        return repr(sample[0])
+
+
+def _deep_as_py(x: Any) -> Any:
+    try:
+        if hasattr(x, "as_py"):
+            return x.as_py()
+        if hasattr(x, "to_pylist"):
+            return x.to_pylist()
+    except Exception:
+        pass
+    if isinstance(x, np.ndarray):
+        return [_deep_as_py(v) for v in x.tolist()]
+    if isinstance(x, np.generic):
+        return x.item()
+    if isinstance(x, pl.Series):
+        return [_deep_as_py(v) for v in x.to_list()]
+    if isinstance(x, dict):
+        return {k: _deep_as_py(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_deep_as_py(v) for v in x]
+    return x
+
+
+def _coerce_mapping(value: Any) -> dict | None:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, Mapping):
+        return dict(value)
+    for attr in ("as_dict", "to_dict"):
+        if hasattr(value, attr):
+            try:
+                return dict(getattr(value, attr)())
+            except Exception:
+                continue
+    return None
+
+
+def _parse_label_hist_cell(
+    cell: Any,
+    *,
+    row_id: str,
+    errors: list[dict],
+    y_col_name: str,
+) -> list[dict]:
+    def _record_error(message: str, sample: Any | None = None) -> None:
+        if len(errors) >= 5:
+            return
+        errors.append(
+            {
+                "id": row_id,
+                "error": message,
+                "sample": (repr(sample)[:240] if sample is not None else None),
+            }
+        )
+
+    if cell is None or (isinstance(cell, float) and np.isnan(cell)):
+        return []
+    cell = _deep_as_py(cell)
+    if isinstance(cell, str):
+        try:
+            cell = json.loads(cell)
+        except Exception as exc:
+            _record_error(f"label_hist JSON parse failed: {exc}", sample=cell)
+            return []
+    if isinstance(cell, dict):
+        entries = [cell]
+    elif isinstance(cell, (list, tuple)):
+        entries = list(cell)
+    else:
+        _record_error(f"label_hist cell must be list/dict/JSON, got {type(cell).__name__}", sample=cell)
+        return []
+
+    out: list[dict] = []
+    for entry in entries:
+        entry = _deep_as_py(entry)
+        if isinstance(entry, str):
+            try:
+                entry = json.loads(entry)
+            except Exception as exc:
+                _record_error(f"label_hist entry JSON parse failed: {exc}", sample=entry)
+                continue
+        entry_map = _coerce_mapping(entry)
+        if entry_map is None:
+            _record_error("label_hist entry must be dict-like", sample=entry)
+            continue
+        r = entry_map.get("r", entry_map.get("round", entry_map.get("observed_round")))
+        if r is None:
+            _record_error("label_hist entry missing round key ('r')", sample=entry_map)
+            continue
+        try:
+            r_int = int(r)
+        except Exception as exc:
+            _record_error(f"label_hist entry round is not int: {exc}", sample=entry_map)
+            continue
+        y_val = entry_map.get("y", entry_map.get("y_obs", entry_map.get("value")))
+        if y_val is None:
+            _record_error("label_hist entry missing 'y'", sample=entry_map)
+            continue
+        try:
+            y_list = [float(v) for v in np.asarray(y_val, dtype=float).ravel().tolist()]
+        except Exception as exc:
+            _record_error(f"label_hist entry 'y' not numeric: {exc}", sample=y_val)
+            continue
+        out.append(
+            {
+                "observed_round": r_int,
+                "label_src": entry_map.get("src", entry_map.get("source")),
+                "label_ts": entry_map.get("ts", entry_map.get("timestamp")),
+                y_col_name: y_list,
+            }
+        )
+    return out
+
+
 def build_label_events(
     *,
     df: pl.DataFrame,
     label_hist_col: str,
     y_col_name: str,
-) -> pl.DataFrame:
+    id_col: str = "id",
+    sequence_col: str = "sequence",
+) -> tuple[pl.DataFrame, dict]:
+    diagnostics = {
+        "status": "ok",
+        "label_hist_col": label_hist_col,
+        "dtype": None,
+        "schema": None,
+        "sample": None,
+        "rows_with_labels": 0,
+        "events_parsed": 0,
+        "errors": [],
+        "exception": None,
+        "suggested_remediation": (
+            "Run `opal label-hist repair` or re-ingest labels with `opal ingest-y` if label_hist is malformed."
+        ),
+    }
+    if df.is_empty():
+        diagnostics["status"] = "empty_df"
+        diagnostics["message"] = "Input DataFrame is empty; no labels to parse."
+        return df.head(0), diagnostics
     if label_hist_col not in df.columns:
-        return df.head(0)
+        diagnostics["status"] = "missing_column"
+        diagnostics["message"] = f"Missing label history column '{label_hist_col}'."
+        return df.head(0), diagnostics
+
+    diagnostics["dtype"] = str(df.schema.get(label_hist_col))
+    diagnostics["schema"] = {name: str(dtype) for name, dtype in df.schema.items()}
+    diagnostics["sample"] = _label_hist_sample_value(df, label_hist_col)
+
+    select_cols = [col for col in df.columns if col != label_hist_col]
+    if label_hist_col not in select_cols:
+        select_cols.append(label_hist_col)
+
+    rows: list[dict] = []
+    errors: list[dict] = []
     try:
-        df_events = df.explode(label_hist_col).drop_nulls(label_hist_col)
-        if df_events.is_empty():
-            return df_events
-        df_events = df_events.with_columns(
-            [
-                pl.col(label_hist_col).struct.field("r").alias("observed_round"),
-                pl.col(label_hist_col).struct.field("src").alias("label_src"),
-                pl.col(label_hist_col).struct.field("ts").alias("label_ts"),
-                pl.col(label_hist_col).struct.field("y").alias(y_col_name),
-            ]
-        ).drop(label_hist_col)
-        return df_events
-    except Exception:
-        return df.head(0)
+        for row in df.select(select_cols).iter_rows(named=True):
+            _id = str(row.get(id_col))
+            cell = row.get(label_hist_col)
+            if cell is None:
+                continue
+            parsed = _parse_label_hist_cell(cell, row_id=_id, errors=errors, y_col_name=y_col_name)
+            if parsed:
+                diagnostics["rows_with_labels"] += 1
+            for entry in parsed:
+                for col in select_cols:
+                    if col == label_hist_col:
+                        continue
+                    if col not in entry:
+                        entry[col] = row.get(col)
+                entry["id"] = _id
+                rows.append(entry)
+    except Exception as exc:
+        diagnostics["status"] = "error"
+        diagnostics["message"] = "Label history parsing failed."
+        diagnostics["exception"] = str(exc)
+        diagnostics["errors"] = errors
+        empty_schema = {
+            "id": pl.Utf8,
+            "observed_round": pl.Int64,
+            "label_src": pl.Utf8,
+            "label_ts": pl.Utf8,
+            y_col_name: pl.Object,
+        }
+        if sequence_col in select_cols:
+            empty_schema["sequence"] = pl.Utf8
+        return pl.DataFrame(schema=empty_schema), diagnostics
+
+    diagnostics["events_parsed"] = len(rows)
+    diagnostics["errors"] = errors
+    if errors:
+        diagnostics["status"] = "parse_warning"
+        diagnostics["message"] = "Some label_hist cells could not be parsed; labels may be incomplete."
+
+    if not rows:
+        empty_schema = {
+            "id": pl.Utf8,
+            "observed_round": pl.Int64,
+            "label_src": pl.Utf8,
+            "label_ts": pl.Utf8,
+            y_col_name: pl.Object,
+        }
+        if sequence_col in select_cols:
+            empty_schema["sequence"] = pl.Utf8
+        return pl.DataFrame(schema=empty_schema), diagnostics
+
+    return pl.DataFrame(rows), diagnostics
 
 
 def dedup_latest_labels(df: pl.DataFrame, *, id_col: str, round_col: str) -> pl.DataFrame:
@@ -737,3 +1107,143 @@ def coerce_selection_dataframe(selected_raw: object) -> pl.DataFrame | None:
         return pl.from_pandas(selected_raw)
     except Exception:
         return None
+
+
+def _ledger_paths(workdir: Path | None) -> dict[str, Path | None]:
+    if workdir is None:
+        return {"runs": None, "labels": None, "preds_dir": None}
+    outputs = Path(workdir) / "outputs"
+    return {
+        "runs": outputs / "ledger.runs.parquet",
+        "labels": outputs / "ledger.labels.parquet",
+        "preds_dir": outputs / "ledger.predictions",
+    }
+
+
+def load_ledger_runs(workdir: Path | None) -> tuple[pl.DataFrame, dict]:
+    diag = {"status": "missing_workdir", "path": None, "rows": 0, "error": None}
+    paths = _ledger_paths(workdir)
+    runs_path = paths["runs"]
+    if runs_path is None:
+        return pl.DataFrame(), diag
+    diag["path"] = str(runs_path)
+    if not runs_path.exists():
+        diag["status"] = "missing"
+        return pl.DataFrame(), diag
+    try:
+        df = pl.read_parquet(runs_path)
+    except Exception as exc:
+        diag["status"] = "error"
+        diag["error"] = str(exc)
+        return pl.DataFrame(), diag
+    diag["status"] = "ok"
+    diag["rows"] = df.height
+    return df, diag
+
+
+def load_ledger_labels(workdir: Path | None) -> tuple[pl.DataFrame, dict]:
+    diag = {"status": "missing_workdir", "path": None, "rows": 0, "error": None}
+    paths = _ledger_paths(workdir)
+    labels_path = paths["labels"]
+    if labels_path is None:
+        return pl.DataFrame(), diag
+    diag["path"] = str(labels_path)
+    if not labels_path.exists():
+        diag["status"] = "missing"
+        return pl.DataFrame(), diag
+    try:
+        df = pl.read_parquet(labels_path)
+    except Exception as exc:
+        diag["status"] = "error"
+        diag["error"] = str(exc)
+        return pl.DataFrame(), diag
+    diag["status"] = "ok"
+    diag["rows"] = df.height
+    return df, diag
+
+
+def load_ledger_predictions(
+    workdir: Path | None,
+    *,
+    run_id: str | None,
+    as_of_round: int | None = None,
+) -> tuple[pl.DataFrame, dict]:
+    diag = {
+        "status": "missing_workdir",
+        "path": None,
+        "rows": 0,
+        "error": None,
+        "run_id": run_id,
+        "as_of_round": as_of_round,
+    }
+    paths = _ledger_paths(workdir)
+    preds_dir = paths["preds_dir"]
+    if preds_dir is None:
+        return pl.DataFrame(), diag
+    diag["path"] = str(preds_dir)
+    if not preds_dir.exists():
+        diag["status"] = "missing"
+        return pl.DataFrame(), diag
+    if run_id is None:
+        diag["status"] = "missing_run_id"
+        diag["error"] = "run_id is required to read ledger predictions without ambiguity."
+        return pl.DataFrame(), diag
+
+    try:
+        runs_path = paths["runs"]
+        runs_df = read_runs(runs_path) if runs_path is not None and runs_path.exists() else None
+        df = read_predictions(
+            preds_dir,
+            round_selector=as_of_round,
+            run_id=run_id,
+            runs_df=runs_df,
+            require_run_id=True,
+        )
+    except Exception as exc:
+        diag["status"] = "error"
+        diag["error"] = str(exc)
+        return pl.DataFrame(), diag
+
+    diag["status"] = "ok"
+    diag["rows"] = df.height
+    return df, diag
+
+
+def _coerce_artifacts_map(raw: Any) -> dict[str, str] | None:
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except Exception:
+            return None
+    raw = _deep_as_py(raw)
+    if not isinstance(raw, dict):
+        return None
+    out: dict[str, str] = {}
+    for key, val in raw.items():
+        if isinstance(val, (list, tuple)) and len(val) >= 2:
+            out[str(key)] = str(val[1])
+        elif isinstance(val, str):
+            out[str(key)] = val
+    return out or None
+
+
+def resolve_run_artifacts(
+    ledger_runs_df: pl.DataFrame | None,
+    *,
+    run_id: str | None,
+) -> tuple[dict[str, str] | None, str | None]:
+    if ledger_runs_df is None or ledger_runs_df.is_empty():
+        return None, "Ledger runs unavailable."
+    if not run_id:
+        return None, "run_id is required to resolve artifacts."
+    if "run_id" not in ledger_runs_df.columns or "artifacts" not in ledger_runs_df.columns:
+        return None, "Ledger runs missing required columns (run_id, artifacts)."
+    rows = ledger_runs_df.filter(pl.col("run_id") == str(run_id)).select(pl.col("artifacts")).to_series().to_list()
+    if not rows:
+        return None, f"run_id {run_id} not found in ledger runs."
+    artifacts = _coerce_artifacts_map(rows[0])
+    if not artifacts:
+        return None, "Artifacts field missing or unparseable."
+    return artifacts, None

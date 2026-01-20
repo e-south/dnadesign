@@ -293,3 +293,46 @@ def test_list_series_to_numpy() -> None:
     assert arr is not None
     assert arr.shape == (2, 2)
     assert utils.list_series_to_numpy(series, expected_len=3) is None
+
+
+def test_resolve_objective_mode_aliases() -> None:
+    mode, warnings = utils.resolve_objective_mode({"objective_mode": "minimize"})
+    assert mode == "minimize"
+    assert warnings == []
+
+    mode, warnings = utils.resolve_objective_mode({"objective": "minimize"})
+    assert mode == "minimize"
+    assert warnings
+
+    mode, warnings = utils.resolve_objective_mode({"objective": "unknown"})
+    assert mode == "maximize"
+    assert warnings
+
+    with pytest.raises(ValueError):
+        utils.resolve_objective_mode({"objective_mode": "maximize", "objective": "minimize"})
+
+
+def test_build_label_events_parsing_variants() -> None:
+    df = pl.DataFrame(
+        {
+            "id": ["a", "b", "c"],
+            "x_vec": [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
+            "opal__demo__label_hist": pl.Series(
+                "opal__demo__label_hist",
+                [
+                    [{"r": 1, "y": [0.1, 0.2], "src": "ingest_y"}],
+                    ['{"r": 2, "y": [0.3, 0.4], "src": "manual"}'],
+                    "not json",
+                ],
+                dtype=pl.Object,
+            ),
+        }
+    )
+    events, diag = utils.build_label_events(
+        df=df,
+        label_hist_col="opal__demo__label_hist",
+        y_col_name="y_obs",
+    )
+    assert "x_vec" in events.columns
+    assert events.height == 2
+    assert diag["status"] in {"parse_warning", "ok"}
