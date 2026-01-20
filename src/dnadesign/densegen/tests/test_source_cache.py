@@ -91,7 +91,7 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
 
     cfg = {
         "densegen": {
-            "schema_version": "2.2",
+            "schema_version": "2.4",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {

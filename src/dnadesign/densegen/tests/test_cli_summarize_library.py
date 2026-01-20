@@ -13,7 +13,7 @@ from dnadesign.densegen.src.core.run_paths import ensure_run_meta_dir, run_manif
 
 def _base_meta(library_hash: str, library_index: int) -> dict:
     return {
-        "schema_version": "2.3",
+        "schema_version": "2.4",
         "run_id": "demo",
         "run_root": ".",
         "run_config_path": "config.yaml",
@@ -118,7 +118,7 @@ def _write_config(path: Path) -> None:
     path.write_text(
         """
         densegen:
-          schema_version: "2.3"
+          schema_version: "2.4"
           run:
             id: demo
             root: "."
@@ -208,7 +208,7 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
     manifest = RunManifest(
         run_id="demo",
         created_at="2026-01-14T00:00:00+00:00",
-        schema_version="2.3",
+        schema_version="2.4",
         config_sha256="dummy",
         run_root=str(run_root),
         random_seed=123,

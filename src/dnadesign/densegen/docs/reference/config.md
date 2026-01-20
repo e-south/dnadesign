@@ -23,7 +23,7 @@ for conceptual flow.
 ### Top-level
 
 - `densegen` (required)
-- `densegen.schema_version` (required; supported: `2.1`, `2.2`, `2.3`, `2.4`)
+- `densegen.schema_version` (required; supported: `2.4`)
 - `densegen.run` (required; run-scoped I/O root)
 - `plots` (optional; required `source` when `output.targets` has multiple sinks)
 
@@ -177,12 +177,11 @@ Output, logs, and plots must resolve inside `densegen.run.root`.
 ### `densegen.generation.sampling`
 
 These controls apply after PWM input sampling. `library_size` does not change PWM sampling counts.
-Under schema `2.2+`, `library_size` also bounds the motif count offered to the solver for
-binding-site and PWM-sampled inputs.
+`library_size` also bounds the motif count offered to the solver for binding-site and PWM-sampled inputs.
 
 - `pool_strategy`: `full | subsample | iterative_subsample`
 - `library_size` (int > 0; used for subsample strategies)
-- `library_sampling_strategy`: `tf_balanced | uniform_over_pairs | coverage_weighted` (schema `2.2+`)
+- `library_sampling_strategy`: `tf_balanced | uniform_over_pairs | coverage_weighted`
 - `coverage_boost_alpha` (float >= 0; used when `library_sampling_strategy=coverage_weighted`)
 - `coverage_boost_power` (float > 0; used when `library_sampling_strategy=coverage_weighted`)
 - `avoid_failed_motifs` (bool; when true, down-weight TFBS that frequently fail solves)

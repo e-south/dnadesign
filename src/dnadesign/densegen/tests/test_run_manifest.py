@@ -31,7 +31,7 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
     manifest = RunManifest(
         run_id="demo_run",
         created_at="2026-01-16T12:00:00Z",
-        schema_version="2.1",
+        schema_version="2.4",
         config_sha256="abc123",
         run_root="/tmp/demo",
         random_seed=42,
@@ -50,7 +50,7 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
     path = run_manifest_path(tmp_path)
     manifest.write_json(path)
     loaded = load_run_manifest(path)
-    assert loaded.schema_version == "2.1"
+    assert loaded.schema_version == "2.4"
     assert loaded.dense_arrays_version == "0.0.0"
     assert loaded.dense_arrays_version_source == "lock"
     assert loaded.items[0].failed_min_count_per_tf == 1

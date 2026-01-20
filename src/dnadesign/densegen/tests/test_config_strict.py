@@ -10,7 +10,7 @@ from dnadesign.densegen.src.config import ConfigError, load_config
 
 MIN_CONFIG = {
     "densegen": {
-        "schema_version": "2.1",
+        "schema_version": "2.4",
         "run": {"id": "demo", "root": "."},
         "inputs": [
             {

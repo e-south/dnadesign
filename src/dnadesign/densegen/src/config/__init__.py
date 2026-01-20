@@ -43,7 +43,7 @@ _StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _c
 
 
 LATEST_SCHEMA_VERSION = "2.4"
-SUPPORTED_SCHEMA_VERSIONS = {"2.1", "2.2", "2.3", LATEST_SCHEMA_VERSION}
+SUPPORTED_SCHEMA_VERSIONS = {LATEST_SCHEMA_VERSION}
 
 KNOWN_SOLVER_OPTION_KEYS = {
     "CBC": {
@@ -69,22 +69,6 @@ KNOWN_SOLVER_OPTION_KEYS = {
         "presolve",
     },
 }
-
-
-def parse_schema_version(value: str) -> tuple[int, int]:
-    parts = str(value).strip().split(".")
-    if len(parts) != 2:
-        raise ValueError(f"Invalid schema_version format: {value!r}")
-    try:
-        major = int(parts[0])
-        minor = int(parts[1])
-    except Exception as exc:
-        raise ValueError(f"Invalid schema_version format: {value!r}") from exc
-    return major, minor
-
-
-def schema_version_at_least(value: str, *, major: int, minor: int) -> bool:
-    return parse_schema_version(value) >= (major, minor)
 
 
 class ConfigError(ValueError):

@@ -110,7 +110,7 @@ Key fields:
 Notes:
 - `pool_strategy: full` uses a single library (no resampling) and ignores `library_size`, `subsample_over_length_budget_by`,
   and related sampling caps/strategies (DenseGen warns in `dense validate-config`/`dense inspect plan`).
-- Under schema `2.2+`, `subsample` can resample reactively on stalls/duplicate guards.
+- `subsample` can resample reactively on stalls/duplicate guards.
 - `iterative_subsample` resamples proactively after `arrays_generated_before_resample` or when a
   library under-produces.
 - `unique_binding_sites` enforces uniqueness at the regulator+sequence pair level.
