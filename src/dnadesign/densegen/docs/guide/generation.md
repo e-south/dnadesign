@@ -103,13 +103,28 @@ Key fields:
 
 Notes:
 - `pool_strategy: full` uses a single library (no resampling) and ignores `library_size`, `subsample_over_length_budget_by`,
-  and related sampling caps/strategies (DenseGen warns in `dense validate`/`dense plan`).
+  and related sampling caps/strategies (DenseGen warns in `dense validate-config`/`dense inspect plan`).
 - Under schema `2.2+`, `subsample` can resample reactively on stalls/duplicate guards.
 - `iterative_subsample` resamples proactively after `arrays_generated_before_resample` or when a
   library under-produces.
 - `unique_binding_sites` enforces uniqueness at the regulator+sequence pair level.
 - `coverage_weighted` dynamically boosts underused TFBS based on the run’s usage counts.
 - `avoid_failed_motifs: true` down-weights TFBS that repeatedly appear in failed solve attempts (tracked in attempts.parquet).
+
+### Stage‑A vs Stage‑B sampling (mental model)
+
+**Stage‑A (input sampling)** lives under `densegen.inputs[].sampling` and defines how TFBS pools
+are generated from PWMs (e.g., DenseGen log‑odds vs FIMO p‑values, thresholds, mining limits,
+length policy). Stage‑A produces the realized TFBS pool (`input_tfbs_count`), which is cached
+once per run and reused across round‑robin passes.
+
+**Stage‑B (library sampling)** lives under `densegen.generation.sampling` and selects a **solver
+library** from the Stage‑A pool (or from a binding‑site table / sequence library). This is where
+`pool_strategy`, `library_size`, and sampling strategies (tf‑balanced, uniform over pairs,
+coverage‑weighted) apply. Stage‑B is the only place that resampling happens.
+
+Use `dense stage-a build-pool` to materialize pools and `dense stage-b build-libraries` to preview
+solver libraries without running the solver.
 
 ### Run scheduling (round‑robin)
 
@@ -124,6 +139,18 @@ uses the same policy per plan, but round‑robin can trigger more frequent libra
 
 Input PWM sampling is performed **once per run** and cached across round‑robin passes. If you
 need a fresh PWM sample, start a new run (or stage a new workspace).
+
+### Runtime policy knobs (resampling + stop conditions)
+
+Key `runtime.*` controls:
+- `arrays_generated_before_resample` — number of successful arrays to emit before forcing a new
+  library (for iterative subsampling).
+- `stall_seconds_before_resample` — idle time with no new solutions before resampling.
+- `stall_warning_every_seconds` — how often to log stall warnings.
+- `max_resample_attempts` / `max_total_resamples` — caps on resample retries.
+- `max_seconds_per_plan` — time budget per plan item (0 = no limit).
+- `max_failed_solutions` / `max_duplicate_solutions` — guardrails to stop when failure/duplicate
+  counts are too high.
 
 ---
 

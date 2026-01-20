@@ -98,9 +98,26 @@ The `dense report` command writes a compact audit summary under `outputs/`:
 
 - `outputs/report.json`
 - `outputs/report.md`
+- `outputs/report.html` (basic HTML wrapper for quick sharing)
 
 These summarize run scope and link to the canonical outputs (`dense_arrays.parquet` and
 `attempts.parquet`).
+Use `dense report --format json|md|html|all` to control which files are emitted.
+
+---
+
+### Stage helper outputs (optional)
+
+DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solver:
+
+- `dense stage-a build-pool` writes:
+  - `outputs/pools/pool_manifest.json`
+  - `outputs/pools/<input>__pool.parquet`
+- `dense stage-b build-libraries` writes:
+  - `outputs/libraries/library_builds.parquet`
+  - `outputs/libraries/library_manifest.json`
+
+These are optional inspection artifacts and are not required for a normal `dense run`.
 
 ---
 

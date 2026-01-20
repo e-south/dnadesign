@@ -7,15 +7,18 @@ the run root. USR is optional and is only imported when configured.
 ### Contents
 - [Invocation](#invocation) - how to call the CLI.
 - [Config option](#config-option) - global or per-command config path.
-- [Commands](#commands) - validate, plan, describe, run, plot, and utilities.
-- [`dense validate`](#dense-validate) - schema and sanity checks.
-- [`dense plan`](#dense-plan) - resolved quota plan.
-- [`dense describe`](#dense-describe) - resolved inputs, outputs, and solver.
+- [Commands](#commands) - validate, inspect, stage helpers, run, plot, report.
+- [`dense validate-config`](#dense-validate-config) - schema and sanity checks.
+- [`dense inspect inputs`](#dense-inspect-inputs) - resolved inputs + PWM sampling summary.
+- [`dense inspect plan`](#dense-inspect-plan) - resolved quota plan.
+- [`dense inspect config`](#dense-inspect-config) - resolved inputs/outputs/solver details.
+- [`dense inspect run`](#dense-inspect-run) - summarize run manifests or list workspaces.
+- [`dense stage-a build-pool`](#dense-stage-a-build-pool) - build TFBS pools (Stage‑A).
+- [`dense stage-b build-libraries`](#dense-stage-b-build-libraries) - build solver libraries (Stage‑B).
+- [`dense workspace init`](#dense-workspace-init) - scaffold a workspace.
 - [`dense run`](#dense-run) - end-to-end generation.
 - [`dense plot`](#dense-plot) - render plots from outputs.
 - [`dense ls-plots`](#dense-ls-plots) - list available plots.
-- [`dense stage`](#dense-stage) - scaffold a workspace.
-- [`dense summarize`](#dense-summarize) - summarize outputs/meta/run_manifest.json or list workspaces.
 - [`dense report`](#dense-report) - write audit-grade report summary.
 - [Examples](#examples) - common command sequences.
 
@@ -35,8 +38,8 @@ python -m dnadesign.densegen --help
 
 - `-c, --config PATH` - config YAML path. Defaults to
   `src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml` inside the package.
-  - May be passed globally (`dense -c path validate`) or per command
-    (`dense validate -c path`).
+  - May be passed globally (`dense -c path inspect inputs`) or per command
+    (`dense inspect inputs -c path`).
 
 Input paths resolve against the config file directory. Outputs and logs must resolve
 inside `densegen.run.root` (run-scoped I/O). Config files must include `densegen.schema_version`
@@ -46,23 +49,92 @@ inside `densegen.run.root` (run-scoped I/O). Config files must include `densegen
 
 ### Commands
 
-### `dense validate`
+### `dense validate-config`
 Validate the config YAML (schema + sanity checks). Fails fast on unknown keys or invalid values.
+
 Options:
 - `--probe-solver` - also probe the solver backend (fails fast if unavailable).
 
 ---
 
-#### `dense plan`
+#### `dense inspect inputs`
+Print resolved inputs plus a PWM sampling summary (Stage‑A details).
+
+---
+
+#### `dense inspect plan`
 Print the resolved quota plan per constraint bucket.
 
 ---
 
-#### `dense describe`
+#### `dense inspect config`
 Summarize resolved inputs, outputs, plan items, and solver settings.
+
 Options:
 - `--show-constraints` - print full fixed elements per plan item.
 - `--probe-solver` - verify the solver backend before reporting.
+
+---
+
+#### `dense inspect run`
+Summarize a run manifest (`outputs/meta/run_manifest.json`) or list workspaces.
+
+Options:
+- `--run` - workspace directory (defaults to `densegen.run.root` from config).
+- `--root` - list workspaces under a root directory.
+- `--limit` - limit workspaces displayed when using `--root`.
+- `--all` - include directories without `config.yaml` when using `--root`.
+- `--config` - config path (used to resolve run root when `--run` is not set).
+- `--verbose` - show failure breakdown columns (constraint filters + duplicate solutions).
+- `--library` - include offered-vs-used summaries (TF/TFBS usage).
+- `--top` - number of rows to show in library summaries.
+- `--by-library/--no-by-library` - group library summaries per build attempt.
+- `--top-per-tf` - limit TFBS rows per TF when summarizing.
+- `--show-library-hash/--short-library-hash` - toggle full vs short library hashes.
+
+Tip:
+- For large runs, prefer `--no-by-library` or lower `--top`/`--top-per-tf` to keep output readable.
+
+---
+
+#### `dense stage-a build-pool`
+Build Stage‑A TFBS pools from inputs and write a pool manifest.
+
+Options:
+- `--out` - output directory relative to run root (default: `outputs/pools`).
+- `--input/-i` - input name(s) to build (defaults to all).
+- `--overwrite` - overwrite existing pool files.
+
+Outputs:
+- `pool_manifest.json`
+- `<input>__pool.parquet` per input
+
+---
+
+#### `dense stage-b build-libraries`
+Build Stage‑B libraries (one per input + plan) from pools or inputs.
+
+Options:
+- `--out` - output directory relative to run root (default: `outputs/libraries`).
+- `--pool` - optional pool directory from `stage-a build-pool` (defaults to reading inputs).
+- `--input/-i` - input name(s) to build (defaults to all).
+- `--plan/-p` - plan item name(s) to build (defaults to all).
+- `--overwrite` - overwrite existing `library_builds.parquet`.
+
+Outputs:
+- `library_builds.parquet`
+- `library_manifest.json`
+
+---
+
+#### `dense workspace init`
+Stage a new workspace with `config.yaml`, `inputs/`, `outputs/`, plus `outputs/logs/` and `outputs/meta/`.
+
+Options:
+- `--id` - run identifier (directory name).
+- `--root` - workspaces root directory (default: package `workspaces/` directory).
+- `--template` - template config YAML to copy.
+- `--copy-inputs` - copy file-based inputs into `workspace/inputs` and rewrite paths.
 
 ---
 
@@ -74,6 +146,7 @@ Options:
 - `--log-file PATH` - override the log file path. Otherwise DenseGen writes
   to `logging.log_dir/<run_id>.log` inside the workspace. The override path
   must still resolve inside `densegen.run.root`.
+
 Notes:
 - If you enable `scoring_backend: fimo`, run via `pixi run dense ...` (or ensure `fimo` is on PATH).
 
@@ -92,53 +165,28 @@ List available plot names and descriptions.
 
 ---
 
-#### `dense stage`
-Stage a new workspace with `config.yaml`, `inputs/`, `outputs/`, plus `outputs/logs/` and `outputs/meta/`.
-Options:
-- `--id` - run identifier (directory name).
-- `--root` - workspaces root directory (default: package `workspaces/` directory).
-- `--template` - template config YAML to copy.
-- `--copy-inputs` - copy file-based inputs into `workspace/inputs` and rewrite paths.
-
----
-
-#### `dense summarize`
-Summarize a run manifest (`outputs/meta/run_manifest.json`).
-Options:
-- `--run` - workspace directory (defaults to `densegen.run.root` from config).
-- `--root` - list workspaces under a root directory.
-- `--limit` - limit workspaces displayed when using `--root`.
-- `--all` - include directories without `config.yaml` when using `--root`.
-- `--config` - config path (used to resolve run root when `--run` is not set).
-- `--verbose` - show failure breakdown columns (constraint filters + duplicate solutions).
-- `--library` - include offered-vs-used summaries (TF/TFBS usage).
-- `--top` - number of rows to show in library summaries.
-- `--by-library/--no-by-library` - group library summaries per build attempt.
-- `--top-per-tf` - limit TFBS rows per TF when summarizing.
-- `--show-library-hash/--short-library-hash` - toggle full vs short library hashes.
-Tip:
-- For large runs, prefer `--no-by-library` or lower `--top`/`--top-per-tf` to keep output readable.
-
----
-
 #### `dense report`
 Generate an audit-grade report summary for a run. Outputs are run-scoped under `outputs/` by default.
+
 Options:
+- `--run` - run directory (defaults to config run root).
 - `--out` - output directory relative to run root (default: `outputs`).
+- `--format` - `json`, `md`, `html`, or `all` (comma-separated allowed).
 
 ---
 
 ### Examples
 
 ```bash
-uv run dense validate -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-uv run dense plan     -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-uv run dense describe -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-uv run dense run      -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-uv run dense plot     -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --only tf_usage,tf_coverage,tfbs_positional_histogram,diversity_health
-uv run dense summarize --run src/dnadesign/densegen/workspaces/demo_meme_two_tf
-uv run dense summarize --root src/dnadesign/densegen/workspaces
-uv run dense report   -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
+pixi run dense validate-config -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
+uv run dense inspect inputs -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
+uv run dense inspect plan   -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
+uv run dense inspect config -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
+uv run dense run            -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
+uv run dense plot           -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --only tf_usage,tf_coverage,tfbs_positional_histogram,diversity_health
+uv run dense inspect run     --run src/dnadesign/densegen/workspaces/demo_meme_two_tf
+uv run dense inspect run     --root src/dnadesign/densegen/workspaces
+uv run dense report          -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --format all
 ```
 
 Demo run (small, Parquet-only config):

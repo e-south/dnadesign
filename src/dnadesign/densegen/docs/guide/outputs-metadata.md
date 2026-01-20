@@ -36,7 +36,7 @@ the full outputs.
 Use the CLI to summarize a run:
 
 ```
-uv run dense summarize --run path/to/run
+uv run dense inspect run --run path/to/run
 ```
 
 ---

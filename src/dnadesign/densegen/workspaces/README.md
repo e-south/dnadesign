@@ -12,4 +12,4 @@ Archived or legacy artifacts live under `_archive/` so the active workspace list
 The canonical demo lives under `demo_meme_two_tf/` and uses MEME motif files copied from
 the basic Cruncher demo workspace (`inputs/local_motifs`). DenseGen reads these with the
 shared Cruncher MEME parser to keep parsing DRY and consistent.
-Use `dense summarize --root workspaces/_archive` if you want to inspect archived workspaces.
+Use `dense inspect run --root workspaces/_archive` if you want to inspect archived workspaces.

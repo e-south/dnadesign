@@ -21,10 +21,10 @@ FIMO-backed PWM sampling is supported when MEME Suite is available (`fimo` on PA
 Stratified FIMO sampling uses canonical p‑value bins by default; see the guide for mining workflows.
 
 ```bash
-uv run dense validate -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-uv run dense describe -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
+pixi run dense validate-config -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
+uv run dense inspect inputs -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
 pixi run dense run -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --no-plot
-uv run dense summarize -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --library --top-per-tf 5
+uv run dense inspect run -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --library --top-per-tf 5
 uv run dense plot -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --only tf_usage,tf_coverage
 ```
 
