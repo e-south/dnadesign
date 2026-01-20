@@ -149,6 +149,88 @@ def test_build_umap_overlay_charts() -> None:
     assert isinstance(score_chart, alt.Chart)
 
 
+def test_build_umap_explorer_chart_cases() -> None:
+    base = pl.DataFrame(
+        {
+            "id": ["a", "b"],
+            "x": [0.1, 0.2],
+            "y": [0.3, 0.4],
+            "opal__transient__observed_event": [True, False],
+            "opal__score__top_k": [True, False],
+        }
+    )
+    ok = plots.build_umap_explorer_chart(
+        df=base,
+        x_col="x",
+        y_col="y",
+        color_value="opal__transient__observed_event",
+        color_label="Observed",
+        point_size=40,
+        opacity=0.7,
+        plot_size=420,
+        dataset_name="demo",
+    )
+    assert ok.valid is True
+    assert ok.note is not None and "Plotting full dataset" in ok.note
+    assert isinstance(ok.chart, alt.Chart)
+
+    missing_id = plots.build_umap_explorer_chart(
+        df=base.drop("id"),
+        x_col="x",
+        y_col="y",
+        color_value=None,
+        color_label=None,
+        point_size=40,
+        opacity=0.7,
+        plot_size=420,
+        dataset_name="demo",
+    )
+    assert missing_id.valid is False
+    assert missing_id.note is not None and "required column `id`" in missing_id.note
+
+    missing_xy = plots.build_umap_explorer_chart(
+        df=base,
+        x_col="",
+        y_col="",
+        color_value=None,
+        color_label=None,
+        point_size=40,
+        opacity=0.7,
+        plot_size=420,
+        dataset_name="demo",
+    )
+    assert missing_xy.valid is False
+    assert missing_xy.note is not None and "provide x/y columns" in missing_xy.note
+
+    non_numeric = plots.build_umap_explorer_chart(
+        df=pl.DataFrame({"id": ["a"], "x": ["na"], "y": ["nb"]}),
+        x_col="x",
+        y_col="y",
+        color_value=None,
+        color_label=None,
+        point_size=40,
+        opacity=0.7,
+        plot_size=420,
+        dataset_name="demo",
+    )
+    assert non_numeric.valid is False
+    assert non_numeric.note is not None and "must be numeric" in non_numeric.note
+
+    no_non_null = plots.build_umap_explorer_chart(
+        df=base.with_columns(pl.lit(None).alias("all_null")),
+        x_col="x",
+        y_col="y",
+        color_value="all_null",
+        color_label="All null",
+        point_size=40,
+        opacity=0.7,
+        plot_size=420,
+        dataset_name="demo",
+    )
+    assert no_non_null.valid is True
+    assert no_non_null.note is not None and "no non-null values" in no_non_null.note
+
+
 def test_diagnostics_notes_merge() -> None:
     diag = diagnostics.Diagnostics().add_note("n1").add_warning("w1").add_error("e1")
     other = diagnostics.Diagnostics().add_note("n2").add_warning("w2")

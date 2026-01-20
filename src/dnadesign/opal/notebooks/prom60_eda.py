@@ -149,6 +149,7 @@ def _():
     namespace_summary = dash_util.namespace_summary
     parse_campaign_info = dash_datasets.parse_campaign_info
     resolve_objective_mode = dash_selection.resolve_objective_mode
+    resolve_brush_selection = dash_selection.resolve_brush_selection
     resolve_sfxi_readiness = dash_sfxi.resolve_sfxi_readiness
     resolve_campaign_workdir = dash_datasets.resolve_campaign_workdir
     resolve_dataset_path = dash_datasets.resolve_dataset_path
@@ -193,6 +194,7 @@ def _():
         observed_event_ids,
         parse_campaign_info,
         resolve_objective_mode,
+        resolve_brush_selection,
         resolve_sfxi_readiness,
         ensure_selection_columns,
         resolve_campaign_workdir,
@@ -1290,11 +1292,9 @@ def _(
 
 @app.cell
 def _(
-    coerce_selection_dataframe,
     df_umap_plot,
-    is_altair_undefined,
     mo,
-    pl,
+    resolve_brush_selection,
     umap_chart_ui,
     umap_valid,
     umap_x_input,
@@ -1302,28 +1302,13 @@ def _(
 ):
     _unused = (umap_x_input, umap_y_input)
     _selected_raw = umap_chart_ui.value
-
-    if not umap_valid:
-        df_umap_selected = df_umap_plot.head(0)
-        umap_selection_note_md = mo.md("UMAP missing; selection disabled.")
-    else:
-        if _selected_raw is None or is_altair_undefined(_selected_raw):
-            df_umap_selected = df_umap_plot.head(0)
-            umap_selection_note_md = mo.md("No points selected.")
-        else:
-            _selected_df = coerce_selection_dataframe(_selected_raw)
-
-            if _selected_df is None or "__row_id" not in _selected_df.columns:
-                df_umap_selected = df_umap_plot.head(0)
-                umap_selection_note_md = mo.md("Selection missing row ids.")
-            else:
-                _selected_ids = _selected_df.select(pl.col("__row_id").drop_nulls().unique()).to_series().to_list()
-                if not _selected_ids:
-                    df_umap_selected = df_umap_plot.head(0)
-                    umap_selection_note_md = mo.md("No points selected.")
-                else:
-                    df_umap_selected = df_umap_plot.filter(pl.col("__row_id").is_in(_selected_ids))
-                    umap_selection_note_md = mo.md(f"Selected rows: `{df_umap_selected.height}`")
+    df_umap_selected, selection_note = resolve_brush_selection(
+        df_plot=df_umap_plot,
+        selected_raw=_selected_raw,
+        selection_enabled=bool(umap_valid),
+        id_col="__row_id",
+    )
+    umap_selection_note_md = mo.md(selection_note)
 
     umap_selected_explorer = mo.ui.table(df_umap_selected)
     return df_umap_selected, umap_selected_explorer, umap_selection_note_md
@@ -2184,6 +2169,7 @@ def _(
 def _(
     df_labels,
     label_src_multiselect,
+    ledger_runs_df,
     mo,
     pl,
 ):
@@ -2202,6 +2188,7 @@ def _(
             df_labels_filtered = df_labels_filtered.filter(pl.col("label_src").is_in(selected_sources))
 
     _rounds = []
+    _round_source = "labels"
     if (
         df_labels_filtered is not None
         and not df_labels_filtered.is_empty()
@@ -2209,9 +2196,17 @@ def _(
     ):
         _rounds = df_labels_filtered.select(pl.col("observed_round").drop_nulls().unique()).to_series().to_list()
         _rounds = sorted({int(_r) for _r in _rounds})
+    if not _rounds and ledger_runs_df is not None and not ledger_runs_df.is_empty():
+        if "as_of_round" in ledger_runs_df.columns:
+            _rounds = ledger_runs_df.select(pl.col("as_of_round").drop_nulls().unique()).to_series().to_list()
+            _rounds = sorted({int(_r) for _r in _rounds})
+            _round_source = "ledger"
     if _rounds:
         _latest_round = _rounds[-1]
-        _latest_label = f"latest (R={_latest_round})"
+        if _round_source == "ledger":
+            _latest_label = f"latest (ledger R={_latest_round})"
+        else:
+            _latest_label = f"latest (R={_latest_round})"
         opal_round_value_map = {_latest_label: _latest_round}
         for _r in _rounds:
             opal_round_value_map[f"R={_r}"] = _r

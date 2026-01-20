@@ -52,6 +52,27 @@ def coerce_selection_dataframe(selected_raw: object) -> pl.DataFrame | None:
         return None
 
 
+def resolve_brush_selection(
+    *,
+    df_plot: pl.DataFrame,
+    selected_raw: object,
+    selection_enabled: bool,
+    id_col: str = "__row_id",
+) -> tuple[pl.DataFrame, str]:
+    if not selection_enabled:
+        return df_plot.head(0), "UMAP missing; selection disabled."
+    if selected_raw is None or is_altair_undefined(selected_raw):
+        return df_plot.head(0), "No points selected."
+    selected_df = coerce_selection_dataframe(selected_raw)
+    if selected_df is None or id_col not in selected_df.columns:
+        return df_plot.head(0), "Selection missing row ids."
+    selected_ids = selected_df.select(pl.col(id_col).drop_nulls().unique()).to_series().to_list()
+    if not selected_ids:
+        return df_plot.head(0), "No points selected."
+    df_selected = df_plot.filter(pl.col(id_col).is_in(selected_ids))
+    return df_selected, f"Selected rows: `{df_selected.height}`"
+
+
 def compute_selection_overlay(
     *,
     ids: np.ndarray,
