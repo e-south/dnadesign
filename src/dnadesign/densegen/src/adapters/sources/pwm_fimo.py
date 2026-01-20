@@ -46,9 +46,14 @@ def _sanitize_id(text: str) -> str:
     return cleaned or "motif"
 
 
-def build_candidate_records(motif_id: str, sequences: Sequence[str]) -> list[tuple[str, str]]:
+def build_candidate_records(
+    motif_id: str,
+    sequences: Sequence[str],
+    *,
+    start_index: int = 0,
+) -> list[tuple[str, str]]:
     prefix = _sanitize_id(motif_id)
-    return [(f"{prefix}|cand{idx}", seq) for idx, seq in enumerate(sequences)]
+    return [(f"{prefix}|cand{start_index + idx}", seq) for idx, seq in enumerate(sequences)]
 
 
 def write_candidates_fasta(records: Sequence[tuple[str, str]], out_path: Path) -> None:

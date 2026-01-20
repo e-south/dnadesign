@@ -21,11 +21,16 @@ densegen:
       sampling:
         strategy: stochastic
         n_sites: 80
-        oversample_factor: 12
-        max_candidates: 50000  # bounded candidate generation
+        oversample_factor: 200
+        max_candidates: 20000  # bounded candidate generation (cap across mining batches)
         scoring_backend: fimo
         pvalue_threshold: 1e-4
         selection_policy: stratified
+        mining:
+          batch_size: 5000
+          max_batches: 4
+          retain_bin_ids: [0, 1, 2, 3]
+          log_every_batches: 1
         length_policy: range
         length_range: [22, 28]
 
@@ -92,7 +97,10 @@ densegen:
     log_dir: outputs/logs
     level: INFO
     suppress_solver_stderr: true
-    print_visual: false
+    print_visual: true
+    progress_style: screen
+    progress_every: 1
+    progress_refresh_seconds: 1.0
 
 plots:
   source: parquet

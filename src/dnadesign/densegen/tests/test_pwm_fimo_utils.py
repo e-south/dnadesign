@@ -41,7 +41,7 @@ def test_write_minimal_meme_motif(tmp_path: Path) -> None:
 
 
 def test_write_candidates_fasta(tmp_path: Path) -> None:
-    records = build_candidate_records("My Motif", ["ACG", "TTT"])
+    records = build_candidate_records("My Motif", ["ACG", "TTT"], start_index=5)
     out = tmp_path / "candidates.fasta"
     write_candidates_fasta(records, out)
     lines = out.read_text().splitlines()
@@ -49,8 +49,8 @@ def test_write_candidates_fasta(tmp_path: Path) -> None:
     assert lines[1] == "ACG"
     assert lines[2].startswith(">")
     assert lines[3] == "TTT"
-    assert records[0][0].endswith("|cand0")
-    assert records[1][0].endswith("|cand1")
+    assert records[0][0].endswith("|cand5")
+    assert records[1][0].endswith("|cand6")
 
 
 def test_parse_fimo_tsv_and_best_hits() -> None:

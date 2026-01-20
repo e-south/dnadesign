@@ -960,6 +960,7 @@ def describe(
             "score",
             "selection",
             "bins",
+            "mining",
             "bgfile",
             "oversample",
             "max_candidates",
@@ -997,9 +998,23 @@ def describe(
                 bins_label = "canonical"
                 if getattr(sampling, "pvalue_bins", None) is not None:
                     bins_label = "custom"
-                bin_ids = getattr(sampling, "pvalue_bin_ids", None)
+                mining_cfg = getattr(sampling, "mining", None)
+                bin_ids = getattr(mining_cfg, "retain_bin_ids", None)
+                if bin_ids is None:
+                    bin_ids = getattr(sampling, "pvalue_bin_ids", None)
                 if bin_ids:
-                    bins_label = f"{bins_label} pick={bin_ids}"
+                    bins_label = f"{bins_label} retain={bin_ids}"
+            mining_label = "-"
+            mining_cfg = getattr(sampling, "mining", None)
+            if backend == "fimo" and mining_cfg is not None:
+                parts = [f"batch={mining_cfg.batch_size}"]
+                if mining_cfg.max_batches is not None:
+                    parts.append(f"max_batches={mining_cfg.max_batches}")
+                if mining_cfg.max_seconds is not None:
+                    parts.append(f"max_seconds={mining_cfg.max_seconds}s")
+                if mining_cfg.retain_bin_ids:
+                    parts.append(f"retain={mining_cfg.retain_bin_ids}")
+                mining_label = ", ".join(parts)
             bgfile_label = getattr(sampling, "bgfile", None) or "-"
             length_label = str(sampling.length_policy)
             if sampling.length_policy == "range" and sampling.length_range is not None:
@@ -1013,6 +1028,7 @@ def describe(
                 score_label,
                 str(selection_label),
                 str(bins_label),
+                str(mining_label),
                 str(bgfile_label),
                 str(sampling.oversample_factor),
                 str(sampling.max_candidates) if sampling.max_candidates is not None else "-",

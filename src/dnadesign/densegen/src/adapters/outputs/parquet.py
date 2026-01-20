@@ -37,6 +37,7 @@ def _meta_arrow_type(name: str, pa):
     }
     list_int = {
         "input_pwm_pvalue_bin_ids",
+        "input_pwm_mining_retain_bin_ids",
     }
     int_fields = {
         "length",
@@ -45,6 +46,9 @@ def _meta_arrow_type(name: str, pa):
         "min_required_regulators",
         "input_pwm_n_sites",
         "input_pwm_oversample_factor",
+        "input_pwm_mining_batch_size",
+        "input_pwm_mining_max_batches",
+        "input_pwm_mining_log_every_batches",
         "input_row_count",
         "input_tf_count",
         "input_tfbs_count",
@@ -68,6 +72,7 @@ def _meta_arrow_type(name: str, pa):
         "input_pwm_score_threshold",
         "input_pwm_score_percentile",
         "input_pwm_pvalue_threshold",
+        "input_pwm_mining_max_seconds",
         "sampling_fraction",
         "sampling_fraction_pairs",
         "gap_fill_gc_min",

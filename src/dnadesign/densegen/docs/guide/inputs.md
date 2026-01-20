@@ -100,10 +100,16 @@ Required sampling fields:
 - `pvalue_threshold` (float in (0, 1]; fimo backend only)
 - `oversample_factor`: oversampling multiplier for candidate generation
 - `max_candidates` (optional): cap on candidate generation; helps bound long motifs
-- `max_seconds` (optional): time limit for candidate generation (best-effort cap)
+- `max_seconds` (optional): time limit for candidate generation per batch (best-effort cap)
 - `selection_policy`: `random_uniform | top_n | stratified` (default: `random_uniform`; fimo only)
 - `pvalue_bins` (optional): list of p‑value bin edges (strictly increasing; must end with `1.0`)
-- `pvalue_bin_ids` (optional): list of bin indices to keep (0‑based, using `pvalue_bins`)
+- `pvalue_bin_ids` (deprecated; use `mining.retain_bin_ids`)
+- `mining` (optional; fimo only): batch/time controls for mining with FIMO
+  - `batch_size` (int > 0): candidates per batch
+  - `max_batches` (optional int > 0): limit batches per motif
+  - `max_seconds` (optional float > 0): limit total mining time per motif
+  - `retain_bin_ids` (optional list of ints): keep only specific p‑value bins
+  - `log_every_batches` (int > 0): log yield summaries every N batches
 - `bgfile` (optional): MEME bfile-format background model for FIMO
 - `keep_all_candidates_debug` (optional): write raw FIMO TSVs to `outputs/meta/fimo/` for inspection
 - `include_matched_sequence` (optional): include `fimo_matched_sequence` column in the TFBS table
@@ -126,11 +132,11 @@ Notes:
 - As a rule of thumb: `1e-4` is a strong match, `1e-3` is moderate, `1e-2` is weak.
 - DenseGen accepts a candidate if its **best hit** within the emitted TFBS passes the threshold.
 - For `strategy: background`, DenseGen keeps **weak** matches where `pvalue >= pvalue_threshold`.
-- If you set `pvalue_bin_ids`, DenseGen only keeps candidates in those bins (useful for mining
+- If you set `mining.retain_bin_ids`, DenseGen only keeps candidates in those bins (useful for mining
   specific affinity ranges).
 - FIMO adds per‑TFBS metadata columns: `fimo_score`, `fimo_pvalue`, `fimo_start`, `fimo_stop`,
   `fimo_strand`, `fimo_bin_id`, `fimo_bin_low`, `fimo_bin_high`, and (optionally)
-  `fimo_matched_sequence`.
+  `fimo_matched_sequence` (the best‑hit window within the TFBS).
 - `length_policy` defaults to `exact`. Use `length_policy: range` with `length_range: [min, max]`
   to sample variable lengths (min must be >= motif length).
 - `trim_window_length` optionally trims the PWM to a max‑information window before sampling (useful
@@ -170,24 +176,42 @@ inputs:
       pvalue_threshold: 1e-4
       selection_policy: top_n
       n_sites: 80
-      oversample_factor: 12
-      max_candidates: 50000
-      max_seconds: 5
+      oversample_factor: 200
+      max_candidates: 20000
+      mining:
+        batch_size: 5000
+        max_batches: 4
+        retain_bin_ids: [0, 1, 2, 3]
+        log_every_batches: 1
 ```
 
 #### Mining workflow (p‑value strata)
 If you want to **mine** sequences across affinity strata, use `selection_policy: stratified` plus
-canonical p‑value bins. A typical workflow:
+canonical p‑value bins and the `mining` block. A typical workflow:
 
-1) Oversample candidates (`oversample_factor`, `max_candidates`) and score with FIMO.
+1) Oversample candidates (`oversample_factor`, `max_candidates`) and score with FIMO in batches
+   (`mining.batch_size`).
 2) Accept candidates using `pvalue_threshold` (global strength cutoff).
-3) Use `pvalue_bin_ids` to select one or more bins (e.g., moderate matches only).
-4) Repeat runs to accumulate a deduplicated reservoir of sequences per bin.
+3) Use `mining.retain_bin_ids` to select one or more bins (e.g., moderate matches only).
+4) Repeat runs (or increase `mining.max_batches` / `mining.max_seconds`) to accumulate a deduplicated
+   reservoir of sequences per bin.
 5) Use `dense summarize --library` to inspect which TFBS were offered vs used in Stage‑B sampling.
 
-DenseGen reports per‑bin yield summaries (hits, accepted, selected) for every FIMO run, so you can
-track how many candidates land in each bin and adjust thresholds or oversampling accordingly. With
-`selection_policy: stratified`, the selected‑bin counts show how evenly the final pool spans strata.
+DenseGen reports per‑bin yield summaries (hits, accepted, selected) for retained bins only (or all
+bins if `retain_bin_ids` is unset), so you can track how many candidates land in each stratum and
+adjust thresholds or oversampling accordingly. With `selection_policy: stratified`, the selected‑bin
+counts show how evenly the final pool spans strata.
+
+#### Stdout UX for long runs
+DenseGen supports three logging styles so long runs stay readable:
+
+- `progress_style: stream` (default) logs per‑sequence updates; tune `progress_every` to reduce noise.
+- `progress_style: summary` hides per‑sequence logs and only prints periodic leaderboard summaries.
+- `progress_style: screen` clears and redraws a compact dashboard (progress, leaderboards, last sequence)
+  at `progress_refresh_seconds`.
+
+For iterative mining workflows, `screen` or `summary` modes are recommended to avoid log spam while still
+seeing yield/leaderboard progress over time.
 
 ---
 
