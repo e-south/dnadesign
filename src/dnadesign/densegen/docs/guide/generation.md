@@ -122,6 +122,9 @@ Round‑robin is **distinct from Stage‑B sampling** (`generation.sampling`): l
 uses the same policy per plan, but round‑robin can trigger more frequent library rebuilds when
 `pool_strategy: iterative_subsample` is used. Expect extra compute if many plans are active.
 
+Input PWM sampling is performed **once per run** and cached across round‑robin passes. If you
+need a fresh PWM sample, start a new run (or stage a new workspace).
+
 ---
 
 ### Regulator constraints

@@ -1283,6 +1283,7 @@ def _process_plan_for_source(
     checkpoint_every: int = 0,
     write_state: Callable[[], None] | None = None,
     site_failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] | None = None,
+    source_cache: dict[str, tuple[list, pd.DataFrame | None]] | None = None,
 ) -> tuple[int, dict]:
     source_label = source_cfg.name
     plan_name = plan_item.name
@@ -1366,9 +1367,16 @@ def _process_plan_for_source(
     outputs_root = run_root_path / "outputs"
     existing_library_builds = _load_existing_library_index(outputs_root)
 
-    # Load source
-    src_obj = deps.source_factory(source_cfg, cfg_path)
-    data_entries, meta_df = src_obj.load_data(rng=np_rng, outputs_root=outputs_root)
+    # Load source (cache PWM sampling results across round-robin passes).
+    cache_key = source_label
+    cached = source_cache.get(cache_key) if source_cache is not None else None
+    if cached is None:
+        src_obj = deps.source_factory(source_cfg, cfg_path)
+        data_entries, meta_df = src_obj.load_data(rng=np_rng, outputs_root=outputs_root)
+        if source_cache is not None:
+            source_cache[cache_key] = (data_entries, meta_df)
+    else:
+        data_entries, meta_df = cached
     input_meta = _input_metadata(source_cfg, cfg_path)
     input_tf_tfbs_pair_count: int | None = None
     if meta_df is not None and isinstance(meta_df, pd.DataFrame):
@@ -2705,6 +2713,7 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
     plan_order: list[tuple[str, str]] = []
     plan_leaderboards: dict[tuple[str, str], dict] = {}
     inputs_manifest_entries: dict[str, dict] = {}
+    source_cache: dict[str, tuple[list, pd.DataFrame | None]] = {}
     outputs_root = run_outputs_root(run_root)
     outputs_root.mkdir(parents=True, exist_ok=True)
     ensure_run_meta_dir(run_root)
@@ -2889,6 +2898,7 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                     checkpoint_every=checkpoint_every,
                     write_state=_write_state,
                     site_failure_counts=site_failure_counts,
+                    source_cache=source_cache,
                 )
                 per_plan[(s.name, item.name)] = per_plan.get((s.name, item.name), 0) + produced
                 total += produced
@@ -2936,6 +2946,7 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                         checkpoint_every=checkpoint_every,
                         write_state=_write_state,
                         site_failure_counts=site_failure_counts,
+                        source_cache=source_cache,
                     )
                     produced_counts[key] = current + produced
                     leaderboard_latest = stats.get("leaderboard_latest")

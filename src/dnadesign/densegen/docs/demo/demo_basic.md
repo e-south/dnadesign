@@ -95,6 +95,10 @@ Example output:
 ✨ Run staged: /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
 ```
 
+If you re-run the demo in the same run root and DenseGen’s schema has changed, you may see a
+Parquet schema mismatch. Either delete `outputs/dense_arrays.parquet` +
+`outputs/_densegen_ids.sqlite` or stage a fresh workspace.
+
 ## 3) Validate config
 
 ```bash

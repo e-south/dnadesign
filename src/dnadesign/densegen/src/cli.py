@@ -247,6 +247,23 @@ def _render_missing_input_hint(cfg_path: Path, loaded, exc: Exception) -> None:
             console.print(f"  - {hint}")
 
 
+def _render_output_schema_hint(exc: Exception) -> bool:
+    msg = str(exc)
+    if "Existing Parquet schema does not match the current DenseGen schema" in msg:
+        console.print(f"[bold red]Output schema mismatch:[/] {msg}")
+        console.print("[bold]Next steps[/]:")
+        console.print("  - Remove outputs/dense_arrays.parquet and outputs/_densegen_ids.sqlite, or")
+        console.print("  - Stage a fresh workspace with `dense stage --copy-inputs` and re-run.")
+        return True
+    if "Output sinks are out of sync before run" in msg:
+        console.print(f"[bold red]Output sink mismatch:[/] {msg}")
+        console.print("[bold]Next steps[/]:")
+        console.print("  - Remove stale outputs so sinks align, or")
+        console.print("  - Run with a single output target to rebuild from scratch.")
+        return True
+    return False
+
+
 def _warn_pwm_sampling_configs(loaded, cfg_path: Path) -> None:
     warnings: list[str] = []
     for inp in loaded.root.densegen.inputs:
@@ -1189,6 +1206,10 @@ def run(
     except FileNotFoundError as exc:
         _render_missing_input_hint(cfg_path, loaded, exc)
         raise typer.Exit(code=1)
+    except RuntimeError as exc:
+        if _render_output_schema_hint(exc):
+            raise typer.Exit(code=1)
+        raise
 
     console.print(":tada: [bold green]Run complete[/].")
     console.print("[bold]Next steps[/]:")
