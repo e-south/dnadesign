@@ -34,6 +34,7 @@ uv run opal run -c campaign.yaml --round 0 --resume
 uv run opal status -c campaign.yaml
 uv run opal runs list -c campaign.yaml
 uv run opal log -c campaign.yaml --round latest
+uv run opal verify-outputs -c campaign.yaml --round latest
 
 # 5) Plot
 uv run opal plot -c campaign.yaml --quick
@@ -143,6 +144,9 @@ outputs/round_<k>/
   model.joblib
   model_meta.json
   selection_top_k.csv
+  selection_top_k.parquet
+  selection_top_k__run_<run_id>.csv
+  selection_top_k__run_<run_id>.parquet
   labels_used.parquet
   round_ctx.json
   objective_meta.json
@@ -170,6 +174,13 @@ uv run opal notebook run -c campaign.yaml
 
 The notebook loads ledger artifacts (runs, predictions, labels) and gives you
 interactive filtering and plots for the selected run.
+
+Canonical vs cache vs transient (notebook):
+
+- **Canonical (ledger)**: append-only, run-aware sources under `outputs/ledger.*`.
+- **Cache (records)**: `latest_pred_*` columns in `records.parquet` (convenience only).
+- **Transient (notebook)**: in-memory overlays (ephemeral) for exploration, never persisted.
+- **Y-ops gating**: SFXI scoring runs only when predictions are in objective space (Y-ops inverse applied).
 
 ---
 

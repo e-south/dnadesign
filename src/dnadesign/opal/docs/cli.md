@@ -124,6 +124,9 @@ opal run --config <yaml> --round <r> \
 * `model.joblib`
 * `model_meta.json`
 * `selection_top_k.csv`
+* `selection_top_k.parquet`
+* `selection_top_k__run_<run_id>.csv` (immutable per-run copy)
+* `selection_top_k__run_<run_id>.parquet` (immutable per-run copy)
 * `labels_used.parquet` (training snapshot for this run)
 * `round_ctx.json`
 * `objective_meta.json`
@@ -148,6 +151,9 @@ re‑run with `--resume`.
 
 * `opal__<slug>__latest_as_of_round`
 * `opal__<slug>__latest_pred_scalar`
+* `opal__<slug>__latest_pred_run_id`
+* `opal__<slug>__latest_pred_as_of_round`
+* `opal__<slug>__latest_pred_written_at`
 
 ---
 
@@ -195,7 +201,7 @@ Per-record history report (ground truth + per-round predictions/rank/selected).
 ```bash
 opal record-show --config <yaml> \
   [<ID-or-SEQ> | --id <ID> | --sequence <SEQ>] \
-  [--with-sequence|--no-sequence] [--json]
+  [--run-id <id>] [--with-sequence|--no-sequence] [--json]
 ```
 
 **Flags**
@@ -203,8 +209,13 @@ opal record-show --config <yaml> \
 * `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
 * `<ID-or-SEQ>`: Positional id or sequence (use `--id/--sequence` to disambiguate).
 * `--id`, `--sequence`: Explicit lookup key (mutually exclusive).
+* `--run-id`: Explicit run_id for ledger predictions (required if multiple runs exist for a round).
 * `--with-sequence/--no-sequence`: Include the sequence in output (default: on).
 * `--json`: Output as JSON.
+
+**Notes**
+
+* If reruns exist for a round, pass `--run-id` to avoid mixing predictions.
 
 #### `model-show`
 
@@ -234,12 +245,36 @@ List objective metadata and diagnostic keys for a round.
 **Usage**
 
 ```bash
-opal objective-meta --config <yaml-or-dir> [--round <k|latest>] [--profile|--no-profile]
+opal objective-meta --config <yaml-or-dir> [--round <k|latest> | --run-id <id>] [--profile|--no-profile]
 ```
 
 **Flags**
 
 * `--config, -c`: Path to `campaign.yaml` (directories supported for `opal plot`, `opal notebook`, `opal objective-meta`).
+* `--run-id`: Explicit run_id to disambiguate when a round has multiple runs.
+
+**Notes**
+
+* If multiple run_ids exist for the selected round, `--run-id` is required.
+
+---
+
+#### `verify-outputs`
+
+Compare selection artifacts against ledger predictions for a single run (run-aware, audit-grade).
+
+**Usage**
+
+```bash
+opal verify-outputs --config <yaml> [--round <k|latest> | --run-id <id>] \
+  [--selection-path <path>] [--eps <float>] [--json]
+```
+
+**Notes**
+
+* Resolves the selection artifact path from `ledger.runs.parquet` when possible.
+* Uses the ledger’s `pred__y_obj_scalar` as the canonical score source.
+* `--selection-path` accepts `.csv` or `.parquet`.
 * `--round, -r`: Round selector (integer or `latest`).
 * `--profile/--no-profile`: Compute hue/size suitability stats (default: off).
 
@@ -395,9 +430,12 @@ opal label-hist <validate|repair|attach-from-y> --config <yaml> [--apply] [--rou
 
 OPAL manages a few derived columns in `records.parquet`:
 
-* `opal__<slug>__label_hist` — append-only label history (SSoT)
+* `opal__<slug>__label_hist` — label history cache (ledger.labels is canonical)
 * `opal__<slug>__latest_as_of_round` — last scored round for each record
 * `opal__<slug>__latest_pred_scalar` — latest objective scalar cache
+* `opal__<slug>__latest_pred_run_id` — run_id that wrote the cache (run-aware provenance)
+* `opal__<slug>__latest_pred_as_of_round` — as_of_round that wrote the cache
+* `opal__<slug>__latest_pred_written_at` — timestamp of cache writeback
 
 `opal init` will add these cache columns if they are missing.
 
@@ -411,7 +449,7 @@ Generate plots declared in the campaign’s `plots:` block. Plots are plugin-dri
 
 ```bash
 opal plot --config <yaml-or-dir> [--plot-config <plots.yaml>] \
-  [--round <selector>] [--name <plot-name>] [--tag <tag> ...]
+  [--round <selector>] [--run-id <id>] [--name <plot-name>] [--tag <tag> ...]
 opal plot --list
 opal plot --list-config --config <yaml-or-dir>
 opal plot --describe <plot-kind>
@@ -427,6 +465,7 @@ opal plot --config <yaml-or-dir> --quick
 * `--describe`: Show parameters + required fields for a plot kind.
 * `--quick`: Run built-in default plots without plots.yaml (explicit).
 * `--round, -r`: `latest | all | 3 | 1,3,7 | 2-5` (plugin may define defaults).
+* `--run-id`: Explicit run_id to disambiguate ledger predictions (required if multiple runs exist for a round).
 * `--name, -n`: Run a single plot by name; omit to run **all**.
 * `--tag`: Run plots with the given tag (repeatable).
 
@@ -439,6 +478,7 @@ opal plot --config <yaml-or-dir> --quick
 * `--quick` is assertive: it does **not** auto-run unless explicitly requested.
 * `plot_defaults` and `plot_presets` reduce redundancy; `preset: <name>` merges into each plot entry.
 * Set `enabled: false` on any plot entry to keep it in the YAML without running it.
+* If a round has multiple run_ids, plots require `--run-id` to avoid mixing reruns.
 
 ---
 

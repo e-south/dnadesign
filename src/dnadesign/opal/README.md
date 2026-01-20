@@ -72,6 +72,7 @@ opal plot -c path/to/campaign.yaml
 opal plot -c path/to/campaign.yaml --quick    # run default plots without plots.yaml
 opal predict -c path/to/campaign.yaml               # uses latest round
 opal objective-meta -c campaign.yaml --round latest
+opal verify-outputs -c campaign.yaml --round latest
 opal notebook generate -c path/to/campaign.yaml     # create a marimo analysis notebook
 opal notebook generate -c path/to/campaign.yaml --no-validate  # scaffold before any runs
 
@@ -92,6 +93,9 @@ opal prune-source -c path/to/campaign.yaml --scope campaign
   - `model.joblib`
   - `model_meta.json` *(includes training__y_ops when configured)*
   - `selection_top_k.csv`
+  - `selection_top_k.parquet`
+  - `selection_top_k__run_<run_id>.csv` *(immutable per-run copy)*
+  - `selection_top_k__run_<run_id>.parquet` *(immutable per-run copy)*
   - `labels_used.parquet`
   - `round_ctx.json` *(runtime audit & fitted Y-ops)*
   - `objective_meta.json` *(objective mode/params/keys)*
@@ -107,8 +111,9 @@ opal prune-source -c path/to/campaign.yaml --scope campaign
   * `outputs/ledger.labels.parquet`
     - 1 row per label event (observed round, id, y).
 
-Schemas are **append-only**; keys are unique:
-  `run_id` (runs), `(run_id,id)` (predictions), `(observed_round,id)` (labels).
+Schemas are **append-only**; uniqueness is enforced for:
+  `run_id` (runs), `(run_id,id)` (predictions). Labels are event rows; exact duplicates are de‑duplicated,
+  but distinct sources for the same `(observed_round,id)` are preserved.
 
 **state.json** tracks campaign state per round, including `run_id` and `round_log_jsonl` paths for auditability.
 
@@ -338,7 +343,7 @@ Use `opal log --round <k|latest>` to summarize `round.log.jsonl`.
 OPAL is **assertive by default**: it will fail fast on inconsistent inputs rather than guessing.
 
 * `opal validate` checks essentials + X presence; if Y exists it must be finite and the expected length.
-* `label_hist` is the **single source of truth** for labels. `run`/`explain` require it to be valid.
+* `label_hist` is a **required input** for `run`/`explain`, but **ledger.labels is canonical** for auditability.
 * Labels present in the Y column but **missing from `label_hist` are rejected** (use `opal ingest-y` or `opal label-hist attach-from-y` for legacy Y columns).
 * Ledger writes are strict: unknown columns are **errors** (override only with `OPAL_LEDGER_ALLOW_EXTRA=1`).
 * Duplicate handling on ingest is explicit via `ingest.duplicate_policy` (error | keep_first | keep_last).
@@ -365,7 +370,7 @@ OPAL is **assertive by default**: it will fail fast on inconsistent inputs rathe
 | `created_at` | timestamp (UTC) | ingest time     |
 
 **X (representation):** Arrow `list<float>` or JSON array string; **fixed length** across used rows.
-**Y (labels):** Arrow `list<float>`; label history is append-only JSON in `opal__<campaign>__label_hist`.
+**Y (labels):** Arrow `list<float>`; label history is cached as JSON in `opal__<campaign>__label_hist`.
 
 Naming: secondary columns follow `<tool>__<field>`.
 
@@ -373,13 +378,23 @@ Naming: secondary columns follow `<tool>__<field>`.
 
 | column                              | type                    | purpose                                  |
 | ----------------------------------- | ----------------------- | ---------------------------------------- |
-| `opal__<slug>__label_hist`          | list<struct{r,ts,src,y}> | append‑only label history (SSoT)         |
+| `opal__<slug>__label_hist`          | list<struct{r,ts,src,y}> | label history cache (ledger is canonical) |
 | `opal__<slug>__latest_as_of_round`  | int                     | last scored round for each record         |
 | `opal__<slug>__latest_pred_scalar`  | double                  | latest objective scalar cache             |
+| `opal__<slug>__latest_pred_run_id`  | string                  | run_id for latest_pred_scalar (cache)     |
+| `opal__<slug>__latest_pred_as_of_round` | int                 | as_of_round for latest_pred_scalar        |
+| `opal__<slug>__latest_pred_written_at`  | string                | cache write timestamp (UTC ISO)           |
 
 These caches are **derived** and can be recomputed; canonical records live in ledger sinks.
 `opal init` will add these cache columns to `records.parquet` if they are missing.
 Use `opal prune-source` to remove OPAL‑derived columns (including the Y column) when you need to start fresh.
+
+#### Canonical vs cache vs transient (notebook)
+
+* **Canonical (ledger)**: append-only, run-aware records under `outputs/ledger.*`.
+* **Cache (records)**: `latest_pred_*` columns in `records.parquet` for convenience; can be stale or not run-aware.
+* **Transient (notebook)**: in-memory overlays (e.g., RF surrogate) for exploration only; never persisted.
+* **Y-ops gating**: notebook SFXI scoring only runs when predictions are in objective space (Y-ops inverse applied).
 
 #### Ledger output schema (append-only)
 
