@@ -14,6 +14,7 @@ import traceback
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import polars as pl
 import typer
 import yaml
 
@@ -96,6 +97,20 @@ def _has_feature_importance(outputs_dir: Path) -> bool:
         if child.name.startswith("round_") and (child / "feature_importance.csv").exists():
             return True
     return False
+
+
+def _resolve_run_round(runs_df: pl.DataFrame, run_id: str) -> int:
+    if runs_df.is_empty():
+        raise ValueError("[plot] ledger.runs is empty; cannot resolve run_id.")
+    if "run_id" not in runs_df.columns or "as_of_round" not in runs_df.columns:
+        raise ValueError("[plot] ledger.runs missing required columns (run_id, as_of_round).")
+    df = runs_df.filter(pl.col("run_id") == str(run_id)).select(pl.col("as_of_round").drop_nulls().unique())
+    if df.is_empty():
+        raise ValueError(f"[plot] run_id not found in ledger.runs: {run_id!r}.")
+    rounds = sorted({int(x) for x in df.to_series().to_list()})
+    if len(rounds) > 1:
+        raise ValueError(f"[plot] run_id {run_id!r} appears in multiple rounds {rounds}.")
+    return rounds[0]
 
 
 def _build_quick_plots(cfg, *, outputs_dir: Path) -> List[Dict[str, Any]]:
@@ -488,6 +503,27 @@ def cmd_plot(
         rounds_sel = parse_round_selector(round)
     except OpalError as e:
         raise typer.BadParameter(str(e), param_hint="--round") from e
+    if run_id:
+        try:
+            runs_df = analysis.read_runs()
+        except OpalError as e:
+            raise ValueError(f"[plot] {e}") from e
+        run_round = _resolve_run_round(runs_df, run_id)
+        if rounds_sel == "all":
+            raise ValueError("[plot] Do not combine --run-id with --round all; run_id is single-round.")
+        if rounds_sel in ("unspecified", "latest"):
+            rounds_sel = [run_round]
+        elif isinstance(rounds_sel, list):
+            if run_round not in rounds_sel:
+                raise ValueError(
+                    f"[plot] run_id {run_id!r} belongs to as_of_round={run_round}, but --round={round!r} excludes it."
+                )
+        else:
+            if int(rounds_sel) != int(run_round):
+                raise ValueError(
+                    f"[plot] run_id {run_id!r} belongs to as_of_round={run_round}, "
+                    f"but --round={round!r} selects a different round."
+                )
     suffix = round_suffix(rounds_sel)
 
     # Ensure Matplotlib cache/config dir is writable before any plot imports.

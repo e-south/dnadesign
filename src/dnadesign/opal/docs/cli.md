@@ -479,6 +479,7 @@ opal plot --config <yaml-or-dir> --quick
 * `plot_defaults` and `plot_presets` reduce redundancy; `preset: <name>` merges into each plot entry.
 * Set `enabled: false` on any plot entry to keep it in the YAML without running it.
 * If a round has multiple run_ids, plots require `--run-id` to avoid mixing reruns.
+* If `--run-id` is provided, OPAL resolves its round from `ledger.runs`; `--round all` is invalid and conflicting `--round` values error.
 
 ---
 

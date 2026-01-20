@@ -207,6 +207,33 @@ def test_plot_cli_quick_mode_multi_rounds(tmp_path):
     assert res.exit_code == 0, res.stdout
 
 
+def test_plot_cli_rejects_run_id_round_mismatch(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+    )
+    from ._cli_helpers import write_ledger
+
+    write_ledger(workdir, run_id="r0", round_index=0)
+    write_ledger(workdir, run_id="r1", round_index=1)
+    _write_min_labels(workdir, round_index=0)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        ["--no-color", "plot", "--quick", "-c", str(campaign), "--round", "1", "--run-id", "r0"],
+    )
+    assert res.exit_code != 0, res.stdout
+    assert "run_id" in res.output
+
+
 def test_plot_cli_rejects_bad_round_selector(tmp_path):
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)
