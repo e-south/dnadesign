@@ -136,7 +136,7 @@ def build_pool_artifact(
     selected_inputs: set[str] | None = None,
 ) -> tuple[TFBSPoolArtifact, dict[str, PoolData]]:
     out_dir.mkdir(parents=True, exist_ok=True)
-    install_native_stderr_filters()
+    install_native_stderr_filters(suppress_solver_messages=False)
     pool_entries: dict[str, PoolInputEntry] = {}
     pool_data: dict[str, PoolData] = {}
     used_names: dict[str, int] = {}

@@ -64,6 +64,7 @@ from .core.artifacts.library import write_library_artifact
 from .core.artifacts.pool import (
     POOL_MODE_SEQUENCE,
     POOL_MODE_TFBS,
+    PoolData,
     build_pool_artifact,
     load_pool_artifact,
 )
@@ -79,14 +80,16 @@ from .core.reporting import collect_report_data, write_report
 from .core.run_manifest import load_run_manifest
 from .core.run_paths import run_manifest_path, run_state_path
 from .core.run_state import load_run_state
+from .core.seeding import derive_seed_map
 from .integrations.meme_suite import require_executable
 from .utils.logging_utils import install_native_stderr_filters, setup_logging
+from .utils.mpl_utils import ensure_mpl_cache_dir
 
 rich_traceback(show_locals=False)
 console = Console()
 _PYARROW_SYSCTL_PATTERN = re.compile(r"sysctlbyname failed for 'hw\.")
 log = logging.getLogger(__name__)
-install_native_stderr_filters()
+install_native_stderr_filters(suppress_solver_messages=False)
 
 
 @contextlib.contextmanager
@@ -214,20 +217,6 @@ def _count_files(path: Path, pattern: str = "*") -> int:
     if not path.exists() or not path.is_dir():
         return 0
     return sum(1 for p in path.glob(pattern) if p.is_file())
-
-
-def _ensure_mpl_cache_dir() -> None:
-    if os.environ.get("MPLCONFIGDIR"):
-        return
-    cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
-    target = cache_root / "densegen" / "matplotlib"
-    try:
-        target.mkdir(parents=True, exist_ok=True)
-        os.environ["MPLCONFIGDIR"] = str(target)
-    except Exception:
-        tmp = Path(os.getenv("TMPDIR") or "/tmp") / "densegen-matplotlib"
-        tmp.mkdir(parents=True, exist_ok=True)
-        os.environ["MPLCONFIGDIR"] = str(tmp)
 
 
 def _short_hash(val: str, *, n: int = 8) -> str:
@@ -663,13 +652,14 @@ def validate_config(
     _ensure_fimo_available(loaded.root.densegen, strict=True)
     if probe_solver:
         from .adapters.optimizer import DenseArraysAdapter
-        from .core.pipeline import select_solver_strict
+        from .core.pipeline import select_solver
 
         solver_cfg = loaded.root.densegen.solver
-        select_solver_strict(
+        select_solver(
             solver_cfg.backend,
             DenseArraysAdapter(),
             strategy=str(solver_cfg.strategy),
+            fallback_to_cbc=bool(solver_cfg.fallback_to_cbc),
         )
     console.print(":white_check_mark: [bold green]Config is valid.[/]")
 
@@ -1181,12 +1171,20 @@ def inspect_config(
 
     if probe_solver:
         from .adapters.optimizer import DenseArraysAdapter
-        from .core.pipeline import select_solver_strict
+        from .core.pipeline import select_solver
 
-        select_solver_strict(cfg.solver.backend, DenseArraysAdapter(), strategy=str(cfg.solver.strategy))
+        select_solver(
+            cfg.solver.backend,
+            DenseArraysAdapter(),
+            strategy=str(cfg.solver.strategy),
+            fallback_to_cbc=bool(cfg.solver.fallback_to_cbc),
+        )
 
     console.print(f"[bold]Config[/]: {cfg_path}")
     console.print(f"[bold]Run[/]: id={cfg.run.id} root={run_root}")
+    effective_path = run_root / "outputs" / "meta" / "effective_config.json"
+    if effective_path.exists():
+        console.print(f"[bold]Effective config[/]: {effective_path}")
 
     _print_inputs_summary(loaded)
 
@@ -1343,7 +1341,8 @@ def stage_a_build_pool(
         if missing:
             raise typer.BadParameter(f"Unknown input name(s): {', '.join(missing)}")
 
-    rng = np.random.default_rng(int(cfg.runtime.random_seed))
+    seeds = derive_seed_map(int(cfg.runtime.random_seed), ["stage_a", "stage_b", "solver"])
+    rng = np.random.default_rng(seeds["stage_a"])
     deps = default_deps()
     outputs_root = run_root / "outputs"
     outputs_root.mkdir(parents=True, exist_ok=True)
@@ -1443,9 +1442,9 @@ def stage_b_build_libraries(
         if missing:
             raise typer.BadParameter(f"Unknown plan name(s): {', '.join(missing)}")
 
-    seed = int(cfg.runtime.random_seed)
-    rng = random.Random(seed)
-    np_rng = np.random.default_rng(seed)
+    seeds = derive_seed_map(int(cfg.runtime.random_seed), ["stage_a", "stage_b", "solver"])
+    rng = random.Random(seeds["stage_b"])
+    np_rng = np.random.default_rng(seeds["stage_b"])
     sampling_cfg = cfg.generation.sampling
     schema_is_22 = schema_version_at_least(cfg.schema_version, major=2, minor=2)
     outputs_root = run_root / "outputs"
@@ -1487,6 +1486,14 @@ def stage_b_build_libraries(
                 data_entries = df["sequence"].tolist()
             else:
                 raise typer.BadParameter(f"Unsupported pool_mode for input {inp.name}: {entry.pool_mode}")
+            pool = PoolData(
+                name=inp.name,
+                input_type=str(inp.type),
+                pool_mode=entry.pool_mode,
+                df=meta_df,
+                sequences=list(data_entries),
+                pool_path=pool_path,
+            )
 
             for plan_item in resolved_plan:
                 if selected_plans and plan_item.name not in selected_plans:
@@ -1494,8 +1501,7 @@ def stage_b_build_libraries(
                 library, _parts, reg_labels, info = build_library_for_plan(
                     source_label=inp.name,
                     plan_item=plan_item,
-                    data_entries=data_entries,
-                    meta_df=meta_df,
+                    pool=pool,
                     sampling_cfg=sampling_cfg,
                     seq_len=int(cfg.generation.sequence_length),
                     min_count_per_tf=int(cfg.runtime.min_count_per_tf),
@@ -1643,8 +1649,8 @@ def run(
 
     # Auto-plot if configured
     if not no_plot and root.plots:
-        _ensure_mpl_cache_dir()
-        install_native_stderr_filters()
+        ensure_mpl_cache_dir()
+        install_native_stderr_filters(suppress_solver_messages=False)
         from .viz.plotting import run_plots_from_config
 
         console.print("[bold]Generating plots...[/]")
@@ -1660,8 +1666,8 @@ def plot(
 ):
     cfg_path = _resolve_config_path(ctx, config)
     loaded = _load_config_or_exit(cfg_path)
-    _ensure_mpl_cache_dir()
-    install_native_stderr_filters()
+    ensure_mpl_cache_dir()
+    install_native_stderr_filters(suppress_solver_messages=False)
     from .viz.plotting import run_plots_from_config
 
     run_plots_from_config(loaded.root, loaded.path, only=only)

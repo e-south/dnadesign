@@ -34,6 +34,10 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
         schema_version="2.1",
         config_sha256="abc123",
         run_root="/tmp/demo",
+        random_seed=42,
+        seed_stage_a=101,
+        seed_stage_b=202,
+        seed_solver=303,
         solver_backend="CBC",
         solver_strategy="iterate",
         solver_options=[],
@@ -52,3 +56,4 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
     assert loaded.items[0].failed_min_count_per_tf == 1
     assert loaded.items[0].duplicate_solutions == 3
     assert loaded.items[0].leaderboard_latest is not None
+    assert loaded.random_seed == 42

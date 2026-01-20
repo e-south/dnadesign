@@ -104,6 +104,22 @@ def test_output_kind_is_rejected(tmp_path: Path) -> None:
         load_config(cfg_path)
 
 
+def test_solver_options_unknown_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["solver"]["options"] = ["UnknownOpt=1"]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="Unknown solver.options"):
+        load_config(cfg_path)
+
+
+def test_solver_options_allow_unknown(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["solver"]["options"] = ["UnknownOpt=1"]
+    cfg["densegen"]["solver"]["allow_unknown_options"] = True
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    load_config(cfg_path)
+
+
 def test_promoter_constraint_motif_validation(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["generation"]["plan"] = [

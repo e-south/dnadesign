@@ -6,6 +6,7 @@ namespaced and recorded consistently so outputs remain resume-safe and auditable
 ### Contents
 - [Output targets](#output-targets) - Parquet and USR sinks.
 - [Run manifest](#run-manifest) - run-level summary JSON.
+- [Effective config](#effective-config) - resolved config + derived caps/seeds.
 - [Inputs manifest](#inputs-manifest) - resolved inputs and PWM sampling metadata.
 - [Library manifest](#library-manifest) - libraries offered to the solver.
 - [Rejection log](#rejection-log) - rejected solutions audit.
@@ -13,6 +14,7 @@ namespaced and recorded consistently so outputs remain resume-safe and auditable
 - [Metadata scheme](#metadata-scheme) - namespacing and categories.
 - [Parquet vs USR encoding](#parquet-vs-usr-encoding) - differences in storage.
 - [Metadata registry](#metadata-registry) - canonical schema location.
+- [Report assets](#report-assets) - plots emitted by `dense report`.
 
 ---
 
@@ -28,16 +30,26 @@ When multiple targets are configured, DenseGen asserts all targets are in sync b
 ### Run manifest
 
 Each run writes `outputs/meta/run_manifest.json` with per-input/plan counts (generated,
-duplicates, failures, resamples, libraries built, stalls), plus solver settings, schema version,
-and the dense-arrays version source. The manifest also tracks constraint-filter failure reasons
-and duplicate-solution counts. A compact `leaderboard_latest` snapshot is recorded per plan
-(top TF/TFBS usage, failure hotspots, and diversity coverage) for quick audits without loading
-the full outputs.
+duplicates, failures, resamples, libraries built, stalls), derived seeds, solver settings,
+schema version, and the dense-arrays version source. The manifest also tracks constraint-filter
+failure reasons and duplicate-solution counts. A compact `leaderboard_latest` snapshot is recorded
+per plan (top TF/TFBS usage, failure hotspots, and diversity coverage) for quick audits without
+loading the full outputs.
 Use the CLI to summarize a run:
 
 ```
 uv run dense inspect run --run path/to/run
 ```
+
+---
+
+### Effective config
+
+DenseGen writes `outputs/meta/effective_config.json`, which includes:
+- fully-resolved config values (defaults expanded),
+- derived seeds (`seed_stage_a`, `seed_stage_b`, `seed_solver`),
+- resolved input paths, and
+- computed sampling caps (requested candidates vs mining/time limits).
 
 ---
 
@@ -59,6 +71,11 @@ DenseGen materializes Stage‑A pools under `outputs/pools/`:
 
 TFBS pools include stable `motif_id` and `tfbs_id` hashes plus optional FIMO metadata
 (`fimo_pvalue`, `fimo_bin_id`, etc.). Sequence pools include `tfbs_id` for joinability.
+
+If `keep_all_candidates_debug: true`, DenseGen writes per-candidate debug artifacts under
+`outputs/meta/fimo/`:
+- `candidates__<label>.parquet` — candidate p‑values, bins, acceptance, and reject reasons.
+- `<label>__fimo.tsv` — raw FIMO TSV (when enabled).
 
 ---
 
@@ -94,6 +111,13 @@ per-input/plan progress so long runs can resume safely after interruption.
 DenseGen writes `outputs/meta/events.jsonl` (JSON lines) with structured events:
 `POOL_BUILT`, `LIBRARY_BUILT`, `STALL_DETECTED`, and `RESAMPLE_TRIGGERED`.
 This is a lightweight, machine-readable trace of the run’s control flow.
+
+---
+
+### Report assets
+
+`dense report` emits summary plots under `outputs/report_assets/` and links them in `report.html`.
+These plots include Stage‑A p‑value histograms and Stage‑B utilization summaries.
 
 ---
 

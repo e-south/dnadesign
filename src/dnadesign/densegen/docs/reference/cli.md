@@ -174,6 +174,10 @@ Options:
 - `--out` - output directory relative to run root (default: `outputs`).
 - `--format` - `json`, `md`, `html`, or `all` (comma-separated allowed).
 
+Report outputs:
+- `report.json`, `report.md`, `report.html`
+- `report_assets/` (plots referenced by the HTML report)
+
 ---
 
 ### Examples
@@ -186,20 +190,20 @@ uv run dense workspace init --id demo_press --root "$RUN_ROOT" \
 CFG="$RUN_ROOT/demo_press/config.yaml"
 
 pixi run dense validate-config -c "$CFG"
-uv run dense inspect inputs -c "$CFG"
-uv run dense inspect plan   -c "$CFG"
-uv run dense inspect config -c "$CFG"
-uv run dense run            -c "$CFG"
-uv run dense plot           -c "$CFG" --only tf_usage,tf_coverage,tfbs_positional_histogram,diversity_health
-uv run dense inspect run     --run "$RUN_ROOT/demo_press"
-uv run dense inspect run     --root "$RUN_ROOT"
-uv run dense report          -c "$CFG" --format all
+pixi run dense inspect inputs -c "$CFG"
+pixi run dense inspect plan   -c "$CFG"
+pixi run dense inspect config -c "$CFG"
+pixi run dense run            -c "$CFG"
+pixi run dense plot           -c "$CFG" --only tf_usage,tf_coverage,tfbs_positional_histogram,diversity_health
+pixi run dense inspect run     --run "$RUN_ROOT/demo_press"
+pixi run dense inspect run     --root "$RUN_ROOT"
+pixi run dense report          -c "$CFG" --format all
 ```
 
 Demo run (small, Parquet-only config):
 
 ```bash
-uv run dense run -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --no-plot
+pixi run dense run -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --no-plot
 ```
 
 FIMO-backed sampling (pixi):

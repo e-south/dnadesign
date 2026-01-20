@@ -9,6 +9,7 @@ import yaml
 from dnadesign.densegen.src.adapters.optimizer import OptimizerRun
 from dnadesign.densegen.src.adapters.outputs.base import SinkBase
 from dnadesign.densegen.src.config import load_config
+from dnadesign.densegen.src.core.artifacts.pool import PoolData
 from dnadesign.densegen.src.core.pipeline import PipelineDeps, _process_plan_for_source
 
 
@@ -157,7 +158,7 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
     )
 
     plan_item = loaded.root.densegen.generation.resolve_plan()[0]
-    source_cache: dict[str, tuple[list, None]] = {}
+    source_cache: dict[str, PoolData] = {}
 
     _process_plan_for_source(
         loaded.root.densegen.inputs[0],

@@ -76,8 +76,9 @@ Exact fields may expand over time. For the canonical list and types, see
 DenseGen writes run-level JSON files under `outputs/meta/`:
 
 - `outputs/meta/run_state.json` — checkpointed progress for resumable runs (updated during execution).
-- `outputs/meta/run_manifest.json` — summary counts per input/plan plus solver settings (written on completion). Includes a `leaderboard_latest` snapshot (top TF/TFBS usage, failure hotspots, diversity coverage).
+- `outputs/meta/run_manifest.json` — summary counts per input/plan plus solver settings and derived seeds (written on completion). Includes a `leaderboard_latest` snapshot (top TF/TFBS usage, failure hotspots, diversity coverage).
 - `outputs/meta/inputs_manifest.json` — resolved input paths and PWM sampling settings used for the run.
+- `outputs/meta/effective_config.json` — resolved config with derived seeds and sampling caps.
 
 These are produced alongside Parquet/USR outputs and provide a compact audit trail.
 
@@ -111,6 +112,7 @@ The `dense report` command writes a compact audit summary under `outputs/`:
 - `outputs/report.json`
 - `outputs/report.md`
 - `outputs/report.html` (basic HTML wrapper for quick sharing)
+- `outputs/report_assets/` (plots linked by `report.html`)
 
 These summarize run scope and link to the canonical outputs (`dense_arrays.parquet` and
 `attempts.parquet`).
@@ -125,6 +127,7 @@ DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solve
 - `dense stage-a build-pool` writes:
   - `outputs/pools/pool_manifest.json`
   - `outputs/pools/<input>__pool.parquet`
+  - `outputs/meta/fimo/candidates__<label>.parquet` (when `keep_all_candidates_debug: true`)
 - `dense stage-b build-libraries` writes:
   - `outputs/libraries/library_builds.parquet`
   - `outputs/libraries/library_members.parquet`

@@ -63,6 +63,10 @@ class RunManifest:
     schema_version: str
     config_sha256: str
     run_root: str
+    random_seed: int | None
+    seed_stage_a: int | None
+    seed_stage_b: int | None
+    seed_solver: int | None
     solver_backend: str | None
     solver_strategy: str
     solver_options: list[str]
@@ -79,6 +83,10 @@ class RunManifest:
             "schema_version": self.schema_version,
             "config_sha256": self.config_sha256,
             "run_root": self.run_root,
+            "random_seed": self.random_seed,
+            "seed_stage_a": self.seed_stage_a,
+            "seed_stage_b": self.seed_stage_b,
+            "seed_solver": self.seed_solver,
             "solver_backend": self.solver_backend,
             "solver_strategy": self.solver_strategy,
             "solver_options": list(self.solver_options),
@@ -123,6 +131,10 @@ def load_run_manifest(path: Path) -> RunManifest:
         schema_version=str(data.get("schema_version", "")),
         config_sha256=str(data.get("config_sha256", "")),
         run_root=str(data.get("run_root", "")),
+        random_seed=data.get("random_seed"),
+        seed_stage_a=data.get("seed_stage_a"),
+        seed_stage_b=data.get("seed_stage_b"),
+        seed_solver=data.get("seed_solver"),
         solver_backend=data.get("solver_backend"),
         solver_strategy=str(data.get("solver_strategy", "")),
         solver_options=list(data.get("solver_options", [])),

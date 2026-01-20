@@ -55,7 +55,7 @@ def write_library_artifact(
     overwrite: bool = False,
 ) -> LibraryArtifact:
     out_dir.mkdir(parents=True, exist_ok=True)
-    install_native_stderr_filters()
+    install_native_stderr_filters(suppress_solver_messages=False)
     builds_path = out_dir / "library_builds.parquet"
     members_path = out_dir / "library_members.parquet"
 

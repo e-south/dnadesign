@@ -46,7 +46,7 @@ from ..config import (
 from ..utils.logging_utils import install_native_stderr_filters
 from .artifacts.ids import hash_tfbs_id
 from .artifacts.library import write_library_artifact
-from .artifacts.pool import build_pool_artifact
+from .artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData, build_pool_artifact
 from .metadata import build_metadata
 from .postprocess import random_fill
 from .pvalue_bins import resolve_pvalue_bins
@@ -59,7 +59,9 @@ from .run_paths import (
     run_state_path,
 )
 from .run_state import RunState, load_run_state
+from .runtime_policy import RuntimePolicy
 from .sampler import TFSampler
+from .seeding import derive_seed_map
 
 log = logging.getLogger(__name__)
 
@@ -112,23 +114,36 @@ def resolve_plan(loaded: LoadedConfig) -> List[ResolvedPlanItem]:
     return loaded.root.densegen.generation.resolve_plan()
 
 
-def select_solver_strict(
+def select_solver(
     preferred: str | None,
     optimizer: OptimizerAdapter,
     *,
     strategy: str,
+    fallback_to_cbc: bool = False,
     test_length: int = 10,
 ) -> str | None:
     """
-    Probe the requested solver once. If it fails, raise with instructions.
-    No fallback behavior.
+    Probe the requested solver once. If it fails, optionally fall back to CBC.
     """
     if strategy == "approximate":
         return preferred
     if not preferred:
         raise ValueError("solver.backend is required unless strategy=approximate")
-    optimizer.probe_solver(preferred, test_length=test_length)
-    return preferred
+    try:
+        optimizer.probe_solver(preferred, test_length=test_length)
+        return preferred
+    except Exception as exc:
+        if fallback_to_cbc and str(preferred).upper() != "CBC":
+            log.warning(
+                "Requested solver '%s' failed; falling back to CBC (solver.fallback_to_cbc=true).",
+                preferred,
+            )
+            optimizer.probe_solver("CBC", test_length=test_length)
+            return "CBC"
+        raise RuntimeError(
+            f"Requested solver '{preferred}' failed during probe: {exc}\n"
+            "Please install/configure this solver or choose another in solver.backend."
+        ) from exc
 
 
 def _summarize_tf_counts(labels: List[str], max_items: int = 6) -> str:
@@ -953,8 +968,7 @@ def build_library_for_plan(
     *,
     source_label: str,
     plan_item: ResolvedPlanItem,
-    data_entries: list,
-    meta_df: pd.DataFrame | None,
+    pool: PoolData,
     sampling_cfg: object,
     seq_len: int,
     min_count_per_tf: int,
@@ -976,6 +990,9 @@ def build_library_for_plan(
     allow_incomplete_coverage = bool(getattr(sampling_cfg, "allow_incomplete_coverage", False))
     iterative_max_libraries = int(getattr(sampling_cfg, "iterative_max_libraries", 0))
     iterative_min_new_solutions = int(getattr(sampling_cfg, "iterative_min_new_solutions", 0))
+
+    data_entries = list(pool.sequences or [])
+    meta_df = pool.df if pool.pool_mode == POOL_MODE_TFBS else None
 
     fixed_elements = plan_item.fixed_elements
     required_regulators = list(dict.fromkeys(plan_item.required_regulators or []))
@@ -1016,6 +1033,9 @@ def build_library_for_plan(
 
     if meta_df is not None and isinstance(meta_df, pd.DataFrame):
         available_tfs = set(meta_df["tf"].tolist())
+        tfbs_counts = (
+            meta_df.groupby("tf")["tfbs"].nunique() if unique_binding_sites else meta_df.groupby("tf")["tfbs"].size()
+        )
         missing = [t for t in required_regulators if t not in available_tfs]
         if missing:
             preview = ", ".join(missing[:10])
@@ -1025,11 +1045,29 @@ def build_library_for_plan(
             if missing_counts:
                 preview = ", ".join(missing_counts[:10])
                 raise ValueError(f"min_count_by_regulator TFs not found in input: {preview}")
+            for tf, min_count in plan_min_count_by_regulator.items():
+                max_allowed = int(tfbs_counts.get(tf, 0))
+                if max_sites_per_tf is not None:
+                    max_allowed = min(max_allowed, int(max_sites_per_tf))
+                if library_size > 0:
+                    max_allowed = min(max_allowed, int(library_size))
+                if int(min_count) > max_allowed:
+                    raise ValueError(
+                        f"min_count_by_regulator[{tf}]={min_count} exceeds available sites ({max_allowed}). "
+                        "Increase library_size, relax min_count_by_regulator, or allow non-unique binding sites."
+                    )
         if min_required_regulators is not None:
             if not required_regulators and min_required_regulators > len(available_tfs):
                 raise ValueError(
                     f"min_required_regulators={min_required_regulators} exceeds available regulators "
                     f"({len(available_tfs)})."
+                )
+        if pool_strategy in {"subsample", "iterative_subsample"} and cover_all_tfs and not allow_incomplete_coverage:
+            if library_size > 0 and library_size < len(available_tfs):
+                raise ValueError(
+                    "library_size is too small to cover all regulators. "
+                    f"library_size={library_size} but available_tfs={len(available_tfs)}. "
+                    "Increase library_size or allow_incomplete_coverage."
                 )
 
         if pool_strategy == "full":
@@ -1296,6 +1334,75 @@ def _emit_event(events_path: Path, *, event: str, payload: dict) -> None:
     events_path.parent.mkdir(parents=True, exist_ok=True)
     with events_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+
+def _dump_model(value) -> dict:
+    if hasattr(value, "model_dump"):
+        return value.model_dump(by_alias=True, exclude_none=False)
+    if hasattr(value, "__dict__"):
+        return dict(value.__dict__)
+    return dict(value)
+
+
+def _effective_sampling_caps(input_cfg, cfg_path: Path) -> dict | None:
+    sampling = getattr(input_cfg, "sampling", None)
+    if sampling is None:
+        return None
+    n_sites = getattr(sampling, "n_sites", None)
+    oversample = getattr(sampling, "oversample_factor", None)
+    requested = None
+    if isinstance(n_sites, int) and isinstance(oversample, int):
+        requested = int(n_sites) * int(oversample)
+    backend = str(getattr(sampling, "scoring_backend", "densegen"))
+    mining = getattr(sampling, "mining", None)
+    return {
+        "scoring_backend": backend,
+        "requested_candidates": requested,
+        "cap_candidates": getattr(mining, "max_candidates", None)
+        if backend == "fimo"
+        else getattr(sampling, "max_candidates", None),
+        "cap_seconds": getattr(mining, "max_seconds", None)
+        if backend == "fimo"
+        else getattr(sampling, "max_seconds", None),
+        "cap_batches": getattr(mining, "max_batches", None) if backend == "fimo" else None,
+    }
+
+
+def _write_effective_config(
+    *,
+    cfg,
+    cfg_path: Path,
+    run_root: Path,
+    seeds: dict[str, int],
+    outputs_root: Path,
+) -> Path:
+    resolved_inputs = []
+    for inp in cfg.inputs:
+        entry = {"name": inp.name, "type": getattr(inp, "type", None)}
+        if hasattr(inp, "path"):
+            entry["path"] = str(resolve_relative_path(cfg_path, getattr(inp, "path")))
+        if hasattr(inp, "paths"):
+            paths = getattr(inp, "paths", None)
+            if isinstance(paths, list):
+                entry["paths"] = [str(resolve_relative_path(cfg_path, p)) for p in paths]
+        caps = _effective_sampling_caps(inp, cfg_path)
+        if caps is not None:
+            entry["sampling_caps"] = caps
+        resolved_inputs.append(entry)
+
+    payload = {
+        "schema_version": cfg.schema_version,
+        "run_id": cfg.run.id,
+        "run_root": str(run_root),
+        "config_path": str(cfg_path),
+        "seeds": {k: int(v) for k, v in seeds.items()},
+        "inputs": resolved_inputs,
+        "config": _dump_model(cfg),
+    }
+    out_path = outputs_root / "meta" / "effective_config.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+    return out_path
 
 
 ATTEMPTS_CHUNK_SIZE = 256
@@ -1603,7 +1710,7 @@ def _process_plan_for_source(
     checkpoint_every: int = 0,
     write_state: Callable[[], None] | None = None,
     site_failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] | None = None,
-    source_cache: dict[str, tuple[list, pd.DataFrame | None]] | None = None,
+    source_cache: dict[str, PoolData] | None = None,
     library_build_rows: list[dict] | None = None,
     library_member_rows: list[dict] | None = None,
     composition_rows: list[dict] | None = None,
@@ -1703,6 +1810,17 @@ def _process_plan_for_source(
     leaderboard_every = int(runtime_cfg.leaderboard_every)
     checkpoint_every = int(checkpoint_every or 0)
 
+    policy = RuntimePolicy(
+        pool_strategy=pool_strategy,
+        schema_is_22=schema_is_22,
+        arrays_generated_before_resample=max_per_subsample,
+        stall_seconds_before_resample=stall_seconds,
+        stall_warning_every_seconds=stall_warn_every,
+        max_resample_attempts=max_resample_attempts,
+        max_total_resamples=max_total_resamples,
+        max_seconds_per_plan=max_seconds_per_plan,
+    )
+
     post = global_cfg.postprocess
     gap_cfg = post.gap_fill
     fill_gap = gap_cfg.mode != "off"
@@ -1757,10 +1875,31 @@ def _process_plan_for_source(
     if cached is None:
         src_obj = deps.source_factory(source_cfg, cfg_path)
         data_entries, meta_df = src_obj.load_data(rng=np_rng, outputs_root=outputs_root)
+        if meta_df is not None and isinstance(meta_df, pd.DataFrame):
+            sequences = meta_df["tfbs"].tolist() if "tfbs" in meta_df.columns else list(data_entries or [])
+            pool = PoolData(
+                name=source_label,
+                input_type=str(getattr(source_cfg, "type", "")),
+                pool_mode=POOL_MODE_TFBS,
+                df=meta_df,
+                sequences=sequences,
+                pool_path=Path("."),
+            )
+        else:
+            pool = PoolData(
+                name=source_label,
+                input_type=str(getattr(source_cfg, "type", "")),
+                pool_mode=POOL_MODE_SEQUENCE,
+                df=None,
+                sequences=list(data_entries or []),
+                pool_path=Path("."),
+            )
         if source_cache is not None:
-            source_cache[cache_key] = (data_entries, meta_df)
+            source_cache[cache_key] = pool
     else:
-        data_entries, meta_df = cached
+        pool = cached
+    data_entries = pool.sequences
+    meta_df = pool.df
     input_meta = _input_metadata(source_cfg, cfg_path)
     input_tf_tfbs_pair_count: int | None = None
     if meta_df is not None and isinstance(meta_df, pd.DataFrame):
@@ -1931,8 +2070,7 @@ def _process_plan_for_source(
     library_for_opt, tfbs_parts, regulator_labels, sampling_info = build_library_for_plan(
         source_label=source_label,
         plan_item=plan_item,
-        data_entries=data_entries,
-        meta_df=meta_df,
+        pool=pool,
         sampling_cfg=sampling_cfg,
         seq_len=seq_len,
         min_count_per_tf=min_count_per_tf,
@@ -2129,7 +2267,7 @@ def _process_plan_for_source(
     produced_total_this_call = 0
 
     while global_generated < quota:
-        if max_seconds_per_plan > 0 and (time.monotonic() - plan_start) > max_seconds_per_plan:
+        if policy.plan_timed_out(now=time.monotonic(), plan_started=plan_start):
             raise RuntimeError(f"[{source_label}/{plan_name}] Exceeded max_seconds_per_plan={max_seconds_per_plan}.")
         local_generated = 0
         resamples_in_try = 0
@@ -2144,7 +2282,11 @@ def _process_plan_for_source(
 
             for sol in generator:
                 now = time.monotonic()
-                if (now - subsample_started >= stall_seconds) and (produced_this_library == 0):
+                if policy.should_trigger_stall(
+                    now=now,
+                    subsample_started=subsample_started,
+                    produced_this_library=produced_this_library,
+                ):
                     log.info(
                         "[%s/%s] Stall (> %ds) with no solutions; will resample.",
                         source_label,
@@ -2169,7 +2311,11 @@ def _process_plan_for_source(
                             log.debug("Failed to emit STALL_DETECTED event.", exc_info=True)
                     stall_triggered = True
                     break
-                if (now - last_log_warn >= stall_warn_every) and (produced_this_library == 0):
+                if policy.should_warn_stall(
+                    now=now,
+                    last_warn=last_log_warn,
+                    produced_this_library=produced_this_library,
+                ):
                     log.info(
                         "[%s/%s] Still working... %.1fs on current library.",
                         source_label,
@@ -2821,8 +2967,7 @@ def _process_plan_for_source(
 
             # Resample
             # Alignment (2): allow reactive resampling for subsample under schema>=2.2.
-            allow_resample = pool_strategy == "iterative_subsample" or (schema_is_22 and pool_strategy == "subsample")
-            if not allow_resample:
+            if not policy.allow_resample():
                 raise RuntimeError(
                     f"[{source_label}/{plan_name}] pool_strategy={pool_strategy!r} does not allow resampling "
                     f"under schema_version={global_cfg.schema_version}. "
@@ -2846,15 +2991,15 @@ def _process_plan_for_source(
                     )
                 except Exception:
                     log.debug("Failed to emit RESAMPLE_TRIGGERED event.", exc_info=True)
-            if max_total_resamples > 0 and total_resamples > max_total_resamples:
+            if policy.max_total_resamples > 0 and total_resamples > policy.max_total_resamples:
                 raise RuntimeError(f"[{source_label}/{plan_name}] Exceeded max_total_resamples={max_total_resamples}.")
-            if resamples_in_try > max_resample_attempts:
+            if resamples_in_try > policy.max_resample_attempts:
                 log.info(
                     "[%s/%s] Reached max_resample_attempts (%d) for this subsample try "
                     "(produced %d/%d here). Moving on.",
                     source_label,
                     plan_name,
-                    max_resample_attempts,
+                    policy.max_resample_attempts,
                     local_generated,
                     max_per_subsample,
                 )
@@ -2869,8 +3014,7 @@ def _process_plan_for_source(
             library_for_opt, tfbs_parts, regulator_labels, sampling_info = build_library_for_plan(
                 source_label=source_label,
                 plan_item=plan_item,
-                data_entries=data_entries,
-                meta_df=meta_df,
+                pool=pool,
                 sampling_cfg=sampling_cfg,
                 seq_len=seq_len,
                 min_count_per_tf=min_count_per_tf,
@@ -2993,8 +3137,8 @@ def _process_plan_for_source(
 
 def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> RunSummary:
     deps = deps or default_deps()
-    install_native_stderr_filters()
     cfg = loaded.root.densegen
+    install_native_stderr_filters(suppress_solver_messages=bool(cfg.logging.suppress_solver_stderr))
     run_root = resolve_run_root(loaded.path, cfg.run.root)
     run_root_str = str(run_root)
     config_sha = hashlib.sha256(loaded.path.read_bytes()).hexdigest()
@@ -3005,13 +3149,19 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
 
     # Seed
     seed = int(cfg.runtime.random_seed)
-    random.seed(seed)
-    rng = random.Random(seed)
-    np_rng = np.random.default_rng(seed)
+    seeds = derive_seed_map(seed, ["stage_a", "stage_b", "solver"])
+    rng = random.Random(seeds["stage_b"])
+    np_rng_stage_a = np.random.default_rng(seeds["stage_a"])
+    np_rng_stage_b = np.random.default_rng(seeds["stage_b"])
 
     # Plan & solver
     pl = cfg.generation.resolve_plan()
-    chosen_solver = select_solver_strict(cfg.solver.backend, deps.optimizer, strategy=str(cfg.solver.strategy))
+    chosen_solver = select_solver(
+        cfg.solver.backend,
+        deps.optimizer,
+        strategy=str(cfg.solver.strategy),
+        fallback_to_cbc=bool(cfg.solver.fallback_to_cbc),
+    )
     dense_arrays_version, dense_arrays_version_source = _resolve_dense_arrays_version(loaded.path)
 
     # Build sinks
@@ -3025,20 +3175,26 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
     plan_order: list[tuple[str, str]] = []
     plan_leaderboards: dict[tuple[str, str], dict] = {}
     inputs_manifest_entries: dict[str, dict] = {}
-    source_cache: dict[str, tuple[list, pd.DataFrame | None]] = {}
+    source_cache: dict[str, PoolData] = {}
     library_build_rows: list[dict] = []
     library_member_rows: list[dict] = []
     composition_rows: list[dict] = []
     outputs_root = run_outputs_root(run_root)
     outputs_root.mkdir(parents=True, exist_ok=True)
     events_path = outputs_root / "meta" / "events.jsonl"
+    try:
+        _write_effective_config(
+            cfg=cfg, cfg_path=loaded.path, run_root=run_root, seeds=seeds, outputs_root=outputs_root
+        )
+    except Exception:
+        log.debug("Failed to write effective_config.json.", exc_info=True)
     pool_dir = outputs_root / "pools"
     try:
         _pool_artifact, pool_data = build_pool_artifact(
             cfg=cfg,
             cfg_path=loaded.path,
             deps=deps,
-            rng=np_rng,
+            rng=np_rng_stage_a,
             outputs_root=outputs_root,
             out_dir=pool_dir,
             overwrite=True,
@@ -3064,7 +3220,7 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
     except Exception:
         log.debug("Failed to emit POOL_BUILT event.", exc_info=True)
     for name, pool in pool_data.items():
-        source_cache[name] = (pool.sequences, pool.df)
+        source_cache[name] = pool
     ensure_run_meta_dir(run_root)
     state_path = run_state_path(run_root)
     state_created_at = datetime.now(timezone.utc).isoformat()
@@ -3228,7 +3384,7 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                     chosen_solver=chosen_solver,
                     deps=deps,
                     rng=rng,
-                    np_rng=np_rng,
+                    np_rng=np_rng_stage_b,
                     cfg_path=loaded.path,
                     run_id=cfg.run.id,
                     run_root=run_root_str,
@@ -3280,7 +3436,7 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                         chosen_solver=chosen_solver,
                         deps=deps,
                         rng=rng,
-                        np_rng=np_rng,
+                        np_rng=np_rng_stage_b,
                         cfg_path=loaded.path,
                         run_id=cfg.run.id,
                         run_root=run_root_str,
@@ -3415,6 +3571,10 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
         schema_version=str(cfg.schema_version),
         config_sha256=config_sha,
         run_root=run_root_str,
+        random_seed=seed,
+        seed_stage_a=seeds.get("stage_a"),
+        seed_stage_b=seeds.get("stage_b"),
+        seed_solver=seeds.get("solver"),
         solver_backend=chosen_solver,
         solver_strategy=str(cfg.solver.strategy),
         solver_options=list(cfg.solver.options),

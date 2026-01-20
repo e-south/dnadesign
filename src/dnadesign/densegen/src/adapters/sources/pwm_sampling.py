@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
+import pandas as pd
 
 from ...core.pvalue_bins import resolve_pvalue_bins
 
@@ -59,6 +60,20 @@ class FimoCandidate:
     stop: int
     strand: str
     matched_sequence: Optional[str] = None
+
+
+def _write_candidate_records(
+    records: list[dict],
+    *,
+    debug_output_dir: Path,
+    debug_label: str,
+    motif_id: str,
+) -> Path:
+    safe_label = _safe_label(debug_label or motif_id)
+    debug_output_dir.mkdir(parents=True, exist_ok=True)
+    path = debug_output_dir / f"candidates__{safe_label}.parquet"
+    pd.DataFrame(records).to_parquet(path, index=False)
+    return path
 
 
 @dataclass(frozen=True)
@@ -720,6 +735,38 @@ def sample_pwm_sites(
         batches = 0
         tsv_lines: list[str] = []
         provided_sequences = sequences
+        candidate_records: list[dict] | None = [] if keep_all_candidates_debug else None
+
+        def _record_candidate(
+            *,
+            seq: str,
+            hit,
+            bin_id: int | None,
+            bin_low: float | None,
+            bin_high: float | None,
+            accepted: bool,
+            reject_reason: str | None,
+        ) -> None:
+            if candidate_records is None:
+                return
+            candidate_records.append(
+                {
+                    "motif_id": motif.motif_id,
+                    "sequence": seq,
+                    "pvalue": None if hit is None else hit.pvalue,
+                    "score": None if hit is None else hit.score,
+                    "bin_id": bin_id,
+                    "bin_low": bin_low,
+                    "bin_high": bin_high,
+                    "start": None if hit is None else hit.start,
+                    "stop": None if hit is None else hit.stop,
+                    "strand": None if hit is None else hit.strand,
+                    "matched_sequence": None if hit is None else hit.matched_sequence,
+                    "accepted": bool(accepted),
+                    "selected": False,
+                    "reject_reason": reject_reason,
+                }
+            )
 
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -746,9 +793,27 @@ def sample_pwm_sites(
                 for rec_id, seq in records:
                     hit = best_hits.get(rec_id)
                     if hit is None:
+                        _record_candidate(
+                            seq=seq,
+                            hit=None,
+                            bin_id=None,
+                            bin_low=None,
+                            bin_high=None,
+                            accepted=False,
+                            reject_reason="no_hit",
+                        )
                         continue
                     bin_id, bin_low, bin_high = _assign_pvalue_bin(hit.pvalue, resolved_bins)
                     if allowed_bins is not None and bin_id not in allowed_bins:
+                        _record_candidate(
+                            seq=seq,
+                            hit=hit,
+                            bin_id=bin_id,
+                            bin_low=bin_low,
+                            bin_high=bin_high,
+                            accepted=False,
+                            reject_reason="bin_filtered",
+                        )
                         continue
                     total_bin_counts[bin_id] += 1
                     if keep_weak:
@@ -756,8 +821,26 @@ def sample_pwm_sites(
                     else:
                         accept = hit.pvalue <= float(pvalue_threshold)
                     if not accept:
+                        _record_candidate(
+                            seq=seq,
+                            hit=hit,
+                            bin_id=bin_id,
+                            bin_low=bin_low,
+                            bin_high=bin_high,
+                            accepted=False,
+                            reject_reason="pvalue_threshold",
+                        )
                         continue
                     if seq in seen:
+                        _record_candidate(
+                            seq=seq,
+                            hit=hit,
+                            bin_id=bin_id,
+                            bin_low=bin_low,
+                            bin_high=bin_high,
+                            accepted=False,
+                            reject_reason="duplicate",
+                        )
                         continue
                     seen.add(seq)
                     accepted_bin_counts[bin_id] += 1
@@ -774,6 +857,15 @@ def sample_pwm_sites(
                             strand=hit.strand,
                             matched_sequence=hit.matched_sequence,
                         )
+                    )
+                    _record_candidate(
+                        seq=seq,
+                        hit=hit,
+                        bin_id=bin_id,
+                        bin_low=bin_low,
+                        bin_high=bin_high,
+                        accepted=True,
+                        reject_reason=None,
                     )
                 generated_total = len(provided_sequences)
                 batches = 1
@@ -819,9 +911,27 @@ def sample_pwm_sites(
                     for rec_id, seq in records:
                         hit = best_hits.get(rec_id)
                         if hit is None:
+                            _record_candidate(
+                                seq=seq,
+                                hit=None,
+                                bin_id=None,
+                                bin_low=None,
+                                bin_high=None,
+                                accepted=False,
+                                reject_reason="no_hit",
+                            )
                             continue
                         bin_id, bin_low, bin_high = _assign_pvalue_bin(hit.pvalue, resolved_bins)
                         if allowed_bins is not None and bin_id not in allowed_bins:
+                            _record_candidate(
+                                seq=seq,
+                                hit=hit,
+                                bin_id=bin_id,
+                                bin_low=bin_low,
+                                bin_high=bin_high,
+                                accepted=False,
+                                reject_reason="bin_filtered",
+                            )
                             continue
                         total_bin_counts[bin_id] += 1
                         if keep_weak:
@@ -829,8 +939,26 @@ def sample_pwm_sites(
                         else:
                             accept = hit.pvalue <= float(pvalue_threshold)
                         if not accept:
+                            _record_candidate(
+                                seq=seq,
+                                hit=hit,
+                                bin_id=bin_id,
+                                bin_low=bin_low,
+                                bin_high=bin_high,
+                                accepted=False,
+                                reject_reason="pvalue_threshold",
+                            )
                             continue
                         if seq in seen:
+                            _record_candidate(
+                                seq=seq,
+                                hit=hit,
+                                bin_id=bin_id,
+                                bin_low=bin_low,
+                                bin_high=bin_high,
+                                accepted=False,
+                                reject_reason="duplicate",
+                            )
                             continue
                         seen.add(seq)
                         accepted_bin_counts[bin_id] += 1
@@ -847,6 +975,15 @@ def sample_pwm_sites(
                                 strand=hit.strand,
                                 matched_sequence=hit.matched_sequence,
                             )
+                        )
+                        _record_candidate(
+                            seq=seq,
+                            hit=hit,
+                            bin_id=bin_id,
+                            bin_low=bin_low,
+                            bin_high=bin_high,
+                            accepted=True,
+                            reject_reason=None,
                         )
                     generated_total += len(sequences)
                     batches += 1
@@ -931,6 +1068,24 @@ def sample_pwm_sites(
             if cand.matched_sequence:
                 meta["fimo_matched_sequence"] = cand.matched_sequence
             meta_by_seq[cand.seq] = meta
+        if candidate_records is not None and debug_dir is not None:
+            selected_set = {c.seq for c in picked}
+            for row in candidate_records:
+                if row.get("sequence") in selected_set:
+                    row["selected"] = True
+                    row["reject_reason"] = None
+                elif row.get("accepted"):
+                    row["reject_reason"] = "not_selected"
+            try:
+                path = _write_candidate_records(
+                    candidate_records,
+                    debug_output_dir=debug_dir,
+                    debug_label=debug_label or motif.motif_id,
+                    motif_id=motif.motif_id,
+                )
+                log.info("FIMO candidate records written: %s", path)
+            except Exception:
+                log.warning("Failed to write FIMO candidate records.", exc_info=True)
         return [c.seq for c in picked], meta_by_seq
 
     if strategy == "consensus":
