@@ -21,6 +21,8 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from typing_extensions import Literal
 
+from ..core.pvalue_bins import CANONICAL_PVALUE_BINS
+
 
 # ---- Strict YAML loader (duplicate keys fail) ----
 class _StrictLoader(yaml.SafeLoader):
@@ -161,6 +163,14 @@ class PWMSamplingConfig(BaseModel):
     max_seconds: Optional[float] = None
     score_threshold: Optional[float] = None
     score_percentile: Optional[float] = None
+    scoring_backend: Literal["densegen", "fimo"] = "densegen"
+    pvalue_threshold: Optional[float] = None
+    pvalue_bins: Optional[List[float]] = None
+    pvalue_bin_ids: Optional[List[int]] = None
+    bgfile: Optional[str] = None
+    selection_policy: Literal["random_uniform", "top_n", "stratified"] = "random_uniform"
+    keep_all_candidates_debug: bool = False
+    include_matched_sequence: bool = False
     length_policy: Literal["exact", "range"] = "exact"
     length_range: Optional[tuple[int, int]] = None
     trim_window_length: Optional[int] = None
@@ -219,15 +229,76 @@ class PWMSamplingConfig(BaseModel):
             raise ValueError("pwm.sampling.trim_window_length must be a positive integer")
         return v
 
+    @field_validator("bgfile")
+    @classmethod
+    def _bgfile_ok(cls, v: Optional[str]):
+        if v is None:
+            return v
+        if not str(v).strip():
+            raise ValueError("pwm.sampling.bgfile must be a non-empty string when set")
+        return str(v).strip()
+
+    @field_validator("pvalue_bins")
+    @classmethod
+    def _pvalue_bins_ok(cls, v: Optional[List[float]]):
+        if v is None:
+            return v
+        if not v:
+            raise ValueError("pwm.sampling.pvalue_bins must be non-empty when set")
+        bins = [float(x) for x in v]
+        prev = 0.0
+        for val in bins:
+            if not (0.0 < val <= 1.0):
+                raise ValueError("pwm.sampling.pvalue_bins values must be in (0, 1]")
+            if val <= prev:
+                raise ValueError("pwm.sampling.pvalue_bins must be strictly increasing")
+            prev = val
+        if abs(bins[-1] - 1.0) > 1e-12:
+            raise ValueError("pwm.sampling.pvalue_bins must end with 1.0")
+        return bins
+
+    @field_validator("pvalue_bin_ids")
+    @classmethod
+    def _pvalue_bin_ids_ok(cls, v: Optional[List[int]]):
+        if v is None:
+            return v
+        if not v:
+            raise ValueError("pwm.sampling.pvalue_bin_ids must be non-empty when set")
+        ids = [int(x) for x in v]
+        if any(idx < 0 for idx in ids):
+            raise ValueError("pwm.sampling.pvalue_bin_ids values must be >= 0")
+        if len(set(ids)) != len(ids):
+            raise ValueError("pwm.sampling.pvalue_bin_ids must be unique")
+        return ids
+
     @model_validator(mode="after")
     def _score_mode(self):
         has_thresh = self.score_threshold is not None
         has_pct = self.score_percentile is not None
-        if has_thresh == has_pct:
-            raise ValueError("pwm.sampling must set exactly one of score_threshold or score_percentile")
+        if self.scoring_backend == "densegen":
+            if has_thresh == has_pct:
+                raise ValueError("pwm.sampling must set exactly one of score_threshold or score_percentile")
+            if self.pvalue_threshold is not None:
+                raise ValueError("pwm.sampling.pvalue_threshold is only valid when scoring_backend='fimo'")
+            if self.pvalue_bins is not None:
+                raise ValueError("pwm.sampling.pvalue_bins is only valid when scoring_backend='fimo'")
+            if self.pvalue_bin_ids is not None:
+                raise ValueError("pwm.sampling.pvalue_bin_ids is only valid when scoring_backend='fimo'")
+            if self.include_matched_sequence:
+                raise ValueError("pwm.sampling.include_matched_sequence is only valid when scoring_backend='fimo'")
+        else:
+            if self.pvalue_threshold is None:
+                raise ValueError("pwm.sampling.pvalue_threshold is required when scoring_backend='fimo'")
+            if not (0.0 < float(self.pvalue_threshold) <= 1.0):
+                raise ValueError("pwm.sampling.pvalue_threshold must be between 0 and 1")
+            if self.pvalue_bin_ids is not None:
+                bins = list(self.pvalue_bins) if self.pvalue_bins is not None else list(CANONICAL_PVALUE_BINS)
+                max_idx = len(bins) - 1
+                if any(idx > max_idx for idx in self.pvalue_bin_ids):
+                    raise ValueError("pwm.sampling.pvalue_bin_ids contains an index outside the available bins")
         if self.strategy == "consensus" and int(self.n_sites) != 1:
             raise ValueError("pwm.sampling.strategy=consensus requires n_sites=1")
-        if self.score_percentile is not None:
+        if self.scoring_backend == "densegen" and self.score_percentile is not None:
             if not (0.0 < float(self.score_percentile) < 100.0):
                 raise ValueError("pwm.sampling.score_percentile must be between 0 and 100")
         if self.length_policy == "exact" and self.length_range is not None:

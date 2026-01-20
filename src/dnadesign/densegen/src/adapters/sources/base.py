@@ -39,7 +39,7 @@ def infer_format(path: Path) -> str | None:
 
 class BaseDataSource(abc.ABC):
     @abc.abstractmethod
-    def load_data(self, *, rng=None) -> Tuple[List, Optional[pd.DataFrame]]:
+    def load_data(self, *, rng=None, outputs_root: Path | None = None) -> Tuple[List, Optional[pd.DataFrame]]:
         """
         Returns:
             (data_entries, meta_df)

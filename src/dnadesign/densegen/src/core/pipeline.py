@@ -44,6 +44,7 @@ from ..config import (
 )
 from .metadata import build_metadata
 from .postprocess import random_fill
+from .pvalue_bins import resolve_pvalue_bins
 from .run_manifest import PlanManifest, RunManifest
 from .run_paths import (
     ensure_run_meta_dir,
@@ -164,6 +165,18 @@ def _sampling_attr(sampling, name: str, default=None):
     return default
 
 
+def _resolve_pvalue_bins_meta(sampling) -> list[float] | None:
+    if sampling is None:
+        return None
+    backend = str(_sampling_attr(sampling, "scoring_backend") or "densegen").lower()
+    bins = _sampling_attr(sampling, "pvalue_bins")
+    if backend == "fimo":
+        return resolve_pvalue_bins(bins)
+    if bins is None:
+        return None
+    return [float(v) for v in bins]
+
+
 def _extract_pwm_sampling_config(source_cfg) -> dict | None:
     sampling = getattr(source_cfg, "sampling", None)
     if sampling is None:
@@ -190,6 +203,7 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
         length_range = list(length_range)
     return {
         "strategy": _sampling_attr(sampling, "strategy"),
+        "scoring_backend": _sampling_attr(sampling, "scoring_backend"),
         "n_sites": _sampling_attr(sampling, "n_sites"),
         "oversample_factor": _sampling_attr(sampling, "oversample_factor"),
         "max_candidates": _sampling_attr(sampling, "max_candidates"),
@@ -199,6 +213,11 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
         "capped": capped,
         "score_threshold": _sampling_attr(sampling, "score_threshold"),
         "score_percentile": _sampling_attr(sampling, "score_percentile"),
+        "pvalue_threshold": _sampling_attr(sampling, "pvalue_threshold"),
+        "pvalue_bins": _resolve_pvalue_bins_meta(sampling),
+        "selection_policy": _sampling_attr(sampling, "selection_policy"),
+        "bgfile": _sampling_attr(sampling, "bgfile"),
+        "keep_all_candidates_debug": _sampling_attr(sampling, "keep_all_candidates_debug"),
         "length_policy": _sampling_attr(sampling, "length_policy"),
         "length_range": length_range,
     }
@@ -452,8 +471,16 @@ def _input_metadata(source_cfg, cfg_path: Path) -> dict:
         sampling = getattr(source_cfg, "sampling", None)
         if sampling is not None:
             meta["input_pwm_strategy"] = getattr(sampling, "strategy", None)
+            meta["input_pwm_scoring_backend"] = getattr(sampling, "scoring_backend", None)
             meta["input_pwm_score_threshold"] = getattr(sampling, "score_threshold", None)
             meta["input_pwm_score_percentile"] = getattr(sampling, "score_percentile", None)
+            meta["input_pwm_pvalue_threshold"] = getattr(sampling, "pvalue_threshold", None)
+            meta["input_pwm_pvalue_bins"] = _resolve_pvalue_bins_meta(sampling)
+            meta["input_pwm_pvalue_bin_ids"] = getattr(sampling, "pvalue_bin_ids", None)
+            meta["input_pwm_selection_policy"] = getattr(sampling, "selection_policy", None)
+            meta["input_pwm_bgfile"] = getattr(sampling, "bgfile", None)
+            meta["input_pwm_keep_all_candidates_debug"] = getattr(sampling, "keep_all_candidates_debug", None)
+            meta["input_pwm_include_matched_sequence"] = getattr(sampling, "include_matched_sequence", None)
             meta["input_pwm_n_sites"] = getattr(sampling, "n_sites", None)
             meta["input_pwm_oversample_factor"] = getattr(sampling, "oversample_factor", None)
             meta["input_pwm_max_candidates"] = getattr(sampling, "max_candidates", None)
@@ -1012,18 +1039,26 @@ def _load_failure_counts_from_attempts(
 
 def _load_existing_library_index(outputs_root: Path) -> int:
     attempts_path = outputs_root / "attempts.parquet"
-    if not attempts_path.exists():
+    paths: list[Path] = []
+    if attempts_path.exists():
+        paths.append(attempts_path)
+    paths.extend(sorted(outputs_root.glob("attempts_part-*.parquet")))
+    if not paths:
         return 0
-    try:
-        df = pd.read_parquet(attempts_path, columns=["sampling_library_index"])
-    except Exception:
-        return 0
-    if df.empty or "sampling_library_index" not in df.columns:
-        return 0
-    try:
-        return int(pd.to_numeric(df["sampling_library_index"], errors="coerce").dropna().max() or 0)
-    except Exception:
-        return 0
+    max_idx = 0
+    for path in paths:
+        try:
+            df = pd.read_parquet(path, columns=["sampling_library_index"])
+        except Exception:
+            continue
+        if df.empty or "sampling_library_index" not in df.columns:
+            continue
+        try:
+            current = int(pd.to_numeric(df["sampling_library_index"], errors="coerce").dropna().max() or 0)
+        except Exception:
+            continue
+        max_idx = max(max_idx, current)
+    return max_idx
 
 
 def _append_attempt(
@@ -1289,7 +1324,7 @@ def _process_plan_for_source(
 
     # Load source
     src_obj = deps.source_factory(source_cfg, cfg_path)
-    data_entries, meta_df = src_obj.load_data(rng=np_rng)
+    data_entries, meta_df = src_obj.load_data(rng=np_rng, outputs_root=outputs_root)
     input_meta = _input_metadata(source_cfg, cfg_path)
     input_tf_tfbs_pair_count: int | None = None
     if meta_df is not None and isinstance(meta_df, pd.DataFrame):
@@ -1313,6 +1348,17 @@ def _process_plan_for_source(
             "sampling_fraction_pairs": None,
         }
     )
+    pair_label = str(input_tf_tfbs_pair_count) if input_tf_tfbs_pair_count is not None else "-"
+    log.info(
+        "[%s/%s] Input summary: mode=%s rows=%d tfs=%d tfbs=%d pairs=%s",
+        source_label,
+        plan_name,
+        input_meta.get("input_mode"),
+        input_row_count,
+        input_tf_count,
+        input_tfbs_count,
+        pair_label,
+    )
     source_type = getattr(source_cfg, "type", None)
     if source_type in PWM_INPUT_TYPES and meta_df is not None and "tf" in meta_df.columns:
         input_meta["input_pwm_ids"] = sorted(set(meta_df["tf"].tolist()))
@@ -1325,15 +1371,27 @@ def _process_plan_for_source(
             max_seconds = _sampling_attr(input_sampling_cfg, "max_seconds")
             score_threshold = _sampling_attr(input_sampling_cfg, "score_threshold")
             score_percentile = _sampling_attr(input_sampling_cfg, "score_percentile")
+            scoring_backend = _sampling_attr(input_sampling_cfg, "scoring_backend") or "densegen"
+            pvalue_threshold = _sampling_attr(input_sampling_cfg, "pvalue_threshold")
+            selection_policy = _sampling_attr(input_sampling_cfg, "selection_policy")
             length_policy = _sampling_attr(input_sampling_cfg, "length_policy")
             length_range = _sampling_attr(input_sampling_cfg, "length_range")
             if length_range is not None:
                 length_range = list(length_range)
             score_label = "-"
-            if score_threshold is not None:
+            if scoring_backend == "fimo" and pvalue_threshold is not None:
+                comparator = ">=" if str(strategy) == "background" else "<="
+                score_label = f"pvalue{comparator}{pvalue_threshold}"
+            elif score_threshold is not None:
                 score_label = f"threshold={score_threshold}"
             elif score_percentile is not None:
                 score_label = f"percentile={score_percentile}"
+            bins_label = "-"
+            if scoring_backend == "fimo":
+                bins_label = "canonical" if _sampling_attr(input_sampling_cfg, "pvalue_bins") is None else "custom"
+                bin_ids = _sampling_attr(input_sampling_cfg, "pvalue_bin_ids")
+                if bin_ids:
+                    bins_label = f"{bins_label} pick={sorted(list(bin_ids))}"
             length_label = str(length_policy)
             if length_policy == "range" and length_range:
                 length_label = f"{length_policy}({length_range[0]}..{length_range[1]})"
@@ -1345,14 +1403,18 @@ def _process_plan_for_source(
             if max_seconds is not None:
                 cap_label = f"{cap_label}; max_seconds={max_seconds}" if cap_label != "-" else f"{max_seconds}s"
             counts_label = _summarize_tf_counts(meta_df["tf"].tolist())
+            selection_label = selection_policy if scoring_backend == "fimo" else "-"
             log.info(
-                "PWM input sampling for %s: motifs=%d | sites=%s | strategy=%s | score=%s | "
-                "oversample=%s | max_candidates=%s | length=%s",
+                "PWM input sampling for %s: motifs=%d | sites=%s | strategy=%s | backend=%s | score=%s | "
+                "selection=%s | bins=%s | oversample=%s | max_candidates=%s | length=%s",
                 source_label,
                 len(input_meta.get("input_pwm_ids") or []),
                 counts_label or "-",
                 strategy,
+                scoring_backend,
                 score_label,
+                selection_label,
+                bins_label,
                 oversample,
                 cap_label,
                 length_label,
@@ -1702,26 +1764,34 @@ def _process_plan_for_source(
     input_meta["sampling_fraction_pairs"] = sampling_fraction_pairs
     # Library summary (succinct)
     tf_summary = _summarize_tf_counts(regulator_labels)
+    library_index = sampling_info.get("library_index")
+    strategy_label = sampling_info.get("library_sampling_strategy", library_sampling_strategy)
+    pool_label = sampling_info.get("pool_strategy")
+    target_len = sampling_info.get("target_length")
+    achieved_len = sampling_info.get("achieved_length")
+    header = f"Stage B library for {source_label}/{plan_name}"
+    if library_index is not None:
+        header = f"{header} (build {library_index})"
     if tf_summary:
         log.info(
-            "Library for %s/%s: %d motifs | TF counts: %s | target=%d achieved=%d pool=%s",
-            source_label,
-            plan_name,
+            "%s: %d motifs | TF counts: %s | target=%s achieved=%s pool=%s sampling=%s",
+            header,
             len(library_for_opt),
             tf_summary,
-            sampling_info.get("target_length"),
-            sampling_info.get("achieved_length"),
-            sampling_info.get("pool_strategy"),
+            target_len,
+            achieved_len,
+            pool_label,
+            strategy_label,
         )
     else:
         log.info(
-            "Library for %s/%s: %d motifs | target=%d achieved=%d pool=%s",
-            source_label,
-            plan_name,
+            "%s: %d motifs | target=%s achieved=%s pool=%s sampling=%s",
+            header,
             len(library_for_opt),
-            sampling_info.get("target_length"),
-            sampling_info.get("achieved_length"),
-            sampling_info.get("pool_strategy"),
+            target_len,
+            achieved_len,
+            pool_label,
+            strategy_label,
         )
 
     solver_min_counts: dict[str, int] | None = None

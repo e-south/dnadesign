@@ -26,7 +26,7 @@ class USRSequencesDataSource(BaseDataSource):
     root: str
     limit: Optional[int] = None
 
-    def load_data(self, *, rng=None):
+    def load_data(self, *, rng=None, outputs_root: Path | None = None):
         try:
             from dnadesign.usr.src.dataset import Dataset as USRDataset  # type: ignore
         except Exception as e:  # pragma: no cover - depends on optional USR install

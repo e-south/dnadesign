@@ -57,7 +57,7 @@ class BindingSitesDataSource(BaseDataSource):
             return pd.read_excel(path)
         raise ValueError(f"Unsupported binding_sites.format: {fmt}")
 
-    def load_data(self, *, rng=None):
+    def load_data(self, *, rng=None, outputs_root: Path | None = None):
         data_path = resolve_path(self.cfg_path, self.path)
         if not (data_path.exists() and data_path.is_file()):
             raise FileNotFoundError(f"Binding sites file not found. Looked here:\n  - {data_path}")

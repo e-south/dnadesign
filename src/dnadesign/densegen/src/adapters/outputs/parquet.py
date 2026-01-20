@@ -32,6 +32,12 @@ def _meta_arrow_type(name: str, pa):
         "input_pwm_ids",
         "required_regulators",
     }
+    list_float = {
+        "input_pwm_pvalue_bins",
+    }
+    list_int = {
+        "input_pwm_pvalue_bin_ids",
+    }
     int_fields = {
         "length",
         "random_seed",
@@ -61,6 +67,7 @@ def _meta_arrow_type(name: str, pa):
         "compression_ratio",
         "input_pwm_score_threshold",
         "input_pwm_score_percentile",
+        "input_pwm_pvalue_threshold",
         "sampling_fraction",
         "sampling_fraction_pairs",
         "gap_fill_gc_min",
@@ -79,10 +86,16 @@ def _meta_arrow_type(name: str, pa):
         "sampling_relaxed_cap",
         "gap_fill_used",
         "gap_fill_relaxed",
+        "input_pwm_keep_all_candidates_debug",
+        "input_pwm_include_matched_sequence",
     }
 
     if name in list_str:
         return pa.list_(pa.string())
+    if name in list_float:
+        return pa.list_(pa.float64())
+    if name in list_int:
+        return pa.list_(pa.int64())
     if name == "used_tfbs_detail":
         return pa.list_(
             pa.struct(

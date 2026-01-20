@@ -56,7 +56,7 @@ class PWMMemeDataSource(BaseDataSource):
     motif_ids: Optional[List[str]]
     sampling: dict
 
-    def load_data(self, *, rng=None):
+    def load_data(self, *, rng=None, outputs_root: Path | None = None):
         if rng is None:
             raise ValueError("PWM sampling requires an RNG; pass the pipeline RNG explicitly.")
         meme_path = resolve_path(self.cfg_path, self.path)
@@ -91,12 +91,29 @@ class PWMMemeDataSource(BaseDataSource):
         length_range = sampling.get("length_range")
         trim_window_length = sampling.get("trim_window_length")
         trim_window_strategy = sampling.get("trim_window_strategy", "max_info")
+        scoring_backend = str(sampling.get("scoring_backend", "densegen")).lower()
+        pvalue_threshold = sampling.get("pvalue_threshold")
+        pvalue_bins = sampling.get("pvalue_bins")
+        pvalue_bin_ids = sampling.get("pvalue_bin_ids")
+        bgfile = sampling.get("bgfile")
+        selection_policy = str(sampling.get("selection_policy", "random_uniform"))
+        keep_all_candidates_debug = bool(sampling.get("keep_all_candidates_debug", False))
+        include_matched_sequence = bool(sampling.get("include_matched_sequence", False))
+        bgfile_path: Path | None = None
+        if bgfile is not None:
+            bgfile_path = resolve_path(self.cfg_path, str(bgfile))
+            if not (bgfile_path.exists() and bgfile_path.is_file()):
+                raise FileNotFoundError(f"PWM sampling bgfile not found. Looked here:\n  - {bgfile_path}")
+        debug_output_dir: Path | None = None
+        if keep_all_candidates_debug and outputs_root is not None:
+            debug_output_dir = Path(outputs_root) / "meta" / "fimo"
 
         entries = []
         all_rows = []
         for motif in motifs:
             pwm = _motif_to_pwm(motif, background)
-            selected = sample_pwm_sites(
+            return_meta = scoring_backend == "fimo"
+            result = sample_pwm_sites(
                 rng,
                 pwm,
                 strategy=strategy,
@@ -106,15 +123,34 @@ class PWMMemeDataSource(BaseDataSource):
                 max_seconds=max_seconds,
                 score_threshold=threshold,
                 score_percentile=percentile,
+                scoring_backend=scoring_backend,
+                pvalue_threshold=pvalue_threshold,
+                pvalue_bins=pvalue_bins,
+                pvalue_bin_ids=pvalue_bin_ids,
+                bgfile=bgfile_path,
+                selection_policy=selection_policy,
+                keep_all_candidates_debug=keep_all_candidates_debug,
+                include_matched_sequence=include_matched_sequence,
+                debug_output_dir=debug_output_dir,
+                debug_label=f"{meme_path.stem}__{pwm.motif_id}",
                 length_policy=length_policy,
                 length_range=length_range,
                 trim_window_length=trim_window_length,
                 trim_window_strategy=str(trim_window_strategy),
+                return_metadata=return_meta,
             )
+            if return_meta:
+                selected, meta_by_seq = result  # type: ignore[misc]
+            else:
+                selected = result  # type: ignore[assignment]
+                meta_by_seq = {}
 
             for seq in selected:
                 entries.append((pwm.motif_id, seq, str(meme_path)))
-                all_rows.append({"tf": pwm.motif_id, "tfbs": seq, "source": str(meme_path)})
+                row = {"tf": pwm.motif_id, "tfbs": seq, "source": str(meme_path)}
+                if meta_by_seq:
+                    row.update(meta_by_seq.get(seq, {}))
+                all_rows.append(row)
 
         import pandas as pd
 
