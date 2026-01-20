@@ -158,6 +158,10 @@ Solver-stage library sampling
 pixi run dense run -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --no-plot
 ```
 
+The demo config sets `logging.progress_style: screen`, so in a TTY you will see a
+refreshing dashboard (progress, leaderboards, last sequence). To see per‑sequence
+logs, set `progress_style: stream` (and optionally tune `progress_every`).
+
 Example output (abridged):
 
 ```text
@@ -360,7 +364,10 @@ To mine specific affinity strata, add canonical p‑value bins and select bins b
       pvalue_threshold: 1e-3
       selection_policy: stratified
       pvalue_bins: [1e-6, 1e-4, 1e-3, 1e-2, 1e-1, 1.0]
-      pvalue_bin_ids: [1, 2]  # (1e-6..1e-4] and (1e-4..1e-3]
+      mining:
+        batch_size: 5000
+        max_batches: 4
+        retain_bin_ids: [1, 2]  # (1e-6..1e-4] and (1e-4..1e-3]
 ```
 
 ### Add USR output

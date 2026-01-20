@@ -37,6 +37,16 @@ def _safe_label(text: str) -> str:
     return cleaned or "motif"
 
 
+def _mining_attr(mining, name: str, default=None):
+    if mining is None:
+        return default
+    if hasattr(mining, name):
+        return getattr(mining, name)
+    if isinstance(mining, dict):
+        return mining.get(name, default)
+    return default
+
+
 @dataclass(frozen=True)
 class FimoCandidate:
     seq: str
@@ -281,15 +291,24 @@ def _assign_pvalue_bin(pvalue: float, edges: Sequence[float]) -> tuple[int, floa
     return len(edges) - 1, float(edges[-2]), float(edges[-1])
 
 
-def _format_pvalue_bins(edges: Sequence[float], counts: Sequence[int]) -> str:
+def _format_pvalue_bins(
+    edges: Sequence[float],
+    counts: Sequence[int],
+    *,
+    only_bins: Optional[Sequence[int]] = None,
+) -> str:
     if not edges or not counts:
         return "-"
+    only_set = {int(idx) for idx in only_bins} if only_bins is not None else None
     labels: list[str] = []
     low = 0.0
-    for edge, count in zip(edges, counts):
+    for idx, (edge, count) in enumerate(zip(edges, counts)):
+        if only_set is not None and idx not in only_set:
+            low = float(edge)
+            continue
         labels.append(f"({low:.0e},{float(edge):.0e}]:{int(count)}")
         low = float(edge)
-    return " ".join(labels)
+    return " ".join(labels) if labels else "-"
 
 
 def _stratified_sample(
@@ -360,18 +379,22 @@ def _select_fimo_candidates(
         if context.get("pvalue_bins_label") is not None:
             msg_lines.append(f"P-value bins={context.get('pvalue_bins_label')}.")
         if context.get("pvalue_bin_ids") is not None:
-            msg_lines.append(f"Selected bins={context.get('pvalue_bin_ids')}.")
+            msg_lines.append(f"Retained bins={context.get('pvalue_bin_ids')}.")
         suggestions = [
             "reduce n_sites",
             "relax pvalue_threshold (e.g., 1e-4 → 1e-3)",
             "increase oversample_factor",
         ]
         if context.get("pvalue_bin_ids") is not None:
-            suggestions.append("broaden pvalue_bin_ids (or remove bin filtering)")
+            suggestions.append("broaden mining.retain_bin_ids (or remove bin filtering)")
         if context.get("cap_applied"):
             suggestions.append("increase max_candidates (cap was hit)")
         if context.get("time_limited"):
             suggestions.append("increase max_seconds (time limit was hit)")
+        if context.get("mining_max_batches") is not None and context.get("mining_batches_limited"):
+            suggestions.append("increase mining.max_batches")
+        if context.get("mining_max_seconds") is not None and context.get("mining_time_limited"):
+            suggestions.append("increase mining.max_seconds")
         if context.get("width") is not None and int(context.get("width")) <= 6:
             suggestions.append("try length_policy=range with a longer length_range")
         msg_lines.append("Try next: " + "; ".join(suggestions) + ".")
@@ -412,6 +435,7 @@ def sample_pwm_sites(
     pvalue_threshold: Optional[float] = None,
     pvalue_bins: Optional[Sequence[float]] = None,
     pvalue_bin_ids: Optional[Sequence[int]] = None,
+    mining: Optional[object] = None,
     bgfile: Optional[str | Path] = None,
     selection_policy: str = "random_uniform",
     keep_all_candidates_debug: bool = False,
@@ -440,6 +464,8 @@ def sample_pwm_sites(
             raise ValueError("pvalue_bins is only valid when scoring_backend='fimo'")
         if pvalue_bin_ids is not None:
             raise ValueError("pvalue_bin_ids is only valid when scoring_backend='fimo'")
+        if mining is not None:
+            raise ValueError("mining is only valid when scoring_backend='fimo'")
         if include_matched_sequence:
             raise ValueError("include_matched_sequence is only valid when scoring_backend='fimo'")
     else:
@@ -450,6 +476,10 @@ def sample_pwm_sites(
             raise ValueError("pwm.sampling.pvalue_threshold must be between 0 and 1")
         if selection_policy not in {"random_uniform", "top_n", "stratified"}:
             raise ValueError(f"Unsupported pwm selection_policy: {selection_policy}")
+        if mining is not None:
+            retain_bins = _mining_attr(mining, "retain_bin_ids")
+            if retain_bins is not None and pvalue_bin_ids is not None:
+                raise ValueError("Provide retain_bin_ids in mining or pvalue_bin_ids, not both.")
         if score_threshold is not None or score_percentile is not None:
             log.warning(
                 "PWM sampling scoring_backend=fimo ignores score_threshold/score_percentile for motif %s.",
@@ -503,6 +533,7 @@ def sample_pwm_sites(
         return cap_label
 
     def _context(length_obs: str, cap_applied: bool, requested: int, generated: int, time_limited: bool) -> dict:
+        mining_cfg = mining
         return {
             "motif_id": motif.motif_id,
             "width": width,
@@ -519,6 +550,11 @@ def sample_pwm_sites(
             "cap_applied": cap_applied,
             "cap_label": _cap_label(cap_applied, time_limited),
             "time_limited": time_limited,
+            "mining_batch_size": _mining_attr(mining_cfg, "batch_size"),
+            "mining_max_batches": _mining_attr(mining_cfg, "max_batches"),
+            "mining_max_seconds": _mining_attr(mining_cfg, "max_seconds"),
+            "mining_log_every_batches": _mining_attr(mining_cfg, "log_every_batches"),
+            "mining_retain_bin_ids": _mining_attr(mining_cfg, "retain_bin_ids"),
         }
 
     def _select(
@@ -564,13 +600,11 @@ def sample_pwm_sites(
         return f"{left}{seq}{right}"
 
     def _score_with_fimo(
-        sequences: List[str],
         *,
-        length_obs: str,
+        n_candidates: int,
         cap_applied: bool,
         requested: int,
-        generated: int,
-        time_limited: bool,
+        sequences: Optional[List[str]] = None,
     ) -> tuple[List[str], dict[str, dict]]:
         import tempfile
 
@@ -585,13 +619,20 @@ def sample_pwm_sites(
         if pvalue_threshold is None:
             raise ValueError("pvalue_threshold required for fimo backend")
         resolved_bins = _resolve_pvalue_edges(pvalue_bins)
+        retain_bins = _mining_attr(mining, "retain_bin_ids")
+        if retain_bins is None and pvalue_bin_ids is not None:
+            retain_bins = list(pvalue_bin_ids)
         allowed_bins: Optional[set[int]] = None
-        if pvalue_bin_ids is not None:
-            allowed_bins = {int(idx) for idx in pvalue_bin_ids}
+        if retain_bins is not None:
+            allowed_bins = {int(idx) for idx in retain_bins}
             max_idx = len(resolved_bins) - 1
             if any(idx > max_idx for idx in allowed_bins):
-                raise ValueError(f"pvalue_bin_ids contains an index outside the available bins (max={max_idx}).")
+                raise ValueError(f"retain_bin_ids contains an index outside the available bins (max={max_idx}).")
         keep_weak = keep_low
+        mining_batch_size = int(_mining_attr(mining, "batch_size", n_candidates))
+        mining_max_batches = _mining_attr(mining, "max_batches")
+        mining_max_seconds = _mining_attr(mining, "max_seconds")
+        mining_log_every = int(_mining_attr(mining, "log_every_batches", 1))
         debug_path: Optional[Path] = None
         debug_dir = debug_output_dir
         if keep_all_candidates_debug:
@@ -607,69 +648,219 @@ def sample_pwm_sites(
             label = _safe_label(debug_label or motif.motif_id)
             debug_path = debug_dir / f"{label}__fimo.tsv"
 
+        def _merge_tsv(existing: list[str], text: str) -> None:
+            lines = [ln for ln in text.splitlines() if ln.strip()]
+            if not lines:
+                return
+            if not existing:
+                existing.extend(lines)
+                return
+            header_skipped = False
+            for ln in lines:
+                if ln.lstrip().startswith("#"):
+                    continue
+                if not header_skipped:
+                    header_skipped = True
+                    continue
+                existing.append(ln)
+
+        def _generate_batch(count: int) -> tuple[list[str], list[int], bool]:
+            batch_start = time.monotonic()
+            sequences: list[str] = []
+            lengths: list[int] = []
+            time_limited = False
+            for _ in range(count):
+                if max_seconds is not None and sequences:
+                    if (time.monotonic() - batch_start) >= float(max_seconds):
+                        time_limited = True
+                        break
+                target_len = _resolve_length()
+                lengths.append(int(target_len))
+                if strategy == "background":
+                    core = sample_sequence_from_background(rng, motif.background, width)
+                else:
+                    core = sample_sequence_from_pwm(rng, matrix)
+                full_seq = _embed_with_background(core, target_len)
+                sequences.append(full_seq)
+            return sequences, lengths, time_limited
+
+        total_bin_counts = [0 for _ in resolved_bins]
+        accepted_bin_counts = [0 for _ in resolved_bins]
+        candidates: List[FimoCandidate] = []
+        seen: set[str] = set()
+        lengths_all: list[int] = []
+        generated_total = 0
+        time_limited = False
+        mining_time_limited = False
+        mining_batches_limited = False
+        batches = 0
+        tsv_lines: list[str] = []
+        provided_sequences = sequences
+
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             meme_path = tmp_path / "motif.meme"
-            fasta_path = tmp_path / "candidates.fasta"
             motif_for_fimo = PWMMotif(motif_id=motif.motif_id, matrix=matrix, background=motif.background)
             write_minimal_meme_motif(motif_for_fimo, meme_path)
-            records = build_candidate_records(motif.motif_id, sequences)
-            write_candidates_fasta(records, fasta_path)
-            thresh = 1.0 if keep_all_candidates_debug or keep_weak else float(pvalue_threshold)
-            rows, raw_tsv = run_fimo(
-                meme_motif_path=meme_path,
-                fasta_path=fasta_path,
-                bgfile=Path(bgfile) if bgfile is not None else None,
-                thresh=thresh,
-                include_matched_sequence=include_matched_sequence or keep_all_candidates_debug,
-                return_tsv=debug_path is not None,
-            )
-            if debug_path is not None and raw_tsv is not None:
-                debug_path.write_text(raw_tsv)
-                log.info("FIMO debug TSV written: %s", debug_path)
-            best_hits = aggregate_best_hits(rows)
-
-        candidates: List[FimoCandidate] = []
-        total_bin_counts = [0 for _ in resolved_bins]
-        accepted_bin_counts = [0 for _ in resolved_bins]
-        for rec_id, seq in records:
-            hit = best_hits.get(rec_id)
-            if hit is None:
-                continue
-            bin_id, bin_low, bin_high = _assign_pvalue_bin(hit.pvalue, resolved_bins)
-            total_bin_counts[bin_id] += 1
-            if keep_weak:
-                accept = hit.pvalue >= float(pvalue_threshold)
-            else:
-                accept = hit.pvalue <= float(pvalue_threshold)
-            if allowed_bins is not None and bin_id not in allowed_bins:
-                continue
-            if not accept:
-                continue
-            accepted_bin_counts[bin_id] += 1
-            candidates.append(
-                FimoCandidate(
-                    seq=seq,
-                    pvalue=hit.pvalue,
-                    score=hit.score,
-                    bin_id=bin_id,
-                    bin_low=bin_low,
-                    bin_high=bin_high,
-                    start=hit.start,
-                    stop=hit.stop,
-                    strand=hit.strand,
-                    matched_sequence=hit.matched_sequence,
+            if provided_sequences is not None:
+                lengths_all = [len(seq) for seq in provided_sequences]
+                fasta_path = tmp_path / "candidates.fasta"
+                records = build_candidate_records(motif.motif_id, provided_sequences, start_index=0)
+                write_candidates_fasta(records, fasta_path)
+                thresh = 1.0 if keep_all_candidates_debug or keep_weak else float(pvalue_threshold)
+                rows, raw_tsv = run_fimo(
+                    meme_motif_path=meme_path,
+                    fasta_path=fasta_path,
+                    bgfile=Path(bgfile) if bgfile is not None else None,
+                    thresh=thresh,
+                    include_matched_sequence=include_matched_sequence or keep_all_candidates_debug,
+                    return_tsv=debug_path is not None,
                 )
-            )
+                if debug_path is not None and raw_tsv is not None:
+                    _merge_tsv(tsv_lines, raw_tsv)
+                best_hits = aggregate_best_hits(rows)
+                for rec_id, seq in records:
+                    hit = best_hits.get(rec_id)
+                    if hit is None:
+                        continue
+                    bin_id, bin_low, bin_high = _assign_pvalue_bin(hit.pvalue, resolved_bins)
+                    if allowed_bins is not None and bin_id not in allowed_bins:
+                        continue
+                    total_bin_counts[bin_id] += 1
+                    if keep_weak:
+                        accept = hit.pvalue >= float(pvalue_threshold)
+                    else:
+                        accept = hit.pvalue <= float(pvalue_threshold)
+                    if not accept:
+                        continue
+                    if seq in seen:
+                        continue
+                    seen.add(seq)
+                    accepted_bin_counts[bin_id] += 1
+                    candidates.append(
+                        FimoCandidate(
+                            seq=seq,
+                            pvalue=hit.pvalue,
+                            score=hit.score,
+                            bin_id=bin_id,
+                            bin_low=bin_low,
+                            bin_high=bin_high,
+                            start=hit.start,
+                            stop=hit.stop,
+                            strand=hit.strand,
+                            matched_sequence=hit.matched_sequence,
+                        )
+                    )
+                generated_total = len(provided_sequences)
+                batches = 1
+            else:
+                mining_start = time.monotonic()
+                while generated_total < n_candidates:
+                    if mining_max_batches is not None and batches >= int(mining_max_batches):
+                        mining_batches_limited = True
+                        break
+                    if mining_max_seconds is not None and (time.monotonic() - mining_start) >= float(
+                        mining_max_seconds
+                    ):
+                        mining_time_limited = True
+                        break
+                    remaining = int(n_candidates) - generated_total
+                    if remaining <= 0:
+                        break
+                    batch_target = min(int(mining_batch_size), remaining)
+                    sequences, lengths, batch_limited = _generate_batch(batch_target)
+                    if batch_limited:
+                        time_limited = True
+                    if not sequences:
+                        break
+                    lengths_all.extend(lengths)
+                    fasta_path = tmp_path / "candidates.fasta"
+                    records = build_candidate_records(motif.motif_id, sequences, start_index=generated_total)
+                    write_candidates_fasta(records, fasta_path)
+                    thresh = 1.0 if keep_all_candidates_debug or keep_weak else float(pvalue_threshold)
+                    rows, raw_tsv = run_fimo(
+                        meme_motif_path=meme_path,
+                        fasta_path=fasta_path,
+                        bgfile=Path(bgfile) if bgfile is not None else None,
+                        thresh=thresh,
+                        include_matched_sequence=include_matched_sequence or keep_all_candidates_debug,
+                        return_tsv=debug_path is not None,
+                    )
+                    if debug_path is not None and raw_tsv is not None:
+                        _merge_tsv(tsv_lines, raw_tsv)
+                    best_hits = aggregate_best_hits(rows)
+                    for rec_id, seq in records:
+                        hit = best_hits.get(rec_id)
+                        if hit is None:
+                            continue
+                        bin_id, bin_low, bin_high = _assign_pvalue_bin(hit.pvalue, resolved_bins)
+                        if allowed_bins is not None and bin_id not in allowed_bins:
+                            continue
+                        total_bin_counts[bin_id] += 1
+                        if keep_weak:
+                            accept = hit.pvalue >= float(pvalue_threshold)
+                        else:
+                            accept = hit.pvalue <= float(pvalue_threshold)
+                        if not accept:
+                            continue
+                        if seq in seen:
+                            continue
+                        seen.add(seq)
+                        accepted_bin_counts[bin_id] += 1
+                        candidates.append(
+                            FimoCandidate(
+                                seq=seq,
+                                pvalue=hit.pvalue,
+                                score=hit.score,
+                                bin_id=bin_id,
+                                bin_low=bin_low,
+                                bin_high=bin_high,
+                                start=hit.start,
+                                stop=hit.stop,
+                                strand=hit.strand,
+                                matched_sequence=hit.matched_sequence,
+                            )
+                        )
+                    generated_total += len(sequences)
+                    batches += 1
+                    if mining_log_every > 0 and batches % mining_log_every == 0:
+                        bins_label = _format_pvalue_bins(resolved_bins, total_bin_counts, only_bins=retain_bins)
+                        accepted_label = _format_pvalue_bins(resolved_bins, accepted_bin_counts, only_bins=retain_bins)
+                        log.info(
+                            "FIMO mining %s batch %d/%s: generated=%d accepted=%d bins=%s accepted_bins=%s",
+                            motif.motif_id,
+                            batches,
+                            str(mining_max_batches) if mining_max_batches is not None else "-",
+                            generated_total,
+                            len(candidates),
+                            bins_label,
+                            accepted_label,
+                        )
+
+        if debug_path is not None and tsv_lines:
+            debug_path.write_text("\n".join(tsv_lines) + "\n")
+            log.info("FIMO debug TSV written: %s", debug_path)
 
         total_hits = sum(total_bin_counts)
         accepted_hits = sum(accepted_bin_counts)
-        bins_label = _format_pvalue_bins(resolved_bins, total_bin_counts)
-        accepted_label = _format_pvalue_bins(resolved_bins, accepted_bin_counts)
+        bins_label = _format_pvalue_bins(resolved_bins, total_bin_counts, only_bins=retain_bins)
+        accepted_label = _format_pvalue_bins(resolved_bins, accepted_bin_counts, only_bins=retain_bins)
+        length_obs = "-"
+        if lengths_all:
+            length_obs = (
+                f"{min(lengths_all)}..{max(lengths_all)}"
+                if min(lengths_all) != max(lengths_all)
+                else str(lengths_all[0])
+            )
 
-        context = _context(length_obs, cap_applied, requested, generated, time_limited)
+        context = _context(length_obs, cap_applied, requested, generated_total, time_limited)
         context["pvalue_bins_label"] = bins_label
         context["pvalue_bin_ids"] = sorted(allowed_bins) if allowed_bins is not None else None
+        context["mining_batch_size"] = mining_batch_size
+        context["mining_max_batches"] = mining_max_batches
+        context["mining_max_seconds"] = mining_max_seconds
+        context["mining_time_limited"] = mining_time_limited
+        context["mining_batches_limited"] = mining_batches_limited
         picked = _select_fimo_candidates(
             candidates,
             n_sites=n_sites,
@@ -684,9 +875,9 @@ def sample_pwm_sites(
         for cand in picked:
             idx = max(0, min(int(cand.bin_id), len(resolved_bins) - 1))
             selected_bin_counts[idx] += 1
-        selected_label = _format_pvalue_bins(resolved_bins, selected_bin_counts)
+        selected_label = _format_pvalue_bins(resolved_bins, selected_bin_counts, only_bins=retain_bins)
         log.info(
-            "FIMO yield for motif %s: hits=%d accepted=%d selected=%d bins=%s accepted_bins=%s selected_bins=%s%s",
+            "FIMO yield for motif %s: hits=%d accepted=%d selected=%d bins=%s accepted_bins=%s selected_bins=%s",
             motif.motif_id,
             total_hits,
             accepted_hits,
@@ -694,7 +885,6 @@ def sample_pwm_sites(
             bins_label,
             accepted_label,
             selected_label,
-            f" allowed_bins={sorted(allowed_bins)}" if allowed_bins is not None else "",
         )
         meta_by_seq: dict[str, dict] = {}
         for cand in picked:
@@ -729,12 +919,10 @@ def sample_pwm_sites(
             )
             return (selected, {}) if return_metadata else selected
         selected, meta = _score_with_fimo(
-            [full_seq],
-            length_obs=str(target_len),
+            n_candidates=1,
             cap_applied=False,
             requested=1,
-            generated=1,
-            time_limited=False,
+            sequences=[full_seq],
         )
         return (selected, meta) if return_metadata else selected
 
@@ -755,34 +943,34 @@ def sample_pwm_sites(
                 cap_val,
             )
     n_candidates = max(1, n_candidates)
-    candidates: List[Tuple[str, str]] = []
-    lengths: List[int] = []
-    start = time.monotonic()
-    time_limited = False
-    for _ in range(n_candidates):
-        if max_seconds is not None and candidates:
-            if (time.monotonic() - start) >= float(max_seconds):
-                time_limited = True
-                break
-        target_len = _resolve_length()
-        lengths.append(int(target_len))
-        if strategy == "background":
-            core = sample_sequence_from_background(rng, motif.background, width)
-        else:
-            core = sample_sequence_from_pwm(rng, matrix)
-        full_seq = _embed_with_background(core, target_len)
-        candidates.append((full_seq, core))
-    if time_limited:
-        log.warning(
-            "PWM sampling hit max_seconds for motif %s: generated=%d requested=%d",
-            motif.motif_id,
-            len(candidates),
-            requested_candidates,
-        )
-    length_obs = "-"
-    if lengths:
-        length_obs = f"{min(lengths)}..{max(lengths)}" if min(lengths) != max(lengths) else str(lengths[0])
     if scoring_backend == "densegen":
+        candidates: List[Tuple[str, str]] = []
+        lengths: List[int] = []
+        start = time.monotonic()
+        time_limited = False
+        for _ in range(n_candidates):
+            if max_seconds is not None and candidates:
+                if (time.monotonic() - start) >= float(max_seconds):
+                    time_limited = True
+                    break
+            target_len = _resolve_length()
+            lengths.append(int(target_len))
+            if strategy == "background":
+                core = sample_sequence_from_background(rng, motif.background, width)
+            else:
+                core = sample_sequence_from_pwm(rng, matrix)
+            full_seq = _embed_with_background(core, target_len)
+            candidates.append((full_seq, core))
+        if time_limited:
+            log.warning(
+                "PWM sampling hit max_seconds for motif %s: generated=%d requested=%d",
+                motif.motif_id,
+                len(candidates),
+                requested_candidates,
+            )
+        length_obs = "-"
+        if lengths:
+            length_obs = f"{min(lengths)}..{max(lengths)}" if min(lengths) != max(lengths) else str(lengths[0])
         scored = [
             (full_seq, score_sequence(core, matrix, log_odds=log_odds, background=motif.background))
             for full_seq, core in candidates
@@ -797,11 +985,8 @@ def sample_pwm_sites(
         )
         return (selected, {}) if return_metadata else selected
     selected, meta = _score_with_fimo(
-        [full_seq for full_seq, _core in candidates],
-        length_obs=length_obs,
         cap_applied=cap_applied,
         requested=requested_candidates,
-        generated=len(candidates),
-        time_limited=time_limited,
+        n_candidates=n_candidates,
     )
     return (selected, meta) if return_metadata else selected

@@ -98,7 +98,27 @@ META_FIELDS: list[MetaField] = [
     MetaField("input_pwm_score_percentile", (numbers.Real,), "PWM score percentile.", allow_none=True),
     MetaField("input_pwm_pvalue_threshold", (numbers.Real,), "PWM p-value threshold (FIMO).", allow_none=True),
     MetaField("input_pwm_pvalue_bins", (list,), "PWM p-value bins (FIMO).", allow_none=True),
-    MetaField("input_pwm_pvalue_bin_ids", (list,), "Selected p-value bin indices (FIMO).", allow_none=True),
+    MetaField(
+        "input_pwm_pvalue_bin_ids",
+        (list,),
+        "Deprecated: selected p-value bin indices (use input_pwm_mining_retain_bin_ids).",
+        allow_none=True,
+    ),
+    MetaField("input_pwm_mining_batch_size", (int,), "PWM mining batch size (FIMO).", allow_none=True),
+    MetaField("input_pwm_mining_max_batches", (int,), "PWM mining max batches (FIMO).", allow_none=True),
+    MetaField("input_pwm_mining_max_seconds", (numbers.Real,), "PWM mining max seconds (FIMO).", allow_none=True),
+    MetaField(
+        "input_pwm_mining_retain_bin_ids",
+        (list,),
+        "PWM mining retained p-value bin indices (FIMO).",
+        allow_none=True,
+    ),
+    MetaField(
+        "input_pwm_mining_log_every_batches",
+        (int,),
+        "PWM mining log frequency (batches).",
+        allow_none=True,
+    ),
     MetaField("input_pwm_selection_policy", (str,), "PWM selection policy (FIMO).", allow_none=True),
     MetaField("input_pwm_bgfile", (str,), "PWM background model path (FIMO).", allow_none=True),
     MetaField("input_pwm_keep_all_candidates_debug", (bool,), "PWM FIMO debug TSV enabled.", allow_none=True),
@@ -224,10 +244,15 @@ def _validate_list_fields(meta: Mapping[str, Any]) -> None:
             for item in vals:
                 if not isinstance(item, int):
                     raise TypeError("Metadata field 'input_pwm_pvalue_bin_ids' must contain only integers")
-            if not isinstance(item["tf"], str):
-                raise TypeError("used_tf_counts.tf must be a string")
-            if not isinstance(item["count"], int):
-                raise TypeError("used_tf_counts.count must be an int")
+
+    if "input_pwm_mining_retain_bin_ids" in meta:
+        vals = meta["input_pwm_mining_retain_bin_ids"]
+        if vals is not None:
+            if isinstance(vals, (str, bytes)) or not isinstance(vals, Sequence):
+                raise TypeError("Metadata field 'input_pwm_mining_retain_bin_ids' must be a list of integers")
+            for item in vals:
+                if not isinstance(item, int):
+                    raise TypeError("Metadata field 'input_pwm_mining_retain_bin_ids' must contain only integers")
 
     if "min_count_by_regulator" in meta:
         vals = meta["min_count_by_regulator"]

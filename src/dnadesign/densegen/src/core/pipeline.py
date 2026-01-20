@@ -29,6 +29,7 @@ from typing import Callable, Iterable, List
 
 import numpy as np
 import pandas as pd
+from rich.console import Console
 
 from ..adapters.optimizer import DenseArraysAdapter, OptimizerAdapter
 from ..adapters.outputs import OutputRecord, SinkBase, build_sinks, load_records_from_config, resolve_bio_alphabet
@@ -165,6 +166,16 @@ def _sampling_attr(sampling, name: str, default=None):
     return default
 
 
+def _mining_attr(mining, name: str, default=None):
+    if mining is None:
+        return default
+    if hasattr(mining, name):
+        return getattr(mining, name)
+    if isinstance(mining, dict):
+        return mining.get(name, default)
+    return default
+
+
 def _resolve_pvalue_bins_meta(sampling) -> list[float] | None:
     if sampling is None:
         return None
@@ -201,6 +212,15 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
     length_range = _sampling_attr(sampling, "length_range")
     if length_range is not None:
         length_range = list(length_range)
+    mining = _sampling_attr(sampling, "mining")
+    mining_batch_size = _mining_attr(mining, "batch_size")
+    mining_max_batches = _mining_attr(mining, "max_batches")
+    mining_max_seconds = _mining_attr(mining, "max_seconds")
+    mining_retain_bin_ids = _mining_attr(mining, "retain_bin_ids")
+    legacy_bin_ids = _sampling_attr(sampling, "pvalue_bin_ids")
+    if mining_retain_bin_ids is None:
+        mining_retain_bin_ids = legacy_bin_ids
+    mining_log_every_batches = _mining_attr(mining, "log_every_batches")
     return {
         "strategy": _sampling_attr(sampling, "strategy"),
         "scoring_backend": _sampling_attr(sampling, "scoring_backend"),
@@ -215,11 +235,21 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
         "score_percentile": _sampling_attr(sampling, "score_percentile"),
         "pvalue_threshold": _sampling_attr(sampling, "pvalue_threshold"),
         "pvalue_bins": _resolve_pvalue_bins_meta(sampling),
+        "pvalue_bin_ids": legacy_bin_ids,
         "selection_policy": _sampling_attr(sampling, "selection_policy"),
         "bgfile": _sampling_attr(sampling, "bgfile"),
         "keep_all_candidates_debug": _sampling_attr(sampling, "keep_all_candidates_debug"),
         "length_policy": _sampling_attr(sampling, "length_policy"),
         "length_range": length_range,
+        "mining": {
+            "batch_size": mining_batch_size,
+            "max_batches": mining_max_batches,
+            "max_seconds": mining_max_seconds,
+            "retain_bin_ids": mining_retain_bin_ids,
+            "log_every_batches": mining_log_every_batches,
+        }
+        if mining is not None
+        else None,
     }
 
 
@@ -476,7 +506,15 @@ def _input_metadata(source_cfg, cfg_path: Path) -> dict:
             meta["input_pwm_score_percentile"] = getattr(sampling, "score_percentile", None)
             meta["input_pwm_pvalue_threshold"] = getattr(sampling, "pvalue_threshold", None)
             meta["input_pwm_pvalue_bins"] = _resolve_pvalue_bins_meta(sampling)
-            meta["input_pwm_pvalue_bin_ids"] = getattr(sampling, "pvalue_bin_ids", None)
+            mining_cfg = getattr(sampling, "mining", None)
+            retained_bins = _mining_attr(mining_cfg, "retain_bin_ids")
+            legacy_bin_ids = getattr(sampling, "pvalue_bin_ids", None)
+            meta["input_pwm_pvalue_bin_ids"] = legacy_bin_ids if legacy_bin_ids is not None else retained_bins
+            meta["input_pwm_mining_batch_size"] = _mining_attr(mining_cfg, "batch_size")
+            meta["input_pwm_mining_max_batches"] = _mining_attr(mining_cfg, "max_batches")
+            meta["input_pwm_mining_max_seconds"] = _mining_attr(mining_cfg, "max_seconds")
+            meta["input_pwm_mining_retain_bin_ids"] = retained_bins
+            meta["input_pwm_mining_log_every_batches"] = _mining_attr(mining_cfg, "log_every_batches")
             meta["input_pwm_selection_policy"] = getattr(sampling, "selection_policy", None)
             meta["input_pwm_bgfile"] = getattr(sampling, "bgfile", None)
             meta["input_pwm_keep_all_candidates_debug"] = getattr(sampling, "keep_all_candidates_debug", None)
@@ -1296,6 +1334,12 @@ def _process_plan_for_source(
 
     log_cfg = global_cfg.logging
     print_visual = bool(log_cfg.print_visual)
+    progress_style = str(getattr(log_cfg, "progress_style", "stream"))
+    progress_every = int(getattr(log_cfg, "progress_every", 1))
+    progress_refresh_seconds = float(getattr(log_cfg, "progress_refresh_seconds", 1.0))
+    screen_console = Console() if progress_style == "screen" else None
+    last_screen_refresh = 0.0
+    latest_failure_totals: str | None = None
 
     policy_gc_fill = str(fill_mode)
     policy_sampling = pool_strategy
@@ -1376,6 +1420,11 @@ def _process_plan_for_source(
             selection_policy = _sampling_attr(input_sampling_cfg, "selection_policy")
             length_policy = _sampling_attr(input_sampling_cfg, "length_policy")
             length_range = _sampling_attr(input_sampling_cfg, "length_range")
+            mining_cfg = _sampling_attr(input_sampling_cfg, "mining")
+            mining_batch_size = _mining_attr(mining_cfg, "batch_size")
+            mining_max_batches = _mining_attr(mining_cfg, "max_batches")
+            mining_max_seconds = _mining_attr(mining_cfg, "max_seconds")
+            mining_retain_bins = _mining_attr(mining_cfg, "retain_bin_ids")
             if length_range is not None:
                 length_range = list(length_range)
             score_label = "-"
@@ -1389,9 +1438,13 @@ def _process_plan_for_source(
             bins_label = "-"
             if scoring_backend == "fimo":
                 bins_label = "canonical" if _sampling_attr(input_sampling_cfg, "pvalue_bins") is None else "custom"
-                bin_ids = _sampling_attr(input_sampling_cfg, "pvalue_bin_ids")
+                bin_ids = (
+                    mining_retain_bins
+                    if mining_retain_bins is not None
+                    else _sampling_attr(input_sampling_cfg, "pvalue_bin_ids")
+                )
                 if bin_ids:
-                    bins_label = f"{bins_label} pick={sorted(list(bin_ids))}"
+                    bins_label = f"{bins_label} retain={sorted(list(bin_ids))}"
             length_label = str(length_policy)
             if length_policy == "range" and length_range:
                 length_label = f"{length_policy}({length_range[0]}..{length_range[1]})"
@@ -1404,9 +1457,19 @@ def _process_plan_for_source(
                 cap_label = f"{cap_label}; max_seconds={max_seconds}" if cap_label != "-" else f"{max_seconds}s"
             counts_label = _summarize_tf_counts(meta_df["tf"].tolist())
             selection_label = selection_policy if scoring_backend == "fimo" else "-"
+            mining_label = "-"
+            if scoring_backend == "fimo" and mining_cfg is not None:
+                parts = []
+                if mining_batch_size is not None:
+                    parts.append(f"batch={mining_batch_size}")
+                if mining_max_batches is not None:
+                    parts.append(f"max_batches={mining_max_batches}")
+                if mining_max_seconds is not None:
+                    parts.append(f"max_seconds={mining_max_seconds}s")
+                mining_label = ", ".join(parts) if parts else "enabled"
             log.info(
                 "PWM input sampling for %s: motifs=%d | sites=%s | strategy=%s | backend=%s | score=%s | "
-                "selection=%s | bins=%s | oversample=%s | max_candidates=%s | length=%s",
+                "selection=%s | bins=%s | mining=%s | oversample=%s | max_candidates=%s | length=%s",
                 source_label,
                 len(input_meta.get("input_pwm_ids") or []),
                 counts_label or "-",
@@ -1415,6 +1478,7 @@ def _process_plan_for_source(
                 score_label,
                 selection_label,
                 bins_label,
+                mining_label,
                 oversample,
                 cap_label,
                 length_label,
@@ -2301,37 +2365,75 @@ def _process_plan_for_source(
                 pct = 100.0 * (global_generated / max(1, quota))
                 bar = _format_progress_bar(global_generated, quota, width=24)
                 cr = getattr(sol, "compression_ratio", float("nan"))
-                if print_visual:
-                    log.info(
-                        "╭─ %s/%s  %s  %d/%d (%.2f%%) — local %d/%d — CR=%.3f\n"
-                        "%s\nsequence %s\n"
-                        "╰────────────────────────────────────────────────────────",
-                        source_label,
-                        plan_name,
-                        bar,
-                        global_generated,
-                        quota,
-                        pct,
-                        local_generated,
-                        max_per_subsample,
-                        cr,
-                        derived["visual"],
-                        final_seq,
-                    )
+                should_log = progress_every > 0 and global_generated % max(1, progress_every) == 0
+                if progress_style == "screen":
+                    if should_log and screen_console is not None:
+                        now = time.monotonic()
+                        if (now - last_screen_refresh) >= progress_refresh_seconds:
+                            screen_console.clear()
+                            seq_preview = final_seq if len(final_seq) <= 120 else f"{final_seq[:117]}..."
+                            screen_console.print(
+                                f"[bold]{source_label}/{plan_name}[/] {bar} {global_generated}/{quota} ({pct:.2f}%)"
+                            )
+                            screen_console.print(
+                                f"local {local_generated}/{max_per_subsample} | CR={cr:.3f} | "
+                                f"resamples={total_resamples} dup_out={duplicate_records} "
+                                f"dup_sol={duplicate_solutions} fails={failed_solutions} stalls={stall_events}"
+                            )
+                            if latest_failure_totals:
+                                screen_console.print(f"failures: {latest_failure_totals}")
+                            if tf_usage_counts:
+                                screen_console.print(
+                                    f"TF leaderboard: {_summarize_leaderboard(tf_usage_counts, top=5)}"
+                                )
+                            if usage_counts:
+                                screen_console.print(f"TFBS leaderboard: {_summarize_leaderboard(usage_counts, top=5)}")
+                            diversity_label = _summarize_diversity(
+                                usage_counts,
+                                tf_usage_counts,
+                                library_tfs=library_tfs,
+                                library_tfbs=library_tfbs,
+                            )
+                            screen_console.print(f"Diversity: {diversity_label}")
+                            if print_visual:
+                                screen_console.print(derived["visual"])
+                            screen_console.print(f"sequence {seq_preview}")
+                            last_screen_refresh = now
+                elif progress_style == "summary":
+                    pass
                 else:
-                    log.info(
-                        "[%s/%s] %s %d/%d (%.2f%%) (local %d/%d) CR=%.3f | seq %s",
-                        source_label,
-                        plan_name,
-                        bar,
-                        global_generated,
-                        quota,
-                        pct,
-                        local_generated,
-                        max_per_subsample,
-                        cr,
-                        final_seq,
-                    )
+                    if should_log:
+                        if print_visual:
+                            log.info(
+                                "╭─ %s/%s  %s  %d/%d (%.2f%%) — local %d/%d — CR=%.3f\n"
+                                "%s\nsequence %s\n"
+                                "╰────────────────────────────────────────────────────────",
+                                source_label,
+                                plan_name,
+                                bar,
+                                global_generated,
+                                quota,
+                                pct,
+                                local_generated,
+                                max_per_subsample,
+                                cr,
+                                derived["visual"],
+                                final_seq,
+                            )
+                        else:
+                            log.info(
+                                "[%s/%s] %s %d/%d (%.2f%%) (local %d/%d) CR=%.3f | seq %s",
+                                source_label,
+                                plan_name,
+                                bar,
+                                global_generated,
+                                quota,
+                                pct,
+                                local_generated,
+                                max_per_subsample,
+                                cr,
+                                final_seq,
+                            )
 
                 if leaderboard_every > 0 and global_generated % max(1, leaderboard_every) == 0:
                     failure_totals = _summarize_failure_totals(
@@ -2339,56 +2441,58 @@ def _process_plan_for_source(
                         input_name=source_label,
                         plan_name=plan_name,
                     )
-                    log.info(
-                        "[%s/%s] Progress %s %d/%d (%.2f%%) | resamples=%d dup_out=%d "
-                        "dup_sol=%d fails=%d stalls=%d | %s",
-                        source_label,
-                        plan_name,
-                        bar,
-                        global_generated,
-                        quota,
-                        pct,
-                        total_resamples,
-                        duplicate_records,
-                        duplicate_solutions,
-                        failed_solutions,
-                        stall_events,
-                        failure_totals,
-                    )
-                    log.info(
-                        "[%s/%s] Leaderboard (TF): %s",
-                        source_label,
-                        plan_name,
-                        _summarize_leaderboard(tf_usage_counts, top=5),
-                    )
-                    log.info(
-                        "[%s/%s] Leaderboard (TFBS): %s",
-                        source_label,
-                        plan_name,
-                        _summarize_leaderboard(usage_counts, top=5),
-                    )
-                    log.info(
-                        "[%s/%s] Failed TFBS: %s",
-                        source_label,
-                        plan_name,
-                        _summarize_failure_leaderboard(
-                            failure_counts,
-                            input_name=source_label,
-                            plan_name=plan_name,
-                            top=5,
-                        ),
-                    )
-                    log.info(
-                        "[%s/%s] Diversity: %s",
-                        source_label,
-                        plan_name,
-                        _summarize_diversity(
-                            usage_counts,
-                            tf_usage_counts,
-                            library_tfs=library_tfs,
-                            library_tfbs=library_tfbs,
-                        ),
-                    )
+                    latest_failure_totals = failure_totals
+                    if progress_style != "screen":
+                        log.info(
+                            "[%s/%s] Progress %s %d/%d (%.2f%%) | resamples=%d dup_out=%d "
+                            "dup_sol=%d fails=%d stalls=%d | %s",
+                            source_label,
+                            plan_name,
+                            bar,
+                            global_generated,
+                            quota,
+                            pct,
+                            total_resamples,
+                            duplicate_records,
+                            duplicate_solutions,
+                            failed_solutions,
+                            stall_events,
+                            failure_totals,
+                        )
+                        log.info(
+                            "[%s/%s] Leaderboard (TF): %s",
+                            source_label,
+                            plan_name,
+                            _summarize_leaderboard(tf_usage_counts, top=5),
+                        )
+                        log.info(
+                            "[%s/%s] Leaderboard (TFBS): %s",
+                            source_label,
+                            plan_name,
+                            _summarize_leaderboard(usage_counts, top=5),
+                        )
+                        log.info(
+                            "[%s/%s] Failed TFBS: %s",
+                            source_label,
+                            plan_name,
+                            _summarize_failure_leaderboard(
+                                failure_counts,
+                                input_name=source_label,
+                                plan_name=plan_name,
+                                top=5,
+                            ),
+                        )
+                        log.info(
+                            "[%s/%s] Diversity: %s",
+                            source_label,
+                            plan_name,
+                            _summarize_diversity(
+                                usage_counts,
+                                tf_usage_counts,
+                                library_tfs=library_tfs,
+                                library_tfbs=library_tfbs,
+                            ),
+                        )
                     log.info(
                         "[%s/%s] Example: %s",
                         source_label,
@@ -2702,6 +2806,11 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
 
     # Round-robin scheduler
     round_robin = bool(cfg.runtime.round_robin)
+    if round_robin and str(cfg.generation.sampling.pool_strategy) == "iterative_subsample":
+        log.warning(
+            "round_robin=true with pool_strategy=iterative_subsample will rebuild libraries more frequently; "
+            "expect higher runtime for multi-plan runs."
+        )
     inputs = cfg.inputs
     checkpoint_every = int(cfg.runtime.checkpoint_every)
     state_counts: dict[tuple[str, str], int] = {}

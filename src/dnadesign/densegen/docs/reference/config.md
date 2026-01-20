@@ -67,7 +67,14 @@ PWM inputs perform **input sampling** (sampling sites from PWMs) via
     - `pvalue_threshold` (float in (0, 1]; **fimo** backend only)
     - `selection_policy`: `random_uniform | top_n | stratified` (default: `random_uniform`; fimo only)
     - `pvalue_bins` (optional list of floats; must end with `1.0`) - p‑value bin edges for stratified sampling
-    - `pvalue_bin_ids` (optional list of ints) - select specific p‑value bins (0‑based indices)
+    - `pvalue_bin_ids` (deprecated; use `mining.retain_bin_ids`)
+    - `mining` (optional; fimo only) - batch/time controls for mining via FIMO:
+      - `batch_size` (int > 0; default 100000) - candidates per FIMO batch
+      - `max_batches` (optional int > 0) - max batches per motif
+      - `max_seconds` (optional float > 0) - max seconds per motif mining loop
+      - `retain_bin_ids` (optional list of ints) - select p‑value bins to retain (0‑based indices);
+        retained bins are the only bins reported in yield summaries
+      - `log_every_batches` (int > 0; default 1) - log per‑bin yield summaries every N batches
     - `bgfile` (optional path) - MEME bfile-format background model for FIMO
     - `keep_all_candidates_debug` (bool, default false) - write raw FIMO TSVs to `outputs/meta/fimo/` for inspection
     - `include_matched_sequence` (bool, default false) - include `fimo_matched_sequence` in TFBS outputs
@@ -80,8 +87,11 @@ PWM inputs perform **input sampling** (sampling sites from PWMs) via
     - FIMO resolves `fimo` via `MEME_BIN` or PATH; pixi users should run `pixi run dense ...` so it is available.
     - Canonical p‑value bins (default): `[1e-10, 1e-8, 1e-6, 1e-4, 1e-3, 1e-2, 1e-1, 1.0]`
       (bin 0 is `(0, 1e-10]`, bin 1 is `(1e-10, 1e-8]`, etc.)
-    - FIMO runs log per‑bin yield summaries (hits, accepted, selected); `selection_policy: stratified`
+    - FIMO runs log per‑bin yield summaries (hits, accepted, selected). If `retain_bin_ids` is set,
+      only those bins are reported; otherwise all bins are reported. `selection_policy: stratified`
       makes the selected‑bin distribution explicit for mining workflows.
+    - When `mining` is enabled, `max_seconds` caps per‑batch candidate generation while
+      `mining.max_seconds` caps the overall mining loop.
 - `type: pwm_meme_set`
   - `paths` - list of MEME PWM files (merged into a single TF pool)
   - `motif_ids` (optional list) - choose motifs by ID across files
@@ -200,7 +210,11 @@ binding-site and PWM-sampled inputs.
 
 ### `densegen.runtime`
 
-- `round_robin` (bool)
+- `round_robin` (bool) - interleave plan items across inputs (one subsample per plan per pass).
+  Use this when you have multiple distinct constraint sets (e.g., different fixed sequences) and want
+  a single run to advance each plan in turn. This **does not** change Stage‑B sampling logic; it only
+  changes scheduling. With `pool_strategy: iterative_subsample`, round‑robin can increase how often
+  libraries are rebuilt, so expect additional compute if many plans are active.
 - `arrays_generated_before_resample` (int > 0)
 - `min_count_per_tf` (int >= 0)
 - `max_duplicate_solutions`, `stall_seconds_before_resample`, `stall_warning_every_seconds`
@@ -226,6 +240,12 @@ binding-site and PWM-sampled inputs.
 - `level` (e.g., `INFO`)
 - `suppress_solver_stderr` (bool)
 - `print_visual` (bool)
+- `progress_style`: `stream | summary | screen` (default `stream`)
+  - `stream`: per‑sequence logs (controlled by `progress_every`)
+  - `summary`: suppress per‑sequence logs; keep periodic leaderboard summaries
+  - `screen`: clear and redraw a compact dashboard at `progress_refresh_seconds`
+- `progress_every` (int >= 0) - log/refresh interval in sequences (`0` disables per‑sequence logging)
+- `progress_refresh_seconds` (float > 0) - minimum seconds between screen refreshes
 
 ---
 

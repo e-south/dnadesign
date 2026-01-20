@@ -13,6 +13,7 @@ Dunlop Lab
 from __future__ import annotations
 
 import os
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Optional, Union
@@ -154,6 +155,59 @@ class SequenceLibraryInput(BaseModel):
     sequence_column: str = "sequence"
 
 
+class PWMMiningConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    batch_size: int = 100000
+    max_batches: Optional[int] = None
+    max_seconds: Optional[float] = None
+    retain_bin_ids: Optional[List[int]] = None
+    log_every_batches: int = 1
+
+    @field_validator("batch_size")
+    @classmethod
+    def _batch_size_ok(cls, v: int):
+        if v <= 0:
+            raise ValueError("pwm.sampling.mining.batch_size must be > 0")
+        return v
+
+    @field_validator("max_batches")
+    @classmethod
+    def _max_batches_ok(cls, v: Optional[int]):
+        if v is not None and v <= 0:
+            raise ValueError("pwm.sampling.mining.max_batches must be > 0 when set")
+        return v
+
+    @field_validator("max_seconds")
+    @classmethod
+    def _max_seconds_ok(cls, v: Optional[float]):
+        if v is None:
+            return v
+        if not isinstance(v, (int, float)) or float(v) <= 0:
+            raise ValueError("pwm.sampling.mining.max_seconds must be > 0 when set")
+        return float(v)
+
+    @field_validator("retain_bin_ids")
+    @classmethod
+    def _retain_bin_ids_ok(cls, v: Optional[List[int]]):
+        if v is None:
+            return v
+        if not v:
+            raise ValueError("pwm.sampling.mining.retain_bin_ids must be non-empty when set")
+        ids = [int(x) for x in v]
+        if any(idx < 0 for idx in ids):
+            raise ValueError("pwm.sampling.mining.retain_bin_ids values must be >= 0")
+        if len(set(ids)) != len(ids):
+            raise ValueError("pwm.sampling.mining.retain_bin_ids must be unique")
+        return ids
+
+    @field_validator("log_every_batches")
+    @classmethod
+    def _log_every_batches_ok(cls, v: int):
+        if v <= 0:
+            raise ValueError("pwm.sampling.mining.log_every_batches must be > 0")
+        return v
+
+
 class PWMSamplingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     strategy: Literal["consensus", "stochastic", "background"] = "stochastic"
@@ -167,6 +221,7 @@ class PWMSamplingConfig(BaseModel):
     pvalue_threshold: Optional[float] = None
     pvalue_bins: Optional[List[float]] = None
     pvalue_bin_ids: Optional[List[int]] = None
+    mining: Optional[PWMMiningConfig] = None
     bgfile: Optional[str] = None
     selection_policy: Literal["random_uniform", "top_n", "stratified"] = "random_uniform"
     keep_all_candidates_debug: bool = False
@@ -284,6 +339,8 @@ class PWMSamplingConfig(BaseModel):
                 raise ValueError("pwm.sampling.pvalue_bins is only valid when scoring_backend='fimo'")
             if self.pvalue_bin_ids is not None:
                 raise ValueError("pwm.sampling.pvalue_bin_ids is only valid when scoring_backend='fimo'")
+            if self.mining is not None:
+                raise ValueError("pwm.sampling.mining is only valid when scoring_backend='fimo'")
             if self.include_matched_sequence:
                 raise ValueError("pwm.sampling.include_matched_sequence is only valid when scoring_backend='fimo'")
         else:
@@ -291,11 +348,26 @@ class PWMSamplingConfig(BaseModel):
                 raise ValueError("pwm.sampling.pvalue_threshold is required when scoring_backend='fimo'")
             if not (0.0 < float(self.pvalue_threshold) <= 1.0):
                 raise ValueError("pwm.sampling.pvalue_threshold must be between 0 and 1")
-            if self.pvalue_bin_ids is not None:
+            if self.pvalue_bin_ids is not None and self.mining is not None:
+                raise ValueError(
+                    "pwm.sampling.pvalue_bin_ids is deprecated; use pwm.sampling.mining.retain_bin_ids instead."
+                )
+            if self.pvalue_bin_ids is not None and self.mining is None:
+                warnings.warn(
+                    "pwm.sampling.pvalue_bin_ids is deprecated; use pwm.sampling.mining.retain_bin_ids.",
+                    stacklevel=2,
+                )
+                self.mining = PWMMiningConfig(retain_bin_ids=list(self.pvalue_bin_ids))
+            bin_ids = None
+            if self.mining is not None and self.mining.retain_bin_ids is not None:
+                bin_ids = list(self.mining.retain_bin_ids)
+            elif self.pvalue_bin_ids is not None:
+                bin_ids = list(self.pvalue_bin_ids)
+            if bin_ids is not None:
                 bins = list(self.pvalue_bins) if self.pvalue_bins is not None else list(CANONICAL_PVALUE_BINS)
                 max_idx = len(bins) - 1
-                if any(idx > max_idx for idx in self.pvalue_bin_ids):
-                    raise ValueError("pwm.sampling.pvalue_bin_ids contains an index outside the available bins")
+                if any(idx > max_idx for idx in bin_ids):
+                    raise ValueError("pwm.sampling.mining.retain_bin_ids contains an index outside the available bins")
         if self.strategy == "consensus" and int(self.n_sites) != 1:
             raise ValueError("pwm.sampling.strategy=consensus requires n_sites=1")
         if self.scoring_backend == "densegen" and self.score_percentile is not None:
@@ -945,6 +1017,9 @@ class LoggingConfig(BaseModel):
     level: str = "INFO"
     suppress_solver_stderr: bool = True
     print_visual: bool = True
+    progress_style: Literal["stream", "summary", "screen"] = "stream"
+    progress_every: int = 1
+    progress_refresh_seconds: float = 1.0
 
     @field_validator("log_dir")
     @classmethod
@@ -961,6 +1036,20 @@ class LoggingConfig(BaseModel):
         if lv not in allowed:
             raise ValueError(f"logging.level must be one of {sorted(allowed)}")
         return lv
+
+    @field_validator("progress_every")
+    @classmethod
+    def _progress_every_ok(cls, v: int):
+        if v < 0:
+            raise ValueError("logging.progress_every must be >= 0")
+        return int(v)
+
+    @field_validator("progress_refresh_seconds")
+    @classmethod
+    def _progress_refresh_ok(cls, v: float):
+        if not isinstance(v, (int, float)) or float(v) <= 0:
+            raise ValueError("logging.progress_refresh_seconds must be > 0")
+        return float(v)
 
 
 # ---- Plots ----

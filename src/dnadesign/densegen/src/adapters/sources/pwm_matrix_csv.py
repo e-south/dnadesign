@@ -81,6 +81,7 @@ class PWMMatrixCSVDataSource(BaseDataSource):
         pvalue_threshold = sampling.get("pvalue_threshold")
         pvalue_bins = sampling.get("pvalue_bins")
         pvalue_bin_ids = sampling.get("pvalue_bin_ids")
+        mining = sampling.get("mining")
         bgfile = sampling.get("bgfile")
         selection_policy = str(sampling.get("selection_policy", "random_uniform"))
         keep_all_candidates_debug = bool(sampling.get("keep_all_candidates_debug", False))
@@ -109,6 +110,7 @@ class PWMMatrixCSVDataSource(BaseDataSource):
             pvalue_threshold=pvalue_threshold,
             pvalue_bins=pvalue_bins,
             pvalue_bin_ids=pvalue_bin_ids,
+            mining=mining,
             bgfile=bgfile_path,
             selection_policy=selection_policy,
             keep_all_candidates_debug=keep_all_candidates_debug,

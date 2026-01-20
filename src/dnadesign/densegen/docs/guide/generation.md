@@ -111,6 +111,17 @@ Notes:
 - `coverage_weighted` dynamically boosts underused TFBS based on the run’s usage counts.
 - `avoid_failed_motifs: true` down-weights TFBS that repeatedly appear in failed solve attempts (tracked in attempts.parquet).
 
+### Run scheduling (round‑robin)
+
+`runtime.round_robin` controls **scheduling**, not sampling. When enabled, DenseGen interleaves plan
+items across inputs so each plan advances in turn (one subsample per pass). This is useful when you
+have multiple constraint sets (e.g., different fixed sequences) and want a single run to progress
+each design target in parallel.
+
+Round‑robin is **distinct from Stage‑B sampling** (`generation.sampling`): library sampling still
+uses the same policy per plan, but round‑robin can trigger more frequent library rebuilds when
+`pool_strategy: iterative_subsample` is used. Expect extra compute if many plans are active.
+
 ---
 
 ### Regulator constraints
