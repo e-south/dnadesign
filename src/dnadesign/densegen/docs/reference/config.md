@@ -62,13 +62,26 @@ PWM inputs perform **input sampling** (sampling sites from PWMs) via
     - `oversample_factor` (int > 0)
     - `max_candidates` (optional int > 0; caps candidate generation)
     - `max_seconds` (optional float > 0; time limit for candidate generation)
-    - `score_threshold` or `score_percentile` (exactly one)
+    - `scoring_backend`: `densegen | fimo` (default: `densegen`)
+    - `score_threshold` or `score_percentile` (exactly one; **densegen** backend only)
+    - `pvalue_threshold` (float in (0, 1]; **fimo** backend only)
+    - `selection_policy`: `random_uniform | top_n | stratified` (default: `random_uniform`; fimo only)
+    - `pvalue_bins` (optional list of floats; must end with `1.0`) - p‑value bin edges for stratified sampling
+    - `pvalue_bin_ids` (optional list of ints) - select specific p‑value bins (0‑based indices)
+    - `bgfile` (optional path) - MEME bfile-format background model for FIMO
+    - `keep_all_candidates_debug` (bool, default false) - write raw FIMO TSVs to `outputs/meta/fimo/` for inspection
+    - `include_matched_sequence` (bool, default false) - include `fimo_matched_sequence` in TFBS outputs
     - `length_policy`: `exact | range` (default: `exact`)
     - `length_range`: `[min, max]` (required when `length_policy=range`; `min` >= motif length)
     - `trim_window_length` (optional int > 0; trims PWM to a max‑information window before sampling)
     - `trim_window_strategy`: `max_info` (window selection strategy)
     - `consensus` requires `n_sites: 1`
-    - `background` selects low-scoring sequences (<= threshold/percentile)
+    - `background` selects low-scoring sequences (<= threshold/percentile; or pvalue >= threshold for fimo)
+    - FIMO resolves `fimo` via `MEME_BIN` or PATH; pixi users should run `pixi run dense ...` so it is available.
+    - Canonical p‑value bins (default): `[1e-10, 1e-8, 1e-6, 1e-4, 1e-3, 1e-2, 1e-1, 1.0]`
+      (bin 0 is `(0, 1e-10]`, bin 1 is `(1e-10, 1e-8]`, etc.)
+    - FIMO runs log per‑bin yield summaries (hits, accepted, selected); `selection_policy: stratified`
+      makes the selected‑bin distribution explicit for mining workflows.
 - `type: pwm_meme_set`
   - `paths` - list of MEME PWM files (merged into a single TF pool)
   - `motif_ids` (optional list) - choose motifs by ID across files

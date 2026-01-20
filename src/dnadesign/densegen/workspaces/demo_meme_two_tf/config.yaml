@@ -23,8 +23,9 @@ densegen:
         n_sites: 80
         oversample_factor: 12
         max_candidates: 50000  # bounded candidate generation
-        score_threshold: null
-        score_percentile: 80
+        scoring_backend: fimo
+        pvalue_threshold: 1e-4
+        selection_policy: stratified
         length_policy: range
         length_range: [22, 28]
 
@@ -40,7 +41,7 @@ densegen:
 
   generation:
     sequence_length: 60
-    quota: 6
+    quota: 50
     sampling:
       pool_strategy: subsample
       library_size: 24
@@ -58,7 +59,7 @@ densegen:
 
     plan:
       - name: meme_demo
-        quota: 6
+        quota: 50
         required_regulators: [lexA, cpxR]
 
   solver:

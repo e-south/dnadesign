@@ -17,11 +17,14 @@ Prerequisites include Python, dense-arrays, and a MILP solver. CBC is open-sourc
 Use the canonical demo config (small, Parquet-only). The demo uses MEME motif files
 copied from the Cruncher basic demo workspace (`inputs/local_motifs`) and parsed with
 Cruncher’s MEME parser for DRY, consistent parsing.
+FIMO-backed PWM sampling is supported when MEME Suite is available (`fimo` on PATH via `pixi run`).
+Stratified FIMO sampling uses canonical p‑value bins by default; see the guide for mining workflows.
 
 ```bash
 uv run dense validate -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
 uv run dense describe -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-uv run dense run -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --no-plot
+pixi run dense run -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --no-plot
+uv run dense summarize -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --library --top-per-tf 5
 uv run dense plot -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --only tf_usage,tf_coverage
 ```
 
