@@ -9,6 +9,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -173,6 +174,50 @@ def _append_parquet_dedupe(path: Path, df: pd.DataFrame, *, key: Sequence[str]) 
     tmp.replace(path)
 
 
+def _append_parquet_dedupe_labels(path: Path, df: pd.DataFrame) -> None:
+    """
+    Append label events while preserving distinct provenance.
+    Dedupes only exact duplicates (including y_obs content), not just (round, id).
+    """
+    ensure_dir(path.parent)
+    if not path.exists():
+        write_parquet_df(path, df, index=False)
+        return
+    existing = read_parquet_df(path)
+    if list(existing.columns) != list(df.columns):
+        raise LedgerError(
+            f"Ledger sink schema mismatch.\n  existing: {list(existing.columns)}\n  new     : {list(df.columns)}"
+        )
+
+    def _sig(val) -> str | None:
+        if val is None or (isinstance(val, float) and pd.isna(val)):
+            return None
+        try:
+            if hasattr(val, "tolist"):
+                val = val.tolist()
+            return json.dumps(val, separators=(",", ":"), ensure_ascii=True)
+        except Exception:
+            return str(val)
+
+    def _with_sig(frame: pd.DataFrame) -> pd.DataFrame:
+        out = frame.copy()
+        out["__y_obs_sig"] = out["y_obs"].apply(_sig) if "y_obs" in out.columns else None
+        return out
+
+    def _dedupe(frame: pd.DataFrame) -> pd.DataFrame:
+        key_cols = [c for c in frame.columns if c not in {"event", "y_obs"}]
+        if "__y_obs_sig" not in key_cols:
+            key_cols.append("__y_obs_sig")
+        out = frame.drop_duplicates(subset=key_cols, keep="last")
+        return out.drop(columns=["__y_obs_sig"])
+
+    combined = pd.concat([_with_sig(existing), _with_sig(df)], ignore_index=True)
+    out = _dedupe(combined)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    write_parquet_df(tmp, out, index=False)
+    tmp.replace(path)
+
+
 def _ensure_event_value(df: pd.DataFrame, kind: str) -> None:
     if "event" not in df.columns:
         raise LedgerError(f"[ledger:{kind}] missing 'event' column.")
@@ -214,7 +259,7 @@ class LedgerWriter:
                 raise LedgerError("[ledger:run_pred] duplicate (run_id, id) rows are not allowed.")
         ensure_dir(self._paths.predictions_dir)
         tbl = table_from_pandas(df)
-        if any(self._paths.predictions_dir.glob("*.parquet")):
+        if any(self._paths.predictions_dir.rglob("*.parquet")):
             dset = dataset_from_dir(self._paths.predictions_dir)
             _assert_schema_match(dset.schema, tbl.schema, ctx="[ledger:run_pred]")
         out = self._paths.predictions_dir / f"part-{uuid4().hex}.parquet"
@@ -228,7 +273,7 @@ class LedgerWriter:
     def append_label(self, df: pd.DataFrame) -> None:
         _ensure_event_value(df, "label")
         _validate_columns(df, "label")
-        _append_parquet_dedupe(self._paths.labels_path, df, key=("observed_round", "id"))
+        _append_parquet_dedupe_labels(self._paths.labels_path, df)
 
 
 class LedgerReader:
@@ -257,27 +302,51 @@ class LedgerReader:
         round_selector: Optional[object] = None,
         run_id: Optional[str] = None,
         id_value: Optional[str] = None,
+        require_run_id: bool = True,
     ) -> pd.DataFrame:
         if not self._paths.predictions_dir.exists():
             raise LedgerError(f"Missing predictions sink: {self._paths.predictions_dir}")
+        round_sel = "latest" if round_selector is None else round_selector
+        if require_run_id and run_id is None:
+            runs_df = self.read_runs(columns=["run_id", "as_of_round"])
+            if runs_df.empty:
+                raise LedgerError("Run ID is required to disambiguate ledger predictions, but ledger.runs is empty.")
+            if round_sel in ("unspecified", "latest"):
+                round_vals = [int(runs_df["as_of_round"].max())]
+            elif round_sel == "all":
+                round_vals = sorted({int(x) for x in runs_df["as_of_round"].to_list()})
+            elif isinstance(round_sel, list):
+                round_vals = [int(x) for x in round_sel]
+            else:
+                round_vals = [int(round_sel)]
+            df_sel = runs_df[runs_df["as_of_round"].isin(round_vals)]
+            if df_sel.empty:
+                raise LedgerError(f"No runs found for selected rounds {round_vals}.")
+            counts = df_sel.groupby("as_of_round")["run_id"].nunique()
+            multi = counts[counts > 1]
+            if not multi.empty:
+                raise LedgerError(
+                    "Multiple run_id values found for round(s) "
+                    f"{sorted(int(x) for x in multi.index.tolist())}. "
+                    "Specify run_id to avoid mixing reruns."
+                )
         dset = dataset_from_dir(self._paths.predictions_dir)
         cols = list(columns) if columns is not None else None
 
         filt = None
-        if round_selector is not None:
-            pc = pyarrow_compute()
-            if round_selector == "all":
-                filt = None
-            elif round_selector in ("latest", "unspecified"):
-                t = dset.to_table(columns=["as_of_round"])
-                if t.num_rows > 0:
-                    latest = int(pd.Series(t.column("as_of_round").to_pylist()).max())
-                    filt = pc.field("as_of_round") == latest
-            elif isinstance(round_selector, list):
-                vals = [int(x) for x in round_selector]
-                filt = pc.field("as_of_round").isin(vals)
-            else:
-                filt = pc.field("as_of_round") == int(round_selector)
+        pc = pyarrow_compute()
+        if round_sel == "all":
+            filt = None
+        elif round_sel in ("latest", "unspecified"):
+            t = dset.to_table(columns=["as_of_round"])
+            if t.num_rows > 0:
+                latest = int(pd.Series(t.column("as_of_round").to_pylist()).max())
+                filt = pc.field("as_of_round") == latest
+        elif isinstance(round_sel, list):
+            vals = [int(x) for x in round_sel]
+            filt = pc.field("as_of_round").isin(vals)
+        else:
+            filt = pc.field("as_of_round") == int(round_sel)
         if run_id is not None:
             pc = pyarrow_compute()
             cond = pc.field("run_id") == str(run_id)

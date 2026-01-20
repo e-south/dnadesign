@@ -144,6 +144,7 @@ def test_load_predictions_with_setpoint_requires_setpoint(tmp_path: Path) -> Non
             ws.outputs_dir,
             {"as_of_round", "pred__y_obj_scalar"},
             round_selector="latest",
+            run_id="r1",
         )
 
-    assert "Missing objective__params.setpoint_vector" in str(exc.value)
+    assert "setpoint_vector" in str(exc.value)

@@ -86,11 +86,13 @@ class RecordsStore:
         df: pd.DataFrame,
         *,
         include_label_hist: bool = True,
+        include_pred_provenance: bool = True,
     ) -> tuple[pd.DataFrame, list[str]]:
         return self._caches.ensure_cache_columns(
             df,
             include_label_hist=include_label_hist,
             label_hist_col=self.label_hist_col(),
+            include_pred_provenance=include_pred_provenance,
         )
 
     def upsert_current_y_column(self, df: pd.DataFrame, labels_resolved: pd.DataFrame, y_col_name: str) -> pd.DataFrame:
@@ -365,6 +367,9 @@ class RecordsStore:
         latest_as_of_round: int,
         latest_scalar_by_id: Dict[str, float],
         require_columns_present: bool,
+        latest_pred_run_id: str | None = None,
+        latest_pred_as_of_round: int | None = None,
+        latest_pred_written_at: str | None = None,
     ) -> pd.DataFrame:
         if str(slug) != str(self.campaign_slug):
             raise OpalError(f"update_latest_cache slug mismatch: got {slug!r}, expected {self.campaign_slug!r}.")
@@ -373,6 +378,9 @@ class RecordsStore:
             latest_as_of_round=latest_as_of_round,
             latest_scalar_by_id=latest_scalar_by_id,
             require_columns_present=require_columns_present,
+            latest_pred_run_id=latest_pred_run_id,
+            latest_pred_as_of_round=latest_pred_as_of_round,
+            latest_pred_written_at=latest_pred_written_at,
         )
 
     # --------------- labeled ids ≤ round ---------------

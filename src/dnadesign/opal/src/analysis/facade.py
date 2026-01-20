@@ -110,13 +110,17 @@ def latest_run_id(runs_df: pl.DataFrame, *, round_k: Optional[int] = None) -> st
     return str(df.sort("run_id").tail(1)["run_id"][0])
 
 
+def _pred_parquet_paths(pred_dir: Path) -> list[Path]:
+    return sorted({p for p in pred_dir.rglob("*.parquet") if p.is_file()})
+
+
 def _ensure_predictions_dir(pred_dir: Path) -> None:
     if not pred_dir.exists():
         raise OpalError(
             f"Missing predictions sink: {pred_dir}. Run `opal run -c <campaign.yaml> --round <k>` first.",
             ExitCodes.BAD_ARGS,
         )
-    if not any(pred_dir.glob("*.parquet")):
+    if not _pred_parquet_paths(pred_dir):
         raise OpalError(
             f"Predictions sink is empty: {pred_dir}. Run `opal run -c <campaign.yaml> --round <k>` first.",
             ExitCodes.BAD_ARGS,
@@ -141,7 +145,8 @@ def _ensure_labels_path(labels_path: Path) -> None:
 
 def scan_predictions(pred_dir: Path) -> pl.LazyFrame:
     _ensure_predictions_dir(pred_dir)
-    return pl.scan_parquet(str(pred_dir / "*.parquet"))
+    files = _pred_parquet_paths(pred_dir)
+    return pl.scan_parquet([str(path) for path in files])
 
 
 def read_runs(runs_path: Path) -> pl.DataFrame:
@@ -188,6 +193,60 @@ def _apply_round_filter(
     return lf.filter(pl.col("as_of_round") == int(round_selector))
 
 
+def _selected_rounds(
+    round_selector: Optional[RoundSelector],
+    runs_df: Optional[pl.DataFrame],
+) -> list[int]:
+    if runs_df is None or runs_df.is_empty():
+        return []
+    if round_selector in (None, "unspecified", "latest"):
+        return [latest_round(runs_df)]
+    if round_selector == "all":
+        return sorted({int(x) for x in runs_df["as_of_round"].to_list()})
+    if isinstance(round_selector, list):
+        return [int(x) for x in round_selector]
+    return [int(round_selector)]
+
+
+def _require_run_id_if_ambiguous(
+    *,
+    runs_df: Optional[pl.DataFrame],
+    round_selector: Optional[RoundSelector],
+    run_id: Optional[str],
+    require_run_id: bool,
+) -> None:
+    if not require_run_id or run_id is not None:
+        return
+    if runs_df is None or runs_df.is_empty():
+        raise OpalError(
+            "Run ID is required to disambiguate ledger predictions, but ledger.runs is missing or empty. "
+            "Provide run_id explicitly (e.g., --run-id) or generate ledger runs first.",
+            ExitCodes.BAD_ARGS,
+        )
+    rounds = _selected_rounds(round_selector, runs_df)
+    if not rounds:
+        raise OpalError(
+            "Run ID is required to disambiguate ledger predictions, but no runs were found for selection.",
+            ExitCodes.BAD_ARGS,
+        )
+    df = runs_df.filter(pl.col("as_of_round").is_in(rounds))
+    if df.is_empty():
+        raise OpalError(
+            f"No runs found in ledger.runs for selected rounds {rounds}.",
+            ExitCodes.BAD_ARGS,
+        )
+    counts = df.group_by("as_of_round").agg(pl.col("run_id").n_unique().alias("n_runs"))
+    multi = counts.filter(pl.col("n_runs") > 1).select(pl.col("as_of_round")).to_series().to_list()
+    if multi:
+        raise OpalError(
+            "Multiple run_id values found for round(s) "
+            f"{sorted(int(x) for x in multi)}. Specify run_id to avoid mixing reruns "
+            "(ledger is append-only; rerunning a round creates a new run_id). "
+            "Use `opal runs list` or `opal status --with-ledger` to find valid run_id values.",
+            ExitCodes.BAD_ARGS,
+        )
+
+
 def read_predictions(
     pred_dir: Path,
     *,
@@ -196,8 +255,15 @@ def read_predictions(
     run_id: Optional[str] = None,
     runs_df: Optional[pl.DataFrame] = None,
     allow_missing: bool = False,
+    require_run_id: bool = True,
 ) -> pl.DataFrame:
     lf = scan_predictions(pred_dir)
+    _require_run_id_if_ambiguous(
+        runs_df=runs_df,
+        round_selector=round_selector,
+        run_id=run_id,
+        require_run_id=require_run_id,
+    )
     if columns:
         want = [c for c in columns if c]
         try:
@@ -224,6 +290,8 @@ def load_predictions_with_setpoint(
     base_columns: Iterable[str],
     *,
     round_selector: Optional[RoundSelector] = None,
+    run_id: Optional[str] = None,
+    require_run_id: bool = True,
 ) -> pl.DataFrame:
     """
     Read predictions (ledger.predictions) and join setpoint from ledger.runs.
@@ -234,7 +302,14 @@ def load_predictions_with_setpoint(
     runs_df = read_runs(runs_path)
 
     want = set(map(str, base_columns)) | {"run_id"}
-    df = read_predictions(pred_dir, columns=sorted(want), round_selector=round_selector, runs_df=runs_df)
+    df = read_predictions(
+        pred_dir,
+        columns=sorted(want),
+        round_selector=round_selector,
+        run_id=run_id,
+        runs_df=runs_df,
+        require_run_id=require_run_id,
+    )
     if df.is_empty():
         raise OpalError("ledger.predictions had zero rows after projection.", ExitCodes.BAD_ARGS)
 
@@ -320,7 +395,10 @@ class CampaignAnalysis:
         run_id: Optional[str] = None,
         runs_df: Optional[pl.DataFrame] = None,
         allow_missing: bool = False,
+        require_run_id: bool = True,
     ) -> pl.DataFrame:
+        if runs_df is None:
+            runs_df = self.read_runs()
         return read_predictions(
             self.workspace.ledger_predictions_dir,
             columns=columns,
@@ -328,6 +406,7 @@ class CampaignAnalysis:
             run_id=run_id,
             runs_df=runs_df,
             allow_missing=allow_missing,
+            require_run_id=require_run_id,
         )
 
     def predictions_with_setpoint(
@@ -335,5 +414,13 @@ class CampaignAnalysis:
         columns: Iterable[str],
         *,
         round_selector: Optional[RoundSelector] = None,
+        run_id: Optional[str] = None,
+        require_run_id: bool = True,
     ) -> pl.DataFrame:
-        return load_predictions_with_setpoint(self.workspace.outputs_dir, columns, round_selector=round_selector)
+        return load_predictions_with_setpoint(
+            self.workspace.outputs_dir,
+            columns,
+            round_selector=round_selector,
+            run_id=run_id,
+            require_run_id=require_run_id,
+        )

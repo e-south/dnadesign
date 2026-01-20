@@ -35,6 +35,7 @@ from ..storage.artifacts import (
     write_objective_meta,
     write_round_ctx,
     write_selection_csv,
+    write_selection_parquet,
 )
 from ..storage.data_access import RecordsStore
 from ..storage.ledger import LedgerWriter
@@ -119,6 +120,29 @@ class _ScoreBundle:
 def _log(enabled: bool, msg: str) -> None:
     if enabled:
         print_stderr(msg)
+
+
+def _resolve_selection_objective_mode(sel_params: Dict[str, Any], *, warn: bool = True) -> str:
+    mode_raw = sel_params.get("objective_mode")
+    legacy_raw = sel_params.get("objective")
+    if mode_raw is not None and legacy_raw is not None:
+        mode_str = str(mode_raw).strip().lower()
+        legacy_str = str(legacy_raw).strip().lower()
+        if mode_str != legacy_str:
+            raise OpalError(
+                "selection.params has both 'objective_mode' and legacy 'objective' with conflicting values "
+                f"({mode_str!r} vs {legacy_str!r})."
+            )
+    if mode_raw is None and legacy_raw is not None:
+        if warn:
+            print_stderr("[opal] selection.params.objective is deprecated; please use selection.params.objective_mode.")
+        mode_raw = legacy_raw
+    if mode_raw is None:
+        mode_raw = "maximize"
+    mode = str(mode_raw).strip().lower()
+    if mode not in {"maximize", "minimize"}:
+        raise OpalError(f"Invalid selection objective_mode: {mode!r} (expected 'maximize' or 'minimize').")
+    return mode
 
 
 def _stage_training(
@@ -422,6 +446,12 @@ def _stage_fit_predict_score(
         )
     diag = obj_res.diagnostics or {}
     obj_mode = getattr(obj_res, "mode", "maximize")
+    obj_mode_norm = str(obj_mode).strip().lower()
+    if obj_mode_norm not in {"maximize", "minimize"}:
+        raise OpalError(
+            f"Objective returned invalid mode {obj_mode!r} (expected 'maximize' or 'minimize'). "
+            "Fix the objective plugin or configuration."
+        )
 
     obj_meta = {
         "mode": obj_mode,
@@ -466,7 +496,14 @@ def _stage_fit_predict_score(
     if top_k <= 0:
         raise OpalError("selection.params.top_k must be > 0 (or override with --k).")
     tie_handling = sel_params.get("tie_handling", "competition_rank")
-    mode = (sel_params.get("objective_mode") or "maximize").strip().lower()
+    mode = _resolve_selection_objective_mode(sel_params)
+    sel_params["objective_mode"] = mode
+    if obj_mode_norm != mode:
+        raise OpalError(
+            "Objective mode mismatch: objective returned "
+            f"{obj_mode_norm!r} but selection objective_mode is {mode!r}. "
+            "Align objective and selection modes to avoid inverted ranking."
+        )
 
     sel_fn = get_selection(sel_name, sel_params)
     sctx = rctx.for_plugin(category="selection", name=sel_name, plugin=sel_fn)
@@ -718,6 +755,8 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
 
     # Map sequences up-front for artifact emission
     seq_map = df.set_index("id")["sequence"].astype(str).to_dict() if "sequence" in df.columns else {}
+    if seq_map:
+        seq_map = {str(k): v for k, v in seq_map.items()}
 
     # Training snapshot (artifact only; not appended to ledger)
     labels_used_df = None
@@ -734,20 +773,50 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
                 "note": [f"labels used in run {run_id} (as_of_round={int(req.as_of_round)})"] * len(train_df),
             }
         )
-    selected_df = (
-        pd.DataFrame(
-            {
-                "id": id_order_pool,
-                "sequence": [seq_map.get(i) for i in id_order_pool],
-                "sel__rank_competition": ranks_competition,
-                "selection_score": y_obj_scalar,
-                "sel__is_selected": selected_bool,
-            }
-        )
-        .loc[lambda d: d["sel__is_selected"]]
-        .sort_values("sel__rank_competition")[["id", "sequence", "sel__rank_competition", "selection_score"]]
+    selected_ids = [str(i) for i in id_order_pool]
+    selected_df = pd.DataFrame(
+        {
+            "id": selected_ids,
+            "sequence": [seq_map.get(i) for i in selected_ids],
+            "sel__rank_competition": ranks_competition,
+            "selection_score": y_obj_scalar,
+            "sel__is_selected": selected_bool,
+        }
     )
+    selected_df = selected_df.loc[lambda d: d["sel__is_selected"]].sort_values("sel__rank_competition")
+    selected_df = selected_df.assign(
+        run_id=run_id,
+        as_of_round=int(req.as_of_round),
+        campaign_slug=cfg.campaign.slug,
+        selection_name=sel_name,
+        objective_name=obj_name,
+        objective_mode=mode,
+        tie_handling=tie_handling,
+        pred__y_obj_scalar=selected_df["selection_score"],
+    )
+    selected_df = selected_df[
+        [
+            "run_id",
+            "as_of_round",
+            "campaign_slug",
+            "selection_name",
+            "objective_name",
+            "objective_mode",
+            "tie_handling",
+            "id",
+            "sequence",
+            "sel__rank_competition",
+            "selection_score",
+            "pred__y_obj_scalar",
+        ]
+    ]
     sel_sha = write_selection_csv(apaths.selection_csv, selected_df)
+    sel_parquet_path = apaths.selection_csv.with_suffix(".parquet")
+    sel_parquet_sha = write_selection_parquet(sel_parquet_path, selected_df)
+    sel_run_csv_path = apaths.selection_csv.with_name(f"selection_top_k__run_{run_id}.csv")
+    sel_run_parquet_path = sel_parquet_path.with_name(f"selection_top_k__run_{run_id}.parquet")
+    sel_run_csv_sha = write_selection_csv(sel_run_csv_path, selected_df)
+    sel_run_parquet_sha = write_selection_parquet(sel_run_parquet_path, selected_df)
 
     ctx_sha = write_round_ctx(apaths.round_ctx_json, rctx.snapshot())
     labels_used_sha = write_labels_used_parquet(rdir / "labels_used.parquet", labels_used_df)
@@ -795,7 +864,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
 
     _log(
         req.verbose,
-        "[artifacts] model, selection_csv, round_ctx, objective_meta"
+        "[artifacts] model, selection_csv, selection_parquet, round_ctx, objective_meta"
         + (", feature_importance" if "feature_importance.csv" in artifacts_paths_and_hashes else "")
         + " written",
     )
@@ -832,6 +901,9 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         {
             "model.joblib": (file_sha256(apaths.model), str(apaths.model.resolve())),
             "selection_top_k.csv": (sel_sha, str(apaths.selection_csv.resolve())),
+            "selection_top_k.parquet": (sel_parquet_sha, str(sel_parquet_path.resolve())),
+            f"selection_top_k__run_{run_id}.csv": (sel_run_csv_sha, str(sel_run_csv_path.resolve())),
+            f"selection_top_k__run_{run_id}.parquet": (sel_run_parquet_sha, str(sel_run_parquet_path.resolve())),
             "round_ctx.json": (ctx_sha, str(apaths.round_ctx_json.resolve())),
             "objective_meta.json": (obj_sha, str(apaths.objective_meta_json.resolve())),
             "model_meta.json": (
@@ -886,6 +958,9 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         latest_as_of_round=int(req.as_of_round),
         latest_scalar_by_id=latest_scalar,
         require_columns_present=cfg.safety.write_back_requires_columns_present,
+        latest_pred_run_id=run_id,
+        latest_pred_as_of_round=int(req.as_of_round),
+        latest_pred_written_at=now_iso(),
     )
     store.save_atomic(df2)
     _log(

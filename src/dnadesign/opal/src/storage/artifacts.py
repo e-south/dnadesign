@@ -35,6 +35,12 @@ def write_selection_csv(path: Path, df_selected: pd.DataFrame) -> str:
     return file_sha256(path)
 
 
+def write_selection_parquet(path: Path, df_selected: pd.DataFrame) -> str:
+    ensure_dir(path.parent)
+    write_parquet_df(path, df_selected, index=False)
+    return file_sha256(path)
+
+
 def write_feature_importance_csv(path: Path, df: pd.DataFrame) -> str:
     """
     Persist per-feature importances. Expected columns:
