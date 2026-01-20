@@ -208,6 +208,23 @@ def _selected_rounds(
     return [int(round_selector)]
 
 
+def _resolve_round_for_run_id(run_id: str, runs_df: pl.DataFrame) -> int:
+    if runs_df.is_empty():
+        raise OpalError("ledger.runs is empty; cannot resolve run_id.", ExitCodes.BAD_ARGS)
+    if "run_id" not in runs_df.columns or "as_of_round" not in runs_df.columns:
+        raise OpalError("ledger.runs missing required columns (run_id, as_of_round).", ExitCodes.BAD_ARGS)
+    df = runs_df.filter(pl.col("run_id") == str(run_id)).select(pl.col("as_of_round").drop_nulls().unique())
+    if df.is_empty():
+        raise OpalError(f"run_id {run_id!r} not found in ledger.runs.", ExitCodes.BAD_ARGS)
+    rounds = sorted({int(x) for x in df.to_series().to_list()})
+    if len(rounds) > 1:
+        raise OpalError(
+            f"run_id {run_id!r} appears in multiple rounds {rounds}; ledger.runs is inconsistent.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    return rounds[0]
+
+
 def _require_run_id_if_ambiguous(
     *,
     runs_df: Optional[pl.DataFrame],
@@ -258,6 +275,27 @@ def read_predictions(
     require_run_id: bool = True,
 ) -> pl.DataFrame:
     lf = scan_predictions(pred_dir)
+    if run_id is not None:
+        if runs_df is None or runs_df.is_empty():
+            if round_selector in (None, "unspecified", "latest"):
+                raise OpalError(
+                    "run_id was provided without ledger.runs context. "
+                    "Pass runs_df or set round_selector explicitly (e.g., --round all) "
+                    "to avoid implicit 'latest' filtering.",
+                    ExitCodes.BAD_ARGS,
+                )
+        else:
+            run_round = _resolve_round_for_run_id(str(run_id), runs_df)
+            if round_selector in (None, "unspecified", "latest"):
+                round_selector = [run_round]
+            elif round_selector != "all":
+                selected = _selected_rounds(round_selector, runs_df)
+                if run_round not in selected:
+                    raise OpalError(
+                        f"run_id {run_id!r} belongs to as_of_round={run_round}, "
+                        f"but round_selector={round_selector!r} excludes it.",
+                        ExitCodes.BAD_ARGS,
+                    )
     _require_run_id_if_ambiguous(
         runs_df=runs_df,
         round_selector=round_selector,

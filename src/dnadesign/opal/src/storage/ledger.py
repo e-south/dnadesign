@@ -307,10 +307,36 @@ class LedgerReader:
         if not self._paths.predictions_dir.exists():
             raise LedgerError(f"Missing predictions sink: {self._paths.predictions_dir}")
         round_sel = "latest" if round_selector is None else round_selector
-        if require_run_id and run_id is None:
+        runs_df = None
+        if run_id is not None or (require_run_id and run_id is None):
             runs_df = self.read_runs(columns=["run_id", "as_of_round"])
             if runs_df.empty:
-                raise LedgerError("Run ID is required to disambiguate ledger predictions, but ledger.runs is empty.")
+                raise LedgerError("ledger.runs is empty; cannot resolve run_id or rounds.")
+
+        if run_id is not None:
+            df_run = runs_df[runs_df["run_id"].astype(str) == str(run_id)] if runs_df is not None else pd.DataFrame()
+            if df_run.empty:
+                raise LedgerError(f"run_id {run_id!r} not found in ledger.runs.")
+            run_rounds = sorted({int(x) for x in df_run["as_of_round"].to_list()})
+            if len(run_rounds) > 1:
+                raise LedgerError(
+                    f"run_id {run_id!r} appears in multiple rounds {run_rounds}; ledger.runs is inconsistent."
+                )
+            run_round = run_rounds[0]
+            if round_sel in ("unspecified", "latest"):
+                round_sel = run_round
+            elif round_sel != "all":
+                if isinstance(round_sel, list):
+                    sel_rounds = [int(x) for x in round_sel]
+                else:
+                    sel_rounds = [int(round_sel)]
+                if run_round not in sel_rounds:
+                    raise LedgerError(
+                        f"run_id {run_id!r} belongs to as_of_round={run_round}, "
+                        f"but round_selector={round_sel!r} excludes it."
+                    )
+
+        if require_run_id and run_id is None:
             if round_sel in ("unspecified", "latest"):
                 round_vals = [int(runs_df["as_of_round"].max())]
             elif round_sel == "all":
