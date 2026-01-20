@@ -1546,6 +1546,16 @@ def _(
                 f"{_missing_transient}. This is a bug — please report."
             ),
         )
+    if df_umap_overlay.height and "opal__transient__round" in df_umap_overlay.columns:
+        _round_missing = df_umap_overlay.select(pl.col("opal__transient__round").is_null().sum()).item()
+        if _round_missing:
+            mo.stop(
+                True,
+                mo.md(
+                    "Transient round provenance is missing. Select a round or ensure ledger/labels are available; "
+                    "transient overlays do not allow round fallbacks."
+                ),
+            )
 
     missing_transient_cols = [c for c in transient_cols if c not in df_umap_overlay.columns]
     if missing_transient_cols:
