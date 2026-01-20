@@ -144,9 +144,12 @@ src/dnadesign/opal/src/
 ├─ runtime/                 # run_round, ingest, predict, explain, preflight, round_plan
 ├─ storage/                 # data_access, ledger, artifacts, writebacks, workspace, state, locks
 ├─ reporting/               # status, summary, record_show
-├─ analysis/                # analysis utilities (e.g., promoter_eda_utils)
+├─ analysis/                # analysis utilities (dashboard modules under analysis/dashboard)
 └─ …
 ```
+
+Dashboard notebooks (e.g., `prom60_eda.py`) now pull their shared logic from
+`src/dnadesign/opal/src/analysis/dashboard/` to keep data contracts explicit and reusable for future dashboards.
 
 ---
 
