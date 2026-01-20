@@ -93,8 +93,16 @@ META_FIELDS: list[MetaField] = [
         allow_none=True,
     ),
     MetaField("input_pwm_strategy", (str,), "PWM sampling strategy.", allow_none=True),
+    MetaField("input_pwm_scoring_backend", (str,), "PWM scoring backend (densegen|fimo).", allow_none=True),
     MetaField("input_pwm_score_threshold", (numbers.Real,), "PWM score threshold.", allow_none=True),
     MetaField("input_pwm_score_percentile", (numbers.Real,), "PWM score percentile.", allow_none=True),
+    MetaField("input_pwm_pvalue_threshold", (numbers.Real,), "PWM p-value threshold (FIMO).", allow_none=True),
+    MetaField("input_pwm_pvalue_bins", (list,), "PWM p-value bins (FIMO).", allow_none=True),
+    MetaField("input_pwm_pvalue_bin_ids", (list,), "Selected p-value bin indices (FIMO).", allow_none=True),
+    MetaField("input_pwm_selection_policy", (str,), "PWM selection policy (FIMO).", allow_none=True),
+    MetaField("input_pwm_bgfile", (str,), "PWM background model path (FIMO).", allow_none=True),
+    MetaField("input_pwm_keep_all_candidates_debug", (bool,), "PWM FIMO debug TSV enabled.", allow_none=True),
+    MetaField("input_pwm_include_matched_sequence", (bool,), "PWM matched-sequence capture.", allow_none=True),
     MetaField("input_pwm_n_sites", (int,), "PWM sampling n_sites.", allow_none=True),
     MetaField("input_pwm_oversample_factor", (int,), "PWM sampling oversample factor.", allow_none=True),
     MetaField("fixed_elements", (dict,), "Fixed-element constraints (promoters + side biases)."),
@@ -198,6 +206,24 @@ def _validate_list_fields(meta: Mapping[str, Any]) -> None:
                 raise TypeError("Metadata field 'used_tf_counts' must contain dict entries")
             if "tf" not in item or "count" not in item:
                 raise ValueError("used_tf_counts entries must include 'tf' and 'count'")
+
+    if "input_pwm_pvalue_bins" in meta:
+        vals = meta["input_pwm_pvalue_bins"]
+        if vals is not None:
+            if isinstance(vals, (str, bytes)) or not isinstance(vals, Sequence):
+                raise TypeError("Metadata field 'input_pwm_pvalue_bins' must be a list of numbers")
+            for item in vals:
+                if not isinstance(item, numbers.Real):
+                    raise TypeError("Metadata field 'input_pwm_pvalue_bins' must contain only numbers")
+
+    if "input_pwm_pvalue_bin_ids" in meta:
+        vals = meta["input_pwm_pvalue_bin_ids"]
+        if vals is not None:
+            if isinstance(vals, (str, bytes)) or not isinstance(vals, Sequence):
+                raise TypeError("Metadata field 'input_pwm_pvalue_bin_ids' must be a list of integers")
+            for item in vals:
+                if not isinstance(item, int):
+                    raise TypeError("Metadata field 'input_pwm_pvalue_bin_ids' must contain only integers")
             if not isinstance(item["tf"], str):
                 raise TypeError("used_tf_counts.tf must be a string")
             if not isinstance(item["count"], int):

@@ -28,7 +28,7 @@ class PWMArtifactSetDataSource(BaseDataSource):
     sampling: dict
     overrides_by_motif_id: dict[str, dict] | None = None
 
-    def load_data(self, *, rng=None):
+    def load_data(self, *, rng=None, outputs_root: Path | None = None):
         if rng is None:
             raise ValueError("PWM sampling requires an RNG; pass the pipeline RNG explicitly.")
 
@@ -69,7 +69,24 @@ class PWMArtifactSetDataSource(BaseDataSource):
             length_range = sampling_cfg.get("length_range")
             trim_window_length = sampling_cfg.get("trim_window_length")
             trim_window_strategy = sampling_cfg.get("trim_window_strategy", "max_info")
-            selected = sample_pwm_sites(
+            scoring_backend = str(sampling_cfg.get("scoring_backend", "densegen")).lower()
+            pvalue_threshold = sampling_cfg.get("pvalue_threshold")
+            pvalue_bins = sampling_cfg.get("pvalue_bins")
+            pvalue_bin_ids = sampling_cfg.get("pvalue_bin_ids")
+            bgfile = sampling_cfg.get("bgfile")
+            selection_policy = str(sampling_cfg.get("selection_policy", "random_uniform"))
+            keep_all_candidates_debug = bool(sampling_cfg.get("keep_all_candidates_debug", False))
+            include_matched_sequence = bool(sampling_cfg.get("include_matched_sequence", False))
+            bgfile_path: Path | None = None
+            if bgfile is not None:
+                bgfile_path = resolve_path(self.cfg_path, str(bgfile))
+                if not (bgfile_path.exists() and bgfile_path.is_file()):
+                    raise FileNotFoundError(f"PWM sampling bgfile not found. Looked here:\n  - {bgfile_path}")
+            debug_output_dir: Path | None = None
+            if keep_all_candidates_debug and outputs_root is not None:
+                debug_output_dir = Path(outputs_root) / "meta" / "fimo"
+            return_meta = scoring_backend == "fimo"
+            result = sample_pwm_sites(
                 rng,
                 motif,
                 strategy=strategy,
@@ -79,15 +96,34 @@ class PWMArtifactSetDataSource(BaseDataSource):
                 max_seconds=max_seconds,
                 score_threshold=threshold,
                 score_percentile=percentile,
+                scoring_backend=scoring_backend,
+                pvalue_threshold=pvalue_threshold,
+                pvalue_bins=pvalue_bins,
+                pvalue_bin_ids=pvalue_bin_ids,
+                bgfile=bgfile_path,
+                selection_policy=selection_policy,
+                keep_all_candidates_debug=keep_all_candidates_debug,
+                include_matched_sequence=include_matched_sequence,
+                debug_output_dir=debug_output_dir,
+                debug_label=f"{Path(path).stem}__{motif.motif_id}",
                 length_policy=length_policy,
                 length_range=length_range,
                 trim_window_length=trim_window_length,
                 trim_window_strategy=str(trim_window_strategy),
+                return_metadata=return_meta,
             )
+            if return_meta:
+                selected, meta_by_seq = result  # type: ignore[misc]
+            else:
+                selected = result  # type: ignore[assignment]
+                meta_by_seq = {}
 
             for seq in selected:
                 entries.append((motif.motif_id, seq, str(path)))
-                all_rows.append({"tf": motif.motif_id, "tfbs": seq, "source": str(path)})
+                row = {"tf": motif.motif_id, "tfbs": seq, "source": str(path)}
+                if meta_by_seq:
+                    row.update(meta_by_seq.get(seq, {}))
+                all_rows.append(row)
 
         import pandas as pd
 

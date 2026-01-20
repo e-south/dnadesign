@@ -254,9 +254,16 @@ def _warn_pwm_sampling_configs(loaded, cfg_path: Path) -> None:
         sampling = getattr(inp, "sampling", None)
         if sampling is None:
             continue
+        scoring_backend = getattr(sampling, "scoring_backend", "densegen")
         n_sites = getattr(sampling, "n_sites", None)
         oversample = getattr(sampling, "oversample_factor", None)
         max_candidates = getattr(sampling, "max_candidates", None)
+        score_threshold = getattr(sampling, "score_threshold", None)
+        score_percentile = getattr(sampling, "score_percentile", None)
+        if scoring_backend == "fimo" and (score_threshold is not None or score_percentile is not None):
+            warnings.append(
+                f"{getattr(inp, 'name', src_type)}: scoring_backend=fimo ignores score_threshold/score_percentile."
+            )
         if isinstance(n_sites, int) and isinstance(oversample, int) and max_candidates is not None:
             requested = n_sites * oversample
             if requested > int(max_candidates):
@@ -949,7 +956,11 @@ def describe(
             "motifs",
             "n_sites",
             "strategy",
+            "backend",
             "score",
+            "selection",
+            "bins",
+            "bgfile",
             "oversample",
             "max_candidates",
             "max_seconds",
@@ -971,11 +982,25 @@ def describe(
                 motif_label = f"{len(getattr(inp, 'paths', []) or [])} artifacts"
             else:
                 motif_label = "from artifact"
+            backend = getattr(sampling, "scoring_backend", "densegen")
             score_label = "-"
-            if sampling.score_threshold is not None:
+            if backend == "fimo" and sampling.pvalue_threshold is not None:
+                comparator = ">=" if sampling.strategy == "background" else "<="
+                score_label = f"pvalue{comparator}{sampling.pvalue_threshold}"
+            elif sampling.score_threshold is not None:
                 score_label = f"threshold={sampling.score_threshold}"
             elif sampling.score_percentile is not None:
                 score_label = f"percentile={sampling.score_percentile}"
+            selection_label = "-" if backend != "fimo" else (getattr(sampling, "selection_policy", None) or "-")
+            bins_label = "-"
+            if backend == "fimo":
+                bins_label = "canonical"
+                if getattr(sampling, "pvalue_bins", None) is not None:
+                    bins_label = "custom"
+                bin_ids = getattr(sampling, "pvalue_bin_ids", None)
+                if bin_ids:
+                    bins_label = f"{bins_label} pick={bin_ids}"
+            bgfile_label = getattr(sampling, "bgfile", None) or "-"
             length_label = str(sampling.length_policy)
             if sampling.length_policy == "range" and sampling.length_range is not None:
                 length_label = f"range({sampling.length_range[0]}..{sampling.length_range[1]})"
@@ -984,7 +1009,11 @@ def describe(
                 motif_label,
                 str(sampling.n_sites),
                 str(sampling.strategy),
+                str(backend),
                 score_label,
+                str(selection_label),
+                str(bins_label),
+                str(bgfile_label),
                 str(sampling.oversample_factor),
                 str(sampling.max_candidates) if sampling.max_candidates is not None else "-",
                 str(sampling.max_seconds) if sampling.max_seconds is not None else "-",
@@ -1146,6 +1175,9 @@ def run(
         raise typer.Exit(code=1)
 
     console.print(":tada: [bold green]Run complete[/].")
+    console.print("[bold]Next steps[/]:")
+    console.print(f"  - dense summarize --library -c {cfg_path}")
+    console.print(f"  - dense report -c {cfg_path}")
 
     # Auto-plot if configured
     if not no_plot and root.plots:
