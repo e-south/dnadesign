@@ -74,13 +74,13 @@ TFBS pools include stable `motif_id` and `tfbs_id` hashes plus optional FIMO met
 (`fimo_pvalue`, `fimo_bin_id`, etc.). Sequence pools include `tfbs_id` for joinability.
 
 If `keep_all_candidates_debug: true`, DenseGen writes per-candidate debug artifacts under
-`outputs/candidates/current/<input_name>/` (overwritten each run):
+`outputs/candidates/<run_id>/<input_name>/` (overwritten by `dense run` or `stage-a build-pool --overwrite`):
 - `candidates__<label>.parquet` — candidate p‑values, bins, acceptance, and reject reasons.
 - `<label>__fimo.tsv` — raw FIMO TSV (when enabled).
-DenseGen also aggregates these into `outputs/candidates/current/candidates.parquet` and
-`outputs/candidates/current/candidates_summary.parquet` with a manifest (`candidates_manifest.json`).
-These are overwritten each run; copy the `outputs/candidates/current` directory if you want
-to keep prior mining logs.
+DenseGen also aggregates these into `outputs/candidates/<run_id>/candidates.parquet` and
+`outputs/candidates/<run_id>/candidates_summary.parquet` with a manifest (`candidates_manifest.json`).
+These are overwritten by `dense run` or `stage-a build-pool --overwrite`; copy the
+`outputs/candidates/<run_id>` directory if you want to keep prior mining logs.
 
 ---
 

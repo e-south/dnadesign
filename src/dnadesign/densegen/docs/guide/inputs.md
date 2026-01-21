@@ -112,8 +112,8 @@ Required sampling fields:
   - `log_every_batches` (int > 0): log yield summaries every N batches
 - `bgfile` (optional): MEME bfile-format background model for FIMO
 - `keep_all_candidates_debug` (optional): write raw FIMO TSVs and candidate-level Parquet
-  (`candidates__<label>.parquet`) under `outputs/candidates/current/<input_name>/` for inspection
-  (overwritten each run)
+  (`candidates__<label>.parquet`) under `outputs/candidates/<run_id>/<input_name>/` for inspection
+  (overwritten each run for that run_id)
 - `include_matched_sequence` (optional): include `fimo_matched_sequence` column in the TFBS table
 
 Notes:
@@ -216,8 +216,9 @@ bins if `retain_bin_ids` is unset), so you can track how many candidates land in
 adjust thresholds or oversampling accordingly. With `selection_policy: stratified`, the selected‑bin
 counts show how evenly the final pool spans strata.
 If candidate logging is enabled, DenseGen also writes aggregated mining summaries to
-`outputs/candidates/current/candidates_summary.parquet` (overwritten each run).
-Copy `outputs/candidates/current/` elsewhere if you want to keep per-run mining logs.
+`outputs/candidates/<run_id>/candidates_summary.parquet` (overwritten by `dense run` or
+`stage-a build-pool --overwrite`). Copy `outputs/candidates/<run_id>/` elsewhere if you want
+to keep per-run mining logs.
 
 #### Stdout UX for long runs
 DenseGen supports three logging styles so long runs stay readable:

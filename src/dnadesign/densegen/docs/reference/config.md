@@ -78,7 +78,8 @@ PWM inputs perform **input sampling** (sampling sites from PWMs) via
       - `log_every_batches` (int > 0; default 1) - log per‑bin yield summaries every N batches
     - `bgfile` (optional path) - MEME bfile-format background model for FIMO
     - `keep_all_candidates_debug` (bool, default false) - write raw FIMO TSVs to
-      `outputs/candidates/current/<input_name>/` for inspection (overwritten each run)
+      `outputs/candidates/<run_id>/<input_name>/` for inspection (overwritten by `dense run` or
+      `stage-a build-pool --overwrite`)
     - `include_matched_sequence` (bool, default false) - include `fimo_matched_sequence` in TFBS outputs
     - `length_policy`: `exact | range` (default: `exact`)
     - `length_range`: `[min, max]` (required when `length_policy=range`; `min` >= motif length)
@@ -128,7 +129,7 @@ Output, logs, and plots must resolve inside `densegen.run.root`.
 
 ### `densegen.run`
 
-- `id` - run identifier (string; required)
+- `id` - run identifier (string; required; must not contain path separators)
 - `root` - run root directory (required; config must live inside it)
 
 ---

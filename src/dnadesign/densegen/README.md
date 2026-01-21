@@ -34,6 +34,9 @@ pixi run dense report -c "$CFG" --format md
 pixi run dense plot -c "$CFG" --only tf_usage,tf_coverage
 ```
 
+If you rerun a workspace that already has outputs, choose `--resume` (continue) or
+`--fresh` (clear outputs and start over).
+
 For a full end-to-end walkthrough with expected outputs, see
 [DenseGen demo](docs/demo/demo_basic.md).
 

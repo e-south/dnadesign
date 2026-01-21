@@ -34,11 +34,13 @@ densegen/
 - **No fallbacks**: all paths are explicit and resolve relative to `config.yaml`.
 - **Scalable**: large runs do not collide in shared output directories.
 - **Predictable logs**: default logs land in `outputs/logs/<run_id>.log` within the workspace.
-- **Resume‑safe**: if `outputs/dense_arrays.parquet` already exists, DenseGen resumes from existing sequences
-  (only when the config hash and run_id match), so interrupted runs can continue without manual cleanup.
-- **Candidate mining artifacts**: `outputs/candidates/current` is overwritten each run to avoid mixing
-  mining outputs across sessions; copy it elsewhere if you want to keep prior candidates.
-  To start a *fresh* solver run, delete `outputs/` or choose a new `densegen.run.id`.
+- **Resume‑safe (explicit)**: if `outputs/` already exists, you must choose `dense run --resume`
+  (continue in‑place) or `dense run --fresh` (clear outputs and start over). This prevents accidental
+  mixing of runs and makes intent explicit.
+- **Candidate mining artifacts**: `outputs/candidates/<run_id>` is overwritten by `dense run` or
+  `stage-a build-pool --overwrite` to avoid mixing mining outputs across sessions; copy it elsewhere
+  if you want to keep prior candidates. Use `dense run --fresh` to clear outputs when restarting
+  a workspace.
 
 ## Config snippet (run-scoped paths)
 
@@ -65,6 +67,9 @@ plots:
 ```
 
 When a run is complete, archive or sync the workspace as a unit.
+If you rerun in the same workspace, DenseGen requires an explicit choice:
+use `dense run --resume` to continue from existing outputs or `dense run --fresh`
+to clear `outputs/` and start over.
 
 Tip: use `dense workspace init --id <run_name>` to scaffold a new workspace. Use
 `dense inspect run --root workspaces/_archive` to inspect archived workspaces.

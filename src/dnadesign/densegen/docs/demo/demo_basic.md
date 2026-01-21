@@ -103,8 +103,7 @@ Example output:
 ```
 
 If you re-run the demo in the same run root and DenseGen’s schema has changed, you may see a
-Parquet schema mismatch. Either delete `outputs/dense_arrays.parquet` +
-`outputs/_densegen_ids.sqlite` or stage a fresh workspace.
+Parquet schema mismatch. Use `dense run --fresh` to clear outputs, or stage a fresh workspace.
 
 ## 3) Validate config
 
@@ -183,6 +182,10 @@ pixi run dense stage-b build-libraries -c /private/tmp/densegen-demo-20260115-14
 ```bash
 pixi run dense run -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --no-plot
 ```
+
+If you rerun the same workspace, choose:
+- `--resume` to continue from existing outputs, or
+- `--fresh` to clear outputs and start over.
 
 The demo config sets `logging.progress_style: screen`, so in a TTY you will see a
 refreshing dashboard (progress, leaderboards, last sequence). To see per‑sequence
