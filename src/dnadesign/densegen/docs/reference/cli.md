@@ -109,7 +109,8 @@ Options:
 Outputs:
 - `pool_manifest.json`
 - `<input>__pool.parquet` per input
-- `outputs/candidates/candidates.parquet` + `candidates_summary.parquet` (when candidate logging is enabled)
+- `outputs/candidates/current/candidates.parquet` + `candidates_summary.parquet` (when candidate logging is enabled)
+  (candidate artifacts are overwritten each run)
 
 ---
 

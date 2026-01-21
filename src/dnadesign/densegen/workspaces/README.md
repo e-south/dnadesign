@@ -13,3 +13,5 @@ The canonical demo lives under `demo_meme_two_tf/` and uses MEME motif files cop
 the basic Cruncher demo workspace (`inputs/local_motifs`). DenseGen reads these with the
 shared Cruncher MEME parser to keep parsing DRY and consistent.
 Use `dense inspect run --root workspaces/_archive` if you want to inspect archived workspaces.
+Only `demo_meme_two_tf/` is tracked in git; any other workspace directories here are ignored
+and intended for local experiments.

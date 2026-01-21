@@ -43,7 +43,7 @@ from ..config import (
     resolve_run_root,
 )
 from ..utils.logging_utils import install_native_stderr_filters
-from .artifacts.candidates import build_candidate_artifact
+from .artifacts.candidates import build_candidate_artifact, find_candidate_files, prepare_candidates_dir
 from .artifacts.ids import hash_tfbs_id
 from .artifacts.library import (
     LibraryArtifact,
@@ -59,6 +59,7 @@ from .postprocess import random_fill
 from .pvalue_bins import resolve_pvalue_bins
 from .run_manifest import PlanManifest, RunManifest
 from .run_paths import (
+    candidates_root,
     ensure_run_meta_dir,
     inputs_manifest_path,
     run_manifest_path,
@@ -77,6 +78,16 @@ log = logging.getLogger(__name__)
 class RunSummary:
     total_generated: int
     per_plan: dict[tuple[str, str], int]
+
+
+def _candidate_logging_enabled(cfg: DenseGenConfig) -> bool:
+    for inp in cfg.inputs:
+        sampling = getattr(inp, "sampling", None)
+        if sampling is None:
+            continue
+        if getattr(sampling, "keep_all_candidates_debug", False):
+            return True
+    return False
 
 
 def _write_run_state(
@@ -3389,6 +3400,21 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
     composition_rows: list[dict] = []
     outputs_root = run_outputs_root(run_root)
     outputs_root.mkdir(parents=True, exist_ok=True)
+    candidates_dir = candidates_root(outputs_root)
+    candidate_logging = _candidate_logging_enabled(cfg)
+    if candidate_logging:
+        try:
+            existed = prepare_candidates_dir(candidates_dir, overwrite=True)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to prepare candidate artifacts directory: {exc}") from exc
+        if existed:
+            log.warning(
+                "Cleared prior candidate artifacts at %s to avoid mixing runs. "
+                "Copy this directory elsewhere if you want to keep previous mining output.",
+                candidates_dir,
+            )
+        else:
+            log.info("Candidate mining artifacts will be written to %s", candidates_dir)
     events_path = outputs_root / "meta" / "events.jsonl"
     try:
         _write_effective_config(
@@ -3429,19 +3455,25 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
         log.debug("Failed to emit POOL_BUILT event.", exc_info=True)
     for name, pool in pool_data.items():
         source_cache[name] = pool
-    candidates_dir = outputs_root / "candidates"
-    candidate_files = list(candidates_dir.rglob("candidates__*.parquet")) if candidates_dir.exists() else []
-    if candidate_files:
-        try:
-            build_candidate_artifact(
-                candidates_dir=candidates_dir,
-                cfg_path=loaded.path,
-                run_id=str(cfg.run.id),
-                run_root=run_root,
-                overwrite=True,
+    if candidate_logging:
+        candidate_files = find_candidate_files(candidates_dir)
+        if candidate_files:
+            try:
+                build_candidate_artifact(
+                    candidates_dir=candidates_dir,
+                    cfg_path=loaded.path,
+                    run_id=str(cfg.run.id),
+                    run_root=run_root,
+                    overwrite=True,
+                )
+            except Exception as exc:
+                raise RuntimeError(f"Failed to write candidate artifacts: {exc}") from exc
+        else:
+            log.warning(
+                "Candidate logging enabled but no candidate records were written under %s. "
+                "Check keep_all_candidates_debug and PWM inputs.",
+                candidates_dir,
             )
-        except Exception as exc:
-            raise RuntimeError(f"Failed to write candidate artifacts: {exc}") from exc
     library_records: dict[tuple[str, str], list[LibraryRecord]] | None = None
     library_cursor: dict[tuple[str, str], int] | None = None
     library_artifact: LibraryArtifact | None = None

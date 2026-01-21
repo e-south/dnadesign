@@ -752,6 +752,7 @@ def sample_pwm_sites(
             if candidate_records is None:
                 return
             candidate_id = hash_candidate_id(
+                input_name=input_name,
                 motif_id=motif.motif_id,
                 sequence=seq,
                 scoring_backend=scoring_backend,

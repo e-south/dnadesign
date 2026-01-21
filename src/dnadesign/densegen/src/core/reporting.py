@@ -27,7 +27,7 @@ from ..config import RootConfig, resolve_run_root, resolve_run_scoped_path
 from ..utils.mpl_utils import ensure_mpl_cache_dir
 from .artifacts.pool import POOL_MODE_TFBS, load_pool_artifact
 from .run_manifest import load_run_manifest
-from .run_paths import run_manifest_path, run_outputs_root
+from .run_paths import candidates_root, run_manifest_path, run_outputs_root
 
 log = logging.getLogger(__name__)
 
@@ -368,6 +368,7 @@ def collect_report_data(
 ) -> ReportBundle:
     run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
     outputs_root = run_outputs_root(run_root)
+    warnings: list[str] = []
     cols = [
         "id",
         "sequence",
@@ -383,29 +384,35 @@ def collect_report_data(
         _dg("used_tf_list"),
         _dg("min_count_per_tf"),
     ]
-    df, source_label = load_records_from_config(root_cfg, cfg_path, columns=cols)
+    try:
+        df, source_label = load_records_from_config(root_cfg, cfg_path, columns=cols)
+    except Exception as exc:
+        warnings.append(f"No output records available; report will focus on Stage-A/Stage-B diagnostics. ({exc})")
+        df = pd.DataFrame(columns=cols)
+        source_label = "missing"
     if df.empty:
-        raise ValueError("No output records found; cannot build report.")
+        warnings.append("Output records are empty; solution-focused sections will be blank.")
 
     used_df = _explode_used(df)
     attempts_path = outputs_root / "attempts.parquet"
     if not attempts_path.exists():
-        raise ValueError(
-            "outputs/attempts.parquet is required for report/summarize. "
-            "Re-run `dense run -c <config.yaml>` to regenerate attempts."
-        )
-    attempts_df = pd.read_parquet(attempts_path)
+        warnings.append("outputs/attempts.parquet is missing; library usage and resample summaries may be incomplete.")
+        attempts_df = pd.DataFrame()
+    else:
+        attempts_df = pd.read_parquet(attempts_path)
     library_df = _explode_library_from_attempts(attempts_df)
     solutions_path = outputs_root / "solutions.parquet"
     if not solutions_path.exists():
-        raise ValueError(
-            "outputs/solutions.parquet is required for reports. "
-            "Re-run `dense run -c <config.yaml>` to regenerate solutions."
+        warnings.append(
+            "outputs/solutions.parquet is missing; solution previews and composition summaries will be skipped."
         )
-    try:
-        solutions_df = pd.read_parquet(solutions_path)
-    except Exception as exc:
-        raise RuntimeError("Failed to load solutions.parquet for report tables.") from exc
+        solutions_df = pd.DataFrame()
+    else:
+        try:
+            solutions_df = pd.read_parquet(solutions_path)
+        except Exception as exc:
+            warnings.append(f"Failed to load solutions.parquet; skipping solution tables. ({exc})")
+            solutions_df = pd.DataFrame()
     tables: Dict[str, pd.DataFrame] = {}
     tables["solutions"] = solutions_df
 
@@ -523,7 +530,7 @@ def collect_report_data(
     candidates_summary = pd.DataFrame(
         columns=["input_name", "motif_id", "scoring_backend", "total_candidates", "accepted", "selected", "rejected"]
     )
-    candidates_dir = outputs_root / "candidates"
+    candidates_dir = candidates_root(outputs_root)
     cand_summary_path = candidates_dir / "candidates_summary.parquet"
     if cand_summary_path.exists():
         try:
@@ -824,6 +831,7 @@ def collect_report_data(
         "schema_version": root_cfg.densegen.schema_version,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "output_source": source_label,
+        "warnings": warnings,
         "output_rows": int(len(df)),
         "output_unique_sequences": int(df["id"].nunique()) if "id" in df.columns else int(len(df)),
         "libraries_in_outputs": int(len(set(library_hashes))),
@@ -1046,6 +1054,7 @@ def _render_report_md(bundle: ReportBundle) -> str:
         f"- Diversity (unique TFs): {report.get('diversity_unique_tfs')}",
         f"- Diversity (unique TFBS): {report.get('diversity_unique_tfbs')}",
         f"- Diversity entropy (TFBS): {report.get('diversity_entropy_tfbs')}",
+        f"- Warnings: {len(report.get('warnings') or [])}",
         "",
         "## Outputs",
         "- outputs/dense_arrays.parquet",
@@ -1057,9 +1066,14 @@ def _render_report_md(bundle: ReportBundle) -> str:
         "- outputs/pools/pool_manifest.json",
         "- outputs/meta/effective_config.json",
         "- outputs/meta/events.jsonl",
-        "- outputs/candidates/candidates.parquet (when candidate logging is enabled)",
-        "- outputs/candidates/candidates_summary.parquet (when candidate logging is enabled)",
+        "- outputs/candidates/current/candidates.parquet (when candidate logging is enabled)",
+        "- outputs/candidates/current/candidates_summary.parquet (when candidate logging is enabled)",
     ]
+    warnings = report.get("warnings") or []
+    if warnings:
+        lines.extend(["", "## Notes"])
+        for warning in warnings:
+            lines.append(f"- {warning}")
     stage_a_bins = bundle.tables.get("stage_a_bins")
     if stage_a_bins is not None and not stage_a_bins.empty:
         lines.extend(["", "## Stage-A p-value bins"])
@@ -1197,6 +1211,9 @@ def _render_report_md(bundle: ReportBundle) -> str:
                 max_rows=10,
             )
         )
+    else:
+        lines.extend(["", "## Solutions"])
+        lines.append("- No solutions found yet. Review attempts/events and adjust constraints or runtime settings.")
     composition = bundle.tables.get("composition")
     if composition is not None and not composition.empty:
         comp = composition.copy()

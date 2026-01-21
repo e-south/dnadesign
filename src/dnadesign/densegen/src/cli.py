@@ -60,7 +60,7 @@ from .config import (
     resolve_run_root,
     resolve_run_scoped_path,
 )
-from .core.artifacts.candidates import build_candidate_artifact
+from .core.artifacts.candidates import build_candidate_artifact, find_candidate_files, prepare_candidates_dir
 from .core.artifacts.library import write_library_artifact
 from .core.artifacts.pool import (
     POOL_MODE_SEQUENCE,
@@ -79,7 +79,7 @@ from .core.pipeline import (
 )
 from .core.reporting import collect_report_data, write_report
 from .core.run_manifest import load_run_manifest
-from .core.run_paths import run_manifest_path, run_state_path
+from .core.run_paths import candidates_root, run_manifest_path, run_state_path
 from .core.run_state import load_run_state
 from .core.seeding import derive_seed_map
 from .integrations.meme_suite import require_executable
@@ -146,6 +146,18 @@ def _input_uses_fimo(input_cfg) -> bool:
                 continue
             if override_backend == "fimo":
                 return True
+    return False
+
+
+def _candidate_logging_enabled(loaded, *, selected: set[str] | None = None) -> bool:
+    for inp in loaded.inputs:
+        if selected is not None and inp.name not in selected:
+            continue
+        sampling = getattr(inp, "sampling", None)
+        if sampling is None:
+            continue
+        if getattr(sampling, "keep_all_candidates_debug", False):
+            return True
     return False
 
 
@@ -1384,6 +1396,16 @@ def stage_a_build_pool(
     deps = default_deps()
     outputs_root = run_root / "outputs"
     outputs_root.mkdir(parents=True, exist_ok=True)
+    candidate_logging = _candidate_logging_enabled(loaded, selected=set(selected) if selected else None)
+    candidates_dir = candidates_root(outputs_root)
+    if candidate_logging:
+        try:
+            existed = prepare_candidates_dir(candidates_dir, overwrite=overwrite)
+        except FileExistsError as exc:
+            console.print(f"[bold red]{exc}[/]")
+            raise typer.Exit(code=1)
+        if existed:
+            console.print(f"[yellow]Cleared prior candidate artifacts at {candidates_dir} to avoid mixing runs.[/]")
 
     with _suppress_pyarrow_sysctl_warnings():
         try:
@@ -1400,20 +1422,24 @@ def stage_a_build_pool(
         except FileExistsError as exc:
             console.print(f"[bold red]{exc}[/]")
             raise typer.Exit(code=1)
-        candidates_dir = outputs_root / "candidates"
-        candidate_files = list(candidates_dir.rglob("candidates__*.parquet")) if candidates_dir.exists() else []
-        if candidate_files:
-            try:
-                build_candidate_artifact(
-                    candidates_dir=candidates_dir,
-                    cfg_path=cfg_path,
-                    run_id=str(cfg.run.id),
-                    run_root=run_root,
-                    overwrite=True,
+        if candidate_logging:
+            candidate_files = find_candidate_files(candidates_dir)
+            if candidate_files:
+                try:
+                    build_candidate_artifact(
+                        candidates_dir=candidates_dir,
+                        cfg_path=cfg_path,
+                        run_id=str(cfg.run.id),
+                        run_root=run_root,
+                        overwrite=True,
+                    )
+                except Exception as exc:
+                    console.print(f"[bold red]Failed to write candidate artifacts:[/] {exc}")
+                    raise typer.Exit(code=1)
+            else:
+                console.print(
+                    f"[yellow]Candidate logging enabled but no candidate records found under {candidates_dir}.[/]"
                 )
-            except Exception as exc:
-                console.print(f"[bold red]Failed to write candidate artifacts:[/] {exc}")
-                raise typer.Exit(code=1)
 
     for pool in pool_data.values():
         if pool.df is None:

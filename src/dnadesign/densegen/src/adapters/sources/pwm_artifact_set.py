@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import List
 
 from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
+from ...core.run_paths import candidates_root
 from .base import BaseDataSource, resolve_path
 from .pwm_artifact import load_artifact
 from .pwm_sampling import sample_pwm_sites
@@ -92,7 +93,7 @@ class PWMArtifactSetDataSource(BaseDataSource):
                     raise FileNotFoundError(f"PWM sampling bgfile not found. Looked here:\n  - {bgfile_path}")
             debug_output_dir: Path | None = None
             if keep_all_candidates_debug and outputs_root is not None:
-                debug_output_dir = Path(outputs_root) / "candidates" / self.input_name
+                debug_output_dir = candidates_root(Path(outputs_root)) / self.input_name
             return_meta = scoring_backend == "fimo"
             result = sample_pwm_sites(
                 rng,
