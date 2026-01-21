@@ -149,8 +149,8 @@ def _input_uses_fimo(input_cfg) -> bool:
     return False
 
 
-def _candidate_logging_enabled(loaded, *, selected: set[str] | None = None) -> bool:
-    for inp in loaded.inputs:
+def _candidate_logging_enabled(cfg, *, selected: set[str] | None = None) -> bool:
+    for inp in cfg.inputs:
         if selected is not None and inp.name not in selected:
             continue
         sampling = getattr(inp, "sampling", None)
@@ -1396,7 +1396,7 @@ def stage_a_build_pool(
     deps = default_deps()
     outputs_root = run_root / "outputs"
     outputs_root.mkdir(parents=True, exist_ok=True)
-    candidate_logging = _candidate_logging_enabled(loaded, selected=set(selected) if selected else None)
+    candidate_logging = _candidate_logging_enabled(cfg, selected=set(selected) if selected else None)
     candidates_dir = candidates_root(outputs_root)
     if candidate_logging:
         try:
@@ -1421,6 +1421,9 @@ def stage_a_build_pool(
             )
         except FileExistsError as exc:
             console.print(f"[bold red]{exc}[/]")
+            raise typer.Exit(code=1)
+        except Exception as exc:
+            console.print(f"[bold red]Failed to build Stage-A pools:[/] {exc}")
             raise typer.Exit(code=1)
         if candidate_logging:
             candidate_files = find_candidate_files(candidates_dir)
