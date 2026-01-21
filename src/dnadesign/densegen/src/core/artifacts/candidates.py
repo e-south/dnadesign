@@ -5,6 +5,7 @@ Stage-A candidate site artifacts.
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,6 +40,22 @@ def _candidates_path(out_dir: Path) -> Path:
     return out_dir / "candidates.parquet"
 
 
+def find_candidate_files(candidates_dir: Path) -> list[Path]:
+    if not candidates_dir.exists():
+        return []
+    return sorted(candidates_dir.rglob("candidates__*.parquet"))
+
+
+def prepare_candidates_dir(candidates_dir: Path, *, overwrite: bool = True) -> bool:
+    existed = candidates_dir.exists()
+    if existed:
+        if not overwrite:
+            raise FileExistsError(f"Candidate artifacts already exist in {candidates_dir}")
+        shutil.rmtree(candidates_dir)
+    candidates_dir.mkdir(parents=True, exist_ok=True)
+    return existed
+
+
 def build_candidate_artifact(
     *,
     candidates_dir: Path,
@@ -57,7 +74,7 @@ def build_candidate_artifact(
         if candidates_path.exists() or summary_path.exists() or manifest_path.exists():
             raise FileExistsError(f"Candidate artifacts already exist in {candidates_dir}")
 
-    files = sorted(candidates_dir.rglob("candidates__*.parquet"))
+    files = find_candidate_files(candidates_dir)
     if not files:
         raise FileNotFoundError(f"No candidate parquet files found under {candidates_dir}")
 

@@ -36,6 +36,9 @@ densegen/
 - **Predictable logs**: default logs land in `outputs/logs/<run_id>.log` within the workspace.
 - **Resume‑safe**: if `outputs/dense_arrays.parquet` already exists, DenseGen resumes from existing sequences
   (only when the config hash and run_id match), so interrupted runs can continue without manual cleanup.
+- **Candidate mining artifacts**: `outputs/candidates/current` is overwritten each run to avoid mixing
+  mining outputs across sessions; copy it elsewhere if you want to keep prior candidates.
+  To start a *fresh* solver run, delete `outputs/` or choose a new `densegen.run.id`.
 
 ## Config snippet (run-scoped paths)
 

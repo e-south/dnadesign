@@ -16,6 +16,8 @@ from pathlib import Path
 
 RUN_OUTPUTS_DIR = "outputs"
 RUN_META_DIR = "meta"
+CANDIDATES_DIR = "candidates"
+CANDIDATES_CURRENT_DIR = "current"
 
 RUN_MANIFEST_NAME = "run_manifest.json"
 INPUTS_MANIFEST_NAME = "inputs_manifest.json"
@@ -24,6 +26,10 @@ RUN_STATE_NAME = "run_state.json"
 
 def run_outputs_root(run_root: Path) -> Path:
     return run_root / RUN_OUTPUTS_DIR
+
+
+def candidates_root(outputs_root: Path) -> Path:
+    return outputs_root / CANDIDATES_DIR / CANDIDATES_CURRENT_DIR
 
 
 def run_meta_root(run_root: Path) -> Path:

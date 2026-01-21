@@ -114,11 +114,13 @@ def hash_solution_id(
 
 def hash_candidate_id(
     *,
+    input_name: str | None = None,
     motif_id: str,
     sequence: str,
     scoring_backend: str,
 ) -> str:
     payload = {
+        "input_name": str(input_name) if input_name is not None else None,
         "motif_id": str(motif_id),
         "sequence": str(sequence),
         "scoring_backend": str(scoring_backend),
