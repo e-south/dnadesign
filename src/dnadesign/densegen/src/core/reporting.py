@@ -527,16 +527,32 @@ def collect_report_data(
     tables["stage_a_bins"] = stage_a_bins
     tables["stage_a_score_summary"] = stage_a_score_summary
 
+    def _candidate_logging_enabled() -> bool:
+        for inp in root_cfg.densegen.inputs:
+            sampling = getattr(inp, "sampling", None)
+            if sampling is None:
+                continue
+            if getattr(sampling, "keep_all_candidates_debug", False):
+                return True
+        return False
+
+    candidate_logging = _candidate_logging_enabled()
     candidates_summary = pd.DataFrame(
         columns=["input_name", "motif_id", "scoring_backend", "total_candidates", "accepted", "selected", "rejected"]
     )
     candidates_dir = candidates_root(outputs_root)
     cand_summary_path = candidates_dir / "candidates_summary.parquet"
     if cand_summary_path.exists():
-        try:
-            candidates_summary = pd.read_parquet(cand_summary_path)
-        except Exception:
-            log.warning("Failed to load candidates_summary.parquet for report.", exc_info=True)
+        if candidate_logging:
+            try:
+                candidates_summary = pd.read_parquet(cand_summary_path)
+            except Exception:
+                log.warning("Failed to load candidates_summary.parquet for report.", exc_info=True)
+        else:
+            warnings.append(
+                "Candidate summary exists but keep_all_candidates_debug is false; "
+                "candidate artifacts may be stale. Enable keep_all_candidates_debug to refresh."
+            )
     tables["candidates_summary"] = candidates_summary
 
     library_summary = pd.DataFrame(
@@ -861,9 +877,9 @@ def collect_report_data(
         "solutions_path": str(solutions_path) if solutions_path.exists() else None,
         "events_path": str(events_path) if events_path.exists() else None,
         "candidates_path": str(candidates_dir / "candidates.parquet")
-        if (candidates_dir / "candidates.parquet").exists()
+        if candidate_logging and (candidates_dir / "candidates.parquet").exists()
         else None,
-        "candidates_summary_path": str(cand_summary_path) if cand_summary_path.exists() else None,
+        "candidates_summary_path": str(cand_summary_path) if candidate_logging and cand_summary_path.exists() else None,
         "outputs_path": str(outputs_root / "dense_arrays.parquet"),
         "effective_config_path": str(outputs_root / "meta" / "effective_config.json")
         if (outputs_root / "meta" / "effective_config.json").exists()
