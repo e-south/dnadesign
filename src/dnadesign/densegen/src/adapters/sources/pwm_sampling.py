@@ -21,6 +21,7 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
+from ...core.artifacts.ids import hash_candidate_id
 from ...core.pvalue_bins import resolve_pvalue_bins
 
 SMOOTHING_ALPHA = 1e-6
@@ -444,6 +445,7 @@ def sample_pwm_sites(
     rng: np.random.Generator,
     motif: PWMMotif,
     *,
+    input_name: Optional[str] = None,
     strategy: str,
     n_sites: int,
     oversample_factor: int,
@@ -749,9 +751,17 @@ def sample_pwm_sites(
         ) -> None:
             if candidate_records is None:
                 return
+            candidate_id = hash_candidate_id(
+                motif_id=motif.motif_id,
+                sequence=seq,
+                scoring_backend=scoring_backend,
+            )
             candidate_records.append(
                 {
+                    "candidate_id": candidate_id,
+                    "input_name": input_name,
                     "motif_id": motif.motif_id,
+                    "scoring_backend": scoring_backend,
                     "sequence": seq,
                     "pvalue": None if hit is None else hit.pvalue,
                     "score": None if hit is None else hit.score,

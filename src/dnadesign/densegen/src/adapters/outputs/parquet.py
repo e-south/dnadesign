@@ -17,9 +17,12 @@ from pathlib import Path
 from typing import Any
 
 from ...core.metadata_schema import META_FIELDS, validate_metadata
+from ...utils.logging_utils import install_native_stderr_filters
 from .base import DEFAULT_NAMESPACE, AlignmentDigest, SinkBase
 from .id_index import IdIndex
 from .record import OutputRecord
+
+install_native_stderr_filters(suppress_solver_messages=False)
 
 
 def _meta_arrow_type(name: str, pa):

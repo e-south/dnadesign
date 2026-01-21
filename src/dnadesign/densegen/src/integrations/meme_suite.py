@@ -17,6 +17,31 @@ import shutil
 from pathlib import Path
 
 
+def _find_pixi_root() -> Path | None:
+    env_root = os.getenv("PIXI_PROJECT_ROOT")
+    if env_root:
+        return Path(env_root).expanduser()
+    cwd = Path.cwd()
+    for base in [cwd, *cwd.parents]:
+        if (base / "pixi.toml").exists() or (base / ".pixi").exists():
+            return base
+    return None
+
+
+def _find_pixi_tool(tool: str) -> Path | None:
+    root = _find_pixi_root()
+    if root is None:
+        return None
+    envs_dir = root / ".pixi" / "envs"
+    if not envs_dir.exists():
+        return None
+    for env_dir in sorted(envs_dir.iterdir()):
+        candidate = env_dir / "bin" / tool
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def resolve_executable(tool: str, *, tool_path: Path | None = None) -> Path | None:
     if tool_path is not None:
         resolved = tool_path.expanduser()
@@ -37,6 +62,9 @@ def resolve_executable(tool: str, *, tool_path: Path | None = None) -> Path | No
         candidate = Path(env_dir).expanduser() / tool
         if candidate.exists():
             return candidate
+    pixi_candidate = _find_pixi_tool(tool)
+    if pixi_candidate is not None:
+        return pixi_candidate
     found = shutil.which(tool)
     return Path(found) if found else None
 

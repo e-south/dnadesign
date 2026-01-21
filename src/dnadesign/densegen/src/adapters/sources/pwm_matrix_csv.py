@@ -29,6 +29,7 @@ class PWMMatrixCSVDataSource(BaseDataSource):
     motif_id: str
     columns: dict[str, str]
     sampling: dict
+    input_name: str
 
     def load_data(self, *, rng=None, outputs_root: Path | None = None):
         if rng is None:
@@ -99,12 +100,13 @@ class PWMMatrixCSVDataSource(BaseDataSource):
                 raise FileNotFoundError(f"PWM sampling bgfile not found. Looked here:\n  - {bgfile_path}")
         debug_output_dir: Path | None = None
         if keep_all_candidates_debug and outputs_root is not None:
-            debug_output_dir = Path(outputs_root) / "meta" / "fimo"
+            debug_output_dir = Path(outputs_root) / "candidates" / self.input_name
 
         return_meta = scoring_backend == "fimo"
         result = sample_pwm_sites(
             rng,
             motif,
+            input_name=self.input_name,
             strategy=strategy,
             n_sites=n_sites,
             oversample_factor=oversample_factor,

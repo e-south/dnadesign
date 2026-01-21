@@ -20,7 +20,8 @@ namespaced and recorded consistently so outputs remain resume-safe and auditable
 
 ### Output targets
 
-- **Parquet**: dataset directory with `part-*.parquet` files (default, analytics-friendly).
+- **Parquet**: single-file `outputs/dense_arrays.parquet` plus audit Parquet tables
+  (`outputs/attempts.parquet`, `outputs/solutions.parquet`, `outputs/composition.parquet`).
 - **USR**: Dataset.attach with namespace `densegen`.
 
 When multiple targets are configured, DenseGen asserts all targets are in sync before writing.
@@ -73,9 +74,11 @@ TFBS pools include stable `motif_id` and `tfbs_id` hashes plus optional FIMO met
 (`fimo_pvalue`, `fimo_bin_id`, etc.). Sequence pools include `tfbs_id` for joinability.
 
 If `keep_all_candidates_debug: true`, DenseGen writes per-candidate debug artifacts under
-`outputs/meta/fimo/`:
+`outputs/candidates/<input_name>/`:
 - `candidates__<label>.parquet` — candidate p‑values, bins, acceptance, and reject reasons.
 - `<label>__fimo.tsv` — raw FIMO TSV (when enabled).
+DenseGen also aggregates these into `outputs/candidates/candidates.parquet` and
+`outputs/candidates/candidates_summary.parquet` with a manifest (`candidates_manifest.json`).
 
 ---
 
@@ -94,7 +97,7 @@ These artifacts provide a stable join path from solver attempts to the exact lib
 ### Composition table
 
 DenseGen writes `outputs/composition.parquet`, one row per TFBS placement in each accepted
-sequence. Columns include `sequence_id`, `input_name`, `plan_name`, `library_index`,
+sequence. Columns include `solution_id`, `attempt_id`, `input_name`, `plan_name`, `library_index`,
 `tf`, `tfbs`, `motif_id`, `tfbs_id`, and placement offsets.
 
 ---
@@ -126,8 +129,15 @@ These plots include Stage‑A p‑value histograms and Stage‑B utilization sum
 DenseGen writes `outputs/attempts.parquet`, a consolidated log of solver attempts (success,
 duplicate, and constraint rejections). Each row includes the attempt status, reason/detail JSON,
 the sequence (if available), solver/provenance fields, and the exact library TF/TFBS/site_id lists
-offered to the solver. If no attempts occur, the file is absent. Attempts logs use Parquet and
-therefore require `pyarrow`.
+offered to the solver. Attempts include `attempt_id`, `attempt_index`, and (for successes)
+`solution_id`. If no attempts occur, the file is absent. Attempts logs use Parquet and therefore
+require `pyarrow`.
+
+### Solutions log
+
+DenseGen writes `outputs/solutions.parquet`, one row per accepted solution with `solution_id`,
+`attempt_id`, and the library hash/index. Join keys: `solutions.solution_id` ↔ `dense_arrays.id`
+and `solutions.attempt_id` ↔ `attempts.attempt_id`.
 
 ---
 

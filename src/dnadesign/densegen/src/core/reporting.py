@@ -12,7 +12,6 @@ Dunlop Lab
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 from dataclasses import dataclass
@@ -65,13 +64,12 @@ def _ensure_list_of_dicts(val) -> list[dict]:
     raise ValueError(f"Expected list of dicts; got {type(val).__name__}.")
 
 
-def _sequence_id(row: pd.Series, fallback: str) -> str:
+def _solution_id(row: pd.Series) -> str:
+    if "solution_id" in row and isinstance(row["solution_id"], str) and row["solution_id"]:
+        return row["solution_id"]
     if "id" in row and isinstance(row["id"], str) and row["id"]:
         return row["id"]
-    seq = row.get("sequence")
-    if isinstance(seq, str) and seq:
-        return hashlib.sha256(seq.encode("utf-8")).hexdigest()
-    return fallback
+    raise ValueError("Output records missing solution_id/id; regenerate outputs before reporting.")
 
 
 def _ensure_list(val: Any) -> list:
@@ -93,6 +91,21 @@ def _ensure_list(val: Any) -> list:
     return []
 
 
+def _load_events(events_path: Path) -> pd.DataFrame:
+    if not events_path.exists():
+        return pd.DataFrame(columns=["event", "created_at", "input_name", "plan_name", "library_index", "library_hash"])
+    rows = []
+    for line in events_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            payload = json.loads(line)
+        except Exception:
+            continue
+        rows.append(payload)
+    return pd.DataFrame(rows)
+
+
 def _explode_used(df: pd.DataFrame) -> pd.DataFrame:
     used_col = _dg("used_tfbs_detail")
     lib_hash_col = _dg("sampling_library_hash")
@@ -106,7 +119,7 @@ def _explode_used(df: pd.DataFrame) -> pd.DataFrame:
         used_detail = _ensure_list_of_dicts(row.get(used_col))
         if not used_detail:
             continue
-        seq_id = _sequence_id(row, fallback=f"row-{idx}")
+        seq_id = _solution_id(row)
         for entry in used_detail:
             tf = str(entry.get("tf") or "").strip()
             tfbs = str(entry.get("tfbs") or "").strip()
@@ -114,7 +127,7 @@ def _explode_used(df: pd.DataFrame) -> pd.DataFrame:
                 continue
             records.append(
                 {
-                    "sequence_id": seq_id,
+                    "solution_id": seq_id,
                     "library_hash": str(row.get(lib_hash_col) or ""),
                     "library_index": int(row.get(lib_index_col) or 0),
                     "plan": str(row.get(plan_col) or ""),
@@ -277,7 +290,7 @@ def _compute_cooccurrence(used_df: pd.DataFrame) -> pd.DataFrame:
     if used_df.empty:
         return pd.DataFrame(columns=["library_hash", "plan", "tf_left", "tf_right", "count"])
     rows = []
-    grouped = used_df.groupby(["library_hash", "plan", "sequence_id"])
+    grouped = used_df.groupby(["library_hash", "plan", "solution_id"])
     for (library_hash, plan, seq_id), group in grouped:
         tfs = sorted({tf for tf in group["tf"].tolist() if tf})
         for i in range(len(tfs)):
@@ -286,7 +299,7 @@ def _compute_cooccurrence(used_df: pd.DataFrame) -> pd.DataFrame:
                     {
                         "library_hash": library_hash,
                         "plan": plan,
-                        "sequence_id": seq_id,
+                        "solution_id": seq_id,
                         "tf_left": tfs[i],
                         "tf_right": tfs[j],
                     }
@@ -307,7 +320,7 @@ def _compute_adjacency(used_df: pd.DataFrame) -> pd.DataFrame:
     if used_df.empty:
         return pd.DataFrame(columns=["library_hash", "plan", "tf_left", "tf_right", "count", "mean_distance"])
     rows = []
-    for (library_hash, plan, seq_id), group in used_df.groupby(["library_hash", "plan", "sequence_id"]):
+    for (library_hash, plan, seq_id), group in used_df.groupby(["library_hash", "plan", "solution_id"]):
         sub = group.dropna(subset=["offset"]).sort_values("offset")
         if sub.empty or len(sub) < 2:
             continue
@@ -322,7 +335,7 @@ def _compute_adjacency(used_df: pd.DataFrame) -> pd.DataFrame:
                 {
                     "library_hash": library_hash,
                     "plan": plan,
-                    "sequence_id": seq_id,
+                    "solution_id": seq_id,
                     "tf_left": left.tf,
                     "tf_right": right.tf,
                     "distance": dist,
@@ -364,6 +377,11 @@ def collect_report_data(
         _dg("sampling_library_index"),
         _dg("used_tfbs_detail"),
         _dg("required_regulators"),
+        _dg("covers_required_regulators"),
+        _dg("covers_all_tfs_in_solution"),
+        _dg("min_required_regulators"),
+        _dg("used_tf_list"),
+        _dg("min_count_per_tf"),
     ]
     df, source_label = load_records_from_config(root_cfg, cfg_path, columns=cols)
     if df.empty:
@@ -378,15 +396,39 @@ def collect_report_data(
         )
     attempts_df = pd.read_parquet(attempts_path)
     library_df = _explode_library_from_attempts(attempts_df)
-
+    solutions_path = outputs_root / "solutions.parquet"
+    if not solutions_path.exists():
+        raise ValueError(
+            "outputs/solutions.parquet is required for reports. "
+            "Re-run `dense run -c <config.yaml>` to regenerate solutions."
+        )
+    try:
+        solutions_df = pd.read_parquet(solutions_path)
+    except Exception as exc:
+        raise RuntimeError("Failed to load solutions.parquet for report tables.") from exc
     tables: Dict[str, pd.DataFrame] = {}
+    tables["solutions"] = solutions_df
 
     stage_a_bins = pd.DataFrame(columns=["input_name", "tf", "bin_id", "bin_low", "bin_high", "count", "total"])
+    stage_a_score_summary = pd.DataFrame(
+        columns=[
+            "input_name",
+            "tf",
+            "metric",
+            "count",
+            "min",
+            "p10",
+            "p50",
+            "p90",
+            "max",
+        ]
+    )
     pool_dir = outputs_root / "pools"
     if pool_dir.exists():
         try:
             pool_artifact = load_pool_artifact(pool_dir)
             rows: list[dict[str, Any]] = []
+            score_rows: list[dict[str, Any]] = []
             for entry in pool_artifact.inputs.values():
                 if entry.pool_mode != POOL_MODE_TFBS:
                     continue
@@ -394,34 +436,101 @@ def collect_report_data(
                 if not pool_path.exists():
                     continue
                 df_pool = pd.read_parquet(pool_path)
-                if "fimo_bin_id" not in df_pool.columns or "tf" not in df_pool.columns:
+                if "tf" not in df_pool.columns:
                     continue
-                total_counts = df_pool.groupby("tf").size().to_dict()
-                grouped = df_pool.groupby(["tf", "fimo_bin_id"])
-                for (tf, bin_id), group in grouped:
-                    bin_low = None
-                    bin_high = None
-                    if "fimo_bin_low" in group.columns and not group["fimo_bin_low"].empty:
-                        bin_low = float(group["fimo_bin_low"].iloc[0])
-                    if "fimo_bin_high" in group.columns and not group["fimo_bin_high"].empty:
-                        bin_high = float(group["fimo_bin_high"].iloc[0])
-                    rows.append(
-                        {
-                            "input_name": entry.name,
-                            "tf": tf,
-                            "bin_id": int(bin_id),
-                            "bin_low": bin_low,
-                            "bin_high": bin_high,
-                            "count": int(len(group)),
-                            "total": int(total_counts.get(tf, len(group))),
-                        }
-                    )
+                if "fimo_bin_id" in df_pool.columns:
+                    total_counts = df_pool.groupby("tf").size().to_dict()
+                    grouped = df_pool.groupby(["tf", "fimo_bin_id"])
+                    for (tf, bin_id), group in grouped:
+                        bin_low = None
+                        bin_high = None
+                        if "fimo_bin_low" in group.columns and not group["fimo_bin_low"].empty:
+                            bin_low = float(group["fimo_bin_low"].iloc[0])
+                        if "fimo_bin_high" in group.columns and not group["fimo_bin_high"].empty:
+                            bin_high = float(group["fimo_bin_high"].iloc[0])
+                        rows.append(
+                            {
+                                "input_name": entry.name,
+                                "tf": tf,
+                                "bin_id": int(bin_id),
+                                "bin_low": bin_low,
+                                "bin_high": bin_high,
+                                "count": int(len(group)),
+                                "total": int(total_counts.get(tf, len(group))),
+                            }
+                        )
+                for tf, sub in df_pool.groupby("tf"):
+                    if sub.empty:
+                        continue
+                    if "fimo_pvalue" in sub.columns:
+                        vals = pd.to_numeric(sub["fimo_pvalue"], errors="coerce").dropna()
+                        if not vals.empty:
+                            score_rows.append(
+                                {
+                                    "input_name": entry.name,
+                                    "tf": tf,
+                                    "metric": "fimo_pvalue",
+                                    "count": int(len(vals)),
+                                    "min": float(vals.min()),
+                                    "p10": float(vals.quantile(0.1)),
+                                    "p50": float(vals.quantile(0.5)),
+                                    "p90": float(vals.quantile(0.9)),
+                                    "max": float(vals.max()),
+                                }
+                            )
+                        if "fimo_score" in sub.columns:
+                            vals = pd.to_numeric(sub["fimo_score"], errors="coerce").dropna()
+                            if not vals.empty:
+                                score_rows.append(
+                                    {
+                                        "input_name": entry.name,
+                                        "tf": tf,
+                                        "metric": "fimo_score",
+                                        "count": int(len(vals)),
+                                        "min": float(vals.min()),
+                                        "p10": float(vals.quantile(0.1)),
+                                        "p50": float(vals.quantile(0.5)),
+                                        "p90": float(vals.quantile(0.9)),
+                                        "max": float(vals.max()),
+                                    }
+                                )
+                        if "score" in sub.columns:
+                            vals = pd.to_numeric(sub["score"], errors="coerce").dropna()
+                            if not vals.empty:
+                                score_rows.append(
+                                    {
+                                        "input_name": entry.name,
+                                        "tf": tf,
+                                        "metric": "densegen_score",
+                                        "count": int(len(vals)),
+                                        "min": float(vals.min()),
+                                        "p10": float(vals.quantile(0.1)),
+                                        "p50": float(vals.quantile(0.5)),
+                                        "p90": float(vals.quantile(0.9)),
+                                        "max": float(vals.max()),
+                                    }
+                                )
             if rows:
                 stage_a_bins = pd.DataFrame(rows)
+            if score_rows:
+                stage_a_score_summary = pd.DataFrame(score_rows)
         except Exception:
             log.warning("Failed to load Stage-A pool bins for report.", exc_info=True)
 
     tables["stage_a_bins"] = stage_a_bins
+    tables["stage_a_score_summary"] = stage_a_score_summary
+
+    candidates_summary = pd.DataFrame(
+        columns=["input_name", "motif_id", "scoring_backend", "total_candidates", "accepted", "selected", "rejected"]
+    )
+    candidates_dir = outputs_root / "candidates"
+    cand_summary_path = candidates_dir / "candidates_summary.parquet"
+    if cand_summary_path.exists():
+        try:
+            candidates_summary = pd.read_parquet(cand_summary_path)
+        except Exception:
+            log.warning("Failed to load candidates_summary.parquet for report.", exc_info=True)
+    tables["candidates_summary"] = candidates_summary
 
     library_summary = pd.DataFrame(
         columns=["library_hash", "library_index", "input_name", "plan_name", "size", "total_bp", "outputs"]
@@ -485,6 +594,40 @@ def collect_report_data(
             library_usage["outputs"] = 0
     tables["library_usage"] = library_usage
 
+    plan_summary = pd.DataFrame(
+        columns=[
+            "input_name",
+            "plan_name",
+            "outputs",
+            "unique_solutions",
+            "coverage_required_rate",
+            "coverage_all_tfs_rate",
+            "avg_used_tf_count",
+            "min_required_regulators",
+            "min_count_per_tf",
+        ]
+    )
+    if not df.empty:
+        df_plan = df.copy()
+        df_plan["_used_tf_count"] = df_plan[_dg("used_tf_list")].apply(lambda x: len(_ensure_list(x)))
+        df_plan["_covers_required"] = df_plan[_dg("covers_required_regulators")].fillna(False).astype(bool)
+        df_plan["_covers_all"] = df_plan[_dg("covers_all_tfs_in_solution")].fillna(False).astype(bool)
+        plan_summary = (
+            df_plan.groupby([_dg("input_name"), _dg("plan")])
+            .agg(
+                outputs=("sequence", "size"),
+                unique_solutions=("id", pd.Series.nunique),
+                coverage_required_rate=("_covers_required", "mean"),
+                coverage_all_tfs_rate=("_covers_all", "mean"),
+                avg_used_tf_count=("_used_tf_count", "mean"),
+                min_required_regulators=(_dg("min_required_regulators"), "max"),
+                min_count_per_tf=(_dg("min_count_per_tf"), "max"),
+            )
+            .reset_index()
+            .rename(columns={_dg("input_name"): "input_name", _dg("plan"): "plan_name"})
+        )
+    tables["plan_summary"] = plan_summary
+
     offered_tf = pd.DataFrame(columns=["library_hash", "tf", "offered_instances", "offered_unique_tfbs"])
     offered_tfbs = pd.DataFrame(columns=["library_hash", "tf", "tfbs", "offered_instances"])
     if not library_df.empty:
@@ -503,13 +646,13 @@ def collect_report_data(
             .agg(
                 used_placements=("tf", "size"),
                 used_unique_tfbs=("tfbs", pd.Series.nunique),
-                used_sequences=("sequence_id", pd.Series.nunique),
+                used_sequences=("solution_id", pd.Series.nunique),
             )
             .reset_index()
         )
         used_tfbs = (
             used_df.groupby(["library_hash", "plan", "tf", "tfbs"])
-            .agg(used_placements=("tfbs", "size"), used_sequences=("sequence_id", pd.Series.nunique))
+            .agg(used_placements=("tfbs", "size"), used_sequences=("solution_id", pd.Series.nunique))
             .reset_index()
         )
     else:
@@ -517,7 +660,7 @@ def collect_report_data(
         used_tfbs = pd.DataFrame(columns=["library_hash", "plan", "tf", "tfbs", "used_placements", "used_sequences"])
 
     total_sequences = (
-        used_df.groupby("library_hash")["sequence_id"].nunique().reset_index(name="total_sequences")
+        used_df.groupby("library_hash")["solution_id"].nunique().reset_index(name="total_sequences")
         if not used_df.empty
         else pd.DataFrame(columns=["library_hash", "total_sequences"])
     )
@@ -556,6 +699,86 @@ def collect_report_data(
     tables["offered_vs_used_tf"] = offered_vs_used_tf
     tables["offered_vs_used_tfbs"] = offered_vs_used_tfbs
     tables["attempts"] = attempts_df
+
+    events_path = outputs_root / "meta" / "events.jsonl"
+    events_df = _load_events(events_path)
+    tables["events"] = events_df
+
+    resample_diffs = pd.DataFrame(
+        columns=[
+            "input_name",
+            "plan_name",
+            "prev_library_hash",
+            "library_hash",
+            "tf_added",
+            "tf_removed",
+            "tfbs_added",
+            "tfbs_removed",
+            "reason",
+        ]
+    )
+    library_members_path = outputs_root / "libraries" / "library_members.parquet"
+    if library_members_path.exists():
+        try:
+            members_df = pd.read_parquet(library_members_path)
+            grouped = members_df.groupby(["input_name", "plan_name", "library_index", "library_hash"])
+            library_sets = []
+            for (input_name, plan_name, library_index, library_hash), sub in grouped:
+                tf_set = set(str(x) for x in sub.get("tf", []))
+                tfbs_set = set(str(x) for x in sub.get("tfbs", []))
+                library_sets.append(
+                    {
+                        "input_name": str(input_name),
+                        "plan_name": str(plan_name),
+                        "library_index": int(library_index),
+                        "library_hash": str(library_hash),
+                        "tf_set": tf_set,
+                        "tfbs_set": tfbs_set,
+                    }
+                )
+            diff_rows: list[dict[str, Any]] = []
+            if library_sets:
+                for _, sub in pd.DataFrame(library_sets).groupby(["input_name", "plan_name"]):
+                    sub = sub.sort_values("library_index")
+                    prev = None
+                    for _, row in sub.iterrows():
+                        if prev is not None:
+                            tf_added = len(row["tf_set"] - prev["tf_set"])
+                            tf_removed = len(prev["tf_set"] - row["tf_set"])
+                            tfbs_added = len(row["tfbs_set"] - prev["tfbs_set"])
+                            tfbs_removed = len(prev["tfbs_set"] - row["tfbs_set"])
+                            diff_rows.append(
+                                {
+                                    "input_name": row["input_name"],
+                                    "plan_name": row["plan_name"],
+                                    "prev_library_hash": prev["library_hash"],
+                                    "library_hash": row["library_hash"],
+                                    "tf_added": tf_added,
+                                    "tf_removed": tf_removed,
+                                    "tfbs_added": tfbs_added,
+                                    "tfbs_removed": tfbs_removed,
+                                    "reason": None,
+                                }
+                            )
+                        prev = row
+            if diff_rows:
+                resample_diffs = pd.DataFrame(diff_rows)
+                if not events_df.empty and "event" in events_df.columns:
+                    resample_events = events_df[events_df["event"] == "RESAMPLE_TRIGGERED"]
+                    required_cols = {"input_name", "plan_name", "library_hash", "reason"}
+                    if not resample_events.empty and required_cols.issubset(resample_events.columns):
+                        resample_diffs = resample_diffs.merge(
+                            resample_events[["input_name", "plan_name", "library_hash", "reason"]],
+                            left_on=["input_name", "plan_name", "prev_library_hash"],
+                            right_on=["input_name", "plan_name", "library_hash"],
+                            how="left",
+                        )
+                        resample_diffs = resample_diffs.drop(columns=["library_hash_y"]).rename(
+                            columns={"library_hash_x": "library_hash"}
+                        )
+        except Exception:
+            log.warning("Failed to load library resample diffs for report.", exc_info=True)
+    tables["resample_diffs"] = resample_diffs
 
     if include_combinatorics:
         tables["tf_cooccurrence"] = _compute_cooccurrence(used_df)
@@ -627,6 +850,12 @@ def collect_report_data(
         "attempts_success": attempts_success,
         "attempts_failed": attempts_failed,
         "attempts_path": str(attempts_path) if attempts_path.exists() else None,
+        "solutions_path": str(solutions_path) if solutions_path.exists() else None,
+        "events_path": str(events_path) if events_path.exists() else None,
+        "candidates_path": str(candidates_dir / "candidates.parquet")
+        if (candidates_dir / "candidates.parquet").exists()
+        else None,
+        "candidates_summary_path": str(cand_summary_path) if cand_summary_path.exists() else None,
         "outputs_path": str(outputs_root / "dense_arrays.parquet"),
         "effective_config_path": str(outputs_root / "meta" / "effective_config.json")
         if (outputs_root / "meta" / "effective_config.json").exists()
@@ -660,6 +889,22 @@ def _plot_available() -> bool:
 
 def _safe_filename(text: str) -> str:
     return "".join(ch if ch.isalnum() or ch in {"-", "_", "."} else "_" for ch in text) or "densegen"
+
+
+def _markdown_table(df: pd.DataFrame, *, columns: list[str] | None = None, max_rows: int = 10) -> str:
+    if df is None or df.empty:
+        return ""
+    cols = columns or list(df.columns)
+    cols = [c for c in cols if c in df.columns]
+    if not cols:
+        return ""
+    sub = df[cols].head(max_rows)
+    header = "| " + " | ".join(cols) + " |"
+    sep = "| " + " | ".join(["---"] * len(cols)) + " |"
+    lines = [header, sep]
+    for _, row in sub.iterrows():
+        lines.append("| " + " | ".join(str(row.get(c, "")) for c in cols) + " |")
+    return "\n".join(lines)
 
 
 def _generate_report_plots(bundle: ReportBundle, *, cfg_path: Path, out_dir: Path) -> dict[str, list[str]]:
@@ -805,11 +1050,15 @@ def _render_report_md(bundle: ReportBundle) -> str:
         "## Outputs",
         "- outputs/dense_arrays.parquet",
         "- outputs/attempts.parquet",
+        "- outputs/solutions.parquet",
         "- outputs/composition.parquet",
         "- outputs/libraries/library_builds.parquet",
         "- outputs/libraries/library_members.parquet",
         "- outputs/pools/pool_manifest.json",
         "- outputs/meta/effective_config.json",
+        "- outputs/meta/events.jsonl",
+        "- outputs/candidates/candidates.parquet (when candidate logging is enabled)",
+        "- outputs/candidates/candidates_summary.parquet (when candidate logging is enabled)",
     ]
     stage_a_bins = bundle.tables.get("stage_a_bins")
     if stage_a_bins is not None and not stage_a_bins.empty:
@@ -828,6 +1077,59 @@ def _render_report_md(bundle: ReportBundle) -> str:
                     label = f"bin{bin_id}"
                 parts.append(f"{label}:{count}")
             lines.append(f"- {input_name}/{tf}: " + " ".join(parts))
+    stage_a_score_summary = bundle.tables.get("stage_a_score_summary")
+    if stage_a_score_summary is not None and not stage_a_score_summary.empty:
+        lines.extend(["", "## Stage-A score/p-value summary (per TF)"])
+        lines.append(
+            _markdown_table(
+                stage_a_score_summary,
+                columns=["input_name", "tf", "metric", "count", "min", "p10", "p50", "p90", "max"],
+                max_rows=20,
+            )
+        )
+    candidates_summary = bundle.tables.get("candidates_summary")
+    if candidates_summary is not None and not candidates_summary.empty:
+        lines.extend(["", "## Candidate mining summary"])
+        lines.append(
+            _markdown_table(
+                candidates_summary,
+                columns=[
+                    "input_name",
+                    "motif_id",
+                    "scoring_backend",
+                    "total_candidates",
+                    "accepted",
+                    "selected",
+                    "rejected",
+                ],
+                max_rows=20,
+            )
+        )
+    plan_summary = bundle.tables.get("plan_summary")
+    if plan_summary is not None and not plan_summary.empty:
+        summary = plan_summary.copy()
+        for col in ("coverage_required_rate", "coverage_all_tfs_rate"):
+            if col in summary.columns:
+                summary[col] = summary[col].apply(
+                    lambda v: f"{float(v):.1%}" if v is not None and not pd.isna(v) else "-"
+                )
+        lines.extend(["", "## Plan coverage summary"])
+        lines.append(
+            _markdown_table(
+                summary,
+                columns=[
+                    "input_name",
+                    "plan_name",
+                    "outputs",
+                    "unique_solutions",
+                    "coverage_required_rate",
+                    "coverage_all_tfs_rate",
+                    "avg_used_tf_count",
+                    "min_required_regulators",
+                ],
+                max_rows=20,
+            )
+        )
     library_usage = bundle.tables.get("library_usage")
     if library_usage is not None and not library_usage.empty:
         lines.extend(["", "## Library usage (top 5)"])
@@ -838,6 +1140,87 @@ def _render_report_md(bundle: ReportBundle) -> str:
             outputs = int(row.get("outputs") or 0)
             plan_name = str(row.get("plan_name") or "")
             lines.append(f"- {plan_name}/{lib_hash}: attempts={attempts} outputs={outputs}")
+    resample_diffs = bundle.tables.get("resample_diffs")
+    if resample_diffs is not None and not resample_diffs.empty:
+        diffs = resample_diffs.copy()
+        diffs["prev_library_hash"] = diffs["prev_library_hash"].apply(lambda v: str(v)[:8])
+        diffs["library_hash"] = diffs["library_hash"].apply(lambda v: str(v)[:8])
+        lines.extend(["", "## Resample diffs (library deltas)"])
+        lines.append(
+            _markdown_table(
+                diffs,
+                columns=[
+                    "input_name",
+                    "plan_name",
+                    "prev_library_hash",
+                    "library_hash",
+                    "tf_added",
+                    "tf_removed",
+                    "tfbs_added",
+                    "tfbs_removed",
+                    "reason",
+                ],
+                max_rows=10,
+            )
+        )
+    events = bundle.tables.get("events")
+    if events is not None and not events.empty and "event" in events.columns:
+        event_summary = (
+            events.groupby("event")
+            .agg(count=("event", "size"), last_created_at=("created_at", "max"))
+            .reset_index()
+            .sort_values("count", ascending=False)
+        )
+        lines.extend(["", "## Events summary"])
+        lines.append(_markdown_table(event_summary, columns=["event", "count", "last_created_at"], max_rows=10))
+    solutions = bundle.tables.get("solutions")
+    if solutions is not None and not solutions.empty:
+        preview = solutions.copy()
+        if "sequence" in preview.columns:
+            preview["sequence_len"] = preview["sequence"].apply(lambda s: len(s) if isinstance(s, str) else 0)
+            preview["sequence_preview"] = preview["sequence"].apply(
+                lambda s: (s[:24] + "…") if isinstance(s, str) and len(s) > 25 else s
+            )
+        lines.extend(["", "## Solutions (sample)"])
+        lines.append(
+            _markdown_table(
+                preview,
+                columns=[
+                    "solution_id",
+                    "attempt_id",
+                    "input_name",
+                    "plan_name",
+                    "sampling_library_hash",
+                    "sequence_len",
+                    "sequence_preview",
+                ],
+                max_rows=10,
+            )
+        )
+    composition = bundle.tables.get("composition")
+    if composition is not None and not composition.empty:
+        comp = composition.copy()
+        if "library_hash" in comp.columns:
+            comp["library_hash"] = comp["library_hash"].apply(lambda v: str(v)[:8])
+        lines.extend(["", "## Composition (sample)"])
+        lines.append(
+            _markdown_table(
+                comp,
+                columns=[
+                    "solution_id",
+                    "attempt_id",
+                    "placement_index",
+                    "tf",
+                    "tfbs",
+                    "motif_id",
+                    "tfbs_id",
+                    "orientation",
+                    "offset",
+                    "library_hash",
+                ],
+                max_rows=12,
+            )
+        )
     leaderboard = report.get("leaderboard_latest") or {}
     leader_tf = leaderboard.get("tf") or []
     leader_tfbs = leaderboard.get("tfbs") or []

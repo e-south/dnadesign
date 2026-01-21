@@ -709,6 +709,8 @@ class PlanItem(BaseModel):
 class SamplingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     pool_strategy: Literal["full", "subsample", "iterative_subsample"] = "subsample"
+    library_source: Literal["build", "artifact"] = "build"
+    library_artifact_path: Optional[str] = None
     library_size: int = 16
     subsample_over_length_budget_by: int = 30
     library_sampling_strategy: Literal[
@@ -770,6 +772,16 @@ class SamplingConfig(BaseModel):
     def _pool_strategy_rules(self):
         if self.pool_strategy == "iterative_subsample" and self.iterative_max_libraries <= 0:
             raise ValueError("iterative_max_libraries must be > 0 when pool_strategy=iterative_subsample")
+        return self
+
+    @model_validator(mode="after")
+    def _library_source_rules(self):
+        if self.library_source == "artifact":
+            if self.library_artifact_path is None or not str(self.library_artifact_path).strip():
+                raise ValueError("sampling.library_artifact_path is required when sampling.library_source=artifact")
+        else:
+            if self.library_artifact_path is not None:
+                raise ValueError("sampling.library_artifact_path is only valid when sampling.library_source=artifact")
         return self
 
 
@@ -924,7 +936,6 @@ class SolverConfig(BaseModel):
     strategy: Literal["iterate", "diverse", "optimal", "approximate"]
     options: List[str] = Field(default_factory=list)
     strands: Literal["single", "double"] = "double"
-    fallback_to_cbc: bool = False
     allow_unknown_options: bool = False
 
     @field_validator("backend")

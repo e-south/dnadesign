@@ -37,8 +37,8 @@ Behavior:
 - Parquet requires `pyarrow`; if unavailable, DenseGen fails fast.
 - The output `path` must be a `.parquet` file (single-file output).
 - List/dict metadata values are stored as native list/struct columns (no JSON encoding).
-- If an existing dataset has a mismatched schema (for example, legacy JSON metadata), DenseGen
-  fails fast and requires a fresh output path.
+- If an existing dataset has a mismatched schema, DenseGen fails fast and requires a fresh output
+  path.
 - DenseGen maintains a local ID index (`_densegen_ids.sqlite`) to speed deduplication and
   alignment checks.
 
@@ -101,7 +101,19 @@ DenseGen records solver library provenance in two places:
 
 Each attempt row stores the full library offered to the solver (`library_tfbs`, `library_tfs`,
 `library_site_ids`, `library_sources`) along with the library hash/index and solver status.
-Output records carry `densegen__sampling_library_hash` so you can join placements to libraries.
+Attempts include `attempt_id` and `solution_id` (when successful) for stable joins. Output
+records carry `densegen__sampling_library_hash` so you can join placements to libraries.
+
+---
+
+### Solutions log
+
+DenseGen writes `outputs/solutions.parquet` (append-only) with the canonical solution id,
+attempt id, and library hash. Join keys:
+
+- `solutions.solution_id` ↔ `dense_arrays.id`
+- `solutions.attempt_id` ↔ `attempts.attempt_id`
+- `solutions.solution_id` ↔ `composition.solution_id`
 
 ---
 
@@ -127,7 +139,8 @@ DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solve
 - `dense stage-a build-pool` writes:
   - `outputs/pools/pool_manifest.json`
   - `outputs/pools/<input>__pool.parquet`
-  - `outputs/meta/fimo/candidates__<label>.parquet` (when `keep_all_candidates_debug: true`)
+  - `outputs/candidates/<input_name>/candidates__<label>.parquet` (when `keep_all_candidates_debug: true`)
+  - `outputs/candidates/candidates.parquet` + `candidates_summary.parquet` + `candidates_manifest.json`
 - `dense stage-b build-libraries` writes:
   - `outputs/libraries/library_builds.parquet`
   - `outputs/libraries/library_members.parquet`
@@ -156,9 +169,15 @@ and the attempts log.
 
 DenseGen writes `outputs/attempts.parquet`, an append-only audit log of solver attempts
 (success, duplicate, and constraint rejections). Each row includes the attempt status,
-reason/detail JSON, solver metadata, and library hash/index. Each attempt also records the
-exact library TF/TFBS/site_id lists offered to the solver (subset attribution). If no attempts
-are logged, the file is absent. Attempts logs require `pyarrow`.
+reason/detail JSON, solver metadata, and library hash/index. Each attempt includes:
+
+- `attempt_id` — stable join key across artifacts
+- `solution_id` — present for successful attempts
+- `attempt_index` — per-plan monotonic counter
+
+Each attempt also records the exact library TF/TFBS/site_id lists offered to the solver
+(subset attribution). If no attempts are logged, the file is absent. Attempts logs require
+`pyarrow`.
 
 ---
 

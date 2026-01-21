@@ -91,6 +91,7 @@ Options:
 - `--by-library/--no-by-library` - group library summaries per build attempt.
 - `--top-per-tf` - limit TFBS rows per TF when summarizing.
 - `--show-library-hash/--short-library-hash` - toggle full vs short library hashes.
+- `--events` - show event summary (stalls/resamples, library rebuilds).
 
 Tip:
 - For large runs, prefer `--no-by-library` or lower `--top`/`--top-per-tf` to keep output readable.
@@ -108,6 +109,7 @@ Options:
 Outputs:
 - `pool_manifest.json`
 - `<input>__pool.parquet` per input
+- `outputs/candidates/candidates.parquet` + `candidates_summary.parquet` (when candidate logging is enabled)
 
 ---
 
