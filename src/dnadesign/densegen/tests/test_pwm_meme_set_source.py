@@ -33,6 +33,7 @@ def test_pwm_meme_set_sampling(tmp_path: Path) -> None:
     ds = PWMMemeSetDataSource(
         paths=[str(meme_a), str(meme_b)],
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         motif_ids=["lexA", "cpxR"],
         sampling={
             "strategy": "stochastic",
@@ -56,6 +57,7 @@ def test_pwm_meme_set_duplicate_motif_ids(tmp_path: Path) -> None:
     ds = PWMMemeSetDataSource(
         paths=[str(meme_a), str(meme_b)],
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         motif_ids=None,
         sampling={
             "strategy": "stochastic",

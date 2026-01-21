@@ -91,7 +91,7 @@ Stage a self-contained workspace from the demo template (this copies inputs and 
 paths):
 
 ```bash
-uv run dense workspace init --id demo_press --root "$RUN_ROOT" \
+pixi run dense workspace init --id demo_press --root "$RUN_ROOT" \
   --template src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml \
   --copy-inputs
 ```
@@ -121,7 +121,7 @@ Example output:
 ## 4) Plan constraints
 
 ```bash
-uv run dense inspect plan -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
+pixi run dense inspect plan -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
 ```
 
 Example output:
@@ -139,7 +139,7 @@ Example output:
 This step shows the resolved inputs, outputs, solver selection, and the two-stage sampling knobs.
 
 ```bash
-uv run dense inspect config -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
+pixi run dense inspect config -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml
 ```
 
 Example output (abridged):
@@ -208,7 +208,7 @@ DenseGen writes `outputs/meta/run_manifest.json`, `outputs/meta/inputs_manifest.
 `outputs/meta/effective_config.json`. Summarize the run manifest:
 
 ```bash
-uv run dense inspect run --run /private/tmp/densegen-demo-20260115-1405/demo_press
+pixi run dense inspect run --run /private/tmp/densegen-demo-20260115-1405/demo_press
 ```
 
 Example output:
@@ -226,21 +226,27 @@ Use `--verbose` for constraint-failure breakdowns and duplicate-solution counts.
 Use `--library` to print offered-vs-used summaries for quick debugging:
 
 ```bash
-uv run dense inspect run --run /private/tmp/densegen-demo-20260115-1405/demo_press --library --top-per-tf 5
+pixi run dense inspect run --run /private/tmp/densegen-demo-20260115-1405/demo_press --library --top-per-tf 5
 ```
 
 This library summary is the quickest way to audit which TFBS were offered vs
 used in the solver stage (Stage‑B sampling).
 
-If any solutions are rejected, DenseGen writes them to
-`outputs/attempts.parquet` in the run root.
+Use `--events` to view stall/resample events and library rebuilds:
+
+```bash
+pixi run dense inspect run --run /private/tmp/densegen-demo-20260115-1405/demo_press --events
+```
+
+DenseGen writes all attempts to `outputs/attempts.parquet` and accepted solutions
+to `outputs/solutions.parquet` (joinable via `attempt_id` / `solution_id`).
 
 ## 9) Audit report
 
 Generate an audit-grade summary of the run:
 
 ```bash
-uv run dense report -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --format all
+pixi run dense report -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --format all
 ```
 
 This writes `outputs/report.json`, `outputs/report.md`, `outputs/report.html`, and `outputs/report_assets/`.
@@ -259,12 +265,15 @@ Example output:
 attempts.parquet
 composition.parquet
 dense_arrays.parquet
+candidates
 libraries
 pools
 report.html
 report.json
 report.md
 report_assets
+solutions.parquet
+meta
 ```
 
 Inspect Stage‑A pools and Stage‑B libraries:
@@ -279,7 +288,7 @@ ls /private/tmp/densegen-demo-20260115-1405/demo_press/outputs/libraries
 First, list the available plots:
 
 ```bash
-uv run dense ls-plots
+pixi run dense ls-plots
 ```
 
 Example output:
@@ -304,7 +313,7 @@ Example output:
 Then render four plots:
 
 ```bash
-uv run dense plot -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --only tf_usage,tf_coverage,tfbs_positional_histogram,diversity_health
+pixi run dense plot -c /private/tmp/densegen-demo-20260115-1405/demo_press/config.yaml --only tf_usage,tf_coverage,tfbs_positional_histogram,diversity_health
 ```
 
 Example output (abridged):

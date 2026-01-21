@@ -20,6 +20,7 @@ def test_pwm_jaspar_sampling(tmp_path: Path) -> None:
     ds = PWMJasparDataSource(
         path=str(jaspar_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         motif_ids=["M1"],
         sampling={
             "strategy": "stochastic",
@@ -40,6 +41,7 @@ def test_pwm_matrix_csv_sampling(tmp_path: Path) -> None:
     ds = PWMMatrixCSVDataSource(
         path=str(csv_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         motif_id="M1",
         columns={"A": "A", "C": "C", "G": "G", "T": "T"},
         sampling={

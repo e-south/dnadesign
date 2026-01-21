@@ -21,11 +21,17 @@ FIMO-backed PWM sampling is supported when MEME Suite is available (`fimo` on PA
 Stratified FIMO sampling uses canonical p‑value bins by default; see the guide for mining workflows.
 
 ```bash
-pixi run dense validate-config -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-uv run dense inspect inputs -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-pixi run dense run -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --no-plot
-uv run dense inspect run -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --library --top-per-tf 5
-uv run dense plot -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --only tf_usage,tf_coverage
+pixi run dense workspace init --id demo --root /tmp --template src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --copy-inputs
+CFG=/tmp/demo/config.yaml
+
+pixi run dense validate-config -c "$CFG" --probe-solver
+pixi run dense inspect inputs -c "$CFG"
+pixi run dense stage-a build-pool -c "$CFG"
+pixi run dense stage-b build-libraries -c "$CFG"
+pixi run dense run -c "$CFG" --no-plot
+pixi run dense inspect run --run /tmp/demo --library --top-per-tf 5
+pixi run dense report -c "$CFG" --format md
+pixi run dense plot -c "$CFG" --only tf_usage,tf_coverage
 ```
 
 For a full end-to-end walkthrough with expected outputs, see

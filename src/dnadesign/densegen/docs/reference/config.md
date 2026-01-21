@@ -77,7 +77,8 @@ PWM inputs perform **input sampling** (sampling sites from PWMs) via
         retained bins are the only bins reported in yield summaries
       - `log_every_batches` (int > 0; default 1) - log per‑bin yield summaries every N batches
     - `bgfile` (optional path) - MEME bfile-format background model for FIMO
-    - `keep_all_candidates_debug` (bool, default false) - write raw FIMO TSVs to `outputs/meta/fimo/` for inspection
+    - `keep_all_candidates_debug` (bool, default false) - write raw FIMO TSVs to `outputs/candidates/<input_name>/`
+      for inspection
     - `include_matched_sequence` (bool, default false) - include `fimo_matched_sequence` in TFBS outputs
     - `length_policy`: `exact | range` (default: `exact`)
     - `length_range`: `[min, max]` (required when `length_policy=range`; `min` >= motif length)
@@ -180,6 +181,8 @@ These controls apply after PWM input sampling. `library_size` does not change PW
 `library_size` also bounds the motif count offered to the solver for binding-site and PWM-sampled inputs.
 
 - `pool_strategy`: `full | subsample | iterative_subsample`
+- `library_source`: `build | artifact` (use `artifact` to replay prebuilt libraries)
+- `library_artifact_path`: required when `library_source: artifact` (path to `outputs/libraries`)
 - `library_size` (int > 0; used for subsample strategies)
 - `library_sampling_strategy`: `tf_balanced | uniform_over_pairs | coverage_weighted`
 - `coverage_boost_alpha` (float >= 0; used when `library_sampling_strategy=coverage_weighted`)
@@ -196,6 +199,11 @@ These controls apply after PWM input sampling. `library_size` does not change PW
 - `iterative_max_libraries` (int > 0 when `pool_strategy=iterative_subsample`)
 - `iterative_min_new_solutions` (int >= 0)
 
+Notes:
+- When `library_source: artifact`, DenseGen replays the libraries found in
+  `library_artifact_path` and validates that `pool_strategy`, `library_sampling_strategy`,
+  and `library_size` match the artifact metadata. Stage‑B sampling is not rebuilt.
+
 ---
 
 ### `densegen.solver`
@@ -206,8 +214,6 @@ These controls apply after PWM input sampling. `library_size` does not change PW
 - `options` (list of solver option strings)
   - `options` must be empty when `strategy: approximate`
 - `strands`: `single | double` (default: `double`)
-- `fallback_to_cbc` (bool; default `false`)
-  - If the requested solver probe fails, fall back to CBC instead of aborting.
 - `allow_unknown_options` (bool; default `false`)
   - DenseGen validates solver option keys for known backends. Set to `true` to bypass validation.
   - Known keys (case-insensitive): `Threads`, `TimeLimit`, `MIPGap`, `Seed`, `LogLevel`, `MaxSeconds`.
@@ -305,7 +311,6 @@ densegen:
     strategy: diverse
     options: []
     strands: double
-    fallback_to_cbc: false
     allow_unknown_options: false
 
   runtime:

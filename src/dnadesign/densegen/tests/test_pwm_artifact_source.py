@@ -37,6 +37,7 @@ def test_pwm_artifact_sampling_exact(tmp_path: Path) -> None:
     ds = PWMArtifactDataSource(
         path=str(artifact_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         sampling={
             "strategy": "stochastic",
             "n_sites": 5,
@@ -59,6 +60,7 @@ def test_pwm_artifact_sampling_range(tmp_path: Path) -> None:
     ds = PWMArtifactDataSource(
         path=str(artifact_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         sampling={
             "strategy": "stochastic",
             "n_sites": 6,
@@ -100,6 +102,7 @@ def test_pwm_artifact_rejects_nonfinite_log_odds(tmp_path: Path) -> None:
     ds = PWMArtifactDataSource(
         path=str(artifact_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         sampling={
             "strategy": "stochastic",
             "n_sites": 2,
@@ -119,6 +122,7 @@ def test_pwm_sampling_error_includes_motif_id(tmp_path: Path) -> None:
     ds = PWMArtifactDataSource(
         path=str(artifact_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         sampling={
             "strategy": "stochastic",
             "n_sites": 2,

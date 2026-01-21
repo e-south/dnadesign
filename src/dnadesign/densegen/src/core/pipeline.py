@@ -43,9 +43,17 @@ from ..config import (
     resolve_run_root,
 )
 from ..utils.logging_utils import install_native_stderr_filters
+from .artifacts.candidates import build_candidate_artifact
 from .artifacts.ids import hash_tfbs_id
-from .artifacts.library import write_library_artifact
+from .artifacts.library import (
+    LibraryArtifact,
+    LibraryRecord,
+    load_library_artifact,
+    load_library_records,
+    write_library_artifact,
+)
 from .artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData, build_pool_artifact
+from .artifacts.records import AttemptRecord, SolutionRecord
 from .metadata import build_metadata
 from .postprocess import random_fill
 from .pvalue_bins import resolve_pvalue_bins
@@ -118,12 +126,9 @@ def select_solver(
     optimizer: OptimizerAdapter,
     *,
     strategy: str,
-    fallback_to_cbc: bool = False,
     test_length: int = 10,
 ) -> str | None:
-    """
-    Probe the requested solver once. If it fails, optionally fall back to CBC.
-    """
+    """Probe the requested solver once and fail fast if unavailable."""
     if strategy == "approximate":
         return preferred
     if not preferred:
@@ -132,13 +137,6 @@ def select_solver(
         optimizer.probe_solver(preferred, test_length=test_length)
         return preferred
     except Exception as exc:
-        if fallback_to_cbc and str(preferred).upper() != "CBC":
-            log.warning(
-                "Requested solver '%s' failed; falling back to CBC (solver.fallback_to_cbc=true).",
-                preferred,
-            )
-            optimizer.probe_solver("CBC", test_length=test_length)
-            return "CBC"
         raise RuntimeError(
             f"Requested solver '{preferred}' failed during probe: {exc}\n"
             "Please install/configure this solver or choose another in solver.backend."
@@ -1391,6 +1389,7 @@ def _write_effective_config(
 
 
 ATTEMPTS_CHUNK_SIZE = 256
+SOLUTIONS_CHUNK_SIZE = 256
 
 
 def _flush_attempts(outputs_root: Path, buffer: list[dict]) -> None:
@@ -1405,6 +1404,7 @@ def _flush_attempts(outputs_root: Path, buffer: list[dict]) -> None:
     schema = pa.schema(
         [
             pa.field("attempt_id", pa.string()),
+            pa.field("attempt_index", pa.int64()),
             pa.field("run_id", pa.string()),
             pa.field("input_name", pa.string()),
             pa.field("plan_name", pa.string()),
@@ -1414,7 +1414,7 @@ def _flush_attempts(outputs_root: Path, buffer: list[dict]) -> None:
             pa.field("detail_json", pa.string()),
             pa.field("sequence", pa.string()),
             pa.field("sequence_hash", pa.string()),
-            pa.field("output_id", pa.string()),
+            pa.field("solution_id", pa.string()),
             pa.field("used_tf_counts_json", pa.string()),
             pa.field("used_tf_list", pa.list_(pa.string())),
             pa.field("sampling_library_index", pa.int64()),
@@ -1433,6 +1433,36 @@ def _flush_attempts(outputs_root: Path, buffer: list[dict]) -> None:
     table = pa.Table.from_pylist(buffer, schema=schema)
     outputs_root.mkdir(parents=True, exist_ok=True)
     filename = f"attempts_part-{uuid.uuid4().hex}.parquet"
+    pq.write_table(table, outputs_root / filename)
+    buffer.clear()
+
+
+def _flush_solutions(outputs_root: Path, buffer: list[dict]) -> None:
+    if not buffer:
+        return
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except Exception as exc:
+        raise RuntimeError("pyarrow is required to write solutions logs.") from exc
+
+    schema = pa.schema(
+        [
+            pa.field("solution_id", pa.string()),
+            pa.field("attempt_id", pa.string()),
+            pa.field("run_id", pa.string()),
+            pa.field("input_name", pa.string()),
+            pa.field("plan_name", pa.string()),
+            pa.field("created_at", pa.string()),
+            pa.field("sequence", pa.string()),
+            pa.field("sequence_hash", pa.string()),
+            pa.field("sampling_library_index", pa.int64()),
+            pa.field("sampling_library_hash", pa.string()),
+        ]
+    )
+    table = pa.Table.from_pylist(buffer, schema=schema)
+    outputs_root.mkdir(parents=True, exist_ok=True)
+    filename = f"solutions_part-{uuid.uuid4().hex}.parquet"
     pq.write_table(table, outputs_root / filename)
     buffer.clear()
 
@@ -1511,12 +1541,77 @@ def _load_existing_library_index(outputs_root: Path) -> int:
     return max_idx
 
 
+def _load_existing_library_index_by_plan(
+    outputs_root: Path,
+) -> dict[tuple[str, str], int]:
+    attempts_path = outputs_root / "attempts.parquet"
+    paths: list[Path] = []
+    if attempts_path.exists():
+        paths.append(attempts_path)
+    paths.extend(sorted(outputs_root.glob("attempts_part-*.parquet")))
+    if not paths:
+        return {}
+    max_by_plan: dict[tuple[str, str], int] = {}
+    for path in paths:
+        try:
+            df = pd.read_parquet(path, columns=["input_name", "plan_name", "sampling_library_index"])
+        except Exception:
+            continue
+        if df.empty:
+            continue
+        for _, row in df.iterrows():
+            input_name = str(row.get("input_name") or "")
+            plan_name = str(row.get("plan_name") or "")
+            idx = row.get("sampling_library_index")
+            try:
+                idx_val = int(idx) if idx is not None else 0
+            except Exception:
+                idx_val = 0
+            key = (input_name, plan_name)
+            max_by_plan[key] = max(max_by_plan.get(key, 0), idx_val)
+    return max_by_plan
+
+
+def _load_existing_attempt_index_by_plan(outputs_root: Path) -> dict[tuple[str, str], int]:
+    attempts_path = outputs_root / "attempts.parquet"
+    paths: list[Path] = []
+    if attempts_path.exists():
+        paths.append(attempts_path)
+    paths.extend(sorted(outputs_root.glob("attempts_part-*.parquet")))
+    if not paths:
+        return {}
+    max_by_plan: dict[tuple[str, str], int] = {}
+    for path in paths:
+        try:
+            df = pd.read_parquet(path)
+        except Exception:
+            continue
+        if df.empty:
+            continue
+        if "attempt_index" not in df.columns:
+            raise RuntimeError(
+                f"attempts file missing attempt_index column: {path}. "
+                "Regenerate outputs with the current DenseGen version."
+            )
+        for _, row in df.iterrows():
+            input_name = str(row.get("input_name") or "")
+            plan_name = str(row.get("plan_name") or "")
+            key = (input_name, plan_name)
+            try:
+                idx_val = int(row.get("attempt_index") or 0)
+            except Exception:
+                idx_val = 0
+            max_by_plan[key] = max(max_by_plan.get(key, 0), idx_val)
+    return max_by_plan
+
+
 def _append_attempt(
     outputs_root: Path,
     *,
     run_id: str,
     input_name: str,
     plan_name: str,
+    attempt_index: int,
     status: str,
     reason: str,
     detail: dict | None,
@@ -1530,50 +1625,54 @@ def _append_attempt(
     solver_solve_time_s: float | None,
     dense_arrays_version: str | None,
     dense_arrays_version_source: str,
-    output_id: str | None = None,
+    solution_id: str | None = None,
     library_tfbs: list[str] | None = None,
     library_tfs: list[str] | None = None,
     library_site_ids: list[str | None] | None = None,
     library_sources: list[str | None] | None = None,
     attempts_buffer: list[dict] | None = None,
-) -> None:
+) -> str:
     sequence_val = sequence or ""
     lib_tfbs = [str(x) for x in (library_tfbs or [])]
     lib_tfs = [str(x) for x in (library_tfs or [])]
     lib_site_ids = [str(x) if x is not None else "" for x in (library_site_ids or [])]
     lib_sources = [str(x) if x is not None else "" for x in (library_sources or [])]
-    payload = {
-        "attempt_id": uuid.uuid4().hex,
-        "run_id": run_id,
-        "input_name": input_name,
-        "plan_name": plan_name,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "status": status,
-        "reason": reason,
-        "detail_json": json.dumps(detail or {}),
-        "sequence": sequence_val,
-        "sequence_hash": hashlib.sha256(sequence_val.encode("utf-8")).hexdigest() if sequence_val else "",
-        "output_id": output_id,
-        "used_tf_counts_json": json.dumps(used_tf_counts or {}),
-        "used_tf_list": used_tf_list or [],
-        "sampling_library_index": int(sampling_library_index),
-        "sampling_library_hash": sampling_library_hash,
-        "solver_status": solver_status,
-        "solver_objective": solver_objective,
-        "solver_solve_time_s": solver_solve_time_s,
-        "dense_arrays_version": dense_arrays_version,
-        "dense_arrays_version_source": dense_arrays_version_source,
-        "library_tfbs": lib_tfbs,
-        "library_tfs": lib_tfs,
-        "library_site_ids": lib_site_ids,
-        "library_sources": lib_sources,
-    }
+    created_at = datetime.now(timezone.utc).isoformat()
+    seq_hash = hashlib.sha256(sequence_val.encode("utf-8")).hexdigest() if sequence_val else ""
+    record = AttemptRecord.build(
+        attempt_index=int(attempt_index),
+        run_id=run_id,
+        input_name=input_name,
+        plan_name=plan_name,
+        created_at=created_at,
+        status=status,
+        reason=reason,
+        detail_json=json.dumps(detail or {}),
+        sequence=sequence_val,
+        sequence_hash=seq_hash,
+        solution_id=solution_id,
+        used_tf_counts_json=json.dumps(used_tf_counts or {}),
+        used_tf_list=used_tf_list or [],
+        sampling_library_index=int(sampling_library_index),
+        sampling_library_hash=str(sampling_library_hash),
+        solver_status=solver_status,
+        solver_objective=solver_objective,
+        solver_solve_time_s=solver_solve_time_s,
+        dense_arrays_version=dense_arrays_version,
+        dense_arrays_version_source=dense_arrays_version_source,
+        library_tfbs=lib_tfbs,
+        library_tfs=lib_tfs,
+        library_site_ids=lib_site_ids,
+        library_sources=lib_sources,
+    )
+    payload = record.to_dict()
     if attempts_buffer is not None:
         attempts_buffer.append(payload)
         if len(attempts_buffer) >= ATTEMPTS_CHUNK_SIZE:
             _flush_attempts(outputs_root, attempts_buffer)
-        return
+        return record.attempt_id
     _flush_attempts(outputs_root, [payload])
+    return record.attempt_id
 
 
 def _log_rejection(
@@ -1582,6 +1681,7 @@ def _log_rejection(
     run_id: str,
     input_name: str,
     plan_name: str,
+    attempt_index: int,
     reason: str,
     detail: dict | None,
     sequence: str,
@@ -1606,6 +1706,7 @@ def _log_rejection(
         run_id=run_id,
         input_name=input_name,
         plan_name=plan_name,
+        attempt_index=attempt_index,
         status=status,
         reason=reason,
         detail=detail,
@@ -1619,6 +1720,7 @@ def _log_rejection(
         solver_solve_time_s=solver_solve_time_s,
         dense_arrays_version=dense_arrays_version,
         dense_arrays_version_source=dense_arrays_version_source,
+        solution_id=None,
         library_tfbs=library_tfbs,
         library_tfs=library_tfs,
         library_site_ids=library_site_ids,
@@ -1696,14 +1798,26 @@ def _process_plan_for_source(
     write_state: Callable[[], None] | None = None,
     site_failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] | None = None,
     source_cache: dict[str, PoolData] | None = None,
+    attempt_counters: dict[tuple[str, str], int] | None = None,
+    library_records: dict[tuple[str, str], list[LibraryRecord]] | None = None,
+    library_cursor: dict[tuple[str, str], int] | None = None,
+    library_source: str | None = None,
     library_build_rows: list[dict] | None = None,
     library_member_rows: list[dict] | None = None,
+    solution_rows: list[dict] | None = None,
     composition_rows: list[dict] | None = None,
     events_path: Path | None = None,
 ) -> tuple[int, dict]:
     source_label = source_cfg.name
     plan_name = plan_item.name
     quota = int(plan_item.quota)
+    attempt_counters = attempt_counters or {}
+
+    def _next_attempt_index() -> int:
+        key = (source_label, plan_name)
+        current = int(attempt_counters.get(key, 0)) + 1
+        attempt_counters[key] = current
+        return current
 
     gen = global_cfg.generation
     seq_len = int(gen.sequence_length)
@@ -1719,6 +1833,8 @@ def _process_plan_for_source(
         library_site_ids: list[str | None],
         library_sources: list[str | None],
     ) -> None:
+        if str(getattr(sampling_cfg, "library_source", "build")).lower() == "artifact":
+            return
         if library_build_rows is None or library_member_rows is None:
             return
         library_index = int(sampling_info.get("library_index") or 0)
@@ -1992,7 +2108,7 @@ def _process_plan_for_source(
                 mining_label = ", ".join(parts) if parts else "enabled"
             log.info(
                 "PWM input sampling for %s: motifs=%d | sites=%s | strategy=%s | backend=%s | score=%s | "
-                "selection=%s | bins=%s | mining=%s | oversample=%s | max_candidates=%s | length=%s",
+                "selection=%s | bins=%s | mining=%s | oversample=%s | caps=%s | length=%s",
                 source_label,
                 len(input_meta.get("input_pwm_ids") or []),
                 counts_label or "-",
@@ -2047,23 +2163,103 @@ def _process_plan_for_source(
     tfbs_parts: List[str]
     libraries_built = existing_library_builds
     libraries_built_start = existing_library_builds
+    libraries_used = 0
+    library_source_label = str(library_source or getattr(sampling_cfg, "library_source", "build")).lower()
+    if library_source_label not in {"build", "artifact"}:
+        raise ValueError(f"Unsupported sampling.library_source: {library_source_label}")
+    if library_source_label == "artifact" and library_cursor is not None:
+        prior_used = int(library_cursor.get((source_label, plan_name), 0))
+        libraries_built = prior_used
+        libraries_built_start = prior_used
+
+    def _select_library_from_artifact() -> tuple[list[str], list[str], list[str], dict]:
+        if library_records is None or library_cursor is None:
+            raise RuntimeError("Library artifacts requested but no library records were provided.")
+        key = (source_label, plan_name)
+        records = library_records.get(key) or []
+        if not records:
+            raise RuntimeError(
+                f"No libraries available in artifact for {source_label}/{plan_name}. "
+                "Build libraries with `dense stage-b build-libraries` and re-run."
+            )
+        cursor = int(library_cursor.get(key, 0))
+        if cursor >= len(records):
+            raise RuntimeError(
+                f"Library artifact exhausted for {source_label}/{plan_name} "
+                f"(requested index={cursor + 1}, available={len(records)}). "
+                "Build more libraries or reduce resampling."
+            )
+        record = records[cursor]
+        library_cursor[key] = cursor + 1
+        if record.pool_strategy is None or record.library_sampling_strategy is None:
+            raise RuntimeError(
+                f"Library artifact missing sampling metadata for {source_label}/{plan_name} "
+                f"(library_index={record.library_index}). Rebuild libraries with the current version."
+            )
+        if str(record.pool_strategy) != str(pool_strategy):
+            raise RuntimeError(
+                f"Library artifact pool_strategy mismatch for {source_label}/{plan_name}: "
+                f"artifact={record.pool_strategy} config={pool_strategy}."
+            )
+        if str(record.library_sampling_strategy) != str(library_sampling_strategy):
+            raise RuntimeError(
+                f"Library artifact sampling strategy mismatch for {source_label}/{plan_name}: "
+                f"artifact={record.library_sampling_strategy} config={library_sampling_strategy}."
+            )
+        if pool_strategy != "full" and record.library_size != int(getattr(sampling_cfg, "library_size", 0)):
+            raise RuntimeError(
+                f"Library artifact size mismatch for {source_label}/{plan_name}: "
+                f"artifact={record.library_size} config={sampling_cfg.library_size}."
+            )
+        tfbs_parts_local = []
+        for idx, tfbs in enumerate(record.library_tfbs):
+            tf = record.library_tfs[idx] if idx < len(record.library_tfs) else ""
+            tfbs_parts_local.append(f"{tf}:{tfbs}" if tf else str(tfbs))
+        if events_path is not None:
+            try:
+                _emit_event(
+                    events_path,
+                    event="LIBRARY_SELECTED",
+                    payload={
+                        "input_name": source_label,
+                        "plan_name": plan_name,
+                        "library_index": int(record.library_index),
+                        "library_hash": str(record.library_hash),
+                        "library_size": int(record.library_size),
+                    },
+                )
+            except Exception:
+                log.debug("Failed to emit LIBRARY_SELECTED event.", exc_info=True)
+        return record.library_tfbs, tfbs_parts_local, record.library_tfs, record.sampling_info()
+
+    def _build_next_library() -> tuple[list[str], list[str], list[str], dict]:
+        nonlocal libraries_built, libraries_used
+        if library_source_label == "artifact":
+            libraries_used += 1
+            libraries_built = libraries_used
+            return _select_library_from_artifact()
+        library_for_opt_local, tfbs_parts_local, regulator_labels_local, sampling_info_local = build_library_for_plan(
+            source_label=source_label,
+            plan_item=plan_item,
+            pool=pool,
+            sampling_cfg=sampling_cfg,
+            seq_len=seq_len,
+            min_count_per_tf=min_count_per_tf,
+            usage_counts=usage_counts,
+            failure_counts=failure_counts if failure_counts else None,
+            rng=rng,
+            np_rng=np_rng,
+            library_index_start=libraries_built,
+        )
+        libraries_built = int(sampling_info_local.get("library_index", libraries_built))
+        libraries_used += 1
+        return library_for_opt_local, tfbs_parts_local, regulator_labels_local, sampling_info_local
 
     if pool_strategy != "iterative_subsample" and not one_subsample_only:
         max_per_subsample = quota
-    library_for_opt, tfbs_parts, regulator_labels, sampling_info = build_library_for_plan(
-        source_label=source_label,
-        plan_item=plan_item,
-        pool=pool,
-        sampling_cfg=sampling_cfg,
-        seq_len=seq_len,
-        min_count_per_tf=min_count_per_tf,
-        usage_counts=usage_counts,
-        failure_counts=failure_counts if failure_counts else None,
-        rng=rng,
-        np_rng=np_rng,
-        library_index_start=libraries_built,
-    )
-    libraries_built = int(sampling_info.get("library_index", libraries_built))
+    library_for_opt, tfbs_parts, regulator_labels, sampling_info = _build_next_library()
+    if library_source_label != "artifact":
+        libraries_built = int(sampling_info.get("library_index", libraries_built))
     site_id_by_index = sampling_info.get("site_id_by_index")
     source_by_index = sampling_info.get("source_by_index")
     tfbs_id_by_index = sampling_info.get("tfbs_id_by_index")
@@ -2356,11 +2552,13 @@ def _process_plan_for_source(
                         failed_solutions += 1
                         failed_min_count_per_tf += 1
                         _record_site_failures("min_count_per_tf")
+                        attempt_index = _next_attempt_index()
                         _log_rejection(
                             outputs_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
+                            attempt_index=attempt_index,
                             reason="min_count_per_tf",
                             detail={
                                 "min_count_per_tf": min_count_per_tf,
@@ -2395,11 +2593,13 @@ def _process_plan_for_source(
                         failed_solutions += 1
                         failed_required_regulators += 1
                         _record_site_failures("required_regulators")
+                        attempt_index = _next_attempt_index()
                         _log_rejection(
                             outputs_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
+                            attempt_index=attempt_index,
                             reason="required_regulators",
                             detail={
                                 "required_regulators": required_regulators,
@@ -2437,11 +2637,13 @@ def _process_plan_for_source(
                         failed_solutions += 1
                         failed_min_count_by_regulator += 1
                         _record_site_failures("min_count_by_regulator")
+                        attempt_index = _next_attempt_index()
                         _log_rejection(
                             outputs_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
+                            attempt_index=attempt_index,
                             reason="min_count_by_regulator",
                             detail={
                                 "min_count_by_regulator": [
@@ -2483,11 +2685,13 @@ def _process_plan_for_source(
                         failed_solutions += 1
                         failed_min_required_regulators += 1
                         _record_site_failures("min_required_regulators")
+                        attempt_index = _next_attempt_index()
                         _log_rejection(
                             outputs_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
+                            attempt_index=attempt_index,
                             reason="min_required_regulators",
                             detail={
                                 "required_regulators": required_regulators,
@@ -2523,11 +2727,13 @@ def _process_plan_for_source(
                         failed_solutions += 1
                         failed_min_required_regulators += 1
                         _record_site_failures("min_required_regulators")
+                        attempt_index = _next_attempt_index()
                         _log_rejection(
                             outputs_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
+                            attempt_index=attempt_index,
                             reason="min_required_regulators",
                             detail={
                                 "min_required_regulators": int(min_required_regulators),
@@ -2660,11 +2866,13 @@ def _process_plan_for_source(
                 if not accepted:
                     failed_solutions += 1
                     duplicate_records += 1
+                    attempt_index = _next_attempt_index()
                     _log_rejection(
                         outputs_root,
                         run_id=run_id,
                         input_name=source_label,
                         plan_name=plan_name,
+                        attempt_index=attempt_index,
                         reason="output_duplicate",
                         detail={},
                         sequence=final_seq,
@@ -2694,11 +2902,14 @@ def _process_plan_for_source(
                     )
                     continue
 
+                composition_start = None
                 if composition_rows is not None:
+                    composition_start = len(composition_rows)
                     for placement_index, entry in enumerate(used_tfbs_detail or []):
                         composition_rows.append(
                             {
-                                "sequence_id": record.id,
+                                "solution_id": record.id,
+                                "attempt_id": None,
                                 "input_name": source_label,
                                 "plan_name": plan_name,
                                 "library_index": int(sampling_library_index),
@@ -2718,11 +2929,13 @@ def _process_plan_for_source(
                             }
                         )
 
-                _append_attempt(
+                attempt_index = _next_attempt_index()
+                attempt_id = _append_attempt(
                     outputs_root,
                     run_id=run_id,
                     input_name=source_label,
                     plan_name=plan_name,
+                    attempt_index=attempt_index,
                     status="success",
                     reason="ok",
                     detail={},
@@ -2736,13 +2949,33 @@ def _process_plan_for_source(
                     solver_solve_time_s=solver_solve_time_s,
                     dense_arrays_version=dense_arrays_version,
                     dense_arrays_version_source=dense_arrays_version_source,
-                    output_id=record.id,
+                    solution_id=record.id,
                     library_tfbs=library_tfbs,
                     library_tfs=library_tfs,
                     library_site_ids=library_site_ids,
                     library_sources=library_sources,
                     attempts_buffer=attempts_buffer,
                 )
+                if composition_rows is not None and composition_start is not None:
+                    for idx in range(composition_start, len(composition_rows)):
+                        composition_rows[idx]["attempt_id"] = attempt_id
+                if solution_rows is not None:
+                    solution_rows.append(
+                        SolutionRecord(
+                            solution_id=record.id,
+                            attempt_id=attempt_id,
+                            run_id=str(run_id),
+                            input_name=source_label,
+                            plan_name=plan_name,
+                            created_at=created_at,
+                            sequence=final_seq,
+                            sequence_hash=hashlib.sha256(final_seq.encode("utf-8")).hexdigest(),
+                            sampling_library_index=int(sampling_library_index),
+                            sampling_library_hash=str(sampling_library_hash),
+                        ).to_dict()
+                    )
+                    if len(solution_rows) >= SOLUTIONS_CHUNK_SIZE:
+                        _flush_solutions(outputs_root, solution_rows)
 
                 _update_usage_counts(usage_counts, used_tfbs_detail)
                 for tf, count in used_tf_counts.items():
@@ -2905,11 +3138,13 @@ def _process_plan_for_source(
             if produced_this_library == 0:
                 reason = "stall_no_solution" if stall_triggered else "no_solution"
                 _record_site_failures(reason)
+                attempt_index = _next_attempt_index()
                 _append_attempt(
                     outputs_root,
                     run_id=run_id,
                     input_name=source_label,
                     plan_name=plan_name,
+                    attempt_index=attempt_index,
                     status="failed",
                     reason=reason,
                     detail={"stall_seconds": stall_seconds} if stall_triggered else {},
@@ -2923,6 +3158,7 @@ def _process_plan_for_source(
                     solver_solve_time_s=None,
                     dense_arrays_version=dense_arrays_version,
                     dense_arrays_version_source=dense_arrays_version_source,
+                    solution_id=None,
                     library_tfbs=library_tfbs,
                     library_tfs=library_tfs,
                     library_site_ids=library_site_ids,
@@ -2985,26 +3221,15 @@ def _process_plan_for_source(
                 )
                 break
 
-            if iterative_max_libraries > 0 and libraries_built >= iterative_max_libraries:
+            if iterative_max_libraries > 0 and libraries_used >= iterative_max_libraries:
                 raise RuntimeError(
                     f"[{source_label}/{plan_name}] Exceeded iterative_max_libraries={iterative_max_libraries}."
                 )
 
             # New library
-            library_for_opt, tfbs_parts, regulator_labels, sampling_info = build_library_for_plan(
-                source_label=source_label,
-                plan_item=plan_item,
-                pool=pool,
-                sampling_cfg=sampling_cfg,
-                seq_len=seq_len,
-                min_count_per_tf=min_count_per_tf,
-                usage_counts=usage_counts,
-                failure_counts=failure_counts if failure_counts else None,
-                rng=rng,
-                np_rng=np_rng,
-                library_index_start=libraries_built,
-            )
-            libraries_built = int(sampling_info.get("library_index", libraries_built))
+            library_for_opt, tfbs_parts, regulator_labels, sampling_info = _build_next_library()
+            if library_source_label != "artifact":
+                libraries_built = int(sampling_info.get("library_index", libraries_built))
             site_id_by_index = sampling_info.get("site_id_by_index")
             source_by_index = sampling_info.get("source_by_index")
             tfbs_id_by_index = sampling_info.get("tfbs_id_by_index")
@@ -3067,6 +3292,8 @@ def _process_plan_for_source(
 
         if one_subsample_only:
             _flush_attempts(outputs_root, attempts_buffer)
+            if solution_rows is not None:
+                _flush_solutions(outputs_root, solution_rows)
             if state_counts is not None:
                 state_counts[(source_label, plan_name)] = int(global_generated)
                 if write_state is not None:
@@ -3090,6 +3317,8 @@ def _process_plan_for_source(
             }
 
     _flush_attempts(outputs_root, attempts_buffer)
+    if solution_rows is not None:
+        _flush_solutions(outputs_root, solution_rows)
     log.info("Completed %s/%s: %d/%d", source_label, plan_name, global_generated, quota)
     if state_counts is not None:
         state_counts[(source_label, plan_name)] = int(global_generated)
@@ -3139,7 +3368,6 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
         cfg.solver.backend,
         deps.optimizer,
         strategy=str(cfg.solver.strategy),
-        fallback_to_cbc=bool(cfg.solver.fallback_to_cbc),
     )
     dense_arrays_version, dense_arrays_version_source = _resolve_dense_arrays_version(loaded.path)
 
@@ -3157,6 +3385,7 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
     source_cache: dict[str, PoolData] = {}
     library_build_rows: list[dict] = []
     library_member_rows: list[dict] = []
+    solution_rows: list[dict] = []
     composition_rows: list[dict] = []
     outputs_root = run_outputs_root(run_root)
     outputs_root.mkdir(parents=True, exist_ok=True)
@@ -3200,6 +3429,89 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
         log.debug("Failed to emit POOL_BUILT event.", exc_info=True)
     for name, pool in pool_data.items():
         source_cache[name] = pool
+    candidates_dir = outputs_root / "candidates"
+    candidate_files = list(candidates_dir.rglob("candidates__*.parquet")) if candidates_dir.exists() else []
+    if candidate_files:
+        try:
+            build_candidate_artifact(
+                candidates_dir=candidates_dir,
+                cfg_path=loaded.path,
+                run_id=str(cfg.run.id),
+                run_root=run_root,
+                overwrite=True,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed to write candidate artifacts: {exc}") from exc
+    library_records: dict[tuple[str, str], list[LibraryRecord]] | None = None
+    library_cursor: dict[tuple[str, str], int] | None = None
+    library_artifact: LibraryArtifact | None = None
+    sampling_cfg = cfg.generation.sampling
+    library_source = str(getattr(sampling_cfg, "library_source", "build")).lower()
+    if library_source == "artifact":
+        artifact_path = resolve_relative_path(loaded.path, sampling_cfg.library_artifact_path)
+        if not artifact_path.exists():
+            raise RuntimeError(f"Library artifact directory not found: {artifact_path}")
+        library_artifact = load_library_artifact(artifact_path)
+        library_records = load_library_records(library_artifact)
+        library_cursor = {}
+        existing_library_by_plan = _load_existing_library_index_by_plan(outputs_root)
+        for inp in cfg.inputs:
+            for plan_item in pl:
+                key = (inp.name, plan_item.name)
+                records = library_records.get(key)
+                if not records:
+                    raise RuntimeError(
+                        f"Library artifact missing libraries for {inp.name}/{plan_item.name}. "
+                        "Build libraries with `dense stage-b build-libraries` using this config."
+                    )
+                max_used = existing_library_by_plan.get(key, 0)
+                used_count = sum(1 for rec in records if int(rec.library_index) <= int(max_used))
+                if max_used and used_count == 0:
+                    raise RuntimeError(
+                        f"Library artifact indices do not cover previously used library_index={max_used} "
+                        f"for {inp.name}/{plan_item.name}."
+                    )
+                library_cursor[key] = used_count
+                for rec in records:
+                    if int(rec.library_index) <= 0:
+                        raise RuntimeError(
+                            f"Library artifact has non-positive library_index={rec.library_index} "
+                            f"for {inp.name}/{plan_item.name}."
+                        )
+                    if rec.library_sampling_strategy is None or rec.pool_strategy is None:
+                        raise RuntimeError(
+                            f"Library artifact missing sampling metadata for {inp.name}/{plan_item.name} "
+                            f"(library_index={rec.library_index})."
+                        )
+                    required = list(dict.fromkeys(plan_item.required_regulators or []))
+                    if required:
+                        present = {tf for tf in rec.library_tfs if tf}
+                        k_required = plan_item.min_required_regulators
+                        if k_required is not None:
+                            if len(present.intersection(required)) < int(k_required):
+                                raise RuntimeError(
+                                    f"Library artifact for {inp.name}/{plan_item.name} "
+                                    f"(library_index={rec.library_index}) cannot satisfy "
+                                    f"min_required_regulators={k_required}."
+                                )
+                        else:
+                            missing = [tf for tf in required if tf not in present]
+                            if missing:
+                                raise RuntimeError(
+                                    f"Library artifact for {inp.name}/{plan_item.name} "
+                                    f"(library_index={rec.library_index}) is missing required regulators: "
+                                    f"{', '.join(missing)}"
+                                )
+                    for tf, min_count in (plan_item.min_count_by_regulator or {}).items():
+                        found = sum(1 for t in rec.library_tfs if t == tf)
+                        if found < int(min_count):
+                            raise RuntimeError(
+                                f"Library artifact for {inp.name}/{plan_item.name} "
+                                f"(library_index={rec.library_index}) has tf={tf} count={found} "
+                                f"< min_count_by_regulator={min_count}."
+                            )
+    elif library_source != "build":
+        raise RuntimeError(f"Unsupported sampling.library_source: {library_source}")
     ensure_run_meta_dir(run_root)
     state_path = run_state_path(run_root)
     state_created_at = datetime.now(timezone.utc).isoformat()
@@ -3225,6 +3537,7 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
     existing_counts: dict[tuple[str, str], int] = {}
     existing_usage_by_plan: dict[tuple[str, str], dict[tuple[str, str], int]] = {}
     site_failure_counts = _load_failure_counts_from_attempts(outputs_root)
+    attempt_counters = _load_existing_attempt_index_by_plan(outputs_root)
     if cfg.output.targets:
         try:
             df_existing, _ = load_records_from_config(
@@ -3383,8 +3696,13 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                     write_state=_write_state,
                     site_failure_counts=site_failure_counts,
                     source_cache=source_cache,
+                    attempt_counters=attempt_counters,
+                    library_records=library_records,
+                    library_cursor=library_cursor,
+                    library_source=library_source,
                     library_build_rows=library_build_rows,
                     library_member_rows=library_member_rows,
+                    solution_rows=solution_rows,
                     composition_rows=composition_rows,
                     events_path=events_path,
                 )
@@ -3435,8 +3753,13 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                         write_state=_write_state,
                         site_failure_counts=site_failure_counts,
                         source_cache=source_cache,
+                        attempt_counters=attempt_counters,
+                        library_records=library_records,
+                        library_cursor=library_cursor,
+                        library_source=library_source,
                         library_build_rows=library_build_rows,
                         library_member_rows=library_member_rows,
+                        solution_rows=solution_rows,
                         composition_rows=composition_rows,
                         events_path=events_path,
                     )
@@ -3453,9 +3776,27 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
 
     outputs_root = run_outputs_root(run_root)
     _consolidate_parts(outputs_root, part_glob="attempts_part-*.parquet", final_name="attempts.parquet")
+    _consolidate_parts(outputs_root, part_glob="solutions_part-*.parquet", final_name="solutions.parquet")
 
-    if library_build_rows:
-        libraries_dir = outputs_root / "libraries"
+    libraries_dir = outputs_root / "libraries"
+    if library_source == "artifact":
+        if library_artifact is None:
+            raise RuntimeError("sampling.library_source=artifact but no library artifact was loaded.")
+        try:
+            build_rows = pd.read_parquet(library_artifact.builds_path).to_dict("records")
+            member_rows = pd.read_parquet(library_artifact.members_path).to_dict("records")
+            write_library_artifact(
+                out_dir=libraries_dir,
+                builds=build_rows,
+                members=member_rows,
+                cfg_path=loaded.path,
+                run_id=str(cfg.run.id),
+                run_root=run_root,
+                overwrite=True,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed to write library artifacts: {exc}") from exc
+    elif library_build_rows:
         existing_builds: list[dict] = []
         existing_members: list[dict] = []
         builds_path = libraries_dir / "library_builds.parquet"
@@ -3516,12 +3857,12 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                 log.warning("Failed to read existing composition.parquet; overwriting.", exc_info=True)
                 existing_rows = []
         existing_keys = {
-            (str(row.get("sequence_id") or ""), int(row.get("placement_index") or 0)) for row in existing_rows
+            (str(row.get("solution_id") or ""), int(row.get("placement_index") or 0)) for row in existing_rows
         }
         new_rows = [
             row
             for row in composition_rows
-            if (str(row.get("sequence_id") or ""), int(row.get("placement_index") or 0)) not in existing_keys
+            if (str(row.get("solution_id") or ""), int(row.get("placement_index") or 0)) not in existing_keys
         ]
         pd.DataFrame(existing_rows + new_rows).to_parquet(composition_path, index=False)
 

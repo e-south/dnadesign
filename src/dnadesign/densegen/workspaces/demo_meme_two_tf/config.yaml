@@ -27,8 +27,7 @@ densegen:
         selection_policy: stratified
         mining:
           batch_size: 5000
-          max_candidates: 20000
-          max_batches: 4
+          max_seconds: 60
           retain_bin_ids: [0, 1, 2, 3]
           log_every_batches: 1
         length_policy: range

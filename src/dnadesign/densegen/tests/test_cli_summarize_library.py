@@ -176,6 +176,7 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
         [
             {
                 "attempt_id": "a1",
+                "attempt_index": 1,
                 "run_id": "demo",
                 "input_name": "demo_input",
                 "plan_name": "demo_plan",
@@ -185,7 +186,7 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
                 "detail_json": "{}",
                 "sequence": "ATGCATGCAT",
                 "sequence_hash": "hash",
-                "output_id": "out1",
+                "solution_id": "out1",
                 "used_tf_counts_json": "{}",
                 "used_tf_list": ["lexA", "cpxR"],
                 "sampling_library_index": 1,
@@ -203,6 +204,24 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
         ]
     )
     attempts_df.to_parquet(outputs_dir / "attempts.parquet", index=False)
+
+    solutions_df = pd.DataFrame(
+        [
+            {
+                "solution_id": "out1",
+                "attempt_id": "a1",
+                "run_id": "demo",
+                "input_name": "demo_input",
+                "plan_name": "demo_plan",
+                "created_at": "2026-01-14T00:00:01+00:00",
+                "sequence": "ATGCATGCAT",
+                "sequence_hash": "hash",
+                "sampling_library_index": 1,
+                "sampling_library_hash": "abc123",
+            }
+        ]
+    )
+    solutions_df.to_parquet(outputs_dir / "solutions.parquet", index=False)
 
     # run manifest
     manifest = RunManifest(

@@ -42,6 +42,7 @@ class PWMMemeSetDataSource(BaseDataSource):
     cfg_path: Path
     motif_ids: Optional[List[str]]
     sampling: dict
+    input_name: str
 
     def load_data(self, *, rng=None, outputs_root: Path | None = None):
         if rng is None:
@@ -101,7 +102,7 @@ class PWMMemeSetDataSource(BaseDataSource):
                 raise FileNotFoundError(f"PWM sampling bgfile not found. Looked here:\n  - {bgfile_path}")
         debug_output_dir: Path | None = None
         if keep_all_candidates_debug and outputs_root is not None:
-            debug_output_dir = Path(outputs_root) / "meta" / "fimo"
+            debug_output_dir = Path(outputs_root) / "candidates" / self.input_name
 
         entries = []
         all_rows = []
@@ -117,6 +118,7 @@ class PWMMemeSetDataSource(BaseDataSource):
             result = sample_pwm_sites(
                 rng,
                 pwm,
+                input_name=self.input_name,
                 strategy=strategy,
                 n_sites=n_sites,
                 oversample_factor=oversample_factor,

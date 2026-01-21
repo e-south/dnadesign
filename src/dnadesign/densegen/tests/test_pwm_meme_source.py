@@ -36,6 +36,7 @@ def test_pwm_meme_sampling_stochastic(tmp_path: Path) -> None:
     ds = PWMMemeDataSource(
         path=str(meme_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         motif_ids=["M1"],
         sampling={
             "strategy": "stochastic",
@@ -57,6 +58,7 @@ def test_pwm_meme_consensus_requires_one_site(tmp_path: Path) -> None:
     ds = PWMMemeDataSource(
         path=str(meme_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         motif_ids=["M2"],
         sampling={
             "strategy": "consensus",
@@ -101,6 +103,7 @@ def test_pwm_sampling_error_context(tmp_path: Path) -> None:
     ds = PWMMemeDataSource(
         path=str(meme_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         motif_ids=["M1"],
         sampling={
             "strategy": "stochastic",

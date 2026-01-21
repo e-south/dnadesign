@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import logging
 import os
 import platform
@@ -59,6 +60,7 @@ from .config import (
     resolve_run_root,
     resolve_run_scoped_path,
 )
+from .core.artifacts.candidates import build_candidate_artifact
 from .core.artifacts.library import write_library_artifact
 from .core.artifacts.pool import (
     POOL_MODE_SEQUENCE,
@@ -608,6 +610,20 @@ def _list_workspaces_table(workspaces_root: Path, *, limit: int, show_all: bool)
     return table
 
 
+def _read_events(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    rows: list[dict] = []
+    for line in path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            rows.append(json.loads(line))
+        except Exception:
+            continue
+    return rows
+
+
 # ----------------- Typer CLI -----------------
 app = typer.Typer(
     add_completion=False,
@@ -658,7 +674,6 @@ def validate_config(
             solver_cfg.backend,
             DenseArraysAdapter(),
             strategy=str(solver_cfg.strategy),
-            fallback_to_cbc=bool(solver_cfg.fallback_to_cbc),
         )
     console.print(":white_check_mark: [bold green]Config is valid.[/]")
 
@@ -788,6 +803,7 @@ def inspect_run(
         "--show-library-hash/--short-library-hash",
         help="Show full library hash (or short hash if disabled).",
     ),
+    events: bool = typer.Option(False, "--events", help="Show events summary (stalls/resamples)."),
 ):
     if root is not None and run is not None:
         console.print("[bold red]Choose either --root or --run, not both.[/]")
@@ -899,6 +915,27 @@ def inspect_run(
                 str(item.stall_events),
             )
     console.print(table)
+
+    if events:
+        events_path = run_root / "outputs" / "meta" / "events.jsonl"
+        rows = _read_events(events_path)
+        if not rows:
+            console.print("[yellow]No events found.[/]")
+        else:
+            counts: dict[str, int] = {}
+            last_seen: dict[str, str] = {}
+            for entry in rows:
+                name = str(entry.get("event") or "unknown")
+                counts[name] = counts.get(name, 0) + 1
+                created = str(entry.get("created_at") or "")
+                if created:
+                    prev = last_seen.get(name)
+                    if prev is None or created > prev:
+                        last_seen[name] = created
+            events_table = Table("event", "count", "last_created_at")
+            for name, count in sorted(counts.items(), key=lambda kv: kv[1], reverse=True):
+                events_table.add_row(name, str(count), last_seen.get(name, "-"))
+            console.print(events_table)
 
     if library:
         if loaded is None or cfg_path is None:
@@ -1176,7 +1213,6 @@ def inspect_config(
             cfg.solver.backend,
             DenseArraysAdapter(),
             strategy=str(cfg.solver.strategy),
-            fallback_to_cbc=bool(cfg.solver.fallback_to_cbc),
         )
 
     console.print(f"[bold]Config[/]: {cfg_path}")
@@ -1265,6 +1301,9 @@ def inspect_config(
     sampling_table = Table("setting", "value")
     target_length = cfg.generation.sequence_length + int(sampling.subsample_over_length_budget_by)
     sampling_table.add_row("pool_strategy", str(sampling.pool_strategy))
+    sampling_table.add_row("library_source", str(sampling.library_source))
+    if sampling.library_source == "artifact":
+        sampling_table.add_row("library_artifact_path", str(sampling.library_artifact_path))
     sampling_table.add_row("library_size", str(sampling.library_size))
     sampling_table.add_row("library_sampling_strategy", str(sampling.library_sampling_strategy))
     sampling_table.add_row(
@@ -1361,6 +1400,20 @@ def stage_a_build_pool(
         except FileExistsError as exc:
             console.print(f"[bold red]{exc}[/]")
             raise typer.Exit(code=1)
+        candidates_dir = outputs_root / "candidates"
+        candidate_files = list(candidates_dir.rglob("candidates__*.parquet")) if candidates_dir.exists() else []
+        if candidate_files:
+            try:
+                build_candidate_artifact(
+                    candidates_dir=candidates_dir,
+                    cfg_path=cfg_path,
+                    run_id=str(cfg.run.id),
+                    run_root=run_root,
+                    overwrite=True,
+                )
+            except Exception as exc:
+                console.print(f"[bold red]Failed to write candidate artifacts:[/] {exc}")
+                raise typer.Exit(code=1)
 
     for pool in pool_data.values():
         if pool.df is None:

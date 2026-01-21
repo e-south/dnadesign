@@ -76,7 +76,9 @@ DenseGen exposes dense-arrays solution modes via `solver.strategy`:
 - `optimal` - only the best solution per library.
 - `approximate` - heuristic solution per library (no solver options; backend optional).
 - `strands` - `single | double` (default: `double`).
-Use `solver.fallback_to_cbc` to allow a CBC fallback if the preferred solver is not available.
+DenseGen fails fast if the requested solver backend is unavailable; use
+`dense validate-config --probe-solver` or `dense inspect config --probe-solver`
+to check availability before long runs.
 
 ```yaml
 solver:
@@ -84,7 +86,6 @@ solver:
   strategy: diverse
   options: ["Threads=8", "TimeLimit=10"]
   strands: double
-  fallback_to_cbc: false
   allow_unknown_options: false
 ```
 
@@ -100,6 +101,8 @@ uniqueness, caps, and relaxation). DenseGen records sampling policy and outcomes
 
 Key fields:
 - `pool_strategy`: `full | subsample | iterative_subsample`
+- `library_source`: `build | artifact` (use `artifact` to replay prebuilt libraries)
+- `library_artifact_path`: path to `outputs/libraries` from `dense stage-b build-libraries`
 - `library_size` (used for subsample strategies)
 - `library_sampling_strategy` (`tf_balanced | uniform_over_pairs | coverage_weighted`)
 - `coverage_boost_alpha`, `coverage_boost_power` (used with `coverage_weighted`)
@@ -131,6 +134,9 @@ coverage‑weighted) apply. Stage‑B is the only place that resampling happens.
 
 Use `dense stage-a build-pool` to materialize pools and `dense stage-b build-libraries` to preview
 solver libraries without running the solver.
+To **replay** a specific library artifact deterministically, set
+`generation.sampling.library_source: artifact` and point
+`generation.sampling.library_artifact_path` at the library artifact directory.
 
 ### Run scheduling (round‑robin)
 
