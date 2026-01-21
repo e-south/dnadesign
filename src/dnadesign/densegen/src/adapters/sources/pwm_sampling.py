@@ -69,8 +69,12 @@ def _write_candidate_records(
     debug_output_dir: Path,
     debug_label: str,
     motif_id: str,
+    motif_hash: str | None = None,
 ) -> Path:
-    safe_label = _safe_label(debug_label or motif_id)
+    suffix = ""
+    if motif_hash:
+        suffix = f"__{_safe_label(motif_hash[:10])}"
+    safe_label = f"{_safe_label(debug_label or motif_id)}{suffix}"
     debug_output_dir.mkdir(parents=True, exist_ok=True)
     path = debug_output_dir / f"candidates__{safe_label}.parquet"
     pd.DataFrame(records).to_parquet(path, index=False)
@@ -446,6 +450,8 @@ def sample_pwm_sites(
     motif: PWMMotif,
     *,
     input_name: Optional[str] = None,
+    motif_hash: str | None = None,
+    run_id: str | None = None,
     strategy: str,
     n_sites: int,
     oversample_factor: int,
@@ -505,6 +511,8 @@ def sample_pwm_sites(
                 "PWM sampling scoring_backend=fimo ignores score_threshold/score_percentile for motif %s.",
                 motif.motif_id,
             )
+    if keep_all_candidates_debug and run_id is None:
+        raise ValueError("PWM sampling keep_all_candidates_debug requires run_id to be set.")
     if strategy == "consensus" and n_sites != 1:
         raise ValueError("PWM sampling strategy 'consensus' requires n_sites=1")
 
@@ -751,17 +759,20 @@ def sample_pwm_sites(
         ) -> None:
             if candidate_records is None:
                 return
+            resolved_motif_id = motif_hash or motif.motif_id
             candidate_id = hash_candidate_id(
                 input_name=input_name,
-                motif_id=motif.motif_id,
+                motif_id=resolved_motif_id,
                 sequence=seq,
                 scoring_backend=scoring_backend,
             )
             candidate_records.append(
                 {
                     "candidate_id": candidate_id,
+                    "run_id": run_id,
                     "input_name": input_name,
-                    "motif_id": motif.motif_id,
+                    "motif_id": resolved_motif_id,
+                    "motif_label": motif.motif_id,
                     "scoring_backend": scoring_backend,
                     "sequence": seq,
                     "pvalue": None if hit is None else hit.pvalue,
@@ -1093,6 +1104,7 @@ def sample_pwm_sites(
                     debug_output_dir=debug_dir,
                     debug_label=debug_label or motif.motif_id,
                     motif_id=motif.motif_id,
+                    motif_hash=motif_hash,
                 )
                 log.info("FIMO candidate records written: %s", path)
             except Exception:

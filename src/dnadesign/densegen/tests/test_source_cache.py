@@ -75,7 +75,7 @@ class _DummySource:
         self.entries = entries
         self.calls = 0
 
-    def load_data(self, *, rng, outputs_root):
+    def load_data(self, *, rng, outputs_root, run_id=None):
         self.calls += 1
         return self.entries, None
 

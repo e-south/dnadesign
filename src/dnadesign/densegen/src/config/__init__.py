@@ -124,9 +124,14 @@ class RunConfig(BaseModel):
     @field_validator("id")
     @classmethod
     def _id_nonempty(cls, v: str):
-        if not v or not str(v).strip():
+        value = str(v).strip()
+        if not value:
             raise ValueError("run.id must be a non-empty string")
-        return str(v).strip()
+        if "/" in value or "\\" in value:
+            raise ValueError("run.id must not contain path separators")
+        if value in {".", ".."}:
+            raise ValueError("run.id must not be '.' or '..'")
+        return value
 
     @field_validator("root")
     @classmethod

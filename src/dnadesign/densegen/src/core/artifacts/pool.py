@@ -146,7 +146,7 @@ def build_pool_artifact(
         if selected_inputs and inp.name not in selected_inputs:
             continue
         src = deps.source_factory(inp, cfg_path)
-        data_entries, meta_df = src.load_data(rng=rng, outputs_root=outputs_root)
+        data_entries, meta_df = src.load_data(rng=rng, outputs_root=outputs_root, run_id=str(cfg.run.id))
         if meta_df is None:
             df = _build_sequence_pool(data_entries)
         else:

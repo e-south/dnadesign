@@ -135,4 +135,4 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
         gap_fill=lambda *args, **kwargs: "",
     )
     with pytest.raises(ValueError, match="sequence_length"):
-        run_pipeline(loaded, deps=deps)
+        run_pipeline(loaded, deps=deps, resume=False)
