@@ -125,6 +125,7 @@ The `dense report` command writes a compact audit summary under `outputs/`:
 - `outputs/report.md`
 - `outputs/report.html` (basic HTML wrapper for quick sharing)
 - `outputs/report_assets/` (plots linked by `report.html`)
+- `outputs/report_assets/composition.csv` (full composition table when available)
 
 These summarize run scope and link to the canonical outputs (`dense_arrays.parquet` and
 `attempts.parquet`).

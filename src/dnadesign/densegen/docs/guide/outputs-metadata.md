@@ -122,7 +122,9 @@ This is a lightweight, machine-readable trace of the run’s control flow.
 ### Report assets
 
 `dense report` emits summary plots under `outputs/report_assets/` and links them in `report.html`.
-These plots include Stage‑A p‑value histograms and Stage‑B utilization summaries.
+These plots include Stage‑A p‑value/score histograms and Stage‑B utilization summaries. When
+composition is available, the report also exports a full `composition.csv` under
+`outputs/report_assets/`.
 
 ---
 

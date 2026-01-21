@@ -184,6 +184,7 @@ Options:
 Report outputs:
 - `report.json`, `report.md`, `report.html`
 - `report_assets/` (plots referenced by the HTML report)
+- `report_assets/composition.csv` (full composition table when available)
 
 ---
 

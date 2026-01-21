@@ -986,6 +986,58 @@ def _generate_report_plots(bundle: ReportBundle, *, cfg_path: Path, out_dir: Pat
         except Exception:
             log.warning("Failed to generate Stage-A p-value histograms.", exc_info=True)
 
+    # Stage-A score histograms per input/TF
+    if pool_dir.exists():
+        try:
+            pool_artifact = load_pool_artifact(pool_dir)
+            for entry in pool_artifact.inputs.values():
+                if entry.pool_mode != POOL_MODE_TFBS:
+                    continue
+                pool_path = pool_dir / entry.pool_path
+                if not pool_path.exists():
+                    continue
+                df_pool = pd.read_parquet(pool_path)
+                if "tf" not in df_pool.columns:
+                    continue
+                for tf, sub in df_pool.groupby("tf"):
+                    if sub.empty:
+                        continue
+                    if "fimo_score" in sub.columns:
+                        vals = pd.to_numeric(sub["fimo_score"], errors="coerce").dropna()
+                        if not vals.empty:
+                            fig, ax = plt.subplots(figsize=(6, 4))
+                            ax.hist(vals, bins=30, color="#72b7b2", edgecolor="white")
+                            ax.set_title(f"Stage-A FIMO score histogram: {entry.name}/{tf}")
+                            ax.set_xlabel("FIMO score")
+                            ax.set_ylabel("count")
+                            fname = (
+                                f"stage_a_fimo_score_hist__{_safe_filename(entry.name)}__{_safe_filename(str(tf))}.png"
+                            )
+                            path = assets_dir / fname
+                            fig.tight_layout()
+                            fig.savefig(path)
+                            plt.close(fig)
+                            plots.setdefault("stage_a_fimo_score_hist", []).append(str(path.relative_to(out_dir)))
+                    if "score" in sub.columns:
+                        vals = pd.to_numeric(sub["score"], errors="coerce").dropna()
+                        if not vals.empty:
+                            fig, ax = plt.subplots(figsize=(6, 4))
+                            ax.hist(vals, bins=30, color="#e45756", edgecolor="white")
+                            ax.set_title(f"Stage-A densegen score histogram: {entry.name}/{tf}")
+                            ax.set_xlabel("densegen score")
+                            ax.set_ylabel("count")
+                            fname = (
+                                "stage_a_densegen_score_hist__"
+                                f"{_safe_filename(entry.name)}__{_safe_filename(str(tf))}.png"
+                            )
+                            path = assets_dir / fname
+                            fig.tight_layout()
+                            fig.savefig(path)
+                            plt.close(fig)
+                            plots.setdefault("stage_a_densegen_score_hist", []).append(str(path.relative_to(out_dir)))
+        except Exception:
+            log.warning("Failed to generate Stage-A score histograms.", exc_info=True)
+
     # Stage-A bin occupancy bar charts (per input)
     stage_a_bins = bundle.tables.get("stage_a_bins")
     if stage_a_bins is not None and not stage_a_bins.empty:
@@ -1044,6 +1096,17 @@ def write_report(
     out_path.mkdir(parents=True, exist_ok=True)
 
     bundle = collect_report_data(root_cfg, cfg_path, include_combinatorics=include_combinatorics)
+    composition = bundle.tables.get("composition")
+    if composition is not None and not composition.empty:
+        bundle.run_report["composition_rows"] = int(len(composition))
+        try:
+            assets_dir = out_path / "report_assets"
+            assets_dir.mkdir(parents=True, exist_ok=True)
+            composition_csv = assets_dir / "composition.csv"
+            composition.to_csv(composition_csv, index=False)
+            bundle.run_report["composition_csv"] = str(composition_csv.relative_to(out_path))
+        except Exception:
+            log.warning("Failed to export composition CSV for report.", exc_info=True)
     try:
         plots = _generate_report_plots(bundle, cfg_path=cfg_path, out_dir=out_path)
         bundle.plots = plots
@@ -1093,6 +1156,8 @@ def _render_report_md(bundle: ReportBundle) -> str:
         "- outputs/meta/events.jsonl",
         "- outputs/candidates/<run_id>/candidates.parquet (when candidate logging is enabled)",
         "- outputs/candidates/<run_id>/candidates_summary.parquet (when candidate logging is enabled)",
+        "- outputs/report_assets/ (plots linked by report.html)",
+        "- outputs/report_assets/composition.csv (full composition table, when available)",
     ]
     warnings = report.get("warnings") or []
     if warnings:
@@ -1264,6 +1329,12 @@ def _render_report_md(bundle: ReportBundle) -> str:
                 max_rows=12,
             )
         )
+        comp_rows = report.get("composition_rows")
+        comp_csv = report.get("composition_csv")
+        if comp_rows is not None:
+            lines.append(f"- Full composition rows: {comp_rows}")
+        if comp_csv:
+            lines.append(f"- Full composition CSV: {comp_csv}")
     leaderboard = report.get("leaderboard_latest") or {}
     leader_tf = leaderboard.get("tf") or []
     leader_tfbs = leaderboard.get("tfbs") or []
