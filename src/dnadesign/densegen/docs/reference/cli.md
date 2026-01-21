@@ -87,6 +87,7 @@ Options:
 - `--config` - config path (used to resolve run root when `--run` is not set).
 - `--verbose` - show failure breakdown columns (constraint filters + duplicate solutions).
 - `--library` - include offered-vs-used summaries (TF/TFBS usage).
+- `--library-limit` - limit library builds shown in per-library summaries (`0` = all).
 - `--top` - number of rows to show in library summaries.
 - `--by-library/--no-by-library` - group library summaries per build attempt.
 - `--top-per-tf` - limit TFBS rows per TF when summarizing.
@@ -94,7 +95,7 @@ Options:
 - `--events` - show event summary (stalls/resamples, library rebuilds).
 
 Tip:
-- For large runs, prefer `--no-by-library` or lower `--top`/`--top-per-tf` to keep output readable.
+- For large runs, prefer `--library-limit`, `--no-by-library`, or lower `--top`/`--top-per-tf` to keep output readable.
 
 ---
 
@@ -109,8 +110,8 @@ Options:
 Outputs:
 - `pool_manifest.json`
 - `<input>__pool.parquet` per input
-- `outputs/candidates/current/candidates.parquet` + `candidates_summary.parquet` (when candidate logging is enabled)
-  (candidate artifacts are overwritten each run)
+- `outputs/candidates/<run_id>/candidates.parquet` + `candidates_summary.parquet` (when candidate logging is enabled)
+  (candidate artifacts are overwritten by `dense run` or by `stage-a build-pool --overwrite` for that run_id)
 
 ---
 
@@ -147,12 +148,15 @@ Run the full generation pipeline.
 
 Options:
 - `--no-plot` - skip auto-plotting even if `plots` is configured in YAML.
+- `--fresh` - delete the workspace `outputs/` directory before running.
+- `--resume` - resume from existing outputs in the workspace.
 - `--log-file PATH` - override the log file path. Otherwise DenseGen writes
   to `logging.log_dir/<run_id>.log` inside the workspace. The override path
   must still resolve inside `densegen.run.root`.
 
 Notes:
 - If you enable `scoring_backend: fimo`, run via `pixi run dense ...` (or ensure `fimo` is on PATH).
+- If the workspace already has outputs, you must choose `--resume` or `--fresh`.
 
 ---
 
