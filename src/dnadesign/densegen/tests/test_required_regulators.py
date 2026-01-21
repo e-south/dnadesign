@@ -140,7 +140,7 @@ def test_required_regulators_filtering(tmp_path: Path) -> None:
         optimizer=_DummyAdapter(),
         gap_fill=lambda *args, **kwargs: "",
     )
-    summary = run_pipeline(loaded, deps=deps)
+    summary = run_pipeline(loaded, deps=deps, resume=False)
     assert summary.total_generated == 1
     assert len(sink.records) == 1
     assert sink.records[0].sequence == "CCC"
@@ -218,7 +218,7 @@ def test_required_regulators_k_of_n(tmp_path: Path) -> None:
         optimizer=_DummyAdapter(),
         gap_fill=lambda *args, **kwargs: "",
     )
-    summary = run_pipeline(loaded, deps=deps)
+    summary = run_pipeline(loaded, deps=deps, resume=False)
     assert summary.total_generated == 1
     assert len(sink.records) == 1
     assert sink.records[0].sequence == "AAA"

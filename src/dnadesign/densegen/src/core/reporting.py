@@ -538,9 +538,18 @@ def collect_report_data(
 
     candidate_logging = _candidate_logging_enabled()
     candidates_summary = pd.DataFrame(
-        columns=["input_name", "motif_id", "scoring_backend", "total_candidates", "accepted", "selected", "rejected"]
+        columns=[
+            "input_name",
+            "motif_id",
+            "motif_label",
+            "scoring_backend",
+            "total_candidates",
+            "accepted",
+            "selected",
+            "rejected",
+        ]
     )
-    candidates_dir = candidates_root(outputs_root)
+    candidates_dir = candidates_root(outputs_root, root_cfg.densegen.run.id)
     cand_summary_path = candidates_dir / "candidates_summary.parquet"
     if cand_summary_path.exists():
         if candidate_logging:
@@ -1082,8 +1091,8 @@ def _render_report_md(bundle: ReportBundle) -> str:
         "- outputs/pools/pool_manifest.json",
         "- outputs/meta/effective_config.json",
         "- outputs/meta/events.jsonl",
-        "- outputs/candidates/current/candidates.parquet (when candidate logging is enabled)",
-        "- outputs/candidates/current/candidates_summary.parquet (when candidate logging is enabled)",
+        "- outputs/candidates/<run_id>/candidates.parquet (when candidate logging is enabled)",
+        "- outputs/candidates/<run_id>/candidates_summary.parquet (when candidate logging is enabled)",
     ]
     warnings = report.get("warnings") or []
     if warnings:
@@ -1125,6 +1134,7 @@ def _render_report_md(bundle: ReportBundle) -> str:
                 candidates_summary,
                 columns=[
                     "input_name",
+                    "motif_label",
                     "motif_id",
                     "scoring_backend",
                     "total_candidates",

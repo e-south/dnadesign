@@ -31,7 +31,7 @@ class PWMArtifactSetDataSource(BaseDataSource):
     overrides_by_motif_id: dict[str, dict] | None = None
     input_name: str = ""
 
-    def load_data(self, *, rng=None, outputs_root: Path | None = None):
+    def load_data(self, *, rng=None, outputs_root: Path | None = None, run_id: str | None = None):
         if rng is None:
             raise ValueError("PWM sampling requires an RNG; pass the pipeline RNG explicitly.")
 
@@ -92,13 +92,19 @@ class PWMArtifactSetDataSource(BaseDataSource):
                 if not (bgfile_path.exists() and bgfile_path.is_file()):
                     raise FileNotFoundError(f"PWM sampling bgfile not found. Looked here:\n  - {bgfile_path}")
             debug_output_dir: Path | None = None
-            if keep_all_candidates_debug and outputs_root is not None:
-                debug_output_dir = candidates_root(Path(outputs_root)) / self.input_name
+            if keep_all_candidates_debug:
+                if outputs_root is None:
+                    raise ValueError("keep_all_candidates_debug requires outputs_root to be set.")
+                if run_id is None:
+                    raise ValueError("keep_all_candidates_debug requires run_id to be set.")
+                debug_output_dir = candidates_root(Path(outputs_root), run_id) / self.input_name
             return_meta = scoring_backend == "fimo"
             result = sample_pwm_sites(
                 rng,
                 motif,
                 input_name=self.input_name,
+                motif_hash=motif_hash,
+                run_id=run_id,
                 strategy=strategy,
                 n_sites=n_sites,
                 oversample_factor=oversample_factor,

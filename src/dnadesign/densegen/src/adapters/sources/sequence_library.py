@@ -50,7 +50,7 @@ class SequenceLibraryDataSource(BaseDataSource):
             return pq.read_table(path).to_pandas()
         raise ValueError(f"Unsupported sequence_library.format: {fmt}")
 
-    def load_data(self, *, rng=None, outputs_root: Path | None = None):
+    def load_data(self, *, rng=None, outputs_root: Path | None = None, run_id: str | None = None):
         data_path = resolve_path(self.cfg_path, self.path)
         if not (data_path.exists() and data_path.is_file()):
             raise FileNotFoundError(f"Sequence library file not found. Looked here:\n  - {data_path}")

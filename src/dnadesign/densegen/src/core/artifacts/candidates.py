@@ -85,12 +85,26 @@ def build_candidate_artifact(
         except Exception as exc:
             raise RuntimeError(f"Failed to read candidate parquet: {path}") from exc
     df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    required = {"input_name", "motif_id", "motif_label", "scoring_backend", "sequence", "run_id"}
+    missing = sorted(required - set(df.columns))
+    if missing:
+        raise ValueError(
+            "Candidate artifacts missing required columns "
+            f"{missing}. Clear outputs/candidates and re-run with keep_all_candidates_debug."
+        )
+    df = df[df["run_id"] == str(run_id)].copy()
+    if df.empty:
+        raise ValueError(
+            "No candidate records match the current run_id. "
+            "Clear outputs/candidates and re-run with keep_all_candidates_debug."
+        )
     df.to_parquet(candidates_path, index=False)
 
     summary = pd.DataFrame(
         columns=[
             "input_name",
             "motif_id",
+            "motif_label",
             "scoring_backend",
             "total_candidates",
             "accepted",
@@ -99,9 +113,9 @@ def build_candidate_artifact(
         ]
     )
     if not df.empty:
-        grouped = df.groupby(["input_name", "motif_id", "scoring_backend"], dropna=False)
+        grouped = df.groupby(["input_name", "motif_id", "motif_label", "scoring_backend"], dropna=False)
         rows = []
-        for (input_name, motif_id, scoring_backend), sub in grouped:
+        for (input_name, motif_id, motif_label, scoring_backend), sub in grouped:
             total = int(len(sub))
             accepted = int(sub["accepted"].sum()) if "accepted" in sub.columns else 0
             selected = int(sub["selected"].sum()) if "selected" in sub.columns else 0
@@ -110,6 +124,7 @@ def build_candidate_artifact(
                 {
                     "input_name": str(input_name),
                     "motif_id": str(motif_id),
+                    "motif_label": str(motif_label),
                     "scoring_backend": str(scoring_backend),
                     "total_candidates": total,
                     "accepted": accepted,

@@ -17,19 +17,22 @@ from pathlib import Path
 RUN_OUTPUTS_DIR = "outputs"
 RUN_META_DIR = "meta"
 CANDIDATES_DIR = "candidates"
-CANDIDATES_CURRENT_DIR = "current"
 
 RUN_MANIFEST_NAME = "run_manifest.json"
 INPUTS_MANIFEST_NAME = "inputs_manifest.json"
 RUN_STATE_NAME = "run_state.json"
+IGNORED_OUTPUT_ENTRIES = {".DS_Store", ".gitkeep"}
 
 
 def run_outputs_root(run_root: Path) -> Path:
     return run_root / RUN_OUTPUTS_DIR
 
 
-def candidates_root(outputs_root: Path) -> Path:
-    return outputs_root / CANDIDATES_DIR / CANDIDATES_CURRENT_DIR
+def candidates_root(outputs_root: Path, run_id: str) -> Path:
+    run_label = str(run_id).strip()
+    if not run_label:
+        raise ValueError("run_id must be a non-empty string for candidate artifacts.")
+    return outputs_root / CANDIDATES_DIR / run_label
 
 
 def run_meta_root(run_root: Path) -> Path:
@@ -52,3 +55,14 @@ def inputs_manifest_path(run_root: Path) -> Path:
 
 def run_state_path(run_root: Path) -> Path:
     return run_meta_root(run_root) / RUN_STATE_NAME
+
+
+def has_existing_run_outputs(run_root: Path) -> bool:
+    outputs_root = run_outputs_root(run_root)
+    if not outputs_root.exists():
+        return False
+    for entry in outputs_root.iterdir():
+        if entry.name in IGNORED_OUTPUT_ENTRIES:
+            continue
+        return True
+    return False

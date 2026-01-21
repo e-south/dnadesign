@@ -79,7 +79,13 @@ from .core.pipeline import (
 )
 from .core.reporting import collect_report_data, write_report
 from .core.run_manifest import load_run_manifest
-from .core.run_paths import candidates_root, run_manifest_path, run_state_path
+from .core.run_paths import (
+    candidates_root,
+    has_existing_run_outputs,
+    run_manifest_path,
+    run_outputs_root,
+    run_state_path,
+)
 from .core.run_state import load_run_state
 from .core.seeding import derive_seed_map
 from .integrations.meme_suite import require_executable
@@ -807,6 +813,7 @@ def inspect_run(
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show failure breakdown columns."),
     library: bool = typer.Option(False, "--library", help="Include offered-vs-used library summaries."),
+    library_limit: int = typer.Option(0, "--library-limit", help="Limit libraries shown in summaries (0 = all)."),
     top: int = typer.Option(10, "--top", help="Rows to show for library summaries."),
     by_library: bool = typer.Option(True, "--by-library/--no-by-library", help="Group library summaries per build."),
     top_per_tf: Optional[int] = typer.Option(None, "--top-per-tf", help="Limit TFBS rows per TF when summarizing."),
@@ -819,6 +826,9 @@ def inspect_run(
 ):
     if root is not None and run is not None:
         console.print("[bold red]Choose either --root or --run, not both.[/]")
+        raise typer.Exit(code=1)
+    if library_limit < 0:
+        console.print("[bold red]--library-limit must be >= 0.[/]")
         raise typer.Exit(code=1)
     if root is not None:
         workspaces_root = root.resolve()
@@ -975,6 +985,27 @@ def inspect_run(
         elif isinstance(offered_vs_used_tf, pd.DataFrame):
             library_hashes = set(offered_vs_used_tf.get("library_hash", []))
 
+        total_libraries = 0
+        display_count = 0
+        truncated_libraries = False
+        display_library_summary = library_summary
+        display_hashes: list[str] = []
+        if isinstance(library_summary, pd.DataFrame) and not library_summary.empty:
+            display_library_summary = library_summary.sort_values("library_index")
+            total_libraries = len(display_library_summary)
+            if library_limit > 0 and total_libraries > library_limit:
+                display_library_summary = display_library_summary.head(library_limit)
+                truncated_libraries = True
+            display_count = len(display_library_summary)
+            display_hashes = [str(val) for val in display_library_summary.get("library_hash", [])]
+        elif library_hashes:
+            display_hashes = sorted(library_hashes)
+            total_libraries = len(display_hashes)
+            if library_limit > 0 and total_libraries > library_limit:
+                display_hashes = display_hashes[:library_limit]
+                truncated_libraries = True
+            display_count = len(display_hashes)
+
         lib_table = Table(
             "library_index",
             "library_hash",
@@ -987,8 +1018,8 @@ def inspect_run(
         sampling_cfg = loaded.root.densegen.generation.sampling
         target_len = loaded.root.densegen.generation.sequence_length + int(sampling_cfg.subsample_over_length_budget_by)
 
-        if isinstance(library_summary, pd.DataFrame) and not library_summary.empty:
-            for _, row in library_summary.sort_values("library_index").iterrows():
+        if isinstance(display_library_summary, pd.DataFrame) and not display_library_summary.empty:
+            for _, row in display_library_summary.iterrows():
                 lib_hash = str(row.get("library_hash") or "")
                 lib_hash_disp = lib_hash if show_library_hash else _short_hash(lib_hash)
                 achieved = row.get("total_bp")
@@ -1002,8 +1033,8 @@ def inspect_run(
                     achieved_label,
                     str(int(row.get("outputs") or 0)),
                 )
-        elif library_hashes:
-            for lib_hash in sorted(library_hashes):
+        elif display_hashes:
+            for lib_hash in display_hashes:
                 lib_hash_disp = lib_hash if show_library_hash else _short_hash(lib_hash)
                 lib_table.add_row("-", lib_hash_disp, "-", "-", "-", f"-/{target_len}", "0")
         else:
@@ -1015,6 +1046,10 @@ def inspect_run(
             console.print(f"  - dense run -c {cfg_path}")
         console.print("[bold]Library build summary[/]")
         console.print(lib_table)
+        if truncated_libraries:
+            console.print(
+                f"[yellow]Showing {display_count} of {total_libraries} libraries. Use --library-limit 0 to show all.[/]"
+            )
 
         if not isinstance(offered_vs_used_tf, pd.DataFrame) or offered_vs_used_tf.empty:
             console.print("[yellow]No offered/used TF data found (attempts missing).[/]")
@@ -1085,15 +1120,15 @@ def inspect_run(
                 console.print(f"[bold]Top {top} TFBS by used placements (per library)[/]")
                 console.print(tfbs_table)
 
-        if by_library and isinstance(library_summary, pd.DataFrame) and not library_summary.empty:
-            for _, row in library_summary.sort_values("library_index").iterrows():
+        if by_library and isinstance(display_library_summary, pd.DataFrame) and not display_library_summary.empty:
+            for _, row in display_library_summary.iterrows():
                 lib_hash = str(row.get("library_hash") or "")
                 lib_index = int(row.get("library_index") or 0)
                 console.print(f"[bold]Library {lib_index}[/]: {_fmt_hash(lib_hash)}")
                 _render_tf_tables(lib_hash)
                 _render_tfbs_tables(lib_hash)
-        elif by_library and library_hashes:
-            for lib_hash in sorted(library_hashes):
+        elif by_library and display_hashes:
+            for lib_hash in display_hashes:
                 console.print(f"[bold]Library[/]: {_fmt_hash(lib_hash)}")
                 _render_tf_tables(lib_hash)
                 _render_tfbs_tables(lib_hash)
@@ -1397,7 +1432,7 @@ def stage_a_build_pool(
     outputs_root = run_root / "outputs"
     outputs_root.mkdir(parents=True, exist_ok=True)
     candidate_logging = _candidate_logging_enabled(cfg, selected=set(selected) if selected else None)
-    candidates_dir = candidates_root(outputs_root)
+    candidates_dir = candidates_root(outputs_root, cfg.run.id)
     if candidate_logging:
         try:
             existed = prepare_candidates_dir(candidates_dir, overwrite=overwrite)
@@ -1686,6 +1721,8 @@ def stage_b_build_libraries(
 def run(
     ctx: typer.Context,
     no_plot: bool = typer.Option(False, help="Do not auto-run plots even if configured."),
+    fresh: bool = typer.Option(False, "--fresh", help="Clear outputs and start a new run."),
+    resume: bool = typer.Option(False, "--resume", help="Resume from existing outputs."),
     log_file: Optional[Path] = typer.Option(None, help="Override logfile path."),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
@@ -1695,6 +1732,39 @@ def run(
     cfg = root.densegen
     run_root = _run_root_for(loaded)
     _ensure_fimo_available(cfg, strict=True)
+
+    if fresh and resume:
+        console.print("[bold red]Choose either --fresh or --resume, not both.[/]")
+        raise typer.Exit(code=1)
+    outputs_root = run_outputs_root(run_root)
+    existing_outputs = has_existing_run_outputs(run_root)
+    if fresh:
+        if outputs_root.exists():
+            try:
+                shutil.rmtree(outputs_root)
+            except Exception as exc:
+                console.print(f"[bold red]Failed to clear outputs:[/] {exc}")
+                raise typer.Exit(code=1)
+            console.print(f":broom: [bold yellow]Cleared outputs[/]: {outputs_root}")
+        else:
+            console.print("[yellow]No outputs directory found; starting fresh.[/]")
+        resume_run = False
+    elif resume:
+        if not existing_outputs:
+            console.print(
+                f"[bold red]--resume requested but no outputs were found under[/] {outputs_root}. "
+                "Run without --resume or use --fresh to reset the workspace."
+            )
+            raise typer.Exit(code=1)
+        resume_run = True
+    else:
+        if existing_outputs:
+            console.print(
+                f"[bold red]Existing outputs found under[/] {outputs_root}. "
+                "Use --resume to continue or --fresh to clear outputs."
+            )
+            raise typer.Exit(code=1)
+        resume_run = False
 
     # Logging setup
     log_cfg = cfg.logging
@@ -1714,7 +1784,7 @@ def run(
     pl = resolve_plan(loaded)
     console.print("[bold]Quota plan[/]: " + ", ".join(f"{p.name}={p.quota}" for p in pl))
     try:
-        run_pipeline(loaded)
+        run_pipeline(loaded, resume=resume_run)
     except FileNotFoundError as exc:
         _render_missing_input_hint(cfg_path, loaded, exc)
         raise typer.Exit(code=1)
