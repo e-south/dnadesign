@@ -110,6 +110,7 @@ def load_round_ctx_from_dir(round_dir: Path) -> tuple[RoundCtx | None, str | Non
 
 @dataclass(frozen=True)
 class ArtifactModelResult:
+    requested_artifact: bool
     use_artifact: bool
     model: Any | None
     model_path: Path | None
@@ -128,19 +129,21 @@ def resolve_artifact_model(
 ) -> ArtifactModelResult:
     if not use_artifact:
         return ArtifactModelResult(
+            requested_artifact=False,
             use_artifact=False,
             model=None,
             model_path=None,
             round_dir=None,
-            note="Ephemeral RF (session-scoped) · refit on UI changes.",
+            note="Overlay RF (session-scoped). Use the notebook compute button to run predictions.",
         )
     if campaign_info is None:
         return ArtifactModelResult(
+            requested_artifact=True,
             use_artifact=False,
             model=None,
             model_path=None,
             round_dir=None,
-            note="No campaign selected; using ephemeral RF.",
+            note="No campaign selected; artifact unavailable.",
         )
 
     artifact_warning = None
@@ -156,11 +159,12 @@ def resolve_artifact_model(
         round_dir = Path(round_ctx_path).parent if round_ctx_path else model_path.parent
         if not model_path.exists():
             return ArtifactModelResult(
+                requested_artifact=True,
                 use_artifact=False,
                 model=None,
                 model_path=model_path,
                 round_dir=round_dir,
-                note=f"Artifact path missing on disk: `{model_path}`; using ephemeral RF.",
+                note=f"Artifact path missing on disk: `{model_path}`.",
                 warning=artifact_warning,
             )
         obj, err = load_model_artifact(model_path)
@@ -168,17 +172,19 @@ def resolve_artifact_model(
         if model is None:
             msg = err or "Unsupported artifact format"
             return ArtifactModelResult(
+                requested_artifact=True,
                 use_artifact=False,
                 model=None,
                 model_path=model_path,
                 round_dir=round_dir,
-                note=f"Artifact load failed: {msg}; using ephemeral RF.",
+                note=f"Artifact load failed: {msg}.",
                 warning=artifact_warning,
             )
         note = f"Loaded artifact for run_id `{run_id}`: `{model_path}`"
         if artifact_warning:
             note += f" (note: {artifact_warning})"
         return ArtifactModelResult(
+            requested_artifact=True,
             use_artifact=True,
             model=model,
             model_path=model_path,
@@ -189,13 +195,11 @@ def resolve_artifact_model(
 
     if not allow_fallback:
         if not run_id:
-            note = "Artifact selection requires a run_id; fallback disabled (enable 'unsafe' fallback to use latest)."
+            note = "Artifact selection requires a run_id; no fallback allowed."
         else:
-            note = (
-                f"Run-aware artifact not resolved for run_id `{run_id}`; fallback disabled "
-                "(enable 'unsafe' fallback to use latest)."
-            )
+            note = f"Run-aware artifact not resolved for run_id `{run_id}`; no fallback allowed."
         return ArtifactModelResult(
+            requested_artifact=True,
             use_artifact=False,
             model=None,
             model_path=None,
@@ -208,20 +212,22 @@ def resolve_artifact_model(
         model_path, round_dir = find_latest_model_artifact(campaign_info)
     except Exception as exc:
         return ArtifactModelResult(
+            requested_artifact=True,
             use_artifact=False,
             model=None,
             model_path=None,
             round_dir=None,
-            note=f"Artifact lookup failed: {exc}; using ephemeral RF.",
+            note=f"Artifact lookup failed: {exc}.",
             warning=artifact_warning,
         )
     if model_path is None:
         return ArtifactModelResult(
+            requested_artifact=True,
             use_artifact=False,
             model=None,
             model_path=None,
             round_dir=None,
-            note="No model.joblib found for this campaign; using ephemeral RF.",
+            note="No model.joblib found for this campaign.",
             warning=artifact_warning,
         )
     obj, err = load_model_artifact(model_path)
@@ -229,17 +235,19 @@ def resolve_artifact_model(
     if model is None:
         msg = err or "Unsupported artifact format"
         return ArtifactModelResult(
+            requested_artifact=True,
             use_artifact=False,
             model=None,
             model_path=model_path,
             round_dir=round_dir,
-            note=f"Artifact load failed: {msg}; using ephemeral RF.",
+            note=f"Artifact load failed: {msg}.",
             warning=artifact_warning,
         )
     note = f"Loaded artifact (latest round, not run-aware): `{model_path}`"
     if artifact_warning:
         note += f" (note: {artifact_warning})"
     return ArtifactModelResult(
+        requested_artifact=True,
         use_artifact=True,
         model=model,
         model_path=model_path,
@@ -251,15 +259,13 @@ def resolve_artifact_model(
 
 def resolve_artifact_state(
     *,
-    rf_model_source_value: str | None,
     campaign_info: CampaignInfo | None,
     run_id: str | None,
     ledger_runs_df: pl.DataFrame | None,
     allow_fallback: bool,
 ) -> ArtifactModelResult:
-    use_artifact = rf_model_source_value == "OPAL artifact (model.joblib)"
     return resolve_artifact_model(
-        use_artifact=use_artifact,
+        use_artifact=True,
         campaign_info=campaign_info,
         run_id=run_id,
         ledger_runs_df=ledger_runs_df,

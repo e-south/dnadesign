@@ -151,13 +151,13 @@ def build_friendly_column_labels(
         "opal__ledger__top_k": "Ledger Top-K (sel__is_selected)",
         "opal__cache__score": "Records cache score (latest_pred_scalar)",
         "opal__cache__top_k": "Records cache Top-K",
-        "opal__transient__score": f"{rf_prefix} score (SFXI)",
-        "opal__transient__logic_fidelity": f"{rf_prefix} logic fidelity (SFXI)",
-        "opal__transient__effect_scaled": f"{rf_prefix} effect scaled (SFXI)",
-        "opal__transient__rank": f"{rf_prefix} rank",
-        "opal__transient__top_k": f"{rf_prefix} Top-K",
-        "opal__transient__observed_event": "Observed events (ingest_y)",
-        "opal__transient__sfxi_scored_label": "SFXI scored labels",
+        "opal__overlay__score": f"{rf_prefix} score (SFXI)",
+        "opal__overlay__logic_fidelity": f"{rf_prefix} logic fidelity (SFXI)",
+        "opal__overlay__effect_scaled": f"{rf_prefix} effect scaled (SFXI)",
+        "opal__overlay__rank": f"{rf_prefix} rank",
+        "opal__overlay__top_k": f"{rf_prefix} Top-K",
+        "opal__overlay__observed_event": "Observed events (ingest_y)",
+        "opal__overlay__sfxi_scored_label": "SFXI scored labels",
     }
     if campaign_slug:
         labels[f"opal__{campaign_slug}__latest_pred_scalar"] = "OPAL latest predicted scalar"

@@ -345,12 +345,27 @@ def build_label_sfxi_view(
         empty_df = labels_view_df.head(0)
         return LabelSfxiView(df=empty_df, notice=notice, table_df=empty_df, table_cols=[])
     if selected_round is None:
-        empty_df = labels_view_df.head(0)
+        if labels_view_df.is_empty():
+            empty_df = labels_view_df.head(0)
+            return LabelSfxiView(
+                df=empty_df,
+                notice="No label events available for the selected filters.",
+                table_df=empty_df,
+                table_cols=[],
+            )
+        sfxi_view = compute_label_sfxi_view(
+            labels_view_df=labels_view_df,
+            labels_current_df=labels_view_df,
+            y_col=readiness.y_col,
+            params=params,
+        )
+        if sfxi_view.notice:
+            return sfxi_view
         return LabelSfxiView(
-            df=empty_df,
-            notice="No label rounds available for the selected campaign.",
-            table_df=empty_df,
-            table_cols=[],
+            df=sfxi_view.df,
+            notice="Using all rounds for SFXI scaling.",
+            table_df=sfxi_view.table_df,
+            table_cols=sfxi_view.table_cols,
         )
     return compute_label_sfxi_view(
         labels_view_df=labels_view_df,
@@ -360,7 +375,7 @@ def build_label_sfxi_view(
     )
 
 
-def apply_transient_label_flags(
+def apply_overlay_label_flags(
     *,
     df_overlay: pl.DataFrame,
     labels_view_df: pl.DataFrame,
@@ -376,12 +391,12 @@ def apply_transient_label_flags(
         observed_ids = observed_event_ids(labels_view_df, label_src=label_src)
     if observed_ids and id_col in df_overlay.columns:
         df_overlay = df_overlay.with_columns(
-            pl.col(id_col).cast(pl.Utf8).is_in(observed_ids).alias("opal__transient__observed_event")
+            pl.col(id_col).cast(pl.Utf8).is_in(observed_ids).alias("opal__overlay__observed_event")
         )
-    elif "opal__transient__observed_event" not in df_overlay.columns:
-        df_overlay = df_overlay.with_columns(pl.lit(False).alias("opal__transient__observed_event"))
+    elif "opal__overlay__observed_event" not in df_overlay.columns:
+        df_overlay = df_overlay.with_columns(pl.lit(False).alias("opal__overlay__observed_event"))
 
-    sfxi_scored_col = "opal__transient__sfxi_scored_label"
+    sfxi_scored_col = "opal__overlay__sfxi_scored_label"
     if "__row_id" in df_overlay.columns and "__row_id" in df_sfxi.columns and not df_sfxi.is_empty():
         sfxi_ids = df_sfxi.select(pl.col("__row_id").drop_nulls().unique()).to_series().to_list()
         df_overlay = df_overlay.with_columns(pl.col("__row_id").is_in(sfxi_ids).alias(sfxi_scored_col))

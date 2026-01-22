@@ -104,11 +104,11 @@ def test_namespace_summary() -> None:
 def test_build_friendly_column_labels() -> None:
     labels_map = util.build_friendly_column_labels(
         score_source_label="Ledger predictions (run-aware)",
-        rf_prefix="Transient",
+        rf_prefix="Overlay",
         campaign_slug="demo",
     )
     assert labels_map["opal__score__scalar"].startswith("Ledger predictions")
-    assert labels_map["opal__transient__score"].startswith("Transient")
+    assert labels_map["opal__overlay__score"].startswith("Overlay")
     assert labels_map["opal__demo__latest_pred_scalar"] == "OPAL latest predicted scalar"
 
 
@@ -143,7 +143,7 @@ def test_build_umap_overlay_charts() -> None:
         df=df,
         dataset_name="demo",
         campaign_slug="demo",
-        use_artifact=False,
+        use_artifact=True,
     )
     assert isinstance(cluster_chart, alt.Chart)
     assert isinstance(score_chart, alt.Chart)
@@ -155,7 +155,7 @@ def test_build_umap_explorer_chart_cases() -> None:
             "id": ["a", "b"],
             "x": [0.1, 0.2],
             "y": [0.3, 0.4],
-            "opal__transient__observed_event": [True, False],
+            "opal__overlay__observed_event": [True, False],
             "opal__score__top_k": [True, False],
         }
     )
@@ -163,7 +163,7 @@ def test_build_umap_explorer_chart_cases() -> None:
         df=base,
         x_col="x",
         y_col="y",
-        color_value="opal__transient__observed_event",
+        color_value="opal__overlay__observed_event",
         color_label="Observed",
         point_size=40,
         opacity=0.7,
@@ -231,19 +231,19 @@ def test_build_umap_explorer_chart_cases() -> None:
     assert no_non_null.note is not None and "no non-null values" in no_non_null.note
 
 
-def test_apply_transient_label_flags() -> None:
+def test_apply_overlay_label_flags() -> None:
     df_overlay = pl.DataFrame({"id": ["a", "b"], "__row_id": [1, 2]})
     labels_view = pl.DataFrame({"id": ["a"], "label_src": ["ingest_y"]})
     df_sfxi = pl.DataFrame({"__row_id": [2]})
-    out = sfxi.apply_transient_label_flags(
+    out = sfxi.apply_overlay_label_flags(
         df_overlay=df_overlay,
         labels_view_df=labels_view,
         df_sfxi=df_sfxi,
         label_src="ingest_y",
         id_col="id",
     )
-    assert out["opal__transient__observed_event"].to_list() == [True, False]
-    assert out["opal__transient__sfxi_scored_label"].to_list() == [False, True]
+    assert out["opal__overlay__observed_event"].to_list() == [True, False]
+    assert out["opal__overlay__sfxi_scored_label"].to_list() == [False, True]
 
 
 def test_diagnostics_notes_merge() -> None:
@@ -573,46 +573,46 @@ def test_apply_score_overlay_ledger_missing_rank() -> None:
     assert diag.warnings
 
 
-def test_apply_score_overlay_transient_round() -> None:
+def test_apply_score_overlay_overlay_round() -> None:
     df = pl.DataFrame(
         {
             "id": ["a", "b"],
-            "opal__transient__score": [0.2, 0.4],
-            "opal__transient__round": [5, 5],
-            "opal__transient__run_id": ["notebook-transient", "notebook-transient"],
+            "opal__overlay__score": [0.2, 0.4],
+            "opal__overlay__round": [5, 5],
+            "opal__overlay__run_id": ["dashboard-overlay", "dashboard-overlay"],
         }
     )
     out, diag = scores.apply_score_overlay(
         df,
-        score_source_value="Transient overlay (RF)",
+        score_source_value="Overlay (RF)",
         campaign_slug="demo",
         selected_round=None,
     )
     assert out["opal__score__round"].to_list() == [5, 5]
-    assert out["opal__score__run_id"].to_list() == ["notebook-transient", "notebook-transient"]
-    assert diag.source_key == "transient"
+    assert out["opal__score__run_id"].to_list() == ["dashboard-overlay", "dashboard-overlay"]
+    assert diag.source_key == "overlay"
 
 
-def test_apply_score_overlay_transient_missing_provenance() -> None:
+def test_apply_score_overlay_overlay_missing_provenance() -> None:
     df = pl.DataFrame(
         {
             "id": ["a"],
-            "opal__transient__score": [0.2],
+            "opal__overlay__score": [0.2],
         }
     )
     out, diag = scores.apply_score_overlay(
         df,
-        score_source_value="Transient overlay (RF)",
+        score_source_value="Overlay (RF)",
         campaign_slug="demo",
         selected_round=None,
     )
     assert out["opal__score__run_id"].to_list() == [None]
     assert out["opal__score__round"].to_list() == [None]
-    assert any("opal__transient__run_id" in msg for msg in diag.warnings)
-    assert any("opal__transient__round" in msg for msg in diag.warnings)
+    assert any("opal__overlay__run_id" in msg for msg in diag.warnings)
+    assert any("opal__overlay__round" in msg for msg in diag.warnings)
 
 
-def test_transient_overlay_provenance_on_early_exit() -> None:
+def test_overlay_provenance_on_early_exit() -> None:
     df_base = pl.DataFrame({"id": ["a"], "__row_id": [0], "x_vec": [[1.0, 2.0]]})
     params = sfxi.compute_sfxi_params(
         setpoint=[0.25, 0.25, 0.25, 0.25],
@@ -634,16 +634,15 @@ def test_transient_overlay_provenance_on_early_exit() -> None:
         x_col="x_vec",
         y_col="y_vec",
         sfxi_params=params,
-        selected_round=None,
-        use_artifact=False,
+        selected_round=0,
         artifact_model=None,
         artifact_round_dir=None,
-        run_id=None,
-        rf_random_state=None,
+        run_id="run-1",
         dataset_name="demo",
     )
-    assert "opal__transient__round" in result.df_overlay.columns
-    assert result.df_overlay["opal__transient__round"].to_list() == [None]
+    assert "opal__overlay__round" in result.df_overlay.columns
+    assert result.df_overlay["opal__overlay__round"].to_list() == [0]
+    assert result.df_overlay["opal__overlay__run_id"].to_list() == ["run-1"]
     assert result.diagnostics.errors
 
 

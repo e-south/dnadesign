@@ -397,7 +397,7 @@ Use `opal prune-source` to remove OPAL‑derived columns (including the Y column
 
 * **Canonical (ledger)**: append-only, run-aware records under `outputs/ledger.*`.
 * **Cache (records)**: `latest_pred_*` columns in `records.parquet` for convenience; can be stale or not run-aware.
-* **Transient (notebook)**: in-memory overlays (e.g., RF surrogate) for exploration only; never persisted.
+* **Overlay (notebook)**: in-memory overlays (e.g., RF surrogate) for exploration only; never persisted.
 * **Y-ops gating**: notebook SFXI scoring only runs when predictions are in objective space (Y-ops inverse applied).
 
 #### Ledger output schema (append-only)

@@ -34,18 +34,24 @@ def _ledger_paths(workdir: Path | None) -> dict[str, Path | None]:
 
 
 def load_ledger_runs(workdir: Path | None) -> tuple[pl.DataFrame, LedgerDiagnostics]:
-    diag = LedgerDiagnostics(
-        status="missing_workdir",
-        path=None,
-        rows=0,
-        error=None,
-        diagnostics=Diagnostics().add_warning("Workdir is not set; ledger runs unavailable."),
-    )
     paths = _ledger_paths(workdir)
     runs_path = paths["runs"]
     if runs_path is None:
+        diag = LedgerDiagnostics(
+            status="missing_workdir",
+            path=None,
+            rows=0,
+            error=None,
+            diagnostics=Diagnostics().add_warning("Workdir is not set; ledger runs unavailable."),
+        )
         return pl.DataFrame(), diag
-    diag = LedgerDiagnostics(**{**diag.__dict__, "path": str(runs_path)})
+    diag = LedgerDiagnostics(
+        status="missing",
+        path=str(runs_path),
+        rows=0,
+        error=None,
+        diagnostics=Diagnostics(),
+    )
     if not runs_path.exists():
         diag = LedgerDiagnostics(
             **{
@@ -73,18 +79,24 @@ def load_ledger_runs(workdir: Path | None) -> tuple[pl.DataFrame, LedgerDiagnost
 
 
 def load_ledger_labels(workdir: Path | None) -> tuple[pl.DataFrame, LedgerDiagnostics]:
-    diag = LedgerDiagnostics(
-        status="missing_workdir",
-        path=None,
-        rows=0,
-        error=None,
-        diagnostics=Diagnostics().add_warning("Workdir is not set; ledger labels unavailable."),
-    )
     paths = _ledger_paths(workdir)
     labels_path = paths["labels"]
     if labels_path is None:
+        diag = LedgerDiagnostics(
+            status="missing_workdir",
+            path=None,
+            rows=0,
+            error=None,
+            diagnostics=Diagnostics().add_warning("Workdir is not set; ledger labels unavailable."),
+        )
         return pl.DataFrame(), diag
-    diag = LedgerDiagnostics(**{**diag.__dict__, "path": str(labels_path)})
+    diag = LedgerDiagnostics(
+        status="missing",
+        path=str(labels_path),
+        rows=0,
+        error=None,
+        diagnostics=Diagnostics(),
+    )
     if not labels_path.exists():
         diag = LedgerDiagnostics(
             **{
@@ -117,20 +129,28 @@ def load_ledger_predictions(
     run_id: str | None,
     as_of_round: int | None = None,
 ) -> tuple[pl.DataFrame, LedgerDiagnostics]:
-    diag = LedgerDiagnostics(
-        status="missing_workdir",
-        path=None,
-        rows=0,
-        error=None,
-        diagnostics=Diagnostics().add_warning("Workdir is not set; ledger predictions unavailable."),
-        run_id=run_id,
-        as_of_round=as_of_round,
-    )
     paths = _ledger_paths(workdir)
     preds_dir = paths["preds_dir"]
     if preds_dir is None:
+        diag = LedgerDiagnostics(
+            status="missing_workdir",
+            path=None,
+            rows=0,
+            error=None,
+            diagnostics=Diagnostics().add_warning("Workdir is not set; ledger predictions unavailable."),
+            run_id=run_id,
+            as_of_round=as_of_round,
+        )
         return pl.DataFrame(), diag
-    diag = LedgerDiagnostics(**{**diag.__dict__, "path": str(preds_dir)})
+    diag = LedgerDiagnostics(
+        status="missing",
+        path=str(preds_dir),
+        rows=0,
+        error=None,
+        diagnostics=Diagnostics(),
+        run_id=run_id,
+        as_of_round=as_of_round,
+    )
     if not preds_dir.exists():
         diag = LedgerDiagnostics(
             **{

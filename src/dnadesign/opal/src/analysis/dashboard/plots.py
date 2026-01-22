@@ -157,7 +157,7 @@ def build_umap_explorer_chart(
             color_title = None
             color_tooltip = None
             color_encoding = alt.Undefined
-        elif color_value == "opal__transient__observed_event":
+        elif color_value == "opal__overlay__observed_event":
             label_col = f"{color_value}__label"
             df_chart = df_chart.with_columns(
                 pl.when(pl.col(color_value)).then(pl.lit("Observed")).otherwise(pl.lit("Not observed")).alias(label_col)
@@ -334,9 +334,9 @@ def build_cluster_chart(
 
     label_map = {
         "opal__score__top_k": ("Top-K", "Not Top-K", f"{score_source_label} Top-K"),
-        "opal__transient__top_k": ("Top-K", "Not Top-K", f"{rf_prefix} Top-K"),
-        "opal__transient__observed_event": ("Observed", "Not observed", "Observed events (ingest_y)"),
-        "opal__transient__sfxi_scored_label": ("SFXI label", "Not label", "SFXI scored label"),
+        "opal__overlay__top_k": ("Top-K", "Not Top-K", f"{rf_prefix} Top-K"),
+        "opal__overlay__observed_event": ("Observed", "Not observed", "Observed events (ingest_y)"),
+        "opal__overlay__sfxi_scored_label": ("SFXI label", "Not label", "SFXI scored label"),
     }
     hue_label = hue_label_display if hue_label_display else "(none)"
     color_encoding = alt.Undefined
@@ -356,7 +356,7 @@ def build_cluster_chart(
     elif hue_value in label_map and hue_value in df_points.columns:
         label_col = f"{hue_value}__label"
         yes_label, no_label, hue_label = label_map[hue_value]
-        top_k_mode = hue_value in {"opal__transient__top_k", "opal__score__top_k"}
+        top_k_mode = hue_value in {"opal__overlay__top_k", "opal__score__top_k"}
         df_points = df_points.with_columns(
             pl.when(pl.col(hue_value)).then(pl.lit(yes_label)).otherwise(pl.lit(no_label)).alias(label_col)
         )
@@ -496,9 +496,9 @@ def build_umap_overlay_charts(
             score_col = latest_col
             score_title = "OPAL latest predicted scalar"
             score_chart_title = "UMAP colored by OPAL latest scalar"
-    if score_col is None and "opal__transient__score" in df.columns:
-        score_col = "opal__transient__score"
-        score_prefix = "OPAL artifact" if use_artifact else "Transient"
+    if score_col is None and "opal__overlay__score" in df.columns:
+        score_col = "opal__overlay__score"
+        score_prefix = "Overlay (artifact)" if use_artifact else "Overlay"
         score_title = f"{score_prefix} score (SFXI)"
         score_chart_title = f"UMAP colored by {score_prefix} score (SFXI)"
 

@@ -45,7 +45,7 @@ def apply_score_overlay(
     context: object | None = None,
 ) -> tuple[pl.DataFrame, ScoreOverlayDiagnostics]:
     warnings: list[str] = []
-    source_key = "transient"
+    source_key = "overlay"
     score_scalar_col = None
     score_rank_col = None
     score_top_k_col = None
@@ -61,10 +61,10 @@ def apply_score_overlay(
         score_rank_col = "opal__cache__rank"
         score_top_k_col = "opal__cache__top_k"
     else:
-        source_key = "transient"
-        score_scalar_col = "opal__transient__score"
-        score_rank_col = "opal__transient__rank"
-        score_top_k_col = "opal__transient__top_k"
+        source_key = "overlay"
+        score_scalar_col = "opal__overlay__score"
+        score_rank_col = "opal__overlay__rank"
+        score_top_k_col = "opal__overlay__top_k"
 
     if score_scalar_col not in df.columns:
         warnings.append(f"Score source '{score_source_value}' missing '{score_scalar_col}'.")
@@ -86,11 +86,11 @@ def apply_score_overlay(
         run_id_expr = pl.col("opal__ledger__run_id")
     elif source_key == "cache" and "opal__cache__run_id" in df.columns:
         run_id_expr = pl.col("opal__cache__run_id")
-    elif source_key == "transient":
-        if "opal__transient__run_id" in df.columns:
-            run_id_expr = pl.col("opal__transient__run_id")
+    elif source_key == "overlay":
+        if "opal__overlay__run_id" in df.columns:
+            run_id_expr = pl.col("opal__overlay__run_id")
         else:
-            warnings.append("Transient score source missing opal__transient__run_id; provenance unavailable.")
+            warnings.append("Overlay score source missing opal__overlay__run_id; provenance unavailable.")
             run_id_expr = pl.lit(None).cast(pl.Utf8)
     else:
         run_id_expr = pl.lit(None).cast(pl.Utf8)
@@ -99,11 +99,11 @@ def apply_score_overlay(
         round_expr = pl.col("opal__ledger__round")
     elif source_key == "cache" and "opal__cache__round" in df.columns:
         round_expr = pl.col("opal__cache__round")
-    elif source_key == "transient":
-        if "opal__transient__round" in df.columns:
-            round_expr = pl.col("opal__transient__round")
+    elif source_key == "overlay":
+        if "opal__overlay__round" in df.columns:
+            round_expr = pl.col("opal__overlay__round")
         else:
-            warnings.append("Transient score source missing opal__transient__round; round provenance unavailable.")
+            warnings.append("Overlay score source missing opal__overlay__round; round provenance unavailable.")
             round_expr = pl.lit(None).cast(pl.Int64)
     else:
         round_expr = pl.lit(None).cast(pl.Int64)

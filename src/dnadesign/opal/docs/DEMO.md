@@ -179,7 +179,7 @@ Canonical vs cache vs transient (notebook):
 
 - **Canonical (ledger)**: append-only, run-aware sources under `outputs/ledger.*`.
 - **Cache (records)**: `latest_pred_*` columns in `records.parquet` (convenience only).
-- **Transient (notebook)**: in-memory overlays (ephemeral) for exploration, never persisted.
+- **Overlay (notebook)**: in-memory overlays (ephemeral) for exploration, never persisted.
 - **Y-ops gating**: SFXI scoring runs only when predictions are in objective space (Y-ops inverse applied).
 
 ---

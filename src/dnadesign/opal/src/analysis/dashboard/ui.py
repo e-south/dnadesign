@@ -28,11 +28,11 @@ _DEFAULT_EXTRA_COLORS = [
     "opal__ledger__top_k",
     "opal__cache__score",
     "opal__cache__top_k",
-    "opal__transient__score",
-    "opal__transient__logic_fidelity",
-    "opal__transient__effect_scaled",
-    "opal__transient__observed_event",
-    "opal__transient__top_k",
+    "opal__overlay__score",
+    "opal__overlay__logic_fidelity",
+    "opal__overlay__effect_scaled",
+    "opal__overlay__observed_event",
+    "opal__overlay__top_k",
 ]
 
 
@@ -40,7 +40,6 @@ def build_umap_controls(
     *,
     mo: Any,
     df_active: pl.DataFrame,
-    rf_model_source_value: str | None,
     score_source_value: str | None,
     campaign_slug: str | None,
     extra_color_options: Sequence[str] | None = None,
@@ -79,7 +78,7 @@ def build_umap_controls(
     umap_color_cols = [_name for _name in umap_color_cols if _name != "id_right"]
     umap_color_default = "cluster__ldn_v1" if "cluster__ldn_v1" in umap_color_cols else "(none)"
 
-    rf_prefix = "OPAL artifact" if rf_model_source_value == "OPAL artifact (model.joblib)" else "Transient"
+    rf_prefix = "Overlay (artifact)"
     score_source_label = score_source_value or "Selected"
     friendly_labels = build_friendly_column_labels(
         score_source_label=score_source_label,

@@ -45,6 +45,7 @@ def test_prom60_eda_headless(tmp_path: Path) -> None:
 
     env_backup = os.environ.copy()
     os.environ["DNADESIGN_USR_ROOT"] = str(usr_root)
+    os.environ["DNADESIGN_HEADLESS"] = "1"
     os.environ["MPLBACKEND"] = "Agg"
 
     try:
@@ -53,6 +54,7 @@ def test_prom60_eda_headless(tmp_path: Path) -> None:
             defs={
                 "active_record": None,
                 "active_record_id": None,
+                "dataset_submit_override": True,
             }
         )
     finally:
