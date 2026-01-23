@@ -186,7 +186,7 @@ def test_end_to_end_run_and_verify_outputs(tmp_path: Path) -> None:
                 "",
                 "model:",
                 '  name: "random_forest"',
-                "  params: { n_estimators: 10, random_state: 7 }",
+                "  params: { n_estimators: 10, random_state: 7, oob_score: false }",
                 "",
                 "objective:",
                 '  name: "scalar_identity_v1"',
