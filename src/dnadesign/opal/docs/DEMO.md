@@ -45,7 +45,7 @@ uv run opal plot -c configs/campaign.yaml
 **Notes:**
 - Use `uv run opal ...` to ensure the correct environment.
 - If `outputs/rounds/round_0/` already exists from a prior run, `opal run` will refuse to overwrite
-  unless you pass `--resume` or delete the existing artifacts first.
+  unless you pass `--resume` (which wipes the round directory) or delete the existing artifacts first.
 
 ---
 
@@ -125,7 +125,7 @@ Latest round
 Runs
   - r=0, run_id=r0-<timestamp>, model=random_forest, objective=sfxi_v1,
     selection=top_n, n_train=6, n_scored=9
-  - (more runs appear here if you re-run with --resume)
+  - (more runs appear here if you re-run with --resume; the round dir is wiped before the re-run)
 ```
 
 #### `opal log --round latest`

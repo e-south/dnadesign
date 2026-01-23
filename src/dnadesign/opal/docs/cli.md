@@ -119,7 +119,7 @@ opal run --config <yaml> --round <r> \
 * `--round, -r, --labels-as-of`: Training cutoff (use labels with `observed_round ≤ r`).
 * `--k, -k`: Override `selection.params.top_k`.
 * `--score-batch-size`: Override `scoring.score_batch_size` for this run.
-* `--resume`: Allow overwriting existing per-round artifacts (required if `outputs/rounds/round_<r>/` already exists).
+* `--resume`: Allow overwriting existing per-round artifacts (required if `outputs/rounds/round_<r>/` already contains artifacts). When set, the round directory is wiped before writing new artifacts.
 * `--verbose/--quiet`: Control log verbosity (default: verbose).
 
 **Pipeline**
