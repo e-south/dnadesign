@@ -323,17 +323,20 @@ def _short_hash(val: str, *, n: int = 8) -> str:
 
 def _print_inputs_summary(loaded) -> None:
     cfg = loaded.root.densegen
-    inputs = Table("name", "type", "source")
+    inputs = Table("name", "type", "inputs")
     for inp in cfg.inputs:
         if hasattr(inp, "path"):
-            src = str(resolve_relative_path(loaded.path, inp.path))
+            resolved = resolve_relative_path(loaded.path, inp.path)
+            src = f"file={resolved}"
         elif hasattr(inp, "paths"):
             resolved = [str(resolve_relative_path(loaded.path, p)) for p in getattr(inp, "paths") or []]
-            src = f"{len(resolved)} files"
+            src = f"files={len(resolved)}"
             if resolved:
-                src = f"{len(resolved)} files ({resolved[0]})"
+                parents = {str(Path(p).parent) for p in resolved}
+                root = parents.pop() if len(parents) == 1 else "multiple"
+                src = f"{src}; dir={root}; first={resolved[0]}"
         elif hasattr(inp, "dataset"):
-            src = f"{inp.dataset} (root={resolve_relative_path(loaded.path, inp.root)})"
+            src = f"dataset={inp.dataset}; root={resolve_relative_path(loaded.path, inp.root)}"
         else:
             src = "-"
         inputs.add_row(inp.name, inp.type, src)
@@ -366,8 +369,8 @@ def _print_inputs_summary(loaded) -> None:
         "mining",
         "bgfile",
         "oversample",
-        "max_candidates",
-        "max_seconds",
+        "candidate_cap",
+        "time_cap_s",
         "length",
     )
     for inp in pwm_inputs:
@@ -381,9 +384,9 @@ def _print_inputs_summary(loaded) -> None:
             motif_label = ", ".join(motif_ids) if motif_ids else "all"
             if inp.type == "pwm_meme_set":
                 file_count = len(getattr(inp, "paths", []) or [])
-                motif_label = f"{motif_label} ({file_count} files)"
+                motif_label = f"{motif_label} (files={file_count})"
         elif inp.type == "pwm_artifact_set":
-            motif_label = f"{len(getattr(inp, 'paths', []) or [])} artifacts"
+            motif_label = f"artifacts={len(getattr(inp, 'paths', []) or [])}"
         else:
             motif_label = "from artifact"
         backend = getattr(sampling, "scoring_backend", "densegen")
@@ -404,24 +407,32 @@ def _print_inputs_summary(loaded) -> None:
             mining_cfg = getattr(sampling, "mining", None)
             bin_ids = getattr(mining_cfg, "retain_bin_ids", None)
             if bin_ids:
-                bins_label = f"{bins_label} retain={bin_ids}"
+                bins_label = f"{bins_label}; retain={','.join(str(i) for i in bin_ids)}"
         mining_label = "-"
         mining_cfg = getattr(sampling, "mining", None)
         if backend == "fimo" and mining_cfg is not None:
             parts = [f"batch={mining_cfg.batch_size}"]
             if mining_cfg.max_batches is not None:
                 parts.append(f"max_batches={mining_cfg.max_batches}")
-            if getattr(mining_cfg, "max_candidates", None) is not None:
-                parts.append(f"max_candidates={mining_cfg.max_candidates}")
-            if mining_cfg.max_seconds is not None:
-                parts.append(f"max_seconds={mining_cfg.max_seconds}s")
-            if mining_cfg.retain_bin_ids:
-                parts.append(f"retain={mining_cfg.retain_bin_ids}")
+            if mining_cfg.log_every_batches is not None:
+                parts.append(f"log_every={mining_cfg.log_every_batches}")
             mining_label = ", ".join(parts)
         bgfile_label = getattr(sampling, "bgfile", None) or "-"
         length_label = str(sampling.length_policy)
         if sampling.length_policy == "range" and sampling.length_range is not None:
             length_label = f"range({sampling.length_range[0]}..{sampling.length_range[1]})"
+        candidate_cap = "-"
+        time_cap = "-"
+        if backend == "fimo" and mining_cfg is not None:
+            if getattr(mining_cfg, "max_candidates", None) is not None:
+                candidate_cap = str(mining_cfg.max_candidates)
+            if mining_cfg.max_seconds is not None:
+                time_cap = str(mining_cfg.max_seconds)
+        else:
+            if sampling.max_candidates is not None:
+                candidate_cap = str(sampling.max_candidates)
+            if sampling.max_seconds is not None:
+                time_cap = str(sampling.max_seconds)
         pwm_table.add_row(
             inp.name,
             motif_label,
@@ -434,14 +445,14 @@ def _print_inputs_summary(loaded) -> None:
             str(mining_label),
             str(bgfile_label),
             str(sampling.oversample_factor),
-            str(sampling.max_candidates) if sampling.max_candidates is not None else "-",
-            str(sampling.max_seconds) if sampling.max_seconds is not None else "-",
+            candidate_cap,
+            time_cap,
             length_label,
         )
     console.print("[bold]Stage-A PWM sampling[/]")
     console.print(pwm_table)
     console.print(
-        "  -> Produces the realized TFBS pool (input_tfbs_count), captured in inputs_manifest.json after runs."
+        "  -> Produces the realized TFBS pool (input_tfbs_count), captured in outputs/meta/inputs_manifest.json."
     )
 
 
