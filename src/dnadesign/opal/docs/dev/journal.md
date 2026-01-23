@@ -13,6 +13,12 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Ingest-y hardened: `--unknown-sequences` handling, default inference for missing bio_type/alphabet, and guards for
   duplicate sequences + deterministic id collisions.
 - Auto-drop unknown sequences that lack X data (ingest-y safety).
+- Registry loading now fails fast on built-in/entry-point import errors (shared loader helper).
+- Prediction flow coerces outputs to numpy arrays and preserves null sequences.
+- Ledger run/label sinks now write dataset directories; run_meta uses upsert-with-compaction on duplicate run_id.
+- Campaign locks now store JSON (pid, ts) and detect stale locks with remediation guidance.
+- Ingest resolves missing ids by sequence, treats known sequences as known (no accidental duplication), and fills
+  missing bio_type/alphabet values via prompt/infer for new sequences.
 
 ### Campaign layout notes
 - Campaign root is the center of gravity; configs live in `configs/` and IO stays under the campaign root.
