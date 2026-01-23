@@ -950,23 +950,29 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         f"[ledger] appended run_pred({len(run_pred_events)}), run_meta(1) under {ws.ledger_dir}",
     )
 
-    # --- records ergonomic caches ---
-    latest_scalar = dict(zip(id_order_pool, y_obj_scalar.tolist()))
-    df2 = store.update_latest_cache(
+    # --- records label history (canonical, run-aware) ---
+    metrics_by_name: Dict[str, List[float]] = {"score": y_obj_scalar.astype(float).tolist()}
+    for key in ("logic_fidelity", "effect_scaled", "effect_raw"):
+        if isinstance(diag, dict) and key in diag:
+            arr = np.asarray(diag[key], dtype=float).ravel()
+            if arr.size == len(id_order_pool):
+                metrics_by_name[key] = arr.tolist()
+
+    objective_meta = {"name": obj_name, "params": obj_params, "mode": mode}
+    df2 = store.append_predictions_from_arrays(
         df,
-        slug=cfg.campaign.slug,
-        latest_as_of_round=int(req.as_of_round),
-        latest_scalar_by_id=latest_scalar,
-        require_columns_present=cfg.safety.write_back_requires_columns_present,
-        latest_pred_run_id=run_id,
-        latest_pred_as_of_round=int(req.as_of_round),
-        latest_pred_written_at=now_iso(),
+        ids=list(map(str, id_order_pool)),
+        y_hat=Y_hat,
+        as_of_round=int(req.as_of_round),
+        run_id=run_id,
+        objective=objective_meta,
+        metrics_by_name=metrics_by_name,
+        selection_rank=ranks_competition,
+        selection_top_k=selected_bool,
+        ts=now_iso(),
     )
     store.save_atomic(df2)
-    _log(
-        req.verbose,
-        "[writeback] records caches updated: latest_as_of_round, latest_pred_scalar",
-    )
+    _log(req.verbose, "[writeback] records label_hist updated with run-aware predictions.")
 
     # --- state.json summary ---
     st = CampaignState.load(ws.state_path)
@@ -1043,9 +1049,8 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
                 "round_log_jsonl": str((rdir / "round.log.jsonl").resolve()),
             },
             writebacks={
-                "records_caches_updated": [
-                    "opal__<slug>__latest_as_of_round",
-                    "opal__<slug>__latest_pred_scalar",
+                "records_label_hist_updated": [
+                    "opal__<slug>__label_hist",
                 ]
             },
             warnings=[],

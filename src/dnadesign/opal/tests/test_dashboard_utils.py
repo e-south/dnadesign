@@ -19,10 +19,9 @@ from dnadesign.opal.src.analysis.dashboard import (
     datasets,
     diagnostics,
     filters,
+    hues,
     labels,
-    mismatch,
     plots,
-    scores,
     selection,
     sfxi,
     transient,
@@ -101,15 +100,26 @@ def test_namespace_summary() -> None:
     assert summary_dict["cluster"]["count"] == 1
 
 
-def test_build_friendly_column_labels() -> None:
-    labels_map = util.build_friendly_column_labels(
-        score_source_label="Ledger predictions (run-aware)",
-        rf_prefix="Overlay",
-        campaign_slug="demo",
+def test_hue_registry_filters_invalid_columns() -> None:
+    df = pl.DataFrame(
+        {
+            "id": ["a", "b"],
+            "valid_num": [0.1, 0.2],
+            "valid_cat": ["x", "y"],
+            "all_null": [None, None],
+            "nested": [[1, 2], [3, 4]],
+            "opal__cache__score": [0.1, 0.2],
+            "opal__ledger__score": [0.2, 0.3],
+        }
     )
-    assert labels_map["opal__score__scalar"].startswith("Ledger predictions")
-    assert labels_map["opal__overlay__score"].startswith("Overlay")
-    assert labels_map["opal__demo__latest_pred_scalar"] == "OPAL latest predicted scalar"
+    registry = hues.build_hue_registry(df, include_columns=True, denylist={"id"})
+    labels = registry.labels()
+    assert "valid_num" in labels
+    assert "valid_cat" in labels
+    assert "all_null" not in labels
+    assert "nested" not in labels
+    assert "opal__cache__score" not in labels
+    assert "opal__ledger__score" not in labels
 
 
 def test_ensure_selection_columns() -> None:
@@ -136,14 +146,12 @@ def test_build_umap_overlay_charts() -> None:
             "cluster__ldn_v1__umap_x": [0.1, 0.2],
             "cluster__ldn_v1__umap_y": [0.3, 0.4],
             "cluster__ldn_v1": ["0", "1"],
-            "opal__score__scalar": [0.2, 0.4],
+            "opal__view__score": [0.2, 0.4],
         }
     )
     cluster_chart, score_chart = plots.build_umap_overlay_charts(
         df=df,
         dataset_name="demo",
-        campaign_slug="demo",
-        use_artifact=True,
     )
     assert isinstance(cluster_chart, alt.Chart)
     assert isinstance(score_chart, alt.Chart)
@@ -159,12 +167,18 @@ def test_build_umap_explorer_chart_cases() -> None:
             "opal__score__top_k": [True, False],
         }
     )
+    hue_observed = hues.HueOption(
+        key="opal__overlay__observed_event",
+        label="Observed",
+        kind="categorical",
+        dtype=pl.Boolean,
+        category_labels=("Observed", "Unlabeled"),
+    )
     ok = plots.build_umap_explorer_chart(
         df=base,
         x_col="x",
         y_col="y",
-        color_value="opal__overlay__observed_event",
-        color_label="Observed",
+        hue=hue_observed,
         point_size=40,
         opacity=0.7,
         plot_size=420,
@@ -178,8 +192,7 @@ def test_build_umap_explorer_chart_cases() -> None:
         df=base.drop("id"),
         x_col="x",
         y_col="y",
-        color_value=None,
-        color_label=None,
+        hue=None,
         point_size=40,
         opacity=0.7,
         plot_size=420,
@@ -192,8 +205,7 @@ def test_build_umap_explorer_chart_cases() -> None:
         df=base,
         x_col="",
         y_col="",
-        color_value=None,
-        color_label=None,
+        hue=None,
         point_size=40,
         opacity=0.7,
         plot_size=420,
@@ -206,8 +218,7 @@ def test_build_umap_explorer_chart_cases() -> None:
         df=pl.DataFrame({"id": ["a"], "x": ["na"], "y": ["nb"]}),
         x_col="x",
         y_col="y",
-        color_value=None,
-        color_label=None,
+        hue=None,
         point_size=40,
         opacity=0.7,
         plot_size=420,
@@ -220,8 +231,12 @@ def test_build_umap_explorer_chart_cases() -> None:
         df=base.with_columns(pl.lit(None).alias("all_null")),
         x_col="x",
         y_col="y",
-        color_value="all_null",
-        color_label="All null",
+        hue=hues.HueOption(
+            key="all_null",
+            label="All null",
+            kind="numeric",
+            dtype=pl.Float64,
+        ),
         point_size=40,
         opacity=0.7,
         plot_size=420,
@@ -265,7 +280,7 @@ def test_diagnostics_to_lines() -> None:
 def test_opal_labeled_mask() -> None:
     df = pl.DataFrame(
         {
-            "opal__a__label_hist": [[], None, [{"r": 1}]],
+            "opal__a__label_hist": [[], None, [{"r": 1, "y": [0.1]}]],
             "opal__b__label_hist": [None, [], []],
         }
     )
@@ -551,67 +566,6 @@ def test_infer_round_from_labels() -> None:
     assert labels.infer_round_from_labels(pl.DataFrame({"x": [1]})) is None
 
 
-def test_apply_score_overlay_ledger_missing_rank() -> None:
-    df = pl.DataFrame(
-        {
-            "id": ["a", "b"],
-            "opal__ledger__score": [0.1, 0.2],
-            "opal__ledger__run_id": ["run-1", "run-1"],
-            "opal__ledger__round": [0, 0],
-        }
-    )
-    out, diag = scores.apply_score_overlay(
-        df,
-        score_source_value="Ledger predictions (run-aware)",
-        campaign_slug="demo",
-        selected_round=0,
-    )
-    assert "opal__score__scalar" in out.columns
-    assert out["opal__score__scalar"].to_list() == [0.1, 0.2]
-    assert "opal__score__top_k" in out.columns
-    assert out["opal__score__top_k"].to_list() == [None, None]
-    assert diag.warnings
-
-
-def test_apply_score_overlay_overlay_round() -> None:
-    df = pl.DataFrame(
-        {
-            "id": ["a", "b"],
-            "opal__overlay__score": [0.2, 0.4],
-            "opal__overlay__round": [5, 5],
-            "opal__overlay__run_id": ["dashboard-overlay", "dashboard-overlay"],
-        }
-    )
-    out, diag = scores.apply_score_overlay(
-        df,
-        score_source_value="Overlay (RF)",
-        campaign_slug="demo",
-        selected_round=None,
-    )
-    assert out["opal__score__round"].to_list() == [5, 5]
-    assert out["opal__score__run_id"].to_list() == ["dashboard-overlay", "dashboard-overlay"]
-    assert diag.source_key == "overlay"
-
-
-def test_apply_score_overlay_overlay_missing_provenance() -> None:
-    df = pl.DataFrame(
-        {
-            "id": ["a"],
-            "opal__overlay__score": [0.2],
-        }
-    )
-    out, diag = scores.apply_score_overlay(
-        df,
-        score_source_value="Overlay (RF)",
-        campaign_slug="demo",
-        selected_round=None,
-    )
-    assert out["opal__score__run_id"].to_list() == [None]
-    assert out["opal__score__round"].to_list() == [None]
-    assert any("opal__overlay__run_id" in msg for msg in diag.warnings)
-    assert any("opal__overlay__round" in msg for msg in diag.warnings)
-
-
 def test_overlay_provenance_on_early_exit() -> None:
     df_base = pl.DataFrame({"id": ["a"], "__row_id": [0], "x_vec": [[1.0, 2.0]]})
     params = sfxi.compute_sfxi_params(
@@ -626,46 +580,17 @@ def test_overlay_provenance_on_early_exit() -> None:
     )
     result = transient.compute_transient_overlay(
         df_base=df_base,
-        labels_asof_df=pl.DataFrame(),
+        pred_df=pl.DataFrame(),
         labels_current_df=pl.DataFrame(),
         df_sfxi=pl.DataFrame(),
-        campaign_info=None,
-        campaign_slug=None,
-        x_col="x_vec",
         y_col="y_vec",
         sfxi_params=params,
-        selected_round=0,
-        artifact_model=None,
-        artifact_round_dir=None,
-        run_id="run-1",
+        selection_params={},
         dataset_name="demo",
+        as_of_round=0,
+        run_id="run-1",
     )
     assert "opal__overlay__round" in result.df_overlay.columns
     assert result.df_overlay["opal__overlay__round"].to_list() == [0]
     assert result.df_overlay["opal__overlay__run_id"].to_list() == ["run-1"]
     assert result.diagnostics.errors
-
-
-def test_mismatch_helper(tmp_path: Path) -> None:
-    ledger = pl.DataFrame(
-        {
-            "id": ["a", "b"],
-            "pred__y_obj_scalar": [0.5, 1.5],
-        }
-    )
-    csv_path = tmp_path / "selection_top_k.csv"
-    df_csv = pl.DataFrame(
-        {
-            "id": ["a", "b"],
-            "pred__y_obj_scalar": [0.5, 1.4],
-            "run_id": ["run-1", "run-1"],
-        }
-    )
-    df_csv.write_csv(csv_path)
-    result = mismatch.compare_selection_to_ledger(
-        selection_path=str(csv_path),
-        ledger_preds_df=ledger,
-        selected_run_id="run-1",
-    )
-    assert "Compared" in result.message
-    assert result.table.height == 2

@@ -46,8 +46,6 @@ def write_records(
     )
     if include_opal_cols:
         df[f"opal__{slug}__label_hist"] = [[], []]
-        df[f"opal__{slug}__latest_as_of_round"] = [0, 0]
-        df[f"opal__{slug}__latest_pred_scalar"] = [0.1, 0.2]
         df["Y"] = [None, None]
     df.to_parquet(path, index=False)
     return df

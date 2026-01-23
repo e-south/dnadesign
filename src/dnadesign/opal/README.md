@@ -155,7 +155,7 @@ Dashboard notebooks (e.g., `prom60_eda.py`) now pull their shared logic from
 
 ### Campaign layout
 
-`opal init` scaffolds a campaign folder and ensures OPAL cache columns exist in `records.parquet`. Edit
+`opal init` scaffolds a campaign folder and ensures the label history column exists in `records.parquet`. Edit
 `campaign.yaml` to define behavior.
 
 ```
@@ -347,7 +347,7 @@ Use `opal log --round <k|latest>` to summarize `round.log.jsonl`.
 OPAL is **assertive by default**: it will fail fast on inconsistent inputs rather than guessing.
 
 * `opal validate` checks essentials + X presence; if Y exists it must be finite and the expected length.
-* `label_hist` is a **required input** for `run`/`explain`, but **ledger.labels is canonical** for auditability.
+* `label_hist` is a **required input** for `run`/`explain` and the canonical dashboard source; **ledger.labels** remains the audit sink.
 * Labels present in the Y column but **missing from `label_hist` are rejected** (use `opal ingest-y` or `opal label-hist attach-from-y` for legacy Y columns).
 * Ledger writes are strict: unknown columns are **errors** (override only with `OPAL_LEDGER_ALLOW_EXTRA=1`).
 * Duplicate handling on ingest is explicit via `ingest.duplicate_policy` (error | keep_first | keep_last).
@@ -374,36 +374,37 @@ OPAL is **assertive by default**: it will fail fast on inconsistent inputs rathe
 | `created_at` | timestamp (UTC) | ingest time     |
 
 **X (representation):** Arrow `list<float>` or JSON array string; **fixed length** across used rows.
-**Y (labels):** Arrow `list<float>`; label history is cached as JSON in `opal__<campaign>__label_hist`.
+**Y (labels):** Arrow `list<float>`; label history is stored in `opal__<campaign>__label_hist`.
 
 Naming: secondary columns follow `<tool>__<field>`.
 
-**Records cache columns (OPAL‑managed)**
+**Records label history (OPAL‑managed)**
 
-| column                              | type                    | purpose                                  |
-| ----------------------------------- | ----------------------- | ---------------------------------------- |
-| `opal__<slug>__label_hist`          | list<struct{r,ts,src,y}> | label history cache (ledger is canonical) |
-| `opal__<slug>__latest_as_of_round`  | int                     | last scored round for each record         |
-| `opal__<slug>__latest_pred_scalar`  | double                  | latest objective scalar cache             |
-| `opal__<slug>__latest_pred_run_id`  | string                  | run_id for latest_pred_scalar (cache)     |
-| `opal__<slug>__latest_pred_as_of_round` | int                 | as_of_round for latest_pred_scalar        |
-| `opal__<slug>__latest_pred_written_at`  | string                | cache write timestamp (UTC ISO)           |
+| column                     | type        | purpose |
+| -------------------------- | ----------- | ------- |
+| `opal__<slug>__label_hist` | list<struct> | Append‑only per‑record history of observed labels and run‑aware predictions (dashboard canonical). |
 
-These caches are **derived** and can be recomputed; canonical records live in ledger sinks.
-`opal init` will add these cache columns to `records.parquet` if they are missing.
+**Label history entry shapes**
+
+* **Observed label entry**
+  `{kind:"label", observed_round:int, ts:str, src:str, y_obs:[float]}`
+* **Prediction/scoring entry**
+  `{kind:"pred", as_of_round:int, run_id:str, ts:str, y_hat:[float], objective:{name,params}, metrics:{score,logic_fidelity,effect_scaled,...}, selection:{rank,top_k}}`
+
+`opal init` ensures the label history column exists in `records.parquet`.
 Use `opal prune-source` to remove OPAL‑derived columns (including the Y column) when you need to start fresh.
 
-#### Canonical vs cache vs transient (notebook)
+#### Canonical vs ledger vs overlay (notebook)
 
-* **Canonical (ledger)**: append-only, run-aware records under `outputs/ledger.*`.
-* **Cache (records)**: `latest_pred_*` columns in `records.parquet` for convenience; can be stale or not run-aware.
-* **Overlay (notebook)**: in-memory overlays (e.g., RF surrogate) for exploration only; never persisted.
-* **Y-ops gating**: notebook SFXI scoring only runs when predictions are in objective space (Y-ops inverse applied).
+* **Canonical (dashboard)**: `records.parquet` label history (`opal__<slug>__label_hist`) plus campaign artifacts/state.
+* **Ledger (audit)**: append‑only run metadata and predictions under `outputs/ledger.*` (useful for audit; dashboard does not require it).
+* **Overlay (notebook)**: in‑memory rescoring from stored predictions for exploration only; never persisted.
+* **Y‑ops gating**: notebook SFXI scoring only runs when predictions are in objective space (Y‑ops inverse applied).
 
 #### Ledger output schema (append-only)
 
-Ledger sinks are the **canonical, append-only** record of what happened in a campaign. They are designed
-for long-term inspection and downstream analysis; avoid treating `records.parquet` caches as the source of truth.
+Ledger sinks are the **append-only audit** record of what happened in a campaign. They are designed
+for long-term inspection and downstream analysis; the dashboard’s canonical source is `records.parquet` label history.
 
 **labels (`outputs/ledger.labels.parquet`)**
 

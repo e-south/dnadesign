@@ -172,14 +172,14 @@ uv run opal notebook generate -c campaign.yaml --round latest
 uv run opal notebook run -c campaign.yaml
 ```
 
-The notebook loads ledger artifacts (runs, predictions, labels) and gives you
-interactive filtering and plots for the selected run.
+The notebook loads campaign artifacts and label history from `records.parquet`,
+then gives you interactive filtering and plots for the selected run.
 
-Canonical vs cache vs transient (notebook):
+Canonical vs ledger vs overlay (notebook):
 
-- **Canonical (ledger)**: append-only, run-aware sources under `outputs/ledger.*`.
-- **Cache (records)**: `latest_pred_*` columns in `records.parquet` (convenience only).
-- **Overlay (notebook)**: in-memory overlays (ephemeral) for exploration, never persisted.
+- **Canonical (dashboard)**: `records.parquet` label history (`opal__<slug>__label_hist`) plus campaign artifacts/state.
+- **Ledger (audit)**: append-only run metadata and predictions under `outputs/ledger.*` (optional for audit).
+- **Overlay (notebook)**: in-memory rescoring from stored predictions for exploration only; never persisted.
 - **Y-ops gating**: SFXI scoring runs only when predictions are in objective space (Y-ops inverse applied).
 
 ---

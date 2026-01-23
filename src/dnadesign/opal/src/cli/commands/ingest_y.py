@@ -224,7 +224,7 @@ def cmd_ingest_y(
                     dup = 0
                     for _id, cell in maybe.itertuples(index=False, name=None):
                         for e in store._normalize_hist_cell(cell):
-                            if int(e.get("r", -1)) == int(round):
+                            if e.get("kind") == "label" and int(e.get("observed_round", -1)) == int(round):
                                 dup += 1
                                 existing_ids.add(str(_id))
                                 break

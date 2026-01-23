@@ -11,12 +11,133 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Mapping, Tuple
 
 import numpy as np
 import pandas as pd
 
 from ..core.utils import OpalError
+
+
+def _deep_as_py(x: Any) -> Any:
+    try:
+        if hasattr(x, "as_py"):
+            return x.as_py()
+        if hasattr(x, "to_pylist"):
+            return x.to_pylist()
+    except Exception:
+        pass
+    if isinstance(x, np.ndarray):
+        return [_deep_as_py(v) for v in x.tolist()]
+    if isinstance(x, np.generic):
+        return x.item()
+    if isinstance(x, pd.Series):
+        return [_deep_as_py(v) for v in x.to_list()]
+    if isinstance(x, dict):
+        return {k: _deep_as_py(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_deep_as_py(v) for v in x]
+    return x
+
+
+def _coerce_mapping(value: Any) -> dict | None:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, Mapping):
+        return dict(value)
+    return None
+
+
+def _coerce_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def _coerce_float(value: Any) -> float | None:
+    try:
+        out = float(value)
+    except Exception:
+        return None
+    if not np.isfinite(out):
+        return None
+    return out
+
+
+def _coerce_float_list(value: Any) -> list[float] | None:
+    try:
+        arr = np.asarray(value, dtype=float).ravel()
+    except Exception:
+        return None
+    if not np.all(np.isfinite(arr)):
+        return None
+    return arr.tolist()
+
+
+def _coerce_bool(value: Any) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    if isinstance(value, (int, np.integer)) and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str):
+        val = value.strip().lower()
+        if val in {"true", "t", "1", "yes"}:
+            return True
+        if val in {"false", "f", "0", "no"}:
+            return False
+    return None
+
+
+def _normalize_label_entry(entry_map: Mapping[str, Any]) -> dict | None:
+    round_val = entry_map.get("observed_round", entry_map.get("r", entry_map.get("round")))
+    r_int = _coerce_int(round_val)
+    if r_int is None:
+        return None
+    y_val = entry_map.get("y_obs", entry_map.get("y", entry_map.get("value")))
+    y_list = _coerce_float_list(y_val)
+    if y_list is None:
+        return None
+    return {
+        "kind": "label",
+        "observed_round": r_int,
+        "ts": entry_map.get("ts"),
+        "src": entry_map.get("src"),
+        "y_obs": y_list,
+    }
+
+
+def _normalize_pred_entry(entry_map: Mapping[str, Any]) -> dict | None:
+    round_val = entry_map.get("as_of_round", entry_map.get("r", entry_map.get("round")))
+    r_int = _coerce_int(round_val)
+    if r_int is None:
+        return None
+    run_id = entry_map.get("run_id")
+    if run_id is None:
+        return None
+    y_hat_val = entry_map.get("y_hat", entry_map.get("y_pred", entry_map.get("y")))
+    y_hat_list = _coerce_float_list(y_hat_val)
+    if y_hat_list is None:
+        return None
+    pred: dict[str, Any] = {
+        "kind": "pred",
+        "as_of_round": r_int,
+        "run_id": str(run_id),
+        "ts": entry_map.get("ts"),
+        "y_hat": y_hat_list,
+    }
+    objective = entry_map.get("objective")
+    if isinstance(objective, Mapping):
+        pred["objective"] = dict(objective)
+    metrics = entry_map.get("metrics")
+    if isinstance(metrics, Mapping):
+        pred["metrics"] = dict(metrics)
+    selection = entry_map.get("selection")
+    if isinstance(selection, Mapping):
+        pred["selection"] = dict(selection)
+    return pred
 
 
 @dataclass(frozen=True)
@@ -30,32 +151,11 @@ class LabelHistory:
     @staticmethod
     def normalize_hist_cell(cell: Any) -> List[Dict[str, Any]]:
         """
-        Normalize a 'label_hist' cell into a Python List[Dict] where each dict has:
-          {r:int, ts:str, src:str, y: List[float]}
+        Normalize a 'label_hist' cell into a Python List[Dict] in the current schema:
+          - label entry: {kind:'label', observed_round:int, ts:str, src:str, y_obs: List[float]}
+          - pred entry:  {kind:'pred', as_of_round:int, run_id:str, ts:str, y_hat: List[float], ...}
         Be permissive on container types to tolerate different Parquet round-trips.
         """
-
-        def _deep_as_py(x: Any) -> Any:
-            # pyarrow scalars/arrays/structs
-            try:
-                if hasattr(x, "as_py"):
-                    return x.as_py()
-                if hasattr(x, "to_pylist"):
-                    return x.to_pylist()
-            except Exception:
-                pass
-            if isinstance(x, np.ndarray):
-                return [_deep_as_py(v) for v in x.tolist()]
-            if isinstance(x, np.generic):
-                return x.item()
-            if isinstance(x, pd.Series):
-                return [_deep_as_py(v) for v in x.to_list()]
-            if isinstance(x, dict):
-                return {k: _deep_as_py(v) for k, v in x.items()}
-            if isinstance(x, (list, tuple)):
-                return [_deep_as_py(v) for v in x]
-            return x
-
         if cell is None or (isinstance(cell, float) and np.isnan(cell)):
             return []
         if isinstance(cell, str):
@@ -73,18 +173,29 @@ class LabelHistory:
             return []
         out: List[Dict[str, Any]] = []
         for e in cell:
-            if not isinstance(e, dict):
+            if isinstance(e, str):
+                try:
+                    e = json.loads(e)
+                except Exception:
+                    continue
+            entry_map = _coerce_mapping(_deep_as_py(e))
+            if entry_map is None:
                 continue
-            try:
-                r = int(e.get("r", -1))
-            except Exception:
+            kind = entry_map.get("kind")
+            if kind is None:
+                normalized = _normalize_label_entry(entry_map)
+                if normalized is not None:
+                    out.append(normalized)
                 continue
-            y = e.get("y", [])
-            try:
-                y_list = [float(v) for v in np.asarray(y, dtype=float).ravel().tolist()]
-            except Exception:
-                continue
-            out.append({"r": r, "ts": e.get("ts"), "src": e.get("src"), "y": y_list})
+            kind_str = str(kind).strip().lower()
+            if kind_str == "label":
+                normalized = _normalize_label_entry(entry_map)
+                if normalized is not None:
+                    out.append(normalized)
+            elif kind_str == "pred":
+                normalized = _normalize_pred_entry(entry_map)
+                if normalized is not None:
+                    out.append(normalized)
         return out
 
     @staticmethod
@@ -92,27 +203,6 @@ class LabelHistory:
         """
         Strict validation for label_hist: ensure every entry has required keys, finite values.
         """
-
-        def _deep_as_py(x: Any) -> Any:
-            try:
-                if hasattr(x, "as_py"):
-                    return x.as_py()
-                if hasattr(x, "to_pylist"):
-                    return x.to_pylist()
-            except Exception:
-                pass
-            if isinstance(x, np.ndarray):
-                return [_deep_as_py(v) for v in x.tolist()]
-            if isinstance(x, np.generic):
-                return x.item()
-            if isinstance(x, pd.Series):
-                return [_deep_as_py(v) for v in x.to_list()]
-            if isinstance(x, dict):
-                return {k: _deep_as_py(v) for k, v in x.items()}
-            if isinstance(x, (list, tuple)):
-                return [_deep_as_py(v) for v in x]
-            return x
-
         if cell is None or (isinstance(cell, float) and np.isnan(cell)):
             return []
         if isinstance(cell, str):
@@ -132,25 +222,68 @@ class LabelHistory:
 
         out: List[Dict[str, Any]] = []
         for e in cell:
-            if not isinstance(e, dict):
+            if isinstance(e, str):
+                try:
+                    e = json.loads(e)
+                except Exception as exc:
+                    raise OpalError(f"label_hist entry JSON parse failed: {exc}") from exc
+            entry_map = _coerce_mapping(_deep_as_py(e))
+            if entry_map is None:
                 raise OpalError("label_hist entries must be dicts.")
-            if "r" not in e:
-                raise OpalError("label_hist entry missing 'r'.")
-            try:
-                r = int(e["r"])
-            except Exception as exc:
-                raise OpalError("label_hist entry has non-integer 'r'.") from exc
-            y = e.get("y", None)
-            y = _deep_as_py(y)
-            if not isinstance(y, (list, tuple, np.ndarray)):
-                raise OpalError("label_hist entry 'y' must be a list.")
-            try:
-                y_list = [float(v) for v in y]
-            except Exception as exc:
-                raise OpalError("label_hist entry 'y' contains non-numeric values.") from exc
-            if not np.all(np.isfinite(np.asarray(y_list, dtype=float))):
-                raise OpalError("label_hist entry 'y' contains non-finite values.")
-            out.append({"r": r, "ts": e.get("ts"), "src": e.get("src"), "y": y_list})
+
+            kind = entry_map.get("kind")
+            if kind is None or str(kind).strip().lower() == "label":
+                normalized = _normalize_label_entry(entry_map)
+                if normalized is None:
+                    raise OpalError("label_hist label entry missing required keys.")
+                out.append(normalized)
+                continue
+
+            kind_str = str(kind).strip().lower()
+            if kind_str != "pred":
+                raise OpalError(f"label_hist entry has unknown kind: {kind_str!r}")
+
+            normalized = _normalize_pred_entry(entry_map)
+            if normalized is None:
+                raise OpalError("label_hist pred entry missing required keys.")
+
+            objective = entry_map.get("objective")
+            if not isinstance(objective, Mapping):
+                raise OpalError("label_hist pred entry missing objective mapping.")
+            if not objective.get("name"):
+                raise OpalError("label_hist pred entry objective missing name.")
+            params_val = objective.get("params")
+            if params_val is not None and not isinstance(params_val, Mapping):
+                raise OpalError("label_hist pred entry objective.params must be a mapping or null.")
+
+            metrics = entry_map.get("metrics")
+            if not isinstance(metrics, Mapping):
+                raise OpalError("label_hist pred entry missing metrics mapping.")
+            if "score" not in metrics:
+                raise OpalError("label_hist pred entry metrics missing score.")
+            score_val = _coerce_float(metrics.get("score"))
+            if score_val is None:
+                raise OpalError("label_hist pred entry metrics.score must be finite.")
+
+            for key in ("logic_fidelity", "effect_scaled", "effect_raw"):
+                if key in metrics:
+                    if _coerce_float(metrics.get(key)) is None:
+                        raise OpalError(f"label_hist pred entry metrics.{key} must be finite.")
+
+            selection = entry_map.get("selection")
+            if not isinstance(selection, Mapping):
+                raise OpalError("label_hist pred entry missing selection mapping.")
+            rank_val = selection.get("rank")
+            if rank_val is None or _coerce_int(rank_val) is None:
+                raise OpalError("label_hist pred entry selection.rank must be an int.")
+            top_k_val = _coerce_bool(selection.get("top_k"))
+            if top_k_val is None:
+                raise OpalError("label_hist pred entry selection.top_k must be a bool.")
+
+            normalized["objective"] = dict(objective)
+            normalized["metrics"] = dict(metrics)
+            normalized["selection"] = dict(selection)
+            out.append(normalized)
         return out
 
     # --------------- validation / repair ---------------
@@ -239,7 +372,7 @@ class LabelHistory:
         new_ys = labels["y"].tolist()
         for i, _id in enumerate(new_ids):
             cur = hist_map.get(_id, [])
-            exists = any((int(e.get("r", -1)) == int(r)) for e in cur)
+            exists = any((e.get("kind") == "label" and int(e.get("observed_round", -1)) == int(r)) for e in cur)
             if exists:
                 policy = (if_exists or "fail").strip().lower()
                 if policy == "fail" and fail_if_any_existing_labels:
@@ -247,13 +380,18 @@ class LabelHistory:
                 elif policy == "skip":
                     continue
                 elif policy == "replace":
-                    cur = [e for e in cur if int(e.get("r", -1)) != int(r)]
+                    cur = [
+                        e
+                        for e in cur
+                        if not (e.get("kind") == "label" and int(e.get("observed_round", e.get("r", -1))) == int(r))
+                    ]
                 else:
                     pass
             entry = {
-                "r": int(r),
+                "kind": "label",
+                "observed_round": int(r),
                 "ts": pd.Timestamp.utcnow().isoformat(),
-                "y": list(map(float, new_ys[i])),
+                "y_obs": list(map(float, new_ys[i])),
                 "src": src,
             }
             cur.append(entry)
@@ -288,7 +426,9 @@ class LabelHistory:
             entries = []
             for e in hist:
                 try:
-                    rr = int(e.get("r", 9_999_999))
+                    if e.get("kind") != "label":
+                        continue
+                    rr = int(e.get("observed_round", 9_999_999))
                 except Exception:
                     continue
                 if use_all:
@@ -302,19 +442,19 @@ class LabelHistory:
                 continue
 
             if policy == "latest_only":
-                best = max(entries, key=lambda x: int(x.get("r", -1)))
-                y = [float(v) for v in (best.get("y", []) or [])]
-                recs.append((_id, y, int(best.get("r", -1))))
+                best = max(entries, key=lambda x: int(x.get("observed_round", -1)))
+                y = [float(v) for v in (best.get("y_obs", []) or [])]
+                recs.append((_id, y, int(best.get("observed_round", -1))))
             elif policy == "all_rounds":
                 for e in entries:
-                    y = [float(v) for v in (e.get("y", []) or [])]
-                    recs.append((_id, y, int(e.get("r", -1))))
+                    y = [float(v) for v in (e.get("y_obs", []) or [])]
+                    recs.append((_id, y, int(e.get("observed_round", -1))))
             elif policy == "error_on_duplicate":
                 if len(entries) > 1:
                     raise OpalError(f"Duplicate labels for id={_id} at multiple rounds (policy=error_on_duplicate).")
                 e = entries[0]
-                y = [float(v) for v in (e.get("y", []) or [])]
-                recs.append((_id, y, int(e.get("r", -1))))
+                y = [float(v) for v in (e.get("y_obs", []) or [])]
+                recs.append((_id, y, int(e.get("observed_round", -1))))
 
         out = pd.DataFrame(recs, columns=["id", "y", "r"])
         return out
@@ -327,3 +467,98 @@ class LabelHistory:
             dedup_policy="latest_only",
         )
         return out[["id", "y"]]
+
+    # --------------- prediction writebacks ---------------
+    def append_predictions_from_arrays(
+        self,
+        df: pd.DataFrame,
+        *,
+        ids: List[str],
+        y_hat: np.ndarray,
+        as_of_round: int,
+        run_id: str,
+        objective: Dict[str, Any],
+        metrics_by_name: Dict[str, List[float]],
+        selection_rank: np.ndarray,
+        selection_top_k: np.ndarray,
+        ts: str | None = None,
+    ) -> pd.DataFrame:
+        if not isinstance(objective, Mapping):
+            raise OpalError("append_predictions_from_arrays requires objective mapping.")
+        if not objective.get("name"):
+            raise OpalError("append_predictions_from_arrays requires objective.name.")
+        params_val = objective.get("params")
+        if params_val is not None and not isinstance(params_val, Mapping):
+            raise OpalError("append_predictions_from_arrays requires objective.params mapping or null.")
+        if isinstance(params_val, Mapping) and not params_val:
+            params_val = None
+        objective = {**objective, "params": params_val}
+        lh = self.label_hist_col()
+        out = df.copy()
+        if lh not in out.columns:
+            out[lh] = None
+        if y_hat.shape[0] != len(ids):
+            raise OpalError("append_predictions_from_arrays length mismatch: ids vs y_hat")
+        if selection_rank.shape[0] != len(ids) or selection_top_k.shape[0] != len(ids):
+            raise OpalError("append_predictions_from_arrays length mismatch: selection arrays")
+        if "score" not in (metrics_by_name or {}):
+            raise OpalError("append_predictions_from_arrays requires metrics_by_name['score'].")
+
+        for key, values in (metrics_by_name or {}).items():
+            if len(values) != len(ids):
+                raise OpalError(f"append_predictions_from_arrays metrics length mismatch for '{key}'")
+
+        y_hat_arr = np.asarray(y_hat, dtype=float)
+        if not np.all(np.isfinite(y_hat_arr)):
+            raise OpalError("append_predictions_from_arrays received non-finite y_hat values.")
+
+        metrics_by_name = metrics_by_name or {}
+        for key, values in metrics_by_name.items():
+            arr = np.asarray(values, dtype=float)
+            if not np.all(np.isfinite(arr)):
+                raise OpalError(f"append_predictions_from_arrays received non-finite metrics for '{key}'.")
+
+        ranks_arr = np.asarray(selection_rank)
+        selected_arr = np.asarray(selection_top_k)
+        ts_val = ts or pd.Timestamp.utcnow().isoformat()
+
+        hist_map: Dict[str, List[Dict[str, Any]]] = {}
+        for _id, hist_cell in out[["id", lh]].itertuples(index=False, name=None):
+            hist_map[str(_id)] = self.normalize_hist_cell(hist_cell)
+
+        for i, _id in enumerate(ids):
+            _id = str(_id)
+            cur = hist_map.get(_id, [])
+            cur = [
+                e for e in cur if not (e.get("kind") == "pred" and int(e.get("as_of_round", -1)) == int(as_of_round))
+            ]
+
+            rank_val = _coerce_int(ranks_arr[i])
+            if rank_val is None:
+                raise OpalError(f"Prediction selection rank invalid for id={_id}.")
+            top_k_val = _coerce_bool(selected_arr[i])
+            if top_k_val is None:
+                raise OpalError(f"Prediction selection top_k invalid for id={_id}.")
+
+            metrics_entry: dict[str, Any] = {}
+            for key, values in metrics_by_name.items():
+                val = _coerce_float(values[i])
+                if val is None:
+                    raise OpalError(f"Prediction metric '{key}' invalid for id={_id}.")
+                metrics_entry[key] = val
+
+            entry = {
+                "kind": "pred",
+                "as_of_round": int(as_of_round),
+                "run_id": str(run_id),
+                "ts": ts_val,
+                "y_hat": y_hat_arr[i, :].tolist(),
+                "objective": dict(objective or {}),
+                "metrics": metrics_entry,
+                "selection": {"rank": rank_val, "top_k": bool(top_k_val)},
+            }
+            cur.append(entry)
+            hist_map[_id] = cur
+
+        out[lh] = out["id"].astype(str).map(hist_map.get)
+        return out

@@ -48,7 +48,7 @@ opal init --config <yaml>
 **Notes**
 
 * Ensures the campaign `workdir` has `outputs/` and `inputs/`.
-* Ensures OPAL cache columns exist in `records.parquet` (adds `label_hist` + cache columns if missing).
+* Ensures the label history column exists in `records.parquet`.
 * Writes/updates `state.json` with campaign identity, data location, and settings.
 
 ---
@@ -92,7 +92,7 @@ opal ingest-y --config <yaml> --round <r> --csv <path> \
 #### `run`
 
 Train on labels with **`observed_round ≤ R`** (where `R` comes from `--round`), score the candidate universe,
-apply the objective, select top-k, write artifacts, append canonical events, and update caches.
+apply the objective, select top-k, write artifacts, and append run-aware label history entries.
 
 **Usage**
 
@@ -147,13 +147,9 @@ If you rerun a round that already exists in `state.json`, OPAL will prompt befor
 contexts (e.g., CI), the prompt cannot be shown and the command will exit with a message instructing you to
 re‑run with `--resume`.
 
-**Write-backs to `records.parquet` (caches only)**
+**Write-backs to `records.parquet` (canonical label history)**
 
-* `opal__<slug>__latest_as_of_round`
-* `opal__<slug>__latest_pred_scalar`
-* `opal__<slug>__latest_pred_run_id`
-* `opal__<slug>__latest_pred_as_of_round`
-* `opal__<slug>__latest_pred_written_at`
+* `opal__<slug>__label_hist` — append-only per-record history of observed labels and run-aware predictions.
 
 ---
 
@@ -426,18 +422,13 @@ opal label-hist <validate|repair|attach-from-y> --config <yaml> [--apply] [--rou
 * `attach-from-y` is a **manual** fix for datasets with a populated Y column but empty label history.
   It only attaches entries for rows where `label_hist` is empty and Y is finite.
 
-#### Records cache columns
+#### Records label history
 
-OPAL manages a few derived columns in `records.parquet`:
+OPAL manages a canonical per‑record label history column in `records.parquet`:
 
-* `opal__<slug>__label_hist` — label history cache (ledger.labels is canonical)
-* `opal__<slug>__latest_as_of_round` — last scored round for each record
-* `opal__<slug>__latest_pred_scalar` — latest objective scalar cache
-* `opal__<slug>__latest_pred_run_id` — run_id that wrote the cache (run-aware provenance)
-* `opal__<slug>__latest_pred_as_of_round` — as_of_round that wrote the cache
-* `opal__<slug>__latest_pred_written_at` — timestamp of cache writeback
+* `opal__<slug>__label_hist` — append‑only history of observed labels and run‑aware predictions.
 
-`opal init` will add these cache columns if they are missing.
+`opal init` will add the label history column if it is missing.
 
 ---
 
@@ -605,7 +596,7 @@ opal run \
   --k 12
 ```
 
-You’ll get per-round artifacts, appended `run_pred`/`run_meta` events, and updated caches.
+You’ll get per-round artifacts, appended `run_pred`/`run_meta` events, and updated label history in `records.parquet`.
 (`--labels-as-of` is an alias for `--round`.)
 
 #### Ephemeral predictions

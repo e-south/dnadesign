@@ -7,6 +7,8 @@ from pathlib import Path
 
 import yaml
 
+from .diagnostics import Diagnostics
+
 
 @dataclass(frozen=True)
 class CampaignInfo:
@@ -34,6 +36,24 @@ class CampaignDatasetRef:
     kind: str | None
     dataset_name: str | None
     records_path: Path | None
+
+
+@dataclass(frozen=True)
+class CampaignSelection:
+    label: str | None
+    path: Path | None
+    info: CampaignInfo | None
+    workdir: Path | None
+    records_path: Path | None
+    diagnostics: Diagnostics
+
+
+@dataclass(frozen=True)
+class RoundOptions:
+    rounds: list[int]
+    run_ids_by_round: dict[int, list[str]]
+    source: str
+    diagnostics: Diagnostics
 
 
 def find_repo_root(start: Path) -> Path | None:
@@ -140,6 +160,30 @@ def list_campaign_dataset_refs(repo_root: Path | None) -> list[CampaignDatasetRe
     return refs
 
 
+def resolve_campaign_records_path(*, raw: dict, campaign_path: Path) -> Path:
+    data = raw.get("data") or {}
+    location = data.get("location") or {}
+    kind = str(location.get("kind") or "").strip().lower()
+    if kind == "usr":
+        dataset_name = location.get("dataset")
+        base_path_raw = location.get("path")
+        if not dataset_name or not base_path_raw:
+            raise ValueError("Campaign YAML missing data.location.dataset or data.location.path for usr.")
+        base_path = Path(str(base_path_raw))
+        if not base_path.is_absolute():
+            base_path = (campaign_path.parent / base_path).resolve()
+        return (base_path / str(dataset_name) / "records.parquet").resolve()
+    if kind == "local":
+        local_path_raw = location.get("path")
+        if not local_path_raw:
+            raise ValueError("Campaign YAML missing data.location.path for local.")
+        local_path = Path(str(local_path_raw))
+        if not local_path.is_absolute():
+            local_path = (campaign_path.parent / local_path).resolve()
+        return local_path
+    raise ValueError(f"Unsupported data.location.kind: {kind!r}.")
+
+
 def campaign_label_from_path(path: Path, repo_root: Path | None) -> str:
     if repo_root is None:
         return str(path)
@@ -216,3 +260,61 @@ def resolve_campaign_workdir(info: CampaignInfo) -> Path:
     if info.workdir is not None:
         return info.workdir
     return info.path.parent
+
+
+def load_campaign_selection(*, campaign_path: Path | None, repo_root: Path | None) -> CampaignSelection:
+    diagnostics = Diagnostics()
+    if campaign_path is None:
+        return CampaignSelection(
+            label=None,
+            path=None,
+            info=None,
+            workdir=None,
+            records_path=None,
+            diagnostics=diagnostics.add_warning("Select a campaign to load records.parquet."),
+        )
+    label = campaign_label_from_path(campaign_path, repo_root)
+    try:
+        raw = load_campaign_yaml(campaign_path)
+    except Exception as exc:
+        return CampaignSelection(
+            label=label,
+            path=campaign_path,
+            info=None,
+            workdir=None,
+            records_path=None,
+            diagnostics=diagnostics.add_error(f"Failed to load campaign.yaml: {exc}"),
+        )
+    try:
+        info = parse_campaign_info(raw=raw, path=campaign_path, label=label)
+    except Exception as exc:
+        return CampaignSelection(
+            label=label,
+            path=campaign_path,
+            info=None,
+            workdir=None,
+            records_path=None,
+            diagnostics=diagnostics.add_error(f"Campaign config invalid: {exc}"),
+        )
+    workdir = resolve_campaign_workdir(info)
+    try:
+        records_path = resolve_campaign_records_path(raw=raw, campaign_path=campaign_path)
+    except Exception as exc:
+        return CampaignSelection(
+            label=label,
+            path=campaign_path,
+            info=info,
+            workdir=workdir,
+            records_path=None,
+            diagnostics=diagnostics.add_error(f"Failed to resolve records.parquet: {exc}"),
+        )
+    if not records_path.exists():
+        diagnostics = diagnostics.add_error(f"records.parquet not found: {records_path}")
+    return CampaignSelection(
+        label=label,
+        path=campaign_path,
+        info=info,
+        workdir=workdir,
+        records_path=records_path,
+        diagnostics=diagnostics,
+    )

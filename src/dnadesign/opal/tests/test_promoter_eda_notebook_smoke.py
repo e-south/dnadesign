@@ -13,7 +13,6 @@ import importlib.util
 import os
 from pathlib import Path
 
-import polars as pl
 import pytest
 
 NOTEBOOK_PATH = Path("src/dnadesign/opal/notebooks/prom60_eda.py")
@@ -31,35 +30,15 @@ def _load_notebook_module() -> object:
 def test_prom60_eda_headless(tmp_path: Path) -> None:
     if importlib.util.find_spec("marimo") is None:
         pytest.skip("marimo is not installed in this environment")
-    usr_root = tmp_path / "usr"
-    dataset_dir = usr_root / "demo"
-    dataset_dir.mkdir(parents=True)
-    df = pl.DataFrame(
-        {
-            "id": ["a", "b"],
-            "cluster__ldn_v1__umap_x": [0.1, 0.2],
-            "cluster__ldn_v1__umap_y": [0.2, 0.3],
-        }
-    )
-    df.write_parquet(dataset_dir / "records.parquet")
-
     env_backup = os.environ.copy()
-    os.environ["DNADESIGN_USR_ROOT"] = str(usr_root)
     os.environ["DNADESIGN_HEADLESS"] = "1"
     os.environ["MPLBACKEND"] = "Agg"
 
     try:
         module = _load_notebook_module()
-        outputs, defs = module.app.run(
-            defs={
-                "active_record": None,
-                "active_record_id": None,
-                "dataset_submit_override": True,
-            }
-        )
+        outputs, defs = module.app.run(defs={"active_record": None, "active_record_id": None})
     finally:
         os.environ.clear()
         os.environ.update(env_backup)
 
     assert outputs is not None
-    assert defs.get("dataset_name") == "demo"

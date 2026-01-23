@@ -12,7 +12,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from typer.testing import CliRunner
 
@@ -131,7 +130,7 @@ def test_cli_pressure_sfxi_multi_round(tmp_path: Path) -> None:
     assert report.get("id") == "e"
     assert len(report.get("runs", [])) >= 2
 
-    # Validate caches + label history on disk
+    # Validate label history on disk
     df = pd.read_parquet(records)
     store = RecordsStore(
         kind="local",
@@ -145,11 +144,11 @@ def test_cli_pressure_sfxi_multi_round(tmp_path: Path) -> None:
     lh = store.label_hist_col()
     hist_a = store._normalize_hist_cell(df.loc[df["id"] == "a", lh].iloc[0])
     hist_c = store._normalize_hist_cell(df.loc[df["id"] == "c", lh].iloc[0])
-    assert any(e.get("r") == 0 for e in hist_a)
-    assert any(e.get("r") == 1 for e in hist_c)
+    assert any(e.get("kind") == "label" and e.get("observed_round") == 0 for e in hist_a)
+    assert any(e.get("kind") == "label" and e.get("observed_round") == 1 for e in hist_c)
 
-    col_r = store.latest_as_of_round_col()
-    col_s = store.latest_pred_scalar_col()
-    row_e = df.loc[df["id"] == "e", [col_r, col_s]].iloc[0]
-    assert int(row_e[col_r]) == 1
-    assert np.isfinite(float(row_e[col_s]))
+    hist_e = store._normalize_hist_cell(df.loc[df["id"] == "e", lh].iloc[0])
+    pred_entries = [e for e in hist_e if e.get("kind") == "pred"]
+    assert pred_entries
+    assert any(e.get("as_of_round") == 1 for e in pred_entries)
+    assert pred_entries[0].get("metrics", {}).get("score") is not None

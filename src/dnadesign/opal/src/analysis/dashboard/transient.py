@@ -1,24 +1,19 @@
-"""Overlay artifact RF helpers for the promoter dashboard."""
+"""Overlay scoring helpers for the promoter dashboard."""
 
 from __future__ import annotations
 
 import math
-from collections.abc import Hashable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import altair as alt
 import numpy as np
 import polars as pl
 
-from .datasets import CampaignInfo
 from .diagnostics import Diagnostics
-from .models import get_feature_importances, load_round_ctx_from_dir
 from .selection import compute_selection_overlay
 from .sfxi import SFXIParams, compute_sfxi_metrics
-from .util import dedupe_columns, list_series_to_numpy
-from .y_ops import apply_y_ops_inverse
+from .util import dedupe_columns
 
 
 @dataclass(frozen=True)
@@ -41,14 +36,14 @@ def _with_title(chart: alt.Chart, title: str, subtitle: str | None = None) -> al
     return chart.properties(title=_chart_title(title, subtitle))
 
 
-def _build_feature_importance_chart(
+def build_feature_importance_chart(
     *,
-    feature_importances: np.ndarray,
+    feature_importances: np.ndarray | None,
     dataset_name: str | None,
     selected_round: int | None,
     n_labels: int,
-    x_dim: int,
-    model_params: dict[str, Any],
+    x_dim: int | None,
+    model_params: dict[str, Any] | None,
 ) -> alt.Chart | None:
     if feature_importances is None or not np.size(feature_importances):
         return None
@@ -62,8 +57,8 @@ def _build_feature_importance_chart(
     if not df_importance.height:
         return None
 
-    n_estimators = model_params.get("n_estimators", "default")
-    max_depth = model_params.get("max_depth", "default")
+    n_estimators = (model_params or {}).get("n_estimators", "default")
+    max_depth = (model_params or {}).get("max_depth", "default")
     df_sorted = df_importance.sort("feature_idx")
     max_ticks = 40
     stride = max(1, math.ceil(feature_count / max_ticks))
@@ -71,10 +66,10 @@ def _build_feature_importance_chart(
     if axis_values and axis_values[-1] != feature_count - 1:
         axis_values.append(feature_count - 1)
 
-    round_label = str(selected_round) if selected_round is not None else "headless"
+    round_label = str(selected_round) if selected_round is not None else "unknown"
     subtitle = (
         f"{dataset_name or 'dataset'} · round={round_label} · "
-        f"n_labels={n_labels} · x_dim={x_dim} · n_features={feature_count} · "
+        f"n_labels={n_labels} · x_dim={x_dim or 'unknown'} · n_features={feature_count} · "
         f"n_estimators={n_estimators} · max_depth={max_depth}"
     )
     chart = (
@@ -102,16 +97,19 @@ def _build_feature_importance_chart(
     )
 
 
-def _build_histogram_chart(
+def build_score_histogram(
     *,
     df_pred_scored: pl.DataFrame,
+    score_col: str,
     df_sfxi: pl.DataFrame,
     df_train: pl.DataFrame,
     dataset_name: str | None,
+    context_label: str | None = None,
+    title: str = "Predicted scalar score distribution",
 ) -> tuple[alt.Chart | None, str | None]:
-    score_col = "opal__overlay__score"
     if df_pred_scored.is_empty() or score_col not in df_pred_scored.columns:
-        return None, "No overlay predictions available."
+        label = f"{context_label} " if context_label else ""
+        return None, f"No {label}predictions available."
 
     hist_source = df_pred_scored
     if "__row_id" in hist_source.columns and "__row_id" in df_train.columns:
@@ -164,13 +162,14 @@ def _build_histogram_chart(
         chart = (
             _with_title(
                 chart,
-                "Predicted scalar score distribution",
+                title,
                 f"{dataset_name or 'dataset'} · n=0 · {obs_note}",
             )
             .properties(width="container", height=240)
             .configure_view(stroke=None)
         )
-        return chart, "No overlay predictions available."
+        label = f"{context_label} " if context_label else ""
+        return chart, f"No {label}predictions available."
 
     score_min = hist_pred.select(pl.col(score_col).min()).item()
     score_max = hist_pred.select(pl.col(score_col).max()).item()
@@ -274,7 +273,7 @@ def _build_histogram_chart(
     chart = (
         _with_title(
             chart,
-            "Predicted scalar score distribution",
+            title,
             f"{dataset_name or 'dataset'} · n={hist_pred.height} · {obs_note}",
         )
         .properties(width="container", height=240)
@@ -286,23 +285,20 @@ def _build_histogram_chart(
 def compute_transient_overlay(
     *,
     df_base: pl.DataFrame,
-    labels_asof_df: pl.DataFrame,
+    pred_df: pl.DataFrame | None,
     labels_current_df: pl.DataFrame,
     df_sfxi: pl.DataFrame,
-    context: object | None = None,
-    campaign_info: CampaignInfo | None = None,
-    campaign_slug: str | None = None,
-    x_col: str | None,
     y_col: str | None,
     sfxi_params: SFXIParams,
-    selected_round: int | None,
-    artifact_model: Any | None,
-    artifact_round_dir: Path | None,
+    selection_params: dict[str, Any],
+    dataset_name: str | None,
+    as_of_round: int | None,
     run_id: str | None,
-    dataset_name: str | None = None,
-    pred_cache: dict | None = None,
-    cache_key: Hashable | None = None,
-    compute_if_missing: bool = True,
+    id_col: str = "id",
+    y_hat_col: str = "pred_y_hat",
+    feature_importances: np.ndarray | None = None,
+    model_params: dict[str, Any] | None = None,
+    x_dim: int | None = None,
 ) -> TransientOverlayResult:
     df_overlay = df_base
     df_pred_scored = df_base.head(0)
@@ -311,381 +307,102 @@ def compute_transient_overlay(
     hist_chart = None
     hist_note = None
 
-    def _note(message: str) -> None:
-        nonlocal diagnostics
-        diagnostics = diagnostics.add_note(message)
-
-    def _warn(message: str) -> None:
-        nonlocal diagnostics
-        diagnostics = diagnostics.add_warning(message)
-
-    def _error(message: str) -> None:
-        nonlocal diagnostics
-        diagnostics = diagnostics.add_error(message)
-
-    if campaign_info is None and context is not None:
-        campaign_info = getattr(context, "campaign_info", None)
-    if campaign_slug is None and context is not None:
-        campaign_slug = getattr(getattr(context, "campaign_info", None), "slug", None)
-    if dataset_name is None and context is not None:
-        dataset_name = getattr(context, "dataset_name", None)
-
-    effective_round = selected_round
-    round_mode = "explicit"
-    run_id_value = run_id
-    source_value = "artifact"
-
-    def _with_overlay_provenance(frame: pl.DataFrame) -> pl.DataFrame:
-        return frame.with_columns(
-            pl.lit(source_value).alias("opal__overlay__source"),
-            pl.lit(campaign_slug).alias("opal__overlay__campaign_slug"),
-            pl.lit(run_id_value).alias("opal__overlay__run_id"),
-            pl.lit(effective_round).alias("opal__overlay__round"),
-            pl.lit(round_mode).alias("opal__overlay__round_mode"),
-        )
-
-    if run_id is None:
-        _error("Artifact overlay requires an explicit run_id selection.")
-        return TransientOverlayResult(
-            df_overlay=_with_overlay_provenance(df_overlay),
-            df_pred_scored=df_pred_scored,
-            diagnostics=diagnostics,
-            feature_chart=feature_chart,
-            hist_chart=hist_chart,
-            hist_note=hist_note,
-        )
-    if effective_round is None:
-        _error("Artifact overlay requires an explicit round selection.")
-        return TransientOverlayResult(
-            df_overlay=_with_overlay_provenance(df_overlay),
-            df_pred_scored=df_pred_scored,
-            diagnostics=diagnostics,
-            feature_chart=feature_chart,
-            hist_chart=hist_chart,
-            hist_note=hist_note,
-        )
-    if artifact_model is None:
-        _error("Artifact model unavailable; overlay disabled.")
-        return TransientOverlayResult(
-            df_overlay=_with_overlay_provenance(df_overlay),
-            df_pred_scored=df_pred_scored,
-            diagnostics=diagnostics,
-            feature_chart=feature_chart,
-            hist_chart=hist_chart,
-            hist_note=hist_note,
-        )
-
-    if campaign_info is None:
-        _error("Overlay predictions unavailable (campaign unsupported).")
-        return TransientOverlayResult(
-            df_overlay=_with_overlay_provenance(df_overlay),
-            df_pred_scored=df_pred_scored,
-            diagnostics=diagnostics,
-            feature_chart=feature_chart,
-            hist_chart=hist_chart,
-            hist_note=hist_note,
-        )
-
-    # cache_key is a stable, hashable fingerprint (e.g. JSON string payload).
-    cache_hit = False
-    cached_pred = None
-    cached_feature_chart = None
-    if pred_cache is not None and cache_key is not None:
-        cached_pred = pred_cache.get(cache_key)
-        if cached_pred is not None:
-            cache_hit = True
-            cached_feature_chart = cached_pred.get("feature_chart")
-
-    df_pred = None
-    y_ops = list(campaign_info.y_ops or [])
-    yops_ctx = None
-    yops_inverse_ready = True
-    df_train = labels_asof_df if labels_asof_df is not None else df_base.head(0)
-    if df_train is None:
-        df_train = df_base.head(0)
-    if df_train.is_empty() and labels_current_df is not None and not labels_current_df.is_empty():
-        df_train = labels_current_df
-
-    if cache_hit:
-        if isinstance(cached_pred, dict):
-            df_pred = cached_pred.get("df_pred")
-            yops_inverse_ready = bool(cached_pred.get("yops_inverse_ready", True))
-            if cached_feature_chart is not None:
-                feature_chart = cached_feature_chart
-            cached_train_ids = cached_pred.get("train_ids")
-            if isinstance(cached_train_ids, pl.DataFrame):
-                df_train = cached_train_ids
-        if df_pred is None or df_pred.is_empty() or "opal__overlay__y_vec" not in df_pred.columns:
-            _warn("Overlay cache entry missing predictions; recompute required.")
-            cache_hit = False
-        else:
-            _note("Overlay cache hit; reusing predictions.")
-
-    if not cache_hit and not compute_if_missing:
-        _warn("Overlay predictions not computed yet. Press 'Compute overlay' to run the model.")
-        return TransientOverlayResult(
-            df_overlay=_with_overlay_provenance(df_overlay),
-            df_pred_scored=df_pred_scored,
-            diagnostics=diagnostics,
-            feature_chart=feature_chart,
-            hist_chart=hist_chart,
-            hist_note=hist_note,
-        )
-
-    if not cache_hit:
-        if x_col is None or x_col not in df_base.columns:
-            _error(f"Missing X column: `{x_col}`.")
-            return TransientOverlayResult(
-                df_overlay=_with_overlay_provenance(df_overlay),
-                df_pred_scored=df_pred_scored,
-                diagnostics=diagnostics,
-                feature_chart=feature_chart,
-                hist_chart=hist_chart,
-                hist_note=hist_note,
-            )
-        df_x_non_null = df_base.filter(pl.col(x_col).is_not_null())
-        df_x_non_null = df_x_non_null.filter(pl.col(x_col).list.len() > 0)
-        if df_x_non_null.is_empty():
-            _error("No candidate X vectors available for prediction.")
-            return TransientOverlayResult(
-                df_overlay=_with_overlay_provenance(df_overlay),
-                df_pred_scored=df_pred_scored,
-                diagnostics=diagnostics,
-                feature_chart=feature_chart,
-                hist_chart=hist_chart,
-                hist_note=hist_note,
-            )
-        len_stats = df_x_non_null.select(
-            pl.col(x_col).list.len().min().alias("min_len"),
-            pl.col(x_col).list.len().max().alias("max_len"),
-        )
-        min_len, max_len = len_stats.row(0)
-        if min_len is None or max_len is None or int(min_len) != int(max_len):
-            _error("X vectors must be fixed-length for artifact predictions.")
-            return TransientOverlayResult(
-                df_overlay=_with_overlay_provenance(df_overlay),
-                df_pred_scored=df_pred_scored,
-                diagnostics=diagnostics,
-                feature_chart=feature_chart,
-                hist_chart=hist_chart,
-                hist_note=hist_note,
-            )
-
-        x_dim = int(min_len)
-        if artifact_round_dir is not None:
-            yops_ctx, yops_err = load_round_ctx_from_dir(artifact_round_dir)
-            if yops_err:
-                _warn(f"Round context load failed: {yops_err}")
-        if yops_ctx is None and y_ops:
-            _warn("No round_ctx.json available; cannot invert Y-ops for artifact predictions.")
-            yops_inverse_ready = False
-        _note("Using OPAL artifact model for predictions.")
-
-        feature_chart = _build_feature_importance_chart(
-            feature_importances=get_feature_importances(artifact_model),
+    if feature_importances is not None:
+        feature_chart = build_feature_importance_chart(
+            feature_importances=feature_importances,
             dataset_name=dataset_name,
-            selected_round=effective_round,
-            n_labels=int(df_train.height),
+            selected_round=as_of_round,
+            n_labels=int(labels_current_df.height),
             x_dim=x_dim,
-            model_params=dict(campaign_info.model_params or {}),
+            model_params=model_params or {},
         )
 
-        _note("Artifact RF: predicting over full pool ...")
-        df_x_all = df_base.select(dedupe_columns(["__row_id", "id", x_col]))
-        df_x_valid = df_x_all.filter(pl.col(x_col).is_not_null() & (pl.col(x_col).list.len() == x_dim))
-        if df_x_valid.is_empty():
-            _error("No candidate X vectors available for prediction.")
-            return TransientOverlayResult(
-                df_overlay=_with_overlay_provenance(df_overlay),
-                df_pred_scored=df_pred_scored,
-                diagnostics=diagnostics,
-                feature_chart=feature_chart,
-                hist_chart=hist_chart,
-                hist_note=hist_note,
-            )
-
-        chunk_size = 50_000
-        pred_chunks = []
-        failed_chunk = False
-        for start in range(0, df_x_valid.height, chunk_size):
-            df_chunk = df_x_valid.slice(start, chunk_size)
-            x_chunk = list_series_to_numpy(df_chunk.select(pl.col(x_col)).to_series(), expected_len=x_dim)
-            if x_chunk is None:
-                failed_chunk = True
-                break
-            try:
-                pred_chunks.append(artifact_model.predict(x_chunk))
-            except Exception as exc:
-                _error(f"Model predict failed: {exc}")
-                failed_chunk = True
-                break
-        if failed_chunk or not pred_chunks:
-            _error("Unable to build feature matrix for full pool.")
-            return TransientOverlayResult(
-                df_overlay=_with_overlay_provenance(df_overlay),
-                df_pred_scored=df_pred_scored,
-                diagnostics=diagnostics,
-                feature_chart=feature_chart,
-                hist_chart=hist_chart,
-                hist_note=hist_note,
-            )
-
-        y_pred = np.vstack(pred_chunks)
-        if yops_ctx is not None:
-            try:
-                y_pred = apply_y_ops_inverse(y_ops=y_ops, y=y_pred, ctx=yops_ctx)
-            except Exception as exc:
-                _warn(f"Y-ops inverse failed: {exc}")
-                yops_inverse_ready = False
-        elif y_ops:
-            yops_inverse_ready = False
-
-        df_pred = df_x_valid.with_columns(pl.Series("opal__overlay__y_vec", y_pred.tolist()))
-        if pred_cache is not None and cache_key is not None:
-            train_id_cols = [col for col in ["id", "__row_id"] if col in df_train.columns]
-            train_ids = df_train.select(train_id_cols) if train_id_cols else df_train.head(0)
-            pred_cache[cache_key] = {
-                "df_pred": df_pred,
-                "yops_inverse_ready": yops_inverse_ready,
-                "feature_chart": feature_chart,
-                "train_ids": train_ids,
-            }
-    if df_pred is None or df_pred.is_empty():
-        _error("Overlay predictions unavailable; no cached or computed predictions found.")
-        return TransientOverlayResult(
-            df_overlay=_with_overlay_provenance(df_overlay),
-            df_pred_scored=df_pred_scored,
-            diagnostics=diagnostics,
-            feature_chart=feature_chart,
-            hist_chart=hist_chart,
-            hist_note=hist_note,
-        )
-
-    if y_col is None or y_col not in labels_current_df.columns:
-        _error(f"Missing label column `{y_col}` for scoring.")
-        return TransientOverlayResult(
-            df_overlay=_with_overlay_provenance(df_overlay),
-            df_pred_scored=df_pred_scored,
-            diagnostics=diagnostics,
-            feature_chart=feature_chart,
-            hist_chart=hist_chart,
-            hist_note=hist_note,
-        )
-    if labels_current_df.is_empty():
-        _error("No labels available for overlay scoring.")
-        return TransientOverlayResult(
-            df_overlay=_with_overlay_provenance(df_overlay),
-            df_pred_scored=df_pred_scored,
-            diagnostics=diagnostics,
-            feature_chart=feature_chart,
-            hist_chart=hist_chart,
-            hist_note=hist_note,
-        )
-    denom_pool = labels_current_df.select(pl.col(y_col).alias("opal__overlay__y_vec"))
-    pred_result = None
-    if y_ops and not yops_inverse_ready:
-        _warn("Y-ops inverse unavailable; SFXI scoring disabled.")
+    if pred_df is None or pred_df.is_empty():
+        diagnostics = diagnostics.add_error("No stored predictions available for overlay.")
+    elif y_hat_col not in pred_df.columns:
+        diagnostics = diagnostics.add_error(f"Missing prediction vector column `{y_hat_col}`.")
+    elif y_col is None or y_col not in labels_current_df.columns:
+        diagnostics = diagnostics.add_error(f"Missing label column `{y_col}` for overlay scoring.")
+    elif labels_current_df.is_empty():
+        diagnostics = diagnostics.add_error("No labels available for overlay scoring.")
     else:
-        if y_ops:
-            _note("Y-ops inverse applied; scoring in objective space.")
+        vec_col = "__overlay_vec"
+        pred_cols = dedupe_columns([id_col, "__row_id", y_hat_col])
+        df_pred = pred_df.select([c for c in pred_cols if c in pred_df.columns]).rename({y_hat_col: vec_col})
+        denom_pool = labels_current_df.select(pl.col(y_col).alias(vec_col))
         try:
             pred_result = compute_sfxi_metrics(
                 df=df_pred,
-                vec_col="opal__overlay__y_vec",
+                vec_col=vec_col,
                 params=sfxi_params,
                 denom_pool_df=denom_pool,
             )
-        except ValueError as exc:
-            _error(f"SFXI scoring failed: {exc}")
+        except Exception as exc:
+            diagnostics = diagnostics.add_error(f"SFXI overlay failed: {exc}")
+        else:
+            df_pred_scored = pred_result.df
+            if df_pred_scored.is_empty():
+                diagnostics = diagnostics.add_warning("No valid predictions after overlay scoring.")
+            else:
+                df_pred_scored = df_pred_scored.with_columns(
+                    pl.col("logic_fidelity").alias("opal__overlay__logic_fidelity").cast(pl.Float64),
+                    pl.col("effect_scaled").alias("opal__overlay__effect_scaled").cast(pl.Float64),
+                    pl.col("score").alias("opal__overlay__score").cast(pl.Float64),
+                    pl.lit(run_id).alias("opal__overlay__run_id"),
+                    pl.lit(as_of_round).alias("opal__overlay__round"),
+                )
 
-    if pred_result is None:
-        return TransientOverlayResult(
-            df_overlay=_with_overlay_provenance(df_overlay),
-            df_pred_scored=df_pred_scored,
-            diagnostics=diagnostics,
-            feature_chart=feature_chart,
-            hist_chart=hist_chart,
-            hist_note=hist_note,
-        )
+                sel_ids = np.asarray(df_pred_scored.get_column(id_col).to_list(), dtype=str)
+                sel_scores = (
+                    df_pred_scored.select(pl.col("opal__overlay__score").fill_null(float("nan")).cast(pl.Float64))
+                    .to_numpy()
+                    .ravel()
+                )
+                try:
+                    ranks, selected, warnings = compute_selection_overlay(
+                        ids=sel_ids,
+                        scores=sel_scores,
+                        selection_params=selection_params,
+                    )
+                    if warnings:
+                        diagnostics = diagnostics.add_warning("Selection objective warning: " + "; ".join(warnings))
+                except Exception as exc:
+                    diagnostics = diagnostics.add_error(f"Selection overlay error: {exc}")
+                    ranks = np.full(sel_scores.shape, None, dtype=object)
+                    selected = np.full(sel_scores.shape, False, dtype=bool)
+                df_pred_scored = df_pred_scored.with_columns(
+                    pl.Series("opal__overlay__rank", ranks),
+                    pl.Series("opal__overlay__top_k", selected),
+                )
 
-    df_pred_scored = pred_result.df
-    if df_pred_scored.is_empty():
-        _warn("No valid predictions after SFXI scoring.")
-        return TransientOverlayResult(
-            df_overlay=_with_overlay_provenance(df_overlay),
-            df_pred_scored=df_pred_scored,
-            diagnostics=diagnostics,
-            feature_chart=feature_chart,
-            hist_chart=hist_chart,
-            hist_note=hist_note,
-        )
+                overlay_cols = [
+                    "opal__overlay__score",
+                    "opal__overlay__rank",
+                    "opal__overlay__logic_fidelity",
+                    "opal__overlay__effect_scaled",
+                    "opal__overlay__top_k",
+                    "opal__overlay__run_id",
+                    "opal__overlay__round",
+                ]
+                pred_cols = [c for c in [id_col, "__row_id", *overlay_cols] if c in df_pred_scored.columns]
+                overlay_drop_cols = [col for col in overlay_cols if col in df_base.columns and col != id_col]
+                df_overlay_base = df_base.drop(overlay_drop_cols) if overlay_drop_cols else df_base
+                df_overlay = df_overlay_base.join(df_pred_scored.select(pred_cols), on=id_col, how="left")
 
-    df_pred_scored = df_pred_scored.with_columns(
-        pl.col("logic_fidelity").alias("opal__overlay__logic_fidelity").cast(pl.Float64),
-        pl.col("effect_scaled").alias("opal__overlay__effect_scaled").cast(pl.Float64),
-        pl.col("score").alias("opal__overlay__score").cast(pl.Float64),
-        pl.lit(source_value).alias("opal__overlay__source"),
-        pl.lit(campaign_slug).alias("opal__overlay__campaign_slug"),
-        pl.lit(run_id_value).alias("opal__overlay__run_id"),
-        pl.lit(effective_round).alias("opal__overlay__round"),
-        pl.lit(round_mode).alias("opal__overlay__round_mode"),
-    )
+                hist_chart, hist_note = build_score_histogram(
+                    df_pred_scored=df_pred_scored,
+                    score_col="opal__overlay__score",
+                    df_sfxi=df_sfxi,
+                    df_train=labels_current_df,
+                    dataset_name=dataset_name,
+                    context_label="overlay",
+                )
 
-    sel_params = dict(campaign_info.selection_params or {})
-    id_col = "id" if "id" in df_pred_scored.columns else "__row_id"
-    sel_ids = np.asarray(df_pred_scored.get_column(id_col).to_list(), dtype=str)
-    sel_scores = (
-        df_pred_scored.select(pl.col("opal__overlay__score").fill_null(float("nan")).cast(pl.Float64))
-        .to_numpy()
-        .ravel()
-    )
-    try:
-        ranks, selected, warnings = compute_selection_overlay(
-            ids=sel_ids,
-            scores=sel_scores,
-            selection_params=sel_params,
-        )
-        if warnings:
-            _warn("Selection objective warning: " + "; ".join(warnings))
-    except Exception as exc:
-        _error(f"Selection overlay error: {exc}")
-        ranks = np.full(sel_scores.shape, None, dtype=object)
-        selected = np.full(sel_scores.shape, False, dtype=bool)
-    df_pred_scored = df_pred_scored.with_columns(
-        pl.Series("opal__overlay__rank", ranks),
-        pl.Series("opal__overlay__top_k", selected),
-    )
-
-    pred_cols = [
-        "__row_id",
-        "opal__overlay__score",
-        "opal__overlay__rank",
-        "opal__overlay__logic_fidelity",
-        "opal__overlay__effect_scaled",
-        "opal__overlay__top_k",
-        "opal__overlay__source",
-        "opal__overlay__campaign_slug",
-        "opal__overlay__run_id",
-        "opal__overlay__round",
-        "opal__overlay__round_mode",
-    ]
-    if "id" in df_pred_scored.columns:
-        pred_cols.append("id")
-    overlay_drop_cols = [col for col in pred_cols if col in df_base.columns and col not in {"__row_id", "id"}]
-    df_overlay_base = df_base.drop(overlay_drop_cols) if overlay_drop_cols else df_base
-    df_overlay = df_overlay_base.join(df_pred_scored.select(pred_cols), on="__row_id", how="left")
-    if cache_hit:
-        _note(f"Overlay RF done: used cached predictions; predicted `{df_pred_scored.height}` candidates.")
-    else:
-        _note(f"Overlay RF done: predicted `{df_pred_scored.height}` candidates from artifact model.")
-
-    hist_chart, hist_note = _build_histogram_chart(
-        df_pred_scored=df_pred_scored,
-        df_sfxi=df_sfxi,
-        df_train=df_train,
-        dataset_name=dataset_name,
-    )
-
+    df_overlay = _ensure_overlay_cols(df_overlay)
+    if as_of_round is not None:
+        df_overlay = df_overlay.with_columns(pl.lit(int(as_of_round)).alias("opal__overlay__round"))
+    if run_id is not None:
+        df_overlay = df_overlay.with_columns(pl.lit(str(run_id)).alias("opal__overlay__run_id"))
     return TransientOverlayResult(
         df_overlay=df_overlay,
         df_pred_scored=df_pred_scored,
@@ -694,3 +411,19 @@ def compute_transient_overlay(
         hist_chart=hist_chart,
         hist_note=hist_note,
     )
+
+
+def _ensure_overlay_cols(df: pl.DataFrame) -> pl.DataFrame:
+    overlay_cols = [
+        "opal__overlay__score",
+        "opal__overlay__rank",
+        "opal__overlay__logic_fidelity",
+        "opal__overlay__effect_scaled",
+        "opal__overlay__top_k",
+        "opal__overlay__run_id",
+        "opal__overlay__round",
+    ]
+    missing = [c for c in overlay_cols if c not in df.columns]
+    if not missing:
+        return df
+    return df.with_columns([pl.lit(None).alias(col) for col in missing])

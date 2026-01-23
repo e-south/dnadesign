@@ -11,28 +11,8 @@ import numpy as np
 import polars as pl
 
 from ...core.round_context import RoundCtx
-from .artifacts import resolve_run_artifacts
-from .datasets import CampaignInfo, resolve_campaign_workdir
-
-
-def find_latest_model_artifact(info: CampaignInfo) -> tuple[Path | None, Path | None]:
-    outputs_dir = resolve_campaign_workdir(info) / "outputs"
-    if not outputs_dir.exists():
-        return None, None
-    candidates: list[tuple[int, Path, Path]] = []
-    for round_dir in outputs_dir.glob("round_*"):
-        model_path = round_dir / "model.joblib"
-        if not model_path.is_file():
-            continue
-        try:
-            round_idx = int(round_dir.name.split("_")[1])
-        except Exception:
-            round_idx = -1
-        candidates.append((round_idx, model_path, round_dir))
-    if not candidates:
-        return None, None
-    _, model_path, round_dir = max(candidates, key=lambda item: item[0])
-    return model_path, round_dir
+from .artifacts import resolve_round_artifacts
+from .datasets import CampaignInfo
 
 
 def load_model_artifact(path: Path):
@@ -71,6 +51,29 @@ def get_feature_importances(model):
         except Exception:
             return None
     return None
+
+
+def load_feature_importances_from_artifact(round_dir: Path | None) -> tuple[np.ndarray | None, str | None]:
+    if round_dir is None:
+        return None, "Round directory unavailable for feature importance."
+    path = Path(round_dir) / "feature_importance.csv"
+    if not path.is_file():
+        return None, f"feature_importance.csv not found under {round_dir}"
+    try:
+        df = pl.read_csv(path)
+    except Exception as exc:
+        return None, f"feature_importance.csv read failed: {exc}"
+    if "importance" not in df.columns:
+        return None, "feature_importance.csv missing required 'importance' column."
+    try:
+        arr = np.asarray(df.get_column("importance").to_numpy(), dtype=float).ravel()
+    except Exception as exc:
+        return None, f"feature_importance.csv parse failed: {exc}"
+    if arr.size == 0:
+        return None, "feature_importance.csv is empty."
+    if not np.all(np.isfinite(arr)):
+        return None, "feature_importance.csv contains non-finite values."
+    return arr, None
 
 
 def load_intensity_params_from_round_ctx(round_dir: Path, *, eps_default: float):
@@ -123,9 +126,8 @@ def resolve_artifact_model(
     *,
     use_artifact: bool,
     campaign_info: CampaignInfo | None,
+    as_of_round: int | None,
     run_id: str | None,
-    ledger_runs_df: pl.DataFrame | None,
-    allow_fallback: bool,
 ) -> ArtifactModelResult:
     if not use_artifact:
         return ArtifactModelResult(
@@ -134,7 +136,7 @@ def resolve_artifact_model(
             model=None,
             model_path=None,
             round_dir=None,
-            note="Overlay RF (session-scoped). Use the notebook compute button to run predictions.",
+            note="Artifact loading disabled.",
         )
     if campaign_info is None:
         return ArtifactModelResult(
@@ -146,88 +148,41 @@ def resolve_artifact_model(
             note="No campaign selected; artifact unavailable.",
         )
 
-    artifact_warning = None
-    artifacts = None
-    if run_id:
-        artifacts, artifact_warning = resolve_run_artifacts(ledger_runs_df, run_id=run_id)
-        if artifacts and "model.joblib" not in artifacts:
-            artifact_warning = "Artifacts missing model.joblib entry for selected run_id."
-
-    if artifacts and "model.joblib" in artifacts:
-        model_path = Path(artifacts["model.joblib"])
-        round_ctx_path = artifacts.get("round_ctx.json")
-        round_dir = Path(round_ctx_path).parent if round_ctx_path else model_path.parent
-        if not model_path.exists():
-            return ArtifactModelResult(
-                requested_artifact=True,
-                use_artifact=False,
-                model=None,
-                model_path=model_path,
-                round_dir=round_dir,
-                note=f"Artifact path missing on disk: `{model_path}`.",
-                warning=artifact_warning,
-            )
-        obj, err = load_model_artifact(model_path)
-        model = unwrap_artifact_model(obj)
-        if model is None:
-            msg = err or "Unsupported artifact format"
-            return ArtifactModelResult(
-                requested_artifact=True,
-                use_artifact=False,
-                model=None,
-                model_path=model_path,
-                round_dir=round_dir,
-                note=f"Artifact load failed: {msg}.",
-                warning=artifact_warning,
-            )
-        note = f"Loaded artifact for run_id `{run_id}`: `{model_path}`"
-        if artifact_warning:
-            note += f" (note: {artifact_warning})"
+    if as_of_round is None:
         return ArtifactModelResult(
             requested_artifact=True,
-            use_artifact=True,
-            model=model,
+            use_artifact=False,
+            model=None,
+            model_path=None,
+            round_dir=None,
+            note="Artifact selection requires a round; select an as-of round first.",
+        )
+
+    artifacts, artifact_warning = resolve_round_artifacts(campaign_info.workdir, as_of_round=as_of_round)
+    if not artifacts or "model.joblib" not in artifacts:
+        note = f"Artifacts missing for round `R={as_of_round}`."
+        if artifact_warning:
+            note = f"{note} ({artifact_warning})"
+        return ArtifactModelResult(
+            requested_artifact=True,
+            use_artifact=False,
+            model=None,
+            model_path=None,
+            round_dir=None,
+            note=note,
+            warning=artifact_warning,
+        )
+
+    model_path = Path(artifacts["model.joblib"])
+    round_dir = Path(artifacts.get("round_dir", model_path.parent))
+    if not model_path.exists():
+        return ArtifactModelResult(
+            requested_artifact=True,
+            use_artifact=False,
+            model=None,
             model_path=model_path,
             round_dir=round_dir,
-            note=note,
-            warning=artifact_warning,
-        )
-
-    if not allow_fallback:
-        if not run_id:
-            note = "Artifact selection requires a run_id; no fallback allowed."
-        else:
-            note = f"Run-aware artifact not resolved for run_id `{run_id}`; no fallback allowed."
-        return ArtifactModelResult(
-            requested_artifact=True,
-            use_artifact=False,
-            model=None,
-            model_path=None,
-            round_dir=None,
-            note=note,
-            warning=artifact_warning,
-        )
-
-    try:
-        model_path, round_dir = find_latest_model_artifact(campaign_info)
-    except Exception as exc:
-        return ArtifactModelResult(
-            requested_artifact=True,
-            use_artifact=False,
-            model=None,
-            model_path=None,
-            round_dir=None,
-            note=f"Artifact lookup failed: {exc}.",
-            warning=artifact_warning,
-        )
-    if model_path is None:
-        return ArtifactModelResult(
-            requested_artifact=True,
-            use_artifact=False,
-            model=None,
-            model_path=None,
-            round_dir=None,
-            note="No model.joblib found for this campaign.",
+            note=f"Artifact path missing on disk: `{model_path}`.",
             warning=artifact_warning,
         )
     obj, err = load_model_artifact(model_path)
@@ -243,7 +198,9 @@ def resolve_artifact_model(
             note=f"Artifact load failed: {msg}.",
             warning=artifact_warning,
         )
-    note = f"Loaded artifact (latest round, not run-aware): `{model_path}`"
+    note = f"Loaded artifact for round `R={as_of_round}`: `{model_path}`"
+    if run_id is not None:
+        note = f"{note} (run_id `{run_id}`)"
     if artifact_warning:
         note += f" (note: {artifact_warning})"
     return ArtifactModelResult(
@@ -260,14 +217,12 @@ def resolve_artifact_model(
 def resolve_artifact_state(
     *,
     campaign_info: CampaignInfo | None,
+    as_of_round: int | None,
     run_id: str | None,
-    ledger_runs_df: pl.DataFrame | None,
-    allow_fallback: bool,
 ) -> ArtifactModelResult:
     return resolve_artifact_model(
         use_artifact=True,
         campaign_info=campaign_info,
+        as_of_round=as_of_round,
         run_id=run_id,
-        ledger_runs_df=ledger_runs_df,
-        allow_fallback=allow_fallback,
     )

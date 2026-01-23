@@ -67,7 +67,7 @@ def cmd_init(
                 if df[col].isna().any():
                     bad = df.loc[df[col].isna(), "id"].astype(str).tolist()[:10]
                     raise OpalError(f"Missing values in '{col}' (sample ids={bad}).")
-        df2, added = store.ensure_cache_columns(df, include_label_hist=True)
+        df2, added = store.ensure_label_hist_column(df)
         if added:
             store.save_atomic(df2)
         st = CampaignState(

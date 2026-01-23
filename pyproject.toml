@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=69", "wheel", "setuptools_scm"]
+requires = ["setuptools>=69", "wheel>=0.46.2", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -68,7 +68,7 @@ infer-evo2 = [
   # --- build helpers (required because we disable build isolation for flash-attn + TE-torch)
   "pip; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "setuptools; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "wheel; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "wheel>=0.46.2; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "packaging; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "ninja; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "cmake>=3.18; sys_platform == 'linux' and platform_machine == 'x86_64'",

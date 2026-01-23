@@ -116,7 +116,7 @@ def test_cli_pressure_unknown_sequences_create_rows(tmp_path: Path) -> None:
     )
     lh = store.label_hist_col()
     hist = store._normalize_hist_cell(new_row[lh])
-    assert any(e.get("r") == 0 for e in hist)
+    assert any(e.get("observed_round") == 0 for e in hist)
 
 
 def test_cli_pressure_if_exists_skip_keeps_history(tmp_path: Path) -> None:

@@ -8,6 +8,7 @@ from typing import Iterable
 import altair as alt
 import polars as pl
 
+from .hues import HueOption
 from .util import safe_is_numeric
 
 
@@ -58,8 +59,7 @@ def build_umap_explorer_chart(
     df: pl.DataFrame,
     x_col: str | None,
     y_col: str | None,
-    color_value: str | None,
-    color_label: str | None,
+    hue: HueOption | None,
     point_size: float,
     opacity: float,
     plot_size: int,
@@ -137,64 +137,51 @@ def build_umap_explorer_chart(
     color_title = None
     color_tooltip = None
     plot_cols = _dedupe([col for col in ["__row_id", "id", _x_col, _y_col] if col in df.columns])
-    if color_value and color_value != "(none)" and color_value in df.columns:
-        if color_value not in plot_cols:
-            plot_cols.append(color_value)
+    if hue is not None and hue.key in df.columns and hue.key not in plot_cols:
+        plot_cols.append(hue.key)
     df_chart = df.select(plot_cols)
 
-    if color_value and color_value != "(none)" and color_value in df_chart.columns:
-        dtype = df.schema[color_value]
-        color_field = color_value
-        color_title = color_label
-        color_tooltip = color_value
-        non_null_count = df_chart.select(pl.col(color_value).count()).item() if df_chart.height else 0
+    if hue is not None and hue.key in df_chart.columns:
+        color_field = hue.key
+        color_title = hue.label
+        color_tooltip = hue.key
+        non_null_count = df_chart.select(pl.col(hue.key).count()).item() if df_chart.height else 0
         if non_null_count == 0:
             note = (
                 f"Plotting full dataset: `{df.height}` points. "
-                f"Color `{color_value}` has no non-null values; rendering without color."
+                f"Color `{hue.key}` has no non-null values; rendering without color."
             )
             color_field = None
             color_title = None
             color_tooltip = None
             color_encoding = alt.Undefined
-        elif color_value == "opal__overlay__observed_event":
-            label_col = f"{color_value}__label"
+        elif hue.kind == "categorical" and hue.category_labels:
+            label_col = f"{hue.key}__label"
+            yes_label, no_label = hue.category_labels
             df_chart = df_chart.with_columns(
-                pl.when(pl.col(color_value)).then(pl.lit("Observed")).otherwise(pl.lit("Not observed")).alias(label_col)
+                pl.when(pl.col(hue.key)).then(pl.lit(yes_label)).otherwise(pl.lit(no_label)).alias(label_col)
             )
             color_field = label_col
-            color_title = color_label
+            color_title = hue.label
             color_tooltip = label_col
-            color_scale = alt.Scale(domain=["Observed", "Not observed"], range=[okabe_ito[2], "#B0B0B0"])
+            if "top_k" in hue.key:
+                color_scale = alt.Scale(domain=[yes_label, no_label], range=[okabe_ito[5], "#B0B0B0"])
+            else:
+                color_scale = alt.Scale(domain=[yes_label, no_label], range=[okabe_ito[2], "#B0B0B0"])
             color_encoding = alt.Color(
                 f"{color_field}:N",
                 title=color_title,
                 scale=color_scale,
                 legend=alt.Legend(title=color_title),
             )
-        elif color_value == "opal__score__top_k":
-            label_col = f"{color_value}__label"
-            df_chart = df_chart.with_columns(
-                pl.when(pl.col(color_value)).then(pl.lit("Top-K")).otherwise(pl.lit("Not Top-K")).alias(label_col)
-            )
-            color_field = label_col
-            color_title = color_label
-            color_tooltip = label_col
-            color_scale = alt.Scale(domain=["Top-K", "Not Top-K"], range=[okabe_ito[5], "#B0B0B0"])
-            color_encoding = alt.Color(
-                f"{color_field}:N",
-                title=color_title,
-                scale=color_scale,
-                legend=alt.Legend(title=color_title),
-            )
-        elif safe_is_numeric(dtype):
+        elif hue.kind == "numeric":
             color_encoding = alt.Color(
                 f"{color_field}:Q",
                 title=color_title,
                 legend=alt.Legend(title=color_title, format=".2f", tickCount=5),
             )
         else:
-            n_unique = df_chart.select(pl.col(color_value).n_unique()).item() if df_chart.height else 0
+            n_unique = df_chart.select(pl.col(hue.key).n_unique()).item() if df_chart.height else 0
             if n_unique <= len(okabe_ito):
                 color_scale = alt.Scale(range=okabe_ito)
             else:
@@ -222,8 +209,8 @@ def build_umap_explorer_chart(
         .add_params(brush)
         .properties(width=plot_size, height=plot_size)
     )
-    if "opal__score__top_k" in df_chart.columns:
-        df_top = df_chart.filter(pl.col("opal__score__top_k"))
+    if "opal__view__top_k" in df_chart.columns:
+        df_top = df_chart.filter(pl.col("opal__view__top_k"))
         if df_top.height:
             top_layer = (
                 alt.Chart(df_top)
@@ -294,10 +281,7 @@ def build_cluster_chart(
     cluster_col: str,
     metric_col: str,
     metric_label: str,
-    hue_value: str | None,
-    hue_label_display: str | None,
-    rf_prefix: str,
-    score_source_label: str,
+    hue: HueOption | None,
     dataset_name: str | None,
     id_col: str,
     title: str,
@@ -305,7 +289,8 @@ def build_cluster_chart(
 ) -> alt.Chart | None:
     if df.is_empty() or cluster_col not in df.columns or metric_col not in df.columns:
         return None
-    cols = _dedupe([cluster_col, metric_col, id_col, hue_value or ""])
+    hue_key = hue.key if hue is not None else ""
+    cols = _dedupe([cluster_col, metric_col, id_col, hue_key])
     df_points = df.select([c for c in cols if c in df.columns]).filter(pl.col(metric_col).is_not_null())
     if df_points.is_empty():
         return None
@@ -332,55 +317,46 @@ def build_cluster_chart(
         "#000000",
     ]
 
-    label_map = {
-        "opal__score__top_k": ("Top-K", "Not Top-K", f"{score_source_label} Top-K"),
-        "opal__overlay__top_k": ("Top-K", "Not Top-K", f"{rf_prefix} Top-K"),
-        "opal__overlay__observed_event": ("Observed", "Not observed", "Observed events (ingest_y)"),
-        "opal__overlay__sfxi_scored_label": ("SFXI label", "Not label", "SFXI scored label"),
-    }
-    hue_label = hue_label_display if hue_label_display else "(none)"
+    hue_label = hue.label if hue is not None else "(none)"
     color_encoding = alt.Undefined
     color_tooltip = None
     label_col = None
     top_k_mode = False
 
-    if hue_value == "Leiden cluster":
-        hue_label = "Leiden cluster"
-        color_tooltip = cluster_col
-        color_encoding = alt.Color(
-            f"{cluster_col}:N",
-            title="Leiden cluster",
-            scale=alt.Scale(range=okabe_ito),
-            legend=alt.Legend(title="Leiden cluster"),
-        )
-    elif hue_value in label_map and hue_value in df_points.columns:
-        label_col = f"{hue_value}__label"
-        yes_label, no_label, hue_label = label_map[hue_value]
-        top_k_mode = hue_value in {"opal__overlay__top_k", "opal__score__top_k"}
-        df_points = df_points.with_columns(
-            pl.when(pl.col(hue_value)).then(pl.lit(yes_label)).otherwise(pl.lit(no_label)).alias(label_col)
-        )
-        color_tooltip = label_col
-        color_scale = (
-            alt.Scale(domain=[yes_label, no_label], range=["#D62728", "#B0B0B0"])
-            if top_k_mode
-            else alt.Scale(domain=[yes_label, no_label], range=[okabe_ito[2], "#B0B0B0"])
-        )
-        color_encoding = alt.Color(
-            f"{label_col}:N",
-            title=hue_label,
-            scale=color_scale,
-            legend=alt.Legend(title=hue_label),
-        )
-    elif hue_value and hue_value in df_points.columns:
-        hue_dtype = df_points.schema.get(hue_value)
-        if hue_dtype is not None and safe_is_numeric(hue_dtype):
-            hue_label = hue_label_display or hue_value
-            color_tooltip = hue_value
+    if hue is not None and hue.key in df_points.columns:
+        if hue.kind == "categorical" and hue.category_labels:
+            label_col = f"{hue.key}__label"
+            yes_label, no_label = hue.category_labels
+            top_k_mode = "top_k" in hue.key
+            df_points = df_points.with_columns(
+                pl.when(pl.col(hue.key)).then(pl.lit(yes_label)).otherwise(pl.lit(no_label)).alias(label_col)
+            )
+            color_tooltip = label_col
+            color_scale = (
+                alt.Scale(domain=[yes_label, no_label], range=["#D62728", "#B0B0B0"])
+                if top_k_mode
+                else alt.Scale(domain=[yes_label, no_label], range=[okabe_ito[2], "#B0B0B0"])
+            )
             color_encoding = alt.Color(
-                f"{hue_value}:Q",
+                f"{label_col}:N",
+                title=hue_label,
+                scale=color_scale,
+                legend=alt.Legend(title=hue_label),
+            )
+        elif hue.kind == "numeric":
+            color_tooltip = hue.key
+            color_encoding = alt.Color(
+                f"{hue.key}:Q",
                 title=hue_label,
                 legend=alt.Legend(title=hue_label, format=".2f", tickCount=5),
+            )
+        else:
+            color_tooltip = hue.key
+            color_encoding = alt.Color(
+                f"{hue.key}:N",
+                title=hue_label,
+                scale=alt.Scale(range=okabe_ito),
+                legend=alt.Legend(title=hue_label),
             )
 
     tooltip_cols = [c for c in [cluster_col, metric_col, id_col, color_tooltip] if c and c in df_points.columns]
@@ -388,7 +364,6 @@ def build_cluster_chart(
     metric_type = "Q" if safe_is_numeric(df_points.schema.get(metric_col, pl.Null)) else "N"
 
     if top_k_mode and label_col:
-        yes_label, no_label, _ = label_map[hue_value]
         df_not = df_points.filter(pl.col(label_col) == no_label)
         df_top = df_points.filter(pl.col(label_col) == yes_label)
         base = (
@@ -450,8 +425,6 @@ def build_umap_overlay_charts(
     *,
     df: pl.DataFrame,
     dataset_name: str | None,
-    campaign_slug: str | None,
-    use_artifact: bool,
     plot_size: int = 420,
     id_col: str = "id",
     umap_x_col: str = "cluster__ldn_v1__umap_x",
@@ -483,24 +456,9 @@ def build_umap_overlay_charts(
             if chart is not None:
                 cluster_chart = chart
 
-    score_col = None
-    score_title = None
-    score_chart_title = None
-    if "opal__score__scalar" in df.columns:
-        score_col = "opal__score__scalar"
-        score_title = "Selected score source (scalar)"
-        score_chart_title = "UMAP colored by selected score source"
-    elif campaign_slug:
-        latest_col = f"opal__{campaign_slug}__latest_pred_scalar"
-        if latest_col in df.columns:
-            score_col = latest_col
-            score_title = "OPAL latest predicted scalar"
-            score_chart_title = "UMAP colored by OPAL latest scalar"
-    if score_col is None and "opal__overlay__score" in df.columns:
-        score_col = "opal__overlay__score"
-        score_prefix = "Overlay (artifact)" if use_artifact else "Overlay"
-        score_title = f"{score_prefix} score (SFXI)"
-        score_chart_title = f"UMAP colored by {score_prefix} score (SFXI)"
+    score_col = "opal__view__score" if "opal__view__score" in df.columns else None
+    score_title = "Score"
+    score_chart_title = "UMAP colored by score"
 
     score_chart = None
     if score_col is not None:
