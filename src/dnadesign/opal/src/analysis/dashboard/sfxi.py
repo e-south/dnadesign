@@ -76,6 +76,12 @@ class LabelSfxiView:
 
 
 @dataclass(frozen=True)
+class PredSfxiView:
+    df: pl.DataFrame
+    notice: str | None
+
+
+@dataclass(frozen=True)
 class SFXIReadiness:
     ready: bool
     notice: str | None
@@ -373,6 +379,67 @@ def build_label_sfxi_view(
         y_col=readiness.y_col,
         params=params,
     )
+
+
+def build_pred_sfxi_view(
+    *,
+    pred_df: pl.DataFrame,
+    labels_current_df: pl.DataFrame,
+    y_col: str | None,
+    params: SFXIParams,
+    mode: str,
+    y_hat_col: str = "pred_y_hat",
+) -> PredSfxiView:
+    notice = None
+    if pred_df is None or pred_df.is_empty():
+        return PredSfxiView(df=pl.DataFrame(), notice="No stored predictions available.")
+
+    mode_val = str(mode or "canonical").strip().lower()
+    if mode_val == "canonical":
+        required = ["pred_score", "pred_logic_fidelity", "pred_effect_scaled"]
+        missing = [c for c in required if c not in pred_df.columns]
+        if missing:
+            return PredSfxiView(
+                df=pred_df.head(0),
+                notice=f"Prediction history missing required metrics: {sorted(missing)}.",
+            )
+        df_out = pred_df.with_columns(
+            [
+                pl.col("pred_logic_fidelity").cast(pl.Float64).alias("logic_fidelity"),
+                pl.col("pred_effect_scaled").cast(pl.Float64).alias("effect_scaled"),
+                pl.col("pred_score").cast(pl.Float64).alias("score"),
+            ]
+        )
+        mask = (
+            pl.col("pred_score").is_not_null()
+            & pl.col("pred_logic_fidelity").is_not_null()
+            & pl.col("pred_effect_scaled").is_not_null()
+        )
+        df_out = df_out.filter(mask)
+        if df_out.is_empty():
+            notice = "No valid prediction metrics available for the selected run."
+        return PredSfxiView(df=df_out, notice=notice)
+
+    if y_hat_col not in pred_df.columns:
+        return PredSfxiView(df=pred_df.head(0), notice=f"Missing prediction vector column `{y_hat_col}`.")
+    if y_col is None or y_col not in labels_current_df.columns:
+        return PredSfxiView(df=pred_df.head(0), notice=f"Missing label column `{y_col}` for overlay scoring.")
+    if labels_current_df.is_empty():
+        return PredSfxiView(df=pred_df.head(0), notice="No labels available for overlay scoring.")
+
+    vec_col = "__overlay_vec"
+    df_pred = pred_df.select([c for c in ["id", "__row_id", y_hat_col] if c in pred_df.columns]).rename(
+        {y_hat_col: vec_col}
+    )
+    denom_pool = labels_current_df.select(pl.col(y_col).alias(vec_col))
+    try:
+        result = compute_sfxi_metrics(df=df_pred, vec_col=vec_col, params=params, denom_pool_df=denom_pool)
+    except Exception as exc:
+        notice = f"SFXI overlay failed: {exc}"
+        return PredSfxiView(df=pred_df.head(0), notice=notice)
+    if result.df.is_empty():
+        notice = "No valid predictions after overlay scoring."
+    return PredSfxiView(df=result.df, notice=notice)
 
 
 def apply_overlay_label_flags(

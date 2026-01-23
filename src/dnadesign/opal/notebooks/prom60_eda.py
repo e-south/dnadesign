@@ -106,6 +106,7 @@ def _():
     build_pred_events = dash_labels.build_pred_events
     build_round_options_from_label_hist = dash_labels.build_round_options_from_label_hist
     build_label_sfxi_view = dash_sfxi.build_label_sfxi_view
+    build_pred_sfxi_view = dash_sfxi.build_pred_sfxi_view
     build_umap_controls = dash_ui.build_umap_controls
     campaign_label_from_path = dash_datasets.campaign_label_from_path
     build_hue_registry = dash_hues.build_hue_registry
@@ -138,6 +139,7 @@ def _():
         build_hue_registry,
         build_label_events,
         build_label_sfxi_view,
+        build_pred_sfxi_view,
         build_mode_view,
         build_pred_events,
         build_round_options_from_label_hist,
@@ -219,7 +221,7 @@ def _(campaign_label_from_path, list_campaign_paths, repo_root):
     campaign_path_map = dict(zip(campaign_labels, campaign_paths))
     default_campaign_label = None
     for label in campaign_labels:
-        if "prom60-etoh-cipro-andgate" in label.replace("\\", "/"):
+        if "opal/campaigns/demo" in label.replace("\\", "/"):
             default_campaign_label = label
             break
     if default_campaign_label is None and campaign_labels:
@@ -1362,6 +1364,17 @@ def _(mo):
 
 
 @app.cell
+def _(mo):
+    sfxi_source_dropdown = mo.ui.dropdown(
+        options=["Observed", "Predicted", "Both"],
+        value="Observed",
+        label="SFXI source",
+        full_width=True,
+    )
+    return (sfxi_source_dropdown,)
+
+
+@app.cell
 def _(
     mo,
     opal_pred_events_df,
@@ -1606,16 +1619,16 @@ def _(mo, sfxi_params):
 
 
 @app.cell
-def _(build_hue_registry, df_sfxi, mo):
+def _(build_hue_registry, df_sfxi_scatter, mo):
     sfxi_hue_registry = build_hue_registry(
-        df_sfxi,
+        df_sfxi_scatter,
         preferred=[],
         include_columns=True,
         denylist={"__row_id", "id", "id_"},
     )
     hue_labels = sfxi_hue_registry.labels()
     if not hue_labels:
-        options = ["score"] if "score" in df_sfxi.columns else ["(none)"]
+        options = ["score"] if "score" in df_sfxi_scatter.columns else ["(none)"]
     else:
         options = hue_labels
     default = "score" if "score" in options else options[0]
@@ -1632,7 +1645,7 @@ def _(build_hue_registry, df_sfxi, mo):
 def _(
     alt,
     dataset_name,
-    df_sfxi,
+    df_sfxi_scatter,
     mo,
     opal_campaign_info,
     pl,
@@ -1659,7 +1672,7 @@ def _(
         "#000000",
     ]
     _fallback_scheme = "tableau20"
-    if df_sfxi.is_empty():
+    if df_sfxi_scatter.is_empty():
         empty_df = pl.DataFrame(
             schema={
                 "__row_id": pl.Int64,
@@ -1713,11 +1726,13 @@ def _(
         sfxi_chart_note_md = mo.md(_sfxi_explain_text)
     else:
         plot_cols = [
-            col for col in ["__row_id", "id", "logic_fidelity", "effect_scaled", "score"] if col in df_sfxi.columns
+            col
+            for col in ["__row_id", "id", "logic_fidelity", "effect_scaled", "score"]
+            if col in df_sfxi_scatter.columns
         ]
-        if _hue is not None and _hue.key in df_sfxi.columns and _hue.key not in plot_cols:
+        if _hue is not None and _hue.key in df_sfxi_scatter.columns and _hue.key not in plot_cols:
             plot_cols.append(_hue.key)
-        df_sfxi_plot = df_sfxi.select(plot_cols)
+        df_sfxi_plot = df_sfxi_scatter.select(plot_cols)
         tooltip_cols = [
             c
             for c in [
@@ -1818,9 +1833,9 @@ def _(
 
 
 @app.cell
-def _(df_sfxi, opal_campaign_info, pl, sfxi_chart_ui):
+def _(df_sfxi_scatter, opal_campaign_info, pl, sfxi_chart_ui):
     _unused = (opal_campaign_info, pl, sfxi_chart_ui)
-    df_sfxi_selected = df_sfxi
+    df_sfxi_selected = df_sfxi_scatter
     return (df_sfxi_selected,)
 
 
@@ -1842,6 +1857,7 @@ def _(
     pred_diag_md,
     pred_notice_md,
     round_notice_md,
+    sfxi_source_dropdown,
     view_notice_md,
 ):
     _opal_references_md = mo.Html(
@@ -1855,7 +1871,9 @@ def _(
         """
     )
 
-    selection_controls = [c for c in [mode_dropdown, opal_round_dropdown, opal_run_id_dropdown] if c is not None]
+    selection_controls = [
+        c for c in [mode_dropdown, sfxi_source_dropdown, opal_round_dropdown, opal_run_id_dropdown] if c is not None
+    ]
     selection_row = mo.hstack(selection_controls) if selection_controls else mo.md("")
 
     label_controls = [c for c in [label_src_multiselect, opal_label_view_dropdown] if c is not None]
@@ -1906,6 +1924,7 @@ def _(
     sfxi_gamma_input,
     sfxi_meta_md,
     sfxi_notice_md,
+    sfxi_source_notice_md,
     sfxi_p00_slider,
     sfxi_p01_slider,
     sfxi_p10_slider,
@@ -1937,6 +1956,7 @@ def _(
             ),
             controls_block,
             sfxi_notice_md,
+            sfxi_source_notice_md,
             sfxi_setpoint_md,
             sfxi_defs_md,
             sfxi_color_dropdown,
@@ -2557,6 +2577,56 @@ def _(
     if not df_sfxi.is_empty():
         sfxi_meta_md = mo.md("Label-level SFXI metrics are shown in the Labels table.")
     return df_sfxi, readiness, sfxi_meta_md, sfxi_notice_md, sfxi_params
+
+
+@app.cell
+def _(
+    build_pred_sfxi_view,
+    df_pred_selected,
+    mode_dropdown,
+    opal_labels_current_df,
+    readiness,
+    sfxi_params,
+):
+    pred_view = build_pred_sfxi_view(
+        pred_df=df_pred_selected,
+        labels_current_df=opal_labels_current_df,
+        y_col=readiness.y_col if readiness is not None else None,
+        params=sfxi_params,
+        mode=mode_dropdown.value,
+    )
+    df_sfxi_pred = pred_view.df
+    sfxi_pred_notice = pred_view.notice
+    return df_sfxi_pred, sfxi_pred_notice
+
+
+@app.cell
+def _(df_sfxi, df_sfxi_pred, mo, pl, sfxi_pred_notice, sfxi_source_dropdown):
+    df_obs = df_sfxi.with_columns(pl.lit("Observed").alias("sfxi_source")) if df_sfxi is not None else pl.DataFrame()
+    df_pred = (
+        df_sfxi_pred.with_columns(pl.lit("Predicted").alias("sfxi_source"))
+        if df_sfxi_pred is not None
+        else pl.DataFrame()
+    )
+    _sfxi_source = sfxi_source_dropdown.value if sfxi_source_dropdown is not None else "Observed"
+    if _sfxi_source == "Predicted":
+        df_sfxi_scatter = df_pred
+    elif _sfxi_source == "Both":
+        if df_obs.is_empty():
+            df_sfxi_scatter = df_pred
+        elif df_pred.is_empty():
+            df_sfxi_scatter = df_obs
+        else:
+            df_sfxi_scatter = pl.concat([df_obs, df_pred], how="vertical_relaxed")
+    else:
+        df_sfxi_scatter = df_obs
+
+    sfxi_source_notice_md = mo.md("")
+    if _sfxi_source in {"Predicted", "Both"} and df_pred.is_empty():
+        sfxi_source_notice_md = (
+            mo.md(sfxi_pred_notice) if sfxi_pred_notice else mo.md("No predicted SFXI data available.")
+        )
+    return df_sfxi_scatter, sfxi_source_notice_md
 
 
 @app.cell

@@ -40,6 +40,10 @@ uv run opal verify-outputs -c configs/campaign.yaml --round latest
 # 5) Plot
 uv run opal plot -c configs/campaign.yaml --quick
 uv run opal plot -c configs/campaign.yaml
+
+# 6) Dashboard (marimo)
+uv run opal notebook generate -c configs/campaign.yaml --round latest
+uv run opal notebook run -c configs/campaign.yaml
 ```
 
 **Notes:**

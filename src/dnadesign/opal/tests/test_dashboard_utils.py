@@ -652,3 +652,68 @@ def test_overlay_provenance_on_early_exit() -> None:
     assert result.df_overlay["opal__overlay__round"].to_list() == [0]
     assert result.df_overlay["opal__overlay__run_id"].to_list() == ["run-1"]
     assert result.diagnostics.errors
+
+
+def test_build_pred_sfxi_view_canonical() -> None:
+    params = sfxi.compute_sfxi_params(
+        setpoint=[0.0, 0.0, 0.0, 1.0],
+        beta=1.0,
+        gamma=1.0,
+        delta=0.0,
+        p=50.0,
+        fallback_p=50.0,
+        min_n=1,
+        eps=1.0e-8,
+    )
+    pred_df = pl.DataFrame(
+        {
+            "id": ["a"],
+            "pred_score": [0.42],
+            "pred_logic_fidelity": [0.7],
+            "pred_effect_scaled": [0.6],
+        }
+    )
+    view = sfxi.build_pred_sfxi_view(
+        pred_df=pred_df,
+        labels_current_df=pl.DataFrame(),
+        y_col="y_obs",
+        params=params,
+        mode="Canonical",
+    )
+    assert view.notice is None
+    assert view.df.select(pl.col("score")).item() == pytest.approx(0.42)
+    assert view.df.select(pl.col("logic_fidelity")).item() == pytest.approx(0.7)
+    assert view.df.select(pl.col("effect_scaled")).item() == pytest.approx(0.6)
+
+
+def test_build_pred_sfxi_view_overlay() -> None:
+    params = sfxi.compute_sfxi_params(
+        setpoint=[0.0, 0.0, 0.0, 1.0],
+        beta=1.0,
+        gamma=1.0,
+        delta=0.0,
+        p=50.0,
+        fallback_p=50.0,
+        min_n=1,
+        eps=1.0e-8,
+    )
+    pred_df = pl.DataFrame(
+        {
+            "id": ["a"],
+            "pred_y_hat": [[0.0, 0.0, 0.0, 1.0, 0.2, 0.2, 0.2, 0.2]],
+        }
+    )
+    labels_current_df = pl.DataFrame(
+        {
+            "y_obs": [[0.0, 0.0, 0.0, 1.0, 0.2, 0.2, 0.2, 0.2]],
+        }
+    )
+    view = sfxi.build_pred_sfxi_view(
+        pred_df=pred_df,
+        labels_current_df=labels_current_df,
+        y_col="y_obs",
+        params=params,
+        mode="Overlay",
+    )
+    assert view.notice is None
+    assert not view.df.is_empty()
