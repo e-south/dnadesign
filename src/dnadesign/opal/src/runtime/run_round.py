@@ -1,3 +1,5 @@
+# ABOUTME: Executes one Opal round from training through selection and writebacks.
+# ABOUTME: Validates round inputs, emits artifacts, and updates ledgers/state.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -9,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -120,6 +123,131 @@ class _ScoreBundle:
 def _log(enabled: bool, msg: str) -> None:
     if enabled:
         print_stderr(msg)
+
+
+def _clear_round_dir(rdir: Path) -> None:
+    if not rdir.exists():
+        return
+    for child in rdir.iterdir():
+        try:
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+        except Exception as exc:
+            raise OpalError(f"Failed to clear round directory {rdir}: {exc}") from exc
+
+
+def _build_sequence_map(df: pd.DataFrame) -> Dict[str, Optional[str]]:
+    if "sequence" not in df.columns:
+        return {}
+    seq_map: Dict[str, Optional[str]] = {}
+    for _id, seq in df[["id", "sequence"]].itertuples(index=False, name=None):
+        seq_map[str(_id)] = None if pd.isna(seq) else str(seq)
+    return seq_map
+
+
+def _update_campaign_state(
+    *,
+    ws: CampaignWorkspace,
+    cfg: RootConfig,
+    req: RunRoundRequest,
+    rep: Any,
+    train_df: pd.DataFrame,
+    id_order_train: List[str],
+    id_order_pool: List[str],
+    top_k: int,
+    selected_effective: int,
+    apaths: ArtifactPaths,
+    run_id: str,
+    obj_name: str,
+    store: RecordsStore,
+    total_duration: float,
+    fit_duration: float,
+) -> None:
+    st = CampaignState.load(ws.state_path)
+    if req.allow_resume:
+        try:
+            st.rounds = [r for r in st.rounds if int(getattr(r, "round_index", -1)) != int(req.as_of_round)]
+        except Exception:
+            pass
+
+    st.campaign_slug = cfg.campaign.slug
+    st.campaign_name = cfg.campaign.name
+    st.workdir = str(ws.workdir.resolve())
+    loc = cfg.data.location
+    if isinstance(loc, LocationUSR):
+        st.data_location = {
+            "kind": "usr",
+            "dataset": loc.dataset,
+            "path": str(Path(loc.path).resolve()),
+            "records_path": str(store.records_path.resolve()),
+        }
+    elif isinstance(loc, LocationLocal):
+        st.data_location = {
+            "kind": "local",
+            "path": str(Path(loc.path).resolve()),
+            "records_path": str(store.records_path.resolve()),
+        }
+    st.x_column_name = cfg.data.x_column_name
+    st.y_column_name = cfg.data.y_column_name
+    st.representation_vector_dimension = rep.x_dim or 0
+    st.representation_transform = {
+        "name": cfg.data.transforms_x.name,
+        "params": cfg.data.transforms_x.params,
+    }
+    st.training_policy = dict(cfg.training.policy or {})
+    st.performance = {
+        "score_batch_size": req.score_batch_size_override or cfg.scoring.score_batch_size,
+        "objective": obj_name,
+    }
+    labels_used_rounds = sorted(set(train_df["r"].astype(int).tolist()))
+    round_dir = ws.round_dir(req.as_of_round)
+    st.add_round(
+        RoundEntry(
+            round_index=int(req.as_of_round),
+            run_id=str(run_id),
+            round_name=f"round_{int(req.as_of_round)}",
+            round_dir=str(round_dir.resolve()),
+            labels_used_rounds=labels_used_rounds,
+            number_of_training_examples_used_in_round=len(id_order_train),
+            number_of_candidates_scored_in_round=len(id_order_pool),
+            selection_top_k_requested=int(top_k),
+            selection_top_k_effective_after_ties=int(selected_effective),
+            model={
+                "type": cfg.model.name,
+                "params": cfg.model.params,
+                "artifact_path": str(apaths.model.resolve()),
+                "artifact_sha256": file_sha256(apaths.model),
+            },
+            metrics={},
+            durations_sec={},  # filled below
+            seeds={
+                "global": cfg.model.params.get("random_state"),
+                "model": cfg.model.params.get("random_state"),
+            },
+            artifacts={
+                "selection_top_k_csv": str(apaths.selection_csv.resolve()),
+                # New, explicit ledger sinks:
+                "ledger_predictions_dir": str(ws.ledger_predictions_dir.resolve()),
+                "ledger_runs_parquet": str(ws.ledger_runs_path.resolve()),
+                "ledger_labels_parquet": str(ws.ledger_labels_path.resolve()),
+                "round_ctx_json": str(apaths.round_ctx_json.resolve()),
+                "objective_meta_json": str(apaths.objective_meta_json.resolve()),
+                "model_meta_json": str((round_dir / "model_meta.json").resolve()),
+                "labels_used_parquet": str((round_dir / "labels_used.parquet").resolve()),
+                "round_log_jsonl": str((round_dir / "round.log.jsonl").resolve()),
+            },
+            writebacks={
+                "records_label_hist_updated": [
+                    "opal__<slug>__label_hist",
+                ]
+            },
+            warnings=[],
+        )
+    )
+    st.rounds[-1].durations_sec = {"total": total_duration, "fit": fit_duration}
+    st.save(ws.state_path)
 
 
 def _resolve_selection_objective_mode(sel_params: Dict[str, Any], *, warn: bool = True) -> str:
@@ -423,6 +551,8 @@ def _stage_fit_predict_score(
     tv = _TrainView(Y_train, R_train, int(req.as_of_round))
     obj_res = obj_fn(y_pred=Y_hat, params=obj_params, ctx=octx, train_view=tv)
     y_obj_scalar = np.asarray(obj_res.score, dtype=float).ravel()
+    if y_obj_scalar.size != len(id_order_pool):
+        raise OpalError(f"Objective produced {y_obj_scalar.size} scores for {len(id_order_pool)} candidates.")
     non_finite_mask = ~np.isfinite(y_obj_scalar)
     if non_finite_mask.any():
         n = int(non_finite_mask.sum())
@@ -595,22 +725,16 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         raise OpalError(f"state.json not found at {ws.state_path}. Run `opal init -c {ws.config_path}` first.")
 
     rdir = ws.round_dir(req.as_of_round)
-    ensure_dir(rdir)
     store.assert_unique_ids(df)
 
     # Guard against accidental double-runs unless explicitly allowed
-    if not req.allow_resume:
-        # Consider the directory "non-empty" if it contains any known artifacts
-        known = [
-            "model.joblib",
-            "selection_top_k.csv",
-            "round_ctx.json",
-            "objective_meta.json",
-        ]
-        if any((rdir / k).exists() for k in known):
-            raise OpalError(
-                f"Round {int(req.as_of_round)} appears to have already produced artifacts in {rdir}. Use --resume to overwrite."  # noqa
-            )
+    if not req.allow_resume and rdir.exists() and any(rdir.iterdir()):
+        raise OpalError(
+            f"Round {int(req.as_of_round)} already contains artifacts in {rdir}. Use --resume to overwrite."
+        )
+    if req.allow_resume:
+        _clear_round_dir(rdir)
+    ensure_dir(rdir)
 
     # --- round start log (assurance of alignment) ---
     append_round_log_event(
@@ -754,9 +878,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     model_meta_sha = write_model_meta(rdir / "model_meta.json", model_meta)
 
     # Map sequences up-front for artifact emission
-    seq_map = df.set_index("id")["sequence"].astype(str).to_dict() if "sequence" in df.columns else {}
-    if seq_map:
-        seq_map = {str(k): v for k, v in seq_map.items()}
+    seq_map = _build_sequence_map(df)
 
     # Training snapshot (artifact only; not appended to ledger)
     labels_used_df = None
@@ -975,91 +1097,24 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     _log(req.verbose, "[writeback] records label_hist updated with run-aware predictions.")
 
     # --- state.json summary ---
-    st = CampaignState.load(ws.state_path)
-    # If resuming on the same round, replace existing entries for this round index
-    if req.allow_resume:
-        try:
-            st.rounds = [r for r in st.rounds if int(getattr(r, "round_index", -1)) != int(req.as_of_round)]
-        except Exception:
-            pass
-
-    st.campaign_slug = cfg.campaign.slug
-    st.campaign_name = cfg.campaign.name
-    st.workdir = str(ws.workdir.resolve())
-    loc = cfg.data.location
-    if isinstance(loc, LocationUSR):
-        st.data_location = {
-            "kind": "usr",
-            "dataset": loc.dataset,
-            "path": str(Path(loc.path).resolve()),
-            "records_path": str(store.records_path.resolve()),
-        }
-    elif isinstance(loc, LocationLocal):
-        st.data_location = {
-            "kind": "local",
-            "path": str(Path(loc.path).resolve()),
-            "records_path": str(store.records_path.resolve()),
-        }
-    st.x_column_name = cfg.data.x_column_name
-    st.y_column_name = cfg.data.y_column_name
-    st.representation_vector_dimension = rep.x_dim or 0
-    st.representation_transform = {
-        "name": cfg.data.transforms_x.name,
-        "params": cfg.data.transforms_x.params,
-    }
-    st.training_policy = dict(cfg.training.policy or {})
-    st.performance = {
-        "score_batch_size": req.score_batch_size_override or cfg.scoring.score_batch_size,
-        "objective": obj_name,
-    }
-    labels_used_rounds = sorted(set(train_df["r"].astype(int).tolist()))
-    st.add_round(
-        RoundEntry(
-            round_index=int(req.as_of_round),
-            run_id=str(run_id),
-            round_name=f"round_{int(req.as_of_round)}",
-            round_dir=str(rdir.resolve()),
-            labels_used_rounds=labels_used_rounds,
-            number_of_training_examples_used_in_round=len(id_order_train),
-            number_of_candidates_scored_in_round=len(id_order_pool),
-            selection_top_k_requested=int(top_k),
-            selection_top_k_effective_after_ties=int(selected_effective),
-            model={
-                "type": cfg.model.name,
-                "params": cfg.model.params,
-                "artifact_path": str(apaths.model.resolve()),
-                "artifact_sha256": file_sha256(apaths.model),
-            },
-            metrics={},
-            durations_sec={},  # filled below
-            seeds={
-                "global": cfg.model.params.get("random_state"),
-                "model": cfg.model.params.get("random_state"),
-            },
-            artifacts={
-                "selection_top_k_csv": str(apaths.selection_csv.resolve()),
-                # New, explicit ledger sinks:
-                "ledger_predictions_dir": str(ws.ledger_predictions_dir.resolve()),
-                "ledger_runs_parquet": str(ws.ledger_runs_path.resolve()),
-                "ledger_labels_parquet": str(ws.ledger_labels_path.resolve()),
-                "round_ctx_json": str(apaths.round_ctx_json.resolve()),
-                "objective_meta_json": str(apaths.objective_meta_json.resolve()),
-                "model_meta_json": str((rdir / "model_meta.json").resolve()),
-                "labels_used_parquet": str((rdir / "labels_used.parquet").resolve()),
-                "round_log_jsonl": str((rdir / "round.log.jsonl").resolve()),
-            },
-            writebacks={
-                "records_label_hist_updated": [
-                    "opal__<slug>__label_hist",
-                ]
-            },
-            warnings=[],
-        )
+    total_duration = time.perf_counter() - t0
+    _update_campaign_state(
+        ws=ws,
+        cfg=cfg,
+        req=req,
+        rep=rep,
+        train_df=train_df,
+        id_order_train=id_order_train,
+        id_order_pool=id_order_pool,
+        top_k=top_k,
+        selected_effective=selected_effective,
+        apaths=apaths,
+        run_id=run_id,
+        obj_name=obj_name,
+        store=store,
+        total_duration=total_duration,
+        fit_duration=fit_duration,
     )
-    t1 = time.perf_counter()
-    # Dataclass field update (not dict-style)
-    st.rounds[-1].durations_sec = {"total": t1 - t0, "fit": fit_duration}
-    st.save(ws.state_path)
 
     append_round_log_event(
         rdir / "round.log.jsonl",
