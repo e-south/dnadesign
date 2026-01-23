@@ -174,6 +174,54 @@ def test_cli_pressure_unknown_sequences_drop_skips_rows(tmp_path: Path) -> None:
     assert "EEE" not in df["sequence"].astype(str).tolist()
 
 
+def test_cli_pressure_unknown_sequences_missing_x_auto_drop(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    _write_records(records)
+
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        transforms_y_name="scalar_from_table_v1",
+        transforms_y_params={"sequence_column": "sequence", "y_column": "y"},
+        objective_name="scalar_identity_v1",
+        objective_params={},
+        y_expected_length=1,
+        model_params={"n_estimators": 5, "random_state": 0, "oob_score": False},
+        selection_params={"top_k": 1},
+    )
+
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "init", "-c", str(campaign)])
+    assert res.exit_code == 0, res.stdout
+
+    labels = workdir / "labels_r0.csv"
+    _write_labels_with_extras(labels, seqs=["AAA", "EEE"], ys=[0.2, 0.9], include_x=False, as_parquet=False)
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(labels),
+            "--yes",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+
+    df = pd.read_parquet(records)
+    assert "EEE" not in df["sequence"].astype(str).tolist()
+
+
 def test_cli_pressure_sequence_exists_with_new_id_errors(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)

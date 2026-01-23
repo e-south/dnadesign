@@ -173,18 +173,27 @@ def cmd_ingest_y(
         if unknown_sequences not in {"create", "drop", "error"}:
             raise OpalError("--unknown-sequences must be one of: create, drop, error.")
 
+        def _build_unknown_mask(frame: pd.DataFrame) -> pd.Series:
+            mask = pd.Series(False, index=frame.index)
+            if "id" in frame.columns:
+                id_series = frame["id"]
+                mask = id_series.isna()
+                if id_series.notna().any() and known_ids:
+                    mask |= ~id_series.astype(str).isin(known_ids)
+            return mask
+
         # Identify unknown rows (ids not resolved to existing records)
         known_ids = set(df["id"].astype(str).tolist()) if "id" in df.columns else set()
-        unknown_mask = pd.Series(False, index=labels_df.index)
         if "id" in labels_df.columns:
-            id_series = labels_df["id"]
-            unknown_mask = id_series.isna()
-            if id_series.notna().any() and known_ids:
-                unknown_mask |= ~id_series.astype(str).isin(known_ids)
+            id_missing_mask = labels_df["id"].isna()
+        else:
+            id_missing_mask = pd.Series(False, index=labels_df.index)
+        unknown_mask = _build_unknown_mask(labels_df)
         unknown_count = int(unknown_mask.sum())
 
         # Missing required columns for new rows (only relevant if unknown rows exist and we intend to create)
         missing_required = [c for c in required_cols if c not in csv_df.columns]
+        dropped_missing_x = 0
 
         # Assertive check: list-valued X columns must arrive as lists (Parquet recommended).
         def _is_listlike(val: object) -> bool:
@@ -218,6 +227,17 @@ def cmd_ingest_y(
                 return None
             return str(mode.iloc[0])
 
+        def _is_missing_value(val: object) -> bool:
+            if val is None:
+                return True
+            if isinstance(val, float) and np.isnan(val):
+                return True
+            if isinstance(val, str) and not val.strip():
+                return True
+            if isinstance(val, (list, tuple, np.ndarray)) and len(val) == 0:
+                return True
+            return False
+
         # Handle unknown sequences before final confirmation
         if unknown_count > 0:
             if unknown_sequences == "error":
@@ -225,7 +245,27 @@ def cmd_ingest_y(
                     f"{unknown_count} sequences not found in records. "
                     "Use --unknown-sequences drop to skip them or provide required columns to create new rows."
                 )
-            if unknown_sequences == "create" and missing_required:
+            if unknown_sequences in {"create", "drop"} and cfg.data.x_column_name in required_cols:
+                x_col = cfg.data.x_column_name
+                if x_col not in csv_df.columns:
+                    missing_x_mask = unknown_mask & id_missing_mask
+                elif len(csv_df) == len(labels_df):
+                    missing_x_mask = csv_df[x_col].map(_is_missing_value)
+                    missing_x_mask = missing_x_mask.fillna(True) & unknown_mask & id_missing_mask
+                else:
+                    missing_x_mask = pd.Series(False, index=labels_df.index)
+                missing_x_count = int(missing_x_mask.sum())
+                if missing_x_count > 0:
+                    labels_df = labels_df.loc[~missing_x_mask].copy()
+                    dropped_missing_x = missing_x_count
+                    id_missing_mask = (
+                        labels_df["id"].isna() if "id" in labels_df.columns else pd.Series(False, index=labels_df.index)
+                    )
+                    unknown_mask = _build_unknown_mask(labels_df)
+                    unknown_count = int(unknown_mask.sum())
+            if unknown_count == 0:
+                pass
+            elif unknown_sequences == "create" and missing_required:
                 missing_set = set(missing_required)
                 defaults = {}
                 if missing_set.issubset({"bio_type", "alphabet"}):
@@ -294,17 +334,28 @@ def cmd_ingest_y(
         # Human-friendly nudges (non-fatal)
         if not json:
             nudges = list(preview.warnings or [])
-            if preview.unknown_sequences and unknown_sequences == "drop":
-                nudges = [
-                    n
-                    for n in nudges
-                    if "sequences not found" not in n.lower() and "new rows will be created" not in n.lower()
-                ]
-                nudges.append(f"Dropping {preview.unknown_sequences} unknown sequences (--unknown-sequences drop).")
-            if preview.unknown_sequences and required_cols and unknown_sequences != "drop":
-                nudges.append(
-                    "New sequences will be created; required columns for new rows: " + ", ".join(required_cols) + "."
-                )
+            total_unknown = int(preview.unknown_sequences or 0)
+            if total_unknown:
+                if unknown_sequences == "drop":
+                    nudges = [
+                        n
+                        for n in nudges
+                        if "sequences not found" not in n.lower() and "new rows will be created" not in n.lower()
+                    ]
+                    nudges.append(f"Dropping {total_unknown} unknown sequences (--unknown-sequences drop).")
+                elif dropped_missing_x:
+                    nudges = [
+                        n
+                        for n in nudges
+                        if "sequences not found" not in n.lower() and "new rows will be created" not in n.lower()
+                    ]
+                    nudges.append(f"Dropping {dropped_missing_x} unknown sequences missing X data.")
+                if unknown_count > 0 and required_cols and unknown_sequences != "drop":
+                    nudges.append(
+                        "New sequences will be created; required columns for new rows: "
+                        + ", ".join(required_cols)
+                        + "."
+                    )
             if nudges:
                 print_stdout(bullet_list("Nudges", nudges))
 

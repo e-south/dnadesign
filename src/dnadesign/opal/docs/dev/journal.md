@@ -12,6 +12,7 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Demo reset command added (hidden from `--help`) to prune records.parquet, remove outputs/, and delete state.json.
 - Ingest-y hardened: `--unknown-sequences` handling, default inference for missing bio_type/alphabet, and guards for
   duplicate sequences + deterministic id collisions.
+- Auto-drop unknown sequences that lack X data (ingest-y safety).
 
 ### Campaign layout notes
 - Campaign root is the center of gravity; configs live in `configs/` and IO stays under the campaign root.

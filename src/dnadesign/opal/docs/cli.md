@@ -92,6 +92,8 @@ opal ingest-y --config <yaml> --round <r> --csv <path> \
   `--unknown-sequences drop` or provide the columns.
 * If `records.parquet` contains duplicate sequences, `ingest-y` requires an explicit `id` column for all rows
   to avoid ambiguous sequence → id mapping.
+* When unknown sequences are missing **X** data, `ingest-y` drops those rows automatically (unless you pass
+  `--unknown-sequences error`). This avoids creating partial records without X.
 * If adding **new sequences** and X is list-valued, prefer **Parquet** input so the X column remains list-typed
   (CSV will coerce lists to strings).
 * Appends to `opal__<slug>__label_hist` and writes the current Y column.
