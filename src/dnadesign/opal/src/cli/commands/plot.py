@@ -49,11 +49,6 @@ def cmd_plot(
         "--describe",
         help="Describe a plot kind (params + required fields) and exit.",
     ),
-    quick: bool = typer.Option(
-        False,
-        "--quick/--no-quick",
-        help="Run default plots without plots.yaml (explicit; no fallbacks).",
-    ),
     round: Optional[str] = typer.Option(
         None,
         "--round",
@@ -115,23 +110,17 @@ def cmd_plot(
     ws = analysis.workspace
     print_config_context(campaign_yaml, cfg=cfg, records_path=store.records_path)
 
-    if quick and plot_config:
-        raise ValueError("[plot] Do not combine --quick with --plot-config.")
-
     try:
         plot_cfg = load_plot_config(
-            cfg=cfg,
             campaign_cfg=campaign_cfg,
             campaign_yaml=campaign_yaml,
             campaign_dir=campaign_dir,
             plot_config_opt=plot_config,
-            quick=quick,
-            outputs_dir=ws.outputs_dir,
         )
     except ValueError as e:
         msg = str(e)
         if "No plots found" in msg:
-            raise ValueError("[plot] No plots found. Add plots.yaml or re-run with --quick.") from e
+            raise ValueError("[plot] No plots found. Add plots.yaml or define plots in campaign.yaml.") from e
         raise
 
     if list_registry or list_config:

@@ -11,7 +11,6 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 from ..config.loader import resolve_path_like
-from ..config.types import RootConfig
 
 ALLOWED_PLOT_KEYS = {
     "name",
@@ -216,92 +215,19 @@ def _resolve_plot_config_source(
     return plot_cfg, campaign_yaml.resolve(), campaign_dir.resolve(), "campaign.yaml"
 
 
-def _has_feature_importance(outputs_dir: Path) -> bool:
-    if not outputs_dir.exists():
-        return False
-    rounds_dir = outputs_dir / "rounds"
-    if not rounds_dir.exists():
-        return False
-    for child in rounds_dir.iterdir():
-        if not child.is_dir():
-            continue
-        if child.name.startswith("round_") and (child / "feature_importance.csv").exists():
-            return True
-    return False
-
-
-def _build_quick_plots(cfg: RootConfig, *, outputs_dir: Path) -> List[Dict[str, Any]]:
-    plots: List[Dict[str, Any]] = [
-        {"name": "quick_score_vs_rank", "kind": "scatter_score_vs_rank", "params": {}},
-        {
-            "name": "quick_percent_high",
-            "kind": "percent_high_activity_over_rounds",
-            "params": {"mode": "line", "swarm": False},
-        },
-    ]
-    obj_name = ""
-    try:
-        obj_block = getattr(cfg, "objective", None)
-        if obj_block is not None:
-            if hasattr(obj_block, "objective"):
-                obj_name = str(getattr(obj_block.objective, "name", "") or "")
-            else:
-                obj_name = str(getattr(obj_block, "name", "") or "")
-    except Exception:
-        obj_name = ""
-    obj_name = obj_name.lower()
-    if obj_name.startswith("sfxi"):
-        plots.extend(
-            [
-                {
-                    "name": "quick_sfxi_logic_fidelity",
-                    "kind": "sfxi_logic_fidelity_closeness",
-                    "params": {"violin": False},
-                },
-                {
-                    "name": "quick_fold_change_vs_logic_fidelity",
-                    "kind": "fold_change_vs_logic_fidelity",
-                    "params": {},
-                },
-            ]
-        )
-    if _has_feature_importance(outputs_dir):
-        plots.append(
-            {
-                "name": "quick_feature_importance",
-                "kind": "feature_importance_bars",
-                "params": {},
-            }
-        )
-    return plots
-
-
 def load_plot_config(
     *,
-    cfg: RootConfig,
     campaign_cfg: dict,
     campaign_yaml: Path,
     campaign_dir: Path,
     plot_config_opt: Optional[Path],
-    quick: bool,
-    outputs_dir: Path,
 ) -> PlotConfig:
-    if quick:
-        plot_cfg = {
-            "plots": _build_quick_plots(cfg, outputs_dir=outputs_dir),
-            "plot_defaults": {},
-            "plot_presets": {},
-        }
-        plot_cfg_path = campaign_yaml
-        plot_cfg_dir = campaign_dir
-        plot_src = "--quick"
-    else:
-        plot_cfg, plot_cfg_path, plot_cfg_dir, plot_src = _resolve_plot_config_source(
-            campaign_cfg=campaign_cfg,
-            campaign_yaml=campaign_yaml,
-            campaign_dir=campaign_dir,
-            plot_config_opt=plot_config_opt,
-        )
+    plot_cfg, plot_cfg_path, plot_cfg_dir, plot_src = _resolve_plot_config_source(
+        campaign_cfg=campaign_cfg,
+        campaign_yaml=campaign_yaml,
+        campaign_dir=campaign_dir,
+        plot_config_opt=plot_config_opt,
+    )
     plots_cfg = plot_cfg.get("plots")
     if not isinstance(plots_cfg, list):
         raise ValueError(f"[plot] plots must be a list in {plot_cfg_path}.")

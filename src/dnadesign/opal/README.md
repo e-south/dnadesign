@@ -69,7 +69,6 @@ opal record-show -c path/to/configs/campaign.yaml --id <some_id>
 opal explain -c path/to/configs/campaign.yaml --round 1
 opal plot --list                              # list available plot kinds
 opal plot -c path/to/configs/campaign.yaml
-opal plot -c path/to/configs/campaign.yaml --quick    # run default plots without plots.yaml
 opal plot -c path/to/configs/campaign.yaml --run-id <run_id>  # run-aware; resolves round, conflicts error
 opal predict -c path/to/configs/campaign.yaml               # uses latest round
 opal objective-meta -c configs/campaign.yaml --round latest

@@ -27,7 +27,6 @@ plots:
   # Set enabled: false to keep a plot config without running it.
   - name: score_vs_rank_latest
     kind: scatter_score_vs_rank
-    tags: [quick]
     params:
       rank_mode: sequential      # "sequential" | "competition"
       hue: logic_fidelity        # alias -> obj__effect_scaled
@@ -43,7 +42,6 @@ plots:
 
   - name: percent_high_activity
     kind: percent_high_activity_over_rounds
-    tags: [quick]
     params:
       threshold: 0.85
       mode: both                    # violin+swarm on left axis, % line on right axis
@@ -92,7 +90,6 @@ plots:
 
   - name: feature_importance_bars
     kind: feature_importance_bars
-    tags: [quick]
     params:
       # aesthetics
       figsize_in: [12, 5]

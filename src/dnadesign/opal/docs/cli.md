@@ -456,7 +456,6 @@ opal plot --config <yaml-or-dir> [--plot-config <plots.yaml>] \
 opal plot --list
 opal plot --list-config --config <yaml-or-dir>
 opal plot --describe <plot-kind>
-opal plot --config <yaml-or-dir> --quick
 ```
 
 **Flags**
@@ -466,7 +465,6 @@ opal plot --config <yaml-or-dir> --quick
 * `--list`: List registered plot kinds and exit (does not require config).
 * `--list-config`: List plots configured in YAML and exit (requires `--config`).
 * `--describe`: Show parameters + required fields for a plot kind.
-* `--quick`: Run built-in default plots without plots.yaml (explicit).
 * `--round, -r`: `latest | all | 3 | 1,3,7 | 2-5` (plugin may define defaults).
 * `--run-id`: Explicit run_id to disambiguate ledger predictions (required if multiple runs exist for a round).
 * `--name, -n`: Run a single plot by name; omit to run **all**.
@@ -478,7 +476,6 @@ opal plot --config <yaml-or-dir> --quick
 * Output directory defaults to `outputs/plots`, or honors `output.dir` if provided.
 * Plot-specific knobs **must** live under `params:`; top-level plotting keys are errors.
 * Prefer `plot_config: plots.yaml` in configs/campaign.yaml to keep runtime config lean.
-* `--quick` is assertive: it does **not** auto-run unless explicitly requested.
 * `plot_defaults` and `plot_presets` reduce redundancy; `preset: <name>` merges into each plot entry.
 * Set `enabled: false` on any plot entry to keep it in the YAML without running it.
 * If a round has multiple run_ids, plots require `--run-id` to avoid mixing reruns.
@@ -521,7 +518,6 @@ plot_defaults:
 plots:
   - name: score_vs_rank_latest
     kind: scatter_score_vs_rank         # plot plugin id
-    tags: [quick]
     params:
       score_field: "pred__y_obj_scalar" # field from run_pred rows
       hue: null                         # or "round"

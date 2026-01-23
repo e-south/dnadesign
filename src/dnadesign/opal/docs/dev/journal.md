@@ -32,3 +32,6 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Moved notebook theme helpers to `analysis/dashboard/theme.py`; added guard test to keep notebooks dir marimo-only.
 - Label history prediction writeback now deep-coerces objective params (e.g., numpy arrays → lists) for portability;
   added test coverage for the coercion.
+- Removed plot `--quick` mode and its built-in quick plots; demo plots now rely solely on plots.yaml.
+- Demo plot config now uses effect_scaled vs logic_fidelity and renames the plot for semantic clarity.
+- Gitignore explicitly blocks non-demo opal campaign records.parquet while keeping demo as a tracked exception.

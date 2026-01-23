@@ -12,7 +12,7 @@ opal plot --config /path/to/campaign.yaml \
   [--plot-config /path/to/plots.yaml] \
   [--round latest|all|3|1,3,7|2-5] \
   [--name my_plot] \
-  [--tag quick]
+  [--tag my_tag]
 ```
 
 - Discover available plot kinds:
@@ -21,7 +21,6 @@ opal plot --config /path/to/campaign.yaml \
 opal plot --list
 opal plot --list-config --config /path/to/campaign.yaml
 opal plot --describe scatter_score_vs_rank
-opal plot --config /path/to/campaign.yaml --quick
 ```
 
 ### Minimal YAML schema
@@ -50,7 +49,6 @@ plot_presets:
 plots:
   - name: score_vs_rank_latest        # unique instance label
     kind: scatter_score_vs_rank       # plugin id registered in plots registry
-    tags: [quick]
 
     # Optional extra sources (built-ins auto-injected: records, outputs)
     data:

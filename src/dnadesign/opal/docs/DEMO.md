@@ -5,7 +5,7 @@ This demo walks a **complete OPAL loop** on a small dataset with the SFXI ingest
 **What you'll learn (and see):**
 - a full `run` (train -> score -> select)
 - ledger-backed inspection (`status`, `runs`, `log`)
-- plots (quick + configured)
+- plots (configured)
 - where artifacts and ledgers live
 
 This demo is **self-contained**: it ships with a local `records.parquet` and label inputs under `inputs/`, so no USR setup is required.
@@ -38,7 +38,6 @@ uv run opal log -c configs/campaign.yaml --round latest
 uv run opal verify-outputs -c configs/campaign.yaml --round latest
 
 # 5) Plot
-uv run opal plot -c configs/campaign.yaml --quick
 uv run opal plot -c configs/campaign.yaml
 
 # 6) Dashboard (marimo)
