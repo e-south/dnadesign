@@ -52,14 +52,14 @@ class _DummyAdapter:
         sequence_length,
         solver,
         strategy,
-        solver_options,
         fixed_elements,
         strands="double",
         regulator_by_index=None,
         required_regulators=None,
         min_count_by_regulator=None,
         min_required_regulators=None,
-        solve_timeout_seconds=None,
+        solver_time_limit_seconds=None,
+        solver_threads=None,
     ):
         opt = _DummyOpt()
         seqs = ["AAA", "CCC"]
@@ -126,7 +126,7 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
                 },
                 "plan": [{"name": "default", "quota": 2}],
             },
-            "solver": {"backend": "CBC", "strategy": "iterate", "options": []},
+            "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {
                 "round_robin": True,
                 "arrays_generated_before_resample": 1,

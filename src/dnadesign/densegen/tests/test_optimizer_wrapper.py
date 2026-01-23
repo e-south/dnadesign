@@ -19,9 +19,13 @@ def test_solver_time_limit_applies(monkeypatch: pytest.MonkeyPatch) -> None:
     class _DummyModel:
         def __init__(self) -> None:
             self.time_limit_ms = None
+            self.threads = None
 
         def SetTimeLimit(self, ms: int) -> None:
             self.time_limit_ms = ms
+
+        def SetNumThreads(self, threads: int) -> None:
+            self.threads = threads
 
     class _DummyOptimizer:
         def __init__(self, library, sequence_length, strands="double") -> None:
@@ -54,9 +58,10 @@ def test_solver_time_limit_applies(monkeypatch: pytest.MonkeyPatch) -> None:
         sequence_length=10,
         solver="CBC",
         strategy="iterate",
-        solver_options=[],
         fixed_elements=None,
-        solve_timeout_seconds=2,
+        solver_time_limit_seconds=2,
+        solver_threads=3,
     )
     run.optimizer.build_model()
     assert run.optimizer.model.time_limit_ms == 2000
+    assert run.optimizer.model.threads == 3

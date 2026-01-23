@@ -215,15 +215,11 @@ Notes:
 - `backend`: solver name string (required unless `strategy: approximate`).
   - Common values: `CBC`, `GUROBI` (depends on your dense-arrays install).
 - `strategy`: `iterate | diverse | optimal | approximate`
-- `options` (list of solver option strings)
-  - `options` must be empty when `strategy: approximate`
+- `time_limit_seconds` (float > 0, optional)
+- `threads` (int > 0, optional)
 - `strands`: `single | double` (default: `double`)
-- `allow_unknown_options` (bool; default `false`)
-  - DenseGen validates solver option keys for known backends. Set to `true` to bypass validation.
-  - Known keys (case-insensitive):
-    - CBC: `Threads`, `TimeLimit`, `TimeLimitSeconds`, `MaxSeconds`, `Seconds`, `RatioGap`,
-      `MIPGap`, `Seed`, `RandomSeed`, `LogLevel`
-    - GUROBI: `Threads`, `TimeLimit`, `MIPGap`, `Seed`, `LogToConsole`, `LogFile`, `Method`, `Presolve`
+  - `time_limit_seconds` and `threads` are invalid when `strategy: approximate`
+  - `threads` is rejected for CBC backends (OR-Tools does not apply it)
 
 ---
 
@@ -237,7 +233,7 @@ Notes:
 - `arrays_generated_before_resample` (int > 0)
 - `min_count_per_tf` (int >= 0)
 - `max_duplicate_solutions`, `stall_seconds_before_resample`, `stall_warning_every_seconds`
-  - `stall_seconds_before_resample` also sets a per‑solve time limit (seconds) for solver‑based strategies; `0` disables.
+  - `stall_seconds_before_resample` controls how long to wait with no new solutions before resampling; the timer resets on each new solution; `0` disables.
 - `max_resample_attempts`, `max_total_resamples`, `max_seconds_per_plan`, `max_failed_solutions`
 - `leaderboard_every` (int >= 0; 0 disables periodic leaderboard logs)
 - `checkpoint_every` (int >= 0; 0 disables run_state checkpoints)
@@ -323,9 +319,8 @@ densegen:
   solver:
     backend: CBC
     strategy: diverse
-    options: []
+    time_limit_seconds: 5
     strands: double
-    allow_unknown_options: false
 
   runtime:
     round_robin: true
@@ -351,7 +346,7 @@ densegen:
         max: 0.6
         target: 0.5
         tolerance: 0.1
-        min_pad_length: 4
+        min_pad_length: 0
       max_tries: 2000
 
   logging:

@@ -27,7 +27,6 @@ install_native_stderr_filters(suppress_solver_messages=False)
 
 def _meta_arrow_type(name: str, pa):
     list_str = {
-        "solver_options",
         "tf_list",
         "tfbs_parts",
         "used_tfbs",
@@ -44,6 +43,7 @@ def _meta_arrow_type(name: str, pa):
     int_fields = {
         "length",
         "random_seed",
+        "solver_threads",
         "min_count_per_tf",
         "min_required_regulators",
         "input_pwm_n_sites",
@@ -87,6 +87,7 @@ def _meta_arrow_type(name: str, pa):
         "gc_core",
         "solver_objective",
         "solver_solve_time_s",
+        "solver_time_limit_seconds",
     }
     bool_fields = {
         "covers_all_tfs_in_solution",

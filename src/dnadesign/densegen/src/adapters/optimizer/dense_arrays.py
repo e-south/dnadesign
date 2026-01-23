@@ -39,14 +39,14 @@ class OptimizerAdapter(Protocol):
         sequence_length: int,
         solver: str | None,
         strategy: str,
-        solver_options: list[str],
         fixed_elements: dict | None,
         strands: str = "double",
         regulator_by_index: list[str] | None = None,
         required_regulators: list[str] | None = None,
         min_count_by_regulator: dict[str, int] | None = None,
         min_required_regulators: int | None = None,
-        solve_timeout_seconds: float | None = None,
+        solver_time_limit_seconds: float | None = None,
+        solver_threads: int | None = None,
     ) -> OptimizerRun: ...
 
 
@@ -116,29 +116,47 @@ def _apply_regulator_constraints(
     )
 
 
-def _apply_solve_timeout(opt: da.Optimizer, *, solve_timeout_seconds: float | None) -> None:
-    if solve_timeout_seconds is None:
+def _apply_solver_controls(
+    opt: da.Optimizer,
+    *,
+    time_limit_seconds: float | None,
+    threads: int | None,
+) -> None:
+    if time_limit_seconds is None and threads is None:
         return
-    try:
-        seconds = float(solve_timeout_seconds)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("solve_timeout_seconds must be a number of seconds > 0") from exc
-    if seconds <= 0:
-        return
+    if time_limit_seconds is not None:
+        try:
+            time_limit_seconds = float(time_limit_seconds)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("solver.time_limit_seconds must be a number of seconds > 0") from exc
+        if time_limit_seconds <= 0:
+            raise ValueError("solver.time_limit_seconds must be > 0")
+    if threads is not None:
+        try:
+            threads = int(threads)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("solver.threads must be an integer > 0") from exc
+        if threads <= 0:
+            raise ValueError("solver.threads must be > 0")
     if not hasattr(opt, "build_model"):
-        raise RuntimeError("Optimizer does not expose build_model; cannot apply solve timeout.")
+        raise RuntimeError("Optimizer does not expose build_model; cannot apply solver controls.")
     original_build_model = opt.build_model
 
-    def _build_model_with_timeout(*args, **kwargs):
+    def _build_model_with_controls(*args, **kwargs):
         original_build_model(*args, **kwargs)
         model = getattr(opt, "model", None)
         if model is None:
-            raise RuntimeError("Solver model not initialized; cannot apply time limit.")
-        if not hasattr(model, "SetTimeLimit"):
-            raise RuntimeError("Solver model does not support SetTimeLimit; cannot enforce stall_seconds.")
-        model.SetTimeLimit(int(max(1, round(seconds * 1000))))
+            raise RuntimeError("Solver model not initialized; cannot apply solver controls.")
+        if time_limit_seconds is not None:
+            if not hasattr(model, "SetTimeLimit"):
+                raise RuntimeError("Solver model does not support SetTimeLimit.")
+            model.SetTimeLimit(int(max(1, round(time_limit_seconds * 1000))))
+        if threads is not None:
+            if not hasattr(model, "SetNumThreads"):
+                raise RuntimeError("Solver model does not support SetNumThreads.")
+            model.SetNumThreads(int(threads))
 
-    opt.build_model = _build_model_with_timeout
+    opt.build_model = _build_model_with_controls
 
 
 class DenseArraysAdapter:
@@ -160,14 +178,14 @@ class DenseArraysAdapter:
         sequence_length: int,
         solver: str | None,
         strategy: str,
-        solver_options: list[str],
         fixed_elements: dict | None,
         strands: str = "double",
         regulator_by_index: list[str] | None = None,
         required_regulators: list[str] | None = None,
         min_count_by_regulator: dict[str, int] | None = None,
         min_required_regulators: int | None = None,
-        solve_timeout_seconds: float | None = None,
+        solver_time_limit_seconds: float | None = None,
+        solver_threads: int | None = None,
     ) -> OptimizerRun:
         if strategy != "approximate" and not solver:
             raise ValueError("solver.backend is required unless strategy=approximate")
@@ -176,7 +194,6 @@ class DenseArraysAdapter:
             library=library,
             sequence_length=sequence_length,
             solver=solver_name,
-            solver_options=solver_options,
             fixed_elements=fixed_elements,
             strands=strands,
         )
@@ -188,18 +205,22 @@ class DenseArraysAdapter:
             min_count_by_regulator=min_count_by_regulator,
             min_required_regulators=min_required_regulators,
         )
-        _apply_solve_timeout(opt, solve_timeout_seconds=solve_timeout_seconds)
+        _apply_solver_controls(
+            opt,
+            time_limit_seconds=solver_time_limit_seconds,
+            threads=solver_threads,
+        )
         if strategy == "diverse":
             if not hasattr(opt, "solutions_diverse"):
                 raise RuntimeError("dense-arrays does not support solutions_diverse on this install.")
-            gen = opt.solutions_diverse(solver=solver_name, solver_options=solver_options)
+            gen = opt.solutions_diverse(solver=solver_name, solver_options=None)
         elif strategy == "iterate":
-            gen = opt.solutions(solver=solver_name, solver_options=solver_options)
+            gen = opt.solutions(solver=solver_name, solver_options=None)
         elif strategy == "optimal":
 
             def _gen():
                 start = time.monotonic()
-                sol = opt.optimal(solver=solver_name, solver_options=solver_options)
+                sol = opt.optimal(solver=solver_name, solver_options=None)
                 try:
                     setattr(sol, "_densegen_solve_time_s", time.monotonic() - start)
                 except Exception:
@@ -247,7 +268,6 @@ class DenseArrayOptimizer:
         library: list[str],
         sequence_length: int,
         solver: str | None = None,
-        solver_options: list | None = None,
         fixed_elements: dict | None = None,
         strands: str = "double",
     ):
@@ -275,7 +295,6 @@ class DenseArrayOptimizer:
         self.library = filtered
         self.sequence_length = sequence_length
         self.solver = solver
-        self.solver_options = solver_options or []
         self.fixed_elements = (fixed_elements or {}).copy()
         if strands not in {"single", "double"}:
             raise ValueError("strands must be 'single' or 'double'")

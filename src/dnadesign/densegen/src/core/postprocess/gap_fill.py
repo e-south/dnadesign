@@ -33,7 +33,7 @@ def generate_pad(
     gc_max: float = 0.60,
     gc_target: float = 0.50,
     gc_tolerance: float = 0.10,
-    gc_min_pad_length: int = 4,
+    gc_min_pad_length: int = 0,
     max_tries: int = 2000,
     rng: random.Random | None = None,
 ) -> tuple[str, dict]:

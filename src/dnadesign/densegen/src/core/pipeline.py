@@ -513,6 +513,96 @@ def _max_fixed_element_len(fixed_elements_dump: dict) -> int:
     return max_len
 
 
+def _min_fixed_elements_length(fixed_elements_dump: dict) -> int:
+    total = 0
+    pcs = fixed_elements_dump.get("promoter_constraints") or []
+    for pc in pcs:
+        if not isinstance(pc, dict):
+            continue
+        upstream = str(pc.get("upstream") or "").strip().upper()
+        downstream = str(pc.get("downstream") or "").strip().upper()
+        spacer = pc.get("spacer_length")
+        if isinstance(spacer, (list, tuple)) and spacer:
+            spacer_min = min(int(v) for v in spacer)
+        elif isinstance(spacer, (int, float)):
+            spacer_min = int(spacer)
+        else:
+            spacer_min = 0
+        total += len(upstream) + len(downstream) + max(0, spacer_min)
+    return total
+
+
+def _min_required_length_for_constraints(
+    *,
+    library_tfbs: list[str],
+    library_tfs: list[str],
+    fixed_elements_dump: dict,
+    required_regulators: list[str] | None,
+    min_required_regulators: int | None,
+    min_count_by_regulator: dict[str, int] | None,
+    min_count_per_tf: int,
+) -> tuple[int, dict[str, int]]:
+    lengths_by_tf: dict[str, list[int]] = {}
+    for idx, tfbs in enumerate(library_tfbs):
+        tf = library_tfs[idx] if idx < len(library_tfs) else ""
+        if not tf:
+            continue
+        lengths_by_tf.setdefault(tf, []).append(len(str(tfbs)))
+    for tf in lengths_by_tf:
+        lengths_by_tf[tf].sort()
+
+    per_tf_required: dict[str, int] = {}
+    if required_regulators and min_required_regulators is None:
+        for tf in required_regulators:
+            per_tf_required[tf] = max(per_tf_required.get(tf, 0), 1)
+    if min_count_by_regulator:
+        for tf, count in min_count_by_regulator.items():
+            per_tf_required[tf] = max(per_tf_required.get(tf, 0), int(count))
+    if min_count_per_tf > 0:
+        for tf in lengths_by_tf:
+            per_tf_required[tf] = max(per_tf_required.get(tf, 0), int(min_count_per_tf))
+
+    missing = []
+    per_tf_total = 0
+    for tf, count in per_tf_required.items():
+        lengths = lengths_by_tf.get(tf, [])
+        if len(lengths) < int(count):
+            missing.append(f"{tf}({len(lengths)}/{count})")
+            continue
+        per_tf_total += sum(lengths[: int(count)])
+    if missing:
+        preview = ", ".join(missing[:6])
+        raise ValueError(f"Not enough TFBS to satisfy per-regulator minimums: {preview}")
+
+    k_required_extra = 0
+    if min_required_regulators is not None:
+        candidate_set = set(required_regulators or lengths_by_tf.keys())
+        available = [tf for tf in candidate_set if tf in lengths_by_tf]
+        if len(available) < int(min_required_regulators):
+            raise ValueError(
+                "min_required_regulators exceeds available regulators in the Stage-B library "
+                f"({len(available)} < {int(min_required_regulators)})."
+            )
+        already_required = {tf for tf, count in per_tf_required.items() if count > 0}
+        remaining = max(0, int(min_required_regulators) - len(set(available) & already_required))
+        if remaining > 0:
+            candidates = [lengths_by_tf[tf][0] for tf in available if tf not in already_required]
+            if len(candidates) < remaining:
+                raise ValueError(
+                    "min_required_regulators exceeds available regulators after fixed minimums "
+                    f"({len(candidates)} < {remaining})."
+                )
+            k_required_extra = sum(sorted(candidates)[:remaining])
+
+    fixed_min = _min_fixed_elements_length(fixed_elements_dump)
+    total = fixed_min + per_tf_total + k_required_extra
+    return total, {
+        "fixed_elements_min": fixed_min,
+        "per_tf_min": per_tf_total,
+        "min_required_extra": k_required_extra,
+    }
+
+
 def _input_metadata(source_cfg, cfg_path: Path) -> dict:
     source_type = getattr(source_cfg, "type", "unknown")
     source_name = getattr(source_cfg, "name", "unknown")
@@ -1917,7 +2007,6 @@ def _process_plan_for_source(
     max_dupes = int(runtime_cfg.max_duplicate_solutions)
     max_resample_attempts = int(runtime_cfg.max_resample_attempts)
     stall_seconds = int(runtime_cfg.stall_seconds_before_resample)
-    solve_timeout_seconds = float(stall_seconds) if stall_seconds > 0 else None
     stall_warn_every = int(runtime_cfg.stall_warning_every_seconds)
     max_total_resamples = int(runtime_cfg.max_total_resamples)
     max_seconds_per_plan = int(runtime_cfg.max_seconds_per_plan)
@@ -1950,9 +2039,12 @@ def _process_plan_for_source(
     pad_max_tries = int(pad_cfg.max_tries)
 
     solver_cfg = global_cfg.solver
-    solver_opts = list(solver_cfg.options)
     solver_strategy = str(solver_cfg.strategy)
     solver_strands = str(solver_cfg.strands)
+    solver_time_limit_seconds = (
+        float(solver_cfg.time_limit_seconds) if solver_cfg.time_limit_seconds is not None else None
+    )
+    solver_threads = int(solver_cfg.threads) if solver_cfg.threads is not None else None
 
     log_cfg = global_cfg.logging
     print_visual = bool(log_cfg.print_visual)
@@ -2316,6 +2408,25 @@ def _process_plan_for_source(
             "Increase densegen.generation.sequence_length or reduce motif lengths "
             "(e.g., adjust Stage-A PWM sampling length_range or fixed-element motifs)."
         )
+    min_required_len, min_breakdown = _min_required_length_for_constraints(
+        library_tfbs=library_tfbs,
+        library_tfs=library_tfs,
+        fixed_elements_dump=fixed_elements_dump,
+        required_regulators=required_regulators,
+        min_required_regulators=min_required_regulators,
+        min_count_by_regulator=plan_min_count_by_regulator,
+        min_count_per_tf=min_count_per_tf,
+    )
+    if min_required_len > 0 and seq_len < min_required_len:
+        raise ValueError(
+            "generation.sequence_length is shorter than the minimum required length for constraints "
+            f"(sequence_length={seq_len}, min_required_length={min_required_len}, "
+            f"fixed_elements_min={min_breakdown['fixed_elements_min']}, "
+            f"per_tf_min={min_breakdown['per_tf_min']}, "
+            f"min_required_extra={min_breakdown['min_required_extra']}). "
+            "Increase densegen.generation.sequence_length or relax required_regulators, "
+            "min_required_regulators, min_count_by_regulator, or fixed-element constraints."
+        )
 
     def _current_leaderboard_snapshot() -> dict[str, object]:
         return _leaderboard_snapshot(
@@ -2451,14 +2562,14 @@ def _process_plan_for_source(
             sequence_length=seq_len,
             solver=chosen_solver,
             strategy=solver_strategy,
-            solver_options=solver_opts,
             fixed_elements=fe_dict,
             strands=solver_strands,
             regulator_by_index=regulator_by_index,
             required_regulators=solver_required_regs,
             min_count_by_regulator=solver_min_counts,
             min_required_regulators=min_required_regulators,
-            solve_timeout_seconds=solve_timeout_seconds,
+            solver_time_limit_seconds=solver_time_limit_seconds,
+            solver_threads=solver_threads,
         )
         return run
 
@@ -2481,6 +2592,7 @@ def _process_plan_for_source(
             consecutive_dup = 0
             subsample_started = time.monotonic()
             last_log_warn = subsample_started
+            last_progress = subsample_started
             produced_this_library = 0
             stall_triggered = False
 
@@ -2503,7 +2615,7 @@ def _process_plan_for_source(
                             payload={
                                 "input_name": source_label,
                                 "plan_name": plan_name,
-                                "stall_seconds": float(now - subsample_started),
+                                "stall_seconds": float(now - last_progress),
                                 "library_index": int(sampling_library_index),
                                 "library_hash": str(sampling_library_hash),
                             },
@@ -2516,15 +2628,14 @@ def _process_plan_for_source(
                 now = time.monotonic()
                 if policy.should_trigger_stall(
                     now=now,
-                    subsample_started=subsample_started,
-                    produced_this_library=produced_this_library,
+                    last_progress=last_progress,
                 ):
                     _mark_stall(now)
                     break
                 if policy.should_warn_stall(
                     now=now,
                     last_warn=last_log_warn,
-                    produced_this_library=produced_this_library,
+                    last_progress=last_progress,
                 ):
                     log.info(
                         "[%s/%s] Still working... %.1fs on current library.",
@@ -2533,6 +2644,7 @@ def _process_plan_for_source(
                         now - subsample_started,
                     )
                     last_log_warn = now
+                last_progress = now
 
                 if forbid_each:
                     opt.forbid(sol)
@@ -2845,7 +2957,8 @@ def _process_plan_for_source(
                     fixed_elements=fixed_elements,
                     chosen_solver=chosen_solver,
                     solver_strategy=solver_strategy,
-                    solver_options=solver_opts,
+                    solver_time_limit_seconds=solver_time_limit_seconds,
+                    solver_threads=solver_threads,
                     solver_strands=solver_strands,
                     seq_len=seq_len,
                     actual_length=len(final_seq),
@@ -3173,7 +3286,7 @@ def _process_plan_for_source(
 
             if produced_this_library == 0 and not stall_triggered and stall_seconds > 0:
                 now = time.monotonic()
-                if (now - subsample_started) >= stall_seconds:
+                if (now - last_progress) >= stall_seconds:
                     _mark_stall(now)
 
             if produced_this_library == 0:
@@ -3425,6 +3538,10 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
         deps.optimizer,
         strategy=str(cfg.solver.strategy),
     )
+    solver_time_limit_seconds = (
+        float(cfg.solver.time_limit_seconds) if cfg.solver.time_limit_seconds is not None else None
+    )
+    solver_threads = int(cfg.solver.threads) if cfg.solver.threads is not None else None
     dense_arrays_version, dense_arrays_version_source = _resolve_dense_arrays_version(loaded.path)
 
     # Build sinks
@@ -3985,7 +4102,8 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
         seed_solver=seeds.get("solver"),
         solver_backend=chosen_solver,
         solver_strategy=str(cfg.solver.strategy),
-        solver_options=list(cfg.solver.options),
+        solver_time_limit_seconds=solver_time_limit_seconds,
+        solver_threads=solver_threads,
         solver_strands=str(cfg.solver.strands),
         dense_arrays_version=dense_arrays_version,
         dense_arrays_version_source=dense_arrays_version_source,

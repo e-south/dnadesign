@@ -99,13 +99,14 @@ runtime config), while Cruncher keeps its own workspace + config.
 
 Why: confirm resolved outputs, Stage‑A sampling knobs, fixed elements, and Stage‑B sampling policy.
 
-Rationale for the demo settings: we want **~100 binding sites per motif**, so we set Stage‑A
+Rationale for the demo settings: we want **dozens of binding sites per motif**, so we set Stage‑A
 `n_sites` and oversampling/mining caps to reach that target; Stage‑B sampling then builds fixed‑size
 libraries before running the solver.
 This demo also pins a strong σ70 promoter pair (`TTGACA`/`TATAAT`) as fixed elements; the default
 `tf_coverage` plot overlays these sites when `plots.options.tf_coverage.include_promoter_sites: true`.
-`generation.sequence_length` is set to 90 so the fixed promoter plus required TFBS sites can fit
-without solver infeasibility.
+To keep the 60‑bp budget feasible with ~21–22 bp TFBS lengths, the plan sets
+`min_required_regulators: 1` while listing both LexA and CpxR, so each sequence must include at
+least one of the two regulators.
 
 ```bash
 dense inspect config
@@ -145,8 +146,8 @@ This demo config also enables plot generation from the run (`plots.default`) and
 `outputs/plots/` using `plots.format` (switch to `pdf` or `svg` in `config.yaml` if desired).
 The demo quota is intentionally small (`generation.quota: 12` with `runtime.max_seconds_per_plan: 60`)
 to keep the end‑to‑end run fast; scale these up for production runs.
-The demo also uses `solver.strategy: approximate` for speed; switch to `iterate` or `diverse`
-once you want full solver runs.
+The demo uses `solver.strategy: iterate` for full solver runs; switch to `diverse` or `optimal`
+as needed for exploration.
 If run outputs already exist (e.g., `outputs/tables/*.parquet` or `outputs/meta/run_state.json`),
 choose `--resume` to continue or `--fresh` to clear outputs. Use `dense run --no-plot` to skip
 auto‑plots when re‑running.

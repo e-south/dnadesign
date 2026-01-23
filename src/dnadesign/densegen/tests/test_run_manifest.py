@@ -40,7 +40,8 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
         seed_solver=303,
         solver_backend="CBC",
         solver_strategy="iterate",
-        solver_options=[],
+        solver_time_limit_seconds=5.0,
+        solver_threads=2,
         solver_strands="double",
         dense_arrays_version="0.0.0",
         dense_arrays_version_source="lock",
@@ -57,3 +58,5 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
     assert loaded.items[0].duplicate_solutions == 3
     assert loaded.items[0].leaderboard_latest is not None
     assert loaded.random_seed == 42
+    assert loaded.solver_time_limit_seconds == 5.0
+    assert loaded.solver_threads == 2
