@@ -6,18 +6,20 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any, Sequence
 
-import numpy as np
 import polars as pl
 
+from ...storage.label_history import (
+    parse_label_hist_cell_for_dashboard,
+    parse_pred_hist_cell_for_dashboard,
+)
 from .datasets import RoundOptions
 from .diagnostics import Diagnostics
-from .util import deep_as_py
 
 
 def _cell_has_label(cell: Any) -> bool:
-    parsed = _parse_label_hist_cell(cell, row_id="__row__", errors=[], y_col_name="y_obs")
+    parsed = parse_label_hist_cell_for_dashboard(cell, row_id="__row__", errors=[], y_col_name="y_obs")
     return bool(parsed)
 
 
@@ -122,104 +124,6 @@ def _label_hist_sample_value(df: pl.DataFrame, label_hist_col: str) -> str | Non
         return repr(sample[0])
 
 
-def _coerce_mapping(value: Any) -> dict | None:
-    if isinstance(value, dict):
-        return value
-    if isinstance(value, Mapping):
-        return dict(value)
-    for attr in ("as_dict", "to_dict"):
-        if hasattr(value, attr):
-            try:
-                return dict(getattr(value, attr)())
-            except Exception:
-                continue
-    return None
-
-
-def _parse_label_hist_cell(
-    cell: Any,
-    *,
-    row_id: str,
-    errors: list[dict],
-    y_col_name: str,
-) -> list[dict]:
-    def _record_error(message: str, sample: Any | None = None) -> None:
-        if len(errors) >= 5:
-            return
-        errors.append(
-            {
-                "id": row_id,
-                "error": message,
-                "sample": (repr(sample)[:240] if sample is not None else None),
-            }
-        )
-
-    if cell is None or (isinstance(cell, float) and np.isnan(cell)):
-        return []
-    cell = deep_as_py(cell)
-    if isinstance(cell, str):
-        try:
-            cell = json.loads(cell)
-        except Exception as exc:
-            _record_error(f"label_hist JSON parse failed: {exc}", sample=cell)
-            return []
-    if isinstance(cell, dict):
-        entries = [cell]
-    elif isinstance(cell, (list, tuple)):
-        entries = list(cell)
-    else:
-        _record_error(f"label_hist cell must be list/dict/JSON, got {type(cell).__name__}", sample=cell)
-        return []
-
-    out: list[dict] = []
-    for entry in entries:
-        entry = deep_as_py(entry)
-        if isinstance(entry, str):
-            try:
-                entry = json.loads(entry)
-            except Exception as exc:
-                _record_error(f"label_hist entry JSON parse failed: {exc}", sample=entry)
-                continue
-        entry_map = _coerce_mapping(entry)
-        if entry_map is None:
-            _record_error("label_hist entry must be dict-like", sample=entry)
-            continue
-        kind = entry_map.get("kind")
-        if kind is not None and str(kind).strip().lower() != "label":
-            continue
-        r = entry_map.get("observed_round", entry_map.get("r", entry_map.get("round")))
-        if r is None:
-            _record_error("label_hist entry missing observed_round", sample=entry_map)
-            continue
-        try:
-            r_int = int(r)
-        except Exception as exc:
-            _record_error(f"label_hist entry round is not int: {exc}", sample=entry_map)
-            continue
-        y_wrap = _coerce_mapping(entry_map.get("y_obs"))
-        if y_wrap is None:
-            _record_error("label_hist entry missing y_obs wrapper", sample=entry_map)
-            continue
-        if "value" not in y_wrap:
-            _record_error("label_hist entry y_obs missing value", sample=y_wrap)
-            continue
-        y_val = deep_as_py(y_wrap.get("value"))
-        try:
-            y_list = [float(v) for v in np.asarray(y_val, dtype=float).ravel().tolist()]
-        except Exception as exc:
-            _record_error(f"label_hist entry 'y' not numeric: {exc}", sample=y_val)
-            continue
-        out.append(
-            {
-                "observed_round": r_int,
-                "label_src": entry_map.get("src", entry_map.get("source")),
-                "label_ts": entry_map.get("ts", entry_map.get("timestamp")),
-                y_col_name: y_list,
-            }
-        )
-    return out
-
-
 @dataclass(frozen=True)
 class LabelDiagnostics:
     status: str
@@ -299,132 +203,6 @@ def _normalize_label_events(df: pl.DataFrame, *, y_col_name: str) -> pl.DataFram
     return df
 
 
-def _parse_pred_hist_cell(
-    cell: Any,
-    *,
-    row_id: str,
-    errors: list[dict],
-) -> list[dict]:
-    def _record_error(message: str, sample: Any | None = None) -> None:
-        if len(errors) >= 5:
-            return
-        errors.append(
-            {
-                "id": row_id,
-                "error": message,
-                "sample": (repr(sample)[:240] if sample is not None else None),
-            }
-        )
-
-    if cell is None or (isinstance(cell, float) and np.isnan(cell)):
-        return []
-    cell = deep_as_py(cell)
-    if isinstance(cell, str):
-        try:
-            cell = json.loads(cell)
-        except Exception as exc:
-            _record_error(f"label_hist JSON parse failed: {exc}", sample=cell)
-            return []
-    if isinstance(cell, dict):
-        entries = [cell]
-    elif isinstance(cell, (list, tuple)):
-        entries = list(cell)
-    else:
-        _record_error(f"label_hist cell must be list/dict/JSON, got {type(cell).__name__}", sample=cell)
-        return []
-
-    out: list[dict] = []
-    for entry in entries:
-        entry = deep_as_py(entry)
-        if isinstance(entry, str):
-            try:
-                entry = json.loads(entry)
-            except Exception as exc:
-                _record_error(f"label_hist entry JSON parse failed: {exc}", sample=entry)
-                continue
-        entry_map = _coerce_mapping(entry)
-        if entry_map is None:
-            _record_error("label_hist entry must be dict-like", sample=entry)
-            continue
-        kind = entry_map.get("kind")
-        if kind is None or str(kind).strip().lower() != "pred":
-            continue
-        as_of_round = entry_map.get("as_of_round", entry_map.get("r"))
-        run_id = entry_map.get("run_id")
-        if as_of_round is None or run_id is None:
-            _record_error("pred entry missing as_of_round or run_id", sample=entry_map)
-            continue
-        try:
-            round_int = int(as_of_round)
-        except Exception as exc:
-            _record_error(f"pred entry as_of_round not int: {exc}", sample=entry_map)
-            continue
-        y_wrap = _coerce_mapping(entry_map.get("y_pred"))
-        if y_wrap is None:
-            _record_error("pred entry missing y_pred wrapper", sample=entry_map)
-            continue
-        if "value" not in y_wrap:
-            _record_error("pred entry y_pred missing value", sample=y_wrap)
-            continue
-
-        pred_value = deep_as_py(y_wrap.get("value"))
-        pred_dtype = y_wrap.get("dtype")
-        pred_y_hat = None
-        try:
-            pred_y_hat = [float(v) for v in np.asarray(pred_value, dtype=float).ravel().tolist()]
-        except Exception:
-            pred_y_hat = None
-        try:
-            pred_value_json = json.dumps(pred_value, ensure_ascii=True)
-        except Exception:
-            pred_value_json = repr(pred_value)
-
-        metrics = _coerce_mapping(entry_map.get("metrics") or {})
-        selection = _coerce_mapping(entry_map.get("selection") or {})
-        score_val = metrics.get("score") if metrics is not None else None
-        if score_val is None:
-            _record_error("pred entry missing metrics.score", sample=entry_map)
-            continue
-        try:
-            score_val = float(score_val)
-        except Exception as exc:
-            _record_error(f"pred entry metrics.score not float: {exc}", sample=entry_map)
-            continue
-
-        rank_val = selection.get("rank") if selection is not None else None
-        top_k_val = selection.get("top_k") if selection is not None else None
-        if rank_val is None or top_k_val is None:
-            _record_error("pred entry missing selection.rank/top_k", sample=entry_map)
-            continue
-        try:
-            rank_val = int(rank_val)
-        except Exception as exc:
-            _record_error(f"pred entry selection.rank not int: {exc}", sample=entry_map)
-            continue
-        top_k_val = bool(top_k_val)
-
-        objective = _coerce_mapping(entry_map.get("objective") or {})
-        out.append(
-            {
-                "as_of_round": round_int,
-                "run_id": str(run_id),
-                "pred_ts": entry_map.get("ts", entry_map.get("timestamp")),
-                "pred_y_hat": pred_y_hat,
-                "pred_y_value": pred_value_json,
-                "pred_y_dtype": str(pred_dtype) if pred_dtype is not None else None,
-                "pred_score": score_val,
-                "pred_logic_fidelity": metrics.get("logic_fidelity") if metrics else None,
-                "pred_effect_scaled": metrics.get("effect_scaled") if metrics else None,
-                "pred_effect_raw": metrics.get("effect_raw") if metrics else None,
-                "pred_rank": rank_val,
-                "pred_top_k": top_k_val,
-                "pred_objective_name": objective.get("name") if objective else None,
-                "pred_objective_params": objective.get("params") if objective else None,
-            }
-        )
-    return out
-
-
 def _empty_pred_df() -> pl.DataFrame:
     return pl.DataFrame(
         schema={
@@ -501,7 +279,7 @@ def build_pred_events(
             cell = row.get(label_hist_col)
             if cell is None:
                 continue
-            parsed = _parse_pred_hist_cell(cell, row_id=_id, errors=errors)
+            parsed = parse_pred_hist_cell_for_dashboard(cell, row_id=_id, errors=errors)
             if parsed:
                 diag = PredDiagnostics(**{**diag.__dict__, "rows_with_preds": diag.rows_with_preds + 1})
                 for entry in parsed:
@@ -630,7 +408,7 @@ def build_label_events(
             cell = row.get(label_hist_col)
             if cell is None:
                 continue
-            parsed = _parse_label_hist_cell(cell, row_id=_id, errors=errors, y_col_name=y_col_name)
+            parsed = parse_label_hist_cell_for_dashboard(cell, row_id=_id, errors=errors, y_col_name=y_col_name)
             if parsed:
                 diag = LabelDiagnostics(**{**diag.__dict__, "rows_with_labels": diag.rows_with_labels + 1})
                 for entry in parsed:

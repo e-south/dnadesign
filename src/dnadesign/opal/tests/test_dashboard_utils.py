@@ -23,12 +23,12 @@ from dnadesign.opal.src.analysis.dashboard import (
     filters,
     hues,
     labels,
-    plots,
     selection,
-    sfxi,
     transient,
     util,
 )
+from dnadesign.opal.src.analysis.dashboard.charts import plots
+from dnadesign.opal.src.analysis.dashboard.views import sfxi
 
 
 def test_find_repo_root(tmp_path: Path) -> None:

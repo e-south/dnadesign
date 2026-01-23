@@ -1,4 +1,6 @@
-"""SFXI scoring utilities."""
+# ABOUTME: Computes SFXI scoring metrics for dashboard views.
+# ABOUTME: Provides label/prediction SFXI view data for charts.
+"""SFXI scoring utilities (view layer)."""
 
 from __future__ import annotations
 
@@ -9,8 +11,8 @@ from typing import Sequence
 import numpy as np
 import polars as pl
 
-from .datasets import CampaignInfo
-from .labels import observed_event_ids
+from ..datasets import CampaignInfo
+from ..labels import observed_event_ids
 
 
 def fit_intensity_median_iqr(y, *, min_labels: int, eps: float):

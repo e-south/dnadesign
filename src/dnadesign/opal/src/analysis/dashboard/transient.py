@@ -12,8 +12,8 @@ import polars as pl
 
 from .diagnostics import Diagnostics
 from .selection import compute_selection_overlay
-from .sfxi import SFXIParams, compute_sfxi_metrics
 from .util import dedupe_columns
+from .views.sfxi import SFXIParams, compute_sfxi_metrics
 
 
 @dataclass(frozen=True)

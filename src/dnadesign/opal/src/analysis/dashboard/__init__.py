@@ -2,24 +2,25 @@
 
 from . import (
     artifacts,
+    charts,
     datasets,
     diagnostics,
     filters,
     hues,
     labels,
     models,
-    plots,
     scores,
     selection,
-    sfxi,
     transient,
     ui,
     util,
+    views,
     y_ops,
 )
 
 __all__ = [
     "artifacts",
+    "charts",
     "datasets",
     "diagnostics",
     "filters",
@@ -28,10 +29,9 @@ __all__ = [
     "models",
     "selection",
     "scores",
-    "sfxi",
     "transient",
-    "plots",
     "ui",
     "util",
+    "views",
     "y_ops",
 ]

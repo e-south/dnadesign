@@ -15,66 +15,9 @@ def _():
     import marimo as mo
     import polars as pl
 
-    alt.data_transformers.disable_max_rows()
+    from dnadesign.opal.notebooks._shared import setup_altair_theme, with_title
 
-    @alt.theme.register("dnad_white", enable=True)
-    def _dnad_white_theme():
-        return alt.theme.ThemeConfig(
-            {
-                "config": {
-                    "background": "white",
-                    "legend": {
-                        "labelColor": "#111111",
-                        "titleColor": "#111111",
-                        "labelFontSize": 11,
-                        "titleFontSize": 12,
-                        "fillColor": "transparent",
-                        "fillOpacity": 0.0,
-                        "strokeColor": None,
-                    },
-                    "title": {
-                        "color": "#111111",
-                        "subtitleColor": "#333333",
-                        "fontSize": 14,
-                        "subtitleFontSize": 11,
-                    },
-                    "axis": {
-                        "domain": True,
-                        "domainColor": "#111111",
-                        "domainWidth": 1,
-                        "grid": True,
-                        "gridColor": "#e6e6e6",
-                        "gridOpacity": 0.35,
-                        "ticks": True,
-                        "tickColor": "#111111",
-                        "tickSize": 5,
-                        "labels": True,
-                        "labelFontSize": 11,
-                        "labelColor": "#111111",
-                        "titleFontSize": 12,
-                        "titleColor": "#111111",
-                        "labelPadding": 2,
-                        "titlePadding": 4,
-                    },
-                    "axisX": {"domain": True},
-                    "axisY": {"domain": True},
-                    "view": {"stroke": None},
-                }
-            }
-        )
-
-    try:
-        alt.theme.enable("dnad_white")
-    except Exception:
-        alt.themes.enable("dnad_white")
-
-    def chart_title(text: str, subtitle: str | None = None) -> alt.TitleParams:
-        if subtitle:
-            return alt.TitleParams(text=text, subtitle=subtitle)
-        return alt.TitleParams(text=text)
-
-    def with_title(chart, title: str, subtitle: str | None = None):
-        return chart.properties(title=chart_title(title, subtitle))
+    setup_altair_theme()
 
     return Path, alt, dedent, mo, pl, with_title
 
@@ -91,13 +34,13 @@ def _():
     from dnadesign.opal.src.analysis.dashboard import hues as dash_hues
     from dnadesign.opal.src.analysis.dashboard import labels as dash_labels
     from dnadesign.opal.src.analysis.dashboard import models as dash_models
-    from dnadesign.opal.src.analysis.dashboard import plots as dash_plots
     from dnadesign.opal.src.analysis.dashboard import scores as dash_scores
     from dnadesign.opal.src.analysis.dashboard import selection as dash_selection
-    from dnadesign.opal.src.analysis.dashboard import sfxi as dash_sfxi
     from dnadesign.opal.src.analysis.dashboard import transient as dash_transient
     from dnadesign.opal.src.analysis.dashboard import ui as dash_ui
     from dnadesign.opal.src.analysis.dashboard import util as dash_util
+    from dnadesign.opal.src.analysis.dashboard.charts import plots as dash_plots
+    from dnadesign.opal.src.analysis.dashboard.views import sfxi as dash_sfxi
 
     build_mode_view = dash_scores.build_mode_view
     build_cluster_chart = dash_plots.build_cluster_chart
@@ -278,7 +221,13 @@ def _(Path, campaign_selection, dataset_override_input, repo_root):
 
 
 @app.cell
-def _(campaign_selection, dataset_mode, dataset_path, mo, pl):
+def _(mo):
+    load_button = mo.ui.run_button(label="Load records.parquet")
+    return (load_button,)
+
+
+@app.cell
+def _(campaign_selection, dataset_mode, dataset_path, load_button, mo, pl):
     df_raw = pl.DataFrame()
     dataset_name = None
     status_lines = []
@@ -293,7 +242,9 @@ def _(campaign_selection, dataset_mode, dataset_path, mo, pl):
     else:
         status_lines.append(f"Records path: `{dataset_path}`")
         status_lines.append(f"Mode: `{dataset_mode}`")
-    if dataset_path is not None and dataset_path.exists():
+    if not load_button.value:
+        status_lines.append("Click **Load** to read records.parquet.")
+    elif dataset_path is not None and dataset_path.exists():
         try:
             df_raw = pl.read_parquet(dataset_path)
             status_lines.append(f"Rows: `{df_raw.height}`")
@@ -439,6 +390,7 @@ def _(
         alt._DNAD_PLOT_SIZE = 420
     _plot_size = alt._DNAD_PLOT_SIZE
     _df_explorer_source = df_view
+    _id_col = "id" if "id" in _df_explorer_source.columns else "__row_id"
 
     _dataset_label = dataset_name or "dataset"
     _color_label = dataset_explorer_color_dropdown.value
@@ -488,20 +440,16 @@ def _(
         else:
             if _y_col == _x_col:
                 y_col_plot = f"{_y_col}__y"
-                _select_exprs = [
-                    pl.col("__row_id"),
-                    pl.col("id"),
-                    pl.col(_x_col),
-                    pl.col(_y_col).alias(y_col_plot),
-                ]
+                _select_exprs = [pl.col("__row_id")]
+                if _id_col != "__row_id":
+                    _select_exprs.append(pl.col(_id_col))
+                _select_exprs.extend([pl.col(_x_col), pl.col(_y_col).alias(y_col_plot)])
             else:
                 y_col_plot = _y_col
-                _select_exprs = [
-                    pl.col("__row_id"),
-                    pl.col("id"),
-                    pl.col(_x_col),
-                    pl.col(_y_col),
-                ]
+                _select_exprs = [pl.col("__row_id")]
+                if _id_col != "__row_id":
+                    _select_exprs.append(pl.col(_id_col))
+                _select_exprs.extend([pl.col(_x_col), pl.col(_y_col)])
             if _hue is not None and _hue.key in _df_explorer_source.columns and _hue.key not in {_x_col, _y_col}:
                 _select_exprs.append(pl.col(_hue.key))
             df_plot = _df_explorer_source.select(dedupe_exprs(_select_exprs))
@@ -557,7 +505,8 @@ def _(
                     )
 
             _brush = alt.selection_interval(name="explorer_brush", encodings=["x", "y"])
-            _tooltip_cols = [c for c in ["id", "__row_id", _x_col, y_col_plot] if c in df_plot.columns]
+            _tooltip_cols = [c for c in [_id_col, "__row_id", _x_col, y_col_plot] if c in df_plot.columns]
+            _tooltip_cols = list(dict.fromkeys(_tooltip_cols))
             if _color_tooltip and _color_tooltip in df_plot.columns and _color_tooltip not in _tooltip_cols:
                 _tooltip_cols.append(_color_tooltip)
             chart = (
@@ -583,7 +532,11 @@ def _(
             )
             chart = alt.Chart(df_plot).mark_bar().encode(x=alt.X("x", bin=alt.Bin(maxbins=10)), y=alt.Y("count()"))
         else:
-            df_plot = _df_explorer_source.select(dedupe_exprs([pl.col("__row_id"), pl.col("id"), pl.col(_x_col)]))
+            _select_exprs = [pl.col("__row_id")]
+            if _id_col != "__row_id":
+                _select_exprs.append(pl.col(_id_col))
+            _select_exprs.append(pl.col(_x_col))
+            df_plot = _df_explorer_source.select(dedupe_exprs(_select_exprs))
             chart = (
                 alt.Chart(df_plot)
                 .mark_bar()

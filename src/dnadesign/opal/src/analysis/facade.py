@@ -18,12 +18,10 @@ from typing import Iterable, List, Optional, Sequence, Union
 
 import polars as pl
 
-from ..config import load_config
 from ..config.types import RootConfig
-from ..core.config_resolve import resolve_campaign_config_path
 from ..core.utils import ExitCodes, OpalError
-from ..storage.store_factory import records_store_from_config
 from ..storage.workspace import CampaignWorkspace
+from .campaign import CampaignData, CampaignPaths, load_campaign_data
 
 RoundSelector = Union[str, List[int]]
 
@@ -415,19 +413,34 @@ def load_predictions_with_setpoint(
 
 @dataclass(frozen=True)
 class CampaignAnalysis:
-    config_path: Path
-    config: RootConfig
-    workspace: CampaignWorkspace
+    data: CampaignData
 
     @classmethod
     def from_config_path(cls, config_opt: Optional[Path], *, allow_dir: bool = False) -> "CampaignAnalysis":
-        cfg_path = resolve_campaign_config_path(config_opt, allow_dir=allow_dir)
-        cfg = load_config(cfg_path)
-        ws = CampaignWorkspace.from_config(cfg, cfg_path)
-        return cls(config_path=cfg_path, config=cfg, workspace=ws)
+        data = load_campaign_data(config_opt, allow_dir=allow_dir)
+        return cls(data=data)
+
+    @property
+    def config_path(self) -> Path:
+        return self.data.config_path
+
+    @property
+    def config(self) -> RootConfig:
+        return self.data.config
+
+    @property
+    def workspace(self) -> CampaignWorkspace:
+        return self.data.workspace
+
+    @property
+    def paths(self) -> CampaignPaths:
+        return self.data.paths
 
     def records_store(self):
-        return records_store_from_config(self.config)
+        return self.data.store
+
+    def read_config_dict(self) -> dict:
+        return dict(self.data.config_dict)
 
     def read_runs(self) -> pl.DataFrame:
         return read_runs(self.workspace.ledger_runs_path)
