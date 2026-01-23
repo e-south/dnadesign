@@ -226,6 +226,6 @@ def test_end_to_end_run_and_verify_outputs(tmp_path: Path) -> None:
     )
 
     outputs_dir = workdir / "outputs"
-    assert (outputs_dir / "ledger" / "runs.parquet").is_file()
+    assert (outputs_dir / "ledger" / "runs.parquet").is_dir()
     assert (outputs_dir / "ledger" / "labels.parquet").is_file() is False
     assert (outputs_dir / "ledger" / "predictions").exists()
