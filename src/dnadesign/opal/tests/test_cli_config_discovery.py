@@ -1,3 +1,5 @@
+# ABOUTME: CLI config discovery tests for OPAL campaign workflows.
+# ABOUTME: Covers env var, marker, directory, and configs/ discovery cases.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -79,3 +81,22 @@ def test_config_directory_rejected(tmp_path: Path) -> None:
     res = runner.invoke(app, ["--no-color", "validate", "--config", str(workdir)])
     assert res.exit_code != 0
     assert "Config path is a directory" in res.output
+
+
+def test_config_discovery_configs_subdir(monkeypatch, tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+
+    configs_dir = workdir / "configs"
+    configs_dir.mkdir(parents=True, exist_ok=True)
+    campaign = configs_dir / "campaign.yaml"
+    write_campaign_yaml(campaign, workdir=Path("."), records_path=Path("records.parquet"))
+
+    monkeypatch.chdir(workdir)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "validate"])
+    assert res.exit_code == 0, res.output

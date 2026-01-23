@@ -1,3 +1,5 @@
+# ABOUTME: Dashboard helpers for discovering campaigns and datasets.
+# ABOUTME: Resolves campaign roots and records paths for notebook UIs.
 """Dataset and campaign helpers for dashboard notebooks."""
 
 from __future__ import annotations
@@ -7,6 +9,7 @@ from pathlib import Path
 
 import yaml
 
+from ...core.config_resolve import resolve_campaign_root
 from .diagnostics import Diagnostics
 
 
@@ -123,6 +126,7 @@ def list_campaign_paths(repo_root: Path | None) -> list[Path]:
 def list_campaign_dataset_refs(repo_root: Path | None) -> list[CampaignDatasetRef]:
     refs: list[CampaignDatasetRef] = []
     for campaign_path in list_campaign_paths(repo_root):
+        campaign_root = resolve_campaign_root(campaign_path)
         campaign_label = campaign_label_from_path(campaign_path, repo_root)
         try:
             raw = load_campaign_yaml(campaign_path)
@@ -138,7 +142,7 @@ def list_campaign_dataset_refs(repo_root: Path | None) -> list[CampaignDatasetRe
             base_path_raw = location.get("path")
             base_path = Path(str(base_path_raw)) if base_path_raw else None
             if base_path is not None and not base_path.is_absolute():
-                base_path = (campaign_path.parent / base_path).resolve()
+                base_path = (campaign_root / base_path).resolve()
             if base_path is not None and dataset_name:
                 records_path = (base_path / str(dataset_name) / "records.parquet").resolve()
         elif kind == "local":
@@ -146,7 +150,7 @@ def list_campaign_dataset_refs(repo_root: Path | None) -> list[CampaignDatasetRe
             if local_path_raw:
                 local_path = Path(str(local_path_raw))
                 if not local_path.is_absolute():
-                    local_path = (campaign_path.parent / local_path).resolve()
+                    local_path = (campaign_root / local_path).resolve()
                 records_path = local_path
         refs.append(
             CampaignDatasetRef(
@@ -164,6 +168,7 @@ def resolve_campaign_records_path(*, raw: dict, campaign_path: Path) -> Path:
     data = raw.get("data") or {}
     location = data.get("location") or {}
     kind = str(location.get("kind") or "").strip().lower()
+    campaign_root = resolve_campaign_root(campaign_path)
     if kind == "usr":
         dataset_name = location.get("dataset")
         base_path_raw = location.get("path")
@@ -171,7 +176,7 @@ def resolve_campaign_records_path(*, raw: dict, campaign_path: Path) -> Path:
             raise ValueError("Campaign YAML missing data.location.dataset or data.location.path for usr.")
         base_path = Path(str(base_path_raw))
         if not base_path.is_absolute():
-            base_path = (campaign_path.parent / base_path).resolve()
+            base_path = (campaign_root / base_path).resolve()
         return (base_path / str(dataset_name) / "records.parquet").resolve()
     if kind == "local":
         local_path_raw = location.get("path")
@@ -179,18 +184,19 @@ def resolve_campaign_records_path(*, raw: dict, campaign_path: Path) -> Path:
             raise ValueError("Campaign YAML missing data.location.path for local.")
         local_path = Path(str(local_path_raw))
         if not local_path.is_absolute():
-            local_path = (campaign_path.parent / local_path).resolve()
+            local_path = (campaign_root / local_path).resolve()
         return local_path
     raise ValueError(f"Unsupported data.location.kind: {kind!r}.")
 
 
 def campaign_label_from_path(path: Path, repo_root: Path | None) -> str:
     if repo_root is None:
-        return str(path)
+        return str(resolve_campaign_root(path))
+    root = resolve_campaign_root(path)
     try:
-        return str(path.relative_to(repo_root))
+        return str(root.relative_to(repo_root))
     except ValueError:
-        return str(path)
+        return str(root)
 
 
 def load_campaign_yaml(path: Path) -> dict:
@@ -212,7 +218,7 @@ def parse_campaign_info(*, raw: dict, path: Path, label: str) -> CampaignInfo:
     if workdir_raw:
         workdir_path = Path(str(workdir_raw))
         if not workdir_path.is_absolute():
-            workdir_path = (path.parent / workdir_path).resolve()
+            workdir_path = (resolve_campaign_root(path) / workdir_path).resolve()
         workdir = workdir_path
     data = raw.get("data") or {}
     x_column = data.get("x_column_name")

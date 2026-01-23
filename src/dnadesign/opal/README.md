@@ -9,7 +9,7 @@
 - **Append** runtime events to **ledger sinks** under **`outputs/`** (per-round predictions + run metadata).
 - **Persist** artifacts per round (model, selection CSV, round context, objective meta, logs) for auditability.
 
-The pipeline is plugin-driven: swap **data transforms** (X/Y), **models**, **objectives**, and **selection** strategies in `campaign.yaml` without touching core code.
+The pipeline is plugin-driven: swap **data transforms** (X/Y), **models**, **objectives**, and **selection** strategies in `configs/campaign.yaml` without touching core code.
 
 > Using OPAL day-to-day? See the **[CLI Manual](./docs/cli.md)**
 
@@ -49,36 +49,36 @@ opal = "dnadesign.opal.src.cli:main"
 
 ```bash
 # 1) Initialize a campaign workspace (creates inputs/, outputs/, state.json, and .opal/config marker)
-opal init -c path/to/campaign.yaml
+opal init -c path/to/configs/campaign.yaml
 
 # 2) Validate essentials + X + (if present) Y shape/values
-opal validate -c path/to/campaign.yaml
+opal validate -c path/to/configs/campaign.yaml
 
 # 3) Ingest experimental labels (CSV/Parquet → Y), preview, then write new columns to X dataset
-opal ingest-y -c path/to/campaign.yaml --round 0 --csv path/to/my_labels.csv
+opal ingest-y -c path/to/configs/campaign.yaml --round 0 --csv path/to/my_labels.csv
 
 # 4) Train on labels with observed_round ≤ R, score the pool, select top-k, persist artifacts & events
-opal run -c path/to/campaign.yaml --round 0
+opal run -c path/to/configs/campaign.yaml --round 0
 
 # 5) Inspect progress
-opal status -c path/to/campaign.yaml
-opal status -c path/to/campaign.yaml --with-ledger
-opal runs list -c path/to/campaign.yaml
-opal log -c path/to/campaign.yaml --round latest
-opal record-show -c path/to/campaign.yaml --id <some_id>
-opal explain -c path/to/campaign.yaml --round 1
+opal status -c path/to/configs/campaign.yaml
+opal status -c path/to/configs/campaign.yaml --with-ledger
+opal runs list -c path/to/configs/campaign.yaml
+opal log -c path/to/configs/campaign.yaml --round latest
+opal record-show -c path/to/configs/campaign.yaml --id <some_id>
+opal explain -c path/to/configs/campaign.yaml --round 1
 opal plot --list                              # list available plot kinds
-opal plot -c path/to/campaign.yaml
-opal plot -c path/to/campaign.yaml --quick    # run default plots without plots.yaml
-opal plot -c path/to/campaign.yaml --run-id <run_id>  # run-aware; resolves round, conflicts error
-opal predict -c path/to/campaign.yaml               # uses latest round
-opal objective-meta -c campaign.yaml --round latest
-opal verify-outputs -c campaign.yaml --round latest
-opal notebook generate -c path/to/campaign.yaml     # create a marimo analysis notebook
-opal notebook generate -c path/to/campaign.yaml --no-validate  # scaffold before any runs
+opal plot -c path/to/configs/campaign.yaml
+opal plot -c path/to/configs/campaign.yaml --quick    # run default plots without plots.yaml
+opal plot -c path/to/configs/campaign.yaml --run-id <run_id>  # run-aware; resolves round, conflicts error
+opal predict -c path/to/configs/campaign.yaml               # uses latest round
+opal objective-meta -c configs/campaign.yaml --round latest
+opal verify-outputs -c configs/campaign.yaml --round latest
+opal notebook generate -c path/to/configs/campaign.yaml     # create a marimo analysis notebook
+opal notebook generate -c path/to/configs/campaign.yaml --no-validate  # scaffold before any runs
 
 # (Optional) Start fresh: remove OPAL-derived columns from records.parquet
-opal prune-source -c path/to/campaign.yaml --scope campaign
+opal prune-source -c path/to/configs/campaign.yaml --scope campaign
 
 ```
 
@@ -156,14 +156,16 @@ Dashboard notebooks (e.g., `prom60_eda.py`) now pull their shared logic from
 ### Campaign layout
 
 `opal init` scaffolds a campaign folder and ensures the label history column exists in `records.parquet`. Edit
-`campaign.yaml` to define behavior.
+`configs/campaign.yaml` to define behavior.
 
 ```
 <repo>/src/dnadesign/opal/campaigns/<my_campaign>/
-├─ campaign.yaml
-├─ plots.yaml                    # optional plot config (recommended)
+├─ configs/
+│  ├─ campaign.yaml
+│  └─ plots.yaml                  # optional plot config (recommended)
 ├─ .opal/
-│  └─ config                     # auto-discovery marker (path to campaign.yaml)
+│  └─ config                     # auto-discovery marker (path to configs/campaign.yaml)
+├─ records.parquet
 ├─ state.json
 ├─ inputs/                       # drop experimental label files here
 └─ outputs/
@@ -186,14 +188,14 @@ Dashboard notebooks (e.g., `prom60_eda.py`) now pull their shared logic from
 
 ### Configuration
 
-OPAL reads a configuration YAML, `campaign.yaml`.
+OPAL reads a configuration YAML, `configs/campaign.yaml`.
 
 #### Key blocks
 
 * `campaign`: `name`, `slug`, `workdir`
 * `data`: `location`, `x_column_name`, `y_column_name`, `y_expected_length`
 * `transforms_x`: `{ name, params }` (raw X → model-ready X)
-* `transforms_y`: `{ name, params }` (CSV → model-ready Y)
+* `transforms_y`: `{ name, params }` (table → model-ready Y; CSV/Parquet/XLSX)
 * `model`: `{ name, params }`
 * `objective`: `{ name, params }`
 * `selection`: `{ name, params }` *(strategy, tie handling, objective mode)*
@@ -268,15 +270,15 @@ safety:
 
 #### Notes on precedence & wiring
 
-* Paths in `campaign.yaml` resolve **relative to the YAML file** (including `campaign.workdir`);
-  prefer `workdir: "."` for portability.
+* `campaign.workdir` and `data.location.path` resolve **relative to the campaign root**
+  (parent of `configs/`), unless absolute. Prefer `workdir: "."` for portability.
 * CLI flags override YAML **for that invocation**:
   `run --k` overrides `selection.params.top_k`, `run --score-batch-size` overrides `scoring.score_batch_size`,
   and `ingest-y --transform/--params` (JSON file, `.json`) overrides `transforms_y`.
 * `--round` is the canonical flag; `--labels-as-of` and `--observed-round` are aliases.
 * `transforms_y` is used for **ingest only**; model training/prediction uses `transforms_x` plus optional `training.y_ops`.
 * `state.json` records the resolved config per round; ledger sinks are the long‑term source of truth.
-* `plot_config` paths resolve **relative to the campaign.yaml** that declares them.
+* `plot_config` paths resolve **relative to the configs/campaign.yaml** that declares them.
 
 ---
 

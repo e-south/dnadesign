@@ -1,3 +1,5 @@
+# ABOUTME: CLI command to ingest labels into OPAL campaigns.
+# ABOUTME: Validates inputs, applies transforms, and writes label history.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -82,8 +84,14 @@ def cmd_ingest_y(
             print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
 
         # Resolve and read input file
-        csv_path = resolve_table_path(csv, label="--csv", must_exist=True)
-        csv_df = read_parquet_df(csv_path) if csv_path.suffix.lower() in (".pq", ".parquet") else pd.read_csv(csv_path)
+        csv_path = resolve_table_path(csv, label="--csv", must_exist=True, allow_xlsx=True)
+        csv_suffix = csv_path.suffix.lower()
+        if csv_suffix in (".pq", ".parquet"):
+            csv_df = read_parquet_df(csv_path)
+        elif csv_suffix == ".xlsx":
+            csv_df = pd.read_excel(csv_path)
+        else:
+            csv_df = pd.read_csv(csv_path)
 
         t_name = (transform or cfg.data.transforms_y.name).strip()
         t_params = cfg.data.transforms_y.params

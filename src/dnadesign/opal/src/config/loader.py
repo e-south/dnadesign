@@ -1,3 +1,5 @@
+# ABOUTME: Loads and validates OPAL campaign YAML into typed config objects.
+# ABOUTME: Resolves paths relative to campaign root and config location.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -17,6 +19,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from typing_extensions import Literal
 
+from ..core.config_resolve import resolve_campaign_root
 from ..core.utils import ConfigError
 from .plugin_schemas import validate_params
 from .types import (
@@ -58,12 +61,13 @@ def _expand(p: str | os.PathLike) -> Path:
     return Path(os.path.expanduser(os.path.expandvars(str(p))))
 
 
-def _resolve_relative_to(cfg_path: Path, p: Path) -> Path:
-    return (cfg_path.parent / p).resolve() if not p.is_absolute() else p
+def _resolve_relative_to(base_dir: Path, p: Path) -> Path:
+    return (base_dir / p).resolve() if not p.is_absolute() else p
 
 
-def resolve_path_like(cfg_path: Path, value: str | os.PathLike) -> Path:
-    return _resolve_relative_to(cfg_path, _expand(value))
+def resolve_path_like(cfg_path: Path, value: str | os.PathLike, *, base_dir: Path | None = None) -> Path:
+    base = base_dir if base_dir is not None else cfg_path.parent
+    return _resolve_relative_to(base, _expand(value))
 
 
 # ---- Pydantic shells for strict validation of top-level YAML ----
@@ -166,6 +170,7 @@ class PRoot(BaseModel):
 
 def load_config(path: Path | str) -> RootConfig:
     cfg_path = Path(path).resolve()
+    campaign_root = resolve_campaign_root(cfg_path)
     raw = yaml.load(cfg_path.read_text(), Loader=_StrictLoader)
 
     try:
@@ -188,17 +193,17 @@ def load_config(path: Path | str) -> RootConfig:
     sel_params = validate_params("selection", sel.name, sel.params)
 
     # Build dataclasses
-    def _abs(v: str) -> str:
-        return str(resolve_path_like(cfg_path, v))
+    def _abs(v: str, *, base_dir: Path | None = None) -> str:
+        return str(resolve_path_like(cfg_path, v, base_dir=base_dir))
 
     if isinstance(pyd.data.location, PLocationUSR):
         loc_dc = LocationUSR(
             kind="usr",
             dataset=pyd.data.location.dataset,
-            path=_abs(pyd.data.location.path),
+            path=_abs(pyd.data.location.path, base_dir=campaign_root),
         )
     else:
-        loc_dc = LocationLocal(kind="local", path=_abs(pyd.data.location.path))
+        loc_dc = LocationLocal(kind="local", path=_abs(pyd.data.location.path, base_dir=campaign_root))
 
     data_dc = DataBlock(
         location=loc_dc,
@@ -229,7 +234,7 @@ def load_config(path: Path | str) -> RootConfig:
         campaign=CampaignBlock(
             name=pyd.campaign.name,
             slug=pyd.campaign.slug,
-            workdir=str(resolve_path_like(cfg_path, pyd.campaign.workdir)),
+            workdir=str(resolve_path_like(cfg_path, pyd.campaign.workdir, base_dir=campaign_root)),
         ),
         data=data_dc,
         model=PluginRef(mdl.name, mdl_params),

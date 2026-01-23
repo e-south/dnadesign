@@ -1,3 +1,5 @@
+# ABOUTME: End-to-end CLI workflow tests for OPAL campaigns.
+# ABOUTME: Covers init/validate, ingest-y, and helper command behavior.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -172,6 +174,46 @@ def test_ingest_y_cli(tmp_path: Path) -> None:
     assert (workdir / "outputs" / "ledger.labels.parquet").exists()
 
 
+def test_ingest_y_accepts_xlsx(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    xlsx_path = workdir / "labels.xlsx"
+    df = pd.DataFrame(
+        {
+            "sequence": ["AAA", "BBB"],
+            "v00": [0.0, 0.0],
+            "v10": [0.0, 0.0],
+            "v01": [0.0, 0.0],
+            "v11": [1.0, 0.5],
+            "y00_star": [0.1, 0.2],
+            "y10_star": [0.1, 0.2],
+            "y01_star": [0.1, 0.2],
+            "y11_star": [0.1, 0.2],
+            "intensity_log2_offset_delta": [0.0, 0.0],
+        }
+    )
+    df.to_excel(xlsx_path, index=False)
+
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(xlsx_path),
+            "--yes",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert (workdir / "outputs" / "ledger.labels.parquet").exists()
+
+
 def test_ingest_y_rejects_unsupported_extension(tmp_path: Path) -> None:
     workdir, campaign, _ = _setup_workspace(tmp_path)
     app = _build()
@@ -209,7 +251,7 @@ def test_ingest_y_rejects_unsupported_extension(tmp_path: Path) -> None:
         ],
     )
     assert res.exit_code != 0, res.stdout
-    assert "must be a CSV or Parquet file" in res.output
+    assert "must be a table file with extension" in res.output
 
 
 def test_ingest_y_rejects_params_non_json(tmp_path: Path) -> None:

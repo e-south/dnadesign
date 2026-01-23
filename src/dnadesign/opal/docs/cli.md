@@ -43,7 +43,7 @@ opal init --config <yaml>
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
+* `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 
 **Notes**
 
@@ -55,7 +55,7 @@ opal init --config <yaml>
 
 #### `ingest-y`
 
-Transform a tidy CSV/Parquet to model-ready **Y**, preview, confirm, and append to label history.
+Transform a tidy CSV/Parquet/XLSX to model-ready **Y**, preview, confirm, and append to label history.
 
 **Usage**
 
@@ -67,9 +67,9 @@ opal ingest-y --config <yaml> --round <r> --csv <path> \
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
+* `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `--round, -r, --observed-round`: Observed round stamp for these labels.
-* `--csv, --in`: CSV/Parquet input (`.csv`, `.parquet`, or `.pq`).
+* `--csv, --in`: CSV/Parquet/XLSX input (`.csv`, `.parquet`, `.pq`, or `.xlsx`).
 * `--transform`: Override YAML `transforms_y.name`.
 * `--params`: JSON file (.json) with transform params (overrides YAML `transforms_y.params`).
 * `--if-exists`: Behavior if `(id, round)` already exists in label history (`fail`/`skip`/`replace`).
@@ -103,7 +103,7 @@ opal run --config <yaml> --round <r> \
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
+* `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `--round, -r, --labels-as-of`: Training cutoff (use labels with `observed_round ≤ r`).
 * `--k, -k`: Override `selection.params.top_k`.
 * `--score-batch-size`: Override `scoring.score_batch_size` for this run.
@@ -170,7 +170,7 @@ opal predict --config <yaml> \
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
+* `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `--model-path`: Path to `model.joblib` (overrides `--round`).
 * `--round, -r`: Round index to resolve model from `state.json` (default: latest). Accepts `latest`.
 * `--model-name` / `--model-params`: Required if `model_meta.json` is missing. `--model-params` must be a `.json`.
@@ -202,7 +202,7 @@ opal record-show --config <yaml> \
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
+* `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `<ID-or-SEQ>`: Positional id or sequence (use `--id/--sequence` to disambiguate).
 * `--id`, `--sequence`: Explicit lookup key (mutually exclusive).
 * `--run-id`: Explicit run_id for ledger predictions (required if multiple runs exist for a round).
@@ -229,7 +229,7 @@ opal model-show \
 **Flags**
 
 * `--model-path`: Path to `model.joblib` (overrides `--config/--round`).
-* `--config, -c`: Path to `campaign.yaml` (required if resolving from `state.json`).
+* `--config, -c`: Path to `configs/campaign.yaml` (required if resolving from `state.json`).
 * `--round, -r`: Round selector (integer or `latest`) to resolve model.
 * `--model-name` / `--model-params`: Required if `model_meta.json` is missing. `--model-params` must be a `.json`.
 * `--out-dir`: Write `feature_importance_full.csv` and print top-20 in JSON.
@@ -246,7 +246,7 @@ opal objective-meta --config <yaml-or-dir> [--round <k|latest> | --run-id <id>] 
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (directories supported for `opal plot`, `opal notebook`, `opal objective-meta`).
+* `--config, -c`: Path to `configs/campaign.yaml` (directories supported for `opal plot`, `opal notebook`, `opal objective-meta`).
 * `--run-id`: Explicit run_id to disambiguate when a round has multiple runs.
 
 **Notes**
@@ -294,7 +294,7 @@ opal ctx diff  --config <yaml> --round-a <k|latest> --round-b <k|latest> [--keys
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
+* `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `--round, -r`: Round selector for `show`/`audit`.
 * `--round-a`, `--round-b`: Round selectors for `diff`.
 * `--keys`: Filter by key prefix (repeatable; applies to `show`/`diff`).
@@ -313,7 +313,7 @@ opal explain --config <yaml> --round <k>
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
+* `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `--round, -r, --labels-as-of`: Training cutoff (alias of `--round`).
 
 Prints: number of training labels, candidate universe size, transforms/models/selection used,
@@ -333,7 +333,7 @@ opal status --config <yaml> [--round <k> | --all] [--with-ledger] [--json]
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
+* `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `--round`: Specific round details.
 * `--all`: Dump every round (JSON output, even without `--json`).
 * `--with-ledger`: Include ledger run_meta summaries in output.
@@ -352,7 +352,7 @@ opal runs show --config <yaml> [--round <k|latest> | --run-id <rid>]
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
+* `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `--round, -r`: Round selector (integer or `latest`).
 * `--run-id`: Explicit run_id to display (show only).
 
@@ -370,7 +370,7 @@ opal log --config <yaml> [--round <k|latest>]
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
+* `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `--round, -r`: Round selector (integer or `latest`).
 
 **Notes**
@@ -389,7 +389,7 @@ opal validate --config <yaml>
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
+* `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 
 **Notes**
 
@@ -411,7 +411,7 @@ opal label-hist <validate|repair|attach-from-y> --config <yaml> [--apply] [--rou
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
+* `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `<validate|repair|attach-from-y>`: Action (alias: `check` = `validate`).
 * `--apply`: Apply changes for `repair` or `attach-from-y` (default: dry-run).
 * `--round, -r`: Required for `attach-from-y`; round stamp to attach.
@@ -450,7 +450,7 @@ opal plot --config <yaml-or-dir> --quick
 **Flags**
 
 * `--config, -c`: Campaign YAML or campaign directory.
-* `--plot-config`: Path to a plots YAML (overrides `plot_config` in campaign.yaml).
+* `--plot-config`: Path to a plots YAML (overrides `plot_config` in configs/campaign.yaml).
 * `--list`: List registered plot kinds and exit (does not require config).
 * `--list-config`: List plots configured in YAML and exit (requires `--config`).
 * `--describe`: Show parameters + required fields for a plot kind.
@@ -465,7 +465,7 @@ opal plot --config <yaml-or-dir> --quick
 * Overwrites files by default; continues on error; exit code **1** if any plot failed.
 * Output directory defaults to `outputs/plots`, or honors `output.dir` if provided.
 * Plot-specific knobs **must** live under `params:`; top-level plotting keys are errors.
-* Prefer `plot_config: plots.yaml` in campaign.yaml to keep runtime config lean.
+* Prefer `plot_config: plots.yaml` in configs/campaign.yaml to keep runtime config lean.
 * `--quick` is assertive: it does **not** auto-run unless explicitly requested.
 * `plot_defaults` and `plot_presets` reduce redundancy; `preset: <name>` merges into each plot entry.
 * Set `enabled: false` on any plot entry to keep it in the YAML without running it.
@@ -552,7 +552,7 @@ opal prune-source --config <yaml> [--scope any|campaign] [--keep <col> ...] \
 
 **Flags**
 
-* `--config, -c`: Path to `campaign.yaml` (optional if auto-discovery works).
+* `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `--scope`: Which opal namespaces to prune: `any` (default) or `campaign` (this campaign’s slug only).
 * `--keep, -k`: Column name(s) to keep even if matched for deletion (repeatable).
 * `--yes, -y`: Skip interactive prompt.
@@ -569,7 +569,7 @@ opal prune-source --config <yaml> [--scope any|campaign] [--keep <col> ...] \
 #### Initialize a campaign
 
 ```bash
-opal init --config src/dnadesign/opal/campaigns/my_campaign/campaign.yaml
+opal init --config src/dnadesign/opal/campaigns/my_campaign/configs/campaign.yaml
 ```
 
 Creates `outputs/` and writes/updates `state.json`.
@@ -579,7 +579,7 @@ Creates `outputs/` and writes/updates `state.json`.
 
 ```bash
 opal ingest-y \
-  --config src/dnadesign/opal/campaigns/my_campaign/campaign.yaml \
+  --config src/dnadesign/opal/campaigns/my_campaign/configs/campaign.yaml \
   --round 0 \
   --csv data/my_new_data_with_labels.csv
 ```
@@ -591,7 +591,7 @@ Appends to label history (`opal__<slug>__label_hist`) and emits `label` events.
 
 ```bash
 opal run \
-  --config src/dnadesign/opal/campaigns/my_campaign/campaign.yaml \
+  --config src/dnadesign/opal/campaigns/my_campaign/configs/campaign.yaml \
   --round 0 \
   --k 12
 ```
@@ -603,7 +603,7 @@ You’ll get per-round artifacts, appended `run_pred`/`run_meta` events, and upd
 
 ```bash
 opal predict \
-  --config src/dnadesign/opal/campaigns/my_campaign/campaign.yaml \
+  --config src/dnadesign/opal/campaigns/my_campaign/configs/campaign.yaml \
   --model-path src/dnadesign/opal/campaigns/my_campaign/outputs/round_0/model.joblib \
   --in new_candidates.parquet \
   --out preds.csv
@@ -612,7 +612,7 @@ opal predict \
 #### Generate plots
 
 ```bash
-opal plot --config src/dnadesign/opal/campaigns/my_campaign/campaign.yaml
+opal plot --config src/dnadesign/opal/campaigns/my_campaign/configs/campaign.yaml
 opal plot -c . --name score_vs_rank_latest --round latest
 ```
 
@@ -625,7 +625,7 @@ You can often omit `--config` thanks to **auto-discovery**. The CLI tries, in or
 1. **Explicit flag** (`--config`)
 2. **Environment variable** `OPAL_CONFIG`
 3. **Workspace marker** `.opal/config` in current or parent folders
-4. **Nearest campaign.yaml** in current or parent folders
+4. **Nearest configs/campaign.yaml** (or campaign.yaml) in current or parent folders
 5. **Single fallback** under `src/dnadesign/opal/campaigns/`
 
 If `$OPAL_CONFIG` or `.opal/config` is set but invalid, OPAL exits with an error (no silent fallback).
@@ -633,8 +633,8 @@ Marker paths are resolved **relative to the campaign workdir**.
 Passing a **directory** to `--config` is supported for `opal plot`, `opal notebook`, and
 `opal objective-meta`; other commands require a YAML file.
 The `.opal/` folder is a lightweight marker created by `opal init` and contains a single `config` file
-pointing to `campaign.yaml`. It is safe to delete and will be regenerated.
-`plot_config` paths are resolved **relative to the campaign.yaml** that declares them.
+pointing to `configs/campaign.yaml` (or `campaign.yaml`). It is safe to delete and will be regenerated.
+`plot_config` paths are resolved **relative to the configs/campaign.yaml** that declares them.
 
 Shell completions:
 

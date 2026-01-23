@@ -1,3 +1,5 @@
+# ABOUTME: Resolve OPAL campaign config paths from CLI/env/markers.
+# ABOUTME: Supports configs/ layout and campaign root discovery.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -26,9 +28,28 @@ def _resolve_path(value: Path | str) -> Path:
     return p.resolve()
 
 
-def _find_campaign_yaml_in_dir(path: Path, *, names: Iterable[str]) -> Path:
+def resolve_campaign_root(cfg_path: Path) -> Path:
+    """
+    Resolve the campaign root directory from a config file path.
+    """
+    p = Path(cfg_path).resolve()
+    if p.is_dir():
+        return p
+    if p.parent.name == "configs":
+        return p.parent.parent
+    return p.parent
+
+
+def _iter_candidate_paths(path: Path, *, names: Iterable[str]) -> Iterable[Path]:
     for name in names:
-        cand = path / name
+        yield path / name
+    configs_dir = path / "configs"
+    for name in names:
+        yield configs_dir / name
+
+
+def _find_campaign_yaml_in_dir(path: Path, *, names: Iterable[str]) -> Path:
+    for cand in _iter_candidate_paths(path, names=names):
         if cand.exists():
             return cand.resolve()
     raise OpalError(f"No campaign YAML found in directory: {path}", ExitCodes.BAD_ARGS)
@@ -99,14 +120,16 @@ def resolve_campaign_config_path(opt: Optional[Path], *, allow_dir: bool = False
             return p
     # Otherwise look for common YAML names, nearest first
     for base in (cur, *cur.parents):
-        for name in names:
-            cand = base / name
+        for cand in _iter_candidate_paths(base, names=names):
             if cand.exists():
                 return cand.resolve()
 
     root = Path("src/dnadesign/opal/campaigns")
     if root.exists():
-        found = list(root.glob("*/campaign.yaml"))
+        found = []
+        for name in names:
+            found.extend(root.glob(f"*/{name}"))
+            found.extend(root.glob(f"*/configs/{name}"))
         if len(found) == 1:
             return found[0].resolve()
 
@@ -120,6 +143,7 @@ def resolve_campaign_config_path(opt: Optional[Path], *, allow_dir: bool = False
         found = []
         for name in names:
             found.extend(root.glob(f"*/{name}"))
+            found.extend(root.glob(f"*/configs/{name}"))
         if len(found) == 1:
             return found[0].resolve()
 

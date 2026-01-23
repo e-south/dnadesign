@@ -1,3 +1,5 @@
+# ABOUTME: Marimo notebook for promoter OPAL dashboard exploration.
+# ABOUTME: Provides interactive exploration of campaign datasets and scoring.
 import marimo
 
 __generated_with = "0.19.4"
@@ -191,7 +193,7 @@ def _(dedent, mo):
     active learning, the `SFXI` metric, and `OPAL` come in.
 
     Suggested workflow
-    1. Select an OPAL campaign (campaign.yaml).
+    1. Select an OPAL campaign (configs/campaign.yaml).
     2. Explore the dataset schema + missingness for that campaign’s records.parquet.
     3. Inspect a record: view its sequence and TFBS placement.
     4. Explore UMAP neighborhoods and brush select a working subset.
@@ -217,7 +219,7 @@ def _(campaign_label_from_path, list_campaign_paths, repo_root):
     campaign_path_map = dict(zip(campaign_labels, campaign_paths))
     default_campaign_label = None
     for label in campaign_labels:
-        if "prom60-etoh-cipro-andgate/campaign.yaml" in label.replace("\\", "/"):
+        if "prom60-etoh-cipro-andgate" in label.replace("\\", "/"):
             default_campaign_label = label
             break
     if default_campaign_label is None and campaign_labels:
