@@ -1,3 +1,5 @@
+# ABOUTME: Registers Y transforms and loads built-in transform modules.
+# ABOUTME: Provides transform factories with schema and PluginCtx handling.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -9,9 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import importlib
 import os
-import pkgutil
 import sys
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
@@ -19,6 +19,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 import numpy as np
 
 from ..core.round_context import Contract, PluginCtx, RoundCtx
+from .loader import load_builtin_modules
 
 # ---- Ingest transforms ----
 
@@ -36,25 +37,7 @@ def _ensure_builtins_loaded() -> None:
     global _BUILTINS_LOADED
     if _BUILTINS_LOADED:
         return
-    try:
-        pkg = importlib.import_module("dnadesign.opal.src.transforms_y")
-        _dbg(f"imported package: {pkg.__name__} ({getattr(pkg, '__file__', '?')})")
-        try:
-            pkg_path = pkg.__path__  # type: ignore[attr-defined]
-        except Exception:
-            pkg_path = []
-        for mod in pkgutil.iter_modules(pkg_path):
-            if mod.name.startswith("_"):
-                continue
-            fq = f"{pkg.__name__}.{mod.name}"
-            try:
-                importlib.import_module(fq)
-                _dbg(f"imported built-in transform_y module: {fq}")
-            except Exception as e:
-                _dbg(f"FAILED importing {fq}: {e!r}")
-                continue
-    except Exception as e:
-        _dbg(f"FAILED importing package dnadesign.opal.src.transforms_y: {e!r}")
+    load_builtin_modules("dnadesign.opal.src.transforms_y", label="transform_y", debug=_dbg)
     _BUILTINS_LOADED = True
 
 
