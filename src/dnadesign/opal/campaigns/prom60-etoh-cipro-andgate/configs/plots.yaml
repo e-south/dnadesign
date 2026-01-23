@@ -1,0 +1,106 @@
+# OPAL plot configuration for prom60-etoh-cipro-andgate
+
+plot_defaults:
+  output:
+    format: "png"
+    dpi: 600
+    save_data: false
+
+plot_presets:
+  fold_change_base:
+    kind: fold_change_vs_logic_fidelity
+    params:
+      intensity_log2_offset_delta: 0.0
+      y_axis: score
+      size_by: obj__effect_raw
+      size_min: 5
+      size_max: 100
+      selected_marker: "*"
+      selected_alpha: 1.0
+      selected_size_scale: 1.0
+      selected_edgecolor: "black"
+      alpha: 0.2
+      rasterize_at: 200000
+      figsize_in: [8, 6]
+
+plots:
+  # Set enabled: false to keep a plot config without running it.
+  - name: score_vs_rank_latest
+    kind: scatter_score_vs_rank
+    tags: [quick]
+    params:
+      rank_mode: sequential      # "sequential" | "competition"
+      hue: logic_fidelity        # alias -> obj__effect_scaled
+      cmap: viridis
+      # size_by: logic_fidelity    # alias -> obj__logic_fidelity
+      size_min: 20
+      size_max: 100
+      alpha: 0.20
+      rasterize_at: 200000
+      figsize_in: [6, 6]
+    output:
+      save_data: true
+
+  - name: percent_high_activity
+    kind: percent_high_activity_over_rounds
+    tags: [quick]
+    params:
+      threshold: 0.85
+      mode: both                    # violin+swarm on left axis, % line on right axis
+      swarm: true
+      swarm_max_points: 2500
+      swarm_jitter: 0.07
+      swarm_alpha: 0.3
+      rasterize_at: 200000
+      figsize_in: [10, 5]
+
+  - name: sfxi_logic_closeness
+    kind: sfxi_logic_fidelity_closeness
+    tags: [heavy]
+    params:
+      figsize_in: [20, 15]     # overall figure size; both panels remain 1:1
+      top_percentile: 25      # optional: show closeness for top 25% nearest-to-setpoint
+      cbar_width_in: 0.25
+      cbar_pad_in: 0.05
+      gap_between_panels_in: 3.00
+
+  - name: fold_change_vs_logic
+    preset: fold_change_base
+    enabled: false
+    tags: [heavy]
+    params:
+      # Categorical hue example (for numeric, set hue to pred__y_obj_scalar).
+      hue: "records.densegen__plan"
+      hue_order: ["sigma70_high", "sigma70_mid", "sigma70_low"]
+
+  # Categorical hue from records.parquet
+  - name: fold_change_vs_logic_by_plan
+    preset: fold_change_base
+    tags: [heavy]
+    params:
+      hue: "records.densegen__plan"
+      hue_order: ["sigma70_high", "sigma70_mid", "sigma70_low"]
+
+  # Original numeric hue (continuous colorbar)
+  - name: fold_change_vs_logic_numeric
+    preset: fold_change_base
+    tags: [heavy]
+    params:
+      hue: pred__y_obj_scalar   # continuous; colorbar will be shown
+      cmap: viridis
+      cbar: true
+
+  - name: feature_importance_bars
+    kind: feature_importance_bars
+    tags: [quick]
+    params:
+      # aesthetics
+      figsize_in: [12, 5]
+      cmap: tab10          # discrete palette across rounds
+      alpha: 0.45          # transparency for overlaid bars
+      bar_width: 0.80
+      xtick_step: 16       # optional: draw every 16th tick; omit for auto
+      title: "Feature importance (overlay by round)"
+      ylabel: "Importance"
+    output:
+      save_data: true

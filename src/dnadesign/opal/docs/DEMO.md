@@ -8,7 +8,7 @@ This demo walks a **complete OPAL loop** on a small dataset with the SFXI ingest
 - plots (quick + configured)
 - where artifacts and ledgers live
 
-This demo is **self-contained**: it ships with a local `records.parquet` and label CSVs under `inputs/`, so no USR setup is required.
+This demo is **self-contained**: it ships with a local `records.parquet` and label inputs under `inputs/`, so no USR setup is required.
 
 ---
 
@@ -20,39 +20,54 @@ From the repo root:
 cd src/dnadesign/opal/campaigns/demo/
 
 # 1) Initialize & validate
-uv run opal init     -c campaign.yaml
-uv run opal validate -c campaign.yaml
+uv run opal init     -c configs/campaign.yaml
+uv run opal validate -c configs/campaign.yaml
 
 # 2) Ingest round-0 labels
-uv run opal ingest-y -c campaign.yaml --round 0 \
-  --csv inputs/r0/demo_y_sfxi.csv
+uv run opal ingest-y -c configs/campaign.yaml --round 0 \
+  --csv inputs/r0/vec8-b0.xlsx
 
 # 3) Train, score, select (round 0)
-uv run opal run -c campaign.yaml --round 0 --resume
+uv run opal run -c configs/campaign.yaml --round 0
 
 # 4) Inspect
-uv run opal status -c campaign.yaml
-uv run opal runs list -c campaign.yaml
-uv run opal log -c campaign.yaml --round latest
-uv run opal verify-outputs -c campaign.yaml --round latest
+uv run opal status -c configs/campaign.yaml
+uv run opal runs list -c configs/campaign.yaml
+uv run opal log -c configs/campaign.yaml --round latest
+uv run opal verify-outputs -c configs/campaign.yaml --round latest
 
 # 5) Plot
-uv run opal plot -c campaign.yaml --quick
-uv run opal plot -c campaign.yaml
+uv run opal plot -c configs/campaign.yaml --quick
+uv run opal plot -c configs/campaign.yaml
 ```
 
 **Notes:**
 - Use `uv run opal ...` to ensure the correct environment.
-- If `outputs/round_0/` already exists (this repo ships with demo outputs), `opal run` will refuse to overwrite
+- If `outputs/round_0/` already exists from a prior run, `opal run` will refuse to overwrite
   unless you pass `--resume` or delete the existing artifacts first.
+
+---
+
+### Clean-slate reset (demo)
+
+From the campaign root:
+
+```bash
+# Remove OPAL-derived columns (including any prior label column) from records.parquet
+uv run opal prune-source -c configs/campaign.yaml --scope any --yes --no-backup
+
+# Clear generated artifacts/ledgers
+rm -rf outputs
+```
 
 ---
 
 ### Data used here
 
 - **Local dataset**: `src/dnadesign/opal/campaigns/demo/records.parquet`
-  - contains `sequence`, `mock__X_value`, and a placeholder label column.
-- **Experimental labels**: `src/dnadesign/opal/campaigns/demo/inputs/r0/demo_y_sfxi.csv`
+  - contains `sequence` and `infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean` (X).
+  - the Y column (`sfxi_8_vector_y_label`) is added during label ingestion.
+- **Experimental labels**: `src/dnadesign/opal/campaigns/demo/inputs/r0/vec8-b0.xlsx`
   - includes `intensity_log2_offset_delta`.
 
 **8-vector label convention**
@@ -61,7 +76,7 @@ uv run opal plot -c campaign.yaml
 Y = [v00, v10, v01, v11, y00*, y10*, y01*, y11*]
 ```
 
-The demo CSV includes **`intensity_log2_offset_delta`** (constant) so the
+The demo XLSX includes **`intensity_log2_offset_delta`** (constant) so the
 `SFXI` transform can enforce a strict match between data and objective params.
 
 ---
@@ -69,7 +84,7 @@ The demo CSV includes **`intensity_log2_offset_delta`** (constant) so the
 ### Optional: swap to a USR dataset
 
 If you want to exercise the same workflow against a USR dataset later, update
-`campaign.yaml`:
+`configs/campaign.yaml`:
 
 ```yaml
 data:
@@ -89,8 +104,8 @@ Campaign
   name           : Demo (vec8)
   slug           : demo
   workdir        : <repo>/src/dnadesign/opal/campaigns/demo
-  X column       : mock__X_value
-  Y column       : mock__y_label
+  X column       : infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean
+  Y column       : sfxi_8_vector_y_label
   num_rounds     : 1
 
 Latest round
@@ -168,8 +183,8 @@ outputs/ledger.predictions/part-*.parquet
 Generate a campaign-tied notebook and open it in marimo:
 
 ```bash
-uv run opal notebook generate -c campaign.yaml --round latest
-uv run opal notebook run -c campaign.yaml
+uv run opal notebook generate -c configs/campaign.yaml --round latest
+uv run opal notebook run -c configs/campaign.yaml
 ```
 
 The notebook loads campaign artifacts and label history from `records.parquet`,
@@ -184,7 +199,7 @@ Canonical vs ledger vs overlay (notebook):
 
 ---
 
-### Demo `campaign.yaml`
+### Demo config (`configs/campaign.yaml`)
 
 ```yaml
 # OPAL demo campaign configuration (local)
@@ -192,12 +207,12 @@ Canonical vs ledger vs overlay (notebook):
 campaign:
   name: "Demo (vec8)"
   slug: "demo"
-  workdir: "."  # resolved relative to this file
+  workdir: "."  # resolved relative to the campaign root
 
 data:
   location: { kind: local, path: records.parquet }
-  x_column_name: "mock__X_value"
-  y_column_name: "mock__y_label"
+  x_column_name: "infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean"
+  y_column_name: "sfxi_8_vector_y_label"
   y_expected_length: 8
 
 ingest:
@@ -276,7 +291,7 @@ plot_config: plots.yaml
 
 - **Delta mismatch** during `ingest-y`:
   - Ensure `intensity_log2_offset_delta` in the CSV equals
-    `objective.params.intensity_log2_offset_delta` in `campaign.yaml`.
+    `objective.params.intensity_log2_offset_delta` in `configs/campaign.yaml`.
 - **Matplotlib cache warning**:
   - OPAL sets a writable Matplotlib cache dir automatically during `opal plot`.
     If you explicitly set `MPLCONFIGDIR` and it points to an unwritable path,
