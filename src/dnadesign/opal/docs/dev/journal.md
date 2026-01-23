@@ -30,3 +30,5 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Campaign reset flow: `opal campaign-reset` (hidden) or `opal prune-source --scope any` + remove `outputs/`.
 - Notebook template now emits campaign context markdown, data-source dropdown + table, and `__generated_with`.
 - Moved notebook theme helpers to `analysis/dashboard/theme.py`; added guard test to keep notebooks dir marimo-only.
+- Label history prediction writeback now deep-coerces objective params (e.g., numpy arrays → lists) for portability;
+  added test coverage for the coercion.

@@ -9,6 +9,7 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -138,3 +139,35 @@ def test_label_hist_validation_allows_missing_when_not_required(tmp_path):
     df = pd.DataFrame({"id": ["a"], "sequence": ["AAA"], "bio_type": ["dna"], "alphabet": ["dna_4"]})
     store = _store(tmp_path)
     store.validate_label_hist(df, require=False)
+
+
+def test_append_predictions_coerces_objective_params(tmp_path):
+    store = _store(tmp_path)
+    label_hist_col = store.label_hist_col()
+    df = pd.DataFrame(
+        {
+            "id": ["a"],
+            "bio_type": ["dna"],
+            "sequence": ["AAA"],
+            "alphabet": ["dna_4"],
+            label_hist_col: [None],
+        }
+    )
+    out = store.append_predictions_from_arrays(
+        df,
+        ids=["a"],
+        y_hat=np.array([[0.1, 0.2]]),
+        as_of_round=0,
+        run_id="run-1",
+        objective={
+            "name": "sfxi_v1",
+            "mode": "maximize",
+            "params": {"setpoint_vector": np.array([0, 0, 0, 1])},
+        },
+        metrics_by_name={"score": [0.5]},
+        selection_rank=np.array([1]),
+        selection_top_k=np.array([True]),
+    )
+    cell = out[label_hist_col].iloc[0][0]
+    params = cell["objective"]["params"]
+    assert isinstance(params["setpoint_vector"], list)

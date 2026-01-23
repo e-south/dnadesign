@@ -788,15 +788,18 @@ class LabelHistory:
         selection_top_k: np.ndarray,
         ts: str | None = None,
     ) -> pd.DataFrame:
-        if not isinstance(objective, Mapping):
+        objective = _coerce_mapping(_deep_as_py(objective))
+        if objective is None:
             raise OpalError("append_predictions_from_arrays requires objective mapping.")
         if not objective.get("name"):
             raise OpalError("append_predictions_from_arrays requires objective.name.")
         params_val = objective.get("params")
         if params_val is not None and not isinstance(params_val, Mapping):
             raise OpalError("append_predictions_from_arrays requires objective.params mapping or null.")
-        if isinstance(params_val, Mapping) and not params_val:
-            params_val = None
+        if isinstance(params_val, Mapping):
+            params_val = _coerce_mapping(_deep_as_py(params_val))
+            if not params_val:
+                params_val = None
         objective = {**objective, "params": params_val}
         lh = self.label_hist_col()
         out = df.copy()
