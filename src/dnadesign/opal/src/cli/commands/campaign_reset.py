@@ -1,9 +1,9 @@
-# ABOUTME: Resets the demo campaign to a clean slate for repeatable runs.
+# ABOUTME: Resets a campaign to a clean slate for repeatable runs.
 # ABOUTME: Prunes OPAL columns, removes outputs, and clears state.json.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/src/cli/commands/demo_reset.py
+src/dnadesign/opal/src/cli/commands/campaign_reset.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import shutil
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -36,13 +37,49 @@ from ._common import (
 from .prune_source import _classify_columns
 
 
+def _resolve_default_demo_config_path() -> Path:
+    demo_paths = (
+        Path("src/dnadesign/opal/campaigns/demo/configs/campaign.yaml"),
+        Path("src/dnadesign/opal/campaigns/demo/campaign.yaml"),
+    )
+    for base in (Path.cwd(), *Path.cwd().parents):
+        for rel in demo_paths:
+            cand = (base / rel).resolve()
+            if cand.exists():
+                return cand
+    for base in Path(__file__).resolve().parents:
+        for rel in demo_paths:
+            cand = (base / rel).resolve()
+            if cand.exists():
+                return cand
+    raise OpalError(
+        "Default demo config not found. Pass --config to specify a campaign.",
+        ExitCodes.BAD_ARGS,
+    )
+
+
+def _prompt_slug_confirm(slug: str) -> bool:
+    if not sys.stdin.isatty():
+        raise OpalError(
+            "No TTY available. Re-run with --yes to confirm campaign-reset.",
+            ExitCodes.BAD_ARGS,
+        )
+    resp = input(f"Type the campaign slug '{slug}' to confirm: ").strip()
+    return resp == slug
+
+
 @cli_command(
-    "demo-reset",
-    help="Reset the demo campaign to a clean slate (hidden).",
+    "campaign-reset",
+    help="Reset a campaign to a clean slate (hidden).",
     hidden=True,
 )
-def cmd_demo_reset(
+def cmd_campaign_reset(
     config: Optional[Path] = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG", help="Path to campaign.yaml"),
+    allow_non_demo: bool = typer.Option(
+        False,
+        "--allow-non-demo",
+        help="Allow resetting a non-demo campaign (dangerous).",
+    ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip interactive confirmation."),
     backup: bool = typer.Option(
         False,
@@ -52,14 +89,17 @@ def cmd_demo_reset(
     json: bool = typer.Option(False, "--json/--human", help="Output format."),
 ) -> None:
     try:
-        cfg_path = resolve_config_path(config)
+        cfg_path = resolve_config_path(config) if config is not None else _resolve_default_demo_config_path()
         cfg = load_cli_config(cfg_path)
         store = store_from_cfg(cfg)
         if not json:
             print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
 
-        if cfg.campaign.slug != "demo":
-            raise OpalError("demo-reset is restricted to the demo campaign (slug must be 'demo').")
+        if cfg.campaign.slug != "demo" and not allow_non_demo:
+            raise OpalError(
+                "campaign-reset is restricted to the demo campaign unless --allow-non-demo is set.",
+                ExitCodes.BAD_ARGS,
+            )
 
         rec_path = store.records_path
         if not rec_path.exists():
@@ -84,6 +124,7 @@ def cmd_demo_reset(
             "workdir": str(workdir.resolve()),
             "records_path": str(rec_path.resolve()),
             "table_shape_before": f"{df.shape[0]} rows × {df.shape[1]} cols",
+            "campaign_slug": cfg.campaign.slug,
             "columns_to_prune": len(to_delete),
             "outputs_dir": str(outputs_dir.resolve()),
             "outputs_exists": outputs_dir.exists(),
@@ -97,12 +138,12 @@ def cmd_demo_reset(
             if not yes:
                 raise typer.Exit(code=ExitCodes.OK)
         else:
-            head = kv_block("[Preview] demo-reset", preview)
+            head = kv_block("[Preview] campaign-reset", preview)
             del_list = bullet_list("Columns to prune from records.parquet", to_delete or ["(none)"])
             warning = "\n".join(
                 [
                     "",
-                    "⚠️  WARNING: demo-reset rewrites records.parquet and removes outputs/state.json.",
+                    "⚠️  WARNING: campaign-reset rewrites records.parquet and removes outputs/state.json.",
                     "   • Essentials and your X column are protected.",
                     "   • Use --backup if you want a copy of records.parquet.",
                 ]
@@ -110,10 +151,14 @@ def cmd_demo_reset(
             print_stdout("\n".join([head, "", del_list, warning]))
 
         if not yes and not json:
-            if not prompt_confirm(
-                "Proceed with demo-reset? This will remove outputs/ and state.json. (y/N): ",
-                non_interactive_hint="No TTY available. Re-run with --yes to confirm demo-reset.",
-            ):
+            if cfg.campaign.slug == "demo":
+                confirmed = prompt_confirm(
+                    "Proceed with campaign-reset? This will remove outputs/ and state.json. (y/N): ",
+                    non_interactive_hint="No TTY available. Re-run with --yes to confirm campaign-reset.",
+                )
+            else:
+                confirmed = _prompt_slug_confirm(cfg.campaign.slug)
+            if not confirmed:
                 print_stdout("Aborted.")
                 raise typer.Exit(code=ExitCodes.BAD_ARGS)
 
@@ -144,10 +189,10 @@ def cmd_demo_reset(
         if json:
             json_out(result)
         else:
-            print_stdout(kv_block("demo-reset", result))
+            print_stdout(kv_block("campaign-reset", result))
     except OpalError as e:
-        opal_error("demo-reset", e)
+        opal_error("campaign-reset", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
-        internal_error("demo-reset", e)
+        internal_error("campaign-reset", e)
         raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)

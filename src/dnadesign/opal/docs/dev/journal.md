@@ -18,4 +18,4 @@ Note: freeform working notes; prune/merge as they become cruft.
   - `outputs/ledger/runs.parquet`, `outputs/ledger/labels.parquet`, `outputs/ledger/predictions/part-*.parquet`
   - `outputs/rounds/round_<k>/...` for per-round artifacts
 - Keep `.opal/config` in root pointing to `configs/campaign.yaml` for auto-discovery.
-- Demo reset flow: `opal demo-reset` (hidden) or `opal prune-source --scope any` + remove `outputs/`.
+- Campaign reset flow: `opal campaign-reset` (hidden) or `opal prune-source --scope any` + remove `outputs/`.

@@ -59,6 +59,7 @@ def write_campaign_yaml(
     workdir: Path,
     records_path: Path,
     plots: Optional[List[Dict[str, Any]]] = None,
+    slug: str = "demo",
     transforms_y_name: str = "sfxi_vec8_from_table_v1",
     transforms_y_params: Optional[Dict[str, Any]] = None,
     objective_name: str = "sfxi_v1",
@@ -77,7 +78,7 @@ def write_campaign_yaml(
     if selection_params is None:
         selection_params = {"top_k": 1}
     cfg: Dict[str, Any] = {
-        "campaign": {"name": "Demo", "slug": "demo", "workdir": str(workdir)},
+        "campaign": {"name": "Demo", "slug": slug, "workdir": str(workdir)},
         "data": {
             "location": {"kind": "local", "path": str(records_path)},
             "x_column_name": "X",

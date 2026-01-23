@@ -301,19 +301,21 @@ plot_config: plots.yaml
 
 ---
 
-### Demo reset command (hidden)
+### Campaign reset command (hidden)
 
-`demo-reset` is a demo-only helper (not listed in `opal --help`) that wipes the demo state:
+`campaign-reset` is a hidden helper (not listed in `opal --help`) that wipes the demo state:
 it prunes OPAL columns from `records.parquet`, deletes `outputs/`, and removes `state.json`.
 
 From the demo campaign root:
 
 ```bash
-uv run opal demo-reset -c configs/campaign.yaml
+uv run opal campaign-reset -c configs/campaign.yaml
 
 # Non-interactive (skip prompt)
-uv run opal demo-reset -c configs/campaign.yaml --yes
+uv run opal campaign-reset -c configs/campaign.yaml --yes
 ```
+
+For non-demo campaigns, you must pass `--allow-non-demo` and confirm the slug.
 
 ---
 
