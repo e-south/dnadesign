@@ -229,6 +229,27 @@ def _append_run_meta_dataset(path: Path, df: pd.DataFrame) -> None:
     _append_dataset_table(path, table, ctx=ctx)
 
 
+def compact_runs_ledger(path: Path) -> dict[str, int]:
+    ctx = "[ledger:run_meta]"
+    if not path.exists():
+        raise LedgerError(f"{ctx} missing dataset: {path}")
+    df = read_parquet_df(path)
+    if df.empty:
+        return {"rows_before": 0, "rows_after": 0, "duplicates_removed": 0}
+    if "run_id" not in df.columns or "as_of_round" not in df.columns:
+        raise LedgerError(f"{ctx} missing required columns run_id/as_of_round.")
+    multi_round = df.groupby("run_id")["as_of_round"].nunique()
+    if (multi_round > 1).any():
+        bad_ids = multi_round[multi_round > 1].index.tolist()[:10]
+        raise LedgerError(f"{ctx} run_id appears in multiple rounds (sample={bad_ids}).")
+    before = int(len(df))
+    df2 = df.drop_duplicates(subset=["run_id"], keep="last")
+    after = int(len(df2))
+    if before != after:
+        _rewrite_dataset(path, df2)
+    return {"rows_before": before, "rows_after": after, "duplicates_removed": before - after}
+
+
 def _ensure_event_value(df: pd.DataFrame, kind: str) -> None:
     if "event" not in df.columns:
         raise LedgerError(f"[ledger:{kind}] missing 'event' column.")
