@@ -207,6 +207,16 @@ def _(
 
 
 @app.cell
+def _(campaign_selection):
+    dashboard_defaults = {}
+    if campaign_selection.info is not None and campaign_selection.info.dashboard:
+        explorer_defaults = campaign_selection.info.dashboard.get("explorer_defaults")
+        if isinstance(explorer_defaults, dict):
+            dashboard_defaults = dict(explorer_defaults)
+    return (dashboard_defaults,)
+
+
+@app.cell
 def _(Path, campaign_selection, dataset_override_input, repo_root):
     override = dataset_override_input.value.strip()
     dataset_mode = "campaign"
@@ -312,6 +322,7 @@ def _(df_prelim, mo):
 def _(
     build_hue_registry,
     data_ready,
+    dashboard_defaults,
     default_view_hues,
     df_view,
     mo,
@@ -319,8 +330,17 @@ def _(
 ):
     df_explorer = df_view if data_ready else df_view.head(0)
     numeric_cols = [name for name, dtype in df_explorer.schema.items() if safe_is_numeric(dtype)]
-    _x_default = numeric_cols[0] if numeric_cols else "(none)"
-    _y_default = numeric_cols[1] if len(numeric_cols) > 1 else _x_default
+    defaults = dashboard_defaults or {}
+    _default_x = defaults.get("x")
+    _default_y = defaults.get("y")
+    if _default_x in numeric_cols:
+        _x_default = _default_x
+    else:
+        _x_default = numeric_cols[0] if numeric_cols else "(none)"
+    if _default_y in numeric_cols:
+        _y_default = _default_y
+    else:
+        _y_default = _x_default if len(numeric_cols) < 2 else numeric_cols[1]
 
     plot_type_dropdown = mo.ui.dropdown(
         options=["scatter", "histogram"],
@@ -346,7 +366,13 @@ def _(
         denylist={"__row_id", "id", "id_", "id__"},
     )
     color_options = ["(none)"] + hue_registry.labels()
-    color_default = "Score" if "Score" in hue_registry.labels() else "(none)"
+    _default_color = defaults.get("color")
+    if _default_color in color_options:
+        color_default = _default_color
+    elif "Score" in hue_registry.labels():
+        color_default = "Score"
+    else:
+        color_default = "(none)"
     dataset_explorer_color_dropdown = mo.ui.dropdown(
         options=color_options,
         value=color_default,
@@ -397,6 +423,8 @@ def _(
     _color_encoding = alt.Undefined
     _color_title = None
     _color_tooltip = None
+    _size_encoding = alt.Undefined
+    _order_encoding = alt.Undefined
     _okabe_ito = [
         "#E69F00",
         "#56B4E9",
@@ -459,26 +487,34 @@ def _(
                     _note_lines.append(f"Color `{_hue.key}` has no non-null values; rendering without color.")
                 elif _hue.kind == "categorical" and _hue.category_labels:
                     _label_col = f"{_hue.key}__label"
+                    _layer_col = f"{_hue.key}__layer"
                     _yes_label, _no_label = _hue.category_labels
+                    _bool_mask = pl.col(_hue.key).fill_null(False)
                     df_plot = df_plot.with_columns(
-                        pl.when(pl.col(_hue.key))
-                        .then(pl.lit(_yes_label))
-                        .otherwise(pl.lit(_no_label))
-                        .alias(_label_col)
+                        pl.when(_bool_mask).then(pl.lit(_yes_label)).otherwise(pl.lit(_no_label)).alias(_label_col),
+                        pl.when(_bool_mask).then(pl.lit(1)).otherwise(pl.lit(0)).alias(_layer_col),
                     )
                     _color_title = _hue.label
                     _color_tooltip = _label_col
-                    _color_scale = (
-                        alt.Scale(domain=[_yes_label, _no_label], range=[_okabe_ito[5], "#B0B0B0"])
-                        if "top_k" in _hue.key
-                        else alt.Scale(domain=[_yes_label, _no_label], range=[_okabe_ito[2], "#B0B0B0"])
-                    )
+                    if "observed" in _hue.key:
+                        _highlight_color = _okabe_ito[5]
+                    elif "top_k" in _hue.key:
+                        _highlight_color = _okabe_ito[2]
+                    else:
+                        _highlight_color = _okabe_ito[0]
+                    _color_scale = alt.Scale(domain=[_yes_label, _no_label], range=[_highlight_color, "#B0B0B0"])
                     _color_encoding = alt.Color(
                         f"{_label_col}:N",
                         title=_color_title,
                         scale=_color_scale,
                         legend=alt.Legend(title=_color_title),
                     )
+                    _size_encoding = alt.Size(
+                        f"{_layer_col}:Q",
+                        legend=None,
+                        scale=alt.Scale(domain=[0, 1], range=[30, 60]),
+                    )
+                    _order_encoding = alt.Order(f"{_layer_col}:Q", sort="ascending")
                 elif _hue.kind == "numeric":
                     _color_title = _hue.label
                     _color_tooltip = _hue.key
@@ -515,6 +551,8 @@ def _(
                     x=alt.X(_x_col, title=_x_col),
                     y=alt.Y(y_col_plot, title=_y_col),
                     color=_color_encoding,
+                    size=_size_encoding,
+                    order=_order_encoding,
                     tooltip=_tooltip_cols,
                 )
                 .add_params(_brush)
@@ -664,14 +702,12 @@ def _(
         "Select an OPAL campaign. The dashboard resolves `records.parquet` from the campaign config and "
         "uses it as the single source of truth."
     )
-    advanced = mo.md("Advanced override: supply a custom records.parquet path for debugging only.")
     mo.vstack(
         [
             header,
             intro,
             opal_panel_prefix_dropdown,
             selection_notice_md,
-            advanced,
             dataset_override_input,
             dataset_status_md,
             data_ready_note_md,
@@ -784,7 +820,6 @@ def _(
 @app.cell(column=2)
 def _(
     dataset_explorer,
-    dataset_status_md,
     dataset_table,
     df_active_note_md,
     explorer_selected_table,
@@ -798,7 +833,6 @@ def _(
                 "Inspect the table, then pivot into targeted plots. Selections here "
                 "propagate to other panels as a shared record pool."
             ),
-            dataset_status_md,
             dataset_table,
             mo.md("### Ad-hoc plotting using a Polars-backed chart explorer."),
             dataset_explorer,
@@ -1801,7 +1835,6 @@ def _(
     opal_label_view_dropdown,
     opal_labels_table_note_md,
     opal_labels_table_ui,
-    opal_panel_prefix_dropdown,
     opal_provenance_md,
     opal_round_dropdown,
     opal_round_notice_md,
@@ -1840,7 +1873,6 @@ def _(
                 "that tries to predict an 8-vector response and reduces it via an objective to rank candidates."
             ),
             _opal_references_md,
-            opal_panel_prefix_dropdown,
             opal_campaign_notice_md,
             mo.md("### Canonical selection"),
             selection_row,
@@ -1947,6 +1979,7 @@ def _(
         if transient_cluster_chart is not None
         else mo.md("Leiden cluster score plot unavailable.")
     )
+    cluster_controls = mo.hstack([transient_cluster_metric_dropdown, transient_cluster_hue_dropdown])
     mode_note = mo.md("")
     if mode_dropdown.value != "Overlay":
         mode_note = mo.md("Switch to **Overlay** mode to recompute SFXI metrics from stored predictions.")
@@ -1954,15 +1987,8 @@ def _(
         mo.md(rf_header),
         rf_model_source_note_md,
         mo.md(
-            "Label history is **per-record** and is the canonical source for observed/predicted values plus "
-            "objective/metrics. It does not carry run-level pointers like artifact paths, `round_dir`, or "
-            "round-level metadata (`round_ctx`, `model_meta`, `objective_meta`). Stuffing those into every "
-            "label history entry would bloat each record with repeated run-level data. To keep a single "
-            "canonical source for values while avoiding intermediate leakage, the dashboard treats "
-            "`label_hist` as canonical and resolves artifacts *optionally* from the round directory "
-            "(`workdir/outputs/rounds/round_<r>`). This preserves a single truth for values while still enabling "
-            "feature importance when artifacts exist. The trade-off is historical reruns for a round are "
-            "not preserved here (pred entries replace-in-place), which aligns with “latest is canonical.”"
+            "Label history is the canonical per-record source for observed/predicted values. "
+            "Artifacts in `outputs/rounds/round_<r>` are optional and used only for feature importance."
         ),
         transient_md if transient_md is not None else mo.md(""),
         mo.md(rf_note),
@@ -1974,8 +2000,7 @@ def _(
         ),
         hist_panel,
         mo.md("The histogram shows the distribution of predicted SFXI scores across the full candidate pool."),
-        transient_cluster_metric_dropdown,
-        transient_cluster_hue_dropdown,
+        cluster_controls,
         cluster_panel,
         mo.md(
             "The cluster plot compares the selected metric across Leiden clusters, ordered numerically for stability."

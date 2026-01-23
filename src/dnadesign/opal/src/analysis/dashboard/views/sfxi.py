@@ -164,6 +164,25 @@ def valid_vec8_mask_expr(vec_col: str) -> pl.Expr:
     return vec.is_not_null() & len_ok & finite_ok
 
 
+def _coerce_vec8_column(df: pl.DataFrame, vec_col: str) -> pl.DataFrame:
+    if vec_col not in df.columns or df.is_empty():
+        return df
+    dtype = df.schema.get(vec_col, pl.Null)
+    if dtype == pl.Object:
+        return df.with_columns(
+            pl.col(vec_col)
+            .map_elements(
+                lambda v: None if v is None else [float(x) for x in v],
+                return_dtype=pl.List(pl.Float64),
+            )
+            .alias(vec_col)
+        )
+    inner = getattr(dtype, "inner", None)
+    if inner is not None and inner != pl.Float64:
+        return df.with_columns(pl.col(vec_col).cast(pl.List(pl.Float64), strict=False))
+    return df
+
+
 def _effect_raw_expr(vec_col: str, weights: Sequence[float], delta: float) -> pl.Expr:
     y0 = pl.col(vec_col).list.get(4)
     y1 = pl.col(vec_col).list.get(5)
@@ -183,6 +202,8 @@ def compute_sfxi_metrics(
     params: SFXIParams,
     denom_pool_df: pl.DataFrame,
 ) -> SFXIResult:
+    df = _coerce_vec8_column(df, vec_col)
+    denom_pool_df = _coerce_vec8_column(denom_pool_df, vec_col)
     if vec_col not in df.columns:
         return SFXIResult(
             df=df.head(0),

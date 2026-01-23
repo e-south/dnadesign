@@ -81,5 +81,10 @@ safety:
 
 metadata:
   notes: "SFXI (vec8) and identity X."
+  dashboard:
+    explorer_defaults:
+      x: opal__view__score
+      y: opal__view__logic_fidelity
+      color: "Observed (labeled)"
 
 plot_config: plots.yaml

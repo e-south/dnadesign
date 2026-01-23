@@ -92,6 +92,21 @@ def test_resolve_dataset_path(tmp_path: Path) -> None:
     assert custom_path == custom_abs
 
 
+def test_parse_campaign_info_dashboard_defaults(tmp_path: Path) -> None:
+    raw = {
+        "campaign": {"name": "demo", "slug": "demo", "workdir": "."},
+        "data": {"x_column_name": "x", "y_column_name": "y", "y_expected_length": 8},
+        "model": {"name": "random_forest", "params": {}},
+        "objective": {"name": "sfxi_v1", "params": {}},
+        "selection": {"name": "top_n", "params": {}},
+        "training": {"policy": {}, "y_ops": []},
+        "metadata": {"dashboard": {"explorer_defaults": {"x": "opal__view__score", "y": "opal__view__logic_fidelity"}}},
+    }
+    info = datasets.parse_campaign_info(raw=raw, path=tmp_path / "campaign.yaml", label="demo")
+    assert info.dashboard is not None
+    assert info.dashboard["explorer_defaults"]["x"] == "opal__view__score"
+
+
 def test_namespace_summary() -> None:
     cols = ["id", "densegen__plan", "opal__x__label_hist", "cluster__ldn_v1"]
     summary = util.namespace_summary(cols, max_examples=2)
@@ -706,6 +721,40 @@ def test_build_pred_sfxi_view_overlay() -> None:
     labels_current_df = pl.DataFrame(
         {
             "y_obs": [[0.0, 0.0, 0.0, 1.0, 0.2, 0.2, 0.2, 0.2]],
+        }
+    )
+    view = sfxi.build_pred_sfxi_view(
+        pred_df=pred_df,
+        labels_current_df=labels_current_df,
+        y_col="y_obs",
+        params=params,
+        mode="Overlay",
+    )
+    assert view.notice is None
+    assert not view.df.is_empty()
+
+
+def test_build_pred_sfxi_view_overlay_object_vectors() -> None:
+    params = sfxi.compute_sfxi_params(
+        setpoint=[0.0, 0.0, 0.0, 1.0],
+        beta=1.0,
+        gamma=1.0,
+        delta=0.0,
+        p=50.0,
+        fallback_p=50.0,
+        min_n=1,
+        eps=1.0e-8,
+    )
+    vec = [0.0, 0.0, 0.0, 1.0, 0.2, 0.2, 0.2, 0.2]
+    pred_df = pl.DataFrame(
+        {
+            "id": ["a"],
+            "pred_y_hat": pl.Series("pred_y_hat", [vec], dtype=pl.Object),
+        }
+    )
+    labels_current_df = pl.DataFrame(
+        {
+            "y_obs": pl.Series("y_obs", [vec], dtype=pl.Object),
         }
     )
     view = sfxi.build_pred_sfxi_view(

@@ -30,6 +30,7 @@ class CampaignInfo:
     selection_params: dict
     training_policy: dict
     y_ops: list[dict]
+    dashboard: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -242,6 +243,10 @@ def parse_campaign_info(*, raw: dict, path: Path, label: str) -> CampaignInfo:
     training_block = raw.get("training") or {}
     training_policy = dict(training_block.get("policy") or {})
     y_ops = list(training_block.get("y_ops") or [])
+    metadata = raw.get("metadata") or {}
+    dashboard = metadata.get("dashboard")
+    if dashboard is not None and not isinstance(dashboard, dict):
+        raise ValueError("metadata.dashboard must be a mapping when provided.")
 
     return CampaignInfo(
         label=label,
@@ -259,6 +264,7 @@ def parse_campaign_info(*, raw: dict, path: Path, label: str) -> CampaignInfo:
         selection_params=selection_params,
         training_policy=training_policy,
         y_ops=y_ops,
+        dashboard=dashboard,
     )
 
 

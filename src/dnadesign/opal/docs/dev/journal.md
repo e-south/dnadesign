@@ -36,3 +36,8 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Demo plot config now uses effect_scaled vs logic_fidelity and renames the plot for semantic clarity.
 - Gitignore explicitly blocks non-demo opal campaign records.parquet while keeping demo as a tracked exception.
 - prom60_eda now auto-loads records.parquet (no load button), with a regression test to prevent reintroducing gating.
+- Campaign dashboard defaults (explorer X/Y/color) now live in campaign metadata and are read by prom60_eda.
+- CampaignInfo carries dashboard metadata; tests cover the new parse path.
+- SFXI overlay now coerces object-typed vec8 columns to list float for robust list ops; tests cover object vectors.
+- Dataset explorer highlights boolean categories (observed/top-k) with gray backfill and layered sizing for true points.
+- prom60_eda UI trimmed redundant campaign/status blocks, removed duplicate config dropdown, and hstacked cluster controls.
