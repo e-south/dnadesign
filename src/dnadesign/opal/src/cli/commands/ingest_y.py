@@ -252,13 +252,27 @@ def cmd_ingest_y(
                 )
             if unknown_sequences in {"create", "drop"} and cfg.data.x_column_name in required_cols:
                 x_col = cfg.data.x_column_name
+                missing_x_mask = pd.Series(False, index=labels_df.index)
                 if x_col not in csv_df.columns:
-                    missing_x_mask = unknown_mask
-                elif len(csv_df) == len(labels_df):
-                    missing_x_mask = csv_df[x_col].map(_is_missing_value)
-                    missing_x_mask = missing_x_mask.fillna(True) & unknown_mask
+                    missing_x_mask = unknown_mask.copy()
                 else:
-                    missing_x_mask = pd.Series(False, index=labels_df.index)
+                    missing_x_values = csv_df[x_col].map(_is_missing_value).fillna(True)
+                    seq_has_x = pd.Series(False, index=labels_df.index)
+                    id_has_x = pd.Series(False, index=labels_df.index)
+                    if "sequence" in labels_df.columns and "sequence" in csv_df.columns:
+                        seq_with_x = set(
+                            csv_df.loc[~missing_x_values & csv_df["sequence"].notna(), "sequence"].astype(str).tolist()
+                        )
+                        seq_series = labels_df["sequence"]
+                        seq_has_x = seq_series.notna() & seq_series.astype(str).isin(seq_with_x)
+                    if "id" in labels_df.columns and "id" in csv_df.columns:
+                        id_with_x = set(csv_df.loc[~missing_x_values & csv_df["id"].notna(), "id"].astype(str).tolist())
+                        id_series = labels_df["id"]
+                        id_has_x = id_series.notna() & id_series.astype(str).isin(id_with_x)
+                    if not seq_has_x.any() and not id_has_x.any():
+                        missing_x_mask = unknown_mask.copy()
+                    else:
+                        missing_x_mask = ~(seq_has_x | id_has_x) & unknown_mask
                 missing_x_count = int(missing_x_mask.sum())
                 if missing_x_count > 0:
                     labels_df = labels_df.loc[~missing_x_mask].copy()
