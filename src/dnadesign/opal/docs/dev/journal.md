@@ -28,3 +28,5 @@ Note: freeform working notes; prune/merge as they become cruft.
   - `outputs/rounds/round_<k>/...` for per-round artifacts
 - Keep `.opal/config` in root pointing to `configs/campaign.yaml` for auto-discovery.
 - Campaign reset flow: `opal campaign-reset` (hidden) or `opal prune-source --scope any` + remove `outputs/`.
+- Notebook template now emits campaign context markdown, data-source dropdown + table, and `__generated_with`.
+- Moved notebook theme helpers to `analysis/dashboard/theme.py`; added guard test to keep notebooks dir marimo-only.

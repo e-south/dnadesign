@@ -15,7 +15,7 @@ def _():
     import marimo as mo
     import polars as pl
 
-    from dnadesign.opal.notebooks._shared import setup_altair_theme, with_title
+    from dnadesign.opal.src.analysis.dashboard.theme import setup_altair_theme, with_title
 
     setup_altair_theme()
 

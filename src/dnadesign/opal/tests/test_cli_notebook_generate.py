@@ -59,6 +59,9 @@ def test_notebook_generate_smoke(tmp_path: Path) -> None:
     assert "marimo.App" in txt
     assert "CampaignAnalysis.from_config_path" in txt
     assert "opal" in txt.lower()
+    assert "Data source" in txt
+    assert "mo.ui.table" in txt
+    assert "__generated_with" in txt
 
     # Optional import check if marimo is installed
     if importlib.util.find_spec("marimo") is not None:

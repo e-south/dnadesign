@@ -1,3 +1,5 @@
+# ABOUTME: Renders marimo notebook templates for OPAL campaigns.
+# ABOUTME: Generates scaffolded notebooks with campaign context and data previews.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -17,9 +19,20 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
     """
     Render a marimo notebook template tied to a campaign.
     """
+    try:
+        import marimo as _marimo
+    except Exception:
+        _marimo = None
+    if _marimo is None:
+        marimo_version = "unknown"
+    else:
+        marimo_version = getattr(_marimo, "__version__", "unknown")
+
     template = dedent(
         """
         import marimo
+
+        __generated_with = "__GENERATED_WITH__"
 
         app = marimo.App(width="full")
 
@@ -60,17 +73,35 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(mo, config_path):
-            mo.md(
-                f"# OPAL Campaign Notebook\\n\\nConfig: `{config_path}`"
-            )
-            return
-
-
-        @app.cell
         def _(CampaignAnalysis, config_path):
             campaign = CampaignAnalysis.from_config_path(config_path, allow_dir=True)
             return campaign
+
+
+        @app.cell
+        def _(campaign, config_path, mo):
+            cfg = campaign.config
+            ws = campaign.workspace
+            store = campaign.records_store()
+            info_lines = [
+                "# OPAL Campaign Notebook",
+                "",
+                f"- Config: `{config_path}`",
+                f"- Name: `{cfg.campaign.name}`",
+                f"- Slug: `{cfg.campaign.slug}`",
+                f"- Workdir: `{ws.workdir}`",
+                f"- Records: `{store.records_path}`",
+                f"- X column: `{cfg.data.x_column_name}`",
+                f"- Y column: `{cfg.data.y_column_name}`",
+            ]
+            mo.md("\\n".join(info_lines))
+            return cfg, store
+
+
+        @app.cell
+        def _(pl, store):
+            records_df = pl.from_pandas(store.load())
+            return records_df
 
 
         @app.cell
@@ -192,6 +223,35 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
             if pred_df.is_empty():
                 raise ValueError("No predictions found for selected run/round.")
             return labels_df, pred_df
+
+
+        @app.cell
+        def _(mo):
+            data_source_ui = mo.ui.dropdown(
+                options=["records", "labels", "predictions"],
+                value="records",
+                label="Data source",
+            )
+            return data_source_ui
+
+
+        @app.cell
+        def _(data_source_ui, labels_df, mo, pred_df, records_df):
+            source = str(data_source_ui.value)
+            if source == "labels":
+                data_df = labels_df
+            elif source == "predictions":
+                data_df = pred_df
+            else:
+                data_df = records_df
+            data_table = mo.ui.table(data_df, page_size=10)
+            return data_df, data_table
+
+
+        @app.cell
+        def _(data_source_ui, data_table, mo):
+            mo.vstack([data_source_ui, data_table])
+            return
 
 
         @app.cell
@@ -354,8 +414,8 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
     ).strip()
 
     return (
-        template.replace("__CONFIG_PATH__", repr(str(config_path))).replace(
-            "__DEFAULT_ROUND__", repr(str(round_selector))
-        )
+        template.replace("__CONFIG_PATH__", repr(str(config_path)))
+        .replace("__DEFAULT_ROUND__", repr(str(round_selector)))
+        .replace("__GENERATED_WITH__", str(marimo_version))
         + "\n"
     )
