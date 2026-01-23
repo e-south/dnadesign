@@ -222,12 +222,13 @@ def _(Path, campaign_selection, dataset_override_input, repo_root):
 
 @app.cell
 def _(mo):
-    load_button = mo.ui.run_button(label="Load records.parquet")
+    load_button = None
     return (load_button,)
 
 
 @app.cell
 def _(campaign_selection, dataset_mode, dataset_path, load_button, mo, pl):
+    _unused = load_button
     df_raw = pl.DataFrame()
     dataset_name = None
     status_lines = []
@@ -242,9 +243,7 @@ def _(campaign_selection, dataset_mode, dataset_path, load_button, mo, pl):
     else:
         status_lines.append(f"Records path: `{dataset_path}`")
         status_lines.append(f"Mode: `{dataset_mode}`")
-    if not load_button.value:
-        status_lines.append("Click **Load** to read records.parquet.")
-    elif dataset_path is not None and dataset_path.exists():
+    if dataset_path is not None and dataset_path.exists():
         try:
             df_raw = pl.read_parquet(dataset_path)
             status_lines.append(f"Rows: `{df_raw.height}`")

@@ -35,3 +35,4 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Removed plot `--quick` mode and its built-in quick plots; demo plots now rely solely on plots.yaml.
 - Demo plot config now uses effect_scaled vs logic_fidelity and renames the plot for semantic clarity.
 - Gitignore explicitly blocks non-demo opal campaign records.parquet while keeping demo as a tracked exception.
+- prom60_eda now auto-loads records.parquet (no load button), with a regression test to prevent reintroducing gating.
