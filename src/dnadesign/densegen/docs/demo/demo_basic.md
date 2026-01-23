@@ -1,27 +1,26 @@
-## DenseGen demo (workspace‑first)
+## DenseGen demo
 
-This walkthrough uses the packaged demo template. The staged workspace contains MEME `.txt` motifs
-in `inputs/` (lexA + cpxR), and Stage‑A sampling uses those files directly.
+This walkthrough uses the packaged demo template. The staged workspace contains MEME `txt` motifs in `inputs/` (lexA + cpxR), and Stage‑A sampling uses those files directly.
 
 ### Contents
-- [0) Prereqs](#0-prereqs) - sync deps and ensure solver tools.
-- [1) Stage a workspace](#1-stage-a-workspace) - scaffold a self‑contained workspace.
-- [2) Validate config](#2-validate-config) - schema + solver probe.
-- [3) Inspect inputs](#3-inspect-inputs) - Stage‑A inputs + sampling summary.
-- [3b) (Optional) Build inputs via Cruncher (external workspace)](#3b-optional-build-inputs-via-cruncher-external-workspace)
-- [4) Inspect config](#4-inspect-config) - resolved outputs + Stage‑A/Stage‑B settings.
-- [5) Stage‑A build‑pool](#5-stage-a-build-pool) - materialize TFBS pools.
-- [6) Stage‑B build‑libraries](#6-stage-b-build-libraries) - materialize solver libraries.
-- [7) Run generation](#7-run-generation) - execute Stage‑A + Stage‑B + optimization.
-- [8) Inspect run summary](#8-inspect-run-summary) - library + events.
-- [9) List plots](#9-list-plots) - available plot names.
-- [10) Plot](#10-plot) - render plots.
-- [11) Report](#11-report) - write audit report.
-- [12) Reset the demo](#12-reset-the-demo) - wipe outputs for a clean rerun.
+0. [Prereqs](#0-prereqs) - sync deps and ensure solver tools.
+1. [Stage a workspace](#1-stage-a-workspace) - scaffold a self‑contained workspace.
+2. [Validate config](#2-validate-config) - schema + solver probe.
+3. [Inspect inputs](#3-inspect-inputs) - Stage‑A inputs + sampling summary.
+3b. [(Optional) Build inputs via Cruncher (external workspace)](#3b-optional-build-inputs-via-cruncher-external-workspace)
+4. [Inspect config](#4-inspect-config) - resolved outputs + Stage‑A/Stage‑B settings.
+5. [Stage‑A build‑pool](#5-stage-a-build-pool) - materialize TFBS pools.
+6. [Stage‑B build‑libraries](#6-stage-b-build-libraries) - materialize solver libraries.
+7. [Run generation](#7-run-generation) - execute Stage‑A + Stage‑B + optimization.
+8. [Inspect run summary](#8-inspect-run-summary) - library + events.
+9. [List plots](#9-list-plots) - available plot names.
+10. [Plot](#10-plot) - render plots.
+11. [Report](#11-report) - write audit report.
+12. [Reset the demo](#12-reset-the-demo) - wipe outputs for a clean rerun.
 
 ---
 
-### 0) Prereqs
+### 0. Prereqs
 
 If you have not synced dependencies yet:
 
@@ -29,28 +28,63 @@ If you have not synced dependencies yet:
 uv sync --locked
 ```
 
-Stage‑A FIMO sampling requires MEME Suite (`fimo` on PATH). If you use pixi, run commands via
-`pixi run dense ...` so MEME tools are available. If running from source, prefix commands with
-`uv run`.
+Stage‑A FIMO sampling requires MEME Suite (`fimo` on PATH).
 
----
-
-### 1) Stage a workspace
-
-Why: create a self‑contained workspace with `config.yaml`, `inputs/`, and `outputs/`.
-
-If you already have a `demo/` workspace, either remove it or choose a different `--id`.
+Here we use pixi, install the environment and smoke test that MEME + DenseGen are reachable:
 
 ```bash
-dense workspace init --id demo --template-id demo_meme_two_tf --copy-inputs
-cd demo
+pixi install
+pixi run fimo --version
+pixi run dense --help
+```
+
+Optional convenience aliases if you plan to use pixi for the rest of the demo:
+
+```bash
+alias fimo="pixi run fimo"
+```
+
+If you are running from source without pixi, ensure MEME Suite is on PATH:
+
+```bash
+fimo --version
+```
+
+When running commands without aliases, prefix DenseGen commands with `uv run`:
+
+```bash
+uv run dense --help
 ```
 
 ---
 
-### 2) Validate config
+### 1. Stage a workspace
 
-Why: fail fast on schema issues and confirm solver availability.
+Use the pre‑staged demo workspace and run commands from its directory so relative paths resolve correctly.
+
+From the repo root:
+
+```bash
+cd src/dnadesign/densegen/workspaces/demo_meme_two_tf
+```
+
+If you use pixi tasks for DenseGen, define an alias that pins the config path in this workspace:
+
+```bash
+alias dense="pixi run dense -c $PWD/config.yaml"
+```
+
+If outputs already exist and you want a clean run, reset them now:
+
+```bash
+dense campaign-reset
+```
+
+---
+
+### 2. Validate config
+
+Fail fast on schema issues and confirm solver availability.
 
 ```bash
 dense validate-config --probe-solver
@@ -58,7 +92,7 @@ dense validate-config --probe-solver
 
 ---
 
-### 3) Inspect inputs
+### 3. Inspect inputs
 
 Why: confirm Stage‑A inputs and sampling settings.
 
@@ -70,10 +104,10 @@ The demo uses MEME `.txt` motifs already in `inputs/` (`lexA.txt`, `cpxR.txt`).
 
 ---
 
-### 3b) (Optional) Build inputs via Cruncher (external workspace)
+### 3b. (Optional) Build inputs via Cruncher (external workspace)
 
-Why: generate Stage‑A motif artifacts and binding‑site tables in **Cruncher’s** workspace, then
-copy the exports into this DenseGen workspace.
+Generate Stage‑A motif artifacts and binding‑site tables in **Cruncher’s** workspace, then copy
+the exports into this DenseGen workspace.
 
 Follow the Cruncher demo (see `cruncher/docs/demos/demo_basics_two_tf.md`) in its own workspace.
 From the Cruncher workspace directory, export DenseGen inputs (no `-c` flag needed when you run in CWD):
@@ -84,20 +118,31 @@ cruncher catalog export-sites --set 1 --out outputs/exports/densegen_sites.csv
 cruncher catalog export-densegen --set 1 --out outputs/exports/densegen_pwms
 ```
 
-Copy those exports into this DenseGen workspace:
+Copy those exports into **this** DenseGen workspace:
 
 ```bash
-cp outputs/exports/densegen_sites.csv <densegen_workspace>/inputs/
-cp -R outputs/exports/densegen_pwms <densegen_workspace>/inputs/motif_artifacts
+cp <cruncher_workspace>/outputs/exports/densegen_sites.csv inputs/
+cp -R <cruncher_workspace>/outputs/exports/densegen_pwms inputs/motif_artifacts
 ```
 
-To use these exports, update `config.yaml` inputs to `type: binding_sites` (CSV/Parquet) or
-`type: pwm_artifact_set` (JSON artifacts). The DenseGen workspace remains config‑centric (one
-runtime config), while Cruncher keeps its own workspace + config.
+Update `config.yaml` inputs to point at the exported artifacts, for example:
+
+```yaml
+inputs:
+  - name: demo_sites
+    type: binding_sites
+    path: inputs/densegen_sites.csv
+  - name: demo_pwms
+    type: pwm_artifact_set
+    paths:
+      - inputs/motif_artifacts/<motif>.json
+```
+
+The DenseGen workspace stays config‑centric (one runtime config); Cruncher keeps its own workspace + config.
 
 ---
 
-### 4) Inspect config
+### 4. Inspect config
 
 Why: confirm resolved outputs, Stage‑A sampling knobs, fixed elements, and Stage‑B sampling policy.
 
@@ -116,7 +161,7 @@ dense inspect config
 
 ---
 
-### 5) Stage‑A build‑pool
+### 5. Stage-A build-pool
 
 Why: materialize TFBS pools for inspection and for deterministic Stage‑B previews.
 
@@ -129,7 +174,7 @@ when re‑running to avoid cumulative pools and candidate logs.
 
 ---
 
-### 6) Stage‑B build‑libraries
+### 6. Stage-B build-libraries
 
 Why: preview solver libraries without running the optimizer.
 
@@ -139,7 +184,7 @@ dense stage-b build-libraries
 
 ---
 
-### 7) Run generation
+### 7. Run generation
 
 Why: execute Stage‑A sampling (if needed), Stage‑B sampling, and solver optimization.
 
@@ -160,7 +205,7 @@ auto‑plots when re‑running.
 
 ---
 
-### 8) Inspect run summary
+### 8. Inspect run summary
 
 Why: inspect Stage‑B library usage and runtime events.
 
@@ -170,7 +215,7 @@ dense inspect run --library --events --library-limit 5
 
 ---
 
-### 9) List plots
+### 9. List plots
 
 Why: see available plot names before selecting a subset.
 
@@ -180,7 +225,7 @@ dense ls-plots
 
 ---
 
-### 10) Plot
+### 10. Plot
 
 Why: render selected plots from existing outputs.
 
@@ -196,7 +241,7 @@ export MPLCONFIGDIR=outputs/.mpl-cache
 
 ---
 
-### 11) Report
+### 11. Report
 
 Why: generate a human‑readable audit summary.
 
@@ -212,7 +257,7 @@ dense plot
 
 ---
 
-### 12) Reset the demo
+### 12. Reset the demo
 
 Why: wipe run outputs and state so you can re-run the demo cleanly.
 
