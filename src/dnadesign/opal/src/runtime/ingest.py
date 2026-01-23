@@ -1,3 +1,5 @@
+# ABOUTME: Validates and ingests label data into records with transform handling.
+# ABOUTME: Produces ingest reports and contract checks for label integrity.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -176,8 +178,14 @@ def run_ingest(
 
     # 4) Preview stats
     total = int(len(csv_df))
-    rows_with_id = int("id" in csv_df.columns)
-    rows_with_seq = int("sequence" in csv_df.columns)
+    if "id" in csv_df.columns:
+        rows_with_id = int(csv_df["id"].notna().sum())
+    else:
+        rows_with_id = 0
+    if "sequence" in csv_df.columns:
+        rows_with_seq = int(csv_df["sequence"].notna().sum())
+    else:
+        rows_with_seq = 0
 
     resolved = int(labels["id"].notna().sum())
     unknown = int((~labels["id"].notna()).sum())
@@ -194,9 +202,9 @@ def run_ingest(
 
     # Warnings / nudges
     warnings: List[str] = []
-    if rows_with_id == 0 and rows_with_seq == 1:
+    if rows_with_id == 0 and rows_with_seq > 0:
         warnings.append("input missing id column; ids will be resolved by sequence or created for new sequences.")
-    if rows_with_id == 1 and rows_with_seq == 0:
+    if rows_with_id > 0 and rows_with_seq == 0:
         warnings.append("input missing sequence column; all rows must have ids and exist in records.")
     if labels["id"].isna().any() and "sequence" in labels.columns:
         warnings.append(
