@@ -4,6 +4,7 @@ Stage-A TFBS pool artifacts.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -13,10 +14,11 @@ from typing import Iterable
 
 import pandas as pd
 
+from ...config import resolve_relative_path
 from ...utils.logging_utils import install_native_stderr_filters
 from .ids import hash_tfbs_id
 
-POOL_SCHEMA_VERSION = "1.0"
+POOL_SCHEMA_VERSION = "1.1"
 POOL_MODE_TFBS = "tfbs"
 POOL_MODE_SEQUENCE = "sequence"
 _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -27,6 +29,53 @@ def _sanitize_filename(name: str) -> str:
     return cleaned or "densegen"
 
 
+def _hash_pool_config(cfg) -> str:
+    payload = [inp.model_dump(mode="json") for inp in sorted(cfg.inputs, key=lambda item: item.name)]
+    blob = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()
+
+
+def _resolve_input_paths(cfg_path: Path, source_cfg) -> list[Path]:
+    paths: list[Path] = []
+    if hasattr(source_cfg, "path"):
+        paths.append(resolve_relative_path(cfg_path, getattr(source_cfg, "path")))
+    if hasattr(source_cfg, "paths"):
+        for path in getattr(source_cfg, "paths") or []:
+            paths.append(resolve_relative_path(cfg_path, path))
+    return paths
+
+
+def _hash_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _normalize_fingerprints(fingerprints: list[dict]) -> list[dict]:
+    return sorted((dict(fp) for fp in fingerprints), key=lambda fp: str(fp.get("path", "")))
+
+
+def _resolve_input_fingerprints(cfg_path: Path, source_cfg) -> list[dict]:
+    fingerprints: list[dict] = []
+    for path in _resolve_input_paths(cfg_path, source_cfg):
+        if not path.exists():
+            raise FileNotFoundError(f"Input file missing: {path}")
+        if not path.is_file():
+            raise ValueError(f"Input path is not a file: {path}")
+        stat = path.stat()
+        fingerprints.append(
+            {
+                "path": str(path),
+                "size": int(stat.st_size),
+                "mtime": float(stat.st_mtime),
+                "sha256": _hash_file(path),
+            }
+        )
+    return _normalize_fingerprints(fingerprints)
+
+
 @dataclass(frozen=True)
 class PoolInputEntry:
     name: str
@@ -35,6 +84,7 @@ class PoolInputEntry:
     rows: int
     columns: list[str]
     pool_mode: str
+    fingerprints: list[dict] | None = None
 
 
 @dataclass(frozen=True)
@@ -55,12 +105,16 @@ class TFBSPoolArtifact:
     run_id: str
     run_root: str
     config_path: str
+    config_hash: str | None = None
 
     @classmethod
     def load(cls, manifest_path: Path) -> "TFBSPoolArtifact":
         payload = json.loads(manifest_path.read_text())
         entries = {}
         for item in payload.get("inputs", []):
+            fingerprints = item.get("fingerprints")
+            if fingerprints is not None:
+                fingerprints = [dict(fp) for fp in fingerprints]
             entry = PoolInputEntry(
                 name=str(item.get("name")),
                 input_type=str(item.get("type")),
@@ -68,6 +122,7 @@ class TFBSPoolArtifact:
                 rows=int(item.get("rows", 0)),
                 columns=list(item.get("columns") or []),
                 pool_mode=str(item.get("pool_mode") or POOL_MODE_TFBS),
+                fingerprints=fingerprints,
             )
             entries[entry.name] = entry
         return cls(
@@ -77,6 +132,7 @@ class TFBSPoolArtifact:
             run_id=str(payload.get("run_id")),
             run_root=str(payload.get("run_root")),
             config_path=str(payload.get("config_path")),
+            config_hash=payload.get("config_hash"),
         )
 
     def entry_for(self, input_name: str) -> PoolInputEntry:
@@ -199,11 +255,18 @@ def build_pool_artifact(
     rows: list[tuple[str, str, str, Path]] = []
     existing_entries: dict[str, PoolInputEntry] = {}
     preserved_entries: dict[str, PoolInputEntry] = {}
+    config_hash = _hash_pool_config(cfg)
+    fingerprints_by_input = {inp.name: _resolve_input_fingerprints(cfg_path, inp) for inp in cfg.inputs}
 
     if not overwrite:
         manifest_path = _pool_manifest_path(out_dir)
         if manifest_path.exists():
             existing_artifact = TFBSPoolArtifact.load(manifest_path)
+            existing_config_hash = existing_artifact.config_hash
+            if not existing_config_hash:
+                raise ValueError("Pool manifest missing config hash. Use --fresh to rebuild pools.")
+            if existing_config_hash != config_hash:
+                raise ValueError("Pool config changed. Use --fresh to rebuild pools.")
             existing_entries = existing_artifact.inputs
             used_names = _seed_used_names_from_entries(existing_entries)
             current_inputs = {inp.name for inp in cfg.inputs}
@@ -217,6 +280,18 @@ def build_pool_artifact(
                 preserved_entries = {
                     name: entry for name, entry in existing_entries.items() if name not in selected_inputs
                 }
+            for inp in cfg.inputs:
+                entry = existing_entries.get(inp.name)
+                if entry is None:
+                    continue
+                existing_fingerprints = entry.fingerprints
+                if existing_fingerprints is None:
+                    raise ValueError(
+                        f"Pool manifest missing input fingerprints for '{inp.name}'. Use --fresh to rebuild pools."
+                    )
+                current_fingerprints = fingerprints_by_input.get(inp.name, [])
+                if _normalize_fingerprints(existing_fingerprints) != _normalize_fingerprints(current_fingerprints):
+                    raise ValueError(f"Input files changed for '{inp.name}'. Use --fresh to rebuild pools.")
 
     for inp in cfg.inputs:
         if selected_inputs and inp.name not in selected_inputs:
@@ -274,6 +349,7 @@ def build_pool_artifact(
             rows=int(len(df)),
             columns=list(df.columns),
             pool_mode=pool_mode,
+            fingerprints=fingerprints_by_input.get(inp.name, []),
         )
         pool_entries[inp.name] = entry
         sequences: list[str]
@@ -306,6 +382,7 @@ def build_pool_artifact(
         "run_id": cfg.run.id,
         "run_root": str(cfg.run.root),
         "config_path": str(cfg_path),
+        "config_hash": config_hash,
         "inputs": [
             {
                 "name": entry.name,
@@ -314,6 +391,7 @@ def build_pool_artifact(
                 "rows": entry.rows,
                 "columns": entry.columns,
                 "pool_mode": entry.pool_mode,
+                "fingerprints": entry.fingerprints or [],
             }
             for entry in pool_entries.values()
         ],

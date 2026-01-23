@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 import yaml
 
 from dnadesign.densegen.src.adapters.sources import data_source_factory
@@ -70,7 +71,6 @@ def test_build_pool_appends_without_overwrite(tmp_path: Path) -> None:
         overwrite=False,
     )
 
-    csv_path.write_text("tf,tfbs\nTF1,GGG\n")
     build_pool_artifact(
         cfg=loaded.root.densegen,
         cfg_path=cfg_path,
@@ -84,4 +84,39 @@ def test_build_pool_appends_without_overwrite(tmp_path: Path) -> None:
     artifact = load_pool_artifact(out_dir)
     entry = artifact.entry_for("demo_input")
     df = pd.read_parquet(out_dir / entry.pool_path)
-    assert set(df["tfbs"].tolist()) == {"AAA", "CCC", "GGG"}
+    assert set(df["tfbs"].tolist()) == {"AAA", "CCC"}
+
+
+def test_build_pool_requires_fresh_on_input_change(tmp_path: Path) -> None:
+    csv_path = tmp_path / "sites.csv"
+    csv_path.write_text("tf,tfbs\nTF1,AAA\nTF1,CCC\n")
+    cfg_path = tmp_path / "config.yaml"
+    _write_config(cfg_path, csv_path)
+
+    loaded = load_config(cfg_path)
+    deps = _Deps()
+    rng = np.random.default_rng(1)
+    outputs_root = tmp_path / "outputs"
+    out_dir = outputs_root / "pools"
+
+    build_pool_artifact(
+        cfg=loaded.root.densegen,
+        cfg_path=cfg_path,
+        deps=deps,
+        rng=rng,
+        outputs_root=outputs_root,
+        out_dir=out_dir,
+        overwrite=False,
+    )
+
+    csv_path.write_text("tf,tfbs\nTF1,GGG\n")
+    with pytest.raises(ValueError, match="fresh"):
+        build_pool_artifact(
+            cfg=loaded.root.densegen,
+            cfg_path=cfg_path,
+            deps=deps,
+            rng=rng,
+            outputs_root=outputs_root,
+            out_dir=out_dir,
+            overwrite=False,
+        )
