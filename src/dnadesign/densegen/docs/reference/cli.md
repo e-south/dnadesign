@@ -85,7 +85,7 @@ Build Stage‑A TFBS pools from inputs and write a pool manifest.
 Options:
 - `--out` — output directory relative to run root (default: `outputs/pools`; must be inside `outputs/`).
 - `--input/-i` — input name(s) to build (defaults to all).
-- `--overwrite` — overwrite existing pool files.
+- `--fresh` — replace existing pool files (default is append + dedupe).
 
 Outputs:
 - `pool_manifest.json`

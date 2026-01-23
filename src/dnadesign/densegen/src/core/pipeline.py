@@ -53,7 +53,7 @@ from .artifacts.library import (
     load_library_records,
     write_library_artifact,
 )
-from .artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData, build_pool_artifact
+from .artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData, build_pool_artifact, load_pool_data
 from .artifacts.records import AttemptRecord, SolutionRecord
 from .metadata import build_metadata
 from .postprocess import generate_pad
@@ -3563,19 +3563,6 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
     outputs_root.mkdir(parents=True, exist_ok=True)
     candidates_dir = candidates_root(outputs_root, cfg.run.id)
     candidate_logging = _candidate_logging_enabled(cfg)
-    if candidate_logging:
-        try:
-            existed = prepare_candidates_dir(candidates_dir, overwrite=True)
-        except Exception as exc:
-            raise RuntimeError(f"Failed to prepare candidate artifacts directory: {exc}") from exc
-        if existed:
-            log.warning(
-                "Cleared prior candidate artifacts at %s to avoid mixing runs. "
-                "Copy this directory elsewhere if you want to keep previous mining output.",
-                candidates_dir,
-            )
-        else:
-            log.info("Candidate mining artifacts will be written to %s", candidates_dir)
     events_path = outputs_root / "meta" / "events.jsonl"
     try:
         _write_effective_config(
@@ -3584,39 +3571,74 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
     except Exception:
         log.debug("Failed to write effective_config.json.", exc_info=True)
     pool_dir = outputs_root / "pools"
-    try:
-        _pool_artifact, pool_data = build_pool_artifact(
-            cfg=cfg,
-            cfg_path=loaded.path,
-            deps=deps,
-            rng=np_rng_stage_a,
-            outputs_root=outputs_root,
-            out_dir=pool_dir,
-            overwrite=True,
+    pool_manifest = pool_dir / "pool_manifest.json"
+    pool_data: dict[str, PoolData] | None = None
+    if pool_manifest.exists():
+        try:
+            _pool_artifact, pool_data = load_pool_data(pool_dir)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to load existing Stage-A pool artifacts: {exc}") from exc
+        log.info(
+            "Using existing Stage-A pools from %s "
+            "(use dense stage-a build-pool --fresh or dense run --fresh to rebuild).",
+            pool_dir,
         )
-    except Exception as exc:
-        raise RuntimeError(f"Failed to build Stage-A TFBS pools: {exc}") from exc
-    try:
-        _emit_event(
-            events_path,
-            event="POOL_BUILT",
-            payload={
-                "inputs": [
-                    {
-                        "name": pool.name,
-                        "input_type": pool.input_type,
-                        "pool_mode": pool.pool_mode,
-                        "rows": int(pool.df.shape[0]) if pool.df is not None else int(len(pool.sequences)),
-                    }
-                    for pool in pool_data.values()
-                ]
-            },
+
+    if resume and pool_data is None:
+        raise RuntimeError(
+            "resume=True requires existing Stage-A pools. Run dense stage-a build-pool first or rerun without resume."
         )
-    except Exception:
-        log.debug("Failed to emit POOL_BUILT event.", exc_info=True)
+
+    build_pools = pool_data is None
+    if build_pools and candidate_logging:
+        try:
+            existed = prepare_candidates_dir(candidates_dir, overwrite=False)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to prepare candidate artifacts directory: {exc}") from exc
+        if existed:
+            log.info(
+                "Appending candidate artifacts under %s (use dense run --fresh to reset).",
+                candidates_dir,
+            )
+        else:
+            log.info("Candidate mining artifacts will be written to %s", candidates_dir)
+
+    if build_pools:
+        try:
+            _pool_artifact, pool_data = build_pool_artifact(
+                cfg=cfg,
+                cfg_path=loaded.path,
+                deps=deps,
+                rng=np_rng_stage_a,
+                outputs_root=outputs_root,
+                out_dir=pool_dir,
+                overwrite=False,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed to build Stage-A TFBS pools: {exc}") from exc
+        try:
+            _emit_event(
+                events_path,
+                event="POOL_BUILT",
+                payload={
+                    "inputs": [
+                        {
+                            "name": pool.name,
+                            "input_type": pool.input_type,
+                            "pool_mode": pool.pool_mode,
+                            "rows": int(pool.df.shape[0]) if pool.df is not None else int(len(pool.sequences)),
+                        }
+                        for pool in pool_data.values()
+                    ]
+                },
+            )
+        except Exception:
+            log.debug("Failed to emit POOL_BUILT event.", exc_info=True)
+    if pool_data is None:
+        raise RuntimeError("Stage-A pool loading failed unexpectedly; no pools are available.")
     for name, pool in pool_data.items():
         source_cache[name] = pool
-    if candidate_logging:
+    if candidate_logging and build_pools:
         candidate_files = find_candidate_files(candidates_dir)
         if candidate_files:
             try:

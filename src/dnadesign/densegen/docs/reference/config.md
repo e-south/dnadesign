@@ -80,7 +80,7 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     - `bgfile` (optional path) - MEME bfile-format background model for FIMO
     - `keep_all_candidates_debug` (bool, default false) - write candidate Parquet logs to
       `outputs/pools/candidates/` for inspection (overwritten by `dense run` or
-      `stage-a build-pool --overwrite`)
+      `stage-a build-pool --fresh`)
     - `include_matched_sequence` (bool, default false) - include `fimo_matched_sequence` in TFBS outputs
     - `length_policy`: `exact | range` (default: `exact`)
     - `length_range`: `[min, max]` (required when `length_policy=range`; `min` >= motif length)

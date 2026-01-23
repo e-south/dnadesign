@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 from dnadesign.densegen.src.cli import app
 
 
-def test_stage_a_build_pool_reports_length_summary(tmp_path: Path) -> None:
+def _write_stage_a_config(tmp_path: Path) -> Path:
     inputs_dir = tmp_path / "inputs"
     inputs_dir.mkdir()
     (inputs_dir / "sites.csv").write_text(
@@ -60,8 +60,20 @@ def test_stage_a_build_pool_reports_length_summary(tmp_path: Path) -> None:
         ).strip()
         + "\n"
     )
+    return cfg_path
+
+
+def test_stage_a_build_pool_reports_length_summary(tmp_path: Path) -> None:
+    cfg_path = _write_stage_a_config(tmp_path)
     runner = CliRunner()
     result = runner.invoke(app, ["stage-a", "build-pool", "-c", str(cfg_path)])
     assert result.exit_code == 0, result.output
     assert "TFBS length summary" in result.output
     assert "toy_sites" in result.output
+
+
+def test_stage_a_build_pool_accepts_fresh_flag(tmp_path: Path) -> None:
+    cfg_path = _write_stage_a_config(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["stage-a", "build-pool", "--fresh", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
