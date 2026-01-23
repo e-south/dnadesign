@@ -3,7 +3,7 @@
 <dnadesign project>
 dnadesign/densegen/core/postprocess/gap_fill.py
 
-Gap fill policy implementation.
+Pad policy implementation (fills remaining length budget).
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -24,17 +24,21 @@ def _gc_fraction(seq: str) -> float:
     return (g + c) / len(seq)
 
 
-def random_fill(
+def generate_pad(
     length: int,
+    *,
+    mode: str = "adaptive",
+    gc_mode: str = "range",
     gc_min: float = 0.40,
     gc_max: float = 0.60,
-    *,
+    gc_target: float = 0.50,
+    gc_tolerance: float = 0.10,
+    gc_min_pad_length: int = 4,
     max_tries: int = 2000,
-    mode: str = "strict",
     rng: random.Random | None = None,
 ) -> tuple[str, dict]:
     """
-    Random filler with strict/adaptive GC control.
+    Generate pad bases to meet a length budget with optional GC constraints.
 
     Returns
     -------
@@ -44,17 +48,13 @@ def random_fill(
           "attempts": int,
           "gc_actual": float,
           "relaxed": bool,
-          "final_gc_min": float,
-          "final_gc_max": float,
-          "target_gc_min": float,
-          "target_gc_max": float,
+          "relaxed_reason": str | None,
+          "final_gc_min": float | None,
+          "final_gc_max": float | None,
+          "target_gc_min": float | None,
+          "target_gc_max": float | None,
+          "gc_mode": str,
         }
-
-    Behavior
-    --------
-    - strict: infeasible windows raise ValueError.
-    - adaptive: infeasible windows relax to [0, 1] and are recorded with relaxed=True.
-    - GC content is constructed directly within the final window (no rejection sampling).
     """
     rng = rng or random
 
@@ -63,27 +63,64 @@ def random_fill(
             "attempts": 0,
             "gc_actual": 0.0,
             "relaxed": False,
-            "final_gc_min": gc_min,
-            "final_gc_max": gc_max,
-            "target_gc_min": gc_min,
-            "target_gc_max": gc_max,
+            "relaxed_reason": None,
+            "final_gc_min": None,
+            "final_gc_max": None,
+            "target_gc_min": None,
+            "target_gc_max": None,
+            "gc_mode": gc_mode,
         }
 
-    # Convert fraction window -> integer GC count window
-    lo = math.ceil(length * gc_min)
-    hi = math.floor(length * gc_max)
+    if gc_mode == "off":
+        bases = [rng.choice("ACGT") for _ in range(length)]
+        seq = "".join(bases)
+        return seq, {
+            "attempts": 1,
+            "gc_actual": _gc_fraction(seq),
+            "relaxed": False,
+            "relaxed_reason": None,
+            "final_gc_min": None,
+            "final_gc_max": None,
+            "target_gc_min": None,
+            "target_gc_max": None,
+            "gc_mode": gc_mode,
+        }
+
+    if gc_mode not in {"range", "target"}:
+        raise ValueError(f"Unsupported gc_mode: {gc_mode!r}")
+
+    if gc_mode == "target":
+        target_min = gc_target - gc_tolerance
+        target_max = gc_target + gc_tolerance
+        if target_min < 0.0 or target_max > 1.0:
+            raise ValueError("gc_target +/- gc_tolerance must stay within [0, 1]")
+    else:
+        target_min = gc_min
+        target_max = gc_max
 
     relaxed = False
-    final_min = gc_min
-    final_max = gc_max
+    relaxed_reason = None
+    final_min = target_min
+    final_max = target_max
 
-    # If infeasible window (common for very small lengths), handle per policy.
+    if length < gc_min_pad_length:
+        if mode == "strict":
+            raise ValueError(f"Pad length {length} is shorter than gc.min_pad_length={gc_min_pad_length}.")
+        relaxed = True
+        relaxed_reason = "short_pad"
+        final_min, final_max = 0.0, 1.0
+
+    lo = math.ceil(length * final_min)
+    hi = math.floor(length * final_max)
+
     if lo > hi:
         if mode == "strict":
-            raise ValueError(f"GC target infeasible for gap length {length} (min={gc_min}, max={gc_max}).")
+            raise ValueError(f"GC target infeasible for pad length {length} (min={target_min}, max={target_max}).")
         relaxed = True
-        lo, hi = 0, length
+        if relaxed_reason is None:
+            relaxed_reason = "infeasible_gc_window"
         final_min, final_max = 0.0, 1.0
+        lo, hi = 0, length
 
     gc_count = rng.randint(lo, hi) if lo <= hi else 0
     bases = [rng.choice("GC") for _ in range(gc_count)] + [rng.choice("AT") for _ in range(length - gc_count)]
@@ -93,8 +130,10 @@ def random_fill(
         "attempts": 1,
         "gc_actual": _gc_fraction(seq),
         "relaxed": relaxed,
+        "relaxed_reason": relaxed_reason,
         "final_gc_min": final_min,
         "final_gc_max": final_max,
-        "target_gc_min": gc_min,
-        "target_gc_max": gc_max,
+        "target_gc_min": target_min,
+        "target_gc_max": target_max,
+        "gc_mode": gc_mode,
     }

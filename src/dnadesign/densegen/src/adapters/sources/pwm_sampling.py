@@ -3,7 +3,7 @@
 <dnadesign project>
 dnadesign/densegen/adapters/sources/pwm_sampling.py
 
-Shared PWM sampling utilities.
+Shared Stage-A PWM sampling utilities.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -242,12 +242,12 @@ def select_by_score(
         unique_total = len({seq for seq, _ in candidates})
         if context is None:
             raise ValueError(
-                f"PWM sampling produced {len(unique)} unique sites after filtering; "
+                f"Stage-A PWM sampling produced {len(unique)} unique sites after filtering; "
                 f"need {n_sites}. Adjust thresholds or oversample_factor."
             )
         msg_lines = [
             (
-                "PWM sampling failed for motif "
+                "Stage-A PWM sampling failed for motif "
                 f"'{context.get('motif_id')}' "
                 f"(width={context.get('width')}, strategy={context.get('strategy')}, "
                 f"length={context.get('length_label')}, window={context.get('window_label')}, "
@@ -382,7 +382,7 @@ def _select_fimo_candidates(
     if len(unique) < n_sites:
         msg_lines = [
             (
-                "PWM sampling failed for motif "
+                "Stage-A PWM sampling failed for motif "
                 f"'{context.get('motif_id')}' "
                 f"(width={context.get('width')}, strategy={context.get('strategy')}, "
                 f"length={context.get('length_label')}, window={context.get('window_label')}, "
@@ -483,10 +483,10 @@ def sample_pwm_sites(
         raise ValueError("max_seconds must be > 0 when set")
     scoring_backend = str(scoring_backend or "densegen").lower()
     if scoring_backend not in {"densegen", "fimo"}:
-        raise ValueError(f"Unsupported pwm sampling scoring_backend: {scoring_backend}")
+        raise ValueError(f"Unsupported Stage-A PWM sampling scoring_backend: {scoring_backend}")
     if scoring_backend == "densegen":
         if (score_threshold is None) == (score_percentile is None):
-            raise ValueError("PWM sampling requires exactly one of score_threshold or score_percentile")
+            raise ValueError("Stage-A PWM sampling requires exactly one of score_threshold or score_percentile")
         if pvalue_bins is not None:
             raise ValueError("pvalue_bins is only valid when scoring_backend='fimo'")
         if mining is not None:
@@ -495,7 +495,7 @@ def sample_pwm_sites(
             raise ValueError("include_matched_sequence is only valid when scoring_backend='fimo'")
     else:
         if pvalue_threshold is None:
-            raise ValueError("PWM sampling requires pvalue_threshold when scoring_backend='fimo'")
+            raise ValueError("Stage-A PWM sampling requires pvalue_threshold when scoring_backend='fimo'")
         pvalue_threshold = float(pvalue_threshold)
         if not (0.0 < pvalue_threshold <= 1.0):
             raise ValueError("pwm.sampling.pvalue_threshold must be between 0 and 1")
@@ -508,13 +508,13 @@ def sample_pwm_sites(
             raise ValueError(f"Unsupported pwm selection_policy: {selection_policy}")
         if score_threshold is not None or score_percentile is not None:
             log.warning(
-                "PWM sampling scoring_backend=fimo ignores score_threshold/score_percentile for motif %s.",
+                "Stage-A PWM sampling scoring_backend=fimo ignores score_threshold/score_percentile for motif %s.",
                 motif.motif_id,
             )
     if keep_all_candidates_debug and run_id is None:
-        raise ValueError("PWM sampling keep_all_candidates_debug requires run_id to be set.")
+        raise ValueError("Stage-A PWM sampling keep_all_candidates_debug requires run_id to be set.")
     if strategy == "consensus" and n_sites != 1:
-        raise ValueError("PWM sampling strategy 'consensus' requires n_sites=1")
+        raise ValueError("Stage-A PWM sampling strategy 'consensus' requires n_sites=1")
 
     keep_low = strategy == "background"
     width = len(motif.matrix)
@@ -534,7 +534,7 @@ def sample_pwm_sites(
         width = len(matrix)
         window_label = f"{width}@{window_start}"
         log.debug(
-            "PWM sampling trimmed motif %s to window length %d (start=%d, score=%.3f).",
+            "Stage-A PWM sampling trimmed motif %s to window length %d (start=%d, score=%.3f).",
             motif.motif_id,
             width,
             window_start,
@@ -688,7 +688,7 @@ def sample_pwm_sites(
                 tmp_dir = tempfile.mkdtemp(prefix="densegen-fimo-")
                 debug_dir = Path(tmp_dir)
                 log.warning(
-                    "PWM sampling keep_all_candidates_debug enabled without outputs_root; "
+                    "Stage-A PWM sampling keep_all_candidates_debug enabled without outputs_root; "
                     "writing FIMO debug TSVs to %s",
                     debug_dir,
                 )
@@ -1147,7 +1147,7 @@ def sample_pwm_sites(
                 n_candidates = cap_val
                 cap_applied = True
                 log.warning(
-                    "PWM sampling capped candidate generation for motif %s: requested=%d max_candidates=%d",
+                    "Stage-A PWM sampling capped candidate generation for motif %s: requested=%d max_candidates=%d",
                     motif.motif_id,
                     requested_candidates,
                     cap_val,
@@ -1187,7 +1187,7 @@ def sample_pwm_sites(
             candidates.append((full_seq, core))
         if time_limited:
             log.warning(
-                "PWM sampling hit max_seconds for motif %s: generated=%d requested=%d",
+                "Stage-A PWM sampling hit max_seconds for motif %s: generated=%d requested=%d",
                 motif.motif_id,
                 len(candidates),
                 requested_candidates,

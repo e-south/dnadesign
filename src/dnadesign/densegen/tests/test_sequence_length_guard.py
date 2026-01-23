@@ -58,6 +58,7 @@ class _DummyAdapter:
         required_regulators=None,
         min_count_by_regulator=None,
         min_required_regulators=None,
+        solve_timeout_seconds=None,
     ):
         opt = _DummyOpt()
         sol = _DummySol(sequence="AAAA", library=library, used_indices=[0])
@@ -73,7 +74,7 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
     csv_path.write_text("tf,tfbs\nTF1,AAAAA\n")
     cfg = {
         "densegen": {
-            "schema_version": "2.4",
+            "schema_version": "2.5",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {
@@ -86,7 +87,7 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": str(tmp_path / "out.parquet")},
+                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
             },
             "generation": {
                 "sequence_length": 4,
@@ -120,8 +121,8 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
                 "max_failed_solutions": 0,
                 "random_seed": 1,
             },
-            "postprocess": {"gap_fill": {"mode": "off", "end": "5prime", "gc_min": 0.4, "gc_max": 0.6}},
-            "logging": {"log_dir": str(tmp_path / "logs"), "level": "INFO"},
+            "postprocess": {"pad": {"mode": "off"}},
+            "logging": {"log_dir": "outputs/logs", "level": "INFO"},
         }
     }
     cfg_path = tmp_path / "cfg.yaml"
@@ -132,7 +133,7 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
         source_factory=data_source_factory,
         sink_factory=lambda _cfg, _path: [sink],
         optimizer=_DummyAdapter(),
-        gap_fill=lambda *args, **kwargs: "",
+        pad=lambda *args, **kwargs: "",
     )
     with pytest.raises(ValueError, match="sequence_length"):
         run_pipeline(loaded, deps=deps, resume=False)

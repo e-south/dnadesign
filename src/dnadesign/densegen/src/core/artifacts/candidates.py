@@ -90,13 +90,13 @@ def build_candidate_artifact(
     if missing:
         raise ValueError(
             "Candidate artifacts missing required columns "
-            f"{missing}. Clear outputs/candidates and re-run with keep_all_candidates_debug."
+            f"{missing}. Clear outputs/pools/candidates and re-run with keep_all_candidates_debug."
         )
     df = df[df["run_id"] == str(run_id)].copy()
     if df.empty:
         raise ValueError(
             "No candidate records match the current run_id. "
-            "Clear outputs/candidates and re-run with keep_all_candidates_debug."
+            "Clear outputs/pools/candidates and re-run with keep_all_candidates_debug."
         )
     df.to_parquet(candidates_path, index=False)
 

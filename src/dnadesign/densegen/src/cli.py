@@ -7,7 +7,7 @@ Typer/Rich CLI entrypoint for DenseGen.
 
 Commands:
   - validate-config : Validate YAML config (schema + sanity).
-  - inspect inputs  : Show resolved inputs + PWM sampling.
+  - inspect inputs  : Show resolved inputs + Stage-A PWM sampling.
   - inspect plan    : Show resolved per-constraint quota plan.
   - inspect config  : Describe resolved config (inputs/outputs/solver).
   - inspect run     : Summarize run manifest or list workspaces.
@@ -41,6 +41,7 @@ import shutil
 import sys
 import tempfile
 from datetime import datetime, timezone
+from importlib import resources
 from pathlib import Path
 from typing import Iterator, Optional
 
@@ -56,9 +57,9 @@ from .config import (
     LATEST_SCHEMA_VERSION,
     ConfigError,
     load_config,
+    resolve_outputs_scoped_path,
     resolve_relative_path,
     resolve_run_root,
-    resolve_run_scoped_path,
 )
 from .core.artifacts.candidates import build_candidate_artifact, find_candidate_files, prepare_candidates_dir
 from .core.artifacts.library import write_library_artifact
@@ -98,6 +99,14 @@ _PYARROW_SYSCTL_PATTERN = re.compile(r"sysctlbyname failed for 'hw\.")
 log = logging.getLogger(__name__)
 install_native_stderr_filters(suppress_solver_messages=False)
 
+DEFAULT_CONFIG_FILENAME = "config.yaml"
+DEFAULT_CONFIG_MISSING_MESSAGE = (
+    "No config found. cd into a workspace containing config.yaml, or pass -c path/to/config.yaml."
+)
+PACKAGED_TEMPLATES: dict[str, str] = {
+    "demo_meme_two_tf": "workspaces/demo_meme_two_tf",
+}
+
 
 @contextlib.contextmanager
 def _suppress_pyarrow_sysctl_warnings() -> Iterator[None]:
@@ -130,12 +139,49 @@ def _suppress_pyarrow_sysctl_warnings() -> Iterator[None]:
 
 
 # ----------------- local path helpers -----------------
-def _densegen_root_from(file_path: Path) -> Path:
-    return file_path.resolve().parent.parent
+def _list_packaged_template_ids() -> list[str]:
+    return sorted(PACKAGED_TEMPLATES.keys())
 
 
-DENSEGEN_ROOT = _densegen_root_from(Path(__file__))
-DEFAULT_WORKSPACES_ROOT = DENSEGEN_ROOT / "workspaces"
+@contextlib.contextmanager
+def _resolve_template_dir(
+    *,
+    template: Optional[Path],
+    template_id: Optional[str],
+) -> Iterator[tuple[Path, Path]]:
+    if template and template_id:
+        console.print("[bold red]Choose either --template or --template-id, not both.[/]")
+        raise typer.Exit(code=1)
+    if template_id:
+        rel_dir = PACKAGED_TEMPLATES.get(template_id)
+        if not rel_dir:
+            available = ", ".join(_list_packaged_template_ids()) or "-"
+            console.print(f"[bold red]Unknown template id:[/] {template_id}")
+            console.print(f"[bold]Available template ids:[/] {available}")
+            raise typer.Exit(code=1)
+        package_root = resources.files("dnadesign.densegen")
+        template_dir = package_root.joinpath(rel_dir)
+        if not template_dir.exists():
+            console.print(f"[bold red]Packaged template not found:[/] {rel_dir}")
+            raise typer.Exit(code=1)
+        with resources.as_file(template_dir) as resolved:
+            config_path = Path(resolved) / DEFAULT_CONFIG_FILENAME
+            if not config_path.exists():
+                console.print(f"[bold red]Template config not found:[/] {config_path}")
+                raise typer.Exit(code=1)
+            yield Path(resolved), config_path
+        return
+    if template is None:
+        console.print("[bold red]No template provided.[/] Use --template-id or --template.")
+        raise typer.Exit(code=1)
+    template_path = template.expanduser().resolve()
+    if not template_path.exists():
+        console.print(f"[bold red]Template config not found:[/] {template_path}")
+        raise typer.Exit(code=1)
+    if not template_path.is_file():
+        console.print(f"[bold red]Template path is not a file:[/] {template_path}")
+        raise typer.Exit(code=1)
+    yield template_path.parent, template_path
 
 
 def _input_uses_fimo(input_cfg) -> bool:
@@ -181,12 +227,24 @@ def _ensure_fimo_available(cfg, *, strict: bool = True) -> None:
 
 
 def _default_config_path() -> Path:
-    # Prefer a realistic, self-contained MEME demo config inside the package tree.
-    return DENSEGEN_ROOT / "workspaces" / "demo_meme_two_tf" / "config.yaml"
+    return Path.cwd() / DEFAULT_CONFIG_FILENAME
 
 
-def _default_template_path() -> Path:
-    return DENSEGEN_ROOT / "workspaces" / "demo_meme_two_tf" / "config.yaml"
+def _workspace_command(command: str, *, cfg_path: Path | None = None, run_root: Path | None = None) -> str:
+    root = run_root or (cfg_path.parent if cfg_path is not None else None)
+    if root is not None:
+        try:
+            root_resolved = root.resolve()
+        except Exception:
+            root_resolved = root
+        if root_resolved == Path.cwd().resolve():
+            return command
+        candidate = root / DEFAULT_CONFIG_FILENAME
+        if candidate.exists():
+            return f"cd {root} && {command}"
+    if cfg_path is not None:
+        return f"{command} -c {cfg_path}"
+    return command
 
 
 # ----------------- schema & helpers -----------------
@@ -209,22 +267,41 @@ def _infer_input_name(inputs_cfg: list) -> str:
     return _sanitize_filename(str(name))
 
 
-def _resolve_config_path(ctx: typer.Context, override: Optional[Path]) -> Path:
+def _resolve_config_path(ctx: typer.Context, override: Optional[Path]) -> tuple[Path, bool]:
     if override is not None:
-        return override
-    if ctx.obj and "config_path" in ctx.obj:
-        return Path(ctx.obj["config_path"])
-    return _default_config_path()
+        return Path(override), False
+    if ctx.obj:
+        ctx_path = ctx.obj.get("config_path")
+        if ctx_path is not None:
+            return Path(ctx_path), False
+    return _default_config_path(), True
 
 
-def _load_config_or_exit(cfg_path: Path):
+def _load_config_or_exit(cfg_path: Path, *, missing_message: str | None = None):
     try:
         return load_config(cfg_path)
     except FileNotFoundError:
-        console.print(f"[bold red]Config file not found:[/] {cfg_path}")
+        if missing_message:
+            console.print(f"[bold red]{missing_message}[/]")
+        else:
+            console.print(f"[bold red]Config file not found:[/] {cfg_path}")
         raise typer.Exit(code=1)
     except ConfigError as e:
         console.print(f"[bold red]Config error:[/] {e}")
+        raise typer.Exit(code=1)
+
+
+def _resolve_outputs_path_or_exit(
+    cfg_path: Path,
+    run_root: Path,
+    value: str | os.PathLike,
+    *,
+    label: str,
+) -> Path:
+    try:
+        return resolve_outputs_scoped_path(cfg_path, run_root, value, label=label)
+    except ConfigError as exc:
+        console.print(f"[bold red]{exc}[/]")
         raise typer.Exit(code=1)
 
 
@@ -361,7 +438,7 @@ def _print_inputs_summary(loaded) -> None:
             str(sampling.max_seconds) if sampling.max_seconds is not None else "-",
             length_label,
         )
-    console.print("[bold]Input-stage PWM sampling[/]")
+    console.print("[bold]Stage-A PWM sampling[/]")
     console.print(pwm_table)
     console.print(
         "  -> Produces the realized TFBS pool (input_tfbs_count), captured in inputs_manifest.json after runs."
@@ -439,17 +516,6 @@ def _render_missing_input_hint(cfg_path: Path, loaded, exc: Exception) -> None:
         hints.append(
             "If this is a staged run dir, use `dense workspace init --copy-inputs` or copy files into run/inputs."
         )
-    missing_str = " ".join(str(p) for p in missing)
-    demo_paths = (
-        "cruncher/workspaces/demo_basics_two_tf",
-        "cruncher/workspaces/demo_campaigns_multi_tf",
-    )
-    if any(path in missing_str for path in demo_paths):
-        hints.append(
-            "To regenerate Cruncher demo motifs: "
-            "cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR --update -c <CONFIG>; "
-            "cruncher lock -c <CONFIG>; cruncher parse -c <CONFIG>; cruncher sample --no-auto-opt -c <CONFIG>"
-        )
     if hints:
         console.print("[bold]Next steps[/]:")
         for hint in hints:
@@ -461,7 +527,7 @@ def _render_output_schema_hint(exc: Exception) -> bool:
     if "Existing Parquet schema does not match the current DenseGen schema" in msg:
         console.print(f"[bold red]Output schema mismatch:[/] {msg}")
         console.print("[bold]Next steps[/]:")
-        console.print("  - Remove outputs/dense_arrays.parquet and outputs/_densegen_ids.sqlite, or")
+        console.print("  - Remove outputs/tables/dense_arrays.parquet and outputs/meta/_densegen_ids.sqlite, or")
         console.print("  - Stage a fresh workspace with `dense workspace init --copy-inputs` and re-run.")
         return True
     if "Output sinks are out of sync before run" in msg:
@@ -538,7 +604,7 @@ def _warn_pwm_sampling_configs(loaded, cfg_path: Path) -> None:
                         "may fail uniqueness; consider reducing n_sites or using length_policy=range."
                     )
     if warnings:
-        console.print("[yellow]PWM sampling warnings:[/]")
+        console.print("[yellow]Stage-A PWM sampling warnings:[/]")
         for warn in warnings:
             console.print(f"  - {warn}")
 
@@ -577,8 +643,8 @@ def _list_workspaces_table(workspaces_root: Path, *, limit: int, show_all: bool)
         run_id = run_dir.name
         status = "ok"
         parquet_count = "-"
-        plots_count = _count_files(run_dir / "outputs", pattern="*")
-        logs_count = _count_files(run_dir / "logs", pattern="*")
+        plots_count = _count_files(run_dir / "outputs" / "plots", pattern="*")
+        logs_count = _count_files(run_dir / "outputs" / "logs", pattern="*")
 
         if cfg_path.exists():
             try:
@@ -586,7 +652,7 @@ def _list_workspaces_table(workspaces_root: Path, *, limit: int, show_all: bool)
                 run_id = loaded.root.densegen.run.id
                 run_root = resolve_run_root(cfg_path, loaded.root.densegen.run.root)
                 if loaded.root.densegen.output.parquet is not None:
-                    pq_dir = resolve_run_scoped_path(
+                    pq_dir = resolve_outputs_scoped_path(
                         cfg_path,
                         run_root,
                         loaded.root.densegen.output.parquet.path,
@@ -594,16 +660,16 @@ def _list_workspaces_table(workspaces_root: Path, *, limit: int, show_all: bool)
                     )
                     parquet_count = _count_files(pq_dir, pattern="*.parquet")
                 plots_count = _count_files(
-                    resolve_run_scoped_path(
+                    resolve_outputs_scoped_path(
                         cfg_path,
                         run_root,
-                        loaded.root.plots.out_dir if loaded.root.plots else "outputs",
+                        loaded.root.plots.out_dir if loaded.root.plots else "outputs/plots",
                         label="plots.out_dir",
                     ),
                     pattern="*",
                 )
                 logs_count = _count_files(
-                    resolve_run_scoped_path(
+                    resolve_outputs_scoped_path(
                         cfg_path,
                         run_root,
                         loaded.root.densegen.logging.log_dir,
@@ -649,8 +715,8 @@ app = typer.Typer(
     help="DenseGen — Dense Array Generator (Typer/Rich CLI)",
 )
 inspect_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Inspect configs, inputs, and runs.")
-stage_a_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Stage A helpers (input TFBS pools).")
-stage_b_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Stage B helpers (library sampling).")
+stage_a_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Stage-A helpers (input TFBS pools).")
+stage_b_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Stage-B helpers (library sampling).")
 workspace_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Workspace scaffolding.")
 
 app.add_typer(inspect_app, name="inspect")
@@ -662,11 +728,11 @@ app.add_typer(workspace_app, name="workspace")
 @app.callback()
 def _root(
     ctx: typer.Context,
-    config: Path = typer.Option(
-        _default_config_path(),
+    config: Optional[Path] = typer.Option(
+        None,
         "--config",
         "-c",
-        help="Path to config YAML (can also be passed per command).",
+        help="Path to config YAML (defaults to ./config.yaml in the current directory).",
     ),
 ):
     ctx.obj = {"config_path": config}
@@ -678,8 +744,11 @@ def validate_config(
     probe_solver: bool = typer.Option(False, help="Also probe the solver backend."),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
-    cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
+    cfg_path, is_default = _resolve_config_path(ctx, config)
+    loaded = _load_config_or_exit(
+        cfg_path,
+        missing_message=DEFAULT_CONFIG_MISSING_MESSAGE if is_default else None,
+    )
     _warn_pwm_sampling_configs(loaded, cfg_path)
     _warn_full_pool_strategy(loaded)
     _ensure_fimo_available(loaded.root.densegen, strict=True)
@@ -709,74 +778,75 @@ def ls_plots():
 @workspace_app.command("init", help="Stage a new workspace with config.yaml and standard subfolders.")
 def workspace_init(
     run_id: str = typer.Option(..., "--id", "-i", help="Run identifier (directory name)."),
-    root: Path = typer.Option(DEFAULT_WORKSPACES_ROOT, "--root", help="Workspaces root directory."),
+    root: Path = typer.Option(
+        Path("."),
+        "--root",
+        help="Workspace root directory (default: current directory).",
+    ),
+    template_id: Optional[str] = typer.Option(
+        None,
+        "--template-id",
+        help="Packaged template id (use to avoid repo-root paths).",
+    ),
     template: Optional[Path] = typer.Option(None, "--template", help="Template config YAML to copy."),
     copy_inputs: bool = typer.Option(False, help="Copy file-based inputs into workspace/inputs and rewrite paths."),
 ):
     run_id_clean = _sanitize_filename(run_id)
     if run_id_clean != run_id:
         console.print(f"[yellow]Sanitized run id:[/] {run_id} -> {run_id_clean}")
-    run_dir = (root / run_id_clean).resolve()
+    root_path = root.expanduser()
+    if root_path.exists() and not root_path.is_dir():
+        console.print(f"[bold red]Workspace root is not a directory:[/] {root_path}")
+        raise typer.Exit(code=1)
+    run_dir = (root_path / run_id_clean).resolve()
     if run_dir.exists():
         console.print(f"[bold red]Run directory already exists:[/] {run_dir}")
         raise typer.Exit(code=1)
 
-    template_path = template or _default_template_path()
-    if not template_path.exists():
-        console.print(f"[bold red]Template config not found:[/] {template_path}")
-        raise typer.Exit(code=1)
+    with _resolve_template_dir(template=template, template_id=template_id) as (_template_dir, template_path):
+        run_dir.mkdir(parents=True, exist_ok=False)
+        (run_dir / "inputs").mkdir(parents=True, exist_ok=True)
+        (run_dir / "outputs" / "logs").mkdir(parents=True, exist_ok=True)
+        (run_dir / "outputs" / "meta").mkdir(parents=True, exist_ok=True)
+        (run_dir / "outputs" / "pools").mkdir(parents=True, exist_ok=True)
+        (run_dir / "outputs" / "libraries").mkdir(parents=True, exist_ok=True)
+        (run_dir / "outputs" / "tables").mkdir(parents=True, exist_ok=True)
+        (run_dir / "outputs" / "plots").mkdir(parents=True, exist_ok=True)
+        (run_dir / "outputs" / "report").mkdir(parents=True, exist_ok=True)
 
-    run_dir.mkdir(parents=True, exist_ok=False)
-    (run_dir / "inputs").mkdir(parents=True, exist_ok=True)
-    (run_dir / "outputs" / "logs").mkdir(parents=True, exist_ok=True)
-    (run_dir / "outputs" / "meta").mkdir(parents=True, exist_ok=True)
+        raw = yaml.safe_load(template_path.read_text())
+        if not isinstance(raw, dict):
+            console.print("[bold red]Template config must be a YAML mapping.[/]")
+            raise typer.Exit(code=1)
 
-    raw = yaml.safe_load(template_path.read_text())
-    if not isinstance(raw, dict):
-        console.print("[bold red]Template config must be a YAML mapping.[/]")
-        raise typer.Exit(code=1)
+        dense = raw.setdefault("densegen", {})
+        dense["schema_version"] = LATEST_SCHEMA_VERSION
+        run_block = dense.get("run") or {}
+        run_block["id"] = run_id_clean
+        run_block["root"] = "."
+        dense["run"] = run_block
 
-    dense = raw.setdefault("densegen", {})
-    dense["schema_version"] = LATEST_SCHEMA_VERSION
-    run_block = dense.get("run") or {}
-    run_block["id"] = run_id_clean
-    run_block["root"] = "."
-    dense["run"] = run_block
+        output = dense.get("output") or {}
+        if "parquet" in output and isinstance(output.get("parquet"), dict):
+            output["parquet"]["path"] = "outputs/tables/dense_arrays.parquet"
+        if "usr" in output and isinstance(output.get("usr"), dict):
+            output["usr"]["root"] = "outputs/usr"
+        dense["output"] = output
 
-    output = dense.get("output") or {}
-    if "parquet" in output and isinstance(output.get("parquet"), dict):
-        output["parquet"]["path"] = "outputs/dense_arrays.parquet"
-    if "usr" in output and isinstance(output.get("usr"), dict):
-        output["usr"]["root"] = "outputs/usr"
-    dense["output"] = output
+        logging_cfg = dense.get("logging") or {}
+        logging_cfg["log_dir"] = "outputs/logs"
+        dense["logging"] = logging_cfg
 
-    logging_cfg = dense.get("logging") or {}
-    logging_cfg["log_dir"] = "outputs/logs"
-    dense["logging"] = logging_cfg
+        if "plots" in raw and isinstance(raw.get("plots"), dict):
+            raw["plots"]["out_dir"] = "outputs/plots"
 
-    if "plots" in raw and isinstance(raw.get("plots"), dict):
-        raw["plots"]["out_dir"] = "outputs"
-
-    if copy_inputs:
-        inputs_cfg = dense.get("inputs") or []
-        for inp in inputs_cfg:
-            if not isinstance(inp, dict):
-                continue
-            if "path" in inp:
-                src = resolve_relative_path(template_path, inp["path"])
-                if not src.exists() or not src.is_file():
-                    console.print(f"[bold red]Input file not found:[/] {src}")
-                    raise typer.Exit(code=1)
-                dest = run_dir / "inputs" / src.name
-                if dest.exists():
-                    console.print(f"[bold red]Input file already exists:[/] {dest}")
-                    raise typer.Exit(code=1)
-                shutil.copy2(src, dest)
-                inp["path"] = str(Path("inputs") / src.name)
-            if "paths" in inp and isinstance(inp["paths"], list):
-                new_paths: list[str] = []
-                for path in inp["paths"]:
-                    src = resolve_relative_path(template_path, path)
+        if copy_inputs:
+            inputs_cfg = dense.get("inputs") or []
+            for inp in inputs_cfg:
+                if not isinstance(inp, dict):
+                    continue
+                if "path" in inp:
+                    src = resolve_relative_path(template_path, inp["path"])
                     if not src.exists() or not src.is_file():
                         console.print(f"[bold red]Input file not found:[/] {src}")
                         raise typer.Exit(code=1)
@@ -785,22 +855,38 @@ def workspace_init(
                         console.print(f"[bold red]Input file already exists:[/] {dest}")
                         raise typer.Exit(code=1)
                     shutil.copy2(src, dest)
-                    new_paths.append(str(Path("inputs") / src.name))
-                inp["paths"] = new_paths
+                    inp["path"] = str(Path("inputs") / src.name)
+                if "paths" in inp and isinstance(inp["paths"], list):
+                    new_paths: list[str] = []
+                    for path in inp["paths"]:
+                        src = resolve_relative_path(template_path, path)
+                        if not src.exists() or not src.is_file():
+                            console.print(f"[bold red]Input file not found:[/] {src}")
+                            raise typer.Exit(code=1)
+                        dest = run_dir / "inputs" / src.name
+                        if dest.exists():
+                            console.print(f"[bold red]Input file already exists:[/] {dest}")
+                            raise typer.Exit(code=1)
+                        shutil.copy2(src, dest)
+                        new_paths.append(str(Path("inputs") / src.name))
+                    inp["paths"] = new_paths
 
-    config_path = run_dir / "config.yaml"
-    config_path.write_text(yaml.safe_dump(raw, sort_keys=False))
-    if not copy_inputs:
-        rel_paths = _collect_relative_input_paths_from_raw(dense)
-        if rel_paths:
-            console.print(
-                "[yellow]Workspace uses file-based inputs with relative paths.[/]"
-                " They will resolve relative to the new workspace."
-            )
-            for rel_path in rel_paths[:6]:
-                console.print(f"  - {rel_path}")
-            console.print("[yellow]Tip[/]: re-run with --copy-inputs or update paths in config.yaml.")
-    console.print(f":sparkles: [bold green]Workspace staged[/]: {config_path}")
+        # Intentionally avoid copying auxiliary tools into the DenseGen workspace
+        # to keep the workspace config-centric and low-cognitive-load.
+
+        config_path = run_dir / "config.yaml"
+        config_path.write_text(yaml.safe_dump(raw, sort_keys=False))
+        if not copy_inputs:
+            rel_paths = _collect_relative_input_paths_from_raw(dense)
+            if rel_paths:
+                console.print(
+                    "[yellow]Workspace uses file-based inputs with relative paths.[/]"
+                    " They will resolve relative to the new workspace."
+                )
+                for rel_path in rel_paths[:6]:
+                    console.print(f"  - {rel_path}")
+                console.print("[yellow]Tip[/]: re-run with --copy-inputs or update paths in config.yaml.")
+        console.print(f":sparkles: [bold green]Workspace staged[/]: {config_path}")
 
 
 @inspect_app.command("run", help="Summarize a run manifest or list workspaces.")
@@ -840,8 +926,11 @@ def inspect_run(
     cfg_path = None
     loaded = None
     if run is None:
-        cfg_path = _resolve_config_path(ctx, config)
-        loaded = _load_config_or_exit(cfg_path)
+        cfg_path, is_default = _resolve_config_path(ctx, config)
+        loaded = _load_config_or_exit(
+            cfg_path,
+            missing_message=DEFAULT_CONFIG_MISSING_MESSAGE if is_default else None,
+        )
         run_root = _run_root_for(loaded)
     else:
         run_root = run
@@ -869,7 +958,7 @@ def inspect_run(
                 table.add_row(item.input_name, item.plan_name, str(item.generated))
             console.print(table)
             console.print("[bold]Next steps[/]:")
-            console.print(f"  - dense run -c {cfg_path or run_root / 'config.yaml'}")
+            console.print(f"  - {_workspace_command('dense run', cfg_path=cfg_path, run_root=run_root)}")
             return
 
         console.print(f"[bold red]Run manifest not found:[/] {manifest_path}")
@@ -877,7 +966,7 @@ def inspect_run(
         if entries:
             console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
         console.print("[bold]Next steps[/]:")
-        console.print(f"  - dense run -c {cfg_path or run_root / 'config.yaml'}")
+        console.print(f"  - {_workspace_command('dense run', cfg_path=cfg_path, run_root=run_root)}")
         raise typer.Exit(code=1)
 
     manifest = load_run_manifest(manifest_path)
@@ -972,7 +1061,7 @@ def inspect_run(
                 if entries:
                     console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
                 console.print("[bold]Next steps[/]:")
-                console.print(f"  - dense run -c {cfg_path}")
+                console.print(f"  - {_workspace_command('dense run', cfg_path=cfg_path, run_root=run_root)}")
                 raise typer.Exit(code=1)
 
         offered_vs_used_tf = bundle.tables.get("offered_vs_used_tf")
@@ -1038,12 +1127,12 @@ def inspect_run(
                 lib_hash_disp = lib_hash if show_library_hash else _short_hash(lib_hash)
                 lib_table.add_row("-", lib_hash_disp, "-", "-", "-", f"-/{target_len}", "0")
         else:
-            console.print("[yellow]No library attempts found (outputs/attempts.parquet missing).[/]")
+            console.print("[yellow]No library attempts found (outputs/tables/attempts.parquet missing).[/]")
             entries = _list_dir_entries(run_root, limit=8)
             if entries:
                 console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
             console.print("[bold]Next steps[/]:")
-            console.print(f"  - dense run -c {cfg_path}")
+            console.print(f"  - {_workspace_command('dense run', cfg_path=cfg_path, run_root=run_root)}")
         console.print("[bold]Library build summary[/]")
         console.print(lib_table)
         if truncated_libraries:
@@ -1168,7 +1257,11 @@ def report(
     ctx: typer.Context,
     run: Optional[Path] = typer.Option(None, "--run", "-r", help="Run directory (defaults to config run root)."),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
-    out: str = typer.Option("outputs", "--out", help="Output directory (relative to run root)."),
+    out: str = typer.Option(
+        "outputs/report",
+        "--out",
+        help="Output directory (relative to run root; must be inside outputs/).",
+    ),
     format: str = typer.Option(
         "all",
         "--format",
@@ -1184,9 +1277,13 @@ def report(
         if not cfg_path.exists():
             console.print(f"[bold red]Config not found under run:[/] {cfg_path}")
             raise typer.Exit(code=1)
+        loaded = _load_config_or_exit(cfg_path)
     else:
-        cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
+        cfg_path, is_default = _resolve_config_path(ctx, config)
+        loaded = _load_config_or_exit(
+            cfg_path,
+            missing_message=DEFAULT_CONFIG_MISSING_MESSAGE if is_default else None,
+        )
     raw_formats = {f.strip().lower() for f in format.split(",") if f.strip()}
     if not raw_formats:
         raw_formats = {"all"}
@@ -1197,20 +1294,19 @@ def report(
         console.print("Allowed: json, md, html, all.")
         raise typer.Exit(code=1)
     formats_used = {"json", "md", "html"} if "all" in raw_formats else raw_formats
+    run_root = _run_root_for(loaded)
+    out_dir = _resolve_outputs_path_or_exit(cfg_path, run_root, out, label="report.out")
     try:
         with _suppress_pyarrow_sysctl_warnings():
-            write_report(loaded.root, cfg_path, out_dir=out, formats=raw_formats)
+            write_report(loaded.root, cfg_path, out_dir=out_dir, formats=raw_formats)
     except FileNotFoundError as exc:
         console.print(f"[bold red]Report failed:[/] {exc}")
-        run_root = _run_root_for(loaded)
         entries = _list_dir_entries(run_root, limit=8)
         if entries:
             console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
         console.print("[bold]Next steps[/]:")
-        console.print(f"  - dense run -c {cfg_path}")
+        console.print(f"  - {_workspace_command('dense run', cfg_path=cfg_path, run_root=run_root)}")
         raise typer.Exit(code=1)
-    run_root = _run_root_for(loaded)
-    out_dir = resolve_run_scoped_path(cfg_path, run_root, out, label="report.out")
     console.print(f":sparkles: [bold green]Report written[/]: {out_dir}")
     outputs = []
     if "json" in formats_used:
@@ -1227,8 +1323,11 @@ def inspect_plan(
     ctx: typer.Context,
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
-    cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
+    cfg_path, is_default = _resolve_config_path(ctx, config)
+    loaded = _load_config_or_exit(
+        cfg_path,
+        missing_message=DEFAULT_CONFIG_MISSING_MESSAGE if is_default else None,
+    )
     _warn_full_pool_strategy(loaded)
     pl = resolve_plan(loaded)
     table = Table("name", "quota", "has promoter_constraints")
@@ -1245,8 +1344,11 @@ def inspect_config(
     probe_solver: bool = typer.Option(False, help="Probe the solver backend before reporting."),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
-    cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
+    cfg_path, is_default = _resolve_config_path(ctx, config)
+    loaded = _load_config_or_exit(
+        cfg_path,
+        missing_message=DEFAULT_CONFIG_MISSING_MESSAGE if is_default else None,
+    )
     root = loaded.root
     cfg = root.densegen
     _ensure_fimo_available(cfg, strict=True)
@@ -1322,7 +1424,7 @@ def inspect_config(
     outputs = Table("target", "path")
     for target in cfg.output.targets:
         if target == "parquet":
-            parquet_path = resolve_run_scoped_path(
+            parquet_path = resolve_outputs_scoped_path(
                 loaded.path,
                 run_root,
                 cfg.output.parquet.path,
@@ -1333,7 +1435,7 @@ def inspect_config(
                 str(parquet_path),
             )
         elif target == "usr":
-            usr_root = resolve_run_scoped_path(loaded.path, run_root, cfg.output.usr.root, label="output.usr.root")
+            usr_root = resolve_outputs_scoped_path(loaded.path, run_root, cfg.output.usr.root, label="output.usr.root")
             outputs.add_row("usr", f"{cfg.output.usr.dataset} (root={usr_root})")
         else:
             outputs.add_row(target, "-")
@@ -1367,41 +1469,57 @@ def inspect_config(
     sampling_table.add_row("arrays_generated_before_resample", str(cfg.runtime.arrays_generated_before_resample))
     sampling_table.add_row("max_resample_attempts", str(cfg.runtime.max_resample_attempts))
     sampling_table.add_row("max_total_resamples", str(cfg.runtime.max_total_resamples))
-    console.print("[bold]Solver-stage library sampling[/]")
+    console.print("[bold]Stage-B library sampling[/]")
     console.print(sampling_table)
 
-    gap = cfg.postprocess.gap_fill
-    console.print(
-        "[bold]Gap fill[/]: "
-        f"mode={gap.mode} end={gap.end} gc=[{gap.gc_min:.2f}, {gap.gc_max:.2f}] "
-        f"max_tries={gap.max_tries}"
-    )
-    log_dir = resolve_run_scoped_path(loaded.path, run_root, cfg.logging.log_dir, label="logging.log_dir")
+    pad = cfg.postprocess.pad
+    pad_gc = pad.gc
+    if pad_gc.mode == "off":
+        gc_label = "off"
+    elif pad_gc.mode == "range":
+        gc_label = f"range[{pad_gc.min:.2f}, {pad_gc.max:.2f}] min_pad_length={pad_gc.min_pad_length}"
+    else:
+        target_min = pad_gc.target - pad_gc.tolerance
+        target_max = pad_gc.target + pad_gc.tolerance
+        gc_label = (
+            f"target={pad_gc.target:.2f}±{pad_gc.tolerance:.2f} "
+            f"range=[{target_min:.2f}, {target_max:.2f}] "
+            f"min_pad_length={pad_gc.min_pad_length}"
+        )
+    console.print(f"[bold]Pad[/]: mode={pad.mode} end={pad.end} gc={gc_label} max_tries={pad.max_tries}")
+    log_dir = resolve_outputs_scoped_path(loaded.path, run_root, cfg.logging.log_dir, label="logging.log_dir")
     console.print(f"[bold]Logging[/]: dir={log_dir} level={cfg.logging.level}")
 
     if root.plots:
-        out_dir = resolve_run_scoped_path(loaded.path, run_root, root.plots.out_dir, label="plots.out_dir")
+        out_dir = resolve_outputs_scoped_path(loaded.path, run_root, root.plots.out_dir, label="plots.out_dir")
         console.print(f"[bold]Plots[/]: source={root.plots.source} out_dir={out_dir}")
     else:
         console.print("[bold]Plots[/]: none")
 
 
-@inspect_app.command("inputs", help="Show resolved inputs and PWM sampling summary.")
+@inspect_app.command("inputs", help="Show resolved inputs and Stage-A PWM sampling summary.")
 def inspect_inputs(
     ctx: typer.Context,
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
-    cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
+    cfg_path, is_default = _resolve_config_path(ctx, config)
+    loaded = _load_config_or_exit(
+        cfg_path,
+        missing_message=DEFAULT_CONFIG_MISSING_MESSAGE if is_default else None,
+    )
     console.print(f"[bold]Config[/]: {cfg_path}")
-    _ensure_fimo_available(loaded.root.densegen, strict=False)
+    _ensure_fimo_available(loaded.root.densegen, strict=True)
     _print_inputs_summary(loaded)
 
 
 @stage_a_app.command("build-pool", help="Build Stage-A TFBS pools from inputs.")
 def stage_a_build_pool(
     ctx: typer.Context,
-    out: str = typer.Option("outputs/pools", "--out", help="Output directory (relative to run root)."),
+    out: str = typer.Option(
+        "outputs/pools",
+        "--out",
+        help="Output directory (relative to run root; must be inside outputs/).",
+    ),
     input_name: Optional[list[str]] = typer.Option(
         None,
         "--input",
@@ -1411,12 +1529,15 @@ def stage_a_build_pool(
     overwrite: bool = typer.Option(False, help="Overwrite existing pool files."),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
-    cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
+    cfg_path, is_default = _resolve_config_path(ctx, config)
+    loaded = _load_config_or_exit(
+        cfg_path,
+        missing_message=DEFAULT_CONFIG_MISSING_MESSAGE if is_default else None,
+    )
     cfg = loaded.root.densegen
     _ensure_fimo_available(cfg, strict=True)
     run_root = _run_root_for(loaded)
-    out_dir = resolve_run_scoped_path(cfg_path, run_root, out, label="stage-a.out")
+    out_dir = _resolve_outputs_path_or_exit(cfg_path, run_root, out, label="stage-a.out")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     selected = {name for name in (input_name or [])}
@@ -1515,11 +1636,18 @@ def stage_a_build_pool(
 @stage_b_app.command("build-libraries", help="Build Stage-B libraries from pools or inputs.")
 def stage_b_build_libraries(
     ctx: typer.Context,
-    out: str = typer.Option("outputs/libraries", "--out", help="Output directory (relative to run root)."),
+    out: str = typer.Option(
+        "outputs/libraries",
+        "--out",
+        help="Output directory (relative to run root; must be inside outputs/).",
+    ),
     pool: Optional[Path] = typer.Option(
         None,
         "--pool",
-        help="Pool directory from `stage-a build-pool` (defaults to outputs/pools for this workspace).",
+        help=(
+            "Pool directory from `stage-a build-pool` (defaults to outputs/pools for this workspace; "
+            "must be inside outputs/)."
+        ),
     ),
     input_name: Optional[list[str]] = typer.Option(
         None,
@@ -1536,11 +1664,14 @@ def stage_b_build_libraries(
     overwrite: bool = typer.Option(False, help="Overwrite existing library_builds.parquet."),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
-    cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
+    cfg_path, is_default = _resolve_config_path(ctx, config)
+    loaded = _load_config_or_exit(
+        cfg_path,
+        missing_message=DEFAULT_CONFIG_MISSING_MESSAGE if is_default else None,
+    )
     cfg = loaded.root.densegen
     run_root = _run_root_for(loaded)
-    out_dir = resolve_run_scoped_path(cfg_path, run_root, out, label="stage-b.out")
+    out_dir = _resolve_outputs_path_or_exit(cfg_path, run_root, out, label="stage-b.out")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     selected_inputs = {name for name in (input_name or [])}
@@ -1566,7 +1697,10 @@ def stage_b_build_libraries(
     failure_counts = _load_failure_counts_from_attempts(outputs_root)
     libraries_built = _load_existing_library_index(outputs_root) if outputs_root.exists() else 0
 
-    pool_dir = resolve_relative_path(cfg_path, pool) if pool is not None else (run_root / "outputs" / "pools")
+    if pool is not None:
+        pool_dir = _resolve_outputs_path_or_exit(cfg_path, run_root, pool, label="stage-b.pool")
+    else:
+        pool_dir = run_root / "outputs" / "pools"
     if pool_dir.exists() and pool_dir.is_file():
         raise typer.BadParameter(f"Pool path must be a directory from `stage-a build-pool`, not a file: {pool_dir}")
     if not pool_dir.exists() or not pool_dir.is_dir():
@@ -1579,13 +1713,22 @@ def stage_b_build_libraries(
         if entries:
             console.print(f"[bold]Pool directory contents[/]: {', '.join(entries)}")
         console.print("[bold]Next steps[/]:")
-        console.print(f"  - dense stage-a build-pool -c {cfg_path}")
+        console.print(f"  - {_workspace_command('dense stage-a build-pool', cfg_path=cfg_path, run_root=run_root)}")
         console.print("  - ensure --pool points to the outputs/pools directory for this workspace")
         raise typer.Exit(code=1)
 
     build_rows = []
     member_rows = []
-    table = Table("input", "plan", "library_index", "library_hash", "size", "achieved/target", "pool", "sampling")
+    table = Table(
+        "input",
+        "plan",
+        "library_index",
+        "library_hash",
+        "size",
+        "achieved/target",
+        "pool",
+        "Stage-B sampling",
+    )
     with _suppress_pyarrow_sysctl_warnings():
         for inp in cfg.inputs:
             if selected_inputs and inp.name not in selected_inputs:
@@ -1723,11 +1866,17 @@ def run(
     no_plot: bool = typer.Option(False, help="Do not auto-run plots even if configured."),
     fresh: bool = typer.Option(False, "--fresh", help="Clear outputs and start a new run."),
     resume: bool = typer.Option(False, "--resume", help="Resume from existing outputs."),
-    log_file: Optional[Path] = typer.Option(None, help="Override logfile path."),
+    log_file: Optional[Path] = typer.Option(
+        None,
+        help="Override logfile path (must be inside outputs/ under the run root).",
+    ),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
-    cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
+    cfg_path, is_default = _resolve_config_path(ctx, config)
+    loaded = _load_config_or_exit(
+        cfg_path,
+        missing_message=DEFAULT_CONFIG_MISSING_MESSAGE if is_default else None,
+    )
     root = loaded.root
     cfg = root.densegen
     run_root = _run_root_for(loaded)
@@ -1768,10 +1917,15 @@ def run(
 
     # Logging setup
     log_cfg = cfg.logging
-    log_dir = resolve_run_scoped_path(loaded.path, run_root, Path(log_cfg.log_dir), label="logging.log_dir")
+    log_dir = _resolve_outputs_path_or_exit(
+        loaded.path,
+        run_root,
+        Path(log_cfg.log_dir),
+        label="logging.log_dir",
+    )
     default_logfile = log_dir / f"{cfg.run.id}.log"
     if log_file is not None:
-        logfile = resolve_run_scoped_path(loaded.path, run_root, log_file, label="logging.log_file")
+        logfile = _resolve_outputs_path_or_exit(loaded.path, run_root, log_file, label="logging.log_file")
     else:
         logfile = default_logfile
     setup_logging(
@@ -1795,12 +1949,17 @@ def run(
 
     console.print(":tada: [bold green]Run complete[/].")
     console.print("[bold]Next steps[/]:")
-    console.print(f"  - dense inspect run --library -c {cfg_path}")
-    console.print(f"  - dense report -c {cfg_path}")
+    console.print(f"  - {_workspace_command('dense inspect run --library', cfg_path=cfg_path, run_root=run_root)}")
+    console.print(f"  - {_workspace_command('dense report', cfg_path=cfg_path, run_root=run_root)}")
 
     # Auto-plot if configured
     if not no_plot and root.plots:
-        ensure_mpl_cache_dir()
+        try:
+            ensure_mpl_cache_dir(run_root / "outputs" / ".mpl-cache")
+        except Exception as exc:
+            console.print(f"[bold red]Matplotlib cache setup failed:[/] {exc}")
+            console.print("[bold]Tip[/]: set MPLCONFIGDIR=outputs/.mpl-cache inside the workspace.")
+            raise typer.Exit(code=1)
         install_native_stderr_filters(suppress_solver_messages=False)
         from .viz.plotting import run_plots_from_config
 
@@ -1809,15 +1968,46 @@ def run(
         console.print(":bar_chart: [bold green]Plots written.[/]")
 
 
+@app.command("campaign-reset", hidden=True, help="Remove run outputs to reset a workspace.")
+def campaign_reset(
+    ctx: typer.Context,
+    config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
+):
+    cfg_path, is_default = _resolve_config_path(ctx, config)
+    loaded = _load_config_or_exit(
+        cfg_path,
+        missing_message=DEFAULT_CONFIG_MISSING_MESSAGE if is_default else None,
+    )
+    run_root = resolve_run_root(loaded.path, loaded.root.densegen.run.root)
+    outputs_root = run_outputs_root(run_root)
+    if not outputs_root.exists():
+        console.print(f"[bold yellow]No outputs found under[/] {outputs_root}")
+        return
+    if not outputs_root.is_dir():
+        console.print(f"[bold red]Outputs path is not a directory:[/] {outputs_root}")
+        raise typer.Exit(code=1)
+    shutil.rmtree(outputs_root)
+    console.print(f":broom: [bold green]Removed outputs under[/] {outputs_root}")
+
+
 @app.command(help="Generate plots from outputs according to YAML. Use --only to select plots.")
 def plot(
     ctx: typer.Context,
     only: Optional[str] = typer.Option(None, help="Comma-separated plot names (subset of available plots)."),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
-    cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
-    ensure_mpl_cache_dir()
+    cfg_path, is_default = _resolve_config_path(ctx, config)
+    loaded = _load_config_or_exit(
+        cfg_path,
+        missing_message=DEFAULT_CONFIG_MISSING_MESSAGE if is_default else None,
+    )
+    run_root = resolve_run_root(loaded.path, loaded.root.densegen.run.root)
+    try:
+        ensure_mpl_cache_dir(run_root / "outputs" / ".mpl-cache")
+    except Exception as exc:
+        console.print(f"[bold red]Matplotlib cache setup failed:[/] {exc}")
+        console.print("[bold]Tip[/]: set MPLCONFIGDIR=outputs/.mpl-cache inside the workspace.")
+        raise typer.Exit(code=1)
     install_native_stderr_filters(suppress_solver_messages=False)
     from .viz.plotting import run_plots_from_config
 

@@ -13,7 +13,7 @@ def _write_template_config(path: Path) -> None:
         textwrap.dedent(
             """
             densegen:
-              schema_version: "2.4"
+              schema_version: "2.5"
               run:
                 id: demo
                 root: "."
@@ -32,7 +32,7 @@ def _write_min_config(path: Path) -> None:
         textwrap.dedent(
             """
             densegen:
-              schema_version: "2.4"
+              schema_version: "2.5"
               run:
                 id: demo
                 root: "."
@@ -47,7 +47,7 @@ def _write_min_config(path: Path) -> None:
                   bio_type: dna
                   alphabet: dna_4
                 parquet:
-                  path: outputs/dense_arrays.parquet
+                  path: outputs/tables/dense_arrays.parquet
 
               generation:
                 sequence_length: 10
@@ -93,8 +93,8 @@ def test_workspace_init_warns_on_relative_inputs_without_copy(tmp_path: Path) ->
 def test_stage_b_reports_missing_pool_manifest(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.yaml"
     _write_min_config(cfg_path)
-    pool_dir = tmp_path / "pools"
-    pool_dir.mkdir()
+    pool_dir = tmp_path / "outputs" / "pools"
+    pool_dir.mkdir(parents=True)
     runner = CliRunner()
     result = runner.invoke(
         app,

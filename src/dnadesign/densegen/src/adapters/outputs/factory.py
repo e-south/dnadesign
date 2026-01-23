@@ -15,7 +15,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable
 
-from ...config import DenseGenConfig, resolve_run_root, resolve_run_scoped_path
+from ...config import DenseGenConfig, resolve_outputs_scoped_path, resolve_run_root
+from ...core.run_paths import id_index_path
 from .base import DEFAULT_NAMESPACE, SinkBase, USRSink
 from .parquet import ParquetSink
 
@@ -42,7 +43,7 @@ def build_sinks(cfg: DenseGenConfig, cfg_path: Path) -> Iterable[SinkBase]:
         usr_cfg = out_cfg.usr
         if usr_cfg is None:
             raise ValueError("output.usr is required when output.targets includes 'usr'")
-        root = resolve_run_scoped_path(cfg_path, run_root, usr_cfg.root, label="output.usr.root")
+        root = resolve_outputs_scoped_path(cfg_path, run_root, usr_cfg.root, label="output.usr.root")
         from .usr_writer import USRWriter
 
         writer = USRWriter(
@@ -60,7 +61,7 @@ def build_sinks(cfg: DenseGenConfig, cfg_path: Path) -> Iterable[SinkBase]:
         pq_cfg = out_cfg.parquet
         if pq_cfg is None:
             raise ValueError("output.parquet is required when output.targets includes 'parquet'")
-        path = resolve_run_scoped_path(cfg_path, run_root, pq_cfg.path, label="output.parquet.path")
+        path = resolve_outputs_scoped_path(cfg_path, run_root, pq_cfg.path, label="output.parquet.path")
         ns = DEFAULT_NAMESPACE
         sinks.append(
             ParquetSink(
@@ -70,6 +71,7 @@ def build_sinks(cfg: DenseGenConfig, cfg_path: Path) -> Iterable[SinkBase]:
                 alphabet=default_alpha,
                 deduplicate=pq_cfg.deduplicate,
                 chunk_size=int(pq_cfg.chunk_size),
+                index_path=id_index_path(run_root),
             )
         )
 

@@ -13,7 +13,7 @@ from dnadesign.densegen.src.core.run_paths import ensure_run_meta_dir, run_manif
 
 def _base_meta(library_hash: str, library_index: int) -> dict:
     return {
-        "schema_version": "2.4",
+        "schema_version": "2.5",
         "run_id": "demo",
         "run_root": ".",
         "run_config_path": "config.yaml",
@@ -21,7 +21,7 @@ def _base_meta(library_hash: str, library_index: int) -> dict:
         "created_at": "2026-01-14T00:00:00+00:00",
         "length": 10,
         "random_seed": 0,
-        "policy_gc_fill": "off",
+        "policy_pad": "off",
         "policy_sampling": "subsample",
         "policy_solver": "iterate",
         "solver_backend": "CBC",
@@ -99,16 +99,18 @@ def _base_meta(library_hash: str, library_index: int) -> dict:
         "min_required_regulators": None,
         "min_count_by_regulator": [],
         "covers_required_regulators": True,
-        "gap_fill_used": False,
-        "gap_fill_bases": None,
-        "gap_fill_end": None,
-        "gap_fill_gc_min": None,
-        "gap_fill_gc_max": None,
-        "gap_fill_gc_target_min": None,
-        "gap_fill_gc_target_max": None,
-        "gap_fill_gc_actual": None,
-        "gap_fill_relaxed": None,
-        "gap_fill_attempts": None,
+        "pad_used": False,
+        "pad_bases": None,
+        "pad_end": None,
+        "pad_gc_mode": None,
+        "pad_gc_min": None,
+        "pad_gc_max": None,
+        "pad_gc_target_min": None,
+        "pad_gc_target_max": None,
+        "pad_gc_actual": None,
+        "pad_relaxed": None,
+        "pad_relaxed_reason": None,
+        "pad_attempts": None,
         "gc_total": 0.5,
         "gc_core": 0.5,
     }
@@ -118,7 +120,7 @@ def _write_config(path: Path) -> None:
     path.write_text(
         """
         densegen:
-          schema_version: "2.4"
+          schema_version: "2.5"
           run:
             id: demo
             root: "."
@@ -132,7 +134,7 @@ def _write_config(path: Path) -> None:
               bio_type: dna
               alphabet: dna_4
             parquet:
-              path: outputs/dense_arrays.parquet
+              path: outputs/tables/dense_arrays.parquet
           generation:
             sequence_length: 10
             quota: 1
@@ -156,7 +158,7 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
     _write_config(cfg_path)
 
     # outputs
-    out_file = run_root / "outputs" / "dense_arrays.parquet"
+    out_file = run_root / "outputs" / "tables" / "dense_arrays.parquet"
     sink = ParquetSink(path=str(out_file), chunk_size=1)
     meta = _base_meta(library_hash="abc123", library_index=1)
     rec = OutputRecord.from_sequence(
@@ -170,7 +172,7 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
     sink.finalize()
 
     # attempts parquet (library offered to solver)
-    outputs_dir = run_root / "outputs"
+    outputs_dir = run_root / "outputs" / "tables"
     outputs_dir.mkdir(parents=True, exist_ok=True)
     attempts_df = pd.DataFrame(
         [
@@ -227,7 +229,7 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
     manifest = RunManifest(
         run_id="demo",
         created_at="2026-01-14T00:00:00+00:00",
-        schema_version="2.4",
+        schema_version="2.5",
         config_sha256="dummy",
         run_root=str(run_root),
         random_seed=123,
@@ -270,7 +272,7 @@ def test_summarize_library_limit_truncates(tmp_path: Path) -> None:
     cfg_path = run_root / "config.yaml"
     _write_config(cfg_path)
 
-    out_file = run_root / "outputs" / "dense_arrays.parquet"
+    out_file = run_root / "outputs" / "tables" / "dense_arrays.parquet"
     sink = ParquetSink(path=str(out_file), chunk_size=1)
     for lib_hash, lib_index in [("abc123", 1), ("def456", 2)]:
         meta = _base_meta(library_hash=lib_hash, library_index=lib_index)
@@ -284,7 +286,7 @@ def test_summarize_library_limit_truncates(tmp_path: Path) -> None:
         sink.add(rec)
     sink.finalize()
 
-    outputs_dir = run_root / "outputs"
+    outputs_dir = run_root / "outputs" / "tables"
     outputs_dir.mkdir(parents=True, exist_ok=True)
     attempts_df = pd.DataFrame(
         [
@@ -379,7 +381,7 @@ def test_summarize_library_limit_truncates(tmp_path: Path) -> None:
     manifest = RunManifest(
         run_id="demo",
         created_at="2026-01-14T00:00:00+00:00",
-        schema_version="2.4",
+        schema_version="2.5",
         config_sha256="dummy",
         run_root=str(run_root),
         random_seed=123,

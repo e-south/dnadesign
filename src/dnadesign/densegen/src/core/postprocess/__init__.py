@@ -2,8 +2,8 @@
 DenseGen postprocess steps.
 """
 
-from .gap_fill import random_fill
+from .gap_fill import generate_pad
 
 __all__ = [
-    "random_fill",
+    "generate_pad",
 ]

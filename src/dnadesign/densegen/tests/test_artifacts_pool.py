@@ -18,7 +18,7 @@ def test_build_pool_artifact_binding_sites(tmp_path: Path) -> None:
         yaml.safe_dump(
             {
                 "densegen": {
-                    "schema_version": "2.4",
+                    "schema_version": "2.5",
                     "run": {"id": "demo", "root": "."},
                     "inputs": [
                         {
@@ -31,7 +31,7 @@ def test_build_pool_artifact_binding_sites(tmp_path: Path) -> None:
                     "output": {
                         "targets": ["parquet"],
                         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                        "parquet": {"path": str(tmp_path / "out.parquet")},
+                        "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
                     },
                     "generation": {
                         "sequence_length": 10,
@@ -54,7 +54,7 @@ def test_build_pool_artifact_binding_sites(tmp_path: Path) -> None:
                         "leaderboard_every": 50,
                     },
                     "logging": {"log_dir": "outputs/logs", "level": "INFO"},
-                    "postprocess": {"gap_fill": {"mode": "off"}},
+                    "postprocess": {"pad": {"mode": "off"}},
                 }
             }
         )

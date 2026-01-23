@@ -59,6 +59,7 @@ class _DummyAdapter:
         required_regulators=None,
         min_count_by_regulator=None,
         min_required_regulators=None,
+        solve_timeout_seconds=None,
     ):
         opt = _DummyOpt()
         seqs = ["AAA", "CCC"]
@@ -91,7 +92,7 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
 
     cfg = {
         "densegen": {
-            "schema_version": "2.4",
+            "schema_version": "2.5",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {
@@ -105,7 +106,7 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": "outputs/dense_arrays.parquet"},
+                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
             },
             "generation": {
                 "sequence_length": 3,
@@ -139,8 +140,8 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
                 "max_failed_solutions": 0,
                 "random_seed": 1,
             },
-            "postprocess": {"gap_fill": {"mode": "off", "end": "5prime", "gc_min": 0.4, "gc_max": 0.6}},
-            "logging": {"log_dir": "logs", "level": "INFO"},
+            "postprocess": {"pad": {"mode": "off"}},
+            "logging": {"log_dir": "outputs/logs", "level": "INFO"},
         }
     }
 
@@ -154,7 +155,7 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
         source_factory=lambda _cfg, _path: dummy_source,
         sink_factory=lambda _cfg, _path: [sink],
         optimizer=_DummyAdapter(),
-        gap_fill=lambda *args, **kwargs: "",
+        pad=lambda *args, **kwargs: "",
     )
 
     plan_item = loaded.root.densegen.generation.resolve_plan()[0]

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.densegen.src import cli
 from dnadesign.densegen.src.adapters.sources.base import resolve_path
 from dnadesign.densegen.src.config import load_config
 
@@ -16,7 +15,6 @@ def test_demo_config_exists_and_loads() -> None:
     assert cfg_path.exists(), f"Missing demo config: {cfg_path}"
     loaded = load_config(cfg_path)
     assert loaded.root.densegen.run.id == "demo_meme_two_tf"
-    assert cli._default_config_path().resolve() == cfg_path
 
 
 def test_demo_artifacts_present() -> None:

@@ -3,7 +3,7 @@
 <dnadesign project>
 dnadesign/densegen/core/pvalue_bins.py
 
-Canonical p-value bin edges for FIMO-based PWM sampling.
+Canonical p-value bin edges for Stage-A FIMO-based PWM sampling.
 
 Module Author(s): Eric J. South
 Dunlop Lab

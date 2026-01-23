@@ -42,7 +42,7 @@ def _construct_mapping(loader, node, deep: bool = False):
 _StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
 
 
-LATEST_SCHEMA_VERSION = "2.4"
+LATEST_SCHEMA_VERSION = "2.5"
 SUPPORTED_SCHEMA_VERSIONS = {LATEST_SCHEMA_VERSION}
 
 KNOWN_SOLVER_OPTION_KEYS = {
@@ -113,6 +113,14 @@ def resolve_run_scoped_path(cfg_path: Path, run_root: Path, value: str | os.Path
     resolved = resolve_relative_path(cfg_path, value)
     if not _is_relative_to(resolved, run_root):
         raise ConfigError(f"{label} must be within densegen.run.root ({run_root}), got: {resolved}")
+    return resolved
+
+
+def resolve_outputs_scoped_path(cfg_path: Path, run_root: Path, value: str | os.PathLike, *, label: str) -> Path:
+    resolved = resolve_run_scoped_path(cfg_path, run_root, value, label=label)
+    outputs_root = run_root / "outputs"
+    if not _is_relative_to(resolved, outputs_root):
+        raise ConfigError(f"{label} must be within outputs/ under densegen.run.root ({outputs_root}), got: {resolved}")
     return resolved
 
 
@@ -1032,31 +1040,59 @@ class RuntimeConfig(BaseModel):
 
 
 # ---- Postprocess ----
-class GapFillConfig(BaseModel):
+class PadGcConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    mode: Literal["off", "strict", "adaptive"] = "adaptive"
-    end: Literal["5prime", "3prime"] = "5prime"
-    gc_min: float = 0.40
-    gc_max: float = 0.60
-    max_tries: int = 2000
+    mode: Literal["off", "range", "target"] = "range"
+    min: float = 0.40
+    max: float = 0.60
+    target: float = 0.50
+    tolerance: float = 0.10
+    min_pad_length: int = 4
 
-    @field_validator("gc_min", "gc_max")
+    @field_validator("min", "max", "target", "tolerance")
     @classmethod
-    def _gc_ok(cls, v: float):
-        if not (0.0 <= v <= 1.0):
-            raise ValueError("GC fraction must be between 0 and 1")
-        return v
+    def _gc_ok(cls, v: float, info):
+        if not (0.0 <= float(v) <= 1.0):
+            raise ValueError(f"{info.field_name} must be between 0 and 1")
+        return float(v)
+
+    @field_validator("min_pad_length")
+    @classmethod
+    def _min_pad_length_ok(cls, v: int):
+        if int(v) < 0:
+            raise ValueError("min_pad_length must be >= 0")
+        return int(v)
 
     @model_validator(mode="after")
     def _gc_bounds(self):
-        if self.gc_min > self.gc_max:
-            raise ValueError("gc_min must be <= gc_max")
+        if self.min > self.max:
+            raise ValueError("gc.min must be <= gc.max")
+        if self.mode == "target":
+            target_min = self.target - self.tolerance
+            target_max = self.target + self.tolerance
+            if target_min < 0.0 or target_max > 1.0:
+                raise ValueError("gc.target +/- gc.tolerance must stay within [0, 1]")
         return self
+
+
+class PadConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mode: Literal["off", "strict", "adaptive"] = "adaptive"
+    end: Literal["5prime", "3prime"] = "5prime"
+    gc: PadGcConfig = Field(default_factory=PadGcConfig)
+    max_tries: int = 2000
+
+    @field_validator("max_tries")
+    @classmethod
+    def _max_tries_ok(cls, v: int):
+        if int(v) <= 0:
+            raise ValueError("max_tries must be > 0")
+        return int(v)
 
 
 class PostprocessConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    gap_fill: GapFillConfig = Field(default_factory=GapFillConfig)
+    pad: PadConfig = Field(default_factory=PadConfig)
 
 
 # ---- Logging ----
@@ -1104,7 +1140,7 @@ class LoggingConfig(BaseModel):
 # ---- Plots ----
 class PlotConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    out_dir: str = "outputs"
+    out_dir: str = "outputs/plots"
     format: Literal["png", "pdf", "svg"] = "png"
     source: Optional[Literal["usr", "parquet"]] = None
     default: List[str] = Field(default_factory=list)
@@ -1180,14 +1216,14 @@ def _validate_run_scoped_paths(cfg_path: Path, root_cfg: RootConfig) -> None:
 
     out_cfg = root_cfg.densegen.output
     if out_cfg.parquet is not None:
-        resolve_run_scoped_path(
+        resolve_outputs_scoped_path(
             cfg_path,
             run_root,
             out_cfg.parquet.path,
             label="output.parquet.path",
         )
     if out_cfg.usr is not None:
-        resolve_run_scoped_path(
+        resolve_outputs_scoped_path(
             cfg_path,
             run_root,
             out_cfg.usr.root,
@@ -1195,10 +1231,21 @@ def _validate_run_scoped_paths(cfg_path: Path, root_cfg: RootConfig) -> None:
         )
 
     log_dir = root_cfg.densegen.logging.log_dir
-    resolve_run_scoped_path(cfg_path, run_root, log_dir, label="logging.log_dir")
+    resolve_outputs_scoped_path(cfg_path, run_root, log_dir, label="logging.log_dir")
+
+    sampling_cfg = root_cfg.densegen.generation.sampling
+    if getattr(sampling_cfg, "library_source", None) == "artifact" and getattr(
+        sampling_cfg, "library_artifact_path", None
+    ):
+        resolve_outputs_scoped_path(
+            cfg_path,
+            run_root,
+            sampling_cfg.library_artifact_path,
+            label="sampling.library_artifact_path",
+        )
 
     if root_cfg.plots is not None:
-        resolve_run_scoped_path(
+        resolve_outputs_scoped_path(
             cfg_path,
             run_root,
             root_cfg.plots.out_dir,

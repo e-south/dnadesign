@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+
+import dnadesign.densegen.src.adapters.optimizer.dense_arrays as dense_arrays_adapter
 from dnadesign.densegen.src.adapters.optimizer import DenseArrayOptimizer
 
 
@@ -10,3 +13,50 @@ def test_promoter_constraint_name_is_ignored() -> None:
         fixed_elements={"promoter_constraints": [{"name": "sigma70", "upstream": "TTGACA", "downstream": "TATAAT"}]},
     )
     opt.get_optimizer_instance()
+
+
+def test_solver_time_limit_applies(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _DummyModel:
+        def __init__(self) -> None:
+            self.time_limit_ms = None
+
+        def SetTimeLimit(self, ms: int) -> None:
+            self.time_limit_ms = ms
+
+    class _DummyOptimizer:
+        def __init__(self, library, sequence_length, strands="double") -> None:
+            self.library = list(library)
+            self.sequence_length = sequence_length
+            self.strands = strands
+            self.model = None
+
+        def add_promoter_constraints(self, **_kwargs) -> None:
+            return None
+
+        def add_side_biases(self, **_kwargs) -> None:
+            return None
+
+        def add_regulator_constraints(self, *_args, **_kwargs) -> None:
+            return None
+
+        def build_model(self, solver="CBC", solver_options=None) -> None:
+            self.model = _DummyModel()
+
+        def solutions(self, solver="CBC", solver_options=None):
+            if False:
+                yield None
+
+    monkeypatch.setattr(dense_arrays_adapter.da, "Optimizer", _DummyOptimizer)
+
+    adapter = dense_arrays_adapter.DenseArraysAdapter()
+    run = adapter.build(
+        library=["AT"],
+        sequence_length=10,
+        solver="CBC",
+        strategy="iterate",
+        solver_options=[],
+        fixed_elements=None,
+        solve_timeout_seconds=2,
+    )
+    run.optimizer.build_model()
+    assert run.optimizer.model.time_limit_ms == 2000
