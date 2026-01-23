@@ -77,7 +77,16 @@ def _write_candidate_records(
     safe_label = f"{_safe_label(debug_label or motif_id)}{suffix}"
     debug_output_dir.mkdir(parents=True, exist_ok=True)
     path = debug_output_dir / f"candidates__{safe_label}.parquet"
-    pd.DataFrame(records).to_parquet(path, index=False)
+    df = pd.DataFrame(records)
+    if path.exists():
+        try:
+            existing = pd.read_parquet(path)
+            df = pd.concat([existing, df], ignore_index=True)
+            if "candidate_id" in df.columns:
+                df = df.drop_duplicates(subset=["candidate_id"], keep="last")
+        except Exception:
+            raise RuntimeError(f"Failed to append candidate records to {path}")
+    df.to_parquet(path, index=False)
     return path
 
 

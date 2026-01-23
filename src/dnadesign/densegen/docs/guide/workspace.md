@@ -39,7 +39,7 @@ workspace/
   `dense run --fresh` (clear outputs and start over). Stage‑A/Stage‑B artifacts in
   `outputs/pools` or `outputs/libraries` do not trigger this guard.
 - **Candidate mining artifacts**: `outputs/pools/candidates/` is overwritten by `dense run` or
-  `stage-a build-pool --overwrite`; copy it elsewhere if you want to keep prior candidates. Use
+  `stage-a build-pool --fresh`; copy it elsewhere if you want to keep prior candidates. Use
   `dense run --fresh` to clear outputs when restarting a workspace.
 
 ---

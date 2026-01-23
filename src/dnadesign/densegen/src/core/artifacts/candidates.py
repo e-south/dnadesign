@@ -49,9 +49,10 @@ def find_candidate_files(candidates_dir: Path) -> list[Path]:
 def prepare_candidates_dir(candidates_dir: Path, *, overwrite: bool = True) -> bool:
     existed = candidates_dir.exists()
     if existed:
-        if not overwrite:
-            raise FileExistsError(f"Candidate artifacts already exist in {candidates_dir}")
-        shutil.rmtree(candidates_dir)
+        if not candidates_dir.is_dir():
+            raise RuntimeError(f"Candidate artifacts path is not a directory: {candidates_dir}")
+        if overwrite:
+            shutil.rmtree(candidates_dir)
     candidates_dir.mkdir(parents=True, exist_ok=True)
     return existed
 

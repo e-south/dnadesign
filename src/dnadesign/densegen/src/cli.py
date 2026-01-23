@@ -899,7 +899,7 @@ def inspect_run(
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show failure breakdown columns."),
     library: bool = typer.Option(False, "--library", help="Include offered-vs-used library summaries."),
-    library_limit: int = typer.Option(0, "--library-limit", help="Limit libraries shown in summaries (0 = all)."),
+    library_limit: int = typer.Option(10, "--library-limit", help="Limit libraries shown in summaries (0 = all)."),
     top: int = typer.Option(10, "--top", help="Rows to show for library summaries."),
     by_library: bool = typer.Option(True, "--by-library/--no-by-library", help="Group library summaries per build."),
     top_per_tf: Optional[int] = typer.Option(None, "--top-per-tf", help="Limit TFBS rows per TF when summarizing."),
@@ -1541,7 +1541,11 @@ def stage_a_build_pool(
         "-i",
         help="Input name(s) to build (defaults to all inputs).",
     ),
-    overwrite: bool = typer.Option(False, help="Overwrite existing pool files."),
+    fresh: bool = typer.Option(
+        False,
+        "--fresh",
+        help="Start from scratch and replace existing pool files.",
+    ),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
     cfg_path, is_default = _resolve_config_path(ctx, config)
@@ -1571,12 +1575,16 @@ def stage_a_build_pool(
     candidates_dir = candidates_root(outputs_root, cfg.run.id)
     if candidate_logging:
         try:
-            existed = prepare_candidates_dir(candidates_dir, overwrite=overwrite)
-        except FileExistsError as exc:
+            existed = prepare_candidates_dir(candidates_dir, overwrite=fresh)
+        except Exception as exc:
             console.print(f"[bold red]{exc}[/]")
             raise typer.Exit(code=1)
-        if existed:
+        if existed and fresh:
             console.print(f"[yellow]Cleared prior candidate artifacts at {candidates_dir} to avoid mixing runs.[/]")
+        elif existed and not fresh:
+            console.print(
+                f"[yellow]Appending to existing candidate artifacts under {candidates_dir} (use --fresh to reset).[/]"
+            )
 
     with _suppress_pyarrow_sysctl_warnings():
         try:
@@ -1587,7 +1595,7 @@ def stage_a_build_pool(
                 rng=rng,
                 outputs_root=outputs_root,
                 out_dir=out_dir,
-                overwrite=overwrite,
+                overwrite=fresh,
                 selected_inputs=selected if selected else None,
             )
         except FileExistsError as exc:

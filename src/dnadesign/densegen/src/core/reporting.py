@@ -723,10 +723,9 @@ def collect_report_data(
     offered_vs_used_tf = offered_tf.merge(used_tf_any, on=["library_hash", "tf"], how="left").merge(
         total_sequences, on="library_hash", how="left"
     )
-    offered_vs_used_tf["used_placements"] = offered_vs_used_tf["used_placements"].fillna(0).astype(int)
-    offered_vs_used_tf["used_unique_tfbs"] = offered_vs_used_tf["used_unique_tfbs"].fillna(0).astype(int)
-    offered_vs_used_tf["used_sequences"] = offered_vs_used_tf["used_sequences"].fillna(0).astype(int)
-    offered_vs_used_tf["total_sequences"] = offered_vs_used_tf["total_sequences"].fillna(0).astype(int)
+    for col in ["used_placements", "used_unique_tfbs", "used_sequences", "total_sequences"]:
+        if col in offered_vs_used_tf.columns:
+            offered_vs_used_tf[col] = pd.to_numeric(offered_vs_used_tf[col], errors="coerce").fillna(0).astype(int)
     offered_vs_used_tf["utilization_any"] = offered_vs_used_tf.apply(
         lambda r: (r["used_sequences"] / r["total_sequences"]) if r["total_sequences"] else 0.0, axis=1
     )
@@ -740,8 +739,9 @@ def collect_report_data(
         .reset_index()
     )
     offered_vs_used_tfbs = offered_tfbs.merge(used_tfbs_any, on=["library_hash", "tf", "tfbs"], how="left")
-    offered_vs_used_tfbs["used_placements"] = offered_vs_used_tfbs["used_placements"].fillna(0).astype(int)
-    offered_vs_used_tfbs["used_sequences"] = offered_vs_used_tfbs["used_sequences"].fillna(0).astype(int)
+    for col in ["used_placements", "used_sequences"]:
+        if col in offered_vs_used_tfbs.columns:
+            offered_vs_used_tfbs[col] = pd.to_numeric(offered_vs_used_tfbs[col], errors="coerce").fillna(0).astype(int)
 
     tables["offered_vs_used_tf"] = offered_vs_used_tf
     tables["offered_vs_used_tfbs"] = offered_vs_used_tfbs

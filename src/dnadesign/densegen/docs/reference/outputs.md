@@ -133,11 +133,14 @@ DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solve
   - `outputs/pools/<input>__pool.parquet`
   - `outputs/pools/candidates/candidates__<label>.parquet` (when `keep_all_candidates_debug: true`)
   - `outputs/pools/candidates/candidates.parquet` + `candidates_summary.parquet` + `candidates_manifest.json`
-    (overwritten by `dense run` or `stage-a build-pool --overwrite`)
+    (overwritten by `dense run` or `stage-a build-pool --fresh`)
 - `dense stage-b build-libraries` writes:
   - `outputs/libraries/library_builds.parquet`
   - `outputs/libraries/library_members.parquet`
   - `outputs/libraries/library_manifest.json`
+
+`dense stage-a build-pool` appends new unique TFBS to existing pools by default; pass `--fresh`
+to rebuild pools from scratch.
 
 Stage‑B expects Stage‑A pools (default `outputs/pools`). These are optional inspection artifacts and are not required for a normal `dense run`.
 
