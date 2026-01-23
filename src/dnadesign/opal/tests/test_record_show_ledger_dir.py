@@ -1,3 +1,5 @@
+# ABOUTME: Ensures record_show reads ledger predictions from canonical paths.
+# ABOUTME: Verifies ledger-backed reporting for individual records.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -26,7 +28,7 @@ def test_record_show_reads_ledger_predictions_dir(tmp_path):
     )
 
     workdir = tmp_path
-    pred_dir = workdir / "outputs" / "ledger.predictions"
+    pred_dir = workdir / "outputs" / "ledger" / "predictions"
     pred_dir.mkdir(parents=True, exist_ok=True)
     ev = pd.DataFrame(
         {
@@ -44,7 +46,7 @@ def test_record_show_reads_ledger_predictions_dir(tmp_path):
     ev.to_parquet(pred_dir / "part-000.parquet", index=False)
 
     # Minimal runs ledger to satisfy run_id disambiguation.
-    runs_path = workdir / "outputs" / "ledger.runs.parquet"
+    runs_path = workdir / "outputs" / "ledger" / "runs.parquet"
     runs_path.parent.mkdir(parents=True, exist_ok=True)
     runs = pd.DataFrame(
         {

@@ -1,3 +1,5 @@
+# ABOUTME: Loads ledger-backed event data for plot plugins.
+# ABOUTME: Resolves output paths for predictions and run metadata.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -37,7 +39,7 @@ def load_events_with_setpoint(
 ) -> pd.DataFrame:
     """
     Read the minimum columns needed for a plot **from the ledger** and join
-    the setpoint from `ledger.runs` via `objective__params.setpoint_vector`.
+    the setpoint from outputs/ledger/runs.parquet via `objective__params.setpoint_vector`.
     `outputs_dir` should point to the campaign's outputs/ directory.
     If multiple run_ids exist for the selected round(s), run_id is required.
     """
@@ -63,9 +65,9 @@ def load_events(
     """
     maybe_install_pyarrow_sysctl_filter()
     want: Set[str] = set(map(str, base_columns))
-    runs_df = read_runs(outputs_dir / "ledger.runs.parquet")
+    runs_df = read_runs(outputs_dir / "ledger" / "runs.parquet")
     df = read_predictions(
-        outputs_dir / "ledger.predictions",
+        outputs_dir / "ledger" / "predictions",
         columns=sorted(want),
         round_selector=round_selector,
         run_id=run_id,

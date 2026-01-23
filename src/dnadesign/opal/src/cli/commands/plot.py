@@ -1,3 +1,5 @@
+# ABOUTME: CLI plotting command for OPAL campaign outputs and ledgers.
+# ABOUTME: Resolves plot configs, rounds, and output locations for charts.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -91,7 +93,10 @@ ALLOWED_PLOT_CONFIG_KEYS = {"plots", "plot_defaults", "plot_presets"}
 def _has_feature_importance(outputs_dir: Path) -> bool:
     if not outputs_dir.exists():
         return False
-    for child in outputs_dir.iterdir():
+    rounds_dir = outputs_dir / "rounds"
+    if not rounds_dir.exists():
+        return False
+    for child in rounds_dir.iterdir():
         if not child.is_dir():
             continue
         if child.name.startswith("round_") and (child / "feature_importance.csv").exists():
@@ -101,12 +106,12 @@ def _has_feature_importance(outputs_dir: Path) -> bool:
 
 def _resolve_run_round(runs_df: pl.DataFrame, run_id: str) -> int:
     if runs_df.is_empty():
-        raise ValueError("[plot] ledger.runs is empty; cannot resolve run_id.")
+        raise ValueError("[plot] outputs/ledger/runs.parquet is empty; cannot resolve run_id.")
     if "run_id" not in runs_df.columns or "as_of_round" not in runs_df.columns:
-        raise ValueError("[plot] ledger.runs missing required columns (run_id, as_of_round).")
+        raise ValueError("[plot] outputs/ledger/runs.parquet missing required columns (run_id, as_of_round).")
     df = runs_df.filter(pl.col("run_id") == str(run_id)).select(pl.col("as_of_round").drop_nulls().unique())
     if df.is_empty():
-        raise ValueError(f"[plot] run_id not found in ledger.runs: {run_id!r}.")
+        raise ValueError(f"[plot] run_id not found in outputs/ledger/runs.parquet: {run_id!r}.")
     rounds = sorted({int(x) for x in df.to_series().to_list()})
     if len(rounds) > 1:
         raise ValueError(f"[plot] run_id {run_id!r} appears in multiple rounds {rounds}.")

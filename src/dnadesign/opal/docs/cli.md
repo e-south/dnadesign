@@ -85,7 +85,7 @@ opal ingest-y --config <yaml> --round <r> --csv <path> \
 * If adding **new sequences** and X is list-valued, prefer **Parquet** input so the X column remains list-typed
   (CSV will coerce lists to strings).
 * Appends to `opal__<slug>__label_hist` and writes the current Y column.
-* Emits `label` events into `outputs/ledger.labels.parquet`.
+* Emits `label` events into `outputs/ledger/labels.parquet`.
 
 ---
 
@@ -107,7 +107,7 @@ opal run --config <yaml> --round <r> \
 * `--round, -r, --labels-as-of`: Training cutoff (use labels with `observed_round ≤ r`).
 * `--k, -k`: Override `selection.params.top_k`.
 * `--score-batch-size`: Override `scoring.score_batch_size` for this run.
-* `--resume`: Allow overwriting existing per-round artifacts (required if `outputs/round_<r>/` already exists).
+* `--resume`: Allow overwriting existing per-round artifacts (required if `outputs/rounds/round_<r>/` already exists).
 * `--verbose/--quiet`: Control log verbosity (default: verbose).
 
 **Pipeline**
@@ -119,7 +119,7 @@ opal run --config <yaml> --round <r> \
   * If `selection.params.exclude_already_labeled: true` (default), designs already labeled are **excluded**;
     scope is controlled by `training.policy.allow_resuggesting_candidates_until_labeled`.
 
-**Artifacts written** (`outputs/round_<r>/`)
+**Artifacts written** (`outputs/rounds/round_<r>/`)
 
 * `model.joblib`
 * `model_meta.json`
@@ -134,9 +134,9 @@ opal run --config <yaml> --round <r> \
 
 **Events appended** to **ledger sinks** under `outputs/`
 
-* `run_pred` → `outputs/ledger.predictions/` (one row per candidate with **`pred__y_hat_model`** and
+* `run_pred` → `outputs/ledger/predictions/` (one row per candidate with **`pred__y_hat_model`** and
   **`pred__y_obj_scalar`**, selection rank/flag, and diagnostics).
-* `run_meta` → `outputs/ledger.runs.parquet` (one row per run with model/config/selection snapshot
+* `run_meta` → `outputs/ledger/runs.parquet` (one row per run with model/config/selection snapshot
   and artifact checksums).
 
 `pred__y_hat_model` is **objective-space** (after any Y‑ops inversion), so downstream logic is plugin‑agnostic.
@@ -268,7 +268,7 @@ opal verify-outputs --config <yaml> [--round <k|latest> | --run-id <id>] \
 
 **Notes**
 
-* Resolves the selection artifact path from `ledger.runs.parquet` when possible.
+* Resolves the selection artifact path from `outputs/ledger/runs.parquet` when possible.
 * Uses the ledger’s `pred__y_obj_scalar` as the canonical score source.
 * `--selection-path` accepts `.csv` or `.parquet`.
 * `--round, -r`: Round selector (integer or `latest`).
@@ -276,7 +276,7 @@ opal verify-outputs --config <yaml> [--round <k|latest> | --run-id <id>] \
 
 **Notes**
 
-* Reads from `outputs/ledger.runs.parquet` and `outputs/ledger.predictions/`.
+* Reads from `outputs/ledger/runs.parquet` and `outputs/ledger/predictions/`.
 
 ---
 
@@ -341,7 +341,7 @@ opal status --config <yaml> [--round <k> | --all] [--with-ledger] [--json]
 
 #### `runs`
 
-List or inspect `run_meta` entries from `outputs/ledger.runs.parquet`.
+List or inspect `run_meta` entries from `outputs/ledger/runs.parquet`.
 
 **Usage**
 
@@ -470,7 +470,7 @@ opal plot --config <yaml-or-dir> --quick
 * `plot_defaults` and `plot_presets` reduce redundancy; `preset: <name>` merges into each plot entry.
 * Set `enabled: false` on any plot entry to keep it in the YAML without running it.
 * If a round has multiple run_ids, plots require `--run-id` to avoid mixing reruns.
-* If `--run-id` is provided, OPAL resolves its round from `ledger.runs`; `--round all` is invalid and conflicting `--round` values error.
+* If `--run-id` is provided, OPAL resolves its round from `outputs/ledger/runs.parquet`; `--round all` is invalid and conflicting `--round` values error.
 
 ---
 
@@ -604,7 +604,7 @@ You’ll get per-round artifacts, appended `run_pred`/`run_meta` events, and upd
 ```bash
 opal predict \
   --config src/dnadesign/opal/campaigns/my_campaign/configs/campaign.yaml \
-  --model-path src/dnadesign/opal/campaigns/my_campaign/outputs/round_0/model.joblib \
+  --model-path src/dnadesign/opal/campaigns/my_campaign/outputs/rounds/round_0/model.joblib \
   --in new_candidates.parquet \
   --out preds.csv
 ```

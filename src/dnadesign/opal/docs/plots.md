@@ -91,11 +91,11 @@ plots:
 
 * `records` → resolved from `data.location` in `campaign.yaml`
 * `outputs` → campaign `outputs/` directory
-* `ledger_predictions_dir` → `outputs/ledger.predictions/`
-* `ledger_runs_parquet` → `outputs/ledger.runs.parquet`
-* `ledger_labels_parquet` → `outputs/ledger.labels.parquet`
+* `ledger_predictions_dir` → `outputs/ledger/predictions/`
+* `ledger_runs_parquet` → `outputs/ledger/runs.parquet`
+* `ledger_labels_parquet` → `outputs/ledger/labels.parquet`
 
-Ledger sinks always live under `context.workspace.outputs_dir` (e.g., `outputs/ledger.*`).
+Ledger sinks always live under `context.workspace.outputs_dir` (e.g., `outputs/ledger/`).
 
 
 ### Writing a new plot

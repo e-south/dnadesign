@@ -244,11 +244,11 @@ Only proximity of $\widehat{v}$ to $p$ (being OFF everywhere) is rewarded.
 
 ### 9. Emissions
 
-All outputs are written to **ledger sinks** under `outputs/`:
+All outputs are written to **ledger sinks** under `outputs/ledger/`:
 
-- `outputs/ledger.predictions/` → per‑ID `run_pred` rows (one per candidate)
-- `outputs/ledger.runs.parquet` → per‑run `run_meta` row (one per run)
-- `outputs/ledger.labels.parquet` → per‑label `label` rows (one per ingest event)
+- `outputs/ledger/predictions/` → per‑ID `run_pred` rows (one per candidate)
+- `outputs/ledger/runs.parquet` → per‑run `run_meta` row (one per run)
+- `outputs/ledger/labels.parquet` → per‑label `label` rows (one per ingest event)
 
 **Per‑ID predictions (`run_pred` rows)**
 

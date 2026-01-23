@@ -1,3 +1,5 @@
+# ABOUTME: Tests training label extraction policies across rounds from label history.
+# ABOUTME: Ensures labels are deduped and pred entries are ignored during training.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -37,15 +39,18 @@ def _df():
             "X": [[0.1]],
             "opal__demo__label_hist": [
                 [
-                    {"kind": "label", "observed_round": 0, "y_obs": [0.0]},
+                    {"kind": "label", "observed_round": 0, "y_obs": {"value": [0.0], "dtype": "vector"}},
                     {
                         "kind": "pred",
                         "as_of_round": 1,
                         "run_id": "run-1",
-                        "y_hat": [0.5],
+                        "y_pred": {"value": [0.5], "dtype": "vector"},
+                        "y_space": "objective",
+                        "objective": {"name": "scalar_identity_v1", "params": {}},
                         "metrics": {"score": 0.2},
+                        "selection": {"rank": 1, "top_k": True},
                     },
-                    {"kind": "label", "observed_round": 1, "y_obs": [1.0]},
+                    {"kind": "label", "observed_round": 1, "y_obs": {"value": [1.0], "dtype": "vector"}},
                 ]
             ],
         }

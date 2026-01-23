@@ -42,6 +42,8 @@ def test_init_validate_explain_cli(tmp_path: Path) -> None:
     assert (workdir / "state.json").exists()
     assert (workdir / ".opal" / "config").exists()
     assert (workdir / "outputs").exists()
+    assert (workdir / "outputs" / "ledger").exists()
+    assert (workdir / "outputs" / "rounds").exists()
     assert (workdir / "inputs").exists()
 
     res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
@@ -78,8 +80,8 @@ def test_ctx_show_audit_diff(tmp_path: Path) -> None:
     app = _build()
     runner = CliRunner()
 
-    round0 = workdir / "outputs" / "round_0"
-    round1 = workdir / "outputs" / "round_1"
+    round0 = workdir / "outputs" / "rounds" / "round_0"
+    round1 = workdir / "outputs" / "rounds" / "round_1"
     round0.mkdir(parents=True, exist_ok=True)
     round1.mkdir(parents=True, exist_ok=True)
 
@@ -171,7 +173,7 @@ def test_ingest_y_cli(tmp_path: Path) -> None:
         ],
     )
     assert res.exit_code == 0, res.stdout
-    assert (workdir / "outputs" / "ledger.labels.parquet").exists()
+    assert (workdir / "outputs" / "ledger" / "labels.parquet").exists()
 
 
 def test_ingest_y_accepts_xlsx(tmp_path: Path) -> None:
@@ -211,7 +213,7 @@ def test_ingest_y_accepts_xlsx(tmp_path: Path) -> None:
         ],
     )
     assert res.exit_code == 0, res.stdout
-    assert (workdir / "outputs" / "ledger.labels.parquet").exists()
+    assert (workdir / "outputs" / "ledger" / "labels.parquet").exists()
 
 
 def test_ingest_y_rejects_unsupported_extension(tmp_path: Path) -> None:

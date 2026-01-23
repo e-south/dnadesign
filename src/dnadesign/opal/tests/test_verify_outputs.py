@@ -1,3 +1,5 @@
+# ABOUTME: Verifies selection outputs against ledger predictions and run metadata.
+# ABOUTME: Covers integration paths for verify-outputs and end-to-end run flows.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -134,8 +136,24 @@ def test_end_to_end_run_and_verify_outputs(tmp_path: Path) -> None:
             "x_vec": [[0.1, 0.2], [0.2, 0.4], [0.3, 0.1], [0.4, 0.3]],
             "y_scalar": [None, None, None, None],
             label_hist_col: [
-                [{"r": 0, "ts": "2024-01-01T00:00:00Z", "src": "ingest_y", "y": [0.1]}],
-                [{"r": 0, "ts": "2024-01-01T00:00:00Z", "src": "ingest_y", "y": [0.2]}],
+                [
+                    {
+                        "kind": "label",
+                        "observed_round": 0,
+                        "ts": "2024-01-01T00:00:00Z",
+                        "src": "ingest_y",
+                        "y_obs": {"value": [0.1], "dtype": "vector"},
+                    }
+                ],
+                [
+                    {
+                        "kind": "label",
+                        "observed_round": 0,
+                        "ts": "2024-01-01T00:00:00Z",
+                        "src": "ingest_y",
+                        "y_obs": {"value": [0.2], "dtype": "vector"},
+                    }
+                ],
                 [],
                 [],
             ],
@@ -208,6 +226,6 @@ def test_end_to_end_run_and_verify_outputs(tmp_path: Path) -> None:
     )
 
     outputs_dir = workdir / "outputs"
-    assert (outputs_dir / "ledger.runs.parquet").is_file()
-    assert (outputs_dir / "ledger.labels.parquet").is_file() is False
-    assert (outputs_dir / "ledger.predictions").exists()
+    assert (outputs_dir / "ledger" / "runs.parquet").is_file()
+    assert (outputs_dir / "ledger" / "labels.parquet").is_file() is False
+    assert (outputs_dir / "ledger" / "predictions").exists()

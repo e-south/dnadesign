@@ -1,3 +1,5 @@
+# ABOUTME: Exercises dashboard utilities for parsing OPAL label history and plots.
+# ABOUTME: Covers parsing, filters, and SFXI overlays for dashboard workflows.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -280,7 +282,11 @@ def test_diagnostics_to_lines() -> None:
 def test_opal_labeled_mask() -> None:
     df = pl.DataFrame(
         {
-            "opal__a__label_hist": [[], None, [{"r": 1, "y": [0.1]}]],
+            "opal__a__label_hist": [
+                [],
+                None,
+                [{"observed_round": 1, "y_obs": {"value": [0.1], "dtype": "vector"}}],
+            ],
             "opal__b__label_hist": [None, [], []],
         }
     )
@@ -434,7 +440,11 @@ def test_integration_smoke(tmp_path: Path) -> None:
                 [0.5, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0],
                 [0.5, 0.5, 0.5, 0.5, 2.0, 2.0, 2.0, 2.0],
             ],
-            "opal__demo__label_hist": [[], [{"r": 1}], []],
+            "opal__demo__label_hist": [
+                [],
+                [{"observed_round": 1, "y_obs": {"value": [0.1], "dtype": "vector"}}],
+                [],
+            ],
             "densegen__used_tfbs_detail": [
                 [{"offset": 1, "orientation": "fwd", "tf": "x", "tfbs": "AAAA"}],
                 [],
@@ -531,8 +541,14 @@ def test_build_label_events_parsing_variants() -> None:
             "opal__demo__label_hist": pl.Series(
                 "opal__demo__label_hist",
                 [
-                    [{"r": 1, "y": [0.1, 0.2], "src": "ingest_y"}],
-                    ['{"r": 2, "y": [0.3, 0.4], "src": "manual"}'],
+                    [
+                        {
+                            "observed_round": 1,
+                            "y_obs": {"value": [0.1, 0.2], "dtype": "vector"},
+                            "src": "ingest_y",
+                        }
+                    ],
+                    ['{"observed_round": 2, "y_obs": {"value": [0.3, 0.4], "dtype": "vector"}, "src": "manual"}'],
                     "not json",
                 ],
                 dtype=pl.Object,
@@ -547,6 +563,48 @@ def test_build_label_events_parsing_variants() -> None:
     assert "x_vec" in label_events.df.columns
     assert label_events.df.height == 2
     assert label_events.diag.status in {"parse_warning", "ok"}
+
+
+def test_build_pred_events_parsing_wrappers() -> None:
+    df = pl.DataFrame(
+        {
+            "id": ["a", "b"],
+            "opal__demo__label_hist": pl.Series(
+                "opal__demo__label_hist",
+                [
+                    [
+                        {
+                            "kind": "pred",
+                            "as_of_round": 1,
+                            "run_id": "run-1",
+                            "y_pred": {"value": [0.2, 0.3], "dtype": "vector"},
+                            "y_space": "objective",
+                            "objective": {"name": "sfxi_v1", "params": {"setpoint_vector": [0, 0, 0, 1]}},
+                            "metrics": {"score": 0.5},
+                            "selection": {"rank": 1, "top_k": True},
+                        }
+                    ],
+                    [
+                        {
+                            "kind": "pred",
+                            "as_of_round": 1,
+                            "run_id": "run-2",
+                            "y_pred": {"value": {"note": "opaque"}, "dtype": "object"},
+                            "y_space": "objective",
+                            "objective": {"name": "sfxi_v1", "params": {"setpoint_vector": [0, 0, 0, 1]}},
+                            "metrics": {"score": 0.2},
+                            "selection": {"rank": 2, "top_k": False},
+                        }
+                    ],
+                ],
+                dtype=pl.Object,
+            ),
+        }
+    )
+    pred_events = labels.build_pred_events(df=df, label_hist_col="opal__demo__label_hist")
+    assert pred_events.df.height == 2
+    assert pred_events.df["pred_y_hat"].to_list()[0] == [0.2, 0.3]
+    assert pred_events.df["pred_y_hat"].to_list()[1] is None
 
 
 def test_observed_event_ids() -> None:

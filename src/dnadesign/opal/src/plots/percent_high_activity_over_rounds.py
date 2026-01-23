@@ -1,3 +1,5 @@
+# ABOUTME: Plots percent high-activity designs over rounds from ledger predictions.
+# ABOUTME: Consumes outputs/ledger/predictions for per-round summaries.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -26,7 +28,7 @@ from ._param_utils import event_columns_for, get_str, normalize_metric_field
             "size_by": "Optional obj__/pred__/sel__ field for swarm size.",
         },
         requires=["as_of_round", "pred__y_obj_scalar"],
-        notes=["Reads ledger.predictions."],
+        notes=["Reads outputs/ledger/predictions."],
     ),
 )
 def render(context, params: dict) -> None:

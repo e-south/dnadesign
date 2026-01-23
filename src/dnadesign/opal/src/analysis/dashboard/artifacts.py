@@ -1,3 +1,5 @@
+# ABOUTME: Resolves round artifact locations for dashboard notebooks.
+# ABOUTME: Translates campaign workdir + round into artifact paths.
 """Artifact resolution helpers for dashboard notebooks."""
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ def resolve_round_artifacts(
         return None, "Campaign workdir unavailable."
     if as_of_round is None:
         return None, "As-of round is required to resolve artifacts."
-    round_dir = Path(workdir) / "outputs" / f"round_{int(as_of_round)}"
+    round_dir = Path(workdir) / "outputs" / "rounds" / f"round_{int(as_of_round)}"
     if not round_dir.exists():
         return None, f"Round directory not found: {round_dir}"
     artifacts: dict[str, str] = {"round_dir": str(round_dir)}

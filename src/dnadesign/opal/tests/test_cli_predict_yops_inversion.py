@@ -1,3 +1,5 @@
+# ABOUTME: Tests predict CLI behavior for Y-ops inversion and round_ctx handling.
+# ABOUTME: Ensures predict reads model artifacts from round directories correctly.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -50,7 +52,7 @@ def test_predict_requires_round_ctx_when_yops_present(tmp_path: Path) -> None:
     campaign = workdir / "campaign.yaml"
     write_campaign_yaml(campaign, workdir=workdir, records_path=records)
 
-    round_dir = workdir / "outputs" / "round_0"
+    round_dir = workdir / "outputs" / "rounds" / "round_0"
     round_dir.mkdir(parents=True, exist_ok=True)
     model_path = round_dir / "model.joblib"
     meta = _train_model(model_path)
@@ -90,7 +92,7 @@ def test_predict_accepts_latest_round_selector(tmp_path: Path) -> None:
     campaign = workdir / "campaign.yaml"
     write_campaign_yaml(campaign, workdir=workdir, records_path=records)
 
-    round_dir = workdir / "outputs" / "round_0"
+    round_dir = workdir / "outputs" / "rounds" / "round_0"
     round_dir.mkdir(parents=True, exist_ok=True)
     model_path = round_dir / "model.joblib"
     meta = _train_model(model_path)
@@ -113,7 +115,7 @@ def test_predict_rejects_round_and_model_path(tmp_path: Path) -> None:
     campaign = workdir / "campaign.yaml"
     write_campaign_yaml(campaign, workdir=workdir, records_path=records)
 
-    model_path = workdir / "outputs" / "round_0" / "model.joblib"
+    model_path = workdir / "outputs" / "rounds" / "round_0" / "model.joblib"
     model_path.parent.mkdir(parents=True, exist_ok=True)
     _train_model(model_path)
 
@@ -144,7 +146,7 @@ def test_predict_errors_on_missing_model_path(tmp_path: Path) -> None:
     campaign = workdir / "campaign.yaml"
     write_campaign_yaml(campaign, workdir=workdir, records_path=records)
 
-    missing_path = workdir / "outputs" / "round_0" / "missing.joblib"
+    missing_path = workdir / "outputs" / "rounds" / "round_0" / "missing.joblib"
 
     app = _build()
     runner = CliRunner()
@@ -171,7 +173,7 @@ def test_predict_rejects_unsupported_out_extension(tmp_path: Path) -> None:
     campaign = workdir / "campaign.yaml"
     write_campaign_yaml(campaign, workdir=workdir, records_path=records)
 
-    round_dir = workdir / "outputs" / "round_0"
+    round_dir = workdir / "outputs" / "rounds" / "round_0"
     round_dir.mkdir(parents=True, exist_ok=True)
     model_path = round_dir / "model.joblib"
     meta = _train_model(model_path)
@@ -208,7 +210,7 @@ def test_predict_rejects_model_params_non_json(tmp_path: Path) -> None:
     campaign = workdir / "campaign.yaml"
     write_campaign_yaml(campaign, workdir=workdir, records_path=records)
 
-    round_dir = workdir / "outputs" / "round_0"
+    round_dir = workdir / "outputs" / "rounds" / "round_0"
     round_dir.mkdir(parents=True, exist_ok=True)
     model_path = round_dir / "model.joblib"
     _train_model(model_path)
@@ -245,7 +247,7 @@ def test_predict_errors_on_x_dim_mismatch(tmp_path: Path) -> None:
     campaign = workdir / "campaign.yaml"
     write_campaign_yaml(campaign, workdir=workdir, records_path=records)
 
-    round_dir = workdir / "outputs" / "round_0"
+    round_dir = workdir / "outputs" / "rounds" / "round_0"
     round_dir.mkdir(parents=True, exist_ok=True)
     model_path = round_dir / "model.joblib"
     meta = _train_model(model_path)

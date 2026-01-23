@@ -1988,7 +1988,7 @@ def _(
             "label history entry would bloat each record with repeated run-level data. To keep a single "
             "canonical source for values while avoiding intermediate leakage, the dashboard treats "
             "`label_hist` as canonical and resolves artifacts *optionally* from the round directory "
-            "(`workdir/outputs/round_<r>`). This preserves a single truth for values while still enabling "
+            "(`workdir/outputs/rounds/round_<r>`). This preserves a single truth for values while still enabling "
             "feature importance when artifacts exist. The trade-off is historical reruns for a round are "
             "not preserved here (pred entries replace-in-place), which aligns with “latest is canonical.”"
         ),

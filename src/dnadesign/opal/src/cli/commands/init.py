@@ -1,3 +1,5 @@
+# ABOUTME: Initializes OPAL campaign workspaces and validates records layout.
+# ABOUTME: Writes state.json and ensures campaign directories exist.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -39,7 +41,9 @@ def cmd_init(
         if not json:
             print_config_context(cfg_path, cfg=cfg)
         workdir = Path(cfg.campaign.workdir)
-        ensure_dir(workdir / "outputs")
+        outputs_dir = workdir / "outputs"
+        ensure_dir(outputs_dir / "ledger")
+        ensure_dir(outputs_dir / "rounds")
         ensure_dir(workdir / "inputs")
 
         # Write a workspace marker so future commands can resolve fast from any child

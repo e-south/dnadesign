@@ -1,3 +1,5 @@
+# ABOUTME: Stores and validates per-record label/prediction history for OPAL campaigns.
+# ABOUTME: Enforces schema contracts for label history entries and training extraction.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -48,6 +50,16 @@ def _coerce_mapping(value: Any) -> dict | None:
     return None
 
 
+def _coerce_non_empty_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    try:
+        val = str(value).strip()
+    except Exception:
+        return None
+    return val or None
+
+
 def _coerce_int(value: Any) -> int | None:
     try:
         return int(value)
@@ -91,21 +103,43 @@ def _coerce_bool(value: Any) -> bool | None:
     return None
 
 
+def _normalize_value_wrapper(value: Any, *, require_numeric: bool) -> dict | None:
+    wrapper = _coerce_mapping(value)
+    if wrapper is None:
+        return None
+    if "value" not in wrapper:
+        return None
+    dtype_val = _coerce_non_empty_str(wrapper.get("dtype"))
+    if dtype_val is None:
+        return None
+    schema_val = wrapper.get("schema")
+    schema_map = _coerce_mapping(schema_val) if schema_val is not None else None
+    raw_value = _deep_as_py(wrapper.get("value"))
+    if require_numeric:
+        numeric = _coerce_float_list(raw_value)
+        if numeric is None:
+            return None
+        raw_value = numeric
+    out = {"value": raw_value, "dtype": dtype_val}
+    if schema_map is not None:
+        out["schema"] = schema_map
+    return out
+
+
 def _normalize_label_entry(entry_map: Mapping[str, Any]) -> dict | None:
     round_val = entry_map.get("observed_round", entry_map.get("r", entry_map.get("round")))
     r_int = _coerce_int(round_val)
     if r_int is None:
         return None
-    y_val = entry_map.get("y_obs", entry_map.get("y", entry_map.get("value")))
-    y_list = _coerce_float_list(y_val)
-    if y_list is None:
+    y_wrap = _normalize_value_wrapper(entry_map.get("y_obs"), require_numeric=True)
+    if y_wrap is None:
         return None
     return {
         "kind": "label",
         "observed_round": r_int,
         "ts": entry_map.get("ts"),
         "src": entry_map.get("src"),
-        "y_obs": y_list,
+        "y_obs": y_wrap,
     }
 
 
@@ -117,16 +151,19 @@ def _normalize_pred_entry(entry_map: Mapping[str, Any]) -> dict | None:
     run_id = entry_map.get("run_id")
     if run_id is None:
         return None
-    y_hat_val = entry_map.get("y_hat", entry_map.get("y_pred", entry_map.get("y")))
-    y_hat_list = _coerce_float_list(y_hat_val)
-    if y_hat_list is None:
+    y_pred_wrap = _normalize_value_wrapper(entry_map.get("y_pred"), require_numeric=False)
+    if y_pred_wrap is None:
+        return None
+    y_space = _coerce_non_empty_str(entry_map.get("y_space"))
+    if y_space is None:
         return None
     pred: dict[str, Any] = {
         "kind": "pred",
         "as_of_round": r_int,
         "run_id": str(run_id),
         "ts": entry_map.get("ts"),
-        "y_hat": y_hat_list,
+        "y_pred": y_pred_wrap,
+        "y_space": y_space,
     }
     objective = entry_map.get("objective")
     if isinstance(objective, Mapping):
@@ -152,8 +189,10 @@ class LabelHistory:
     def normalize_hist_cell(cell: Any) -> List[Dict[str, Any]]:
         """
         Normalize a 'label_hist' cell into a Python List[Dict] in the current schema:
-          - label entry: {kind:'label', observed_round:int, ts:str, src:str, y_obs: List[float]}
-          - pred entry:  {kind:'pred', as_of_round:int, run_id:str, ts:str, y_hat: List[float], ...}
+          - label entry: {kind:'label', observed_round:int, ts:str, src:str,
+            y_obs:{value,dtype,schema?}}
+          - pred entry:  {kind:'pred', as_of_round:int, run_id:str, ts:str,
+            y_pred:{value,dtype,schema?}, y_space:str, ...}
         Be permissive on container types to tolerate different Parquet round-trips.
         """
         if cell is None or (isinstance(cell, float) and np.isnan(cell)):
@@ -246,6 +285,10 @@ class LabelHistory:
             normalized = _normalize_pred_entry(entry_map)
             if normalized is None:
                 raise OpalError("label_hist pred entry missing required keys.")
+
+            y_space_val = normalized.get("y_space")
+            if not isinstance(y_space_val, str) or not y_space_val.strip():
+                raise OpalError("label_hist pred entry y_space must be a non-empty string.")
 
             objective = entry_map.get("objective")
             if not isinstance(objective, Mapping):
@@ -387,11 +430,16 @@ class LabelHistory:
                     ]
                 else:
                     pass
+            y_list = list(map(float, new_ys[i]))
             entry = {
                 "kind": "label",
                 "observed_round": int(r),
                 "ts": pd.Timestamp.utcnow().isoformat(),
-                "y_obs": list(map(float, new_ys[i])),
+                "y_obs": {
+                    "value": y_list,
+                    "dtype": "vector",
+                    "schema": {"length": int(len(y_list))},
+                },
                 "src": src,
             }
             cur.append(entry)
@@ -443,17 +491,26 @@ class LabelHistory:
 
             if policy == "latest_only":
                 best = max(entries, key=lambda x: int(x.get("observed_round", -1)))
-                y = [float(v) for v in (best.get("y_obs", []) or [])]
+                y_wrap = _normalize_value_wrapper(best.get("y_obs"), require_numeric=True)
+                if y_wrap is None:
+                    raise OpalError(f"Label history y_obs missing/invalid for id={_id}.")
+                y = [float(v) for v in (y_wrap.get("value") or [])]
                 recs.append((_id, y, int(best.get("observed_round", -1))))
             elif policy == "all_rounds":
                 for e in entries:
-                    y = [float(v) for v in (e.get("y_obs", []) or [])]
+                    y_wrap = _normalize_value_wrapper(e.get("y_obs"), require_numeric=True)
+                    if y_wrap is None:
+                        raise OpalError(f"Label history y_obs missing/invalid for id={_id}.")
+                    y = [float(v) for v in (y_wrap.get("value") or [])]
                     recs.append((_id, y, int(e.get("observed_round", -1))))
             elif policy == "error_on_duplicate":
                 if len(entries) > 1:
                     raise OpalError(f"Duplicate labels for id={_id} at multiple rounds (policy=error_on_duplicate).")
                 e = entries[0]
-                y = [float(v) for v in (e.get("y_obs", []) or [])]
+                y_wrap = _normalize_value_wrapper(e.get("y_obs"), require_numeric=True)
+                if y_wrap is None:
+                    raise OpalError(f"Label history y_obs missing/invalid for id={_id}.")
+                y = [float(v) for v in (y_wrap.get("value") or [])]
                 recs.append((_id, y, int(e.get("observed_round", -1))))
 
         out = pd.DataFrame(recs, columns=["id", "y", "r"])
@@ -547,12 +604,18 @@ class LabelHistory:
                     raise OpalError(f"Prediction metric '{key}' invalid for id={_id}.")
                 metrics_entry[key] = val
 
+            y_vec = y_hat_arr[i, :].tolist()
             entry = {
                 "kind": "pred",
                 "as_of_round": int(as_of_round),
                 "run_id": str(run_id),
                 "ts": ts_val,
-                "y_hat": y_hat_arr[i, :].tolist(),
+                "y_pred": {
+                    "value": y_vec,
+                    "dtype": "vector",
+                    "schema": {"length": int(len(y_vec))},
+                },
+                "y_space": "objective",
                 "objective": dict(objective or {}),
                 "metrics": metrics_entry,
                 "selection": {"rank": rank_val, "top_k": bool(top_k_val)},

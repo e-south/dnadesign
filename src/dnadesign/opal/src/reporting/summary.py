@@ -1,3 +1,5 @@
+# ABOUTME: Summarizes run logs and run metadata for reporting commands.
+# ABOUTME: Provides helpers for CLI status and log summaries.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -46,7 +48,7 @@ def select_run_meta(
     run_id: Optional[str] = None,
 ) -> pd.Series:
     if df_runs.empty:
-        raise OpalError("No runs found in ledger.runs.parquet.")
+        raise OpalError("No runs found in outputs/ledger/runs.parquet.")
     if run_id is not None:
         sel = df_runs[df_runs["run_id"].astype(str) == str(run_id)]
         if sel.empty:

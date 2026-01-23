@@ -1,3 +1,5 @@
+# ABOUTME: CLI command to inspect objective metadata and diagnostics for runs.
+# ABOUTME: Reads outputs/ledger predictions and run metadata for reporting.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -67,7 +69,7 @@ def cmd_objective_meta(
             print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
         ws = CampaignWorkspace.from_config(cfg, cfg_path)
         base = ws.outputs_dir
-        pred_dir = base / "ledger.predictions"
+        pred_dir = base / "ledger" / "predictions"
 
         # Load runs metadata (strict; no legacy fallbacks)
         reader = LedgerReader(ws)
@@ -81,7 +83,7 @@ def cmd_objective_meta(
             ]
         )
         if rtab.empty:
-            raise OpalError("No runs found in ledger.runs.parquet. Run `opal run ...` first.")
+            raise OpalError("No runs found in outputs/ledger/runs.parquet. Run `opal run ...` first.")
 
         if round and run_id:
             raise OpalError("Provide only one of --round or --run-id.")
@@ -107,7 +109,7 @@ def cmd_objective_meta(
 
         # Row-level diagnostic schema from predictions
         if not pred_dir.exists():
-            raise OpalError("Missing ledger.predictions sink. Run a round to produce it.")
+            raise OpalError("Missing outputs/ledger/predictions sink. Run a round to produce it.")
         pdset = ds.dataset(str(pred_dir))
         pred_schema = [f.name for f in pdset.schema]
         obj_diag_cols = sorted([c for c in pred_schema if c.startswith("obj__")])

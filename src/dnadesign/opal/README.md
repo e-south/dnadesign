@@ -90,7 +90,7 @@ opal prune-source -c path/to/configs/campaign.yaml --scope campaign
 ### What gets saved
 
 * **Per-round**
-  - `outputs/round_<k>/`
+  - `outputs/rounds/round_<k>/`
   - `model.joblib`
   - `model_meta.json` *(includes training__y_ops when configured)*
   - `selection_top_k.csv`
@@ -104,12 +104,12 @@ opal prune-source -c path/to/configs/campaign.yaml --scope campaign
 
 * **Campaign-wide ledger (append-only)**
 
-  * `outputs/ledger.runs.parquet`
+  * `outputs/ledger/runs.parquet`
     - Plugin configs, counts, objective summaries, artifact hashes, versions.
-  * `outputs/ledger.predictions/`
+  * `outputs/ledger/predictions/`
     - Ŷ vector, scalar score, selection rank/flag, and row-level diagnostics (e.g., logic fidelity/effects).
     - `pred__y_hat_model` is in objective-space.
-  * `outputs/ledger.labels.parquet`
+  * `outputs/ledger/labels.parquet`
     - 1 row per label event (observed round, id, y).
 
 Schemas are **append-only**; uniqueness is enforced for:
@@ -169,10 +169,12 @@ Dashboard notebooks (e.g., `prom60_eda.py`) now pull their shared logic from
 ├─ state.json
 ├─ inputs/                       # drop experimental label files here
 └─ outputs/
-   ├─ ledger.predictions/        # append-only run_pred parts
-   ├─ ledger.runs.parquet        # run_meta (deduped)
-   ├─ ledger.labels.parquet      # label events (ingest-only)
-   └─ round_<k>/
+   ├─ ledger/
+   │  ├─ predictions/            # append-only run_pred parts
+   │  ├─ runs.parquet            # run_meta (deduped)
+   │  └─ labels.parquet          # label events (ingest-only)
+   └─ rounds/
+      └─ round_<k>/
       ├─ model.joblib
       ├─ model_meta.json
       ├─ selection_top_k.csv
@@ -349,7 +351,7 @@ Use `opal log --round <k|latest>` to summarize `round.log.jsonl`.
 OPAL is **assertive by default**: it will fail fast on inconsistent inputs rather than guessing.
 
 * `opal validate` checks essentials + X presence; if Y exists it must be finite and the expected length.
-* `label_hist` is a **required input** for `run`/`explain` and the canonical dashboard source; **ledger.labels** remains the audit sink.
+* `label_hist` is a **required input** for `run`/`explain` and the canonical dashboard source; `outputs/ledger/labels.parquet` remains the audit sink.
 * Labels present in the Y column but **missing from `label_hist` are rejected** (use `opal ingest-y` or `opal label-hist attach-from-y` for legacy Y columns).
 * Ledger writes are strict: unknown columns are **errors** (override only with `OPAL_LEDGER_ALLOW_EXTRA=1`).
 * Duplicate handling on ingest is explicit via `ingest.duplicate_policy` (error | keep_first | keep_last).
@@ -389,9 +391,9 @@ Naming: secondary columns follow `<tool>__<field>`.
 **Label history entry shapes**
 
 * **Observed label entry**
-  `{kind:"label", observed_round:int, ts:str, src:str, y_obs:[float]}`
+  `{kind:"label", observed_round:int, ts:str, src:str, y_obs:{value:<json>, dtype:str, schema?:{...}}}`
 * **Prediction/scoring entry**
-  `{kind:"pred", as_of_round:int, run_id:str, ts:str, y_hat:[float], objective:{name,params}, metrics:{score,logic_fidelity,effect_scaled,...}, selection:{rank,top_k}}`
+  `{kind:"pred", as_of_round:int, run_id:str, ts:str, y_pred:{value:<json>, dtype:str, schema?:{...}}, y_space:str, objective:{name,params}, metrics:{score,logic_fidelity,effect_scaled,...}, selection:{rank,top_k}}`
 
 `opal init` ensures the label history column exists in `records.parquet`.
 Use `opal prune-source` to remove OPAL‑derived columns (including the Y column) when you need to start fresh.
@@ -399,7 +401,7 @@ Use `opal prune-source` to remove OPAL‑derived columns (including the Y column
 #### Canonical vs ledger vs overlay (notebook)
 
 * **Canonical (dashboard)**: `records.parquet` label history (`opal__<slug>__label_hist`) plus campaign artifacts/state.
-* **Ledger (audit)**: append‑only run metadata and predictions under `outputs/ledger.*` (useful for audit; dashboard does not require it).
+* **Ledger (audit)**: append‑only run metadata and predictions under `outputs/ledger/` (useful for audit; dashboard does not require it).
 * **Overlay (notebook)**: in‑memory rescoring from stored predictions for exploration only; never persisted.
 * **Y‑ops gating**: notebook SFXI scoring only runs when predictions are in objective space (Y‑ops inverse applied).
 
@@ -408,21 +410,21 @@ Use `opal prune-source` to remove OPAL‑derived columns (including the Y column
 Ledger sinks are the **append-only audit** record of what happened in a campaign. They are designed
 for long-term inspection and downstream analysis; the dashboard’s canonical source is `records.parquet` label history.
 
-**labels (`outputs/ledger.labels.parquet`)**
+**labels (`outputs/ledger/labels.parquet`)**
 
 * `event`: `"label"`
 * `observed_round`, `id`, `sequence` (if available)
 * `y_obs`: list<float> (canonical Y vector)
 * `src`, `note`
 
-**run_pred (`outputs/ledger.predictions/`)**
+**run_pred (`outputs/ledger/predictions/`)**
 
 * `event`: `"run_pred"`, plus `run_id`, `as_of_round`, `id`, `sequence`
 * `pred__y_dim`, `pred__y_hat_model` (list<float>, objective-space), `pred__y_obj_scalar`
 * `sel__rank_competition`, `sel__is_selected`
 * Optional row diagnostics under `obj__*` (e.g., `obj__logic_fidelity`, `obj__effect_raw`, `obj__effect_scaled`)
 
-**run_meta (`outputs/ledger.runs.parquet`)**
+**run_meta (`outputs/ledger/runs.parquet`)**
 
 * `event`: `"run_meta"`, plus `run_id`, `as_of_round`
 * Config snapshot: `model__*`, `x_transform__*`, `y_ingest__*`, `objective__*`, `selection__*`, `training__y_ops`

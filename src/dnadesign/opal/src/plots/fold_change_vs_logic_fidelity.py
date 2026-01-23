@@ -1,3 +1,5 @@
+# ABOUTME: Plots effect vs logic fidelity diagnostics for SFXI predictions.
+# ABOUTME: Consumes ledger predictions with setpoint joins from run metadata.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -35,7 +37,7 @@ from ._param_utils import event_columns_for, get_float, get_str, normalize_metri
             "pred__y_obj_scalar",
             "obj__diag__setpoint",
         ],
-        notes=["Reads ledger.predictions + ledger.runs (setpoint join)."],
+        notes=["Reads outputs/ledger/predictions + outputs/ledger/runs.parquet (setpoint join)."],
     ),
 )
 def render(context, params: dict) -> None:

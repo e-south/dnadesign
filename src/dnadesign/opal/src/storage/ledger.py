@@ -1,3 +1,5 @@
+# ABOUTME: Handles append-only ledger sinks and schema validation for OPAL.
+# ABOUTME: Reads/writes run metadata, predictions, and label events.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -311,16 +313,17 @@ class LedgerReader:
         if run_id is not None or (require_run_id and run_id is None):
             runs_df = self.read_runs(columns=["run_id", "as_of_round"])
             if runs_df.empty:
-                raise LedgerError("ledger.runs is empty; cannot resolve run_id or rounds.")
+                raise LedgerError("outputs/ledger/runs.parquet is empty; cannot resolve run_id or rounds.")
 
         if run_id is not None:
             df_run = runs_df[runs_df["run_id"].astype(str) == str(run_id)] if runs_df is not None else pd.DataFrame()
             if df_run.empty:
-                raise LedgerError(f"run_id {run_id!r} not found in ledger.runs.")
+                raise LedgerError(f"run_id {run_id!r} not found in outputs/ledger/runs.parquet.")
             run_rounds = sorted({int(x) for x in df_run["as_of_round"].to_list()})
             if len(run_rounds) > 1:
                 raise LedgerError(
-                    f"run_id {run_id!r} appears in multiple rounds {run_rounds}; ledger.runs is inconsistent."
+                    f"run_id {run_id!r} appears in multiple rounds {run_rounds}; "
+                    "outputs/ledger/runs.parquet is inconsistent."
                 )
             run_round = run_rounds[0]
             if round_sel in ("unspecified", "latest"):

@@ -1,3 +1,5 @@
+# ABOUTME: Validates label_history schema parsing and strictness for OPAL records.
+# ABOUTME: Ensures label/pred entries meet required contracts for auditability.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -33,7 +35,14 @@ def test_label_hist_validation_rejects_malformed_entries(tmp_path):
             "bio_type": ["dna"],
             "sequence": ["AAA"],
             "alphabet": ["dna_4"],
-            "opal__demo__label_hist": [[{"y": [1.0, 2.0]}]],  # missing observed_round
+            "opal__demo__label_hist": [
+                [
+                    {
+                        "kind": "label",
+                        "y_obs": {"value": [1.0, 2.0], "dtype": "vector"},
+                    }
+                ]
+            ],  # missing observed_round
         }
     )
     store = _store(tmp_path)
@@ -50,12 +59,18 @@ def test_label_hist_validation_accepts_pred_entries(tmp_path):
             "alphabet": ["dna_4"],
             "opal__demo__label_hist": [
                 [
-                    {"kind": "label", "observed_round": 0, "y_obs": [0.1], "src": "ingest_y"},
+                    {
+                        "kind": "label",
+                        "observed_round": 0,
+                        "y_obs": {"value": [0.1], "dtype": "vector"},
+                        "src": "ingest_y",
+                    },
                     {
                         "kind": "pred",
                         "as_of_round": 1,
                         "run_id": "run-1",
-                        "y_hat": [0.2],
+                        "y_pred": {"value": [0.2], "dtype": "vector"},
+                        "y_space": "objective",
                         "objective": {"name": "sfxi_v1", "params": {"setpoint_vector": [0, 0, 0, 1]}},
                         "metrics": {"score": 0.5},
                         "selection": {"rank": 1, "top_k": True},
@@ -80,7 +95,8 @@ def test_label_hist_validation_rejects_pred_missing_run_id(tmp_path):
                     {
                         "kind": "pred",
                         "as_of_round": 1,
-                        "y_hat": [0.2],
+                        "y_pred": {"value": [0.2], "dtype": "vector"},
+                        "y_space": "objective",
                     }
                 ]
             ],
@@ -89,6 +105,33 @@ def test_label_hist_validation_rejects_pred_missing_run_id(tmp_path):
     store = _store(tmp_path)
     with pytest.raises(OpalError):
         store.validate_label_hist(df, require=True)
+
+
+def test_label_hist_validation_accepts_pred_nonnumeric_payload(tmp_path):
+    df = pd.DataFrame(
+        {
+            "id": ["a"],
+            "bio_type": ["dna"],
+            "sequence": ["AAA"],
+            "alphabet": ["dna_4"],
+            "opal__demo__label_hist": [
+                [
+                    {
+                        "kind": "pred",
+                        "as_of_round": 1,
+                        "run_id": "run-1",
+                        "y_pred": {"value": {"v": [1, 2, 3]}, "dtype": "object"},
+                        "y_space": "objective",
+                        "objective": {"name": "sfxi_v1", "params": {"setpoint_vector": [0, 0, 0, 1]}},
+                        "metrics": {"score": 0.5},
+                        "selection": {"rank": 1, "top_k": True},
+                    }
+                ]
+            ],
+        }
+    )
+    store = _store(tmp_path)
+    store.validate_label_hist(df, require=True)
 
 
 def test_label_hist_validation_allows_missing_when_not_required(tmp_path):

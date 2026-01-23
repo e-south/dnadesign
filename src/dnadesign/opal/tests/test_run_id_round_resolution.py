@@ -1,3 +1,5 @@
+# ABOUTME: Tests run_id round resolution against ledger predictions.
+# ABOUTME: Verifies facade and ledger reader behavior for run_id selectors.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -34,7 +36,7 @@ def _write_pred_parts(pred_dir: Path) -> None:
 
 
 def test_facade_read_predictions_run_id_resolves_round(tmp_path: Path) -> None:
-    pred_dir = tmp_path / "ledger.predictions"
+    pred_dir = tmp_path / "ledger" / "predictions"
     _write_pred_parts(pred_dir)
     runs_df = pl.DataFrame({"run_id": ["run-a", "run-b"], "as_of_round": [1, 2]})
 
@@ -51,7 +53,7 @@ def test_facade_read_predictions_run_id_resolves_round(tmp_path: Path) -> None:
 
 
 def test_facade_read_predictions_run_id_round_mismatch_raises(tmp_path: Path) -> None:
-    pred_dir = tmp_path / "ledger.predictions"
+    pred_dir = tmp_path / "ledger" / "predictions"
     _write_pred_parts(pred_dir)
     runs_df = pl.DataFrame({"run_id": ["run-a", "run-b"], "as_of_round": [1, 2]})
 
@@ -66,7 +68,7 @@ def test_facade_read_predictions_run_id_round_mismatch_raises(tmp_path: Path) ->
 
 
 def test_facade_read_predictions_requires_runs_df(tmp_path: Path) -> None:
-    pred_dir = tmp_path / "ledger.predictions"
+    pred_dir = tmp_path / "ledger" / "predictions"
     _write_pred_parts(pred_dir)
 
     with pytest.raises(OpalError):

@@ -1,3 +1,5 @@
+# ABOUTME: Plots objective score vs selection rank from ledger predictions.
+# ABOUTME: Reads outputs/ledger/predictions for scatter plots.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -40,7 +42,7 @@ from ._param_utils import (
             "sel__rank_competition",
             "sel__is_selected",
         ],
-        notes=["Reads ledger.predictions."],
+        notes=["Reads outputs/ledger/predictions."],
     ),
 )
 def render(context, params: dict) -> None:
@@ -89,7 +91,7 @@ def render(context, params: dict) -> None:
     need |= event_columns_for(hue_field, size_by)
     df = load_events(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
     if df.empty:
-        raise ValueError("ledger.predictions had zero rows for requested columns.")
+        raise ValueError("outputs/ledger/predictions had zero rows for requested columns.")
 
     rsel = context.rounds
     if rsel in ("unspecified", "latest"):

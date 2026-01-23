@@ -43,7 +43,7 @@ uv run opal plot -c configs/campaign.yaml
 
 **Notes:**
 - Use `uv run opal ...` to ensure the correct environment.
-- If `outputs/round_0/` already exists from a prior run, `opal run` will refuse to overwrite
+- If `outputs/rounds/round_0/` already exists from a prior run, `opal run` will refuse to overwrite
   unless you pass `--resume` or delete the existing artifacts first.
 
 ---
@@ -115,7 +115,7 @@ Latest round
   n_scored       : 9
   top_k requested: 5
   top_k effective: 5
-  round_dir      : <repo>/src/dnadesign/opal/campaigns/demo/outputs/round_0
+  round_dir      : <repo>/src/dnadesign/opal/campaigns/demo/outputs/rounds/round_0
 ```
 
 #### `opal runs list`
@@ -132,7 +132,7 @@ Runs
 ```
 Round log
   round            : 0
-  path             : <repo>/.../outputs/round_0/round.log.jsonl
+  path             : <repo>/.../outputs/rounds/round_0/round.log.jsonl
   events           : <count>
   predict_batches  : <count>
   predict_rows     : <count>
@@ -155,7 +155,7 @@ Stages
 **Per-round artifacts** (for audit + reuse):
 
 ```
-outputs/round_<k>/
+outputs/rounds/round_<k>/
   model.joblib
   model_meta.json
   selection_top_k.csv
@@ -171,9 +171,9 @@ outputs/round_<k>/
 **Ledger sinks (append-only)**:
 
 ```
-outputs/ledger.runs.parquet
-outputs/ledger.labels.parquet
-outputs/ledger.predictions/part-*.parquet
+outputs/ledger/runs.parquet
+outputs/ledger/labels.parquet
+outputs/ledger/predictions/part-*.parquet
 ```
 
 ---
@@ -193,7 +193,7 @@ then gives you interactive filtering and plots for the selected run.
 Canonical vs ledger vs overlay (notebook):
 
 - **Canonical (dashboard)**: `records.parquet` label history (`opal__<slug>__label_hist`) plus campaign artifacts/state.
-- **Ledger (audit)**: append-only run metadata and predictions under `outputs/ledger.*` (optional for audit).
+- **Ledger (audit)**: append-only run metadata and predictions under `outputs/ledger/` (optional for audit).
 - **Overlay (notebook)**: in-memory rescoring from stored predictions for exploration only; never persisted.
 - **Y-ops gating**: SFXI scoring runs only when predictions are in objective space (Y-ops inverse applied).
 
@@ -297,7 +297,23 @@ plot_config: plots.yaml
     If you explicitly set `MPLCONFIGDIR` and it points to an unwritable path,
     unset it or point it at a writable directory.
 - **Old outputs layout**:
-  - Remove `outputs/` and `state.json`, then re-run `opal init`.
+  - Remove `outputs/` and `state.json`, then re-run `opal init` (or use the demo reset command below).
+
+---
+
+### Demo reset command (hidden)
+
+`demo-reset` is a demo-only helper (not listed in `opal --help`) that wipes the demo state:
+it prunes OPAL columns from `records.parquet`, deletes `outputs/`, and removes `state.json`.
+
+From the demo campaign root:
+
+```bash
+uv run opal demo-reset -c configs/campaign.yaml
+
+# Non-interactive (skip prompt)
+uv run opal demo-reset -c configs/campaign.yaml --yes
+```
 
 ---
 

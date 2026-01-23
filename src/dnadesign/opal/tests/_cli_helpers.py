@@ -1,3 +1,5 @@
+# ABOUTME: Test helpers for building OPAL campaign fixtures and ledgers.
+# ABOUTME: Provides small utilities for CLI workflow tests.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -114,7 +116,7 @@ def write_state(
     run_id: str,
     round_index: int = 0,
 ) -> None:
-    round_dir = workdir / "outputs" / f"round_{int(round_index)}"
+    round_dir = workdir / "outputs" / "rounds" / f"round_{int(round_index)}"
     round_dir.mkdir(parents=True, exist_ok=True)
     round_log = round_dir / "round.log.jsonl"
     if not round_log.exists():

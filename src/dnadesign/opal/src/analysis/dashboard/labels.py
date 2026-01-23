@@ -1,3 +1,5 @@
+# ABOUTME: Parses label history entries for dashboard views and diagnostics.
+# ABOUTME: Normalizes label/pred events from records into analysis-ready tables.
 """Label history parsing and normalization for dashboard views."""
 
 from __future__ import annotations
@@ -194,10 +196,14 @@ def _parse_label_hist_cell(
         except Exception as exc:
             _record_error(f"label_hist entry round is not int: {exc}", sample=entry_map)
             continue
-        y_val = entry_map.get("y_obs", entry_map.get("y", entry_map.get("value")))
-        if y_val is None:
-            _record_error("label_hist entry missing y_obs", sample=entry_map)
+        y_wrap = _coerce_mapping(entry_map.get("y_obs"))
+        if y_wrap is None:
+            _record_error("label_hist entry missing y_obs wrapper", sample=entry_map)
             continue
+        if "value" not in y_wrap:
+            _record_error("label_hist entry y_obs missing value", sample=y_wrap)
+            continue
+        y_val = deep_as_py(y_wrap.get("value"))
         try:
             y_list = [float(v) for v in np.asarray(y_val, dtype=float).ravel().tolist()]
         except Exception as exc:
@@ -353,15 +359,25 @@ def _parse_pred_hist_cell(
         except Exception as exc:
             _record_error(f"pred entry as_of_round not int: {exc}", sample=entry_map)
             continue
-        y_hat = entry_map.get("y_hat")
-        if y_hat is None:
-            _record_error("pred entry missing y_hat", sample=entry_map)
+        y_wrap = _coerce_mapping(entry_map.get("y_pred"))
+        if y_wrap is None:
+            _record_error("pred entry missing y_pred wrapper", sample=entry_map)
             continue
+        if "value" not in y_wrap:
+            _record_error("pred entry y_pred missing value", sample=y_wrap)
+            continue
+
+        pred_value = deep_as_py(y_wrap.get("value"))
+        pred_dtype = y_wrap.get("dtype")
+        pred_y_hat = None
         try:
-            y_hat_list = [float(v) for v in np.asarray(y_hat, dtype=float).ravel().tolist()]
-        except Exception as exc:
-            _record_error(f"pred entry y_hat not numeric: {exc}", sample=y_hat)
-            continue
+            pred_y_hat = [float(v) for v in np.asarray(pred_value, dtype=float).ravel().tolist()]
+        except Exception:
+            pred_y_hat = None
+        try:
+            pred_value_json = json.dumps(pred_value, ensure_ascii=True)
+        except Exception:
+            pred_value_json = repr(pred_value)
 
         metrics = _coerce_mapping(entry_map.get("metrics") or {})
         selection = _coerce_mapping(entry_map.get("selection") or {})
@@ -393,7 +409,9 @@ def _parse_pred_hist_cell(
                 "as_of_round": round_int,
                 "run_id": str(run_id),
                 "pred_ts": entry_map.get("ts", entry_map.get("timestamp")),
-                "pred_y_hat": y_hat_list,
+                "pred_y_hat": pred_y_hat,
+                "pred_y_value": pred_value_json,
+                "pred_y_dtype": str(pred_dtype) if pred_dtype is not None else None,
                 "pred_score": score_val,
                 "pred_logic_fidelity": metrics.get("logic_fidelity") if metrics else None,
                 "pred_effect_scaled": metrics.get("effect_scaled") if metrics else None,
@@ -416,6 +434,8 @@ def _empty_pred_df() -> pl.DataFrame:
             "run_id": pl.Utf8,
             "pred_ts": pl.Utf8,
             "pred_y_hat": pl.Object,
+            "pred_y_value": pl.Utf8,
+            "pred_y_dtype": pl.Utf8,
             "pred_score": pl.Float64,
             "pred_logic_fidelity": pl.Float64,
             "pred_effect_scaled": pl.Float64,
@@ -516,7 +536,14 @@ def build_pred_events(
     if not rows:
         return PredEvents(df=_empty_pred_df(), diag=diag)
 
-    df_out = pl.DataFrame(rows).with_columns(
+    df_out = pl.DataFrame(
+        rows,
+        schema_overrides={
+            "pred_y_hat": pl.Object,
+            "pred_y_value": pl.Utf8,
+            "pred_y_dtype": pl.Utf8,
+        },
+    ).with_columns(
         pl.col("pred_score").cast(pl.Float64),
         pl.col("pred_logic_fidelity").cast(pl.Float64),
         pl.col("pred_effect_scaled").cast(pl.Float64),

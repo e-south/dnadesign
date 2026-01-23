@@ -1,3 +1,5 @@
+# ABOUTME: Resolves canonical campaign workspace paths and output locations.
+# ABOUTME: Centralizes layout for outputs, ledgers, and per-round artifacts.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -48,20 +50,24 @@ class CampaignWorkspace:
     # --- Ledger sinks ---
     @property
     def ledger_dir(self) -> Path:
-        return self.outputs_dir
+        return self.outputs_dir / "ledger"
 
     @property
     def ledger_predictions_dir(self) -> Path:
-        return self.outputs_dir / "ledger.predictions"
+        return self.ledger_dir / "predictions"
 
     @property
     def ledger_runs_path(self) -> Path:
-        return self.outputs_dir / "ledger.runs.parquet"
+        return self.ledger_dir / "runs.parquet"
 
     @property
     def ledger_labels_path(self) -> Path:
-        return self.outputs_dir / "ledger.labels.parquet"
+        return self.ledger_dir / "labels.parquet"
 
     # --- Per-round ---
+    @property
+    def rounds_dir(self) -> Path:
+        return self.outputs_dir / "rounds"
+
     def round_dir(self, round_index: int) -> Path:
-        return self.outputs_dir / f"round_{int(round_index)}"
+        return self.rounds_dir / f"round_{int(round_index)}"

@@ -1,3 +1,5 @@
+# ABOUTME: Provides analysis-layer helpers for reading campaign outputs and ledgers.
+# ABOUTME: Resolves run/round selectors and joins predictions with objective metadata.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -210,16 +212,19 @@ def _selected_rounds(
 
 def _resolve_round_for_run_id(run_id: str, runs_df: pl.DataFrame) -> int:
     if runs_df.is_empty():
-        raise OpalError("ledger.runs is empty; cannot resolve run_id.", ExitCodes.BAD_ARGS)
+        raise OpalError("outputs/ledger/runs.parquet is empty; cannot resolve run_id.", ExitCodes.BAD_ARGS)
     if "run_id" not in runs_df.columns or "as_of_round" not in runs_df.columns:
-        raise OpalError("ledger.runs missing required columns (run_id, as_of_round).", ExitCodes.BAD_ARGS)
+        raise OpalError(
+            "outputs/ledger/runs.parquet missing required columns (run_id, as_of_round).",
+            ExitCodes.BAD_ARGS,
+        )
     df = runs_df.filter(pl.col("run_id") == str(run_id)).select(pl.col("as_of_round").drop_nulls().unique())
     if df.is_empty():
-        raise OpalError(f"run_id {run_id!r} not found in ledger.runs.", ExitCodes.BAD_ARGS)
+        raise OpalError(f"run_id {run_id!r} not found in outputs/ledger/runs.parquet.", ExitCodes.BAD_ARGS)
     rounds = sorted({int(x) for x in df.to_series().to_list()})
     if len(rounds) > 1:
         raise OpalError(
-            f"run_id {run_id!r} appears in multiple rounds {rounds}; ledger.runs is inconsistent.",
+            f"run_id {run_id!r} appears in multiple rounds {rounds}; outputs/ledger/runs.parquet is inconsistent.",
             ExitCodes.CONTRACT_VIOLATION,
         )
     return rounds[0]
@@ -236,8 +241,9 @@ def _require_run_id_if_ambiguous(
         return
     if runs_df is None or runs_df.is_empty():
         raise OpalError(
-            "Run ID is required to disambiguate ledger predictions, but ledger.runs is missing or empty. "
-            "Provide run_id explicitly (e.g., --run-id) or generate ledger runs first.",
+            "Run ID is required to disambiguate ledger predictions, but "
+            "outputs/ledger/runs.parquet is missing or empty. Provide run_id "
+            "explicitly (e.g., --run-id) or generate ledger runs first.",
             ExitCodes.BAD_ARGS,
         )
     rounds = _selected_rounds(round_selector, runs_df)
@@ -249,7 +255,7 @@ def _require_run_id_if_ambiguous(
     df = runs_df.filter(pl.col("as_of_round").is_in(rounds))
     if df.is_empty():
         raise OpalError(
-            f"No runs found in ledger.runs for selected rounds {rounds}.",
+            f"No runs found in outputs/ledger/runs.parquet for selected rounds {rounds}.",
             ExitCodes.BAD_ARGS,
         )
     counts = df.group_by("as_of_round").agg(pl.col("run_id").n_unique().alias("n_runs"))
@@ -278,8 +284,8 @@ def read_predictions(
     if run_id is not None:
         if runs_df is None or runs_df.is_empty():
             raise OpalError(
-                "run_id was provided but ledger.runs context is missing or empty. "
-                "Pass runs_df (ledger.runs) or call CampaignAnalysis.read_predictions "
+                "run_id was provided but outputs/ledger/runs.parquet is missing or empty. "
+                "Pass runs_df (outputs/ledger/runs.parquet) or call CampaignAnalysis.read_predictions "
                 "so OPAL can resolve run_id → as_of_round. "
                 "Use `opal runs list` or `opal status --with-ledger` to find valid run_id values.",
                 ExitCodes.BAD_ARGS,
@@ -310,7 +316,7 @@ def read_predictions(
         missing = [c for c in want if c not in schema_cols]
         if missing and not allow_missing:
             raise OpalError(
-                f"ledger.predictions is missing columns: {sorted(missing)}",
+                f"outputs/ledger/predictions is missing columns: {sorted(missing)}",
                 ExitCodes.CONTRACT_VIOLATION,
             )
         if allow_missing:
@@ -331,11 +337,11 @@ def load_predictions_with_setpoint(
     require_run_id: bool = True,
 ) -> pl.DataFrame:
     """
-    Read predictions (ledger.predictions) and join setpoint from ledger.runs.
+    Read predictions (outputs/ledger/predictions) and join setpoint from outputs/ledger/runs.parquet.
     Returns a polars DataFrame with an added obj__diag__setpoint column.
     """
-    pred_dir = outputs_dir / "ledger.predictions"
-    runs_path = outputs_dir / "ledger.runs.parquet"
+    pred_dir = outputs_dir / "ledger" / "predictions"
+    runs_path = outputs_dir / "ledger" / "runs.parquet"
     runs_df = read_runs(runs_path)
 
     want = set(map(str, base_columns)) | {"run_id"}
@@ -348,7 +354,7 @@ def load_predictions_with_setpoint(
         require_run_id=require_run_id,
     )
     if df.is_empty():
-        raise OpalError("ledger.predictions had zero rows after projection.", ExitCodes.BAD_ARGS)
+        raise OpalError("outputs/ledger/predictions had zero rows after projection.", ExitCodes.BAD_ARGS)
 
     def _extract_setpoint(obj) -> Optional[List[float]]:
         vec = (obj or {}).get("setpoint_vector")
@@ -366,7 +372,7 @@ def load_predictions_with_setpoint(
 
     if "objective__params" not in runs_df.columns:
         raise OpalError(
-            "ledger.runs is missing objective__params (cannot resolve setpoints).",
+            "outputs/ledger/runs.parquet is missing objective__params (cannot resolve setpoints).",
             ExitCodes.BAD_ARGS,
         )
 

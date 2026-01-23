@@ -1,3 +1,5 @@
+# ABOUTME: Registers and installs OPAL CLI commands and command groups.
+# ABOUTME: Supports hidden commands and deferred import error handling.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -24,26 +26,27 @@ class CommandSpec:
     help: str
     callback: Callable[..., None] | typer.Typer
     is_group: bool = False
+    hidden: bool = False
 
 
 _CLI_REGISTRY: Dict[str, CommandSpec] = {}
 
 
-def cli_command(name: str, help: str):
+def cli_command(name: str, help: str, *, hidden: bool = False):
     def _wrap(func: Callable[..., None]) -> Callable[..., None]:
         if name in _CLI_REGISTRY:
             raise RuntimeError(f"CLI command '{name}' already registered")
-        _CLI_REGISTRY[name] = CommandSpec(name=name, help=help, callback=func, is_group=False)
+        _CLI_REGISTRY[name] = CommandSpec(name=name, help=help, callback=func, is_group=False, hidden=hidden)
         return func
 
     return _wrap
 
 
-def cli_group(name: str, help: str):
+def cli_group(name: str, help: str, *, hidden: bool = False):
     def _wrap(app: typer.Typer) -> typer.Typer:
         if name in _CLI_REGISTRY:
             raise RuntimeError(f"CLI command '{name}' already registered")
-        _CLI_REGISTRY[name] = CommandSpec(name=name, help=help, callback=app, is_group=True)
+        _CLI_REGISTRY[name] = CommandSpec(name=name, help=help, callback=app, is_group=True, hidden=hidden)
         return app
 
     return _wrap
@@ -52,9 +55,9 @@ def cli_group(name: str, help: str):
 def install_registered_commands(app: typer.Typer) -> None:
     for spec in _CLI_REGISTRY.values():
         if spec.is_group:
-            app.add_typer(spec.callback, name=spec.name, help=spec.help)
+            app.add_typer(spec.callback, name=spec.name, help=spec.help, hidden=spec.hidden)
         else:
-            app.command(name=spec.name, help=spec.help)(spec.callback)
+            app.command(name=spec.name, help=spec.help, hidden=spec.hidden)(spec.callback)
 
 
 def discover_commands(package: str = "dnadesign.opal.src.cli.commands") -> None:

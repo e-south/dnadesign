@@ -1,3 +1,5 @@
+# ABOUTME: Tests model-show CLI behavior for resolving round artifacts.
+# ABOUTME: Ensures model paths are discovered under round directories.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -23,7 +25,7 @@ from dnadesign.opal.tests._cli_helpers import (
 
 
 def test_model_show_with_model_meta(tmp_path):
-    round_dir = tmp_path / "outputs" / "round_0"
+    round_dir = tmp_path / "outputs" / "rounds" / "round_0"
     round_dir.mkdir(parents=True, exist_ok=True)
     model_path = round_dir / "model.joblib"
 
@@ -60,7 +62,7 @@ def test_model_show_round_latest(tmp_path: Path) -> None:
         records_path=records,
     )
 
-    round_dir = workdir / "outputs" / "round_0"
+    round_dir = workdir / "outputs" / "rounds" / "round_0"
     round_dir.mkdir(parents=True, exist_ok=True)
     model_path = round_dir / "model.joblib"
     model = get_model("random_forest", {"n_estimators": 5, "random_state": 0, "oob_score": False})
