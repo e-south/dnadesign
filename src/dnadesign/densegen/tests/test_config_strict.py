@@ -33,7 +33,7 @@ MIN_CONFIG = {
             "quota": 1,
             "plan": [{"name": "default", "quota": 1}],
         },
-        "solver": {"backend": "CBC", "strategy": "iterate", "options": []},
+        "solver": {"backend": "CBC", "strategy": "iterate", "strands": "double"},
         "logging": {"log_dir": "outputs/logs"},
     }
 }
@@ -93,6 +93,57 @@ def test_pad_config_accepts(tmp_path: Path) -> None:
     }
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     load_config(cfg_path)
+
+
+def test_pad_mode_off_accepts_yaml_boolean(tmp_path: Path) -> None:
+    cfg_text = """
+    densegen:
+      schema_version: "2.5"
+      run:
+        id: demo
+        root: "."
+      inputs:
+        - name: demo
+          type: binding_sites
+          path: inputs.csv
+      output:
+        targets: [parquet]
+        schema:
+          bio_type: dna
+          alphabet: dna_4
+        parquet:
+          path: outputs/tables/dense_arrays.parquet
+          deduplicate: true
+          chunk_size: 128
+      generation:
+        sequence_length: 10
+        quota: 1
+        plan:
+          - name: default
+            quota: 1
+      solver:
+        backend: CBC
+        strategy: iterate
+      postprocess:
+        pad:
+          mode: off
+          end: 5prime
+          gc:
+            mode: off
+            min: 0.4
+            max: 0.6
+            target: 0.5
+            tolerance: 0.1
+            min_pad_length: 0
+          max_tries: 2000
+      logging:
+        log_dir: outputs/logs
+    """
+    cfg_path = tmp_path / "cfg.yaml"
+    cfg_path.write_text(cfg_text.strip())
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.postprocess.pad.mode == "off"
+    assert loaded.root.densegen.postprocess.pad.gc.mode == "off"
 
 
 def test_plan_mixing_quota_and_fraction(tmp_path: Path) -> None:
@@ -180,20 +231,70 @@ def test_output_kind_is_rejected(tmp_path: Path) -> None:
         load_config(cfg_path)
 
 
-def test_solver_options_unknown_rejected(tmp_path: Path) -> None:
+def test_solver_options_removed(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
-    cfg["densegen"]["solver"]["options"] = ["UnknownOpt=1"]
+    cfg["densegen"]["solver"]["options"] = ["TimeLimit=5"]
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
-    with pytest.raises(ConfigError, match="Unknown solver.options"):
+    with pytest.raises(ConfigError, match="solver.options"):
         load_config(cfg_path)
 
 
-def test_solver_options_allow_unknown(tmp_path: Path) -> None:
+def test_solver_allow_unknown_options_removed(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
-    cfg["densegen"]["solver"]["options"] = ["UnknownOpt=1"]
     cfg["densegen"]["solver"]["allow_unknown_options"] = True
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
-    load_config(cfg_path)
+    with pytest.raises(ConfigError, match="solver.allow_unknown_options"):
+        load_config(cfg_path)
+
+
+def test_solver_controls_accepts_threads_and_time_limit(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["solver"]["backend"] = "GUROBI"
+    cfg["densegen"]["solver"]["time_limit_seconds"] = 5
+    cfg["densegen"]["solver"]["threads"] = 2
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.solver.time_limit_seconds == 5
+    assert loaded.root.densegen.solver.threads == 2
+
+
+def test_solver_controls_rejected_for_approximate(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["solver"]["strategy"] = "approximate"
+    cfg["densegen"]["solver"]["backend"] = None
+    cfg["densegen"]["solver"]["time_limit_seconds"] = 5
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="approximate"):
+        load_config(cfg_path)
+
+
+def test_solver_threads_rejected_for_cbc(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["solver"]["threads"] = 2
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="threads.*CBC"):
+        load_config(cfg_path)
+
+
+def test_pad_gc_default_min_pad_length_zero(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["postprocess"] = {
+        "pad": {
+            "mode": "adaptive",
+            "end": "5prime",
+            "gc": {
+                "mode": "range",
+                "min": 0.4,
+                "max": 0.6,
+                "target": 0.5,
+                "tolerance": 0.1,
+            },
+            "max_tries": 2000,
+        }
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.postprocess.pad.gc.min_pad_length == 0
 
 
 def test_promoter_constraint_motif_validation(tmp_path: Path) -> None:
@@ -265,9 +366,9 @@ def test_side_biases_overlap_rejected(tmp_path: Path) -> None:
         load_config(cfg_path)
 
 
-def test_solver_strategy_approximate_requires_no_options(tmp_path: Path) -> None:
+def test_solver_strategy_approximate_rejects_threads(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
-    cfg["densegen"]["solver"] = {"backend": "CBC", "strategy": "approximate", "options": ["Threads=2"]}
+    cfg["densegen"]["solver"] = {"backend": "CBC", "strategy": "approximate", "threads": 2}
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     with pytest.raises(ConfigError):
         load_config(cfg_path)
@@ -275,7 +376,7 @@ def test_solver_strategy_approximate_requires_no_options(tmp_path: Path) -> None
 
 def test_solver_backend_optional_for_approximate(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
-    cfg["densegen"]["solver"] = {"strategy": "approximate", "options": []}
+    cfg["densegen"]["solver"] = {"strategy": "approximate"}
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     load_config(cfg_path)
 

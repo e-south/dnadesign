@@ -29,7 +29,7 @@ plan:
       promoter_constraints:
         - upstream: "TTGACA"
           downstream: "TATAAT"
-          spacer_length: [16, 18]
+          spacer_length: [15, 19]
 ```
 Note: `generation.sequence_length` must be at least as long as the widest motif in the library or fixed elements; DenseGen fails fast if a motif cannot fit.
 
@@ -71,7 +71,7 @@ DenseGen exposes dense-arrays solution modes via `solver.strategy`:
 - `iterate` - yield solutions in descending score.
 - `diverse` - yield solutions with diversity-biased ordering.
 - `optimal` - only the best solution per library.
-- `approximate` - heuristic solution per library (no solver options; backend optional).
+- `approximate` - heuristic solution per library (no solver backend required).
 - `strands` - `single | double` (default: `double`).
 
 DenseGen fails fast if the requested solver backend is unavailable; use `dense validate-config --probe-solver` or `dense inspect config --probe-solver` to check availability before long runs.
@@ -80,12 +80,10 @@ DenseGen fails fast if the requested solver backend is unavailable; use `dense v
 solver:
   backend: CBC
   strategy: diverse
-  options: ["Threads=8", "TimeLimit=10"]
+  time_limit_seconds: 10
   strands: double
-  allow_unknown_options: false
 ```
-
-DenseGen validates solver option keys for known backends and fails fast on unknown options. If you need to pass custom solver flags, set `solver.allow_unknown_options: true` explicitly.
+DenseGen fails fast if the solver cannot apply requested time limits or thread counts (CBC does not support threads).
 
 ---
 

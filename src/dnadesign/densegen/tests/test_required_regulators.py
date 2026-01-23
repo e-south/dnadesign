@@ -50,14 +50,14 @@ class _DummyAdapter:
         sequence_length,
         solver,
         strategy,
-        solver_options,
         fixed_elements,
         strands="double",
         regulator_by_index=None,
         required_regulators=None,
         min_count_by_regulator=None,
         min_required_regulators=None,
-        solve_timeout_seconds=None,
+        solver_time_limit_seconds=None,
+        solver_threads=None,
     ):
         opt = _DummyOpt()
         sol1 = _DummySol(sequence="AAA", library=library, used_indices=[0])
@@ -113,7 +113,7 @@ def test_required_regulators_filtering(tmp_path: Path) -> None:
                     }
                 ],
             },
-            "solver": {"backend": "CBC", "strategy": "iterate", "options": []},
+            "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {
                 "round_robin": False,
                 "arrays_generated_before_resample": 10,
@@ -191,7 +191,7 @@ def test_required_regulators_k_of_n(tmp_path: Path) -> None:
                     }
                 ],
             },
-            "solver": {"backend": "CBC", "strategy": "iterate", "options": []},
+            "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {
                 "round_robin": False,
                 "arrays_generated_before_resample": 10,

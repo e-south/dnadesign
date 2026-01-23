@@ -26,7 +26,7 @@ postprocess:
       max: 0.60
       target: 0.50
       tolerance: 0.10
-      min_pad_length: 4
+      min_pad_length: 0
     max_tries: 2000
 ```
 

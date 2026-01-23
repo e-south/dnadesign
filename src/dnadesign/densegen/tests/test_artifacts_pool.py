@@ -38,7 +38,7 @@ def test_build_pool_artifact_binding_sites(tmp_path: Path) -> None:
                         "quota": 1,
                         "plan": [{"name": "default", "quota": 1}],
                     },
-                    "solver": {"backend": "CBC", "strategy": "iterate", "options": []},
+                    "solver": {"backend": "CBC", "strategy": "iterate"},
                     "runtime": {
                         "round_robin": False,
                         "arrays_generated_before_resample": 10,

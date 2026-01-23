@@ -40,7 +40,18 @@ META_FIELDS: list[MetaField] = [
     MetaField("policy_solver", (str,), "Solver policy label (strategy name)."),
     MetaField("solver_backend", (str,), "Solver backend name (null when approximate).", allow_none=True),
     MetaField("solver_strategy", (str,), "Solver strategy used."),
-    MetaField("solver_options", (list,), "Solver options list."),
+    MetaField(
+        "solver_time_limit_seconds",
+        (numbers.Real,),
+        "Solver time limit in seconds.",
+        allow_none=True,
+    ),
+    MetaField(
+        "solver_threads",
+        (int,),
+        "Solver thread count.",
+        allow_none=True,
+    ),
     MetaField("solver_strands", (str,), "Solver strands mode (single|double)."),
     MetaField("dense_arrays_version", (str,), "dense-arrays package version.", allow_none=True),
     MetaField("dense_arrays_version_source", (str,), "dense-arrays version source (installed|lock|pyproject|unknown)."),
@@ -190,7 +201,6 @@ def validate_metadata(meta: Mapping[str, Any]) -> None:
 
 def _validate_list_fields(meta: Mapping[str, Any]) -> None:
     list_of_str = {
-        "solver_options",
         "tf_list",
         "tfbs_parts",
         "used_tfbs",

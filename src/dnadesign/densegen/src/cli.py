@@ -1441,9 +1441,11 @@ def inspect_config(
             outputs.add_row(target, "-")
     console.print(outputs)
 
-    solver = Table("backend", "strategy", "options", "strands")
+    solver = Table("backend", "strategy", "time_limit_s", "threads", "strands")
     backend_display = str(cfg.solver.backend) if cfg.solver.backend is not None else "-"
-    solver.add_row(backend_display, str(cfg.solver.strategy), str(len(cfg.solver.options)), str(cfg.solver.strands))
+    time_limit = "-" if cfg.solver.time_limit_seconds is None else str(cfg.solver.time_limit_seconds)
+    threads = "-" if cfg.solver.threads is None else str(cfg.solver.threads)
+    solver.add_row(backend_display, str(cfg.solver.strategy), time_limit, threads, str(cfg.solver.strands))
     console.print(solver)
 
     sampling = cfg.generation.sampling
@@ -1625,6 +1627,24 @@ def stage_a_build_pool(
                 bin_table.add_row(str(bin_id), range_label, str(int(count)))
             console.print(f"[bold]FIMO p-value bins for {pool.name}[/]")
             console.print(bin_table)
+
+    length_table = Table("input", "count", "min_len", "median_len", "max_len")
+    for pool in pool_data.values():
+        if pool.df is None or "tfbs" not in pool.df.columns:
+            continue
+        lengths = pool.df["tfbs"].astype(str).str.len()
+        if lengths.empty:
+            continue
+        length_table.add_row(
+            str(pool.name),
+            str(int(lengths.count())),
+            str(int(lengths.min())),
+            f"{float(lengths.median()):.1f}",
+            str(int(lengths.max())),
+        )
+    if length_table.row_count:
+        console.print("[bold]TFBS length summary[/]")
+        console.print(length_table)
 
     table = Table("input", "type", "rows", "pool_file")
     for entry in artifact.inputs.values():

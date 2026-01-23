@@ -45,31 +45,6 @@ _StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _c
 LATEST_SCHEMA_VERSION = "2.5"
 SUPPORTED_SCHEMA_VERSIONS = {LATEST_SCHEMA_VERSION}
 
-KNOWN_SOLVER_OPTION_KEYS = {
-    "CBC": {
-        "threads",
-        "timelimit",
-        "timelimitseconds",
-        "maxseconds",
-        "seconds",
-        "ratiogap",
-        "mipgap",
-        "seed",
-        "randomseed",
-        "loglevel",
-    },
-    "GUROBI": {
-        "threads",
-        "timelimit",
-        "mipgap",
-        "seed",
-        "logtoconsole",
-        "logfile",
-        "method",
-        "presolve",
-    },
-}
-
 
 class ConfigError(ValueError):
     pass
@@ -947,9 +922,9 @@ class SolverConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     backend: Optional[str] = None
     strategy: Literal["iterate", "diverse", "optimal", "approximate"]
-    options: List[str] = Field(default_factory=list)
     strands: Literal["single", "double"] = "double"
-    allow_unknown_options: bool = False
+    time_limit_seconds: float | None = None
+    threads: int | None = None
 
     @field_validator("backend")
     @classmethod
@@ -960,38 +935,36 @@ class SolverConfig(BaseModel):
             raise ValueError("solver.backend must be a non-empty string")
         return v
 
+    @field_validator("time_limit_seconds")
+    @classmethod
+    def _time_limit_ok(cls, v: float | None):
+        if v is None:
+            return v
+        value = float(v)
+        if value <= 0:
+            raise ValueError("solver.time_limit_seconds must be > 0")
+        return value
+
+    @field_validator("threads")
+    @classmethod
+    def _threads_ok(cls, v: int | None):
+        if v is None:
+            return v
+        value = int(v)
+        if value <= 0:
+            raise ValueError("solver.threads must be > 0")
+        return value
+
     @model_validator(mode="after")
     def _strategy_backend_consistency(self):
         if self.strategy != "approximate" and not self.backend:
             raise ValueError("solver.backend is required unless strategy=approximate")
-        if self.strategy == "approximate" and self.options:
-            raise ValueError("solver.options must be empty when strategy=approximate")
-        if self.options:
-            cleaned: list[str] = []
-            for opt in self.options:
-                if not isinstance(opt, str) or not opt.strip():
-                    raise ValueError("solver.options entries must be non-empty strings")
-                cleaned.append(opt.strip())
-            self.options = cleaned
-            if not self.allow_unknown_options:
-                backend = (self.backend or "").strip().upper()
-                allowed = KNOWN_SOLVER_OPTION_KEYS.get(backend)
-                if allowed is None:
-                    raise ValueError(
-                        f"solver.options provided but backend '{backend}' has no known option list. "
-                        "Set solver.allow_unknown_options: true to bypass validation."
-                    )
-                unknown: list[str] = []
-                for opt in self.options:
-                    key = opt.split("=", 1)[0].split()[0].strip().lower()
-                    if key not in allowed:
-                        unknown.append(opt)
-                if unknown:
-                    preview = ", ".join(unknown[:5])
-                    raise ValueError(
-                        f"Unknown solver.options for backend '{backend}': {preview}. "
-                        "Set solver.allow_unknown_options: true to bypass validation."
-                    )
+        if self.strategy == "approximate" and (self.time_limit_seconds is not None or self.threads is not None):
+            raise ValueError("solver.time_limit_seconds/threads are invalid when strategy=approximate")
+        if self.threads is not None and self.backend:
+            backend = str(self.backend).strip().upper()
+            if backend == "CBC":
+                raise ValueError("solver.threads is not supported for CBC backends.")
         return self
 
 
@@ -1047,7 +1020,7 @@ class PadGcConfig(BaseModel):
     max: float = 0.60
     target: float = 0.50
     tolerance: float = 0.10
-    min_pad_length: int = 4
+    min_pad_length: int = 0
 
     @field_validator("min", "max", "target", "tolerance")
     @classmethod
@@ -1055,6 +1028,15 @@ class PadGcConfig(BaseModel):
         if not (0.0 <= float(v) <= 1.0):
             raise ValueError(f"{info.field_name} must be between 0 and 1")
         return float(v)
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def _coerce_mode(cls, v):
+        if isinstance(v, bool):
+            if v is False:
+                return "off"
+            raise ValueError("pad.gc.mode must be one of: off, range, target")
+        return v
 
     @field_validator("min_pad_length")
     @classmethod
@@ -1088,6 +1070,15 @@ class PadConfig(BaseModel):
         if int(v) <= 0:
             raise ValueError("max_tries must be > 0")
         return int(v)
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def _coerce_mode(cls, v):
+        if isinstance(v, bool):
+            if v is False:
+                return "off"
+            raise ValueError("pad.mode must be one of: off, strict, adaptive")
+        return v
 
 
 class PostprocessConfig(BaseModel):
@@ -1253,9 +1244,25 @@ def _validate_run_scoped_paths(cfg_path: Path, root_cfg: RootConfig) -> None:
         )
 
 
+def _reject_removed_solver_options(raw: object) -> None:
+    if not isinstance(raw, dict):
+        return
+    densegen = raw.get("densegen")
+    if not isinstance(densegen, dict):
+        return
+    solver = densegen.get("solver")
+    if not isinstance(solver, dict):
+        return
+    if "options" in solver:
+        raise ConfigError("solver.options has been removed. Use solver.time_limit_seconds or solver.threads instead.")
+    if "allow_unknown_options" in solver:
+        raise ConfigError("solver.allow_unknown_options has been removed.")
+
+
 def load_config(path: Path | str) -> LoadedConfig:
     cfg_path = Path(path).resolve()
     raw = yaml.load(cfg_path.read_text(), Loader=_StrictLoader)
+    _reject_removed_solver_options(raw)
     try:
         root = RootConfig.model_validate(raw)
     except ValidationError as e:

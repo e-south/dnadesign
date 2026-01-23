@@ -53,14 +53,14 @@ class _DummyAdapter:
         sequence_length,
         solver,
         strategy,
-        solver_options,
         fixed_elements,
         strands="double",
         regulator_by_index=None,
         required_regulators=None,
         min_count_by_regulator=None,
         min_required_regulators=None,
-        solve_timeout_seconds=None,
+        solver_time_limit_seconds=None,
+        solver_threads=None,
     ):
         opt = _DummyOpt()
         seqs = ["AAA", "CCC", "GGG", "TTT", "AAC", "CCA"]
@@ -116,7 +116,7 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
                 },
                 "plan": [{"name": "default", "quota": 5}],
             },
-            "solver": {"backend": "CBC", "strategy": "iterate", "options": []},
+            "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {
                 "round_robin": True,
                 "arrays_generated_before_resample": 2,
@@ -219,7 +219,7 @@ def test_stall_detected_with_no_solutions(monkeypatch: pytest.MonkeyPatch, tmp_p
                 },
                 "plan": [{"name": "default", "quota": 1}],
             },
-            "solver": {"backend": "CBC", "strategy": "iterate", "options": []},
+            "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {
                 "round_robin": False,
                 "arrays_generated_before_resample": 1,
@@ -253,14 +253,14 @@ def test_stall_detected_with_no_solutions(monkeypatch: pytest.MonkeyPatch, tmp_p
             sequence_length,
             solver,
             strategy,
-            solver_options,
             fixed_elements,
             strands="double",
             regulator_by_index=None,
             required_regulators=None,
             min_count_by_regulator=None,
             min_required_regulators=None,
-            solve_timeout_seconds=None,
+            solver_time_limit_seconds=None,
+            solver_threads=None,
         ):
             opt = _DummyOpt()
 
