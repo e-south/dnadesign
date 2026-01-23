@@ -1,3 +1,5 @@
+# ABOUTME: Runs model prediction flows with optional Y-ops inversion and validation.
+# ABOUTME: Emits prediction DataFrames suitable for ledger/parquet export.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -173,30 +175,35 @@ def run_predict_ephemeral(
         require_ctx_if_yops=not assume_no_yops,
         y_ops_declared=y_ops_declared,
     )
+    try:
+        yhat_arr = np.asarray(yhat, dtype=float)
+    except Exception as e:
+        raise OpalError(f"Predicted Y could not be coerced to a numeric array: {e}") from e
+    if yhat_arr.ndim not in (1, 2):
+        raise OpalError(f"Predicted Y has unexpected ndim={yhat_arr.ndim}.")
     meta_y_dim = meta.get("y_dim") if meta is not None else None
     if meta_y_dim is not None:
         try:
             meta_y_dim = int(meta_y_dim)
         except Exception as e:
             raise OpalError(f"model_meta.json has non-integer y_dim: {meta_y_dim}") from e
-        yhat_arr = np.asarray(yhat)
         if yhat_arr.ndim == 1:
             pred_dim = 1
-        elif yhat_arr.ndim == 2:
-            pred_dim = int(yhat_arr.shape[1])
         else:
-            raise OpalError(f"Predicted Y has unexpected ndim={yhat_arr.ndim}.")
+            pred_dim = int(yhat_arr.shape[1])
         if pred_dim != meta_y_dim:
             raise OpalError(
                 f"Y dimension mismatch: model_meta.json expects y_dim={meta_y_dim}, but prediction produced {pred_dim}."
             )
 
     # normalize to list for dataframe export (list[float], parquet-friendly)
-    y_list = [list(map(float, row)) if yhat.ndim == 2 else [float(row)] for row in yhat]
+    y_list = [list(map(float, row)) if yhat_arr.ndim == 2 else [float(row)] for row in yhat_arr]
     out = pd.DataFrame({"id": id_order, "y_pred_vec": y_list})
     # add sequence
-    seq_map = (
-        df_work.set_index("id")[sequence_column].astype(str).to_dict() if sequence_column in df_work.columns else {}
-    )
-    out["sequence"] = [seq_map.get(i, "") for i in id_order]
+    if sequence_column in df_work.columns:
+        seq_series = df_work.set_index("id")[sequence_column]
+        seq_map = {str(_id): (None if pd.isna(seq) else str(seq)) for _id, seq in seq_series.items()}
+    else:
+        seq_map = {}
+    out["sequence"] = [seq_map.get(i) for i in id_order]
     return out[["id", "sequence", "y_pred_vec"]]
