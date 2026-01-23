@@ -371,6 +371,7 @@ def collect_report_data(
     cfg_path: Path,
     *,
     include_combinatorics: bool = False,
+    strict: bool = False,
 ) -> ReportBundle:
     run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
     outputs_root = run_outputs_root(run_root)
@@ -394,7 +395,10 @@ def collect_report_data(
     try:
         df, source_label = load_records_from_config(root_cfg, cfg_path, columns=cols)
     except Exception as exc:
-        warnings.append(f"No output records available; report will focus on Stage-A/Stage-B diagnostics. ({exc})")
+        message = f"No output records available; report will focus on Stage-A/Stage-B diagnostics. ({exc})"
+        if strict:
+            raise ValueError(message) from exc
+        warnings.append(message)
         df = pd.DataFrame(columns=cols)
         source_label = "missing"
     if df.empty:
@@ -403,24 +407,31 @@ def collect_report_data(
     used_df = _explode_used(df)
     attempts_path = tables_root / "attempts.parquet"
     if not attempts_path.exists():
-        warnings.append(
-            "outputs/tables/attempts.parquet is missing; library usage and resample summaries may be incomplete."
-        )
+        message = "outputs/tables/attempts.parquet is missing; library usage and resample summaries may be incomplete."
+        if strict:
+            raise ValueError(message)
+        warnings.append(message)
         attempts_df = pd.DataFrame()
     else:
         attempts_df = pd.read_parquet(attempts_path)
     library_df = _explode_library_from_attempts(attempts_df)
     solutions_path = tables_root / "solutions.parquet"
     if not solutions_path.exists():
-        warnings.append(
+        message = (
             "outputs/tables/solutions.parquet is missing; solution previews and composition summaries will be skipped."
         )
+        if strict:
+            raise ValueError(message)
+        warnings.append(message)
         solutions_df = pd.DataFrame()
     else:
         try:
             solutions_df = pd.read_parquet(solutions_path)
         except Exception as exc:
-            warnings.append(f"Failed to load solutions.parquet; skipping solution tables. ({exc})")
+            message = f"Failed to load solutions.parquet; skipping solution tables. ({exc})"
+            if strict:
+                raise ValueError(message) from exc
+            warnings.append(message)
             solutions_df = pd.DataFrame()
     tables: Dict[str, pd.DataFrame] = {}
     tables["solutions"] = solutions_df
@@ -971,12 +982,18 @@ def write_report(
     out_dir: str | Path = "outputs/report",
     include_combinatorics: bool = False,
     include_plots: bool = False,
+    strict: bool = False,
     formats: set[str] | None = None,
 ) -> ReportBundle:
     run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
     out_path = resolve_outputs_scoped_path(cfg_path, run_root, str(out_dir), label="report.out")
     out_path.mkdir(parents=True, exist_ok=True)
-    bundle = collect_report_data(root_cfg, cfg_path, include_combinatorics=include_combinatorics)
+    bundle = collect_report_data(
+        root_cfg,
+        cfg_path,
+        include_combinatorics=include_combinatorics,
+        strict=strict,
+    )
     composition = bundle.tables.get("composition")
     if composition is not None and not composition.empty:
         bundle.run_report["composition_rows"] = int(len(composition))

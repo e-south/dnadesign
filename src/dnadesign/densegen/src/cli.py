@@ -1267,6 +1267,12 @@ def report(
         "--plots",
         help="Include plot links in the report: none or include (requires outputs/plots/plot_manifest.json).",
     ),
+    strict: bool = typer.Option(
+        False,
+        "--strict",
+        "--fail-on-missing",
+        help="Fail if core report inputs are missing.",
+    ),
     format: str = typer.Option(
         "all",
         "--format",
@@ -1308,8 +1314,15 @@ def report(
     out_dir = _resolve_outputs_path_or_exit(cfg_path, run_root, out, label="report.out")
     try:
         with _suppress_pyarrow_sysctl_warnings():
-            write_report(loaded.root, cfg_path, out_dir=out_dir, include_plots=include_plots, formats=raw_formats)
-    except FileNotFoundError as exc:
+            write_report(
+                loaded.root,
+                cfg_path,
+                out_dir=out_dir,
+                include_plots=include_plots,
+                strict=strict,
+                formats=raw_formats,
+            )
+    except (FileNotFoundError, ValueError) as exc:
         console.print(f"[bold red]Report failed:[/] {exc}")
         entries = _list_dir_entries(run_root, limit=8)
         if entries:

@@ -141,6 +141,7 @@ DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solve
 
 `dense stage-a build-pool` appends new unique TFBS to existing pools by default; pass `--fresh`
 to rebuild pools from scratch.
+`pool_manifest.json` includes the input config hash plus file fingerprints; append requires they match.
 
 Stage‑B expects Stage‑A pools (default `outputs/pools`). These are optional inspection artifacts and are not required for a normal `dense run`.
 

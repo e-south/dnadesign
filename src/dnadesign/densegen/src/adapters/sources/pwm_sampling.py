@@ -81,11 +81,22 @@ def _write_candidate_records(
     if path.exists():
         try:
             existing = pd.read_parquet(path)
+            if "candidate_id" not in existing.columns or "candidate_id" not in df.columns:
+                raise ValueError(
+                    f"Candidate append requires candidate_id in {path}. "
+                    "Clear outputs/pools/candidates or use --fresh to reset."
+                )
+            if set(existing.columns) != set(df.columns):
+                raise ValueError(
+                    f"Candidate schema mismatch for {path}. Clear outputs/pools/candidates or use --fresh to reset."
+                )
+            df = df[existing.columns]
             df = pd.concat([existing, df], ignore_index=True)
-            if "candidate_id" in df.columns:
-                df = df.drop_duplicates(subset=["candidate_id"], keep="last")
-        except Exception:
-            raise RuntimeError(f"Failed to append candidate records to {path}")
+            df = df.drop_duplicates(subset=["candidate_id"], keep="last")
+        except Exception as exc:
+            if isinstance(exc, ValueError):
+                raise
+            raise RuntimeError(f"Failed to append candidate records to {path}") from exc
     df.to_parquet(path, index=False)
     return path
 
