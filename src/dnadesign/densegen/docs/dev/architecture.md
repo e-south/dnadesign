@@ -20,7 +20,7 @@ YAML config
   -> optimization (dense-arrays ILP)
   -> postprocess (pad, policies)
   -> outputs (tables + manifests)
-  -> plots (outputs/plots; report assets under outputs/report/assets)
+  -> plots (outputs/plots)
 ```
 
 ---

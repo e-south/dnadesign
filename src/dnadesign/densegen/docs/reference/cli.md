@@ -176,11 +176,11 @@ Options:
 - `--run` — run directory (defaults to config run root).
 - `--out` — output directory relative to run root (default: `outputs/report`; must be inside `outputs/`).
 - `--format` — `json`, `md`, `html`, or `all` (comma‑separated allowed).
+- `--plots` — `none` or `include` (default: `none`). When `include`, report links plots from
+  `outputs/plots/plot_manifest.json` (run `dense plot` first).
 
 Report outputs:
 - `report.json`, `report.md`, `report.html`
-- `assets/` (plots referenced by the HTML report)
-- `assets/composition.csv` (full composition table when available)
 
 ---
 

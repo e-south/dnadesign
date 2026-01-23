@@ -61,10 +61,9 @@ Optional targets (when enabled):
   - `candidates.parquet` + `candidates_summary.parquet` + `candidates_manifest.json` (aggregates)
 - `outputs/plots/` — plot images from `dense run` auto‑plotting or `dense plot`
   (format controlled by `plots.format`).
+- `outputs/plots/plot_manifest.json` — plot inventory used by reports when `--plots include` is set.
 - `outputs/report/` — audit report outputs:
   - `report.json`, `report.md`, `report.html`
-  - `assets/` (plots linked by the HTML report)
-  - `assets/composition.csv` (full composition table)
 
 ---
 
