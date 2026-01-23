@@ -331,6 +331,11 @@ class RecordsStore:
                         for col, (_, newv) in mismatches.items():
                             out.loc[out["id"].astype(str) == _id, col] = newv
                     continue
+                if seq_val is not None and seq_val in seq_to_id and seq_to_id[seq_val] != _id:
+                    raise OpalError(
+                        f"Sequence already exists for id={seq_to_id[seq_val]!r}; "
+                        f"cannot create new id={_id!r} for sequence={seq_val!r}."
+                    )
                 # new id → require sequence + essentials
                 if seq_val is None:
                     raise OpalError(
@@ -350,8 +355,14 @@ class RecordsStore:
             for seq in rows_no_id["sequence"].dropna().astype(str).tolist():
                 if seq not in seq_to_id:
                     csv_row = _csv_row_for(None, seq)
+                    new_id = self.deterministic_id_from_sequence(seq)
+                    if new_id in known_ids:
+                        raise OpalError(
+                            f"Deterministic id collision for sequence={seq!r}. "
+                            f"Generated id={new_id!r} already exists in records."
+                        )
                     new_row = {
-                        "id": self.deterministic_id_from_sequence(seq),
+                        "id": new_id,
                         "sequence": seq,
                     }
                     for c in required_cols:

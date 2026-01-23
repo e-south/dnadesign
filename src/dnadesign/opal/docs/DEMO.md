@@ -25,7 +25,8 @@ uv run opal validate -c configs/campaign.yaml
 
 # 2) Ingest round-0 labels
 uv run opal ingest-y -c configs/campaign.yaml --round 0 \
-  --csv inputs/r0/vec8-b0.xlsx
+  --csv inputs/r0/vec8-b0.xlsx \
+  --unknown-sequences drop
 
 # 3) Train, score, select (round 0)
 uv run opal run -c configs/campaign.yaml --round 0
@@ -53,11 +54,11 @@ uv run opal plot -c configs/campaign.yaml
 From the campaign root:
 
 ```bash
-# Remove OPAL-derived columns (including any prior label column) from records.parquet
-uv run opal prune-source -c configs/campaign.yaml --scope any --yes --no-backup
+# Preferred: reset campaign state + remove OPAL columns
+uv run opal campaign-reset -c configs/campaign.yaml --yes --no-backup
 
-# Clear generated artifacts/ledgers
-rm -rf outputs
+# Manual fallback (if you want to keep outputs/)
+uv run opal prune-source -c configs/campaign.yaml --scope any --yes --no-backup
 ```
 
 ---

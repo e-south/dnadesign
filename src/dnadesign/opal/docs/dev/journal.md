@@ -10,6 +10,8 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Decisions: outputs layout standardized to `outputs/ledger/` + `outputs/rounds/round_<k>/`.
 - Label history schema uses value wrappers `{value,dtype,schema?}` for y_obs/y_pred; y_pred accepts non-numeric JSON.
 - Demo reset command added (hidden from `--help`) to prune records.parquet, remove outputs/, and delete state.json.
+- Ingest-y hardened: `--unknown-sequences` handling, default inference for missing bio_type/alphabet, and guards for
+  duplicate sequences + deterministic id collisions.
 
 ### Campaign layout notes
 - Campaign root is the center of gravity; configs live in `configs/` and IO stays under the campaign root.

@@ -135,6 +135,13 @@ def run_ingest(
     # 2) Try to resolve ids by sequence (existing rows only; new rows remain without id for now)
     seq2id = {}
     if "sequence" in records_df.columns and "id" in records_df.columns:
+        if records_df["sequence"].duplicated().any():
+            if "id" not in labels.columns or labels["id"].isna().any():
+                dup = records_df["sequence"][records_df["sequence"].duplicated()].astype(str).unique().tolist()[:10]
+                raise OpalError(
+                    "records.parquet contains duplicate sequences; ingest-y requires id for all rows to disambiguate "
+                    f"(sample={dup})."
+                )
         seq2id = records_df.drop_duplicates(subset=["sequence"]).set_index("sequence")["id"].astype(str).to_dict()
     if "id" not in labels.columns:
         labels["id"] = labels["sequence"].map(seq2id)

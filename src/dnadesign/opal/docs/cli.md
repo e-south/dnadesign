@@ -62,6 +62,7 @@ Transform a tidy CSV/Parquet/XLSX to model-ready **Y**, preview, confirm, and ap
 ```bash
 opal ingest-y --config <yaml> --round <r> --csv <path> \
   [--transform <name>] [--params <transform_params.json>] \
+  [--unknown-sequences create|drop|error] [--infer-missing-required] \
   [--if-exists fail|skip|replace] [--yes]
 ```
 
@@ -72,6 +73,10 @@ opal ingest-y --config <yaml> --round <r> --csv <path> \
 * `--csv, --in`: CSV/Parquet/XLSX input (`.csv`, `.parquet`, `.pq`, or `.xlsx`).
 * `--transform`: Override YAML `transforms_y.name`.
 * `--params`: JSON file (.json) with transform params (overrides YAML `transforms_y.params`).
+* `--unknown-sequences`: How to handle sequences not found in records (default: `create`). Use `drop` to skip
+  unknown sequences when required columns are missing or when you want a strict in‑place update.
+* `--infer-missing-required`: Auto-fill missing required columns for new sequences (`bio_type`, `alphabet`)
+  using the most common values found in `records.parquet`.
 * `--if-exists`: Behavior if `(id, round)` already exists in label history (`fail`/`skip`/`replace`).
 * `--yes, -y`: Skip interactive prompt.
 
@@ -82,6 +87,11 @@ opal ingest-y --config <yaml> --round <r> --csv <path> \
 * **Preview is printed** (counts + sample) before any write.
 * Duplicate handling is controlled by `ingest.duplicate_policy` (error | keep_first | keep_last).
 * **New IDs** allowed if your CSV includes essentials: `sequence`, `bio_type`, `alphabet`, and the configured X column.
+* If new sequences are missing required columns, OPAL will prompt to infer defaults for `bio_type`/`alphabet`
+  (or use `--infer-missing-required` for non-interactive runs). For other missing columns, use
+  `--unknown-sequences drop` or provide the columns.
+* If `records.parquet` contains duplicate sequences, `ingest-y` requires an explicit `id` column for all rows
+  to avoid ambiguous sequence → id mapping.
 * If adding **new sequences** and X is list-valued, prefer **Parquet** input so the X column remains list-typed
   (CSV will coerce lists to strings).
 * Appends to `opal__<slug>__label_hist` and writes the current Y column.
