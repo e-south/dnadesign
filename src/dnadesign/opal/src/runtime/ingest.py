@@ -147,6 +147,10 @@ def run_ingest(
         seq2id = records_df.drop_duplicates(subset=["sequence"]).set_index("sequence")["id"].astype(str).to_dict()
     if "id" not in labels.columns:
         labels["id"] = labels["sequence"].map(seq2id)
+    elif "sequence" in labels.columns:
+        missing_ids = labels["id"].isna()
+        if missing_ids.any():
+            labels.loc[missing_ids, "id"] = labels.loc[missing_ids, "sequence"].map(seq2id)
 
     # 3) Duplicate handling (assertive, policy-driven)
     policy = str(duplicate_policy or "error").strip().lower()

@@ -173,21 +173,26 @@ def cmd_ingest_y(
         if unknown_sequences not in {"create", "drop", "error"}:
             raise OpalError("--unknown-sequences must be one of: create, drop, error.")
 
-        def _build_unknown_mask(frame: pd.DataFrame) -> pd.Series:
-            mask = pd.Series(False, index=frame.index)
-            if "id" in frame.columns:
-                id_series = frame["id"]
-                mask = id_series.isna()
-                if id_series.notna().any() and known_ids:
-                    mask |= ~id_series.astype(str).isin(known_ids)
-            return mask
-
-        # Identify unknown rows (ids not resolved to existing records)
+        # Identify unknown rows (ids or sequences not resolved to existing records)
         known_ids = set(df["id"].astype(str).tolist()) if "id" in df.columns else set()
-        if "id" in labels_df.columns:
-            id_missing_mask = labels_df["id"].isna()
-        else:
-            id_missing_mask = pd.Series(False, index=labels_df.index)
+        seq_to_id = {}
+        if "sequence" in df.columns and "id" in df.columns:
+            seq_to_id = (
+                df[["sequence", "id"]].dropna().astype(str).drop_duplicates().set_index("sequence")["id"].to_dict()
+            )
+        known_sequences = set(seq_to_id.keys())
+
+        def _build_unknown_mask(frame: pd.DataFrame) -> pd.Series:
+            id_known = pd.Series(False, index=frame.index)
+            if "id" in frame.columns and known_ids:
+                id_series = frame["id"]
+                id_known = id_series.notna() & id_series.astype(str).isin(known_ids)
+            seq_known = pd.Series(False, index=frame.index)
+            if "sequence" in frame.columns and known_sequences:
+                seq_series = frame["sequence"]
+                seq_known = seq_series.notna() & seq_series.astype(str).isin(known_sequences)
+            return ~(id_known | seq_known)
+
         unknown_mask = _build_unknown_mask(labels_df)
         unknown_count = int(unknown_mask.sum())
 
@@ -248,43 +253,81 @@ def cmd_ingest_y(
             if unknown_sequences in {"create", "drop"} and cfg.data.x_column_name in required_cols:
                 x_col = cfg.data.x_column_name
                 if x_col not in csv_df.columns:
-                    missing_x_mask = unknown_mask & id_missing_mask
+                    missing_x_mask = unknown_mask
                 elif len(csv_df) == len(labels_df):
                     missing_x_mask = csv_df[x_col].map(_is_missing_value)
-                    missing_x_mask = missing_x_mask.fillna(True) & unknown_mask & id_missing_mask
+                    missing_x_mask = missing_x_mask.fillna(True) & unknown_mask
                 else:
                     missing_x_mask = pd.Series(False, index=labels_df.index)
                 missing_x_count = int(missing_x_mask.sum())
                 if missing_x_count > 0:
                     labels_df = labels_df.loc[~missing_x_mask].copy()
                     dropped_missing_x = missing_x_count
-                    id_missing_mask = (
-                        labels_df["id"].isna() if "id" in labels_df.columns else pd.Series(False, index=labels_df.index)
-                    )
                     unknown_mask = _build_unknown_mask(labels_df)
                     unknown_count = int(unknown_mask.sum())
             if unknown_count == 0:
                 pass
-            elif unknown_sequences == "create" and missing_required:
-                missing_set = set(missing_required)
-                defaults = {}
-                if missing_set.issubset({"bio_type", "alphabet"}):
+            elif unknown_sequences == "create":
+                unknown_seqs: list[str] = []
+                if "sequence" in labels_df.columns:
+                    unknown_seqs = labels_df.loc[unknown_mask, "sequence"].dropna().astype(str).unique().tolist()
+
+                def _missing_required_values_for_unknown() -> list[str]:
+                    if not unknown_seqs:
+                        return []
+                    if "sequence" not in csv_df.columns:
+                        raise OpalError(
+                            "Input missing sequence column; cannot validate required metadata for new sequences."
+                        )
+                    csv_unknown_mask = csv_df["sequence"].astype(str).isin(unknown_seqs)
+                    missing_cols: list[str] = []
+                    for col in required_cols:
+                        if col == cfg.data.x_column_name:
+                            continue
+                        if col in csv_df.columns:
+                            missing_mask = csv_df[col].map(_is_missing_value).fillna(True) & csv_unknown_mask
+                            if missing_mask.any():
+                                missing_cols.append(col)
+                    return missing_cols
+
+                def _apply_defaults(defaults: dict[str, str]) -> None:
+                    if not defaults:
+                        return
+                    if not unknown_seqs:
+                        for col, val in defaults.items():
+                            if col not in csv_df.columns:
+                                csv_df[col] = val
+                        return
+                    if "sequence" not in csv_df.columns:
+                        raise OpalError("Input missing sequence column; cannot apply defaults for new sequences.")
+                    csv_unknown_mask = csv_df["sequence"].astype(str).isin(unknown_seqs)
+                    for col, val in defaults.items():
+                        if col not in csv_df.columns:
+                            csv_df[col] = val
+                            continue
+                        missing_mask = csv_df[col].map(_is_missing_value).fillna(True) & csv_unknown_mask
+                        if missing_mask.any():
+                            csv_df.loc[missing_mask, col] = val
+
+                missing_required_values = _missing_required_values_for_unknown()
+                missing_set = set(missing_required) | set(missing_required_values)
+                defaults: dict[str, str] = {}
+                if missing_set and missing_set.issubset({"bio_type", "alphabet"}):
                     if "bio_type" in missing_set:
                         defaults["bio_type"] = _infer_default(df.get("bio_type", pd.Series(dtype=object)))
                     if "alphabet" in missing_set:
                         defaults["alphabet"] = _infer_default(df.get("alphabet", pd.Series(dtype=object)))
                     if any(v is None for v in defaults.values()):
                         raise OpalError(
-                            "Missing required columns for new sequences, and defaults could not be inferred. "
+                            "Missing required metadata for new sequences, and defaults could not be inferred. "
                             "Provide the missing columns or use --unknown-sequences drop."
                         )
                     if infer_missing_required:
-                        for col, val in defaults.items():
-                            csv_df[col] = val
+                        _apply_defaults(defaults)
                     elif not yes:
                         prompt = (
-                            "Input missing required columns for new sequences: "
-                            f"{', '.join(missing_required)}. "
+                            "Input missing required metadata for new sequences: "
+                            f"{', '.join(sorted(missing_set))}. "
                             f"Inferred defaults: {defaults}. Fill and continue? (y/N): "
                         )
                         if not prompt_confirm(
@@ -296,19 +339,20 @@ def cmd_ingest_y(
                         ):
                             print_stdout("Aborted.")
                             return
-                        for col, val in defaults.items():
-                            csv_df[col] = val
+                        _apply_defaults(defaults)
                     else:
                         raise OpalError(
-                            "Missing required columns for new sequences. Re-run without --yes to confirm defaults "
+                            "Missing required metadata for new sequences. Re-run without --yes to confirm defaults "
                             "or pass --infer-missing-required."
                         )
                     missing_required = [c for c in required_cols if c not in csv_df.columns]
-                if missing_required:
+                    missing_required_values = _missing_required_values_for_unknown()
+                    missing_set = set(missing_required) | set(missing_required_values)
+                if missing_set:
                     if not yes:
                         prompt = (
-                            "Input missing required columns for new sequences: "
-                            f"{', '.join(missing_required)}. "
+                            "Input missing required columns/values for new sequences: "
+                            f"{', '.join(sorted(missing_set))}. "
                             "Drop unknown sequences and continue? (y/N): "
                         )
                         if prompt_confirm(
@@ -323,8 +367,8 @@ def cmd_ingest_y(
                             return
                     else:
                         raise OpalError(
-                            "Missing required columns for new sequences. "
-                            "Provide the columns or use --unknown-sequences drop."
+                            "Missing required columns/values for new sequences. "
+                            "Provide the columns/values or use --unknown-sequences drop."
                         )
 
             if unknown_sequences == "drop":
