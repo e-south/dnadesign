@@ -3,6 +3,7 @@ from __future__ import annotations
 import textwrap
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from dnadesign.densegen.src.cli import app
@@ -13,7 +14,7 @@ def _write_min_config(path: Path) -> None:
         textwrap.dedent(
             """
             densegen:
-              schema_version: "2.4"
+              schema_version: "2.5"
               run:
                 id: demo
                 root: "."
@@ -28,7 +29,7 @@ def _write_min_config(path: Path) -> None:
                   bio_type: dna
                   alphabet: dna_4
                 parquet:
-                  path: outputs/dense_arrays.parquet
+                  path: outputs/tables/dense_arrays.parquet
 
               generation:
                 sequence_length: 10
@@ -42,7 +43,7 @@ def _write_min_config(path: Path) -> None:
                 strategy: iterate
 
               logging:
-                log_dir: logs
+                log_dir: outputs/logs
             """
         ).strip()
         + "\n"
@@ -65,3 +66,21 @@ def test_validate_reports_invalid_config(tmp_path: Path) -> None:
     result = runner.invoke(app, ["validate-config", "-c", str(cfg_path)])
     assert result.exit_code != 0, result.output
     assert "Config error" in result.output
+
+
+def test_validate_uses_cwd_config_when_missing_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    _write_min_config(cfg_path)
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["validate-config"])
+    assert result.exit_code == 0, result.output
+    assert "Config is valid" in result.output
+
+
+def test_validate_missing_cwd_config_reports_actionable_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["validate-config"])
+    assert result.exit_code != 0, result.output
+    assert "No config found" in result.output

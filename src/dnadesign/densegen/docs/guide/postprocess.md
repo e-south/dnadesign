@@ -1,10 +1,10 @@
-## Postprocess (gap fill)
+## Postprocess (pad)
 
-If dense-arrays returns a sequence shorter than `sequence_length`, DenseGen can gap-fill with
+If dense-arrays returns a sequence shorter than `sequence_length`, DenseGen can pad with
 random bases. Postprocess runs after optimization and is recorded in metadata.
 
 ### Contents
-- [Modes](#modes) - off, strict, or adaptive gap fill.
+- [Modes](#modes) - off, strict, or adaptive pad.
 - [GC feasibility](#gc-feasibility) - why some targets are impossible.
 
 ---
@@ -12,16 +12,21 @@ random bases. Postprocess runs after optimization and is recorded in metadata.
 ### Modes
 
 - `off` - fail if the sequence is short.
-- `strict` - fill while enforcing the GC window; raise on infeasible targets.
-- `adaptive` - relax the GC window when infeasible and record the relaxation.
+- `strict` - pad while enforcing GC targets; raise on infeasible targets.
+- `adaptive` - relax GC targets when infeasible and record the relaxation.
 
 ```yaml
 postprocess:
-  gap_fill:
+  pad:
     mode: adaptive
     end: 5prime
-    gc_min: 0.40
-    gc_max: 0.60
+    gc:
+      mode: range
+      min: 0.40
+      max: 0.60
+      target: 0.50
+      tolerance: 0.10
+      min_pad_length: 4
     max_tries: 2000
 ```
 
@@ -29,8 +34,8 @@ postprocess:
 
 ### GC feasibility
 
-Very short gaps (for example, a 1 nt gap) cannot hit mid-range GC targets. `strict` fails fast
-in these cases; `adaptive` relaxes bounds and records the final target and achieved GC in
+Very short pads (for example, a 1 nt pad) cannot hit mid-range GC targets. `strict` fails fast
+in these cases; `adaptive` relaxes bounds (via `gc.min_pad_length`) and records the final target and achieved GC in
 metadata.
 
 ---

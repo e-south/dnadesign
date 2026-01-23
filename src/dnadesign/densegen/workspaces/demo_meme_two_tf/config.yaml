@@ -1,10 +1,6 @@
 # DenseGen demo: two TF motifs (LexA + CpxR) with bounded PWM sampling.
-# Source: Cruncher basic demo MEME files (lexA + cpxR) copied into this demo for
-# reproducibility. Parsing uses Cruncher’s MEME parser (DRY).
-# Motif widths: lexA=22, cpxR=21.
-
 densegen:
-  schema_version: "2.4"
+  schema_version: "2.5"
   run:
     id: demo_meme_two_tf
     root: "."
@@ -39,16 +35,16 @@ densegen:
       bio_type: dna
       alphabet: dna_4
     parquet:
-      path: outputs/dense_arrays.parquet
+      path: outputs/tables/dense_arrays.parquet
       deduplicate: true
       chunk_size: 64
 
   generation:
     sequence_length: 60
-    quota: 50
+    quota: 12
     sampling:
       pool_strategy: subsample
-      library_size: 24
+      library_size: 20
       subsample_over_length_budget_by: 80
       library_sampling_strategy: coverage_weighted
       coverage_boost_alpha: 0.15
@@ -63,13 +59,22 @@ densegen:
 
     plan:
       - name: meme_demo
-        quota: 50
+        quota: 12
+        fixed_elements:
+          promoter_constraints:
+            - name: sigma70_consensus
+              upstream: TTGACA
+              downstream: TATAAT
+              spacer_length: [16, 18]
+              upstream_pos: [0, 60]
         required_regulators: [lexA, cpxR]
 
   solver:
     backend: CBC
     strategy: iterate
-    options: []
+    options:
+      - "Threads=16"
+      - "TimeLimit=5"
 
   runtime:
     round_robin: true
@@ -80,16 +85,21 @@ densegen:
     stall_warning_every_seconds: 10
     max_resample_attempts: 2
     max_total_resamples: 50
-    max_seconds_per_plan: 0
+    max_seconds_per_plan: 60
     max_failed_solutions: 0
     random_seed: 42
 
   postprocess:
-    gap_fill:
+    pad:
       mode: adaptive
       end: 5prime
-      gc_min: 0.40
-      gc_max: 0.60
+      gc:
+        mode: range
+        min: 0.40
+        max: 0.60
+        target: 0.50
+        tolerance: 0.10
+        min_pad_length: 4
       max_tries: 2000
 
   logging:
@@ -103,5 +113,9 @@ densegen:
 
 plots:
   source: parquet
-  out_dir: outputs
+  out_dir: outputs/plots
   format: png
+  default: [tf_usage, tf_coverage]
+  options:
+    tf_coverage:
+      include_promoter_sites: true

@@ -4,6 +4,7 @@ import random
 from pathlib import Path
 
 import numpy as np
+import pytest
 import yaml
 
 from dnadesign.densegen.src.adapters.optimizer import OptimizerRun
@@ -59,6 +60,7 @@ class _DummyAdapter:
         required_regulators=None,
         min_count_by_regulator=None,
         min_required_regulators=None,
+        solve_timeout_seconds=None,
     ):
         opt = _DummyOpt()
         seqs = ["AAA", "CCC", "GGG", "TTT", "AAC", "CCA"]
@@ -81,7 +83,7 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
 
     cfg = {
         "densegen": {
-            "schema_version": "2.4",
+            "schema_version": "2.5",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {
@@ -94,7 +96,7 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": "outputs/dense_arrays.parquet"},
+                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
             },
             "generation": {
                 "sequence_length": 3,
@@ -128,8 +130,8 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
                 "max_failed_solutions": 0,
                 "random_seed": 1,
             },
-            "postprocess": {"gap_fill": {"mode": "off", "end": "5prime", "gc_min": 0.4, "gc_max": 0.6}},
-            "logging": {"log_dir": "logs", "level": "INFO"},
+            "postprocess": {"pad": {"mode": "off"}},
+            "logging": {"log_dir": "outputs/logs", "level": "INFO"},
         }
     }
 
@@ -142,7 +144,7 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
         source_factory=data_source_factory,
         sink_factory=lambda _cfg, _path: [sink],
         optimizer=_DummyAdapter(),
-        gap_fill=lambda *args, **kwargs: "",
+        pad=lambda *args, **kwargs: "",
     )
 
     plan_item = loaded.root.densegen.generation.resolve_plan()[0]
@@ -171,3 +173,145 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
     )
 
     assert produced <= loaded.root.densegen.runtime.arrays_generated_before_resample
+
+
+def test_stall_detected_with_no_solutions(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "outputs" / "parquet").mkdir(parents=True)
+    (run_dir / "logs").mkdir()
+
+    csv_path = run_dir / "sites.csv"
+    csv_path.write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
+
+    cfg = {
+        "densegen": {
+            "schema_version": "2.5",
+            "run": {"id": "demo", "root": "."},
+            "inputs": [
+                {
+                    "name": "demo",
+                    "type": "binding_sites",
+                    "path": str(csv_path),
+                    "format": "csv",
+                }
+            ],
+            "output": {
+                "targets": ["parquet"],
+                "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
+            },
+            "generation": {
+                "sequence_length": 3,
+                "quota": 1,
+                "sampling": {
+                    "pool_strategy": "subsample",
+                    "library_size": 2,
+                    "subsample_over_length_budget_by": 0,
+                    "library_sampling_strategy": "tf_balanced",
+                    "cover_all_regulators": False,
+                    "unique_binding_sites": True,
+                    "max_sites_per_regulator": None,
+                    "relax_on_exhaustion": False,
+                    "allow_incomplete_coverage": False,
+                    "iterative_max_libraries": 1,
+                    "iterative_min_new_solutions": 0,
+                },
+                "plan": [{"name": "default", "quota": 1}],
+            },
+            "solver": {"backend": "CBC", "strategy": "iterate", "options": []},
+            "runtime": {
+                "round_robin": False,
+                "arrays_generated_before_resample": 1,
+                "min_count_per_tf": 0,
+                "max_duplicate_solutions": 5,
+                "stall_seconds_before_resample": 10,
+                "stall_warning_every_seconds": 0,
+                "max_resample_attempts": 0,
+                "max_total_resamples": 0,
+                "max_seconds_per_plan": 0,
+                "max_failed_solutions": 0,
+                "random_seed": 1,
+            },
+            "postprocess": {"pad": {"mode": "off"}},
+            "logging": {"log_dir": "outputs/logs", "level": "INFO"},
+        }
+    }
+
+    cfg_path = run_dir / "config.yaml"
+    cfg_path.write_text(yaml.safe_dump(cfg))
+    loaded = load_config(cfg_path)
+
+    class _EmptyAdapter:
+        def probe_solver(self, backend: str, *, test_length: int = 10) -> None:
+            return None
+
+        def build(
+            self,
+            *,
+            library,
+            sequence_length,
+            solver,
+            strategy,
+            solver_options,
+            fixed_elements,
+            strands="double",
+            regulator_by_index=None,
+            required_regulators=None,
+            min_count_by_regulator=None,
+            min_required_regulators=None,
+            solve_timeout_seconds=None,
+        ):
+            opt = _DummyOpt()
+
+            def _gen():
+                if False:
+                    yield None
+
+            return OptimizerRun(optimizer=opt, generator=_gen())
+
+    def _monotonic():
+        _monotonic.value += 100.0
+        return _monotonic.value
+
+    _monotonic.value = 0.0
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.core.pipeline.time.monotonic",
+        _monotonic,
+    )
+
+    sink = _DummySink()
+    deps = PipelineDeps(
+        source_factory=data_source_factory,
+        sink_factory=lambda _cfg, _path: [sink],
+        optimizer=_EmptyAdapter(),
+        pad=lambda *args, **kwargs: "",
+    )
+
+    plan_item = loaded.root.densegen.generation.resolve_plan()[0]
+    produced, stats = _process_plan_for_source(
+        loaded.root.densegen.inputs[0],
+        plan_item,
+        loaded.root.densegen,
+        [sink],
+        chosen_solver="CBC",
+        deps=deps,
+        rng=random.Random(1),
+        np_rng=np.random.default_rng(1),
+        cfg_path=loaded.path,
+        run_id=loaded.root.densegen.run.id,
+        run_root=str(run_dir),
+        run_config_path="config.yaml",
+        run_config_sha256="sha",
+        random_seed=1,
+        dense_arrays_version=None,
+        dense_arrays_version_source="test",
+        output_bio_type="dna",
+        output_alphabet="dna_4",
+        one_subsample_only=True,
+        already_generated=0,
+        inputs_manifest={},
+    )
+
+    assert produced == 0
+    assert stats["stall_events"] == 1

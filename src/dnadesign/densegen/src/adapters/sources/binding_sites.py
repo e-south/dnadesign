@@ -107,7 +107,8 @@ class BindingSitesDataSource(BaseDataSource):
             dup_count = int(dup_mask.sum())
             log.warning(
                 "Binding sites input contains %d duplicate regulator/binding-site pairs in %s. "
-                "Duplicates are retained; set generation.sampling.unique_binding_sites=true to dedupe at sampling.",
+                "Duplicates are retained; set generation.sampling.unique_binding_sites=true to dedupe at "
+                "Stage-B sampling.",
                 dup_count,
                 data_path,
             )

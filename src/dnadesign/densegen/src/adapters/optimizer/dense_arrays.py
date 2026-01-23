@@ -46,6 +46,7 @@ class OptimizerAdapter(Protocol):
         required_regulators: list[str] | None = None,
         min_count_by_regulator: dict[str, int] | None = None,
         min_required_regulators: int | None = None,
+        solve_timeout_seconds: float | None = None,
     ) -> OptimizerRun: ...
 
 
@@ -115,6 +116,31 @@ def _apply_regulator_constraints(
     )
 
 
+def _apply_solve_timeout(opt: da.Optimizer, *, solve_timeout_seconds: float | None) -> None:
+    if solve_timeout_seconds is None:
+        return
+    try:
+        seconds = float(solve_timeout_seconds)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("solve_timeout_seconds must be a number of seconds > 0") from exc
+    if seconds <= 0:
+        return
+    if not hasattr(opt, "build_model"):
+        raise RuntimeError("Optimizer does not expose build_model; cannot apply solve timeout.")
+    original_build_model = opt.build_model
+
+    def _build_model_with_timeout(*args, **kwargs):
+        original_build_model(*args, **kwargs)
+        model = getattr(opt, "model", None)
+        if model is None:
+            raise RuntimeError("Solver model not initialized; cannot apply time limit.")
+        if not hasattr(model, "SetTimeLimit"):
+            raise RuntimeError("Solver model does not support SetTimeLimit; cannot enforce stall_seconds.")
+        model.SetTimeLimit(int(max(1, round(seconds * 1000))))
+
+    opt.build_model = _build_model_with_timeout
+
+
 class DenseArraysAdapter:
     def probe_solver(self, backend: str, *, test_length: int = 10) -> None:
         try:
@@ -141,6 +167,7 @@ class DenseArraysAdapter:
         required_regulators: list[str] | None = None,
         min_count_by_regulator: dict[str, int] | None = None,
         min_required_regulators: int | None = None,
+        solve_timeout_seconds: float | None = None,
     ) -> OptimizerRun:
         if strategy != "approximate" and not solver:
             raise ValueError("solver.backend is required unless strategy=approximate")
@@ -161,6 +188,7 @@ class DenseArraysAdapter:
             min_count_by_regulator=min_count_by_regulator,
             min_required_regulators=min_required_regulators,
         )
+        _apply_solve_timeout(opt, solve_timeout_seconds=solve_timeout_seconds)
         if strategy == "diverse":
             if not hasattr(opt, "solutions_diverse"):
                 raise RuntimeError("dense-arrays does not support solutions_diverse on this install.")

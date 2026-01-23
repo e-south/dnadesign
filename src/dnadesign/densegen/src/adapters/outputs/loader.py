@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Iterable, Tuple
 if TYPE_CHECKING:
     import pandas as pd
 
-from ...config import RootConfig, resolve_run_root, resolve_run_scoped_path
+from ...config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
 from .base import DEFAULT_NAMESPACE
 from .parquet import validate_parquet_schema
 
@@ -63,7 +63,7 @@ def load_records_from_config(
         usr_cfg = out_cfg.usr
         if usr_cfg is None:
             raise ValueError("output.usr is required when source='usr'")
-        root = resolve_run_scoped_path(cfg_path, run_root, usr_cfg.root, label="output.usr.root")
+        root = resolve_outputs_scoped_path(cfg_path, run_root, usr_cfg.root, label="output.usr.root")
         try:
             from dnadesign.usr.src.dataset import Dataset
         except Exception as e:
@@ -87,7 +87,7 @@ def load_records_from_config(
         pq_cfg = out_cfg.parquet
         if pq_cfg is None:
             raise ValueError("output.parquet is required when source='parquet'")
-        root = resolve_run_scoped_path(cfg_path, run_root, pq_cfg.path, label="output.parquet.path")
+        root = resolve_outputs_scoped_path(cfg_path, run_root, pq_cfg.path, label="output.parquet.path")
         if root.exists() and root.is_dir():
             raise ValueError(f"Parquet path must be a file, got directory: {root}")
 

@@ -13,7 +13,7 @@ def _write_min_config(path: Path) -> None:
         textwrap.dedent(
             """
             densegen:
-              schema_version: "2.4"
+              schema_version: "2.5"
               run:
                 id: demo
                 root: "."
@@ -28,7 +28,7 @@ def _write_min_config(path: Path) -> None:
                   bio_type: dna
                   alphabet: dna_4
                 parquet:
-                  path: outputs/dense_arrays.parquet
+                  path: outputs/tables/dense_arrays.parquet
 
               generation:
                 sequence_length: 10
@@ -42,7 +42,7 @@ def _write_min_config(path: Path) -> None:
                 options: []
 
               logging:
-                log_dir: logs
+                log_dir: outputs/logs
             """
         ).strip()
         + "\n"
@@ -56,4 +56,4 @@ def test_describe_outputs_summary(tmp_path: Path) -> None:
     result = runner.invoke(app, ["inspect", "config", "-c", str(cfg_path)])
     assert result.exit_code == 0, result.output
     assert "Config" in result.output
-    assert "Gap fill" in result.output
+    assert "Pad" in result.output

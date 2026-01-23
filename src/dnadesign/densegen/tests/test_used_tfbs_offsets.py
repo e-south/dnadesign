@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dnadesign.densegen.src.core.pipeline import _apply_gap_fill_offsets, _compute_used_tf_info
+from dnadesign.densegen.src.core.pipeline import _apply_pad_offsets, _compute_used_tf_info
 
 
 class _DummySol:
@@ -29,8 +29,8 @@ def test_used_tfbs_offsets_shift_with_5prime_padding() -> None:
     assert used_counts == {"TF1": 1, "TF2": 1}
     assert used_list == ["TF1", "TF2"]
 
-    gap_meta = {"used": True, "bases": 3, "end": "5prime"}
-    updated = _apply_gap_fill_offsets(used_detail, gap_meta)
+    pad_meta = {"used": True, "bases": 3, "end": "5prime"}
+    updated = _apply_pad_offsets(used_detail, pad_meta)
     assert updated[0]["offset_raw"] == 0
     assert updated[0]["offset"] == 3
     assert updated[0]["length"] == 2

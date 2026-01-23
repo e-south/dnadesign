@@ -21,9 +21,9 @@ PLOT_SPECS = {
         "fn": "plot_tf_usage",
         "description": "TF usage summary (stacked by length/TFBS or totals).",
     },
-    "gap_fill_gc": {
-        "fn": "plot_gap_fill_gc",
-        "description": "GC content target vs actual for gap-fill pads.",
+    "pad_gc": {
+        "fn": "plot_pad_gc",
+        "description": "GC content target vs actual for pad bases.",
     },
     "plan_counts": {
         "fn": "plot_plan_counts",

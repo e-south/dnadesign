@@ -35,7 +35,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from ..adapters.outputs import load_records_from_config
-from ..config import RootConfig, resolve_run_root, resolve_run_scoped_path
+from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
 from .plot_registry import PLOT_SPECS
 
 # Embed TrueType fonts for clean text in vector exports
@@ -272,8 +272,8 @@ def _plan_to_pair_label_map(cfg: dict) -> dict[str, str]:
 
 
 def _ensure_out_dir(plots_cfg, cfg_path: Path, run_root: Path) -> Path:
-    out_dir = plots_cfg.out_dir if plots_cfg else "outputs"
-    out = resolve_run_scoped_path(cfg_path, run_root, out_dir, label="plots.out_dir")
+    out_dir = plots_cfg.out_dir if plots_cfg else "outputs/plots"
+    out = resolve_outputs_scoped_path(cfg_path, run_root, out_dir, label="plots.out_dir")
     out.mkdir(parents=True, exist_ok=True)
     return out
 
@@ -478,11 +478,11 @@ def plot_tf_usage(
     raise ValueError("tf_usage.mode must be one of: stack_lengths, stack_tfbs, totals")
 
 
-def plot_gap_fill_gc(df: pd.DataFrame, out_path: Path, *, style: Optional[dict] = None) -> None:
+def plot_pad_gc(df: pd.DataFrame, out_path: Path, *, style: Optional[dict] = None) -> None:
     used_col, gc_col, b_col = (
-        _dg("gap_fill_used"),
-        _dg("gap_fill_gc_actual"),
-        _dg("gap_fill_bases"),
+        _dg("pad_used"),
+        _dg("pad_gc_actual"),
+        _dg("pad_bases"),
     )
     mask = df[used_col] == True  # noqa: E712
     x = pd.to_numeric(df.loc[mask, gc_col], errors="coerce")
@@ -492,9 +492,9 @@ def plot_gap_fill_gc(df: pd.DataFrame, out_path: Path, *, style: Optional[dict] 
     style = _style(style)
     fig, ax = _fig_ax(style)
     ax.scatter(x.values, y.values, alpha=0.35, s=12)
-    ax.set_xlabel("Gap-fill GC fraction")
-    ax.set_ylabel("Gap-fill bases")
-    ax.set_title("Gap-fill: bases vs GC fraction (filled only)")
+    ax.set_xlabel("Pad GC fraction")
+    ax.set_ylabel("Pad bases")
+    ax.set_title("Pad: bases vs GC fraction (padded only)")
     _apply_style(ax, style)
     fig.tight_layout()
     fig.savefig(out_path)
@@ -784,7 +784,7 @@ def plot_tfbs_length_density(
     by_tf: Dict[str, list[int]] = {}
     if attempts_df is None or attempts_df.empty:
         raise ValueError(
-            "outputs/attempts.parquet is required for tfbs_length_density. "
+            "outputs/tables/attempts.parquet is required for tfbs_length_density. "
             "Run `dense run -c <config.yaml>` to generate attempts."
         )
     if attempts_df is not None and not attempts_df.empty:
@@ -1322,7 +1322,7 @@ _ALLOWED_OPTIONS = {
         "include_promoter_sites",
         "promoter_site_motifs",
     },
-    "gap_fill_gc": set(),
+    "pad_gc": set(),
 }
 
 
@@ -1348,8 +1348,8 @@ def _plot_required_columns(selected: Iterable[str], options: Dict[str, Dict[str,
             cols.add(_dg("compression_ratio"))
         elif name == "tf_usage":
             cols.update({_dg("used_tf_counts"), _dg("used_tfbs_detail")})
-        elif name == "gap_fill_gc":
-            cols.update({_dg("gap_fill_used"), _dg("gap_fill_gc_actual"), _dg("gap_fill_bases")})
+        elif name == "pad_gc":
+            cols.update({_dg("pad_used"), _dg("pad_gc_actual"), _dg("pad_bases")})
         elif name == "plan_counts":
             cols.add(_dg("plan"))
             created_col = str(raw.get("created_at_col", _dg("created_at")))
@@ -1435,7 +1435,7 @@ def run_plots_from_config(root_cfg: RootConfig, cfg_path: Path, *, only: Optiona
                 fn(df, out_path, style=style, cfg=root_cfg.densegen.model_dump(), **kwargs)
             elif name == "tfbs_length_density":
                 attempts_df = None
-                attempts_path = run_root / "outputs" / "attempts.parquet"
+                attempts_path = run_root / "outputs" / "tables" / "attempts.parquet"
                 if attempts_path.exists():
                     attempts_df = pd.read_parquet(attempts_path)
                 fn(df, out_path, style=style, attempts_df=attempts_df, **kwargs)

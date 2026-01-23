@@ -39,6 +39,7 @@ from ..config import (
     DenseGenConfig,
     LoadedConfig,
     ResolvedPlanItem,
+    resolve_outputs_scoped_path,
     resolve_relative_path,
     resolve_run_root,
 )
@@ -55,7 +56,7 @@ from .artifacts.library import (
 from .artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData, build_pool_artifact
 from .artifacts.records import AttemptRecord, SolutionRecord
 from .metadata import build_metadata
-from .postprocess import random_fill
+from .postprocess import generate_pad
 from .pvalue_bins import resolve_pvalue_bins
 from .run_manifest import PlanManifest, RunManifest
 from .run_paths import (
@@ -66,6 +67,7 @@ from .run_paths import (
     run_manifest_path,
     run_outputs_root,
     run_state_path,
+    run_tables_root,
 )
 from .run_state import RunState, load_run_state
 from .runtime_policy import RuntimePolicy
@@ -117,7 +119,7 @@ class PipelineDeps:
     source_factory: Callable[[object, Path], BaseDataSource]
     sink_factory: Callable[[DenseGenConfig, Path], Iterable[SinkBase]]
     optimizer: OptimizerAdapter
-    gap_fill: Callable[..., tuple[str, dict] | str]
+    pad: Callable[..., tuple[str, dict] | str]
 
 
 def default_deps() -> PipelineDeps:
@@ -125,7 +127,7 @@ def default_deps() -> PipelineDeps:
         source_factory=data_source_factory,
         sink_factory=build_sinks,
         optimizer=DenseArraysAdapter(),
-        gap_fill=random_fill,
+        pad=generate_pad,
     )
 
 
@@ -927,10 +929,10 @@ def _leaderboard_snapshot(
     }
 
 
-def _apply_gap_fill_offsets(used_tfbs_detail: list[dict], gap_meta: dict) -> list[dict]:
+def _apply_pad_offsets(used_tfbs_detail: list[dict], pad_meta: dict) -> list[dict]:
     pad_left = 0
-    if gap_meta.get("used") and gap_meta.get("end") == "5prime":
-        pad_left = int(gap_meta.get("bases") or 0)
+    if pad_meta.get("used") and pad_meta.get("end") == "5prime":
+        pad_left = int(pad_meta.get("bases") or 0)
     for entry in used_tfbs_detail:
         offset_raw = int(entry.get("offset_raw", entry.get("offset", 0)))
         length = int(entry.get("length", len(entry.get("tfbs") or "")))
@@ -1294,8 +1296,8 @@ def _compute_sampling_fraction_pairs(
     return len(pairs) / float(input_pair_count)
 
 
-def _consolidate_parts(outputs_root: Path, *, part_glob: str, final_name: str) -> bool:
-    parts = sorted(outputs_root.glob(part_glob))
+def _consolidate_parts(tables_root: Path, *, part_glob: str, final_name: str) -> bool:
+    parts = sorted(tables_root.glob(part_glob))
     if not parts:
         return False
     try:
@@ -1304,12 +1306,12 @@ def _consolidate_parts(outputs_root: Path, *, part_glob: str, final_name: str) -
         import pyarrow.parquet as pq
     except Exception as exc:  # pragma: no cover - optional dependency
         raise RuntimeError("pyarrow is required to consolidate parquet parts.") from exc
-    final_path = outputs_root / final_name
+    final_path = tables_root / final_name
     sources = [str(p) for p in parts]
     if final_path.exists():
         sources.insert(0, str(final_path))
     dataset = ds.dataset(sources, format="parquet")
-    tmp_path = outputs_root / f".{final_name}.tmp"
+    tmp_path = tables_root / f".{final_name}.tmp"
     writer = pq.ParquetWriter(tmp_path, schema=dataset.schema)
     scanner = ds.Scanner.from_dataset(dataset, batch_size=4096)
     for batch in scanner.to_batches():
@@ -1404,7 +1406,7 @@ ATTEMPTS_CHUNK_SIZE = 256
 SOLUTIONS_CHUNK_SIZE = 256
 
 
-def _flush_attempts(outputs_root: Path, buffer: list[dict]) -> None:
+def _flush_attempts(tables_root: Path, buffer: list[dict]) -> None:
     if not buffer:
         return
     try:
@@ -1443,13 +1445,13 @@ def _flush_attempts(outputs_root: Path, buffer: list[dict]) -> None:
         ]
     )
     table = pa.Table.from_pylist(buffer, schema=schema)
-    outputs_root.mkdir(parents=True, exist_ok=True)
+    tables_root.mkdir(parents=True, exist_ok=True)
     filename = f"attempts_part-{uuid.uuid4().hex}.parquet"
-    pq.write_table(table, outputs_root / filename)
+    pq.write_table(table, tables_root / filename)
     buffer.clear()
 
 
-def _flush_solutions(outputs_root: Path, buffer: list[dict]) -> None:
+def _flush_solutions(tables_root: Path, buffer: list[dict]) -> None:
     if not buffer:
         return
     try:
@@ -1473,16 +1475,16 @@ def _flush_solutions(outputs_root: Path, buffer: list[dict]) -> None:
         ]
     )
     table = pa.Table.from_pylist(buffer, schema=schema)
-    outputs_root.mkdir(parents=True, exist_ok=True)
+    tables_root.mkdir(parents=True, exist_ok=True)
     filename = f"solutions_part-{uuid.uuid4().hex}.parquet"
-    pq.write_table(table, outputs_root / filename)
+    pq.write_table(table, tables_root / filename)
     buffer.clear()
 
 
 def _load_failure_counts_from_attempts(
-    outputs_root: Path,
+    tables_root: Path,
 ) -> dict[tuple[str, str, str, str, str | None], dict[str, int]]:
-    attempts_path = outputs_root / "attempts.parquet"
+    attempts_path = tables_root / "attempts.parquet"
     if not attempts_path.exists():
         return {}
     try:
@@ -1529,12 +1531,12 @@ def _load_failure_counts_from_attempts(
     return counts
 
 
-def _load_existing_library_index(outputs_root: Path) -> int:
-    attempts_path = outputs_root / "attempts.parquet"
+def _load_existing_library_index(tables_root: Path) -> int:
+    attempts_path = tables_root / "attempts.parquet"
     paths: list[Path] = []
     if attempts_path.exists():
         paths.append(attempts_path)
-    paths.extend(sorted(outputs_root.glob("attempts_part-*.parquet")))
+    paths.extend(sorted(tables_root.glob("attempts_part-*.parquet")))
     if not paths:
         return 0
     max_idx = 0
@@ -1554,13 +1556,13 @@ def _load_existing_library_index(outputs_root: Path) -> int:
 
 
 def _load_existing_library_index_by_plan(
-    outputs_root: Path,
+    tables_root: Path,
 ) -> dict[tuple[str, str], int]:
-    attempts_path = outputs_root / "attempts.parquet"
+    attempts_path = tables_root / "attempts.parquet"
     paths: list[Path] = []
     if attempts_path.exists():
         paths.append(attempts_path)
-    paths.extend(sorted(outputs_root.glob("attempts_part-*.parquet")))
+    paths.extend(sorted(tables_root.glob("attempts_part-*.parquet")))
     if not paths:
         return {}
     max_by_plan: dict[tuple[str, str], int] = {}
@@ -1584,12 +1586,12 @@ def _load_existing_library_index_by_plan(
     return max_by_plan
 
 
-def _load_existing_attempt_index_by_plan(outputs_root: Path) -> dict[tuple[str, str], int]:
-    attempts_path = outputs_root / "attempts.parquet"
+def _load_existing_attempt_index_by_plan(tables_root: Path) -> dict[tuple[str, str], int]:
+    attempts_path = tables_root / "attempts.parquet"
     paths: list[Path] = []
     if attempts_path.exists():
         paths.append(attempts_path)
-    paths.extend(sorted(outputs_root.glob("attempts_part-*.parquet")))
+    paths.extend(sorted(tables_root.glob("attempts_part-*.parquet")))
     if not paths:
         return {}
     max_by_plan: dict[tuple[str, str], int] = {}
@@ -1618,7 +1620,7 @@ def _load_existing_attempt_index_by_plan(outputs_root: Path) -> dict[tuple[str, 
 
 
 def _append_attempt(
-    outputs_root: Path,
+    tables_root: Path,
     *,
     run_id: str,
     input_name: str,
@@ -1681,14 +1683,14 @@ def _append_attempt(
     if attempts_buffer is not None:
         attempts_buffer.append(payload)
         if len(attempts_buffer) >= ATTEMPTS_CHUNK_SIZE:
-            _flush_attempts(outputs_root, attempts_buffer)
+            _flush_attempts(tables_root, attempts_buffer)
         return record.attempt_id
-    _flush_attempts(outputs_root, [payload])
+    _flush_attempts(tables_root, [payload])
     return record.attempt_id
 
 
 def _log_rejection(
-    outputs_root: Path,
+    tables_root: Path,
     *,
     run_id: str,
     input_name: str,
@@ -1714,7 +1716,7 @@ def _log_rejection(
 ) -> None:
     status = "duplicate" if reason == "output_duplicate" else "rejected"
     _append_attempt(
-        outputs_root,
+        tables_root,
         run_id=run_id,
         input_name=input_name,
         plan_name=plan_name,
@@ -1915,6 +1917,7 @@ def _process_plan_for_source(
     max_dupes = int(runtime_cfg.max_duplicate_solutions)
     max_resample_attempts = int(runtime_cfg.max_resample_attempts)
     stall_seconds = int(runtime_cfg.stall_seconds_before_resample)
+    solve_timeout_seconds = float(stall_seconds) if stall_seconds > 0 else None
     stall_warn_every = int(runtime_cfg.stall_warning_every_seconds)
     max_total_resamples = int(runtime_cfg.max_total_resamples)
     max_seconds_per_plan = int(runtime_cfg.max_seconds_per_plan)
@@ -1933,13 +1936,18 @@ def _process_plan_for_source(
     )
 
     post = global_cfg.postprocess
-    gap_cfg = post.gap_fill
-    fill_gap = gap_cfg.mode != "off"
-    fill_mode = gap_cfg.mode
-    fill_end = gap_cfg.end
-    fill_gc_min = float(gap_cfg.gc_min)
-    fill_gc_max = float(gap_cfg.gc_max)
-    fill_max_tries = int(gap_cfg.max_tries)
+    pad_cfg = post.pad
+    pad_enabled = pad_cfg.mode != "off"
+    pad_mode = pad_cfg.mode
+    pad_end = pad_cfg.end
+    pad_gc_cfg = pad_cfg.gc
+    pad_gc_mode = pad_gc_cfg.mode
+    pad_gc_min = float(pad_gc_cfg.min)
+    pad_gc_max = float(pad_gc_cfg.max)
+    pad_gc_target = float(pad_gc_cfg.target)
+    pad_gc_tolerance = float(pad_gc_cfg.tolerance)
+    pad_gc_min_length = int(pad_gc_cfg.min_pad_length)
+    pad_max_tries = int(pad_cfg.max_tries)
 
     solver_cfg = global_cfg.solver
     solver_opts = list(solver_cfg.options)
@@ -1955,7 +1963,7 @@ def _process_plan_for_source(
     last_screen_refresh = 0.0
     latest_failure_totals: str | None = None
 
-    policy_gc_fill = str(fill_mode)
+    policy_pad = str(pad_mode)
     policy_sampling = pool_strategy
     policy_solver = solver_strategy
 
@@ -1977,10 +1985,11 @@ def _process_plan_for_source(
     failure_counts = site_failure_counts if site_failure_counts is not None else {}
     attempts_buffer: list[dict] = []
     run_root_path = Path(run_root)
-    outputs_root = run_root_path / "outputs"
-    existing_library_builds = _load_existing_library_index(outputs_root)
+    outputs_root = run_outputs_root(run_root_path)
+    tables_root = run_tables_root(run_root_path)
+    existing_library_builds = _load_existing_library_index(tables_root)
 
-    # Load source (cache PWM sampling results across round-robin passes).
+    # Load source (cache Stage-A PWM sampling results across round-robin passes).
     cache_key = source_label
     cached = source_cache.get(cache_key) if source_cache is not None else None
     if cached is None:
@@ -2123,7 +2132,7 @@ def _process_plan_for_source(
                     parts.append(f"max_seconds={mining_max_seconds}s")
                 mining_label = ", ".join(parts) if parts else "enabled"
             log.info(
-                "PWM input sampling for %s: motifs=%d | sites=%s | strategy=%s | backend=%s | score=%s | "
+                "Stage-A PWM sampling for %s: motifs=%d | sites=%s | strategy=%s | backend=%s | score=%s | "
                 "selection=%s | bins=%s | mining=%s | oversample=%s | caps=%s | length=%s",
                 source_label,
                 len(input_meta.get("input_pwm_ids") or []),
@@ -2182,7 +2191,7 @@ def _process_plan_for_source(
     libraries_used = 0
     library_source_label = str(library_source or getattr(sampling_cfg, "library_source", "build")).lower()
     if library_source_label not in {"build", "artifact"}:
-        raise ValueError(f"Unsupported sampling.library_source: {library_source_label}")
+        raise ValueError(f"Unsupported Stage-B sampling.library_source: {library_source_label}")
     if library_source_label == "artifact" and library_cursor is not None:
         prior_used = int(library_cursor.get((source_label, plan_name), 0))
         libraries_built = prior_used
@@ -2203,13 +2212,13 @@ def _process_plan_for_source(
             raise RuntimeError(
                 f"Library artifact exhausted for {source_label}/{plan_name} "
                 f"(requested index={cursor + 1}, available={len(records)}). "
-                "Build more libraries or reduce resampling."
+                "Build more libraries or reduce Stage-B resampling."
             )
         record = records[cursor]
         library_cursor[key] = cursor + 1
         if record.pool_strategy is None or record.library_sampling_strategy is None:
             raise RuntimeError(
-                f"Library artifact missing sampling metadata for {source_label}/{plan_name} "
+                f"Library artifact missing Stage-B sampling metadata for {source_label}/{plan_name} "
                 f"(library_index={record.library_index}). Rebuild libraries with the current version."
             )
         if str(record.pool_strategy) != str(pool_strategy):
@@ -2219,7 +2228,7 @@ def _process_plan_for_source(
             )
         if str(record.library_sampling_strategy) != str(library_sampling_strategy):
             raise RuntimeError(
-                f"Library artifact sampling strategy mismatch for {source_label}/{plan_name}: "
+                f"Library artifact Stage-B sampling strategy mismatch for {source_label}/{plan_name}: "
                 f"artifact={record.library_sampling_strategy} config={library_sampling_strategy}."
             )
         if pool_strategy != "full" and record.library_size != int(getattr(sampling_cfg, "library_size", 0)):
@@ -2305,7 +2314,7 @@ def _process_plan_for_source(
             f"(sequence_length={seq_len}, max_library_motif={max_tfbs_len}, "
             f"max_fixed_element={fixed_elements_max_len}). "
             "Increase densegen.generation.sequence_length or reduce motif lengths "
-            "(e.g., adjust PWM sampling length_range or fixed-element motifs)."
+            "(e.g., adjust Stage-A PWM sampling length_range or fixed-element motifs)."
         )
 
     def _current_leaderboard_snapshot() -> dict[str, object]:
@@ -2392,12 +2401,12 @@ def _process_plan_for_source(
     pool_label = sampling_info.get("pool_strategy")
     target_len = sampling_info.get("target_length")
     achieved_len = sampling_info.get("achieved_length")
-    header = f"Stage B library for {source_label}/{plan_name}"
+    header = f"Stage-B library for {source_label}/{plan_name}"
     if library_index is not None:
         header = f"{header} (build {library_index})"
     if tf_summary:
         log.info(
-            "%s: %d motifs | TF counts: %s | target=%s achieved=%s pool=%s sampling=%s",
+            "%s: %d motifs | TF counts: %s | target=%s achieved=%s pool=%s stage_b_sampling=%s",
             header,
             len(library_for_opt),
             tf_summary,
@@ -2408,7 +2417,7 @@ def _process_plan_for_source(
         )
     else:
         log.info(
-            "%s: %d motifs | target=%s achieved=%s pool=%s sampling=%s",
+            "%s: %d motifs | target=%s achieved=%s pool=%s stage_b_sampling=%s",
             header,
             len(library_for_opt),
             target_len,
@@ -2432,7 +2441,7 @@ def _process_plan_for_source(
             if k_required is not None and len(solver_required_regs) < k_required:
                 raise ValueError(
                     "Required regulator candidate set is smaller than min_required_regulators "
-                    f"after library sampling ({len(solver_required_regs)} < {k_required}). "
+                    f"after Stage-B library sampling ({len(solver_required_regs)} < {k_required}). "
                     "Increase library_size or relax required_regulators/min_required_regulators."
                 )
         if min_required_regulators is not None and not required_regulators:
@@ -2449,6 +2458,7 @@ def _process_plan_for_source(
             required_regulators=solver_required_regs,
             min_count_by_regulator=solver_min_counts,
             min_required_regulators=min_required_regulators,
+            solve_timeout_seconds=solve_timeout_seconds,
         )
         return run
 
@@ -2474,6 +2484,34 @@ def _process_plan_for_source(
             produced_this_library = 0
             stall_triggered = False
 
+            def _mark_stall(now: float) -> None:
+                nonlocal stall_events, stall_triggered
+                if stall_triggered:
+                    return
+                log.info(
+                    "[%s/%s] Stall (> %ds) with no solutions; will resample.",
+                    source_label,
+                    plan_name,
+                    stall_seconds,
+                )
+                stall_events += 1
+                if events_path is not None:
+                    try:
+                        _emit_event(
+                            events_path,
+                            event="STALL_DETECTED",
+                            payload={
+                                "input_name": source_label,
+                                "plan_name": plan_name,
+                                "stall_seconds": float(now - subsample_started),
+                                "library_index": int(sampling_library_index),
+                                "library_hash": str(sampling_library_hash),
+                            },
+                        )
+                    except Exception:
+                        log.debug("Failed to emit STALL_DETECTED event.", exc_info=True)
+                stall_triggered = True
+
             for sol in generator:
                 now = time.monotonic()
                 if policy.should_trigger_stall(
@@ -2481,29 +2519,7 @@ def _process_plan_for_source(
                     subsample_started=subsample_started,
                     produced_this_library=produced_this_library,
                 ):
-                    log.info(
-                        "[%s/%s] Stall (> %ds) with no solutions; will resample.",
-                        source_label,
-                        plan_name,
-                        stall_seconds,
-                    )
-                    stall_events += 1
-                    if events_path is not None:
-                        try:
-                            _emit_event(
-                                events_path,
-                                event="STALL_DETECTED",
-                                payload={
-                                    "input_name": source_label,
-                                    "plan_name": plan_name,
-                                    "stall_seconds": float(now - subsample_started),
-                                    "library_index": int(sampling_library_index),
-                                    "library_hash": str(sampling_library_hash),
-                                },
-                            )
-                        except Exception:
-                            log.debug("Failed to emit STALL_DETECTED event.", exc_info=True)
-                    stall_triggered = True
+                    _mark_stall(now)
                     break
                 if policy.should_warn_stall(
                     now=now,
@@ -2570,7 +2586,7 @@ def _process_plan_for_source(
                         _record_site_failures("min_count_per_tf")
                         attempt_index = _next_attempt_index()
                         _log_rejection(
-                            outputs_root,
+                            tables_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
@@ -2611,7 +2627,7 @@ def _process_plan_for_source(
                         _record_site_failures("required_regulators")
                         attempt_index = _next_attempt_index()
                         _log_rejection(
-                            outputs_root,
+                            tables_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
@@ -2655,7 +2671,7 @@ def _process_plan_for_source(
                         _record_site_failures("min_count_by_regulator")
                         attempt_index = _next_attempt_index()
                         _log_rejection(
-                            outputs_root,
+                            tables_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
@@ -2703,7 +2719,7 @@ def _process_plan_for_source(
                         _record_site_failures("min_required_regulators")
                         attempt_index = _next_attempt_index()
                         _log_rejection(
-                            outputs_root,
+                            tables_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
@@ -2745,7 +2761,7 @@ def _process_plan_for_source(
                         _record_site_failures("min_required_regulators")
                         attempt_index = _next_attempt_index()
                         _log_rejection(
-                            outputs_root,
+                            tables_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
@@ -2777,20 +2793,22 @@ def _process_plan_for_source(
                             )
                         continue
 
-                gap_meta = {"used": False}
+                pad_meta = {"used": False}
                 final_seq = seq
-                if not fill_gap and len(final_seq) < seq_len:
-                    raise RuntimeError(
-                        f"[{source_label}/{plan_name}] Sequence shorter than target and gap_fill.mode=off."
-                    )
-                if fill_gap and len(final_seq) < seq_len:
+                if not pad_enabled and len(final_seq) < seq_len:
+                    raise RuntimeError(f"[{source_label}/{plan_name}] Sequence shorter than target and pad.mode=off.")
+                if pad_enabled and len(final_seq) < seq_len:
                     gap = seq_len - len(final_seq)
-                    rf = deps.gap_fill(
-                        gap,
-                        fill_gc_min,
-                        fill_gc_max,
-                        max_tries=fill_max_tries,
-                        mode=fill_mode,
+                    rf = deps.pad(
+                        length=gap,
+                        mode=pad_mode,
+                        gc_mode=pad_gc_mode,
+                        gc_min=pad_gc_min,
+                        gc_max=pad_gc_max,
+                        gc_target=pad_gc_target,
+                        gc_tolerance=pad_gc_tolerance,
+                        gc_min_pad_length=pad_gc_min_length,
+                        max_tries=pad_max_tries,
                         rng=rng,
                     )
                     if isinstance(rf, tuple) and len(rf) == 2:
@@ -2798,21 +2816,23 @@ def _process_plan_for_source(
                         pad_info = pad_info or {}
                     else:
                         pad, pad_info = rf, {}
-                    final_seq = (pad + final_seq) if fill_end == "5prime" else (final_seq + pad)
-                    gap_meta = {
+                    final_seq = (pad + final_seq) if pad_end == "5prime" else (final_seq + pad)
+                    pad_meta = {
                         "used": True,
                         "bases": gap,
-                        "end": fill_end,
-                        "gc_min": pad_info.get("final_gc_min", fill_gc_min),
-                        "gc_max": pad_info.get("final_gc_max", fill_gc_max),
-                        "gc_target_min": pad_info.get("target_gc_min", fill_gc_min),
-                        "gc_target_max": pad_info.get("target_gc_max", fill_gc_max),
+                        "end": pad_end,
+                        "gc_mode": pad_info.get("gc_mode", pad_gc_mode),
+                        "gc_min": pad_info.get("final_gc_min"),
+                        "gc_max": pad_info.get("final_gc_max"),
+                        "gc_target_min": pad_info.get("target_gc_min"),
+                        "gc_target_max": pad_info.get("target_gc_max"),
                         "gc_actual": pad_info.get("gc_actual"),
                         "relaxed": pad_info.get("relaxed"),
+                        "relaxed_reason": pad_info.get("relaxed_reason"),
                         "attempts": pad_info.get("attempts"),
                     }
 
-                used_tfbs_detail = _apply_gap_fill_offsets(used_tfbs_detail, gap_meta)
+                used_tfbs_detail = _apply_pad_offsets(used_tfbs_detail, pad_meta)
                 gc_core = _gc_fraction(seq)
                 gc_total = _gc_fraction(final_seq)
                 created_at = datetime.now(timezone.utc).isoformat()
@@ -2829,7 +2849,7 @@ def _process_plan_for_source(
                     solver_strands=solver_strands,
                     seq_len=seq_len,
                     actual_length=len(final_seq),
-                    gap_meta=gap_meta,
+                    pad_meta=pad_meta,
                     sampling_meta=sampling_info,
                     schema_version=str(global_cfg.schema_version),
                     created_at=created_at,
@@ -2838,7 +2858,7 @@ def _process_plan_for_source(
                     run_config_path=run_config_path,
                     run_config_sha256=run_config_sha256,
                     random_seed=random_seed,
-                    policy_gc_fill=policy_gc_fill,
+                    policy_pad=policy_pad,
                     policy_sampling=policy_sampling,
                     policy_solver=policy_solver,
                     input_meta=input_meta,
@@ -2884,7 +2904,7 @@ def _process_plan_for_source(
                     duplicate_records += 1
                     attempt_index = _next_attempt_index()
                     _log_rejection(
-                        outputs_root,
+                        tables_root,
                         run_id=run_id,
                         input_name=source_label,
                         plan_name=plan_name,
@@ -2947,7 +2967,7 @@ def _process_plan_for_source(
 
                 attempt_index = _next_attempt_index()
                 attempt_id = _append_attempt(
-                    outputs_root,
+                    tables_root,
                     run_id=run_id,
                     input_name=source_label,
                     plan_name=plan_name,
@@ -2991,7 +3011,7 @@ def _process_plan_for_source(
                         ).to_dict()
                     )
                     if len(solution_rows) >= SOLUTIONS_CHUNK_SIZE:
-                        _flush_solutions(outputs_root, solution_rows)
+                        _flush_solutions(tables_root, solution_rows)
 
                 _update_usage_counts(usage_counts, used_tfbs_detail)
                 for tf, count in used_tf_counts.items():
@@ -3151,12 +3171,17 @@ def _process_plan_for_source(
             if local_generated >= max_per_subsample or global_generated >= quota:
                 break
 
+            if produced_this_library == 0 and not stall_triggered and stall_seconds > 0:
+                now = time.monotonic()
+                if (now - subsample_started) >= stall_seconds:
+                    _mark_stall(now)
+
             if produced_this_library == 0:
                 reason = "stall_no_solution" if stall_triggered else "no_solution"
                 _record_site_failures(reason)
                 attempt_index = _next_attempt_index()
                 _append_attempt(
-                    outputs_root,
+                    tables_root,
                     run_id=run_id,
                     input_name=source_label,
                     plan_name=plan_name,
@@ -3185,7 +3210,7 @@ def _process_plan_for_source(
             if pool_strategy == "iterative_subsample" and iterative_min_new_solutions > 0:
                 if produced_this_library < iterative_min_new_solutions:
                     log.info(
-                        "[%s/%s] Library produced %d < iterative_min_new_solutions=%d; resampling.",
+                        "[%s/%s] Library produced %d < iterative_min_new_solutions=%d; Stage-B resampling.",
                         source_label,
                         plan_name,
                         produced_this_library,
@@ -3202,8 +3227,8 @@ def _process_plan_for_source(
             # Resample
             if not policy.allow_resample():
                 raise RuntimeError(
-                    f"[{source_label}/{plan_name}] pool_strategy={pool_strategy!r} does not allow resampling. "
-                    "Reduce quota or use iterative_subsample."
+                    f"[{source_label}/{plan_name}] pool_strategy={pool_strategy!r} does not allow Stage-B "
+                    "resampling. Reduce quota or use iterative_subsample."
                 )
             resamples_in_try += 1
             total_resamples += 1
@@ -3307,9 +3332,9 @@ def _process_plan_for_source(
             sink.flush()
 
         if one_subsample_only:
-            _flush_attempts(outputs_root, attempts_buffer)
+            _flush_attempts(tables_root, attempts_buffer)
             if solution_rows is not None:
-                _flush_solutions(outputs_root, solution_rows)
+                _flush_solutions(tables_root, solution_rows)
             if state_counts is not None:
                 state_counts[(source_label, plan_name)] = int(global_generated)
                 if write_state is not None:
@@ -3332,9 +3357,9 @@ def _process_plan_for_source(
                 "leaderboard_latest": snapshot,
             }
 
-    _flush_attempts(outputs_root, attempts_buffer)
+    _flush_attempts(tables_root, attempts_buffer)
     if solution_rows is not None:
-        _flush_solutions(outputs_root, solution_rows)
+        _flush_solutions(tables_root, solution_rows)
     log.info("Completed %s/%s: %d/%d", source_label, plan_name, global_generated, quota)
     if state_counts is not None:
         state_counts[(source_label, plan_name)] = int(global_generated)
@@ -3372,6 +3397,7 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
         run_cfg_path = str(loaded.path)
 
     outputs_root = run_outputs_root(run_root)
+    tables_root = run_tables_root(run_root)
     existing_outputs = has_existing_run_outputs(run_root)
     if resume:
         if not existing_outputs:
@@ -3498,13 +3524,18 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
     sampling_cfg = cfg.generation.sampling
     library_source = str(getattr(sampling_cfg, "library_source", "build")).lower()
     if library_source == "artifact":
-        artifact_path = resolve_relative_path(loaded.path, sampling_cfg.library_artifact_path)
+        artifact_path = resolve_outputs_scoped_path(
+            loaded.path,
+            run_root,
+            sampling_cfg.library_artifact_path,
+            label="sampling.library_artifact_path",
+        )
         if not artifact_path.exists():
             raise RuntimeError(f"Library artifact directory not found: {artifact_path}")
         library_artifact = load_library_artifact(artifact_path)
         library_records = load_library_records(library_artifact)
         library_cursor = {}
-        existing_library_by_plan = _load_existing_library_index_by_plan(outputs_root)
+        existing_library_by_plan = _load_existing_library_index_by_plan(tables_root)
         for inp in cfg.inputs:
             for plan_item in pl:
                 key = (inp.name, plan_item.name)
@@ -3530,7 +3561,7 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
                         )
                     if rec.library_sampling_strategy is None or rec.pool_strategy is None:
                         raise RuntimeError(
-                            f"Library artifact missing sampling metadata for {inp.name}/{plan_item.name} "
+                            f"Library artifact missing Stage-B sampling metadata for {inp.name}/{plan_item.name} "
                             f"(library_index={rec.library_index})."
                         )
                     required = list(dict.fromkeys(plan_item.required_regulators or []))
@@ -3561,7 +3592,7 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
                                 f"< min_count_by_regulator={min_count}."
                             )
     elif library_source != "build":
-        raise RuntimeError(f"Unsupported sampling.library_source: {library_source}")
+        raise RuntimeError(f"Unsupported Stage-B sampling.library_source: {library_source}")
     ensure_run_meta_dir(run_root)
     state_path = run_state_path(run_root)
     state_created_at = datetime.now(timezone.utc).isoformat()
@@ -3588,8 +3619,8 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
     site_failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] = {}
     attempt_counters: dict[tuple[str, str], int] = {}
     if resume:
-        site_failure_counts = _load_failure_counts_from_attempts(outputs_root)
-        attempt_counters = _load_existing_attempt_index_by_plan(outputs_root)
+        site_failure_counts = _load_failure_counts_from_attempts(tables_root)
+        attempt_counters = _load_existing_attempt_index_by_plan(tables_root)
         if cfg.output.targets:
             try:
                 df_existing, _ = load_records_from_config(
@@ -3611,14 +3642,16 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
                     if mismatched and any(val != config_sha for val in mismatched):
                         raise RuntimeError(
                             "Existing outputs were produced with a different config. "
-                            "Remove outputs/ or stage a new run root to start fresh."
+                            "Remove outputs/tables (and outputs/meta if present) "
+                            "or stage a new run root to start fresh."
                         )
                 if "densegen__run_id" in df_existing.columns:
                     run_ids = df_existing["densegen__run_id"].dropna().unique().tolist()
                     if run_ids and any(val != cfg.run.id for val in run_ids):
                         raise RuntimeError(
                             "Existing outputs were produced with a different run_id. "
-                            "Remove outputs/ or stage a new run root to start fresh."
+                            "Remove outputs/tables (and outputs/meta if present) "
+                            "or stage a new run root to start fresh."
                         )
                 if {"densegen__input_name", "densegen__plan"} <= set(df_existing.columns):
                     counts = (
@@ -3829,13 +3862,14 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
         sink.finalize()
 
     outputs_root = run_outputs_root(run_root)
-    _consolidate_parts(outputs_root, part_glob="attempts_part-*.parquet", final_name="attempts.parquet")
-    _consolidate_parts(outputs_root, part_glob="solutions_part-*.parquet", final_name="solutions.parquet")
+    tables_root = run_tables_root(run_root)
+    _consolidate_parts(tables_root, part_glob="attempts_part-*.parquet", final_name="attempts.parquet")
+    _consolidate_parts(tables_root, part_glob="solutions_part-*.parquet", final_name="solutions.parquet")
 
     libraries_dir = outputs_root / "libraries"
     if library_source == "artifact":
         if library_artifact is None:
-            raise RuntimeError("sampling.library_source=artifact but no library artifact was loaded.")
+            raise RuntimeError("Stage-B sampling.library_source=artifact but no library artifact was loaded.")
         try:
             build_rows = pd.read_parquet(library_artifact.builds_path).to_dict("records")
             member_rows = pd.read_parquet(library_artifact.members_path).to_dict("records")
@@ -3902,7 +3936,7 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
             raise RuntimeError(f"Failed to write library artifacts: {exc}") from exc
 
     if composition_rows:
-        composition_path = outputs_root / "composition.parquet"
+        composition_path = tables_root / "composition.parquet"
         existing_rows: list[dict] = []
         if composition_path.exists():
             try:

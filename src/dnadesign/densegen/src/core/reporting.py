@@ -23,11 +23,17 @@ import numpy as np
 import pandas as pd
 
 from ..adapters.outputs import load_records_from_config
-from ..config import RootConfig, resolve_run_root, resolve_run_scoped_path
+from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
 from ..utils.mpl_utils import ensure_mpl_cache_dir
 from .artifacts.pool import POOL_MODE_TFBS, load_pool_artifact
 from .run_manifest import load_run_manifest
-from .run_paths import candidates_root, run_manifest_path, run_outputs_root
+from .run_paths import (
+    candidates_root,
+    dense_arrays_path,
+    run_manifest_path,
+    run_outputs_root,
+    run_tables_root,
+)
 
 log = logging.getLogger(__name__)
 
@@ -368,6 +374,7 @@ def collect_report_data(
 ) -> ReportBundle:
     run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
     outputs_root = run_outputs_root(run_root)
+    tables_root = run_tables_root(run_root)
     warnings: list[str] = []
     cols = [
         "id",
@@ -394,17 +401,19 @@ def collect_report_data(
         warnings.append("Output records are empty; solution-focused sections will be blank.")
 
     used_df = _explode_used(df)
-    attempts_path = outputs_root / "attempts.parquet"
+    attempts_path = tables_root / "attempts.parquet"
     if not attempts_path.exists():
-        warnings.append("outputs/attempts.parquet is missing; library usage and resample summaries may be incomplete.")
+        warnings.append(
+            "outputs/tables/attempts.parquet is missing; library usage and resample summaries may be incomplete."
+        )
         attempts_df = pd.DataFrame()
     else:
         attempts_df = pd.read_parquet(attempts_path)
     library_df = _explode_library_from_attempts(attempts_df)
-    solutions_path = outputs_root / "solutions.parquet"
+    solutions_path = tables_root / "solutions.parquet"
     if not solutions_path.exists():
         warnings.append(
-            "outputs/solutions.parquet is missing; solution previews and composition summaries will be skipped."
+            "outputs/tables/solutions.parquet is missing; solution previews and composition summaries will be skipped."
         )
         solutions_df = pd.DataFrame()
     else:
@@ -816,7 +825,7 @@ def collect_report_data(
         tables["tf_cooccurrence"] = _compute_cooccurrence(used_df)
         tables["tf_adjacency"] = _compute_adjacency(used_df)
 
-    composition_path = outputs_root / "composition.parquet"
+    composition_path = tables_root / "composition.parquet"
     if composition_path.exists():
         try:
             tables["composition"] = pd.read_parquet(composition_path)
@@ -889,7 +898,7 @@ def collect_report_data(
         if candidate_logging and (candidates_dir / "candidates.parquet").exists()
         else None,
         "candidates_summary_path": str(cand_summary_path) if candidate_logging and cand_summary_path.exists() else None,
-        "outputs_path": str(outputs_root / "dense_arrays.parquet"),
+        "outputs_path": str(dense_arrays_path(run_root)),
         "effective_config_path": str(outputs_root / "meta" / "effective_config.json")
         if (outputs_root / "meta" / "effective_config.json").exists()
         else None,
@@ -911,11 +920,12 @@ def collect_report_data(
     return ReportBundle(run_report=run_report, tables=tables, plots={})
 
 
-def _plot_available() -> bool:
+def _plot_available(cache_dir: Path) -> bool:
     try:
-        ensure_mpl_cache_dir()
+        ensure_mpl_cache_dir(cache_dir)
         import matplotlib  # noqa: F401
-    except Exception:
+    except Exception as exc:
+        log.info("Matplotlib not available or cache setup failed; skipping report plots. (%s)", exc)
         return False
     return True
 
@@ -940,14 +950,16 @@ def _markdown_table(df: pd.DataFrame, *, columns: list[str] | None = None, max_r
     return "\n".join(lines)
 
 
-def _generate_report_plots(bundle: ReportBundle, *, cfg_path: Path, out_dir: Path) -> dict[str, list[str]]:
-    if not _plot_available():
+def _generate_report_plots(
+    bundle: ReportBundle, *, cfg_path: Path, out_dir: Path, cache_dir: Path
+) -> dict[str, list[str]]:
+    if not _plot_available(cache_dir):
         log.info("matplotlib not available; skipping report plots.")
         return {}
     import matplotlib.pyplot as plt
 
     plots: dict[str, list[str]] = {}
-    assets_dir = out_dir / "report_assets"
+    assets_dir = out_dir / "assets"
     assets_dir.mkdir(parents=True, exist_ok=True)
     run_root = resolve_run_root(cfg_path, bundle.run_report.get("run_root", ""))
     outputs_root = run_outputs_root(run_root)
@@ -1087,20 +1099,21 @@ def write_report(
     root_cfg: RootConfig,
     cfg_path: Path,
     *,
-    out_dir: str | Path = "outputs",
+    out_dir: str | Path = "outputs/report",
     include_combinatorics: bool = False,
     formats: set[str] | None = None,
 ) -> ReportBundle:
     run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
-    out_path = resolve_run_scoped_path(cfg_path, run_root, str(out_dir), label="report.out")
+    out_path = resolve_outputs_scoped_path(cfg_path, run_root, str(out_dir), label="report.out")
     out_path.mkdir(parents=True, exist_ok=True)
+    cache_dir = run_root / "outputs" / ".mpl-cache"
 
     bundle = collect_report_data(root_cfg, cfg_path, include_combinatorics=include_combinatorics)
     composition = bundle.tables.get("composition")
     if composition is not None and not composition.empty:
         bundle.run_report["composition_rows"] = int(len(composition))
         try:
-            assets_dir = out_path / "report_assets"
+            assets_dir = out_path / "assets"
             assets_dir.mkdir(parents=True, exist_ok=True)
             composition_csv = assets_dir / "composition.csv"
             composition.to_csv(composition_csv, index=False)
@@ -1108,7 +1121,7 @@ def write_report(
         except Exception:
             log.warning("Failed to export composition CSV for report.", exc_info=True)
     try:
-        plots = _generate_report_plots(bundle, cfg_path=cfg_path, out_dir=out_path)
+        plots = _generate_report_plots(bundle, cfg_path=cfg_path, out_dir=out_path, cache_dir=cache_dir)
         bundle.plots = plots
         if plots:
             bundle.run_report["report_plots"] = plots
@@ -1145,19 +1158,19 @@ def _render_report_md(bundle: ReportBundle) -> str:
         f"- Warnings: {len(report.get('warnings') or [])}",
         "",
         "## Outputs",
-        "- outputs/dense_arrays.parquet",
-        "- outputs/attempts.parquet",
-        "- outputs/solutions.parquet",
-        "- outputs/composition.parquet",
+        "- outputs/tables/dense_arrays.parquet",
+        "- outputs/tables/attempts.parquet",
+        "- outputs/tables/solutions.parquet",
+        "- outputs/tables/composition.parquet",
         "- outputs/libraries/library_builds.parquet",
         "- outputs/libraries/library_members.parquet",
         "- outputs/pools/pool_manifest.json",
         "- outputs/meta/effective_config.json",
         "- outputs/meta/events.jsonl",
-        "- outputs/candidates/<run_id>/candidates.parquet (when candidate logging is enabled)",
-        "- outputs/candidates/<run_id>/candidates_summary.parquet (when candidate logging is enabled)",
-        "- outputs/report_assets/ (plots linked by report.html)",
-        "- outputs/report_assets/composition.csv (full composition table, when available)",
+        "- outputs/pools/candidates/candidates.parquet (when candidate logging is enabled)",
+        "- outputs/pools/candidates/candidates_summary.parquet (when candidate logging is enabled)",
+        "- outputs/report/assets/ (plots linked by report.html)",
+        "- outputs/report/assets/composition.csv (full composition table, when available)",
     ]
     warnings = report.get("warnings") or []
     if warnings:

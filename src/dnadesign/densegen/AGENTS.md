@@ -5,9 +5,8 @@ Supplement to repo-root `AGENTS.md` with `densegen`-specific locations + run sha
 ### Key paths
 - README: `src/dnadesign/densegen/README.md`
 - Tool code: `src/dnadesign/densegen/src/` (entrypoint lives here)
-- Default demo workspace: `src/dnadesign/densegen/workspaces/demo_meme_two_tf/`
-- Demo config: `src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml`
-- Outputs: per-workspace `outputs/` (generated)
+- Packaged demo template id: `demo_meme_two_tf`
+- Outputs: per-workspace `outputs/` (generated; run artifacts live in tables/plots/report)
 
 ### External deps (do not install unless asked)
 - MILP solver required (e.g., CBC or GUROBI).
@@ -17,30 +16,38 @@ Supplement to repo-root `AGENTS.md` with `densegen`-specific locations + run sha
 - Generated: `workspaces/*/outputs/**` (parquet, plots, logs, manifests)
 
 ### Run ergonomics (explicit)
-- If `outputs/` already exists, use `dense run --resume` to continue or `dense run --fresh` to clear
-  outputs and start over. Runs do not auto-resume.
+- If run outputs already exist (e.g., `outputs/tables/attempts.parquet` or `outputs/meta/run_state.json`),
+  use `dense run --resume` to continue or `dense run --fresh` to clear outputs and start over.
+  Runs do not auto-resume.
 
 ### Commands (copy/paste)
 DenseGen CLI is exposed as `dense` in this repo:
 ```bash
 uv run dense --help
 
-pixi run dense validate-config -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-uv run dense inspect plan     -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-pixi run dense run      -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --fresh
-uv run dense plot     -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-# subset example:
-uv run dense plot -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --only tf_usage,tf_coverage
+# Workspace-first demo flow (no repo-root paths).
+uv run dense workspace init --id demo --template-id demo_meme_two_tf --copy-inputs
+cd demo
+uv run dense validate-config --probe-solver
+uv run dense inspect inputs
+uv run dense inspect config
+uv run dense stage-a build-pool
+uv run dense stage-b build-libraries
+uv run dense run
+uv run dense inspect run --library --events
+uv run dense ls-plots
+uv run dense plot --only tf_usage,tf_coverage
 ```
 
 ### MEME Suite / FIMO pressure testing
 
-When the demo uses `scoring_backend: fimo`, prefer the pixi workflow so MEME Suite is on PATH:
+When the demo uses `scoring_backend: fimo`, prefer the pixi workflow so MEME Suite is on PATH
+(run these from a workspace directory):
 
 ```bash
 pixi run fimo --version
-pixi run dense validate-config -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-pixi run dense run -c src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml --no-plot --fresh
+pixi run dense validate-config --probe-solver
+pixi run dense run --fresh
 ```
 
 Pixi includes a `dense` task alias in `pixi.toml`, so `pixi run dense ...` works without `uv run`.
@@ -49,8 +56,8 @@ If `fimo` is not found, either use `pixi run ...` or set `MEME_BIN` to the MEME 
 
 ### Candidate artifacts
 
-When `keep_all_candidates_debug: true`, candidate artifacts land under:
-`outputs/candidates/<run_id>/<input_name>/` and are overwritten each run for that run_id.
+When `keep_all_candidates_debug: true`, candidate artifacts land under
+`outputs/pools/candidates/` (files named `candidates__<label>.parquet`) and are overwritten each run.
 If you want to keep a snapshot, copy the directory elsewhere before rerunning.
 
 ### Tests

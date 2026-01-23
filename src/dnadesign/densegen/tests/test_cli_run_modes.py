@@ -12,7 +12,7 @@ def _write_config(run_root: Path) -> Path:
     cfg_path.write_text(
         """
         densegen:
-          schema_version: "2.4"
+          schema_version: "2.5"
           run:
             id: demo
             root: "."
@@ -26,7 +26,7 @@ def _write_config(run_root: Path) -> Path:
               bio_type: dna
               alphabet: dna_4
             parquet:
-              path: outputs/dense_arrays.parquet
+              path: outputs/tables/dense_arrays.parquet
           generation:
             sequence_length: 10
             quota: 1
@@ -36,6 +36,17 @@ def _write_config(run_root: Path) -> Path:
           solver:
             backend: CBC
             strategy: iterate
+          postprocess:
+            pad:
+              mode: adaptive
+              end: 5prime
+              gc:
+                mode: range
+                min: 0.4
+                max: 0.6
+                target: 0.5
+                tolerance: 0.1
+                min_pad_length: 4
           logging:
             log_dir: outputs/logs
         """.strip()
@@ -76,3 +87,24 @@ def test_run_resume_requires_outputs(tmp_path: Path) -> None:
 
     assert result.exit_code != 0, result.output
     assert "--resume requested but no outputs were found" in result.output
+
+
+def test_campaign_reset_removes_outputs(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+
+    outputs_dir = run_root / "outputs"
+    outputs_dir.mkdir(parents=True, exist_ok=True)
+    (outputs_dir / "meta").mkdir(parents=True, exist_ok=True)
+    (outputs_dir / "tables").mkdir(parents=True, exist_ok=True)
+    (outputs_dir / "meta" / "run_state.json").write_text("{}")
+    (outputs_dir / "tables" / "dense_arrays.parquet").write_text("seed")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["campaign-reset", "-c", str(cfg_path)])
+
+    assert result.exit_code == 0, result.output
+    assert not outputs_dir.exists()
+    assert (run_root / "inputs.csv").exists()

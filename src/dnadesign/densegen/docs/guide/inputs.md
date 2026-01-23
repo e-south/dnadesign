@@ -1,427 +1,340 @@
-## Inputs
+## Inputs (Stage‑A)
 
-Inputs define the binding-site library that feeds planning and optimization. Each entry in
-`densegen.inputs` is a named source (choose one input type per entry), and paths resolve relative
-to the config file location.
-
-PWM inputs perform **input sampling** (sampling sites from PWMs) via
-`densegen.inputs[].sampling`. This is distinct from **library sampling**
-(`densegen.generation.sampling`), which selects a solver library (`library_size`) from the
-realized TFBS pool (`input_tfbs_count`). PWM sampling size is controlled only by the input
-sampling config; solver library size is controlled only by `densegen.generation.sampling`.
-
-Sample inputs live in:
-- `src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs` (LexA + CpxR MEME files, copied from
-  the Cruncher demo workspace for a self-contained example)
-- For PWM artifacts, generate files with `cruncher catalog export-densegen` and place them
-  under your run’s `inputs/` directory (see examples below).
-
-Common end-to-end flow (Cruncher → DenseGen):
-1) `cruncher fetch sites` (DAP-seq, RegulonDB, local MEME sites) and merge as needed.
-2) `cruncher lock` → `cruncher parse` (optional) → `cruncher discover` (MEME/STREME) to generate PWMs.
-3) `cruncher catalog export-densegen` to emit per-motif JSON artifacts.
-4) (Optional) `cruncher catalog export-sites` to emit a binding-site table for DenseGen.
-5) Point DenseGen `inputs` at those artifacts (or at MEME/JASPAR files directly).
+This guide covers **Stage‑A ingestion and sampling** (`densegen.inputs[]`). Stage‑B sampling
+(`densegen.generation.sampling` for Stage‑B sampling) is documented in the generation guide.
 
 ### Contents
+- [Stage‑A PWM sampling config (common)](#stage-a-pwm-sampling-config-common) - shared Stage‑A sampling fields.
 - [Binding site table](#binding-site-table-type-binding_sites) - explicit TF/TFBS pairs.
 - [Sequence library](#sequence-library-type-sequence_library) - raw sequence seeds.
 - [PWM MEME](#pwm-meme-type-pwm_meme) - sample from MEME PWMs.
-- [PWM MEME set](#pwm-meme-set-type-pwm_meme_set) - merge multiple MEME files into one TF pool.
+- [PWM MEME set](#pwm-meme-set-type-pwm_meme_set) - merge multiple MEME files.
 - [PWM JASPAR](#pwm-jaspar-type-pwm_jaspar) - sample from JASPAR PFMs.
 - [PWM matrix CSV](#pwm-matrix-csv-type-pwm_matrix_csv) - sample from CSV matrices.
-- [PWM artifact JSON](#pwm-artifact-json-type-pwm_artifact) - sample from contract-first motif artifacts.
-- [PWM artifact set](#pwm-artifact-set-json-type-pwm_artifact_set) - combine multiple motif artifacts into one input.
+- [PWM artifact JSON](#pwm-artifact-json-type-pwm_artifact) - sample from artifact contracts.
+- [PWM artifact set](#pwm-artifact-set-json-type-pwm_artifact_set) - merge multiple artifacts.
 - [USR sequences](#usr-sequences-type-usr_sequences) - read sequences from USR.
-- [Path resolution](#path-resolution) - how relative paths are resolved.
-- [Interaction with constraints](#interaction-with-constraints) - constraints that depend on inputs.
+- [Path resolution](#path-resolution) - how relative paths resolve.
+- [Interaction with constraints](#interaction-with-constraints) - Stage‑A inputs + constraints.
+
+---
+
+### Stage‑A PWM sampling config (common)
+
+Applies to `pwm_meme`, `pwm_meme_set`, `pwm_jaspar`, `pwm_matrix_csv`, `pwm_artifact`, and
+`pwm_artifact_set`.
+
+Required (always):
+- `n_sites` (int > 0)
+
+Required when `scoring_backend: densegen`:
+- `scoring_backend: densegen` (default)
+- exactly one of `score_threshold` or `score_percentile`
+
+Required when `scoring_backend: fimo`:
+- `scoring_backend: fimo`
+- `pvalue_threshold` (float in (0, 1])
+
+Optional (supported):
+- `strategy`: `consensus | stochastic | background` (default `stochastic`)
+- `oversample_factor` (int > 0; default `10`)
+- `max_candidates` (densegen‑only; int > 0 when set)
+- `max_seconds` (densegen‑only; float > 0 when set)
+- `selection_policy` (fimo‑only): `random_uniform | top_n | stratified`
+- `pvalue_bins` (fimo‑only): list of floats, strictly increasing, must end with `1.0`
+- `mining` (fimo‑only):
+  - `batch_size` (int > 0)
+  - `max_batches` (optional int > 0)
+  - `max_candidates` (optional int > 0; must be ≥ `n_sites`)
+  - `max_seconds` (optional float > 0; default 60s)
+  - `retain_bin_ids` (optional list of ints; unique, in‑range)
+  - `log_every_batches` (int > 0)
+- `bgfile` (fimo‑only): MEME background file
+- `keep_all_candidates_debug` (bool): write candidate‑level Parquet under `outputs/pools/candidates/`
+  (files named `candidates__<label>.parquet`) and aggregate to
+  `outputs/pools/candidates/candidates.parquet` + `outputs/pools/candidates/candidates_summary.parquet`
+- `include_matched_sequence` (fimo‑only)
+- `length_policy`: `exact | range` (default `exact`)
+- `length_range`: `[min, max]` (required when `length_policy: range`)
+- `trim_window_length` (optional int > 0)
+- `trim_window_strategy`: `max_info`
+
+Strict validation behavior:
+- Unknown keys are errors (extra fields are rejected).
+- DenseGen backend requires exactly one of `score_threshold` or `score_percentile`.
+- FIMO backend requires `pvalue_threshold`; `max_candidates`/`max_seconds` are **not** allowed.
+- `consensus` requires `n_sites: 1`.
+
+Minimal Stage‑A PWM example (DenseGen backend):
+
+```yaml
+inputs:
+  - name: lexA
+    type: pwm_meme
+    path: inputs/lexA.txt
+    sampling:  # Stage‑A sampling
+      n_sites: 80
+      score_percentile: 80
+```
+
+Minimal Stage‑A PWM example (FIMO backend):
+
+```yaml
+inputs:
+  - name: lexA
+    type: pwm_meme
+    path: inputs/lexA.txt
+    sampling:  # Stage‑A sampling
+      scoring_backend: fimo
+      pvalue_threshold: 1e-4
+      n_sites: 80
+```
 
 ---
 
 ### Binding site table (`type: binding_sites`)
 
-Use a CSV, Parquet, or XLSX table with regulator and binding-site sequences.
+Required fields:
+- `name`, `type`, `path`
 
-Required columns (override via `columns`):
-- `regulator` (default column: `tf`)
-- `sequence` (default column: `tfbs`)
+Supported optional fields:
+- `format`: `csv | parquet | xlsx`
+- `columns.regulator` (default: `tf`)
+- `columns.sequence` (default: `tfbs`)
+- `columns.site_id`, `columns.source`
 
-Optional columns:
-- `site_id`
-- `source`
+Strict validation:
+- Regulator + sequence must be non‑empty.
+- Sequences must be A/C/G/T only.
 
-Strict rules:
-- Regulator + sequence must be non-empty.
-- Duplicate regulator/sequence pairs are allowed; use `generation.sampling.unique_binding_sites`
-  to dedupe at sampling time (or keep duplicates as implicit weights).
-- Sequences must be A/C/G/T only (DNA_4).
-
-Example:
+Minimal example:
 
 ```yaml
 inputs:
   - name: demo
     type: binding_sites
-    path: inputs/binding_sites.xlsx
-    format: xlsx
+    path: inputs/binding_sites.csv
 ```
 
 ---
 
 ### Sequence library (`type: sequence_library`)
 
-Use a CSV or Parquet table with a `sequence` column (override via `sequence_column`).
+Required fields:
+- `name`, `type`, `path`
 
-Strict rules:
-- Sequences must be non-empty.
-- Sequences must be A/C/G/T only.
+Supported optional fields:
+- `format`: `csv | parquet`
+- `sequence_column` (default: `sequence`)
 
-Example:
+Strict validation:
+- Sequence column must exist.
+- Sequences must be non‑empty and A/C/G/T only.
+
+Minimal example:
 
 ```yaml
 inputs:
   - name: seeds
     type: sequence_library
     path: inputs/seed_sequences.csv
-    format: csv
 ```
 
 ---
 
 ### PWM MEME (`type: pwm_meme`)
 
-Use a MEME-format PWM file and explicitly sample binding sites.
+Required fields:
+- `name`, `type`, `path`, Stage‑A `sampling` config
 
-Required sampling fields:
-- `strategy`: `consensus | stochastic | background`
-- `n_sites`: number of binding sites to generate per motif
-- `scoring_backend`: `densegen | fimo` (default: `densegen`)
-- `score_threshold` or `score_percentile` (exactly one; densegen backend only)
-- `pvalue_threshold` (float in (0, 1]; fimo backend only)
-- `oversample_factor`: oversampling multiplier for candidate generation
-- `max_candidates` (optional): cap on candidate generation; helps bound long motifs (**densegen** backend only)
-- `max_seconds` (optional): time limit for candidate generation per batch (best-effort cap; **densegen** backend only)
-- `selection_policy`: `random_uniform | top_n | stratified` (default: `random_uniform`; fimo only)
-- `pvalue_bins` (optional): list of p‑value bin edges (strictly increasing; must end with `1.0`)
-- `mining` (fimo only): batch/time controls for mining with FIMO
-  - `batch_size` (int > 0): candidates per batch
-  - `max_batches` (optional int > 0): limit batches per motif (quota-style)
-  - `max_candidates` (optional int > 0): total candidates per motif (quota-style)
-  - `max_seconds` (optional float > 0; default 60s): limit total mining time per motif
-  - `retain_bin_ids` (optional list of ints): keep only specific p‑value bins
-  - `log_every_batches` (int > 0): log yield summaries every N batches
-- `bgfile` (optional): MEME bfile-format background model for FIMO
-- `keep_all_candidates_debug` (optional): write raw FIMO TSVs and candidate-level Parquet
-  (`candidates__<label>.parquet`) under `outputs/candidates/<run_id>/<input_name>/` for inspection
-  (overwritten each run for that run_id)
-- `include_matched_sequence` (optional): include `fimo_matched_sequence` column in the TFBS table
+Supported optional fields:
+- `motif_ids` (list of motif IDs to include)
 
-Notes:
-- `densegen` scoring uses PWM log-odds with the motif background (from MEME when available).
-- `fimo` scoring scans the entire emitted TFBS and uses a model-based p-value threshold.
-  `pvalue_threshold` controls match strength (smaller values are stronger).
-- `fimo` backend requires the `fimo` executable on PATH (run via pixi).
-- If `bgfile` is omitted, FIMO uses the motif background (or uniform if none provided).
-- `background` selects low-scoring sequences (<= threshold/percentile; or pvalue >= threshold for fimo).
-- `selection_policy: stratified` uses fixed p‑value bins to balance strong/weak matches.
-- Canonical p‑value bins (default): `[1e-10, 1e-8, 1e-6, 1e-4, 1e-3, 1e-2, 1e-1, 1.0]`.
-  Bin 0 is `(0, 1e-10]`, bin 1 is `(1e-10, 1e-8]`, etc.
-- For FIMO, the candidate target is `n_sites * oversample_factor`, but mining caps or time limits
-  can stop early. Expect fewer candidates if `mining.max_seconds`, `mining.max_batches`, or
-  `mining.max_candidates` are binding.
-- FIMO mining defaults to **time-based** limits (`mining.max_seconds: 60`). To switch to a quota,
-  set `mining.max_seconds: null` and use `mining.max_candidates` or `mining.max_batches`
-  (with `mining.batch_size`) as the primary cap.
-- `mining.max_candidates` must be >= `n_sites`; DenseGen fails fast otherwise.
-- If you omit `mining` entirely, DenseGen uses the default mining settings (batch size + time cap)
-  for FIMO-backed sampling.
+Strict validation:
+- `motif_ids` must be unique, non‑empty strings.
+- Stage‑A sampling config is validated as above.
 
-#### FIMO p-values (beginner-friendly)
-- A **p-value** is the probability that a random sequence (under the background model)
-  would score **at least as well** as the observed match.
-- Smaller p-values mean **stronger** motif matches; larger p-values mean **weaker** matches.
-- As a rule of thumb: `1e-4` is a strong match, `1e-3` is moderate, `1e-2` is weak.
-- DenseGen accepts a candidate if its **best hit** within the emitted TFBS passes the threshold.
-- For `strategy: background`, DenseGen keeps **weak** matches where `pvalue >= pvalue_threshold`.
-- If you set `mining.retain_bin_ids`, DenseGen only keeps candidates in those bins (useful for mining
-  specific affinity ranges).
-- FIMO adds per‑TFBS metadata columns: `fimo_score`, `fimo_pvalue`, `fimo_start`, `fimo_stop`,
-  `fimo_strand`, `fimo_bin_id`, `fimo_bin_low`, `fimo_bin_high`, and (optionally)
-  `fimo_matched_sequence` (the best‑hit window within the TFBS; includes strand-aware match).
-- `length_policy` defaults to `exact`. Use `length_policy: range` with `length_range: [min, max]`
-  to sample variable lengths (min must be >= motif length).
-- `trim_window_length` optionally trims the PWM to a max‑information window before sampling (useful
-  for long motifs when you want shorter cores); `trim_window_strategy` currently supports `max_info`.
-- `consensus` requires `n_sites: 1`.
-
-Example:
+Minimal example:
 
 ```yaml
 inputs:
-  - name: lexA_meme
+  - name: lexA
     type: pwm_meme
     path: inputs/lexA.txt
     motif_ids: [lexA]
-    sampling:
-      strategy: stochastic
+    sampling:  # Stage‑A sampling
       n_sites: 80
-      oversample_factor: 12
-      max_candidates: 50000
-      max_seconds: 5
       score_percentile: 80
-      length_policy: range
-      length_range: [22, 28]
 ```
-
-FIMO-backed example:
-
-```yaml
-inputs:
-  - name: lexA_meme
-    type: pwm_meme
-    path: inputs/lexA.txt
-    motif_ids: [lexA]
-    sampling:
-      strategy: stochastic
-      scoring_backend: fimo
-      pvalue_threshold: 1e-4
-      selection_policy: top_n
-      n_sites: 80
-      oversample_factor: 200
-      mining:
-        batch_size: 5000
-        max_candidates: 20000
-        max_batches: 4
-        retain_bin_ids: [0, 1, 2, 3]
-        log_every_batches: 1
-```
-
-#### Mining workflow (p‑value strata)
-If you want to **mine** sequences across affinity strata, use `selection_policy: stratified` plus
-canonical p‑value bins and the `mining` block. A typical workflow:
-
-1) Oversample candidates (`oversample_factor`) or set a direct quota (`mining.max_candidates`),
-   then score with FIMO in batches (`mining.batch_size`).
-2) Accept candidates using `pvalue_threshold` (global strength cutoff).
-3) Use `mining.retain_bin_ids` to select one or more bins (e.g., moderate matches only).
-4) Repeat runs (or increase `mining.max_candidates` / `mining.max_batches` / `mining.max_seconds`)
-   to accumulate a deduplicated reservoir of sequences per bin. By default mining runs for 60
-   seconds per motif; set `mining.max_seconds: null` to make quotas the primary cap.
-5) Use `dense stage-a build-pool` to materialize the pool, then `dense stage-b build-libraries`
-   to preview Stage‑B library sampling without running the solver.
-6) Use `dense inspect run --library` to inspect which TFBS were offered vs used in Stage‑B sampling.
-
-DenseGen reports per‑bin yield summaries (hits, accepted, selected) for retained bins only (or all
-bins if `retain_bin_ids` is unset), so you can track how many candidates land in each stratum and
-adjust thresholds or oversampling accordingly. With `selection_policy: stratified`, the selected‑bin
-counts show how evenly the final pool spans strata.
-If candidate logging is enabled, DenseGen also writes aggregated mining summaries to
-`outputs/candidates/<run_id>/candidates_summary.parquet` (overwritten by `dense run` or
-`stage-a build-pool --overwrite`). Copy `outputs/candidates/<run_id>/` elsewhere if you want
-to keep per-run mining logs.
-
-#### Stdout UX for long runs
-DenseGen supports three logging styles so long runs stay readable:
-
-- `progress_style: stream` (default) logs per‑sequence updates; tune `progress_every` to reduce noise.
-- `progress_style: summary` hides per‑sequence logs and only prints periodic leaderboard summaries.
-- `progress_style: screen` clears and redraws a compact dashboard (progress, leaderboards, last sequence)
-  at `progress_refresh_seconds`.
-
-For iterative mining workflows, `screen` or `summary` modes are recommended to avoid log spam while still
-seeing yield/leaderboard progress over time.
 
 ---
 
 ### PWM MEME set (`type: pwm_meme_set`)
 
-Use multiple MEME files and sample them into a single TF pool. This is the
-recommended way to combine LexA + CpxR motifs for DenseGen so the solver stage
-can see both TFs at once (rather than sampling two independent inputs).
+Required fields:
+- `name`, `type`, `paths` (non‑empty list), Stage‑A `sampling`
 
-Required sampling fields are identical to `pwm_meme`.
+Supported optional fields:
+- `motif_ids` (list of motif IDs to include)
 
-Example:
+Strict validation:
+- `paths` must be unique, non‑empty.
+- `motif_ids` must be unique, non‑empty.
+
+Minimal example:
 
 ```yaml
 inputs:
-  - name: lexA_cpxR_meme
+  - name: lexA_cpxR
     type: pwm_meme_set
-    paths:
-      - inputs/lexA.txt
-      - inputs/cpxR.txt
-    motif_ids: [lexA, cpxR]
-    sampling:
-      strategy: stochastic
+    paths: [inputs/lexA.txt, inputs/cpxR.txt]
+    sampling:  # Stage‑A sampling
       n_sites: 80
-      oversample_factor: 12
-      max_candidates: 50000
       score_percentile: 80
-      length_policy: range
-      length_range: [22, 28]
 ```
 
 ---
 
 ### PWM JASPAR (`type: pwm_jaspar`)
 
-Use a JASPAR PFM file and explicitly sample binding sites.
+Required fields:
+- `name`, `type`, `path`, Stage‑A `sampling`
 
-Required sampling fields are identical to `pwm_meme`.
+Supported optional fields:
+- `motif_ids` (list of motif IDs to include)
 
-Example:
+Strict validation:
+- `motif_ids` must be unique, non‑empty.
+
+Minimal example:
 
 ```yaml
 inputs:
   - name: jaspar_demo
     type: pwm_jaspar
-    # Replace with your JASPAR PFM file.
-    path: /path/to/motifs.jaspar
-    motif_ids: [YourTF]
-    sampling:
-      strategy: background
-      n_sites: 200
-      oversample_factor: 5
-      score_percentile: 10
+    path: inputs/motifs.jaspar
+    sampling:  # Stage‑A sampling
+      n_sites: 80
+      score_percentile: 80
 ```
 
 ---
 
 ### PWM matrix CSV (`type: pwm_matrix_csv`)
 
-Use a CSV matrix with `A,C,G,T` columns (override via `columns`) and a single motif ID.
+Required fields:
+- `name`, `type`, `path`, `motif_id`, Stage‑A `sampling`
 
-Required sampling fields are identical to `pwm_meme`.
+Supported optional fields:
+- `columns` (map column names to A/C/G/T)
 
-Example:
+Strict validation:
+- `motif_id` must be a non‑empty string.
+
+Minimal example:
 
 ```yaml
 inputs:
-  - name: matrix_demo
+  - name: pwm_csv
     type: pwm_matrix_csv
-    # Replace with your CSV matrix file.
-    path: /path/to/motif_matrix.csv
-    motif_id: YourTF
-    columns:
-      A: A
-      C: C
-      G: G
-      T: T
-    sampling:
-      strategy: stochastic
-      n_sites: 200
-      oversample_factor: 5
-      score_threshold: -9.0
+    path: inputs/lexA_matrix.csv
+    motif_id: lexA
+    sampling:  # Stage‑A sampling
+      n_sites: 80
+      score_percentile: 80
 ```
 
 ---
 
 ### PWM artifact JSON (`type: pwm_artifact`)
 
-Use a per-motif JSON artifact that follows DenseGen's motif artifact contract
-(see `docs/reference/motif_artifacts.md`). This is the most decoupled path:
-DenseGen consumes explicit artifact files without parsing MEME/JASPAR directly.
-Artifacts in the Cruncher demo are generated via `cruncher catalog export-densegen`
-(implemented in `cruncher/src/app/motif_artifacts.py`).
+Required fields:
+- `name`, `type`, `path`, Stage‑A `sampling`
 
-Required sampling fields are identical to `pwm_meme`.
-Log-odds in the artifact are used for scoring.
+Supported optional fields:
+- none (aside from the Stage‑A sampling config)
 
-Example:
+Strict validation:
+- Artifact must match the motif contract (see `reference/motif_artifacts.md`).
+
+Minimal example:
 
 ```yaml
 inputs:
-  - name: motif_artifact
+  - name: lexA_artifact
     type: pwm_artifact
-    path: inputs/motif_artifacts/lexA__demo_local_meme__lexA.json
-    sampling:
-      strategy: stochastic
-      n_sites: 200
-      oversample_factor: 5
-      score_percentile: 90
-      length_policy: exact
+    path: inputs/motif_artifacts/lexA.json
+    sampling:  # Stage‑A sampling
+      n_sites: 80
+      score_percentile: 80
 ```
 
 ---
 
-### PWM artifact set JSON (`type: pwm_artifact_set`)
+### PWM artifact set (`type: pwm_artifact_set`)
 
-Use multiple per-motif JSON artifacts (one file per motif) and sample each PWM
-with the same policy. This keeps parsing decoupled while producing a single
-combined input library.
+Required fields:
+- `name`, `type`, `paths` (non‑empty list), Stage‑A `sampling`
 
-Notes:
-- Each artifact must declare a unique `motif_id` (duplicates are errors).
-- `overrides_by_motif_id` lets you override PWM sampling per motif while keeping a shared default.
+Supported optional fields:
+- `overrides_by_motif_id` (per‑motif Stage‑A sampling overrides)
 
-Example:
+Strict validation:
+- `paths` must be unique, non‑empty.
+- `overrides_by_motif_id` keys must be unique, non‑empty strings.
+
+Minimal example:
 
 ```yaml
 inputs:
   - name: lexA_cpxR_artifacts
     type: pwm_artifact_set
     paths:
-      - inputs/motif_artifacts/lexA__demo_local_meme__lexA.json
-      - inputs/motif_artifacts/cpxR__demo_local_meme__cpxR.json
-    sampling:
-      strategy: stochastic
+      - inputs/motif_artifacts/lexA.json
+      - inputs/motif_artifacts/cpxR.json
+    sampling:  # Stage‑A sampling
       n_sites: 80
-      oversample_factor: 10
-      score_percentile: 90
-      length_policy: exact
-    overrides_by_motif_id:
-      cpxR:
-        strategy: stochastic
-        n_sites: 40
-        oversample_factor: 10
-        score_percentile: 85
-        length_policy: exact
+      score_percentile: 80
 ```
 
 ---
 
 ### USR sequences (`type: usr_sequences`)
 
-Read sequences from a USR dataset.
+Required fields:
+- `name`, `type`, `dataset`, `root`
 
-Strict rules:
-- `root` is required (no default lookup).
-- Sequences must be non-empty and A/C/G/T only.
+Supported optional fields:
+- `limit`
 
-Example:
+Strict validation:
+- USR must be installed when this input is used.
+- Sequences must be A/C/G/T only.
+
+Minimal example:
 
 ```yaml
 inputs:
-  - name: usr_seed
+  - name: usr_seqs
     type: usr_sequences
     dataset: my_dataset
-    root: /path/to/usr/datasets
+    root: inputs/usr_datasets
 ```
 
 ---
 
 ### Path resolution
 
-All relative paths resolve against the config file directory.
+Input paths resolve relative to the config file directory. For `usr_sequences`, `root` is explicit
+and must exist; there is no fallback search.
 
 ---
 
 ### Interaction with constraints
 
-- Promoter constraints are fixed motifs and enforced by the optimizer.
-- `side_biases` motifs must exist in the sampled library (DenseGen fails fast if missing).
-- `required_regulators` (per plan item) must appear in the sampled library and in each solution.
-
----
-
-### Troubleshooting
-
-- Required regulators cannot be satisfied: increase `densegen.generation.sampling.library_size`,
-  reduce required regulators, or relax `cover_all_regulators`.
-- `cover_all_regulators` impossible when TF count exceeds `library_size`: set
-  `allow_incomplete_coverage: true` or increase `library_size`.
-- PWM sampling produced too few unique sites: raise `oversample_factor`, lower the
-  `score_threshold` / `score_percentile`, widen `length_range`, or raise `max_candidates` / `max_seconds`.
+Stage‑A inputs must provide motifs needed by constraints (e.g., `side_biases` or
+`promoter_constraints`). If a required motif is missing from the Stage‑A pool, DenseGen fails fast
+during Stage‑B library construction.
 
 ---
 

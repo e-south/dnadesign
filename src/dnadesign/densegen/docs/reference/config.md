@@ -1,19 +1,20 @@
 ## DenseGen Config Reference
 
 This is the strict YAML schema for DenseGen. Unknown keys are errors and all paths resolve
-relative to the config file directory. Use this reference for exact field names; see the guide
-for conceptual flow.
+relative to the config file directory. Stage‑A sampling lives under `densegen.inputs[].sampling`,
+Stage‑B sampling lives under `densegen.generation.sampling`. Use this reference for exact
+field names; see the guide for conceptual flow.
 
 ### Contents
 - [Top-level](#top-level) - required roots and plotting.
-- [`densegen.inputs[]`](#densegeninputs) - input sources and sampling.
+- [`densegen.inputs[]`](#densegeninputs) - input sources and Stage‑A sampling.
 - [`densegen.run`](#densegenrun) - run identifier and root.
 - [`densegen.output`](#densegenoutput) - output targets and schema.
 - [`densegen.generation`](#densegengeneration) - plan and fixed elements.
-- [`densegen.generation.sampling`](#densegengenerationsampling) - library building controls.
+- [`densegen.generation.sampling`](#densegengenerationsampling) - Stage‑B library building controls.
 - [`densegen.solver`](#densegensolver) - backend and strategy.
 - [`densegen.runtime`](#densegenruntime) - retry and guard rails.
-- [`densegen.postprocess.gap_fill`](#densegenpostprocessgap_fill) - gap fill policy.
+- [`densegen.postprocess.pad`](#densegenpostprocesspad) - pad policy.
 - [`densegen.logging`](#densegenlogging) - log file configuration.
 - [`plots`](#plots) - plotting options and defaults.
 - [Minimal example](#minimal-example) - smallest runnable config.
@@ -23,7 +24,7 @@ for conceptual flow.
 ### Top-level
 
 - `densegen` (required)
-- `densegen.schema_version` (required; supported: `2.4`)
+- `densegen.schema_version` (required; supported: `2.5`)
 - `densegen.run` (required; run-scoped I/O root)
 - `plots` (optional; required `source` when `output.targets` has multiple sinks)
 
@@ -33,9 +34,9 @@ for conceptual flow.
 
 Choose one input type per entry:
 
-PWM inputs perform **input sampling** (sampling sites from PWMs) via
-`densegen.inputs[].sampling`. This is distinct from **library sampling**
-(`densegen.generation.sampling`), which selects a solver library from the realized TFBS pool.
+PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
+`densegen.inputs[].sampling`. This is distinct from **Stage‑B sampling**
+(`densegen.generation.sampling` for Stage‑B sampling), which selects solver libraries from the realized TFBS pool.
 
 - `type: binding_sites`
   - `path` - CSV, Parquet, or XLSX file
@@ -45,7 +46,7 @@ PWM inputs perform **input sampling** (sampling sites from PWMs) via
   - `columns.site_id` (optional)
   - `columns.source` (optional)
   - Empty regulator/sequence rows are errors
-  - Duplicate regulator+sequence rows are allowed (use `generation.sampling.unique_binding_sites` to dedupe)
+  - Duplicate regulator+sequence rows are allowed (use Stage‑B `generation.sampling.unique_binding_sites` to dedupe)
   - Sequences must be A/C/G/T only
 - `type: sequence_library`
   - `path` - CSV or Parquet file
@@ -56,7 +57,7 @@ PWM inputs perform **input sampling** (sampling sites from PWMs) via
 - `type: pwm_meme`
   - `path` - MEME PWM file
   - `motif_ids` (optional list) - choose motifs by ID
-  - `sampling` (required):
+  - `sampling` (required Stage‑A config):
     - `strategy`: `consensus | stochastic | background`
     - `n_sites` (int > 0)
     - `oversample_factor` (int > 0)
@@ -66,7 +67,7 @@ PWM inputs perform **input sampling** (sampling sites from PWMs) via
     - `score_threshold` or `score_percentile` (exactly one; **densegen** backend only)
     - `pvalue_threshold` (float in (0, 1]; **fimo** backend only)
     - `selection_policy`: `random_uniform | top_n | stratified` (default: `random_uniform`; fimo only)
-    - `pvalue_bins` (optional list of floats; must end with `1.0`) - p‑value bin edges for stratified sampling
+    - `pvalue_bins` (optional list of floats; must end with `1.0`) - p‑value bin edges for Stage‑A stratified sampling
     - `mining` (fimo only) - batch/time controls for mining via FIMO:
       - `batch_size` (int > 0; default 100000) - candidates per FIMO batch
       - `max_batches` (optional int > 0) - max batches per motif
@@ -77,13 +78,13 @@ PWM inputs perform **input sampling** (sampling sites from PWMs) via
         retained bins are the only bins reported in yield summaries
       - `log_every_batches` (int > 0; default 1) - log per‑bin yield summaries every N batches
     - `bgfile` (optional path) - MEME bfile-format background model for FIMO
-    - `keep_all_candidates_debug` (bool, default false) - write raw FIMO TSVs to
-      `outputs/candidates/<run_id>/<input_name>/` for inspection (overwritten by `dense run` or
+    - `keep_all_candidates_debug` (bool, default false) - write candidate Parquet logs to
+      `outputs/pools/candidates/` for inspection (overwritten by `dense run` or
       `stage-a build-pool --overwrite`)
     - `include_matched_sequence` (bool, default false) - include `fimo_matched_sequence` in TFBS outputs
     - `length_policy`: `exact | range` (default: `exact`)
     - `length_range`: `[min, max]` (required when `length_policy=range`; `min` >= motif length)
-    - `trim_window_length` (optional int > 0; trims PWM to a max‑information window before sampling)
+    - `trim_window_length` (optional int > 0; trims PWM to a max‑information window before Stage‑A sampling)
     - `trim_window_strategy`: `max_info` (window selection strategy)
     - `consensus` requires `n_sites: 1`
     - `background` selects low-scoring sequences (<= threshold/percentile; or pvalue >= threshold for fimo)
@@ -99,23 +100,23 @@ PWM inputs perform **input sampling** (sampling sites from PWMs) via
 - `type: pwm_meme_set`
   - `paths` - list of MEME PWM files (merged into a single TF pool)
   - `motif_ids` (optional list) - choose motifs by ID across files
-  - `sampling` (required) - same fields as `pwm_meme`
+  - `sampling` (required Stage‑A config) - same fields as `pwm_meme`
 - `type: pwm_jaspar`
   - `path` - JASPAR PFM file
   - `motif_ids` (optional list) - choose motifs by ID
-  - `sampling` (required) - same fields as `pwm_meme`
+  - `sampling` (required Stage‑A config) - same fields as `pwm_meme`
 - `type: pwm_matrix_csv`
   - `path` - CSV matrix with A/C/G/T columns
   - `motif_id` (required) - single motif ID label
   - `columns` (optional) - map columns to `A/C/G/T` (defaults to literal column names)
-  - `sampling` (required) - same fields as `pwm_meme`
+  - `sampling` (required Stage‑A config) - same fields as `pwm_meme`
 - `type: pwm_artifact`
   - `path` - per-motif JSON artifact (contract-first; see `docs/reference/motif_artifacts.md`)
-  - `sampling` (required) - same fields as `pwm_meme`
+  - `sampling` (required Stage‑A config) - same fields as `pwm_meme`
 - `type: pwm_artifact_set`
   - `paths` - list of per-motif JSON artifacts (one file per motif)
-  - `sampling` (required) - same fields as `pwm_meme`
-  - `overrides_by_motif_id` (optional dict) - per-motif sampling overrides
+  - `sampling` (required Stage‑A config) - same fields as `pwm_meme`
+  - `overrides_by_motif_id` (optional dict) - per‑motif Stage‑A sampling overrides
 - `type: usr_sequences`
   - `dataset` - USR dataset name
   - `root` - USR root path (required; no fallback)
@@ -123,14 +124,14 @@ PWM inputs perform **input sampling** (sampling sites from PWMs) via
   - Sequences must be A/C/G/T only
 
 Input paths resolve relative to the config file directory.
-Output, logs, and plots must resolve inside `densegen.run.root`.
+Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen.run.root`.
 
 ---
 
 ### `densegen.run`
 
 - `id` - run identifier (string; required; must not contain path separators)
-- `root` - run root directory (required; config must live inside it)
+- `root` - run root directory (required; must exist on disk)
 
 ---
 
@@ -144,7 +145,7 @@ Output, logs, and plots must resolve inside `densegen.run.root`.
 - `parquet` (required when `targets` includes `parquet`)
   - `path` (file), `deduplicate`, `chunk_size`
   - `path` must be a `.parquet` file (single-file output)
-- `output.usr.root` and `output.parquet.path` must be inside `densegen.run.root`
+- `output.usr.root` and `output.parquet.path` must be inside `outputs/` under `densegen.run.root`
 
 ---
 
@@ -153,7 +154,7 @@ Output, logs, and plots must resolve inside `densegen.run.root`.
 - `sequence_length` (int > 0)
 - `sequence_length` must be >= the widest required motif (library TFBS or fixed elements)
 - `quota` (int > 0)
-- `sampling` (see below)
+- `sampling` (Stage‑B; see below)
 - `plan` (required, non-empty)
   - Each item: `name`, and either `quota` or `fraction`
   - Mixing quotas and fractions across items is not allowed.
@@ -176,18 +177,20 @@ Output, logs, and plots must resolve inside `densegen.run.root`.
 
 ---
 
-### `densegen.generation.sampling`
+### `densegen.generation.sampling` (Stage‑B sampling)
 
-These controls apply after PWM input sampling. `library_size` does not change PWM sampling counts.
-`library_size` also bounds the motif count offered to the solver for binding-site and PWM-sampled inputs.
+These controls apply to **Stage‑B sampling** (library construction) after Stage‑A input sampling.
+`library_size` does not change Stage‑A sampling counts. `library_size` also bounds the motif count
+offered to the solver for binding-site and PWM-sampled inputs.
 
 - `pool_strategy`: `full | subsample | iterative_subsample`
 - `library_source`: `build | artifact` (use `artifact` to replay prebuilt libraries)
-- `library_artifact_path`: required when `library_source: artifact` (path to `outputs/libraries`)
+- `library_artifact_path`: required when `library_source: artifact` (path to `outputs/libraries`;
+  must be inside `outputs/` under `densegen.run.root`)
 - `library_size` (int > 0; used for subsample strategies)
-- `library_sampling_strategy`: `tf_balanced | uniform_over_pairs | coverage_weighted`
-- `coverage_boost_alpha` (float >= 0; used when `library_sampling_strategy=coverage_weighted`)
-- `coverage_boost_power` (float > 0; used when `library_sampling_strategy=coverage_weighted`)
+- `library_sampling_strategy` (Stage‑B): `tf_balanced | uniform_over_pairs | coverage_weighted`
+- `coverage_boost_alpha` (Stage‑B; float >= 0; used when `library_sampling_strategy=coverage_weighted`)
+- `coverage_boost_power` (Stage‑B; float > 0; used when `library_sampling_strategy=coverage_weighted`)
 - `avoid_failed_motifs` (bool; when true, down-weight TFBS that frequently fail solves)
 - `failure_penalty_alpha` (float >= 0; penalty strength for failed motifs)
 - `failure_penalty_power` (float > 0; penalty exponent for failed motifs)
@@ -202,7 +205,7 @@ These controls apply after PWM input sampling. `library_size` does not change PW
 
 Notes:
 - When `library_source: artifact`, DenseGen replays the libraries found in
-  `library_artifact_path` and validates that `pool_strategy`, `library_sampling_strategy`,
+  `library_artifact_path` and validates that `pool_strategy`, Stage‑B `library_sampling_strategy`,
   and `library_size` match the artifact metadata. Stage‑B sampling is not rebuilt.
 
 ---
@@ -217,7 +220,10 @@ Notes:
 - `strands`: `single | double` (default: `double`)
 - `allow_unknown_options` (bool; default `false`)
   - DenseGen validates solver option keys for known backends. Set to `true` to bypass validation.
-  - Known keys (case-insensitive): `Threads`, `TimeLimit`, `MIPGap`, `Seed`, `LogLevel`, `MaxSeconds`.
+  - Known keys (case-insensitive):
+    - CBC: `Threads`, `TimeLimit`, `TimeLimitSeconds`, `MaxSeconds`, `Seconds`, `RatioGap`,
+      `MIPGap`, `Seed`, `RandomSeed`, `LogLevel`
+    - GUROBI: `Threads`, `TimeLimit`, `MIPGap`, `Seed`, `LogToConsole`, `LogFile`, `Method`, `Presolve`
 
 ---
 
@@ -231,6 +237,7 @@ Notes:
 - `arrays_generated_before_resample` (int > 0)
 - `min_count_per_tf` (int >= 0)
 - `max_duplicate_solutions`, `stall_seconds_before_resample`, `stall_warning_every_seconds`
+  - `stall_seconds_before_resample` also sets a per‑solve time limit (seconds) for solver‑based strategies; `0` disables.
 - `max_resample_attempts`, `max_total_resamples`, `max_seconds_per_plan`, `max_failed_solutions`
 - `leaderboard_every` (int >= 0; 0 disables periodic leaderboard logs)
 - `checkpoint_every` (int >= 0; 0 disables run_state checkpoints)
@@ -238,18 +245,24 @@ Notes:
 
 ---
 
-### `densegen.postprocess.gap_fill`
+### `densegen.postprocess.pad`
 
 - `mode`: `off | strict | adaptive`
 - `end`: `5prime | 3prime`
-- `gc_min`, `gc_max`, `max_tries`
+- `max_tries` (int > 0)
+- `gc.mode`: `off | range | target`
+- `gc.min`, `gc.max` (floats in [0, 1]) — target GC range when `gc.mode=range`
+- `gc.target`, `gc.tolerance` (floats in [0, 1]) — target center and tolerance when `gc.mode=target`
+- `gc.min_pad_length` (int >= 0) — if the pad length is shorter than this value:
+  - `strict` → error
+  - `adaptive` → relax GC bounds to `[0, 1]` and record the relaxation
 
 ---
 
 ### `densegen.logging`
 
 - `log_dir` (required) - directory for log files (relative to config path, must be inside
-  `densegen.run.root`).
+  `outputs/` under `densegen.run.root`).
 - `level` (e.g., `INFO`)
 - `suppress_solver_stderr` (bool)
 - `print_visual` (bool)
@@ -265,13 +278,13 @@ Notes:
 ### `plots`
 
 - `source`: `usr | parquet` (required if `output.targets` has multiple sinks)
-- `out_dir` (optional; default `outputs`; must be inside `densegen.run.root`)
+- `out_dir` (optional; default `outputs/plots`; must be inside `outputs/` under `densegen.run.root`)
 - `format` (optional; `png | pdf | svg`, default `png`)
 - `default`: list of plot names to run when `dense plot` is invoked (defaults to all)
 - `options`: dict keyed by plot name (strict; unknown options error)
-- `style`: global style dict applied to every plot (can be overridden per plot)
+- `style`: global style dict applied to every plot (can be overridden per plot). Common keys:
+  - `seaborn_style` (bool; default `true`) — set to `false` if seaborn styles are unavailable.
 - `sample_rows`: optional cap on rows loaded for plotting (reads the first N rows for speed)
-  - `seaborn_style: true` requires seaborn styles to be available; otherwise set to `false`.
 
 ---
 
@@ -279,7 +292,7 @@ Notes:
 
 ```yaml
 densegen:
-  schema_version: "2.4"
+  schema_version: "2.5"
   run:
     id: demo
     root: "."
@@ -296,7 +309,7 @@ densegen:
       bio_type: dna
       alphabet: dna_4
     parquet:
-      path: outputs/dense_arrays.parquet
+      path: outputs/tables/dense_arrays.parquet
       deduplicate: true
       chunk_size: 128
 
@@ -329,11 +342,16 @@ densegen:
     random_seed: 42
 
   postprocess:
-    gap_fill:
+    pad:
       mode: strict
       end: 5prime
-      gc_min: 0.4
-      gc_max: 0.6
+      gc:
+        mode: range
+        min: 0.4
+        max: 0.6
+        target: 0.5
+        tolerance: 0.1
+        min_pad_length: 4
       max_tries: 2000
 
   logging:
@@ -342,3 +360,7 @@ densegen:
     suppress_solver_stderr: true
     print_visual: true
 ```
+
+---
+
+@e-south

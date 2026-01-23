@@ -157,7 +157,7 @@ class PWMArtifactDataSource(BaseDataSource):
 
     def load_data(self, *, rng=None, outputs_root: Path | None = None, run_id: str | None = None):
         if rng is None:
-            raise ValueError("PWM sampling requires an RNG; pass the pipeline RNG explicitly.")
+            raise ValueError("Stage-A PWM sampling requires an RNG; pass the pipeline RNG explicitly.")
         artifact_path = resolve_path(self.cfg_path, self.path)
         if not (artifact_path.exists() and artifact_path.is_file()):
             raise FileNotFoundError(f"PWM artifact not found. Looked here:\n  - {artifact_path}")
@@ -194,7 +194,7 @@ class PWMArtifactDataSource(BaseDataSource):
         if bgfile is not None:
             bgfile_path = resolve_path(self.cfg_path, str(bgfile))
             if not (bgfile_path.exists() and bgfile_path.is_file()):
-                raise FileNotFoundError(f"PWM sampling bgfile not found. Looked here:\n  - {bgfile_path}")
+                raise FileNotFoundError(f"Stage-A PWM sampling bgfile not found. Looked here:\n  - {bgfile_path}")
         debug_output_dir: Path | None = None
         if keep_all_candidates_debug:
             if outputs_root is None:

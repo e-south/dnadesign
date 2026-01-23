@@ -1,73 +1,57 @@
 ## Cruncher to DenseGen PWM workflow (artifact-first)
 
-This workflow demonstrates a decoupled path where Cruncher exports PWM artifacts
-and DenseGen consumes them via `pwm_artifact_set`. The DenseGen config remains the
-single source of truth for runtime sampling behavior.
+This workflow describes the **artifact‑first** handoff: Cruncher exports per‑motif JSON artifacts,
+and DenseGen consumes them for **Stage‑A sampling**. For a full, progressive walkthrough that
+uses Cruncher in its own workspace and then hands off to DenseGen, see the [demo](../demo/demo_basic.md).
 
-### 1) Ensure Cruncher has motifs cached
+### Contents
+- [Overview](#overview) - what this handoff enables.
+- [Minimal operator flow](#minimal-operator-flow) - cache → export → handoff.
+- [DenseGen inputs](#densegen-inputs) - Stage‑A consumption points.
 
-Use the demo workspace if you want a reproducible example:
+---
 
-```bash
-uv run cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR -c src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml
-```
+### Overview
 
-### 2) Export DenseGen motif artifacts (one file per motif)
+Cruncher produces stable PWM artifacts (one JSON per motif) with explicit background + log‑odds.
+DenseGen treats these artifacts as a strict contract and uses them in **Stage‑A sampling** to
+build TFBS pools. Stage‑B sampling remains fully controlled by the DenseGen config.
 
-```bash
-uv run cruncher catalog export-densegen \
-  -c src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml \
-  --tf lexA --tf cpxR --source demo_local_meme \
-  --out /path/to/densegen-run/inputs/motif_artifacts \
-  --background record \
-  --pseudocount 0.01
-```
+---
 
-This writes per-motif JSON files plus an `artifact_manifest.json` for inspection. Any directory
-works; keeping artifacts under the DenseGen run `inputs/` directory keeps the workspace
-self-contained.
+### Minimal operator flow
 
-### 3) Point DenseGen at the artifacts
-
-```yaml
-densegen:
-inputs:
-    - name: lexA_cpxR
-      type: pwm_artifact_set
-      paths:
-        - inputs/motif_artifacts/demo_local_meme__lexA.json
-        - inputs/motif_artifacts/demo_local_meme__cpxR.json
-      sampling:
-        strategy: stochastic
-        n_sites: 80
-        oversample_factor: 10
-        score_percentile: 90
-        length_policy: exact
-```
-
-PWM sampling is stochastic. `pool_strategy: subsample` will resample
-reactively on stalls/duplicate guards, while `iterative_subsample` resamples proactively
-after `arrays_generated_before_resample` or when a library under-produces.
-
-### 4) Run DenseGen
+Run Cruncher in its **own** workspace (Cruncher owns its configs and outputs). Cruncher resolves
+its config from CWD, so no `-c` flags are required when you run inside that workspace:
 
 ```bash
-pixi run dense validate-config -c path/to/config.yaml
-uv run dense inspect config -c path/to/config.yaml
-uv run dense run -c path/to/config.yaml --no-plot
+# From a Cruncher workspace (see cruncher demo docs)
+cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR
+cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --hydrate
+cruncher lock
+
+# Export to a Cruncher-owned location
+cruncher catalog export-densegen --set 1 --out outputs/exports/densegen_pwms
+cruncher catalog export-sites --set 1 --out outputs/exports/densegen_sites.csv
 ```
 
-### Captured output (excerpt)
+Copy the exports into the DenseGen workspace `inputs/` (DenseGen remains config‑centric):
 
-```
-INFO | dnadesign.densegen.src.core.pipeline | PWM input sampling for lexA_cpxR: motifs=2 | sites=lexA x 80, cpxR x 80 | strategy=stochastic | score=percentile=90 | oversample=10 | length=exact
-INFO | dnadesign.densegen.src.core.pipeline | Library for lexA_cpxR/lexA_cpxR: 16 motifs | TF counts: lexA x 8, cpxR x 8 | target=180 achieved=192 pool=subsample
-INFO | dnadesign.densegen.src.core.pipeline | [lexA_cpxR/lexA_cpxR] 8/8 (100.00%) (local 8/8) CR=1.050 | seq ...
+```bash
+cp outputs/exports/densegen_sites.csv <densegen_workspace>/inputs/
+cp -R outputs/exports/densegen_pwms <densegen_workspace>/inputs/motif_artifacts
 ```
 
-DenseGen writes `outputs/meta/inputs_manifest.json` plus run-scoped library artifacts under `outputs/`
-(`outputs/attempts.parquet`),
-capturing resolved PWM sampling settings and the exact TFBS library offered to the solver.
+---
+
+### DenseGen inputs
+
+Use the exported artifacts in Stage‑A sampling inputs:
+
+- `type: pwm_artifact_set` for per‑motif JSON artifacts.
+- `type: binding_sites` for the exported `binding_sites.csv` (optional).
+
+See the config reference for exact fields and Stage‑A sampling knobs.
 
 ---
 
