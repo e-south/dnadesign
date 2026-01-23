@@ -151,14 +151,22 @@ def scan_predictions(pred_dir: Path) -> pl.LazyFrame:
     return pl.scan_parquet([str(path) for path in files])
 
 
-def read_runs(runs_path: Path) -> pl.DataFrame:
+def scan_runs(runs_path: Path) -> pl.LazyFrame:
     _ensure_runs_path(runs_path)
-    return pl.read_parquet(runs_path)
+    return pl.scan_parquet(str(runs_path))
+
+
+def scan_labels(labels_path: Path) -> pl.LazyFrame:
+    _ensure_labels_path(labels_path)
+    return pl.scan_parquet(str(labels_path))
+
+
+def read_runs(runs_path: Path) -> pl.DataFrame:
+    return scan_runs(runs_path).collect()
 
 
 def read_labels(labels_path: Path) -> pl.DataFrame:
-    _ensure_labels_path(labels_path)
-    return pl.read_parquet(labels_path)
+    return scan_labels(labels_path).collect()
 
 
 def ensure_predictions_dir(pred_dir: Path) -> None:
@@ -426,6 +434,12 @@ class CampaignAnalysis:
 
     def read_labels(self) -> pl.DataFrame:
         return read_labels(self.workspace.ledger_labels_path)
+
+    def scan_runs(self) -> pl.LazyFrame:
+        return scan_runs(self.workspace.ledger_runs_path)
+
+    def scan_labels(self) -> pl.LazyFrame:
+        return scan_labels(self.workspace.ledger_labels_path)
 
     def scan_predictions(self) -> pl.LazyFrame:
         return scan_predictions(self.workspace.ledger_predictions_dir)
