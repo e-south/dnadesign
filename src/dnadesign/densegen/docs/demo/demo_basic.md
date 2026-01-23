@@ -39,6 +39,8 @@ Stage‑A FIMO sampling requires MEME Suite (`fimo` on PATH). If you use pixi, r
 
 Why: create a self‑contained workspace with `config.yaml`, `inputs/`, and `outputs/`.
 
+If you already have a `demo/` workspace, either remove it or choose a different `--id`.
+
 ```bash
 dense workspace init --id demo --template-id demo_meme_two_tf --copy-inputs
 cd demo
@@ -119,8 +121,11 @@ dense inspect config
 Why: materialize TFBS pools for inspection and for deterministic Stage‑B previews.
 
 ```bash
-dense stage-a build-pool
+dense stage-a build-pool --fresh
 ```
+
+Note: `stage-a build-pool` appends new unique TFBS into existing pools by default. Use `--fresh`
+when re‑running to avoid cumulative pools and candidate logs.
 
 ---
 
