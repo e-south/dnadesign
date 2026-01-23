@@ -599,6 +599,8 @@ def collect_report_data(
         library_summary = library_summary.merge(outputs_by_lib, on="library_index", how="left")
     elif not library_summary.empty:
         library_summary["outputs"] = 0
+    if not library_summary.empty and "outputs" in library_summary.columns:
+        library_summary["outputs"] = pd.to_numeric(library_summary["outputs"], errors="coerce").fillna(0).astype(int)
 
     tables["library_summary"] = library_summary
 
@@ -633,6 +635,8 @@ def collect_report_data(
             library_usage = library_usage.merge(outputs_by_lib, on="library_index", how="left")
         if "outputs" not in library_usage.columns:
             library_usage["outputs"] = 0
+        if "outputs" in library_usage.columns:
+            library_usage["outputs"] = pd.to_numeric(library_usage["outputs"], errors="coerce").fillna(0).astype(int)
     tables["library_usage"] = library_usage
 
     plan_summary = pd.DataFrame(
