@@ -13,9 +13,10 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
+from typing import Iterable, Optional
 from uuid import uuid4
 
 import pandas as pd
@@ -28,7 +29,6 @@ from .parquet_io import (
     read_parquet_df,
     schema_signature,
     table_from_pandas,
-    write_parquet_df,
     write_parquet_table,
 )
 from .workspace import CampaignWorkspace
@@ -159,38 +159,39 @@ def _validate_columns(df: pd.DataFrame, kind: str) -> None:
         )
 
 
-def _append_parquet_dedupe(path: Path, df: pd.DataFrame, *, key: Sequence[str]) -> None:
-    ensure_dir(path.parent)
-    if not path.exists():
-        write_parquet_df(path, df, index=False)
-        return
-    existing = read_parquet_df(path)
-    if list(existing.columns) != list(df.columns):
-        raise LedgerError(
-            f"Ledger sink schema mismatch.\n  existing: {list(existing.columns)}\n  new     : {list(df.columns)}"
-        )
-    out = pd.concat([existing, df], ignore_index=True)
-    out = out.drop_duplicates(subset=list(key), keep="last")
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    write_parquet_df(tmp, out, index=False)
-    tmp.replace(path)
+def _ensure_dataset_dir(path: Path, *, ctx: str) -> None:
+    if path.exists() and not path.is_dir():
+        raise LedgerError(f"{ctx} expects a directory sink at {path}; remove the file to proceed.")
+    ensure_dir(path)
 
 
-def _append_parquet_dedupe_labels(path: Path, df: pd.DataFrame) -> None:
-    """
-    Append label events while preserving distinct provenance.
-    Dedupes only exact duplicates (including y_obs content), not just (round, id).
-    """
-    ensure_dir(path.parent)
-    if not path.exists():
-        write_parquet_df(path, df, index=False)
-        return
-    existing = read_parquet_df(path)
-    if list(existing.columns) != list(df.columns):
-        raise LedgerError(
-            f"Ledger sink schema mismatch.\n  existing: {list(existing.columns)}\n  new     : {list(df.columns)}"
-        )
+def _dataset_schema(path: Path):
+    if any(path.rglob("*.parquet")):
+        return dataset_from_dir(path).schema
+    return None
 
+
+def _append_dataset_table(path: Path, table, *, ctx: str) -> None:
+    _ensure_dataset_dir(path, ctx=ctx)
+    schema = _dataset_schema(path)
+    if schema is not None:
+        _assert_schema_match(schema, table.schema, ctx=ctx)
+    out = path / f"part-{uuid4().hex}.parquet"
+    write_parquet_table(out, table)
+
+
+def _rewrite_dataset(path: Path, df: pd.DataFrame) -> None:
+    tmp_dir = path.with_name(f"{path.name}.tmp-{uuid4().hex}")
+    ensure_dir(tmp_dir)
+    table = table_from_pandas(df)
+    out = tmp_dir / f"part-{uuid4().hex}.parquet"
+    write_parquet_table(out, table)
+    if path.exists():
+        shutil.rmtree(path)
+    tmp_dir.replace(path)
+
+
+def _dedupe_labels_frame(df: pd.DataFrame) -> pd.DataFrame:
     def _sig(val) -> str | None:
         if val is None or (isinstance(val, float) and pd.isna(val)):
             return None
@@ -201,23 +202,31 @@ def _append_parquet_dedupe_labels(path: Path, df: pd.DataFrame) -> None:
         except Exception:
             return str(val)
 
-    def _with_sig(frame: pd.DataFrame) -> pd.DataFrame:
-        out = frame.copy()
-        out["__y_obs_sig"] = out["y_obs"].apply(_sig) if "y_obs" in out.columns else None
-        return out
+    out = df.copy()
+    out["__y_obs_sig"] = out["y_obs"].apply(_sig) if "y_obs" in out.columns else None
+    key_cols = [c for c in out.columns if c not in {"event", "y_obs"}]
+    if "__y_obs_sig" not in key_cols:
+        key_cols.append("__y_obs_sig")
+    out = out.drop_duplicates(subset=key_cols, keep="last")
+    return out.drop(columns=["__y_obs_sig"])
 
-    def _dedupe(frame: pd.DataFrame) -> pd.DataFrame:
-        key_cols = [c for c in frame.columns if c not in {"event", "y_obs"}]
-        if "__y_obs_sig" not in key_cols:
-            key_cols.append("__y_obs_sig")
-        out = frame.drop_duplicates(subset=key_cols, keep="last")
-        return out.drop(columns=["__y_obs_sig"])
 
-    combined = pd.concat([_with_sig(existing), _with_sig(df)], ignore_index=True)
-    out = _dedupe(combined)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    write_parquet_df(tmp, out, index=False)
-    tmp.replace(path)
+def _append_run_meta_dataset(path: Path, df: pd.DataFrame) -> None:
+    ctx = "[ledger:run_meta]"
+    _ensure_dataset_dir(path, ctx=ctx)
+    run_ids = set(df["run_id"].astype(str).tolist())
+    schema = _dataset_schema(path)
+    table = table_from_pandas(df, schema=schema) if schema is not None else table_from_pandas(df)
+    if schema is not None:
+        _assert_schema_match(schema, table.schema, ctx=ctx)
+        existing_ids = set(read_parquet_df(path, columns=["run_id"])["run_id"].astype(str).tolist())
+        if run_ids & existing_ids:
+            existing = read_parquet_df(path)
+            out = pd.concat([existing, df], ignore_index=True)
+            out = out.drop_duplicates(subset=["run_id"], keep="last")
+            _rewrite_dataset(path, out)
+            return
+    _append_dataset_table(path, table, ctx=ctx)
 
 
 def _ensure_event_value(df: pd.DataFrame, kind: str) -> None:
@@ -259,23 +268,20 @@ class LedgerWriter:
             dup = df.duplicated(subset=["run_id", "id"]).any()
             if dup:
                 raise LedgerError("[ledger:run_pred] duplicate (run_id, id) rows are not allowed.")
-        ensure_dir(self._paths.predictions_dir)
         tbl = table_from_pandas(df)
-        if any(self._paths.predictions_dir.rglob("*.parquet")):
-            dset = dataset_from_dir(self._paths.predictions_dir)
-            _assert_schema_match(dset.schema, tbl.schema, ctx="[ledger:run_pred]")
-        out = self._paths.predictions_dir / f"part-{uuid4().hex}.parquet"
-        write_parquet_table(out, tbl)
+        _append_dataset_table(self._paths.predictions_dir, tbl, ctx="[ledger:run_pred]")
 
     def append_run_meta(self, df: pd.DataFrame) -> None:
         _ensure_event_value(df, "run_meta")
         _validate_columns(df, "run_meta")
-        _append_parquet_dedupe(self._paths.runs_path, df, key=("run_id",))
+        _append_run_meta_dataset(self._paths.runs_path, df)
 
     def append_label(self, df: pd.DataFrame) -> None:
         _ensure_event_value(df, "label")
         _validate_columns(df, "label")
-        _append_parquet_dedupe_labels(self._paths.labels_path, df)
+        deduped = _dedupe_labels_frame(df)
+        tbl = table_from_pandas(deduped)
+        _append_dataset_table(self._paths.labels_path, tbl, ctx="[ledger:label]")
 
 
 class LedgerReader:
