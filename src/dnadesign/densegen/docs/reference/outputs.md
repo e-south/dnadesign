@@ -109,17 +109,18 @@ The `dense report` command writes a compact audit summary under `outputs/report/
 - `outputs/report/report.json`
 - `outputs/report/report.md`
 - `outputs/report/report.html` (basic HTML wrapper for quick sharing)
-- `outputs/report/assets/` (plots linked by `report.html`)
-- `outputs/report/assets/composition.csv` (full composition table when available)
 
 These summarize run scope and link to the canonical outputs (`outputs/tables/dense_arrays.parquet` and
-`outputs/tables/attempts.parquet`). Use `dense report --format json|md|html|all` to control which files are emitted.
+`outputs/tables/attempts.parquet`). Reports do not generate plots; run `dense plot` to populate
+`outputs/plots/`, and use `dense report --plots include` to link the existing plot manifest.
+Use `dense report --format json|md|html|all` to control which files are emitted.
 
 ---
 
 ### Plots
 
 `dense plot` writes plot images under `outputs/plots/` (format controlled by `plots.format`).
+`outputs/plots/plot_manifest.json` records the plot inventory for reports.
 
 ---
 

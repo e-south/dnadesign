@@ -1262,6 +1262,11 @@ def report(
         "--out",
         help="Output directory (relative to run root; must be inside outputs/).",
     ),
+    plots: str = typer.Option(
+        "none",
+        "--plots",
+        help="Include plot links in the report: none or include (requires outputs/plots/plot_manifest.json).",
+    ),
     format: str = typer.Option(
         "all",
         "--format",
@@ -1293,19 +1298,27 @@ def report(
         console.print(f"[bold red]Unknown report format(s):[/] {', '.join(unknown)}")
         console.print("Allowed: json, md, html, all.")
         raise typer.Exit(code=1)
+    plots_mode = str(plots or "none").strip().lower()
+    if plots_mode not in {"none", "include"}:
+        console.print("[bold red]--plots must be one of: none, include.[/]")
+        raise typer.Exit(code=1)
+    include_plots = plots_mode == "include"
     formats_used = {"json", "md", "html"} if "all" in raw_formats else raw_formats
     run_root = _run_root_for(loaded)
     out_dir = _resolve_outputs_path_or_exit(cfg_path, run_root, out, label="report.out")
     try:
         with _suppress_pyarrow_sysctl_warnings():
-            write_report(loaded.root, cfg_path, out_dir=out_dir, formats=raw_formats)
+            write_report(loaded.root, cfg_path, out_dir=out_dir, include_plots=include_plots, formats=raw_formats)
     except FileNotFoundError as exc:
         console.print(f"[bold red]Report failed:[/] {exc}")
         entries = _list_dir_entries(run_root, limit=8)
         if entries:
             console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
         console.print("[bold]Next steps[/]:")
-        console.print(f"  - {_workspace_command('dense run', cfg_path=cfg_path, run_root=run_root)}")
+        if "plot_manifest" in str(exc):
+            console.print(f"  - {_workspace_command('dense plot', cfg_path=cfg_path, run_root=run_root)}")
+        else:
+            console.print(f"  - {_workspace_command('dense run', cfg_path=cfg_path, run_root=run_root)}")
         raise typer.Exit(code=1)
     console.print(f":sparkles: [bold green]Report written[/]: {out_dir}")
     outputs = []
@@ -1984,7 +1997,7 @@ def run(
         from .viz.plotting import run_plots_from_config
 
         console.print("[bold]Generating plots...[/]")
-        run_plots_from_config(root, loaded.path)
+        run_plots_from_config(root, loaded.path, source="run")
         console.print(":bar_chart: [bold green]Plots written.[/]")
 
 
@@ -2031,7 +2044,7 @@ def plot(
     install_native_stderr_filters(suppress_solver_messages=False)
     from .viz.plotting import run_plots_from_config
 
-    run_plots_from_config(loaded.root, loaded.path, only=only)
+    run_plots_from_config(loaded.root, loaded.path, only=only, source="plot")
     console.print(":bar_chart: [bold green]Plots written.[/]")
 
 

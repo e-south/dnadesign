@@ -144,6 +144,7 @@ dense run
 
 This demo config also enables plot generation from the run (`plots.default`) and saves plots in
 `outputs/plots/` using `plots.format` (switch to `pdf` or `svg` in `config.yaml` if desired).
+Reports do not generate plots; they can optionally link the existing plot manifest.
 The demo quota is intentionally small (`generation.quota: 12` with `runtime.max_seconds_per_plan: 60`)
 to keep the end‑to‑end run fast; scale these up for production runs.
 The demo uses `solver.strategy: iterate` for full solver runs; switch to `diverse` or `optimal`
@@ -159,7 +160,7 @@ auto‑plots when re‑running.
 Why: inspect Stage‑B library usage and runtime events.
 
 ```bash
-dense inspect run --library --events
+dense inspect run --library --events --library-limit 5
 ```
 
 ---
@@ -195,7 +196,13 @@ export MPLCONFIGDIR=outputs/.mpl-cache
 Why: generate a human‑readable audit summary.
 
 ```bash
-dense report --format md
+dense report --format md --plots include
+```
+
+If you skipped plots during the run, generate them first:
+
+```bash
+dense plot
 ```
 
 ---

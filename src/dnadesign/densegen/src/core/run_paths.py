@@ -22,7 +22,6 @@ RUN_LIBRARIES_DIR = "libraries"
 RUN_TABLES_DIR = "tables"
 RUN_PLOTS_DIR = "plots"
 RUN_REPORT_DIR = "report"
-RUN_REPORT_ASSETS_DIR = "assets"
 CANDIDATES_DIR = "candidates"
 
 RUN_MANIFEST_NAME = "run_manifest.json"
@@ -79,10 +78,6 @@ def run_plots_root(run_root: Path) -> Path:
 
 def run_report_root(run_root: Path) -> Path:
     return run_outputs_root(run_root) / RUN_REPORT_DIR
-
-
-def run_report_assets_root(run_root: Path) -> Path:
-    return run_report_root(run_root) / RUN_REPORT_ASSETS_DIR
 
 
 def ensure_run_meta_dir(run_root: Path) -> Path:

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,7 +25,6 @@ import pandas as pd
 
 from ..adapters.outputs import load_records_from_config
 from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
-from ..utils.mpl_utils import ensure_mpl_cache_dir
 from .artifacts.pool import POOL_MODE_TFBS, load_pool_artifact
 from .run_manifest import load_run_manifest
 from .run_paths import (
@@ -701,7 +701,9 @@ def collect_report_data(
             .reset_index()
         )
     else:
-        used_tf = pd.DataFrame(columns=["library_hash", "plan", "tf", "used_placements", "used_unique_tfbs"])
+        used_tf = pd.DataFrame(
+            columns=["library_hash", "plan", "tf", "used_placements", "used_unique_tfbs", "used_sequences"]
+        )
         used_tfbs = pd.DataFrame(columns=["library_hash", "plan", "tf", "tfbs", "used_placements", "used_sequences"])
 
     total_sequences = (
@@ -924,16 +926,6 @@ def collect_report_data(
     return ReportBundle(run_report=run_report, tables=tables, plots={})
 
 
-def _plot_available(cache_dir: Path) -> bool:
-    try:
-        ensure_mpl_cache_dir(cache_dir)
-        import matplotlib  # noqa: F401
-    except Exception as exc:
-        log.info("Matplotlib not available or cache setup failed; skipping report plots. (%s)", exc)
-        return False
-    return True
-
-
 def _safe_filename(text: str) -> str:
     return "".join(ch if ch.isalnum() or ch in {"-", "_", "."} else "_" for ch in text) or "densegen"
 
@@ -954,148 +946,21 @@ def _markdown_table(df: pd.DataFrame, *, columns: list[str] | None = None, max_r
     return "\n".join(lines)
 
 
-def _generate_report_plots(
-    bundle: ReportBundle, *, cfg_path: Path, out_dir: Path, cache_dir: Path
-) -> dict[str, list[str]]:
-    if not _plot_available(cache_dir):
-        log.info("matplotlib not available; skipping report plots.")
-        return {}
-    import matplotlib.pyplot as plt
-
+def _load_plot_manifest(manifest_path: Path, *, report_root: Path) -> dict[str, list[str]]:
+    if not manifest_path.exists():
+        raise FileNotFoundError(f"plot_manifest not found: {manifest_path}")
+    payload = json.loads(manifest_path.read_text())
     plots: dict[str, list[str]] = {}
-    assets_dir = out_dir / "assets"
-    assets_dir.mkdir(parents=True, exist_ok=True)
-    run_root = resolve_run_root(cfg_path, bundle.run_report.get("run_root", ""))
-    outputs_root = run_outputs_root(run_root)
-
-    # Stage-A p-value histograms per input/TF (FIMO)
-    pool_dir = outputs_root / "pools"
-    if pool_dir.exists():
-        try:
-            pool_artifact = load_pool_artifact(pool_dir)
-            for entry in pool_artifact.inputs.values():
-                if entry.pool_mode != POOL_MODE_TFBS:
-                    continue
-                pool_path = pool_dir / entry.pool_path
-                if not pool_path.exists():
-                    continue
-                df_pool = pd.read_parquet(pool_path)
-                if "fimo_pvalue" not in df_pool.columns or "tf" not in df_pool.columns:
-                    continue
-                for tf, sub in df_pool.groupby("tf"):
-                    if sub.empty:
-                        continue
-                    pvals = sub["fimo_pvalue"].astype(float).replace(0, np.nan).dropna()
-                    if pvals.empty:
-                        continue
-                    fig, ax = plt.subplots(figsize=(6, 4))
-                    ax.hist(np.log10(pvals), bins=30, color="#4c78a8", edgecolor="white")
-                    ax.set_title(f"Stage-A p-value histogram: {entry.name}/{tf}")
-                    ax.set_xlabel("log10(p-value)")
-                    ax.set_ylabel("count")
-                    fname = f"stage_a_pvalue_hist__{_safe_filename(entry.name)}__{_safe_filename(str(tf))}.png"
-                    path = assets_dir / fname
-                    fig.tight_layout()
-                    fig.savefig(path)
-                    plt.close(fig)
-                    plots.setdefault("stage_a_pvalue_hist", []).append(str(path.relative_to(out_dir)))
-        except Exception:
-            log.warning("Failed to generate Stage-A p-value histograms.", exc_info=True)
-
-    # Stage-A score histograms per input/TF
-    if pool_dir.exists():
-        try:
-            pool_artifact = load_pool_artifact(pool_dir)
-            for entry in pool_artifact.inputs.values():
-                if entry.pool_mode != POOL_MODE_TFBS:
-                    continue
-                pool_path = pool_dir / entry.pool_path
-                if not pool_path.exists():
-                    continue
-                df_pool = pd.read_parquet(pool_path)
-                if "tf" not in df_pool.columns:
-                    continue
-                for tf, sub in df_pool.groupby("tf"):
-                    if sub.empty:
-                        continue
-                    if "fimo_score" in sub.columns:
-                        vals = pd.to_numeric(sub["fimo_score"], errors="coerce").dropna()
-                        if not vals.empty:
-                            fig, ax = plt.subplots(figsize=(6, 4))
-                            ax.hist(vals, bins=30, color="#72b7b2", edgecolor="white")
-                            ax.set_title(f"Stage-A FIMO score histogram: {entry.name}/{tf}")
-                            ax.set_xlabel("FIMO score")
-                            ax.set_ylabel("count")
-                            fname = (
-                                f"stage_a_fimo_score_hist__{_safe_filename(entry.name)}__{_safe_filename(str(tf))}.png"
-                            )
-                            path = assets_dir / fname
-                            fig.tight_layout()
-                            fig.savefig(path)
-                            plt.close(fig)
-                            plots.setdefault("stage_a_fimo_score_hist", []).append(str(path.relative_to(out_dir)))
-                    if "score" in sub.columns:
-                        vals = pd.to_numeric(sub["score"], errors="coerce").dropna()
-                        if not vals.empty:
-                            fig, ax = plt.subplots(figsize=(6, 4))
-                            ax.hist(vals, bins=30, color="#e45756", edgecolor="white")
-                            ax.set_title(f"Stage-A densegen score histogram: {entry.name}/{tf}")
-                            ax.set_xlabel("densegen score")
-                            ax.set_ylabel("count")
-                            fname = (
-                                "stage_a_densegen_score_hist__"
-                                f"{_safe_filename(entry.name)}__{_safe_filename(str(tf))}.png"
-                            )
-                            path = assets_dir / fname
-                            fig.tight_layout()
-                            fig.savefig(path)
-                            plt.close(fig)
-                            plots.setdefault("stage_a_densegen_score_hist", []).append(str(path.relative_to(out_dir)))
-        except Exception:
-            log.warning("Failed to generate Stage-A score histograms.", exc_info=True)
-
-    # Stage-A bin occupancy bar charts (per input)
-    stage_a_bins = bundle.tables.get("stage_a_bins")
-    if stage_a_bins is not None and not stage_a_bins.empty:
-        try:
-            for input_name, sub in stage_a_bins.groupby("input_name"):
-                fig, ax = plt.subplots(figsize=(6, 4))
-                sub = sub.sort_values(["tf", "bin_id"])
-                labels = [f"{row['tf']}:{int(row['bin_id'])}" for _, row in sub.iterrows()]
-                counts = sub["count"].astype(int).tolist()
-                ax.bar(labels, counts, color="#f58518")
-                ax.set_title(f"Stage-A bin occupancy: {input_name}")
-                ax.set_ylabel("count")
-                ax.tick_params(axis="x", labelrotation=45, labelsize=8)
-                fname = f"stage_a_bin_counts__{_safe_filename(str(input_name))}.png"
-                path = assets_dir / fname
-                fig.tight_layout()
-                fig.savefig(path)
-                plt.close(fig)
-                plots.setdefault("stage_a_bin_counts", []).append(str(path.relative_to(out_dir)))
-        except Exception:
-            log.warning("Failed to generate Stage-A bin occupancy plots.", exc_info=True)
-
-    # Stage-B TF utilization (offered vs used)
-    offered_vs_used = bundle.tables.get("offered_vs_used_tf")
-    if offered_vs_used is not None and not offered_vs_used.empty:
-        try:
-            for lib_hash, sub in offered_vs_used.groupby("library_hash"):
-                sub = sub.sort_values("tf")
-                fig, ax = plt.subplots(figsize=(7, 4))
-                ax.bar(sub["tf"], sub["used_sequences"], color="#54a24b", label="used sequences")
-                ax.set_title(f"Stage-B TF utilization: {lib_hash[:8]}")
-                ax.set_ylabel("used sequences")
-                ax.tick_params(axis="x", labelrotation=45, labelsize=8)
-                fname = f"stage_b_tf_util__{_safe_filename(str(lib_hash))}.png"
-                path = assets_dir / fname
-                fig.tight_layout()
-                fig.savefig(path)
-                plt.close(fig)
-                plots.setdefault("stage_b_tf_utilization", []).append(str(path.relative_to(out_dir)))
-        except Exception:
-            log.warning("Failed to generate Stage-B utilization plots.", exc_info=True)
-
+    for entry in payload.get("plots", []):
+        name = str(entry.get("name") or "").strip()
+        rel = str(entry.get("path") or "").strip()
+        if not name or not rel:
+            raise ValueError("plot_manifest entries must include name and path.")
+        plot_path = manifest_path.parent / rel
+        if not plot_path.exists():
+            raise FileNotFoundError(f"Plot listed in plot_manifest is missing: {plot_path}")
+        rel_to_report = os.path.relpath(plot_path, report_root)
+        plots.setdefault(name, []).append(rel_to_report)
     return plots
 
 
@@ -1105,32 +970,21 @@ def write_report(
     *,
     out_dir: str | Path = "outputs/report",
     include_combinatorics: bool = False,
+    include_plots: bool = False,
     formats: set[str] | None = None,
 ) -> ReportBundle:
     run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
     out_path = resolve_outputs_scoped_path(cfg_path, run_root, str(out_dir), label="report.out")
     out_path.mkdir(parents=True, exist_ok=True)
-    cache_dir = run_root / "outputs" / ".mpl-cache"
-
     bundle = collect_report_data(root_cfg, cfg_path, include_combinatorics=include_combinatorics)
     composition = bundle.tables.get("composition")
     if composition is not None and not composition.empty:
         bundle.run_report["composition_rows"] = int(len(composition))
-        try:
-            assets_dir = out_path / "assets"
-            assets_dir.mkdir(parents=True, exist_ok=True)
-            composition_csv = assets_dir / "composition.csv"
-            composition.to_csv(composition_csv, index=False)
-            bundle.run_report["composition_csv"] = str(composition_csv.relative_to(out_path))
-        except Exception:
-            log.warning("Failed to export composition CSV for report.", exc_info=True)
-    try:
-        plots = _generate_report_plots(bundle, cfg_path=cfg_path, out_dir=out_path, cache_dir=cache_dir)
+    if include_plots:
+        plot_manifest = run_root / "outputs" / "plots" / "plot_manifest.json"
+        plots = _load_plot_manifest(plot_manifest, report_root=out_path)
         bundle.plots = plots
-        if plots:
-            bundle.run_report["report_plots"] = plots
-    except Exception:
-        log.debug("Failed to generate report plots.", exc_info=True)
+        bundle.run_report["plot_manifest"] = str(plot_manifest.relative_to(run_root))
     formats = {f.lower() for f in (formats or {"json", "md"})}
     if "all" in formats:
         formats = {"json", "md", "html"}
@@ -1173,8 +1027,8 @@ def _render_report_md(bundle: ReportBundle) -> str:
         "- outputs/meta/events.jsonl",
         "- outputs/pools/candidates/candidates.parquet (when candidate logging is enabled)",
         "- outputs/pools/candidates/candidates_summary.parquet (when candidate logging is enabled)",
-        "- outputs/report/assets/ (plots linked by report.html)",
-        "- outputs/report/assets/composition.csv (full composition table, when available)",
+        "- outputs/plots/ (visual artifacts; run `dense plot` to populate)",
+        "- outputs/plots/plot_manifest.json (plot index for reports)",
     ]
     warnings = report.get("warnings") or []
     if warnings:
@@ -1347,11 +1201,8 @@ def _render_report_md(bundle: ReportBundle) -> str:
             )
         )
         comp_rows = report.get("composition_rows")
-        comp_csv = report.get("composition_csv")
         if comp_rows is not None:
             lines.append(f"- Full composition rows: {comp_rows}")
-        if comp_csv:
-            lines.append(f"- Full composition CSV: {comp_csv}")
     leaderboard = report.get("leaderboard_latest") or {}
     leader_tf = leaderboard.get("tf") or []
     leader_tfbs = leaderboard.get("tfbs") or []
