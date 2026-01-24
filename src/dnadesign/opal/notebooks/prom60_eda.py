@@ -52,6 +52,7 @@ def _():
     build_pred_sfxi_view = dash_sfxi.build_pred_sfxi_view
     build_umap_controls = dash_ui.build_umap_controls
     campaign_label_from_path = dash_datasets.campaign_label_from_path
+    build_explorer_hue_registry = dash_hues.build_explorer_hue_registry
     build_hue_registry = dash_hues.build_hue_registry
     default_view_hues = dash_hues.default_view_hues
     compute_sfxi_params = dash_sfxi.compute_sfxi_params
@@ -83,6 +84,7 @@ def _():
         Diagnostics,
         attach_namespace_columns,
         build_cluster_chart,
+        build_explorer_hue_registry,
         build_feature_importance_chart,
         build_hue_registry,
         build_label_events,
@@ -328,7 +330,7 @@ def _(df_prelim, mo):
 
 @app.cell
 def _(
-    build_hue_registry,
+    build_explorer_hue_registry,
     choose_axis_defaults,
     data_ready,
     dashboard_defaults,
@@ -369,7 +371,7 @@ def _(
         label="Y column (scatter only)",
         full_width=True,
     )
-    hue_registry = build_hue_registry(
+    hue_registry = build_explorer_hue_registry(
         df_explorer,
         preferred=default_view_hues(),
         include_columns=True,

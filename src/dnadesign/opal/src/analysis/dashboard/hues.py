@@ -161,6 +161,25 @@ def build_hue_registry(
     return HueRegistry(options=options, label_map=label_map)
 
 
+def build_explorer_hue_registry(
+    df: pl.DataFrame,
+    *,
+    preferred: Sequence[HueOption] | None = None,
+    include_columns: bool = True,
+    denylist: Iterable[str] = (),
+    deny_prefixes: Iterable[str] = (),
+    max_unique: int = 100,
+) -> HueRegistry:
+    return build_hue_registry(
+        df,
+        preferred=preferred,
+        include_columns=include_columns,
+        denylist=denylist,
+        deny_prefixes=deny_prefixes,
+        max_unique=max_unique,
+    )
+
+
 def default_view_hues() -> list[HueOption]:
     return [
         HueOption(key="opal__view__score", label="Score", kind="numeric", dtype=pl.Float64),

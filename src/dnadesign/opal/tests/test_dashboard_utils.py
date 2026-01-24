@@ -196,6 +196,22 @@ def test_hue_registry_filters_invalid_columns() -> None:
     assert "opal__ledger__score" not in labels
 
 
+def test_explorer_hue_registry_allows_high_cardinality() -> None:
+    values = [str(i) for i in range(67)]
+    df = pl.DataFrame(
+        {
+            "id": [f"id_{i}" for i in range(len(values))],
+            "cluster__ldn_v1": values,
+            "opal__view__score": list(range(len(values))),
+        }
+    )
+    default_labels = hues.build_hue_registry(df, include_columns=True).labels()
+    assert "cluster__ldn_v1" not in default_labels
+
+    explorer_labels = hues.build_explorer_hue_registry(df, include_columns=True).labels()
+    assert "cluster__ldn_v1" in explorer_labels
+
+
 def test_ensure_selection_columns() -> None:
     df = pl.DataFrame({"id": ["a", "b", "c"], "score": [0.3, 0.1, 0.2]})
     df_out, warnings, err = selection.ensure_selection_columns(
