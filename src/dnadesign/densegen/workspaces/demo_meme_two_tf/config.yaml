@@ -10,8 +10,8 @@ densegen:
     - name: lexA_cpxR_artifacts
       type: pwm_artifact_set
       paths:
-        - inputs/motif_artifacts/lexA__demo_local_meme__lexA.json
-        - inputs/motif_artifacts/cpxR__demo_local_meme__cpxR.json
+        - inputs/motif_artifacts/lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json
+        - inputs/motif_artifacts/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json
       sampling:
         strategy: stochastic
         n_sites: 200
@@ -25,7 +25,7 @@ densegen:
           retain_bin_ids: [0, 1, 2, 3]
           log_every_batches: 1
         length_policy: range
-        length_range: [22, 28]
+        length_range: [15, 20]
 
   output:
     targets: [parquet]

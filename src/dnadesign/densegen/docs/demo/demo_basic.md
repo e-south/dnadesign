@@ -99,7 +99,7 @@ Confirm Stage‑A inputs and sampling settings.
 dense inspect inputs
 ```
 
-The demo uses DenseGen PWM artifacts in `inputs/motif_artifacts/` (`lexA__demo_local_meme__lexA.json`, `cpxR__demo_local_meme__cpxR.json`).
+The demo uses DenseGen PWM artifacts in `inputs/motif_artifacts/` (`lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json`, `cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json`).
 
 ---
 
@@ -139,7 +139,7 @@ The DenseGen workspace stays config‑centric (one runtime config); Cruncher kee
 
 Confirm resolved outputs, Stage‑A sampling knobs, fixed elements, and Stage‑B sampling policy.
 
-Stage‑A is configured to mine **hundreds of binding sites per TF** from the PWM artifacts. The motif JSONs declare widths (LexA 22 bp, CpxR 21 bp), so `length_policy: range` with `length_range: [22, 28]` adds jitter around those sizes while still selecting high‑scoring windows from the top p‑value strata. (Scale to thousands by raising `n_sites` if you need a larger pool.)
+Stage‑A is configured to mine **hundreds of binding sites per TF** from the MEME‑derived PWM artifacts. The motif JSONs declare widths (LexA 15 bp, CpxR 11 bp), so `length_policy: range` with `length_range: [15, 20]` samples target lengths and pads flanks to reach the chosen length while still selecting high‑scoring windows from the top p‑value strata. (Scale to thousands by raising `n_sites` if you need a larger pool.)
 
 Stage‑B then **subsamples** the Stage‑A pool into candidate libraries (`pool_strategy: subsample`, `library_size: 20`) with coverage weighting so each library includes the TFs you specified (`cover_all_regulators: true`). Each library is a candidate set offered to the solver; the solver assembles 60‑bp sequences by selecting a subset, and the run resamples new libraries as needed.
 
