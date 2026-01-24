@@ -1,6 +1,6 @@
 ## DenseGen demo
 
-This walkthrough uses the packaged demo template. The staged workspace contains MEME `txt` motifs in `inputs/` (lexA + cpxR), and Stage‑A sampling uses those files directly.
+This walkthrough uses the packaged demo workspace. The staged workspace contains **DenseGen PWM artifacts** in `inputs/motif_artifacts/` (lexA + cpxR), and Stage‑A sampling uses those JSON files directly.
 
 ### Contents
 0. [Prereqs](#0-prereqs) - sync deps and ensure solver tools.
@@ -38,7 +38,7 @@ pixi run fimo --version
 pixi run dense --help
 ```
 
-Optional convenience aliases if you plan to use pixi for the rest of the demo:
+Optional convenience alias for MEME tools when using pixi:
 
 ```bash
 alias fimo="pixi run fimo"
@@ -68,7 +68,8 @@ From the repo root:
 cd src/dnadesign/densegen/workspaces/demo_meme_two_tf
 ```
 
-If you use pixi tasks for DenseGen, define an alias that pins the config path in this workspace:
+If you use pixi tasks for DenseGen, define an alias that pins the config path in this workspace
+(pixi tasks run from the repo root, so relative `-c` paths will not resolve):
 
 ```bash
 alias dense="pixi run dense -c $PWD/config.yaml"
@@ -100,42 +101,44 @@ Why: confirm Stage‑A inputs and sampling settings.
 dense inspect inputs
 ```
 
-The demo uses MEME `.txt` motifs already in `inputs/` (`lexA.txt`, `cpxR.txt`).
+The demo uses DenseGen PWM artifacts in `inputs/motif_artifacts/` (`lexA__demo_local_meme__lexA.json`,
+`cpxR__demo_local_meme__cpxR.json`).
 
 ---
 
 ### 3b. (Optional) Build inputs via Cruncher (external workspace)
 
-Generate Stage‑A motif artifacts and binding‑site tables in **Cruncher’s** workspace, then copy
-the exports into this DenseGen workspace.
+Refresh the demo motifs by exporting **DenseGen PWM artifacts** from Cruncher, then copy them into
+this DenseGen workspace. This is optional — the demo already ships with artifacts.
 
 Follow the Cruncher demo (see `cruncher/docs/demos/demo_basics_two_tf.md`) in its own workspace.
-From the Cruncher workspace directory, export DenseGen inputs (no `-c` flag needed when you run in CWD):
+From the Cruncher workspace directory, export DenseGen artifacts (no `-c` flag needed when you run in CWD):
 
 ```bash
 cd <cruncher_workspace>
-cruncher catalog export-sites --set 1 --out outputs/exports/densegen_sites.csv
-cruncher catalog export-densegen --set 1 --out outputs/exports/densegen_pwms
+cruncher catalog export-densegen --set 1 --out outputs/densegen_motifs
 ```
 
-Copy those exports into **this** DenseGen workspace:
+Copy those artifacts into **this** DenseGen workspace:
 
 ```bash
-cp <cruncher_workspace>/outputs/exports/densegen_sites.csv inputs/
-cp -R <cruncher_workspace>/outputs/exports/densegen_pwms inputs/motif_artifacts
+cp -R <cruncher_workspace>/outputs/densegen_motifs/* inputs/motif_artifacts/
 ```
 
-Update `config.yaml` inputs to point at the exported artifacts, for example:
+If you also want to drive Stage‑A from binding sites instead of PWM sampling, export them too:
+
+```bash
+cruncher catalog export-sites --set 1 --out outputs/densegen_sites.parquet
+cp <cruncher_workspace>/outputs/densegen_sites.parquet inputs/
+```
+
+Then update `config.yaml` inputs to point at the exported binding sites (optional), for example:
 
 ```yaml
 inputs:
   - name: demo_sites
     type: binding_sites
-    path: inputs/densegen_sites.csv
-  - name: demo_pwms
-    type: pwm_artifact_set
-    paths:
-      - inputs/motif_artifacts/<motif>.json
+    path: inputs/densegen_sites.parquet
 ```
 
 The DenseGen workspace stays config‑centric (one runtime config); Cruncher keeps its own workspace + config.

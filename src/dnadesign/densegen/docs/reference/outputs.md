@@ -1,6 +1,6 @@
 ## DenseGen Output Formats
 
-DenseGen can emit USR datasets and/or Parquet datasets. Both formats share the same canonical ID scheme and metadata semantics. Parquet is the canonical non-USR output format (columnar, appendable, analytics-ready).
+DenseGen can emit Parquet datasets (stored locally or in the sibling USR package).
 
 ### Contents
 - [Canonical IDs](#canonical-ids) - deterministic sequence identifiers.
@@ -58,8 +58,7 @@ Keys are namespaced as `densegen__<key>`. Categories include:
 - **Library + Stage‑B sampling**: library size, unique TF/TFBS counts, sampling caps and relaxations.
 - **Placement stats**: used TFBS details, coverage of required regulators, per-TF counts.
 
-Exact fields may expand over time. For the canonical list and types, see
-`src/dnadesign/densegen/src/core/metadata_schema.py`.
+Exact fields may expand over time. For the canonical list and types, see `src/dnadesign/densegen/src/core/metadata_schema.py`.
 
 ---
 
@@ -87,8 +86,7 @@ DenseGen writes `outputs/meta/events.jsonl` (JSON lines) with structured events 
 DenseGen records solver library provenance in two places:
 
 - `outputs/libraries/library_builds.parquet` + `library_members.parquet` (canonical library artifacts).
-- `outputs/tables/attempts.parquet` (attempt-level audit log with offered library lists). Each attempt row stores the full library offered to the solver (`library_tfbs`, `library_tfs`,
-`library_site_ids`, `library_sources`) along with the library hash/index and solver status. Attempts include `attempt_id` and `solution_id` (when successful) for stable joins. Output records carry `densegen__sampling_library_hash` (Stage‑B) so you can join placements to libraries.
+- `outputs/tables/attempts.parquet` (attempt-level audit log with offered library lists). Each attempt row stores the full library offered to the solver (`library_tfbs`, `library_tfs`, `library_site_ids`, `library_sources`) along with the library hash/index and solver status. Attempts include `attempt_id` and `solution_id` (when successful) for stable joins. Output records carry `densegen__sampling_library_hash` (Stage‑B) so you can join placements to libraries.
 
 ---
 
@@ -110,17 +108,13 @@ The `dense report` command writes a compact audit summary under `outputs/report/
 - `outputs/report/report.md`
 - `outputs/report/report.html` (basic HTML wrapper for quick sharing)
 
-These summarize run scope and link to the canonical outputs (`outputs/tables/dense_arrays.parquet` and
-`outputs/tables/attempts.parquet`). Reports do not generate plots; run `dense plot` to populate
-`outputs/plots/`, and use `dense report --plots include` to link the existing plot manifest.
-Use `dense report --format json|md|html|all` to control which files are emitted.
+These summarize run scope and link to the canonical outputs (`outputs/tables/dense_arrays.parquet` and `outputs/tables/attempts.parquet`). Reports do not generate plots; run `dense plot` to populate `outputs/plots/`, and use `dense report --plots include` to link the existing plot manifest. Use `dense report --format json|md|html|all` to control which files are emitted.
 
 ---
 
 ### Plots
 
-`dense plot` writes plot images under `outputs/plots/` (format controlled by `plots.format`).
-`outputs/plots/plot_manifest.json` records the plot inventory for reports.
+`dense plot` writes plot images under `outputs/plots/` (format controlled by `plots.format`). `outputs/plots/plot_manifest.json` records the plot inventory for reports.
 
 ---
 

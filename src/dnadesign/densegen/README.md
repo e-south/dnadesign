@@ -21,42 +21,42 @@ For a full walkthrough with expected outputs, see [DenseGen demo](docs/demo/demo
 Prerequisites include Python, dense-arrays, and a MILP solver. CBC is open-source; [GUROBI](https://www.gurobi.com/) is supported if installed and licensed. Stage‑A FIMO sampling requires MEME Suite (`fimo` on PATH; use `pixi run` if needed).
 
 ```bash
-# 1) Scaffold a workspace from a packaged template (self-contained).
-dense workspace init --id demo --template-id demo_meme_two_tf --copy-inputs
+# 1) Enter the pre‑staged demo workspace (config.yaml is auto‑discovered).
+cd src/dnadesign/densegen/workspaces/demo_meme_two_tf
 
-# 2) Enter the workspace so config.yaml is auto‑discovered.
-cd demo
-
-# 3) Validate schema + solver availability before long runs.
+# 2) Validate schema + solver availability before long runs.
 dense validate-config --probe-solver
 
-# 4) Inspect Stage‑A inputs and sampling settings.
+# 3) Inspect Stage‑A inputs and sampling settings.
 dense inspect inputs
 
-# 5) Inspect resolved outputs + Stage‑A/Stage‑B settings.
+# 4) Inspect resolved outputs + Stage‑A/Stage‑B settings.
 dense inspect config
 
-# 6) Stage‑A: materialize TFBS pools (optional, for inspection).
+# 5) Stage‑A: materialize TFBS pools (optional, for inspection).
 dense stage-a build-pool
 
-# 7) Stage‑B: materialize solver libraries (optional, for inspection).
+# 6) Stage‑B: materialize solver libraries (optional, for inspection).
 dense stage-b build-libraries
 
-# 8) Run generation (use --resume or --fresh if outputs already exist).
+# 7) Run generation (use --resume or --fresh if outputs already exist).
 dense run
 
-# 9) Inspect run summary (library + events are optional add‑ons).
+# 8) Inspect run summary (library + events are optional add‑ons).
 dense inspect run --library --events
 
-# 10) Emit an audit report.
+# 9) Emit an audit report.
 dense report --format md
 
-# 11) List plots and render a subset.
+# 10) List plots and render a subset.
 dense ls-plots
 dense plot --only tf_usage,tf_coverage
 ```
 
 If you rerun a workspace that already has run outputs (e.g., `outputs/tables/attempts.parquet` or `outputs/meta/run_state.json`), choose `--resume` (continue) or `--fresh` (clear outputs and start over).
+
+If you want to scaffold a new workspace from a packaged template, run `dense workspace init` from
+`src/dnadesign/densegen/workspaces/` to keep new workspaces colocated.
 
 ---
 

@@ -50,14 +50,11 @@ YAML config
 - **Workspace‑first execution:** CLI resolves config from `./config.yaml` in CWD unless `-c` is provided.
 - **No config fallbacks:** missing config exits immediately with an actionable error message.
 - **Strict schema:** unknown keys, mixed quota/fraction plans, or missing required fields are errors.
-- **Run‑scoped I/O:** outputs/tables/logs/plots/report must resolve inside `outputs/` under
-  `densegen.run.root` (enforced).
-- **Stage‑A invariants:** Stage‑A sampling is defined per input and produces pools (plus optional
-  candidate artifacts). Stage‑A pools are cached per run.
-- **Stage‑B invariants:** Stage‑B sampling constructs solver libraries from pools or artifacts;
-  resampling happens only in Stage‑B. Library artifacts capture sampling metadata.
+- **Run‑scoped I/O:** outputs/tables/logs/plots/report must resolve inside `outputs/` under `densegen.run.root` (enforced).
+- **Stage‑A invariants:** Stage‑A sampling is defined per input and produces pools (plus optional candidate artifacts). Stage‑A pools are cached per run.
+- **Stage‑B invariants:** Stage‑B sampling constructs solver libraries from pools or artifacts; resampling happens only in Stage‑B. Library artifacts capture sampling metadata.
 - **Explicit policies:** Stage‑A/Stage‑B sampling, solver settings, and pad policies are
-  recorded in metadata.
+ recorded in metadata.
 - **Canonical IDs:** Parquet and USR share the same deterministic ID computation.
 - **Output schema:** `output.schema` defines `bio_type` and `alphabet` once for all sinks.
 - **Optional deps:** USR support is imported only when `output.targets` includes `usr`.
@@ -68,8 +65,7 @@ YAML config
 
 ### Extension points
 
-- Add input types by implementing a new data source and wiring it into
-  `adapters/sources/factory.py`.
+- Add input types by implementing a new data source and wiring it into `adapters/sources/factory.py`.
 - Add new plot types by registering them in `viz/plotting.py` (names are strict; unknowns error).
 - Add new postprocess steps under `core/postprocess/` and wire them in the pipeline with
   explicit policy metadata.
