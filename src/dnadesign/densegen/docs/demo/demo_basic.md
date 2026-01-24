@@ -107,7 +107,7 @@ The demo uses DenseGen PWM artifacts in `inputs/motif_artifacts/` (`lexA__meme_s
 
 Refresh the demo motifs by exporting **DenseGen PWM artifacts** from Cruncher, then copy them into this DenseGen workspace. This is optional as the demo already ships with artifacts.
 
-Follow the Cruncher demo (see `cruncher/docs/demos/demo_basics_two_tf.md`) in its own workspace. From the Cruncher workspace directory, export DenseGen artifacts into the target DenseGen workspace name or path (no `-c` flag needed when you run in CWD):
+Follow the Cruncher demo (see `cruncher/docs/demos/demo_basics_two_tf.md`) in its own workspace. From the Cruncher workspace directory, export DenseGen artifacts into the target DenseGen workspace name or path.
 
 ```bash
 cd <cruncher_workspace>
@@ -135,15 +135,15 @@ The DenseGen workspace stays config‑centric (one runtime config); Cruncher kee
 
 ---
 
-### 4. Inspect config
+### 4. Inspect the config
 
-Confirm resolved outputs, Stage‑A sampling knobs, fixed elements, and Stage‑B sampling policy.
+Review the resolved outputs, Stage‑A sampling settings, fixed elements, and Stage‑B sampling policy.
 
-Stage‑A is configured to mine **hundreds of binding sites per TF** from the MEME‑derived PWM artifacts. The motif JSONs declare widths (LexA 15 bp, CpxR 11 bp), so `length_policy: range` with `length_range: [15, 20]` samples target lengths and pads flanks to reach the chosen length while still selecting high‑scoring windows from the top p‑value strata. (Scale to thousands by raising `n_sites` if you need a larger pool.)
+Stage‑A sampling: the pipeline mines hundreds of binding sites per TF from the MEME‑derived PWM artifacts. The motif JSONs specify widths (LexA 15 bp, CpxR 11 bp), and `length_policy: range` with `length_range: [15, 20]` chooses a target length and pads flanks to it while pulling from the top p‑value bins. Increase `n_sites` if you need a larger pool.
 
-Stage‑B then **subsamples** the Stage‑A pool into candidate libraries (`pool_strategy: subsample`, `library_size: 20`) with coverage weighting so each library includes the TFs you specified (`cover_all_regulators: true`). Each library is a candidate set offered to the solver; the solver assembles 60‑bp sequences by selecting a subset, and the run resamples new libraries as needed.
+Stage‑B sampling: the Stage‑A pool is subsampled into candidate libraries (`pool_strategy: subsample`, `library_size: 20`) with coverage weighting so each library contains the specified TFs (`cover_all_regulators: true`). Each library is offered to the solver, which assembles 60‑bp sequences by selecting a subset; new libraries are sampled as needed.
 
-This demo constrains a strong σ70 promoter pair (`TTGACA`/`TATAAT`) as fixed elements with a 15–19 bp spacer; the default `tf_coverage` plot overlays these sites when `plots.options.tf_coverage.include_promoter_sites: true`. To keep the 60‑bp budget feasible with ~21–22 bp TFBS lengths, the plan sets `min_required_regulators: 1` while listing both LexA and CpxR, so each sequence must include at least one of the two regulators.
+Fixed promoter: this demo fixes a strong σ70 promoter pair (`TTGACA`/`TATAAT`) with a 15–19 bp spacer; if `plots.options.tf_coverage.include_promoter_sites` is true, the `tf_coverage` plot overlays these sites. To keep the 60‑bp sequence length feasible alongside ~11–15 bp TFBS, the plan sets `min_required_regulators: 1` while still listing both LexA and CpxR, so each sequence includes at least one of them.
 
 ```bash
 dense inspect config
@@ -153,7 +153,7 @@ dense inspect config
 
 ### 5. Stage-A build-pool
 
-Why: materialize TFBS pools for inspection and for deterministic Stage‑B previews.
+Materialize TFBS pools for inspection and for deterministic Stage‑B previews.
 
 ```bash
 dense stage-a build-pool --fresh
@@ -166,7 +166,7 @@ when re‑running to avoid cumulative pools and candidate logs.
 
 ### 6. Stage-B build-libraries
 
-Why: preview solver libraries without running the optimizer.
+Preview solver libraries without running the optimizer.
 
 ```bash
 dense stage-b build-libraries
@@ -176,22 +176,15 @@ dense stage-b build-libraries
 
 ### 7. Run generation
 
-Why: execute Stage‑A sampling (if needed), Stage‑B sampling, and solver optimization.
+Execute Stage‑A sampling (if needed), Stage‑B sampling, and solver optimization.
 
 ```bash
 dense run
 ```
 
-This demo config also enables plot generation from the run (`plots.default`) and saves plots in
-`outputs/plots/` using `plots.format` (switch to `pdf` or `svg` in `config.yaml` if desired).
-Reports do not generate plots; they can optionally link the existing plot manifest.
-The demo quota is intentionally small (`generation.quota: 12` with `runtime.max_seconds_per_plan: 60`)
-to keep the end‑to‑end run fast; scale these up for production runs.
-The demo uses `solver.strategy: iterate` for full solver runs; switch to `diverse` or `optimal`
-as needed for exploration.
-If run outputs already exist (e.g., `outputs/tables/*.parquet` or `outputs/meta/run_state.json`),
-choose `--resume` to continue or `--fresh` to clear outputs. Use `dense run --no-plot` to skip
-auto‑plots when re‑running.
+This demo config also enables plot generation from the run (`plots.default`) and saves plots in `outputs/plots/` using `plots.format` (switch to `pdf` or `svg` in `config.yaml` if desired). Reports do not generate plots; they can optionally link the existing plot manifest.
+
+The demo quota is intentionally small (`generation.quota: 12` with `runtime.max_seconds_per_plan: 60`) to keep the end‑to‑end run fast; scale these up for production runs. The demo uses `solver.strategy: iterate` for full solver runs; switch to `diverse` or `optimal` as needed for exploration. If run outputs already exist (e.g., `outputs/tables/*.parquet` or `outputs/meta/run_state.json`), choose `--resume` to continue or `--fresh` to clear outputs. Use `dense run --no-plot` to skip auto‑plots when re‑running.
 
 ---
 
