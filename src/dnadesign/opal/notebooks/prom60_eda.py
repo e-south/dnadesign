@@ -64,6 +64,7 @@ def _():
     attach_namespace_columns = dash_util.attach_namespace_columns
     choose_axis_defaults = dash_util.choose_axis_defaults
     choose_dropdown_value = dash_util.choose_dropdown_value
+    state_value_changed = dash_util.state_value_changed
     dedupe_exprs = dash_util.dedupe_exprs
     dedup_latest_labels = dash_labels.dedup_latest_labels
     find_repo_root = dash_datasets.find_repo_root
@@ -115,6 +116,7 @@ def _():
         resolve_brush_selection,
         resolve_sfxi_readiness,
         safe_is_numeric,
+        state_value_changed,
     )
 
 
@@ -1668,9 +1670,11 @@ def _(build_hue_registry, choose_dropdown_value, df_sfxi_scatter, mo, sfxi_color
 
 
 @app.cell
-def _(set_sfxi_color_state, sfxi_color_dropdown):
+def _(set_sfxi_color_state, sfxi_color_dropdown, sfxi_color_state, state_value_changed):
     if sfxi_color_dropdown is not None:
-        set_sfxi_color_state(sfxi_color_dropdown.value)
+        _next_value = sfxi_color_dropdown.value
+        if state_value_changed(sfxi_color_state(), _next_value):
+            set_sfxi_color_state(_next_value)
     return ()
 
 

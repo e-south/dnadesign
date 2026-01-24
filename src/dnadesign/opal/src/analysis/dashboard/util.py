@@ -69,6 +69,10 @@ def choose_dropdown_value(
     return options[0] if options else None
 
 
+def state_value_changed(current: object, next_value: object) -> bool:
+    return current != next_value
+
+
 def choose_axis_defaults(
     *,
     numeric_cols: Sequence[str],

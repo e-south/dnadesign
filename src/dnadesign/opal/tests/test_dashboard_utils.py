@@ -138,6 +138,13 @@ def test_choose_axis_defaults_skips_row_id() -> None:
     assert y_default == "opal__view__effect_scaled"
 
 
+def test_state_value_changed() -> None:
+    assert util.state_value_changed("score", "score") is False
+    assert util.state_value_changed("score", "logic_fidelity") is True
+    assert util.state_value_changed(None, None) is False
+    assert util.state_value_changed(None, "score") is True
+
+
 def test_attach_namespace_columns_prefers_row_id() -> None:
     df_base = pl.DataFrame(
         {

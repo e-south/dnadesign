@@ -56,3 +56,4 @@ Note: freeform working notes; prune/merge as they become cruft.
 - SFXI scatter now attaches `cluster__*` + `densegen__*` columns for hue selection; added util helper + test.
 - prom60_eda: preserve SFXI color selection across setpoint updates; dataset explorer defaults now prefer
   `opal__view__score`/`opal__view__effect_scaled` and skip `__row_id` when possible.
+- Guarded SFXI color state updates to avoid reactive rerun loops when opening prom60_eda.
