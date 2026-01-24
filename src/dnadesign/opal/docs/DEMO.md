@@ -136,7 +136,7 @@ Runs
 ```
 Round log
   round            : 0
-  path             : <repo>/.../outputs/rounds/round_0/round.log.jsonl
+  path             : <repo>/.../outputs/rounds/round_0/logs/round.log.jsonl
   events           : <count>
   predict_batches  : <count>
   predict_rows     : <count>
@@ -160,16 +160,22 @@ Stages
 
 ```
 outputs/rounds/round_<k>/
-  model.joblib
-  model_meta.json
-  selection_top_k.csv
-  selection_top_k.parquet
-  selection_top_k__run_<run_id>.csv
-  selection_top_k__run_<run_id>.parquet
-  labels_used.parquet
-  round_ctx.json
-  objective_meta.json
-  round.log.jsonl
+  model/
+    model.joblib
+    model_meta.json
+    feature_importance.csv
+  selection/
+    selection_top_k.csv
+    selection_top_k.parquet
+    selection_top_k__run_<run_id>.csv
+    selection_top_k__run_<run_id>.parquet
+  labels/
+    labels_used.parquet
+  metadata/
+    round_ctx.json
+    objective_meta.json
+  logs/
+    round.log.jsonl
 ```
 
 **Ledger sinks (append-only)**:

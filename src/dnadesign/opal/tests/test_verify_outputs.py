@@ -35,7 +35,7 @@ def test_compare_selection_to_ledger_matches() -> None:
 
 
 def test_compare_selection_to_ledger_mismatch() -> None:
-    selection_df = pd.DataFrame({"id": ["a", "b"], "selection_score": [1.0, 2.0]})
+    selection_df = pd.DataFrame({"id": ["a", "b"], "pred__y_obj_scalar": [1.0, 2.0]})
     ledger_df = pd.DataFrame({"id": ["a", "b"], "pred__y_obj_scalar": [1.0, 2.5]})
     summary, mismatches = compare_selection_to_ledger(selection_df, ledger_df, eps=1e-9)
     assert summary["mismatch_count"] == 1
@@ -70,14 +70,10 @@ def test_verify_outputs_integration(tmp_path: Path) -> None:
 
     rdir = ws.round_dir(as_of_round)
     rdir.mkdir(parents=True, exist_ok=True)
-    selection_df = pd.DataFrame(
-        {
-            "id": ids,
-            "selection_score": y_obj,
-            "pred__y_obj_scalar": y_obj,
-        }
-    )
-    selection_path = rdir / "selection_top_k.csv"
+    selection_df = pd.DataFrame({"id": ids, "pred__y_obj_scalar": y_obj})
+    selection_dir = rdir / "selection"
+    selection_dir.mkdir(parents=True, exist_ok=True)
+    selection_path = selection_dir / "selection_top_k.csv"
     write_selection_csv(selection_path, selection_df)
 
     run_meta = build_run_meta_event(
@@ -101,7 +97,7 @@ def test_verify_outputs_integration(tmp_path: Path) -> None:
         stats_n_scored=len(ids),
         unc_mean_sd=None,
         pred_rows_df=run_pred,
-        artifact_paths_and_hashes={"selection_top_k.csv": ("sha", str(selection_path))},
+        artifact_paths_and_hashes={"selection/selection_top_k.csv": ("sha", str(selection_path))},
         objective_summary_stats=None,
     )
 

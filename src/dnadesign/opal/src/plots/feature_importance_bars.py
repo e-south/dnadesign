@@ -46,7 +46,7 @@ def _discover_round_fi_files(outputs_dir: Path) -> Dict[int, Path]:
         if not m:
             continue
         r = int(m.group(1))
-        p = child / "feature_importance.csv"
+        p = child / "model" / "feature_importance.csv"
         if p.exists():
             found[r] = p.resolve()
     return dict(sorted(found.items()))
@@ -168,7 +168,7 @@ def _resolve_order(frames: List[pd.DataFrame], policy: str) -> List[int]:
             "alpha": "Bar transparency (default 0.45).",
             "figsize_in": "Figure size in inches (default [12, 5]).",
         },
-        requires=["outputs/rounds/round_<k>/feature_importance.csv"],
+        requires=["outputs/rounds/round_<k>/model/feature_importance.csv"],
         notes=["Reads per-round outputs, not ledger."],
     ),
 )

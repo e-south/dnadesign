@@ -1,3 +1,5 @@
+# ABOUTME: Tests predict Y-ops guardrails for missing round context metadata.
+# ABOUTME: Ensures prediction fails fast when Y-ops inversion lacks round_ctx.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -42,7 +44,9 @@ def test_predict_requires_round_ctx_when_yops(tmp_path):
         }
     )
     model.fit(X_train, Y_train)
-    model_path = tmp_path / "model.joblib"
+    model_dir = tmp_path / "model"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    model_path = model_dir / "model.joblib"
     model.save(str(model_path))
 
     # model_meta declares Y-ops but no round_ctx.json is present
@@ -51,7 +55,7 @@ def test_predict_requires_round_ctx_when_yops(tmp_path):
         "model__params": model.get_params(),
         "training__y_ops": [{"name": "intensity_median_iqr", "params": {"min_labels": 5}}],
     }
-    (tmp_path / "model_meta.json").write_text(json.dumps(meta))
+    (model_dir / "model_meta.json").write_text(json.dumps(meta))
 
     store = RecordsStore(
         kind="local",

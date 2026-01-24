@@ -96,8 +96,12 @@ def test_ctx_show_audit_diff(tmp_path: Path) -> None:
             "model/random_forest/y_dim",
         ],
     }
-    (round0 / "round_ctx.json").write_text(json.dumps(ctx0))
-    (round1 / "round_ctx.json").write_text(json.dumps(ctx1))
+    ctx0_path = round0 / "metadata" / "round_ctx.json"
+    ctx1_path = round1 / "metadata" / "round_ctx.json"
+    ctx0_path.parent.mkdir(parents=True, exist_ok=True)
+    ctx1_path.parent.mkdir(parents=True, exist_ok=True)
+    ctx0_path.write_text(json.dumps(ctx0))
+    ctx1_path.write_text(json.dumps(ctx1))
 
     res = runner.invoke(
         app,

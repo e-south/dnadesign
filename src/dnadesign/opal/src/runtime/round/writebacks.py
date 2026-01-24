@@ -15,7 +15,7 @@ import pandas as pd
 
 from ...config.types import RootConfig
 from ...core.round_context import RoundCtx
-from ...core.utils import OpalError, file_sha256, now_iso, print_stderr
+from ...core.utils import OpalError, ensure_dir, file_sha256, now_iso, print_stderr
 from ...storage.artifacts import (
     ArtifactPaths,
     append_round_log_event,
@@ -73,12 +73,16 @@ def write_round_artifacts(
     df = inputs.df
 
     apaths = ArtifactPaths(
-        model=rdir / "model.joblib",
-        selection_csv=rdir / "selection_top_k.csv",
-        round_log_jsonl=rdir / "round.log.jsonl",
-        round_ctx_json=rdir / "round_ctx.json",
-        objective_meta_json=rdir / "objective_meta.json",
+        model=rdir / "model" / "model.joblib",
+        model_meta_json=rdir / "model" / "model_meta.json",
+        selection_csv=rdir / "selection" / "selection_top_k.csv",
+        round_log_jsonl=rdir / "logs" / "round.log.jsonl",
+        round_ctx_json=rdir / "metadata" / "round_ctx.json",
+        objective_meta_json=rdir / "metadata" / "objective_meta.json",
+        labels_used_parquet=rdir / "labels" / "labels_used.parquet",
+        feature_importance_csv=rdir / "model" / "feature_importance.csv",
     )
+    ensure_dir(apaths.model.parent)
     score.model.save(str(apaths.model))
     model_meta = {
         "model__name": cfg.model.name,
@@ -87,7 +91,7 @@ def write_round_artifacts(
         "x_dim": int(xbundle.X_train.shape[1]),
         "y_dim": int(training.y_dim),
     }
-    model_meta_sha = write_model_meta(rdir / "model_meta.json", model_meta)
+    model_meta_sha = write_model_meta(apaths.model_meta_json, model_meta)
 
     seq_map = build_sequence_map(df)
 
@@ -112,7 +116,7 @@ def write_round_artifacts(
             "id": selected_ids,
             "sequence": [seq_map.get(i) for i in selected_ids],
             "sel__rank_competition": score.ranks_competition,
-            "selection_score": score.y_obj_scalar,
+            "pred__y_obj_scalar": score.y_obj_scalar,
             "sel__is_selected": score.selected_bool,
         }
     )
@@ -125,7 +129,6 @@ def write_round_artifacts(
         objective_name=score.obj_name,
         objective_mode=score.mode,
         tie_handling=score.tie_handling,
-        pred__y_obj_scalar=selected_df["selection_score"],
     )
     selected_df = selected_df[
         [
@@ -139,7 +142,6 @@ def write_round_artifacts(
             "id",
             "sequence",
             "sel__rank_competition",
-            "selection_score",
             "pred__y_obj_scalar",
         ]
     ]
@@ -152,7 +154,7 @@ def write_round_artifacts(
     sel_run_parquet_sha = write_selection_parquet(sel_run_parquet_path, selected_df)
 
     ctx_sha = write_round_ctx(apaths.round_ctx_json, rctx.snapshot())
-    labels_used_sha = write_labels_used_parquet(rdir / "labels_used.parquet", labels_used_df)
+    labels_used_sha = write_labels_used_parquet(apaths.labels_used_parquet, labels_used_df)
 
     artifacts_paths_and_hashes: Dict[str, tuple[str, str]] = {}
 
@@ -161,7 +163,7 @@ def write_round_artifacts(
             m_arts = score.model.model_artifacts() or {}
             if "feature_importance" in m_arts:
                 fi_df = m_arts["feature_importance"]
-                fi_path = rdir / "feature_importance.csv"
+                fi_path = apaths.feature_importance_csv
                 fi_sha = write_feature_importance_csv(fi_path, fi_df)
                 imp = fi_df["importance"].to_numpy(dtype=float)
                 xdim = int(imp.shape[0])
@@ -173,7 +175,7 @@ def write_round_artifacts(
                     f"[model] feature_importance: x_dim={xdim} nonzero={nonzero} HHI={hhi:.4f}",
                 )
                 append_round_log_event(
-                    rdir / "round.log.jsonl",
+                    apaths.round_log_jsonl,
                     {
                         "ts": now_iso(),
                         "stage": "model_feature_importance",
@@ -185,7 +187,7 @@ def write_round_artifacts(
                         "artifact_sha256": fi_sha,
                     },
                 )
-                artifacts_paths_and_hashes["feature_importance.csv"] = (
+                artifacts_paths_and_hashes["model/feature_importance.csv"] = (
                     fi_sha,
                     str(fi_path.resolve()),
                 )
@@ -195,26 +197,29 @@ def write_round_artifacts(
     _log(
         req.verbose,
         "[artifacts] model, selection_csv, selection_parquet, round_ctx, objective_meta"
-        + (", feature_importance" if "feature_importance.csv" in artifacts_paths_and_hashes else "")
+        + (", feature_importance" if "model/feature_importance.csv" in artifacts_paths_and_hashes else "")
         + " written",
     )
 
     artifacts_paths_and_hashes.update(
         {
-            "model.joblib": (file_sha256(apaths.model), str(apaths.model.resolve())),
-            "selection_top_k.csv": (sel_sha, str(apaths.selection_csv.resolve())),
-            "selection_top_k.parquet": (sel_parquet_sha, str(sel_parquet_path.resolve())),
-            f"selection_top_k__run_{run_id}.csv": (sel_run_csv_sha, str(sel_run_csv_path.resolve())),
-            f"selection_top_k__run_{run_id}.parquet": (sel_run_parquet_sha, str(sel_run_parquet_path.resolve())),
-            "round_ctx.json": (ctx_sha, str(apaths.round_ctx_json.resolve())),
-            "objective_meta.json": (score.obj_sha, str(apaths.objective_meta_json.resolve())),
-            "model_meta.json": (
-                model_meta_sha,
-                str((rdir / "model_meta.json").resolve()),
+            "model/model.joblib": (file_sha256(apaths.model), str(apaths.model.resolve())),
+            "selection/selection_top_k.csv": (sel_sha, str(apaths.selection_csv.resolve())),
+            "selection/selection_top_k.parquet": (sel_parquet_sha, str(sel_parquet_path.resolve())),
+            f"selection/selection_top_k__run_{run_id}.csv": (sel_run_csv_sha, str(sel_run_csv_path.resolve())),
+            f"selection/selection_top_k__run_{run_id}.parquet": (
+                sel_run_parquet_sha,
+                str(sel_run_parquet_path.resolve()),
             ),
-            "labels_used.parquet": (
+            "metadata/round_ctx.json": (ctx_sha, str(apaths.round_ctx_json.resolve())),
+            "metadata/objective_meta.json": (score.obj_sha, str(apaths.objective_meta_json.resolve())),
+            "model/model_meta.json": (
+                model_meta_sha,
+                str(apaths.model_meta_json.resolve()),
+            ),
+            "labels/labels_used.parquet": (
                 labels_used_sha,
-                str((rdir / "labels_used.parquet").resolve()),
+                str(apaths.labels_used_parquet.resolve()),
             ),
         }
     )
@@ -422,9 +427,9 @@ def update_campaign_state(
                 "ledger_labels_parquet": str(ws.ledger_labels_path.resolve()),
                 "round_ctx_json": str(apaths.round_ctx_json.resolve()),
                 "objective_meta_json": str(apaths.objective_meta_json.resolve()),
-                "model_meta_json": str((round_dir / "model_meta.json").resolve()),
-                "labels_used_parquet": str((round_dir / "labels_used.parquet").resolve()),
-                "round_log_jsonl": str((round_dir / "round.log.jsonl").resolve()),
+                "model_meta_json": str(apaths.model_meta_json.resolve()),
+                "labels_used_parquet": str(apaths.labels_used_parquet.resolve()),
+                "round_log_jsonl": str(apaths.round_log_jsonl.resolve()),
             },
             writebacks={
                 "records_label_hist_updated": [

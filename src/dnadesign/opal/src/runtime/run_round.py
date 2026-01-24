@@ -95,7 +95,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
 
     ensure_dir(rdir)
     append_round_log_event(
-        rdir / "round.log.jsonl",
+        rdir / "logs" / "round.log.jsonl",
         {
             "ts": now_iso(),
             "stage": "start",
@@ -226,7 +226,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     )
 
     append_round_log_event(
-        rdir / "round.log.jsonl",
+        rdir / "logs" / "round.log.jsonl",
         {
             "ts": now_iso(),
             "round": int(req.as_of_round),
@@ -235,7 +235,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         },
     )
     append_round_log_event(
-        rdir / "round.log.jsonl",
+        rdir / "logs" / "round.log.jsonl",
         {
             "ts": now_iso(),
             "round": int(req.as_of_round),
@@ -245,7 +245,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         },
     )
     append_round_log_event(
-        rdir / "round.log.jsonl",
+        rdir / "logs" / "round.log.jsonl",
         {"ts": now_iso(), "round": int(req.as_of_round), "stage": "done"},
     )
 

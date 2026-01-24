@@ -119,7 +119,7 @@ def write_state(
 ) -> None:
     round_dir = workdir / "outputs" / "rounds" / f"round_{int(round_index)}"
     round_dir.mkdir(parents=True, exist_ok=True)
-    round_log = round_dir / "round.log.jsonl"
+    round_log = round_dir / "logs" / "round.log.jsonl"
     if not round_log.exists():
         write_round_log(round_log)
     st = CampaignState(
@@ -148,7 +148,7 @@ def write_state(
             model={
                 "type": "random_forest",
                 "params": {},
-                "artifact_path": str(round_dir / "model.joblib"),
+                "artifact_path": str(round_dir / "model" / "model.joblib"),
             },
             metrics={},
             durations_sec={},

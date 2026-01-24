@@ -987,6 +987,29 @@ def _(
             overlay_ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
             out_path = _export_out_dir / f"promoter_eda_{dataset_slug}_{ts}.{suffix}"
             can_write = True
+
+            def _prefix_objective_columns(df_export: pl.DataFrame) -> pl.DataFrame:
+                mapping = {
+                    "score": "obj__score",
+                    "logic_fidelity": "obj__logic_fidelity",
+                    "effect_scaled": "obj__effect_scaled",
+                    "effect_raw": "obj__effect_raw",
+                }
+                rename_map = {
+                    src: dst
+                    for src, dst in mapping.items()
+                    if src in df_export.columns and dst not in df_export.columns
+                }
+                if rename_map:
+                    df_export = df_export.rename(rename_map)
+                drop_cols = [
+                    src for src, dst in mapping.items() if src in df_export.columns and dst in df_export.columns
+                ]
+                if drop_cols:
+                    df_export = df_export.drop(drop_cols)
+                return df_export
+
+            df_export = _prefix_objective_columns(df_export)
             if mode_dropdown.value == "Overlay":
                 overlay_ready = True
                 if (

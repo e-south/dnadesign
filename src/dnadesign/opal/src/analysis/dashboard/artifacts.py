@@ -20,7 +20,7 @@ def resolve_round_artifacts(
     if not round_dir.exists():
         return None, f"Round directory not found: {round_dir}"
     artifacts: dict[str, str] = {"round_dir": str(round_dir)}
-    model_path = round_dir / "model.joblib"
+    model_path = round_dir / "model" / "model.joblib"
     if model_path.exists():
-        artifacts["model.joblib"] = str(model_path)
+        artifacts["model/model.joblib"] = str(model_path)
     return artifacts, None

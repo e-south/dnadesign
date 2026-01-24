@@ -54,12 +54,13 @@ def _inverse_yops_if_present(
     require_ctx_if_yops: bool,
     y_ops_declared: bool,
 ) -> np.ndarray:
-    ctx_path = model_path.parent / "round_ctx.json"
+    round_dir = model_path.parent.parent
+    ctx_path = round_dir / "metadata" / "round_ctx.json"
     if not ctx_path.exists():
         if require_ctx_if_yops and y_ops_declared:
             raise OpalError(
-                "round_ctx.json is missing next to the model, but training used Y-ops. "
-                "Provide --assume-no-yops to bypass inversion or copy the round_ctx.json alongside the model."
+                "round_ctx.json is missing under metadata/, but training used Y-ops. "
+                "Provide --assume-no-yops to bypass inversion or supply the round_ctx.json."
             )
         return yhat
     try:

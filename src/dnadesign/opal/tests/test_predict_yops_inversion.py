@@ -1,3 +1,5 @@
+# ABOUTME: Verifies Y-ops inversion during prediction with round metadata.
+# ABOUTME: Ensures round_ctx-driven inversion modifies predictions as expected.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -67,7 +69,9 @@ def test_predict_inverts_yops_when_round_ctx_present(tmp_path):
         }
     )
     model.fit(X_train, Y_train)
-    model_path = tmp_path / "model.joblib"
+    model_dir = tmp_path / "model"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    model_path = model_dir / "model.joblib"
     model.save(str(model_path))
 
     # model_meta declares Y-ops
@@ -76,11 +80,13 @@ def test_predict_inverts_yops_when_round_ctx_present(tmp_path):
         "model__params": model.get_params(),
         "training__y_ops": [{"name": "test_add1_invert", "params": {}}],
     }
-    (tmp_path / "model_meta.json").write_text(json.dumps(meta))
+    (model_dir / "model_meta.json").write_text(json.dumps(meta))
 
     # round_ctx.json with Y-ops pipeline
     ctx = {"yops/pipeline/names": ["test_add1_invert"], "yops/pipeline/params": [{}]}
-    (tmp_path / "round_ctx.json").write_text(json.dumps(ctx))
+    metadata_dir = tmp_path / "metadata"
+    metadata_dir.mkdir(parents=True, exist_ok=True)
+    (metadata_dir / "round_ctx.json").write_text(json.dumps(ctx))
 
     store = RecordsStore(
         kind="local",

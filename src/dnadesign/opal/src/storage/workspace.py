@@ -71,3 +71,18 @@ class CampaignWorkspace:
 
     def round_dir(self, round_index: int) -> Path:
         return self.rounds_dir / f"round_{int(round_index)}"
+
+    def round_model_dir(self, round_index: int) -> Path:
+        return self.round_dir(round_index) / "model"
+
+    def round_selection_dir(self, round_index: int) -> Path:
+        return self.round_dir(round_index) / "selection"
+
+    def round_labels_dir(self, round_index: int) -> Path:
+        return self.round_dir(round_index) / "labels"
+
+    def round_metadata_dir(self, round_index: int) -> Path:
+        return self.round_dir(round_index) / "metadata"
+
+    def round_logs_dir(self, round_index: int) -> Path:
+        return self.round_dir(round_index) / "logs"

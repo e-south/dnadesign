@@ -1,3 +1,5 @@
+# ABOUTME: Defines round artifact paths and write helpers for OPAL outputs.
+# ABOUTME: Provides consistent filesystem write utilities for round artifacts.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -23,10 +25,13 @@ from .parquet_io import write_parquet_df
 @dataclass
 class ArtifactPaths:
     model: Path
+    model_meta_json: Path
     selection_csv: Path
     round_log_jsonl: Path
     round_ctx_json: Path
     objective_meta_json: Path
+    labels_used_parquet: Path
+    feature_importance_csv: Path
 
 
 def write_selection_csv(path: Path, df_selected: pd.DataFrame) -> str:

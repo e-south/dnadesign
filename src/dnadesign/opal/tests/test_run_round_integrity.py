@@ -216,7 +216,9 @@ def test_run_round_blocks_when_round_dir_has_any_entry_without_resume(tmp_path: 
 
     round_dir = workdir / "outputs" / "rounds" / "round_0"
     round_dir.mkdir(parents=True, exist_ok=True)
-    (round_dir / "round.log.jsonl").write_text("stale\n")
+    round_log = round_dir / "logs" / "round.log.jsonl"
+    round_log.parent.mkdir(parents=True, exist_ok=True)
+    round_log.write_text("stale\n")
 
     store = RecordsStore(
         kind="local",
@@ -324,7 +326,7 @@ def test_run_round_preserves_null_sequence_in_selection_artifacts(tmp_path: Path
     )
     assert res.ok is True
 
-    sel_path = workdir / "outputs" / "rounds" / "round_0" / "selection_top_k.parquet"
+    sel_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selection_top_k.parquet"
     assert sel_path.exists()
     sel_df = pd.read_parquet(sel_path)
     assert pd.isna(sel_df.loc[0, "sequence"])

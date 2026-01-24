@@ -166,7 +166,7 @@ def test_run_round_writes_round_ctx_and_ledger(tmp_path):
     assert tracker["progress"].total == res.scored
     assert tracker["progress"].advanced == res.scored
 
-    ctx_path = workdir / "outputs" / "rounds" / "round_0" / "round_ctx.json"
+    ctx_path = workdir / "outputs" / "rounds" / "round_0" / "metadata" / "round_ctx.json"
     assert ctx_path.exists()
     snap = json.loads(ctx_path.read_text())
     assert "core/data/x_dim" in snap

@@ -1,3 +1,5 @@
+# ABOUTME: Loads model artifacts and round context for dashboard overlays.
+# ABOUTME: Centralizes artifact resolution and validation for model-based plots.
 """Model and artifact helpers used by dashboard overlays."""
 
 from __future__ import annotations
@@ -56,7 +58,7 @@ def get_feature_importances(model):
 def load_feature_importances_from_artifact(round_dir: Path | None) -> tuple[np.ndarray | None, str | None]:
     if round_dir is None:
         return None, "Round directory unavailable for feature importance."
-    path = Path(round_dir) / "feature_importance.csv"
+    path = Path(round_dir) / "model" / "feature_importance.csv"
     if not path.is_file():
         return None, f"feature_importance.csv not found under {round_dir}"
     try:
@@ -77,7 +79,7 @@ def load_feature_importances_from_artifact(round_dir: Path | None) -> tuple[np.n
 
 
 def load_intensity_params_from_round_ctx(round_dir: Path, *, eps_default: float):
-    ctx_path = round_dir / "round_ctx.json"
+    ctx_path = round_dir / "metadata" / "round_ctx.json"
     if not ctx_path.is_file():
         return None
     try:
@@ -98,7 +100,7 @@ def load_intensity_params_from_round_ctx(round_dir: Path, *, eps_default: float)
 
 
 def load_round_ctx_from_dir(round_dir: Path) -> tuple[RoundCtx | None, str | None]:
-    ctx_path = round_dir / "round_ctx.json"
+    ctx_path = round_dir / "metadata" / "round_ctx.json"
     if not ctx_path.is_file():
         return None, f"round_ctx.json not found under {round_dir}"
     try:
@@ -159,7 +161,7 @@ def resolve_artifact_model(
         )
 
     artifacts, artifact_warning = resolve_round_artifacts(campaign_info.workdir, as_of_round=as_of_round)
-    if not artifacts or "model.joblib" not in artifacts:
+    if not artifacts or "model/model.joblib" not in artifacts:
         note = f"Artifacts missing for round `R={as_of_round}`."
         if artifact_warning:
             note = f"{note} ({artifact_warning})"
@@ -173,8 +175,8 @@ def resolve_artifact_model(
             warning=artifact_warning,
         )
 
-    model_path = Path(artifacts["model.joblib"])
-    round_dir = Path(artifacts.get("round_dir", model_path.parent))
+    model_path = Path(artifacts["model/model.joblib"])
+    round_dir = Path(artifacts.get("round_dir", model_path.parent.parent))
     if not model_path.exists():
         return ArtifactModelResult(
             requested_artifact=True,

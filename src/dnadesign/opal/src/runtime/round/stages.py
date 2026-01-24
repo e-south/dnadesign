@@ -193,7 +193,7 @@ def stage_scoring(
         f"[y-ops] applying {len(yops_cfg)} op(s) to training labels: {([p.name for p in yops_cfg] or [])}",
     )
     append_round_log_event(
-        rdir / "round.log.jsonl",
+        rdir / "logs" / "round.log.jsonl",
         {
             "ts": now_iso(),
             "stage": "yops_fit_transform",
@@ -206,7 +206,7 @@ def stage_scoring(
     model = get_model(cfg.model.name, cfg.model.params)
     mctx = rctx.for_plugin(category="model", name=cfg.model.name, plugin=model)
     append_round_log_event(
-        rdir / "round.log.jsonl",
+        rdir / "logs" / "round.log.jsonl",
         {
             "ts": now_iso(),
             "stage": "fit_start",
@@ -238,7 +238,7 @@ def stage_scoring(
             yhat_chunks.append(model.predict(batch_X, ctx=mctx))
             prog.advance(int(batch_X.shape[0]))
             append_round_log_event(
-                rdir / "round.log.jsonl",
+                rdir / "logs" / "round.log.jsonl",
                 {
                     "ts": now_iso(),
                     "stage": "predict_batch",
@@ -255,7 +255,7 @@ def stage_scoring(
     )
     Y_hat = run_y_ops_pipeline(stage="inverse", y_ops=yops_cfg, Y=Y_hat_fit, ctx=rctx)
     append_round_log_event(
-        rdir / "round.log.jsonl",
+        rdir / "logs" / "round.log.jsonl",
         {
             "ts": now_iso(),
             "stage": "yops_inverse_done",
@@ -329,7 +329,7 @@ def stage_scoring(
         "params": obj_params,
         "diagnostics_summary_keys": list(diag.keys()),
     }
-    obj_sha = write_objective_meta(rdir / "objective_meta.json", obj_meta)
+    obj_sha = write_objective_meta(rdir / "metadata" / "objective_meta.json", obj_meta)
 
     obj_summary_stats = diag.get("summary_stats") if isinstance(diag, dict) else None
     if isinstance(obj_summary_stats, dict) and obj_summary_stats:
@@ -351,7 +351,7 @@ def stage_scoring(
             stat_line,
         )
     append_round_log_event(
-        rdir / "round.log.jsonl",
+        rdir / "logs" / "round.log.jsonl",
         {
             "ts": now_iso(),
             "stage": "objective_done",
@@ -425,7 +425,7 @@ def stage_scoring(
         selection_line,
     )
     append_round_log_event(
-        rdir / "round.log.jsonl",
+        rdir / "logs" / "round.log.jsonl",
         {
             "ts": now_iso(),
             "stage": "selection_done",

@@ -1,3 +1,5 @@
+# ABOUTME: CLI for validating selection outputs against ledger predictions.
+# ABOUTME: Resolves selection artifacts and reports mismatches for a run.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -58,9 +60,9 @@ def verify_outputs(
         sel_path = selection_path or resolve_selection_path_from_artifacts(artifacts, run_id=run_id)
         if sel_path is None:
             round_dir = ws.round_dir(as_of_round)
-            candidate = round_dir / "selection_top_k.parquet"
+            candidate = round_dir / "selection" / "selection_top_k.parquet"
             if not candidate.exists():
-                candidate = round_dir / "selection_top_k.csv"
+                candidate = round_dir / "selection" / "selection_top_k.csv"
             if candidate.exists():
                 sel_path = candidate
         if sel_path is None:

@@ -133,16 +133,22 @@ opal run --config <yaml> --round <r> \
 
 **Artifacts written** (`outputs/rounds/round_<r>/`)
 
-* `model.joblib`
-* `model_meta.json`
-* `selection_top_k.csv`
-* `selection_top_k.parquet`
-* `selection_top_k__run_<run_id>.csv` (immutable per-run copy)
-* `selection_top_k__run_<run_id>.parquet` (immutable per-run copy)
-* `labels_used.parquet` (training snapshot for this run)
-* `round_ctx.json`
-* `objective_meta.json`
-* `round.log.jsonl` — compact JSONL with stage events and prediction batch progress
+* `model/`
+  * `model.joblib`
+  * `model_meta.json`
+  * `feature_importance.csv` (optional)
+* `selection/`
+  * `selection_top_k.csv`
+  * `selection_top_k.parquet`
+  * `selection_top_k__run_<run_id>.csv` (immutable per-run copy)
+  * `selection_top_k__run_<run_id>.parquet` (immutable per-run copy)
+* `labels/`
+  * `labels_used.parquet` (training snapshot for this run)
+* `metadata/`
+  * `round_ctx.json`
+  * `objective_meta.json`
+* `logs/`
+  * `round.log.jsonl` — compact JSONL with stage events and prediction batch progress
 
 **Events appended** to **ledger sinks** under `outputs/`
 
@@ -183,7 +189,7 @@ opal predict --config <yaml> \
 **Flags**
 
 * `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
-* `--model-path`: Path to `model.joblib` (overrides `--round`).
+* `--model-path`: Path to `model.joblib` (overrides `--round`, e.g. `outputs/rounds/round_<r>/model/model.joblib`).
 * `--round, -r`: Round index to resolve model from `state.json` (default: latest). Accepts `latest`.
 * `--model-name` / `--model-params`: Required if `model_meta.json` is missing. `--model-params` must be a `.json`.
 * `--in`: Optional input CSV/Parquet (`.csv`, `.parquet`, `.pq`; defaults to `records.parquet`).
@@ -240,7 +246,7 @@ opal model-show \
 
 **Flags**
 
-* `--model-path`: Path to `model.joblib` (overrides `--config/--round`).
+* `--model-path`: Path to `model.joblib` (overrides `--config/--round`, e.g. `outputs/rounds/round_<r>/model/model.joblib`).
 * `--config, -c`: Path to `configs/campaign.yaml` (required if resolving from `state.json`).
 * `--round, -r`: Round selector (integer or `latest`) to resolve model.
 * `--model-name` / `--model-params`: Required if `model_meta.json` is missing. `--model-params` must be a `.json`.
@@ -612,7 +618,7 @@ You’ll get per-round artifacts, appended `run_pred`/`run_meta` events, and upd
 ```bash
 opal predict \
   --config src/dnadesign/opal/campaigns/my_campaign/configs/campaign.yaml \
-  --model-path src/dnadesign/opal/campaigns/my_campaign/outputs/rounds/round_0/model.joblib \
+  --model-path src/dnadesign/opal/campaigns/my_campaign/outputs/rounds/round_0/model/model.joblib \
   --in new_candidates.parquet \
   --out preds.csv
 ```

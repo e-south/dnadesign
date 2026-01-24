@@ -1,3 +1,5 @@
+# ABOUTME: CLI command to summarize per-round log events.
+# ABOUTME: Loads round log artifacts and prints a compact summary.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -41,7 +43,7 @@ def cmd_log(
         cfg = load_cli_config(cfg_path)
         ws = CampaignWorkspace.from_config(cfg, cfg_path)
         r = resolve_round_index_from_state(ws.state_path, round)
-        path = ws.round_dir(r) / "round.log.jsonl"
+        path = ws.round_logs_dir(r) / "round.log.jsonl"
         events = load_round_log(path)
         summary = summarize_round_log(events)
         summary["round_index"] = int(r)

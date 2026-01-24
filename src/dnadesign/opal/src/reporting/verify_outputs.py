@@ -1,3 +1,5 @@
+# ABOUTME: Validates selection outputs against ledger predictions for a run.
+# ABOUTME: Provides strict selection output checks and artifact resolution helpers.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -30,9 +32,7 @@ def read_selection_table(path: Path) -> pd.DataFrame:
 def resolve_selection_score_column(df: pd.DataFrame) -> str:
     if "pred__y_obj_scalar" in df.columns:
         return "pred__y_obj_scalar"
-    if "selection_score" in df.columns:
-        return "selection_score"
-    raise OpalError("Selection data missing pred__y_obj_scalar or selection_score.")
+    raise OpalError("Selection data missing pred__y_obj_scalar.")
 
 
 def _extract_artifact_path(val: Any) -> Path | None:
@@ -54,11 +54,11 @@ def resolve_selection_path_from_artifacts(
     if run_id:
         preferred_keys.extend(
             [
-                f"selection_top_k__run_{run_id}.parquet",
-                f"selection_top_k__run_{run_id}.csv",
+                f"selection/selection_top_k__run_{run_id}.parquet",
+                f"selection/selection_top_k__run_{run_id}.csv",
             ]
         )
-    preferred_keys.extend(["selection_top_k.parquet", "selection_top_k.csv"])
+    preferred_keys.extend(["selection/selection_top_k.parquet", "selection/selection_top_k.csv"])
     for key in preferred_keys:
         if key not in artifacts:
             continue

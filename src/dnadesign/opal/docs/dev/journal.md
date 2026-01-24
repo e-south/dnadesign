@@ -45,3 +45,11 @@ Note: freeform working notes; prune/merge as they become cruft.
 - UMAP controls now show raw column names (keys) instead of label aliases to avoid ambiguity.
 - Fold-change plot exports now namespace logic fidelity as obj__logic_fidelity.
 - prom60 explorer defaults updated to effect_scaled for the Y axis.
+
+## 2026-01-24
+- Round artifacts reorganized into subdirectories under each `outputs/rounds/round_<k>/`:
+  `model/`, `selection/`, `labels/`, `metadata/`, `logs/` (no legacy flat layout).
+- Round log, round_ctx, objective_meta, and feature_importance now resolve from the new subdirs.
+- Selection outputs standardized to prefixed columns (removed `selection_score`; keep `pred__y_obj_scalar`).
+- Dashboard exports now prefix canonical objective metrics (`obj__score`, `obj__logic_fidelity`, `obj__effect_scaled`,
+  `obj__effect_raw`) to distinguish from overlay fields.

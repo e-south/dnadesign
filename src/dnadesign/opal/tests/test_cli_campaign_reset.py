@@ -32,7 +32,9 @@ def test_campaign_reset_prunes_and_clears(tmp_path: Path) -> None:
 
     outputs = workdir / "outputs" / "rounds" / "round_0"
     outputs.mkdir(parents=True, exist_ok=True)
-    (outputs / "round_ctx.json").write_text("{}")
+    ctx_path = outputs / "metadata" / "round_ctx.json"
+    ctx_path.parent.mkdir(parents=True, exist_ok=True)
+    ctx_path.write_text("{}")
     state_path = workdir / "state.json"
     state_path.write_text("{}")
 
@@ -76,7 +78,9 @@ def test_campaign_reset_allows_non_demo_with_flag(tmp_path: Path) -> None:
 
     outputs = workdir / "outputs" / "rounds" / "round_0"
     outputs.mkdir(parents=True, exist_ok=True)
-    (outputs / "round_ctx.json").write_text("{}")
+    ctx_path = outputs / "metadata" / "round_ctx.json"
+    ctx_path.parent.mkdir(parents=True, exist_ok=True)
+    ctx_path.write_text("{}")
     state_path = workdir / "state.json"
     state_path.write_text("{}")
 
