@@ -62,6 +62,8 @@ def _():
     Diagnostics = dash_diagnostics.Diagnostics
     diagnostics_to_lines = dash_diagnostics.diagnostics_to_lines
     attach_namespace_columns = dash_util.attach_namespace_columns
+    choose_axis_defaults = dash_util.choose_axis_defaults
+    choose_dropdown_value = dash_util.choose_dropdown_value
     dedupe_exprs = dash_util.dedupe_exprs
     dedup_latest_labels = dash_labels.dedup_latest_labels
     find_repo_root = dash_datasets.find_repo_root
@@ -92,6 +94,8 @@ def _():
         build_umap_controls,
         build_umap_explorer_chart,
         campaign_label_from_path,
+        choose_axis_defaults,
+        choose_dropdown_value,
         coerce_selection_dataframe,
         compute_sfxi_params,
         compute_transient_overlay,
@@ -323,6 +327,7 @@ def _(df_prelim, mo):
 @app.cell
 def _(
     build_hue_registry,
+    choose_axis_defaults,
     data_ready,
     dashboard_defaults,
     default_view_hues,
@@ -335,20 +340,15 @@ def _(
     defaults = dashboard_defaults or {}
     _default_x = defaults.get("x")
     _default_y = defaults.get("y")
-    _preferred_x = "opal_view_score"
-    _preferred_y = "opal_view_effect_scaled"
-    if _default_x in numeric_cols:
-        _x_default = _default_x
-    elif _preferred_x in numeric_cols:
-        _x_default = _preferred_x
-    else:
-        _x_default = numeric_cols[0] if numeric_cols else "(none)"
-    if _default_y in numeric_cols:
-        _y_default = _default_y
-    elif _preferred_y in numeric_cols:
-        _y_default = _preferred_y
-    else:
-        _y_default = _x_default if len(numeric_cols) < 2 else numeric_cols[1]
+    _preferred_x = "opal__view__score"
+    _preferred_y = "opal__view__effect_scaled"
+    _x_default, _y_default = choose_axis_defaults(
+        numeric_cols=numeric_cols,
+        default_x=_default_x,
+        default_y=_default_y,
+        preferred_x=_preferred_x,
+        preferred_y=_preferred_y,
+    )
 
     plot_type_dropdown = mo.ui.dropdown(
         options=["scatter", "histogram"],
@@ -1638,7 +1638,13 @@ def _(mo, sfxi_params):
 
 
 @app.cell
-def _(build_hue_registry, df_sfxi_scatter, mo):
+def _(mo):
+    sfxi_color_state, set_sfxi_color_state = mo.state(None)
+    return sfxi_color_state, set_sfxi_color_state
+
+
+@app.cell
+def _(build_hue_registry, choose_dropdown_value, df_sfxi_scatter, mo, sfxi_color_state):
     sfxi_hue_registry = build_hue_registry(
         df_sfxi_scatter,
         preferred=[],
@@ -1650,7 +1656,8 @@ def _(build_hue_registry, df_sfxi_scatter, mo):
         options = ["score"] if "score" in df_sfxi_scatter.columns else ["(none)"]
     else:
         options = hue_labels
-    default = "score" if "score" in options else options[0]
+    preferred = "score" if "score" in options else None
+    default = choose_dropdown_value(options, current=sfxi_color_state(), preferred=preferred) or options[0]
     sfxi_color_dropdown = mo.ui.dropdown(
         options=options,
         value=default,
@@ -1658,6 +1665,13 @@ def _(build_hue_registry, df_sfxi_scatter, mo):
         full_width=True,
     )
     return sfxi_color_dropdown, sfxi_hue_registry
+
+
+@app.cell
+def _(set_sfxi_color_state, sfxi_color_dropdown):
+    if sfxi_color_dropdown is not None:
+        set_sfxi_color_state(sfxi_color_dropdown.value)
+    return ()
 
 
 @app.cell

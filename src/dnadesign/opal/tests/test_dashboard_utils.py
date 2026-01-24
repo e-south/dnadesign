@@ -119,6 +119,25 @@ def test_namespace_summary() -> None:
     assert summary_dict["cluster"]["count"] == 1
 
 
+def test_choose_dropdown_value_prefers_current_then_preferred() -> None:
+    options = ["a", "b"]
+    assert util.choose_dropdown_value(options, current="b", preferred="a") == "b"
+    assert util.choose_dropdown_value(options, current="c", preferred="a") == "a"
+    assert util.choose_dropdown_value(options, current=None, preferred=None) == "a"
+    assert util.choose_dropdown_value([], current="a", preferred="b") is None
+
+
+def test_choose_axis_defaults_skips_row_id() -> None:
+    numeric_cols = ["__row_id", "opal__view__score", "opal__view__effect_scaled"]
+    x_default, y_default = util.choose_axis_defaults(
+        numeric_cols=numeric_cols,
+        preferred_x="opal__view__score",
+        preferred_y="opal__view__effect_scaled",
+    )
+    assert x_default == "opal__view__score"
+    assert y_default == "opal__view__effect_scaled"
+
+
 def test_attach_namespace_columns_prefers_row_id() -> None:
     df_base = pl.DataFrame(
         {

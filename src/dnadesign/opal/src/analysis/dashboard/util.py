@@ -56,6 +56,48 @@ def namespace_summary(columns: Sequence[str], max_examples: int = 3) -> pl.DataF
     return pl.DataFrame(rows)
 
 
+def choose_dropdown_value(
+    options: Sequence[str],
+    *,
+    current: str | None = None,
+    preferred: str | None = None,
+) -> str | None:
+    if current in options:
+        return current
+    if preferred in options:
+        return preferred
+    return options[0] if options else None
+
+
+def choose_axis_defaults(
+    *,
+    numeric_cols: Sequence[str],
+    default_x: str | None = None,
+    default_y: str | None = None,
+    preferred_x: str | None = None,
+    preferred_y: str | None = None,
+    avoid: Sequence[str] = ("__row_id",),
+) -> tuple[str, str]:
+    if not numeric_cols:
+        return "(none)", "(none)"
+
+    avoid_set = set(avoid)
+    axis_cols = [col for col in numeric_cols if col not in avoid_set]
+    if not axis_cols:
+        axis_cols = list(numeric_cols)
+
+    x_default = choose_dropdown_value(axis_cols, current=default_x, preferred=preferred_x) or "(none)"
+    y_default = choose_dropdown_value(axis_cols, current=default_y, preferred=preferred_y)
+    if y_default is None:
+        y_default = x_default
+    if y_default == x_default and len(axis_cols) > 1:
+        for col in axis_cols:
+            if col != x_default:
+                y_default = col
+                break
+    return x_default, y_default
+
+
 def attach_namespace_columns(
     *,
     df: pl.DataFrame,
