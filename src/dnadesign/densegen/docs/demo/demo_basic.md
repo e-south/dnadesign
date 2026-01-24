@@ -60,9 +60,7 @@ uv run dense --help
 
 ### 1. Stage a workspace
 
-Use the pre‑staged demo workspace and run commands from its directory so relative paths resolve correctly.
-
-From the repo root:
+Navigate to the demo workspace and run commands from its directory so relative paths resolve correctly.
 
 ```bash
 cd src/dnadesign/densegen/workspaces/demo_meme_two_tf
@@ -95,41 +93,34 @@ dense validate-config --probe-solver
 
 ### 3. Inspect inputs
 
-Why: confirm Stage‑A inputs and sampling settings.
+Confirm Stage‑A inputs and sampling settings.
 
 ```bash
 dense inspect inputs
 ```
 
-The demo uses DenseGen PWM artifacts in `inputs/motif_artifacts/` (`lexA__demo_local_meme__lexA.json`,
-`cpxR__demo_local_meme__cpxR.json`).
+The demo uses DenseGen PWM artifacts in `inputs/motif_artifacts/` (`lexA__demo_local_meme__lexA.json`, `cpxR__demo_local_meme__cpxR.json`).
 
 ---
 
 ### 3b. (Optional) Build inputs via Cruncher (external workspace)
 
-Refresh the demo motifs by exporting **DenseGen PWM artifacts** from Cruncher, then copy them into
-this DenseGen workspace. This is optional — the demo already ships with artifacts.
+Refresh the demo motifs by exporting **DenseGen PWM artifacts** from Cruncher, then copy them into this DenseGen workspace. This is optional as the demo already ships with artifacts.
 
-Follow the Cruncher demo (see `cruncher/docs/demos/demo_basics_two_tf.md`) in its own workspace.
-From the Cruncher workspace directory, export DenseGen artifacts (no `-c` flag needed when you run in CWD):
+Follow the Cruncher demo (see `cruncher/docs/demos/demo_basics_two_tf.md`) in its own workspace. From the Cruncher workspace directory, export DenseGen artifacts into the target DenseGen workspace name or path (no `-c` flag needed when you run in CWD):
 
 ```bash
 cd <cruncher_workspace>
-cruncher catalog export-densegen --set 1 --out outputs/densegen_motifs
+cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_two_tf
 ```
 
-Copy those artifacts into **this** DenseGen workspace:
-
-```bash
-cp -R <cruncher_workspace>/outputs/densegen_motifs/* inputs/motif_artifacts/
-```
+Tip: `--densegen-workspace` accepts a workspace name (resolved under `src/dnadesign/densegen/workspaces`)
+or an absolute path. Cruncher fails fast if it cannot find `config.yaml` + `inputs/`.
 
 If you also want to drive Stage‑A from binding sites instead of PWM sampling, export them too:
 
 ```bash
-cruncher catalog export-sites --set 1 --out outputs/densegen_sites.parquet
-cp <cruncher_workspace>/outputs/densegen_sites.parquet inputs/
+cruncher catalog export-sites --set 1 --densegen-workspace demo_meme_two_tf
 ```
 
 Then update `config.yaml` inputs to point at the exported binding sites (optional), for example:
