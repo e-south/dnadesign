@@ -6,14 +6,12 @@ densegen:
     root: "."
 
   inputs:
-    # LexA + CpxR MEME motifs from Cruncher demo basics, merged into one TF pool.
-    # Motif ids expected in these files: lexA, cpxR.
-    - name: lexA_cpxR_meme
-      type: pwm_meme_set
+    # LexA + CpxR DenseGen artifacts exported from the Cruncher demo.
+    - name: lexA_cpxR_artifacts
+      type: pwm_artifact_set
       paths:
-        - inputs/lexA.txt
-        - inputs/cpxR.txt
-      motif_ids: [lexA, cpxR]
+        - inputs/motif_artifacts/lexA__demo_local_meme__lexA.json
+        - inputs/motif_artifacts/cpxR__demo_local_meme__cpxR.json
       sampling:
         strategy: stochastic
         n_sites: 80

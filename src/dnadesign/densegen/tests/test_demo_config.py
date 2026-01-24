@@ -20,8 +20,8 @@ def test_demo_config_exists_and_loads() -> None:
 def test_demo_artifacts_present() -> None:
     cfg_path = _demo_config_path()
     cfg = load_config(cfg_path)
-    pwm_inputs = [inp for inp in cfg.root.densegen.inputs if inp.type == "pwm_meme_set"]
-    assert pwm_inputs, "Demo config should include pwm_meme_set inputs."
+    pwm_inputs = [inp for inp in cfg.root.densegen.inputs if inp.type == "pwm_artifact_set"]
+    assert pwm_inputs, "Demo config should include pwm_artifact_set inputs."
     missing: list[str] = []
     for inp in pwm_inputs:
         for path in getattr(inp, "paths", []) or []:
