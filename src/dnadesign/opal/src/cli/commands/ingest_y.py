@@ -144,6 +144,10 @@ def cmd_ingest_y(
         )
         tctx = rctx.for_plugin(category="transform_y", name=t_name, plugin=get_transform_y(t_name))
 
+        unknown_sequences = (unknown_sequences or "create").strip().lower()
+        if unknown_sequences not in {"create", "drop", "error"}:
+            raise OpalError("--unknown-sequences must be one of: create, drop, error.")
+
         labels_df, preview = run_ingest(
             df,
             csv_df,
@@ -156,6 +160,23 @@ def cmd_ingest_y(
         )
 
         # Preview
+        if preview.unknown_sequences:
+            preview_warnings = list(preview.warnings or [])
+            if unknown_sequences in {"drop", "error"}:
+                preview_warnings = [
+                    w
+                    for w in preview_warnings
+                    if "sequences not found" not in w.lower() and "new rows will be created" not in w.lower()
+                ]
+            if unknown_sequences == "drop":
+                preview_warnings.append(
+                    f"{int(preview.unknown_sequences)} unknown sequences will be dropped (--unknown-sequences drop)."
+                )
+            elif unknown_sequences == "error":
+                preview_warnings.append(
+                    f"{int(preview.unknown_sequences)} unknown sequences will abort ingest (--unknown-sequences error)."
+                )
+            preview.warnings = preview_warnings
         sample = labels_df.head(5).to_dict(orient="records")
         if json:
             json_out({"preview": asdict(preview), "sample": sample})
@@ -168,10 +189,6 @@ def cmd_ingest_y(
             if cfg.data.x_column_name not in df.columns:
                 raise OpalError(f"records.parquet missing required X column '{cfg.data.x_column_name}'.")
             required_cols.append(cfg.data.x_column_name)
-
-        unknown_sequences = (unknown_sequences or "create").strip().lower()
-        if unknown_sequences not in {"create", "drop", "error"}:
-            raise OpalError("--unknown-sequences must be one of: create, drop, error.")
 
         # Identify unknown rows (ids or sequences not resolved to existing records)
         known_ids = set(df["id"].astype(str).tolist()) if "id" in df.columns else set()

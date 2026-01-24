@@ -1,3 +1,5 @@
+# ABOUTME: Builds overlay scoring charts for the promoter dashboard.
+# ABOUTME: Generates transient score histograms and feature importance views.
 """Overlay scoring helpers for the promoter dashboard."""
 
 from __future__ import annotations
@@ -119,8 +121,16 @@ def build_score_histogram(
 
     hist_pred = hist_source.filter(pl.col(score_col).is_not_null()).select(pl.col(score_col))
     obs_scores = pl.DataFrame({score_col: []})
+    hover_id_col = None
     if "score" in df_sfxi.columns:
-        obs_scores = df_sfxi.filter(pl.col("score").is_not_null()).select(pl.col("score").alias(score_col))
+        obs_cols = [pl.col("score").alias(score_col)]
+        if "id" in df_sfxi.columns:
+            obs_cols.append(pl.col("id"))
+            hover_id_col = "id"
+        elif "__row_id" in df_sfxi.columns:
+            obs_cols.append(pl.col("__row_id"))
+            hover_id_col = "__row_id"
+        obs_scores = df_sfxi.filter(pl.col("score").is_not_null()).select(obs_cols)
     obs_n = int(obs_scores.height)
     obs_cap = 200
     if obs_n > obs_cap:
@@ -244,12 +254,17 @@ def build_score_histogram(
                 y2="__lollipop_top:Q",
             )
         )
+        tooltip_fields = [alt.Tooltip(f"{score_col}:Q", title="score")]
+        if hover_id_col:
+            hover_title = "id" if hover_id_col == "id" else "__row_id"
+            tooltip_fields.insert(0, alt.Tooltip(f"{hover_id_col}:N", title=hover_title))
         obs_lollipops = (
             alt.Chart(obs_plot)
             .mark_point(filled=True, opacity=0.35, size=20)
             .encode(
                 x=alt.X(f"{score_col}:Q", scale=x_scale),
                 y=alt.Y("__lollipop_top:Q", axis=None),
+                tooltip=tooltip_fields,
             )
         )
         obs_note_chart = (

@@ -51,6 +51,7 @@ def render(context, params: dict) -> None:
     delta = get_float(params, ["intensity_log2_offset_delta"], 0.0)
     # Allow user to choose the Y axis: fold_change (default), effect_raw/scaled, or score.
     y_axis = get_str(params, ["y_axis", "y_field", "y"], "fold_change")
+    y_axis_field = normalize_metric_field(y_axis) if y_axis else None
     alpha = get_float(params, ["alpha"], 0.40)
     # Hue: support both continuous metrics (obj__/pred__/sel__) and *categorical* from records.parquet.
     hue_raw = get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None)
@@ -127,7 +128,7 @@ def render(context, params: dict) -> None:
     need |= event_columns_for(hue_field, size_by)
     # If hue/size/y ask for objective/pred/sel columns, load them from predictions
     # (fold_change is derived locally and won't be added here)
-    need |= event_columns_for(hue_field, size_by, y_axis)
+    need |= event_columns_for(hue_field, size_by, y_axis_field)
     df = load_events_with_setpoint(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
 
     # Round selection: single round (default latest)

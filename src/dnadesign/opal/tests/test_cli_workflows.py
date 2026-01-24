@@ -220,6 +220,50 @@ def test_ingest_y_accepts_xlsx(tmp_path: Path) -> None:
     assert (workdir / "outputs" / "ledger" / "labels.parquet").exists()
 
 
+def test_ingest_y_drop_unknown_sequences_preview(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    csv_path = workdir / "labels.csv"
+    df = pd.DataFrame(
+        {
+            "sequence": ["AAA", "ZZZ"],
+            "v00": [0.0, 0.0],
+            "v10": [0.0, 0.0],
+            "v01": [0.0, 0.0],
+            "v11": [1.0, 0.5],
+            "y00_star": [0.1, 0.2],
+            "y10_star": [0.1, 0.2],
+            "y01_star": [0.1, 0.2],
+            "y11_star": [0.1, 0.2],
+            "intensity_log2_offset_delta": [0.0, 0.0],
+        }
+    )
+    df.to_csv(csv_path, index=False)
+
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(csv_path),
+            "--unknown-sequences",
+            "drop",
+            "--yes",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    lowered = res.stdout.lower()
+    assert "new rows will be created" not in lowered
+    assert "dropping 1 unknown sequences" in lowered
+
+
 def test_ingest_y_rejects_unsupported_extension(tmp_path: Path) -> None:
     workdir, campaign, _ = _setup_workspace(tmp_path)
     app = _build()

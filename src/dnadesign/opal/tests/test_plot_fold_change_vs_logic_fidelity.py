@@ -66,6 +66,7 @@ def test_fold_change_plot_does_not_request_setpoint_column(tmp_path, monkeypatch
 
 def test_fold_change_plot_saves_namespaced_columns(tmp_path, monkeypatch):
     def _stub_load_events_with_setpoint(outputs_dir, base_columns, round_selector=None, run_id=None):
+        assert "obj__effect_scaled" in base_columns
         return pd.DataFrame(
             {
                 "as_of_round": [0],

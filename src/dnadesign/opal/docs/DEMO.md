@@ -40,9 +40,10 @@ uv run opal verify-outputs -c configs/campaign.yaml --round latest
 # 5) Plot
 uv run opal plot -c configs/campaign.yaml
 
-# 6) Dashboard (marimo)
-uv run opal notebook generate -c configs/campaign.yaml --round latest
-uv run opal notebook run -c configs/campaign.yaml
+# 6) Notebook (marimo)
+uv run opal notebook
+uv run opal notebook generate --round latest
+uv run opal notebook run
 ```
 
 **Notes:**
@@ -190,12 +191,25 @@ outputs/ledger/predictions/part-*.parquet
 
 ### Interactive notebook (marimo)
 
-Generate a campaign-tied notebook and open it in marimo:
+From the campaign root, the notebook workflow is now path-aware:
 
 ```bash
-uv run opal notebook generate -c configs/campaign.yaml --round latest
-uv run opal notebook run -c configs/campaign.yaml
+# See what exists (or get a nudge to generate)
+uv run opal notebook
+
+# Generate a default notebook
+uv run opal notebook generate --round latest
+
+# Optional: custom name
+uv run opal notebook generate --name demo_analysis --round latest
+
+# Open the notebook (auto-selects if only one exists)
+uv run opal notebook run
 ```
+
+If you are *not* inside the campaign directory, pass `-c configs/campaign.yaml`.
+When multiple notebooks exist, `uv run opal notebook run` will prompt you to choose (TTY)
+or ask you to pass `--path` in non-interactive contexts.
 
 The notebook loads campaign artifacts and label history from `records.parquet`,
 then gives you interactive filtering and plots for the selected run.

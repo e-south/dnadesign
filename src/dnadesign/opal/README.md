@@ -73,8 +73,10 @@ opal plot -c path/to/configs/campaign.yaml --run-id <run_id>  # run-aware; resol
 opal predict -c path/to/configs/campaign.yaml               # uses latest round
 opal objective-meta -c configs/campaign.yaml --round latest
 opal verify-outputs -c configs/campaign.yaml --round latest
-opal notebook generate -c path/to/configs/campaign.yaml     # create a marimo analysis notebook
-opal notebook generate -c path/to/configs/campaign.yaml --no-validate  # scaffold before any runs
+uv run opal notebook                               # list notebooks / nudge next step
+uv run opal notebook generate -c path/to/configs/campaign.yaml --round latest  # create a marimo analysis notebook
+uv run opal notebook generate -c path/to/configs/campaign.yaml --name my_analysis --no-validate  # scaffold before any runs
+uv run opal notebook run -c path/to/configs/campaign.yaml
 
 # (Optional) Start fresh: remove OPAL-derived columns from records.parquet
 opal prune-source -c path/to/configs/campaign.yaml --scope campaign
@@ -90,16 +92,22 @@ opal prune-source -c path/to/configs/campaign.yaml --scope campaign
 
 * **Per-round**
   - `outputs/rounds/round_<k>/`
-  - `model.joblib`
-  - `model_meta.json` *(includes training__y_ops when configured)*
-  - `selection_top_k.csv`
-  - `selection_top_k.parquet`
-  - `selection_top_k__run_<run_id>.csv` *(immutable per-run copy)*
-  - `selection_top_k__run_<run_id>.parquet` *(immutable per-run copy)*
-  - `labels_used.parquet`
-  - `round_ctx.json` *(runtime audit & fitted Y-ops)*
-  - `objective_meta.json` *(objective mode/params/keys)*
-  - `round.log.jsonl`
+    - `model/`
+      - `model.joblib`
+      - `model_meta.json` *(includes training__y_ops when configured)*
+      - `feature_importance.csv`
+    - `selection/`
+      - `selection_top_k.csv`
+      - `selection_top_k.parquet`
+      - `selection_top_k__run_<run_id>.csv` *(immutable per-run copy)*
+      - `selection_top_k__run_<run_id>.parquet` *(immutable per-run copy)*
+    - `labels/`
+      - `labels_used.parquet`
+    - `metadata/`
+      - `round_ctx.json` *(runtime audit & fitted Y-ops)*
+      - `objective_meta.json` *(objective mode/params/keys)*
+    - `logs/`
+      - `round.log.jsonl`
 
 * **Campaign-wide ledger (append-only)**
 

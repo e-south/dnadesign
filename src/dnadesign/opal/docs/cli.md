@@ -264,7 +264,7 @@ opal objective-meta --config <yaml-or-dir> [--round <k|latest> | --run-id <id>] 
 
 **Flags**
 
-* `--config, -c`: Path to `configs/campaign.yaml` (directories supported for `opal plot`, `opal notebook`, `opal objective-meta`).
+* `--config, -c`: Path to `configs/campaign.yaml` (directories supported for `opal plot`, `opal notebook`, `opal objective-meta`; optional if auto-discovery works in a campaign folder).
 * `--run-id`: Explicit run_id to disambiguate when a round has multiple runs.
 
 **Notes**
@@ -496,16 +496,21 @@ Generate or run a campaign-tied marimo notebook for interactive analysis.
 **Usage**
 
 ```bash
-opal notebook generate --config <yaml-or-dir> [--round <latest|k>] [--out <path>] [--force] [--validate/--no-validate]
-opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
+uv run opal notebook
+uv run opal notebook generate --config <yaml-or-dir> [--round <latest|k>] [--out <path>] [--name <file>] [--force] [--validate/--no-validate]
+uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
 ```
 
 **Notes**
 
 * `generate` writes a marimo notebook that loads ledger artifacts (runs/predictions/labels).
+* `generate` requires the campaign `records.parquet` to exist because the notebook loads records on startup.
 * By default, `generate` validates ledger artifacts exist. Use `--no-validate` to scaffold a notebook before any runs.
 * When `--validate` is on, `--round` must exist in ledger runs (otherwise use `--no-validate`).
 * `run` launches `marimo edit` if marimo is installed; otherwise it prints install guidance.
+* `run` resolves the notebook under `<workdir>/notebooks`. If multiple exist, it prompts in TTY or requires `--path` in non-interactive mode.
+* Running `uv run opal notebook` (no subcommand) lists available notebooks and nudges the next step.
+* If you run from inside a campaign directory, you can omit `--config` entirely.
 
 **Campaign YAML (example)**
 

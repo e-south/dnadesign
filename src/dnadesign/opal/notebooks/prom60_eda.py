@@ -333,12 +333,18 @@ def _(
     defaults = dashboard_defaults or {}
     _default_x = defaults.get("x")
     _default_y = defaults.get("y")
+    _preferred_x = "opal_view_score"
+    _preferred_y = "opal_view_effect_scaled"
     if _default_x in numeric_cols:
         _x_default = _default_x
+    elif _preferred_x in numeric_cols:
+        _x_default = _preferred_x
     else:
         _x_default = numeric_cols[0] if numeric_cols else "(none)"
     if _default_y in numeric_cols:
         _y_default = _default_y
+    elif _preferred_y in numeric_cols:
+        _y_default = _preferred_y
     else:
         _y_default = _x_default if len(numeric_cols) < 2 else numeric_cols[1]
 

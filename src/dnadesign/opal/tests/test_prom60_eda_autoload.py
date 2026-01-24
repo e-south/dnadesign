@@ -17,3 +17,10 @@ def test_prom60_eda_has_no_load_button() -> None:
     text = nb_path.read_text()
     assert "Load records.parquet" not in text
     assert "Click **Load**" not in text
+
+
+def test_prom60_eda_explorer_defaults_use_opal_view_score() -> None:
+    nb_path = Path("src/dnadesign/opal/notebooks/prom60_eda.py")
+    text = nb_path.read_text()
+    assert '_preferred_x = "opal_view_score"' in text
+    assert '_preferred_y = "opal_view_effect_scaled"' in text

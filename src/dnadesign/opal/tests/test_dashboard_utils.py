@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import altair as alt
@@ -262,6 +263,28 @@ def test_build_umap_explorer_chart_cases() -> None:
     )
     assert no_non_null.valid is True
     assert no_non_null.note is not None and "no non-null values" in no_non_null.note
+
+
+def test_score_histogram_lollipop_includes_id() -> None:
+    df_pred_scored = pl.DataFrame(
+        {
+            "id": ["a", "b"],
+            "pred_score": [0.1, 0.4],
+        }
+    )
+    df_sfxi = pl.DataFrame({"id": ["obs-1"], "score": [0.2]})
+    df_train = pl.DataFrame({"id": ["train-1"]})
+    chart, note = transient.build_score_histogram(
+        df_pred_scored=df_pred_scored,
+        score_col="pred_score",
+        df_sfxi=df_sfxi,
+        df_train=df_train,
+        dataset_name="demo",
+    )
+    assert note is None
+    assert chart is not None
+    spec = json.dumps(chart.to_dict())
+    assert '"field": "id"' in spec
 
 
 def test_build_umap_controls_uses_raw_column_names() -> None:
