@@ -114,8 +114,7 @@ cd <cruncher_workspace>
 cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_two_tf
 ```
 
-Tip: `--densegen-workspace` accepts a workspace name (resolved under `src/dnadesign/densegen/workspaces`)
-or an absolute path. Cruncher fails fast if it cannot find `config.yaml` + `inputs/`.
+Tip: `--densegen-workspace` accepts a workspace name (resolved under `src/dnadesign/densegen/workspaces`) or an absolute path. Cruncher fails fast if it cannot find `config.yaml` + `inputs/`.
 
 If you also want to drive Stage‑A from binding sites instead of PWM sampling, export them too:
 
@@ -138,7 +137,7 @@ The DenseGen workspace stays config‑centric (one runtime config); Cruncher kee
 
 ### 4. Inspect config
 
-Why: confirm resolved outputs, Stage‑A sampling knobs, fixed elements, and Stage‑B sampling policy.
+Confirm resolved outputs, Stage‑A sampling knobs, fixed elements, and Stage‑B sampling policy.
 
 Rationale for the demo settings: we want **dozens of binding sites per motif**, so we set Stage‑A
 `n_sites` and oversampling/mining caps to reach that target; Stage‑B sampling then builds fixed‑size
