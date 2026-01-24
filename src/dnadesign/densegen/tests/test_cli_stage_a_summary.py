@@ -5,9 +5,10 @@ from __future__ import annotations
 import textwrap
 from pathlib import Path
 
+import pandas as pd
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.cli import app
+from dnadesign.densegen.src.cli import _fimo_bin_rows, app
 
 
 def _write_stage_a_config(tmp_path: Path) -> Path:
@@ -77,3 +78,28 @@ def test_stage_a_build_pool_accepts_fresh_flag(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["stage-a", "build-pool", "--fresh", "-c", str(cfg_path)])
     assert result.exit_code == 0, result.output
+
+
+def test_stage_a_build_pool_logs_initialized(tmp_path: Path) -> None:
+    cfg_path = _write_stage_a_config(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["stage-a", "build-pool", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert "Logging initialized" in result.output
+
+
+def test_fimo_bin_rows_include_zero_counts() -> None:
+    df = pd.DataFrame(
+        {
+            "fimo_bin_id": [1, 1, 2],
+            "fimo_bin_low": [1e-10, 1e-10, 1e-8],
+            "fimo_bin_high": [1e-8, 1e-8, 1e-6],
+        }
+    )
+    edges = [1e-10, 1e-8, 1e-6]
+    rows = _fimo_bin_rows(df, edges)
+    by_id = {row[0]: row for row in rows}
+    assert by_id[0][2] == 0
+    assert by_id[1][2] == 2
+    assert by_id[2][2] == 1
+    assert by_id[0][1] == "(0, 1e-10]"
