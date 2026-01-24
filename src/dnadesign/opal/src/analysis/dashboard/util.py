@@ -56,6 +56,41 @@ def namespace_summary(columns: Sequence[str], max_examples: int = 3) -> pl.DataF
     return pl.DataFrame(rows)
 
 
+def attach_namespace_columns(
+    *,
+    df: pl.DataFrame,
+    df_base: pl.DataFrame,
+    prefixes: Sequence[str],
+    join_key: str | None = None,
+) -> pl.DataFrame:
+    if df.is_empty() or df_base.is_empty():
+        return df
+    if join_key is None:
+        if "__row_id" in df.columns and "__row_id" in df_base.columns:
+            join_key = "__row_id"
+        elif "id" in df.columns and "id" in df_base.columns:
+            join_key = "id"
+        else:
+            return df
+    if join_key not in df.columns or join_key not in df_base.columns:
+        return df
+    prefixes = tuple(prefixes)
+    if not prefixes:
+        return df
+    base_cols = [col for col in df_base.columns if col.startswith(prefixes)]
+    new_cols = [col for col in base_cols if col not in df.columns]
+    if not new_cols:
+        return df
+    base = df_base.select([join_key, *new_cols])
+    if base.is_empty():
+        return df
+    try:
+        base = base.unique(subset=[join_key], keep="first")
+    except Exception:
+        pass
+    return df.join(base, on=join_key, how="left")
+
+
 def missingness_summary(df: pl.DataFrame) -> pl.DataFrame:
     if df.is_empty():
         return pl.DataFrame({"column": [], "null_pct": [], "non_null_count": []})

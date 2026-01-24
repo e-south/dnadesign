@@ -61,6 +61,7 @@ def _():
     coerce_selection_dataframe = dash_selection.coerce_selection_dataframe
     Diagnostics = dash_diagnostics.Diagnostics
     diagnostics_to_lines = dash_diagnostics.diagnostics_to_lines
+    attach_namespace_columns = dash_util.attach_namespace_columns
     dedupe_exprs = dash_util.dedupe_exprs
     dedup_latest_labels = dash_labels.dedup_latest_labels
     find_repo_root = dash_datasets.find_repo_root
@@ -77,6 +78,7 @@ def _():
     safe_is_numeric = dash_util.safe_is_numeric
     return (
         Diagnostics,
+        attach_namespace_columns,
         build_cluster_chart,
         build_feature_importance_chart,
         build_hue_registry,
@@ -2609,7 +2611,7 @@ def _(
 
 
 @app.cell
-def _(df_sfxi, df_sfxi_pred, mo, pl, sfxi_pred_notice, sfxi_source_dropdown):
+def _(attach_namespace_columns, df_active, df_sfxi, df_sfxi_pred, mo, pl, sfxi_pred_notice, sfxi_source_dropdown):
     df_obs = df_sfxi.with_columns(pl.lit("Observed").alias("sfxi_source")) if df_sfxi is not None else pl.DataFrame()
     df_pred = (
         df_sfxi_pred.with_columns(pl.lit("Predicted").alias("sfxi_source"))
@@ -2628,6 +2630,11 @@ def _(df_sfxi, df_sfxi_pred, mo, pl, sfxi_pred_notice, sfxi_source_dropdown):
             df_sfxi_scatter = pl.concat([df_obs, df_pred], how="vertical_relaxed")
     else:
         df_sfxi_scatter = df_obs
+    df_sfxi_scatter = attach_namespace_columns(
+        df=df_sfxi_scatter,
+        df_base=df_active,
+        prefixes=("cluster__", "densegen__"),
+    )
 
     sfxi_source_notice_md = mo.md("")
     if _sfxi_source in {"Predicted", "Both"} and df_pred.is_empty():

@@ -119,6 +119,35 @@ def test_namespace_summary() -> None:
     assert summary_dict["cluster"]["count"] == 1
 
 
+def test_attach_namespace_columns_prefers_row_id() -> None:
+    df_base = pl.DataFrame(
+        {
+            "__row_id": [0, 1],
+            "id": ["a", "b"],
+            "cluster__ldn_v1": ["0", "1"],
+            "densegen__score": [0.1, 0.2],
+            "other": ["x", "y"],
+        }
+    )
+    df_target = pl.DataFrame(
+        {
+            "__row_id": [0, 1],
+            "id": ["x", "y"],
+            "logic_fidelity": [0.5, 0.6],
+        }
+    )
+    df_out = util.attach_namespace_columns(
+        df=df_target,
+        df_base=df_base,
+        prefixes=("cluster__", "densegen__"),
+    )
+    assert "cluster__ldn_v1" in df_out.columns
+    assert "densegen__score" in df_out.columns
+    assert "other" not in df_out.columns
+    assert df_out["cluster__ldn_v1"].to_list() == ["0", "1"]
+    assert df_out["densegen__score"].to_list() == [0.1, 0.2]
+
+
 def test_hue_registry_filters_invalid_columns() -> None:
     df = pl.DataFrame(
         {

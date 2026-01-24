@@ -53,3 +53,4 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Selection outputs standardized to prefixed columns (removed `selection_score`; keep `pred__y_obj_scalar`).
 - Dashboard exports now prefix canonical objective metrics (`obj__score`, `obj__logic_fidelity`, `obj__effect_scaled`,
   `obj__effect_raw`) to distinguish from overlay fields.
+- SFXI scatter now attaches `cluster__*` + `densegen__*` columns for hue selection; added util helper + test.
