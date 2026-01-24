@@ -682,7 +682,7 @@ class LabelHistory:
             entry = {
                 "kind": "label",
                 "observed_round": int(r),
-                "ts": pd.Timestamp.utcnow().isoformat(),
+                "ts": pd.Timestamp.now("UTC").isoformat(),
                 "y_obs": {
                     "value": y_list,
                     "dtype": "vector",
@@ -828,7 +828,7 @@ class LabelHistory:
 
         ranks_arr = np.asarray(selection_rank)
         selected_arr = np.asarray(selection_top_k)
-        ts_val = ts or pd.Timestamp.utcnow().isoformat()
+        ts_val = ts or pd.Timestamp.now("UTC").isoformat()
 
         hist_map: Dict[str, List[Dict[str, Any]]] = {}
         for _id, hist_cell in out[["id", lh]].itertuples(index=False, name=None):
