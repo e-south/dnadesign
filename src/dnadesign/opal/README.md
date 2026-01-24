@@ -3,7 +3,7 @@
 **OPAL** is an [EVOLVEpro-style](https://www.science.org/doi/10.1126/science.adr6006) active-learning engine for biological sequence design.
 
 - **Train** a top-layer regressor on your chosen representation **X** and label **Y**.
-- **Score** every candidate sample with **X** present.
+- **Predict** every candidate sample with **X** present.
 - **Reduce** each prediction Ŷ to a scalar **score** via your configured **objective** → `pred__y_obj_scalar`.
 - **Rank** candidates by that score and **select top-k**.
 - **Append** runtime events to **ledger sinks** under **`outputs/`** (per-round predictions + run metadata).
@@ -67,20 +67,19 @@ opal runs list -c path/to/configs/campaign.yaml
 opal log -c path/to/configs/campaign.yaml --round latest
 opal record-show -c path/to/configs/campaign.yaml --id <some_id>
 opal explain -c path/to/configs/campaign.yaml --round 1
-opal plot --list                              # list available plot kinds
+opal plot --list                                                  # list available plot kinds
 opal plot -c path/to/configs/campaign.yaml
-opal plot -c path/to/configs/campaign.yaml --run-id <run_id>  # run-aware; resolves round, conflicts error
-opal predict -c path/to/configs/campaign.yaml               # uses latest round
+opal plot -c path/to/configs/campaign.yaml --run-id <run_id>      # run-aware; resolves round, conflicts error
+opal predict -c path/to/configs/campaign.yaml                     # uses latest round
 opal objective-meta -c configs/campaign.yaml --round latest
 opal verify-outputs -c configs/campaign.yaml --round latest
-uv run opal notebook                               # list notebooks / nudge next step
-uv run opal notebook generate -c path/to/configs/campaign.yaml --round latest  # create a marimo analysis notebook
-uv run opal notebook generate -c path/to/configs/campaign.yaml --name my_analysis --no-validate  # scaffold before any runs
+uv run opal notebook                                              # list notebooks / nudge next step
+uv run opal notebook generate -c path/to/configs/campaign.yaml --round latest
+uv run opal notebook generate -c path/to/configs/campaign.yaml --name my_analysis --no-validate
 uv run opal notebook run -c path/to/configs/campaign.yaml
 
 # (Optional) Start fresh: remove OPAL-derived columns from records.parquet
 opal prune-source -c path/to/configs/campaign.yaml --scope campaign
-
 ```
 
 **Round terminology**
@@ -98,9 +97,7 @@ opal prune-source -c path/to/configs/campaign.yaml --scope campaign
       - `feature_importance.csv`
     - `selection/`
       - `selection_top_k.csv`
-      - `selection_top_k.parquet`
       - `selection_top_k__run_<run_id>.csv` *(immutable per-run copy)*
-      - `selection_top_k__run_<run_id>.parquet` *(immutable per-run copy)*
     - `labels/`
       - `labels_used.parquet`
     - `metadata/`
@@ -119,9 +116,7 @@ opal prune-source -c path/to/configs/campaign.yaml --scope campaign
   * `outputs/ledger/labels.parquet`
     - 1 row per label event (observed round, id, y).
 
-Schemas are **append-only**; uniqueness is enforced for:
-  `run_id` (runs), `(run_id,id)` (predictions). Labels are event rows; exact duplicates are de‑duplicated,
-  but distinct sources for the same `(observed_round,id)` are preserved.
+Schemas are **append-only**; uniqueness is enforced for: `run_id` (runs), `(run_id,id)` (predictions). Labels are event rows; exact duplicates are de‑duplicated, but distinct sources for the same `(observed_round,id)` are preserved.
 
 **state.json** tracks campaign state per round, including `run_id` and `round_log_jsonl` paths for auditability.
 
@@ -277,7 +272,7 @@ safety:
 
 ---
 
-#### Notes on precedence & wiring
+### Notes on precedence & wiring
 
 * `campaign.workdir` and `data.location.path` resolve **relative to the campaign root**
   (parent of `configs/`), unless absolute. Prefer `workdir: "."` for portability.

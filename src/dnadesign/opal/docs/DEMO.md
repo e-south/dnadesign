@@ -1,14 +1,14 @@
 ## OPAL Demo Campaign -- SFXI (setpoint x intensity)
 
-This demo walks a **complete OPAL loop** on a small dataset with the SFXI ingest + plotting stack.
+This demo walks a **complete OPAL loop** on a dataset with the SFXI ingest + plotting stack.
 
 **What you'll learn (and see):**
 - a full `run` (train -> score -> select)
 - ledger-backed inspection (`status`, `runs`, `log`)
-- plots (configured)
+- plots
 - where artifacts and ledgers live
 
-This demo is **self-contained**: it ships with a local `records.parquet` and label inputs under `inputs/`, so no USR setup is required.
+This demo is **self-contained**: it ships with a local `records.parquet` and label inputs under `inputs/`.
 
 ---
 
@@ -167,9 +167,7 @@ outputs/rounds/round_<k>/
     feature_importance.csv
   selection/
     selection_top_k.csv
-    selection_top_k.parquet
     selection_top_k__run_<run_id>.csv
-    selection_top_k__run_<run_id>.parquet
   labels/
     labels_used.parquet
   metadata/

@@ -54,11 +54,10 @@ def resolve_selection_path_from_artifacts(
     if run_id:
         preferred_keys.extend(
             [
-                f"selection/selection_top_k__run_{run_id}.parquet",
                 f"selection/selection_top_k__run_{run_id}.csv",
             ]
         )
-    preferred_keys.extend(["selection/selection_top_k.parquet", "selection/selection_top_k.csv"])
+    preferred_keys.extend(["selection/selection_top_k.csv"])
     for key in preferred_keys:
         if key not in artifacts:
             continue

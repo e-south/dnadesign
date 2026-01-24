@@ -33,10 +33,8 @@ dnadesign/
 ### Documentation
 
 1. [Installation](docs/installation.md)
-2. [Quickstart marimo notebooks](docs/notebooks.md)
-3. [Maintaining dependencies](docs/dependencies.md)
-4. [CUDA/GPU install notes (BU SCC)](docs/INSTALL_BU_SCC.md)
-5. [Marimo reference](docs/marimo_reference.md)
+2. [Maintaining dependencies](docs/dependencies.md)
+3. [CUDA/GPU install notes (BU SCC)](docs/INSTALL_BU_SCC.md)
 
 ---
 

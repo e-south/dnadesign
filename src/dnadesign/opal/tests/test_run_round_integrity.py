@@ -326,7 +326,9 @@ def test_run_round_preserves_null_sequence_in_selection_artifacts(tmp_path: Path
     )
     assert res.ok is True
 
-    sel_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selection_top_k.parquet"
-    assert sel_path.exists()
-    sel_df = pd.read_parquet(sel_path)
+    sel_csv_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selection_top_k.csv"
+    sel_parquet_path = sel_csv_path.with_suffix(".parquet")
+    assert sel_csv_path.exists()
+    assert not sel_parquet_path.exists()
+    sel_df = pd.read_csv(sel_csv_path)
     assert pd.isna(sel_df.loc[0, "sequence"])

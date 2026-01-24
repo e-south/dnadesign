@@ -24,7 +24,6 @@ from ...storage.artifacts import (
     write_model_meta,
     write_round_ctx,
     write_selection_csv,
-    write_selection_parquet,
 )
 from ...storage.data_access import RecordsStore
 from ...storage.ledger import LedgerWriter
@@ -146,12 +145,8 @@ def write_round_artifacts(
         ]
     ]
     sel_sha = write_selection_csv(apaths.selection_csv, selected_df)
-    sel_parquet_path = apaths.selection_csv.with_suffix(".parquet")
-    sel_parquet_sha = write_selection_parquet(sel_parquet_path, selected_df)
     sel_run_csv_path = apaths.selection_csv.with_name(f"selection_top_k__run_{run_id}.csv")
-    sel_run_parquet_path = sel_parquet_path.with_name(f"selection_top_k__run_{run_id}.parquet")
     sel_run_csv_sha = write_selection_csv(sel_run_csv_path, selected_df)
-    sel_run_parquet_sha = write_selection_parquet(sel_run_parquet_path, selected_df)
 
     ctx_sha = write_round_ctx(apaths.round_ctx_json, rctx.snapshot())
     labels_used_sha = write_labels_used_parquet(apaths.labels_used_parquet, labels_used_df)
@@ -196,7 +191,7 @@ def write_round_artifacts(
 
     _log(
         req.verbose,
-        "[artifacts] model, selection_csv, selection_parquet, round_ctx, objective_meta"
+        "[artifacts] model, selection_csv, round_ctx, objective_meta"
         + (", feature_importance" if "model/feature_importance.csv" in artifacts_paths_and_hashes else "")
         + " written",
     )
@@ -205,12 +200,7 @@ def write_round_artifacts(
         {
             "model/model.joblib": (file_sha256(apaths.model), str(apaths.model.resolve())),
             "selection/selection_top_k.csv": (sel_sha, str(apaths.selection_csv.resolve())),
-            "selection/selection_top_k.parquet": (sel_parquet_sha, str(sel_parquet_path.resolve())),
             f"selection/selection_top_k__run_{run_id}.csv": (sel_run_csv_sha, str(sel_run_csv_path.resolve())),
-            f"selection/selection_top_k__run_{run_id}.parquet": (
-                sel_run_parquet_sha,
-                str(sel_run_parquet_path.resolve()),
-            ),
             "metadata/round_ctx.json": (ctx_sha, str(apaths.round_ctx_json.resolve())),
             "metadata/objective_meta.json": (score.obj_sha, str(apaths.objective_meta_json.resolve())),
             "model/model_meta.json": (

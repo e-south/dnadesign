@@ -70,8 +70,7 @@ $$
 
 ### 1.2 Modeling note (median–IQR robust scaling):
 
-Random forest (RF) models can handle mixed targets (our 8-vector: four bounded logic $v$ + four log-intensity $y^\star$), but with low sample counts the per-state log-intensities risks having large variance, letting one state potentially dominate RF-internal split decisions. An affine, monotonic, and reversible median–IQR scaling
- puts the four intensity targets on a comparable scale so early fits aren’t skewed.
+Random forest (RF) models can handle mixed targets (our 8-vector: four bounded logic $v$ + four log-intensity $y^\star$), but with low sample counts the per-state log-intensities risks having large variance, letting one state potentially dominate RF-internal split decisions. An affine, monotonic, and reversible median–IQR scaling puts the four intensity targets on a comparable scale so early fits aren’t skewed.
 
 * Fit-time transform (applied to all training samples, per state): compute campaign-cumulative training median and IQR for each intensity target $y^\star_i$, then
 

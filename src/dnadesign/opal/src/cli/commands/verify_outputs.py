@@ -38,7 +38,7 @@ def verify_outputs(
     selection_path: Optional[Path] = typer.Option(
         None,
         "--selection-path",
-        help="Optional selection_top_k.csv/.parquet path (defaults to run artifacts).",
+        help="Optional selection_top_k.csv path (defaults to run artifacts).",
     ),
     eps: float = typer.Option(1e-6, "--eps", help="Mismatch tolerance for numeric comparisons."),
     json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)."),
@@ -60,9 +60,7 @@ def verify_outputs(
         sel_path = selection_path or resolve_selection_path_from_artifacts(artifacts, run_id=run_id)
         if sel_path is None:
             round_dir = ws.round_dir(as_of_round)
-            candidate = round_dir / "selection" / "selection_top_k.parquet"
-            if not candidate.exists():
-                candidate = round_dir / "selection" / "selection_top_k.csv"
+            candidate = round_dir / "selection" / "selection_top_k.csv"
             if candidate.exists():
                 sel_path = candidate
         if sel_path is None:

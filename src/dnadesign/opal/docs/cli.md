@@ -139,9 +139,7 @@ opal run --config <yaml> --round <r> \
   * `feature_importance.csv` (optional)
 * `selection/`
   * `selection_top_k.csv`
-  * `selection_top_k.parquet`
   * `selection_top_k__run_<run_id>.csv` (immutable per-run copy)
-  * `selection_top_k__run_<run_id>.parquet` (immutable per-run copy)
 * `labels/`
   * `labels_used.parquet` (training snapshot for this run)
 * `metadata/`
