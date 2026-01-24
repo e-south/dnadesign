@@ -14,7 +14,7 @@ densegen:
         - inputs/motif_artifacts/cpxR__demo_local_meme__cpxR.json
       sampling:
         strategy: stochastic
-        n_sites: 80
+        n_sites: 200
         oversample_factor: 200
         scoring_backend: fimo
         pvalue_threshold: 1e-4

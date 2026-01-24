@@ -139,14 +139,11 @@ The DenseGen workspace stays config‑centric (one runtime config); Cruncher kee
 
 Confirm resolved outputs, Stage‑A sampling knobs, fixed elements, and Stage‑B sampling policy.
 
-Rationale for the demo settings: we want **dozens of binding sites per motif**, so we set Stage‑A
-`n_sites` and oversampling/mining caps to reach that target; Stage‑B sampling then builds fixed‑size
-libraries before running the solver.
-This demo also pins a strong σ70 promoter pair (`TTGACA`/`TATAAT`) as fixed elements; the default
-`tf_coverage` plot overlays these sites when `plots.options.tf_coverage.include_promoter_sites: true`.
-To keep the 60‑bp budget feasible with ~21–22 bp TFBS lengths, the plan sets
-`min_required_regulators: 1` while listing both LexA and CpxR, so each sequence must include at
-least one of the two regulators.
+Stage‑A is configured to mine **hundreds of binding sites per TF** from the PWM artifacts. The motif JSONs declare widths (LexA 22 bp, CpxR 21 bp), so `length_policy: range` with `length_range: [22, 28]` adds jitter around those sizes while still selecting high‑scoring windows from the top p‑value strata. (Scale to thousands by raising `n_sites` if you need a larger pool.)
+
+Stage‑B then **subsamples** the Stage‑A pool into candidate libraries (`pool_strategy: subsample`, `library_size: 20`) with coverage weighting so each library includes the TFs you specified (`cover_all_regulators: true`). Each library is a candidate set offered to the solver; the solver assembles 60‑bp sequences by selecting a subset, and the run resamples new libraries as needed.
+
+This demo constrains a strong σ70 promoter pair (`TTGACA`/`TATAAT`) as fixed elements with a 15–19 bp spacer; the default `tf_coverage` plot overlays these sites when `plots.options.tf_coverage.include_promoter_sites: true`. To keep the 60‑bp budget feasible with ~21–22 bp TFBS lengths, the plan sets `min_required_regulators: 1` while listing both LexA and CpxR, so each sequence must include at least one of the two regulators.
 
 ```bash
 dense inspect config
