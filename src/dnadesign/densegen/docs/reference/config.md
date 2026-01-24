@@ -1,9 +1,6 @@
 ## DenseGen Config Reference
 
-This is the strict YAML schema for DenseGen. Unknown keys are errors and all paths resolve
-relative to the config file directory. Stage‑A sampling lives under `densegen.inputs[].sampling`,
-Stage‑B sampling lives under `densegen.generation.sampling`. Use this reference for exact
-field names; see the guide for conceptual flow.
+This is the YAML schema for DenseGen. Unknown keys are errors and all paths resolve relative to the config file directory. Stage‑A sampling lives under `densegen.inputs[].sampling`, Stage‑B sampling lives under `densegen.generation.sampling`. Use this reference for exact field names; see the guide for conceptual flow.
 
 ### Contents
 - [Top-level](#top-level) - required roots and plotting.

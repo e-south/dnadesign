@@ -1,6 +1,6 @@
 ## Motif artifact contract (JSON)
 
-DenseGen can consume **per‑motif JSON artifacts** that encode a single PWM. This keeps DenseGen decoupled from parsing code: any producer (Cruncher or external tooling) can emit the contract, and DenseGen only reads the artifact path specified in `config.yaml`. Cruncher produces these artifacts via `cruncher catalog export-densegen` (implemented in `cruncher/src/app/motif_artifacts.py`).
+DenseGen can consume **per‑motif JSON artifacts** that encode a single PWM. This keeps DenseGen decoupled from parsing code e.g., from Cruncher, and DenseGen only reads the artifact path specified in `config.yaml`. Cruncher produces these artifacts via `cruncher catalog export-densegen` (implemented in `cruncher/src/app/motif_artifacts.py`).
 
 ### Contents
 - [Context](#context) - why artifacts exist and where they fit.
@@ -14,10 +14,9 @@ DenseGen can consume **per‑motif JSON artifacts** that encode a single PWM. Th
 
 ### Context
 
-Artifact‑first PWM inputs are a decoupling contract: producers generate stable, versioned JSON,
-and DenseGen consumes them without embedding parser logic. This enables independent producers,
-reproducible ingestion, and clear provenance. DenseGen uses these artifacts in **Stage‑A sampling**
-to build TFBS pools from the PWM matrices.
+Artifact‑first PWM inputs are a decoupling contract: producers generate stable, versioned JSON, and DenseGen consumes them. This enables independent producers, reproducible ingestion, and clear provenance. DenseGen uses these artifacts in **Stage‑A sampling** to build TFBS pools from the PWM matrices.
+
+---
 
 ### Core principles
 
@@ -25,6 +24,8 @@ to build TFBS pools from the PWM matrices.
 - **JSON-first**, no sidecar schema files.
 - **Strict, fail-fast validation** to keep runs deterministic.
 - **Both probabilities and log-odds** are required.
+
+---
 
 ### Required fields
 
@@ -43,6 +44,8 @@ Optional keys (ignored by DenseGen but recommended for provenance):
 
 - `tf_name`, `source`, `organism`, `provenance`, `checksums`, `tags`, `length`
 
+---
+
 ### Scoring semantics
 
 DenseGen scores sampled candidates using **PWM log-odds** with the provided background.
@@ -52,6 +55,8 @@ thresholding.
 Log-odds values must be **finite** (no infinities). DenseGen assumes log-odds are
 computed with the natural log (ln) of `p/background`. If your matrices contain zeros,
 apply pseudocounts before emitting artifacts.
+
+---
 
 ### Example artifact
 
@@ -76,6 +81,8 @@ apply pseudocounts before emitting artifacts.
   "provenance": {"source_url": "https://example.org", "citation": "Example et al. 2025"}
 }
 ```
+
+---
 
 ### Config usage
 
