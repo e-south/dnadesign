@@ -78,6 +78,7 @@ from .core.pipeline import (
     resolve_plan,
     run_pipeline,
 )
+from .core.pvalue_bins import resolve_pvalue_bins
 from .core.reporting import collect_report_data, write_report
 from .core.run_manifest import load_run_manifest
 from .core.run_paths import (
@@ -454,6 +455,51 @@ def _print_inputs_summary(loaded) -> None:
     console.print(
         "  -> Produces the realized TFBS pool (input_tfbs_count), captured in outputs/meta/inputs_manifest.json."
     )
+
+
+def _resolve_fimo_bin_edges(cfg, *, input_name: str) -> list[float] | None:
+    for inp in cfg.inputs:
+        if inp.name != input_name:
+            continue
+        sampling = getattr(inp, "sampling", None)
+        if sampling is None:
+            return None
+        backend = getattr(sampling, "scoring_backend", None)
+        if backend is None or str(backend).lower() != "fimo":
+            return None
+        bins = getattr(sampling, "pvalue_bins", None)
+        return resolve_pvalue_bins(bins)
+    return None
+
+
+def _fimo_bin_rows(df: pd.DataFrame, edges: list[float] | None) -> list[tuple[int, str, int]]:
+    counts = df["fimo_bin_id"].value_counts().to_dict()
+    rows: list[tuple[int, str, int]] = []
+    if edges:
+        low = 0.0
+        for idx, high in enumerate(edges):
+            count = int(counts.get(idx, 0))
+            rows.append((idx, f"({low:g}, {float(high):g}]", count))
+            low = float(high)
+        return rows
+    for bin_id in sorted(counts):
+        count = int(counts[bin_id])
+        low = None
+        high = None
+        if "fimo_bin_low" in df.columns:
+            low_vals = df.loc[df["fimo_bin_id"] == bin_id, "fimo_bin_low"]
+            if not low_vals.empty:
+                low = float(low_vals.iloc[0])
+        if "fimo_bin_high" in df.columns:
+            high_vals = df.loc[df["fimo_bin_id"] == bin_id, "fimo_bin_high"]
+            if not high_vals.empty:
+                high = float(high_vals.iloc[0])
+        if low is not None and high is not None:
+            range_label = f"({low:g}, {high:g}]"
+        else:
+            range_label = "-"
+        rows.append((int(bin_id), range_label, count))
+    return rows
 
 
 def _list_dir_entries(path: Path, *, limit: int = 10) -> list[str]:
@@ -1580,6 +1626,19 @@ def stage_a_build_pool(
     cfg = loaded.root.densegen
     _ensure_fimo_available(cfg, strict=True)
     run_root = _run_root_for(loaded)
+    log_cfg = cfg.logging
+    log_dir = _resolve_outputs_path_or_exit(
+        loaded.path,
+        run_root,
+        Path(log_cfg.log_dir),
+        label="logging.log_dir",
+    )
+    logfile = log_dir / f"{cfg.run.id}.stage_a.log"
+    setup_logging(
+        level=log_cfg.level,
+        logfile=str(logfile),
+        suppress_solver_stderr=bool(log_cfg.suppress_solver_stderr),
+    )
     out_dir = _resolve_outputs_path_or_exit(cfg_path, run_root, out, label="stage-a.out")
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1652,23 +1711,9 @@ def stage_a_build_pool(
             continue
         df = pool.df
         if "fimo_bin_id" in df.columns:
-            bin_counts = df["fimo_bin_id"].value_counts().sort_index()
             bin_table = Table("bin_id", "pvalue_range", "count")
-            for bin_id, count in bin_counts.items():
-                low = None
-                high = None
-                if "fimo_bin_low" in df.columns:
-                    low_vals = df.loc[df["fimo_bin_id"] == bin_id, "fimo_bin_low"]
-                    if not low_vals.empty:
-                        low = float(low_vals.iloc[0])
-                if "fimo_bin_high" in df.columns:
-                    high_vals = df.loc[df["fimo_bin_id"] == bin_id, "fimo_bin_high"]
-                    if not high_vals.empty:
-                        high = float(high_vals.iloc[0])
-                if low is not None and high is not None:
-                    range_label = f"({low:g}, {high:g}]"
-                else:
-                    range_label = "-"
+            edges = _resolve_fimo_bin_edges(cfg, input_name=pool.name)
+            for bin_id, range_label, count in _fimo_bin_rows(df, edges):
                 bin_table.add_row(str(bin_id), range_label, str(int(count)))
             console.print(f"[bold]FIMO p-value bins for {pool.name}[/]")
             console.print(bin_table)
