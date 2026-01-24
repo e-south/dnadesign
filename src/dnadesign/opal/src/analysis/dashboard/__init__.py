@@ -1,4 +1,11 @@
-"""Dashboard analysis utilities for OPAL notebooks."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/__init__.py
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from . import (
     artifacts,

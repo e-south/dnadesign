@@ -1,9 +1,10 @@
-# ABOUTME: CLI for validating selection outputs against ledger predictions.
-# ABOUTME: Resolves selection artifacts and reports mismatches for a run.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/verify_outputs.py
+
+CLI for validating selection outputs against ledger predictions. Resolves
+selection artifacts and reports mismatches for a run.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -27,10 +28,20 @@ from ...reporting.verify_outputs import (
 from ...storage.ledger import LedgerReader
 from ...storage.workspace import CampaignWorkspace
 from ..registry import cli_command
-from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context, resolve_config_path
+from ._common import (
+    internal_error,
+    json_out,
+    load_cli_config,
+    opal_error,
+    print_config_context,
+    resolve_config_path,
+)
 
 
-@cli_command("verify-outputs", help="Compare selection artifacts against ledger predictions for a run.")
+@cli_command(
+    "verify-outputs",
+    help="Compare selection artifacts against ledger predictions for a run.",
+)
 def verify_outputs(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
     round: Optional[str] = typer.Option(None, "--round", "-r", help="Round selector: int or 'latest'."),
@@ -83,7 +94,12 @@ def verify_outputs(
         )
 
         if json:
-            json_out({"summary": summary, "mismatches": mismatches.head(10).to_dict(orient="records")})
+            json_out(
+                {
+                    "summary": summary,
+                    "mismatches": mismatches.head(10).to_dict(orient="records"),
+                }
+            )
         else:
             print_config_context(cfg_path, cfg=cfg)
             print_stdout("verify-outputs")

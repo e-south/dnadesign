@@ -1,9 +1,10 @@
-# ABOUTME: Registers objective functions and loads built-in and plugin objectives.
-# ABOUTME: Provides objective access with PluginCtx contract enforcement.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/registries/objectives.py
+
+Registers objective functions and loads built-in and plugin objectives. Provides
+objective access with PluginCtx contract enforcement.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

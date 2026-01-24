@@ -1,9 +1,10 @@
-# ABOUTME: Stores and validates per-record label/prediction history for OPAL campaigns.
-# ABOUTME: Enforces schema contracts for label history entries and training extraction.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/storage/label_history.py
+
+Stores and validates per-record label/prediction history for OPAL campaigns.
+Enforces schema contracts for label history entries and training extraction.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

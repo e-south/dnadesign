@@ -1,9 +1,10 @@
-# ABOUTME: Provides plot parameter utilities and metric field normalization.
-# ABOUTME: Maps user-facing metric names to ledger column fields.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/plots/_param_utils.py
+
+Provides plot parameter utilities and metric field normalization. Maps
+user-facing metric names to ledger column fields.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

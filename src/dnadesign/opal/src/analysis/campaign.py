@@ -1,6 +1,14 @@
-# ABOUTME: Loads campaign configuration and workspace paths for analysis.
-# ABOUTME: Provides IO-only data containers for analysis consumers.
-"""Campaign data loaders for analysis."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/campaign.py
+
+Loads campaign configuration and workspace paths for analysis. Provides IO-only
+data containers for analysis consumers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

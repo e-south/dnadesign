@@ -1,9 +1,10 @@
-# ABOUTME: Shared CLI helpers for OPAL commands (path resolution and output).
-# ABOUTME: Centralizes validation for config, table, and json file inputs.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/_common.py
+
+Shared CLI helpers for OPAL commands (path resolution and output). Centralizes
+validation for config, table, and json file inputs.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

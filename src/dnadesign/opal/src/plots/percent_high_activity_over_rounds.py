@@ -1,9 +1,10 @@
-# ABOUTME: Plots percent high-activity designs over rounds from ledger predictions.
-# ABOUTME: Consumes outputs/ledger/predictions for per-round summaries.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/plots/percent_high_activity_over_rounds.py
+
+Plots percent high-activity designs over rounds from ledger predictions.
+Consumes outputs/ledger/predictions for per-round summaries.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -13,7 +14,12 @@ from __future__ import annotations
 
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import load_events, resolve_outputs_dir
-from ._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir, scale_to_sizes, swarm_smart
+from ._mpl_utils import (
+    annotate_plot_meta,
+    ensure_mpl_config_dir,
+    scale_to_sizes,
+    swarm_smart,
+)
 from ._param_utils import event_columns_for, get_str, normalize_metric_field
 
 

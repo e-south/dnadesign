@@ -1,9 +1,10 @@
-# ABOUTME: Plots effect vs logic fidelity diagnostics for SFXI predictions.
-# ABOUTME: Consumes ledger predictions with setpoint joins from run metadata.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/plots/fold_change_vs_logic_fidelity.py
+
+Plots effect vs logic fidelity diagnostics for SFXI predictions. Consumes
+ledger predictions with setpoint joins from run metadata.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,7 +17,12 @@ from typing import List
 from ..registries.plots import PlotMeta, register_plot
 from ..storage.parquet_io import read_parquet_df
 from ._events_util import load_events_with_setpoint, resolve_outputs_dir
-from ._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir, scale_to_sizes, scatter_smart
+from ._mpl_utils import (
+    annotate_plot_meta,
+    ensure_mpl_config_dir,
+    scale_to_sizes,
+    scatter_smart,
+)
 from ._param_utils import event_columns_for, get_float, get_str, normalize_metric_field
 
 

@@ -1,9 +1,11 @@
-# ABOUTME: CLI commands for inspecting round_ctx runtime carriers.
-# ABOUTME: Loads and filters round_ctx snapshots from round metadata.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/ctx.py
+
+
+CLI commands for inspecting round_ctx runtime carriers. Loads and filters
+round_ctx snapshots from round metadata.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,9 +1,10 @@
-# ABOUTME: Provides campaign-scoped filesystem locks for write operations.
-# ABOUTME: Detects stale locks and guides remediation to avoid silent failures.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/storage/locks.py
+
+Provides campaign-scoped filesystem locks for write operations. Detects stale
+locks and guides remediation to avoid silent failures.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -61,7 +62,10 @@ class CampaignLock:
         try:
             fd = os.open(self.lockfile, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             payload = {"pid": int(os.getpid()), "ts": now_iso()}
-            os.write(fd, json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8"))
+            os.write(
+                fd,
+                json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8"),
+            )
             os.close(fd)
         except FileExistsError as e:
             if not self.lockfile.exists():

@@ -1,9 +1,10 @@
-# ABOUTME: CLI plotting command for OPAL campaign outputs and ledgers.
-# ABOUTME: Resolves plot configs, rounds, and output locations for charts.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/plot.py
+
+CLI plotting command for OPAL campaign outputs and ledgers. Resolves plot
+configs, rounds, and output locations for charts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

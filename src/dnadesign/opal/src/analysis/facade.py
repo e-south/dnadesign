@@ -1,9 +1,10 @@
-# ABOUTME: Provides analysis-layer helpers for reading campaign outputs and ledgers.
-# ABOUTME: Resolves run/round selectors and joins predictions with objective metadata.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/analysis/facade.py
+
+Provides analysis-layer helpers for reading campaign outputs and ledgers.
+Resolves run/round selectors and joins predictions with objective metadata.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -218,7 +219,10 @@ def _selected_rounds(
 
 def _resolve_round_for_run_id(run_id: str, runs_df: pl.DataFrame) -> int:
     if runs_df.is_empty():
-        raise OpalError("outputs/ledger/runs.parquet is empty; cannot resolve run_id.", ExitCodes.BAD_ARGS)
+        raise OpalError(
+            "outputs/ledger/runs.parquet is empty; cannot resolve run_id.",
+            ExitCodes.BAD_ARGS,
+        )
     if "run_id" not in runs_df.columns or "as_of_round" not in runs_df.columns:
         raise OpalError(
             "outputs/ledger/runs.parquet missing required columns (run_id, as_of_round).",
@@ -226,7 +230,10 @@ def _resolve_round_for_run_id(run_id: str, runs_df: pl.DataFrame) -> int:
         )
     df = runs_df.filter(pl.col("run_id") == str(run_id)).select(pl.col("as_of_round").drop_nulls().unique())
     if df.is_empty():
-        raise OpalError(f"run_id {run_id!r} not found in outputs/ledger/runs.parquet.", ExitCodes.BAD_ARGS)
+        raise OpalError(
+            f"run_id {run_id!r} not found in outputs/ledger/runs.parquet.",
+            ExitCodes.BAD_ARGS,
+        )
     rounds = sorted({int(x) for x in df.to_series().to_list()})
     if len(rounds) > 1:
         raise OpalError(
@@ -360,7 +367,10 @@ def load_predictions_with_setpoint(
         require_run_id=require_run_id,
     )
     if df.is_empty():
-        raise OpalError("outputs/ledger/predictions had zero rows after projection.", ExitCodes.BAD_ARGS)
+        raise OpalError(
+            "outputs/ledger/predictions had zero rows after projection.",
+            ExitCodes.BAD_ARGS,
+        )
 
     def _extract_setpoint(obj) -> Optional[List[float]]:
         vec = (obj or {}).get("setpoint_vector")

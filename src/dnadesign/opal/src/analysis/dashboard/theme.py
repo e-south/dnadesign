@@ -1,6 +1,14 @@
-# ABOUTME: Shared notebook helpers for OPAL marimo dashboards.
-# ABOUTME: Defines theme setup and chart title utilities.
-"""Shared helpers for OPAL notebooks."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/theme.py
+
+Shared notebook helpers for OPAL marimo dashboards. Defines theme setup and
+chart title utilities.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

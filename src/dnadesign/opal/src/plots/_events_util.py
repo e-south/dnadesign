@@ -1,9 +1,10 @@
-# ABOUTME: Loads ledger-backed event data for plot plugins.
-# ABOUTME: Resolves output paths for predictions and run metadata.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/plots/_events_util.py
+
+Loads ledger-backed event data for plot plugins. Resolves output paths
+for predictions and run metadata.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -14,7 +15,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, List, Optional, Set, Union
 
-from ..analysis.facade import load_predictions_with_setpoint, read_predictions, read_runs
+from ..analysis.facade import (
+    load_predictions_with_setpoint,
+    read_predictions,
+    read_runs,
+)
 from ..core.stderr_filter import maybe_install_pyarrow_sysctl_filter
 
 if TYPE_CHECKING:

@@ -1,9 +1,10 @@
-# ABOUTME: Registers Y transforms and loads built-in transform modules.
-# ABOUTME: Provides transform factories with schema and PluginCtx handling.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/registries/transforms_y.py
+
+Registers Y transforms and loads built-in transform modules. Provides transform
+factories with schema and PluginCtx handling.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

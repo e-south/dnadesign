@@ -1,7 +1,13 @@
-# ABOUTME: Handles round artifact persistence and ledger/state writebacks.
-# ABOUTME: Centralizes run meta/pred event construction and record updates.
 """
-Round writebacks for OPAL runs.
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/runtime/round/writebacks.py
+
+Handles round artifact persistence and ledger/state writebacks. Centralizes run
+meta/pred event construction and record updates.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -198,11 +204,23 @@ def write_round_artifacts(
 
     artifacts_paths_and_hashes.update(
         {
-            "model/model.joblib": (file_sha256(apaths.model), str(apaths.model.resolve())),
-            "selection/selection_top_k.csv": (sel_sha, str(apaths.selection_csv.resolve())),
-            f"selection/selection_top_k__run_{run_id}.csv": (sel_run_csv_sha, str(sel_run_csv_path.resolve())),
+            "model/model.joblib": (
+                file_sha256(apaths.model),
+                str(apaths.model.resolve()),
+            ),
+            "selection/selection_top_k.csv": (
+                sel_sha,
+                str(apaths.selection_csv.resolve()),
+            ),
+            f"selection/selection_top_k__run_{run_id}.csv": (
+                sel_run_csv_sha,
+                str(sel_run_csv_path.resolve()),
+            ),
             "metadata/round_ctx.json": (ctx_sha, str(apaths.round_ctx_json.resolve())),
-            "metadata/objective_meta.json": (score.obj_sha, str(apaths.objective_meta_json.resolve())),
+            "metadata/objective_meta.json": (
+                score.obj_sha,
+                str(apaths.objective_meta_json.resolve()),
+            ),
             "model/model_meta.json": (
                 model_meta_sha,
                 str(apaths.model_meta_json.resolve()),
@@ -297,7 +315,10 @@ def append_ledgers(
     ledger = LedgerWriter(ws)
     ledger.append_run_pred(run_pred_events)
     ledger.append_run_meta(run_meta_event)
-    _log(verbose, f"[ledger] appended run_pred({len(run_pred_events)}), run_meta(1) under {ws.ledger_dir}")
+    _log(
+        verbose,
+        f"[ledger] appended run_pred({len(run_pred_events)}), run_meta(1) under {ws.ledger_dir}",
+    )
 
 
 def write_prediction_label_hist(

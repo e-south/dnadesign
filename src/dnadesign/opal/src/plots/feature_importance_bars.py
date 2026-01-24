@@ -1,9 +1,10 @@
-# ABOUTME: Aggregates per-round feature importance artifacts into plots.
-# ABOUTME: Discovers round artifacts under outputs/rounds for visualization.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/plots/feature_importance_bars.py
+
+Aggregates per-round feature importance artifacts into plots. Discovers
+round artifacts under outputs/rounds for visualization.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

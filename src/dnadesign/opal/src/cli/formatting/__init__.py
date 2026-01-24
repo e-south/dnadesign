@@ -1,6 +1,14 @@
-# ABOUTME: Exposes formatting helpers and renderers for OPAL CLI commands.
-# ABOUTME: Aggregates core formatting utilities and per-command renderers.
-"""Formatting helpers for OPAL CLI."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/cli/formatting/__init__.py
+
+Exposes formatting helpers and renderers for OPAL CLI commands. Aggregates core
+formatting utilities and per-command renderers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from .core import bullet_list, kv_block, short_array
 from .renderers.explain import render_explain_human

@@ -1,9 +1,10 @@
-# ABOUTME: Registers X transforms and loads built-in transform modules.
-# ABOUTME: Wraps transforms with validation and PluginCtx enforcement.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/registries/transforms_x.py
+
+Registers X transforms and loads built-in transform modules. Wraps transforms
+with validation and PluginCtx enforcement.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

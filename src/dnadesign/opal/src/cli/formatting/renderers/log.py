@@ -1,6 +1,13 @@
-# ABOUTME: Renders round log summaries for OPAL CLI.
-# ABOUTME: Formats log event counts and durations.
-"""Round log renderers."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/cli/formatting/renderers/log.py
+
+Renders round log summaries for OPAL CLI. Formats log event counts and durations.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

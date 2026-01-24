@@ -1,6 +1,14 @@
-# ABOUTME: Renders explain command output for OPAL CLI.
-# ABOUTME: Formats explain summaries for human-readable display.
-"""Explain command renderers."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/cli/formatting/renderers/explain.py
+
+Renders explain command output for OPAL CLI. Formats explain summaries for
+human-readable display.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

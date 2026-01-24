@@ -1,9 +1,10 @@
-# ABOUTME: Registers selection strategies and loads built-in selection modules.
-# ABOUTME: Provides selection lookup and contract enforcement helpers.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/registries/selection.py
+
+Registers selection strategies and loads built-in selection modules. Provides
+selection lookup and contract enforcement helpers.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

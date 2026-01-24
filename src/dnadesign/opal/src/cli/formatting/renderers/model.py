@@ -1,6 +1,14 @@
-# ABOUTME: Renders model command output for OPAL CLI.
-# ABOUTME: Formats model metadata and feature importance summaries.
-"""Model command renderers."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/cli/formatting/renderers/model.py
+
+Renders model command output for OPAL CLI. Formats model metadata and feature
+importance summaries.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

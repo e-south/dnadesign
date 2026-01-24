@@ -1,7 +1,13 @@
-# ABOUTME: Implements core round stages for OPAL execution (training, scoring, selection).
-# ABOUTME: Each stage returns a typed bundle for the next stage.
 """
-Round stages for OPAL runs.
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/runtime/round/stages.py
+
+Implements core round stages for OPAL execution (training, scoring, selection).
+Each stage returns a typed bundle for the next stage.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

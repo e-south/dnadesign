@@ -1,6 +1,14 @@
-# ABOUTME: Parses label history entries for dashboard views and diagnostics.
-# ABOUTME: Normalizes label/pred events from records into analysis-ready tables.
-"""Label history parsing and normalization for dashboard views."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/labels.py
+
+Parses label history entries for dashboard views and diagnostics. Normalizes
+label/pred events from records into analysis-ready tables.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -433,7 +441,10 @@ def build_label_events(
                 "diagnostics": diag.diagnostics.add_error(error_msg),
             }
         )
-        return LabelEvents(df=_empty_label_df(y_col_name=y_col_name, sequence_col=sequence_col), diag=diag)
+        return LabelEvents(
+            df=_empty_label_df(y_col_name=y_col_name, sequence_col=sequence_col),
+            diag=diag,
+        )
 
     diag = LabelDiagnostics(**{**diag.__dict__, "events_parsed": len(rows), "errors": errors})
     if errors:
@@ -448,7 +459,10 @@ def build_label_events(
         )
 
     if not rows:
-        return LabelEvents(df=_empty_label_df(y_col_name=y_col_name, sequence_col=sequence_col), diag=diag)
+        return LabelEvents(
+            df=_empty_label_df(y_col_name=y_col_name, sequence_col=sequence_col),
+            diag=diag,
+        )
 
     df_out = pl.DataFrame(rows)
     try:
@@ -464,7 +478,10 @@ def build_label_events(
                 "diagnostics": diag.diagnostics.add_error(error_msg),
             }
         )
-        return LabelEvents(df=_empty_label_df(y_col_name=y_col_name, sequence_col=sequence_col), diag=diag)
+        return LabelEvents(
+            df=_empty_label_df(y_col_name=y_col_name, sequence_col=sequence_col),
+            diag=diag,
+        )
     return LabelEvents(df=df_out, diag=diag)
 
 

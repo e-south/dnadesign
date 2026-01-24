@@ -1,9 +1,10 @@
-# ABOUTME: CLI command to ingest labels into OPAL campaigns.
-# ABOUTME: Validates inputs, applies transforms, and writes label history.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/ingest_y.py
+
+CLI command to ingest labels into OPAL campaigns. Validates inputs, applies
+transforms, and writes label history.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -278,7 +279,12 @@ def cmd_ingest_y(
                     id_has_x = pd.Series(False, index=labels_df.index)
                     if "sequence" in labels_df.columns and "sequence" in csv_df.columns:
                         seq_with_x = set(
-                            csv_df.loc[~missing_x_values & csv_df["sequence"].notna(), "sequence"].astype(str).tolist()
+                            csv_df.loc[
+                                ~missing_x_values & csv_df["sequence"].notna(),
+                                "sequence",
+                            ]
+                            .astype(str)
+                            .tolist()
                         )
                         seq_series = labels_df["sequence"]
                         seq_has_x = seq_series.notna() & seq_series.astype(str).isin(seq_with_x)

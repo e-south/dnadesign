@@ -1,9 +1,10 @@
-# ABOUTME: Defines round artifact paths and write helpers for OPAL outputs.
-# ABOUTME: Provides consistent filesystem write utilities for round artifacts.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/storage/artifacts.py
+
+Defines round artifact paths and write helpers for OPAL outputs. Provides
+consistent filesystem write utilities for round artifacts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,9 +1,10 @@
-# ABOUTME: CLI command to inspect objective metadata and diagnostics for runs.
-# ABOUTME: Reads outputs/ledger predictions and run metadata for reporting.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/objective_meta.py
+
+CLI command to inspect objective metadata and diagnostics for runs. Reads
+outputs/ledger predictions and run metadata for reporting.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

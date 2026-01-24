@@ -1,9 +1,10 @@
-# ABOUTME: CLI command to inspect stored model artifacts and parameters.
-# ABOUTME: Resolves model paths from state or explicit paths for reporting.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/model_show.py
+
+CLI command to inspect stored model artifacts and parameters. Resolves model
+paths from state or explicit paths for reporting.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,9 +1,10 @@
-# ABOUTME: Compacts ledger datasets to remove duplicate entries.
-# ABOUTME: Provides a CLI helper for run_meta cleanup.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/ledger_compact.py
+
+Compacts ledger datasets to remove duplicate entries. Provides a CLI helper
+for run_meta cleanup.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

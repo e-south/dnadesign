@@ -1,7 +1,13 @@
-# ABOUTME: Defines round-level data contracts for OPAL execution stages.
-# ABOUTME: Provides dataclasses for round inputs, outputs, and stage bundles.
 """
-Round execution contracts.
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/runtime/round/contracts.py
+
+Defines round-level data contracts for OPAL execution stages. Provides
+dataclasses for round inputs, outputs, and stage bundles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

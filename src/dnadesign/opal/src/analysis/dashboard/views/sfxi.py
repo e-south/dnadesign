@@ -1,6 +1,14 @@
-# ABOUTME: Computes SFXI scoring metrics for dashboard views.
-# ABOUTME: Provides label/prediction SFXI view data for charts.
-"""SFXI scoring utilities (view layer)."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/views/sfxi.py
+
+Computes SFXI scoring metrics for dashboard views. Provides label/prediction
+SFXI view data for charts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -444,9 +452,15 @@ def build_pred_sfxi_view(
         return PredSfxiView(df=df_out, notice=notice)
 
     if y_hat_col not in pred_df.columns:
-        return PredSfxiView(df=pred_df.head(0), notice=f"Missing prediction vector column `{y_hat_col}`.")
+        return PredSfxiView(
+            df=pred_df.head(0),
+            notice=f"Missing prediction vector column `{y_hat_col}`.",
+        )
     if y_col is None or y_col not in labels_current_df.columns:
-        return PredSfxiView(df=pred_df.head(0), notice=f"Missing label column `{y_col}` for overlay scoring.")
+        return PredSfxiView(
+            df=pred_df.head(0),
+            notice=f"Missing label column `{y_col}` for overlay scoring.",
+        )
     if labels_current_df.is_empty():
         return PredSfxiView(df=pred_df.head(0), notice="No labels available for overlay scoring.")
 

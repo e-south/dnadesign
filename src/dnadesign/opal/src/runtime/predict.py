@@ -1,9 +1,10 @@
-# ABOUTME: Runs model prediction flows with optional Y-ops inversion and validation.
-# ABOUTME: Emits prediction DataFrames suitable for ledger/parquet export.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/runtime/predict.py
+
+Runs model prediction flows with optional Y-ops inversion and validation. Emits
+prediction DataFrames suitable for ledger/parquet export.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

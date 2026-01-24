@@ -1,9 +1,10 @@
-# ABOUTME: Initializes OPAL campaign workspaces and validates records layout.
-# ABOUTME: Writes state.json and ensures campaign directories exist.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/init.py
+
+Initializes OPAL campaign workspaces and validates records layout. Writes
+state.json and ensures campaign directories exist.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

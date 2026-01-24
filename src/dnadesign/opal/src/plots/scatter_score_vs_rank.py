@@ -1,9 +1,10 @@
-# ABOUTME: Plots objective score vs selection rank from ledger predictions.
-# ABOUTME: Reads outputs/ledger/predictions for scatter plots.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/plots/scatter_score_vs_rank.py
+
+Plots objective score vs selection rank from ledger predictions. Reads
+outputs/ledger/predictions for scatter plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -15,7 +16,12 @@ from typing import List
 
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import load_events, resolve_outputs_dir
-from ._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir, scale_to_sizes, scatter_smart
+from ._mpl_utils import (
+    annotate_plot_meta,
+    ensure_mpl_config_dir,
+    scale_to_sizes,
+    scatter_smart,
+)
 from ._param_utils import (
     event_columns_for,
     get_float,

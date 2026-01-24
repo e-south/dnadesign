@@ -1,6 +1,14 @@
-# ABOUTME: Prepares dashboard plot data for UMAP and cluster visualizations.
-# ABOUTME: Provides pure-data view objects for chart builders.
-"""Data views for dashboard plots."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/views/plots.py
+
+Prepares dashboard plot data for UMAP and cluster visualizations. Provides
+pure-data view objects for chart builders.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

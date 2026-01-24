@@ -1,6 +1,14 @@
-# ABOUTME: Builds reusable UI widgets for dashboard notebooks.
-# ABOUTME: Keeps UI wiring thin by centralizing control construction.
-"""UI helpers for dashboard notebooks."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/ui.py
+
+Builds reusable UI widgets for dashboard notebooks. Keeps UI wiring thin by
+centralizing control construction.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,9 +1,10 @@
-# ABOUTME: CLI command for running ephemeral predictions from saved models.
-# ABOUTME: Resolves model artifacts and outputs prediction tables.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/predict.py
+
+CLI command for running ephemeral predictions from saved models. Resolves model
+artifacts and outputs prediction tables.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,9 +1,10 @@
-# ABOUTME: Plots observed label logic fidelity vs closeness for SFXI campaigns.
-# ABOUTME: Reads ledger labels and run metadata for setpoint context.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/plots/sfxi_logic_fidelity_closeness.py
+
+Plots observed label logic fidelity vs closeness for SFXI campaigns. Reads
+ledger labels and run metadata for setpoint context.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,9 +1,10 @@
-# ABOUTME: Registers and installs OPAL CLI commands and command groups.
-# ABOUTME: Supports hidden commands and deferred import error handling.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/cli/registry.py
+
+Registers and installs OPAL CLI commands and command groups. Supports hidden
+commands and deferred import error handling.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

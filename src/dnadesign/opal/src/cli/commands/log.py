@@ -1,9 +1,10 @@
-# ABOUTME: CLI command to summarize per-round log events.
-# ABOUTME: Loads round log artifacts and prints a compact summary.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/log.py
+
+CLI command to summarize per-round log events. Loads round log artifacts and
+prints a compact summary.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

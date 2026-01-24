@@ -1,9 +1,10 @@
-# ABOUTME: Registers model factories and resolves built-in and plugin models.
-# ABOUTME: Provides model construction and loading helpers with contract checks.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/registries/models.py
+
+Registers model factories and resolves built-in and plugin models. Provides
+model construction and loading helpers with contract checks.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

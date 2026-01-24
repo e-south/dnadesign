@@ -1,4 +1,13 @@
-"""Selection helpers for dashboard comparisons."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/selection.py
+
+Selection helpers for dashboard comparisons.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -13,7 +22,9 @@ from .util import is_altair_undefined
 _OBJECTIVE_MODES = {"maximize", "minimize"}
 
 
-def resolve_objective_mode(selection_params: Mapping[str, Any]) -> tuple[str, list[str]]:
+def resolve_objective_mode(
+    selection_params: Mapping[str, Any],
+) -> tuple[str, list[str]]:
     """
     Resolve objective_mode with legacy alias support and warnings.
     Returns (mode, warnings).
@@ -112,7 +123,11 @@ def ensure_selection_columns(
     if id_col not in df.columns:
         return df, [], f"Selection reconstruction failed: missing id column '{id_col}'."
     if score_col not in df.columns:
-        return df, [], f"Selection reconstruction failed: missing score column '{score_col}'."
+        return (
+            df,
+            [],
+            f"Selection reconstruction failed: missing score column '{score_col}'.",
+        )
 
     ids = np.asarray(df.get_column(id_col).cast(pl.Utf8).to_list(), dtype=str)
     scores = df.select(pl.col(score_col).fill_null(float("nan")).cast(pl.Float64)).to_numpy().ravel()

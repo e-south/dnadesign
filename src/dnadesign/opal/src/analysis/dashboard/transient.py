@@ -1,6 +1,14 @@
-# ABOUTME: Builds overlay scoring charts for the promoter dashboard.
-# ABOUTME: Generates transient score histograms and feature importance views.
-"""Overlay scoring helpers for the promoter dashboard."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/transient.py
+
+Builds overlay scoring charts for the promoter dashboard. Generates transient
+score histograms and feature importance views.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -94,7 +102,11 @@ def build_feature_importance_chart(
     )
     return (
         _with_title(chart, "Random Forest feature importance", subtitle)
-        .properties(width="container", height=240, autosize={"type": "fit", "contains": "padding"})
+        .properties(
+            width="container",
+            height=240,
+            autosize={"type": "fit", "contains": "padding"},
+        )
         .configure_view(stroke=None)
     )
 

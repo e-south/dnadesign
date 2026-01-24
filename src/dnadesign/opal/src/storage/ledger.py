@@ -1,9 +1,10 @@
-# ABOUTME: Handles append-only ledger sinks and schema validation for OPAL.
-# ABOUTME: Reads/writes run metadata, predictions, and label events.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/storage/ledger.py
+
+Handles append-only ledger sinks and schema validation for OPAL. Reads/writes
+run metadata, predictions, and label events.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -247,7 +248,11 @@ def compact_runs_ledger(path: Path) -> dict[str, int]:
     after = int(len(df2))
     if before != after:
         _rewrite_dataset(path, df2)
-    return {"rows_before": before, "rows_after": after, "duplicates_removed": before - after}
+    return {
+        "rows_before": before,
+        "rows_after": after,
+        "duplicates_removed": before - after,
+    }
 
 
 def _ensure_event_value(df: pd.DataFrame, kind: str) -> None:

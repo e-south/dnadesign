@@ -1,6 +1,14 @@
-# ABOUTME: Resolves round artifact locations for dashboard notebooks.
-# ABOUTME: Translates campaign workdir + round into artifact paths.
-"""Artifact resolution helpers for dashboard notebooks."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/artifacts.py
+
+Resolves round artifact locations for dashboard notebooks. Translates campaign
+workdir + round into artifact paths.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

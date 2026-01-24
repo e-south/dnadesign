@@ -1,6 +1,14 @@
-# ABOUTME: Core formatting helpers for OPAL CLI output.
-# ABOUTME: Provides markup-aware formatting utilities and shared helpers.
-"""Core formatting helpers for OPAL CLI."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/cli/formatting/core.py
+
+Core formatting helpers for OPAL CLI output. Provides markup-aware formatting
+utilities and shared helpers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

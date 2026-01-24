@@ -1,9 +1,10 @@
-# ABOUTME: Validates selection outputs against ledger predictions for a run.
-# ABOUTME: Provides strict selection output checks and artifact resolution helpers.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/reporting/verify_outputs.py
+
+Validates selection outputs against ledger predictions for a run. Provides
+strict selection output checks and artifact resolution helpers.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

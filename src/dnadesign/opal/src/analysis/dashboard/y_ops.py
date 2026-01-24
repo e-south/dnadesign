@@ -1,4 +1,13 @@
-"""Y-ops helpers used by dashboard scoring and overlays."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/y_ops.py
+
+Y-ops helpers used by dashboard scoring and overlays.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

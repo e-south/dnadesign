@@ -1,4 +1,13 @@
-"""Diagnostics helpers for dashboard workflows."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/diagnostics.py
+
+Diagnostics helpers for dashboard workflows.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

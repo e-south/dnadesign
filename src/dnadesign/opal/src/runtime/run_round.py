@@ -1,9 +1,10 @@
-# ABOUTME: Executes one Opal round from training through selection and writebacks.
-# ABOUTME: Coordinates round stages, artifacts, ledgers, and state updates.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/runtime/run_round.py
+
+Executes one Opal round from training through selection and writebacks.
+Coordinates round stages, artifacts, ledgers, and state updates.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -191,7 +192,11 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
             if arr.size == len(xbundle.id_order_pool):
                 metrics_by_name[key] = arr.tolist()
 
-    objective_meta = {"name": score.obj_name, "params": score.obj_params, "mode": score.mode}
+    objective_meta = {
+        "name": score.obj_name,
+        "params": score.obj_params,
+        "mode": score.mode,
+    }
     _ = write_prediction_label_hist(
         store=store,
         df=df,

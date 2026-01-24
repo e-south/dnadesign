@@ -1,6 +1,14 @@
-# ABOUTME: Dashboard helpers for discovering campaigns and datasets.
-# ABOUTME: Resolves campaign roots and records paths for notebook UIs.
-"""Dataset and campaign helpers for dashboard notebooks."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/datasets.py
+
+Dashboard helpers for discovering campaigns and datasets. Resolves campaign
+roots and records paths for notebook UIs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

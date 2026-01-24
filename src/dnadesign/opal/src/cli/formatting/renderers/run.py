@@ -1,6 +1,14 @@
-# ABOUTME: Renders run-related command output for OPAL CLI.
-# ABOUTME: Formats run summaries and run metadata displays.
-"""Run command renderers."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/cli/formatting/renderers/run.py
+
+Renders run-related command output for OPAL CLI. Formats run summaries and
+run metadata displays.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,6 +1,14 @@
-# ABOUTME: Loads model artifacts and round context for dashboard overlays.
-# ABOUTME: Centralizes artifact resolution and validation for model-based plots.
-"""Model and artifact helpers used by dashboard overlays."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/models.py
+
+Loads model artifacts and round context for dashboard overlays. Centralizes
+artifact resolution and validation for model-based plots.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -55,7 +63,9 @@ def get_feature_importances(model):
     return None
 
 
-def load_feature_importances_from_artifact(round_dir: Path | None) -> tuple[np.ndarray | None, str | None]:
+def load_feature_importances_from_artifact(
+    round_dir: Path | None,
+) -> tuple[np.ndarray | None, str | None]:
     if round_dir is None:
         return None, "Round directory unavailable for feature importance."
     path = Path(round_dir) / "model" / "feature_importance.csv"

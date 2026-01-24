@@ -1,6 +1,14 @@
-# ABOUTME: Altair chart builders for dashboard UMAP and cluster plots.
-# ABOUTME: Consumes view data from analysis.dashboard.views.plots.
-"""Chart builders for dashboard plots."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/charts/plots.py
+
+Altair chart builders for dashboard UMAP and cluster plots. Consumes view data
+from analysis.dashboard.views.plots.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -9,6 +17,7 @@ from typing import Iterable
 
 import altair as alt
 import polars as pl
+from altair.utils.schemapi import UndefinedType
 
 from ..hues import HueOption
 from ..views.plots import (
@@ -30,7 +39,7 @@ def with_title(chart: alt.Chart, title: str, subtitle: str | None = None) -> alt
     return chart.properties(title=_chart_title(title, subtitle))
 
 
-def _color_encoding(spec: ColorSpec | None) -> alt.Color | alt.Undefined:
+def _color_encoding(spec: ColorSpec | None) -> alt.Color | UndefinedType:
     if spec is None:
         return alt.Undefined
     if spec.kind == "numeric":
@@ -87,7 +96,11 @@ def build_umap_explorer_chart(
             )
             .properties(width=plot_size, height=plot_size)
         )
-        chart = with_title(chart, "UMAP explorer (Evo2 embedding)", f"{dataset_name or 'dataset'} · color=none")
+        chart = with_title(
+            chart,
+            "UMAP explorer (Evo2 embedding)",
+            f"{dataset_name or 'dataset'} · color=none",
+        )
         return UmapExplorerResult(chart=chart, df_plot=df, valid=False, note=view.note)
 
     color_encoding = _color_encoding(view.color_spec)
@@ -129,7 +142,11 @@ def build_umap_explorer_chart(
             chart = chart + top_layer
 
     color_context = (view.color_spec.title if view.color_spec else None) or "none"
-    chart = with_title(chart, "UMAP explorer (Evo2 embedding)", f"{dataset_name or 'dataset'} · color={color_context}")
+    chart = with_title(
+        chart,
+        "UMAP explorer (Evo2 embedding)",
+        f"{dataset_name or 'dataset'} · color={color_context}",
+    )
     return UmapExplorerResult(chart=chart, df_plot=df, valid=True, note=view.note)
 
 

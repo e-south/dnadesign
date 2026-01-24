@@ -1,4 +1,13 @@
-"""Filtering utilities for dashboard views."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/filters.py
+
+Filtering utilities for dashboard views.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Hue registry helpers for dashboard plots."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/hues.py
+
+Hue registry helpers for dashboard plots.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -155,8 +164,18 @@ def build_hue_registry(
 def default_view_hues() -> list[HueOption]:
     return [
         HueOption(key="opal__view__score", label="Score", kind="numeric", dtype=pl.Float64),
-        HueOption(key="opal__view__logic_fidelity", label="Logic fidelity", kind="numeric", dtype=pl.Float64),
-        HueOption(key="opal__view__effect_scaled", label="Effect scaled", kind="numeric", dtype=pl.Float64),
+        HueOption(
+            key="opal__view__logic_fidelity",
+            label="Logic fidelity",
+            kind="numeric",
+            dtype=pl.Float64,
+        ),
+        HueOption(
+            key="opal__view__effect_scaled",
+            label="Effect scaled",
+            kind="numeric",
+            dtype=pl.Float64,
+        ),
         HueOption(key="opal__view__rank", label="Rank", kind="numeric", dtype=pl.Float64),
         HueOption(
             key="opal__view__top_k",

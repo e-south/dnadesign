@@ -1,6 +1,13 @@
-# ABOUTME: Renders runs list output for OPAL CLI.
-# ABOUTME: Formats list of run metadata entries.
-"""Runs list renderers."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/cli/formatting/renderers/runs.py
+
+Renders runs list output for OPAL CLI. Formats list of run metadata entries.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

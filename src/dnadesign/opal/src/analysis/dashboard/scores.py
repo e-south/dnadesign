@@ -1,4 +1,13 @@
-"""Canonical/overlay view helpers for dashboard plots."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/scores.py
+
+Canonical/overlay view helpers for dashboard plots.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

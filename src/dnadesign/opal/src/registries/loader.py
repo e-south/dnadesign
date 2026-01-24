@@ -1,9 +1,10 @@
-# ABOUTME: Centralizes registry discovery for built-ins and entry-point plugins.
-# ABOUTME: Raises OpalError on import/load failures to enforce fail-fast behavior.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/registries/loader.py
+
+Centralizes registry discovery for built-ins and entry-point plugins. Raises
+OpalError on import/load failures to enforce fail-fast behavior.
 
 Module Author(s): Eric J. South (extended by Codex)
 --------------------------------------------------------------------------------

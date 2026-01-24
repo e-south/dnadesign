@@ -1,6 +1,14 @@
-# ABOUTME: Renders init command output for OPAL CLI.
-# ABOUTME: Formats campaign initialization summaries.
-"""Init command renderers."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/cli/formatting/renderers/init.py
+
+Renders init command output for OPAL CLI. Formats campaign initialization
+summaries.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

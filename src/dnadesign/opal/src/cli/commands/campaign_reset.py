@@ -1,9 +1,10 @@
-# ABOUTME: Resets a campaign to a clean slate for repeatable runs.
-# ABOUTME: Prunes OPAL columns, removes outputs, and clears state.json.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/campaign_reset.py
+
+Resets a campaign to a clean slate for repeatable runs. Prunes OPAL columns,
+removes outputs, and clears state.json.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

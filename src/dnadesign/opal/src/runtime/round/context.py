@@ -1,7 +1,13 @@
-# ABOUTME: Builds the round context and registry view for OPAL runs.
-# ABOUTME: Centralizes run_id creation and RoundCtx initialization.
 """
-Round context helpers.
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/runtime/round/context.py
+
+Builds the round context and registry view for OPAL runs. Centralizes run_id
+creation and RoundCtx initialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

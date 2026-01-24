@@ -1,9 +1,10 @@
-# ABOUTME: Resolves canonical campaign workspace paths and output locations.
-# ABOUTME: Centralizes layout for outputs, ledgers, and per-round artifacts.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/storage/workspace.py
+
+Resolves canonical campaign workspace paths and output locations. Centralizes
+layout for outputs, ledgers, and per-round artifacts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

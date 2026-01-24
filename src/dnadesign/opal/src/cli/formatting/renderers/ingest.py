@@ -1,6 +1,14 @@
-# ABOUTME: Renders ingest-y command output for OPAL CLI.
-# ABOUTME: Formats ingest preview and commit summaries.
-"""Ingest command renderers."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/cli/formatting/renderers/ingest.py
+
+Renders ingest-y command output for OPAL CLI. Formats ingest preview and commit
+summaries.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,9 +1,10 @@
-# ABOUTME: Registers plot functions and loads built-in and plugin plot modules.
-# ABOUTME: Provides plot lookup and metadata for Opal reporting.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/registries/plots.py
+
+Registers plot functions and loads built-in and plugin plot modules. Provides
+plot lookup and metadata for Opal reporting.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

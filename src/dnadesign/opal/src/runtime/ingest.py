@@ -1,9 +1,10 @@
-# ABOUTME: Validates and ingests label data into records with transform handling.
-# ABOUTME: Produces ingest reports and contract checks for label integrity.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/runtime/ingest.py
+
+Validates and ingests label data into records with transform handling. Produces
+ingest reports and contract checks for label integrity.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,6 +1,14 @@
-# ABOUTME: Executes configured plots for OPAL campaigns using PlotContext.
-# ABOUTME: Owns plot dispatch, output resolution, and error handling.
-"""Plot execution for OPAL."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/plots/runner.py
+
+Executes configured plots for OPAL campaigns using PlotContext. Owns plot
+dispatch, output resolution, and error handling.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

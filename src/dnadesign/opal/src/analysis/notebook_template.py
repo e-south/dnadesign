@@ -1,9 +1,10 @@
-# ABOUTME: Renders marimo notebook templates for OPAL campaigns.
-# ABOUTME: Generates scaffolded notebooks with campaign context and data previews.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/analysis/notebook_template.py
+
+Renders marimo notebook templates for OPAL campaigns. Generates scaffolded
+notebooks with campaign context and data previews.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

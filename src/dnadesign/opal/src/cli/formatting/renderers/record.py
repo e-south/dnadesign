@@ -1,6 +1,13 @@
-# ABOUTME: Renders record-show command output for OPAL CLI.
-# ABOUTME: Formats record summaries and run history lines.
-"""Record command renderers."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/cli/formatting/renderers/record.py
+
+Renders record-show command output for OPAL CLI.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

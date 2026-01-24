@@ -1,9 +1,10 @@
-# ABOUTME: Provides notebook CLI commands for campaign analysis workflows.
-# ABOUTME: Generates and launches marimo notebooks tied to campaigns.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/notebook.py
+
+Provides notebook CLI commands for campaign analysis workflows. Generates and
+launches marimo notebooks tied to campaigns.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

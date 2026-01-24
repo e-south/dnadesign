@@ -1,6 +1,14 @@
-# ABOUTME: Parses plot configuration for OPAL campaigns and validates plot entries.
-# ABOUTME: Provides helpers for resolving plot config sources and defaults.
-"""Plot configuration parsing for OPAL."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/plots/config.py
+
+Parses plot configuration for OPAL campaigns and validates plot entries.
+Provides helpers for resolving plot config sources and defaults.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

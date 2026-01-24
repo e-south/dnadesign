@@ -1,6 +1,14 @@
-# ABOUTME: Renders status command output for OPAL CLI.
-# ABOUTME: Formats campaign status summaries and round details.
-"""Status command renderers."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/cli/formatting/renderers/status.py
+
+Renders status command output for OPAL CLI. Formats campaign status summaries
+and round details.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Shared utility helpers for dashboard notebooks."""
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/analysis/dashboard/util.py
+
+Shared utility helpers for dashboard notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

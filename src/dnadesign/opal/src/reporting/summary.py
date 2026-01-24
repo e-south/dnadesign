@@ -1,9 +1,10 @@
-# ABOUTME: Summarizes run logs and run metadata for reporting commands.
-# ABOUTME: Provides helpers for CLI status and log summaries.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/src/reporting/summary.py
+
+Summarizes run logs and run metadata for reporting commands. Provides helpers
+for CLI status and log summaries.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
