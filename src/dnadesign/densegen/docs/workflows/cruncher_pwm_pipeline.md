@@ -25,17 +25,13 @@ cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR
 cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --hydrate
 cruncher lock
 
-# Export to a Cruncher-owned location
-cruncher catalog export-densegen --set 1 --out outputs/densegen_motifs
-cruncher catalog export-sites --set 1 --out outputs/densegen_sites.parquet
+# Export directly into a DenseGen workspace (name or absolute path).
+cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_two_tf
+cruncher catalog export-sites --set 1 --densegen-workspace demo_meme_two_tf
 ```
 
-Copy the exports into the DenseGen workspace `inputs/` (DenseGen remains config‑centric):
-
-```bash
-cp outputs/densegen_sites.parquet <densegen_workspace>/inputs/
-cp -R outputs/densegen_motifs <densegen_workspace>/inputs/motif_artifacts
-```
+If you prefer explicit paths, you can still use `--out`, but when `--densegen-workspace`
+is set the output path must live under that workspace's `inputs/` directory.
 
 ---
 

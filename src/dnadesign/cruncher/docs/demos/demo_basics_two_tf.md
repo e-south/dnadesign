@@ -483,11 +483,15 @@ Export the binding-site superset and the selected motifs for DenseGen runs:
 
 ```bash
 # Export binding sites (CSV/Parquet) for DenseGen binding_sites inputs
-cruncher catalog export-sites --set 1 --out /tmp/densegen_sites.csv -c "$CONFIG"
+cruncher catalog export-sites --set 1 --densegen-workspace demo_meme_two_tf -c "$CONFIG"
 
 # Export per-motif JSON artifacts for DenseGen PWM artifact inputs
-cruncher catalog export-densegen --set 1 --out /tmp/densegen_pwms -c "$CONFIG"
+cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_two_tf -c "$CONFIG"
 ```
+
+`--densegen-workspace` accepts a workspace name (resolved under `src/dnadesign/densegen/workspaces`)
+or an absolute path, and writes under that workspace's `inputs/`. You can still provide `--out`,
+but the path must remain inside the target `inputs/` directory.
 
 Then point DenseGen configs at the exported files (`type: binding_sites`) or artifacts
 (`type: pwm_artifact_set`).
