@@ -84,7 +84,7 @@ metadata:
   dashboard:
     explorer_defaults:
       x: opal__view__score
-      y: opal__view__logic_fidelity
+      y: opal__view__effect_scaled
       color: "Observed (labeled)"
 
 plot_config: plots.yaml

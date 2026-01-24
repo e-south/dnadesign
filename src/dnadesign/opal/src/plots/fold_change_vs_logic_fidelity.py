@@ -423,5 +423,5 @@ def render(context, params: dict) -> None:
 
     if context.save_data:
         # Save logic_fidelity and the actually-plotted Y series under a meaningful column name
-        tidy = pd.DataFrame({"logic_fidelity": lf, tidy_col: y_plot})
+        tidy = pd.DataFrame({"obj__logic_fidelity": lf, tidy_col: y_plot})
         context.save_df(tidy)

@@ -774,7 +774,9 @@ def _(
     _plot_size = alt._DNAD_PLOT_SIZE
 
     _color_label = umap_color_dropdown.value
-    _hue = None if _color_label == "(none)" else hue_registry.get(_color_label)
+    _hue = None
+    if _color_label != "(none)":
+        _hue = next((opt for opt in hue_registry.options if opt.key == _color_label), None)
 
     _result = build_umap_explorer_chart(
         df=df_view,

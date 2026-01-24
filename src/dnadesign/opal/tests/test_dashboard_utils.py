@@ -25,6 +25,7 @@ from dnadesign.opal.src.analysis.dashboard import (
     labels,
     selection,
     transient,
+    ui,
     util,
 )
 from dnadesign.opal.src.analysis.dashboard.charts import plots
@@ -261,6 +262,49 @@ def test_build_umap_explorer_chart_cases() -> None:
     )
     assert no_non_null.valid is True
     assert no_non_null.note is not None and "no non-null values" in no_non_null.note
+
+
+def test_build_umap_controls_uses_raw_column_names() -> None:
+    class _DummyDropdown:
+        def __init__(self, *, options, value=None, label=None, full_width=False):
+            self.options = options
+            self.value = value
+            self.label = label
+            self.full_width = full_width
+
+    class _DummyText:
+        def __init__(self, *, value=None, label=None, full_width=False):
+            self.value = value
+            self.label = label
+            self.full_width = full_width
+
+    class _DummyUI:
+        def dropdown(self, *, options, value=None, label=None, full_width=False):
+            return _DummyDropdown(options=options, value=value, label=label, full_width=full_width)
+
+        def text(self, *, value=None, label=None, full_width=False):
+            return _DummyText(value=value, label=label, full_width=full_width)
+
+    class _DummyMo:
+        ui = _DummyUI()
+
+    df = pl.DataFrame(
+        {
+            "cluster__ldn_v1__umap_x": [0.1],
+            "cluster__ldn_v1__umap_y": [0.2],
+            "opal__view__score": [0.3],
+        }
+    )
+    opt = hues.HueOption(key="opal__view__score", label="Score", kind="numeric", dtype=pl.Float64)
+    registry = hues.HueRegistry(options=[opt], label_map={"Score": opt})
+    controls = ui.build_umap_controls(
+        mo=_DummyMo(),
+        df_active=df,
+        hue_registry=registry,
+        default_hue_key="opal__view__score",
+    )
+    assert controls.umap_color_dropdown.options == ["(none)", "opal__view__score"]
+    assert controls.umap_color_dropdown.value == "opal__view__score"
 
 
 def test_apply_overlay_label_flags() -> None:

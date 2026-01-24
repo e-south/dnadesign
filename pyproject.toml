@@ -90,7 +90,7 @@ test = ["pytest>=8.2", "pytest-cov", "hypothesis>=6.100"]
 lint = ["ruff>=0.4", "pre-commit>=3.7"]
 dev  = [{ include-group = "test" }, { include-group = "lint" }]
 notebooks = [
-    "marimo>=0.18.4",
+    "marimo>=0.19.5",
     "openai>=2.14.0",
 ]
 

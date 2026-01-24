@@ -1,3 +1,5 @@
+# ABOUTME: Builds reusable UI widgets for dashboard notebooks.
+# ABOUTME: Keeps UI wiring thin by centralizing control construction.
 """UI helpers for dashboard notebooks."""
 
 from __future__ import annotations
@@ -50,13 +52,8 @@ def build_umap_controls(
         label="UMAP Y column",
         full_width=True,
     )
-    options = ["(none)"] + hue_registry.labels()
-    default_label = None
-    if default_hue_key is not None:
-        for option in hue_registry.options:
-            if option.key == default_hue_key:
-                default_label = option.label
-                break
+    options = ["(none)"] + [option.key for option in hue_registry.options]
+    default_label = default_hue_key if default_hue_key in options else None
     umap_color_dropdown = mo.ui.dropdown(
         options=options,
         value=default_label or "(none)",

@@ -41,3 +41,7 @@ Note: freeform working notes; prune/merge as they become cruft.
 - SFXI overlay now coerces object-typed vec8 columns to list float for robust list ops; tests cover object vectors.
 - Dataset explorer highlights boolean categories (observed/top-k) with gray backfill and layered sizing for true points.
 - prom60_eda UI trimmed redundant campaign/status blocks, removed duplicate config dropdown, and hstacked cluster controls.
+- Marimo bumped to 0.19.5 (lock + spec).
+- UMAP controls now show raw column names (keys) instead of label aliases to avoid ambiguity.
+- Fold-change plot exports now namespace logic fidelity as obj__logic_fidelity.
+- prom60 explorer defaults updated to effect_scaled for the Y axis.
