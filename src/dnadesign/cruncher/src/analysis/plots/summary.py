@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from dnadesign.cruncher.analysis.parquet import read_parquet
+from dnadesign.cruncher.analysis.parquet import read_parquet, write_parquet
 from dnadesign.cruncher.analysis.plots._savefig import savefig
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ def write_score_summary(score_df: pd.DataFrame, tf_names: list[str], out_path: P
     summary.reset_index(drop=True, inplace=True)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if out_path.suffix == ".parquet":
-        summary.to_parquet(out_path, engine="fastparquet", index=False)
+        write_parquet(summary, out_path)
     else:
         summary.to_csv(out_path, index=False)
 
@@ -71,7 +71,7 @@ def write_elite_topk(elites_df: pd.DataFrame, tf_names: list[str], out_path: Pat
     keep_cols = ["sequence"] + [c for c in ("rank", "norm_sum") if c in df.columns] + cols
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if out_path.suffix == ".parquet":
-        df[keep_cols].to_parquet(out_path, engine="fastparquet", index=False)
+        write_parquet(df[keep_cols], out_path)
     else:
         df[keep_cols].to_csv(out_path, index=False)
 
@@ -120,7 +120,7 @@ def write_joint_metrics(elites_df: pd.DataFrame, tf_names: list[str], out_path: 
         }
         df = pd.DataFrame([payload])
         if out_path.suffix == ".parquet":
-            df.to_parquet(out_path, engine="fastparquet", index=False)
+            write_parquet(df, out_path)
         else:
             df.to_csv(out_path, index=False)
         return
@@ -160,7 +160,7 @@ def write_joint_metrics(elites_df: pd.DataFrame, tf_names: list[str], out_path: 
     }
     df = pd.DataFrame([payload])
     if out_path.suffix == ".parquet":
-        df.to_parquet(out_path, engine="fastparquet", index=False)
+        write_parquet(df, out_path)
     else:
         df.to_csv(out_path, index=False)
 
