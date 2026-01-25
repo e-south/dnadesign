@@ -53,14 +53,9 @@ PLOT_SPECS = {
         "fn": "plot_tfbs_usage",
         "description": "TFBS usage by TF, ranked by occurrences.",
     },
-    "stage_a_pvalue_strat_hist": {
-        "fn": "plot_stage_a_pvalue_strat_hist",
-        "description": "Stage-A FIMO p-value stratification histogram (accepted pool).",
-        "requires": ["pools"],
-    },
-    "stage_a_length_hist": {
-        "fn": "plot_stage_a_length_hist",
-        "description": "Stage-A TFBS length histogram (accepted pool).",
+    "stage_a_strata_overview": {
+        "fn": "plot_stage_a_strata_overview",
+        "description": "Stage-A strata overview (eligible p-values + retained TFBS lengths).",
         "requires": ["pools"],
     },
 }

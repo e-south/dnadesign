@@ -161,6 +161,12 @@ dense stage-a build-pool --fresh
 
 **Note:** `stage-a build-pool` appends new unique TFBS into existing pools by default. Use `--fresh` when re‑running if you want to avoid cumulative pools and candidate logs.
 
+Optional: visualize Stage‑A strata and retained lengths (per regulator) right after sampling:
+
+```bash
+dense plot --only stage_a_strata_overview
+```
+
 ---
 
 ### 6. Stage-B build-libraries

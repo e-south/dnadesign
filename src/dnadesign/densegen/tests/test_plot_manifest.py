@@ -1,3 +1,15 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_plot_manifest.py
+
+Plot manifest coverage for plot generation outputs.
+Dunlop Lab.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import json
@@ -91,7 +103,7 @@ def _write_pool_manifest(run_root: Path) -> None:
     pool_path = pools_dir / "demo_input__pool.parquet"
     df.to_parquet(pool_path, index=False)
     manifest = {
-        "schema_version": "1.0",
+        "schema_version": "1.2",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",
@@ -103,6 +115,20 @@ def _write_pool_manifest(run_root: Path) -> None:
                 "rows": int(len(df)),
                 "columns": list(df.columns),
                 "pool_mode": "tfbs",
+                "stage_a_sampling": {
+                    "backend": "fimo",
+                    "pvalue_strata": [1e-10, 1e-8, 1e-6],
+                    "retain_depth": 3,
+                    "retain_bins": [0, 1, 2],
+                    "eligible_bins": [
+                        {"regulator": "tfA", "counts": [1, 1, 0]},
+                        {"regulator": "tfB", "counts": [0, 0, 1]},
+                    ],
+                    "retained_bins": [
+                        {"regulator": "tfA", "counts": [1, 1, 0]},
+                        {"regulator": "tfB", "counts": [0, 0, 1]},
+                    ],
+                },
             }
         ],
     }
@@ -133,7 +159,7 @@ def test_stage_a_plots_without_outputs(tmp_path: Path) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
     cfg_path = run_root / "config.yaml"
-    _write_config(cfg_path, plots_default=["stage_a_pvalue_strat_hist", "stage_a_length_hist"])
+    _write_config(cfg_path, plots_default=["stage_a_strata_overview"])
     (run_root / "inputs.csv").write_text("tf,tfbs\n")
     _write_pool_manifest(run_root)
 
@@ -141,7 +167,5 @@ def test_stage_a_plots_without_outputs(tmp_path: Path) -> None:
     run_plots_from_config(loaded.root, cfg_path)
 
     plots_dir = run_root / "outputs" / "plots"
-    pval_plot = plots_dir / "stage_a_pvalue_strat_hist__demo_input.png"
-    length_plot = plots_dir / "stage_a_length_hist__demo_input.png"
-    assert pval_plot.exists()
-    assert length_plot.exists()
+    overview_plot = plots_dir / "stage_a_strata_overview__demo_input.png"
+    assert overview_plot.exists()

@@ -223,6 +223,11 @@ class PWMSamplingSummary:
     retained_len_mean: Optional[float]
     retained_len_max: Optional[int]
     strata_bins: Optional[str]
+    pvalue_strata: Optional[List[float]]
+    retain_depth: Optional[int]
+    retain_bins: Optional[List[int]]
+    eligible_bin_counts: Optional[List[int]]
+    retained_bin_counts: Optional[List[int]]
 
 
 @dataclass(frozen=True)
@@ -299,6 +304,11 @@ def _build_summary(
     eligible: Sequence[str],
     retained: Sequence[str],
     strata_bins: Optional[str],
+    pvalue_strata: Optional[Sequence[float]] = None,
+    retain_depth: Optional[int] = None,
+    retain_bins: Optional[Sequence[int]] = None,
+    eligible_bin_counts: Optional[Sequence[int]] = None,
+    retained_bin_counts: Optional[Sequence[int]] = None,
     input_name: Optional[str] = None,
     regulator: Optional[str] = None,
     backend: Optional[str] = None,
@@ -319,6 +329,11 @@ def _build_summary(
         retained_len_mean=mean_len,
         retained_len_max=max_len,
         strata_bins=strata_bins,
+        pvalue_strata=list(pvalue_strata) if pvalue_strata is not None else None,
+        retain_depth=int(retain_depth) if retain_depth is not None else None,
+        retain_bins=list(retain_bins) if retain_bins is not None else None,
+        eligible_bin_counts=list(eligible_bin_counts) if eligible_bin_counts is not None else None,
+        retained_bin_counts=list(retained_bin_counts) if retained_bin_counts is not None else None,
     )
 
 
@@ -532,11 +547,9 @@ def _format_pvalue_bin_pairs(
     if not edges or not eligible_counts or not retained_counts:
         return "-"
     labels: list[str] = []
-    low = 0.0
-    for edge, eligible, retained in zip(edges, eligible_counts, retained_counts):
-        labels.append(f"({low:.0e},{float(edge):.0e}]:{int(eligible)}/{int(retained)}")
-        low = float(edge)
-    return " ".join(labels) if labels else "-"
+    for idx, (eligible, retained) in enumerate(zip(eligible_counts, retained_counts)):
+        labels.append(f"b{idx} {int(eligible)}/{int(retained)}")
+    return " | ".join(labels) if labels else "-"
 
 
 def _select_fimo_candidates(
@@ -1279,6 +1292,7 @@ def sample_pwm_sites(
                 log.warning("Failed to write FIMO candidate records.", exc_info=True)
         summary = None
         if return_summary:
+            retain_bin_ids = list(retain_bins)
             summary = _build_summary(
                 generated=generated_total,
                 target=requested,
@@ -1286,6 +1300,11 @@ def sample_pwm_sites(
                 eligible=[c.seq for c in candidates],
                 retained=[c.seq for c in picked],
                 strata_bins=strata_label,
+                pvalue_strata=resolved_bins,
+                retain_depth=depth,
+                retain_bins=retain_bin_ids,
+                eligible_bin_counts=eligible_bin_counts,
+                retained_bin_counts=retained_bin_counts,
                 input_name=input_name,
                 regulator=motif.motif_id,
                 backend=scoring_backend,
@@ -1323,6 +1342,11 @@ def sample_pwm_sites(
                     eligible=selection.retained,
                     retained=selection.selected,
                     strata_bins=None,
+                    pvalue_strata=None,
+                    retain_depth=None,
+                    retain_bins=None,
+                    eligible_bin_counts=None,
+                    retained_bin_counts=None,
                     input_name=input_name,
                     regulator=motif.motif_id,
                     backend=scoring_backend,
@@ -1338,6 +1362,11 @@ def sample_pwm_sites(
                     eligible=selection.retained,
                     retained=selection.selected,
                     strata_bins=None,
+                    pvalue_strata=None,
+                    retain_depth=None,
+                    retain_bins=None,
+                    eligible_bin_counts=None,
+                    retained_bin_counts=None,
                     input_name=input_name,
                     regulator=motif.motif_id,
                     backend=scoring_backend,
@@ -1456,6 +1485,11 @@ def sample_pwm_sites(
                 eligible=selection.retained,
                 retained=selection.selected,
                 strata_bins=None,
+                pvalue_strata=None,
+                retain_depth=None,
+                retain_bins=None,
+                eligible_bin_counts=None,
+                retained_bin_counts=None,
                 input_name=input_name,
                 regulator=motif.motif_id,
                 backend=scoring_backend,

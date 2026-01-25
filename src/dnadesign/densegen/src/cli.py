@@ -53,6 +53,10 @@ from rich.console import Console
 from rich.table import Table
 from rich.traceback import install as rich_traceback
 
+from dnadesign.cruncher.io.parsers.meme import parse_meme_file
+
+from .adapters.sources.pwm_artifact import load_artifact
+from .adapters.sources.pwm_jaspar import _parse_jaspar
 from .adapters.sources.pwm_sampling import PWMSamplingSummary
 from .config import (
     LATEST_SCHEMA_VERSION,
@@ -534,7 +538,7 @@ def _stage_a_sampling_rows(pool_data: dict[str, PoolData]) -> list[tuple[str, st
                 backend = summary.backend or "-"
                 candidates = _format_sampling_ratio(summary.generated, summary.target)
                 eligible = _format_sampling_ratio(summary.eligible, summary.generated)
-                pooled = _format_sampling_ratio(summary.retained, summary.target_sites)
+                retained = _format_sampling_ratio(summary.retained, summary.target_sites)
                 bins_label = summary.strata_bins or "-"
                 length_label = _format_sampling_lengths(
                     min_len=summary.retained_len_min,
@@ -550,7 +554,7 @@ def _stage_a_sampling_rows(pool_data: dict[str, PoolData]) -> list[tuple[str, st
                         str(backend),
                         candidates,
                         eligible,
-                        pooled,
+                        retained,
                         bins_label,
                         length_label,
                     )
@@ -587,6 +591,114 @@ def _stage_a_sampling_rows(pool_data: dict[str, PoolData]) -> list[tuple[str, st
                 length_label,
             )
         )
+    rows.sort(key=lambda row: (row[0], row[1]))
+    return rows
+
+
+def _format_pvalue_strata_label(strata: list[float] | None) -> str:
+    if not strata:
+        return "-"
+    return ",".join(f"{float(edge):g}" for edge in strata)
+
+
+def _filter_meme_motifs(motifs, motif_ids: list[str] | None) -> list:
+    if not motif_ids:
+        return list(motifs)
+    keep = {m.strip().lower() for m in motif_ids if m}
+    filtered = []
+    for motif in motifs:
+        cand = {
+            getattr(motif, "motif_id", None),
+            getattr(motif, "motif_name", None),
+            getattr(motif, "motif_label", None),
+        }
+        cand = {str(x).strip().lower() for x in cand if x}
+        if cand & keep:
+            filtered.append(motif)
+    return filtered
+
+
+def _meme_motif_labels(path: Path, motif_ids: list[str] | None) -> list[str]:
+    result = parse_meme_file(path)
+    motifs = _filter_meme_motifs(result.motifs, motif_ids)
+    labels = []
+    for motif in motifs:
+        label = (
+            getattr(motif, "motif_id", None)
+            or getattr(motif, "motif_name", None)
+            or getattr(motif, "motif_label", None)
+        )
+        if label:
+            labels.append(str(label))
+    return labels
+
+
+def _jaspar_motif_labels(path: Path, motif_ids: list[str] | None) -> list[str]:
+    motifs = _parse_jaspar(path)
+    if motif_ids:
+        keep = {m for m in motif_ids if m}
+        motifs = [m for m in motifs if m.motif_id in keep]
+    return [m.motif_id for m in motifs if m.motif_id]
+
+
+def _stage_a_plan_rows(cfg, cfg_path: Path, selected_inputs: set[str] | None) -> list[tuple[str, str, str, str, str]]:
+    rows: list[tuple[str, str, str, str, str]] = []
+    for inp in cfg.inputs:
+        if selected_inputs and inp.name not in selected_inputs:
+            continue
+        input_type = str(inp.type)
+        if not input_type.startswith("pwm_"):
+            continue
+        sampling = getattr(inp, "sampling", None)
+        backend = str(getattr(sampling, "scoring_backend", "densegen")).lower() if sampling else "densegen"
+        pvalue_strata = getattr(sampling, "pvalue_strata", None) if sampling else None
+        retain_depth = getattr(sampling, "retain_depth", None) if sampling else None
+
+        regulators: list[str] = []
+        if input_type == "pwm_meme":
+            path = resolve_relative_path(cfg_path, getattr(inp, "path"))
+            regulators = _meme_motif_labels(path, getattr(inp, "motif_ids", None))
+        elif input_type == "pwm_meme_set":
+            for raw in getattr(inp, "paths", []) or []:
+                path = resolve_relative_path(cfg_path, raw)
+                regulators.extend(_meme_motif_labels(path, getattr(inp, "motif_ids", None)))
+        elif input_type == "pwm_jaspar":
+            path = resolve_relative_path(cfg_path, getattr(inp, "path"))
+            regulators = _jaspar_motif_labels(path, getattr(inp, "motif_ids", None))
+        elif input_type == "pwm_matrix_csv":
+            motif_id = getattr(inp, "motif_id", None)
+            if motif_id:
+                regulators = [str(motif_id)]
+        elif input_type == "pwm_artifact":
+            path = resolve_relative_path(cfg_path, getattr(inp, "path"))
+            regulators = [load_artifact(path).motif_id]
+        elif input_type == "pwm_artifact_set":
+            for raw in getattr(inp, "paths", []) or []:
+                path = resolve_relative_path(cfg_path, raw)
+                regulators.append(load_artifact(path).motif_id)
+
+        overrides = getattr(inp, "overrides_by_motif_id", None) if input_type == "pwm_artifact_set" else None
+        for reg in regulators:
+            reg_backend = backend
+            reg_strata = pvalue_strata
+            reg_depth = retain_depth
+            if overrides and reg in overrides:
+                override = overrides.get(reg) or {}
+                if "scoring_backend" in override:
+                    reg_backend = str(override.get("scoring_backend", reg_backend)).lower()
+                if "pvalue_strata" in override:
+                    reg_strata = override.get("pvalue_strata")
+                if "retain_depth" in override:
+                    reg_depth = override.get("retain_depth")
+            rows.append(
+                (
+                    str(inp.name),
+                    str(reg),
+                    str(reg_backend),
+                    _format_pvalue_strata_label(reg_strata),
+                    str(reg_depth) if reg_depth is not None else "-",
+                )
+            )
     rows.sort(key=lambda row: (row[0], row[1]))
     return rows
 
@@ -1758,6 +1870,19 @@ def stage_a_build_pool(
                 f"[yellow]Appending to existing candidate artifacts under {candidates_dir} (use --fresh to reset).[/]"
             )
 
+    plan_rows = _stage_a_plan_rows(cfg, cfg_path, selected if selected else None)
+    if plan_rows:
+        plan_table = Table()
+        plan_table.add_column("input", overflow="fold")
+        plan_table.add_column("reg", overflow="fold")
+        plan_table.add_column("backend")
+        plan_table.add_column("pvalue_strata", overflow="fold")
+        plan_table.add_column("retain_depth")
+        for row in plan_rows:
+            plan_table.add_row(*row)
+        console.print("[bold]Stage-A plan[/]")
+        console.print(plan_table)
+
     with _suppress_pyarrow_sysctl_warnings():
         try:
             artifact, pool_data = build_pool_artifact(
@@ -1797,34 +1922,37 @@ def stage_a_build_pool(
 
     recap_rows = _stage_a_sampling_rows(pool_data)
     if recap_rows:
-        recap_table = Table()
-        recap_table.add_column("input", overflow="fold")
-        recap_table.add_column("reg", overflow="fold")
-        recap_table.add_column("backend")
-        recap_table.add_column("candidates")
-        recap_table.add_column("eligible")
-        recap_table.add_column("pool")
-        recap_table.add_column("bins", overflow="fold")
-        recap_table.add_column("len(n/min/med/avg/max)")
-        for row in recap_rows:
-            recap_table.add_row(*row)
         console.print("[bold]Stage-A sampling recap[/]")
-        console.print(recap_table)
+        grouped: dict[str, list[tuple[str, str, str, str, str, str, str, str]]] = {}
+        for row in recap_rows:
+            grouped.setdefault(row[0], []).append(row)
+        for input_name in sorted(grouped):
+            recap_table = Table()
+            recap_table.add_column("reg", overflow="fold")
+            recap_table.add_column("candidates")
+            recap_table.add_column("eligible")
+            recap_table.add_column("retained")
+            recap_table.add_column("bins", overflow="fold")
+            recap_table.add_column("len(n/min/med/avg/max)")
+            for row in sorted(grouped[input_name], key=lambda item: item[1]):
+                recap_table.add_row(row[1], row[3], row[4], row[5], row[6], row[7])
+            console.print(f"[bold]Input: {input_name}[/]")
+            console.print(recap_table)
         backends = {row[2] for row in recap_rows}
         if "fimo" in backends:
             console.print(
                 "  fimo: candidates=generated/target; eligible=hits at/below p-value floor; "
-                "pool=top-N within retained strata (shortfall ok); bins=eligible/retained per bin; "
-                "len=n/min/med/avg/max (pool)"
+                "retained=top-N within retained strata (shortfall ok); bins=b<idx> eligible/retained; "
+                "len=n/min/med/avg/max (retained)"
             )
         if "densegen" in backends:
             console.print(
                 "  densegen: candidates=generated/target; eligible=score-filtered candidates "
-                "(threshold/percentile); pool=top-N by score (shortfall ok); bins=-; "
-                "len=n/min/med/avg/max (pool)"
+                "(threshold/percentile); retained=top-N by score (shortfall ok); bins=-; "
+                "len=n/min/med/avg/max (retained)"
             )
         if "provided" in backends:
-            console.print("  provided: candidates=total; pool=total; bins=-; len=n/min/med/avg/max")
+            console.print("  provided: candidates=total; retained=total; bins=-; len=n/min/med/avg/max")
     console.print(f":sparkles: [bold green]Pool manifest written[/]: {artifact.manifest_path}")
 
 

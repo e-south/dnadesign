@@ -52,6 +52,8 @@ Optional targets (when enabled):
 - `outputs/pools/` — **Stage‑A** pool artifacts:
   - `pool_manifest.json`
   - `<input>__pool.parquet`
+  - `pool_manifest.json` captures Stage‑A sampling metadata when using FIMO
+    (p‑value strata, retain depth, and per‑regulator bin counts).
 - `outputs/libraries/` — **Stage‑B** library artifacts:
   - `library_builds.parquet`
   - `library_members.parquet`

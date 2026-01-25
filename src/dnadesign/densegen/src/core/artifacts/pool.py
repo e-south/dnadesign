@@ -14,11 +14,12 @@ from typing import Iterable
 
 import pandas as pd
 
+from ...adapters.sources.pwm_sampling import PWMSamplingSummary
 from ...config import resolve_relative_path
 from ...utils.logging_utils import install_native_stderr_filters
 from .ids import hash_tfbs_id
 
-POOL_SCHEMA_VERSION = "1.1"
+POOL_SCHEMA_VERSION = "1.2"
 POOL_MODE_TFBS = "tfbs"
 POOL_MODE_SEQUENCE = "sequence"
 _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -85,6 +86,7 @@ class PoolInputEntry:
     columns: list[str]
     pool_mode: str
     fingerprints: list[dict] | None = None
+    stage_a_sampling: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -116,6 +118,9 @@ class TFBSPoolArtifact:
             fingerprints = item.get("fingerprints")
             if fingerprints is not None:
                 fingerprints = [dict(fp) for fp in fingerprints]
+            stage_a_sampling = item.get("stage_a_sampling")
+            if stage_a_sampling is not None:
+                stage_a_sampling = dict(stage_a_sampling)
             entry = PoolInputEntry(
                 name=str(item.get("name")),
                 input_type=str(item.get("type")),
@@ -124,6 +129,7 @@ class TFBSPoolArtifact:
                 columns=list(item.get("columns") or []),
                 pool_mode=str(item.get("pool_mode") or POOL_MODE_TFBS),
                 fingerprints=fingerprints,
+                stage_a_sampling=stage_a_sampling,
             )
             entries[entry.name] = entry
         return cls(
@@ -140,6 +146,57 @@ class TFBSPoolArtifact:
         if input_name not in self.inputs:
             raise KeyError(f"Pool manifest missing input: {input_name}")
         return self.inputs[input_name]
+
+
+def _build_stage_a_sampling_manifest(summaries: list[object] | None) -> dict | None:
+    if not summaries:
+        return None
+    pwm_summaries = [s for s in summaries if isinstance(s, PWMSamplingSummary)]
+    if not pwm_summaries:
+        return None
+    fimo_summaries = [s for s in pwm_summaries if s.backend == "fimo"]
+    if not fimo_summaries:
+        return None
+    strata_values = {tuple(s.pvalue_strata or []) for s in fimo_summaries}
+    if len(strata_values) != 1:
+        raise ValueError("Stage-A sampling pvalue_strata values must match across regulators.")
+    retain_depths = {s.retain_depth for s in fimo_summaries}
+    if len(retain_depths) != 1:
+        raise ValueError("Stage-A sampling retain_depth values must match across regulators.")
+    pvalue_strata = list(next(iter(strata_values)))
+    retain_depth = next(iter(retain_depths))
+    if retain_depth is None:
+        raise ValueError("Stage-A sampling retain_depth is required for FIMO summaries.")
+    retain_bins = list(range(int(retain_depth)))
+    eligible_bins = []
+    retained_bins = []
+    for summary in fimo_summaries:
+        if summary.eligible_bin_counts is None or summary.retained_bin_counts is None:
+            raise ValueError("Stage-A sampling summaries missing bin counts.")
+        if len(summary.eligible_bin_counts) != len(pvalue_strata):
+            raise ValueError("Stage-A eligible bin counts do not match pvalue_strata length.")
+        if len(summary.retained_bin_counts) != len(pvalue_strata):
+            raise ValueError("Stage-A retained bin counts do not match pvalue_strata length.")
+        eligible_bins.append(
+            {
+                "regulator": summary.regulator,
+                "counts": [int(v) for v in summary.eligible_bin_counts],
+            }
+        )
+        retained_bins.append(
+            {
+                "regulator": summary.regulator,
+                "counts": [int(v) for v in summary.retained_bin_counts],
+            }
+        )
+    return {
+        "backend": "fimo",
+        "pvalue_strata": [float(v) for v in pvalue_strata],
+        "retain_depth": int(retain_depth),
+        "retain_bins": retain_bins,
+        "eligible_bins": eligible_bins,
+        "retained_bins": retained_bins,
+    }
 
 
 def _pool_manifest_path(out_dir: Path) -> Path:
@@ -348,6 +405,7 @@ def build_pool_artifact(
                 raise FileExistsError(f"Pool already exists: {dest}")
         df.to_parquet(dest, index=False)
 
+        stage_a_sampling = _build_stage_a_sampling_manifest(summaries)
         entry = PoolInputEntry(
             name=inp.name,
             input_type=str(inp.type),
@@ -356,6 +414,7 @@ def build_pool_artifact(
             columns=list(df.columns),
             pool_mode=pool_mode,
             fingerprints=fingerprints_by_input.get(inp.name, []),
+            stage_a_sampling=stage_a_sampling,
         )
         pool_entries[inp.name] = entry
         sequences: list[str]
@@ -399,6 +458,7 @@ def build_pool_artifact(
                 "columns": entry.columns,
                 "pool_mode": entry.pool_mode,
                 "fingerprints": entry.fingerprints or [],
+                "stage_a_sampling": entry.stage_a_sampling,
             }
             for entry in pool_entries.values()
         ],

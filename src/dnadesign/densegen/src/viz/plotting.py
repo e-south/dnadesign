@@ -38,7 +38,7 @@ from rich.table import Table
 
 from ..adapters.outputs import load_records_from_config
 from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
-from ..core.artifacts.pool import POOL_MODE_TFBS, load_pool_artifact
+from ..core.artifacts.pool import POOL_MODE_TFBS, TFBSPoolArtifact, load_pool_artifact
 from .plot_registry import PLOT_SPECS
 
 # Embed TrueType fonts for clean text in vector exports
@@ -330,7 +330,7 @@ def _ensure_out_dir(plots_cfg, cfg_path: Path, run_root: Path) -> Path:
     return out
 
 
-def _load_stage_a_pools(run_root: Path) -> dict[str, pd.DataFrame]:
+def _load_stage_a_pools(run_root: Path) -> tuple[TFBSPoolArtifact, dict[str, pd.DataFrame]]:
     pools_dir = run_root / "outputs" / "pools"
     artifact = load_pool_artifact(pools_dir)
     pools: dict[str, pd.DataFrame] = {}
@@ -343,7 +343,7 @@ def _load_stage_a_pools(run_root: Path) -> dict[str, pd.DataFrame]:
         pools[entry.name] = pd.read_parquet(pool_path)
     if not pools:
         raise ValueError("No TFBS pools available for Stage-A plots.")
-    return pools
+    return artifact, pools
 
 
 # ---------------------- Plots ----------------------
@@ -1322,117 +1322,103 @@ def plot_tfbs_positional_histogram(
     plt.close(fig)
 
 
-def plot_stage_a_pvalue_strat_hist(
+def plot_stage_a_strata_overview(
     df: pd.DataFrame,
     out_path: Path,
     *,
     pools: dict[str, pd.DataFrame] | None = None,
+    pool_manifest: TFBSPoolArtifact | None = None,
     style: Optional[dict] = None,
 ) -> list[Path]:
-    if pools is None:
-        raise ValueError("Stage-A plots require Stage-A pools; run stage-a build-pool first.")
+    if pools is None or pool_manifest is None:
+        raise ValueError("Stage-A plots require pool manifests; run stage-a build-pool first.")
     raw_style = style or {}
     style = _style(raw_style)
     if "figsize" not in raw_style:
-        style["figsize"] = (8, 4)
+        style["figsize"] = (11, 4)
     paths: list[Path] = []
     for input_name, pool_df in pools.items():
-        required = {"fimo_pvalue", "fimo_bin_id", "fimo_bin_low", "fimo_bin_high"}
-        missing = sorted(required - set(pool_df.columns))
-        if missing:
-            raise ValueError(f"Stage-A p-value stratification plot missing columns: {', '.join(missing)}")
-        pvals = pd.to_numeric(pool_df["fimo_pvalue"], errors="coerce").replace(0, np.nan).dropna()
-        if pvals.empty:
-            raise ValueError(f"No FIMO p-values available for input '{input_name}'.")
-        min_p = float(pvals[pvals > 0].min())
-        bin_rows = pool_df[["fimo_bin_id", "fimo_bin_low", "fimo_bin_high"]].dropna().drop_duplicates("fimo_bin_id")
-        if bin_rows.empty:
-            raise ValueError(f"No FIMO bin metadata found for input '{input_name}'.")
-        counts = pool_df.groupby("fimo_bin_id").size().to_dict()
-        bins: list[dict] = []
-        for _, row in bin_rows.iterrows():
-            bin_id = int(row["fimo_bin_id"])
-            low = float(row["fimo_bin_low"])
-            high = float(row["fimo_bin_high"])
-            if high <= 0:
-                raise ValueError(f"FIMO bin high bound must be > 0 (input '{input_name}', bin {bin_id}).")
-            low_val = max(low, min_p)
-            left = -np.log10(high)
-            right = -np.log10(low_val)
-            if not (np.isfinite(left) and np.isfinite(right)):
-                raise ValueError(f"Invalid p-value bin bounds for input '{input_name}', bin {bin_id}.")
-            if right < left:
-                left, right = right, left
-            label = f"({low:.0e},{high:.0e}]"
-            bins.append(
-                {
-                    "left": left,
-                    "right": right,
-                    "count": int(counts.get(bin_id, 0)),
-                    "label": label,
-                }
-            )
-        bins.sort(key=lambda b: b["left"])
-        colors = _palette(style, len(bins), no_repeat=bool(style.get("palette_no_repeat", False)))
+        entry = pool_manifest.entry_for(input_name)
+        sampling = entry.stage_a_sampling
+        if sampling is None:
+            raise ValueError(f"Stage-A sampling metadata missing for input '{input_name}'.")
+        if sampling.get("backend") != "fimo":
+            raise ValueError(f"Stage-A strata overview requires FIMO sampling (input '{input_name}').")
+        pvalue_strata = sampling.get("pvalue_strata") or []
+        retain_depth = sampling.get("retain_depth")
+        eligible_bins = sampling.get("eligible_bins") or []
+        retained_bins = sampling.get("retained_bins") or []
+        if not pvalue_strata:
+            raise ValueError(f"Stage-A sampling missing pvalue_strata for input '{input_name}'.")
+        if retain_depth is None:
+            raise ValueError(f"Stage-A sampling missing retain_depth for input '{input_name}'.")
+        if not eligible_bins:
+            raise ValueError(f"Stage-A sampling missing eligible bin counts for input '{input_name}'.")
+        if not retained_bins:
+            raise ValueError(f"Stage-A sampling missing retained bin counts for input '{input_name}'.")
+        if int(retain_depth) < 1 or int(retain_depth) > len(pvalue_strata):
+            raise ValueError(f"Stage-A sampling retain_depth out of range for input '{input_name}'.")
 
-        fig, ax = _fig_ax(style)
-        for idx, entry in enumerate(bins):
-            left = entry["left"]
-            right = entry["right"]
-            width = max(1e-6, right - left)
-            ax.bar(
-                left + width / 2,
-                entry["count"],
-                width=width,
-                color=colors[idx],
-                edgecolor="white",
-                label=entry["label"],
-                align="center",
-            )
-        ax.set_xlabel("-log10(p-value) (higher = more significant)")
-        ax.set_ylabel("count")
-        ax.set_title(f"Stage-A FIMO stratification: {input_name}")
-        ax.legend(loc="best", frameon=bool(style.get("legend_frame", False)))
-        _apply_style(ax, style)
-        fig.tight_layout()
-        fname = f"{out_path.stem}__{_safe_filename(input_name)}{out_path.suffix}"
-        path = out_path.parent / fname
-        fig.savefig(path)
-        plt.close(fig)
-        paths.append(path)
-    return paths
+        regulators = [str(row.get("regulator")) for row in eligible_bins]
+        eligible_by_reg = {str(row.get("regulator")): list(row.get("counts") or []) for row in eligible_bins}
+        retained_by_reg = {str(row.get("regulator")): list(row.get("counts") or []) for row in retained_bins}
+        for reg, counts in eligible_by_reg.items():
+            if len(counts) != len(pvalue_strata):
+                raise ValueError(f"Eligible bin counts length mismatch for '{input_name}' ({reg}).")
+        for reg, counts in retained_by_reg.items():
+            if len(counts) != len(pvalue_strata):
+                raise ValueError(f"Retained bin counts length mismatch for '{input_name}' ({reg}).")
 
+        colors = _palette(style, len(regulators), no_repeat=bool(style.get("palette_no_repeat", False)))
+        color_by_reg = {reg: colors[idx] for idx, reg in enumerate(regulators)}
 
-def plot_stage_a_length_hist(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    pools: dict[str, pd.DataFrame] | None = None,
-    style: Optional[dict] = None,
-) -> list[Path]:
-    if pools is None:
-        raise ValueError("Stage-A plots require Stage-A pools; run stage-a build-pool first.")
-    raw_style = style or {}
-    style = _style(raw_style)
-    if "figsize" not in raw_style:
-        style["figsize"] = (5, 5)
-    paths: list[Path] = []
-    for input_name, pool_df in pools.items():
-        if "tfbs" not in pool_df.columns:
-            raise ValueError(f"Stage-A TFBS length plot missing 'tfbs' column for input '{input_name}'.")
-        lengths = pool_df["tfbs"].astype(str).map(len)
-        if lengths.empty:
-            raise ValueError(f"No TFBS lengths available for input '{input_name}'.")
-        min_len = int(lengths.min())
-        max_len = int(lengths.max())
-        bins = np.arange(min_len, max_len + 2) - 0.5
-        fig, ax = _fig_ax(style)
-        ax.hist(lengths, bins=bins, color="#4c78a8", edgecolor="white")
-        ax.set_xlabel("TFBS length (nt)")
-        ax.set_ylabel("count")
-        ax.set_title(f"Stage-A TFBS lengths: {input_name}")
-        ax.set_xticks(list(range(min_len, max_len + 1)))
-        _apply_style(ax, style)
+        fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=style["figsize"])
+
+        xs = [float(edge) for edge in pvalue_strata]
+        for reg in regulators:
+            counts = eligible_by_reg.get(reg, [0 for _ in pvalue_strata])
+            ax_left.plot(xs, counts, marker="o", color=color_by_reg[reg], label=reg)
+        ax_left.set_xscale("log")
+        ax_left.invert_xaxis()
+        ax_left.set_xticks(xs)
+        ax_left.set_xticklabels([f"{edge:.0e}" for edge in pvalue_strata])
+        ax_left.set_xlabel("p-value (lower is better)")
+        ax_left.set_ylabel("eligible count")
+        retain_edge = float(pvalue_strata[int(retain_depth) - 1])
+        ax_left.axvline(retain_edge, linestyle="--", color="black", linewidth=1)
+        ax_left.legend(loc="best", frameon=bool(style.get("legend_frame", False)))
+
+        lengths_by_reg: dict[str, list[int]] = {}
+        if "tf" not in pool_df.columns or "tfbs" not in pool_df.columns:
+            raise ValueError(f"Stage-A pool missing tf/tfbs columns for input '{input_name}'.")
+        for reg, seq in pool_df[["tf", "tfbs"]].itertuples(index=False):
+            reg_label = str(reg)
+            lengths_by_reg.setdefault(reg_label, []).append(len(str(seq)))
+        all_lengths = [val for vals in lengths_by_reg.values() for val in vals]
+        if not all_lengths:
+            ax_right.text(0.5, 0.5, "No retained sequences", ha="center", va="center", transform=ax_right.transAxes)
+        else:
+            min_len = min(all_lengths)
+            max_len = max(all_lengths)
+            bins = np.arange(min_len, max_len + 2) - 0.5
+            for reg, lengths in lengths_by_reg.items():
+                if not lengths:
+                    continue
+                ax_right.hist(
+                    lengths,
+                    bins=bins,
+                    color=color_by_reg.get(reg, "#4c78a8"),
+                    alpha=0.6,
+                    edgecolor="white",
+                    label=reg,
+                )
+            ax_right.set_xticks(list(range(min_len, max_len + 1)))
+        ax_right.set_xlabel("TFBS length (nt)")
+        ax_right.set_ylabel("retained count")
+
+        fig.suptitle(f"Stage-A strata overview: {input_name}")
+        _apply_style(ax_left, style)
+        _apply_style(ax_right, style)
         fig.tight_layout()
         fname = f"{out_path.stem}__{_safe_filename(input_name)}{out_path.suffix}"
         path = out_path.parent / fname
@@ -1512,8 +1498,7 @@ _ALLOWED_OPTIONS = {
         "promoter_site_motifs",
     },
     "pad_gc": set(),
-    "stage_a_pvalue_strat_hist": set(),
-    "stage_a_length_hist": set(),
+    "stage_a_strata_overview": set(),
 }
 
 
@@ -1535,7 +1520,7 @@ def _plot_required_columns(selected: Iterable[str], options: Dict[str, Dict[str,
     cols: set[str] = set()
     for name in selected:
         raw = options.get(name, {}) if options else {}
-        if name in {"stage_a_pvalue_strat_hist", "stage_a_length_hist"}:
+        if name == "stage_a_strata_overview":
             continue
         if name == "compression_ratio":
             cols.add(_dg("compression_ratio"))
@@ -1610,8 +1595,9 @@ def run_plots_from_config(
         df, src_label = load_records_from_config(root_cfg, cfg_path, columns=cols, max_rows=max_rows)
         row_count = len(df)
     pools: dict[str, pd.DataFrame] | None = None
+    pool_manifest: TFBSPoolArtifact | None = None
     if "pools" in required_sources:
-        pools = _load_stage_a_pools(run_root)
+        pool_manifest, pools = _load_stage_a_pools(run_root)
         if row_count == 0:
             row_count = sum(len(pool_df) for pool_df in pools.values())
             src_label = f"pools:{run_root / 'outputs' / 'pools'}"
@@ -1663,8 +1649,8 @@ def run_plots_from_config(
                 if attempts_path.exists():
                     attempts_df = pd.read_parquet(attempts_path)
                 result = fn(df, out_path, style=style, attempts_df=attempts_df, **kwargs)
-            elif name in {"stage_a_pvalue_strat_hist", "stage_a_length_hist"}:
-                result = fn(df, out_path, style=style, pools=pools, **kwargs)
+            elif name == "stage_a_strata_overview":
+                result = fn(df, out_path, style=style, pools=pools, pool_manifest=pool_manifest, **kwargs)
             else:
                 result = fn(df, out_path, style=style, **kwargs)
             if result is None:
