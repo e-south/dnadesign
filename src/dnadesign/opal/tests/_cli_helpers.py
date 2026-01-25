@@ -1,3 +1,5 @@
+# ABOUTME: Test helpers for building OPAL campaign fixtures and ledgers.
+# ABOUTME: Provides small utilities for CLI workflow tests.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -46,8 +48,6 @@ def write_records(
     )
     if include_opal_cols:
         df[f"opal__{slug}__label_hist"] = [[], []]
-        df[f"opal__{slug}__latest_as_of_round"] = [0, 0]
-        df[f"opal__{slug}__latest_pred_scalar"] = [0.1, 0.2]
         df["Y"] = [None, None]
     df.to_parquet(path, index=False)
     return df
@@ -59,6 +59,7 @@ def write_campaign_yaml(
     workdir: Path,
     records_path: Path,
     plots: Optional[List[Dict[str, Any]]] = None,
+    slug: str = "demo",
     transforms_y_name: str = "sfxi_vec8_from_table_v1",
     transforms_y_params: Optional[Dict[str, Any]] = None,
     objective_name: str = "sfxi_v1",
@@ -77,7 +78,7 @@ def write_campaign_yaml(
     if selection_params is None:
         selection_params = {"top_k": 1}
     cfg: Dict[str, Any] = {
-        "campaign": {"name": "Demo", "slug": "demo", "workdir": str(workdir)},
+        "campaign": {"name": "Demo", "slug": slug, "workdir": str(workdir)},
         "data": {
             "location": {"kind": "local", "path": str(records_path)},
             "x_column_name": "X",
@@ -116,9 +117,9 @@ def write_state(
     run_id: str,
     round_index: int = 0,
 ) -> None:
-    round_dir = workdir / "outputs" / f"round_{int(round_index)}"
+    round_dir = workdir / "outputs" / "rounds" / f"round_{int(round_index)}"
     round_dir.mkdir(parents=True, exist_ok=True)
-    round_log = round_dir / "round.log.jsonl"
+    round_log = round_dir / "logs" / "round.log.jsonl"
     if not round_log.exists():
         write_round_log(round_log)
     st = CampaignState(
@@ -147,7 +148,7 @@ def write_state(
             model={
                 "type": "random_forest",
                 "params": {},
-                "artifact_path": str(round_dir / "model.joblib"),
+                "artifact_path": str(round_dir / "model" / "model.joblib"),
             },
             metrics={},
             durations_sec={},

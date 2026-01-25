@@ -39,6 +39,7 @@ def cmd_record_show(
     key: str = typer.Argument(None, help="ID or sequence (positional). Use --id/--sequence to disambiguate."),
     id: str = typer.Option(None, "--id"),
     sequence: str = typer.Option(None, "--sequence"),
+    run_id: str = typer.Option(None, "--run-id", help="Explicit run_id for ledger predictions."),
     with_sequence: bool = typer.Option(True, "--with-sequence/--no-sequence"),
     json: bool = typer.Option(False, "--json"),
 ):
@@ -77,6 +78,7 @@ def cmd_record_show(
             with_sequence=with_sequence,
             ledger_reader=ledger_reader,
             records_path=store.records_path,
+            run_id=run_id,
         )
         if json:
             json_out(report)

@@ -3,15 +3,16 @@
 <dnadesign project>
 src/dnadesign/opal/src/registries/transforms_x.py
 
+Registers X transforms and loads built-in transform modules. Wraps transforms
+with validation and PluginCtx enforcement.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
-import importlib
 import os
-import pkgutil
 import sys
 from typing import Any, Callable, Dict, Optional
 
@@ -19,6 +20,7 @@ import numpy as np
 import pandas as pd
 
 from ..core.round_context import Contract, PluginCtx
+from .loader import load_builtin_modules
 
 _REGISTRY: Dict[str, Callable[..., Callable[[pd.Series], np.ndarray]]] = {}
 _BUILTINS_LOADED = False
@@ -34,25 +36,7 @@ def _ensure_builtins_loaded() -> None:
     global _BUILTINS_LOADED
     if _BUILTINS_LOADED:
         return
-    try:
-        pkg = importlib.import_module("dnadesign.opal.src.transforms_x")
-        _dbg(f"imported package: {pkg.__name__} ({getattr(pkg, '__file__', '?')})")
-        try:
-            pkg_path = pkg.__path__  # type: ignore[attr-defined]
-        except Exception:
-            pkg_path = []
-        for mod in pkgutil.iter_modules(pkg_path):
-            if mod.name.startswith("_"):
-                continue
-            fq = f"{pkg.__name__}.{mod.name}"
-            try:
-                importlib.import_module(fq)
-                _dbg(f"imported built-in transform_x module: {fq}")
-            except Exception as e:
-                _dbg(f"FAILED importing {fq}: {e!r}")
-                continue
-    except Exception as e:
-        _dbg(f"FAILED importing package dnadesign.opal.src.transforms_x: {e!r}")
+    load_builtin_modules("dnadesign.opal.src.transforms_x", label="transform_x", debug=_dbg)
     _BUILTINS_LOADED = True
 
 

@@ -3,6 +3,9 @@
 <dnadesign project>
 src/dnadesign/opal/src/analysis/notebook_template.py
 
+Renders marimo notebook templates for OPAL campaigns. Generates scaffolded
+notebooks with campaign context and data previews.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -17,21 +20,33 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
     """
     Render a marimo notebook template tied to a campaign.
     """
+    try:
+        import marimo as _marimo
+    except Exception:
+        _marimo = None
+    if _marimo is None:
+        marimo_version = "unknown"
+    else:
+        marimo_version = getattr(_marimo, "__version__", "unknown")
+
     template = dedent(
         """
+        # ABOUTME: Marimo notebook for OPAL campaign analysis workflows.
+        # ABOUTME: Loads records, labels, and predictions for interactive inspection.
         import marimo
 
-        app = marimo.App(width="full")
+        __generated_with = "__GENERATED_WITH__"
+
+        app = marimo.App(width="medium")
 
 
         @app.cell
         def _():
             import marimo as mo
             import polars as pl
+            import altair as alt
             from pathlib import Path
-            from dnadesign.opal.src.plots._mpl_utils import ensure_mpl_config_dir
-            ensure_mpl_config_dir(workdir=Path(__CONFIG_PATH__).parent)
-            import matplotlib.pyplot as plt
+            from dnadesign.opal.src.analysis.dashboard.theme import setup_altair_theme
             from dnadesign.opal.src.analysis.facade import (
                 CampaignAnalysis,
                 available_rounds,
@@ -39,11 +54,13 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                 latest_run_id,
                 require_columns,
             )
+            setup_altair_theme()
             return (
                 mo,
                 pl,
-                plt,
+                alt,
                 Path,
+                setup_altair_theme,
                 CampaignAnalysis,
                 available_rounds,
                 latest_round,
@@ -60,17 +77,33 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(mo, config_path):
-            mo.md(
-                f"# OPAL Campaign Notebook\\n\\nConfig: `{config_path}`"
-            )
-            return
-
-
-        @app.cell
         def _(CampaignAnalysis, config_path):
             campaign = CampaignAnalysis.from_config_path(config_path, allow_dir=True)
             return campaign
+
+
+        @app.cell
+        def _(campaign, config_path, mo):
+            cfg = campaign.config
+            ws = campaign.workspace
+            store = campaign.records_store()
+            summary_lines = [
+                "# OPAL Campaign Notebook",
+                "",
+                f"Campaign `{cfg.campaign.name}` (slug `{cfg.campaign.slug}`) uses config `{config_path}`.",
+                f"Workdir: `{ws.workdir}`",
+                f"Records: `{store.records_path}`",
+                f"X column: `{cfg.data.x_column_name}`; Y column: `{cfg.data.y_column_name}`",
+            ]
+            summary = "\\n".join(summary_lines)
+            mo.md(summary)
+            return cfg, store
+
+
+        @app.cell
+        def _(pl, store):
+            records_df = pl.from_pandas(store.load())
+            return records_df
 
 
         @app.cell
@@ -126,67 +159,68 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                 raise ValueError(f"Run id not found: {run_id}")
             run_meta = run_row.to_dicts()[0]
             objective_name = str(run_meta.get("objective__name") or "")
-            summary_df = pl.DataFrame(
-                {
-                    "field": [
-                        "run_id",
-                        "round",
-                        "model",
-                        "objective",
-                        "selection",
-                        "n_train",
-                        "n_scored",
-                    ],
-                    "value": [
-                        run_id,
-                        int(run_meta.get("as_of_round", -1)),
-                        run_meta.get("model__name"),
-                        objective_name,
-                        run_meta.get("selection__name"),
-                        run_meta.get("stats__n_train"),
-                        run_meta.get("stats__n_scored"),
-                    ],
-                }
-            )
-            return run_id, run_meta, objective_name, summary_df
+            run_summary_lines = [
+                "## Run Summary",
+                "",
+                (
+                    f"Run `{run_id}` (round {run_meta.get('as_of_round', -1)}) uses "
+                    f"objective `{objective_name}` and selection `{run_meta.get('selection__name')}`."
+                ),
+                f"Model: `{run_meta.get('model__name')}`",
+                f"Train size: {run_meta.get('stats__n_train')} | Scored: {run_meta.get('stats__n_scored')}",
+            ]
+            run_summary = "\\n".join(run_summary_lines)
+            return run_id, run_meta, objective_name, run_summary
 
 
         @app.cell
-        def _(mo, summary_df):
-            mo.ui.dataframe(summary_df)
+        def _(mo, run_summary):
+            mo.md(run_summary)
             return
 
 
         @app.cell
-        def _(campaign, require_columns, run_id, selected_round):
+        def _():
+            pred_columns = [
+                "id",
+                "sequence",
+                "as_of_round",
+                "run_id",
+                "pred__y_obj_scalar",
+                "sel__rank_competition",
+                "sel__is_selected",
+                "obj__logic_fidelity",
+                "obj__effect_raw",
+                "obj__effect_scaled",
+            ]
+            return pred_columns
+
+
+        @app.cell
+        def _():
+            pred_required = [
+                "id",
+                "run_id",
+                "as_of_round",
+                "pred__y_obj_scalar",
+                "sel__rank_competition",
+                "sel__is_selected",
+            ]
+            return pred_required
+
+
+        @app.cell
+        def _(campaign, pred_columns, pred_required, require_columns, run_id, selected_round):
             labels_df = campaign.read_labels()
             pred_df = campaign.read_predictions(
-                columns=[
-                    "id",
-                    "sequence",
-                    "as_of_round",
-                    "run_id",
-                    "pred__y_obj_scalar",
-                    "sel__rank_competition",
-                    "sel__is_selected",
-                    "obj__logic_fidelity",
-                    "obj__effect_raw",
-                    "obj__effect_scaled",
-                ],
+                columns=pred_columns,
                 round_selector=[selected_round],
                 run_id=run_id,
                 allow_missing=True,
             )
             require_columns(
                 pred_df,
-                [
-                    "id",
-                    "run_id",
-                    "as_of_round",
-                    "pred__y_obj_scalar",
-                    "sel__rank_competition",
-                    "sel__is_selected",
-                ],
+                pred_required,
                 ctx="predictions",
             )
             if pred_df.is_empty():
@@ -195,27 +229,116 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(mo, pred_df):
-            ranks = pred_df.get_column("sel__rank_competition").drop_nulls()
-            if len(ranks) == 0:
-                raise ValueError("sel__rank_competition has no non-null values.")
-            max_rank = int(ranks.max())
-            if max_rank < 1:
-                raise ValueError("sel__rank_competition must be >= 1.")
-            default_max = min(max_rank, 2000)
-            show_selected_ui = mo.ui.checkbox(label="Selected only", value=False)
-            max_rank_ui = mo.ui.slider(1, max_rank, value=default_max, label="Max rank")
-            return max_rank_ui, show_selected_ui
+        def _(mo):
+            data_source_ui = mo.ui.dropdown(
+                options=[
+                    "predictions (selected run)",
+                    "predictions (all rounds)",
+                    "labels (selected round)",
+                    "labels (all rounds)",
+                    "records",
+                ],
+                value="predictions (selected run)",
+                label="Data source",
+            )
+            return data_source_ui
 
 
         @app.cell
-        def _(pl, pred_df, show_selected_ui, max_rank_ui):
-            df = pred_df
-            if show_selected_ui.value and "sel__is_selected" in df.columns:
-                df = df.filter(pl.col("sel__is_selected") == True)
-            max_rank_val = int(max_rank_ui.value)
-            df = df.filter(pl.col("sel__rank_competition") <= max_rank_val)
-            return df
+        def _(mo, pred_df):
+            plot_max = max(200, int(pred_df.height))
+            plot_rows_ui = mo.ui.slider(
+                200,
+                plot_max,
+                value=min(plot_max, 5000),
+                step=200,
+                label="Plot rows",
+            )
+            return plot_rows_ui
+
+
+        @app.cell
+        def _(
+            campaign,
+            data_source_ui,
+            labels_df,
+            mo,
+            pl,
+            pred_columns,
+            pred_df,
+            pred_required,
+            records_df,
+            require_columns,
+            selected_round,
+        ):
+            source = str(data_source_ui.value)
+            if source == "records":
+                data_df = records_df
+            elif source == "labels (all rounds)":
+                data_df = labels_df
+            elif source == "labels (selected round)":
+                if "as_of_round" not in labels_df.columns:
+                    raise ValueError("Labels do not include as_of_round for round filtering.")
+                data_df = labels_df.filter(pl.col("as_of_round") == selected_round)
+            elif source == "predictions (selected run)":
+                data_df = pred_df
+            elif source == "predictions (all rounds)":
+                data_df = campaign.read_predictions(
+                    columns=pred_columns,
+                    round_selector="all",
+                    allow_missing=True,
+                    require_run_id=False,
+                )
+                require_columns(data_df, pred_required, ctx="predictions")
+            else:
+                raise ValueError(f"Unknown data source: {source}")
+            if data_df.is_empty():
+                raise ValueError(f"Selected data source '{source}' returned no rows.")
+            data_table = mo.ui.table(data_df, page_size=10)
+            return data_df, data_table
+
+
+        @app.cell
+        def _(data_source_ui, data_table, mo):
+            mo.vstack([data_source_ui, data_table])
+            return
+
+
+        @app.cell
+        def _(mo):
+            show_selected_ui = mo.ui.checkbox(label="Selected only", value=False)
+            return show_selected_ui
+
+
+        @app.cell
+        def _(mo, pred_df):
+            color_candidates = []
+            for col in pred_df.columns:
+                if col in ("id", "sequence"):
+                    continue
+                dtype = pred_df.schema.get(col)
+                if dtype is None:
+                    continue
+                if dtype.is_numeric() or str(dtype) in ("Boolean", "String", "Categorical"):
+                    color_candidates.append(col)
+            default_color = (
+                "sel__is_selected"
+                if "sel__is_selected" in color_candidates
+                else (color_candidates[0] if color_candidates else None)
+            )
+            mo.stop(default_color is None, mo.md("No columns available for color."))
+            color_by_ui = mo.ui.dropdown(
+                color_candidates, value=default_color, label="Color by"
+            )
+            return color_candidates, default_color, color_by_ui
+
+
+        @app.cell
+        def _(pl, pred_df, show_selected_ui):
+            filtered_df = pred_df
+            if show_selected_ui.value and "sel__is_selected" in filtered_df.columns:
+                filtered_df = filtered_df.filter(pl.col("sel__is_selected") == True)
+            return filtered_df
 
 
         @app.cell
@@ -226,10 +349,13 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
         @app.cell
         def _(mo, pred_df):
+            schema = pred_df.schema
             candidates = [
                 c
                 for c in pred_df.columns
-                if c.startswith("pred__") or c.startswith("obj__")
+                if (c.startswith("pred__") or c.startswith("obj__"))
+                and (schema.get(c) is not None)
+                and schema.get(c).is_numeric()
             ]
             default_field = "pred__y_obj_scalar" if "pred__y_obj_scalar" in candidates else None
             if default_field is None:
@@ -242,8 +368,8 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(mo, max_rank_ui, score_field_ui, show_selected_ui):
-            mo.vstack([score_field_ui, show_selected_ui, max_rank_ui])
+        def _(color_by_ui, mo, plot_rows_ui, score_field_ui, show_selected_ui):
+            mo.vstack([score_field_ui, color_by_ui, show_selected_ui, plot_rows_ui])
             return
 
 
@@ -251,7 +377,7 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
         def _(pl, filtered_df, score_field_ui):
             score_field = str(score_field_ui.value)
             try:
-                scores = filtered_df.get_column(score_field).cast(pl.Float64)
+                scores = filtered_df.get_column(score_field).cast(pl.Float64, strict=False)
             except Exception as exc:
                 raise ValueError(f"Score field '{score_field}' could not be cast to float.") from exc
             finite_mask = scores.is_finite().fill_null(False)
@@ -262,52 +388,6 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(plt, scores, score_field):
-            def _make_hist():
-                fig, ax = plt.subplots(figsize=(6.5, 4.0), constrained_layout=True)
-                vals = scores.drop_nulls().to_list()
-                ax.hist(vals, bins=40, alpha=0.75)
-                ax.set_title(f"Score distribution: {score_field}")
-                ax.set_xlabel(score_field)
-                ax.set_ylabel("Count")
-                return fig
-
-            score_hist_fig = _make_hist()
-            score_hist_fig
-            return score_hist_fig
-
-
-        @app.cell
-        def _(plt, pl, filtered_df, score_field):
-            def _make_scatter():
-                fig, ax = plt.subplots(figsize=(6.5, 4.0), constrained_layout=True)
-                df = filtered_df.select(
-                    ["sel__rank_competition", score_field, "sel__is_selected"]
-                ).with_columns(
-                    pl.col("sel__rank_competition").cast(pl.Int64),
-                    pl.col(score_field).cast(pl.Float64),
-                )
-                df = df.filter(
-                    pl.col("sel__rank_competition").is_not_null()
-                    & pl.col(score_field).is_finite()
-                )
-                if df.is_empty():
-                    raise ValueError("No finite rank/score pairs after filtering.")
-                x = df["sel__rank_competition"].to_list()
-                y = df[score_field].to_list()
-                ax.scatter(x, y, s=18, alpha=0.5)
-                ax.set_title("Score vs rank")
-                ax.set_xlabel("Rank (competition)")
-                ax.set_ylabel(score_field)
-                ax.set_xlim(max(x), 1)
-                return fig
-
-            score_scatter_fig = _make_scatter()
-            score_scatter_fig
-            return score_scatter_fig
-
-
-        @app.cell
         def _(mo, objective_name):
             is_sfxi = objective_name.lower().startswith("sfxi")
             mo.md("SFXI diagnostics enabled." if is_sfxi else "SFXI diagnostics not applicable.")
@@ -315,47 +395,160 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(mo, plt, pl, filtered_df, is_sfxi):
-            mo.stop(not is_sfxi, mo.md("SFXI diagnostics not applicable."))
-            needed = ["obj__logic_fidelity", "obj__effect_scaled"]
-            missing = [c for c in needed if c not in filtered_df.columns]
-            mo.stop(bool(missing), mo.md(f"Missing SFXI diagnostic columns: {missing}"))
+        def _(alt, color_by_ui, filtered_df, is_sfxi, mo, pl, plot_rows_ui, score_field):
+            plot_limit = int(plot_rows_ui.value)
+            plot_total_rows = filtered_df.height
+            plot_limit = min(plot_limit, plot_total_rows)
+            if plot_total_rows > plot_limit:
+                plot_df = filtered_df.sample(n=plot_limit, seed=0, shuffle=True)
+                plot_note = (
+                    f"Plotting a random sample of {plot_limit} of {plot_total_rows} rows. "
+                    "Increase Plot rows to include more data. Large charts may exceed Marimo output limits."
+                )
+            else:
+                plot_df = filtered_df
+                plot_note = (
+                    f"Plotting all {plot_total_rows} rows. "
+                    "Large charts may exceed Marimo output limits; lower Plot rows if needed."
+                )
+            mo.md(plot_note)
+            color_field = str(color_by_ui.value)
+            if color_field not in plot_df.columns:
+                raise ValueError(f"Color field '{color_field}' not found in data.")
+            color_dtype = plot_df.schema.get(color_field)
+            color_type = "Q" if color_dtype is not None and color_dtype.is_numeric() else "N"
+            color_enc = alt.Color(
+                f"{color_field}:{color_type}",
+                legend=alt.Legend(title=color_field),
+            )
 
-            def _make_sfxi():
-                fig, ax = plt.subplots(figsize=(6.5, 4.0), constrained_layout=True)
-                x = filtered_df["obj__logic_fidelity"].cast(pl.Float64, strict=False).to_list()
-                y = filtered_df["obj__effect_scaled"].cast(pl.Float64, strict=False).to_list()
-                ax.scatter(x, y, s=18, alpha=0.5)
-                ax.set_title("SFXI: effect_scaled vs logic_fidelity")
-                ax.set_xlabel("logic_fidelity")
-                ax.set_ylabel("effect_scaled")
-                return fig
+            select_cols = ["id", "sel__rank_competition", score_field, color_field]
+            select_cols = list(dict.fromkeys(select_cols))
+            base = plot_df.select(select_cols).with_columns(
+                pl.col("sel__rank_competition").cast(pl.Int64),
+                pl.col(score_field).cast(pl.Float64, strict=False),
+            )
+            base = base.filter(
+                pl.col("sel__rank_competition").is_not_null()
+                & pl.col(score_field).is_finite()
+            )
+            if base.is_empty():
+                raise ValueError("No finite rank/score pairs after filtering.")
+            base_data = base.to_pandas()
 
-            sfxi_diag_fig = _make_sfxi()
-            sfxi_diag_fig
-            return sfxi_diag_fig
+            hist = (
+                alt.Chart(base_data, title="Score distribution")
+                .mark_bar(opacity=0.75)
+                .encode(
+                    x=alt.X(
+                        f"{score_field}:Q",
+                        bin=alt.Bin(maxbins=40),
+                        title=score_field,
+                    ),
+                    y=alt.Y("count():Q", title="Count"),
+                    color=color_enc,
+                    tooltip=[alt.Tooltip("count():Q", title="Count")],
+                )
+                .properties(width=260, height=240)
+            )
 
+            scatter = (
+                alt.Chart(base_data, title="Score vs rank")
+                .mark_circle(size=60, opacity=0.7)
+                .encode(
+                    x=alt.X("sel__rank_competition:Q", title="Rank (competition)"),
+                    y=alt.Y(f"{score_field}:Q", title=score_field),
+                    color=color_enc,
+                    tooltip=[
+                        alt.Tooltip("id:N", title="id"),
+                        alt.Tooltip("sel__rank_competition:Q", title="rank"),
+                        alt.Tooltip(f"{score_field}:Q", title=score_field),
+                        alt.Tooltip(f"{color_field}:{color_type}", title=color_field),
+                    ],
+                )
+                .properties(width=260, height=240)
+            )
 
-        @app.cell
-        def _(mo, filtered_df):
-            mo.ui.data_explorer(filtered_df)
-            return
+            if not is_sfxi:
+                sfxi_chart = (
+                    alt.Chart([{"note": "SFXI diagnostics not applicable."}])
+                    .mark_text(color="black")
+                    .encode(text="note:N")
+                    .properties(width=260, height=240)
+                )
+            else:
+                needed = ["obj__logic_fidelity", "obj__effect_scaled"]
+                missing = [c for c in needed if c not in filtered_df.columns]
+                if missing:
+                    sfxi_chart = (
+                        alt.Chart([{"note": f"Missing columns: {missing}"}])
+                        .mark_text(color="black")
+                        .encode(text="note:N")
+                        .properties(width=260, height=240)
+                    )
+                else:
+                    sfxi_cols = [
+                        "id",
+                        "obj__logic_fidelity",
+                        "obj__effect_scaled",
+                        color_field,
+                    ]
+                    sfxi_cols = list(dict.fromkeys(sfxi_cols))
+                    sfxi_df = plot_df.select(sfxi_cols).with_columns(
+                        pl.col("obj__logic_fidelity").cast(pl.Float64, strict=False),
+                        pl.col("obj__effect_scaled").cast(pl.Float64, strict=False),
+                    )
+                    sfxi_df = sfxi_df.filter(
+                        pl.col("obj__logic_fidelity").is_finite()
+                        & pl.col("obj__effect_scaled").is_finite()
+                    )
+                    sfxi_data = sfxi_df.to_pandas()
+                    sfxi_chart = (
+                        alt.Chart(sfxi_data, title="SFXI: effect_scaled vs logic_fidelity")
+                        .mark_circle(size=60, opacity=0.7)
+                        .encode(
+                            x=alt.X("obj__logic_fidelity:Q", title="logic_fidelity"),
+                            y=alt.Y("obj__effect_scaled:Q", title="effect_scaled"),
+                            color=color_enc,
+                            tooltip=[
+                                alt.Tooltip("id:N", title="id"),
+                                alt.Tooltip("obj__logic_fidelity:Q", title="logic_fidelity"),
+                                alt.Tooltip("obj__effect_scaled:Q", title="effect_scaled"),
+                                alt.Tooltip(f"{color_field}:{color_type}", title=color_field),
+                            ],
+                        )
+                        .properties(width=260, height=240)
+                    )
 
-
-        @app.cell
-        def _(mo, labels_df):
-            mo.ui.dataframe(labels_df)
+            charts = alt.hconcat(hist, scatter, sfxi_chart).properties(
+                background="white"
+            ).configure_view(
+                fill="white",
+                stroke="black",
+            ).configure_axis(
+                labelColor="black",
+                titleColor="black",
+                tickColor="black",
+                domainColor="black",
+                grid=False,
+            ).configure_legend(
+                labelColor="black",
+                titleColor="black",
+            ).configure_title(
+                color="black",
+            )
+            mo.ui.altair_chart(charts)
             return
 
 
         if __name__ == "__main__":
             app.run()
         """
-    ).strip()
+    ).strip("\n")
 
     return (
-        template.replace("__CONFIG_PATH__", repr(str(config_path))).replace(
-            "__DEFAULT_ROUND__", repr(str(round_selector))
-        )
+        template.replace("__CONFIG_PATH__", repr(str(config_path)))
+        .replace("__DEFAULT_ROUND__", repr(str(round_selector)))
+        .replace("__GENERATED_WITH__", str(marimo_version))
         + "\n"
     )

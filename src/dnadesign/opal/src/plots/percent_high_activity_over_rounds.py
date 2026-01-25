@@ -3,6 +3,9 @@
 <dnadesign project>
 src/dnadesign/opal/src/plots/percent_high_activity_over_rounds.py
 
+Plots percent high-activity designs over rounds from ledger predictions.
+Consumes outputs/ledger/predictions for per-round summaries.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -11,7 +14,12 @@ from __future__ import annotations
 
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import load_events, resolve_outputs_dir
-from ._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir, scale_to_sizes, swarm_smart
+from ._mpl_utils import (
+    annotate_plot_meta,
+    ensure_mpl_config_dir,
+    scale_to_sizes,
+    swarm_smart,
+)
 from ._param_utils import event_columns_for, get_str, normalize_metric_field
 
 
@@ -26,7 +34,7 @@ from ._param_utils import event_columns_for, get_str, normalize_metric_field
             "size_by": "Optional obj__/pred__/sel__ field for swarm size.",
         },
         requires=["as_of_round", "pred__y_obj_scalar"],
-        notes=["Reads ledger.predictions."],
+        notes=["Reads outputs/ledger/predictions."],
     ),
 )
 def render(context, params: dict) -> None:
@@ -68,7 +76,7 @@ def render(context, params: dict) -> None:
     # Always read from typed sinks (predictions + runs).
     need = {"as_of_round", "pred__y_obj_scalar"}
     need |= event_columns_for(hue_field, size_by)
-    df = load_events(outputs_dir, need, round_selector=context.rounds)
+    df = load_events(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
     if df.empty:
         raise ValueError("Ledger predictions contained zero rows after projection.")
 

@@ -1,3 +1,5 @@
+# ABOUTME: Validates run_round wiring for round_ctx and ledger outputs.
+# ABOUTME: Exercises runtime with label history and SFXI objective metadata.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -48,7 +50,8 @@ def _label_vec(v_logic=1.0, inten=1.0) -> list[float]:
 def test_run_round_writes_round_ctx_and_ledger(tmp_path):
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)
-    (workdir / "outputs").mkdir(parents=True, exist_ok=True)
+    (workdir / "outputs" / "ledger").mkdir(parents=True, exist_ok=True)
+    (workdir / "outputs" / "rounds").mkdir(parents=True, exist_ok=True)
     (workdir / "inputs").mkdir(parents=True, exist_ok=True)
 
     records_path = tmp_path / "records.parquet"
@@ -60,8 +63,8 @@ def test_run_round_writes_round_ctx_and_ledger(tmp_path):
             "alphabet": ["dna_4", "dna_4", "dna_4"],
             "X": [[0.1], [0.2], [0.3]],
             "opal__demo__label_hist": [
-                [{"r": 0, "y": _label_vec(1.0, 1.0)}],
-                [{"r": 0, "y": _label_vec(0.8, 2.0)}],
+                [{"observed_round": 0, "y_obs": {"value": _label_vec(1.0, 1.0), "dtype": "vector"}}],
+                [{"observed_round": 0, "y_obs": {"value": _label_vec(0.8, 2.0), "dtype": "vector"}}],
                 [],
             ],
             "Y": [None, None, None],
@@ -163,7 +166,7 @@ def test_run_round_writes_round_ctx_and_ledger(tmp_path):
     assert tracker["progress"].total == res.scored
     assert tracker["progress"].advanced == res.scored
 
-    ctx_path = workdir / "outputs" / "round_0" / "round_ctx.json"
+    ctx_path = workdir / "outputs" / "rounds" / "round_0" / "metadata" / "round_ctx.json"
     assert ctx_path.exists()
     snap = json.loads(ctx_path.read_text())
     assert "core/data/x_dim" in snap
@@ -174,7 +177,7 @@ def test_run_round_writes_round_ctx_and_ledger(tmp_path):
     produced_model = snap.get("core/contracts/model/random_forest/produced", [])
     assert "model/random_forest/fit_metrics" in produced_model
 
-    assert (workdir / "outputs" / "ledger.runs.parquet").exists()
-    pred_dir = workdir / "outputs" / "ledger.predictions"
+    assert (workdir / "outputs" / "ledger" / "runs.parquet").exists()
+    pred_dir = workdir / "outputs" / "ledger" / "predictions"
     assert pred_dir.exists()
     assert any(p.suffix == ".parquet" for p in pred_dir.iterdir())

@@ -3,21 +3,23 @@
 <dnadesign project>
 src/dnadesign/opal/src/registries/selection.py
 
+Registers selection strategies and loads built-in selection modules. Provides
+selection lookup and contract enforcement helpers.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
-import importlib
 import os
-import pkgutil
 import sys
 from typing import Any, Callable, Dict, List
 
 import numpy as np
 
 from ..core.round_context import PluginCtx
+from .loader import load_builtin_modules
 
 # Registry: name -> (either)
 #   (A) selection_fn(...)
@@ -36,25 +38,7 @@ def _ensure_builtins_loaded() -> None:
     global _BUILTINS_LOADED
     if _BUILTINS_LOADED:
         return
-    try:
-        pkg = importlib.import_module("dnadesign.opal.src.selection")
-        _dbg(f"imported package: {pkg.__name__} ({getattr(pkg, '__file__', '?')})")
-        try:
-            pkg_path = pkg.__path__  # type: ignore[attr-defined]
-        except Exception:
-            pkg_path = []
-        for mod in pkgutil.iter_modules(pkg_path):
-            if mod.name.startswith("_"):
-                continue
-            fq = f"{pkg.__name__}.{mod.name}"
-            try:
-                importlib.import_module(fq)
-                _dbg(f"imported built-in selection module: {fq}")
-            except Exception as e:
-                _dbg(f"FAILED importing {fq}: {e!r}")
-                continue
-    except Exception as e:
-        _dbg(f"FAILED importing package dnadesign.opal.src.selection: {e!r}")
+    load_builtin_modules("dnadesign.opal.src.selection", label="selection", debug=_dbg)
     _BUILTINS_LOADED = True
 
 

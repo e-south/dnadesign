@@ -9,10 +9,12 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import sys
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 from dnadesign.cruncher.utils.paths import find_repo_root, resolve_cruncher_root
@@ -33,6 +35,37 @@ def _env_path(name: str) -> Path | None:
     if not path.is_absolute():
         path = Path.cwd() / path
     return path.resolve()
+
+
+@contextlib.contextmanager
+def temporary_numba_cache_dir(*, env_var: str = _NUMBA_CACHE_ENV) -> Iterator[Path]:
+    prior_env = os.environ.get(env_var)
+    numba_config = None
+    prior_cache_dir = None
+    if "numba" in sys.modules:
+        try:
+            from numba.core import config as numba_config
+        except Exception as exc:
+            raise RuntimeError("Failed to access numba config") from exc
+        prior_cache_dir = numba_config.CACHE_DIR
+
+    with tempfile.TemporaryDirectory(prefix="cruncher-numba-cache-") as raw_cache_dir:
+        cache_dir = Path(raw_cache_dir).resolve()
+        os.environ[env_var] = str(cache_dir)
+        if numba_config is not None:
+            try:
+                numba_config.CACHE_DIR = str(cache_dir)
+            except Exception as exc:
+                raise RuntimeError(f"Failed to configure numba cache dir: {cache_dir}") from exc
+        try:
+            yield cache_dir
+        finally:
+            if prior_env is None:
+                os.environ.pop(env_var, None)
+            else:
+                os.environ[env_var] = prior_env
+            if numba_config is not None:
+                numba_config.CACHE_DIR = prior_cache_dir
 
 
 def ensure_numba_cache_dir(anchor: Path, *, env_var: str = _NUMBA_CACHE_ENV) -> Path:
@@ -78,4 +111,4 @@ def ensure_numba_cache_dir(anchor: Path, *, env_var: str = _NUMBA_CACHE_ENV) -> 
     return cache_dir
 
 
-__all__ = ["ensure_numba_cache_dir"]
+__all__ = ["ensure_numba_cache_dir", "temporary_numba_cache_dir"]

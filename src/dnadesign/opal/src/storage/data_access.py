@@ -19,7 +19,6 @@ import pandas as pd
 from ..core.round_context import PluginCtx
 from ..core.utils import OpalError
 from ..registries.transforms_x import get_transform_x
-from .caches import RecordCaches
 from .label_history import LabelHistory
 from .records_io import RecordsIO
 
@@ -42,12 +41,10 @@ class RecordsStore:
     x_transform_params: Dict[str, Any]
     _io: RecordsIO = field(init=False, repr=False)
     _label_hist: LabelHistory = field(init=False, repr=False)
-    _caches: RecordCaches = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         self._io = RecordsIO(self.records_path)
         self._label_hist = LabelHistory(self.campaign_slug)
-        self._caches = RecordCaches(self.campaign_slug)
 
     # --------------- basic IO ---------------
     def load(self) -> pd.DataFrame:
@@ -71,27 +68,17 @@ class RecordsStore:
 
         return "s" + hashlib.sha1(str(seq).encode("utf-8")).hexdigest()[:16]
 
-    # --------------- cache column names ---------------
+    # --------------- label history column ---------------
     def label_hist_col(self) -> str:
         return self._label_hist.label_hist_col()
 
-    def latest_as_of_round_col(self) -> str:
-        return self._caches.latest_as_of_round_col()
-
-    def latest_pred_scalar_col(self) -> str:
-        return self._caches.latest_pred_scalar_col()
-
-    def ensure_cache_columns(
-        self,
-        df: pd.DataFrame,
-        *,
-        include_label_hist: bool = True,
-    ) -> tuple[pd.DataFrame, list[str]]:
-        return self._caches.ensure_cache_columns(
-            df,
-            include_label_hist=include_label_hist,
-            label_hist_col=self.label_hist_col(),
-        )
+    def ensure_label_hist_column(self, df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+        lh = self.label_hist_col()
+        if lh in df.columns:
+            return df, []
+        out = df.copy()
+        out[lh] = None
+        return out, [lh]
 
     def upsert_current_y_column(self, df: pd.DataFrame, labels_resolved: pd.DataFrame, y_col_name: str) -> pd.DataFrame:
         """
@@ -112,8 +99,7 @@ class RecordsStore:
     @staticmethod
     def _normalize_hist_cell(cell: Any) -> List[Dict[str, Any]]:
         """
-        Normalize a 'label_hist' cell into a Python List[Dict] where each dict has:
-          {r:int, ts:str, src:str, y: List[float]}
+        Normalize a 'label_hist' cell into a Python List[Dict] in the current schema.
         Be permissive on container types to tolerate different Parquet round-trips.
         Accepted inputs:
           - list / tuple of dicts
@@ -156,6 +142,33 @@ class RecordsStore:
             src=src,
             fail_if_any_existing_labels=fail_if_any_existing_labels,
             if_exists=if_exists,
+        )
+
+    def append_predictions_from_arrays(
+        self,
+        df: pd.DataFrame,
+        *,
+        ids: List[str],
+        y_hat: np.ndarray,
+        as_of_round: int,
+        run_id: str,
+        objective: Dict[str, Any],
+        metrics_by_name: Dict[str, List[float]],
+        selection_rank: np.ndarray,
+        selection_top_k: np.ndarray,
+        ts: str | None = None,
+    ) -> pd.DataFrame:
+        return self._label_hist.append_predictions_from_arrays(
+            df,
+            ids=ids,
+            y_hat=y_hat,
+            as_of_round=as_of_round,
+            run_id=run_id,
+            objective=objective,
+            metrics_by_name=metrics_by_name,
+            selection_rank=selection_rank,
+            selection_top_k=selection_top_k,
+            ts=ts,
         )
 
     def training_labels_from_y(self, df: pd.DataFrame, as_of_round: int) -> pd.DataFrame:
@@ -318,6 +331,11 @@ class RecordsStore:
                         for col, (_, newv) in mismatches.items():
                             out.loc[out["id"].astype(str) == _id, col] = newv
                     continue
+                if seq_val is not None and seq_val in seq_to_id and seq_to_id[seq_val] != _id:
+                    raise OpalError(
+                        f"Sequence already exists for id={seq_to_id[seq_val]!r}; "
+                        f"cannot create new id={_id!r} for sequence={seq_val!r}."
+                    )
                 # new id → require sequence + essentials
                 if seq_val is None:
                     raise OpalError(
@@ -337,8 +355,14 @@ class RecordsStore:
             for seq in rows_no_id["sequence"].dropna().astype(str).tolist():
                 if seq not in seq_to_id:
                     csv_row = _csv_row_for(None, seq)
+                    new_id = self.deterministic_id_from_sequence(seq)
+                    if new_id in known_ids:
+                        raise OpalError(
+                            f"Deterministic id collision for sequence={seq!r}. "
+                            f"Generated id={new_id!r} already exists in records."
+                        )
                     new_row = {
-                        "id": self.deterministic_id_from_sequence(seq),
+                        "id": new_id,
                         "sequence": seq,
                     }
                     for c in required_cols:
@@ -356,25 +380,6 @@ class RecordsStore:
 
         return out
 
-    # --------------- update ergonomic caches ---------------
-    def update_latest_cache(
-        self,
-        df: pd.DataFrame,
-        *,
-        slug: str,
-        latest_as_of_round: int,
-        latest_scalar_by_id: Dict[str, float],
-        require_columns_present: bool,
-    ) -> pd.DataFrame:
-        if str(slug) != str(self.campaign_slug):
-            raise OpalError(f"update_latest_cache slug mismatch: got {slug!r}, expected {self.campaign_slug!r}.")
-        return self._caches.update_latest_cache(
-            df,
-            latest_as_of_round=latest_as_of_round,
-            latest_scalar_by_id=latest_scalar_by_id,
-            require_columns_present=require_columns_present,
-        )
-
     # --------------- labeled ids ≤ round ---------------
     def labeled_id_set_leq_round(self, df: pd.DataFrame, as_of_round: int) -> set[str]:
         lh = self.label_hist_col()
@@ -385,7 +390,9 @@ class RecordsStore:
             _id = str(_id)
             for e in self._normalize_hist_cell(hist_cell):
                 try:
-                    if int(e.get("r", 9_999_999)) <= as_of_round:
+                    if e.get("kind") != "label":
+                        continue
+                    if int(e.get("observed_round", 9_999_999)) <= as_of_round:
                         s.add(_id)
                         break
                 except Exception:
@@ -400,7 +407,7 @@ class RecordsStore:
         for _id, hist_cell in df[["id", lh]].itertuples(index=False, name=None):
             _id = str(_id)
             for e in self._normalize_hist_cell(hist_cell):
-                if e.get("r", None) is not None:
+                if e.get("kind") == "label" and e.get("observed_round", None) is not None:
                     s.add(_id)
                     break
         return s

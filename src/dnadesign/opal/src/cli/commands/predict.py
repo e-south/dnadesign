@@ -3,6 +3,9 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/predict.py
 
+CLI command for running ephemeral predictions from saved models. Resolves model
+artifacts and outputs prediction tables.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -115,7 +118,7 @@ def cmd_predict(
                 raise OpalError(f"Round {round} not found in {st_path}")
             mp = Path(entry.model.get("artifact_path", "")) if entry.model else None
             if not mp or not mp.exists():
-                mp = Path(entry.round_dir) / "model.joblib"
+                mp = Path(entry.round_dir) / "model" / "model.joblib"
             model_path = mp
         if model_path is None or not Path(model_path).exists():
             raise OpalError(f"Resolved model path not found: {model_path}")

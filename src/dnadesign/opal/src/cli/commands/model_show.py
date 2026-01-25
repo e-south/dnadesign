@@ -3,6 +3,9 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/model_show.py
 
+CLI command to inspect stored model artifacts and parameters. Resolves model
+paths from state or explicit paths for reporting.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -77,7 +80,7 @@ def cmd_model_show(
             # Prefer recorded artifact path; fallback to conventional path
             mp = Path(entry.model.get("artifact_path", "")) if entry.model else None
             if not mp or not mp.exists():
-                mp = Path(entry.round_dir) / "model.joblib"
+                mp = Path(entry.round_dir) / "model" / "model.joblib"
             model_path = mp
         params_obj = None
         if model_params:

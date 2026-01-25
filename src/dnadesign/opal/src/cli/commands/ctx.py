@@ -3,6 +3,10 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/ctx.py
 
+
+CLI commands for inspecting round_ctx runtime carriers. Loads and filters
+round_ctx snapshots from round metadata.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -33,7 +37,7 @@ ctx_app = typer.Typer(no_args_is_help=True, help="Inspect runtime carriers (roun
 
 def _load_round_ctx(ws: CampaignWorkspace, round_sel: Optional[str]) -> Dict[str, Any]:
     r = resolve_round_index_from_state(ws.state_path, round_sel)
-    path = ws.round_dir(r) / "round_ctx.json"
+    path = ws.round_metadata_dir(r) / "round_ctx.json"
     if not path.exists():
         raise OpalError(f"round_ctx.json not found for round {r} at {path}")
     return json.loads(path.read_text())

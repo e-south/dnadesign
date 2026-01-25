@@ -1,3 +1,5 @@
+# ABOUTME: Resolves round selectors from state and ledger metadata.
+# ABOUTME: Validates round selection inputs for OPAL commands.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -106,12 +108,12 @@ def resolve_round_index_from_runs(runs_df, round_sel: Optional[str], *, allow_no
         rounds: List[int] = []
     else:
         if "as_of_round" not in getattr(runs_df, "columns", []):
-            raise OpalError("ledger.runs is missing as_of_round.", ExitCodes.CONTRACT_VIOLATION)
+            raise OpalError("outputs/ledger/runs.parquet is missing as_of_round.", ExitCodes.CONTRACT_VIOLATION)
         rounds = [int(x) for x in _series_to_list(runs_df["as_of_round"]) if x is not None]
     return resolve_round_index(
         round_sel,
         rounds=rounds,
         allow_none=allow_none,
-        empty_message="No runs found in ledger.runs.parquet. Run `opal run ...` first.",
+        empty_message="No runs found in outputs/ledger/runs.parquet. Run `opal run ...` first.",
         param_label="--round",
     )

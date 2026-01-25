@@ -34,6 +34,7 @@ def build_record_report(
     with_sequence: bool = True,
     ledger_reader: Optional[LedgerReader] = None,
     records_path: Optional[Path] = None,
+    run_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     if id_ is None and sequence is None:
         raise ValueError("Provide id or sequence.")
@@ -96,7 +97,12 @@ def build_record_report(
         "sel__rank_competition",
         "sel__is_selected",
     ]
-    out = ledger_reader.read_predictions(columns=needed_cols, id_value=rid)
+    out = ledger_reader.read_predictions(
+        columns=needed_cols,
+        id_value=rid,
+        run_id=run_id,
+        round_selector="all",
+    )
     out = out[out.get("event") == "run_pred"] if not out.empty else out
 
     report["runs"] = out.to_dict(orient="records")

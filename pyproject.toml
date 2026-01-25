@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=69", "wheel", "setuptools_scm"]
+requires = ["setuptools>=69", "wheel>=0.46.2", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -44,6 +44,7 @@ dependencies = [
   "netcdf4>=1.7.3",
   "certifi>=2025.11.12",
   "fastparquet>=2025.12.0",
+  "marimo",
 ]
 
 [project.scripts]
@@ -68,7 +69,7 @@ infer-evo2 = [
   # --- build helpers (required because we disable build isolation for flash-attn + TE-torch)
   "pip; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "setuptools; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "wheel; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "wheel>=0.46.2; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "packaging; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "ninja; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "cmake>=3.18; sys_platform == 'linux' and platform_machine == 'x86_64'",
@@ -90,7 +91,7 @@ test = ["pytest>=8.2", "pytest-cov", "hypothesis>=6.100"]
 lint = ["ruff>=0.4", "pre-commit>=3.7"]
 dev  = [{ include-group = "test" }, { include-group = "lint" }]
 notebooks = [
-    "marimo>=0.18.4",
+    "marimo>=0.19.5",
     "openai>=2.14.0",
 ]
 

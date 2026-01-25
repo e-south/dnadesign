@@ -74,7 +74,8 @@ def cmd_label_hist(
                 if y is None or (isinstance(y, float) and np.isnan(y)):
                     continue
                 hist_norm = store._normalize_hist_cell(hist)
-                if len(hist_norm) > 0:
+                has_label = any(e.get("kind") == "label" for e in hist_norm)
+                if has_label:
                     continue
                 try:
                     vec = np.asarray(y, dtype=float).ravel().tolist()

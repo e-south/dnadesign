@@ -1,3 +1,5 @@
+# ABOUTME: End-to-end CLI workflow tests for OPAL campaigns.
+# ABOUTME: Covers init/validate, ingest-y, and helper command behavior.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -40,6 +42,8 @@ def test_init_validate_explain_cli(tmp_path: Path) -> None:
     assert (workdir / "state.json").exists()
     assert (workdir / ".opal" / "config").exists()
     assert (workdir / "outputs").exists()
+    assert (workdir / "outputs" / "ledger").exists()
+    assert (workdir / "outputs" / "rounds").exists()
     assert (workdir / "inputs").exists()
 
     res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
@@ -76,8 +80,8 @@ def test_ctx_show_audit_diff(tmp_path: Path) -> None:
     app = _build()
     runner = CliRunner()
 
-    round0 = workdir / "outputs" / "round_0"
-    round1 = workdir / "outputs" / "round_1"
+    round0 = workdir / "outputs" / "rounds" / "round_0"
+    round1 = workdir / "outputs" / "rounds" / "round_1"
     round0.mkdir(parents=True, exist_ok=True)
     round1.mkdir(parents=True, exist_ok=True)
 
@@ -92,8 +96,12 @@ def test_ctx_show_audit_diff(tmp_path: Path) -> None:
             "model/random_forest/y_dim",
         ],
     }
-    (round0 / "round_ctx.json").write_text(json.dumps(ctx0))
-    (round1 / "round_ctx.json").write_text(json.dumps(ctx1))
+    ctx0_path = round0 / "metadata" / "round_ctx.json"
+    ctx1_path = round1 / "metadata" / "round_ctx.json"
+    ctx0_path.parent.mkdir(parents=True, exist_ok=True)
+    ctx1_path.parent.mkdir(parents=True, exist_ok=True)
+    ctx0_path.write_text(json.dumps(ctx0))
+    ctx1_path.write_text(json.dumps(ctx1))
 
     res = runner.invoke(
         app,
@@ -169,7 +177,91 @@ def test_ingest_y_cli(tmp_path: Path) -> None:
         ],
     )
     assert res.exit_code == 0, res.stdout
-    assert (workdir / "outputs" / "ledger.labels.parquet").exists()
+    assert (workdir / "outputs" / "ledger" / "labels.parquet").exists()
+
+
+def test_ingest_y_accepts_xlsx(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    xlsx_path = workdir / "labels.xlsx"
+    df = pd.DataFrame(
+        {
+            "sequence": ["AAA", "BBB"],
+            "v00": [0.0, 0.0],
+            "v10": [0.0, 0.0],
+            "v01": [0.0, 0.0],
+            "v11": [1.0, 0.5],
+            "y00_star": [0.1, 0.2],
+            "y10_star": [0.1, 0.2],
+            "y01_star": [0.1, 0.2],
+            "y11_star": [0.1, 0.2],
+            "intensity_log2_offset_delta": [0.0, 0.0],
+        }
+    )
+    df.to_excel(xlsx_path, index=False)
+
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(xlsx_path),
+            "--yes",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert (workdir / "outputs" / "ledger" / "labels.parquet").exists()
+
+
+def test_ingest_y_drop_unknown_sequences_preview(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    csv_path = workdir / "labels.csv"
+    df = pd.DataFrame(
+        {
+            "sequence": ["AAA", "ZZZ"],
+            "v00": [0.0, 0.0],
+            "v10": [0.0, 0.0],
+            "v01": [0.0, 0.0],
+            "v11": [1.0, 0.5],
+            "y00_star": [0.1, 0.2],
+            "y10_star": [0.1, 0.2],
+            "y01_star": [0.1, 0.2],
+            "y11_star": [0.1, 0.2],
+            "intensity_log2_offset_delta": [0.0, 0.0],
+        }
+    )
+    df.to_csv(csv_path, index=False)
+
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(csv_path),
+            "--unknown-sequences",
+            "drop",
+            "--yes",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    lowered = res.stdout.lower()
+    assert "new rows will be created" not in lowered
+    assert "dropping 1 unknown sequences" in lowered
 
 
 def test_ingest_y_rejects_unsupported_extension(tmp_path: Path) -> None:
@@ -209,7 +301,7 @@ def test_ingest_y_rejects_unsupported_extension(tmp_path: Path) -> None:
         ],
     )
     assert res.exit_code != 0, res.stdout
-    assert "must be a CSV or Parquet file" in res.output
+    assert "must be a table file with extension" in res.output
 
 
 def test_ingest_y_rejects_params_non_json(tmp_path: Path) -> None:

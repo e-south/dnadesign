@@ -1,3 +1,5 @@
+# ABOUTME: Tests model-show CLI behavior for resolving round artifacts.
+# ABOUTME: Ensures model paths are discovered under round directories.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -23,9 +25,10 @@ from dnadesign.opal.tests._cli_helpers import (
 
 
 def test_model_show_with_model_meta(tmp_path):
-    round_dir = tmp_path / "outputs" / "round_0"
-    round_dir.mkdir(parents=True, exist_ok=True)
-    model_path = round_dir / "model.joblib"
+    round_dir = tmp_path / "outputs" / "rounds" / "round_0"
+    model_dir = round_dir / "model"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    model_path = model_dir / "model.joblib"
 
     model = get_model("random_forest", {"n_estimators": 5, "random_state": 0, "oob_score": False})
     X = np.array([[0.1, 0.2], [0.2, 0.3]])
@@ -37,7 +40,7 @@ def test_model_show_with_model_meta(tmp_path):
         "model__name": "random_forest",
         "model__params": {"n_estimators": 5, "random_state": 0},
     }
-    (round_dir / "model_meta.json").write_text(json.dumps(meta))
+    (model_dir / "model_meta.json").write_text(json.dumps(meta))
 
     app = _build()
     runner = CliRunner()
@@ -60,9 +63,10 @@ def test_model_show_round_latest(tmp_path: Path) -> None:
         records_path=records,
     )
 
-    round_dir = workdir / "outputs" / "round_0"
-    round_dir.mkdir(parents=True, exist_ok=True)
-    model_path = round_dir / "model.joblib"
+    round_dir = workdir / "outputs" / "rounds" / "round_0"
+    model_dir = round_dir / "model"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    model_path = model_dir / "model.joblib"
     model = get_model("random_forest", {"n_estimators": 5, "random_state": 0, "oob_score": False})
     X = np.array([[0.1, 0.2], [0.2, 0.3]])
     Y = np.array([[0.4], [0.6]])
@@ -72,7 +76,7 @@ def test_model_show_round_latest(tmp_path: Path) -> None:
         "model__name": "random_forest",
         "model__params": {"n_estimators": 5, "random_state": 0},
     }
-    (round_dir / "model_meta.json").write_text(json.dumps(meta))
+    (model_dir / "model_meta.json").write_text(json.dumps(meta))
     write_state(workdir, records_path=records, run_id="r0-test", round_index=0)
 
     app = _build()

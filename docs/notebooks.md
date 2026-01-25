@@ -4,6 +4,18 @@ More in depth marimo guidance lives at `docs/marimo_reference.md`.
 
 There are two ways to use marimo in `dnadesign`:
 
+### 0) Campaign-tied notebooks (OPAL)
+
+If you are working inside an OPAL campaign directory, prefer the OPAL CLI:
+
+```bash
+uv run opal notebook              # list notebooks / nudge next step
+uv run opal notebook generate     # scaffold a notebook in <workdir>/notebooks
+uv run opal notebook run          # open the notebook (auto-select if only one exists)
+```
+
+From outside the campaign, pass `-c configs/campaign.yaml`.
+
 ### 1) Install marimo into the project
 
 ```bash

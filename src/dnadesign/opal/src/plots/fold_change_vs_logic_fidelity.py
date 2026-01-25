@@ -3,6 +3,9 @@
 <dnadesign project>
 src/dnadesign/opal/src/plots/fold_change_vs_logic_fidelity.py
 
+Plots effect vs logic fidelity diagnostics for SFXI predictions. Consumes
+ledger predictions with setpoint joins from run metadata.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -14,7 +17,12 @@ from typing import List
 from ..registries.plots import PlotMeta, register_plot
 from ..storage.parquet_io import read_parquet_df
 from ._events_util import load_events_with_setpoint, resolve_outputs_dir
-from ._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir, scale_to_sizes, scatter_smart
+from ._mpl_utils import (
+    annotate_plot_meta,
+    ensure_mpl_config_dir,
+    scale_to_sizes,
+    scatter_smart,
+)
 from ._param_utils import event_columns_for, get_float, get_str, normalize_metric_field
 
 
@@ -35,7 +43,7 @@ from ._param_utils import event_columns_for, get_float, get_str, normalize_metri
             "pred__y_obj_scalar",
             "obj__diag__setpoint",
         ],
-        notes=["Reads ledger.predictions + ledger.runs (setpoint join)."],
+        notes=["Reads outputs/ledger/predictions + outputs/ledger/runs.parquet (setpoint join)."],
     ),
 )
 def render(context, params: dict) -> None:
@@ -49,6 +57,7 @@ def render(context, params: dict) -> None:
     delta = get_float(params, ["intensity_log2_offset_delta"], 0.0)
     # Allow user to choose the Y axis: fold_change (default), effect_raw/scaled, or score.
     y_axis = get_str(params, ["y_axis", "y_field", "y"], "fold_change")
+    y_axis_field = normalize_metric_field(y_axis) if y_axis else None
     alpha = get_float(params, ["alpha"], 0.40)
     # Hue: support both continuous metrics (obj__/pred__/sel__) and *categorical* from records.parquet.
     hue_raw = get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None)
@@ -125,8 +134,8 @@ def render(context, params: dict) -> None:
     need |= event_columns_for(hue_field, size_by)
     # If hue/size/y ask for objective/pred/sel columns, load them from predictions
     # (fold_change is derived locally and won't be added here)
-    need |= event_columns_for(hue_field, size_by, y_axis)
-    df = load_events_with_setpoint(outputs_dir, need, round_selector=context.rounds)
+    need |= event_columns_for(hue_field, size_by, y_axis_field)
+    df = load_events_with_setpoint(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
 
     # Round selection: single round (default latest)
     rsel = context.rounds
@@ -421,5 +430,5 @@ def render(context, params: dict) -> None:
 
     if context.save_data:
         # Save logic_fidelity and the actually-plotted Y series under a meaningful column name
-        tidy = pd.DataFrame({"logic_fidelity": lf, tidy_col: y_plot})
+        tidy = pd.DataFrame({"obj__logic_fidelity": lf, tidy_col: y_plot})
         context.save_df(tidy)

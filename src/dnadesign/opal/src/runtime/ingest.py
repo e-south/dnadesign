@@ -3,6 +3,9 @@
 <dnadesign project>
 src/dnadesign/opal/src/runtime/ingest.py
 
+Validates and ingests label data into records with transform handling. Produces
+ingest reports and contract checks for label integrity.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -135,9 +138,20 @@ def run_ingest(
     # 2) Try to resolve ids by sequence (existing rows only; new rows remain without id for now)
     seq2id = {}
     if "sequence" in records_df.columns and "id" in records_df.columns:
+        if records_df["sequence"].duplicated().any():
+            if "id" not in labels.columns or labels["id"].isna().any():
+                dup = records_df["sequence"][records_df["sequence"].duplicated()].astype(str).unique().tolist()[:10]
+                raise OpalError(
+                    "records.parquet contains duplicate sequences; ingest-y requires id for all rows to disambiguate "
+                    f"(sample={dup})."
+                )
         seq2id = records_df.drop_duplicates(subset=["sequence"]).set_index("sequence")["id"].astype(str).to_dict()
     if "id" not in labels.columns:
         labels["id"] = labels["sequence"].map(seq2id)
+    elif "sequence" in labels.columns:
+        missing_ids = labels["id"].isna()
+        if missing_ids.any():
+            labels.loc[missing_ids, "id"] = labels.loc[missing_ids, "sequence"].map(seq2id)
 
     # 3) Duplicate handling (assertive, policy-driven)
     policy = str(duplicate_policy or "error").strip().lower()
@@ -169,8 +183,14 @@ def run_ingest(
 
     # 4) Preview stats
     total = int(len(csv_df))
-    rows_with_id = int("id" in csv_df.columns)
-    rows_with_seq = int("sequence" in csv_df.columns)
+    if "id" in csv_df.columns:
+        rows_with_id = int(csv_df["id"].notna().sum())
+    else:
+        rows_with_id = 0
+    if "sequence" in csv_df.columns:
+        rows_with_seq = int(csv_df["sequence"].notna().sum())
+    else:
+        rows_with_seq = 0
 
     resolved = int(labels["id"].notna().sum())
     unknown = int((~labels["id"].notna()).sum())
@@ -187,9 +207,9 @@ def run_ingest(
 
     # Warnings / nudges
     warnings: List[str] = []
-    if rows_with_id == 0 and rows_with_seq == 1:
+    if rows_with_id == 0 and rows_with_seq > 0:
         warnings.append("input missing id column; ids will be resolved by sequence or created for new sequences.")
-    if rows_with_id == 1 and rows_with_seq == 0:
+    if rows_with_id > 0 and rows_with_seq == 0:
         warnings.append("input missing sequence column; all rows must have ids and exist in records.")
     if labels["id"].isna().any() and "sequence" in labels.columns:
         warnings.append(

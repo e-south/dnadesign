@@ -3,6 +3,9 @@
 <dnadesign project>
 src/dnadesign/opal/src/plots/_param_utils.py
 
+Provides plot parameter utilities and metric field normalization. Maps
+user-facing metric names to ledger column fields.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -89,7 +92,7 @@ def normalize_metric_field(field: Optional[str]) -> Optional[str]:
 def event_columns_for(*fields: Optional[str]) -> set[str]:
     """
     Return the subset of fields that are columns we must request from
-    ledger.predictions (i.e., with obj__/pred__/sel__ prefixes).
+    outputs/ledger/predictions (i.e., with obj__/pred__/sel__ prefixes).
     """
     cols: set[str] = set()
     for f in fields:

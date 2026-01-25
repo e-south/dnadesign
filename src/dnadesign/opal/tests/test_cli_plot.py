@@ -14,8 +14,6 @@ from typer.testing import CliRunner
 from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.src.plots._context import PlotContext
 from dnadesign.opal.src.registries.plots import register_plot
-from dnadesign.opal.src.storage.ledger import LedgerWriter
-from dnadesign.opal.src.storage.workspace import CampaignWorkspace
 
 from ._cli_helpers import write_campaign_yaml, write_records
 
@@ -25,23 +23,6 @@ def _plot_minimal(ctx: PlotContext, params: dict) -> None:
     ctx.output_dir.mkdir(parents=True, exist_ok=True)
     out = ctx.output_dir / ctx.filename
     out.write_text(f"ok:{params.get('tag', 'none')}")
-
-
-def _write_min_labels(workdir: Path, *, round_index: int = 0) -> None:
-    import pandas as pd
-
-    writer = LedgerWriter(CampaignWorkspace(config_path=workdir / "campaign.yaml", workdir=workdir))
-    labels_df = pd.DataFrame(
-        {
-            "event": ["label"],
-            "observed_round": [int(round_index)],
-            "id": ["a"],
-            "sequence": ["AAA"],
-            "y_obs": [[0.1, 0.2, 0.3, 0.4]],
-            "src": ["test"],
-        }
-    )
-    writer.append_label(labels_df)
 
 
 def test_plot_cli_writes_output(tmp_path):
@@ -134,7 +115,7 @@ def test_plot_cli_accepts_directory(tmp_path):
     assert res.exit_code == 0, res.stdout
 
 
-def test_plot_cli_quick_mode(tmp_path):
+def test_plot_cli_rejects_run_id_round_mismatch(tmp_path):
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)
     records = workdir / "records.parquet"
@@ -144,67 +125,20 @@ def test_plot_cli_quick_mode(tmp_path):
         campaign,
         workdir=workdir,
         records_path=records,
-    )
-    # Minimal ledger for quick plots
-    from ._cli_helpers import write_ledger
-
-    write_ledger(workdir, run_id="r0", round_index=0)
-
-    # Append a minimal labels sink for SFXI plot
-    _write_min_labels(workdir, round_index=0)
-
-    app = _build()
-    runner = CliRunner()
-    res = runner.invoke(app, ["--no-color", "plot", "--quick", "-c", str(campaign)])
-    assert res.exit_code == 0, res.stdout
-
-    out_path = Path(workdir) / "outputs" / "plots" / "quick_score_vs_rank.png"
-    assert out_path.exists()
-
-
-def test_plot_cli_quick_mode_latest_round_selector(tmp_path):
-    workdir = tmp_path / "campaign"
-    workdir.mkdir(parents=True, exist_ok=True)
-    records = workdir / "records.parquet"
-    write_records(records)
-    campaign = workdir / "campaign.yaml"
-    write_campaign_yaml(
-        campaign,
-        workdir=workdir,
-        records_path=records,
-    )
-    from ._cli_helpers import write_ledger
-
-    write_ledger(workdir, run_id="r0", round_index=0)
-    _write_min_labels(workdir, round_index=0)
-
-    app = _build()
-    runner = CliRunner()
-    res = runner.invoke(app, ["--no-color", "plot", "--quick", "-c", str(campaign), "--round", "latest"])
-    assert res.exit_code == 0, res.stdout
-
-
-def test_plot_cli_quick_mode_multi_rounds(tmp_path):
-    workdir = tmp_path / "campaign"
-    workdir.mkdir(parents=True, exist_ok=True)
-    records = workdir / "records.parquet"
-    write_records(records)
-    campaign = workdir / "campaign.yaml"
-    write_campaign_yaml(
-        campaign,
-        workdir=workdir,
-        records_path=records,
+        plots=[{"name": "mini", "kind": "test_plot_cli_minimal", "params": {"tag": "demo"}}],
     )
     from ._cli_helpers import write_ledger
 
     write_ledger(workdir, run_id="r0", round_index=0)
     write_ledger(workdir, run_id="r1", round_index=1)
-    _write_min_labels(workdir, round_index=0)
-
     app = _build()
     runner = CliRunner()
-    res = runner.invoke(app, ["--no-color", "plot", "--quick", "-c", str(campaign), "--round", "all"])
-    assert res.exit_code == 0, res.stdout
+    res = runner.invoke(
+        app,
+        ["--no-color", "plot", "-c", str(campaign), "--round", "1", "--run-id", "r0"],
+    )
+    assert res.exit_code != 0, res.stdout
+    assert "run_id" in res.output
 
 
 def test_plot_cli_rejects_bad_round_selector(tmp_path):
@@ -217,6 +151,7 @@ def test_plot_cli_rejects_bad_round_selector(tmp_path):
         campaign,
         workdir=workdir,
         records_path=records,
+        plots=[{"name": "mini", "kind": "test_plot_cli_minimal", "params": {"tag": "demo"}}],
     )
     from ._cli_helpers import write_ledger
 
@@ -224,7 +159,7 @@ def test_plot_cli_rejects_bad_round_selector(tmp_path):
 
     app = _build()
     runner = CliRunner()
-    res = runner.invoke(app, ["--no-color", "plot", "--quick", "-c", str(campaign), "--round", "bad"])
+    res = runner.invoke(app, ["--no-color", "plot", "-c", str(campaign), "--round", "bad"])
     assert res.exit_code != 0, res.stdout
     assert "Invalid round selector" in res.output
 

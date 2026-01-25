@@ -3,6 +3,9 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/init.py
 
+Initializes OPAL campaign workspaces and validates records layout. Writes
+state.json and ensures campaign directories exist.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -39,7 +42,9 @@ def cmd_init(
         if not json:
             print_config_context(cfg_path, cfg=cfg)
         workdir = Path(cfg.campaign.workdir)
-        ensure_dir(workdir / "outputs")
+        outputs_dir = workdir / "outputs"
+        ensure_dir(outputs_dir / "ledger")
+        ensure_dir(outputs_dir / "rounds")
         ensure_dir(workdir / "inputs")
 
         # Write a workspace marker so future commands can resolve fast from any child
@@ -67,7 +72,7 @@ def cmd_init(
                 if df[col].isna().any():
                     bad = df.loc[df[col].isna(), "id"].astype(str).tolist()[:10]
                     raise OpalError(f"Missing values in '{col}' (sample ids={bad}).")
-        df2, added = store.ensure_cache_columns(df, include_label_hist=True)
+        df2, added = store.ensure_label_hist_column(df)
         if added:
             store.save_atomic(df2)
         st = CampaignState(

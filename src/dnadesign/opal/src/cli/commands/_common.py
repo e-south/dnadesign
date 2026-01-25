@@ -3,6 +3,9 @@
 <dnadesign project>
 src/dnadesign/opal/src/cli/commands/_common.py
 
+Shared CLI helpers for OPAL commands (path resolution and output). Centralizes
+validation for config, table, and json file inputs.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -50,18 +53,24 @@ def resolve_config_path(opt: Optional[Path], *, allow_dir: bool = False) -> Path
 
 
 _TABLE_EXTS = {".csv", ".parquet", ".pq"}
+_XLSX_EXTS = {".xlsx"}
 _JSON_EXTS = {".json"}
 
 
-def resolve_table_path(path: Path, *, label: str, must_exist: bool) -> Path:
+def resolve_table_path(path: Path, *, label: str, must_exist: bool, allow_xlsx: bool = False) -> Path:
     p = Path(path)
     if not p.is_absolute():
         p = (Path.cwd() / p).resolve()
     suffix = p.suffix.lower()
-    if suffix not in _TABLE_EXTS:
-        raise OpalError(
-            f"{label} must be a CSV or Parquet file with extension {', '.join(sorted(_TABLE_EXTS))}; got '{p}'."
-        )
+    exts = set(_TABLE_EXTS)
+    if allow_xlsx:
+        exts |= _XLSX_EXTS
+    if suffix not in exts:
+        if exts == _TABLE_EXTS:
+            msg = f"{label} must be a CSV or Parquet file with extension {', '.join(sorted(_TABLE_EXTS))}; got '{p}'."
+        else:
+            msg = f"{label} must be a table file with extension {', '.join(sorted(exts))}; got '{p}'."
+        raise OpalError(msg)
     if must_exist:
         if not p.exists():
             raise OpalError(f"{label} not found: {p}")

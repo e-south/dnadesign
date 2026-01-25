@@ -75,7 +75,8 @@ def preflight_run(
             if y is None or (isinstance(y, float) and np.isnan(y)):
                 continue
             hist = store._normalize_hist_cell(row.get(lh))
-            if len(hist) == 0:
+            has_label = any(e.get("kind") == "label" for e in hist)
+            if not has_label:
                 try:
                     vec = [float(x) for x in np.asarray(y, dtype=float).ravel().tolist()]
                 except Exception:

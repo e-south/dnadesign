@@ -65,8 +65,6 @@ def test_cli_pressure_scalar_multi_round(tmp_path: Path) -> None:
     assert res.exit_code == 0, res.stdout
     df = pd.read_parquet(records)
     assert "opal__demo__label_hist" in df.columns
-    assert "opal__demo__latest_as_of_round" in df.columns
-    assert "opal__demo__latest_pred_scalar" in df.columns
 
     res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
     assert res.exit_code == 0, res.stdout

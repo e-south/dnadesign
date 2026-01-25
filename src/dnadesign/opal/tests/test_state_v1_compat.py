@@ -1,3 +1,5 @@
+# ABOUTME: Tests campaign state loading compatibility for minimal state v1.
+# ABOUTME: Ensures status reporting handles missing run_id fields.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -34,7 +36,7 @@ def test_state_v1_loads_without_run_id(tmp_path):
             {
                 "round_index": 0,
                 "round_name": "round_0",
-                "round_dir": str(tmp_path / "outputs" / "round_0"),
+                "round_dir": str(tmp_path / "outputs" / "rounds" / "round_0"),
                 "labels_used_rounds": [0],
                 "number_of_training_examples_used_in_round": 2,
                 "number_of_candidates_scored_in_round": 3,

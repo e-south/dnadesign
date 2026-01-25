@@ -7,7 +7,6 @@ plot_defaults:
 plots:
   - name: score_vs_rank_latest
     kind: scatter_score_vs_rank
-    tags: [quick]
     params:
       rank_mode: competition    # "sequential" | "competition"
       hue: effect_scaled        # alias -> obj__effect_scaled
@@ -23,7 +22,6 @@ plots:
 
   - name: percent_high_activity
     kind: percent_high_activity_over_rounds
-    tags: [quick]
     params:
       threshold: 0.85
       mode: both                    # violin+swarm on left axis, % line on right axis
@@ -45,13 +43,13 @@ plots:
       gap_between_panels_in: 0.35
       on_violin_invalid: line  # explicit: fallback to mean line when sample too small
 
-  - name: fold_change_vs_logic
+  - name: effect_scaled_vs_logic_fidelity
     kind: fold_change_vs_logic_fidelity
     tags: [analysis]
     params:
       intensity_log2_offset_delta: 0.0
-      hue: logic_fidelity        # derived
-      size_by: obj__effect_raw   # or "obj__effect_scaled" | "logic_fidelity" | "fold_change"
+      y_axis: effect_scaled
+      hue: score
       size_min: 10
       size_max: 60
       alpha: 0.4

@@ -3,12 +3,12 @@
 campaign:
   name: "Demo (vec8)"
   slug: "demo"
-  workdir: "."  # resolved relative to this file
+  workdir: "."  # resolved relative to the campaign root
 
 data:
   location: { kind: local, path: records.parquet }
-  x_column_name: "mock__X_value"
-  y_column_name: "mock__y_label"
+  x_column_name: "infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean"
+  y_column_name: "sfxi_8_vector_y_label"
   y_expected_length: 8
 
 ingest:
@@ -82,6 +82,6 @@ safety:
   accept_x_mismatch: false
 
 metadata:
-  notes: "Demo campaign for OPAL using SFXI (vec8) and identity X."
+  notes: "Demo campaign for OPAL using SFXI (vec8) and Evo2 logits mean."
 
 plot_config: plots.yaml

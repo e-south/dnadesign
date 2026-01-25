@@ -1,3 +1,5 @@
+# ABOUTME: Validates selection exclusion logic against label history entries.
+# ABOUTME: Ensures labeled ids are filtered correctly by observed round.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -21,7 +23,15 @@ def test_labeled_id_set_leq_round_basic(tmp_path):
             "sequence": ["AAA", "CCC"],
             "alphabet": ["dna_4", "dna_4"],
             "X": [[0.1], [0.2]],
-            "opal__demo__label_hist": [[{"r": 0, "y": [0, 0, 0, 0, 0, 0, 0, 0]}], None],
+            "opal__demo__label_hist": [
+                [
+                    {
+                        "observed_round": 0,
+                        "y_obs": {"value": [0, 0, 0, 0, 0, 0, 0, 0], "dtype": "vector"},
+                    }
+                ],
+                None,
+            ],
         }
     )
     p = tmp_path / "records.parquet"

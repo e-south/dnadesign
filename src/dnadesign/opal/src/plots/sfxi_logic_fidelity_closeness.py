@@ -3,6 +3,9 @@
 <dnadesign project>
 src/dnadesign/opal/src/plots/sfxi_logic_fidelity_closeness.py
 
+Plots observed label logic fidelity vs closeness for SFXI campaigns. Reads
+ledger labels and run metadata for setpoint context.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -41,7 +44,7 @@ def _import_pyarrow():
             "setpoint_override": "Override setpoint vector (length-4).",
         },
         requires=["observed_round", "y_obs", "objective__params"],
-        notes=["Reads ledger.labels + ledger.runs for setpoint."],
+        notes=["Reads outputs/ledger/labels.parquet + outputs/ledger/runs.parquet for setpoint."],
     ),
 )
 def render(context, params: dict) -> None:
@@ -53,7 +56,7 @@ def render(context, params: dict) -> None:
 
     arrow_pc, ds = _import_pyarrow()
     # ---- Parameters (assertive, yet simple to change) ----
-    # Source is now *observed* labels (ledger.labels) instead of predictions.
+    # Source is now *observed* labels (outputs/ledger/labels.parquet) instead of predictions.
     outputs_dir = resolve_outputs_dir(context)  # ledger sinks live here
     top_percentile = params.get("top_percentile")
     if top_percentile is not None:
@@ -84,10 +87,10 @@ def render(context, params: dict) -> None:
     coerce_clip = bool(params.get("coerce_clip", False))
     _TOL = 1e-6
 
-    # ---- Data: read ledger.labels and join a setpoint from ledger.runs ----
+    # ---- Data: read outputs/ledger/labels.parquet and join a setpoint from outputs/ledger/runs.parquet ----
     root = outputs_dir
-    labels_path = root / "ledger.labels.parquet"
-    runs_path = root / "ledger.runs.parquet"
+    labels_path = root / "ledger" / "labels.parquet"
+    runs_path = root / "ledger" / "runs.parquet"
     if not labels_path.exists():
         raise OpalError(
             f"Missing labels sink: {labels_path}. Run `opal ingest-y -c <campaign.yaml> --round <k>` first.",
@@ -130,11 +133,11 @@ def render(context, params: dict) -> None:
     need = {"observed_round", "y_obs"}
     missing = sorted(need - names)
     if missing:
-        raise ValueError(f"ledger.labels missing columns: {missing}")
+        raise ValueError(f"outputs/ledger/labels.parquet missing columns: {missing}")
     filt = _round_filter(dlab)
     df = dlab.to_table(columns=list(need), filter=filt).to_pandas()
     if df.empty:
-        raise ValueError("ledger.labels had zero rows for the requested rounds.")
+        raise ValueError("outputs/ledger/labels.parquet had zero rows for the requested rounds.")
 
     # Resolve setpoint: override > specific round > latest
     def _extract_setpoint(obj):
@@ -145,7 +148,7 @@ def render(context, params: dict) -> None:
 
     # Param overrides for setpoint (optional but assertive)
     sp_override = params.get("setpoint") or params.get("setpoint_override")
-    sp_round = params.get("setpoint_round")  # int (as_of_round in ledger.runs)
+    sp_round = params.get("setpoint_round")  # int (as_of_round in outputs/ledger/runs.parquet)
     if sp_override is not None:
         sp_arr = np.asarray(list(sp_override), dtype=float).ravel()
         if sp_arr.size != 4 or not np.all(np.isfinite(sp_arr)):
@@ -157,14 +160,14 @@ def render(context, params: dict) -> None:
         need_runs = {"as_of_round", "objective__params"}
         miss = sorted(need_runs - nn)
         if miss:
-            raise ValueError(f"ledger.runs missing columns: {miss}")
+            raise ValueError(f"outputs/ledger/runs.parquet missing columns: {miss}")
         if sp_round is None:
             # Pick the latest run that has a setpoint
             meta = druns.to_table(columns=list(need_runs)).to_pandas()
             meta["setpoint"] = meta["objective__params"].map(_extract_setpoint)
             meta = meta.dropna(subset=["setpoint"])
             if meta.empty:
-                raise ValueError("No setpoint_vector found in ledger.runs objective__params.")
+                raise ValueError("No setpoint_vector found in outputs/ledger/runs.parquet objective__params.")
             meta = meta.sort_values(["as_of_round"]).tail(1)
             setpoint = np.asarray(list(meta["setpoint"].iloc[0]), dtype=float).ravel()
         else:
@@ -177,7 +180,7 @@ def render(context, params: dict) -> None:
             meta["setpoint"] = meta["objective__params"].map(_extract_setpoint)
             meta = meta.dropna(subset=["setpoint"])
             if meta.empty:
-                raise ValueError(f"No setpoint_vector found in ledger.runs for as_of_round={sp_round}.")
+                raise ValueError(f"No setpoint_vector found in outputs/ledger/runs.parquet for as_of_round={sp_round}.")
             setpoint = np.asarray(list(meta["setpoint"].iloc[0]), dtype=float).ravel()
 
     if setpoint.size != 4 or not np.all(np.isfinite(setpoint)):
@@ -370,7 +373,7 @@ def render(context, params: dict) -> None:
         extras={
             "setpoint": sp_str,
             "top%": (f"{top_percentile:.0f}" if top_percentile else "all"),
-            "source": "y_obs (ledger.labels)",
+            "source": "y_obs (outputs/ledger/labels.parquet)",
         },
     )
     context.logger.info(

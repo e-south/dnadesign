@@ -3,6 +3,9 @@
 <dnadesign project>
 src/dnadesign/opal/src/plots/feature_importance_bars.py
 
+Aggregates per-round feature importance artifacts into plots. Discovers
+round artifacts under outputs/rounds for visualization.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -34,14 +37,17 @@ def _discover_round_fi_files(outputs_dir: Path) -> Dict[int, Path]:
     that contains the file. Strictly requires the file to exist.
     """
     found: Dict[int, Path] = {}
-    for child in outputs_dir.iterdir():
+    rounds_dir = outputs_dir / "rounds"
+    if not rounds_dir.exists():
+        return {}
+    for child in rounds_dir.iterdir():
         if not child.is_dir():
             continue
         m = _ROUND_DIR_RE.match(child.name)
         if not m:
             continue
         r = int(m.group(1))
-        p = child / "feature_importance.csv"
+        p = child / "model" / "feature_importance.csv"
         if p.exists():
             found[r] = p.resolve()
     return dict(sorted(found.items()))
@@ -83,7 +89,7 @@ def _select_rounds(available: List[int], rounds_sel) -> List[int]:
     Decide the target rounds from context.rounds, assertively.
     """
     if not available:
-        raise FileNotFoundError("No round_* folders with feature_importance.csv were found under outputs/.")
+        raise FileNotFoundError("No round_* folders with feature_importance.csv were found under outputs/rounds/.")
 
     if rounds_sel in ("unspecified", "latest"):
         return [max(available)]
@@ -163,7 +169,7 @@ def _resolve_order(frames: List[pd.DataFrame], policy: str) -> List[int]:
             "alpha": "Bar transparency (default 0.45).",
             "figsize_in": "Figure size in inches (default [12, 5]).",
         },
-        requires=["outputs/round_<k>/feature_importance.csv"],
+        requires=["outputs/rounds/round_<k>/model/feature_importance.csv"],
         notes=["Reads per-round outputs, not ledger."],
     ),
 )
@@ -204,7 +210,7 @@ def render(context, params: dict) -> None:
     xtick_step = int(xtick_step_cfg) if xtick_step_cfg is not None else None
     order_policy = str(params.get("order_policy", "preserve")).strip().lower()
 
-    # ---- Discover files from round_* directories (decoupled from runs parquet)
+    # ---- Discover files from outputs/rounds/round_* directories (decoupled from runs parquet)
     outputs_dir = resolve_outputs_dir(context)
     fi_map = _discover_round_fi_files(outputs_dir)  # {round: path}
     available_rounds = sorted(fi_map.keys())

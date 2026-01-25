@@ -3,19 +3,22 @@
 <dnadesign project>
 src/dnadesign/opal/src/registries/plots.py
 
+Registers plot functions and loads built-in and plugin plot modules. Provides
+plot lookup and metadata for Opal reporting.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
-import importlib
 import inspect
 import os
-import pkgutil
 import sys
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
+
+from .loader import load_builtin_modules, load_entry_points
 
 _PLOTS: Dict[str, Callable] = {}
 _PLOT_META: Dict[str, "PlotMeta"] = {}
@@ -62,66 +65,15 @@ def _ensure_builtins_loaded() -> None:
     global _BUILTINS_LOADED
     if _BUILTINS_LOADED:
         return
-    try:
-        pkg = importlib.import_module("dnadesign.opal.src.plots")
-        _dbg(f"imported package: {pkg.__name__} ({getattr(pkg, '__file__', '?')})")
-        try:
-            pkg_path = pkg.__path__  # type: ignore[attr-defined]
-        except Exception:
-            pkg_path = []
-        for mod in pkgutil.iter_modules(pkg_path):
-            if mod.name.startswith("_"):
-                continue
-            fq = f"{pkg.__name__}.{mod.name}"
-            try:
-                importlib.import_module(fq)
-                _dbg(f"imported built-in plot module: {fq}")
-            except Exception as e:
-                _dbg(f"FAILED importing {fq}: {e!r}")
-                continue
-    except Exception as e:
-        _dbg(f"FAILED importing package dnadesign.opal.src.plots: {e!r}")
+    load_builtin_modules("dnadesign.opal.src.plots", label="plot", debug=_dbg)
     _BUILTINS_LOADED = True
-
-
-def _iter_entry_points(group: str):
-    # Prefer importlib.metadata; fall back to pkg_resources if needed
-    try:
-        import importlib.metadata as _ilmd
-
-        eps = _ilmd.entry_points()
-        try:
-            # Python 3.10+ interface
-            yield from eps.select(group=group)  # type: ignore[attr-defined]
-            return
-        except Exception:
-            # Older interface
-            for ep in eps.get(group, []):  # type: ignore[index]
-                yield ep
-            return
-    except Exception as e:
-        _dbg(f"importlib.metadata unavailable or failed: {e!r}")
-    try:
-        import pkg_resources
-
-        for ep in pkg_resources.iter_entry_points(group):
-            yield ep
-        return
-    except Exception as e:
-        _dbg(f"pkg_resources fallback unavailable or failed: {e!r}")
 
 
 def _ensure_plugins_loaded() -> None:
     global _PLUGINS_LOADED
     if _PLUGINS_LOADED:
         return
-    for ep in _iter_entry_points("dnadesign.opal.plots"):
-        try:
-            ep.load()
-            _dbg(f"loaded plot plugin entry point: {getattr(ep, 'name', '?')} from {getattr(ep, 'module', '?')}")
-        except Exception as e:
-            _dbg(f"FAILED loading plot plugin entry point {ep!r}: {e!r}")
-            continue
+    load_entry_points("dnadesign.opal.plots", label="plot", debug=_dbg)
     _PLUGINS_LOADED = True
 
 

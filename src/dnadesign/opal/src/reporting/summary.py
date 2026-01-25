@@ -3,6 +3,9 @@
 <dnadesign project>
 src/dnadesign/opal/src/reporting/summary.py
 
+Summarizes run logs and run metadata for reporting commands. Provides helpers
+for CLI status and log summaries.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
@@ -46,7 +49,7 @@ def select_run_meta(
     run_id: Optional[str] = None,
 ) -> pd.Series:
     if df_runs.empty:
-        raise OpalError("No runs found in ledger.runs.parquet.")
+        raise OpalError("No runs found in outputs/ledger/runs.parquet.")
     if run_id is not None:
         sel = df_runs[df_runs["run_id"].astype(str) == str(run_id)]
         if sel.empty:
@@ -57,6 +60,8 @@ def select_run_meta(
     sel = df_runs[df_runs["as_of_round"] == int(round_sel)]
     if sel.empty:
         raise OpalError(f"No runs found for as_of_round={int(round_sel)}.")
+    if sel["run_id"].nunique() > 1:
+        raise OpalError(f"Multiple run_id values found for round {int(round_sel)}. Specify run_id to disambiguate.")
     return sel.sort_values(["run_id"]).tail(1).iloc[0]
 
 

@@ -7,7 +7,7 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from dnadesign.opal.src.cli.commands.plot import _resolve_output_dir
+from dnadesign.opal.src.plots.runner import _resolve_output_dir
 from dnadesign.opal.src.storage.workspace import CampaignWorkspace
 
 
