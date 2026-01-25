@@ -152,6 +152,26 @@ def test_progress_handler_suppresses_flagged_records() -> None:
     assert stream.getvalue() == ""
 
 
+def test_progress_handler_closed_stream_avoids_logging_error(capsys) -> None:
+    stream = io.StringIO()
+    handler = logging_utils.ProgressAwareStreamHandler(stream=stream)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger = logging.getLogger("progress_handler_closed")
+    logger.handlers = [handler]
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    stream.close()
+    raise_exceptions = logging.raiseExceptions
+    logging.raiseExceptions = True
+    try:
+        logger.info("hello")
+    finally:
+        logging.raiseExceptions = raise_exceptions
+        logger.handlers = []
+    captured = capsys.readouterr()
+    assert "Logging error" not in captured.err
+
+
 class _TtyBuffer(io.StringIO):
     def isatty(self) -> bool:
         return True

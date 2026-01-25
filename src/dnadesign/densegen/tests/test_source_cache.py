@@ -1,3 +1,16 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_source_cache.py
+
+Pipeline source cache behavior tests.
+
+Dunlop Lab.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import random
@@ -78,7 +91,7 @@ class _DummySource:
 
     def load_data(self, *, rng, outputs_root, run_id=None):
         self.calls += 1
-        return self.entries, None
+        return self.entries, None, None
 
 
 def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:

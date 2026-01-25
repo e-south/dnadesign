@@ -1810,11 +1810,21 @@ def stage_a_build_pool(
             recap_table.add_row(*row)
         console.print("[bold]Stage-A sampling recap[/]")
         console.print(recap_table)
-        console.print(
-            "  candidates=generated/target; eligible=hits at/below p-value floor; "
-            "pool=top-N within retained strata (shortfall ok); bins=eligible/retained per bin; "
-            "len=n/min/med/avg/max (pool)"
-        )
+        backends = {row[2] for row in recap_rows}
+        if "fimo" in backends:
+            console.print(
+                "  fimo: candidates=generated/target; eligible=hits at/below p-value floor; "
+                "pool=top-N within retained strata (shortfall ok); bins=eligible/retained per bin; "
+                "len=n/min/med/avg/max (pool)"
+            )
+        if "densegen" in backends:
+            console.print(
+                "  densegen: candidates=generated/target; eligible=score-filtered candidates "
+                "(threshold/percentile); pool=top-N by score (shortfall ok); bins=-; "
+                "len=n/min/med/avg/max (pool)"
+            )
+        if "provided" in backends:
+            console.print("  provided: candidates=total; pool=total; bins=-; len=n/min/med/avg/max")
     console.print(f":sparkles: [bold green]Pool manifest written[/]: {artifact.manifest_path}")
 
 

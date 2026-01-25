@@ -83,8 +83,8 @@ def test_stage_a_build_pool_reports_sampling_recap(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert "Stage-A sampling recap" in result.output
     assert "candidates" in result.output
-    assert "strata" in result.output
     assert "pool" in result.output
+    assert "provided:" in result.output
     assert "toy_sites" in result.output
 
 

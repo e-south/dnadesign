@@ -1,3 +1,16 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_binding_sites_duplicates.py
+
+Binding-sites duplicate handling tests.
+
+Dunlop Lab.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,7 +25,7 @@ def test_binding_sites_duplicates_allowed(tmp_path: Path, caplog) -> None:
     csv_path.write_text("tf,tfbs\nTF1,AAA\nTF1,AAA\nTF2,CCC\n")
     ds = BindingSitesDataSource(path=str(csv_path), cfg_path=tmp_path)
     with caplog.at_level("WARNING"):
-        entries, df = ds.load_data()
+        entries, df, _summaries = ds.load_data()
     assert len(entries) == 3
     assert isinstance(df, pd.DataFrame)
     assert df.shape[0] == 3

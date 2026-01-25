@@ -58,7 +58,7 @@ def test_pwm_meme_sampling_stochastic(tmp_path: Path) -> None:
             "score_percentile": None,
         },
     )
-    entries, df = ds.load_data(rng=np.random.default_rng(0))
+    entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
     assert len(entries) == 5
     assert df is not None
     assert set(df["tf"].tolist()) == {"M1"}
