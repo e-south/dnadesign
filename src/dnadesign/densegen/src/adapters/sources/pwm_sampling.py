@@ -650,10 +650,15 @@ def sample_pwm_sites(
     if scoring_backend not in {"densegen", "fimo"}:
         raise ValueError(f"Unsupported Stage-A PWM sampling scoring_backend: {scoring_backend}")
     if scoring_backend == "densegen":
-        if score_threshold is None:
-            raise ValueError("Stage-A PWM sampling requires score_threshold when scoring_backend='densegen'")
-        if score_percentile is not None:
-            raise ValueError("Stage-A PWM sampling does not support score_percentile when scoring_backend='densegen'")
+        if score_threshold is None and score_percentile is None:
+            raise ValueError(
+                "Stage-A PWM sampling requires score_threshold or score_percentile when scoring_backend='densegen'"
+            )
+        if score_threshold is not None and score_percentile is not None:
+            raise ValueError(
+                "Stage-A PWM sampling requires exactly one of score_threshold or score_percentile when "
+                "scoring_backend='densegen'"
+            )
         if pvalue_strata is not None:
             raise ValueError("pvalue_strata is only valid when scoring_backend='fimo'")
         if retain_depth is not None:

@@ -68,12 +68,19 @@ class FimoMiningBatchLogFilter(logging.Filter):
 
 class ProgressAwareStreamHandler(logging.StreamHandler):
     def emit(self, record: logging.LogRecord) -> None:
+        if getattr(self.stream, "closed", False):
+            return
         if getattr(record, "suppress_stdout", False):
             return
         if _FIMO_STDOUT_SUPPRESS_RE.search(record.getMessage()):
             return
         _maybe_clear_progress_line(self.stream)
-        super().emit(record)
+        try:
+            super().emit(record)
+        except ValueError:
+            if getattr(self.stream, "closed", False):
+                return
+            raise
 
 
 def _register_native_stderr_patterns(patterns: Iterable[tuple[str, str | None]]) -> None:

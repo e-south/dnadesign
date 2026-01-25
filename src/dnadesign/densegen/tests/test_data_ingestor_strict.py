@@ -1,3 +1,16 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_data_ingestor_strict.py
+
+Input table validation tests for DenseGen sources.
+
+Dunlop Lab.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,7 +33,7 @@ def test_binding_sites_allows_duplicates(tmp_path: Path, caplog) -> None:
     csv_path.write_text("tf,tfbs\nLexA,AAA\nLexA,AAA\n")
     ds = BindingSitesDataSource(path=str(csv_path), cfg_path=tmp_path / "config.yaml")
     with caplog.at_level("WARNING"):
-        entries, df = ds.load_data()
+        entries, df, _summaries = ds.load_data()
     assert len(entries) == 2
     assert df.shape[0] == 2
     assert "duplicate regulator/binding-site pairs" in caplog.text.lower()

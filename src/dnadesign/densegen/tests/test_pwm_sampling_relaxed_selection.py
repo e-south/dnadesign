@@ -31,20 +31,20 @@ def _motif() -> PWMMotif:
     )
 
 
-def test_densegen_requires_score_threshold() -> None:
+def test_densegen_accepts_score_percentile() -> None:
     rng = np.random.default_rng(0)
-    with pytest.raises(ValueError, match="score_threshold"):
-        sample_pwm_sites(
-            rng,
-            _motif(),
-            strategy="stochastic",
-            n_sites=3,
-            oversample_factor=2,
-            max_candidates=None,
-            max_seconds=None,
-            score_threshold=None,
-            score_percentile=90.0,
-        )
+    sites = sample_pwm_sites(
+        rng,
+        _motif(),
+        strategy="stochastic",
+        n_sites=1,
+        oversample_factor=2,
+        max_candidates=None,
+        max_seconds=None,
+        score_threshold=None,
+        score_percentile=90.0,
+    )
+    assert len(sites) == 1
 
 
 def test_densegen_allows_shortfall_with_warning(caplog: pytest.LogCaptureFixture) -> None:
