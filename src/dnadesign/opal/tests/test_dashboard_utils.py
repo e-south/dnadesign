@@ -212,6 +212,19 @@ def test_explorer_hue_registry_allows_high_cardinality() -> None:
     assert "cluster__ldn_v1" in explorer_labels
 
 
+def test_sfxi_hue_registry_allows_high_cardinality() -> None:
+    values = [str(i) for i in range(67)]
+    df = pl.DataFrame(
+        {
+            "id": [f"id_{i}" for i in range(len(values))],
+            "cluster__ldn_v1": values,
+            "score": list(range(len(values))),
+        }
+    )
+    sfxi_labels = hues.build_sfxi_hue_registry(df, include_columns=True).labels()
+    assert "cluster__ldn_v1" in sfxi_labels
+
+
 def test_ensure_selection_columns() -> None:
     df = pl.DataFrame({"id": ["a", "b", "c"], "score": [0.3, 0.1, 0.2]})
     df_out, warnings, err = selection.ensure_selection_columns(

@@ -54,6 +54,7 @@ def _():
     campaign_label_from_path = dash_datasets.campaign_label_from_path
     build_explorer_hue_registry = dash_hues.build_explorer_hue_registry
     build_hue_registry = dash_hues.build_hue_registry
+    build_sfxi_hue_registry = dash_hues.build_sfxi_hue_registry
     default_view_hues = dash_hues.default_view_hues
     compute_sfxi_params = dash_sfxi.compute_sfxi_params
     build_score_histogram = dash_transient.build_score_histogram
@@ -87,6 +88,7 @@ def _():
         build_explorer_hue_registry,
         build_feature_importance_chart,
         build_hue_registry,
+        build_sfxi_hue_registry,
         build_label_events,
         build_label_sfxi_view,
         build_pred_sfxi_view,
@@ -1648,8 +1650,8 @@ def _(mo):
 
 
 @app.cell
-def _(build_hue_registry, choose_dropdown_value, df_sfxi_scatter, mo, sfxi_color_state):
-    sfxi_hue_registry = build_hue_registry(
+def _(build_sfxi_hue_registry, choose_dropdown_value, df_sfxi_scatter, mo, sfxi_color_state):
+    sfxi_hue_registry = build_sfxi_hue_registry(
         df_sfxi_scatter,
         preferred=[],
         include_columns=True,

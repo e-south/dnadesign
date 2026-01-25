@@ -58,3 +58,4 @@ Note: freeform working notes; prune/merge as they become cruft.
   `opal__view__score`/`opal__view__effect_scaled` and skip `__row_id` when possible.
 - Guarded SFXI color state updates to avoid reactive rerun loops when opening prom60_eda.
 - Dataset explorer hue registry now allows higher-cardinality categories (max_unique=100) for cluster labels.
+- SFXI hue registry now allows higher-cardinality categories so cluster labels appear in color-by options.
