@@ -17,11 +17,11 @@ densegen:
         n_sites: 200
         oversample_factor: 200
         scoring_backend: fimo
-        pvalue_threshold: 1e-8
+        pvalue_strata: [1e-8, 1e-6, 1e-4]
+        retain_depth: 1
         mining:
           batch_size: 5000
           max_seconds: 60
-          retain_bin_ids: [0, 1, 2, 3]
           log_every_batches: 1
         length_policy: range
         length_range: [15, 20]

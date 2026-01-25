@@ -62,16 +62,17 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     - `max_seconds` (optional float > 0; time limit for candidate generation; **densegen** backend only)
     - `scoring_backend`: `densegen | fimo` (default: `densegen`)
     - `score_threshold` or `score_percentile` (exactly one; **densegen** backend only)
-    - `pvalue_threshold` (float in (0, 1]; **fimo** backend only)
-    - `pvalue_bins` (optional list of floats; must end with `1.0`) - p‑value bin edges for Stage‑A stratified sampling
+    - `pvalue_strata` (list of floats; strictly increasing; **fimo** backend only) - p‑value bin edges
+      for Stage‑A stratified sampling. The last edge is the eligibility floor used for FIMO `--thresh`.
+      Example: `[1e-8, 1e-6, 1e-4]`
+    - `retain_depth` (int > 0; **fimo** backend only) - number of best p‑value bins to retain for Stage‑B
+      (prefix of `pvalue_strata`)
     - `mining` (fimo only) - batch/time controls for mining via FIMO:
       - `batch_size` (int > 0; default 100000) - candidates per FIMO batch
       - `max_batches` (optional int > 0) - max batches per motif
       - `max_candidates` (optional int > 0) - total candidates to generate per motif (quota mode)
         (must be >= `n_sites`)
       - `max_seconds` (optional float > 0; default 60s) - max seconds per motif mining loop
-      - `retain_bin_ids` (optional list of ints) - select p‑value bins to retain (0‑based indices);
-        retained bins are the only bins reported in yield summaries
       - `log_every_batches` (int > 0; default 1) - log per‑bin yield summaries every N batches
     - `bgfile` (optional path) - MEME bfile-format background model for FIMO
     - `keep_all_candidates_debug` (bool, default false) - write candidate Parquet logs to
@@ -83,13 +84,12 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     - `trim_window_length` (optional int > 0; trims PWM to a max‑information window before Stage‑A sampling)
     - `trim_window_strategy`: `max_info` (window selection strategy)
     - `consensus` requires `n_sites: 1`
-    - `background` selects low-scoring sequences (<= threshold/percentile; or pvalue >= threshold for fimo)
+    - `background` selects low-scoring sequences (<= threshold/percentile; or pvalue >= floor for fimo)
     - FIMO resolves `fimo` via `MEME_BIN` or PATH; pixi users should run `pixi run dense ...` so it is available.
-    - Canonical p‑value bins (default): `[1e-10, 1e-8, 1e-6, 1e-4, 1e-3, 1e-2, 1e-1, 1.0]`
+    - Canonical p‑value strata: `[1e-10, 1e-8, 1e-6, 1e-4, 1e-3, 1e-2, 1e-1, 1.0]`
       (bin 0 is `(0, 1e-10]`, bin 1 is `(1e-10, 1e-8]`, etc.)
-    - FIMO runs log per‑bin yield summaries (hits, accepted, selected). If `retain_bin_ids` is set,
-      only those bins are reported; otherwise all bins are reported. Stratification defines the
-      eligible population (bins + `pvalue_threshold`), and selection is top‑N within that population
+    - FIMO logs per‑bin yield summaries as eligible/retained counts. Stratification defines the
+      eligible population (bins up to the floor), and selection is top‑N within the retained bins
       by p‑value (score tie‑break).
     - For `scoring_backend: fimo`, use `mining.max_seconds` (time mode) or
       `mining.max_candidates`/`mining.max_batches` (quota mode). The default is

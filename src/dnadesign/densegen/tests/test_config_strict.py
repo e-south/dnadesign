@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_config_strict.py
+
+Config validation strictness checks for DenseGen.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import copy
@@ -334,6 +345,53 @@ def test_fimo_rejects_max_candidates(tmp_path: Path) -> None:
     ]
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     with pytest.raises(ConfigError, match="max_candidates is not used"):
+        load_config(cfg_path)
+
+
+def test_fimo_rejects_legacy_pvalue_threshold(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["inputs"] = [
+        {
+            "name": "motifs",
+            "type": "pwm_meme",
+            "path": "inputs.meme",
+            "sampling": {
+                "strategy": "stochastic",
+                "n_sites": 2,
+                "oversample_factor": 2,
+                "scoring_backend": "fimo",
+                "pvalue_strata": [1e-8, 1e-6, 1e-4],
+                "retain_depth": 1,
+                "pvalue_threshold": 1e-8,
+                "mining": {"batch_size": 10},
+            },
+        }
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_fimo_rejects_legacy_retain_bin_ids(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["inputs"] = [
+        {
+            "name": "motifs",
+            "type": "pwm_meme",
+            "path": "inputs.meme",
+            "sampling": {
+                "strategy": "stochastic",
+                "n_sites": 2,
+                "oversample_factor": 2,
+                "scoring_backend": "fimo",
+                "pvalue_strata": [1e-8, 1e-6, 1e-4],
+                "retain_depth": 1,
+                "mining": {"batch_size": 10, "retain_bin_ids": [0]},
+            },
+        }
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
         load_config(cfg_path)
 
 
