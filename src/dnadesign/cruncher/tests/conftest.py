@@ -12,10 +12,10 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import os
-import tempfile
-from pathlib import Path
 
 import pytest
+
+from dnadesign.cruncher.utils.numba_cache import temporary_numba_cache_dir
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -36,22 +36,15 @@ def _cruncher_test_environment() -> None:
         if name in os.environ:
             del os.environ[name]
 
-    prior_numba_cache = os.environ.get("NUMBA_CACHE_DIR")
-    numba_cache_dir = Path(tempfile.mkdtemp(prefix="cruncher-numba-cache-"))
-    os.environ["NUMBA_CACHE_DIR"] = str(numba_cache_dir)
-
     prior_string_storage = getattr(pd.options.mode, "string_storage", None)
     if prior_string_storage is not None:
         pd.options.mode.string_storage = "python"
     try:
-        yield
+        with temporary_numba_cache_dir():
+            yield
     finally:
         if prior_string_storage is not None:
             pd.options.mode.string_storage = prior_string_storage
-        if prior_numba_cache is None:
-            os.environ.pop("NUMBA_CACHE_DIR", None)
-        else:
-            os.environ["NUMBA_CACHE_DIR"] = prior_numba_cache
         for name, value in prior_env.items():
             if value is None:
                 os.environ.pop(name, None)

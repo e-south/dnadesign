@@ -14,7 +14,10 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.cruncher.utils.numba_cache import ensure_numba_cache_dir
+from dnadesign.cruncher.utils.numba_cache import (
+    ensure_numba_cache_dir,
+    temporary_numba_cache_dir,
+)
 
 
 def test_numba_cache_defaults_to_cruncher_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -71,3 +74,11 @@ def test_numba_cache_requires_writable_dir(tmp_path: Path, monkeypatch: pytest.M
             ensure_numba_cache_dir(tmp_path)
     finally:
         readonly_dir.chmod(0o700)
+
+
+def test_temporary_numba_cache_dir_cleans_up(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("NUMBA_CACHE_DIR", raising=False)
+    with temporary_numba_cache_dir() as cache_dir:
+        assert cache_dir.exists()
+        assert os.environ.get("NUMBA_CACHE_DIR") == str(cache_dir)
+    assert not cache_dir.exists()
