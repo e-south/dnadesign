@@ -1713,6 +1713,7 @@ def _(
         "#000000",
     ]
     _fallback_scheme = "tableau20"
+    _sfxi_brush = alt.selection_interval(name="sfxi_brush", encodings=["x", "y"])
     if df_sfxi_scatter.is_empty():
         empty_df = pl.DataFrame(
             schema={
@@ -1758,6 +1759,7 @@ def _(
                 ),
                 tooltip=tooltip_cols,
             )
+            .add_params(_sfxi_brush)
         )
         _chart = with_title(
             _chart,
@@ -1858,6 +1860,7 @@ def _(
                 color=_color_encoding,
                 tooltip=tooltip_cols,
             )
+            .add_params(_sfxi_brush)
         )
         _color_subtitle = _base_subtitle
         if _color_title:
@@ -1874,10 +1877,15 @@ def _(
 
 
 @app.cell
-def _(df_sfxi_scatter, opal_campaign_info, pl, sfxi_chart_ui):
-    _unused = (opal_campaign_info, pl, sfxi_chart_ui)
+def _(df_sfxi_scatter, resolve_brush_selection, sfxi_chart_ui):
+    df_sfxi_brush_selected, _ = resolve_brush_selection(
+        df_plot=df_sfxi_scatter,
+        selected_raw=sfxi_chart_ui.value,
+        selection_enabled=not df_sfxi_scatter.is_empty(),
+        id_col="__row_id",
+    )
     df_sfxi_selected = df_sfxi_scatter
-    return (df_sfxi_selected,)
+    return df_sfxi_brush_selected, df_sfxi_selected
 
 
 @app.cell(column=5)
@@ -2082,6 +2090,7 @@ def _(mo):
     inspect_pool_label_map = {
         "Full dataset (all rows)": "df_active",
         "UMAP brush selection": "df_umap_selected",
+        "SFXI brush selection": "df_sfxi_brush_selected",
         "SFXI scored labels (current view)": "df_sfxi_selected",
         "Selected score Top-K": "df_score_top_k_pool",
         "Overlay Top-K": "df_overlay_top_k_pool",
@@ -2100,6 +2109,7 @@ def _(
     df_active,
     df_overlay_top_k_pool,
     df_score_top_k_pool,
+    df_sfxi_brush_selected,
     df_sfxi_selected,
     df_umap_selected,
     inspect_pool_dropdown,
@@ -2108,6 +2118,8 @@ def _(
     pool_choice = inspect_pool_label_map.get(inspect_pool_dropdown.value, inspect_pool_dropdown.value)
     if pool_choice == "df_umap_selected":
         df_pool = df_umap_selected
+    elif pool_choice == "df_sfxi_brush_selected":
+        df_pool = df_sfxi_brush_selected
     elif pool_choice == "df_sfxi_selected":
         df_pool = df_sfxi_selected
     elif pool_choice == "df_overlay_top_k_pool":
