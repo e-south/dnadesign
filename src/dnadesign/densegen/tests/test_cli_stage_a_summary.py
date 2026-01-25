@@ -1,3 +1,15 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_cli_stage_a_summary.py
+
+CLI coverage for Stage-A build-pool summaries.
+Dunlop Lab.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 # ABOUTME: CLI coverage for Stage-A build-pool length summaries.
 # ABOUTME: Ensures pooled TFBS length stats are surfaced in stdout.
 from __future__ import annotations
@@ -64,12 +76,15 @@ def _write_stage_a_config(tmp_path: Path) -> Path:
     return cfg_path
 
 
-def test_stage_a_build_pool_reports_length_summary(tmp_path: Path) -> None:
+def test_stage_a_build_pool_reports_sampling_recap(tmp_path: Path) -> None:
     cfg_path = _write_stage_a_config(tmp_path)
     runner = CliRunner()
     result = runner.invoke(app, ["stage-a", "build-pool", "-c", str(cfg_path)])
     assert result.exit_code == 0, result.output
-    assert "TFBS length summary" in result.output
+    assert "Stage-A sampling recap" in result.output
+    assert "candidates" in result.output
+    assert "strata" in result.output
+    assert "pool" in result.output
     assert "toy_sites" in result.output
 
 

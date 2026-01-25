@@ -95,6 +95,7 @@ class PoolData:
     df: pd.DataFrame | None
     sequences: list[str]
     pool_path: Path
+    summaries: list[object] | None = None
 
 
 @dataclass(frozen=True)
@@ -204,6 +205,7 @@ def load_pool_data(out_dir: Path) -> tuple[TFBSPoolArtifact, dict[str, PoolData]
             df=pool_df,
             sequences=sequences,
             pool_path=pool_path,
+            summaries=None,
         )
     return artifact, pool_data
 
@@ -304,7 +306,11 @@ def build_pool_artifact(
                 raise FileNotFoundError(f"Pool file listed in manifest is missing: {pool_path}")
             existing_df = pd.read_parquet(pool_path)
         src = deps.source_factory(inp, cfg_path)
-        data_entries, meta_df = src.load_data(rng=rng, outputs_root=outputs_root, run_id=str(cfg.run.id))
+        data_entries, meta_df, summaries = src.load_data(
+            rng=rng,
+            outputs_root=outputs_root,
+            run_id=str(cfg.run.id),
+        )
         if meta_df is None:
             df = _build_sequence_pool(data_entries)
         else:
@@ -366,6 +372,7 @@ def build_pool_artifact(
             df=pool_df,
             sequences=sequences,
             pool_path=dest,
+            summaries=summaries,
         )
         rows.append((inp.name, str(inp.type), str(len(df)), dest))
 

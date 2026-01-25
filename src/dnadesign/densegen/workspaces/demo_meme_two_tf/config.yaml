@@ -17,8 +17,7 @@ densegen:
         n_sites: 200
         oversample_factor: 200
         scoring_backend: fimo
-        pvalue_threshold: 1e-4
-        selection_policy: stratified
+        pvalue_threshold: 1e-8
         mining:
           batch_size: 5000
           max_seconds: 60

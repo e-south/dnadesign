@@ -53,6 +53,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.traceback import install as rich_traceback
 
+from .adapters.sources.pwm_sampling import PWMSamplingSummary
 from .config import (
     LATEST_SCHEMA_VERSION,
     ConfigError,
@@ -78,7 +79,7 @@ from .core.pipeline import (
     resolve_plan,
     run_pipeline,
 )
-from .core.pvalue_bins import resolve_pvalue_bins
+from .core.pvalue_bins import resolve_pvalue_strata
 from .core.reporting import collect_report_data, write_report
 from .core.run_manifest import load_run_manifest
 from .core.run_paths import (
@@ -365,7 +366,6 @@ def _print_inputs_summary(loaded) -> None:
         "strategy",
         "backend",
         "score",
-        "selection",
         "bins",
         "mining",
         "bgfile",
@@ -392,23 +392,22 @@ def _print_inputs_summary(loaded) -> None:
             motif_label = "from artifact"
         backend = getattr(sampling, "scoring_backend", "densegen")
         score_label = "-"
-        if backend == "fimo" and sampling.pvalue_threshold is not None:
-            comparator = ">=" if sampling.strategy == "background" else "<="
-            score_label = f"pvalue{comparator}{sampling.pvalue_threshold}"
+        if backend == "fimo":
+            strata = getattr(sampling, "pvalue_strata", None) or []
+            if strata:
+                comparator = ">=" if sampling.strategy == "background" else "<="
+                score_label = f"floor{comparator}{strata[-1]:g}"
         elif sampling.score_threshold is not None:
             score_label = f"threshold={sampling.score_threshold}"
         elif sampling.score_percentile is not None:
             score_label = f"percentile={sampling.score_percentile}"
-        selection_label = "-" if backend != "fimo" else (getattr(sampling, "selection_policy", None) or "-")
         bins_label = "-"
         if backend == "fimo":
-            bins_label = "canonical"
-            if getattr(sampling, "pvalue_bins", None) is not None:
-                bins_label = "custom"
-            mining_cfg = getattr(sampling, "mining", None)
-            bin_ids = getattr(mining_cfg, "retain_bin_ids", None)
-            if bin_ids:
-                bins_label = f"{bins_label}; retain={','.join(str(i) for i in bin_ids)}"
+            strata = getattr(sampling, "pvalue_strata", None) or []
+            retain_depth = getattr(sampling, "retain_depth", None)
+            bins_label = f"strata={len(strata)}"
+            if retain_depth is not None:
+                bins_label = f"{bins_label}; retain={retain_depth}"
         mining_label = "-"
         mining_cfg = getattr(sampling, "mining", None)
         if backend == "fimo" and mining_cfg is not None:
@@ -441,7 +440,6 @@ def _print_inputs_summary(loaded) -> None:
             str(sampling.strategy),
             str(backend),
             score_label,
-            str(selection_label),
             str(bins_label),
             str(mining_label),
             str(bgfile_label),
@@ -467,8 +465,8 @@ def _resolve_fimo_bin_edges(cfg, *, input_name: str) -> list[float] | None:
         backend = getattr(sampling, "scoring_backend", None)
         if backend is None or str(backend).lower() != "fimo":
             return None
-        bins = getattr(sampling, "pvalue_bins", None)
-        return resolve_pvalue_bins(bins)
+        strata = getattr(sampling, "pvalue_strata", None)
+        return resolve_pvalue_strata(strata)
     return None
 
 
@@ -499,6 +497,97 @@ def _fimo_bin_rows(df: pd.DataFrame, edges: list[float] | None) -> list[tuple[in
         else:
             range_label = "-"
         rows.append((int(bin_id), range_label, count))
+    return rows
+
+
+def _format_sampling_ratio(value: int, target: int | None) -> str:
+    if target is None or target <= 0:
+        return str(int(value))
+    return f"{int(value)}/{int(target)}"
+
+
+def _format_sampling_lengths(
+    *,
+    min_len: int | None,
+    median_len: float | None,
+    mean_len: float | None,
+    max_len: int | None,
+    count: int | None,
+) -> str:
+    if count is None:
+        return "-"
+    if min_len is None or median_len is None or mean_len is None or max_len is None:
+        return f"{int(count)}/-/-/-/-"
+    return f"{int(count)}/{int(min_len)}/{median_len:.1f}/{mean_len:.1f}/{int(max_len)}"
+
+
+def _stage_a_sampling_rows(pool_data: dict[str, PoolData]) -> list[tuple[str, str, str, str, str, str, str, str]]:
+    rows: list[tuple[str, str, str, str, str, str, str, str]] = []
+    for pool in pool_data.values():
+        summaries = pool.summaries or []
+        if summaries:
+            for summary in summaries:
+                if not isinstance(summary, PWMSamplingSummary):
+                    continue
+                input_name = summary.input_name or pool.name
+                regulator = summary.regulator or "-"
+                backend = summary.backend or "-"
+                candidates = _format_sampling_ratio(summary.generated, summary.target)
+                eligible = _format_sampling_ratio(summary.eligible, summary.generated)
+                pooled = _format_sampling_ratio(summary.retained, summary.target_sites)
+                bins_label = summary.strata_bins or "-"
+                length_label = _format_sampling_lengths(
+                    min_len=summary.retained_len_min,
+                    median_len=summary.retained_len_median,
+                    mean_len=summary.retained_len_mean,
+                    max_len=summary.retained_len_max,
+                    count=summary.retained,
+                )
+                rows.append(
+                    (
+                        str(input_name),
+                        str(regulator),
+                        str(backend),
+                        candidates,
+                        eligible,
+                        pooled,
+                        bins_label,
+                        length_label,
+                    )
+                )
+            continue
+        total = len(pool.sequences)
+        lengths = [len(seq) for seq in pool.sequences]
+        if lengths:
+            arr = np.asarray(lengths, dtype=float)
+            length_label = _format_sampling_lengths(
+                min_len=int(arr.min()),
+                median_len=float(np.median(arr)),
+                mean_len=float(arr.mean()),
+                max_len=int(arr.max()),
+                count=int(total),
+            )
+        else:
+            length_label = _format_sampling_lengths(
+                min_len=None,
+                median_len=None,
+                mean_len=None,
+                max_len=None,
+                count=int(total),
+            )
+        rows.append(
+            (
+                str(pool.name),
+                "-",
+                "provided",
+                _format_sampling_ratio(total, None),
+                "-",
+                _format_sampling_ratio(total, None),
+                "-",
+                length_label,
+            )
+        )
+    rows.sort(key=lambda row: (row[0], row[1]))
     return rows
 
 
@@ -1706,40 +1795,26 @@ def stage_a_build_pool(
                     f"[yellow]Candidate logging enabled but no candidate records found under {candidates_dir}.[/]"
                 )
 
-    for pool in pool_data.values():
-        if pool.df is None:
-            continue
-        df = pool.df
-        if "fimo_bin_id" in df.columns:
-            bin_table = Table("bin_id", "pvalue_range", "count")
-            edges = _resolve_fimo_bin_edges(cfg, input_name=pool.name)
-            for bin_id, range_label, count in _fimo_bin_rows(df, edges):
-                bin_table.add_row(str(bin_id), range_label, str(int(count)))
-            console.print(f"[bold]FIMO p-value bins for {pool.name}[/]")
-            console.print(bin_table)
-
-    length_table = Table("input", "count", "min_len", "median_len", "max_len")
-    for pool in pool_data.values():
-        if pool.df is None or "tfbs" not in pool.df.columns:
-            continue
-        lengths = pool.df["tfbs"].astype(str).str.len()
-        if lengths.empty:
-            continue
-        length_table.add_row(
-            str(pool.name),
-            str(int(lengths.count())),
-            str(int(lengths.min())),
-            f"{float(lengths.median()):.1f}",
-            str(int(lengths.max())),
+    recap_rows = _stage_a_sampling_rows(pool_data)
+    if recap_rows:
+        recap_table = Table()
+        recap_table.add_column("input", overflow="fold")
+        recap_table.add_column("reg", overflow="fold")
+        recap_table.add_column("backend")
+        recap_table.add_column("candidates")
+        recap_table.add_column("eligible")
+        recap_table.add_column("pool")
+        recap_table.add_column("bins", overflow="fold")
+        recap_table.add_column("len(n/min/med/avg/max)")
+        for row in recap_rows:
+            recap_table.add_row(*row)
+        console.print("[bold]Stage-A sampling recap[/]")
+        console.print(recap_table)
+        console.print(
+            "  candidates=generated/target; eligible=hits at/below p-value floor; "
+            "pool=top-N within retained strata (shortfall ok); bins=eligible/retained per bin; "
+            "len=n/min/med/avg/max (pool)"
         )
-    if length_table.row_count:
-        console.print("[bold]TFBS length summary[/]")
-        console.print(length_table)
-
-    table = Table("input", "type", "rows", "pool_file")
-    for entry in artifact.inputs.values():
-        table.add_row(entry.name, entry.input_type, str(entry.rows), entry.pool_path.name)
-    console.print(table)
     console.print(f":sparkles: [bold green]Pool manifest written[/]: {artifact.manifest_path}")
 
 

@@ -45,11 +45,12 @@ class BaseDataSource(abc.ABC):
         rng=None,
         outputs_root: Path | None = None,
         run_id: str | None = None,
-    ) -> Tuple[List, Optional[pd.DataFrame]]:
+    ) -> Tuple[List, Optional[pd.DataFrame], Optional[list[dict]]]:
         """
         Returns:
-            (data_entries, meta_df)
+            (data_entries, meta_df, sampling_summaries)
             - For binding-site inputs: meta_df is a DataFrame with 'tf' and 'tfbs' columns.
             - For sequence library inputs: data_entries is a list of sequences; meta_df None.
+            - sampling_summaries is only populated for PWM sampling inputs.
         """
         raise NotImplementedError

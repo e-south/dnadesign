@@ -1,3 +1,15 @@
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+dnadesign/densegen/tests/test_pwm_log_odds_smoothing.py
+
+Checks PWM log-odds smoothing and sampling stability.
+
+Module Author(s): Eric J. South
+Dunlop Lab
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -28,8 +40,8 @@ def test_pwm_log_odds_smoothing_finite() -> None:
         strategy="stochastic",
         n_sites=1,
         oversample_factor=3,
-        score_threshold=None,
-        score_percentile=50.0,
+        score_threshold=-100.0,
+        score_percentile=None,
     )
     assert len(sites) == 1
     core = sites[0][: len(matrix)]
