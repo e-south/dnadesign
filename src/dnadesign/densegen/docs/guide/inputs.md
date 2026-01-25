@@ -33,20 +33,19 @@ Required when `scoring_backend: densegen`:
 
 Required when `scoring_backend: fimo`:
 - `scoring_backend: fimo`
-- `pvalue_threshold` (float in (0, 1])
+- `pvalue_strata` (list of floats; strictly increasing)
+- `retain_depth` (int > 0)
 
 Optional (supported):
 - `strategy`: `consensus | stochastic | background` (default `stochastic`)
 - `oversample_factor` (int > 0; default `10`)
 - `max_candidates` (densegen‑only; int > 0 when set)
 - `max_seconds` (densegen‑only; float > 0 when set)
-- `pvalue_bins` (fimo‑only): list of floats, strictly increasing, must end with `1.0`
 - `mining` (fimo‑only):
   - `batch_size` (int > 0)
   - `max_batches` (optional int > 0)
   - `max_candidates` (optional int > 0; must be ≥ `n_sites`)
   - `max_seconds` (optional float > 0; default 60s)
-  - `retain_bin_ids` (optional list of ints; unique, in‑range)
   - `log_every_batches` (int > 0)
 - `bgfile` (fimo‑only): MEME background file
 - `keep_all_candidates_debug` (bool): write candidate‑level Parquet under `outputs/pools/candidates/`
@@ -61,13 +60,13 @@ Optional (supported):
 Strict validation behavior:
 - Unknown keys are errors (extra fields are rejected).
 - DenseGen backend requires exactly one of `score_threshold` or `score_percentile`.
-- FIMO backend requires `pvalue_threshold`; `max_candidates`/`max_seconds` are **not** allowed.
+- FIMO backend requires `pvalue_strata` + `retain_depth`; `max_candidates`/`max_seconds` are **not** allowed.
 - `consensus` requires `n_sites: 1`.
 
 FIMO stratification behavior:
-- `pvalue_threshold` is the primary stringency knob; lower values yield fewer matches.
-- `pvalue_threshold` and `mining.retain_bin_ids` define the eligible population.
-- Stage‑A selection is top‑N within that population, ordered by p‑value (score tie‑break).
+- `pvalue_strata` defines p‑value bins; the last edge is the eligibility floor used for FIMO `--thresh`.
+- `retain_depth` keeps the best bins (prefix of `pvalue_strata`) for Stage‑B.
+- Stage‑A selection is top‑N within the retained bins, ordered by p‑value (score tie‑break).
 
 Minimal Stage‑A PWM example (DenseGen backend):
 
@@ -90,7 +89,8 @@ inputs:
     path: inputs/lexA.txt
     sampling:  # Stage‑A sampling
       scoring_backend: fimo
-      pvalue_threshold: 1e-8
+      pvalue_strata: [1e-8, 1e-6, 1e-4]
+      retain_depth: 1
       n_sites: 80
 ```
 

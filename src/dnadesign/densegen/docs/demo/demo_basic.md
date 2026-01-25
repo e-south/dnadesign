@@ -139,7 +139,7 @@ The DenseGen workspace stays config‑centric (one runtime config); Cruncher kee
 
 Review the resolved outputs, Stage‑A sampling settings, fixed elements, and Stage‑B sampling policy.
 
-Stage‑A sampling: the pipeline can mine hundreds of binding sites per TF from the MEME‑derived PWM artifacts. The motif JSONs specify widths (LexA 15 bp, CpxR 11 bp), and `length_policy: range` with `length_range: [15, 20]` chooses a target length and pads flanks to it while pulling from the top p‑value bins. Increase `n_sites` if you need a larger pool.
+Stage‑A sampling: the pipeline can mine hundreds of binding sites per TF from the MEME‑derived PWM artifacts. The motif JSONs specify widths (LexA 15 bp, CpxR 11 bp), and `length_policy: range` with `length_range: [15, 20]` chooses a target length and pads flanks to it while retaining the best p‑value strata (`pvalue_strata` + `retain_depth`). Increase `n_sites` if you need a larger pool.
 
 Stage‑B sampling: the Stage‑A pool is subsampled into candidate libraries (`pool_strategy: subsample`, `library_size: 20`) with coverage weighting so each library contains the specified TFs (`cover_all_regulators: true`). Each library is offered to the solver, which assembles 60‑bp sequences by selecting a subset; new libraries are sampled as needed.
 

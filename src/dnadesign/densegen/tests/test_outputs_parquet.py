@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_outputs_parquet.py
+
+Parquet output metadata contract tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -58,15 +69,13 @@ def _dummy_meta() -> dict:
         "input_pwm_scoring_backend": None,
         "input_pwm_score_threshold": None,
         "input_pwm_score_percentile": None,
-        "input_pwm_pvalue_threshold": None,
-        "input_pwm_pvalue_bins": None,
+        "input_pwm_pvalue_strata": None,
+        "input_pwm_retain_depth": None,
         "input_pwm_mining_batch_size": None,
         "input_pwm_mining_max_batches": None,
         "input_pwm_mining_max_candidates": None,
         "input_pwm_mining_max_seconds": None,
-        "input_pwm_mining_retain_bin_ids": None,
         "input_pwm_mining_log_every_batches": None,
-        "input_pwm_selection_policy": None,
         "input_pwm_bgfile": None,
         "input_pwm_keep_all_candidates_debug": None,
         "input_pwm_include_matched_sequence": None,

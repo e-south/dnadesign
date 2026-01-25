@@ -35,11 +35,9 @@ def _meta_arrow_type(name: str, pa):
         "required_regulators",
     }
     list_float = {
-        "input_pwm_pvalue_bins",
+        "input_pwm_pvalue_strata",
     }
-    list_int = {
-        "input_pwm_mining_retain_bin_ids",
-    }
+    list_int = set()
     int_fields = {
         "length",
         "random_seed",
@@ -48,6 +46,7 @@ def _meta_arrow_type(name: str, pa):
         "min_required_regulators",
         "input_pwm_n_sites",
         "input_pwm_oversample_factor",
+        "input_pwm_retain_depth",
         "input_pwm_mining_batch_size",
         "input_pwm_mining_max_batches",
         "input_pwm_mining_max_candidates",
@@ -74,7 +73,6 @@ def _meta_arrow_type(name: str, pa):
         "compression_ratio",
         "input_pwm_score_threshold",
         "input_pwm_score_percentile",
-        "input_pwm_pvalue_threshold",
         "input_pwm_mining_max_seconds",
         "sampling_fraction",
         "sampling_fraction_pairs",
