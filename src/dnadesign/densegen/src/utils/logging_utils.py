@@ -1,10 +1,12 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/utils/logging_utils.py
+dnadesign
+src/dnadesign/densegen/src/utils/logging_utils.py
+
+Logging setup and stderr filtering utilities.
+Dunlop Lab.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -16,10 +18,62 @@ import re
 import sys
 import threading
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Optional, TextIO
 
 _NATIVE_STDERR_PATTERNS: list[tuple[str, re.Pattern, str | None]] = []
 _NATIVE_STDERR_LOCK = threading.Lock()
+_FIMO_STDOUT_SUPPRESS_RE = re.compile(r"^\s*FIMO (mining|yield)\b")
+_PROGRESS_LOCK = threading.Lock()
+_PROGRESS_ACTIVE = False
+_PROGRESS_VISIBLE = False
+
+
+def set_progress_active(active: bool) -> None:
+    global _PROGRESS_ACTIVE, _PROGRESS_VISIBLE
+    with _PROGRESS_LOCK:
+        _PROGRESS_ACTIVE = bool(active)
+        if not _PROGRESS_ACTIVE:
+            _PROGRESS_VISIBLE = False
+
+
+def mark_progress_line_visible() -> None:
+    global _PROGRESS_VISIBLE
+    with _PROGRESS_LOCK:
+        if _PROGRESS_ACTIVE:
+            _PROGRESS_VISIBLE = True
+
+
+def is_progress_line_visible() -> bool:
+    with _PROGRESS_LOCK:
+        return bool(_PROGRESS_VISIBLE)
+
+
+def _maybe_clear_progress_line(stream: TextIO) -> None:
+    global _PROGRESS_VISIBLE
+    with _PROGRESS_LOCK:
+        if not (_PROGRESS_ACTIVE and _PROGRESS_VISIBLE):
+            return
+        _PROGRESS_VISIBLE = False
+    stream.write("\n")
+    stream.flush()
+
+
+class FimoMiningBatchLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        if _FIMO_STDOUT_SUPPRESS_RE.search(message):
+            return False
+        return True
+
+
+class ProgressAwareStreamHandler(logging.StreamHandler):
+    def emit(self, record: logging.LogRecord) -> None:
+        if getattr(record, "suppress_stdout", False):
+            return
+        if _FIMO_STDOUT_SUPPRESS_RE.search(record.getMessage()):
+            return
+        _maybe_clear_progress_line(self.stream)
+        super().emit(record)
 
 
 def _register_native_stderr_patterns(patterns: Iterable[tuple[str, str | None]]) -> None:
@@ -164,9 +218,10 @@ def setup_logging(
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    sh = logging.StreamHandler(stream=sys.stdout)
+    sh = ProgressAwareStreamHandler(stream=sys.stdout)
     sh.setLevel(lvl)
     sh.setFormatter(fmt)
+    sh.addFilter(FimoMiningBatchLogFilter())
     root.addHandler(sh)
 
     if logfile:

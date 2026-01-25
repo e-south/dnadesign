@@ -40,7 +40,6 @@ Optional (supported):
 - `oversample_factor` (int > 0; default `10`)
 - `max_candidates` (densegen‑only; int > 0 when set)
 - `max_seconds` (densegen‑only; float > 0 when set)
-- `selection_policy` (fimo‑only): `random_uniform | top_n | stratified`
 - `pvalue_bins` (fimo‑only): list of floats, strictly increasing, must end with `1.0`
 - `mining` (fimo‑only):
   - `batch_size` (int > 0)
@@ -65,6 +64,11 @@ Strict validation behavior:
 - FIMO backend requires `pvalue_threshold`; `max_candidates`/`max_seconds` are **not** allowed.
 - `consensus` requires `n_sites: 1`.
 
+FIMO stratification behavior:
+- `pvalue_threshold` is the primary stringency knob; lower values yield fewer matches.
+- `pvalue_threshold` and `mining.retain_bin_ids` define the eligible population.
+- Stage‑A selection is top‑N within that population, ordered by p‑value (score tie‑break).
+
 Minimal Stage‑A PWM example (DenseGen backend):
 
 ```yaml
@@ -86,7 +90,7 @@ inputs:
     path: inputs/lexA.txt
     sampling:  # Stage‑A sampling
       scoring_backend: fimo
-      pvalue_threshold: 1e-4
+      pvalue_threshold: 1e-8
       n_sites: 80
 ```
 

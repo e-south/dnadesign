@@ -56,6 +56,7 @@ class PWMArtifactSetDataSource(BaseDataSource):
 
         entries = []
         all_rows = []
+        summaries = []
         for motif, path in zip(motifs, resolved):
             motif_hash = hash_pwm_motif(
                 motif_label=motif.motif_id,
@@ -79,11 +80,10 @@ class PWMArtifactSetDataSource(BaseDataSource):
             trim_window_length = sampling_cfg.get("trim_window_length")
             trim_window_strategy = sampling_cfg.get("trim_window_strategy", "max_info")
             scoring_backend = str(sampling_cfg.get("scoring_backend", "densegen")).lower()
-            pvalue_threshold = sampling_cfg.get("pvalue_threshold")
-            pvalue_bins = sampling_cfg.get("pvalue_bins")
+            pvalue_strata = sampling_cfg.get("pvalue_strata")
+            retain_depth = sampling_cfg.get("retain_depth")
             mining = sampling_cfg.get("mining")
             bgfile = sampling_cfg.get("bgfile")
-            selection_policy = str(sampling_cfg.get("selection_policy", "random_uniform"))
             keep_all_candidates_debug = bool(sampling_cfg.get("keep_all_candidates_debug", False))
             include_matched_sequence = bool(sampling_cfg.get("include_matched_sequence", False))
             bgfile_path: Path | None = None
@@ -113,11 +113,10 @@ class PWMArtifactSetDataSource(BaseDataSource):
                 score_threshold=threshold,
                 score_percentile=percentile,
                 scoring_backend=scoring_backend,
-                pvalue_threshold=pvalue_threshold,
-                pvalue_bins=pvalue_bins,
+                pvalue_strata=pvalue_strata,
+                retain_depth=retain_depth,
                 mining=mining,
                 bgfile=bgfile_path,
-                selection_policy=selection_policy,
                 keep_all_candidates_debug=keep_all_candidates_debug,
                 include_matched_sequence=include_matched_sequence,
                 debug_output_dir=debug_output_dir,
@@ -127,12 +126,15 @@ class PWMArtifactSetDataSource(BaseDataSource):
                 trim_window_length=trim_window_length,
                 trim_window_strategy=str(trim_window_strategy),
                 return_metadata=return_meta,
+                return_summary=True,
             )
             if return_meta:
-                selected, meta_by_seq = result  # type: ignore[misc]
+                selected, meta_by_seq, summary = result  # type: ignore[misc]
             else:
-                selected = result  # type: ignore[assignment]
+                selected, summary = result  # type: ignore[assignment]
                 meta_by_seq = {}
+            if summary is not None:
+                summaries.append(summary)
 
             for seq in selected:
                 entries.append((motif.motif_id, seq, str(path)))
@@ -162,4 +164,4 @@ class PWMArtifactSetDataSource(BaseDataSource):
         import pandas as pd
 
         df = pd.DataFrame(all_rows)
-        return entries, df
+        return entries, df, summaries

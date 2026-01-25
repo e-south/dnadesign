@@ -78,4 +78,4 @@ class SequenceLibraryDataSource(BaseDataSource):
         if invalid_rows:
             preview = ", ".join(str(i) for i in invalid_rows[:10])
             raise ValueError(f"Invalid sequences in {data_path} (rows: {preview}). DenseGen requires A/C/G/T only.")
-        return seqs, None
+        return seqs, None, None

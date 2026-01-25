@@ -146,4 +146,4 @@ class BindingSitesDataSource(BaseDataSource):
         else:
             src_list = [source_default] * len(out)
         entries = list(zip(out["tf"].tolist(), out["tfbs"].tolist(), src_list))
-        return entries, out
+        return entries, out, None

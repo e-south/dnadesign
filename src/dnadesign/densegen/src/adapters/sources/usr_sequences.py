@@ -60,4 +60,4 @@ class USRSequencesDataSource(BaseDataSource):
             )
         if self.limit:
             seqs = seqs[: max(0, int(self.limit))]
-        return seqs, None
+        return seqs, None, None

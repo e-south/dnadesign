@@ -130,7 +130,12 @@ META_FIELDS: list[MetaField] = [
         "Stage-A PWM mining log frequency (batches).",
         allow_none=True,
     ),
-    MetaField("input_pwm_selection_policy", (str,), "Stage-A PWM selection policy (FIMO).", allow_none=True),
+    MetaField(
+        "input_pwm_selection_policy",
+        (str,),
+        "Stage-A PWM selection policy (FIMO; fixed stratified top-N).",
+        allow_none=True,
+    ),
     MetaField("input_pwm_bgfile", (str,), "Stage-A PWM background model path (FIMO).", allow_none=True),
     MetaField("input_pwm_keep_all_candidates_debug", (bool,), "Stage-A PWM FIMO debug TSV enabled.", allow_none=True),
     MetaField("input_pwm_include_matched_sequence", (bool,), "Stage-A PWM matched-sequence capture.", allow_none=True),

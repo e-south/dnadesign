@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-CANONICAL_PVALUE_BINS: tuple[float, ...] = (
+CANONICAL_PVALUE_STRATA: tuple[float, ...] = (
     1e-10,
     1e-8,
     1e-6,
@@ -26,7 +26,7 @@ CANONICAL_PVALUE_BINS: tuple[float, ...] = (
 )
 
 
-def resolve_pvalue_bins(pvalue_bins: Sequence[float] | None) -> list[float]:
-    if pvalue_bins is None:
-        return list(CANONICAL_PVALUE_BINS)
-    return [float(v) for v in pvalue_bins]
+def resolve_pvalue_strata(pvalue_strata: Sequence[float] | None) -> list[float]:
+    if pvalue_strata is None:
+        return list(CANONICAL_PVALUE_STRATA)
+    return [float(v) for v in pvalue_strata]

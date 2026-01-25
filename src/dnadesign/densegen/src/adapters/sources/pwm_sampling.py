@@ -1,32 +1,131 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/sources/pwm_sampling.py
+dnadesign
+src/dnadesign/densegen/src/adapters/sources/pwm_sampling.py
 
 Shared Stage-A PWM sampling utilities.
+Dunlop Lab.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
 import logging
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence, TextIO, Tuple, Union
 
 import numpy as np
 import pandas as pd
 
 from ...core.artifacts.ids import hash_candidate_id
-from ...core.pvalue_bins import resolve_pvalue_bins
+from ...core.pvalue_bins import resolve_pvalue_strata
+from ...utils import logging_utils
 
 SMOOTHING_ALPHA = 1e-6
 log = logging.getLogger(__name__)
 _SAFE_LABEL_RE = None
+
+
+def _format_rate(rate: float) -> str:
+    if rate >= 1000.0:
+        return f"{rate / 1000.0:.1f}k/s"
+    return f"{rate:.1f}/s"
+
+
+def _format_pwm_progress_line(
+    *,
+    motif_id: str,
+    backend: str,
+    generated: int,
+    target: int,
+    accepted: Optional[int],
+    accepted_target: Optional[int],
+    batch_index: Optional[int],
+    batch_total: Optional[int],
+    elapsed: float,
+) -> str:
+    safe_target = max(1, int(target))
+    gen_pct = min(100, int(100 * generated / safe_target))
+    parts = [f"PWM {motif_id}", backend, f"gen {gen_pct}% ({generated}/{safe_target})"]
+    if batch_index is not None:
+        total_label = "-" if batch_total is None else str(int(batch_total))
+        parts.append(f"batch {int(batch_index)}/{total_label}")
+    elapsed_label = f"{max(0.0, float(elapsed)):.1f}s"
+    rate = generated / elapsed if elapsed > 0 else 0.0
+    parts.append(elapsed_label)
+    parts.append(_format_rate(rate))
+    return " | ".join(parts)
+
+
+@dataclass
+class _PwmSamplingProgress:
+    motif_id: str
+    backend: str
+    target: int
+    accepted_target: Optional[int]
+    stream: TextIO
+    min_interval: float = 0.2
+
+    def __post_init__(self) -> None:
+        self._enabled = bool(getattr(self.stream, "isatty", lambda: False)())
+        self._start = time.monotonic()
+        self._last_update = self._start
+        self._last_len = 0
+        self._last_state: tuple[int, Optional[int], Optional[int]] | None = None
+        self._shown = False
+        if self._enabled:
+            logging_utils.set_progress_active(True)
+
+    def update(
+        self,
+        *,
+        generated: int,
+        accepted: Optional[int],
+        batch_index: Optional[int] = None,
+        batch_total: Optional[int] = None,
+        force: bool = False,
+    ) -> None:
+        if not self._enabled:
+            return
+        now = time.monotonic()
+        if not force and (now - self._last_update) < float(self.min_interval):
+            return
+        state = (int(generated), batch_index, batch_total)
+        if self._shown and state == self._last_state and logging_utils.is_progress_line_visible():
+            self._last_update = now
+            return
+        line = _format_pwm_progress_line(
+            motif_id=self.motif_id,
+            backend=self.backend,
+            generated=int(generated),
+            target=int(self.target),
+            accepted=accepted,
+            accepted_target=self.accepted_target,
+            batch_index=batch_index,
+            batch_total=batch_total,
+            elapsed=now - self._start,
+        )
+        padded = line.ljust(self._last_len)
+        self._last_len = max(self._last_len, len(line))
+        self.stream.write(f"\r{padded}")
+        self.stream.flush()
+        self._last_update = now
+        self._last_state = state
+        self._shown = True
+        logging_utils.mark_progress_line_visible()
+
+    def finish(self) -> None:
+        if self._enabled:
+            logging_utils.set_progress_active(False)
+        if not self._shown:
+            return
+        self.stream.write("\n")
+        self.stream.flush()
 
 
 def _safe_label(text: str) -> str:
@@ -109,6 +208,29 @@ class PWMMotif:
     log_odds: Optional[List[dict[str, float]]] = None
 
 
+@dataclass(frozen=True)
+class PWMSamplingSummary:
+    input_name: Optional[str]
+    regulator: str
+    backend: str
+    generated: int
+    target: int
+    target_sites: Optional[int]
+    eligible: int
+    retained: int
+    retained_len_min: Optional[int]
+    retained_len_median: Optional[float]
+    retained_len_mean: Optional[float]
+    retained_len_max: Optional[int]
+    strata_bins: Optional[str]
+
+
+@dataclass(frozen=True)
+class SelectionOutcome:
+    selected: List[str]
+    retained: List[str]
+
+
 def normalize_background(bg: Optional[dict[str, float]]) -> dict[str, float]:
     if not bg:
         return {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
@@ -160,6 +282,44 @@ def score_sequence(
             return float("-inf")
         score += float(lod)
     return score
+
+
+def _summarize_lengths(lengths: Sequence[int]) -> tuple[Optional[int], Optional[float], Optional[float], Optional[int]]:
+    if not lengths:
+        return None, None, None, None
+    arr = np.asarray(lengths, dtype=float)
+    return int(arr.min()), float(np.median(arr)), float(arr.mean()), int(arr.max())
+
+
+def _build_summary(
+    *,
+    generated: int,
+    target: int,
+    target_sites: Optional[int],
+    eligible: Sequence[str],
+    retained: Sequence[str],
+    strata_bins: Optional[str],
+    input_name: Optional[str] = None,
+    regulator: Optional[str] = None,
+    backend: Optional[str] = None,
+) -> PWMSamplingSummary:
+    lengths = [len(seq) for seq in retained]
+    min_len, median_len, mean_len, max_len = _summarize_lengths(lengths)
+    return PWMSamplingSummary(
+        input_name=input_name,
+        regulator=str(regulator or ""),
+        backend=str(backend or ""),
+        generated=int(generated),
+        target=int(target),
+        target_sites=int(target_sites) if target_sites is not None else None,
+        eligible=int(len(eligible)),
+        retained=int(len(retained)),
+        retained_len_min=min_len,
+        retained_len_median=median_len,
+        retained_len_mean=mean_len,
+        retained_len_max=max_len,
+        strata_bins=strata_bins,
+    )
 
 
 def sample_sequence_from_background(rng: np.random.Generator, probs: dict[str, float], length: int) -> str:
@@ -240,7 +400,7 @@ def select_by_score(
     percentile: Optional[float],
     keep_low: bool,
     context: Optional[dict] = None,
-) -> List[str]:
+) -> SelectionOutcome:
     scores = np.array([s for _, s in candidates], dtype=float)
     if threshold is None:
         cutoff = np.percentile(scores, float(percentile))  # type: ignore[arg-type]
@@ -254,20 +414,31 @@ def select_by_score(
             context = dict(context)
             context["score_label"] = f"threshold={threshold}"
     if keep_low:
-        picked = [seq for seq, score in candidates if score <= cutoff]
+        picked = [(seq, score) for seq, score in candidates if score <= cutoff]
+        ordered = sorted(picked, key=lambda item: item[1])
     else:
-        picked = [seq for seq, score in candidates if score >= cutoff]
-    unique = list(dict.fromkeys(picked))
+        picked = [(seq, score) for seq, score in candidates if score >= cutoff]
+        ordered = sorted(picked, key=lambda item: item[1], reverse=True)
+    seen: set[str] = set()
+    unique: list[str] = []
+    for seq, _score in ordered:
+        if seq in seen:
+            continue
+        seen.add(seq)
+        unique.append(seq)
     if len(unique) < n_sites:
         unique_total = len({seq for seq, _ in candidates})
         if context is None:
-            raise ValueError(
-                f"Stage-A PWM sampling produced {len(unique)} unique sites after filtering; "
-                f"need {n_sites}. Adjust thresholds or oversample_factor."
+            log.warning(
+                "Stage-A PWM sampling shortfall: retained=%d need=%d (candidates=%d).",
+                len(unique),
+                n_sites,
+                unique_total,
             )
+            return SelectionOutcome(selected=unique, retained=unique)
         msg_lines = [
             (
-                "Stage-A PWM sampling failed for motif "
+                "Stage-A PWM sampling shortfall for motif "
                 f"'{context.get('motif_id')}' "
                 f"(width={context.get('width')}, strategy={context.get('strategy')}, "
                 f"length={context.get('length_label')}, window={context.get('window_label')}, "
@@ -285,7 +456,7 @@ def select_by_score(
             msg_lines.append(f"Observed candidate lengths={context.get('length_observed')}.")
         suggestions = [
             "reduce n_sites",
-            "lower score_percentile (e.g., 90 → 80)",
+            "lower score_threshold",
             "increase oversample_factor",
         ]
         if context.get("cap_applied"):
@@ -298,26 +469,25 @@ def select_by_score(
         if context.get("width") is not None and int(context.get("width")) <= 6:
             suggestions.append("try length_policy=range with a longer length_range")
         msg_lines.append("Try next: " + "; ".join(suggestions) + ".")
-        raise ValueError(" ".join(msg_lines))
-    return unique[:n_sites]
+        log.warning(" ".join(msg_lines))
+        return SelectionOutcome(selected=unique, retained=unique)
+    return SelectionOutcome(selected=unique[:n_sites], retained=unique)
 
 
-def _resolve_pvalue_edges(pvalue_bins: Sequence[float] | None) -> list[float]:
-    edges = resolve_pvalue_bins(pvalue_bins)
+def _resolve_pvalue_strata(pvalue_strata: Sequence[float] | None) -> list[float]:
+    edges = resolve_pvalue_strata(pvalue_strata)
     if not edges:
-        raise ValueError("pvalue_bins must contain at least one edge.")
+        raise ValueError("pvalue_strata must contain at least one edge.")
     cleaned: list[float] = []
     prev = 0.0
     for edge in edges:
         edge_val = float(edge)
         if not (0.0 < edge_val <= 1.0):
-            raise ValueError("pvalue_bins values must be in (0, 1].")
+            raise ValueError("pvalue_strata values must be in (0, 1].")
         if edge_val <= prev:
-            raise ValueError("pvalue_bins must be strictly increasing.")
+            raise ValueError("pvalue_strata must be strictly increasing.")
         cleaned.append(edge_val)
         prev = edge_val
-    if abs(cleaned[-1] - 1.0) > 1e-12:
-        raise ValueError("pvalue_bins must end with 1.0.")
     return cleaned
 
 
@@ -354,42 +524,26 @@ def _format_pvalue_bins(
     return " ".join(labels) if labels else "-"
 
 
-def _stratified_sample(
-    candidates: List[FimoCandidate],
-    *,
-    n_sites: int,
-    rng: np.random.Generator,
-    n_bins: int,
-) -> List[FimoCandidate]:
-    bins: list[list[FimoCandidate]] = [[] for _ in range(n_bins)]
-    for cand in candidates:
-        idx = max(0, min(int(cand.bin_id), n_bins - 1))
-        bins[idx].append(cand)
-    for bucket in bins:
-        rng.shuffle(bucket)
-    picked: list[FimoCandidate] = []
-    while len(picked) < n_sites:
-        progressed = False
-        for bucket in bins:
-            if bucket:
-                picked.append(bucket.pop())
-                progressed = True
-                if len(picked) >= n_sites:
-                    break
-        if not progressed:
-            break
-    return picked
+def _format_pvalue_bin_pairs(
+    edges: Sequence[float],
+    eligible_counts: Sequence[int],
+    retained_counts: Sequence[int],
+) -> str:
+    if not edges or not eligible_counts or not retained_counts:
+        return "-"
+    labels: list[str] = []
+    low = 0.0
+    for edge, eligible, retained in zip(edges, eligible_counts, retained_counts):
+        labels.append(f"({low:.0e},{float(edge):.0e}]:{int(eligible)}/{int(retained)}")
+        low = float(edge)
+    return " ".join(labels) if labels else "-"
 
 
 def _select_fimo_candidates(
     candidates: List[FimoCandidate],
     *,
     n_sites: int,
-    selection_policy: str,
-    rng: np.random.Generator,
-    pvalue_threshold: float,
     keep_weak: bool,
-    n_bins: int,
     context: dict,
 ) -> List[FimoCandidate]:
     unique: list[FimoCandidate] = []
@@ -402,12 +556,11 @@ def _select_fimo_candidates(
     if len(unique) < n_sites:
         msg_lines = [
             (
-                "Stage-A PWM sampling failed for motif "
+                "Stage-A PWM sampling shortfall for motif "
                 f"'{context.get('motif_id')}' "
                 f"(width={context.get('width')}, strategy={context.get('strategy')}, "
                 f"length={context.get('length_label')}, window={context.get('window_label')}, "
-                f"backend=fimo, selection={selection_policy}, "
-                f"pvalue={context.get('pvalue_label')})."
+                f"backend=fimo, stratified, pvalue={context.get('pvalue_label')})."
             ),
             (
                 f"Requested n_sites={context.get('n_sites')} oversample_factor={context.get('oversample_factor')} "
@@ -419,17 +572,17 @@ def _select_fimo_candidates(
         ]
         if context.get("length_observed"):
             msg_lines.append(f"Observed candidate lengths={context.get('length_observed')}.")
-        if context.get("pvalue_bins_label") is not None:
-            msg_lines.append(f"P-value bins={context.get('pvalue_bins_label')}.")
-        if context.get("retain_bin_ids") is not None:
-            msg_lines.append(f"Retained bins={context.get('retain_bin_ids')}.")
+        if context.get("pvalue_strata_label") is not None:
+            msg_lines.append(f"P-value strata={context.get('pvalue_strata_label')}.")
+        if context.get("retain_depth") is not None:
+            msg_lines.append(f"Retain depth={context.get('retain_depth')}.")
         suggestions = [
             "reduce n_sites",
-            "relax pvalue_threshold (e.g., 1e-4 → 1e-3)",
+            "relax pvalue_strata floor (e.g., 1e-4 → 1e-3)",
             "increase oversample_factor",
         ]
-        if context.get("retain_bin_ids") is not None:
-            suggestions.append("broaden mining.retain_bin_ids (or remove bin filtering)")
+        if context.get("retain_depth") is not None:
+            suggestions.append("increase retain_depth")
         if context.get("cap_applied"):
             suggestions.append("increase max_candidates (cap was hit)")
         if context.get("time_limited"):
@@ -443,26 +596,13 @@ def _select_fimo_candidates(
         if context.get("width") is not None and int(context.get("width")) <= 6:
             suggestions.append("try length_policy=range with a longer length_range")
         msg_lines.append("Try next: " + "; ".join(suggestions) + ".")
-        raise ValueError(" ".join(msg_lines))
-    if selection_policy == "random_uniform":
-        if len(unique) == n_sites:
-            return unique
-        picks = rng.choice(len(unique), size=n_sites, replace=False)
-        return [unique[int(i)] for i in picks]
-    if selection_policy == "top_n":
-        if keep_weak:
-            ordered = sorted(unique, key=lambda c: (-c.pvalue, c.score))
-        else:
-            ordered = sorted(unique, key=lambda c: (c.pvalue, -c.score))
-        return ordered[:n_sites]
-    if selection_policy == "stratified":
-        return _stratified_sample(
-            unique,
-            n_sites=n_sites,
-            rng=rng,
-            n_bins=n_bins,
-        )
-    raise ValueError(f"Unsupported pwm selection_policy: {selection_policy}")
+        log.warning(" ".join(msg_lines))
+        return unique
+    if keep_weak:
+        ordered = sorted(unique, key=lambda c: (-c.pvalue, c.score))
+    else:
+        ordered = sorted(unique, key=lambda c: (c.pvalue, -c.score))
+    return ordered[:n_sites]
 
 
 def sample_pwm_sites(
@@ -480,11 +620,10 @@ def sample_pwm_sites(
     score_threshold: Optional[float],
     score_percentile: Optional[float],
     scoring_backend: str = "densegen",
-    pvalue_threshold: Optional[float] = None,
-    pvalue_bins: Optional[Sequence[float]] = None,
+    pvalue_strata: Optional[Sequence[float]] = None,
+    retain_depth: Optional[int] = None,
     mining: Optional[object] = None,
     bgfile: Optional[str | Path] = None,
-    selection_policy: str = "random_uniform",
     keep_all_candidates_debug: bool = False,
     include_matched_sequence: bool = False,
     debug_output_dir: Optional[Path] = None,
@@ -494,7 +633,13 @@ def sample_pwm_sites(
     trim_window_length: Optional[int] = None,
     trim_window_strategy: str = "max_info",
     return_metadata: bool = False,
-) -> List[str] | Tuple[List[str], dict[str, dict]]:
+    return_summary: bool = False,
+) -> Union[
+    List[str],
+    Tuple[List[str], dict[str, dict]],
+    Tuple[List[str], PWMSamplingSummary],
+    Tuple[List[str], dict[str, dict], Optional[PWMSamplingSummary]],
+]:
     if n_sites <= 0:
         raise ValueError("n_sites must be > 0")
     if oversample_factor <= 0:
@@ -505,27 +650,28 @@ def sample_pwm_sites(
     if scoring_backend not in {"densegen", "fimo"}:
         raise ValueError(f"Unsupported Stage-A PWM sampling scoring_backend: {scoring_backend}")
     if scoring_backend == "densegen":
-        if (score_threshold is None) == (score_percentile is None):
-            raise ValueError("Stage-A PWM sampling requires exactly one of score_threshold or score_percentile")
-        if pvalue_bins is not None:
-            raise ValueError("pvalue_bins is only valid when scoring_backend='fimo'")
+        if score_threshold is None:
+            raise ValueError("Stage-A PWM sampling requires score_threshold when scoring_backend='densegen'")
+        if score_percentile is not None:
+            raise ValueError("Stage-A PWM sampling does not support score_percentile when scoring_backend='densegen'")
+        if pvalue_strata is not None:
+            raise ValueError("pvalue_strata is only valid when scoring_backend='fimo'")
+        if retain_depth is not None:
+            raise ValueError("retain_depth is only valid when scoring_backend='fimo'")
         if mining is not None:
             raise ValueError("mining is only valid when scoring_backend='fimo'")
         if include_matched_sequence:
             raise ValueError("include_matched_sequence is only valid when scoring_backend='fimo'")
     else:
-        if pvalue_threshold is None:
-            raise ValueError("Stage-A PWM sampling requires pvalue_threshold when scoring_backend='fimo'")
-        pvalue_threshold = float(pvalue_threshold)
-        if not (0.0 < pvalue_threshold <= 1.0):
-            raise ValueError("pwm.sampling.pvalue_threshold must be between 0 and 1")
+        if pvalue_strata is None:
+            raise ValueError("Stage-A PWM sampling requires pvalue_strata when scoring_backend='fimo'")
+        if retain_depth is None:
+            raise ValueError("Stage-A PWM sampling requires retain_depth when scoring_backend='fimo'")
         if max_candidates is not None or max_seconds is not None:
             raise ValueError(
                 "max_candidates/max_seconds are only supported for densegen scoring; "
                 "use mining.max_candidates or mining.max_seconds for fimo."
             )
-        if selection_policy not in {"random_uniform", "top_n", "stratified"}:
-            raise ValueError(f"Unsupported pwm selection_policy: {selection_policy}")
         if score_threshold is not None or score_percentile is not None:
             log.warning(
                 "Stage-A PWM sampling scoring_backend=fimo ignores score_threshold/score_percentile for motif %s.",
@@ -565,9 +711,10 @@ def sample_pwm_sites(
 
     score_label = f"threshold={score_threshold}" if score_threshold is not None else f"percentile={score_percentile}"
     pvalue_label = None
-    if scoring_backend == "fimo" and pvalue_threshold is not None:
+    if scoring_backend == "fimo" and pvalue_strata is not None:
+        floor = float(_resolve_pvalue_strata(pvalue_strata)[-1])
         comparator = ">=" if keep_low else "<="
-        pvalue_label = f"{comparator}{pvalue_threshold:g}"
+        pvalue_label = f"{comparator}{floor:g}"
     length_label = str(length_policy)
     if length_policy == "range" and length_range is not None and len(length_range) == 2:
         length_label = f"{length_policy}({length_range[0]}..{length_range[1]})"
@@ -611,7 +758,6 @@ def sample_pwm_sites(
             "mining_max_batches": _mining_attr(mining_cfg, "max_batches"),
             "mining_max_seconds": _mining_attr(mining_cfg, "max_seconds"),
             "mining_log_every_batches": _mining_attr(mining_cfg, "log_every_batches"),
-            "mining_retain_bin_ids": _mining_attr(mining_cfg, "retain_bin_ids"),
             "mining_max_candidates": mining_max_candidates,
         }
 
@@ -657,6 +803,8 @@ def sample_pwm_sites(
         right = sample_sequence_from_background(rng, motif.background, right_len)
         return f"{left}{seq}{right}"
 
+    progress: _PwmSamplingProgress | None = None
+
     def _score_with_fimo(
         *,
         n_candidates: int,
@@ -674,17 +822,23 @@ def sample_pwm_sites(
             write_minimal_meme_motif,
         )
 
-        if pvalue_threshold is None:
-            raise ValueError("pvalue_threshold required for fimo backend")
-        resolved_bins = _resolve_pvalue_edges(pvalue_bins)
-        retain_bins = _mining_attr(mining, "retain_bin_ids")
-        allowed_bins: Optional[set[int]] = None
-        if retain_bins is not None:
-            allowed_bins = {int(idx) for idx in retain_bins}
-            max_idx = len(resolved_bins) - 1
-            if any(idx > max_idx for idx in allowed_bins):
-                raise ValueError(f"retain_bin_ids contains an index outside the available bins (max={max_idx}).")
+        if pvalue_strata is None:
+            raise ValueError("pvalue_strata required for fimo backend")
+        if retain_depth is None:
+            raise ValueError("retain_depth required for fimo backend")
+        resolved_bins = _resolve_pvalue_strata(pvalue_strata)
+        floor = float(resolved_bins[-1])
+        depth = int(retain_depth)
+        if depth <= 0:
+            raise ValueError("retain_depth must be >= 1")
+        if depth > len(resolved_bins):
+            raise ValueError("retain_depth cannot exceed the number of pvalue_strata bins")
         keep_weak = keep_low
+        if keep_weak:
+            retain_bins = list(range(len(resolved_bins) - depth, len(resolved_bins)))
+        else:
+            retain_bins = list(range(depth))
+        retained_set = {int(idx) for idx in retain_bins}
         mining_batch_size = int(_mining_attr(mining, "batch_size", n_candidates))
         mining_max_batches = _mining_attr(mining, "max_batches")
         mining_max_candidates = _mining_attr(mining, "max_candidates")
@@ -692,14 +846,16 @@ def sample_pwm_sites(
         mining_log_every = int(_mining_attr(mining, "log_every_batches", 1))
         log.info(
             "FIMO mining config for %s: target=%d batch=%d "
-            "max_batches=%s max_candidates=%s max_seconds=%s retain_bins=%s",
+            "max_batches=%s max_candidates=%s max_seconds=%s floor=%s retain_depth=%d",
             motif.motif_id,
             n_candidates,
             mining_batch_size,
             str(mining_max_batches) if mining_max_batches is not None else "-",
             str(mining_max_candidates) if mining_max_candidates is not None else "-",
             str(mining_max_seconds) if mining_max_seconds is not None else "-",
-            str(sorted(allowed_bins)) if allowed_bins is not None else "all",
+            f"{floor:g}",
+            depth,
+            extra={"suppress_stdout": True},
         )
         debug_path: Optional[Path] = None
         debug_dir = debug_output_dir
@@ -752,8 +908,7 @@ def sample_pwm_sites(
                 sequences.append(full_seq)
             return sequences, lengths, time_limited
 
-        total_bin_counts = [0 for _ in resolved_bins]
-        accepted_bin_counts = [0 for _ in resolved_bins]
+        eligible_bin_counts = [0 for _ in resolved_bins]
         candidates: List[FimoCandidate] = []
         seen: set[str] = set()
         lengths_all: list[int] = []
@@ -820,7 +975,7 @@ def sample_pwm_sites(
                 fasta_path = tmp_path / "candidates.fasta"
                 records = build_candidate_records(motif.motif_id, provided_sequences, start_index=0)
                 write_candidates_fasta(records, fasta_path)
-                thresh = 1.0 if keep_all_candidates_debug or keep_weak else float(pvalue_threshold)
+                thresh = 1.0 if keep_all_candidates_debug or keep_weak else float(floor)
                 rows, raw_tsv = run_fimo(
                     meme_motif_path=meme_path,
                     fasta_path=fasta_path,
@@ -846,23 +1001,11 @@ def sample_pwm_sites(
                         )
                         continue
                     bin_id, bin_low, bin_high = _assign_pvalue_bin(hit.pvalue, resolved_bins)
-                    if allowed_bins is not None and bin_id not in allowed_bins:
-                        _record_candidate(
-                            seq=seq,
-                            hit=hit,
-                            bin_id=bin_id,
-                            bin_low=bin_low,
-                            bin_high=bin_high,
-                            accepted=False,
-                            reject_reason="bin_filtered",
-                        )
-                        continue
-                    total_bin_counts[bin_id] += 1
                     if keep_weak:
-                        accept = hit.pvalue >= float(pvalue_threshold)
+                        eligible = hit.pvalue >= float(floor)
                     else:
-                        accept = hit.pvalue <= float(pvalue_threshold)
-                    if not accept:
+                        eligible = hit.pvalue <= float(floor)
+                    if not eligible:
                         _record_candidate(
                             seq=seq,
                             hit=hit,
@@ -870,7 +1013,7 @@ def sample_pwm_sites(
                             bin_low=bin_low,
                             bin_high=bin_high,
                             accepted=False,
-                            reject_reason="pvalue_threshold",
+                            reject_reason="pvalue_floor",
                         )
                         continue
                     if seq in seen:
@@ -885,7 +1028,7 @@ def sample_pwm_sites(
                         )
                         continue
                     seen.add(seq)
-                    accepted_bin_counts[bin_id] += 1
+                    eligible_bin_counts[bin_id] += 1
                     candidates.append(
                         FimoCandidate(
                             seq=seq,
@@ -911,6 +1054,8 @@ def sample_pwm_sites(
                     )
                 generated_total = len(provided_sequences)
                 batches = 1
+                if progress is not None:
+                    progress.update(generated=generated_total, accepted=len(candidates), force=True)
             else:
                 mining_start = time.monotonic()
                 while generated_total < n_candidates:
@@ -938,7 +1083,7 @@ def sample_pwm_sites(
                     fasta_path = tmp_path / "candidates.fasta"
                     records = build_candidate_records(motif.motif_id, sequences, start_index=generated_total)
                     write_candidates_fasta(records, fasta_path)
-                    thresh = 1.0 if keep_all_candidates_debug or keep_weak else float(pvalue_threshold)
+                    thresh = 1.0 if keep_all_candidates_debug or keep_weak else float(floor)
                     rows, raw_tsv = run_fimo(
                         meme_motif_path=meme_path,
                         fasta_path=fasta_path,
@@ -964,23 +1109,11 @@ def sample_pwm_sites(
                             )
                             continue
                         bin_id, bin_low, bin_high = _assign_pvalue_bin(hit.pvalue, resolved_bins)
-                        if allowed_bins is not None and bin_id not in allowed_bins:
-                            _record_candidate(
-                                seq=seq,
-                                hit=hit,
-                                bin_id=bin_id,
-                                bin_low=bin_low,
-                                bin_high=bin_high,
-                                accepted=False,
-                                reject_reason="bin_filtered",
-                            )
-                            continue
-                        total_bin_counts[bin_id] += 1
                         if keep_weak:
-                            accept = hit.pvalue >= float(pvalue_threshold)
+                            eligible = hit.pvalue >= float(floor)
                         else:
-                            accept = hit.pvalue <= float(pvalue_threshold)
-                        if not accept:
+                            eligible = hit.pvalue <= float(floor)
+                        if not eligible:
                             _record_candidate(
                                 seq=seq,
                                 hit=hit,
@@ -988,7 +1121,7 @@ def sample_pwm_sites(
                                 bin_low=bin_low,
                                 bin_high=bin_high,
                                 accepted=False,
-                                reject_reason="pvalue_threshold",
+                                reject_reason="pvalue_floor",
                             )
                             continue
                         if seq in seen:
@@ -1003,7 +1136,7 @@ def sample_pwm_sites(
                             )
                             continue
                         seen.add(seq)
-                        accepted_bin_counts[bin_id] += 1
+                        eligible_bin_counts[bin_id] += 1
                         candidates.append(
                             FimoCandidate(
                                 seq=seq,
@@ -1029,11 +1162,17 @@ def sample_pwm_sites(
                         )
                     generated_total += len(sequences)
                     batches += 1
+                    if progress is not None:
+                        progress.update(
+                            generated=generated_total,
+                            accepted=len(candidates),
+                            batch_index=batches,
+                            batch_total=mining_max_batches,
+                        )
                     if mining_log_every > 0 and batches % mining_log_every == 0:
-                        bins_label = _format_pvalue_bins(resolved_bins, total_bin_counts, only_bins=retain_bins)
-                        accepted_label = _format_pvalue_bins(resolved_bins, accepted_bin_counts, only_bins=retain_bins)
+                        bins_label = _format_pvalue_bins(resolved_bins, eligible_bin_counts)
                         log.info(
-                            "FIMO mining %s batch %d/%s: generated=%d/%d accepted=%d bins=%s accepted_bins=%s",
+                            "FIMO mining %s batch %d/%s: generated=%d/%d eligible=%d strata=%s",
                             motif.motif_id,
                             batches,
                             str(mining_max_batches) if mining_max_batches is not None else "-",
@@ -1041,17 +1180,13 @@ def sample_pwm_sites(
                             n_candidates,
                             len(candidates),
                             bins_label,
-                            accepted_label,
                         )
 
         if debug_path is not None and tsv_lines:
             debug_path.write_text("\n".join(tsv_lines) + "\n")
             log.info("FIMO debug TSV written: %s", debug_path)
 
-        total_hits = sum(total_bin_counts)
-        accepted_hits = sum(accepted_bin_counts)
-        bins_label = _format_pvalue_bins(resolved_bins, total_bin_counts, only_bins=retain_bins)
-        accepted_label = _format_pvalue_bins(resolved_bins, accepted_bin_counts, only_bins=retain_bins)
+        eligible_hits = sum(eligible_bin_counts)
         length_obs = "-"
         if lengths_all:
             length_obs = (
@@ -1061,8 +1196,8 @@ def sample_pwm_sites(
             )
 
         context = _context(length_obs, cap_applied, requested, generated_total, time_limited)
-        context["pvalue_bins_label"] = bins_label
-        context["retain_bin_ids"] = sorted(allowed_bins) if allowed_bins is not None else None
+        context["pvalue_strata_label"] = ",".join(f"{edge:g}" for edge in resolved_bins)
+        context["retain_depth"] = depth
         context["mining_batch_size"] = mining_batch_size
         context["mining_max_batches"] = mining_max_batches
         context["mining_max_candidates"] = mining_max_candidates
@@ -1070,30 +1205,34 @@ def sample_pwm_sites(
         context["mining_time_limited"] = mining_time_limited
         context["mining_batches_limited"] = mining_batches_limited
         context["mining_candidates_limited"] = mining_candidates_limited
+        retained_candidates = [cand for cand in candidates if int(cand.bin_id) in retained_set]
         picked = _select_fimo_candidates(
-            candidates,
+            retained_candidates,
             n_sites=n_sites,
-            selection_policy=selection_policy,
-            rng=rng,
-            pvalue_threshold=float(pvalue_threshold),
             keep_weak=keep_weak,
-            n_bins=len(resolved_bins),
             context=context,
         )
-        selected_bin_counts = [0 for _ in resolved_bins]
+        retained_bin_counts = [0 for _ in resolved_bins]
         for cand in picked:
             idx = max(0, min(int(cand.bin_id), len(resolved_bins) - 1))
-            selected_bin_counts[idx] += 1
-        selected_label = _format_pvalue_bins(resolved_bins, selected_bin_counts, only_bins=retain_bins)
+            retained_bin_counts[idx] += 1
+        strata_label = _format_pvalue_bin_pairs(resolved_bins, eligible_bin_counts, retained_bin_counts)
+        if progress is not None:
+            progress.update(
+                generated=generated_total,
+                accepted=len(candidates),
+                batch_index=batches if batches > 0 else None,
+                batch_total=mining_max_batches,
+                force=True,
+            )
+            progress.finish()
         log.info(
-            "FIMO yield for motif %s: hits=%d accepted=%d selected=%d bins=%s accepted_bins=%s selected_bins=%s",
+            "FIMO yield for motif %s: eligible=%d retained=%d strata=%s",
             motif.motif_id,
-            total_hits,
-            accepted_hits,
+            eligible_hits,
             len(picked),
-            bins_label,
-            accepted_label,
-            selected_label,
+            strata_label,
+            extra={"suppress_stdout": True},
         )
         meta_by_seq: dict[str, dict] = {}
         for cand in picked:
@@ -1117,7 +1256,11 @@ def sample_pwm_sites(
                     row["selected"] = True
                     row["reject_reason"] = None
                 elif row.get("accepted"):
-                    row["reject_reason"] = "not_selected"
+                    bin_id = row.get("bin_id")
+                    if bin_id is not None and int(bin_id) not in retained_set:
+                        row["reject_reason"] = "outside_retained_bins"
+                    else:
+                        row["reject_reason"] = "not_selected"
             try:
                 path = _write_candidate_records(
                     candidate_records,
@@ -1129,15 +1272,35 @@ def sample_pwm_sites(
                 log.info("FIMO candidate records written: %s", path)
             except Exception:
                 log.warning("Failed to write FIMO candidate records.", exc_info=True)
-        return [c.seq for c in picked], meta_by_seq
+        summary = None
+        if return_summary:
+            summary = _build_summary(
+                generated=generated_total,
+                target=requested,
+                target_sites=n_sites,
+                eligible=[c.seq for c in candidates],
+                retained=[c.seq for c in picked],
+                strata_bins=strata_label,
+                input_name=input_name,
+                regulator=motif.motif_id,
+                backend=scoring_backend,
+            )
+        return [c.seq for c in picked], meta_by_seq, summary
 
     if strategy == "consensus":
+        progress = _PwmSamplingProgress(
+            motif_id=motif.motif_id,
+            backend=scoring_backend,
+            target=1,
+            accepted_target=n_sites if scoring_backend == "fimo" else None,
+            stream=sys.stdout,
+        )
         seq = "".join(max(row.items(), key=lambda kv: kv[1])[0] for row in matrix)
         target_len = _resolve_length()
         full_seq = _embed_with_background(seq, target_len)
         if scoring_backend == "densegen":
             score = score_sequence(seq, matrix, log_odds=log_odds, background=motif.background)
-            selected = _select(
+            selection = _select(
                 [(full_seq, score)],
                 length_obs=str(target_len),
                 cap_applied=False,
@@ -1145,14 +1308,50 @@ def sample_pwm_sites(
                 generated=1,
                 time_limited=False,
             )
-            return (selected, {}) if return_metadata else selected
-        selected, meta = _score_with_fimo(
+            progress.update(generated=1, accepted=None, force=True)
+            progress.finish()
+            if return_metadata and return_summary:
+                summary = _build_summary(
+                    generated=1,
+                    target=1,
+                    target_sites=n_sites,
+                    eligible=selection.retained,
+                    retained=selection.selected,
+                    strata_bins=None,
+                    input_name=input_name,
+                    regulator=motif.motif_id,
+                    backend=scoring_backend,
+                )
+                return selection.selected, {}, summary
+            if return_metadata:
+                return selection.selected, {}
+            if return_summary:
+                summary = _build_summary(
+                    generated=1,
+                    target=1,
+                    target_sites=n_sites,
+                    eligible=selection.retained,
+                    retained=selection.selected,
+                    strata_bins=None,
+                    input_name=input_name,
+                    regulator=motif.motif_id,
+                    backend=scoring_backend,
+                )
+                return selection.selected, summary
+            return selection.selected
+        selected, meta, summary = _score_with_fimo(
             n_candidates=1,
             cap_applied=False,
             requested=1,
             sequences=[full_seq],
         )
-        return (selected, meta) if return_metadata else selected
+        if return_metadata and return_summary:
+            return selected, meta, summary
+        if return_metadata:
+            return selected, meta
+        if return_summary:
+            return selected, summary
+        return selected
 
     requested_candidates = max(1, n_sites * oversample_factor)
     n_candidates = requested_candidates
@@ -1172,21 +1371,34 @@ def sample_pwm_sites(
                     requested_candidates,
                     cap_val,
                 )
-    else:
-        if mining_max_candidates is not None:
-            mining_cap = int(mining_max_candidates)
-            if mining_cap < n_sites:
-                raise ValueError("pwm.sampling.mining.max_candidates must be >= n_sites")
-            if mining_cap != requested_candidates:
-                cap_applied = mining_cap < requested_candidates
-                n_candidates = mining_cap
-                log.info(
-                    "PWM mining candidate target for motif %s: requested=%d mining.max_candidates=%d",
-                    motif.motif_id,
-                    requested_candidates,
-                    mining_cap,
-                )
+        else:
+            if mining_max_candidates is not None:
+                mining_cap = int(mining_max_candidates)
+                if mining_cap < n_sites:
+                    log.warning(
+                        "Stage-A PWM sampling mining.max_candidates=%d is below n_sites=%d for motif %s; "
+                        "shortfall possible.",
+                        mining_cap,
+                        n_sites,
+                        motif.motif_id,
+                    )
+                if mining_cap != requested_candidates:
+                    cap_applied = mining_cap < requested_candidates
+                    n_candidates = mining_cap
+                    log.info(
+                        "PWM mining candidate target for motif %s: requested=%d mining.max_candidates=%d",
+                        motif.motif_id,
+                        requested_candidates,
+                        mining_cap,
+                    )
     n_candidates = max(1, n_candidates)
+    progress = _PwmSamplingProgress(
+        motif_id=motif.motif_id,
+        backend=scoring_backend,
+        target=requested_candidates,
+        accepted_target=n_sites if scoring_backend == "fimo" else None,
+        stream=sys.stdout,
+    )
     if scoring_backend == "densegen":
         candidates: List[Tuple[str, str]] = []
         lengths: List[int] = []
@@ -1205,6 +1417,9 @@ def sample_pwm_sites(
                 core = sample_sequence_from_pwm(rng, matrix)
             full_seq = _embed_with_background(core, target_len)
             candidates.append((full_seq, core))
+            progress.update(generated=len(candidates), accepted=None)
+        progress.update(generated=len(candidates), accepted=None, force=True)
+        progress.finish()
         if time_limited:
             log.warning(
                 "Stage-A PWM sampling hit max_seconds for motif %s: generated=%d requested=%d",
@@ -1219,7 +1434,7 @@ def sample_pwm_sites(
             (full_seq, score_sequence(core, matrix, log_odds=log_odds, background=motif.background))
             for full_seq, core in candidates
         ]
-        selected = _select(
+        selection = _select(
             scored,
             length_obs=length_obs,
             cap_applied=cap_applied,
@@ -1227,10 +1442,35 @@ def sample_pwm_sites(
             generated=len(candidates),
             time_limited=time_limited,
         )
-        return (selected, {}) if return_metadata else selected
-    selected, meta = _score_with_fimo(
+        summary = None
+        if return_summary:
+            summary = _build_summary(
+                generated=len(candidates),
+                target=requested_candidates,
+                target_sites=n_sites,
+                eligible=selection.retained,
+                retained=selection.selected,
+                strata_bins=None,
+                input_name=input_name,
+                regulator=motif.motif_id,
+                backend=scoring_backend,
+            )
+        if return_metadata and return_summary:
+            return selection.selected, {}, summary
+        if return_metadata:
+            return selection.selected, {}
+        if return_summary:
+            return selection.selected, summary
+        return selection.selected
+    selected, meta, summary = _score_with_fimo(
         cap_applied=cap_applied,
         requested=requested_candidates,
         n_candidates=n_candidates,
     )
-    return (selected, meta) if return_metadata else selected
+    if return_metadata and return_summary:
+        return selected, meta, summary
+    if return_metadata:
+        return selected, meta
+    if return_summary:
+        return selected, summary
+    return selected

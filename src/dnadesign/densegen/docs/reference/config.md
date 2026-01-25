@@ -63,7 +63,6 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     - `scoring_backend`: `densegen | fimo` (default: `densegen`)
     - `score_threshold` or `score_percentile` (exactly one; **densegen** backend only)
     - `pvalue_threshold` (float in (0, 1]; **fimo** backend only)
-    - `selection_policy`: `random_uniform | top_n | stratified` (default: `random_uniform`; fimo only)
     - `pvalue_bins` (optional list of floats; must end with `1.0`) - p‑value bin edges for Stage‑A stratified sampling
     - `mining` (fimo only) - batch/time controls for mining via FIMO:
       - `batch_size` (int > 0; default 100000) - candidates per FIMO batch
@@ -89,8 +88,9 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     - Canonical p‑value bins (default): `[1e-10, 1e-8, 1e-6, 1e-4, 1e-3, 1e-2, 1e-1, 1.0]`
       (bin 0 is `(0, 1e-10]`, bin 1 is `(1e-10, 1e-8]`, etc.)
     - FIMO runs log per‑bin yield summaries (hits, accepted, selected). If `retain_bin_ids` is set,
-      only those bins are reported; otherwise all bins are reported. `selection_policy: stratified`
-      makes the selected‑bin distribution explicit for mining workflows.
+      only those bins are reported; otherwise all bins are reported. Stratification defines the
+      eligible population (bins + `pvalue_threshold`), and selection is top‑N within that population
+      by p‑value (score tie‑break).
     - For `scoring_backend: fimo`, use `mining.max_seconds` (time mode) or
       `mining.max_candidates`/`mining.max_batches` (quota mode). The default is
       `mining.max_seconds: 60`. Set `mining.max_seconds: null` to make quotas the primary cap.

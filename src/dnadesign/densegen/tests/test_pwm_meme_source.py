@@ -1,3 +1,15 @@
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+dnadesign/densegen/tests/test_pwm_meme_source.py
+
+Stage-A PWM sampling via MEME sources.
+
+Module Author(s): Eric J. South
+Dunlop Lab
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import logging
@@ -97,7 +109,7 @@ def test_pwm_sampling_cap_warns(caplog: pytest.LogCaptureFixture) -> None:
     assert "capped candidate generation" in caplog.text
 
 
-def test_pwm_sampling_error_context(tmp_path: Path) -> None:
+def test_pwm_sampling_shortfall_warns(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     meme_path = tmp_path / "motifs.meme"
     meme_path.write_text(MEME_TEXT)
     ds = PWMMemeDataSource(
@@ -114,10 +126,6 @@ def test_pwm_sampling_error_context(tmp_path: Path) -> None:
             "score_percentile": None,
         },
     )
-    with pytest.raises(ValueError) as exc:
+    with caplog.at_level(logging.WARNING):
         ds.load_data(rng=np.random.default_rng(2))
-    msg = str(exc.value)
-    assert "motif 'M1'" in msg
-    assert "width=" in msg
-    assert "requested" in msg
-    assert "unique candidates" in msg or "Unique candidates" in msg
+    assert "shortfall" in caplog.text

@@ -183,11 +183,10 @@ class PWMArtifactDataSource(BaseDataSource):
         trim_window_length = sampling.get("trim_window_length")
         trim_window_strategy = sampling.get("trim_window_strategy", "max_info")
         scoring_backend = str(sampling.get("scoring_backend", "densegen")).lower()
-        pvalue_threshold = sampling.get("pvalue_threshold")
-        pvalue_bins = sampling.get("pvalue_bins")
+        pvalue_strata = sampling.get("pvalue_strata")
+        retain_depth = sampling.get("retain_depth")
         mining = sampling.get("mining")
         bgfile = sampling.get("bgfile")
-        selection_policy = str(sampling.get("selection_policy", "random_uniform"))
         keep_all_candidates_debug = bool(sampling.get("keep_all_candidates_debug", False))
         include_matched_sequence = bool(sampling.get("include_matched_sequence", False))
         bgfile_path: Path | None = None
@@ -218,11 +217,10 @@ class PWMArtifactDataSource(BaseDataSource):
             score_threshold=threshold,
             score_percentile=percentile,
             scoring_backend=scoring_backend,
-            pvalue_threshold=pvalue_threshold,
-            pvalue_bins=pvalue_bins,
+            pvalue_strata=pvalue_strata,
+            retain_depth=retain_depth,
             mining=mining,
             bgfile=bgfile_path,
-            selection_policy=selection_policy,
             keep_all_candidates_debug=keep_all_candidates_debug,
             include_matched_sequence=include_matched_sequence,
             debug_output_dir=debug_output_dir,
@@ -232,11 +230,12 @@ class PWMArtifactDataSource(BaseDataSource):
             trim_window_length=trim_window_length,
             trim_window_strategy=str(trim_window_strategy),
             return_metadata=return_meta,
+            return_summary=True,
         )
         if return_meta:
-            selected, meta_by_seq = result  # type: ignore[misc]
+            selected, meta_by_seq, summary = result  # type: ignore[misc]
         else:
-            selected = result  # type: ignore[assignment]
+            selected, summary = result  # type: ignore[assignment]
             meta_by_seq = {}
 
         entries = [(motif.motif_id, seq, str(artifact_path)) for seq in selected]
@@ -267,4 +266,5 @@ class PWMArtifactDataSource(BaseDataSource):
                 row.update(meta)
             rows.append(row)
         df_out = pd.DataFrame(rows)
-        return entries, df_out
+        summaries = [summary] if summary is not None else []
+        return entries, df_out, summaries

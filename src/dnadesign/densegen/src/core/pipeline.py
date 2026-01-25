@@ -57,7 +57,7 @@ from .artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData, build_
 from .artifacts.records import AttemptRecord, SolutionRecord
 from .metadata import build_metadata
 from .postprocess import generate_pad
-from .pvalue_bins import resolve_pvalue_bins
+from .pvalue_bins import resolve_pvalue_strata
 from .run_manifest import PlanManifest, RunManifest
 from .run_paths import (
     candidates_root,
@@ -206,16 +206,16 @@ def _mining_attr(mining, name: str, default=None):
     return default
 
 
-def _resolve_pvalue_bins_meta(sampling) -> list[float] | None:
+def _resolve_pvalue_strata_meta(sampling) -> list[float] | None:
     if sampling is None:
         return None
     backend = str(_sampling_attr(sampling, "scoring_backend") or "densegen").lower()
-    bins = _sampling_attr(sampling, "pvalue_bins")
+    strata = _sampling_attr(sampling, "pvalue_strata")
     if backend == "fimo":
-        return resolve_pvalue_bins(bins)
-    if bins is None:
+        return resolve_pvalue_strata(strata)
+    if strata is None:
         return None
-    return [float(v) for v in bins]
+    return [float(v) for v in strata]
 
 
 def _extract_pwm_sampling_config(source_cfg) -> dict | None:
@@ -256,15 +256,15 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
     if length_range is not None:
         length_range = list(length_range)
     mining = _sampling_attr(sampling, "mining")
+    scoring_backend = _sampling_attr(sampling, "scoring_backend")
     mining_batch_size = _mining_attr(mining, "batch_size")
     mining_max_batches = _mining_attr(mining, "max_batches")
     mining_max_candidates = _mining_attr(mining, "max_candidates")
     mining_max_seconds = _mining_attr(mining, "max_seconds")
-    mining_retain_bin_ids = _mining_attr(mining, "retain_bin_ids")
     mining_log_every_batches = _mining_attr(mining, "log_every_batches")
     return {
         "strategy": _sampling_attr(sampling, "strategy"),
-        "scoring_backend": _sampling_attr(sampling, "scoring_backend"),
+        "scoring_backend": scoring_backend,
         "n_sites": _sampling_attr(sampling, "n_sites"),
         "oversample_factor": _sampling_attr(sampling, "oversample_factor"),
         "max_candidates": _sampling_attr(sampling, "max_candidates"),
@@ -274,9 +274,8 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
         "capped": capped,
         "score_threshold": _sampling_attr(sampling, "score_threshold"),
         "score_percentile": _sampling_attr(sampling, "score_percentile"),
-        "pvalue_threshold": _sampling_attr(sampling, "pvalue_threshold"),
-        "pvalue_bins": _resolve_pvalue_bins_meta(sampling),
-        "selection_policy": _sampling_attr(sampling, "selection_policy"),
+        "pvalue_strata": _resolve_pvalue_strata_meta(sampling),
+        "retain_depth": _sampling_attr(sampling, "retain_depth"),
         "bgfile": _sampling_attr(sampling, "bgfile"),
         "keep_all_candidates_debug": _sampling_attr(sampling, "keep_all_candidates_debug"),
         "length_policy": _sampling_attr(sampling, "length_policy"),
@@ -286,7 +285,6 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
             "max_batches": mining_max_batches,
             "max_candidates": mining_max_candidates,
             "max_seconds": mining_max_seconds,
-            "retain_bin_ids": mining_retain_bin_ids,
             "log_every_batches": mining_log_every_batches,
         }
         if mining is not None
@@ -635,17 +633,14 @@ def _input_metadata(source_cfg, cfg_path: Path) -> dict:
             meta["input_pwm_scoring_backend"] = getattr(sampling, "scoring_backend", None)
             meta["input_pwm_score_threshold"] = getattr(sampling, "score_threshold", None)
             meta["input_pwm_score_percentile"] = getattr(sampling, "score_percentile", None)
-            meta["input_pwm_pvalue_threshold"] = getattr(sampling, "pvalue_threshold", None)
-            meta["input_pwm_pvalue_bins"] = _resolve_pvalue_bins_meta(sampling)
+            meta["input_pwm_pvalue_strata"] = _resolve_pvalue_strata_meta(sampling)
+            meta["input_pwm_retain_depth"] = getattr(sampling, "retain_depth", None)
             mining_cfg = getattr(sampling, "mining", None)
-            retained_bins = _mining_attr(mining_cfg, "retain_bin_ids")
             meta["input_pwm_mining_batch_size"] = _mining_attr(mining_cfg, "batch_size")
             meta["input_pwm_mining_max_batches"] = _mining_attr(mining_cfg, "max_batches")
             meta["input_pwm_mining_max_candidates"] = _mining_attr(mining_cfg, "max_candidates")
             meta["input_pwm_mining_max_seconds"] = _mining_attr(mining_cfg, "max_seconds")
-            meta["input_pwm_mining_retain_bin_ids"] = retained_bins
             meta["input_pwm_mining_log_every_batches"] = _mining_attr(mining_cfg, "log_every_batches")
-            meta["input_pwm_selection_policy"] = getattr(sampling, "selection_policy", None)
             meta["input_pwm_bgfile"] = getattr(sampling, "bgfile", None)
             meta["input_pwm_keep_all_candidates_debug"] = getattr(sampling, "keep_all_candidates_debug", None)
             meta["input_pwm_include_matched_sequence"] = getattr(sampling, "include_matched_sequence", None)
@@ -2086,7 +2081,7 @@ def _process_plan_for_source(
     cached = source_cache.get(cache_key) if source_cache is not None else None
     if cached is None:
         src_obj = deps.source_factory(source_cfg, cfg_path)
-        data_entries, meta_df = src_obj.load_data(
+        data_entries, meta_df, _summaries = src_obj.load_data(
             rng=np_rng,
             outputs_root=outputs_root,
             run_id=str(run_id),
@@ -2163,8 +2158,8 @@ def _process_plan_for_source(
             score_threshold = _sampling_attr(input_sampling_cfg, "score_threshold")
             score_percentile = _sampling_attr(input_sampling_cfg, "score_percentile")
             scoring_backend = _sampling_attr(input_sampling_cfg, "scoring_backend") or "densegen"
-            pvalue_threshold = _sampling_attr(input_sampling_cfg, "pvalue_threshold")
-            selection_policy = _sampling_attr(input_sampling_cfg, "selection_policy")
+            pvalue_strata = _sampling_attr(input_sampling_cfg, "pvalue_strata")
+            retain_depth = _sampling_attr(input_sampling_cfg, "retain_depth")
             length_policy = _sampling_attr(input_sampling_cfg, "length_policy")
             length_range = _sampling_attr(input_sampling_cfg, "length_range")
             mining_cfg = _sampling_attr(input_sampling_cfg, "mining")
@@ -2172,23 +2167,23 @@ def _process_plan_for_source(
             mining_max_batches = _mining_attr(mining_cfg, "max_batches")
             mining_max_candidates = _mining_attr(mining_cfg, "max_candidates")
             mining_max_seconds = _mining_attr(mining_cfg, "max_seconds")
-            mining_retain_bins = _mining_attr(mining_cfg, "retain_bin_ids")
             if length_range is not None:
                 length_range = list(length_range)
             score_label = "-"
-            if scoring_backend == "fimo" and pvalue_threshold is not None:
+            if scoring_backend == "fimo" and pvalue_strata:
+                floor = float(resolve_pvalue_strata(pvalue_strata)[-1])
                 comparator = ">=" if str(strategy) == "background" else "<="
-                score_label = f"pvalue{comparator}{pvalue_threshold}"
+                score_label = f"floor{comparator}{floor:g}"
             elif score_threshold is not None:
                 score_label = f"threshold={score_threshold}"
             elif score_percentile is not None:
                 score_label = f"percentile={score_percentile}"
             bins_label = "-"
             if scoring_backend == "fimo":
-                bins_label = "canonical" if _sampling_attr(input_sampling_cfg, "pvalue_bins") is None else "custom"
-                bin_ids = mining_retain_bins
-                if bin_ids:
-                    bins_label = f"{bins_label} retain={sorted(list(bin_ids))}"
+                strata_len = len(pvalue_strata or [])
+                bins_label = f"strata={strata_len}"
+                if retain_depth is not None:
+                    bins_label = f"{bins_label} retain={int(retain_depth)}"
             length_label = str(length_policy)
             if length_policy == "range" and length_range:
                 length_label = f"{length_policy}({length_range[0]}..{length_range[1]})"
@@ -2210,7 +2205,6 @@ def _process_plan_for_source(
                     if max_seconds is not None:
                         cap_label = f"{cap_label}; max_seconds={max_seconds}" if cap_label != "-" else f"{max_seconds}s"
             counts_label = _summarize_tf_counts(meta_df["tf"].tolist())
-            selection_label = selection_policy if scoring_backend == "fimo" else "-"
             mining_label = "-"
             if scoring_backend == "fimo" and mining_cfg is not None:
                 parts = []
@@ -2225,14 +2219,13 @@ def _process_plan_for_source(
                 mining_label = ", ".join(parts) if parts else "enabled"
             log.info(
                 "Stage-A PWM sampling for %s: motifs=%d | sites=%s | strategy=%s | backend=%s | score=%s | "
-                "selection=%s | bins=%s | mining=%s | oversample=%s | caps=%s | length=%s",
+                "bins=%s | mining=%s | oversample=%s | caps=%s | length=%s",
                 source_label,
                 len(input_meta.get("input_pwm_ids") or []),
                 counts_label or "-",
                 strategy,
                 scoring_backend,
                 score_label,
-                selection_label,
                 bins_label,
                 mining_label,
                 oversample,
