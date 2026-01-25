@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from dnadesign.cruncher.analysis.parquet import read_parquet
+from dnadesign.cruncher.analysis.parquet import read_parquet, write_parquet
 from dnadesign.cruncher.analysis.plots.scatter_utils import encode_sequence
 from dnadesign.cruncher.artifacts.layout import sequences_path
 from dnadesign.cruncher.core.scoring import Scorer
@@ -152,7 +152,7 @@ def gather_per_pwm_scores(
     out_df = out_df.sort_values(["chain", "draw"]).reset_index(drop=True)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if out_path.suffix == ".parquet":
-        out_df.to_parquet(out_path, engine="fastparquet", index=False)
+        write_parquet(out_df, out_path)
     else:
         out_df.to_csv(out_path, index=False)
     logger.info("Wrote change-threshold per-PWM scores → %s", out_path)
