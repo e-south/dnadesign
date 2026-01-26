@@ -82,6 +82,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
                                 "scoring_backend": "fimo",
                                 "n_sites": 2,
                                 "oversample_factor": 2,
+                                "bgfile": "inputs/bg.txt",
                             },
                         }
                     ],
@@ -148,6 +149,8 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert stage_a_sampling["eligibility_rule"].startswith("best_hit_score")
     assert stage_a_sampling["retention_rule"] == "top_n_sites_by_best_hit_score"
     assert stage_a_sampling["fimo_thresh"] == 1.0
+    assert stage_a_sampling["bgfile"] == "inputs/bg.txt"
+    assert stage_a_sampling["background_source"] == "bgfile"
     hist = stage_a_sampling["eligible_score_hist"]
     assert hist[0]["regulator"] == "regA"
     assert hist[0]["edges"] == [0.0, 1.0, 2.0]

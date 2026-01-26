@@ -14,8 +14,9 @@ from typing import Iterable
 
 import pandas as pd
 
-from ...adapters.sources.pwm_sampling import FIMO_REPORT_THRESH, PWMSamplingSummary
+from ...adapters.sources.pwm_sampling import PWMSamplingSummary
 from ...config import resolve_relative_path
+from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from ...utils.logging_utils import install_native_stderr_filters
 from .ids import hash_tfbs_id
 
@@ -148,7 +149,12 @@ class TFBSPoolArtifact:
         return self.inputs[input_name]
 
 
-def _build_stage_a_sampling_manifest(summaries: list[object] | None) -> dict | None:
+def _build_stage_a_sampling_manifest(
+    summaries: list[object] | None,
+    *,
+    bgfile: str | None = None,
+    bgfile_by_regulator: dict[str, str] | None = None,
+) -> dict | None:
     if not summaries:
         return None
     pwm_summaries = [s for s in summaries if isinstance(s, PWMSamplingSummary)]
@@ -158,12 +164,16 @@ def _build_stage_a_sampling_manifest(summaries: list[object] | None) -> dict | N
     if not fimo_summaries:
         return None
     eligible_score_hist = []
+    bgfile_by_regulator = bgfile_by_regulator or {}
+    reg_bgfiles = []
     for summary in fimo_summaries:
         if summary.eligible_score_hist_edges is None or summary.eligible_score_hist_counts is None:
             raise ValueError("Stage-A sampling summaries missing eligible score histogram.")
         if summary.eligible_score_hist_edges:
             if len(summary.eligible_score_hist_counts) != len(summary.eligible_score_hist_edges) - 1:
                 raise ValueError("Stage-A eligible score histogram length mismatch.")
+        reg_bgfile = bgfile_by_regulator.get(summary.regulator, bgfile)
+        reg_bgfiles.append(reg_bgfile)
         eligible_score_hist.append(
             {
                 "regulator": summary.regulator,
@@ -171,14 +181,25 @@ def _build_stage_a_sampling_manifest(summaries: list[object] | None) -> dict | N
                 "counts": [int(v) for v in summary.eligible_score_hist_counts],
                 "tier0_score": summary.tier0_score,
                 "tier1_score": summary.tier1_score,
+                "bgfile": reg_bgfile,
+                "background_source": "bgfile" if reg_bgfile else "motif_background",
             }
         )
+    unique_bgfiles = {val for val in reg_bgfiles}
+    if len(unique_bgfiles) == 1:
+        base_bgfile = reg_bgfiles[0]
+        background_source = "bgfile" if base_bgfile else "motif_background"
+    else:
+        base_bgfile = None
+        background_source = "mixed"
     return {
         "backend": "fimo",
         "tier_scheme": "pct_1_9_90",
         "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
         "retention_rule": "top_n_sites_by_best_hit_score",
         "fimo_thresh": FIMO_REPORT_THRESH,
+        "bgfile": base_bgfile,
+        "background_source": background_source,
         "eligible_score_hist": eligible_score_hist,
     }
 
@@ -389,7 +410,19 @@ def build_pool_artifact(
                 raise FileExistsError(f"Pool already exists: {dest}")
         df.to_parquet(dest, index=False)
 
-        stage_a_sampling = _build_stage_a_sampling_manifest(summaries)
+        sampling_cfg = getattr(inp, "sampling", None)
+        base_bgfile = getattr(sampling_cfg, "bgfile", None) if sampling_cfg is not None else None
+        overrides = getattr(inp, "overrides_by_motif_id", None) or {}
+        bgfile_by_regulator: dict[str, str] = {}
+        for motif_id, override in overrides.items():
+            override_bgfile = getattr(override, "bgfile", None)
+            if override_bgfile is not None:
+                bgfile_by_regulator[str(motif_id)] = str(override_bgfile)
+        stage_a_sampling = _build_stage_a_sampling_manifest(
+            summaries,
+            bgfile=str(base_bgfile) if base_bgfile is not None else None,
+            bgfile_by_regulator=bgfile_by_regulator or None,
+        )
         entry = PoolInputEntry(
             name=inp.name,
             input_type=str(inp.type),

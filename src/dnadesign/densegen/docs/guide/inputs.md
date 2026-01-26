@@ -144,8 +144,12 @@ inputs:
     path: inputs/lexA.txt
     motif_ids: [lexA]
     sampling:  # Stage‑A sampling
+      scoring_backend: fimo
       n_sites: 80
-      score_percentile: 80
+      oversample_factor: 50
+      mining:
+        batch_size: 5000
+        max_seconds: 60
 ```
 
 ---
@@ -170,8 +174,12 @@ inputs:
     type: pwm_meme_set
     paths: [inputs/lexA.txt, inputs/cpxR.txt]
     sampling:  # Stage‑A sampling
+      scoring_backend: fimo
       n_sites: 80
-      score_percentile: 80
+      oversample_factor: 50
+      mining:
+        batch_size: 5000
+        max_seconds: 60
 ```
 
 ---
@@ -195,8 +203,12 @@ inputs:
     type: pwm_jaspar
     path: inputs/motifs.jaspar
     sampling:  # Stage‑A sampling
+      scoring_backend: fimo
       n_sites: 80
-      score_percentile: 80
+      oversample_factor: 50
+      mining:
+        batch_size: 5000
+        max_seconds: 60
 ```
 
 ---
@@ -221,8 +233,12 @@ inputs:
     path: inputs/lexA_matrix.csv
     motif_id: lexA
     sampling:  # Stage‑A sampling
+      scoring_backend: fimo
       n_sites: 80
-      score_percentile: 80
+      oversample_factor: 50
+      mining:
+        batch_size: 5000
+        max_seconds: 60
 ```
 
 ---
@@ -246,8 +262,12 @@ inputs:
     type: pwm_artifact
     path: inputs/motif_artifacts/lexA.json
     sampling:  # Stage‑A sampling
+      scoring_backend: fimo
       n_sites: 80
-      score_percentile: 80
+      oversample_factor: 50
+      mining:
+        batch_size: 5000
+        max_seconds: 60
 ```
 
 ---
@@ -274,8 +294,12 @@ inputs:
       - inputs/motif_artifacts/lexA.json
       - inputs/motif_artifacts/cpxR.json
     sampling:  # Stage‑A sampling
+      scoring_backend: fimo
       n_sites: 80
-      score_percentile: 80
+      oversample_factor: 50
+      mining:
+        batch_size: 5000
+        max_seconds: 60
 ```
 
 ---

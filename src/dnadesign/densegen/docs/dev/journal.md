@@ -18,3 +18,4 @@
 - Follow-up: removed unused Stage-A sampling vars after ruff failures; ruff check/format now clean.
 - Follow-up: rank_within_regulator is now 1-based; added end-to-end Stage-A FIMO test and score-tier helper module; docs/plot registry updated to score-only semantics.
 - Follow-up: centralized FIMO report threshold, removed p-value-only fields from FIMO hits, added non-finite score guardrails, and documented 1-based ranks in outputs.
+- Follow-up: Stage-A manifest now surfaces bgfile/background_source and FIMO threshold lives in core constants; legacy score_percentile examples removed from docs.

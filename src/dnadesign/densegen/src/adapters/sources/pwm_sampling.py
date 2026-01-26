@@ -24,11 +24,11 @@ import pandas as pd
 
 from ...core.artifacts.ids import hash_candidate_id
 from ...core.score_tiers import score_tier_counts
+from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from ...utils import logging_utils
 
 SMOOTHING_ALPHA = 1e-6
 SCORE_HIST_BINS = 60
-FIMO_REPORT_THRESH = 1.0
 log = logging.getLogger(__name__)
 _SAFE_LABEL_RE = None
 

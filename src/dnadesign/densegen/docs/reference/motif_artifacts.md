@@ -95,9 +95,12 @@ inputs:
     path: inputs/artifacts/lexA.json
     sampling:  # Stage‑A sampling
       strategy: stochastic
+      scoring_backend: fimo
       n_sites: 200
-      oversample_factor: 5
-      score_percentile: 90
+      oversample_factor: 50
+      mining:
+        batch_size: 5000
+        max_seconds: 60
       length_policy: exact
 ```
 
