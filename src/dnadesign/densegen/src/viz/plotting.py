@@ -30,6 +30,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 from matplotlib.colors import to_rgba
 from matplotlib.patches import Patch
 from rich.console import Console
@@ -1322,6 +1323,179 @@ def plot_tfbs_positional_histogram(
     plt.close(fig)
 
 
+def _build_stage_a_strata_overview_figure(
+    *,
+    input_name: str,
+    pool_df: pd.DataFrame,
+    sampling: dict,
+    style: dict,
+) -> tuple[mpl.figure.Figure, mpl.axes.Axes, mpl.axes.Axes]:
+    style = _style(style)
+    if sampling.get("backend") != "fimo":
+        raise ValueError(f"Stage-A strata overview requires FIMO sampling (input '{input_name}').")
+    pvalue_strata = sampling.get("pvalue_strata") or []
+    retain_depth = sampling.get("retain_depth")
+    eligible_bins = sampling.get("eligible_bins") or []
+    retained_bins = sampling.get("retained_bins") or []
+    eligible_pvalue_hist = sampling.get("eligible_pvalue_hist") or []
+    if not pvalue_strata:
+        raise ValueError(f"Stage-A sampling missing pvalue_strata for input '{input_name}'.")
+    if retain_depth is None:
+        raise ValueError(f"Stage-A sampling missing retain_depth for input '{input_name}'.")
+    if not eligible_bins:
+        raise ValueError(f"Stage-A sampling missing eligible bin counts for input '{input_name}'.")
+    if not retained_bins:
+        raise ValueError(f"Stage-A sampling missing retained bin counts for input '{input_name}'.")
+    if not eligible_pvalue_hist:
+        raise ValueError(f"Stage-A sampling missing eligible p-value histogram for input '{input_name}'.")
+    if int(retain_depth) < 1 or int(retain_depth) > len(pvalue_strata):
+        raise ValueError(f"Stage-A sampling retain_depth out of range for input '{input_name}'.")
+    if "tf" not in pool_df.columns or "tfbs" not in pool_df.columns:
+        raise ValueError(f"Stage-A pool missing tf/tfbs columns for input '{input_name}'.")
+
+    regulators = [str(row.get("regulator")) for row in eligible_pvalue_hist]
+    eligible_by_reg = {str(row.get("regulator")): list(row.get("counts") or []) for row in eligible_bins}
+    retained_by_reg = {str(row.get("regulator")): list(row.get("counts") or []) for row in retained_bins}
+    hist_by_reg: dict[str, tuple[list[float], list[int]]] = {}
+    for row in eligible_pvalue_hist:
+        reg = str(row.get("regulator"))
+        edges = [float(v) for v in (row.get("edges") or [])]
+        counts = [int(v) for v in (row.get("counts") or [])]
+        if edges and len(counts) != len(edges) - 1:
+            raise ValueError(f"Eligible p-value histogram length mismatch for '{input_name}' ({reg}).")
+        hist_by_reg[reg] = (edges, counts)
+    for reg, counts in eligible_by_reg.items():
+        if len(counts) != len(pvalue_strata):
+            raise ValueError(f"Eligible bin counts length mismatch for '{input_name}' ({reg}).")
+    for reg, counts in retained_by_reg.items():
+        if len(counts) != len(pvalue_strata):
+            raise ValueError(f"Retained bin counts length mismatch for '{input_name}' ({reg}).")
+
+    colors = _palette(style, len(regulators), no_repeat=bool(style.get("palette_no_repeat", False)))
+    color_by_reg = {reg: colors[idx] for idx, reg in enumerate(regulators)}
+
+    fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=style["figsize"])
+
+    max_height = 0.0
+    height_by_reg: dict[str, tuple[list[float], np.ndarray]] = {}
+    for reg in regulators:
+        edges, counts = hist_by_reg.get(reg, ([], []))
+        if not edges:
+            continue
+        heights = np.log10(np.asarray(counts, dtype=float) + 1.0)
+        height_by_reg[reg] = (edges, heights)
+        if heights.size:
+            max_height = max(max_height, float(heights.max()))
+    if not height_by_reg:
+        ax_left.text(0.5, 0.5, "No eligible hits", ha="center", va="center", transform=ax_left.transAxes)
+    else:
+        track_height = max_height if max_height > 0 else 1.0
+        gap = track_height * 0.4
+        step = track_height + gap
+        baselines = []
+        for idx, reg in enumerate(regulators):
+            edges, heights = height_by_reg.get(reg, ([], np.array([])))
+            baseline = idx * step
+            baselines.append(baseline)
+            if edges:
+                centers = (np.asarray(edges[:-1]) + np.asarray(edges[1:])) / 2.0
+                ax_left.plot(
+                    centers,
+                    baseline + heights,
+                    color=color_by_reg[reg],
+                    linewidth=1.4,
+                )
+                ax_left.fill_between(
+                    centers,
+                    baseline,
+                    baseline + heights,
+                    color=color_by_reg[reg],
+                    alpha=0.25,
+                )
+        ax_left.set_yticks(baselines)
+        ax_left.set_yticklabels(regulators)
+        ax_left.set_ylim(-gap, baselines[-1] + track_height + gap)
+    ax_left.set_xscale("log")
+    ax_left.invert_xaxis()
+    xs = [float(edge) for edge in pvalue_strata]
+    ax_left.set_xticks(xs)
+    ax_left.set_xticklabels([f"{edge:.0e}" for edge in pvalue_strata])
+    ax_left.set_xlabel("FIMO p-value")
+    ax_left.set_ylabel("Regulator tracks")
+    retain_edge = float(pvalue_strata[int(retain_depth) - 1])
+    ax_left.axvline(retain_edge, linestyle="--", color="#222222", linewidth=1)
+
+    lengths_by_reg: dict[str, list[int]] = {}
+    for reg, seq in pool_df[["tf", "tfbs"]].itertuples(index=False):
+        reg_label = str(reg)
+        lengths_by_reg.setdefault(reg_label, []).append(len(str(seq)))
+    all_lengths = [val for vals in lengths_by_reg.values() for val in vals]
+    if not all_lengths:
+        ax_right.text(0.5, 0.5, "No retained sequences", ha="center", va="center", transform=ax_right.transAxes)
+    else:
+        max_len = 35
+        for reg, lengths in lengths_by_reg.items():
+            if not lengths:
+                continue
+            values = np.asarray(lengths, dtype=float)
+            if len(values) < 2:
+                base = float(values[0])
+                values = np.array([base - 0.1, base + 0.1], dtype=float)
+            elif len(np.unique(values)) < 2:
+                values = values + np.linspace(-0.1, 0.1, num=len(values))
+            hue = color_by_reg.get(reg, "#4c78a8")
+            sns.kdeplot(
+                values,
+                ax=ax_right,
+                fill=True,
+                bw_adjust=0.8,
+                cut=0,
+                clip=(0, max_len),
+                gridsize=256,
+                color=hue,
+                alpha=0.18,
+                linewidth=0,
+                warn_singular=False,
+            )
+            sns.kdeplot(
+                values,
+                ax=ax_right,
+                fill=False,
+                bw_adjust=0.8,
+                cut=0,
+                clip=(0, max_len),
+                gridsize=256,
+                color=hue,
+                alpha=0.9,
+                linewidth=1.6,
+                warn_singular=False,
+            )
+    ax_right.set_xlim(0, 35)
+    ax_right.set_xticks(list(range(0, 36, 5)))
+    ax_right.set_xlabel("TFBS length (nt)")
+    ax_right.set_ylabel("Density")
+
+    fig.suptitle(f"Stage-A strata overview — {input_name}")
+    ax_left.set_title("Eligible p-value distribution")
+    ax_right.set_title("Retained TFBS lengths")
+    legend_handles = [
+        Patch(facecolor=color_by_reg[reg], edgecolor=color_by_reg[reg], label=reg, alpha=0.35) for reg in regulators
+    ]
+    if legend_handles:
+        fig.legend(
+            legend_handles,
+            [handle.get_label() for handle in legend_handles],
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.02),
+            ncol=min(len(legend_handles), 3),
+            frameon=bool(style.get("legend_frame", False)),
+        )
+    _apply_style(ax_left, style)
+    _apply_style(ax_right, style)
+    fig.tight_layout(rect=[0, 0.12, 1, 0.9])
+    return fig, ax_left, ax_right
+
+
 def plot_stage_a_strata_overview(
     df: pd.DataFrame,
     out_path: Path,
@@ -1342,84 +1516,12 @@ def plot_stage_a_strata_overview(
         sampling = entry.stage_a_sampling
         if sampling is None:
             raise ValueError(f"Stage-A sampling metadata missing for input '{input_name}'.")
-        if sampling.get("backend") != "fimo":
-            raise ValueError(f"Stage-A strata overview requires FIMO sampling (input '{input_name}').")
-        pvalue_strata = sampling.get("pvalue_strata") or []
-        retain_depth = sampling.get("retain_depth")
-        eligible_bins = sampling.get("eligible_bins") or []
-        retained_bins = sampling.get("retained_bins") or []
-        if not pvalue_strata:
-            raise ValueError(f"Stage-A sampling missing pvalue_strata for input '{input_name}'.")
-        if retain_depth is None:
-            raise ValueError(f"Stage-A sampling missing retain_depth for input '{input_name}'.")
-        if not eligible_bins:
-            raise ValueError(f"Stage-A sampling missing eligible bin counts for input '{input_name}'.")
-        if not retained_bins:
-            raise ValueError(f"Stage-A sampling missing retained bin counts for input '{input_name}'.")
-        if int(retain_depth) < 1 or int(retain_depth) > len(pvalue_strata):
-            raise ValueError(f"Stage-A sampling retain_depth out of range for input '{input_name}'.")
-
-        regulators = [str(row.get("regulator")) for row in eligible_bins]
-        eligible_by_reg = {str(row.get("regulator")): list(row.get("counts") or []) for row in eligible_bins}
-        retained_by_reg = {str(row.get("regulator")): list(row.get("counts") or []) for row in retained_bins}
-        for reg, counts in eligible_by_reg.items():
-            if len(counts) != len(pvalue_strata):
-                raise ValueError(f"Eligible bin counts length mismatch for '{input_name}' ({reg}).")
-        for reg, counts in retained_by_reg.items():
-            if len(counts) != len(pvalue_strata):
-                raise ValueError(f"Retained bin counts length mismatch for '{input_name}' ({reg}).")
-
-        colors = _palette(style, len(regulators), no_repeat=bool(style.get("palette_no_repeat", False)))
-        color_by_reg = {reg: colors[idx] for idx, reg in enumerate(regulators)}
-
-        fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=style["figsize"])
-
-        xs = [float(edge) for edge in pvalue_strata]
-        for reg in regulators:
-            counts = eligible_by_reg.get(reg, [0 for _ in pvalue_strata])
-            ax_left.plot(xs, counts, marker="o", color=color_by_reg[reg], label=reg)
-        ax_left.set_xscale("log")
-        ax_left.invert_xaxis()
-        ax_left.set_xticks(xs)
-        ax_left.set_xticklabels([f"{edge:.0e}" for edge in pvalue_strata])
-        ax_left.set_xlabel("p-value (lower is better)")
-        ax_left.set_ylabel("eligible count")
-        retain_edge = float(pvalue_strata[int(retain_depth) - 1])
-        ax_left.axvline(retain_edge, linestyle="--", color="black", linewidth=1)
-        ax_left.legend(loc="best", frameon=bool(style.get("legend_frame", False)))
-
-        lengths_by_reg: dict[str, list[int]] = {}
-        if "tf" not in pool_df.columns or "tfbs" not in pool_df.columns:
-            raise ValueError(f"Stage-A pool missing tf/tfbs columns for input '{input_name}'.")
-        for reg, seq in pool_df[["tf", "tfbs"]].itertuples(index=False):
-            reg_label = str(reg)
-            lengths_by_reg.setdefault(reg_label, []).append(len(str(seq)))
-        all_lengths = [val for vals in lengths_by_reg.values() for val in vals]
-        if not all_lengths:
-            ax_right.text(0.5, 0.5, "No retained sequences", ha="center", va="center", transform=ax_right.transAxes)
-        else:
-            min_len = min(all_lengths)
-            max_len = max(all_lengths)
-            bins = np.arange(min_len, max_len + 2) - 0.5
-            for reg, lengths in lengths_by_reg.items():
-                if not lengths:
-                    continue
-                ax_right.hist(
-                    lengths,
-                    bins=bins,
-                    color=color_by_reg.get(reg, "#4c78a8"),
-                    alpha=0.6,
-                    edgecolor="white",
-                    label=reg,
-                )
-            ax_right.set_xticks(list(range(min_len, max_len + 1)))
-        ax_right.set_xlabel("TFBS length (nt)")
-        ax_right.set_ylabel("retained count")
-
-        fig.suptitle(f"Stage-A strata overview: {input_name}")
-        _apply_style(ax_left, style)
-        _apply_style(ax_right, style)
-        fig.tight_layout()
+        fig, _, _ = _build_stage_a_strata_overview_figure(
+            input_name=input_name,
+            pool_df=pool_df,
+            sampling=sampling,
+            style=style,
+        )
         fname = f"{out_path.stem}__{_safe_filename(input_name)}{out_path.suffix}"
         path = out_path.parent / fname
         fig.savefig(path)

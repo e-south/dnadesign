@@ -27,6 +27,7 @@ from ...core.pvalue_bins import resolve_pvalue_strata
 from ...utils import logging_utils
 
 SMOOTHING_ALPHA = 1e-6
+PVAL_HIST_BINS = 60
 log = logging.getLogger(__name__)
 _SAFE_LABEL_RE = None
 
@@ -228,6 +229,8 @@ class PWMSamplingSummary:
     retain_bins: Optional[List[int]]
     eligible_bin_counts: Optional[List[int]]
     retained_bin_counts: Optional[List[int]]
+    eligible_pvalue_hist_edges: Optional[List[float]] = None
+    eligible_pvalue_hist_counts: Optional[List[int]] = None
 
 
 @dataclass(frozen=True)
@@ -296,6 +299,31 @@ def _summarize_lengths(lengths: Sequence[int]) -> tuple[Optional[int], Optional[
     return int(arr.min()), float(np.median(arr)), float(arr.mean()), int(arr.max())
 
 
+def _build_pvalue_hist(
+    pvalues: Sequence[float],
+    *,
+    floor: float,
+    min_edge: Optional[float] = None,
+    bins: int = PVAL_HIST_BINS,
+) -> tuple[list[float], list[int]]:
+    vals = [float(v) for v in pvalues if v is not None and float(v) > 0.0]
+    if not vals:
+        return [], []
+    lo = min(vals)
+    if min_edge is not None:
+        lo = min(lo, float(min_edge))
+    hi = max(vals)
+    hi = max(hi, float(floor))
+    hi = min(1.0, hi)
+    if hi <= lo:
+        hi = min(1.0, lo * 10.0) if lo > 0 else min(1.0, float(floor))
+    if hi <= lo:
+        hi = lo * 1.000001
+    edges = np.logspace(np.log10(lo), np.log10(hi), num=int(bins) + 1)
+    counts, _ = np.histogram(vals, bins=edges)
+    return [float(v) for v in edges], [int(v) for v in counts]
+
+
 def _build_summary(
     *,
     generated: int,
@@ -309,6 +337,8 @@ def _build_summary(
     retain_bins: Optional[Sequence[int]] = None,
     eligible_bin_counts: Optional[Sequence[int]] = None,
     retained_bin_counts: Optional[Sequence[int]] = None,
+    eligible_pvalue_hist_edges: Optional[Sequence[float]] = None,
+    eligible_pvalue_hist_counts: Optional[Sequence[int]] = None,
     input_name: Optional[str] = None,
     regulator: Optional[str] = None,
     backend: Optional[str] = None,
@@ -334,6 +364,10 @@ def _build_summary(
         retain_bins=list(retain_bins) if retain_bins is not None else None,
         eligible_bin_counts=list(eligible_bin_counts) if eligible_bin_counts is not None else None,
         retained_bin_counts=list(retained_bin_counts) if retained_bin_counts is not None else None,
+        eligible_pvalue_hist_edges=list(eligible_pvalue_hist_edges) if eligible_pvalue_hist_edges is not None else None,
+        eligible_pvalue_hist_counts=list(eligible_pvalue_hist_counts)
+        if eligible_pvalue_hist_counts is not None
+        else None,
     )
 
 
@@ -1293,6 +1327,12 @@ def sample_pwm_sites(
         summary = None
         if return_summary:
             retain_bin_ids = list(retain_bins)
+            eligible_pvalues = [cand.pvalue for cand in candidates if cand.pvalue is not None]
+            hist_edges, hist_counts = _build_pvalue_hist(
+                eligible_pvalues,
+                floor=floor,
+                min_edge=resolved_bins[0] if resolved_bins else None,
+            )
             summary = _build_summary(
                 generated=generated_total,
                 target=requested,
@@ -1305,6 +1345,8 @@ def sample_pwm_sites(
                 retain_bins=retain_bin_ids,
                 eligible_bin_counts=eligible_bin_counts,
                 retained_bin_counts=retained_bin_counts,
+                eligible_pvalue_hist_edges=hist_edges,
+                eligible_pvalue_hist_counts=hist_counts,
                 input_name=input_name,
                 regulator=motif.motif_id,
                 backend=scoring_backend,

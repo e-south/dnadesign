@@ -128,6 +128,10 @@ def _write_pool_manifest(run_root: Path) -> None:
                         {"regulator": "tfA", "counts": [1, 1, 0]},
                         {"regulator": "tfB", "counts": [0, 0, 1]},
                     ],
+                    "eligible_pvalue_hist": [
+                        {"regulator": "tfA", "edges": [1e-9, 1e-8, 1e-7], "counts": [1, 1]},
+                        {"regulator": "tfB", "edges": [1e-8, 1e-7, 1e-6], "counts": [0, 1]},
+                    ],
                 },
             }
         ],

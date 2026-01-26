@@ -57,6 +57,8 @@ class _DummySource(BaseDataSource):
             retain_bins=[0],
             eligible_bin_counts=[2, 0],
             retained_bin_counts=[1, 0],
+            eligible_pvalue_hist_edges=[1e-8, 1e-7, 1e-6],
+            eligible_pvalue_hist_counts=[1, 1],
         )
         return [("regA", "AAAA", "dummy")], df, [summary]
 
@@ -150,3 +152,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     retained = stage_a_sampling["retained_bins"]
     assert retained[0]["regulator"] == "regA"
     assert retained[0]["counts"] == [1, 0]
+    hist = stage_a_sampling["eligible_pvalue_hist"]
+    assert hist[0]["regulator"] == "regA"
+    assert hist[0]["edges"] == [1e-8, 1e-7, 1e-6]
+    assert hist[0]["counts"] == [1, 1]

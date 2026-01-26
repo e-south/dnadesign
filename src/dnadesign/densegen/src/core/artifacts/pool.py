@@ -170,13 +170,19 @@ def _build_stage_a_sampling_manifest(summaries: list[object] | None) -> dict | N
     retain_bins = list(range(int(retain_depth)))
     eligible_bins = []
     retained_bins = []
+    eligible_pvalue_hist = []
     for summary in fimo_summaries:
         if summary.eligible_bin_counts is None or summary.retained_bin_counts is None:
             raise ValueError("Stage-A sampling summaries missing bin counts.")
+        if summary.eligible_pvalue_hist_edges is None or summary.eligible_pvalue_hist_counts is None:
+            raise ValueError("Stage-A sampling summaries missing eligible p-value histogram.")
         if len(summary.eligible_bin_counts) != len(pvalue_strata):
             raise ValueError("Stage-A eligible bin counts do not match pvalue_strata length.")
         if len(summary.retained_bin_counts) != len(pvalue_strata):
             raise ValueError("Stage-A retained bin counts do not match pvalue_strata length.")
+        if summary.eligible_pvalue_hist_edges:
+            if len(summary.eligible_pvalue_hist_counts) != len(summary.eligible_pvalue_hist_edges) - 1:
+                raise ValueError("Stage-A eligible p-value histogram length mismatch.")
         eligible_bins.append(
             {
                 "regulator": summary.regulator,
@@ -189,6 +195,13 @@ def _build_stage_a_sampling_manifest(summaries: list[object] | None) -> dict | N
                 "counts": [int(v) for v in summary.retained_bin_counts],
             }
         )
+        eligible_pvalue_hist.append(
+            {
+                "regulator": summary.regulator,
+                "edges": [float(v) for v in summary.eligible_pvalue_hist_edges],
+                "counts": [int(v) for v in summary.eligible_pvalue_hist_counts],
+            }
+        )
     return {
         "backend": "fimo",
         "pvalue_strata": [float(v) for v in pvalue_strata],
@@ -196,6 +209,7 @@ def _build_stage_a_sampling_manifest(summaries: list[object] | None) -> dict | N
         "retain_bins": retain_bins,
         "eligible_bins": eligible_bins,
         "retained_bins": retained_bins,
+        "eligible_pvalue_hist": eligible_pvalue_hist,
     }
 
 

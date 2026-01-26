@@ -137,7 +137,8 @@ DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solve
 to rebuild pools from scratch.
 `pool_manifest.json` includes the input config hash plus file fingerprints; append requires they match.
 For FIMO-backed PWM inputs, it also records Stage‑A sampling metadata
-(`pvalue_strata`, `retain_depth`, and eligible/retained bin counts per regulator).
+(`pvalue_strata`, `retain_depth`, eligible/retained bin counts per regulator, and eligible
+p‑value histograms per regulator).
 
 Stage‑B expects Stage‑A pools (default `outputs/pools`). These are optional inspection artifacts and are not required for a normal `dense run`.
 
