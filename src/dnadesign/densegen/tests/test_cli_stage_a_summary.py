@@ -17,10 +17,13 @@ from __future__ import annotations
 import textwrap
 from pathlib import Path
 
-import pandas as pd
+import pytest
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.cli import _fimo_bin_rows, app
+from dnadesign.densegen.src.cli import _format_tier_counts, app
+from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+
+_FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 
 def _write_stage_a_config(tmp_path: Path) -> Path:
@@ -120,7 +123,8 @@ def _write_pwm_stage_a_config(tmp_path: Path) -> Path:
                   sampling:
                     strategy: consensus
                     n_sites: 1
-                    score_threshold: -100.0
+                    oversample_factor: 1
+                    scoring_backend: fimo
               output:
                 targets: [parquet]
                 schema:
@@ -154,6 +158,8 @@ def test_stage_a_build_pool_reports_sampling_recap(tmp_path: Path) -> None:
     assert "Stage-A sampling recap" in result.output
     assert "Input: toy_sites" in result.output
     assert "candidates" in result.output
+    assert "tiers" in result.output
+    assert "score" in result.output
     assert "retained" in result.output
     assert "provided:" in result.output
 
@@ -175,6 +181,8 @@ def test_stage_a_build_pool_logs_initialized(tmp_path: Path) -> None:
 
 def test_stage_a_build_pool_reports_plan(tmp_path: Path) -> None:
     cfg_path = _write_pwm_stage_a_config(tmp_path)
+    if _FIMO_MISSING:
+        pytest.skip("fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).")
     runner = CliRunner()
     result = runner.invoke(app, ["stage-a", "build-pool", "-c", str(cfg_path)])
     assert result.exit_code == 0, result.output
@@ -183,18 +191,6 @@ def test_stage_a_build_pool_reports_plan(tmp_path: Path) -> None:
     assert "M2" in result.output
 
 
-def test_fimo_bin_rows_include_zero_counts() -> None:
-    df = pd.DataFrame(
-        {
-            "fimo_bin_id": [1, 1, 2],
-            "fimo_bin_low": [1e-10, 1e-10, 1e-8],
-            "fimo_bin_high": [1e-8, 1e-8, 1e-6],
-        }
-    )
-    edges = [1e-10, 1e-8, 1e-6]
-    rows = _fimo_bin_rows(df, edges)
-    by_id = {row[0]: row for row in rows}
-    assert by_id[0][2] == 0
-    assert by_id[1][2] == 2
-    assert by_id[2][2] == 1
-    assert by_id[0][1] == "(0, 1e-10]"
+def test_tier_rows_include_zero_counts() -> None:
+    label = _format_tier_counts([2, 0, 1], [1, 0, 0])
+    assert label == "t0 2/1 | t1 0/0 | t2 1/0"

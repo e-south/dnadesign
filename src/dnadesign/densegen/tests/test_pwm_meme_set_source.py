@@ -19,6 +19,9 @@ import numpy as np
 import pytest
 
 from dnadesign.densegen.src.adapters.sources import PWMMemeSetDataSource
+from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+
+_FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 
 def _meme_text(motif_id: str) -> str:
@@ -37,6 +40,10 @@ letter-probability matrix: alength= 4 w= 3 nsites= 20 E= 0
 """
 
 
+@pytest.mark.skipif(
+    _FIMO_MISSING,
+    reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
+)
 def test_pwm_meme_set_sampling(tmp_path: Path) -> None:
     meme_a = tmp_path / "lexA.meme"
     meme_b = tmp_path / "cpxR.meme"
@@ -52,8 +59,7 @@ def test_pwm_meme_set_sampling(tmp_path: Path) -> None:
             "strategy": "stochastic",
             "n_sites": 3,
             "oversample_factor": 3,
-            "score_threshold": -10.0,
-            "score_percentile": None,
+            "scoring_backend": "fimo",
         },
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
@@ -76,8 +82,7 @@ def test_pwm_meme_set_duplicate_motif_ids(tmp_path: Path) -> None:
             "strategy": "stochastic",
             "n_sites": 1,
             "oversample_factor": 2,
-            "score_threshold": -10.0,
-            "score_percentile": None,
+            "scoring_backend": "fimo",
         },
     )
     with pytest.raises(ValueError, match="Duplicate motif_id"):

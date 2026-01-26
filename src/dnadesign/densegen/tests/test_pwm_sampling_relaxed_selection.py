@@ -31,20 +31,17 @@ def _motif() -> PWMMotif:
     )
 
 
-def test_densegen_accepts_score_percentile() -> None:
+def test_stage_a_requires_fimo_backend() -> None:
     rng = np.random.default_rng(0)
-    sites = sample_pwm_sites(
-        rng,
-        _motif(),
-        strategy="stochastic",
-        n_sites=1,
-        oversample_factor=2,
-        max_candidates=None,
-        max_seconds=None,
-        score_threshold=None,
-        score_percentile=90.0,
-    )
-    assert len(sites) == 1
+    with pytest.raises(ValueError, match="scoring_backend"):
+        sample_pwm_sites(
+            rng,
+            _motif(),
+            strategy="stochastic",
+            n_sites=1,
+            oversample_factor=2,
+            scoring_backend="densegen",
+        )
 
 
 def test_densegen_allows_shortfall_with_warning(caplog: pytest.LogCaptureFixture) -> None:
@@ -56,10 +53,8 @@ def test_densegen_allows_shortfall_with_warning(caplog: pytest.LogCaptureFixture
             strategy="stochastic",
             n_sites=10,
             oversample_factor=1,
-            max_candidates=None,
-            max_seconds=None,
-            score_threshold=1e6,
-            score_percentile=None,
+            scoring_backend="fimo",
+            mining={"batch_size": 2, "max_seconds": 0, "log_every_batches": 1},
         )
     assert len(sites) < 10
     assert "shortfall" in caplog.text

@@ -19,7 +19,7 @@ from ...config import resolve_relative_path
 from ...utils.logging_utils import install_native_stderr_filters
 from .ids import hash_tfbs_id
 
-POOL_SCHEMA_VERSION = "1.2"
+POOL_SCHEMA_VERSION = "1.3"
 POOL_MODE_TFBS = "tfbs"
 POOL_MODE_SEQUENCE = "sequence"
 _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -157,59 +157,29 @@ def _build_stage_a_sampling_manifest(summaries: list[object] | None) -> dict | N
     fimo_summaries = [s for s in pwm_summaries if s.backend == "fimo"]
     if not fimo_summaries:
         return None
-    strata_values = {tuple(s.pvalue_strata or []) for s in fimo_summaries}
-    if len(strata_values) != 1:
-        raise ValueError("Stage-A sampling pvalue_strata values must match across regulators.")
-    retain_depths = {s.retain_depth for s in fimo_summaries}
-    if len(retain_depths) != 1:
-        raise ValueError("Stage-A sampling retain_depth values must match across regulators.")
-    pvalue_strata = list(next(iter(strata_values)))
-    retain_depth = next(iter(retain_depths))
-    if retain_depth is None:
-        raise ValueError("Stage-A sampling retain_depth is required for FIMO summaries.")
-    retain_bins = list(range(int(retain_depth)))
-    eligible_bins = []
-    retained_bins = []
-    eligible_pvalue_hist = []
+    eligible_score_hist = []
     for summary in fimo_summaries:
-        if summary.eligible_bin_counts is None or summary.retained_bin_counts is None:
-            raise ValueError("Stage-A sampling summaries missing bin counts.")
-        if summary.eligible_pvalue_hist_edges is None or summary.eligible_pvalue_hist_counts is None:
-            raise ValueError("Stage-A sampling summaries missing eligible p-value histogram.")
-        if len(summary.eligible_bin_counts) != len(pvalue_strata):
-            raise ValueError("Stage-A eligible bin counts do not match pvalue_strata length.")
-        if len(summary.retained_bin_counts) != len(pvalue_strata):
-            raise ValueError("Stage-A retained bin counts do not match pvalue_strata length.")
-        if summary.eligible_pvalue_hist_edges:
-            if len(summary.eligible_pvalue_hist_counts) != len(summary.eligible_pvalue_hist_edges) - 1:
-                raise ValueError("Stage-A eligible p-value histogram length mismatch.")
-        eligible_bins.append(
+        if summary.eligible_score_hist_edges is None or summary.eligible_score_hist_counts is None:
+            raise ValueError("Stage-A sampling summaries missing eligible score histogram.")
+        if summary.eligible_score_hist_edges:
+            if len(summary.eligible_score_hist_counts) != len(summary.eligible_score_hist_edges) - 1:
+                raise ValueError("Stage-A eligible score histogram length mismatch.")
+        eligible_score_hist.append(
             {
                 "regulator": summary.regulator,
-                "counts": [int(v) for v in summary.eligible_bin_counts],
-            }
-        )
-        retained_bins.append(
-            {
-                "regulator": summary.regulator,
-                "counts": [int(v) for v in summary.retained_bin_counts],
-            }
-        )
-        eligible_pvalue_hist.append(
-            {
-                "regulator": summary.regulator,
-                "edges": [float(v) for v in summary.eligible_pvalue_hist_edges],
-                "counts": [int(v) for v in summary.eligible_pvalue_hist_counts],
+                "edges": [float(v) for v in summary.eligible_score_hist_edges],
+                "counts": [int(v) for v in summary.eligible_score_hist_counts],
+                "tier0_score": summary.tier0_score,
+                "tier1_score": summary.tier1_score,
             }
         )
     return {
         "backend": "fimo",
-        "pvalue_strata": [float(v) for v in pvalue_strata],
-        "retain_depth": int(retain_depth),
-        "retain_bins": retain_bins,
-        "eligible_bins": eligible_bins,
-        "retained_bins": retained_bins,
-        "eligible_pvalue_hist": eligible_pvalue_hist,
+        "tier_scheme": "pct_1_9_90",
+        "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
+        "retention_rule": "top_n_sites_by_best_hit_score",
+        "fimo_thresh": 1.0,
+        "eligible_score_hist": eligible_score_hist,
     }
 
 

@@ -104,14 +104,8 @@ META_FIELDS: list[MetaField] = [
         allow_none=True,
     ),
     MetaField("input_pwm_strategy", (str,), "Stage-A PWM sampling strategy.", allow_none=True),
-    MetaField("input_pwm_scoring_backend", (str,), "Stage-A PWM scoring backend (densegen|fimo).", allow_none=True),
-    MetaField("input_pwm_score_threshold", (numbers.Real,), "Stage-A PWM score threshold.", allow_none=True),
-    MetaField("input_pwm_score_percentile", (numbers.Real,), "Stage-A PWM score percentile.", allow_none=True),
-    MetaField("input_pwm_pvalue_strata", (list,), "Stage-A PWM p-value strata edges (FIMO).", allow_none=True),
-    MetaField("input_pwm_retain_depth", (int,), "Stage-A PWM retained strata depth (FIMO).", allow_none=True),
+    MetaField("input_pwm_scoring_backend", (str,), "Stage-A PWM scoring backend (fimo).", allow_none=True),
     MetaField("input_pwm_mining_batch_size", (int,), "Stage-A PWM mining batch size (FIMO).", allow_none=True),
-    MetaField("input_pwm_mining_max_batches", (int,), "Stage-A PWM mining max batches (FIMO).", allow_none=True),
-    MetaField("input_pwm_mining_max_candidates", (int,), "Stage-A PWM mining max candidates (FIMO).", allow_none=True),
     MetaField(
         "input_pwm_mining_max_seconds",
         (numbers.Real,),
@@ -231,15 +225,6 @@ def _validate_list_fields(meta: Mapping[str, Any]) -> None:
                 raise TypeError("Metadata field 'used_tf_counts' must contain dict entries")
             if "tf" not in item or "count" not in item:
                 raise ValueError("used_tf_counts entries must include 'tf' and 'count'")
-
-    if "input_pwm_pvalue_strata" in meta:
-        vals = meta["input_pwm_pvalue_strata"]
-        if vals is not None:
-            if isinstance(vals, (str, bytes)) or not isinstance(vals, Sequence):
-                raise TypeError("Metadata field 'input_pwm_pvalue_strata' must be a list of numbers")
-            for item in vals:
-                if not isinstance(item, numbers.Real):
-                    raise TypeError("Metadata field 'input_pwm_pvalue_strata' must contain only numbers")
 
     if "min_count_by_regulator" in meta:
         vals = meta["min_count_by_regulator"]

@@ -61,6 +61,7 @@ from .adapters.sources.pwm_sampling import PWMSamplingSummary
 from .config import (
     LATEST_SCHEMA_VERSION,
     ConfigError,
+    PWMMiningConfig,
     load_config,
     resolve_outputs_scoped_path,
     resolve_relative_path,
@@ -83,7 +84,6 @@ from .core.pipeline import (
     resolve_plan,
     run_pipeline,
 )
-from .core.pvalue_bins import resolve_pvalue_strata
 from .core.reporting import collect_report_data, write_report
 from .core.run_manifest import load_run_manifest
 from .core.run_paths import (
@@ -217,6 +217,58 @@ def _candidate_logging_enabled(cfg, *, selected: set[str] | None = None) -> bool
         if getattr(sampling, "keep_all_candidates_debug", False):
             return True
     return False
+
+
+def _apply_stage_a_overrides(
+    cfg,
+    *,
+    selected: set[str] | None,
+    n_sites: int | None,
+    oversample_factor: int | None,
+    batch_size: int | None,
+    max_seconds: float | None,
+) -> None:
+    if n_sites is None and oversample_factor is None and batch_size is None and max_seconds is None:
+        return
+    for inp in cfg.inputs:
+        if selected is not None and inp.name not in selected:
+            continue
+        if not str(getattr(inp, "type", "")).startswith("pwm_"):
+            continue
+        sampling = getattr(inp, "sampling", None)
+        if sampling is None:
+            continue
+        sampling_updates: dict = {}
+        if n_sites is not None:
+            sampling_updates["n_sites"] = n_sites
+        if oversample_factor is not None:
+            sampling_updates["oversample_factor"] = oversample_factor
+        mining_updates: dict = {}
+        if batch_size is not None:
+            mining_updates["batch_size"] = batch_size
+        if max_seconds is not None:
+            mining_updates["max_seconds"] = max_seconds
+        if mining_updates:
+            mining = sampling.mining or PWMMiningConfig()
+            sampling_updates["mining"] = mining.model_copy(update=mining_updates)
+        if sampling_updates:
+            inp.sampling = sampling.model_copy(update=sampling_updates)
+        overrides = getattr(inp, "overrides_by_motif_id", None)
+        if isinstance(overrides, dict) and overrides:
+            new_overrides = {}
+            for motif_id, override in overrides.items():
+                override_updates: dict = {}
+                if n_sites is not None:
+                    override_updates["n_sites"] = n_sites
+                if oversample_factor is not None:
+                    override_updates["oversample_factor"] = oversample_factor
+                if mining_updates:
+                    mining = override.mining or PWMMiningConfig()
+                    override_updates["mining"] = mining.model_copy(update=mining_updates)
+                if override_updates:
+                    override = override.model_copy(update=override_updates)
+                new_overrides[motif_id] = override
+            inp.overrides_by_motif_id = new_overrides
 
 
 def _ensure_fimo_available(cfg, *, strict: bool = True) -> None:
@@ -369,13 +421,9 @@ def _print_inputs_summary(loaded) -> None:
         "n_sites",
         "strategy",
         "backend",
-        "score",
-        "bins",
         "mining",
         "bgfile",
         "oversample",
-        "candidate_cap",
-        "time_cap_s",
         "length",
     )
     for inp in pwm_inputs:
@@ -394,30 +442,13 @@ def _print_inputs_summary(loaded) -> None:
             motif_label = f"artifacts={len(getattr(inp, 'paths', []) or [])}"
         else:
             motif_label = "from artifact"
-        backend = getattr(sampling, "scoring_backend", "densegen")
-        score_label = "-"
-        if backend == "fimo":
-            strata = getattr(sampling, "pvalue_strata", None) or []
-            if strata:
-                comparator = ">=" if sampling.strategy == "background" else "<="
-                score_label = f"floor{comparator}{strata[-1]:g}"
-        elif sampling.score_threshold is not None:
-            score_label = f"threshold={sampling.score_threshold}"
-        elif sampling.score_percentile is not None:
-            score_label = f"percentile={sampling.score_percentile}"
-        bins_label = "-"
-        if backend == "fimo":
-            strata = getattr(sampling, "pvalue_strata", None) or []
-            retain_depth = getattr(sampling, "retain_depth", None)
-            bins_label = f"strata={len(strata)}"
-            if retain_depth is not None:
-                bins_label = f"{bins_label}; retain={retain_depth}"
+        backend = getattr(sampling, "scoring_backend", "fimo")
         mining_label = "-"
         mining_cfg = getattr(sampling, "mining", None)
-        if backend == "fimo" and mining_cfg is not None:
+        if mining_cfg is not None:
             parts = [f"batch={mining_cfg.batch_size}"]
-            if mining_cfg.max_batches is not None:
-                parts.append(f"max_batches={mining_cfg.max_batches}")
+            if mining_cfg.max_seconds is not None:
+                parts.append(f"max_seconds={mining_cfg.max_seconds}")
             if mining_cfg.log_every_batches is not None:
                 parts.append(f"log_every={mining_cfg.log_every_batches}")
             mining_label = ", ".join(parts)
@@ -425,31 +456,15 @@ def _print_inputs_summary(loaded) -> None:
         length_label = str(sampling.length_policy)
         if sampling.length_policy == "range" and sampling.length_range is not None:
             length_label = f"range({sampling.length_range[0]}..{sampling.length_range[1]})"
-        candidate_cap = "-"
-        time_cap = "-"
-        if backend == "fimo" and mining_cfg is not None:
-            if getattr(mining_cfg, "max_candidates", None) is not None:
-                candidate_cap = str(mining_cfg.max_candidates)
-            if mining_cfg.max_seconds is not None:
-                time_cap = str(mining_cfg.max_seconds)
-        else:
-            if sampling.max_candidates is not None:
-                candidate_cap = str(sampling.max_candidates)
-            if sampling.max_seconds is not None:
-                time_cap = str(sampling.max_seconds)
         pwm_table.add_row(
             inp.name,
             motif_label,
             str(sampling.n_sites),
             str(sampling.strategy),
             str(backend),
-            score_label,
-            str(bins_label),
             str(mining_label),
             str(bgfile_label),
             str(sampling.oversample_factor),
-            candidate_cap,
-            time_cap,
             length_label,
         )
     console.print("[bold]Stage-A PWM sampling[/]")
@@ -457,51 +472,7 @@ def _print_inputs_summary(loaded) -> None:
     console.print(
         "  -> Produces the realized TFBS pool (input_tfbs_count), captured in outputs/meta/inputs_manifest.json."
     )
-
-
-def _resolve_fimo_bin_edges(cfg, *, input_name: str) -> list[float] | None:
-    for inp in cfg.inputs:
-        if inp.name != input_name:
-            continue
-        sampling = getattr(inp, "sampling", None)
-        if sampling is None:
-            return None
-        backend = getattr(sampling, "scoring_backend", None)
-        if backend is None or str(backend).lower() != "fimo":
-            return None
-        strata = getattr(sampling, "pvalue_strata", None)
-        return resolve_pvalue_strata(strata)
-    return None
-
-
-def _fimo_bin_rows(df: pd.DataFrame, edges: list[float] | None) -> list[tuple[int, str, int]]:
-    counts = df["fimo_bin_id"].value_counts().to_dict()
-    rows: list[tuple[int, str, int]] = []
-    if edges:
-        low = 0.0
-        for idx, high in enumerate(edges):
-            count = int(counts.get(idx, 0))
-            rows.append((idx, f"({low:g}, {float(high):g}]", count))
-            low = float(high)
-        return rows
-    for bin_id in sorted(counts):
-        count = int(counts[bin_id])
-        low = None
-        high = None
-        if "fimo_bin_low" in df.columns:
-            low_vals = df.loc[df["fimo_bin_id"] == bin_id, "fimo_bin_low"]
-            if not low_vals.empty:
-                low = float(low_vals.iloc[0])
-        if "fimo_bin_high" in df.columns:
-            high_vals = df.loc[df["fimo_bin_id"] == bin_id, "fimo_bin_high"]
-            if not high_vals.empty:
-                high = float(high_vals.iloc[0])
-        if low is not None and high is not None:
-            range_label = f"({low:g}, {high:g}]"
-        else:
-            range_label = "-"
-        rows.append((int(bin_id), range_label, count))
-    return rows
+    console.print("  eligibility/retention is score-based (best_hit_score > 0; retain top-N by score).")
 
 
 def _format_sampling_ratio(value: int, target: int | None) -> str:
@@ -525,8 +496,31 @@ def _format_sampling_lengths(
     return f"{int(count)}/{int(min_len)}/{median_len:.1f}/{mean_len:.1f}/{int(max_len)}"
 
 
-def _stage_a_sampling_rows(pool_data: dict[str, PoolData]) -> list[tuple[str, str, str, str, str, str, str, str]]:
-    rows: list[tuple[str, str, str, str, str, str, str, str]] = []
+def _format_score_stats(
+    *,
+    min_score: float | None,
+    median_score: float | None,
+    mean_score: float | None,
+    max_score: float | None,
+) -> str:
+    if min_score is None or median_score is None or mean_score is None or max_score is None:
+        return "-"
+    return f"{min_score:.2f}/{median_score:.2f}/{mean_score:.2f}/{max_score:.2f}"
+
+
+def _format_tier_counts(eligible: list[int] | None, retained: list[int] | None) -> str:
+    if not eligible or not retained or len(eligible) != 3 or len(retained) != 3:
+        return "-"
+    parts = []
+    for idx in range(3):
+        parts.append(f"t{idx} {int(eligible[idx])}/{int(retained[idx])}")
+    return " | ".join(parts)
+
+
+def _stage_a_sampling_rows(
+    pool_data: dict[str, PoolData],
+) -> list[tuple[str, str, str, str, str, str, str, str, str]]:
+    rows: list[tuple[str, str, str, str, str, str, str, str, str]] = []
     for pool in pool_data.values():
         summaries = pool.summaries or []
         if summaries:
@@ -539,13 +533,19 @@ def _stage_a_sampling_rows(pool_data: dict[str, PoolData]) -> list[tuple[str, st
                 candidates = _format_sampling_ratio(summary.generated, summary.target)
                 eligible = _format_sampling_ratio(summary.eligible, summary.generated)
                 retained = _format_sampling_ratio(summary.retained, summary.target_sites)
-                bins_label = summary.strata_bins or "-"
+                tiers_label = _format_tier_counts(summary.eligible_tier_counts, summary.retained_tier_counts)
                 length_label = _format_sampling_lengths(
                     min_len=summary.retained_len_min,
                     median_len=summary.retained_len_median,
                     mean_len=summary.retained_len_mean,
                     max_len=summary.retained_len_max,
                     count=summary.retained,
+                )
+                score_label = _format_score_stats(
+                    min_score=summary.retained_score_min,
+                    median_score=summary.retained_score_median,
+                    mean_score=summary.retained_score_mean,
+                    max_score=summary.retained_score_max,
                 )
                 rows.append(
                     (
@@ -555,7 +555,8 @@ def _stage_a_sampling_rows(pool_data: dict[str, PoolData]) -> list[tuple[str, st
                         candidates,
                         eligible,
                         retained,
-                        bins_label,
+                        tiers_label,
+                        score_label,
                         length_label,
                     )
                 )
@@ -588,17 +589,12 @@ def _stage_a_sampling_rows(pool_data: dict[str, PoolData]) -> list[tuple[str, st
                 "-",
                 _format_sampling_ratio(total, None),
                 "-",
+                "-",
                 length_label,
             )
         )
     rows.sort(key=lambda row: (row[0], row[1]))
     return rows
-
-
-def _format_pvalue_strata_label(strata: list[float] | None) -> str:
-    if not strata:
-        return "-"
-    return ",".join(f"{float(edge):g}" for edge in strata)
 
 
 def _filter_meme_motifs(motifs, motif_ids: list[str] | None) -> list:
@@ -650,9 +646,9 @@ def _stage_a_plan_rows(cfg, cfg_path: Path, selected_inputs: set[str] | None) ->
         if not input_type.startswith("pwm_"):
             continue
         sampling = getattr(inp, "sampling", None)
-        backend = str(getattr(sampling, "scoring_backend", "densegen")).lower() if sampling else "densegen"
-        pvalue_strata = getattr(sampling, "pvalue_strata", None) if sampling else None
-        retain_depth = getattr(sampling, "retain_depth", None) if sampling else None
+        backend = str(getattr(sampling, "scoring_backend", "fimo")).lower() if sampling else "fimo"
+        base_n_sites = getattr(sampling, "n_sites", None) if sampling else None
+        base_oversample = getattr(sampling, "oversample_factor", None) if sampling else None
 
         regulators: list[str] = []
         if input_type == "pwm_meme":
@@ -680,23 +676,23 @@ def _stage_a_plan_rows(cfg, cfg_path: Path, selected_inputs: set[str] | None) ->
         overrides = getattr(inp, "overrides_by_motif_id", None) if input_type == "pwm_artifact_set" else None
         for reg in regulators:
             reg_backend = backend
-            reg_strata = pvalue_strata
-            reg_depth = retain_depth
+            reg_n_sites = base_n_sites
+            reg_oversample = base_oversample
             if overrides and reg in overrides:
                 override = overrides.get(reg) or {}
                 if "scoring_backend" in override:
                     reg_backend = str(override.get("scoring_backend", reg_backend)).lower()
-                if "pvalue_strata" in override:
-                    reg_strata = override.get("pvalue_strata")
-                if "retain_depth" in override:
-                    reg_depth = override.get("retain_depth")
+                if "n_sites" in override:
+                    reg_n_sites = override.get("n_sites")
+                if "oversample_factor" in override:
+                    reg_oversample = override.get("oversample_factor")
             rows.append(
                 (
                     str(inp.name),
                     str(reg),
                     str(reg_backend),
-                    _format_pvalue_strata_label(reg_strata),
-                    str(reg_depth) if reg_depth is not None else "-",
+                    str(reg_n_sites) if reg_n_sites is not None else "-",
+                    str(reg_oversample) if reg_oversample is not None else "-",
                 )
             )
     rows.sort(key=lambda row: (row[0], row[1]))
@@ -804,23 +800,7 @@ def _warn_pwm_sampling_configs(loaded, cfg_path: Path) -> None:
         sampling = getattr(inp, "sampling", None)
         if sampling is None:
             continue
-        scoring_backend = getattr(sampling, "scoring_backend", "densegen")
         n_sites = getattr(sampling, "n_sites", None)
-        oversample = getattr(sampling, "oversample_factor", None)
-        max_candidates = getattr(sampling, "max_candidates", None)
-        score_threshold = getattr(sampling, "score_threshold", None)
-        score_percentile = getattr(sampling, "score_percentile", None)
-        if scoring_backend == "fimo" and (score_threshold is not None or score_percentile is not None):
-            warnings.append(
-                f"{getattr(inp, 'name', src_type)}: scoring_backend=fimo ignores score_threshold/score_percentile."
-            )
-        if isinstance(n_sites, int) and isinstance(oversample, int) and max_candidates is not None:
-            requested = n_sites * oversample
-            if requested > int(max_candidates):
-                warnings.append(
-                    f"{getattr(inp, 'name', src_type)}: requested candidates ({requested}) exceeds max_candidates "
-                    f"({max_candidates}); sampling will be capped."
-                )
         # Width preflight (best-effort)
         if src_type in {"pwm_meme", "pwm_jaspar", "pwm_matrix_csv"} and isinstance(n_sites, int):
             widths = {}
@@ -1806,6 +1786,26 @@ def stage_a_build_pool(
         "--out",
         help="Output directory (relative to run root; must be inside outputs/).",
     ),
+    n_sites: Optional[int] = typer.Option(
+        None,
+        "--n-sites",
+        help="Override Stage-A PWM sampling n_sites for all PWM inputs.",
+    ),
+    oversample_factor: Optional[int] = typer.Option(
+        None,
+        "--oversample-factor",
+        help="Override Stage-A PWM sampling oversample_factor for all PWM inputs.",
+    ),
+    batch_size: Optional[int] = typer.Option(
+        None,
+        "--batch-size",
+        help="Override Stage-A PWM mining batch_size for all PWM inputs.",
+    ),
+    max_seconds: Optional[float] = typer.Option(
+        None,
+        "--max-seconds",
+        help="Override Stage-A PWM mining max_seconds for all PWM inputs.",
+    ),
     input_name: Optional[list[str]] = typer.Option(
         None,
         "--input",
@@ -1849,6 +1849,22 @@ def stage_a_build_pool(
         missing = sorted(selected - available)
         if missing:
             raise typer.BadParameter(f"Unknown input name(s): {', '.join(missing)}")
+    if n_sites is not None and n_sites <= 0:
+        raise typer.BadParameter("--n-sites must be > 0")
+    if oversample_factor is not None and oversample_factor <= 0:
+        raise typer.BadParameter("--oversample-factor must be > 0")
+    if batch_size is not None and batch_size <= 0:
+        raise typer.BadParameter("--batch-size must be > 0")
+    if max_seconds is not None and max_seconds <= 0:
+        raise typer.BadParameter("--max-seconds must be > 0")
+    _apply_stage_a_overrides(
+        cfg,
+        selected=selected if selected else None,
+        n_sites=n_sites,
+        oversample_factor=oversample_factor,
+        batch_size=batch_size,
+        max_seconds=max_seconds,
+    )
 
     seeds = derive_seed_map(int(cfg.runtime.random_seed), ["stage_a", "stage_b", "solver"])
     rng = np.random.default_rng(seeds["stage_a"])
@@ -1876,8 +1892,8 @@ def stage_a_build_pool(
         plan_table.add_column("input", overflow="fold")
         plan_table.add_column("reg", overflow="fold")
         plan_table.add_column("backend")
-        plan_table.add_column("pvalue_strata", overflow="fold")
-        plan_table.add_column("retain_depth")
+        plan_table.add_column("n_sites")
+        plan_table.add_column("oversample")
         for row in plan_rows:
             plan_table.add_row(*row)
         console.print("[bold]Stage-A plan[/]")
@@ -1932,27 +1948,22 @@ def stage_a_build_pool(
             recap_table.add_column("candidates")
             recap_table.add_column("eligible")
             recap_table.add_column("retained")
-            recap_table.add_column("bins", overflow="fold")
+            recap_table.add_column("tiers", overflow="fold")
+            recap_table.add_column("score(min/med/avg/max)")
             recap_table.add_column("len(n/min/med/avg/max)")
             for row in sorted(grouped[input_name], key=lambda item: item[1]):
-                recap_table.add_row(row[1], row[3], row[4], row[5], row[6], row[7])
+                recap_table.add_row(row[1], row[3], row[4], row[5], row[6], row[7], row[8])
             console.print(f"[bold]Input: {input_name}[/]")
             console.print(recap_table)
         backends = {row[2] for row in recap_rows}
         if "fimo" in backends:
             console.print(
-                "  fimo: candidates=generated/target; eligible=hits at/below p-value floor; "
-                "retained=top-N within retained strata (shortfall ok); bins=b<idx> eligible/retained; "
-                "len=n/min/med/avg/max (retained)"
-            )
-        if "densegen" in backends:
-            console.print(
-                "  densegen: candidates=generated/target; eligible=score-filtered candidates "
-                "(threshold/percentile); retained=top-N by score (shortfall ok); bins=-; "
+                "  eligibility/retention is score-based (best_hit_score > 0; retain top-N by score). "
+                "tiers=t0 e/r | t1 e/r | t2 e/r; score=min/med/avg/max (retained); "
                 "len=n/min/med/avg/max (retained)"
             )
         if "provided" in backends:
-            console.print("  provided: candidates=total; retained=total; bins=-; len=n/min/med/avg/max")
+            console.print("  provided: candidates=total; retained=total; tiers=-; score=-; len=n/min/med/avg/max")
     console.print(f":sparkles: [bold green]Pool manifest written[/]: {artifact.manifest_path}")
 
 

@@ -1333,43 +1333,30 @@ def _build_stage_a_strata_overview_figure(
     style = _style(style)
     if sampling.get("backend") != "fimo":
         raise ValueError(f"Stage-A strata overview requires FIMO sampling (input '{input_name}').")
-    pvalue_strata = sampling.get("pvalue_strata") or []
-    retain_depth = sampling.get("retain_depth")
-    eligible_bins = sampling.get("eligible_bins") or []
-    retained_bins = sampling.get("retained_bins") or []
-    eligible_pvalue_hist = sampling.get("eligible_pvalue_hist") or []
-    if not pvalue_strata:
-        raise ValueError(f"Stage-A sampling missing pvalue_strata for input '{input_name}'.")
-    if retain_depth is None:
-        raise ValueError(f"Stage-A sampling missing retain_depth for input '{input_name}'.")
-    if not eligible_bins:
-        raise ValueError(f"Stage-A sampling missing eligible bin counts for input '{input_name}'.")
-    if not retained_bins:
-        raise ValueError(f"Stage-A sampling missing retained bin counts for input '{input_name}'.")
-    if not eligible_pvalue_hist:
-        raise ValueError(f"Stage-A sampling missing eligible p-value histogram for input '{input_name}'.")
-    if int(retain_depth) < 1 or int(retain_depth) > len(pvalue_strata):
-        raise ValueError(f"Stage-A sampling retain_depth out of range for input '{input_name}'.")
+    eligible_score_hist = sampling.get("eligible_score_hist") or []
+    if not eligible_score_hist:
+        raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
     if "tf" not in pool_df.columns or "tfbs" not in pool_df.columns:
         raise ValueError(f"Stage-A pool missing tf/tfbs columns for input '{input_name}'.")
+    if "best_hit_score" not in pool_df.columns:
+        raise ValueError(f"Stage-A pool missing best_hit_score for input '{input_name}'.")
 
-    regulators = [str(row.get("regulator")) for row in eligible_pvalue_hist]
-    eligible_by_reg = {str(row.get("regulator")): list(row.get("counts") or []) for row in eligible_bins}
-    retained_by_reg = {str(row.get("regulator")): list(row.get("counts") or []) for row in retained_bins}
-    hist_by_reg: dict[str, tuple[list[float], list[int]]] = {}
-    for row in eligible_pvalue_hist:
+    regulators = [str(row.get("regulator")) for row in eligible_score_hist]
+    hist_by_reg: dict[str, tuple[list[float], list[int], float | None, float | None]] = {}
+    for row in eligible_score_hist:
         reg = str(row.get("regulator"))
         edges = [float(v) for v in (row.get("edges") or [])]
         counts = [int(v) for v in (row.get("counts") or [])]
+        tier0_score = row.get("tier0_score")
+        tier1_score = row.get("tier1_score")
         if edges and len(counts) != len(edges) - 1:
-            raise ValueError(f"Eligible p-value histogram length mismatch for '{input_name}' ({reg}).")
-        hist_by_reg[reg] = (edges, counts)
-    for reg, counts in eligible_by_reg.items():
-        if len(counts) != len(pvalue_strata):
-            raise ValueError(f"Eligible bin counts length mismatch for '{input_name}' ({reg}).")
-    for reg, counts in retained_by_reg.items():
-        if len(counts) != len(pvalue_strata):
-            raise ValueError(f"Retained bin counts length mismatch for '{input_name}' ({reg}).")
+            raise ValueError(f"Eligible score histogram length mismatch for '{input_name}' ({reg}).")
+        hist_by_reg[reg] = (
+            edges,
+            counts,
+            float(tier0_score) if tier0_score is not None else None,
+            float(tier1_score) if tier1_score is not None else None,
+        )
 
     colors = _palette(style, len(regulators), no_repeat=bool(style.get("palette_no_repeat", False)))
     color_by_reg = {reg: colors[idx] for idx, reg in enumerate(regulators)}
@@ -1377,13 +1364,21 @@ def _build_stage_a_strata_overview_figure(
     fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=style["figsize"])
 
     max_height = 0.0
-    height_by_reg: dict[str, tuple[list[float], np.ndarray]] = {}
+    height_by_reg: dict[str, tuple[list[float], np.ndarray, np.ndarray | None, float | None, float | None]] = {}
     for reg in regulators:
-        edges, counts = hist_by_reg.get(reg, ([], []))
+        edges, counts, tier0_score, tier1_score = hist_by_reg.get(reg, ([], [], None, None))
         if not edges:
             continue
         heights = np.log10(np.asarray(counts, dtype=float) + 1.0)
-        height_by_reg[reg] = (edges, heights)
+        retained_vals = pd.to_numeric(
+            pool_df.loc[pool_df["tf"].astype(str) == reg, "best_hit_score"],
+            errors="coerce",
+        ).dropna()
+        retained_heights = None
+        if not retained_vals.empty:
+            retained_counts, _ = np.histogram(retained_vals.to_numpy(dtype=float), bins=np.asarray(edges))
+            retained_heights = np.log10(retained_counts.astype(float) + 1.0)
+        height_by_reg[reg] = (edges, heights, retained_heights, tier0_score, tier1_score)
         if heights.size:
             max_height = max(max_height, float(heights.max()))
     if not height_by_reg:
@@ -1394,7 +1389,9 @@ def _build_stage_a_strata_overview_figure(
         step = track_height + gap
         baselines = []
         for idx, reg in enumerate(regulators):
-            edges, heights = height_by_reg.get(reg, ([], np.array([])))
+            edges, heights, retained_heights, tier0_score, tier1_score = height_by_reg.get(
+                reg, ([], np.array([]), None, None, None)
+            )
             baseline = idx * step
             baselines.append(baseline)
             if edges:
@@ -1412,18 +1409,43 @@ def _build_stage_a_strata_overview_figure(
                     color=color_by_reg[reg],
                     alpha=0.25,
                 )
+                if retained_heights is not None:
+                    ax_left.plot(
+                        centers,
+                        baseline + retained_heights,
+                        color=color_by_reg[reg],
+                        linewidth=1.6,
+                    )
+                    ax_left.fill_between(
+                        centers,
+                        baseline,
+                        baseline + retained_heights,
+                        color=color_by_reg[reg],
+                        alpha=0.4,
+                    )
+                if tier0_score is not None:
+                    ax_left.vlines(
+                        float(tier0_score),
+                        baseline,
+                        baseline + track_height,
+                        color="#222222",
+                        linestyle="--",
+                        linewidth=1,
+                    )
+                if tier1_score is not None:
+                    ax_left.vlines(
+                        float(tier1_score),
+                        baseline,
+                        baseline + track_height,
+                        color="#222222",
+                        linestyle=":",
+                        linewidth=1,
+                    )
         ax_left.set_yticks(baselines)
         ax_left.set_yticklabels(regulators)
         ax_left.set_ylim(-gap, baselines[-1] + track_height + gap)
-    ax_left.set_xscale("log")
-    ax_left.invert_xaxis()
-    xs = [float(edge) for edge in pvalue_strata]
-    ax_left.set_xticks(xs)
-    ax_left.set_xticklabels([f"{edge:.0e}" for edge in pvalue_strata])
-    ax_left.set_xlabel("FIMO p-value")
+    ax_left.set_xlabel("FIMO log-odds score")
     ax_left.set_ylabel("Regulator tracks")
-    retain_edge = float(pvalue_strata[int(retain_depth) - 1])
-    ax_left.axvline(retain_edge, linestyle="--", color="#222222", linewidth=1)
 
     lengths_by_reg: dict[str, list[int]] = {}
     for reg, seq in pool_df[["tf", "tfbs"]].itertuples(index=False):
@@ -1476,7 +1498,7 @@ def _build_stage_a_strata_overview_figure(
     ax_right.set_ylabel("Density")
 
     fig.suptitle(f"Stage-A strata overview — {input_name}")
-    ax_left.set_title("Eligible p-value distribution")
+    ax_left.set_title("Eligible score distribution")
     ax_right.set_title("Retained TFBS lengths")
     legend_handles = [
         Patch(facecolor=color_by_reg[reg], edgecolor=color_by_reg[reg], label=reg, alpha=0.35) for reg in regulators

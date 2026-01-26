@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import random
+import time
 from pathlib import Path
 
 import numpy as np
-import pytest
 import yaml
 
 from dnadesign.densegen.src.adapters.optimizer import OptimizerRun
@@ -175,7 +175,7 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
     assert produced <= loaded.root.densegen.runtime.arrays_generated_before_resample
 
 
-def test_stall_detected_with_no_solutions(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     (run_dir / "outputs" / "parquet").mkdir(parents=True)
@@ -225,7 +225,7 @@ def test_stall_detected_with_no_solutions(monkeypatch: pytest.MonkeyPatch, tmp_p
                 "arrays_generated_before_resample": 1,
                 "min_count_per_tf": 0,
                 "max_duplicate_solutions": 5,
-                "stall_seconds_before_resample": 10,
+                "stall_seconds_before_resample": 1,
                 "stall_warning_every_seconds": 0,
                 "max_resample_attempts": 0,
                 "max_total_resamples": 0,
@@ -265,20 +265,11 @@ def test_stall_detected_with_no_solutions(monkeypatch: pytest.MonkeyPatch, tmp_p
             opt = _DummyOpt()
 
             def _gen():
+                time.sleep(1.1)
                 if False:
                     yield None
 
             return OptimizerRun(optimizer=opt, generator=_gen())
-
-    def _monotonic():
-        _monotonic.value += 100.0
-        return _monotonic.value
-
-    _monotonic.value = 0.0
-    monkeypatch.setattr(
-        "dnadesign.densegen.src.core.pipeline.time.monotonic",
-        _monotonic,
-    )
 
     sink = _DummySink()
     deps = PipelineDeps(

@@ -152,8 +152,6 @@ class SequenceLibraryInput(BaseModel):
 class PWMMiningConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     batch_size: int = 100000
-    max_batches: Optional[int] = None
-    max_candidates: Optional[int] = None
     max_seconds: Optional[float] = 60.0
     log_every_batches: int = 1
 
@@ -162,20 +160,6 @@ class PWMMiningConfig(BaseModel):
     def _batch_size_ok(cls, v: int):
         if v <= 0:
             raise ValueError("pwm.sampling.mining.batch_size must be > 0")
-        return v
-
-    @field_validator("max_batches")
-    @classmethod
-    def _max_batches_ok(cls, v: Optional[int]):
-        if v is not None and v <= 0:
-            raise ValueError("pwm.sampling.mining.max_batches must be > 0 when set")
-        return v
-
-    @field_validator("max_candidates")
-    @classmethod
-    def _max_candidates_ok(cls, v: Optional[int]):
-        if v is not None and v <= 0:
-            raise ValueError("pwm.sampling.mining.max_candidates must be > 0 when set")
         return v
 
     @field_validator("max_seconds")
@@ -200,13 +184,7 @@ class PWMSamplingConfig(BaseModel):
     strategy: Literal["consensus", "stochastic", "background"] = "stochastic"
     n_sites: int
     oversample_factor: int = 10
-    max_candidates: Optional[int] = 100000
-    max_seconds: Optional[float] = None
-    score_threshold: Optional[float] = None
-    score_percentile: Optional[float] = None
-    scoring_backend: Literal["densegen", "fimo"] = "densegen"
-    pvalue_strata: Optional[List[float]] = None
-    retain_depth: Optional[int] = None
+    scoring_backend: Literal["fimo"] = "fimo"
     mining: Optional[PWMMiningConfig] = None
     bgfile: Optional[str] = None
     keep_all_candidates_debug: bool = False
@@ -229,22 +207,6 @@ class PWMSamplingConfig(BaseModel):
         if v <= 0:
             raise ValueError("pwm.sampling.oversample_factor must be > 0")
         return v
-
-    @field_validator("max_candidates")
-    @classmethod
-    def _max_candidates_ok(cls, v: Optional[int]):
-        if v is not None and v <= 0:
-            raise ValueError("pwm.sampling.max_candidates must be > 0 when set")
-        return v
-
-    @field_validator("max_seconds")
-    @classmethod
-    def _max_seconds_ok(cls, v: Optional[float]):
-        if v is None:
-            return v
-        if not isinstance(v, (int, float)) or float(v) <= 0:
-            raise ValueError("pwm.sampling.max_seconds must be > 0 when set")
-        return float(v)
 
     @field_validator("length_range")
     @classmethod
@@ -278,74 +240,14 @@ class PWMSamplingConfig(BaseModel):
             raise ValueError("pwm.sampling.bgfile must be a non-empty string when set")
         return str(v).strip()
 
-    @field_validator("pvalue_strata")
-    @classmethod
-    def _pvalue_strata_ok(cls, v: Optional[List[float]]):
-        if v is None:
-            return v
-        if not v:
-            raise ValueError("pwm.sampling.pvalue_strata must be non-empty when set")
-        bins = [float(x) for x in v]
-        prev = 0.0
-        for val in bins:
-            if not (0.0 < val <= 1.0):
-                raise ValueError("pwm.sampling.pvalue_strata values must be in (0, 1]")
-            if val <= prev:
-                raise ValueError("pwm.sampling.pvalue_strata must be strictly increasing")
-            prev = val
-        return bins
-
     @model_validator(mode="after")
     def _score_mode(self):
-        has_thresh = self.score_threshold is not None
-        has_pct = self.score_percentile is not None
-        if self.scoring_backend == "densegen":
-            if has_thresh == has_pct:
-                raise ValueError("pwm.sampling must set exactly one of score_threshold or score_percentile")
-            if self.pvalue_strata is not None:
-                raise ValueError("pwm.sampling.pvalue_strata is only valid when scoring_backend='fimo'")
-            if self.retain_depth is not None:
-                raise ValueError("pwm.sampling.retain_depth is only valid when scoring_backend='fimo'")
-            if self.mining is not None:
-                raise ValueError("pwm.sampling.mining is only valid when scoring_backend='fimo'")
-            if self.include_matched_sequence:
-                raise ValueError("pwm.sampling.include_matched_sequence is only valid when scoring_backend='fimo'")
-        else:
-            if self.pvalue_strata is None:
-                raise ValueError("pwm.sampling.pvalue_strata is required when scoring_backend='fimo'")
-            if self.retain_depth is None:
-                raise ValueError("pwm.sampling.retain_depth is required when scoring_backend='fimo'")
-            if "max_candidates" in self.model_fields_set and self.max_candidates is not None:
-                raise ValueError(
-                    "pwm.sampling.max_candidates is not used with scoring_backend='fimo'. "
-                    "Use pwm.sampling.mining.max_candidates instead."
-                )
-            if "max_seconds" in self.model_fields_set and self.max_seconds is not None:
-                raise ValueError(
-                    "pwm.sampling.max_seconds is not used with scoring_backend='fimo'. "
-                    "Use pwm.sampling.mining.max_seconds instead."
-                )
-            if "max_candidates" not in self.model_fields_set:
-                self.max_candidates = None
-            if "max_seconds" not in self.model_fields_set:
-                self.max_seconds = None
-            if self.mining is None:
-                self.mining = PWMMiningConfig()
-            if self.mining is not None and self.mining.max_candidates is not None:
-                if int(self.mining.max_candidates) < int(self.n_sites):
-                    raise ValueError("pwm.sampling.mining.max_candidates must be >= n_sites")
-            depth = int(self.retain_depth)
-            if depth <= 0:
-                raise ValueError("pwm.sampling.retain_depth must be >= 1")
-            if self.pvalue_strata is None:
-                raise ValueError("pwm.sampling.pvalue_strata is required when scoring_backend='fimo'")
-            if depth > len(self.pvalue_strata):
-                raise ValueError("pwm.sampling.retain_depth cannot exceed the number of pvalue_strata bins")
+        if self.scoring_backend != "fimo":
+            raise ValueError("pwm.sampling.scoring_backend must be 'fimo'")
+        if self.mining is None:
+            self.mining = PWMMiningConfig()
         if self.strategy == "consensus" and int(self.n_sites) != 1:
             raise ValueError("pwm.sampling.strategy=consensus requires n_sites=1")
-        if self.scoring_backend == "densegen" and self.score_percentile is not None:
-            if not (0.0 < float(self.score_percentile) < 100.0):
-                raise ValueError("pwm.sampling.score_percentile must be between 0 and 100")
         if self.length_policy == "exact" and self.length_range is not None:
             raise ValueError("pwm.sampling.length_range is not allowed when length_policy=exact")
         if self.length_policy == "range" and self.length_range is None:

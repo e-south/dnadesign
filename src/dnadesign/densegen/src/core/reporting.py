@@ -436,7 +436,7 @@ def collect_report_data(
     tables: Dict[str, pd.DataFrame] = {}
     tables["solutions"] = solutions_df
 
-    stage_a_bins = pd.DataFrame(columns=["input_name", "tf", "bin_id", "bin_low", "bin_high", "count", "total"])
+    stage_a_tiers = pd.DataFrame(columns=["input_name", "tf", "tier", "count", "total"])
     stage_a_score_summary = pd.DataFrame(
         columns=[
             "input_name",
@@ -465,23 +465,15 @@ def collect_report_data(
                 df_pool = pd.read_parquet(pool_path)
                 if "tf" not in df_pool.columns:
                     continue
-                if "fimo_bin_id" in df_pool.columns:
+                if "tier" in df_pool.columns:
                     total_counts = df_pool.groupby("tf").size().to_dict()
-                    grouped = df_pool.groupby(["tf", "fimo_bin_id"])
-                    for (tf, bin_id), group in grouped:
-                        bin_low = None
-                        bin_high = None
-                        if "fimo_bin_low" in group.columns and not group["fimo_bin_low"].empty:
-                            bin_low = float(group["fimo_bin_low"].iloc[0])
-                        if "fimo_bin_high" in group.columns and not group["fimo_bin_high"].empty:
-                            bin_high = float(group["fimo_bin_high"].iloc[0])
+                    grouped = df_pool.groupby(["tf", "tier"])
+                    for (tf, tier), group in grouped:
                         rows.append(
                             {
                                 "input_name": entry.name,
                                 "tf": tf,
-                                "bin_id": int(bin_id),
-                                "bin_low": bin_low,
-                                "bin_high": bin_high,
+                                "tier": int(tier),
                                 "count": int(len(group)),
                                 "total": int(total_counts.get(tf, len(group))),
                             }
@@ -489,14 +481,14 @@ def collect_report_data(
                 for tf, sub in df_pool.groupby("tf"):
                     if sub.empty:
                         continue
-                    if "fimo_pvalue" in sub.columns:
-                        vals = pd.to_numeric(sub["fimo_pvalue"], errors="coerce").dropna()
+                    if "best_hit_score" in sub.columns:
+                        vals = pd.to_numeric(sub["best_hit_score"], errors="coerce").dropna()
                         if not vals.empty:
                             score_rows.append(
                                 {
                                     "input_name": entry.name,
                                     "tf": tf,
-                                    "metric": "fimo_pvalue",
+                                    "metric": "best_hit_score",
                                     "count": int(len(vals)),
                                     "min": float(vals.min()),
                                     "p10": float(vals.quantile(0.1)),
@@ -505,22 +497,6 @@ def collect_report_data(
                                     "max": float(vals.max()),
                                 }
                             )
-                        if "fimo_score" in sub.columns:
-                            vals = pd.to_numeric(sub["fimo_score"], errors="coerce").dropna()
-                            if not vals.empty:
-                                score_rows.append(
-                                    {
-                                        "input_name": entry.name,
-                                        "tf": tf,
-                                        "metric": "fimo_score",
-                                        "count": int(len(vals)),
-                                        "min": float(vals.min()),
-                                        "p10": float(vals.quantile(0.1)),
-                                        "p50": float(vals.quantile(0.5)),
-                                        "p90": float(vals.quantile(0.9)),
-                                        "max": float(vals.max()),
-                                    }
-                                )
                         if "score" in sub.columns:
                             vals = pd.to_numeric(sub["score"], errors="coerce").dropna()
                             if not vals.empty:
@@ -538,13 +514,13 @@ def collect_report_data(
                                     }
                                 )
             if rows:
-                stage_a_bins = pd.DataFrame(rows)
+                stage_a_tiers = pd.DataFrame(rows)
             if score_rows:
                 stage_a_score_summary = pd.DataFrame(score_rows)
         except Exception:
-            log.warning("Failed to load Stage-A pool bins for report.", exc_info=True)
+            log.warning("Failed to load Stage-A pool tiers for report.", exc_info=True)
 
-    tables["stage_a_bins"] = stage_a_bins
+    tables["stage_a_tiers"] = stage_a_tiers
     tables["stage_a_score_summary"] = stage_a_score_summary
 
     def _candidate_logging_enabled() -> bool:
@@ -1052,26 +1028,20 @@ def _render_report_md(bundle: ReportBundle) -> str:
         lines.extend(["", "## Notes"])
         for warning in warnings:
             lines.append(f"- {warning}")
-    stage_a_bins = bundle.tables.get("stage_a_bins")
-    if stage_a_bins is not None and not stage_a_bins.empty:
-        lines.extend(["", "## Stage-A p-value bins"])
-        for (input_name, tf), sub in stage_a_bins.groupby(["input_name", "tf"]):
-            sub = sub.sort_values("bin_id")
+    stage_a_tiers = bundle.tables.get("stage_a_tiers")
+    if stage_a_tiers is not None and not stage_a_tiers.empty:
+        lines.extend(["", "## Stage-A tiers"])
+        for (input_name, tf), sub in stage_a_tiers.groupby(["input_name", "tf"]):
+            sub = sub.sort_values("tier")
             parts = []
             for _, row in sub.iterrows():
-                bin_id = int(row.get("bin_id") or 0)
+                tier = int(row.get("tier") or 0)
                 count = int(row.get("count") or 0)
-                low = row.get("bin_low")
-                high = row.get("bin_high")
-                if low is not None and high is not None:
-                    label = f"({float(low):.0e},{float(high):.0e}]"
-                else:
-                    label = f"bin{bin_id}"
-                parts.append(f"{label}:{count}")
+                parts.append(f"tier{tier}:{count}")
             lines.append(f"- {input_name}/{tf}: " + " ".join(parts))
     stage_a_score_summary = bundle.tables.get("stage_a_score_summary")
     if stage_a_score_summary is not None and not stage_a_score_summary.empty:
-        lines.extend(["", "## Stage-A score/p-value summary (per TF)"])
+        lines.extend(["", "## Stage-A score summary (per TF)"])
         lines.append(
             _markdown_table(
                 stage_a_score_summary,

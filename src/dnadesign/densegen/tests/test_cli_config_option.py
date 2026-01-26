@@ -1,12 +1,23 @@
 from __future__ import annotations
 
+import os
 import textwrap
+from contextlib import contextmanager
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from dnadesign.densegen.src.cli import app
+
+
+@contextmanager
+def _chdir(path: Path):
+    prev = Path.cwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(prev)
 
 
 def _write_min_config(path: Path) -> None:
@@ -68,19 +79,19 @@ def test_validate_reports_invalid_config(tmp_path: Path) -> None:
     assert "Config error" in result.output
 
 
-def test_validate_uses_cwd_config_when_missing_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_validate_uses_cwd_config_when_missing_flag(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.yaml"
     _write_min_config(cfg_path)
-    monkeypatch.chdir(tmp_path)
-    runner = CliRunner()
-    result = runner.invoke(app, ["validate-config"])
-    assert result.exit_code == 0, result.output
-    assert "Config is valid" in result.output
+    with _chdir(tmp_path):
+        runner = CliRunner()
+        result = runner.invoke(app, ["validate-config"])
+        assert result.exit_code == 0, result.output
+        assert "Config is valid" in result.output
 
 
-def test_validate_missing_cwd_config_reports_actionable_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    runner = CliRunner()
-    result = runner.invoke(app, ["validate-config"])
-    assert result.exit_code != 0, result.output
-    assert "No config found" in result.output
+def test_validate_missing_cwd_config_reports_actionable_error(tmp_path: Path) -> None:
+    with _chdir(tmp_path):
+        runner = CliRunner()
+        result = runner.invoke(app, ["validate-config"])
+        assert result.exit_code != 0, result.output
+        assert "No config found" in result.output

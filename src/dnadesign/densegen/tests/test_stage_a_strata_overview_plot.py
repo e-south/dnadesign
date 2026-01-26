@@ -21,25 +21,32 @@ def test_stage_a_strata_overview_axes_and_legend() -> None:
     matplotlib.use("Agg", force=True)
     sampling = {
         "backend": "fimo",
-        "pvalue_strata": [1e-8, 1e-6, 1e-4],
-        "retain_depth": 2,
-        "eligible_bins": [
-            {"regulator": "regA", "counts": [2, 1, 0]},
-            {"regulator": "regB", "counts": [1, 0, 0]},
-        ],
-        "retained_bins": [
-            {"regulator": "regA", "counts": [1, 1, 0]},
-            {"regulator": "regB", "counts": [0, 0, 0]},
-        ],
-        "eligible_pvalue_hist": [
-            {"regulator": "regA", "edges": [1e-8, 1e-7, 1e-6, 1e-5], "counts": [1, 2, 1]},
-            {"regulator": "regB", "edges": [1e-8, 1e-7, 1e-6, 1e-5], "counts": [0, 1, 0]},
+        "tier_scheme": "pct_1_9_90",
+        "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
+        "retention_rule": "top_n_sites_by_best_hit_score",
+        "fimo_thresh": 1.0,
+        "eligible_score_hist": [
+            {
+                "regulator": "regA",
+                "edges": [0.0, 2.0, 4.0, 6.0],
+                "counts": [1, 2, 1],
+                "tier0_score": 6.0,
+                "tier1_score": 4.0,
+            },
+            {
+                "regulator": "regB",
+                "edges": [0.0, 1.0, 2.0],
+                "counts": [0, 1],
+                "tier0_score": 2.0,
+                "tier1_score": 1.0,
+            },
         ],
     }
     pool_df = pd.DataFrame(
         {
             "tf": ["regA", "regA", "regB"],
             "tfbs": ["AAAAAA", "AAAAAAA", "CCCCCC"],
+            "best_hit_score": [5.0, 3.0, 1.5],
         }
     )
 
@@ -51,15 +58,14 @@ def test_stage_a_strata_overview_axes_and_legend() -> None:
     )
 
     try:
-        assert ax_left.get_xscale() == "log"
+        assert ax_left.get_xscale() == "linear"
         left_xlim = ax_left.get_xlim()
-        assert left_xlim[0] > left_xlim[1]
-        assert ax_left.get_xlabel() == "FIMO p-value"
-        assert "eligible" not in ax_left.get_xlabel().lower()
+        assert left_xlim[0] < left_xlim[1]
+        assert "score" in ax_left.get_xlabel().lower()
         left_labels = [label.get_text() for label in ax_left.get_yticklabels() if label.get_text()]
         assert "regA" in left_labels
         assert "regB" in left_labels
-        assert ax_right.get_xlim() == (0.0, 35.0)
+        assert ax_right.get_xlim()[1] > ax_right.get_xlim()[0]
         assert fig.legends
         assert ax_left.get_legend() is None
         assert len(ax_right.collections) > 0

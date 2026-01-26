@@ -64,10 +64,10 @@ def test_parse_fimo_tsv_and_best_hits() -> None:
     )
     rows = parse_fimo_tsv(tsv)
     best = aggregate_best_hits(rows)
-    assert best["cand0"].pvalue == pytest.approx(1e-4)
     assert best["cand0"].score == pytest.approx(5.2)
     assert best["cand0"].matched_sequence == "ACG"
-    assert best["cand1"].pvalue == pytest.approx(0.5)
+    assert best["cand0"].strand == "+"
+    assert best["cand1"].score == pytest.approx(2.0)
 
 
 @pytest.mark.skipif(

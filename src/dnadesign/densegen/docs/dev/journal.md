@@ -13,3 +13,6 @@
   - Retention per regulator: top n_sites by score (tie-break by sequence); shortfall allowed.
   - FIMO run must use thresh=1.0 so score-only eligibility works across motifs.
   - Remove p-value strata/retain-depth knobs and p-value-based plots/summary.
+- User decision: drop mocks across densegen tests; convert to real FIMO-backed tests and skip when FIMO unavailable.
+- Commit timing: commit once the mock-removal work is done; include new untracked files but keep the stray Excel temp file untracked.
+- Follow-up: removed unused Stage-A sampling vars after ruff failures; ruff check/format now clean.

@@ -20,6 +20,9 @@ import pytest
 
 from dnadesign.densegen.src.adapters.sources import PWMMemeDataSource
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import PWMMotif, sample_pwm_sites
+from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+
+_FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 MEME_TEXT = """\
 MEME version 4
@@ -42,6 +45,10 @@ letter-probability matrix: alength= 4 w= 2 nsites= 10 E= 0
 """
 
 
+@pytest.mark.skipif(
+    _FIMO_MISSING,
+    reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
+)
 def test_pwm_meme_sampling_stochastic(tmp_path: Path) -> None:
     meme_path = tmp_path / "motifs.meme"
     meme_path.write_text(MEME_TEXT)
@@ -54,8 +61,7 @@ def test_pwm_meme_sampling_stochastic(tmp_path: Path) -> None:
             "strategy": "stochastic",
             "n_sites": 5,
             "oversample_factor": 3,
-            "score_threshold": -10.0,
-            "score_percentile": None,
+            "scoring_backend": "fimo",
         },
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
@@ -76,15 +82,14 @@ def test_pwm_meme_consensus_requires_one_site(tmp_path: Path) -> None:
             "strategy": "consensus",
             "n_sites": 2,
             "oversample_factor": 2,
-            "score_threshold": -10.0,
-            "score_percentile": None,
+            "scoring_backend": "fimo",
         },
     )
     with pytest.raises(ValueError, match="consensus"):
         ds.load_data(rng=np.random.default_rng(1))
 
 
-def test_pwm_sampling_cap_warns(caplog: pytest.LogCaptureFixture) -> None:
+def test_pwm_sampling_shortfall_warns_on_time_limit(caplog: pytest.LogCaptureFixture) -> None:
     motif = PWMMotif(
         motif_id="M1",
         matrix=[
@@ -102,11 +107,10 @@ def test_pwm_sampling_cap_warns(caplog: pytest.LogCaptureFixture) -> None:
             strategy="stochastic",
             n_sites=10,
             oversample_factor=10,
-            max_candidates=20,
-            score_threshold=-10.0,
-            score_percentile=None,
+            scoring_backend="fimo",
+            mining={"batch_size": 10, "max_seconds": 0, "log_every_batches": 1},
         )
-    assert "capped candidate generation" in caplog.text
+    assert "shortfall" in caplog.text.lower()
 
 
 def test_pwm_sampling_shortfall_warns(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
@@ -121,9 +125,8 @@ def test_pwm_sampling_shortfall_warns(tmp_path: Path, caplog: pytest.LogCaptureF
             "strategy": "stochastic",
             "n_sites": 5,
             "oversample_factor": 2,
-            "max_candidates": 4,
-            "score_threshold": 1000.0,
-            "score_percentile": None,
+            "scoring_backend": "fimo",
+            "mining": {"batch_size": 2, "max_seconds": 0, "log_every_batches": 1},
         },
     )
     with caplog.at_level(logging.WARNING):

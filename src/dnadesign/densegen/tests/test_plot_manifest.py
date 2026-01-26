@@ -92,10 +92,9 @@ def _write_pool_manifest(run_root: Path) -> None:
             "input_name": ["demo_input"] * 3,
             "tf": ["tfA", "tfA", "tfB"],
             "tfbs": ["AAAA", "AAAAT", "AAAAAA"],
-            "fimo_pvalue": [1e-8, 1e-9, 1e-6],
-            "fimo_bin_id": [1, 0, 2],
-            "fimo_bin_low": [1e-10, 0.0, 1e-8],
-            "fimo_bin_high": [1e-8, 1e-10, 1e-6],
+            "best_hit_score": [7.0, 9.0, 5.5],
+            "tier": [1, 0, 2],
+            "rank_within_regulator": [1, 0, 0],
             "motif_id": ["m1", "m1", "m2"],
             "tfbs_id": ["id1", "id2", "id3"],
         }
@@ -103,7 +102,7 @@ def _write_pool_manifest(run_root: Path) -> None:
     pool_path = pools_dir / "demo_input__pool.parquet"
     df.to_parquet(pool_path, index=False)
     manifest = {
-        "schema_version": "1.2",
+        "schema_version": "1.3",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",
@@ -117,20 +116,25 @@ def _write_pool_manifest(run_root: Path) -> None:
                 "pool_mode": "tfbs",
                 "stage_a_sampling": {
                     "backend": "fimo",
-                    "pvalue_strata": [1e-10, 1e-8, 1e-6],
-                    "retain_depth": 3,
-                    "retain_bins": [0, 1, 2],
-                    "eligible_bins": [
-                        {"regulator": "tfA", "counts": [1, 1, 0]},
-                        {"regulator": "tfB", "counts": [0, 0, 1]},
-                    ],
-                    "retained_bins": [
-                        {"regulator": "tfA", "counts": [1, 1, 0]},
-                        {"regulator": "tfB", "counts": [0, 0, 1]},
-                    ],
-                    "eligible_pvalue_hist": [
-                        {"regulator": "tfA", "edges": [1e-9, 1e-8, 1e-7], "counts": [1, 1]},
-                        {"regulator": "tfB", "edges": [1e-8, 1e-7, 1e-6], "counts": [0, 1]},
+                    "tier_scheme": "pct_1_9_90",
+                    "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
+                    "retention_rule": "top_n_sites_by_best_hit_score",
+                    "fimo_thresh": 1.0,
+                    "eligible_score_hist": [
+                        {
+                            "regulator": "tfA",
+                            "edges": [4.0, 6.0, 8.0, 10.0],
+                            "counts": [0, 1, 1],
+                            "tier0_score": 9.0,
+                            "tier1_score": 7.0,
+                        },
+                        {
+                            "regulator": "tfB",
+                            "edges": [4.0, 6.0, 8.0],
+                            "counts": [1, 0],
+                            "tier0_score": 5.5,
+                            "tier1_score": None,
+                        },
                     ],
                 },
             }

@@ -21,6 +21,9 @@ import pytest
 
 from dnadesign.densegen.src.adapters.sources import PWMArtifactSetDataSource
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import build_log_odds
+from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+
+_FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 
 def _write_artifact(path: Path, motif_id: str) -> None:
@@ -44,6 +47,10 @@ def _write_artifact(path: Path, motif_id: str) -> None:
     path.write_text(json.dumps(artifact))
 
 
+@pytest.mark.skipif(
+    _FIMO_MISSING,
+    reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
+)
 def test_pwm_artifact_set_sampling(tmp_path: Path) -> None:
     a_path = tmp_path / "m1.json"
     b_path = tmp_path / "m2.json"
@@ -57,8 +64,7 @@ def test_pwm_artifact_set_sampling(tmp_path: Path) -> None:
             "strategy": "stochastic",
             "n_sites": 4,
             "oversample_factor": 3,
-            "score_threshold": -10.0,
-            "score_percentile": None,
+            "scoring_backend": "fimo",
             "length_policy": "exact",
         },
     )
@@ -82,8 +88,7 @@ def test_pwm_artifact_set_rejects_duplicate_ids(tmp_path: Path) -> None:
             "strategy": "stochastic",
             "n_sites": 2,
             "oversample_factor": 2,
-            "score_threshold": -10.0,
-            "score_percentile": None,
+            "scoring_backend": "fimo",
             "length_policy": "exact",
         },
     )
@@ -91,6 +96,10 @@ def test_pwm_artifact_set_rejects_duplicate_ids(tmp_path: Path) -> None:
         ds.load_data(rng=np.random.default_rng(1))
 
 
+@pytest.mark.skipif(
+    _FIMO_MISSING,
+    reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
+)
 def test_pwm_artifact_set_overrides_by_motif_id(tmp_path: Path) -> None:
     a_path = tmp_path / "m1.json"
     b_path = tmp_path / "m2.json"
@@ -104,8 +113,7 @@ def test_pwm_artifact_set_overrides_by_motif_id(tmp_path: Path) -> None:
             "strategy": "stochastic",
             "n_sites": 2,
             "oversample_factor": 3,
-            "score_threshold": -10.0,
-            "score_percentile": None,
+            "scoring_backend": "fimo",
             "length_policy": "exact",
         },
         overrides_by_motif_id={
@@ -113,8 +121,7 @@ def test_pwm_artifact_set_overrides_by_motif_id(tmp_path: Path) -> None:
                 "strategy": "stochastic",
                 "n_sites": 1,
                 "oversample_factor": 3,
-                "score_threshold": -10.0,
-                "score_percentile": None,
+                "scoring_backend": "fimo",
                 "length_policy": "exact",
             }
         },

@@ -21,6 +21,9 @@ import pytest
 
 from dnadesign.densegen.src.adapters.sources import PWMArtifactDataSource
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import build_log_odds
+from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+
+_FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 
 def _write_artifact(path: Path) -> None:
@@ -44,6 +47,10 @@ def _write_artifact(path: Path) -> None:
     path.write_text(json.dumps(artifact))
 
 
+@pytest.mark.skipif(
+    _FIMO_MISSING,
+    reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
+)
 def test_pwm_artifact_sampling_exact(tmp_path: Path) -> None:
     artifact_path = tmp_path / "motif.json"
     _write_artifact(artifact_path)
@@ -55,8 +62,7 @@ def test_pwm_artifact_sampling_exact(tmp_path: Path) -> None:
             "strategy": "stochastic",
             "n_sites": 5,
             "oversample_factor": 3,
-            "score_threshold": -10.0,
-            "score_percentile": None,
+            "scoring_backend": "fimo",
             "length_policy": "exact",
         },
     )
@@ -67,6 +73,10 @@ def test_pwm_artifact_sampling_exact(tmp_path: Path) -> None:
     assert all(len(seq) == 3 for seq in df["tfbs"].tolist())
 
 
+@pytest.mark.skipif(
+    _FIMO_MISSING,
+    reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
+)
 def test_pwm_artifact_sampling_range(tmp_path: Path) -> None:
     artifact_path = tmp_path / "motif.json"
     _write_artifact(artifact_path)
@@ -78,8 +88,7 @@ def test_pwm_artifact_sampling_range(tmp_path: Path) -> None:
             "strategy": "stochastic",
             "n_sites": 6,
             "oversample_factor": 3,
-            "score_threshold": -10.0,
-            "score_percentile": None,
+            "scoring_backend": "fimo",
             "length_policy": "range",
             "length_range": (3, 5),
         },
@@ -120,8 +129,7 @@ def test_pwm_artifact_rejects_nonfinite_log_odds(tmp_path: Path) -> None:
             "strategy": "stochastic",
             "n_sites": 2,
             "oversample_factor": 2,
-            "score_threshold": -10.0,
-            "score_percentile": None,
+            "scoring_backend": "fimo",
             "length_policy": "exact",
         },
     )
@@ -140,8 +148,8 @@ def test_pwm_sampling_shortfall_includes_motif_id(tmp_path: Path, caplog: pytest
             "strategy": "stochastic",
             "n_sites": 2,
             "oversample_factor": 1,
-            "score_threshold": 100.0,
-            "score_percentile": None,
+            "scoring_backend": "fimo",
+            "mining": {"batch_size": 2, "max_seconds": 0, "log_every_batches": 1},
             "length_policy": "exact",
         },
     )

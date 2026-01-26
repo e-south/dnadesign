@@ -108,17 +108,11 @@ class PWMJasparDataSource(BaseDataSource):
         strategy = str(sampling.get("strategy", "stochastic"))
         n_sites = int(sampling.get("n_sites"))
         oversample_factor = int(sampling.get("oversample_factor", 10))
-        max_candidates = sampling.get("max_candidates")
-        max_seconds = sampling.get("max_seconds")
-        threshold = sampling.get("score_threshold")
-        percentile = sampling.get("score_percentile")
         length_policy = str(sampling.get("length_policy", "exact"))
         length_range = sampling.get("length_range")
         trim_window_length = sampling.get("trim_window_length")
         trim_window_strategy = sampling.get("trim_window_strategy", "max_info")
-        scoring_backend = str(sampling.get("scoring_backend", "densegen")).lower()
-        pvalue_strata = sampling.get("pvalue_strata")
-        retain_depth = sampling.get("retain_depth")
+        scoring_backend = str(sampling.get("scoring_backend", "fimo")).lower()
         mining = sampling.get("mining")
         bgfile = sampling.get("bgfile")
         keep_all_candidates_debug = bool(sampling.get("keep_all_candidates_debug", False))
@@ -146,7 +140,7 @@ class PWMJasparDataSource(BaseDataSource):
                 background=motif.background,
                 source_kind="pwm_jaspar",
             )
-            return_meta = scoring_backend == "fimo"
+            return_meta = True
             result = sample_pwm_sites(
                 rng,
                 motif,
@@ -156,13 +150,7 @@ class PWMJasparDataSource(BaseDataSource):
                 strategy=strategy,
                 n_sites=n_sites,
                 oversample_factor=oversample_factor,
-                max_candidates=max_candidates,
-                max_seconds=max_seconds,
-                score_threshold=threshold,
-                score_percentile=percentile,
                 scoring_backend=scoring_backend,
-                pvalue_strata=pvalue_strata,
-                retain_depth=retain_depth,
                 mining=mining,
                 bgfile=bgfile_path,
                 keep_all_candidates_debug=keep_all_candidates_debug,
@@ -200,6 +188,8 @@ class PWMJasparDataSource(BaseDataSource):
                 row = {
                     "tf": motif.motif_id,
                     "tfbs": seq,
+                    "regulator_id": motif.motif_id,
+                    "tfbs_sequence": seq,
                     "source": str(jaspar_path),
                     "motif_id": motif_hash,
                     "tfbs_id": tfbs_id,

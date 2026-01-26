@@ -16,8 +16,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from dnadesign.densegen.src.adapters.sources import PWMJasparDataSource, PWMMatrixCSVDataSource
+from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+
+_FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 JASPAR_TEXT = """>M1
 A [ 3 1 0 ]
@@ -27,6 +31,10 @@ T [ 0 1 0 ]
 """
 
 
+@pytest.mark.skipif(
+    _FIMO_MISSING,
+    reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
+)
 def test_pwm_jaspar_sampling(tmp_path: Path) -> None:
     jaspar_path = tmp_path / "motifs.pfm"
     jaspar_path.write_text(JASPAR_TEXT)
@@ -39,8 +47,7 @@ def test_pwm_jaspar_sampling(tmp_path: Path) -> None:
             "strategy": "stochastic",
             "n_sites": 4,
             "oversample_factor": 3,
-            "score_threshold": -10.0,
-            "score_percentile": None,
+            "scoring_backend": "fimo",
         },
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
@@ -48,6 +55,10 @@ def test_pwm_jaspar_sampling(tmp_path: Path) -> None:
     assert set(df["tf"].tolist()) == {"M1"}
 
 
+@pytest.mark.skipif(
+    _FIMO_MISSING,
+    reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
+)
 def test_pwm_matrix_csv_sampling(tmp_path: Path) -> None:
     csv_path = tmp_path / "matrix.csv"
     csv_path.write_text("A,C,G,T\n3,0,1,0\n1,3,0,1\n0,1,3,0\n")
@@ -61,8 +72,7 @@ def test_pwm_matrix_csv_sampling(tmp_path: Path) -> None:
             "strategy": "consensus",
             "n_sites": 1,
             "oversample_factor": 2,
-            "score_threshold": -10.0,
-            "score_percentile": None,
+            "scoring_backend": "fimo",
         },
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(1))

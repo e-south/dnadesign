@@ -51,14 +51,16 @@ class _DummySource(BaseDataSource):
             retained_len_median=4.0,
             retained_len_mean=4.0,
             retained_len_max=4,
-            strata_bins="b0 2/1 | b1 0/0",
-            pvalue_strata=[1e-8, 1e-6],
-            retain_depth=1,
-            retain_bins=[0],
-            eligible_bin_counts=[2, 0],
-            retained_bin_counts=[1, 0],
-            eligible_pvalue_hist_edges=[1e-8, 1e-7, 1e-6],
-            eligible_pvalue_hist_counts=[1, 1],
+            retained_score_min=1.0,
+            retained_score_median=1.0,
+            retained_score_mean=1.0,
+            retained_score_max=1.0,
+            eligible_tier_counts=[1, 1, 0],
+            retained_tier_counts=[1, 0, 0],
+            tier0_score=2.0,
+            tier1_score=1.5,
+            eligible_score_hist_edges=[0.0, 1.0, 2.0],
+            eligible_score_hist_counts=[1, 1],
         )
         return [("regA", "AAAA", "dummy")], df, [summary]
 
@@ -78,9 +80,8 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
                             "path": str(tmp_path / "motifs.meme"),
                             "sampling": {
                                 "scoring_backend": "fimo",
-                                "pvalue_strata": [1e-8, 1e-6],
-                                "retain_depth": 1,
                                 "n_sites": 2,
+                                "oversample_factor": 2,
                             },
                         }
                     ],
@@ -143,16 +144,13 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     stage_a_sampling = entry.get("stage_a_sampling")
     assert stage_a_sampling is not None
     assert stage_a_sampling["backend"] == "fimo"
-    assert stage_a_sampling["pvalue_strata"] == [1e-8, 1e-6]
-    assert stage_a_sampling["retain_depth"] == 1
-    assert stage_a_sampling["retain_bins"] == [0]
-    eligible = stage_a_sampling["eligible_bins"]
-    assert eligible[0]["regulator"] == "regA"
-    assert eligible[0]["counts"] == [2, 0]
-    retained = stage_a_sampling["retained_bins"]
-    assert retained[0]["regulator"] == "regA"
-    assert retained[0]["counts"] == [1, 0]
-    hist = stage_a_sampling["eligible_pvalue_hist"]
+    assert stage_a_sampling["tier_scheme"] == "pct_1_9_90"
+    assert stage_a_sampling["eligibility_rule"].startswith("best_hit_score")
+    assert stage_a_sampling["retention_rule"] == "top_n_sites_by_best_hit_score"
+    assert stage_a_sampling["fimo_thresh"] == 1.0
+    hist = stage_a_sampling["eligible_score_hist"]
     assert hist[0]["regulator"] == "regA"
-    assert hist[0]["edges"] == [1e-8, 1e-7, 1e-6]
+    assert hist[0]["edges"] == [0.0, 1.0, 2.0]
     assert hist[0]["counts"] == [1, 1]
+    assert hist[0]["tier0_score"] == 2.0
+    assert hist[0]["tier1_score"] == 1.5
