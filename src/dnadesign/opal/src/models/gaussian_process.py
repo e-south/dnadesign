@@ -90,7 +90,8 @@ class GaussianProcessModel:
     def predict(self, X: np.ndarray, *, ctx=None) -> np.ndarray:
         if self._est is None:
             raise RuntimeError("[gaussian_process] predict() before fit().")
-        y = np.asarray(self._est.predict(X, return_std = True), dtype=float)
+        y, covar = self._est.predict(X, return_std = True)
+        y = np.asarray(y, dtype=float)
         if y.ndim == 1:
             y = y.reshape(-1, 1)
         return y
