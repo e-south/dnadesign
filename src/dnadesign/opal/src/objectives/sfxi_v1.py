@@ -15,6 +15,15 @@ import numpy as np
 
 from ..core.round_context import PluginCtx, roundctx_contract
 from ..registries.objectives import register_objective
+from .sfxi_math import (
+    denom_from_pool,
+    effect_raw,
+    effect_scaled,
+    logic_fidelity,
+    parse_setpoint_vector,
+    recover_linear_intensity,
+    weights_from_setpoint,
+)
 
 
 class ObjectiveResult:
@@ -30,43 +39,18 @@ class ObjectiveResult:
         self.diagnostics = diagnostics
 
 
-def _worst_corner_distance(p: np.ndarray) -> float:
-    a = np.maximum(p * p, (1.0 - p) * (1.0 - p))
-    return float(np.sqrt(np.sum(a)))
-
-
-def _logic_fidelity(v_hat: np.ndarray, p: np.ndarray) -> np.ndarray:
-    D = _worst_corner_distance(p)
-    if not np.isfinite(D) or D <= 0.0:
-        return np.ones(v_hat.shape[0], dtype=float)
-    dist = np.linalg.norm(v_hat - p[None, :], axis=1)
-    out = 1.0 - (dist / D)
-    return np.clip(out, 0.0, 1.0)
-
-
-def _weights_from_setpoint(p: np.ndarray, eps: float = 1e-12) -> np.ndarray:
-    P = float(np.sum(p))
-    if not np.isfinite(P) or P <= eps:
-        return np.zeros_like(p)
-    return p / P
-
-
-def _recover_linear_intensity(y_star: np.ndarray, delta: float) -> np.ndarray:
-    return np.maximum(0.0, np.power(2.0, y_star) - float(delta))
-
-
 def _compute_train_effect_pool(train_view, setpoint: np.ndarray, delta: float, *, min_n: int) -> Sequence[float]:
     """
     Use *current round* labels only for round-calibrated scaling.
     """
-    w = _weights_from_setpoint(setpoint)
+    w = weights_from_setpoint(setpoint)
 
     def _dot_effect(y):
         y = np.asarray(y, dtype=float).ravel()
         if y.size < 8:
             return None
-        ylin = _recover_linear_intensity(y[4:8], delta)
-        return float(np.dot(w, ylin))
+        ylin = recover_linear_intensity(y[4:8], delta)
+        return float(effect_raw(ylin, w))
 
     if not hasattr(train_view, "iter_labels_y_current_round"):
         raise ValueError("[sfxi_v1] train_view must expose iter_labels_y_current_round() for round-calibrated scaling.")
@@ -83,23 +67,6 @@ def _compute_train_effect_pool(train_view, setpoint: np.ndarray, delta: float, *
             f"got {len(pool_cur)}. Add labels or lower scaling.min_n."
         )
     return pool_cur
-
-
-def _resolve_denom_from_pool(pool: Sequence[float], *, p: int, min_n: int, eps: float) -> float:
-    arr = np.asarray(pool, dtype=float)
-    if arr.size < int(min_n):
-        raise ValueError(
-            f"[sfxi_v1] Need at least min_n={int(min_n)} labels in current round to compute denom; got {arr.size}."
-        )
-    v = float(np.percentile(arr, int(p)))
-    if not np.isfinite(v):
-        raise ValueError(f"[sfxi_v1] Invalid denom computed (value={v}). Check labels and scaling config.")
-    if v < 0.0:
-        raise ValueError(f"[sfxi_v1] Denom percentile is negative (value={v}). Check labels and scaling config.")
-    if not np.isfinite(eps) or eps <= 0.0:
-        raise ValueError(f"[sfxi_v1] eps must be positive and finite; got {eps}.")
-    v = max(v, float(eps))
-    return v
 
 
 def _parse_scaling_cfg(raw: Any) -> Tuple[int, int, float]:
@@ -125,17 +92,6 @@ def _parse_scaling_cfg(raw: Any) -> Tuple[int, int, float]:
     return p, min_n, eps
 
 
-def _parse_setpoint(params: Dict[str, Any]) -> np.ndarray:
-    setpoint = np.asarray(params.get("setpoint_vector", [0, 0, 0, 1]), dtype=float).ravel()
-    if setpoint.size != 4:
-        raise ValueError("[sfxi_v1] setpoint_vector must have length 4.")
-    if not np.all(np.isfinite(setpoint)):
-        raise ValueError("[sfxi_v1] setpoint_vector must be finite.")
-    if np.any(setpoint < 0.0) or np.any(setpoint > 1.0):
-        raise ValueError("[sfxi_v1] setpoint_vector entries must be in [0, 1].")
-    return setpoint
-
-
 @roundctx_contract(
     category="objective",
     requires=["core/labels_as_of_round"],
@@ -159,10 +115,10 @@ def sfxi_v1(
     v_hat = np.clip(y_pred[:, 0:4].astype(float), 0.0, 1.0)
     y_star = y_pred[:, 4:8].astype(float)
 
-    setpoint = _parse_setpoint(params)
+    setpoint = parse_setpoint_vector(params)
     sum_setpoint = float(np.sum(setpoint))
     intensity_disabled = bool(not np.isfinite(sum_setpoint) or sum_setpoint <= 1e-12)
-    w = _weights_from_setpoint(setpoint)
+    w = weights_from_setpoint(setpoint)
 
     beta = float(params.get("logic_exponent_beta", 1.0))
     gamma = float(params.get("intensity_exponent_gamma", 1.0))
@@ -185,7 +141,7 @@ def sfxi_v1(
         if train_view is None:
             raise ValueError("[sfxi_v1] train_view is required")
         effect_pool = _compute_train_effect_pool(train_view, setpoint=setpoint, delta=delta, min_n=min_n)
-        denom = _resolve_denom_from_pool(effect_pool, p=p, min_n=min_n, eps=eps)
+        denom = denom_from_pool(effect_pool, percentile=p, min_n=min_n, eps=eps)
 
     # persist into RoundCtx (strict: must be declared in produces)
     if ctx is None:
@@ -194,15 +150,15 @@ def sfxi_v1(
     ctx.set("objective/<self>/denom_value", float(denom))
 
     # ---- score candidates ----
-    F_logic = _logic_fidelity(v_hat, setpoint)
+    F_logic = logic_fidelity(v_hat, setpoint)
     if intensity_disabled:
         E_raw = np.zeros(v_hat.shape[0], dtype=float)
         E_scaled = np.ones(v_hat.shape[0], dtype=float)
         score = np.power(F_logic, beta)
     else:
-        y_lin = _recover_linear_intensity(y_star, delta=delta)
-        E_raw = (y_lin * w[None, :]).sum(axis=1)
-        E_scaled = np.clip(E_raw / float(denom), 0.0, 1.0)
+        y_lin = recover_linear_intensity(y_star, delta=delta)
+        E_raw = effect_raw(y_lin, w)
+        E_scaled = effect_scaled(E_raw, float(denom))
         score = np.power(F_logic, beta) * np.power(E_scaled, gamma)
 
     diagnostics: Dict[str, Any] = {

@@ -19,8 +19,10 @@ from typing import Sequence
 import numpy as np
 import polars as pl
 
+from ....objectives import sfxi_math
 from ..datasets import CampaignInfo
 from ..labels import observed_event_ids
+from ..util import list_series_to_numpy
 
 
 def fit_intensity_median_iqr(y, *, min_labels: int, eps: float):
@@ -143,14 +145,11 @@ def compute_sfxi_params(
     if len(setpoint) != 4:
         raise ValueError("setpoint must have length 4")
     p0, p1, p2, p3 = (float(x) for x in setpoint)
-    total = p0 + p1 + p2 + p3
-    if total <= eps:
-        weights = (0.0, 0.0, 0.0, 0.0)
-    else:
-        weights = (p0 / total, p1 / total, p2 / total, p3 / total)
-    d = math.sqrt(sum(max(v * v, (1.0 - v) * (1.0 - v)) for v in (p0, p1, p2, p3)))
-    if d <= 0:
-        d = eps
+    weights_arr = sfxi_math.weights_from_setpoint(np.array([p0, p1, p2, p3], dtype=float), eps=eps)
+    weights = tuple(float(x) for x in weights_arr.tolist())
+    d = float(sfxi_math.worst_corner_distance(np.array([p0, p1, p2, p3], dtype=float)))
+    if not math.isfinite(d) or d <= 0:
+        d = float(eps)
     return SFXIParams(
         setpoint=(p0, p1, p2, p3),
         weights=weights,
@@ -191,18 +190,6 @@ def _coerce_vec8_column(df: pl.DataFrame, vec_col: str) -> pl.DataFrame:
     return df
 
 
-def _effect_raw_expr(vec_col: str, weights: Sequence[float], delta: float) -> pl.Expr:
-    y0 = pl.col(vec_col).list.get(4)
-    y1 = pl.col(vec_col).list.get(5)
-    y2 = pl.col(vec_col).list.get(6)
-    y3 = pl.col(vec_col).list.get(7)
-    y0_lin = pl.max_horizontal(pl.lit(0.0), (pl.lit(2.0) ** y0) - delta)
-    y1_lin = pl.max_horizontal(pl.lit(0.0), (pl.lit(2.0) ** y1) - delta)
-    y2_lin = pl.max_horizontal(pl.lit(0.0), (pl.lit(2.0) ** y2) - delta)
-    y3_lin = pl.max_horizontal(pl.lit(0.0), (pl.lit(2.0) ** y3) - delta)
-    return weights[0] * y0_lin + weights[1] * y1_lin + weights[2] * y2_lin + weights[3] * y3_lin
-
-
 def compute_sfxi_metrics(
     *,
     df: pl.DataFrame,
@@ -223,25 +210,40 @@ def compute_sfxi_metrics(
         )
     valid_mask = valid_vec8_mask_expr(vec_col)
     df_valid = df.filter(valid_mask)
+    if df_valid.is_empty():
+        return SFXIResult(
+            df=df.head(0),
+            denom=params.eps,
+            weights=params.weights,
+            d=params.d,
+            pool_size=0,
+            denom_source="empty",
+        )
 
     p0, p1, p2, p3 = params.setpoint
     setpoint_sum = p0 + p1 + p2 + p3
     intensity_disabled = not math.isfinite(setpoint_sum) or setpoint_sum <= 1.0e-12
-    v0 = pl.col(vec_col).list.get(0)
-    v1 = pl.col(vec_col).list.get(1)
-    v2 = pl.col(vec_col).list.get(2)
-    v3 = pl.col(vec_col).list.get(3)
-    dist = ((v0 - p0) ** 2 + (v1 - p1) ** 2 + (v2 - p2) ** 2 + (v3 - p3) ** 2) ** 0.5
-    logic_fidelity = (1.0 - dist / params.d).clip(0.0, 1.0)
+    vec = list_series_to_numpy(df_valid.get_column(vec_col), expected_len=8)
+    if vec is None:
+        raise ValueError("Invalid SFXI vectors: expected length-8 lists of finite values.")
+    v_hat = np.clip(vec[:, 0:4], 0.0, 1.0)
+    y_star = vec[:, 4:8]
+    setpoint = np.array([p0, p1, p2, p3], dtype=float)
+    weights = np.array(params.weights, dtype=float)
+    F_logic = sfxi_math.logic_fidelity(v_hat, setpoint)
 
     if intensity_disabled:
+        E_raw = np.zeros(v_hat.shape[0], dtype=float)
+        E_scaled = np.ones(v_hat.shape[0], dtype=float)
+        score = np.power(F_logic, params.beta)
         df_sfxi = df_valid.with_columns(
             [
-                logic_fidelity.alias("logic_fidelity"),
-                pl.lit(0.0).alias("effect_raw"),
-                pl.lit(1.0).alias("effect_scaled"),
+                pl.Series("logic_fidelity", F_logic),
+                pl.Series("effect_raw", E_raw),
+                pl.Series("effect_scaled", E_scaled),
+                pl.Series("score", score),
             ]
-        ).with_columns((pl.col("logic_fidelity") ** params.beta).alias("score"))
+        )
         return SFXIResult(
             df=df_sfxi,
             denom=1.0,
@@ -250,8 +252,6 @@ def compute_sfxi_metrics(
             pool_size=0,
             denom_source="disabled",
         )
-
-    effect_raw_expr = _effect_raw_expr(vec_col, params.weights, params.delta)
 
     pool_size = 0
     denom_source = "p"
@@ -263,33 +263,36 @@ def compute_sfxi_metrics(
         raise ValueError(f"Need at least min_n={params.min_n} labels in current round to scale intensity; got 0.")
 
     pool_valid = denom_pool_df.filter(valid_vec8_mask_expr(vec_col))
-    pool_effect = pool_valid.select(effect_raw_expr.alias("effect_raw"))
-    pool_size = pool_effect.height
+    pool_vec = list_series_to_numpy(pool_valid.get_column(vec_col), expected_len=8)
+    if pool_vec is None:
+        raise ValueError("Invalid SFXI label vectors: expected length-8 lists of finite values.")
+    pool_size = int(pool_vec.shape[0])
     if pool_size < params.min_n:
         raise ValueError(
             f"Need at least min_n={params.min_n} labels in current round to scale intensity; got {pool_size}."
         )
 
-    denom = float(pool_effect["effect_raw"].quantile(params.p / 100.0, interpolation="nearest"))
-    if not math.isfinite(denom):
-        raise ValueError("Invalid denom computed (non-finite). Check labels and scaling config.")
-    if denom < 0.0:
-        raise ValueError("Invalid denom computed (negative). Check labels and scaling config.")
-    if not math.isfinite(params.eps) or params.eps <= 0.0:
-        raise ValueError(f"eps must be positive and finite; got {params.eps}.")
-    denom = max(denom, params.eps)
+    denom = sfxi_math.denom_from_labels(
+        pool_vec[:, 4:8],
+        setpoint,
+        delta=params.delta,
+        percentile=int(params.p),
+        min_n=int(params.min_n),
+        eps=float(params.eps),
+    )
 
-    df_sfxi = (
-        df_valid.with_columns(
-            [
-                logic_fidelity.alias("logic_fidelity"),
-                effect_raw_expr.alias("effect_raw"),
-            ]
-        )
-        .with_columns(((pl.col("effect_raw") / pl.lit(denom)).clip(0.0, 1.0).alias("effect_scaled")))
-        .with_columns(
-            ((pl.col("logic_fidelity") ** params.beta) * (pl.col("effect_scaled") ** params.gamma)).alias("score")
-        )
+    y_lin = sfxi_math.recover_linear_intensity(y_star, delta=params.delta)
+    E_raw = sfxi_math.effect_raw(y_lin, weights)
+    E_scaled = sfxi_math.effect_scaled(E_raw, float(denom))
+    score = np.power(F_logic, params.beta) * np.power(E_scaled, params.gamma)
+
+    df_sfxi = df_valid.with_columns(
+        [
+            pl.Series("logic_fidelity", F_logic),
+            pl.Series("effect_raw", E_raw),
+            pl.Series("effect_scaled", E_scaled),
+            pl.Series("score", score),
+        ]
     )
 
     return SFXIResult(

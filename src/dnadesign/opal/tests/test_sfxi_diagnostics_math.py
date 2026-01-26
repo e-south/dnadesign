@@ -1,0 +1,105 @@
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/tests/test_sfxi_diagnostics_math.py
+
+Tests core SFXI diagnostics math utilities (factorial effects, gates, support,
+and intensity scaling).
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import numpy as np
+
+from dnadesign.opal.src.analysis.sfxi.factorial_effects import compute_factorial_effects
+from dnadesign.opal.src.analysis.sfxi.gates import nearest_gate
+from dnadesign.opal.src.analysis.sfxi.intensity_scaling import summarize_intensity_scaling
+from dnadesign.opal.src.analysis.sfxi.support import dist_to_labeled_logic
+
+
+def test_factorial_effects_known_vectors():
+    v = np.array(
+        [
+            [0.0, 0.0, 0.0, 1.0],  # AND
+            [1.0, 1.0, 1.0, 1.0],  # TRUE
+        ],
+        dtype=float,
+    )
+    a, b, ab = compute_factorial_effects(v)
+    assert np.allclose(a[0], 0.5)
+    assert np.allclose(b[0], 0.5)
+    assert np.allclose(ab[0], 0.5)
+    assert np.allclose(a[1], 0.0)
+    assert np.allclose(b[1], 0.0)
+    assert np.allclose(ab[1], 0.0)
+
+
+def test_nearest_gate_assigns_truth_table_to_self():
+    v = np.array(
+        [
+            [0.0, 0.0, 0.0, 1.0],
+            [1.0, 1.0, 1.0, 1.0],
+        ],
+        dtype=float,
+    )
+    classes, distances = nearest_gate(v)
+    assert classes[0] == "0001"
+    assert classes[1] == "1111"
+    assert np.allclose(distances, 0.0)
+
+
+def test_nearest_gate_prefers_expected_table():
+    v = np.array([[0.05, 0.1, 0.05, 0.9]], dtype=float)
+    classes, distances = nearest_gate(v)
+    assert classes[0] == "0001"
+    assert distances[0] >= 0.0
+
+
+def test_dist_to_labeled_logic_min_l2():
+    labels = np.array(
+        [
+            [0.0, 0.0, 0.0, 1.0],
+            [1.0, 1.0, 1.0, 0.0],
+        ],
+        dtype=float,
+    )
+    candidates = np.array(
+        [
+            [0.0, 0.0, 0.0, 1.0],
+            [0.0, 1.0, 0.0, 1.0],
+        ],
+        dtype=float,
+    )
+    dists = dist_to_labeled_logic(candidates, labels)
+    expected_second = min(
+        np.linalg.norm(candidates[1] - labels[0]),
+        np.linalg.norm(candidates[1] - labels[1]),
+    )
+    assert np.allclose(dists[0], 0.0)
+    assert np.allclose(dists[1], expected_second)
+
+
+def test_intensity_scaling_denom_and_clipping():
+    y_star = np.array(
+        [
+            [0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+            [0.0, 0.0, 0.0, 2.0],
+        ],
+        dtype=float,
+    )
+    setpoint = np.array([0.0, 0.0, 0.0, 1.0], dtype=float)
+    summary = summarize_intensity_scaling(
+        y_star,
+        setpoint=setpoint,
+        delta=0.0,
+        percentile=50,
+        min_n=1,
+        eps=1e-8,
+    )
+    assert np.isclose(summary.denom, 2.0)
+    assert np.isclose(summary.clip_hi_fraction, 2.0 / 3.0)
+    assert np.isclose(summary.clip_lo_fraction, 0.0)
