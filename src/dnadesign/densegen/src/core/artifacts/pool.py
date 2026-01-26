@@ -14,7 +14,7 @@ from typing import Iterable
 
 import pandas as pd
 
-from ...adapters.sources.pwm_sampling import PWMSamplingSummary
+from ...adapters.sources.pwm_sampling import FIMO_REPORT_THRESH, PWMSamplingSummary
 from ...config import resolve_relative_path
 from ...utils.logging_utils import install_native_stderr_filters
 from .ids import hash_tfbs_id
@@ -178,7 +178,7 @@ def _build_stage_a_sampling_manifest(summaries: list[object] | None) -> dict | N
         "tier_scheme": "pct_1_9_90",
         "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
         "retention_rule": "top_n_sites_by_best_hit_score",
-        "fimo_thresh": 1.0,
+        "fimo_thresh": FIMO_REPORT_THRESH,
         "eligible_score_hist": eligible_score_hist,
     }
 

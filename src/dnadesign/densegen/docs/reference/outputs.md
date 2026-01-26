@@ -139,6 +139,8 @@ to rebuild pools from scratch.
 For FIMO-backed PWM inputs, it also records Stage‑A sampling metadata
 (tier scheme, eligibility/retention rules, FIMO threshold, and eligible score histograms with
 tier boundary scores per regulator).
+Stage‑A pool rows include `best_hit_score`, `tier`, and `rank_within_regulator` (1‑based rank among
+eligible unique TFBS per regulator).
 
 Stage‑B expects Stage‑A pools (default `outputs/pools`). These are optional inspection artifacts and are not required for a normal `dense run`.
 

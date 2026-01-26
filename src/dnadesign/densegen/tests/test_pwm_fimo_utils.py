@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -70,6 +71,26 @@ def test_parse_fimo_tsv_and_best_hits() -> None:
     assert best["cand1"].score == pytest.approx(2.0)
 
 
+def test_parse_fimo_tsv_without_pvalue_column() -> None:
+    tsv = "\n".join(
+        [
+            "motif_id\tsequence_name\tstart\tstop\tstrand\tscore\tmatched_sequence",
+            "M1\tcand0\t2\t4\t+\t5.2\tACG",
+        ]
+    )
+    rows = parse_fimo_tsv(tsv)
+    assert rows[0]["sequence_name"] == "cand0"
+    assert "p_value" not in rows[0]
+
+
+def test_aggregate_best_hits_rejects_non_finite_scores() -> None:
+    rows = [
+        {"sequence_name": "cand0", "start": 1, "stop": 3, "strand": "+", "score": float("nan")},
+    ]
+    with pytest.raises(ValueError, match="non-finite"):
+        aggregate_best_hits(rows)
+
+
 @pytest.mark.skipif(
     resolve_executable("fimo", tool_path=None) is None,
     reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
@@ -92,5 +113,5 @@ def test_run_fimo_smoke(tmp_path: Path) -> None:
     rows, _raw = run_fimo(meme_motif_path=meme_path, fasta_path=fasta_path, thresh=1.0)
     assert rows
     for row in rows:
-        pval = float(row["p_value"])
-        assert 0.0 <= pval <= 1.0
+        score = float(row["score"])
+        assert math.isfinite(score)

@@ -17,3 +17,4 @@
 - Commit timing: commit once the mock-removal work is done; include new untracked files but keep the stray Excel temp file untracked.
 - Follow-up: removed unused Stage-A sampling vars after ruff failures; ruff check/format now clean.
 - Follow-up: rank_within_regulator is now 1-based; added end-to-end Stage-A FIMO test and score-tier helper module; docs/plot registry updated to score-only semantics.
+- Follow-up: centralized FIMO report threshold, removed p-value-only fields from FIMO hits, added non-finite score guardrails, and documented 1-based ranks in outputs.

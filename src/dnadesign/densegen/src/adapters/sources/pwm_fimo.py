@@ -13,6 +13,7 @@ Dunlop Lab
 from __future__ import annotations
 
 import csv
+import math
 import re
 import subprocess
 from dataclasses import dataclass
@@ -33,7 +34,6 @@ class FimoHit:
     stop: int
     strand: str
     score: float
-    pvalue: float
     matched_sequence: str | None = None
 
 
@@ -100,7 +100,7 @@ def parse_fimo_tsv(text: str) -> list[dict]:
     alias = {"pvalue": "p_value", "qvalue": "q_value", "sequence": "sequence_name"}
     normalized = [alias.get(_normalize_header(h), _normalize_header(h)) for h in header]
     idx = {name: i for i, name in enumerate(normalized)}
-    required = {"sequence_name", "start", "stop", "strand", "score", "p_value"}
+    required = {"sequence_name", "start", "stop", "strand", "score"}
     if not required.issubset(idx):
         raise ValueError(f"FIMO output missing required columns: {sorted(required - set(idx))}")
     rows: list[dict] = []
@@ -114,8 +114,9 @@ def parse_fimo_tsv(text: str) -> list[dict]:
             "stop": int(row[idx["stop"]]),
             "strand": row[idx["strand"]],
             "score": float(row[idx["score"]]),
-            "p_value": float(row[idx["p_value"]]),
         }
+        if "p_value" in idx:
+            entry["p_value"] = float(row[idx["p_value"]])
         if "q_value" in idx:
             try:
                 entry["q_value"] = float(row[idx["q_value"]])
@@ -133,15 +134,15 @@ def aggregate_best_hits(rows: Iterable[dict]) -> dict[str, FimoHit]:
         if str(row.get("strand")) != "+":
             continue
         seq_name = row["sequence_name"]
-        pval = float(row["p_value"])
         score = float(row["score"])
+        if not math.isfinite(score):
+            raise ValueError(f"FIMO hit has non-finite score for '{seq_name}'.")
         hit = FimoHit(
             sequence_name=seq_name,
             start=int(row["start"]),
             stop=int(row["stop"]),
             strand=str(row["strand"]),
             score=score,
-            pvalue=pval,
             matched_sequence=row.get("matched_sequence"),
         )
         prev = best.get(seq_name)

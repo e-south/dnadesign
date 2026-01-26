@@ -28,6 +28,7 @@ from ...utils import logging_utils
 
 SMOOTHING_ALPHA = 1e-6
 SCORE_HIST_BINS = 60
+FIMO_REPORT_THRESH = 1.0
 log = logging.getLogger(__name__)
 _SAFE_LABEL_RE = None
 
@@ -623,11 +624,12 @@ def sample_pwm_sites(
         mining_max_seconds = _mining_attr(mining, "max_seconds")
         mining_log_every = int(_mining_attr(mining, "log_every_batches", 1))
         log.info(
-            "FIMO mining config for %s: target=%d batch=%d max_seconds=%s thresh=1.0",
+            "FIMO mining config for %s: target=%d batch=%d max_seconds=%s thresh=%s",
             motif.motif_id,
             n_candidates,
             mining_batch_size,
             str(mining_max_seconds) if mining_max_seconds is not None else "-",
+            FIMO_REPORT_THRESH,
             extra={"suppress_stdout": True},
         )
         debug_path: Optional[Path] = None
@@ -742,7 +744,7 @@ def sample_pwm_sites(
                     meme_motif_path=meme_path,
                     fasta_path=fasta_path,
                     bgfile=Path(bgfile) if bgfile is not None else None,
-                    thresh=1.0,
+                    thresh=FIMO_REPORT_THRESH,
                     norc=True,
                     include_matched_sequence=include_matched_sequence or keep_all_candidates_debug,
                     return_tsv=debug_path is not None,
@@ -817,7 +819,7 @@ def sample_pwm_sites(
                         meme_motif_path=meme_path,
                         fasta_path=fasta_path,
                         bgfile=Path(bgfile) if bgfile is not None else None,
-                        thresh=1.0,
+                        thresh=FIMO_REPORT_THRESH,
                         norc=True,
                         include_matched_sequence=include_matched_sequence or keep_all_candidates_debug,
                         return_tsv=debug_path is not None,
