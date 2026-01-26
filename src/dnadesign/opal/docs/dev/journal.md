@@ -59,3 +59,9 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Guarded SFXI color state updates to avoid reactive rerun loops when opening prom60_eda.
 - Dataset explorer hue registry now allows higher-cardinality categories (max_unique=100) for cluster labels.
 - SFXI hue registry now allows higher-cardinality categories so cluster labels appear in color-by options.
+
+## 2026-01-26
+- Starting prom60 SFXI diagnostics + uncertainty work on branch `opal-dashboard-extend`.
+- Decisions: setpoint sweep library uses 16 truth tables + current setpoint; factorial size uses `effect_scaled`.
+- Uncertainty contract will support both `score` and `y_hat` kinds (default `score`).
+- dist_to_labeled_x will use UMAP embedding distance (X-space visualization only).
