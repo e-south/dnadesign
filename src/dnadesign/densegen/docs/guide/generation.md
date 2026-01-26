@@ -164,6 +164,8 @@ Solver strategies (`iterate|diverse|optimal`) enforce these constraints at the s
 `approximate` runs are validated in the pipeline to keep behavior consistent.
 
 Notes:
+- Regulator labels must match the `tf` values in the Stage‑A pool. For PWM inputs, this is the motif ID
+  (see `dense stage-a build-pool` or `outputs/pools/pool_manifest.json` for the canonical labels).
 - `min_count_by_regulator` takes precedence over the global `runtime.min_count_per_tf`
   for listed regulators (DenseGen uses the maximum of the two).
 

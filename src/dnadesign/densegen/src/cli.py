@@ -2092,19 +2092,28 @@ def stage_b_build_libraries(
             for plan_item in resolved_plan:
                 if selected_plans and plan_item.name not in selected_plans:
                     continue
-                library, _parts, reg_labels, info = build_library_for_plan(
-                    source_label=inp.name,
-                    plan_item=plan_item,
-                    pool=pool,
-                    sampling_cfg=sampling_cfg,
-                    seq_len=int(cfg.generation.sequence_length),
-                    min_count_per_tf=int(cfg.runtime.min_count_per_tf),
-                    usage_counts={},
-                    failure_counts=failure_counts if failure_counts else None,
-                    rng=rng,
-                    np_rng=np_rng,
-                    library_index_start=libraries_built,
-                )
+                try:
+                    library, _parts, reg_labels, info = build_library_for_plan(
+                        source_label=inp.name,
+                        plan_item=plan_item,
+                        pool=pool,
+                        sampling_cfg=sampling_cfg,
+                        seq_len=int(cfg.generation.sequence_length),
+                        min_count_per_tf=int(cfg.runtime.min_count_per_tf),
+                        usage_counts={},
+                        failure_counts=failure_counts if failure_counts else None,
+                        rng=rng,
+                        np_rng=np_rng,
+                        library_index_start=libraries_built,
+                    )
+                except ValueError as exc:
+                    console.print(f"[bold red]Stage-B sampling failed[/]: {exc}")
+                    console.print(f"[bold]Context[/]: input={inp.name} plan={plan_item.name}")
+                    console.print("[bold]Next steps[/]:")
+                    console.print("  - ensure required_regulators match Stage-A regulator labels")
+                    console.print("  - inspect available regulators via dense inspect inputs")
+                    console.print("    or outputs/pools/pool_manifest.json")
+                    raise typer.Exit(code=1)
                 libraries_built = int(info.get("library_index", libraries_built))
                 library_hash = str(info.get("library_hash") or "")
                 target_len = int(info.get("target_length") or 0)

@@ -1081,7 +1081,10 @@ def build_library_for_plan(
         missing = [t for t in required_regulators if t not in available_tfs]
         if missing:
             preview = ", ".join(missing[:10])
-            raise ValueError(f"Required regulators not found in input: {preview}")
+            available_preview = ", ".join(sorted(available_tfs)[:10]) if available_tfs else "n/a"
+            raise ValueError(
+                f"Required regulators not found in input: {preview}. Available regulators: {available_preview}."
+            )
         if plan_min_count_by_regulator:
             missing_counts = [t for t in plan_min_count_by_regulator if t not in available_tfs]
             if missing_counts:

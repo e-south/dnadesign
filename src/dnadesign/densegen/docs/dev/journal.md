@@ -19,3 +19,7 @@
 - Follow-up: rank_within_regulator is now 1-based; added end-to-end Stage-A FIMO test and score-tier helper module; docs/plot registry updated to score-only semantics.
 - Follow-up: centralized FIMO report threshold, removed p-value-only fields from FIMO hits, added non-finite score guardrails, and documented 1-based ranks in outputs.
 - Follow-up: Stage-A manifest now surfaces bgfile/background_source and FIMO threshold lives in core constants; legacy score_percentile examples removed from docs.
+- Audit: ran full demo flow; Stage-B build-libraries failed when required_regulators used short labels not matching PWM motif IDs.
+- Fixes: demo config now uses motif IDs (lexA_CTGTATAWAWWHACA, cpxR_MANWWHTTTAM) and demo docs call out label source.
+- Added Stage-B CLI error handling for missing regulators + improved core error message to include available regulators; new CLI test added.
+- Docs: clarified required_regulators must match Stage-A pool tf labels; outputs reference now mentions bgfile/background_source in Stage-A metadata.

@@ -137,8 +137,8 @@ DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solve
 to rebuild pools from scratch.
 `pool_manifest.json` includes the input config hash plus file fingerprints; append requires they match.
 For FIMO-backed PWM inputs, it also records Stage‑A sampling metadata
-(tier scheme, eligibility/retention rules, FIMO threshold, and eligible score histograms with
-tier boundary scores per regulator).
+(tier scheme, eligibility/retention rules, FIMO threshold, background source/bgfile, and
+eligible score histograms with tier boundary scores per regulator).
 Stage‑A pool rows include `best_hit_score`, `tier`, and `rank_within_regulator` (1‑based rank among
 eligible unique TFBS per regulator).
 

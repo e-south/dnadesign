@@ -143,7 +143,7 @@ Stage‑A sampling: the pipeline can mine hundreds of binding sites per TF from 
 
 Stage‑B sampling: the Stage‑A pool is subsampled into candidate libraries (`pool_strategy: subsample`, `library_size: 20`) with coverage weighting so each library contains the specified TFs (`cover_all_regulators: true`). Each library is offered to the solver, which assembles 60‑bp sequences by selecting a subset; new libraries are sampled as needed.
 
-Fixed promoter: this demo fixes a strong σ70 promoter pair (`TTGACA`/`TATAAT`) with a 15–19 bp spacer; if `plots.options.tf_coverage.include_promoter_sites` is true, the `tf_coverage` plot overlays these sites. To keep the 60‑bp sequence length feasible alongside ~11–15 bp TFBS, the plan sets `min_required_regulators: 1` while still listing both LexA and CpxR, so each sequence includes at least one of them.
+Fixed promoter: this demo fixes a strong σ70 promoter pair (`TTGACA`/`TATAAT`) with a 15–19 bp spacer; if `plots.options.tf_coverage.include_promoter_sites` is true, the `tf_coverage` plot overlays these sites. To keep the 60‑bp sequence length feasible alongside ~11–15 bp TFBS, the plan sets `min_required_regulators: 1` while listing both motif IDs (`lexA_CTGTATAWAWWHACA`, `cpxR_MANWWHTTTAM`), so each sequence includes at least one of them. Use the Stage‑A plan output (`dense stage-a build-pool`) or pool manifest to confirm the regulator labels if you customize inputs.
 
 ```bash
 dense inspect config
@@ -160,6 +160,19 @@ dense stage-a build-pool --fresh
 ```
 
 **Note:** `stage-a build-pool` appends new unique TFBS into existing pools by default. Use `--fresh` when re‑running if you want to avoid cumulative pools and candidate logs.
+
+Optional: confirm the regulator labels (used by `required_regulators`) and tier cutoffs:
+
+```bash
+python - <<'PY'
+import json
+from pathlib import Path
+manifest = json.loads(Path("outputs/pools/pool_manifest.json").read_text())
+hist = manifest["inputs"][0]["stage_a_sampling"]["eligible_score_hist"]
+for row in hist:
+    print(f"{row['regulator']}: tier0={row.get('tier0_score')} tier1={row.get('tier1_score')}")
+PY
+```
 
 Optional: visualize Stage‑A strata and retained lengths (per regulator) right after sampling:
 
