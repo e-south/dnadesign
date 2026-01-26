@@ -1,0 +1,15 @@
+## Journal
+
+### 2026-01-26
+- Task: Stage-A PWM sampling overhaul to FIMO score-only semantics; remove p-value strata and p-value-based retention.
+- User decision: FIMO-only backend; remove densegen backend and score_threshold/score_percentile knobs.
+- Tie-breaker for equal scores: tfbs_sequence lexicographic ascending.
+- Branch: working on densegen/cruncher-refine (stay on this branch).
+- Spec notes:
+  - Use FIMO log-odds score only; best_hit_score = max score per candidate (forward strand only).
+  - Eligibility: has at least one hit and best_hit_score > 0.
+  - Deduplicate by tfbs sequence before tiering and retention.
+  - Tiering per regulator: 1% / 9% / 90% by score rank with deterministic counts.
+  - Retention per regulator: top n_sites by score (tie-break by sequence); shortfall allowed.
+  - FIMO run must use thresh=1.0 so score-only eligibility works across motifs.
+  - Remove p-value strata/retain-depth knobs and p-value-based plots/summary.
