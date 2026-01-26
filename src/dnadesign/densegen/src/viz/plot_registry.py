@@ -58,4 +58,43 @@ PLOT_SPECS = {
         "description": "Stage-A strata overview (eligible scores + retained TFBS lengths).",
         "requires": ["pools"],
     },
+    "run_timeline_funnel": {
+        "fn": "plot_run_timeline_funnel",
+        "description": "Run timeline funnel (attempts by status with resample/stall markers).",
+        "requires": ["attempts", "events"],
+    },
+    "run_failure_pareto": {
+        "fn": "plot_run_failure_pareto",
+        "description": "Failure reason Pareto (overall + by plan).",
+        "requires": ["attempts"],
+    },
+    "stage_b_library_health": {
+        "fn": "plot_stage_b_library_health",
+        "description": "Stage-B library health over builds (coverage, entropy, score, slack).",
+        "requires": ["metrics"],
+    },
+    "stage_b_library_slack": {
+        "fn": "plot_stage_b_library_slack",
+        "description": "Stage-B library slack distribution (feasibility check).",
+        "requires": ["metrics"],
+    },
+    "stage_a_score_traceability": {
+        "fn": "plot_stage_a_score_traceability",
+        "description": "Stage-A score traceability in solutions (tier + quantile enrichment).",
+        "requires": ["metrics"],
+    },
+    "stage_b_offered_vs_used": {
+        "fn": "plot_stage_b_offered_vs_used",
+        "description": "Stage-B offered vs used TF utilization per library.",
+        "requires": ["metrics"],
+    },
+    "stage_b_sampling_pressure": {
+        "fn": "plot_stage_b_sampling_pressure",
+        "description": "Stage-B sampling pressure heatmap (coverage weights + penalties).",
+        "requires": ["metrics"],
+    },
+    "tfbs_positional_occupancy": {
+        "fn": "plot_tfbs_positional_occupancy",
+        "description": "Motif-aware positional occupancy with fixed-element overlays.",
+    },
 }

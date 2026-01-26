@@ -25,6 +25,7 @@ outputs/
     attempts.parquet
     solutions.parquet
     composition.parquet
+    run_metrics.parquet
   pools/
   libraries/
   plots/
@@ -44,16 +45,18 @@ Optional targets (when enabled):
 - `outputs/tables/attempts.parquet` — solver attempt audit log (success, duplicate, constraint failures).
 - `outputs/tables/solutions.parquet` — accepted solutions keyed by `solution_id` + `attempt_id`.
 - `outputs/tables/composition.parquet` — per‑TFBS placements for accepted solutions.
+- `outputs/tables/run_metrics.parquet` — run‑level diagnostics (pools, libraries, attempts, composition).
 - `outputs/meta/run_manifest.json` — run‑level counts (Stage‑A pools, Stage‑B libraries, resamples, stalls).
 - `outputs/meta/inputs_manifest.json` — resolved inputs and **Stage‑A sampling** settings.
 - `outputs/meta/effective_config.json` — resolved config + derived seeds and caps.
 - `outputs/meta/run_state.json` — checkpoint (resume guardrails).
-- `outputs/meta/events.jsonl` — structured events (Stage‑A pool built, Stage‑B library built, stalls).
+- `outputs/meta/events.jsonl` — structured events (pool/library builds, resamples, stalls, sampling pressure).
 - `outputs/pools/` — **Stage‑A** pool artifacts:
   - `pool_manifest.json`
   - `<input>__pool.parquet`
   - `pool_manifest.json` captures Stage‑A sampling metadata when using FIMO
-    (p‑value strata, retain depth, per‑regulator bin counts, and eligible p‑value histograms).
+    (tier scheme, eligibility/retention rules, FIMO threshold, background source/bgfile,
+    and eligible score histograms with tier boundary scores).
 - `outputs/libraries/` — **Stage‑B** library artifacts:
   - `library_builds.parquet`
   - `library_members.parquet`

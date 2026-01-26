@@ -77,7 +77,13 @@ These are produced alongside Parquet/USR outputs and provide a compact audit tra
 
 ### Events log
 
-DenseGen writes `outputs/meta/events.jsonl` (JSON lines) with structured events for pool builds, library builds, stalls, and resamples. This is a lightweight machine-readable trace of runtime control flow.
+DenseGen writes `outputs/meta/events.jsonl` (JSON lines) with structured events for pool builds, library builds, sampling pressure, stalls, and resamples. This is a lightweight machine-readable trace of runtime control flow.
+
+---
+
+### Run diagnostics table
+
+DenseGen writes `outputs/tables/run_metrics.parquet`, an aggregated diagnostics table built from pools, libraries, attempts, and composition. It powers the run-level plots and makes it easy to answer: which libraries were weak, which TFs were over/under-used, and whether top-scoring Stage-A sites were actually consumed.
 
 ---
 
@@ -115,6 +121,20 @@ These summarize run scope and link to the canonical outputs (`outputs/tables/den
 ### Plots
 
 `dense plot` writes plot images under `outputs/plots/` (format controlled by `plots.format`). `outputs/plots/plot_manifest.json` records the plot inventory for reports.
+
+Run diagnostics metrics are summarized in `outputs/tables/run_metrics.parquet` (aggregated from pools, libraries, attempts, and composition). These metrics power the run‑level diagnostics plots below.
+
+Core diagnostics plots (non‑exhaustive):
+
+- `stage_a_strata_overview` — eligible score distribution with retained region + TFBS length density (Stage‑A quality check).
+- `run_timeline_funnel` — attempts over time with resample/stall markers (are we sampling‑bound or solver‑bound?).
+- `run_failure_pareto` — dominant failure reasons overall, by plan, and by library (what’s breaking?).
+- `stage_b_library_health` — library health metrics over build index (coverage, entropy, slack, scores).
+- `stage_b_library_slack` — feasibility slack distribution (how close are libraries to length budget?).
+- `stage_a_score_traceability` — tier/quantile enrichment in final solutions (are top scores used?).
+- `stage_b_offered_vs_used` — offered vs used TF utilization per library (what the solver actually consumes).
+- `stage_b_sampling_pressure` — coverage‑weighted sampling pressure over builds (weights + penalties).
+- `tfbs_positional_occupancy` — positional occupancy with fixed‑element overlays (placement artifacts).
 
 ---
 

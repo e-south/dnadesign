@@ -174,7 +174,7 @@ for row in hist:
 PY
 ```
 
-Optional: visualize Stage‑A strata and retained lengths (per regulator) right after sampling:
+Optional: visualize Stage‑A score strata and retained lengths (per regulator) right after sampling:
 
 ```bash
 dense plot --only stage_a_strata_overview
@@ -200,7 +200,7 @@ Execute Stage‑A sampling (if needed), Stage‑B sampling, and solver optimizat
 dense run
 ```
 
-This demo config also enables plot generation from the run (`plots.default`) and saves plots in `outputs/plots/` using `plots.format` (switch to `pdf` or `svg` in `config.yaml` if desired). Reports do not generate plots; they can optionally link the existing plot manifest.
+This demo config also enables plot generation from the run (`plots.default`) and saves plots in `outputs/plots/` using `plots.format` (switch to `pdf` or `svg` in `config.yaml` if desired). The run also writes `outputs/tables/run_metrics.parquet`, which powers the diagnostics plots. Reports do not generate plots; they can optionally link the existing plot manifest.
 
 The demo quota is intentionally small (`generation.quota: 12` with `runtime.max_seconds_per_plan: 60`) to keep the end‑to‑end run fast; scale these up for production runs. The demo uses `solver.strategy: iterate` for full solver runs; switch to `diverse` or `optimal` as needed for exploration. If run outputs already exist (e.g., `outputs/tables/*.parquet` or `outputs/meta/run_state.json`), choose `--resume` to continue or `--fresh` to clear outputs. Use `dense run --no-plot` to skip auto‑plots when re‑running.
 
@@ -228,10 +228,16 @@ dense ls-plots
 
 ### 10. Plot
 
-Why: render selected plots from existing outputs.
+Why: render selected plots from existing outputs and diagnostics metrics.
 
 ```bash
-dense plot --only tf_usage,tf_coverage
+dense plot --only stage_a_strata_overview,run_timeline_funnel,run_failure_pareto,stage_b_library_health,stage_b_library_slack,stage_b_sampling_pressure,stage_a_score_traceability,stage_b_offered_vs_used,tfbs_positional_occupancy
+```
+
+Optional: include the standard TF usage/coverage plots alongside diagnostics:
+
+```bash
+dense plot --only tf_usage,tf_coverage,stage_a_strata_overview,run_timeline_funnel,run_failure_pareto,stage_b_library_health,stage_b_library_slack,stage_b_sampling_pressure,stage_a_score_traceability,stage_b_offered_vs_used,tfbs_positional_occupancy
 ```
 
 If Matplotlib complains about cache permissions, set a workspace‑scoped cache:

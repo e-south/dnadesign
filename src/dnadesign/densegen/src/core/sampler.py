@@ -113,6 +113,33 @@ class TFSampler:
         if not unique_tfs:
             raise ValueError("No regulators found in input.")
 
+        weight_by_tf: dict[str, float] | None = None
+        weight_fraction_by_tf: dict[str, float] | None = None
+        usage_count_by_tf: dict[str, int] | None = None
+        failure_count_by_tf: dict[str, int] | None = None
+        if sampling_strategy == "coverage_weighted":
+            weight_by_tf = {}
+            usage_count_by_tf = {}
+            failure_count_by_tf = {}
+            for _, row in df.iterrows():
+                tf = str(row["tf"])
+                tfbs = str(row["tfbs"])
+                key = (tf, tfbs)
+                count = int(usage_counts.get(key, 0)) if usage_counts else 0
+                usage_count_by_tf[tf] = usage_count_by_tf.get(tf, 0) + count
+                weight = 1.0 + float(coverage_boost_alpha) / ((1.0 + count) ** float(coverage_boost_power))
+                if avoid_failed_motifs and failure_counts is not None:
+                    fails = int(failure_counts.get(key, 0))
+                    failure_count_by_tf[tf] = failure_count_by_tf.get(tf, 0) + fails
+                    if fails > 0:
+                        penalty = 1.0 + float(failure_penalty_alpha) * float(fails)
+                        weight = weight / (penalty ** float(failure_penalty_power))
+                weight_by_tf[tf] = weight_by_tf.get(tf, 0.0) + float(weight)
+            total_weight = sum(weight_by_tf.values()) if weight_by_tf else 0.0
+            weight_fraction_by_tf = {
+                tf: (float(val) / total_weight if total_weight > 0 else 0.0) for tf, val in (weight_by_tf or {}).items()
+            }
+
         required = [str(s).strip().upper() for s in (required_tfbs or []) if str(s).strip()]
         if len(set(required)) != len(required):
             raise ValueError("required_tfbs must be unique")
@@ -364,5 +391,9 @@ class TFSampler:
             "tfbs_id_by_index": tfbs_ids if has_tfbs_id else None,
             "motif_id_by_index": motif_ids if has_motif_id else None,
             "selection_reason_by_index": reasons,
+            "sampling_weight_by_tf": weight_by_tf,
+            "sampling_weight_fraction_by_tf": weight_fraction_by_tf,
+            "sampling_usage_count_by_tf": usage_count_by_tf,
+            "sampling_failure_count_by_tf": failure_count_by_tf,
         }
         return sites, meta, labels, info

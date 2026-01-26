@@ -58,6 +58,7 @@ from .artifacts.records import AttemptRecord, SolutionRecord
 from .metadata import build_metadata
 from .postprocess import generate_pad
 from .run_manifest import PlanManifest, RunManifest
+from .run_metrics import write_run_metrics
 from .run_paths import (
     candidates_root,
     ensure_run_meta_dir,
@@ -1917,6 +1918,25 @@ def _process_plan_for_source(
                 )
             except Exception:
                 log.debug("Failed to emit LIBRARY_BUILT event.", exc_info=True)
+            if sampling_info.get("sampling_weight_by_tf"):
+                try:
+                    _emit_event(
+                        events_path,
+                        event="LIBRARY_SAMPLING_PRESSURE",
+                        payload={
+                            "input_name": source_label,
+                            "plan_name": plan_name,
+                            "library_index": library_index,
+                            "library_hash": library_hash,
+                            "sampling_strategy": sampling_info.get("library_sampling_strategy"),
+                            "weight_by_tf": sampling_info.get("sampling_weight_by_tf"),
+                            "weight_fraction_by_tf": sampling_info.get("sampling_weight_fraction_by_tf"),
+                            "usage_count_by_tf": sampling_info.get("sampling_usage_count_by_tf"),
+                            "failure_count_by_tf": sampling_info.get("sampling_failure_count_by_tf"),
+                        },
+                    )
+                except Exception:
+                    log.debug("Failed to emit LIBRARY_SAMPLING_PRESSURE event.", exc_info=True)
         for idx, tfbs in enumerate(library_tfbs):
             library_member_rows.append(
                 {
@@ -3988,6 +4008,11 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
             if (str(row.get("solution_id") or ""), int(row.get("placement_index") or 0)) not in existing_keys
         ]
         pd.DataFrame(existing_rows + new_rows).to_parquet(composition_path, index=False)
+
+    try:
+        write_run_metrics(cfg=cfg, run_root=run_root)
+    except Exception as exc:
+        raise RuntimeError(f"Failed to write run_metrics.parquet: {exc}") from exc
 
     manifest_items = [
         PlanManifest(

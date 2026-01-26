@@ -23,3 +23,6 @@
 - Fixes: demo config now uses motif IDs (lexA_CTGTATAWAWWHACA, cpxR_MANWWHTTTAM) and demo docs call out label source.
 - Added Stage-B CLI error handling for missing regulators + improved core error message to include available regulators; new CLI test added.
 - Docs: clarified required_regulators must match Stage-A pool tf labels; outputs reference now mentions bgfile/background_source in Stage-A metadata.
+- Plan note: proceed with ROI diagnostics plots; create run_metrics in outputs/tables; standardize resample/stall markers in outputs/meta/events.jsonl.
+- Follow-up: implemented run_metrics aggregation + pipeline write; added run-level diagnostics plots (timeline funnel, failure pareto, library health, score traceability, offered vs used) and plot runner support; updated outputs/docs/demo to document run_metrics and diagnostics plots; added tests for run_metrics and plot functions.
+- Follow-up: added sampling pressure events + run_metrics aggregation, failure breakdown by library, library slack distribution, positional occupancy plot with fixed-element overlay, and dense_arrays placement fallback for traceability; updated docs/demo and added tests.

@@ -34,6 +34,7 @@ TABLE_FILES = {
     "attempts.parquet",
     "solutions.parquet",
     "composition.parquet",
+    "run_metrics.parquet",
 }
 IGNORED_OUTPUT_ENTRIES = {".DS_Store", ".gitkeep"}
 NON_BLOCKING_OUTPUT_DIRS = {
