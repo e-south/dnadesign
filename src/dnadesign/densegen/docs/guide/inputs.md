@@ -27,31 +27,19 @@ Applies to `pwm_meme`, `pwm_meme_set`, `pwm_jaspar`, `pwm_matrix_csv`, `pwm_arti
 Required (always):
 - `n_sites` (int > 0)
 
-Required when `scoring_backend: densegen`:
-- `scoring_backend: densegen` (default)
-- exactly one of `score_threshold` or `score_percentile`
-
-Required when `scoring_backend: fimo`:
-- `scoring_backend: fimo`
-- `pvalue_strata` (list of floats; strictly increasing)
-- `retain_depth` (int > 0)
-
 Optional (supported):
 - `strategy`: `consensus | stochastic | background` (default `stochastic`)
 - `oversample_factor` (int > 0; default `10`)
-- `max_candidates` (densegen‑only; int > 0 when set)
-- `max_seconds` (densegen‑only; float > 0 when set)
-- `mining` (fimo‑only):
+- `scoring_backend`: `fimo` (only supported value)
+- `mining`:
   - `batch_size` (int > 0)
-  - `max_batches` (optional int > 0)
-  - `max_candidates` (optional int > 0; must be ≥ `n_sites`)
   - `max_seconds` (optional float > 0; default 60s)
   - `log_every_batches` (int > 0)
-- `bgfile` (fimo‑only): MEME background file
+- `bgfile`: MEME background file
 - `keep_all_candidates_debug` (bool): write candidate‑level Parquet under `outputs/pools/candidates/`
   (files named `candidates__<label>.parquet`) and aggregate to
   `outputs/pools/candidates/candidates.parquet` + `outputs/pools/candidates/candidates_summary.parquet`
-- `include_matched_sequence` (fimo‑only)
+- `include_matched_sequence`
 - `length_policy`: `exact | range` (default `exact`)
 - `length_range`: `[min, max]` (required when `length_policy: range`)
 - `trim_window_length` (optional int > 0)
@@ -59,28 +47,15 @@ Optional (supported):
 
 Strict validation behavior:
 - Unknown keys are errors (extra fields are rejected).
-- DenseGen backend requires exactly one of `score_threshold` or `score_percentile`.
-- FIMO backend requires `pvalue_strata` + `retain_depth`; `max_candidates`/`max_seconds` are **not** allowed.
+- `scoring_backend` must be `fimo`.
 - `consensus` requires `n_sites: 1`.
 
-FIMO stratification behavior:
-- `pvalue_strata` defines p‑value bins; the last edge is the eligibility floor used for FIMO `--thresh`.
-- `retain_depth` keeps the best bins (prefix of `pvalue_strata`) for Stage‑B.
-- Stage‑A selection is top‑N within the retained bins, ordered by p‑value (score tie‑break).
+FIMO score-based behavior:
+- Eligibility is `best_hit_score > 0` and requires at least one FIMO hit.
+- Tiering is 1% / 9% / 90% by score rank; retention is top‑`n_sites` by score (tie‑break by sequence).
+- FIMO runs with `--thresh 1.0` so score‑based eligibility is applied consistently.
 
-Minimal Stage‑A PWM example (DenseGen backend):
-
-```yaml
-inputs:
-  - name: lexA
-    type: pwm_meme
-    path: inputs/lexA.txt
-    sampling:  # Stage‑A sampling
-      n_sites: 80
-      score_percentile: 80
-```
-
-Minimal Stage‑A PWM example (FIMO backend):
+Minimal Stage‑A PWM example (score‑based FIMO):
 
 ```yaml
 inputs:
@@ -89,9 +64,11 @@ inputs:
     path: inputs/lexA.txt
     sampling:  # Stage‑A sampling
       scoring_backend: fimo
-      pvalue_strata: [1e-8, 1e-6, 1e-4]
-      retain_depth: 1
       n_sites: 80
+      oversample_factor: 50
+      mining:
+        batch_size: 5000
+        max_seconds: 60
 ```
 
 ---

@@ -58,7 +58,7 @@ def test_pwm_sampling_fimo_mining_consensus_includes_score_metadata() -> None:
     assert len(selected) == 1
     info = meta[selected[0]]
     assert info["best_hit_score"] > 0
-    assert info["rank_within_regulator"] == 0
+    assert info["rank_within_regulator"] == 1
     assert info["tier"] in {0, 1, 2}
     assert info["fimo_matched_sequence"] is not None
 

@@ -55,7 +55,7 @@ PLOT_SPECS = {
     },
     "stage_a_strata_overview": {
         "fn": "plot_stage_a_strata_overview",
-        "description": "Stage-A strata overview (eligible p-values + retained TFBS lengths).",
+        "description": "Stage-A strata overview (eligible scores + retained TFBS lengths).",
         "requires": ["pools"],
     },
 }

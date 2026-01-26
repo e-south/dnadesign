@@ -16,3 +16,4 @@
 - User decision: drop mocks across densegen tests; convert to real FIMO-backed tests and skip when FIMO unavailable.
 - Commit timing: commit once the mock-removal work is done; include new untracked files but keep the stray Excel temp file untracked.
 - Follow-up: removed unused Stage-A sampling vars after ruff failures; ruff check/format now clean.
+- Follow-up: rank_within_regulator is now 1-based; added end-to-end Stage-A FIMO test and score-tier helper module; docs/plot registry updated to score-only semantics.

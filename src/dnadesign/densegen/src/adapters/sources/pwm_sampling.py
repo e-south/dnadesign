@@ -13,7 +13,6 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
-import math
 import sys
 import time
 from dataclasses import dataclass
@@ -24,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 from ...core.artifacts.ids import hash_candidate_id
+from ...core.score_tiers import score_tier_counts
 from ...utils import logging_utils
 
 SMOOTHING_ALPHA = 1e-6
@@ -311,13 +311,12 @@ def _rank_scored_sequences(scored: Sequence[tuple[str, float]]) -> list[tuple[st
     return sorted(best_by_seq.items(), key=lambda item: (-item[1], item[0]))
 
 
+def _ranked_sequence_positions(ranked: Sequence[tuple[str, float]]) -> dict[str, int]:
+    return {seq: idx + 1 for idx, (seq, _score) in enumerate(ranked)}
+
+
 def _score_tier_counts(total: int) -> tuple[int, int, int]:
-    if total <= 0:
-        return 0, 0, 0
-    n0 = max(1, int(math.ceil(0.01 * total)))
-    n1 = min(total - n0, int(math.ceil(0.09 * total)))
-    n2 = total - n0 - n1
-    return n0, n1, n2
+    return score_tier_counts(total)
 
 
 def _assign_score_tiers(ranked: Sequence[tuple[str, float]]) -> list[int]:
@@ -902,8 +901,9 @@ def sample_pwm_sites(
         context["mining_max_seconds"] = mining_max_seconds
         context["mining_time_limited"] = mining_time_limited
         ranked = sorted(candidates_by_seq.values(), key=lambda cand: (-cand.score, cand.seq))
-        tiers = _assign_score_tiers([(cand.seq, cand.score) for cand in ranked])
-        rank_by_seq = {cand.seq: idx for idx, cand in enumerate(ranked)}
+        ranked_pairs = [(cand.seq, cand.score) for cand in ranked]
+        tiers = _assign_score_tiers(ranked_pairs)
+        rank_by_seq = _ranked_sequence_positions(ranked_pairs)
         tier_by_seq = {cand.seq: tiers[idx] for idx, cand in enumerate(ranked)}
         eligible_tier_counts = [0, 0, 0]
         for tier in tiers:

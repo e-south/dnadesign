@@ -94,7 +94,7 @@ def _write_pool_manifest(run_root: Path) -> None:
             "tfbs": ["AAAA", "AAAAT", "AAAAAA"],
             "best_hit_score": [7.0, 9.0, 5.5],
             "tier": [1, 0, 2],
-            "rank_within_regulator": [1, 0, 0],
+            "rank_within_regulator": [2, 1, 1],
             "motif_id": ["m1", "m1", "m2"],
             "tfbs_id": ["id1", "id2", "id3"],
         }

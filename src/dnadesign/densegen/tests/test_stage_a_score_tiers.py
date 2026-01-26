@@ -50,3 +50,9 @@ def test_rank_scored_sequences_dedup_and_tiebreak() -> None:
         ("BBB", 5.0),
         ("DDD", 5.0),
     ]
+
+
+def test_ranked_sequence_positions_are_one_based() -> None:
+    ranked = [("CCC", 7.0), ("AAA", 6.0), ("BBB", 5.0)]
+    positions = pwm_sampling._ranked_sequence_positions(ranked)
+    assert positions == {"CCC": 1, "AAA": 2, "BBB": 3}
