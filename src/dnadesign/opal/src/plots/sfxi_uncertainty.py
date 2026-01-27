@@ -32,6 +32,23 @@ from ._param_utils import get_int, get_str, normalize_metric_field
 from .sfxi_diag_data import resolve_run_id, resolve_single_round
 
 
+def _coerce_y_ops(value: object) -> list[dict]:
+    if value is None:
+        return []
+    if isinstance(value, pl.Series):
+        items = value.to_list()
+        if not items:
+            return []
+        value = items[0]
+    if isinstance(value, dict):
+        return [value]
+    if isinstance(value, tuple):
+        return list(value)
+    if isinstance(value, list):
+        return value
+    raise OpalError("training__y_ops must be a list of entries.", ExitCodes.CONTRACT_VIOLATION)
+
+
 @register_plot(
     "sfxi_uncertainty",
     meta=PlotMeta(
@@ -76,7 +93,8 @@ def render(context, params: dict) -> None:
     gamma = float((obj_params or {}).get("gamma", 1.0))
     delta = float((obj_params or {}).get("delta", 0.0))
     denom = run_row["objective__denom_value"][0] if "objective__denom_value" in run_row.columns else None
-    y_ops = run_row["training__y_ops"][0] if "training__y_ops" in run_row.columns else []
+    y_ops_raw = run_row["training__y_ops"][0] if "training__y_ops" in run_row.columns else []
+    y_ops = _coerce_y_ops(y_ops_raw)
 
     artifacts, err = resolve_round_artifacts(context.workspace.workdir, as_of_round=round_k)
     if artifacts is None or "model/model.joblib" not in artifacts:

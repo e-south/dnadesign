@@ -70,3 +70,12 @@ Note: freeform working notes; prune/merge as they become cruft.
   uncertainty, and intensity scaling panels plus derived-metrics status.
 - Derived metrics (nearest gate, dist-to-labeled logic/X, uncertainty) are attached to df_view for hue options.
 - UMAP explorer overlays labeled points; tests cover hue registry and chart layering.
+
+## 2026-01-27
+- prom60_eda headless marimo errors fixed (duplicate variable names, UI value access in creation cell).
+- Dashboard UMAP tooltips now typed to avoid empty-data Altair errors.
+- Demo plots config expanded to include all SFXI diagnostics; DEMO doc updated for setpoint plot + ingest-y replace.
+- Facade read_predictions now filters before projection; added test for round filtering without as_of_round column.
+- SFXI plot helpers: setpoint parsing fixed for tuple/list values; added unit test.
+- sfxi_setpoint_decomposition no longer requests derived setpoint column; added plot test.
+- sfxi_uncertainty now coerces polars Series y_ops to list; added unit test.

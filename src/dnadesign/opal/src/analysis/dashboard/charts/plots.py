@@ -20,6 +20,7 @@ import polars as pl
 from altair.utils.schemapi import UndefinedType
 
 from ..hues import HueOption
+from ..util import safe_is_numeric
 from ..views.plots import (
     ColorSpec,
     prepare_cluster_view,
@@ -65,6 +66,18 @@ def _color_encoding(spec: ColorSpec | None) -> alt.Color | UndefinedType:
     return alt.Undefined
 
 
+def _tooltip_fields(df: pl.DataFrame, cols: Iterable[str]) -> list[alt.Tooltip]:
+    seen: set[str] = set()
+    tooltips: list[alt.Tooltip] = []
+    for col in cols:
+        if not col or col in seen or col not in df.columns:
+            continue
+        seen.add(col)
+        kind = "Q" if safe_is_numeric(df.schema.get(col, pl.Null)) else "N"
+        tooltips.append(alt.Tooltip(f"{col}:{kind}", title=col))
+    return tooltips
+
+
 @dataclass(frozen=True)
 class UmapExplorerResult:
     chart: alt.Chart
@@ -92,7 +105,7 @@ def build_umap_explorer_chart(
             .encode(
                 x=alt.X(view.x_col),
                 y=alt.Y(view.y_col),
-                tooltip=[c for c in ["id", "__row_id", view.x_col, view.y_col] if c in view.df_plot.columns],
+                tooltip=_tooltip_fields(view.df_plot, ["id", "__row_id", view.x_col, view.y_col]),
             )
             .properties(width=plot_size, height=plot_size)
         )
@@ -105,9 +118,10 @@ def build_umap_explorer_chart(
 
     color_encoding = _color_encoding(view.color_spec)
     brush = alt.selection_interval(name="umap_brush", encodings=["x", "y"])
-    tooltip_cols = [c for c in ["id", "__row_id", view.x_col, view.y_col] if c in view.df_plot.columns]
-    if view.color_tooltip and view.color_tooltip in view.df_plot.columns and view.color_tooltip not in tooltip_cols:
-        tooltip_cols.append(view.color_tooltip)
+    tooltip_candidates = ["id", "__row_id", view.x_col, view.y_col]
+    if view.color_tooltip:
+        tooltip_candidates.append(view.color_tooltip)
+    tooltip_fields = _tooltip_fields(view.df_plot, tooltip_candidates)
 
     chart = (
         alt.Chart(view.df_plot)
@@ -116,7 +130,7 @@ def build_umap_explorer_chart(
             x=alt.X(view.x_col, title=view.x_col),
             y=alt.Y(view.y_col, title=view.y_col),
             color=color_encoding,
-            tooltip=tooltip_cols,
+            tooltip=tooltip_fields,
         )
         .add_params(brush)
         .properties(width=plot_size, height=plot_size)
@@ -136,7 +150,7 @@ def build_umap_explorer_chart(
                 .encode(
                     x=alt.X(view.x_col, title=view.x_col),
                     y=alt.Y(view.y_col, title=view.y_col),
-                    tooltip=tooltip_cols,
+                    tooltip=tooltip_fields,
                 )
             )
             chart = chart + obs_layer
@@ -155,7 +169,7 @@ def build_umap_explorer_chart(
                 .encode(
                     x=alt.X(view.x_col, title=view.x_col),
                     y=alt.Y(view.y_col, title=view.y_col),
-                    tooltip=tooltip_cols,
+                    tooltip=tooltip_fields,
                 )
             )
             chart = chart + top_layer
@@ -194,10 +208,11 @@ def build_umap_chart(
     if view is None:
         return None
 
+    tooltip_fields = _tooltip_fields(view.df_plot, view.tooltip_cols)
     enc = {
         "x": alt.X(view.x_col, title="UMAP X"),
         "y": alt.Y(view.y_col, title="UMAP Y"),
-        "tooltip": view.tooltip_cols,
+        "tooltip": tooltip_fields,
     }
     if view.color_col:
         kind = "Q" if view.color_kind == "numeric" else "N"
@@ -239,6 +254,7 @@ def build_cluster_chart(
     tooltip_cols = [
         c for c in [cluster_col, metric_col, id_col, view.color_tooltip] if c and c in view.df_points.columns
     ]
+    tooltip_fields = _tooltip_fields(view.df_points, tooltip_cols)
 
     color_encoding = _color_encoding(view.color_spec)
 
@@ -258,7 +274,7 @@ def build_cluster_chart(
                 xOffset="__jitter:Q",
                 y=alt.Y(f"{metric_col}:{view.metric_type}", title=metric_label),
                 color=color_encoding,
-                tooltip=tooltip_cols,
+                tooltip=tooltip_fields,
             )
         ) + (
             alt.Chart(df_top)
@@ -273,7 +289,7 @@ def build_cluster_chart(
                 xOffset="__jitter:Q",
                 y=alt.Y(f"{metric_col}:{view.metric_type}", title=metric_label),
                 color=color_encoding,
-                tooltip=tooltip_cols,
+                tooltip=tooltip_fields,
             )
         )
     else:
@@ -290,7 +306,7 @@ def build_cluster_chart(
                 xOffset="__jitter:Q",
                 y=alt.Y(f"{metric_col}:{view.metric_type}", title=metric_label),
                 color=color_encoding if color_encoding is not alt.Undefined else alt.value(view.okabe_ito[4]),
-                tooltip=tooltip_cols,
+                tooltip=tooltip_fields,
             )
         )
 

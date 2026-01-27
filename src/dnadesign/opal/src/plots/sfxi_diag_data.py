@@ -92,4 +92,5 @@ def parse_setpoint_from_runs(runs_df: pl.DataFrame) -> Sequence[float]:
     unique = {tuple(v) for v in vals.to_list()}
     if len(unique) > 1:
         raise OpalError(f"Multiple setpoints found: {sorted(unique)}.", ExitCodes.CONTRACT_VIOLATION)
-    return sfxi_math.parse_setpoint_vector(list(unique)[0])
+    setpoint = list(unique)[0]
+    return sfxi_math.parse_setpoint_vector({"setpoint_vector": list(setpoint)})

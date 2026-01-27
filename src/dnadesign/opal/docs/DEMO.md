@@ -26,7 +26,8 @@ uv run opal validate -c configs/campaign.yaml
 # 2) Ingest round-0 labels
 uv run opal ingest-y -c configs/campaign.yaml --round 0 \
   --csv inputs/r0/vec8-b0.xlsx \
-  --unknown-sequences drop
+  --unknown-sequences drop \
+  --if-exists replace
 
 # 3) Train, score, select (round 0)
 uv run opal run -c configs/campaign.yaml --round 0
@@ -47,6 +48,12 @@ uv run opal notebook run
 ```
 
 **Notes:**
+- The demo `records.parquet` already includes round-0 label history for the 19 known
+  sequences in `inputs/r0/vec8-b0.xlsx`. Use `--if-exists replace` to ensure the
+  ledger labels sink is populated even if the labels are already present.
+- Demo plots live in `configs/plots.yaml` and include SFXI diagnostics (factorial effects,
+  setpoint decomposition, setpoint sweep, logic support, uncertainty, intensity scaling).
+  If you swap datasets, update the `record_id` in the setpoint decomposition plot entry.
 - Use `uv run opal ...` to ensure the correct environment.
 - If `outputs/rounds/round_0/` already exists from a prior run, `opal run` will refuse to overwrite
   unless you pass `--resume` (which wipes the round directory) or delete the existing artifacts first.

@@ -49,7 +49,7 @@ def render(context, params: dict) -> None:
 
     df = load_predictions_with_setpoint(
         outputs_dir,
-        {"id", "pred__y_hat_model", "obj__diag__setpoint"},
+        {"id", "pred__y_hat_model"},
         round_selector=round_k,
         run_id=run_id,
         require_run_id=False,
@@ -70,7 +70,7 @@ def render(context, params: dict) -> None:
     setpoint_raw = df.get_column("obj__diag__setpoint").to_list()
     if not setpoint_raw:
         raise OpalError("Missing obj__diag__setpoint for selected record.", ExitCodes.CONTRACT_VIOLATION)
-    setpoint = sfxi_math.parse_setpoint_vector(setpoint_raw[0])
+    setpoint = sfxi_math.parse_setpoint_vector({"setpoint_vector": setpoint_raw[0]})
 
     fig = sfxi_setpoint_decomposition.make_setpoint_decomposition_figure(
         v_hat=v_hat,

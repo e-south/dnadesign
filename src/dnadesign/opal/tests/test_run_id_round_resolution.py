@@ -81,6 +81,22 @@ def test_facade_read_predictions_requires_runs_df(tmp_path: Path) -> None:
         )
 
 
+def test_facade_read_predictions_round_filter_without_as_of_round(tmp_path: Path) -> None:
+    pred_dir = tmp_path / "ledger" / "predictions"
+    _write_pred_parts(pred_dir)
+    runs_df = pl.DataFrame({"run_id": ["run-a", "run-b"], "as_of_round": [1, 2]})
+
+    df = read_predictions(
+        pred_dir,
+        columns=["id"],
+        round_selector=None,
+        runs_df=runs_df,
+        run_id=None,
+    )
+    assert df.height == 1
+    assert df["id"][0] == "b1"
+
+
 def test_ledger_reader_run_id_resolves_round(tmp_path: Path) -> None:
     ws = CampaignWorkspace(config_path=tmp_path / "campaign.yaml", workdir=tmp_path)
     _write_pred_parts(ws.ledger_predictions_dir)

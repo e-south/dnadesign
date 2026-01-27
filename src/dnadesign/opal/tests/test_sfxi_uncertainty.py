@@ -12,9 +12,11 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import numpy as np
+import polars as pl
 
 from dnadesign.opal.src.analysis.sfxi.uncertainty import UncertaintyContext, compute_uncertainty
 from dnadesign.opal.src.models.random_forest import RandomForestModel
+from dnadesign.opal.src.plots.sfxi_uncertainty import _coerce_y_ops
 
 
 def test_random_forest_uncertainty_shapes_and_nonnegative():
@@ -42,3 +44,8 @@ def test_random_forest_uncertainty_shapes_and_nonnegative():
     res_score = compute_uncertainty(model, X, kind="score", ctx=ctx)
     assert res_score.values.shape == (X.shape[0],)
     assert np.all(res_score.values >= 0.0)
+
+
+def test_coerce_y_ops_from_polars_series():
+    series = pl.Series([[{"name": "intensity_median_iqr", "params": {"min_labels": 5}}]])
+    assert _coerce_y_ops(series) == [{"name": "intensity_median_iqr", "params": {"min_labels": 5}}]

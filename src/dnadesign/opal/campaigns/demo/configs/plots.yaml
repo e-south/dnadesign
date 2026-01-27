@@ -55,3 +55,51 @@ plots:
       alpha: 0.4
       rasterize_at: 20000
       figsize_in: [10, 8]
+
+  - name: sfxi_factorial_effects
+    kind: sfxi_factorial_effects
+    tags: [diagnostic]
+    params:
+      size_by: obj__effect_scaled
+      sample_n: 1500
+      seed: 7
+      top_k: 10
+
+  - name: sfxi_setpoint_decomposition
+    kind: sfxi_setpoint_decomposition
+    tags: [diagnostic]
+    params:
+      record_id: "e153ebc49fd3b253592d97c448df4e2f10ab126e"
+      delta: 0.0
+
+  - name: sfxi_setpoint_sweep
+    kind: sfxi_setpoint_sweep
+    tags: [diagnostic]
+    params:
+      top_k: 5
+      tau: 0.8
+
+  - name: sfxi_support_diagnostics
+    kind: sfxi_support_diagnostics
+    tags: [diagnostic]
+    params:
+      y_axis: score
+      hue: effect_scaled
+      sample_n: 1500
+      seed: 7
+
+  - name: sfxi_uncertainty
+    kind: sfxi_uncertainty
+    tags: [diagnostic]
+    params:
+      kind: score
+      y_axis: score
+      hue: logic_fidelity
+      sample_n: 1500
+      seed: 7
+
+  - name: sfxi_intensity_scaling
+    kind: sfxi_intensity_scaling
+    tags: [diagnostic]
+    params:
+      include_pool: true

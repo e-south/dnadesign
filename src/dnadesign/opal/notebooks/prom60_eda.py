@@ -1727,6 +1727,24 @@ def _(build_sfxi_hue_registry, choose_dropdown_value, df_sfxi_scatter, mo, sfxi_
 def _(mo):
     diagnostics_sample_slider = mo.ui.slider(0, 5000, value=1500, step=100, label="Diagnostics sample (n)")
     diagnostics_seed_slider = mo.ui.slider(0, 10000, value=0, step=1, label="Diagnostics seed")
+    support_y_dropdown = mo.ui.dropdown(
+        options=["Score", "Logic fidelity"],
+        value="Score",
+        label="Support Y-axis",
+        full_width=True,
+    )
+    support_color_dropdown = mo.ui.dropdown(
+        options=["Effect scaled", "Logic fidelity", "Score"],
+        value="Effect scaled",
+        label="Support color",
+        full_width=True,
+    )
+    uncertainty_color_dropdown = mo.ui.dropdown(
+        options=["Logic fidelity", "Effect scaled", "Score"],
+        value="Logic fidelity",
+        label="Uncertainty color",
+        full_width=True,
+    )
     uncertainty_kind_dropdown = mo.ui.dropdown(
         options=["score", "y_hat"],
         value="score",
@@ -1748,6 +1766,9 @@ def _(mo):
     return (
         diagnostics_sample_slider,
         diagnostics_seed_slider,
+        support_color_dropdown,
+        support_y_dropdown,
+        uncertainty_color_dropdown,
         uncertainty_components_dropdown,
         uncertainty_kind_dropdown,
         uncertainty_reduction_dropdown,
@@ -2182,14 +2203,17 @@ def _(
     sfxi_math,
     sfxi_params,
     sfxi_setpoint_sweep,
+    support_color_dropdown,
+    support_y_dropdown,
+    uncertainty_color_dropdown,
     uncertainty_available,
 ):
-    sample_n = int(diagnostics_sample_slider.value) if diagnostics_sample_slider is not None else 0
-    seed = int(diagnostics_seed_slider.value) if diagnostics_seed_slider is not None else 0
+    diag_sample_n = int(diagnostics_sample_slider.value) if diagnostics_sample_slider is not None else 0
+    diag_seed = int(diagnostics_seed_slider.value) if diagnostics_seed_slider is not None else 0
 
     sample_note = mo.md("")
-    if sample_n > 0:
-        sample_note = mo.md(f"Displaying up to **{sample_n}** sampled points (seed={seed}).")
+    if diag_sample_n > 0:
+        sample_note = mo.md(f"Displaying up to **{diag_sample_n}** sampled points (seed={diag_seed}).")
 
     factorial_panel = mo.md("Factorial effects unavailable (missing predictions).")
     df_factorial = df_pred_selected if df_pred_selected is not None else pl.DataFrame()
@@ -2200,8 +2224,8 @@ def _(
                 on="id",
                 how="left",
             )
-        if sample_n > 0 and df_factorial.height > sample_n:
-            df_factorial = df_factorial.sample(n=sample_n, seed=seed, shuffle=True)
+        if diag_sample_n > 0 and df_factorial.height > diag_sample_n:
+            df_factorial = df_factorial.sample(n=diag_sample_n, seed=diag_seed, shuffle=True)
         size_col = None
         if "pred_effect_scaled" in df_factorial.columns:
             size_col = "pred_effect_scaled"
@@ -2221,7 +2245,7 @@ def _(
 
     decomp_panel = mo.md("Select an active record to view setpoint decomposition.")
     if active_record is not None and not active_record.is_empty():
-        vec = None
+        diag_vec = None
         vec_col = None
         if "pred_y_hat" in active_record.columns:
             vec_col = "pred_y_hat"
@@ -2230,11 +2254,11 @@ def _(
         elif "y_obs" in active_record.columns:
             vec_col = "y_obs"
         if vec_col is not None:
-            vec = list_series_to_numpy(active_record.get_column(vec_col), expected_len=None)
-        if vec is None:
+            diag_vec = list_series_to_numpy(active_record.get_column(vec_col), expected_len=None)
+        if diag_vec is None:
             decomp_panel = mo.md("Setpoint decomposition unavailable (missing vec8).")
         else:
-            y_hat = vec[0]
+            y_hat = diag_vec[0]
             if y_hat.shape[0] < 8:
                 decomp_panel = mo.md("Setpoint decomposition unavailable (vec8 too short).")
             else:
@@ -2257,28 +2281,16 @@ def _(
         "Logic fidelity": "opal__view__logic_fidelity",
         "Score": "opal__view__score",
     }
-    support_y_dropdown = mo.ui.dropdown(
-        options=list(support_y_map.keys()),
-        value="Score",
-        label="Support Y-axis",
-        full_width=True,
-    )
-    support_color_dropdown = mo.ui.dropdown(
-        options=list(support_color_map.keys()),
-        value="Effect scaled",
-        label="Support color",
-        full_width=True,
-    )
     if df_view is not None and "opal__sfxi__dist_to_labeled_logic" in df_view.columns:
         df_support = df_view
-        if sample_n > 0 and df_support.height > sample_n:
-            df_support = df_support.sample(n=sample_n, seed=seed, shuffle=True)
-        y_col = support_y_map.get(support_y_dropdown.value, "opal__view__score")
+        if diag_sample_n > 0 and df_support.height > diag_sample_n:
+            df_support = df_support.sample(n=diag_sample_n, seed=diag_seed, shuffle=True)
+        support_y_col = support_y_map.get(support_y_dropdown.value, "opal__view__score")
         hue_col = support_color_map.get(support_color_dropdown.value, "opal__view__effect_scaled")
         fig = make_support_diagnostics_figure(
             df_support,
             x_col="opal__sfxi__dist_to_labeled_logic",
-            y_col=y_col,
+            y_col=support_y_col,
             hue_col=hue_col if hue_col in df_support.columns else None,
             selected_col="opal__view__top_k",
             subtitle="Logic-space support",
@@ -2287,16 +2299,10 @@ def _(
         support_panel = fig_to_image(fig)
 
     uncertainty_panel = mo.md("Uncertainty plot unavailable.")
-    uncertainty_color_dropdown = mo.ui.dropdown(
-        options=["Logic fidelity", "Effect scaled", "Score"],
-        value="Logic fidelity",
-        label="Uncertainty color",
-        full_width=True,
-    )
     if uncertainty_available and df_view is not None and "opal__sfxi__uncertainty" in df_view.columns:
-        df_unc = df_view.filter(pl.col("opal__sfxi__uncertainty").is_not_null())
-        if sample_n > 0 and df_unc.height > sample_n:
-            df_unc = df_unc.sample(n=sample_n, seed=seed, shuffle=True)
+        diag_unc_df = df_view.filter(pl.col("opal__sfxi__uncertainty").is_not_null())
+        if diag_sample_n > 0 and diag_unc_df.height > diag_sample_n:
+            diag_unc_df = diag_unc_df.sample(n=diag_sample_n, seed=diag_seed, shuffle=True)
         hue_lookup = {
             "Logic fidelity": "opal__view__logic_fidelity",
             "Effect scaled": "opal__view__effect_scaled",
@@ -2304,10 +2310,10 @@ def _(
         }
         hue_col = hue_lookup.get(uncertainty_color_dropdown.value, "opal__view__logic_fidelity")
         fig = make_uncertainty_figure(
-            df_unc,
+            diag_unc_df,
             x_col="opal__sfxi__uncertainty",
             y_col="opal__view__score",
-            hue_col=hue_col if hue_col in df_unc.columns else None,
+            hue_col=hue_col if hue_col in diag_unc_df.columns else None,
             subtitle="Uncertainty vs score",
             rasterize_at=20000,
         )
@@ -2319,19 +2325,19 @@ def _(
     if labels_df.is_empty():
         labels_df = opal_labels_asof_df if opal_labels_asof_df is not None else pl.DataFrame()
     if labels_df is not None and not labels_df.is_empty():
-        y_col = None
+        diag_labels_y_col = None
         if opal_campaign_info is not None and opal_campaign_info.y_column in labels_df.columns:
-            y_col = opal_campaign_info.y_column
+            diag_labels_y_col = opal_campaign_info.y_column
         elif "y_obs" in labels_df.columns:
-            y_col = "y_obs"
-        if y_col is not None:
-            labels_vec = list_series_to_numpy(labels_df.get_column(y_col), expected_len=8)
-            if labels_vec is not None:
+            diag_labels_y_col = "y_obs"
+        if diag_labels_y_col is not None:
+            diag_labels_vec8 = list_series_to_numpy(labels_df.get_column(diag_labels_y_col), expected_len=8)
+            if diag_labels_vec8 is not None:
                 pool_vec = None
                 if df_pred_selected is not None and "pred_y_hat" in df_pred_selected.columns:
                     pool_vec = list_series_to_numpy(df_pred_selected.get_column("pred_y_hat"), expected_len=8)
                 sweep_df = sfxi_setpoint_sweep.sweep_setpoints(
-                    labels_vec8=labels_vec,
+                    labels_vec8=diag_labels_vec8,
                     current_setpoint=sfxi_params.setpoint,
                     percentile=int(sfxi_params.p),
                     min_n=int(sfxi_params.min_n),
@@ -2350,12 +2356,12 @@ def _(
                         "denom_used",
                         "clip_hi_fraction",
                     ],
-                    subtitle=f"labels={labels_vec.shape[0]}",
+                    subtitle=f"labels={diag_labels_vec8.shape[0]}",
                 )
                 sweep_panel = fig_to_image(fig)
 
                 weights = sfxi_math.weights_from_setpoint(np.array(sfxi_params.setpoint, dtype=float), eps=1.0e-12)
-                y_lin = sfxi_math.recover_linear_intensity(labels_vec[:, 4:8], delta=float(sfxi_params.delta))
+                y_lin = sfxi_math.recover_linear_intensity(diag_labels_vec8[:, 4:8], delta=float(sfxi_params.delta))
                 label_effect_raw = sfxi_math.effect_raw(y_lin, weights)
                 pool_effect_raw = None
                 if pool_vec is not None:
@@ -3282,11 +3288,11 @@ def _(
     elif "pred_y_hat" not in df_pred_selected.columns:
         derived_notes.append("Nearest gate unavailable (missing pred_y_hat).")
     else:
-        vec = list_series_to_numpy(df_pred_selected.get_column("pred_y_hat"), expected_len=8)
-        if vec is None:
+        pred_vec8 = list_series_to_numpy(df_pred_selected.get_column("pred_y_hat"), expected_len=8)
+        if pred_vec8 is None:
             derived_notes.append("Nearest gate unavailable (invalid pred_y_hat vectors).")
         else:
-            gate_cls, gate_dist = sfxi_gates.nearest_gate(vec[:, 0:4])
+            gate_cls, gate_dist = sfxi_gates.nearest_gate(pred_vec8[:, 0:4])
             gate_df = df_pred_selected.select([pred_join_key]).with_columns(
                 [
                     pl.Series("opal__sfxi__nearest_gate_class", gate_cls),
@@ -3305,21 +3311,21 @@ def _(
             if "id" in opal_labels_asof_df.columns
             else []
         )
-        y_col = None
+        labels_y_col = None
         if opal_campaign_info is not None and opal_campaign_info.y_column in opal_labels_asof_df.columns:
-            y_col = opal_campaign_info.y_column
+            labels_y_col = opal_campaign_info.y_column
         elif "y_obs" in opal_labels_asof_df.columns:
-            y_col = "y_obs"
+            labels_y_col = "y_obs"
             if opal_campaign_info is not None and opal_campaign_info.y_column not in opal_labels_asof_df.columns:
                 derived_notes.append("Using y_obs for labels (campaign y_column missing).")
-        if y_col is None:
+        if labels_y_col is None:
             derived_notes.append("dist_to_labeled_logic unavailable (label vectors missing).")
         else:
-            labels_vec = list_series_to_numpy(opal_labels_asof_df.get_column(y_col), expected_len=8)
-            if labels_vec is None:
+            label_vec8 = list_series_to_numpy(opal_labels_asof_df.get_column(labels_y_col), expected_len=8)
+            if label_vec8 is None:
                 derived_notes.append("dist_to_labeled_logic unavailable (invalid label vectors).")
             else:
-                label_logic = labels_vec[:, 0:4]
+                label_logic = label_vec8[:, 0:4]
 
     if label_logic is not None:
         if pred_join_key is None or df_pred_selected is None or df_pred_selected.is_empty():
@@ -3371,8 +3377,8 @@ def _(
     uncertainty_reduction = (
         uncertainty_reduction_dropdown.value if uncertainty_reduction_dropdown is not None else "mean"
     )
-    sample_n = diagnostics_sample_slider.value if diagnostics_sample_slider is not None else 0
-    seed = diagnostics_seed_slider.value if diagnostics_seed_slider is not None else 0
+    uncertainty_sample_n = diagnostics_sample_slider.value if diagnostics_sample_slider is not None else 0
+    uncertainty_seed = diagnostics_seed_slider.value if diagnostics_seed_slider is not None else 0
 
     if opal_campaign_info is None or not opal_campaign_info.x_column:
         derived_notes.append("uncertainty unavailable (x_column missing).")
@@ -3381,42 +3387,48 @@ def _(
     elif opal_campaign_info.x_column not in df_view.columns:
         derived_notes.append("uncertainty unavailable (X column missing in view).")
     else:
-        artifact_result = resolve_artifact_state(
+        uncertainty_artifact = resolve_artifact_state(
             campaign_info=opal_campaign_info,
             as_of_round=opal_pred_selected_round,
             run_id=opal_pred_selected_run_id,
         )
-        if artifact_result is None or not artifact_result.use_artifact or artifact_result.model is None:
+        if uncertainty_artifact is None or not uncertainty_artifact.use_artifact or uncertainty_artifact.model is None:
             derived_notes.append("uncertainty unavailable (artifact model missing).")
-        elif not sfxi_uncertainty.supports_uncertainty(model=artifact_result.model):
+        elif not sfxi_uncertainty.supports_uncertainty(model=uncertainty_artifact.model):
             derived_notes.append("uncertainty unavailable (model lacks per-tree predictions).")
         else:
-            df_unc = df_view
-            if sample_n and df_view.height > int(sample_n):
-                df_unc = df_view.sample(n=int(sample_n), seed=int(seed), shuffle=True)
-                uncertainty_sample_info = f"sampled {df_unc.height}/{df_view.height}"
-            X = list_series_to_numpy(df_unc.get_column(opal_campaign_info.x_column), expected_len=None)
+            uncertainty_df = df_view
+            if uncertainty_sample_n and df_view.height > int(uncertainty_sample_n):
+                uncertainty_df = df_view.sample(
+                    n=int(uncertainty_sample_n),
+                    seed=int(uncertainty_seed),
+                    shuffle=True,
+                )
+                uncertainty_sample_info = f"sampled {uncertainty_df.height}/{df_view.height}"
+            X = list_series_to_numpy(uncertainty_df.get_column(opal_campaign_info.x_column), expected_len=None)
             if X is None:
                 derived_notes.append("uncertainty unavailable (invalid X vectors).")
             else:
                 y_ops = opal_campaign_info.y_ops or []
                 round_ctx = None
                 if y_ops:
-                    if artifact_result.round_dir is None:
+                    if uncertainty_artifact.round_dir is None:
                         derived_notes.append("uncertainty unavailable (round_ctx missing).")
                     else:
-                        round_ctx, ctx_err = load_round_ctx_from_dir(artifact_result.round_dir)
+                        round_ctx, ctx_err = load_round_ctx_from_dir(uncertainty_artifact.round_dir)
                         if round_ctx is None:
                             derived_notes.append(f"uncertainty unavailable ({ctx_err}).")
                 denom = None
                 if opal_labels_current_df is not None and not opal_labels_current_df.is_empty():
-                    y_col = opal_campaign_info.y_column
-                    if y_col in opal_labels_current_df.columns:
-                        labels_vec = list_series_to_numpy(opal_labels_current_df.get_column(y_col), expected_len=8)
-                        if labels_vec is not None:
+                    labels_y_col = opal_campaign_info.y_column
+                    if labels_y_col in opal_labels_current_df.columns:
+                        labels_vec8 = list_series_to_numpy(
+                            opal_labels_current_df.get_column(labels_y_col), expected_len=8
+                        )
+                        if labels_vec8 is not None:
                             try:
                                 denom = sfxi_math.denom_from_labels(
-                                    labels_vec[:, 4:8],
+                                    labels_vec8[:, 4:8],
                                     np.array(sfxi_params.setpoint, dtype=float),
                                     delta=float(sfxi_params.delta),
                                     percentile=int(sfxi_params.p),
@@ -3436,7 +3448,7 @@ def _(
                         round_ctx=round_ctx,
                     )
                     result = sfxi_uncertainty.compute_uncertainty(
-                        artifact_result.model,
+                        uncertainty_artifact.model,
                         X,
                         kind=uncertainty_kind,
                         ctx=ctx,
@@ -3447,9 +3459,11 @@ def _(
                     derived_notes.append(f"uncertainty unavailable ({exc})")
                 else:
                     uncertainty_available = True
-                    join_key = "id" if "id" in df_unc.columns else "__row_id"
-                    unc_df = df_unc.select([join_key]).with_columns(pl.Series("opal__sfxi__uncertainty", result.values))
-                    df_view = df_view.join(unc_df, on=join_key, how="left")
+                    uncertainty_join_key = "id" if "id" in uncertainty_df.columns else "__row_id"
+                    uncertainty_values_df = uncertainty_df.select([uncertainty_join_key]).with_columns(
+                        pl.Series("opal__sfxi__uncertainty", result.values)
+                    )
+                    df_view = df_view.join(uncertainty_values_df, on=uncertainty_join_key, how="left")
     view_notice_lines = diagnostics_to_lines(view_bundle.diagnostics)
     view_notice_md = mo.md("\n".join(view_notice_lines)) if view_notice_lines else mo.md("")
     derived_metrics_note_md = mo.md("\n".join(derived_notes)) if derived_notes else mo.md("")
@@ -3468,9 +3482,9 @@ def _(
     uncertainty_sample_info,
 ):
     total = int(df_view.height) if df_view is not None else 0
-    selected = 0
+    selected_count = 0
     if df_view is not None and "opal__view__top_k" in df_view.columns:
-        selected = int(df_view.filter(pl.col("opal__view__top_k").fill_null(False)).height)
+        selected_count = int(df_view.filter(pl.col("opal__view__top_k").fill_null(False)).height)
     labeled = 0
     if opal_labels_asof_df is not None and not opal_labels_asof_df.is_empty():
         if "id" in opal_labels_asof_df.columns:
@@ -3487,7 +3501,7 @@ def _(
                 "### Derived metrics status",
                 f"- total records: **{total}**",
                 f"- labeled (as-of): **{labeled}**",
-                f"- selected (Top-K): **{selected}**",
+                f"- selected (Top-K): **{selected_count}**",
                 f"- uncertainty: **{unc_text}**",
                 f"- setpoint: `[{sp}]`",
             ]
