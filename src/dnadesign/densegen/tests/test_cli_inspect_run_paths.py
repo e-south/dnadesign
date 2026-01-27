@@ -79,3 +79,12 @@ def test_inspect_run_root_listing_uses_relative_config_paths(tmp_path: Path) -> 
     assert result.exit_code == 0, result.output
     assert str(workspace_root) not in result.output
     assert "demo_run/config.yaml" in result.output
+
+
+def test_inspect_config_missing_uses_relative_path(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "missing_config.yaml"
+    runner = CliRunner()
+    result = runner.invoke(app, ["inspect", "config", "-c", str(cfg_path)])
+    assert result.exit_code != 0
+    assert str(cfg_path) not in result.output
+    assert "Config file not found" in result.output

@@ -11,7 +11,7 @@ This walkthrough uses the packaged demo workspace. The staged workspace contains
 4. [Inspect config](#4-inspect-config) - resolved outputs + Stage‑A/Stage‑B settings.
 5. [Stage‑A build‑pool](#5-stage-a-build-pool) - materialize TFBS pools.
 6. [Stage‑B build‑libraries](#6-stage-b-build-libraries) - materialize solver libraries.
-7. [Run generation](#7-run-generation) - execute Stage‑A + Stage‑B + optimization.
+7. [Run generation](#7-run-generation) - execute Stage‑B sampling + optimization.
 8. [Inspect run summary](#8-inspect-run-summary) - library + events.
 9. [List plots](#9-list-plots) - available plot names.
 10. [Plot](#10-plot) - render plots.

@@ -171,7 +171,9 @@ def _resolve_template_dir(
         with resources.as_file(template_dir) as resolved:
             config_path = Path(resolved) / DEFAULT_CONFIG_FILENAME
             if not config_path.exists():
-                console.print(f"[bold red]Template config not found:[/] {config_path}")
+                console.print(
+                    f"[bold red]Template config not found:[/] {_display_path(config_path, Path.cwd(), absolute=False)}"
+                )
                 raise typer.Exit(code=1)
             yield Path(resolved), config_path
         return
@@ -180,10 +182,14 @@ def _resolve_template_dir(
         raise typer.Exit(code=1)
     template_path = template.expanduser().resolve()
     if not template_path.exists():
-        console.print(f"[bold red]Template config not found:[/] {template_path}")
+        console.print(
+            f"[bold red]Template config not found:[/] {_display_path(template_path, Path.cwd(), absolute=False)}"
+        )
         raise typer.Exit(code=1)
     if not template_path.is_file():
-        console.print(f"[bold red]Template path is not a file:[/] {template_path}")
+        console.print(
+            f"[bold red]Template path is not a file:[/] {_display_path(template_path, Path.cwd(), absolute=False)}"
+        )
         raise typer.Exit(code=1)
     yield template_path.parent, template_path
 
@@ -333,14 +339,21 @@ def _resolve_config_path(ctx: typer.Context, override: Optional[Path]) -> tuple[
     return _default_config_path(), True
 
 
-def _load_config_or_exit(cfg_path: Path, *, missing_message: str | None = None):
+def _load_config_or_exit(
+    cfg_path: Path,
+    *,
+    missing_message: str | None = None,
+    absolute: bool = False,
+    display_root: Path | None = None,
+):
     try:
         return load_config(cfg_path)
     except FileNotFoundError:
         if missing_message:
             console.print(f"[bold red]{missing_message}[/]")
         else:
-            console.print(f"[bold red]Config file not found:[/] {cfg_path}")
+            root = display_root or Path.cwd()
+            console.print(f"[bold red]Config file not found:[/] {_display_path(cfg_path, root, absolute=absolute)}")
         raise typer.Exit(code=1)
     except ConfigError as e:
         console.print(f"[bold red]Config error:[/] {e}")
@@ -1141,11 +1154,15 @@ def workspace_init(
         console.print(f"[yellow]Sanitized run id:[/] {run_id} -> {run_id_clean}")
     root_path = root.expanduser()
     if root_path.exists() and not root_path.is_dir():
-        console.print(f"[bold red]Workspace root is not a directory:[/] {root_path}")
+        console.print(
+            f"[bold red]Workspace root is not a directory:[/] {_display_path(root_path, Path.cwd(), absolute=False)}"
+        )
         raise typer.Exit(code=1)
     run_dir = (root_path / run_id_clean).resolve()
     if run_dir.exists():
-        console.print(f"[bold red]Run directory already exists:[/] {run_dir}")
+        console.print(
+            f"[bold red]Run directory already exists:[/] {_display_path(run_dir, root_path.resolve(), absolute=False)}"
+        )
         raise typer.Exit(code=1)
 
     with _resolve_template_dir(template=template, template_id=template_id) as (_template_dir, template_path):
@@ -1231,7 +1248,9 @@ def workspace_init(
                 for rel_path in rel_paths[:6]:
                     console.print(f"  - {rel_path}")
                 console.print("[yellow]Tip[/]: re-run with --copy-inputs or update paths in config.yaml.")
-        console.print(f":sparkles: [bold green]Workspace staged[/]: {config_path}")
+        console.print(
+            f":sparkles: [bold green]Workspace staged[/]: {_display_path(config_path, run_dir, absolute=False)}"
+        )
 
 
 @inspect_app.command("run", help="Summarize a run manifest or list workspaces.")
@@ -1265,7 +1284,10 @@ def inspect_run(
     if root is not None:
         workspaces_root = root.resolve()
         if not workspaces_root.exists() or not workspaces_root.is_dir():
-            console.print(f"[bold red]Workspaces root not found:[/] {workspaces_root}")
+            console.print(
+                f"[bold red]Workspaces root not found:[/] "
+                f"{_display_path(workspaces_root, Path.cwd(), absolute=absolute)}"
+            )
             raise typer.Exit(code=1)
         console.print(_list_workspaces_table(workspaces_root, limit=limit, show_all=show_all, absolute=absolute))
         return
@@ -1276,6 +1298,8 @@ def inspect_run(
         loaded = _load_config_or_exit(
             cfg_path,
             missing_message=DEFAULT_CONFIG_MISSING_MESSAGE if is_default else None,
+            absolute=absolute,
+            display_root=Path.cwd(),
         )
         run_root = _run_root_for(loaded)
     else:
@@ -1289,7 +1313,7 @@ def inspect_run(
                     "Provide --config or run inspect run without --library."
                 )
                 raise typer.Exit(code=1)
-            loaded = _load_config_or_exit(cfg_path)
+            loaded = _load_config_or_exit(cfg_path, absolute=absolute, display_root=run_root)
     manifest_path = run_manifest_path(run_root)
     if not manifest_path.exists():
         state_path = run_state_path(run_root)
@@ -1638,14 +1662,18 @@ def report(
     if run is not None:
         cfg_path = Path(run) / "config.yaml"
         if not cfg_path.exists():
-            console.print(f"[bold red]Config not found under run:[/] {cfg_path}")
+            console.print(
+                f"[bold red]Config not found under run:[/] {_display_path(cfg_path, Path(run), absolute=absolute)}"
+            )
             raise typer.Exit(code=1)
-        loaded = _load_config_or_exit(cfg_path)
+        loaded = _load_config_or_exit(cfg_path, absolute=absolute, display_root=Path(run))
     else:
         cfg_path, is_default = _resolve_config_path(ctx, config)
         loaded = _load_config_or_exit(
             cfg_path,
             missing_message=DEFAULT_CONFIG_MISSING_MESSAGE if is_default else None,
+            absolute=absolute,
+            display_root=Path.cwd(),
         )
     raw_formats = {f.strip().lower() for f in format.split(",") if f.strip()}
     if not raw_formats:
@@ -2277,9 +2305,11 @@ def stage_b_build_libraries(
     else:
         pool_dir = run_root / "outputs" / "pools"
     if pool_dir.exists() and pool_dir.is_file():
-        raise typer.BadParameter(f"Pool path must be a directory from `stage-a build-pool`, not a file: {pool_dir}")
+        pool_label = _display_path(pool_dir, run_root, absolute=False)
+        raise typer.BadParameter(f"Pool path must be a directory from `stage-a build-pool`, not a file: {pool_label}")
     if not pool_dir.exists() or not pool_dir.is_dir():
-        raise typer.BadParameter(f"Pool directory not found: {pool_dir}")
+        pool_label = _display_path(pool_dir, run_root, absolute=False)
+        raise typer.BadParameter(f"Pool directory not found: {pool_label}")
     try:
         pool_artifact = load_pool_artifact(pool_dir)
     except FileNotFoundError as exc:
@@ -2310,7 +2340,8 @@ def stage_b_build_libraries(
             entry = pool_artifact.entry_for(inp.name)
             pool_path = pool_dir / entry.pool_path
             if not pool_path.exists():
-                raise typer.BadParameter(f"Pool file not found for input {inp.name}: {pool_path}")
+                pool_label = _display_path(pool_path, run_root, absolute=False)
+                raise typer.BadParameter(f"Pool file not found for input {inp.name}: {pool_label}")
             df = pd.read_parquet(pool_path)
             if entry.pool_mode == POOL_MODE_TFBS:
                 meta_df = df

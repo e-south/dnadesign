@@ -16,7 +16,7 @@ DenseGen writes Parquet outputs with a shared, deterministic ID scheme. This gui
 
 ### Outputs layout
 
-Typical workspace output tree (Stage‑A + Stage‑B):
+Typical workspace output tree (Stage‑A + Stage‑B artifacts):
 
 ```
 outputs/

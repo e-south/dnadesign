@@ -38,9 +38,9 @@ workspace/
   `outputs/meta/run_state.json`), you must choose `dense run --resume` (continue in‑place) or
   `dense run --fresh` (clear outputs and start over). Stage‑A/Stage‑B artifacts in
   `outputs/pools` or `outputs/libraries` do not trigger this guard.
-- **Candidate mining artifacts**: `outputs/pools/candidates/` is overwritten by `dense run` or
-  `stage-a build-pool --fresh`; copy it elsewhere if you want to keep prior candidates. Use
-  `dense run --fresh` to clear outputs when restarting a workspace.
+- **Candidate mining artifacts**: `outputs/pools/candidates/` is overwritten by
+  `stage-a build-pool --fresh` or `dense run --rebuild-stage-a`; copy it elsewhere if you want
+  to keep prior candidates. Use `dense run --fresh` to clear outputs when restarting a workspace.
 
 ---
 

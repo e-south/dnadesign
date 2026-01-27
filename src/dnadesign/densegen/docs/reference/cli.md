@@ -12,7 +12,7 @@ DenseGen exposes a Typer CLI via `dense`. This page is an operator manual (comma
 - [`dense stage-a build-pool`](#dense-stage-a-build-pool) - build Stage‑A TFBS pools.
 - [`dense stage-b build-libraries`](#dense-stage-b-build-libraries) - build Stage‑B solver libraries.
 - [`dense workspace init`](#dense-workspace-init) - scaffold a workspace.
-- [`dense run`](#dense-run) - run Stage‑A + Stage‑B + optimization.
+- [`dense run`](#dense-run) - run Stage‑B sampling + optimization.
 - [`dense campaign-reset`](#dense-campaign-reset) - remove outputs for a clean rerun (hidden command).
 - [`dense plot`](#dense-plot) - render plots from outputs.
 - [`dense ls-plots`](#dense-ls-plots) - list available plots.
@@ -43,6 +43,11 @@ Options:
 #### `dense inspect inputs`
 Print resolved inputs plus Stage‑A pool status.
 
+Options:
+- `--verbose` — show full source file lists.
+- `--absolute` — show absolute paths instead of workspace‑relative.
+- `--show-motif-ids` — show full motif IDs instead of short TF labels.
+
 ---
 
 #### `dense inspect plan`
@@ -57,6 +62,7 @@ listed in `dense inspect inputs`.
 Options:
 - `--show-constraints` — print full fixed elements per plan item.
 - `--probe-solver` — verify the solver backend before reporting.
+- `--absolute` — show absolute paths instead of workspace‑relative.
 
 ---
 
@@ -69,6 +75,7 @@ Options:
 - `--limit` — limit workspaces displayed when using `--root`.
 - `--all` — include directories without `config.yaml` when using `--root`.
 - `--config` — config path (used to resolve run root when `--run` is not set).
+- `--absolute` — show absolute paths instead of workspace‑relative.
 - `--verbose` — show failure breakdown columns (constraint filters + duplicate solutions).
 - `--library` — include Stage‑B offered‑vs‑used summaries (TF/TFBS usage).
 - `--library-limit` — limit library builds shown in per‑library summaries (`0` = all).
@@ -184,6 +191,7 @@ Generate an audit-grade report summary for a run. Outputs are run‑scoped under
 Options:
 - `--run` — run directory (defaults to config run root).
 - `--out` — output directory relative to run root (default: `outputs/report`; must be inside `outputs/`).
+- `--absolute` — show absolute paths instead of workspace‑relative.
 - `--format` — `json`, `md`, `html`, or `all` (comma‑separated allowed).
 - `--strict/--fail-on-missing` — fail if core report inputs are missing.
 - `--plots` — `none` or `include` (default: `none`). When `include`, report links plots from

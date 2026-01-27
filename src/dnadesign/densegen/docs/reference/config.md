@@ -67,8 +67,8 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
       - `log_every_batches` (int > 0; default 1) - log yield summaries every N batches
     - `bgfile` (optional path) - MEME bfile-format background model for FIMO
     - `keep_all_candidates_debug` (bool, default false) - write candidate Parquet logs to
-      `outputs/pools/candidates/` for inspection (overwritten by `dense run` or
-      `stage-a build-pool --fresh`)
+      `outputs/pools/candidates/` for inspection (overwritten by `stage-a build-pool --fresh`
+      or `dense run --rebuild-stage-a`)
     - `include_matched_sequence` (bool, default false) - include `fimo_matched_sequence` in TFBS outputs
     - `dedupe_by` (optional; `sequence | core`) - Stage‑A uniqueness key for TFBS retention (default `core` for
       `length_policy: range`, otherwise `sequence`). This key is intended to be extensible as new uniqueness
