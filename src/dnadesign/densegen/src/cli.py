@@ -98,6 +98,7 @@ from .core.run_paths import (
 from .core.run_state import load_run_state
 from .core.seeding import derive_seed_map
 from .integrations.meme_suite import require_executable
+from .utils import logging_utils
 from .utils.logging_utils import install_native_stderr_filters, setup_logging
 from .utils.mpl_utils import ensure_mpl_cache_dir
 
@@ -850,11 +851,12 @@ def _collect_relative_input_paths_from_raw(dense_cfg: dict) -> list[str]:
 
 def _render_missing_input_hint(cfg_path: Path, loaded, exc: Exception) -> None:
     console.print(f"[bold red]Input error:[/] {exc}")
+    run_root = _run_root_for(loaded)
     missing = _collect_missing_input_paths(loaded, cfg_path)
     if missing:
         console.print("[bold]Missing inputs[/]:")
         for path in missing[:6]:
-            console.print(f"  - {path}")
+            console.print(f"  - {_display_path(path, run_root, absolute=False)}")
             parent = path.parent
             siblings = []
             if parent.exists() and parent.is_dir():
@@ -968,7 +970,13 @@ def _warn_full_pool_strategy(loaded) -> None:
     )
 
 
-def _list_workspaces_table(workspaces_root: Path, *, limit: int, show_all: bool) -> Table:
+def _list_workspaces_table(
+    workspaces_root: Path,
+    *,
+    limit: int,
+    show_all: bool,
+    absolute: bool,
+) -> Table:
     workspace_dirs = sorted([p for p in workspaces_root.iterdir() if p.is_dir()], key=lambda p: p.name)
     if limit and limit > 0:
         workspace_dirs = workspace_dirs[: int(limit)]
@@ -1021,10 +1029,13 @@ def _list_workspaces_table(workspaces_root: Path, *, limit: int, show_all: bool)
         else:
             status = "missing config.yaml"
 
+        config_label = "-"
+        if cfg_path.exists():
+            config_label = _display_path(cfg_path, workspaces_root, absolute=absolute)
         table.add_row(
             run_dir.name,
             run_id,
-            str(cfg_path) if cfg_path.exists() else "-",
+            config_label,
             str(parquet_count),
             str(plots_count),
             str(logs_count),
@@ -1236,6 +1247,7 @@ def inspect_run(
     limit: int = typer.Option(0, "--limit", help="Limit workspaces displayed when using --root (0 = all)."),
     show_all: bool = typer.Option(False, "--all", help="Include directories without config.yaml when using --root."),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
+    absolute: bool = typer.Option(False, "--absolute", help="Show absolute paths instead of workspace-relative."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show failure breakdown columns."),
     library: bool = typer.Option(False, "--library", help="Include offered-vs-used library summaries."),
     library_limit: int = typer.Option(10, "--library-limit", help="Limit libraries shown in summaries (0 = all)."),
@@ -1260,7 +1272,7 @@ def inspect_run(
         if not workspaces_root.exists() or not workspaces_root.is_dir():
             console.print(f"[bold red]Workspaces root not found:[/] {workspaces_root}")
             raise typer.Exit(code=1)
-        console.print(_list_workspaces_table(workspaces_root, limit=limit, show_all=show_all))
+        console.print(_list_workspaces_table(workspaces_root, limit=limit, show_all=show_all, absolute=absolute))
         return
     cfg_path = None
     loaded = None
@@ -1277,7 +1289,8 @@ def inspect_run(
             cfg_path = run_root / "config.yaml"
             if not cfg_path.exists():
                 console.print(
-                    f"[bold red]Config not found for --library:[/] {cfg_path}. "
+                    f"[bold red]Config not found for --library:[/] "
+                    f"{_display_path(cfg_path, run_root, absolute=absolute)}. "
                     "Provide --config or run inspect run without --library."
                 )
                 raise typer.Exit(code=1)
@@ -1288,8 +1301,9 @@ def inspect_run(
         if state_path.exists():
             state = load_run_state(state_path)
             console.print("[yellow]Run manifest missing; showing checkpointed run_state.[/]")
+            root_label = _display_path(run_root, run_root, absolute=absolute)
             console.print(
-                f"[bold]Run:[/] {state.run_id}  [bold]Root:[/] {state.run_root}  "
+                f"[bold]Run:[/] {state.run_id}  [bold]Root:[/] {root_label}  "
                 f"[bold]Schema:[/] {state.schema_version}  [bold]Config:[/] {state.config_sha256[:8]}…"
             )
             table = Table("input", "plan", "generated")
@@ -1300,7 +1314,9 @@ def inspect_run(
             console.print(f"  - {_workspace_command('dense run', cfg_path=cfg_path, run_root=run_root)}")
             return
 
-        console.print(f"[bold red]Run manifest not found:[/] {manifest_path}")
+        console.print(
+            f"[bold red]Run manifest not found:[/] {_display_path(manifest_path, run_root, absolute=absolute)}"
+        )
         entries = _list_dir_entries(run_root, limit=8)
         if entries:
             console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
@@ -1314,8 +1330,9 @@ def inspect_run(
     dense_arrays_source = manifest.dense_arrays_version_source or "-"
     if dense_arrays_label != "-" and dense_arrays_source != "-":
         dense_arrays_label = f"{dense_arrays_label} ({dense_arrays_source})"
+    root_label = _display_path(run_root, run_root, absolute=absolute)
     console.print(
-        f"[bold]Run:[/] {manifest.run_id}  [bold]Root:[/] {manifest.run_root}  "
+        f"[bold]Run:[/] {manifest.run_id}  [bold]Root:[/] {root_label}  "
         f"[bold]Schema:[/] {schema_label}  [bold]dense-arrays:[/] {dense_arrays_label}"
     )
     if verbose:
@@ -1601,6 +1618,7 @@ def report(
         "--out",
         help="Output directory (relative to run root; must be inside outputs/).",
     ),
+    absolute: bool = typer.Option(False, "--absolute", help="Show absolute paths instead of workspace-relative."),
     plots: str = typer.Option(
         "none",
         "--plots",
@@ -1672,7 +1690,7 @@ def report(
         else:
             console.print(f"  - {_workspace_command('dense run', cfg_path=cfg_path, run_root=run_root)}")
         raise typer.Exit(code=1)
-    console.print(f":sparkles: [bold green]Report written[/]: {out_dir}")
+    console.print(f":sparkles: [bold green]Report written[/]: {_display_path(out_dir, run_root, absolute=absolute)}")
     outputs = []
     if "json" in formats_used:
         outputs.append("report.json")
@@ -2004,6 +2022,7 @@ def stage_a_build_pool(
         logfile=str(logfile),
         suppress_solver_stderr=bool(log_cfg.suppress_solver_stderr),
     )
+    logging_utils.set_progress_enabled(str(log_cfg.progress_style) == "stream")
     out_dir = _resolve_outputs_path_or_exit(cfg_path, run_root, out, label="stage-a.out")
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -2644,13 +2663,17 @@ def campaign_reset(
     run_root = resolve_run_root(loaded.path, loaded.root.densegen.run.root)
     outputs_root = run_outputs_root(run_root)
     if not outputs_root.exists():
-        console.print(f"[bold yellow]No outputs found under[/] {outputs_root}")
+        console.print(f"[bold yellow]No outputs found under[/] {_display_path(outputs_root, run_root, absolute=False)}")
         return
     if not outputs_root.is_dir():
-        console.print(f"[bold red]Outputs path is not a directory:[/] {outputs_root}")
+        console.print(
+            f"[bold red]Outputs path is not a directory:[/] {_display_path(outputs_root, run_root, absolute=False)}"
+        )
         raise typer.Exit(code=1)
     shutil.rmtree(outputs_root)
-    console.print(f":broom: [bold green]Removed outputs under[/] {outputs_root}")
+    console.print(
+        f":broom: [bold green]Removed outputs under[/] {_display_path(outputs_root, run_root, absolute=False)}"
+    )
 
 
 @app.command(help="Generate plots from outputs according to YAML. Use --only to select plots.")

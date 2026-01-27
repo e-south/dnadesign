@@ -1,28 +1,23 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/pipeline.py
+dnadesign
+src/dnadesign/densegen/src/core/pipeline/orchestrator.py
 
 DenseGen pipeline orchestration (CLI-agnostic).
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
-import atexit
 import hashlib
-import importlib.metadata
 import json
 import logging
 import math
 import random
 import time
-import tomllib
 import uuid
-from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,11 +25,7 @@ from typing import Callable, Iterable, List
 
 import numpy as np
 import pandas as pd
-from rich import box
 from rich.console import Console
-from rich.live import Live
-from rich.panel import Panel
-from rich.table import Table
 
 from ..adapters.optimizer import DenseArraysAdapter, OptimizerAdapter
 from ..adapters.outputs import OutputRecord, SinkBase, build_sinks, load_records_from_config, resolve_bio_alphabet
@@ -48,6 +39,7 @@ from ..config import (
     resolve_relative_path,
     resolve_run_root,
 )
+from ..utils import logging_utils
 from ..utils.logging_utils import install_native_stderr_filters
 from .artifacts.candidates import build_candidate_artifact, find_candidate_files, prepare_candidates_dir
 from .artifacts.ids import hash_tfbs_id
@@ -67,8 +59,29 @@ from .artifacts.pool import (
     pool_status_by_input,
 )
 from .artifacts.records import AttemptRecord, SolutionRecord
+from .inputs import (
+    PWM_INPUT_TYPES,
+    _build_input_manifest_entry,
+    _input_metadata,
+    _mining_attr,
+    _sampling_attr,
+)
 from .metadata import build_metadata
 from .postprocess import generate_pad
+from .progress import (
+    _aggregate_failure_counts_for_sampling,
+    _build_screen_dashboard,
+    _format_progress_bar,
+    _leaderboard_snapshot,
+    _ScreenDashboard,
+    _short_seq,
+    _summarize_diversity,
+    _summarize_failure_leaderboard,
+    _summarize_failure_totals,
+    _summarize_leaderboard,
+    _summarize_tf_counts,
+    _summarize_tfbs_usage_stats,
+)
 from .run_manifest import PlanManifest, RunManifest
 from .run_metrics import write_run_metrics
 from .run_paths import (
@@ -85,6 +98,7 @@ from .run_state import RunState, load_run_state
 from .runtime_policy import RuntimePolicy
 from .sampler import TFSampler
 from .seeding import derive_seed_map
+from .versioning import _resolve_dense_arrays_version
 
 log = logging.getLogger(__name__)
 
@@ -169,235 +183,12 @@ def select_solver(
         ) from exc
 
 
-def _summarize_tf_counts(labels: List[str], max_items: int = 6) -> str:
-    if not labels:
-        return ""
-    counts = Counter(labels)
-    items = [f"{tf} x {n}" for tf, n in counts.most_common(max_items)]
-    extra = len(counts) - min(len(counts), max_items)
-    return ", ".join(items) + (f" (+{extra} TFs)" if extra > 0 else "")
-
-
-PWM_INPUT_TYPES = {
-    "pwm_meme",
-    "pwm_meme_set",
-    "pwm_jaspar",
-    "pwm_matrix_csv",
-    "pwm_artifact",
-    "pwm_artifact_set",
-}
-
-
-def _resolve_input_paths(source_cfg, cfg_path: Path) -> list[str]:
-    paths: list[str] = []
-    if hasattr(source_cfg, "path"):
-        paths.append(str(resolve_relative_path(cfg_path, getattr(source_cfg, "path"))))
-    if hasattr(source_cfg, "paths"):
-        for path in getattr(source_cfg, "paths") or []:
-            paths.append(str(resolve_relative_path(cfg_path, path)))
-    return paths
-
-
-def _sampling_attr(sampling, name: str, default=None):
-    if sampling is None:
-        return default
-    if hasattr(sampling, name):
-        return getattr(sampling, name)
-    if isinstance(sampling, dict):
-        return sampling.get(name, default)
-    return default
-
-
-def _mining_attr(mining, name: str, default=None):
-    if mining is None:
-        return default
-    if hasattr(mining, name):
-        return getattr(mining, name)
-    if isinstance(mining, dict):
-        return mining.get(name, default)
-    return default
-
-
-def _extract_pwm_sampling_config(source_cfg) -> dict | None:
-    sampling = getattr(source_cfg, "sampling", None)
-    if sampling is None:
-        return None
-    n_sites = _sampling_attr(sampling, "n_sites")
-    oversample = _sampling_attr(sampling, "oversample_factor")
-    requested = None
-    generated = None
-    if isinstance(n_sites, int) and isinstance(oversample, int):
-        requested = int(n_sites) * int(oversample)
-        generated = requested
-    length_range = _sampling_attr(sampling, "length_range")
-    if length_range is not None:
-        length_range = list(length_range)
-    mining = _sampling_attr(sampling, "mining")
-    scoring_backend = _sampling_attr(sampling, "scoring_backend")
-    mining_batch_size = _mining_attr(mining, "batch_size")
-    mining_max_seconds = _mining_attr(mining, "max_seconds")
-    mining_log_every_batches = _mining_attr(mining, "log_every_batches")
-    return {
-        "strategy": _sampling_attr(sampling, "strategy"),
-        "scoring_backend": scoring_backend,
-        "n_sites": _sampling_attr(sampling, "n_sites"),
-        "oversample_factor": _sampling_attr(sampling, "oversample_factor"),
-        "requested_candidates": requested,
-        "generated_candidates": generated,
-        "bgfile": _sampling_attr(sampling, "bgfile"),
-        "keep_all_candidates_debug": _sampling_attr(sampling, "keep_all_candidates_debug"),
-        "length_policy": _sampling_attr(sampling, "length_policy"),
-        "length_range": length_range,
-        "mining": {
-            "batch_size": mining_batch_size,
-            "max_seconds": mining_max_seconds,
-            "log_every_batches": mining_log_every_batches,
-        }
-        if mining is not None
-        else None,
-    }
-
-
-def _build_input_manifest_entry(
-    *,
-    source_cfg,
-    cfg_path: Path,
-    input_meta: dict,
-    input_row_count: int,
-    input_tf_count: int,
-    input_tfbs_count: int,
-    input_tf_tfbs_pair_count: int | None,
-    meta_df: pd.DataFrame | None,
-) -> dict:
-    source_type = getattr(source_cfg, "type", "unknown")
-    entry = {
-        "name": getattr(source_cfg, "name", "unknown"),
-        "type": source_type,
-        "mode": input_meta.get("input_mode"),
-        "resolved_paths": _resolve_input_paths(source_cfg, cfg_path),
-        "resolved_root": str(resolve_relative_path(cfg_path, getattr(source_cfg, "root")))
-        if hasattr(source_cfg, "root")
-        else None,
-        "dataset": getattr(source_cfg, "dataset", None),
-        "counts": {
-            "rows": int(input_row_count),
-            "tf_count": int(input_tf_count),
-            "tfbs_count": int(input_tfbs_count),
-            "tf_tfbs_pair_count": int(input_tf_tfbs_pair_count) if input_tf_tfbs_pair_count is not None else None,
-        },
-    }
-    if source_type in PWM_INPUT_TYPES:
-        entry["pwm_ids_requested"] = []
-        if source_type == "pwm_matrix_csv":
-            motif_id = getattr(source_cfg, "motif_id", None)
-            entry["pwm_ids_requested"] = [motif_id] if motif_id else []
-        elif source_type in {"pwm_meme", "pwm_meme_set", "pwm_jaspar"}:
-            entry["pwm_ids_requested"] = list(getattr(source_cfg, "motif_ids") or [])
-        entry["pwm_sampling"] = _extract_pwm_sampling_config(source_cfg)
-        entry["pwm_ids"] = list(input_meta.get("input_pwm_ids") or [])
-        if meta_df is not None and "tf" in meta_df.columns:
-            counts = meta_df["tf"].value_counts().to_dict()
-            entry["pwm_sites_per_motif"] = {str(k): int(v) for k, v in counts.items()}
-    return entry
-
-
 def _gc_fraction(seq: str) -> float:
     if not seq:
         return 0.0
     g = seq.count("G")
     c = seq.count("C")
     return (g + c) / len(seq)
-
-
-def _find_project_root(start: Path) -> Path | None:
-    current = start.resolve()
-    if current.is_file():
-        current = current.parent
-    while True:
-        if (current / "uv.lock").exists() or (current / "pyproject.toml").exists():
-            return current
-        if current.parent == current:
-            return None
-        current = current.parent
-
-
-def _dense_arrays_version_from_uv_lock(root: Path) -> str | None:
-    lock_path = root / "uv.lock"
-    if not lock_path.exists():
-        return None
-    try:
-        data = tomllib.loads(lock_path.read_text())
-    except Exception:
-        return None
-    packages = data.get("package", [])
-    for pkg in packages:
-        name = str(pkg.get("name", "")).lower()
-        if name not in {"dense-arrays", "dense_arrays"}:
-            continue
-        version = pkg.get("version")
-        if isinstance(version, str) and version:
-            source = pkg.get("source") or {}
-            if isinstance(source, dict):
-                git_url = source.get("git")
-                if isinstance(git_url, str) and "#" in git_url:
-                    rev = git_url.split("#")[-1]
-                    if rev:
-                        return f"{version}+git.{rev[:7]}"
-            return version
-    return None
-
-
-def _dense_arrays_version_from_pyproject(root: Path) -> str | None:
-    pyproject_path = root / "pyproject.toml"
-    if not pyproject_path.exists():
-        return None
-    try:
-        data = tomllib.loads(pyproject_path.read_text())
-    except Exception:
-        return None
-    deps = data.get("project", {}).get("dependencies", [])
-    for dep in deps:
-        dep_str = str(dep).strip()
-        if dep_str.startswith("dense-arrays") or dep_str.startswith("dense_arrays"):
-            return dep_str
-    sources = data.get("tool", {}).get("uv", {}).get("sources", {})
-    if isinstance(sources, dict):
-        entry = sources.get("dense-arrays") or sources.get("dense_arrays")
-        if isinstance(entry, dict):
-            git_url = entry.get("git")
-            if isinstance(git_url, str) and git_url:
-                return f"git:{git_url}"
-    return None
-
-
-def _resolve_dense_arrays_version(cfg_path: Path) -> tuple[str | None, str]:
-    try:
-        import dense_arrays as da  # type: ignore
-
-        version = getattr(da, "__version__", None)
-        if isinstance(version, str) and version:
-            return version, "installed"
-    except Exception:
-        pass
-    for pkg_name in ("dense-arrays", "dense_arrays"):
-        try:
-            version = importlib.metadata.version(pkg_name)
-            return version, "installed"
-        except importlib.metadata.PackageNotFoundError:
-            continue
-        except Exception:
-            break
-    root = _find_project_root(cfg_path)
-    if root is None:
-        root = _find_project_root(Path(__file__).resolve())
-    if root is not None:
-        version = _dense_arrays_version_from_uv_lock(root)
-        if version:
-            return version, "lock"
-        version = _dense_arrays_version_from_pyproject(root)
-        if version:
-            return version, "pyproject"
-    return None, "unknown"
 
 
 def _min_count_by_regulator(labels: list[str] | None, min_count_per_tf: int) -> dict[str, int] | None:
@@ -567,51 +358,6 @@ def _min_required_length_for_constraints(
     }
 
 
-def _input_metadata(source_cfg, cfg_path: Path) -> dict:
-    source_type = getattr(source_cfg, "type", "unknown")
-    source_name = getattr(source_cfg, "name", "unknown")
-    meta = {"input_type": source_type, "input_name": source_name}
-    if hasattr(source_cfg, "path"):
-        meta["input_path"] = str(resolve_relative_path(cfg_path, getattr(source_cfg, "path")))
-    if source_type == "usr_sequences":
-        meta["input_dataset"] = getattr(source_cfg, "dataset", None)
-        meta["input_root"] = str(resolve_relative_path(cfg_path, getattr(source_cfg, "root")))
-        meta["input_mode"] = "sequence_library"
-        meta["input_pwm_ids"] = []
-    elif source_type == "sequence_library":
-        meta["input_mode"] = "sequence_library"
-        meta["input_pwm_ids"] = []
-    elif source_type == "binding_sites":
-        meta["input_mode"] = "binding_sites"
-        meta["input_pwm_ids"] = []
-    elif source_type in PWM_INPUT_TYPES:
-        meta["input_mode"] = "pwm_sampled"
-        if source_type == "pwm_matrix_csv":
-            motif_id = getattr(source_cfg, "motif_id", None)
-            meta["input_pwm_ids"] = [motif_id] if motif_id else []
-        elif source_type in {"pwm_meme", "pwm_jaspar"}:
-            meta["input_pwm_ids"] = list(getattr(source_cfg, "motif_ids") or [])
-        else:
-            meta["input_pwm_ids"] = []
-        sampling = getattr(source_cfg, "sampling", None)
-        if sampling is not None:
-            meta["input_pwm_strategy"] = getattr(sampling, "strategy", None)
-            meta["input_pwm_scoring_backend"] = getattr(sampling, "scoring_backend", None)
-            mining_cfg = getattr(sampling, "mining", None)
-            meta["input_pwm_mining_batch_size"] = _mining_attr(mining_cfg, "batch_size")
-            meta["input_pwm_mining_max_seconds"] = _mining_attr(mining_cfg, "max_seconds")
-            meta["input_pwm_mining_log_every_batches"] = _mining_attr(mining_cfg, "log_every_batches")
-            meta["input_pwm_bgfile"] = getattr(sampling, "bgfile", None)
-            meta["input_pwm_keep_all_candidates_debug"] = getattr(sampling, "keep_all_candidates_debug", None)
-            meta["input_pwm_include_matched_sequence"] = getattr(sampling, "include_matched_sequence", None)
-            meta["input_pwm_n_sites"] = getattr(sampling, "n_sites", None)
-            meta["input_pwm_oversample_factor"] = getattr(sampling, "oversample_factor", None)
-    else:
-        meta["input_mode"] = source_type
-        meta["input_pwm_ids"] = []
-    return meta
-
-
 def _compute_used_tf_info(
     sol,
     library_for_opt,
@@ -722,340 +468,6 @@ def _update_usage_counts(
             continue
         key = (tf, tfbs)
         usage_counts[key] = int(usage_counts.get(key, 0)) + 1
-
-
-def _summarize_leaderboard(counts: dict, *, top: int = 5) -> str:
-    if not counts:
-        return "-"
-    items = sorted(counts.items(), key=lambda x: (-x[1], str(x[0])))
-    items = items[: max(1, int(top))]
-    parts = []
-    for key, val in items:
-        if isinstance(key, tuple):
-            key_label = f"{key[0]}:{key[1]}"
-        else:
-            key_label = str(key)
-        parts.append(f"{key_label}={int(val)}")
-    return ", ".join(parts) if parts else "-"
-
-
-def _leaderboard_items(counts: dict, *, top: int = 5) -> list[dict]:
-    if not counts:
-        return []
-    items = sorted(counts.items(), key=lambda x: (-x[1], str(x[0])))
-    items = items[: max(1, int(top))]
-    out: list[dict] = []
-    for key, val in items:
-        if isinstance(key, tuple):
-            tf = str(key[0])
-            tfbs = str(key[1])
-            out.append({"tf": tf, "tfbs": tfbs, "count": int(val)})
-        else:
-            out.append({"tf": str(key), "count": int(val)})
-    return out
-
-
-def _format_progress_bar(current: int, total: int, *, width: int = 24) -> str:
-    if total <= 0:
-        return "[?]"
-    filled = int(width * (current / max(1, total)))
-    filled = min(width, max(0, filled))
-    return "[" + ("#" * filled) + ("-" * (width - filled)) + "]"
-
-
-def _short_seq(value: str, *, max_len: int = 16) -> str:
-    if not value:
-        return "-"
-    if len(value) <= max_len:
-        return value
-    keep = max(1, max_len - 3)
-    return value[:keep] + "..."
-
-
-def _summarize_failure_totals(
-    failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]],
-    *,
-    input_name: str,
-    plan_name: str,
-) -> str:
-    total = 0
-    unique = 0
-    for (inp, plan, tf, tfbs, _site_id), reasons in failure_counts.items():
-        if inp != input_name or plan != plan_name:
-            continue
-        if not tfbs:
-            continue
-        count = sum(int(v) for v in reasons.values())
-        if count > 0:
-            total += count
-            unique += 1
-    if total <= 0:
-        return "failed_sites=0 total_failures=0"
-    return f"failed_sites={unique} total_failures={total}"
-
-
-def _summarize_failure_leaderboard(
-    failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]],
-    *,
-    input_name: str,
-    plan_name: str,
-    top: int = 5,
-) -> str:
-    if not failure_counts:
-        return "-"
-    totals: dict[tuple[str, str], int] = {}
-    for (inp, plan, tf, tfbs, _site_id), reasons in failure_counts.items():
-        if inp != input_name or plan != plan_name:
-            continue
-        if not tfbs:
-            continue
-        count = sum(int(v) for v in reasons.values())
-        if count <= 0:
-            continue
-        key = (str(tf), str(tfbs))
-        totals[key] = totals.get(key, 0) + int(count)
-    if not totals:
-        return "-"
-    items = sorted(totals.items(), key=lambda x: (-x[1], x[0][0], x[0][1]))
-    items = items[: max(1, int(top))]
-    parts = []
-    for (tf, tfbs), count in items:
-        parts.append(f"{tf}:{_short_seq(tfbs)}={int(count)}")
-    return ", ".join(parts) if parts else "-"
-
-
-def _failure_leaderboard_items(
-    failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]],
-    *,
-    input_name: str,
-    plan_name: str,
-    top: int = 5,
-) -> list[dict]:
-    if not failure_counts:
-        return []
-    totals: dict[tuple[str, str], int] = {}
-    reasons_by_key: dict[tuple[str, str], dict[str, int]] = {}
-    for (inp, plan, tf, tfbs, _site_id), reasons in failure_counts.items():
-        if inp != input_name or plan != plan_name:
-            continue
-        if not tfbs:
-            continue
-        count = sum(int(v) for v in (reasons or {}).values())
-        if count <= 0:
-            continue
-        key = (str(tf), str(tfbs))
-        totals[key] = totals.get(key, 0) + int(count)
-        reason_counts = reasons_by_key.setdefault(key, {})
-        for reason, n in (reasons or {}).items():
-            reason_counts[str(reason)] = reason_counts.get(str(reason), 0) + int(n)
-    if not totals:
-        return []
-    items = sorted(totals.items(), key=lambda x: (-x[1], x[0][0], x[0][1]))
-    items = items[: max(1, int(top))]
-    out: list[dict] = []
-    for (tf, tfbs), count in items:
-        reasons = reasons_by_key.get((tf, tfbs), {})
-        top_reason = max(reasons.items(), key=lambda kv: kv[1])[0] if reasons else ""
-        out.append({"tf": tf, "tfbs": tfbs, "failures": int(count), "top_reason": top_reason})
-    return out
-
-
-def _aggregate_failure_counts_for_sampling(
-    failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]],
-    *,
-    input_name: str,
-    plan_name: str,
-) -> dict[tuple[str, str], int]:
-    if not failure_counts:
-        return {}
-    totals: dict[tuple[str, str], int] = {}
-    for (inp, plan, tf, tfbs, _site_id), reasons in failure_counts.items():
-        if inp != input_name or plan != plan_name:
-            continue
-        if not tfbs:
-            continue
-        count = sum(int(v) for v in (reasons or {}).values())
-        if count <= 0:
-            continue
-        key = (str(tf), str(tfbs))
-        totals[key] = totals.get(key, 0) + int(count)
-    return totals
-
-
-def _normalized_entropy(counts: dict) -> float | None:
-    values = np.array(list(counts.values()), dtype=float)
-    if values.size == 0:
-        return None
-    total = float(values.sum())
-    if total <= 0:
-        return None
-    p = values / total
-    ent = -np.sum(p * np.log(p))
-    max_ent = math.log(len(values)) if len(values) > 1 else 0.0
-    if max_ent <= 0:
-        return 0.0
-    return float(ent / max_ent)
-
-
-def _summarize_diversity(
-    usage_counts: dict[tuple[str, str], int],
-    tf_usage_counts: dict[str, int],
-    *,
-    library_tfs: list[str],
-    library_tfbs: list[str],
-) -> str:
-    lib_tf_count = len(set(library_tfs)) if library_tfs else 0
-    if library_tfs:
-        lib_tfbs_count = len(set(zip(library_tfs, library_tfbs)))
-    else:
-        lib_tfbs_count = len(set(library_tfbs))
-    used_tf_count = len(tf_usage_counts)
-    used_tfbs_count = len(usage_counts)
-    tf_cov = used_tf_count / max(1, lib_tf_count) if lib_tf_count else 0.0
-    tfbs_cov = used_tfbs_count / max(1, lib_tfbs_count) if lib_tfbs_count else 0.0
-    ent = _normalized_entropy(usage_counts)
-    ent_label = f"{ent:.3f}" if ent is not None else "n/a"
-    return (
-        f"tf_coverage={tf_cov:.2f} ({used_tf_count}/{lib_tf_count}) | "
-        f"tfbs_coverage={tfbs_cov:.2f} ({used_tfbs_count}/{lib_tfbs_count}) | "
-        f"tfbs_entropy={ent_label}"
-    )
-
-
-def _summarize_tfbs_usage_stats(usage_counts: dict[tuple[str, str], int]) -> str:
-    if not usage_counts:
-        return "unique=0"
-    counts = np.array(list(usage_counts.values()), dtype=int)
-    if counts.size == 0:
-        return "unique=0"
-    unique = int(counts.size)
-    min_val = int(counts.min())
-    med_val = float(np.median(counts))
-    max_val = int(counts.max())
-    top_vals = sorted(counts.tolist(), reverse=True)[:3]
-    top_label = ",".join(str(int(v)) for v in top_vals)
-    med_label = f"{med_val:.1f}" if med_val % 1 else str(int(med_val))
-    return f"unique={unique} min/med/max={min_val}/{med_label}/{max_val} top={top_label}"
-
-
-class _ScreenDashboard:
-    def __init__(self, *, console: Console, refresh_seconds: float) -> None:
-        refresh_rate = max(1.0, 1.0 / max(refresh_seconds, 0.1))
-        self._live = Live(console=console, refresh_per_second=refresh_rate, transient=False)
-        self._started = False
-        atexit.register(self.close)
-
-    def update(self, renderable) -> None:
-        if not self._started:
-            self._live.start()
-            self._started = True
-        self._live.update(renderable, refresh=True)
-
-    def close(self) -> None:
-        if self._started:
-            self._live.stop()
-            self._started = False
-
-
-def _build_screen_dashboard(
-    *,
-    source_label: str,
-    plan_name: str,
-    bar: str,
-    generated: int,
-    quota: int,
-    pct: float,
-    local_generated: int,
-    local_target: int,
-    library_index: int,
-    cr_now: float | None,
-    cr_avg: float | None,
-    resamples: int,
-    dup_out: int,
-    dup_sol: int,
-    fails: int,
-    stalls: int,
-    failure_totals: str | None,
-    tf_usage: dict[str, int],
-    tfbs_usage: dict[tuple[str, str], int],
-    diversity_label: str,
-    show_tfbs: bool,
-    show_solutions: bool,
-    sequence_preview: str | None,
-) -> Panel:
-    table = Table(show_header=False, box=box.SIMPLE, expand=True)
-    header = f"{source_label}/{plan_name}"
-    table.add_row("run", header)
-    table.add_row("progress", f"{bar} {generated}/{quota} ({pct:.2f}%)")
-    table.add_row("library", f"index={library_index} local={local_generated}/{local_target}")
-    if cr_now is not None:
-        if cr_avg is not None:
-            table.add_row("compression", f"now={cr_now:.3f} avg={cr_avg:.3f}")
-        else:
-            table.add_row("compression", f"now={cr_now:.3f}")
-    table.add_row("counts", f"resamples={resamples} dup_out={dup_out} dup_sol={dup_sol} fails={fails} stalls={stalls}")
-    if failure_totals:
-        table.add_row("failures", failure_totals)
-    if tf_usage:
-        table.add_row("TF usage", _summarize_leaderboard(tf_usage, top=5))
-    tfbs_label = _summarize_leaderboard(tfbs_usage, top=5) if show_tfbs else _summarize_tfbs_usage_stats(tfbs_usage)
-    table.add_row("TFBS usage", tfbs_label)
-    table.add_row("diversity", diversity_label)
-    if show_solutions and sequence_preview:
-        table.add_row("sequence", sequence_preview)
-    return Panel(table, title="DenseGen progress")
-
-
-def _diversity_snapshot(
-    usage_counts: dict[tuple[str, str], int],
-    tf_usage_counts: dict[str, int],
-    *,
-    library_tfs: list[str],
-    library_tfbs: list[str],
-) -> dict[str, object]:
-    lib_tf_count = len(set(library_tfs)) if library_tfs else 0
-    if library_tfs:
-        lib_tfbs_count = len(set(zip(library_tfs, library_tfbs)))
-    else:
-        lib_tfbs_count = len(set(library_tfbs))
-    used_tf_count = len(tf_usage_counts)
-    used_tfbs_count = len(usage_counts)
-    tf_cov = used_tf_count / max(1, lib_tf_count) if lib_tf_count else 0.0
-    tfbs_cov = used_tfbs_count / max(1, lib_tfbs_count) if lib_tfbs_count else 0.0
-    ent = _normalized_entropy(usage_counts)
-    return {
-        "tf_coverage": float(tf_cov),
-        "tfbs_coverage": float(tfbs_cov),
-        "tfbs_entropy": float(ent) if ent is not None else None,
-        "used_tf_count": int(used_tf_count),
-        "library_tf_count": int(lib_tf_count),
-        "used_tfbs_count": int(used_tfbs_count),
-        "library_tfbs_count": int(lib_tfbs_count),
-    }
-
-
-def _leaderboard_snapshot(
-    usage_counts: dict[tuple[str, str], int],
-    tf_usage_counts: dict[str, int],
-    failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]],
-    *,
-    input_name: str,
-    plan_name: str,
-    library_tfs: list[str],
-    library_tfbs: list[str],
-    top: int = 5,
-) -> dict[str, object]:
-    return {
-        "tf": _leaderboard_items(tf_usage_counts, top=top),
-        "tfbs": _leaderboard_items(usage_counts, top=top),
-        "failed_tfbs": _failure_leaderboard_items(failure_counts, input_name=input_name, plan_name=plan_name, top=top),
-        "diversity": _diversity_snapshot(
-            usage_counts,
-            tf_usage_counts,
-            library_tfs=library_tfs,
-            library_tfbs=library_tfbs,
-        ),
-    }
 
 
 def _apply_pad_offsets(used_tfbs_detail: list[dict], pad_meta: dict) -> list[dict]:
@@ -2169,6 +1581,7 @@ def _process_plan_for_source(
     progress_style = str(getattr(log_cfg, "progress_style", "stream"))
     progress_every = int(getattr(log_cfg, "progress_every", 1))
     progress_refresh_seconds = float(getattr(log_cfg, "progress_refresh_seconds", 1.0))
+    logging_utils.set_progress_enabled(progress_style == "stream")
     screen_console = Console() if progress_style == "screen" else None
     last_screen_refresh = 0.0
     latest_failure_totals: str | None = None

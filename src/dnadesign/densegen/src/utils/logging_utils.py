@@ -24,8 +24,23 @@ _NATIVE_STDERR_PATTERNS: list[tuple[str, re.Pattern, str | None]] = []
 _NATIVE_STDERR_LOCK = threading.Lock()
 _FIMO_STDOUT_SUPPRESS_RE = re.compile(r"^\s*FIMO (mining|yield)\b")
 _PROGRESS_LOCK = threading.Lock()
+_PROGRESS_ENABLED = True
 _PROGRESS_ACTIVE = False
 _PROGRESS_VISIBLE = False
+
+
+def set_progress_enabled(enabled: bool) -> None:
+    global _PROGRESS_ENABLED, _PROGRESS_ACTIVE, _PROGRESS_VISIBLE
+    with _PROGRESS_LOCK:
+        _PROGRESS_ENABLED = bool(enabled)
+        if not _PROGRESS_ENABLED:
+            _PROGRESS_ACTIVE = False
+            _PROGRESS_VISIBLE = False
+
+
+def is_progress_enabled() -> bool:
+    with _PROGRESS_LOCK:
+        return bool(_PROGRESS_ENABLED)
 
 
 def set_progress_active(active: bool) -> None:

@@ -74,7 +74,9 @@ class _PwmSamplingProgress:
     min_interval: float = 0.2
 
     def __post_init__(self) -> None:
-        self._enabled = bool(getattr(self.stream, "isatty", lambda: False)())
+        self._enabled = bool(logging_utils.is_progress_enabled()) and bool(
+            getattr(self.stream, "isatty", lambda: False)()
+        )
         self._start = time.monotonic()
         self._last_update = self._start
         self._last_len = 0
