@@ -55,6 +55,22 @@ def test_plot_cli_list_registry(tmp_path):
     assert "test_plot_cli_minimal" in res.stdout
 
 
+def test_plot_cli_list_registry_includes_sfxi_diagnostics(tmp_path):
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "plot", "--list"])
+    assert res.exit_code == 0, res.stdout
+    for name in [
+        "sfxi_factorial_effects",
+        "sfxi_setpoint_decomposition",
+        "sfxi_setpoint_sweep",
+        "sfxi_support_diagnostics",
+        "sfxi_uncertainty",
+        "sfxi_intensity_scaling",
+    ]:
+        assert name in res.stdout
+
+
 def test_plot_cli_list_registry_ignores_config(tmp_path):
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)

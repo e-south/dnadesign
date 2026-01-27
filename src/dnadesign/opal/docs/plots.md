@@ -95,6 +95,69 @@ plots:
 
 Ledger sinks always live under `context.workspace.outputs_dir` (e.g., `outputs/ledger/`).
 
+---
+
+## SFXI diagnostics plots
+
+These plots reuse shared SFXI math and are safe to run without retraining.
+
+### Plot kinds + params
+
+- **`sfxi_factorial_effects`**: factorial-effects map from predicted logic vectors.
+  - params: `size_by` (default `obj__effect_scaled`), `sample_n`, `seed`, `top_k`, `include_labels`, `rasterize_at`
+- **`sfxi_setpoint_decomposition`**: per-state residuals + intensity contribution for a single record.
+  - params: `record_id` (required), `delta`
+- **`sfxi_setpoint_sweep`**: objective landscape across discrete setpoints.
+  - params: `y_col` (default `y_obs`), `top_k`, `tau`, `percentile`, `min_n`, `eps`, `delta`
+- **`sfxi_support_diagnostics`**: distance-to-labeled-logic vs score (OOD check).
+  - params: `y_axis`, `hue`, `sample_n`, `seed`, `batch_size`
+- **`sfxi_uncertainty`**: uncertainty vs score (artifact model; RF variance).
+  - params: `kind` (`score|y_hat`), `components`, `reduction`, `y_axis`, `hue`, `sample_n`, `seed`
+- **`sfxi_intensity_scaling`**: denom + clip fractions + E_raw distribution.
+  - params: `y_col` (default `y_obs`), `percentile`, `min_n`, `eps`, `delta`, `include_pool`
+
+### Example YAML
+
+```yaml
+plots:
+  - name: sfxi_factorial_map
+    kind: sfxi_factorial_effects
+    params:
+      size_by: obj__effect_scaled
+      sample_n: 2000
+      seed: 7
+
+  - name: sfxi_setpoint_record
+    kind: sfxi_setpoint_decomposition
+    params:
+      record_id: "rec_001"
+      delta: 0.0
+
+  - name: sfxi_setpoint_sweep
+    kind: sfxi_setpoint_sweep
+    params:
+      top_k: 5
+      tau: 0.8
+
+  - name: sfxi_support_diag
+    kind: sfxi_support_diagnostics
+    params:
+      y_axis: score
+      hue: effect_scaled
+      sample_n: 1500
+
+  - name: sfxi_uncertainty
+    kind: sfxi_uncertainty
+    params:
+      kind: score
+      sample_n: 1000
+
+  - name: sfxi_intensity_scaling
+    kind: sfxi_intensity_scaling
+    params:
+      include_pool: true
+```
+
 
 ### Writing a new plot
 

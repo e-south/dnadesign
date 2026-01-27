@@ -1,0 +1,173 @@
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/src/plots/sfxi_uncertainty.py
+
+Uncertainty diagnostics using artifact model variance (RF).
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import polars as pl
+
+from ..analysis.campaign import load_campaign_data
+from ..analysis.dashboard.artifacts import resolve_round_artifacts
+from ..analysis.dashboard.charts import sfxi_uncertainty
+from ..analysis.dashboard.models import load_model_artifact, load_round_ctx_from_dir, unwrap_artifact_model
+from ..analysis.dashboard.util import list_series_to_numpy
+from ..analysis.facade import load_predictions_with_setpoint, read_runs
+from ..analysis.sfxi.uncertainty import UncertaintyContext, compute_uncertainty, supports_uncertainty
+from ..core.utils import ExitCodes, OpalError
+from ..objectives import sfxi_math
+from ..registries.plots import PlotMeta, register_plot
+from ..storage.parquet_io import read_parquet_df
+from ._events_util import resolve_outputs_dir
+from ._param_utils import get_int, get_str, normalize_metric_field
+from .sfxi_diag_data import resolve_run_id, resolve_single_round
+
+
+@register_plot(
+    "sfxi_uncertainty",
+    meta=PlotMeta(
+        summary="Uncertainty vs score diagnostics (artifact model).",
+        params={
+            "kind": "score|y_hat (default score).",
+            "components": "all|logic|intensity (y_hat only; default all).",
+            "reduction": "mean|max for y_hat (default mean).",
+            "y_axis": "Metric for Y-axis (default score).",
+            "hue": "Metric for color (default logic_fidelity).",
+            "sample_n": "Optional sample size for plotting.",
+            "seed": "Random seed for sampling (default 0).",
+        },
+        requires=["model artifact", "predictions", "records"],
+        notes=["Loads artifact model from outputs/rounds/round_<r>/model/model.joblib."],
+    ),
+)
+def render(context, params: dict) -> None:
+    outputs_dir = resolve_outputs_dir(context)
+    runs_df = read_runs(outputs_dir / "ledger" / "runs.parquet")
+    round_k = resolve_single_round(runs_df, round_selector=context.rounds)
+    run_id = resolve_run_id(runs_df, round_k=round_k, run_id=context.run_id)
+
+    kind = get_str(params, ["kind"], "score")
+    components = get_str(params, ["components"], "all")
+    reduction = get_str(params, ["reduction"], "mean")
+    y_axis = normalize_metric_field(get_str(params, ["y_axis", "y_field", "y"], "score"))
+    hue = normalize_metric_field(get_str(params, ["hue", "color", "color_by"], "logic_fidelity"))
+    sample_n = get_int(params, ["sample_n", "n", "sample"], 0)
+    seed = get_int(params, ["seed"], 0)
+
+    run_sel = runs_df.filter(pl.col("as_of_round") == int(round_k))
+    if run_id is not None and "run_id" in run_sel.columns:
+        run_sel = run_sel.filter(pl.col("run_id") == str(run_id))
+    if run_sel.is_empty():
+        raise OpalError("No run metadata found for requested round/run.", ExitCodes.BAD_ARGS)
+
+    run_row = run_sel.head(1)
+    obj_params = run_row["objective__params"][0] if "objective__params" in run_row.columns else {}
+    setpoint = sfxi_math.parse_setpoint_vector(obj_params or {})
+    beta = float((obj_params or {}).get("beta", 1.0))
+    gamma = float((obj_params or {}).get("gamma", 1.0))
+    delta = float((obj_params or {}).get("delta", 0.0))
+    denom = run_row["objective__denom_value"][0] if "objective__denom_value" in run_row.columns else None
+    y_ops = run_row["training__y_ops"][0] if "training__y_ops" in run_row.columns else []
+
+    artifacts, err = resolve_round_artifacts(context.workspace.workdir, as_of_round=round_k)
+    if artifacts is None or "model/model.joblib" not in artifacts:
+        raise OpalError(err or "Model artifact not found.", ExitCodes.BAD_ARGS)
+    model_path = Path(artifacts["model/model.joblib"])
+    obj, err = load_model_artifact(model_path)
+    if err:
+        raise OpalError(f"Model artifact load failed: {err}", ExitCodes.BAD_ARGS)
+    model = unwrap_artifact_model(obj)
+    if model is None:
+        raise OpalError("Unsupported model artifact format.", ExitCodes.BAD_ARGS)
+    if not supports_uncertainty(model=model):
+        raise OpalError("Model does not support uncertainty.", ExitCodes.BAD_ARGS)
+
+    round_dir = Path(artifacts["round_dir"]) if "round_dir" in artifacts else None
+    round_ctx, ctx_err = (None, None)
+    if round_dir is not None:
+        round_ctx, ctx_err = load_round_ctx_from_dir(round_dir)
+    if y_ops and round_ctx is None:
+        raise OpalError(ctx_err or "round_ctx.json is required to invert y-ops.", ExitCodes.BAD_ARGS)
+
+    campaign = load_campaign_data(context.workspace.config_path, allow_dir=True)
+    x_col = campaign.config.data.x_column_name
+    if not x_col:
+        raise OpalError("x_column_name missing from campaign config.", ExitCodes.BAD_ARGS)
+    records_path = context.data_paths.get("records")
+    if records_path is None:
+        raise OpalError("records path not available in PlotContext.", ExitCodes.BAD_ARGS)
+
+    need = {"id", "pred__y_obj_scalar", "obj__logic_fidelity"}
+    if y_axis:
+        need.add(y_axis)
+    if hue:
+        need.add(hue)
+    pred_df = load_predictions_with_setpoint(
+        outputs_dir,
+        need,
+        round_selector=round_k,
+        run_id=run_id,
+        require_run_id=False,
+    )
+    if pred_df.is_empty():
+        raise OpalError("No predictions available for uncertainty plot.", ExitCodes.BAD_ARGS)
+
+    total = pred_df.height
+    subtitle = None
+    if sample_n > 0 and total > sample_n:
+        pred_df = pred_df.sample(n=sample_n, seed=seed, shuffle=True)
+        subtitle = f"sampled {pred_df.height}/{total}"
+
+    records = read_parquet_df(records_path, columns=["id", x_col])
+    rec_df = pl.from_pandas(records)
+    df_joined = pred_df.join(rec_df, on="id", how="left")
+    if x_col not in df_joined.columns:
+        raise OpalError(f"records.parquet missing x column: {x_col}", ExitCodes.CONTRACT_VIOLATION)
+
+    X = list_series_to_numpy(df_joined.get_column(x_col), expected_len=None)
+    if X is None:
+        raise OpalError("Invalid X vectors for uncertainty computation.", ExitCodes.CONTRACT_VIOLATION)
+
+    ctx = UncertaintyContext(
+        setpoint=np.asarray(setpoint, dtype=float),
+        beta=beta,
+        gamma=gamma,
+        delta=delta,
+        denom=None if denom is None else float(denom),
+        y_ops=y_ops or [],
+        round_ctx=round_ctx,
+    )
+    result = compute_uncertainty(
+        model,
+        X,
+        kind=kind,
+        ctx=ctx,
+        components=components,
+        reduction=reduction,
+    )
+
+    df_plot = df_joined.with_columns(pl.Series("uncertainty", result.values))
+    if y_axis not in df_plot.columns:
+        raise OpalError(f"Missing y-axis column: {y_axis}", ExitCodes.CONTRACT_VIOLATION)
+    if hue and hue not in df_plot.columns:
+        raise OpalError(f"Missing hue column: {hue}", ExitCodes.CONTRACT_VIOLATION)
+
+    fig = sfxi_uncertainty.make_uncertainty_figure(
+        df_plot,
+        x_col="uncertainty",
+        y_col=y_axis,
+        hue_col=hue,
+        subtitle=subtitle,
+    )
+    out_dir = context.output_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_dir / context.filename, dpi=context.dpi, format=context.format)
