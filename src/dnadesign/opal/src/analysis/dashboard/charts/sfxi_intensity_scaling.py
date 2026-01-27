@@ -15,6 +15,7 @@ import numpy as np
 import polars as pl
 
 from ....plots._mpl_utils import apply_plot_style
+from .diagnostics_style import diagnostics_figsize
 
 
 def make_intensity_scaling_figure(
@@ -51,7 +52,7 @@ def make_intensity_scaling_figure(
     fig, axes = plt.subplots(
         1,
         3,
-        figsize=(max(7.5, 0.65 * len(labels)), 3.2),
+        figsize=diagnostics_figsize(width_scale=2.2, height_scale=0.9),
         constrained_layout=True,
     )
     ax_denom, ax_clip, ax_hist = axes

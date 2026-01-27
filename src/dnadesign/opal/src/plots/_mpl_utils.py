@@ -73,6 +73,16 @@ def apply_plot_style(*, variant: str = "diagnostic") -> None:
             "legend.fontsize": 9,
             "figure.titlesize": 12,
             "axes.titlepad": 6,
+            "figure.facecolor": "white",
+            "axes.facecolor": "white",
+            "savefig.facecolor": "white",
+            "text.color": "#111111",
+            "axes.labelcolor": "#111111",
+            "axes.titlecolor": "#111111",
+            "xtick.color": "#111111",
+            "ytick.color": "#111111",
+            "axes.edgecolor": "#111111",
+            "legend.frameon": False,
         }
     )
 

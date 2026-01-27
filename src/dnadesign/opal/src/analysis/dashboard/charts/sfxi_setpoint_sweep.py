@@ -17,6 +17,7 @@ import numpy as np
 import polars as pl
 
 from ....plots._mpl_utils import apply_plot_style
+from .diagnostics_style import diagnostics_table_figsize
 
 
 def make_setpoint_sweep_figure(
@@ -43,7 +44,7 @@ def make_setpoint_sweep_figure(
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(
-        figsize=(max(6.5, 0.75 * len(setpoint_labels)), 2.6 + 0.45 * len(metrics)),
+        figsize=diagnostics_table_figsize(n_cols=len(setpoint_labels) + 1, n_rows=len(metrics)),
         constrained_layout=True,
     )
     ax.axis("off")

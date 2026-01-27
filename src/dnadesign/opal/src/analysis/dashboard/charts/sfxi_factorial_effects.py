@@ -20,6 +20,7 @@ from ....plots._mpl_utils import annotate_plot_meta, apply_plot_style, scale_to_
 from ...sfxi.factorial_effects import compute_factorial_effects
 from ...sfxi.state_order import STATE_ORDER, assert_state_order
 from ..util import list_series_to_numpy
+from .diagnostics_style import diagnostics_figsize
 
 
 def make_factorial_effects_figure(
@@ -61,7 +62,7 @@ def make_factorial_effects_figure(
     apply_plot_style()
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(4.8, 4.4), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=diagnostics_figsize(), constrained_layout=True)
     sc = scatter_smart(
         ax,
         a_eff,

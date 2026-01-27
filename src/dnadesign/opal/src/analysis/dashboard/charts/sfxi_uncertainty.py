@@ -15,6 +15,7 @@ import numpy as np
 import polars as pl
 
 from ....plots._mpl_utils import annotate_plot_meta, apply_plot_style, scale_to_sizes, scatter_smart
+from .diagnostics_style import diagnostics_figsize
 
 
 def make_uncertainty_figure(
@@ -57,7 +58,7 @@ def make_uncertainty_figure(
     apply_plot_style()
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(4.8, 4.4), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=diagnostics_figsize(), constrained_layout=True)
     sc = scatter_smart(
         ax,
         x,

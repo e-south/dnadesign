@@ -40,17 +40,10 @@ def _():
     from dnadesign.opal.src.analysis.dashboard import transient as dash_transient
     from dnadesign.opal.src.analysis.dashboard import ui as dash_ui
     from dnadesign.opal.src.analysis.dashboard import util as dash_util
+    from dnadesign.opal.src.analysis.dashboard.charts import diagnostics_guidance as dash_diag_guidance
     from dnadesign.opal.src.analysis.dashboard.charts import plots as dash_plots
-    from dnadesign.opal.src.analysis.dashboard.charts import sfxi_factorial_effects as dash_sfxi_factorial
-    from dnadesign.opal.src.analysis.dashboard.charts import sfxi_intensity_scaling as dash_sfxi_intensity
-    from dnadesign.opal.src.analysis.dashboard.charts import sfxi_setpoint_decomposition as dash_sfxi_decomp
-    from dnadesign.opal.src.analysis.dashboard.charts import sfxi_setpoint_sweep as dash_sfxi_sweep
-    from dnadesign.opal.src.analysis.dashboard.charts import sfxi_support_diagnostics as dash_sfxi_support_chart
-    from dnadesign.opal.src.analysis.dashboard.charts import sfxi_uncertainty as dash_sfxi_uncertainty_chart
     from dnadesign.opal.src.analysis.dashboard.views import sfxi as dash_sfxi
     from dnadesign.opal.src.analysis.sfxi import gates as sfxi_gates
-    from dnadesign.opal.src.analysis.sfxi import intensity_scaling as sfxi_intensity
-    from dnadesign.opal.src.analysis.sfxi import setpoint_sweep as sfxi_setpoint_sweep
     from dnadesign.opal.src.analysis.sfxi import support as sfxi_support
     from dnadesign.opal.src.analysis.sfxi import uncertainty as sfxi_uncertainty
     from dnadesign.opal.src.objectives import sfxi_math
@@ -64,6 +57,7 @@ def _():
     build_label_sfxi_view = dash_sfxi.build_label_sfxi_view
     build_pred_sfxi_view = dash_sfxi.build_pred_sfxi_view
     build_umap_controls = dash_ui.build_umap_controls
+    build_diagnostics_panels = dash_diag_guidance.build_diagnostics_panels
     campaign_label_from_path = dash_datasets.campaign_label_from_path
     build_explorer_hue_registry = dash_hues.build_explorer_hue_registry
     build_hue_registry = dash_hues.build_hue_registry
@@ -96,16 +90,11 @@ def _():
     resolve_brush_selection = dash_selection.resolve_brush_selection
     resolve_sfxi_readiness = dash_sfxi.resolve_sfxi_readiness
     safe_is_numeric = dash_util.safe_is_numeric
-    make_factorial_effects_figure = dash_sfxi_factorial.make_factorial_effects_figure
-    make_intensity_scaling_figure = dash_sfxi_intensity.make_intensity_scaling_figure
-    make_setpoint_decomposition_figure = dash_sfxi_decomp.make_setpoint_decomposition_figure
-    make_setpoint_sweep_figure = dash_sfxi_sweep.make_setpoint_sweep_figure
-    make_support_diagnostics_figure = dash_sfxi_support_chart.make_support_diagnostics_figure
-    make_uncertainty_figure = dash_sfxi_uncertainty_chart.make_uncertainty_figure
     return (
         Diagnostics,
         attach_namespace_columns,
         build_cluster_chart,
+        build_diagnostics_panels,
         build_explorer_hue_registry,
         build_feature_importance_chart,
         build_hue_registry,
@@ -135,12 +124,6 @@ def _():
         load_feature_importances_from_artifact,
         load_round_ctx_from_dir,
         is_altair_undefined,
-        make_factorial_effects_figure,
-        make_intensity_scaling_figure,
-        make_setpoint_decomposition_figure,
-        make_setpoint_sweep_figure,
-        make_support_diagnostics_figure,
-        make_uncertainty_figure,
         list_campaign_paths,
         load_campaign_selection,
         missingness_summary,
@@ -151,9 +134,7 @@ def _():
         safe_is_numeric,
         state_value_changed,
         sfxi_gates,
-        sfxi_intensity,
         sfxi_math,
-        sfxi_setpoint_sweep,
         sfxi_support,
         sfxi_uncertainty,
     )
@@ -2117,7 +2098,7 @@ def _(
     return
 
 
-@app.cell(column=6)
+@app.cell(column=7)
 def _(
     mo,
     mode_dropdown,
@@ -2176,102 +2157,29 @@ def _(
     return
 
 
-@app.cell(column=7)
+@app.cell(column=8)
 def _(
     active_record,
     active_record_id,
+    build_diagnostics_panels,
     diagnostics_sample_slider,
     diagnostics_seed_slider,
     derived_metrics_note_md,
-    derived_metrics_status_md,
     df_pred_selected,
     df_view,
     fig_to_image,
-    list_series_to_numpy,
-    make_factorial_effects_figure,
-    make_intensity_scaling_figure,
-    make_setpoint_decomposition_figure,
-    make_setpoint_sweep_figure,
-    make_support_diagnostics_figure,
-    make_uncertainty_figure,
     mo,
-    np,
     opal_campaign_info,
-    opal_labels_asof_df,
     opal_labels_current_df,
-    pl,
-    sfxi_math,
     sfxi_params,
-    sfxi_setpoint_sweep,
     support_color_dropdown,
     support_y_dropdown,
-    uncertainty_color_dropdown,
     uncertainty_available,
+    uncertainty_color_dropdown,
 ):
     diag_sample_n = int(diagnostics_sample_slider.value) if diagnostics_sample_slider is not None else 0
     diag_seed = int(diagnostics_seed_slider.value) if diagnostics_seed_slider is not None else 0
 
-    sample_note = mo.md("")
-    if diag_sample_n > 0:
-        sample_note = mo.md(f"Displaying up to **{diag_sample_n}** sampled points (seed={diag_seed}).")
-
-    factorial_panel = mo.md("Factorial effects unavailable (missing predictions).")
-    df_factorial = df_pred_selected if df_pred_selected is not None else pl.DataFrame()
-    if df_factorial is not None and not df_factorial.is_empty() and "pred_y_hat" in df_factorial.columns:
-        if "id" in df_view.columns and "id" in df_factorial.columns:
-            df_factorial = df_factorial.join(
-                df_view.select(["id", "opal__view__observed", "opal__view__top_k"]),
-                on="id",
-                how="left",
-            )
-        if diag_sample_n > 0 and df_factorial.height > diag_sample_n:
-            df_factorial = df_factorial.sample(n=diag_sample_n, seed=diag_seed, shuffle=True)
-        size_col = None
-        if "pred_effect_scaled" in df_factorial.columns:
-            size_col = "pred_effect_scaled"
-        elif "opal__view__effect_scaled" in df_factorial.columns:
-            size_col = "opal__view__effect_scaled"
-        fig = make_factorial_effects_figure(
-            df_factorial,
-            logic_col="pred_y_hat",
-            size_col=size_col,
-            label_col="opal__view__observed",
-            selected_col="pred_top_k" if "pred_top_k" in df_factorial.columns else "opal__view__top_k",
-            top_k_col="opal__view__top_k",
-            rasterize_at=20000,
-            subtitle="Predicted logic vectors",
-        )
-        factorial_panel = fig_to_image(fig)
-
-    decomp_panel = mo.md("Select an active record to view setpoint decomposition.")
-    if active_record is not None and not active_record.is_empty():
-        diag_vec = None
-        vec_col = None
-        if "pred_y_hat" in active_record.columns:
-            vec_col = "pred_y_hat"
-        elif opal_campaign_info is not None and opal_campaign_info.y_column in active_record.columns:
-            vec_col = opal_campaign_info.y_column
-        elif "y_obs" in active_record.columns:
-            vec_col = "y_obs"
-        if vec_col is not None:
-            diag_vec = list_series_to_numpy(active_record.get_column(vec_col), expected_len=None)
-        if diag_vec is None:
-            decomp_panel = mo.md("Setpoint decomposition unavailable (missing vec8).")
-        else:
-            y_hat = diag_vec[0]
-            if y_hat.shape[0] < 8:
-                decomp_panel = mo.md("Setpoint decomposition unavailable (vec8 too short).")
-            else:
-                fig = make_setpoint_decomposition_figure(
-                    v_hat=y_hat[0:4],
-                    y_star=y_hat[4:8],
-                    setpoint=np.array(sfxi_params.setpoint, dtype=float),
-                    delta=float(sfxi_params.delta),
-                    subtitle=f"id={active_record_id or 'n/a'}",
-                )
-                decomp_panel = fig_to_image(fig)
-
-    support_panel = mo.md("Support diagnostics unavailable.")
     support_y_map = {
         "Score": "opal__view__score",
         "Logic fidelity": "opal__view__logic_fidelity",
@@ -2281,113 +2189,51 @@ def _(
         "Logic fidelity": "opal__view__logic_fidelity",
         "Score": "opal__view__score",
     }
-    if df_view is not None and "opal__sfxi__dist_to_labeled_logic" in df_view.columns:
-        df_support = df_view
-        if diag_sample_n > 0 and df_support.height > diag_sample_n:
-            df_support = df_support.sample(n=diag_sample_n, seed=diag_seed, shuffle=True)
-        support_y_col = support_y_map.get(support_y_dropdown.value, "opal__view__score")
-        hue_col = support_color_map.get(support_color_dropdown.value, "opal__view__effect_scaled")
-        fig = make_support_diagnostics_figure(
-            df_support,
-            x_col="opal__sfxi__dist_to_labeled_logic",
-            y_col=support_y_col,
-            hue_col=hue_col if hue_col in df_support.columns else None,
-            selected_col="opal__view__top_k",
-            subtitle="Logic-space support",
-            rasterize_at=20000,
-        )
-        support_panel = fig_to_image(fig)
+    support_y_col = support_y_map.get(support_y_dropdown.value, "opal__view__score")
+    support_color_col = support_color_map.get(support_color_dropdown.value, "opal__view__effect_scaled")
 
-    uncertainty_panel = mo.md("Uncertainty plot unavailable.")
-    if uncertainty_available and df_view is not None and "opal__sfxi__uncertainty" in df_view.columns:
-        diag_unc_df = df_view.filter(pl.col("opal__sfxi__uncertainty").is_not_null())
-        if diag_sample_n > 0 and diag_unc_df.height > diag_sample_n:
-            diag_unc_df = diag_unc_df.sample(n=diag_sample_n, seed=diag_seed, shuffle=True)
-        hue_lookup = {
-            "Logic fidelity": "opal__view__logic_fidelity",
-            "Effect scaled": "opal__view__effect_scaled",
-            "Score": "opal__view__score",
-        }
-        hue_col = hue_lookup.get(uncertainty_color_dropdown.value, "opal__view__logic_fidelity")
-        fig = make_uncertainty_figure(
-            diag_unc_df,
-            x_col="opal__sfxi__uncertainty",
-            y_col="opal__view__score",
-            hue_col=hue_col if hue_col in diag_unc_df.columns else None,
-            subtitle="Uncertainty vs score",
-            rasterize_at=20000,
-        )
-        uncertainty_panel = fig_to_image(fig)
+    uncertainty_color_map = {
+        "Logic fidelity": "opal__view__logic_fidelity",
+        "Effect scaled": "opal__view__effect_scaled",
+        "Score": "opal__view__score",
+    }
+    uncertainty_color_col = uncertainty_color_map.get(uncertainty_color_dropdown.value, "opal__view__logic_fidelity")
 
-    sweep_panel = mo.md("Setpoint sweep unavailable (current-round labels missing).")
-    intensity_panel = mo.md("Intensity scaling unavailable (current-round labels missing).")
-    labels_df = opal_labels_current_df if opal_labels_current_df is not None else pl.DataFrame()
-    if labels_df is not None and not labels_df.is_empty():
-        diag_labels_y_col = None
-        if opal_campaign_info is not None and opal_campaign_info.y_column in labels_df.columns:
-            diag_labels_y_col = opal_campaign_info.y_column
-        elif "y_obs" in labels_df.columns:
-            diag_labels_y_col = "y_obs"
-        if diag_labels_y_col is not None:
-            diag_labels_vec8 = list_series_to_numpy(labels_df.get_column(diag_labels_y_col), expected_len=8)
-            if diag_labels_vec8 is not None:
-                pool_vec = None
-                if df_pred_selected is not None and "pred_y_hat" in df_pred_selected.columns:
-                    pool_vec = list_series_to_numpy(df_pred_selected.get_column("pred_y_hat"), expected_len=8)
-                sweep_df = sfxi_setpoint_sweep.sweep_setpoints(
-                    labels_vec8=diag_labels_vec8,
-                    current_setpoint=sfxi_params.setpoint,
-                    percentile=int(sfxi_params.p),
-                    min_n=int(sfxi_params.min_n),
-                    eps=float(sfxi_params.eps),
-                    delta=float(sfxi_params.delta),
-                    top_k=5,
-                    tau=0.8,
-                    pool_vec8=pool_vec,
-                    state_order=sfxi_math.STATE_ORDER,
-                )
-                denom_note = f"denom={int(sfxi_params.p)}th pct E_raw (min_n={int(sfxi_params.min_n)})"
-                fig = make_setpoint_sweep_figure(
-                    sweep_df,
-                    metrics=[
-                        "median_logic_fidelity",
-                        "top_k_logic_fidelity",
-                        "frac_logic_fidelity_gt_tau",
-                        "denom_used",
-                        "clip_hi_fraction",
-                    ],
-                    subtitle=f"labels={diag_labels_vec8.shape[0]} · {denom_note}",
-                )
-                sweep_panel = fig_to_image(fig)
+    panels = build_diagnostics_panels(
+        df_pred_selected=df_pred_selected,
+        df_view=df_view,
+        active_record=active_record,
+        active_record_id=active_record_id,
+        opal_campaign_info=opal_campaign_info,
+        opal_labels_current_df=opal_labels_current_df,
+        sfxi_params=sfxi_params,
+        support_y_col=support_y_col,
+        support_color_col=support_color_col,
+        uncertainty_color_col=uncertainty_color_col,
+        uncertainty_available=uncertainty_available,
+        sample_n=diag_sample_n,
+        seed=diag_seed,
+    )
 
-                label_effect_raw, _ = sfxi_math.effect_raw_from_y_star(
-                    diag_labels_vec8[:, 4:8],
-                    np.array(sfxi_params.setpoint, dtype=float),
-                    delta=float(sfxi_params.delta),
-                    eps=float(sfxi_params.eps),
-                    state_order=sfxi_math.STATE_ORDER,
-                )
-                pool_effect_raw = None
-                if pool_vec is not None:
-                    pool_effect_raw, _ = sfxi_math.effect_raw_from_y_star(
-                        pool_vec[:, 4:8],
-                        np.array(sfxi_params.setpoint, dtype=float),
-                        delta=float(sfxi_params.delta),
-                        eps=float(sfxi_params.eps),
-                        state_order=sfxi_math.STATE_ORDER,
-                    )
-                fig = make_intensity_scaling_figure(
-                    sweep_df,
-                    label_effect_raw=label_effect_raw,
-                    pool_effect_raw=pool_effect_raw,
-                    subtitle=denom_note,
-                )
-                intensity_panel = fig_to_image(fig)
+    def _render_panel(panel, *, default_note: str):
+        if panel.chart is None:
+            return mo.md(panel.note or default_note)
+        element = fig_to_image(panel.chart) if panel.kind != "altair" else mo.ui.altair_chart(panel.chart)
+        if panel.note:
+            return mo.vstack([mo.md(panel.note), element])
+        return element
+
+    sample_note = mo.md(panels.sample_note) if panels.sample_note else mo.md("")
+    factorial_panel = _render_panel(panels.factorial, default_note="Factorial effects unavailable.")
+    decomp_panel = _render_panel(panels.decomposition, default_note="Setpoint decomposition unavailable.")
+    support_panel = _render_panel(panels.support, default_note="Support diagnostics unavailable.")
+    uncertainty_panel = _render_panel(panels.uncertainty, default_note="Uncertainty plot unavailable.")
+    sweep_panel = _render_panel(panels.sweep, default_note="Setpoint sweep unavailable.")
+    intensity_panel = _render_panel(panels.intensity, default_note="Intensity scaling unavailable.")
 
     mo.vstack(
         [
             mo.md("## Diagnostics / AL Guidance"),
-            derived_metrics_status_md,
             derived_metrics_note_md,
             sample_note,
             mo.md("### Factorial-effects map"),
@@ -2809,7 +2655,7 @@ def _(
     return save_pdf_status_md, save_pdf_target_md
 
 
-@app.cell(column=8)
+@app.cell(column=9)
 def _(
     export_button,
     export_format_dropdown,
@@ -3487,46 +3333,6 @@ def _(
     view_notice_md = mo.md("\n".join(view_notice_lines)) if view_notice_lines else mo.md("")
     derived_metrics_note_md = mo.md("\n".join(derived_notes)) if derived_notes else mo.md("")
     return df_view, derived_metrics_note_md, uncertainty_available, uncertainty_sample_info, view_notice_md
-
-
-@app.cell
-def _(
-    df_view,
-    derived_metrics_note_md,
-    mo,
-    opal_labels_asof_df,
-    pl,
-    sfxi_params,
-    uncertainty_available,
-    uncertainty_sample_info,
-):
-    total = int(df_view.height) if df_view is not None else 0
-    selected_count = 0
-    if df_view is not None and "opal__view__top_k" in df_view.columns:
-        selected_count = int(df_view.filter(pl.col("opal__view__top_k").fill_null(False)).height)
-    labeled = 0
-    if opal_labels_asof_df is not None and not opal_labels_asof_df.is_empty():
-        if "id" in opal_labels_asof_df.columns:
-            labeled = int(opal_labels_asof_df.select(pl.col("id").n_unique()).item())
-        else:
-            labeled = int(opal_labels_asof_df.height)
-    sp = ", ".join([f"{float(v):.2f}" for v in sfxi_params.setpoint]) if sfxi_params is not None else "NA"
-    unc_text = "available" if uncertainty_available else "unavailable"
-    if uncertainty_sample_info:
-        unc_text = f"{unc_text} ({uncertainty_sample_info})"
-    derived_metrics_status_md = mo.md(
-        "\n".join(
-            [
-                "### Derived metrics status",
-                f"- total records: **{total}**",
-                f"- labeled (as-of): **{labeled}**",
-                f"- selected (Top-K): **{selected_count}**",
-                f"- uncertainty: **{unc_text}**",
-                f"- setpoint: `[{sp}]`",
-            ]
-        )
-    )
-    return (derived_metrics_status_md,)
 
 
 @app.cell

@@ -18,6 +18,7 @@ import numpy as np
 from ....objectives import sfxi_math
 from ....plots._mpl_utils import apply_plot_style
 from ...sfxi.state_order import STATE_ORDER, assert_state_order
+from .diagnostics_style import diagnostics_figsize
 
 
 def _to_grid(vec4: np.ndarray) -> np.ndarray:
@@ -61,7 +62,12 @@ def make_setpoint_decomposition_figure(
     apply_plot_style()
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(1, 2, figsize=(6.8, 3.0), constrained_layout=True)
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=diagnostics_figsize(width_scale=1.8, height_scale=0.85),
+        constrained_layout=True,
+    )
     ax_res, ax_contrib = axes
 
     res_grid = _to_grid(residuals)

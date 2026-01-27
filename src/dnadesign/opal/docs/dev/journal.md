@@ -93,3 +93,7 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Notebook template removed the tri-plot Altair panel in favor of a single plot gallery dropdown; simplified UI controls.
 - Plot gallery avoids marimo variable redefinition errors by using unique loop variable names.
 - Plot gallery cells now avoid early returns, use unique tag variables, and pass marimo check.
+- prom60_eda diagnostics refactored into `analysis/dashboard/charts/diagnostics_guidance.py` with structured panel outputs and overlay-aware view joins.
+- prom60_eda column layout updated so OPAL artifact model, Diagnostics, and Export are in columns 7/8/9 respectively.
+- Diagnostics panel no longer renders the derived-metrics status markdown; derived-metrics notes remain.
+- Added diagnostics sizing helpers and tightened Matplotlib diagnostics styling for white backgrounds + black text.
