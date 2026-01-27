@@ -57,11 +57,13 @@ from ..artifacts.pool import (
 )
 from ..artifacts.records import SolutionRecord
 from ..metadata import build_metadata
+from ..motif_labels import input_motifs, motif_display_name
 from ..postprocess import generate_pad
 from ..run_manifest import PlanManifest, RunManifest
 from ..run_metrics import write_run_metrics
 from ..run_paths import (
     candidates_root,
+    display_path,
     ensure_run_meta_dir,
     has_existing_run_outputs,
     inputs_manifest_path,
@@ -382,11 +384,34 @@ def _process_plan_for_source(
     solution_rows: list[dict] | None = None,
     composition_rows: list[dict] | None = None,
     events_path: Path | None = None,
+    display_map_by_input: dict[str, dict[str, str]] | None = None,
 ) -> tuple[int, dict]:
     source_label = source_cfg.name
     plan_name = plan_item.name
     quota = int(plan_item.quota)
     attempt_counters = attempt_counters or {}
+    display_map = display_map_by_input.get(source_label, {}) if display_map_by_input else {}
+
+    def _display_tf_label(label: str) -> str:
+        if not label:
+            return label
+        if label in display_map:
+            return display_map[label]
+        return motif_display_name(label, None)
+
+    def _map_tf_usage(counts: dict[str, int]) -> dict[str, int]:
+        mapped: dict[str, int] = {}
+        for tf, count in counts.items():
+            label = _display_tf_label(str(tf))
+            mapped[label] = mapped.get(label, 0) + int(count)
+        return mapped
+
+    def _map_tfbs_usage(counts: dict[tuple[str, str], int]) -> dict[tuple[str, str], int]:
+        mapped: dict[tuple[str, str], int] = {}
+        for (tf, tfbs), count in counts.items():
+            label = _display_tf_label(str(tf))
+            mapped[(label, str(tfbs))] = mapped.get((label, str(tfbs)), 0) + int(count)
+        return mapped
 
     def _next_attempt_index() -> int:
         key = (source_label, plan_name)
@@ -681,7 +706,7 @@ def _process_plan_for_source(
             length_label = str(length_policy)
             if length_policy == "range" and length_range:
                 length_label = f"{length_policy}({length_range[0]}..{length_range[1]})"
-            counts_label = _summarize_tf_counts(meta_df["tf"].tolist())
+            counts_label = _summarize_tf_counts([_display_tf_label(tf) for tf in meta_df["tf"].tolist()])
             mining_label = "-"
             if mining_cfg is not None:
                 parts = []
@@ -692,20 +717,21 @@ def _process_plan_for_source(
                 if mining_log_every is not None:
                     parts.append(f"log_every={mining_log_every}")
                 mining_label = ", ".join(parts) if parts else "enabled"
-            log.info(
-                "Stage-A PWM sampling for %s: motifs=%d | sites=%s | strategy=%s | backend=%s | "
-                "eligibility=%s | tiers=%s | mining=%s | oversample=%s | length=%s",
-                source_label,
-                len(input_meta.get("input_pwm_ids") or []),
-                counts_label or "-",
-                strategy,
-                scoring_backend,
-                score_label,
-                tiers_label,
-                mining_label,
-                oversample,
-                length_label,
-            )
+            if progress_style != "screen":
+                log.info(
+                    "Stage-A PWM sampling for %s: motifs=%d | sites=%s | strategy=%s | backend=%s | "
+                    "eligibility=%s | tiers=%s | mining=%s | oversample=%s | length=%s",
+                    source_label,
+                    len(input_meta.get("input_pwm_ids") or []),
+                    counts_label or "-",
+                    strategy,
+                    scoring_backend,
+                    score_label,
+                    tiers_label,
+                    mining_label,
+                    oversample,
+                    length_label,
+                )
             inputs_manifest[source_label] = _build_input_manifest_entry(
                 source_cfg=source_cfg,
                 cfg_path=cfg_path,
@@ -917,29 +943,46 @@ def _process_plan_for_source(
         )
 
     def _log_leaderboard_snapshot() -> None:
+        tf_usage_display = _map_tf_usage(tf_usage_counts)
+        tfbs_usage_display = _map_tfbs_usage(usage_counts) if show_tfbs else usage_counts
         log.info(
             "[%s/%s] Leaderboard (TF): %s",
             source_label,
             plan_name,
-            _summarize_leaderboard(tf_usage_counts, top=5),
+            _summarize_leaderboard(tf_usage_display, top=5),
         )
-        log.info(
-            "[%s/%s] Leaderboard (TFBS): %s",
-            source_label,
-            plan_name,
-            _summarize_leaderboard(usage_counts, top=5),
-        )
-        log.info(
-            "[%s/%s] Failed TFBS: %s",
-            source_label,
-            plan_name,
-            _summarize_failure_leaderboard(
+        if show_tfbs:
+            log.info(
+                "[%s/%s] Leaderboard (TFBS): %s",
+                source_label,
+                plan_name,
+                _summarize_leaderboard(tfbs_usage_display, top=5),
+            )
+            log.info(
+                "[%s/%s] Failed TFBS: %s",
+                source_label,
+                plan_name,
+                _summarize_failure_leaderboard(
+                    failure_counts,
+                    input_name=source_label,
+                    plan_name=plan_name,
+                    top=5,
+                ),
+            )
+        else:
+            log.info(
+                "[%s/%s] TFBS usage: %s",
+                source_label,
+                plan_name,
+                _summarize_tfbs_usage_stats(usage_counts),
+            )
+            failure_totals = _summarize_failure_totals(
                 failure_counts,
                 input_name=source_label,
                 plan_name=plan_name,
-                top=5,
-            ),
-        )
+            )
+            if failure_totals:
+                log.info("[%s/%s] Failures: %s", source_label, plan_name, failure_totals)
         log.info(
             "[%s/%s] Diversity: %s",
             source_label,
@@ -983,7 +1026,7 @@ def _process_plan_for_source(
     )
     input_meta["sampling_fraction_pairs"] = sampling_fraction_pairs
     # Library summary (succinct)
-    tf_summary = _summarize_tf_counts(regulator_labels)
+    tf_summary = _summarize_tf_counts([_display_tf_label(tf) for tf in regulator_labels] if regulator_labels else [])
     library_index = sampling_info.get("library_index")
     strategy_label = sampling_info.get("library_sampling_strategy", library_sampling_strategy)
     pool_label = sampling_info.get("pool_strategy")
@@ -992,27 +1035,28 @@ def _process_plan_for_source(
     header = f"Stage-B library for {source_label}/{plan_name}"
     if library_index is not None:
         header = f"{header} (build {library_index})"
-    if tf_summary:
-        log.info(
-            "%s: %d motifs | TF counts: %s | target=%s achieved=%s pool=%s stage_b_sampling=%s",
-            header,
-            len(library_for_opt),
-            tf_summary,
-            target_len,
-            achieved_len,
-            pool_label,
-            strategy_label,
-        )
-    else:
-        log.info(
-            "%s: %d motifs | target=%s achieved=%s pool=%s stage_b_sampling=%s",
-            header,
-            len(library_for_opt),
-            target_len,
-            achieved_len,
-            pool_label,
-            strategy_label,
-        )
+    if progress_style != "screen":
+        if tf_summary:
+            log.info(
+                "%s: %d motifs | TF counts: %s | target=%s achieved=%s pool=%s stage_b_sampling=%s",
+                header,
+                len(library_for_opt),
+                tf_summary,
+                target_len,
+                achieved_len,
+                pool_label,
+                strategy_label,
+            )
+        else:
+            log.info(
+                "%s: %d motifs | target=%s achieved=%s pool=%s stage_b_sampling=%s",
+                header,
+                len(library_for_opt),
+                target_len,
+                achieved_len,
+                pool_label,
+                strategy_label,
+            )
 
     solver_min_counts: dict[str, int] | None = None
 
@@ -1636,6 +1680,8 @@ def _process_plan_for_source(
                                 library_tfs=library_tfs,
                                 library_tfbs=library_tfbs,
                             )
+                            tf_usage_display = _map_tf_usage(tf_usage_counts)
+                            tfbs_usage_display = _map_tfbs_usage(usage_counts) if show_tfbs else usage_counts
                             seq_preview = _short_seq(final_seq, max_len=120) if show_solutions else None
                             dashboard.update(
                                 _build_screen_dashboard(
@@ -1656,8 +1702,8 @@ def _process_plan_for_source(
                                     fails=failed_solutions,
                                     stalls=stall_events,
                                     failure_totals=latest_failure_totals,
-                                    tf_usage=tf_usage_counts,
-                                    tfbs_usage=usage_counts,
+                                    tf_usage=tf_usage_display,
+                                    tfbs_usage=tfbs_usage_display,
                                     diversity_label=diversity_label,
                                     show_tfbs=show_tfbs,
                                     show_solutions=show_solutions,
@@ -1738,18 +1784,20 @@ def _process_plan_for_source(
                             stall_events,
                             failure_totals,
                         )
+                        tf_usage_display = _map_tf_usage(tf_usage_counts)
+                        tfbs_usage_display = _map_tfbs_usage(usage_counts) if show_tfbs else usage_counts
                         log.info(
                             "[%s/%s] Leaderboard (TF): %s",
                             source_label,
                             plan_name,
-                            _summarize_leaderboard(tf_usage_counts, top=5),
+                            _summarize_leaderboard(tf_usage_display, top=5),
                         )
                         if show_tfbs:
                             log.info(
                                 "[%s/%s] Leaderboard (TFBS): %s",
                                 source_label,
                                 plan_name,
-                                _summarize_leaderboard(usage_counts, top=5),
+                                _summarize_leaderboard(tfbs_usage_display, top=5),
                             )
                         else:
                             log.info(
@@ -1758,17 +1806,20 @@ def _process_plan_for_source(
                                 plan_name,
                                 _summarize_tfbs_usage_stats(usage_counts),
                             )
-                        log.info(
-                            "[%s/%s] Failed TFBS: %s",
-                            source_label,
-                            plan_name,
-                            _summarize_failure_leaderboard(
-                                failure_counts,
-                                input_name=source_label,
-                                plan_name=plan_name,
-                                top=5,
-                            ),
-                        )
+                        if show_tfbs:
+                            log.info(
+                                "[%s/%s] Failed TFBS: %s",
+                                source_label,
+                                plan_name,
+                                _summarize_failure_leaderboard(
+                                    failure_counts,
+                                    input_name=source_label,
+                                    plan_name=plan_name,
+                                    top=5,
+                                ),
+                            )
+                        elif failure_totals:
+                            log.info("[%s/%s] Failures: %s", source_label, plan_name, failure_totals)
                         log.info(
                             "[%s/%s] Diversity: %s",
                             source_label,
@@ -1949,21 +2000,22 @@ def _process_plan_for_source(
             )
             input_meta["sampling_fraction_pairs"] = sampling_fraction_pairs
             tf_summary = _summarize_tf_counts(regulator_labels)
-            if tf_summary:
-                log.info(
-                    "Resampled library for %s/%s: %d motifs | TF counts: %s",
-                    source_label,
-                    plan_name,
-                    len(library_for_opt),
-                    tf_summary,
-                )
-            else:
-                log.info(
-                    "Resampled library for %s/%s: %d motifs",
-                    source_label,
-                    plan_name,
-                    len(library_for_opt),
-                )
+            if progress_style != "screen":
+                if tf_summary:
+                    log.info(
+                        "Resampled library for %s/%s: %d motifs | TF counts: %s",
+                        source_label,
+                        plan_name,
+                        len(library_for_opt),
+                        tf_summary,
+                    )
+                else:
+                    log.info(
+                        "Resampled library for %s/%s: %d motifs",
+                        source_label,
+                        plan_name,
+                        len(library_for_opt),
+                    )
 
             run = _make_generator(library_for_opt, regulator_labels)
             opt = run.optimizer
@@ -2055,14 +2107,16 @@ def run_pipeline(
     existing_outputs = has_existing_run_outputs(run_root)
     if resume:
         if not existing_outputs:
+            outputs_label = display_path(outputs_root, run_root, absolute=False)
             raise RuntimeError(
-                f"resume=True requested but no outputs were found under {outputs_root}. "
+                f"resume=True requested but no outputs were found under {outputs_label}. "
                 "Start a fresh run or remove resume=True."
             )
     else:
         if existing_outputs:
+            outputs_label = display_path(outputs_root, run_root, absolute=False)
             raise RuntimeError(
-                f"Existing outputs found under {outputs_root}. Explicit resume is required to continue this run."
+                f"Existing outputs found under {outputs_label}. Explicit resume is required to continue this run."
             )
 
     # Seed
@@ -2122,12 +2176,14 @@ def run_pipeline(
             except Exception as exc:
                 raise RuntimeError(f"Failed to prepare candidate artifacts directory: {exc}") from exc
             if existed:
+                candidates_label = display_path(candidates_dir, run_root, absolute=False)
                 log.info(
                     "Appending candidate artifacts under %s (use dense run --fresh to reset).",
-                    candidates_dir,
+                    candidates_label,
                 )
             else:
-                log.info("Candidate mining artifacts will be written to %s", candidates_dir)
+                candidates_label = display_path(candidates_dir, run_root, absolute=False)
+                log.info("Candidate mining artifacts will be written to %s", candidates_label)
         try:
             _pool_artifact, pool_data = build_pool_artifact(
                 cfg=cfg,
@@ -2176,7 +2232,8 @@ def run_pipeline(
         _pool_artifact, pool_data = load_pool_data(pool_dir)
     except Exception as exc:
         raise RuntimeError(f"Failed to load existing Stage-A pool artifacts: {exc}") from exc
-    log.info("Using Stage-A pools from %s", pool_dir)
+    pool_label = display_path(pool_dir, run_root, absolute=False)
+    log.info("Using Stage-A pools from %s", pool_label)
 
     if resume and pool_data is None:
         raise RuntimeError(
@@ -2198,10 +2255,11 @@ def run_pipeline(
             except Exception as exc:
                 raise RuntimeError(f"Failed to write candidate artifacts: {exc}") from exc
         else:
+            candidates_label = display_path(candidates_dir, run_root, absolute=False)
             log.warning(
                 "Candidate logging enabled but no candidate records were written under %s. "
                 "Check keep_all_candidates_debug and PWM inputs.",
-                candidates_dir,
+                candidates_label,
             )
     library_records: dict[tuple[str, str], list[LibraryRecord]] | None = None
     library_cursor: dict[tuple[str, str], int] | None = None
@@ -2216,7 +2274,8 @@ def run_pipeline(
             label="sampling.library_artifact_path",
         )
         if not artifact_path.exists():
-            raise RuntimeError(f"Library artifact directory not found: {artifact_path}")
+            artifact_label = display_path(artifact_path, run_root, absolute=False)
+            raise RuntimeError(f"Library artifact directory not found: {artifact_label}")
         library_artifact = load_library_artifact(artifact_path)
         library_records = load_library_records(library_artifact)
         library_cursor = {}
@@ -2390,6 +2449,14 @@ def run_pipeline(
             "expect higher runtime for multi-plan runs."
         )
     inputs = cfg.inputs
+    display_map_by_input: dict[str, dict[str, str]] = {}
+    for inp in inputs:
+        mapping: dict[str, str] = {}
+        for motif_id, name in input_motifs(inp, loaded.path):
+            if motif_id and name and motif_id not in mapping:
+                mapping[motif_id] = name
+        if mapping:
+            display_map_by_input[inp.name] = mapping
     checkpoint_every = int(cfg.runtime.checkpoint_every)
     state_counts: dict[tuple[str, str], int] = {}
     for s in inputs:
@@ -2479,6 +2546,7 @@ def run_pipeline(
                     solution_rows=solution_rows,
                     composition_rows=composition_rows,
                     events_path=events_path,
+                    display_map_by_input=display_map_by_input,
                 )
                 per_plan[(s.name, item.name)] = per_plan.get((s.name, item.name), 0) + produced
                 total += produced
@@ -2538,6 +2606,7 @@ def run_pipeline(
                         solution_rows=solution_rows,
                         composition_rows=composition_rows,
                         events_path=events_path,
+                        display_map_by_input=display_map_by_input,
                     )
                     produced_counts[key] = current + produced
                     leaderboard_latest = stats.get("leaderboard_latest")

@@ -129,6 +129,7 @@ def test_library_summary_outputs_filled(tmp_path: Path) -> None:
     library_summary = bundle.tables["library_summary"]
 
     assert not library_summary.empty
-    assert not library_summary["outputs"].isna().any()
-    outputs_by_lib = library_summary.set_index("library_index")["outputs"].to_dict()
-    assert outputs_by_lib.get(2) == 0
+    row = library_summary.iloc[0]
+    assert int(row["libraries"]) == 2
+    assert int(row["library_size_min"]) == 2
+    assert int(row["library_size_max"]) == 2

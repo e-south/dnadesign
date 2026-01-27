@@ -54,9 +54,6 @@ from rich.console import Console
 from rich.table import Table
 from rich.traceback import install as rich_traceback
 
-from dnadesign.cruncher.io.parsers.meme import parse_meme_file
-
-from .adapters.sources.pwm_jaspar import _parse_jaspar
 from .adapters.sources.pwm_sampling import PWMSamplingSummary
 from .config import (
     LATEST_SCHEMA_VERSION,
@@ -77,6 +74,7 @@ from .core.artifacts.pool import (
     load_pool_artifact,
     pool_status_by_input,
 )
+from .core.motif_labels import input_motifs
 from .core.pipeline import default_deps, resolve_plan, run_pipeline
 from .core.pipeline.attempts import _load_existing_library_index, _load_failure_counts_from_attempts
 from .core.pipeline.outputs import _emit_event
@@ -85,6 +83,7 @@ from .core.reporting import collect_report_data, write_report
 from .core.run_manifest import load_run_manifest
 from .core.run_paths import (
     candidates_root,
+    display_path,
     has_existing_run_outputs,
     run_manifest_path,
     run_outputs_root,
@@ -391,12 +390,7 @@ def _short_hash(val: str, *, n: int = 8) -> str:
 
 
 def _display_path(path: Path, run_root: Path, *, absolute: bool) -> str:
-    if absolute:
-        return str(path)
-    try:
-        return str(path.relative_to(run_root))
-    except ValueError:
-        return os.path.relpath(path, run_root)
+    return display_path(path, run_root, absolute=absolute)
 
 
 def _input_kind_label(input_type: str) -> str:
@@ -413,14 +407,6 @@ def _input_kind_label(input_type: str) -> str:
     return labels.get(input_type, input_type.replace("_", " "))
 
 
-def _motif_display_name(motif_id: str, tf_name: str | None) -> str:
-    if tf_name and str(tf_name).strip():
-        return str(tf_name).strip()
-    if "_" in motif_id:
-        return motif_id.split("_", 1)[0]
-    return motif_id
-
-
 def _unique_preserve(values: list[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
@@ -430,67 +416,6 @@ def _unique_preserve(values: list[str]) -> list[str]:
         seen.add(val)
         out.append(val)
     return out
-
-
-def _artifact_motif_metadata(path: Path) -> tuple[str, str | None]:
-    raw = json.loads(path.read_text())
-    motif_id = raw.get("motif_id")
-    if not motif_id or not str(motif_id).strip():
-        raise ValueError(f"PWM artifact missing motif_id: {path}")
-    tf_name = raw.get("tf_name")
-    tf_name = str(tf_name).strip() if tf_name and str(tf_name).strip() else None
-    return str(motif_id).strip(), tf_name
-
-
-def _meme_motif_ids(path: Path, motif_ids: list[str] | None) -> list[str]:
-    result = parse_meme_file(path)
-    motifs = _filter_meme_motifs(result.motifs, motif_ids)
-    labels: list[str] = []
-    for motif in motifs:
-        label = (
-            getattr(motif, "motif_id", None)
-            or getattr(motif, "motif_name", None)
-            or getattr(motif, "motif_label", None)
-        )
-        if label:
-            labels.append(str(label))
-    return labels
-
-
-def _input_motifs(
-    inp,
-    cfg_path: Path,
-) -> list[tuple[str, str]]:
-    input_type = str(inp.type)
-    motifs: list[tuple[str, str]] = []
-    if input_type == "pwm_meme":
-        path = resolve_relative_path(cfg_path, getattr(inp, "path"))
-        for motif_id in _meme_motif_ids(path, getattr(inp, "motif_ids", None)):
-            motifs.append((motif_id, _motif_display_name(motif_id, None)))
-    elif input_type == "pwm_meme_set":
-        for raw in getattr(inp, "paths", []) or []:
-            path = resolve_relative_path(cfg_path, raw)
-            for motif_id in _meme_motif_ids(path, getattr(inp, "motif_ids", None)):
-                motifs.append((motif_id, _motif_display_name(motif_id, None)))
-    elif input_type == "pwm_jaspar":
-        path = resolve_relative_path(cfg_path, getattr(inp, "path"))
-        for motif in _jaspar_motif_labels(path, getattr(inp, "motif_ids", None)):
-            motifs.append((motif, _motif_display_name(motif, None)))
-    elif input_type == "pwm_matrix_csv":
-        motif_id = getattr(inp, "motif_id", None)
-        if motif_id:
-            motif_id = str(motif_id)
-            motifs.append((motif_id, _motif_display_name(motif_id, None)))
-    elif input_type == "pwm_artifact":
-        path = resolve_relative_path(cfg_path, getattr(inp, "path"))
-        motif_id, tf_name = _artifact_motif_metadata(path)
-        motifs.append((motif_id, _motif_display_name(motif_id, tf_name)))
-    elif input_type == "pwm_artifact_set":
-        for raw in getattr(inp, "paths", []) or []:
-            path = resolve_relative_path(cfg_path, raw)
-            motif_id, tf_name = _artifact_motif_metadata(path)
-            motifs.append((motif_id, _motif_display_name(motif_id, tf_name)))
-    return motifs
 
 
 def _print_inputs_summary(
@@ -508,7 +433,7 @@ def _print_inputs_summary(
     for inp in cfg.inputs:
         input_type = str(inp.type)
         kind = _input_kind_label(input_type)
-        motifs = _input_motifs(inp, loaded.path)
+        motifs = input_motifs(inp, loaded.path)
         if show_motif_ids:
             motif_labels = _unique_preserve([m_id for m_id, _name in motifs if m_id])
         else:
@@ -712,46 +637,6 @@ def _stage_a_sampling_rows(
     return rows
 
 
-def _filter_meme_motifs(motifs, motif_ids: list[str] | None) -> list:
-    if not motif_ids:
-        return list(motifs)
-    keep = {m.strip().lower() for m in motif_ids if m}
-    filtered = []
-    for motif in motifs:
-        cand = {
-            getattr(motif, "motif_id", None),
-            getattr(motif, "motif_name", None),
-            getattr(motif, "motif_label", None),
-        }
-        cand = {str(x).strip().lower() for x in cand if x}
-        if cand & keep:
-            filtered.append(motif)
-    return filtered
-
-
-def _meme_motif_labels(path: Path, motif_ids: list[str] | None) -> list[str]:
-    result = parse_meme_file(path)
-    motifs = _filter_meme_motifs(result.motifs, motif_ids)
-    labels = []
-    for motif in motifs:
-        label = (
-            getattr(motif, "motif_id", None)
-            or getattr(motif, "motif_name", None)
-            or getattr(motif, "motif_label", None)
-        )
-        if label:
-            labels.append(str(label))
-    return labels
-
-
-def _jaspar_motif_labels(path: Path, motif_ids: list[str] | None) -> list[str]:
-    motifs = _parse_jaspar(path)
-    if motif_ids:
-        keep = {m for m in motif_ids if m}
-        motifs = [m for m in motifs if m.motif_id in keep]
-    return [m.motif_id for m in motifs if m.motif_id]
-
-
 def _stage_a_plan_rows(
     cfg,
     cfg_path: Path,
@@ -776,7 +661,7 @@ def _stage_a_plan_rows(
         if length_policy == "range" and length_range:
             length_label = f"range({length_range[0]}..{length_range[1]})"
 
-        motifs = _input_motifs(inp, cfg_path)
+        motifs = input_motifs(inp, cfg_path)
         overrides = getattr(inp, "overrides_by_motif_id", None) if input_type == "pwm_artifact_set" else None
         for motif_id, display_name in motifs:
             reg_backend = backend
@@ -1264,7 +1149,7 @@ def inspect_run(
     absolute: bool = typer.Option(False, "--absolute", help="Show absolute paths instead of workspace-relative."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show failure breakdown columns."),
     library: bool = typer.Option(False, "--library", help="Include offered-vs-used library summaries."),
-    top: int = typer.Option(10, "--top", help="Rows to show for library summaries."),
+    show_tfbs: bool = typer.Option(False, "--show-tfbs", help="Show TFBS sequences in library summaries."),
     show_motif_ids: bool = typer.Option(
         False,
         "--show-motif-ids",
@@ -1442,7 +1327,7 @@ def inspect_run(
 
         display_map: dict[str, str] = {}
         for inp in loaded.root.densegen.inputs:
-            for motif_id, name in _input_motifs(inp, cfg_path):
+            for motif_id, name in input_motifs(inp, cfg_path):
                 if motif_id and name and motif_id not in display_map:
                     display_map[motif_id] = name
 
@@ -1472,8 +1357,6 @@ def inspect_run(
                 axis=1,
             )
             agg_tf = agg_tf.sort_values(["used_placements", "offered_instances"], ascending=False)
-            if top > 0:
-                agg_tf = agg_tf.head(top)
             tf_table = Table("tf", "offered", "used", "util_any", "util_per_offered")
             for _, row in agg_tf.iterrows():
                 tf_table.add_row(
@@ -1498,18 +1381,48 @@ def inspect_run(
                 .reset_index()
             )
             agg_tfbs = agg_tfbs.sort_values(["used_placements", "offered_instances"], ascending=False)
-            if top > 0:
-                agg_tfbs = agg_tfbs.head(top)
-            tfbs_table = Table("tf", "tfbs", "offered", "used")
-            for _, row in agg_tfbs.iterrows():
-                tfbs_table.add_row(
-                    _display_tf_label(str(row.get("tf") or "-")),
-                    str(row.get("tfbs") or "-"),
-                    str(int(row.get("offered_instances", 0))),
-                    str(int(row.get("used_placements", 0))),
+            if show_tfbs:
+                tfbs_table = Table("tf", "tfbs", "offered", "used")
+                for _, row in agg_tfbs.iterrows():
+                    tfbs_table.add_row(
+                        _display_tf_label(str(row.get("tf") or "-")),
+                        str(row.get("tfbs") or "-"),
+                        str(int(row.get("offered_instances", 0))),
+                        str(int(row.get("used_placements", 0))),
+                    )
+                console.print("[bold]TFBS usage summary (all libraries)[/]")
+                console.print(tfbs_table)
+            else:
+                unique_offered = int(len(agg_tfbs))
+                unique_used = int((agg_tfbs["used_placements"] > 0).sum())
+                usage_rate = float(unique_used) / float(unique_offered) if unique_offered else 0.0
+                used_vals = pd.to_numeric(
+                    agg_tfbs.loc[agg_tfbs["used_placements"] > 0, "used_placements"], errors="coerce"
+                ).dropna()
+                if used_vals.empty:
+                    min_used = med_used = max_used = "-"
+                else:
+                    min_used = f"{float(used_vals.min()):.0f}"
+                    med_used = f"{float(used_vals.median()):.0f}"
+                    max_used = f"{float(used_vals.max()):.0f}"
+                summary_table = Table(
+                    "unique_offered",
+                    "unique_used",
+                    "usage_rate",
+                    "used_min",
+                    "used_median",
+                    "used_max",
                 )
-            console.print("[bold]TFBS usage summary (all libraries)[/]")
-            console.print(tfbs_table)
+                summary_table.add_row(
+                    str(unique_offered),
+                    str(unique_used),
+                    f"{usage_rate:.2f}",
+                    str(min_used),
+                    str(med_used),
+                    str(max_used),
+                )
+                console.print("[bold]TFBS usage summary (all libraries)[/]")
+                console.print(summary_table)
 
 
 @app.command(help="Generate audit-grade report summary for a run.")
@@ -2047,7 +1960,7 @@ def stage_a_build_pool(
 
     display_map_by_input: dict[str, dict[str, str]] = {}
     for inp in cfg.inputs:
-        motifs = _input_motifs(inp, cfg_path)
+        motifs = input_motifs(inp, cfg_path)
         display_map_by_input[inp.name] = {motif_id: name for motif_id, name in motifs}
 
     recap_rows = _stage_a_sampling_rows(pool_data)
@@ -2209,7 +2122,7 @@ def stage_b_build_libraries(
 
     display_map_by_input: dict[str, dict[str, str]] = {}
     for inp in cfg.inputs:
-        motifs = _input_motifs(inp, cfg_path)
+        motifs = input_motifs(inp, cfg_path)
         display_map_by_input[inp.name] = {motif_id: name for motif_id, name in motifs}
 
     build_rows = []

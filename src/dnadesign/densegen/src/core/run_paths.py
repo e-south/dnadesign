@@ -12,6 +12,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 RUN_OUTPUTS_DIR = "outputs"
@@ -117,6 +118,15 @@ def solutions_path(run_root: Path) -> Path:
 
 def composition_path(run_root: Path) -> Path:
     return run_tables_root(run_root) / "composition.parquet"
+
+
+def display_path(path: Path, run_root: Path, *, absolute: bool) -> str:
+    if absolute:
+        return str(path)
+    try:
+        return str(path.relative_to(run_root))
+    except ValueError:
+        return os.path.relpath(path, run_root)
 
 
 def has_existing_run_outputs(run_root: Path) -> bool:

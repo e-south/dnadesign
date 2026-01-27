@@ -26,6 +26,7 @@ import pandas as pd
 from ..adapters.outputs import load_records_from_config
 from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
 from .artifacts.pool import POOL_MODE_TFBS, load_pool_artifact
+from .motif_labels import input_motifs, motif_display_name
 from .run_manifest import load_run_manifest
 from .run_paths import (
     candidates_root,
@@ -237,59 +238,16 @@ def _normalized_entropy_from_counts(counts: dict[str, int]) -> float | None:
     return float(ent / np.log(len(counts)))
 
 
-def _summarize_failure_top_tfbs(attempts_df: pd.DataFrame, *, top: int = 5) -> list[dict]:
-    if attempts_df.empty or "status" not in attempts_df.columns:
-        return []
-    failed = attempts_df[attempts_df["status"] != "success"]
-    if failed.empty:
-        return []
-    counts: dict[tuple[str, str], int] = {}
-    reason_counts: dict[tuple[str, str], dict[str, int]] = {}
-    for _, row in failed.iterrows():
-        reason = str(row.get("reason") or "unknown")
-        tfbs_list = _ensure_list(row.get("library_tfbs"))
-        tf_list = _ensure_list(row.get("library_tfs"))
-        for idx, tfbs in enumerate(tfbs_list):
-            tf = str(tf_list[idx]) if idx < len(tf_list) else ""
-            if not tf and not tfbs:
-                continue
-            key = (tf, str(tfbs))
-            counts[key] = counts.get(key, 0) + 1
-            reasons = reason_counts.setdefault(key, {})
-            reasons[reason] = reasons.get(reason, 0) + 1
-    ordered = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)[: max(1, int(top))]
-    summary: list[dict] = []
-    for (tf, tfbs), count in ordered:
-        reasons = reason_counts.get((tf, tfbs), {})
-        top_reason = max(reasons.items(), key=lambda kv: kv[1])[0] if reasons else ""
-        summary.append(
-            {
-                "tf": tf,
-                "tfbs": tfbs,
-                "failures": int(count),
-                "top_reason": top_reason,
-            }
-        )
-    return summary
-
-
-def _summarize_top_tfs(tf_counts: dict[str, int], *, top: int = 5) -> list[dict]:
-    if not tf_counts:
-        return []
-    items = sorted(tf_counts.items(), key=lambda kv: kv[1], reverse=True)[: max(1, int(top))]
-    return [{"tf": tf, "count": int(count)} for tf, count in items]
-
-
-def _summarize_top_tfbs(used_df: pd.DataFrame, *, top: int = 5) -> list[dict]:
-    if used_df.empty or "tf" not in used_df.columns or "tfbs" not in used_df.columns:
-        return []
-    counts = used_df.groupby(["tf", "tfbs"]).size().reset_index(name="count")
-    if counts.empty:
-        return []
-    counts = counts.sort_values("count", ascending=False).head(max(1, int(top)))
-    return [
-        {"tf": str(row["tf"]), "tfbs": str(row["tfbs"]), "count": int(row["count"])} for _, row in counts.iterrows()
-    ]
+def _usage_stats_from_counts(counts: dict[str, int]) -> dict[str, float | int | None]:
+    if not counts:
+        return {"min": None, "median": None, "max": None, "unique": 0}
+    values = np.asarray(list(counts.values()), dtype=float)
+    return {
+        "min": float(values.min()),
+        "median": float(np.median(values)),
+        "max": float(values.max()),
+        "unique": int(len(values)),
+    }
 
 
 def _compute_cooccurrence(used_df: pd.DataFrame) -> pd.DataFrame:
@@ -407,7 +365,7 @@ def collect_report_data(
     used_df = _explode_used(df)
     attempts_path = tables_root / "attempts.parquet"
     if not attempts_path.exists():
-        message = "outputs/tables/attempts.parquet is missing; library usage and resample summaries may be incomplete."
+        message = "outputs/tables/attempts.parquet is missing; library utilization summaries may be incomplete."
         if strict:
             raise ValueError(message)
         warnings.append(message)
@@ -435,6 +393,18 @@ def collect_report_data(
             solutions_df = pd.DataFrame()
     tables: Dict[str, pd.DataFrame] = {}
     tables["solutions"] = solutions_df
+    display_map_by_input: dict[str, dict[str, str]] = {}
+    for inp in root_cfg.densegen.inputs:
+        mapping: dict[str, str] = {}
+        for motif_id, name in input_motifs(inp, cfg_path):
+            if motif_id and name and motif_id not in mapping:
+                mapping[motif_id] = name
+        if mapping:
+            display_map_by_input[inp.name] = mapping
+
+    def _display_tf_label(input_name: str, tf: str) -> str:
+        mapping = display_map_by_input.get(input_name, {})
+        return mapping.get(tf, motif_display_name(tf, None))
 
     stage_a_tiers = pd.DataFrame(columns=["input_name", "tf", "tier", "count", "total"])
     stage_a_score_summary = pd.DataFrame(
@@ -520,6 +490,21 @@ def collect_report_data(
         except Exception:
             log.warning("Failed to load Stage-A pool tiers for report.", exc_info=True)
 
+    if not stage_a_tiers.empty and "input_name" in stage_a_tiers.columns and "tf" in stage_a_tiers.columns:
+        stage_a_tiers["tf"] = stage_a_tiers.apply(
+            lambda row: _display_tf_label(str(row.get("input_name") or ""), str(row.get("tf") or "")),
+            axis=1,
+        )
+    if (
+        not stage_a_score_summary.empty
+        and "input_name" in stage_a_score_summary.columns
+        and "tf" in stage_a_score_summary.columns
+    ):
+        stage_a_score_summary["tf"] = stage_a_score_summary.apply(
+            lambda row: _display_tf_label(str(row.get("input_name") or ""), str(row.get("tf") or "")),
+            axis=1,
+        )
+
     tables["stage_a_tiers"] = stage_a_tiers
     tables["stage_a_score_summary"] = stage_a_score_summary
 
@@ -561,70 +546,45 @@ def collect_report_data(
     tables["candidates_summary"] = candidates_summary
 
     library_summary = pd.DataFrame(
-        columns=["library_hash", "library_index", "input_name", "plan_name", "size", "total_bp", "outputs"]
+        columns=[
+            "input_name",
+            "plan_name",
+            "libraries",
+            "library_size_min",
+            "library_size_median",
+            "library_size_max",
+            "total_bp_min",
+            "total_bp_median",
+            "total_bp_max",
+        ]
     )
     if not library_df.empty:
-        library_summary = (
+        per_library = (
             library_df.groupby(["library_hash", "library_index", "input_name", "plan_name"])
             .agg(
                 size=("tfbs", "size"),
                 total_bp=("tfbs_length", "sum"),
-                unique_tf_count=("tf", pd.Series.nunique),
-                unique_tfbs_count=("tfbs", pd.Series.nunique),
             )
             .reset_index()
         )
-    outputs_by_lib = pd.DataFrame()
-    if _dg("sampling_library_index") in df.columns:
-        outputs_by_lib = (
-            df.groupby(_dg("sampling_library_index"))
-            .size()
-            .reset_index(name="outputs")
-            .rename(columns={_dg("sampling_library_index"): "library_index"})
+        library_summary = (
+            per_library.groupby(["input_name", "plan_name"])
+            .agg(
+                libraries=("library_index", "size"),
+                library_size_min=("size", "min"),
+                library_size_median=("size", "median"),
+                library_size_max=("size", "max"),
+                total_bp_min=("total_bp", "min"),
+                total_bp_median=("total_bp", "median"),
+                total_bp_max=("total_bp", "max"),
+            )
+            .reset_index()
         )
-    if not library_summary.empty and not outputs_by_lib.empty:
-        library_summary = library_summary.merge(outputs_by_lib, on="library_index", how="left")
-    elif not library_summary.empty:
-        library_summary["outputs"] = 0
-    if not library_summary.empty and "outputs" in library_summary.columns:
-        library_summary["outputs"] = pd.to_numeric(library_summary["outputs"], errors="coerce").fillna(0).astype(int)
+        library_summary["libraries"] = (
+            pd.to_numeric(library_summary["libraries"], errors="coerce").fillna(0).astype(int)
+        )
 
     tables["library_summary"] = library_summary
-
-    library_usage = pd.DataFrame(
-        columns=[
-            "library_hash",
-            "library_index",
-            "input_name",
-            "plan_name",
-            "attempts",
-            "successes",
-            "outputs",
-        ]
-    )
-    if not attempts_df.empty:
-        attempts_by_lib = (
-            attempts_df.groupby(["sampling_library_hash", "sampling_library_index", "input_name", "plan_name"])
-            .agg(
-                attempts=("status", "size"),
-                successes=("status", lambda x: int((x == "success").sum())),
-            )
-            .reset_index()
-            .rename(
-                columns={
-                    "sampling_library_hash": "library_hash",
-                    "sampling_library_index": "library_index",
-                }
-            )
-        )
-        library_usage = attempts_by_lib
-        if not outputs_by_lib.empty:
-            library_usage = library_usage.merge(outputs_by_lib, on="library_index", how="left")
-        if "outputs" not in library_usage.columns:
-            library_usage["outputs"] = 0
-        if "outputs" in library_usage.columns:
-            library_usage["outputs"] = pd.to_numeric(library_usage["outputs"], errors="coerce").fillna(0).astype(int)
-    tables["library_usage"] = library_usage
 
     plan_summary = pd.DataFrame(
         columns=[
@@ -738,82 +698,6 @@ def collect_report_data(
     events_df = _load_events(events_path)
     tables["events"] = events_df
 
-    resample_diffs = pd.DataFrame(
-        columns=[
-            "input_name",
-            "plan_name",
-            "prev_library_hash",
-            "library_hash",
-            "tf_added",
-            "tf_removed",
-            "tfbs_added",
-            "tfbs_removed",
-            "reason",
-        ]
-    )
-    library_members_path = outputs_root / "libraries" / "library_members.parquet"
-    if library_members_path.exists():
-        try:
-            members_df = pd.read_parquet(library_members_path)
-            grouped = members_df.groupby(["input_name", "plan_name", "library_index", "library_hash"])
-            library_sets = []
-            for (input_name, plan_name, library_index, library_hash), sub in grouped:
-                tf_set = set(str(x) for x in sub.get("tf", []))
-                tfbs_set = set(str(x) for x in sub.get("tfbs", []))
-                library_sets.append(
-                    {
-                        "input_name": str(input_name),
-                        "plan_name": str(plan_name),
-                        "library_index": int(library_index),
-                        "library_hash": str(library_hash),
-                        "tf_set": tf_set,
-                        "tfbs_set": tfbs_set,
-                    }
-                )
-            diff_rows: list[dict[str, Any]] = []
-            if library_sets:
-                for _, sub in pd.DataFrame(library_sets).groupby(["input_name", "plan_name"]):
-                    sub = sub.sort_values("library_index")
-                    prev = None
-                    for _, row in sub.iterrows():
-                        if prev is not None:
-                            tf_added = len(row["tf_set"] - prev["tf_set"])
-                            tf_removed = len(prev["tf_set"] - row["tf_set"])
-                            tfbs_added = len(row["tfbs_set"] - prev["tfbs_set"])
-                            tfbs_removed = len(prev["tfbs_set"] - row["tfbs_set"])
-                            diff_rows.append(
-                                {
-                                    "input_name": row["input_name"],
-                                    "plan_name": row["plan_name"],
-                                    "prev_library_hash": prev["library_hash"],
-                                    "library_hash": row["library_hash"],
-                                    "tf_added": tf_added,
-                                    "tf_removed": tf_removed,
-                                    "tfbs_added": tfbs_added,
-                                    "tfbs_removed": tfbs_removed,
-                                    "reason": None,
-                                }
-                            )
-                        prev = row
-            if diff_rows:
-                resample_diffs = pd.DataFrame(diff_rows)
-                if not events_df.empty and "event" in events_df.columns:
-                    resample_events = events_df[events_df["event"] == "RESAMPLE_TRIGGERED"]
-                    required_cols = {"input_name", "plan_name", "library_hash", "reason"}
-                    if not resample_events.empty and required_cols.issubset(resample_events.columns):
-                        resample_diffs = resample_diffs.merge(
-                            resample_events[["input_name", "plan_name", "library_hash", "reason"]],
-                            left_on=["input_name", "plan_name", "prev_library_hash"],
-                            right_on=["input_name", "plan_name", "library_hash"],
-                            how="left",
-                        )
-                        resample_diffs = resample_diffs.drop(columns=["library_hash_y"]).rename(
-                            columns={"library_hash_x": "library_hash"}
-                        )
-        except Exception:
-            log.warning("Failed to load library resample diffs for report.", exc_info=True)
-    tables["resample_diffs"] = resample_diffs
-
     if include_combinatorics:
         tables["tf_cooccurrence"] = _compute_cooccurrence(used_df)
         tables["tf_adjacency"] = _compute_adjacency(used_df)
@@ -821,7 +705,13 @@ def collect_report_data(
     composition_path = tables_root / "composition.parquet"
     if composition_path.exists():
         try:
-            tables["composition"] = pd.read_parquet(composition_path)
+            composition = pd.read_parquet(composition_path)
+            if not composition.empty and "tf" in composition.columns and "input_name" in composition.columns:
+                composition["tf"] = composition.apply(
+                    lambda row: _display_tf_label(str(row.get("input_name") or ""), str(row.get("tf") or "")),
+                    axis=1,
+                )
+            tables["composition"] = composition
         except Exception:
             log.warning("Failed to load composition.parquet for report tables.", exc_info=True)
 
@@ -829,9 +719,8 @@ def collect_report_data(
     tf_counts = used_df["tf"].value_counts().to_dict() if not used_df.empty else {}
     tfbs_counts = used_df["tfbs"].value_counts().to_dict() if not used_df.empty else {}
     diversity_entropy_tfbs = _normalized_entropy_from_counts({str(k): int(v) for k, v in tfbs_counts.items()})
-    leaderboard_tf = _summarize_top_tfs({str(k): int(v) for k, v in tf_counts.items()}, top=5)
-    leaderboard_tfbs = _summarize_top_tfbs(used_df, top=5)
-    failure_top_tfbs = _summarize_failure_top_tfbs(attempts_df, top=5)
+    tf_usage_stats = _usage_stats_from_counts({str(k): int(v) for k, v in tf_counts.items()})
+    tfbs_usage_stats = _usage_stats_from_counts({str(k): int(v) for k, v in tfbs_counts.items()})
     attempts_total = int(len(attempts_df)) if attempts_df is not None else 0
     attempts_success = int((attempts_df["status"] == "success").sum()) if "status" in attempts_df else 0
     attempts_failed = max(0, attempts_total - attempts_success)
@@ -854,7 +743,7 @@ def collect_report_data(
     tfbs_coverage = used_tfbs_total / max(1, lib_tfbs_total) if lib_tfbs_total else None
 
     run_report = {
-        "run_root": str(run_root),
+        "run_root": os.path.relpath(run_root, run_root),
         "schema_version": root_cfg.densegen.schema_version,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "output_source": source_label,
@@ -866,33 +755,32 @@ def collect_report_data(
         "diversity_unique_tfs": int(len(tf_counts)),
         "diversity_unique_tfbs": int(len(tfbs_counts)),
         "diversity_entropy_tfbs": diversity_entropy_tfbs,
-        "failure_top_tfbs": failure_top_tfbs,
-        "leaderboard_latest": {
-            "tf": leaderboard_tf,
-            "tfbs": leaderboard_tfbs,
-            "failed_tfbs": failure_top_tfbs,
-            "diversity": {
-                "tf_coverage": tf_coverage,
-                "tfbs_coverage": tfbs_coverage,
-                "tfbs_entropy": diversity_entropy_tfbs,
-                "used_tf_count": int(len(tf_counts)),
-                "library_tf_count": int(lib_tf_total),
-                "used_tfbs_count": int(len(tfbs_counts)),
-                "library_tfbs_count": int(lib_tfbs_total),
-            },
+        "coverage": {
+            "tf_coverage": tf_coverage,
+            "tfbs_coverage": tfbs_coverage,
+            "library_tf_count": int(lib_tf_total),
+            "library_tfbs_count": int(lib_tfbs_total),
+            "used_tf_count": int(len(tf_counts)),
+            "used_tfbs_count": int(len(tfbs_counts)),
+        },
+        "usage_stats": {
+            "tf": tf_usage_stats,
+            "tfbs": tfbs_usage_stats,
         },
         "attempts_total": attempts_total,
         "attempts_success": attempts_success,
         "attempts_failed": attempts_failed,
-        "attempts_path": str(attempts_path) if attempts_path.exists() else None,
-        "solutions_path": str(solutions_path) if solutions_path.exists() else None,
-        "events_path": str(events_path) if events_path.exists() else None,
-        "candidates_path": str(candidates_dir / "candidates.parquet")
+        "attempts_path": os.path.relpath(attempts_path, run_root) if attempts_path.exists() else None,
+        "solutions_path": os.path.relpath(solutions_path, run_root) if solutions_path.exists() else None,
+        "events_path": os.path.relpath(events_path, run_root) if events_path.exists() else None,
+        "candidates_path": os.path.relpath(candidates_dir / "candidates.parquet", run_root)
         if candidate_logging and (candidates_dir / "candidates.parquet").exists()
         else None,
-        "candidates_summary_path": str(cand_summary_path) if candidate_logging and cand_summary_path.exists() else None,
-        "outputs_path": str(dense_arrays_path(run_root)),
-        "effective_config_path": str(outputs_root / "meta" / "effective_config.json")
+        "candidates_summary_path": os.path.relpath(cand_summary_path, run_root)
+        if candidate_logging and cand_summary_path.exists()
+        else None,
+        "outputs_path": os.path.relpath(dense_arrays_path(run_root), run_root),
+        "effective_config_path": os.path.relpath(outputs_root / "meta" / "effective_config.json", run_root)
         if (outputs_root / "meta" / "effective_config.json").exists()
         else None,
     }
@@ -995,6 +883,26 @@ def write_report(
 
 def _render_report_md(bundle: ReportBundle) -> str:
     report = bundle.run_report
+    coverage = report.get("coverage") or {}
+    usage_stats = report.get("usage_stats") or {}
+    tf_cov = coverage.get("tf_coverage")
+    tfbs_cov = coverage.get("tfbs_coverage")
+    tf_cov_label = "-"
+    tfbs_cov_label = "-"
+    if tf_cov is not None:
+        tf_cov_label = f"{float(tf_cov):.1%} ({coverage.get('used_tf_count', 0)}/{coverage.get('library_tf_count', 0)})"
+    if tfbs_cov is not None:
+        tfbs_cov_label = (
+            f"{float(tfbs_cov):.1%} ({coverage.get('used_tfbs_count', 0)}/{coverage.get('library_tfbs_count', 0)})"
+        )
+    tf_usage = usage_stats.get("tf") or {}
+    tfbs_usage = usage_stats.get("tfbs") or {}
+    tf_usage_label = "-"
+    tfbs_usage_label = "-"
+    if tf_usage.get("min") is not None:
+        tf_usage_label = f"{tf_usage.get('min'):.0f}/{tf_usage.get('median'):.0f}/{tf_usage.get('max'):.0f}"
+    if tfbs_usage.get("min") is not None:
+        tfbs_usage_label = f"{tfbs_usage.get('min'):.0f}/{tfbs_usage.get('median'):.0f}/{tfbs_usage.get('max'):.0f}"
     lines = [
         "# DenseGen Report",
         "",
@@ -1006,6 +914,10 @@ def _render_report_md(bundle: ReportBundle) -> str:
         f"- Diversity (unique TFs): {report.get('diversity_unique_tfs')}",
         f"- Diversity (unique TFBS): {report.get('diversity_unique_tfbs')}",
         f"- Diversity entropy (TFBS): {report.get('diversity_entropy_tfbs')}",
+        f"- Coverage (TFs used / offered): {tf_cov_label}",
+        f"- Coverage (TFBS used / offered): {tfbs_cov_label}",
+        f"- TF usage (min/median/max): {tf_usage_label}",
+        f"- TFBS usage (min/median/max): {tfbs_usage_label}",
         f"- Warnings: {len(report.get('warnings') or [])}",
         "",
         "## Outputs",
@@ -1093,37 +1005,24 @@ def _render_report_md(bundle: ReportBundle) -> str:
                 max_rows=20,
             )
         )
-    library_usage = bundle.tables.get("library_usage")
-    if library_usage is not None and not library_usage.empty:
-        lines.extend(["", "## Library usage (top 5)"])
-        top_usage = library_usage.sort_values(["attempts", "outputs"], ascending=False).head(5)
-        for _, row in top_usage.iterrows():
-            lib_hash = str(row.get("library_hash") or "")[:8]
-            attempts = int(row.get("attempts") or 0)
-            outputs = int(row.get("outputs") or 0)
-            plan_name = str(row.get("plan_name") or "")
-            lines.append(f"- {plan_name}/{lib_hash}: attempts={attempts} outputs={outputs}")
-    resample_diffs = bundle.tables.get("resample_diffs")
-    if resample_diffs is not None and not resample_diffs.empty:
-        diffs = resample_diffs.copy()
-        diffs["prev_library_hash"] = diffs["prev_library_hash"].apply(lambda v: str(v)[:8])
-        diffs["library_hash"] = diffs["library_hash"].apply(lambda v: str(v)[:8])
-        lines.extend(["", "## Resample diffs (library deltas)"])
+    library_summary = bundle.tables.get("library_summary")
+    if library_summary is not None and not library_summary.empty:
+        lines.extend(["", "## Library summary (aggregate)"])
         lines.append(
             _markdown_table(
-                diffs,
+                library_summary,
                 columns=[
                     "input_name",
                     "plan_name",
-                    "prev_library_hash",
-                    "library_hash",
-                    "tf_added",
-                    "tf_removed",
-                    "tfbs_added",
-                    "tfbs_removed",
-                    "reason",
+                    "libraries",
+                    "library_size_min",
+                    "library_size_median",
+                    "library_size_max",
+                    "total_bp_min",
+                    "total_bp_median",
+                    "total_bp_max",
                 ],
-                max_rows=10,
+                max_rows=20,
             )
         )
     events = bundle.tables.get("events")
@@ -1190,32 +1089,6 @@ def _render_report_md(bundle: ReportBundle) -> str:
         comp_rows = report.get("composition_rows")
         if comp_rows is not None:
             lines.append(f"- Full composition rows: {comp_rows}")
-    leaderboard = report.get("leaderboard_latest") or {}
-    leader_tf = leaderboard.get("tf") or []
-    leader_tfbs = leaderboard.get("tfbs") or []
-    if leader_tf or leader_tfbs:
-        lines.extend(["", "## Leaderboards"])
-        if leader_tf:
-            lines.append("")
-            lines.append("Top TFs:")
-            for row in leader_tf:
-                lines.append(f"- {row.get('tf')}: {row.get('count')}")
-        if leader_tfbs:
-            lines.append("")
-            lines.append("Top TFBS:")
-            for row in leader_tfbs:
-                lines.append(f"- {row.get('tf')}:{row.get('tfbs')} ({row.get('count')})")
-    failure_top = report.get("failure_top_tfbs") or []
-    if failure_top:
-        lines.extend(["", "## Failure hotspots (top TFBS)"])
-        for entry in failure_top:
-            tf = entry.get("tf") or ""
-            tfbs = entry.get("tfbs") or ""
-            failures = entry.get("failures") or 0
-            reason = entry.get("top_reason") or ""
-            label = f"{tf}:{tfbs}" if tf else tfbs
-            reason_suffix = f" (top reason: {reason})" if reason else ""
-            lines.append(f"- {label} — failures={failures}{reason_suffix}")
     if bundle.plots:
         lines.extend(["", "## Report plots"])
         for plot_name, paths in bundle.plots.items():
