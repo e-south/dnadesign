@@ -18,7 +18,7 @@ def test_build_pool_artifact_binding_sites(tmp_path: Path) -> None:
         yaml.safe_dump(
             {
                 "densegen": {
-                    "schema_version": "2.5",
+                    "schema_version": "2.6",
                     "run": {"id": "demo", "root": "."},
                     "inputs": [
                         {
@@ -81,3 +81,4 @@ def test_build_pool_artifact_binding_sites(tmp_path: Path) -> None:
     assert pool.df is not None
     assert "tfbs_id" in pool.df.columns
     assert "motif_id" in pool.df.columns
+    assert "tfbs_core" in pool.df.columns

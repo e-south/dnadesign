@@ -9,7 +9,7 @@ def write_minimal_config(path: Path) -> None:
         textwrap.dedent(
             """
             densegen:
-              schema_version: "2.5"
+              schema_version: "2.6"
               run:
                 id: demo
                 root: "."

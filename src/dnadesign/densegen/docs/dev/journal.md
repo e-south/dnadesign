@@ -34,3 +34,4 @@
 - Changes: plot registry + plotting overhaul, new Stage-A yield/bias panels, Stage-B feasibility/utilization summary, updated demo configs/docs + tests; added Stage-B feasibility fields to library_builds and Stage-A yield counters in pool manifest.
 - Tests: updated plot registry/manifest and run diagnostics tests; fixed run_health tick labeling warning; adjusted Stage-A summary expectations.
 - Follow-up: placement_map now accepts effective_config.json structure (nested config), with test coverage; demo run uses pixi with -c path due to pixi running from repo root.
+- Follow-up: enabled core-unique sampling defaults (unique_binding_cores=true), added tfbs_core to binding_sites inputs, surfaced dedupe_by/min_core_hamming_distance in pool manifest, and added screen-style progress dashboard with show_tfbs/show_solutions toggles; updated demo/config/docs/tests to schema 2.6 and added core-uniqueness tests.

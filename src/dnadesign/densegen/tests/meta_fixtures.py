@@ -14,7 +14,7 @@ from __future__ import annotations
 
 def output_meta(*, library_hash: str, library_index: int) -> dict:
     return {
-        "schema_version": "2.5",
+        "schema_version": "2.6",
         "run_id": "demo",
         "run_root": ".",
         "run_config_path": "config.yaml",

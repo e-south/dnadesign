@@ -1,5 +1,5 @@
 densegen:
-  schema_version: '2.5'
+  schema_version: '2.6'
   run:
     id: demo
     root: .
@@ -12,7 +12,7 @@ densegen:
     sampling:
       strategy: stochastic
       n_sites: 200
-      oversample_factor: 200
+      oversample_factor: 1000
       scoring_backend: fimo
       mining:
         batch_size: 5000
@@ -22,6 +22,7 @@ densegen:
       length_range:
       - 15
       - 20
+      dedupe_by: core
   output:
     targets:
     - parquet
@@ -44,6 +45,7 @@ densegen:
       coverage_boost_power: 1.0
       cover_all_regulators: true
       unique_binding_sites: true
+      unique_binding_cores: true
       max_sites_per_regulator: null
       relax_on_exhaustion: false
       allow_incomplete_coverage: false
@@ -99,7 +101,7 @@ densegen:
     log_dir: outputs/logs
     level: INFO
     suppress_solver_stderr: true
-    print_visual: true
+    print_visual: false
     progress_style: screen
     progress_every: 1
     progress_refresh_seconds: 1.0

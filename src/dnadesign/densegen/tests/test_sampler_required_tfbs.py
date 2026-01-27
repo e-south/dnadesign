@@ -7,10 +7,12 @@ from dnadesign.densegen.src.core.sampler import TFSampler
 
 
 def test_required_tfbs_are_injected() -> None:
+    tfbs = ["AAA", "CCC", "GGG"]
     df = pd.DataFrame(
         {
             "tf": ["TF1", "TF1", "TF2"],
-            "tfbs": ["AAA", "CCC", "GGG"],
+            "tfbs": tfbs,
+            "tfbs_core": tfbs,
         }
     )
     rng = np.random.default_rng(0)
@@ -30,10 +32,12 @@ def test_required_tfbs_are_injected() -> None:
 
 
 def test_required_tfs_are_injected() -> None:
+    tfbs = ["AAA", "CCC", "GGG"]
     df = pd.DataFrame(
         {
             "tf": ["TF1", "TF1", "TF2"],
-            "tfbs": ["AAA", "CCC", "GGG"],
+            "tfbs": tfbs,
+            "tfbs_core": tfbs,
         }
     )
     rng = np.random.default_rng(1)

@@ -42,6 +42,8 @@ class _DummySource(BaseDataSource):
             input_name="demo_pwm",
             regulator="regA",
             backend="fimo",
+            dedupe_by="core",
+            min_core_hamming_distance=None,
             generated=10,
             target=10,
             target_sites=2,
@@ -74,7 +76,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
         yaml.safe_dump(
             {
                 "densegen": {
-                    "schema_version": "2.5",
+                    "schema_version": "2.6",
                     "run": {"id": "demo", "root": "."},
                     "inputs": [
                         {
@@ -152,6 +154,8 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert stage_a_sampling["eligibility_rule"].startswith("best_hit_score")
     assert stage_a_sampling["retention_rule"] == "top_n_sites_by_best_hit_score"
     assert stage_a_sampling["fimo_thresh"] == 1.0
+    assert stage_a_sampling["dedupe_by"] == "core"
+    assert stage_a_sampling["min_core_hamming_distance"] is None
     assert stage_a_sampling["bgfile"] == "inputs/bg.txt"
     assert stage_a_sampling["background_source"] == "bgfile"
     hist = stage_a_sampling["eligible_score_hist"]

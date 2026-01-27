@@ -33,8 +33,8 @@ dense inspect inputs
 # 4) Inspect resolved outputs + Stage‑A/Stage‑B settings.
 dense inspect config
 
-# 5) Stage‑A: materialize TFBS pools (optional, for inspection).
-dense stage-a build-pool
+# 5) Stage‑A: materialize TFBS pools (required before `dense run` unless you pass --rebuild-stage-a).
+dense stage-a build-pool --fresh
 
 # 6) Stage‑B: materialize solver libraries (optional, for inspection).
 dense stage-b build-libraries
@@ -53,7 +53,7 @@ dense ls-plots
 dense plot --only placement_map,tfbs_usage,run_health
 ```
 
-If you rerun a workspace that already has run outputs (e.g., `outputs/tables/attempts.parquet` or `outputs/meta/run_state.json`), choose `--resume` (continue) or `--fresh` (clear outputs and start over).
+If you rerun a workspace that already has run outputs (e.g., `outputs/tables/attempts.parquet` or `outputs/meta/run_state.json`), choose `--resume` (continue) or `--fresh` (clear outputs and start over). `dense run` will reuse existing Stage‑A pools by default; use `dense stage-a build-pool --fresh` or `dense run --rebuild-stage-a` when pools are missing or stale.
 
 If you want to scaffold a new workspace from a packaged template, run `dense workspace init` from
 `src/dnadesign/densegen/workspaces/` to keep new workspaces colocated.

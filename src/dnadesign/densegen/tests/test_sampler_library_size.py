@@ -7,10 +7,12 @@ from dnadesign.densegen.src.core.sampler import TFSampler
 
 
 def _sample_df() -> pd.DataFrame:
+    tfbs = ["AAA", "CCC", "GGG", "TTT", "AAC", "CCA"]
     return pd.DataFrame(
         {
             "tf": ["TF1", "TF1", "TF1", "TF2", "TF2", "TF2"],
-            "tfbs": ["AAA", "CCC", "GGG", "TTT", "AAC", "CCA"],
+            "tfbs": tfbs,
+            "tfbs_core": tfbs,
         }
     )
 

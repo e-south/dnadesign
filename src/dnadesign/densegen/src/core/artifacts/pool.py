@@ -241,6 +241,8 @@ def _build_stage_a_sampling_manifest(
     eligible_score_hist = []
     bgfile_by_regulator = bgfile_by_regulator or {}
     reg_bgfiles = []
+    dedupe_values = {summary.dedupe_by for summary in fimo_summaries}
+    min_core_values = {summary.min_core_hamming_distance for summary in fimo_summaries}
     for summary in fimo_summaries:
         if summary.eligible_score_hist_edges is None or summary.eligible_score_hist_counts is None:
             raise ValueError("Stage-A sampling summaries missing eligible score histogram.")
@@ -275,12 +277,21 @@ def _build_stage_a_sampling_manifest(
     else:
         base_bgfile = None
         background_source = "mixed"
+    if len(dedupe_values) == 1:
+        dedupe_by = next(iter(dedupe_values))
+    else:
+        dedupe_by = "mixed"
+    min_core_hamming_distance = None
+    if len(min_core_values) == 1:
+        min_core_hamming_distance = next(iter(min_core_values))
     return {
         "backend": "fimo",
         "tier_scheme": "pct_0.1_1_9",
         "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
         "retention_rule": "top_n_sites_by_best_hit_score",
         "fimo_thresh": FIMO_REPORT_THRESH,
+        "dedupe_by": dedupe_by,
+        "min_core_hamming_distance": min_core_hamming_distance,
         "bgfile": base_bgfile,
         "background_source": background_source,
         "eligible_score_hist": eligible_score_hist,

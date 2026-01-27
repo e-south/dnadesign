@@ -28,7 +28,7 @@ def _write_config(tmp_path: Path) -> Path:
         textwrap.dedent(
             """
             densegen:
-              schema_version: "2.5"
+              schema_version: "2.6"
               run:
                 id: demo
                 root: "."

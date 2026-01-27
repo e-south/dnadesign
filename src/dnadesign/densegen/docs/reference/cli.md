@@ -28,7 +28,7 @@ DenseGen exposes a Typer CLI via `dense`. This page is an operator manual (comma
   “No config found. cd into a workspace containing config.yaml, or pass -c path/to/config.yaml.”
 - Input paths resolve against the config file directory.
 - Outputs/tables/logs/plots/report must resolve inside `outputs/` under `densegen.run.root`.
-- Config files must include `densegen.schema_version` (currently `2.5`) and `densegen.run`.
+- Config files must include `densegen.schema_version` (currently `2.6`) and `densegen.run`.
 
 ---
 
@@ -41,7 +41,7 @@ Options:
 ---
 
 #### `dense inspect inputs`
-Print resolved inputs plus a Stage‑A PWM sampling summary.
+Print resolved inputs plus Stage‑A pool status.
 
 ---
 
@@ -51,7 +51,8 @@ Print the resolved quota plan per constraint bucket.
 ---
 
 #### `dense inspect config`
-Summarize resolved inputs, outputs, Stage‑A sampling, Stage‑B sampling, and solver settings.
+Summarize outputs, Stage‑A sampling policy, Stage‑B sampling policy, and solver settings. Input sources are
+listed in `dense inspect inputs`.
 
 Options:
 - `--show-constraints` — print full fixed elements per plan item.
@@ -86,6 +87,7 @@ Options:
 - `--out` — output directory relative to run root (default: `outputs/pools`; must be inside `outputs/`).
 - `--input/-i` — input name(s) to build (defaults to all).
 - `--fresh` — replace existing pool files (default is append + dedupe).
+- `--show-motif-ids` — show full motif IDs instead of short TF labels.
 
 Outputs:
 - `pool_manifest.json`
@@ -104,6 +106,8 @@ Options:
 - `--input/-i` — input name(s) to build (defaults to all).
 - `--plan/-p` — plan item name(s) to build (defaults to all).
 - `--overwrite` — overwrite existing library artifacts.
+- `--show-hash` — include full library hashes in output.
+- `--show-motif-ids` — show full motif IDs instead of short TF labels.
 
 Outputs:
 - `library_builds.parquet`
@@ -126,17 +130,22 @@ Options:
 ---
 
 #### `dense run`
-Run the full pipeline (Stage‑A sampling → Stage‑B sampling → optimization → outputs).
+Run the pipeline (Stage‑B sampling → optimization → outputs) using existing Stage‑A pools.
 
 Options:
 - `--no-plot` — skip auto‑plotting even if `plots` is configured in YAML.
 - `--fresh` — delete the workspace `outputs/` directory before running.
 - `--resume` — resume from existing outputs in the workspace.
+- `--rebuild-stage-a` — rebuild Stage‑A pools before running (required if pools are missing or stale).
 - `--log-file PATH` — override the log file path. Otherwise DenseGen writes to
   `logging.log_dir/<run_id>.log` inside the workspace. The override path must still resolve
   inside `outputs/` under `densegen.run.root`.
+- `--show-tfbs` — include TFBS sequences in progress output.
+- `--show-solutions` — include full solution sequences in progress output.
 
 Notes:
+- `dense run` requires Stage‑A pools under `outputs/pools` by default. If they are missing or stale,
+  run `dense stage-a build-pool --fresh` or pass `--rebuild-stage-a`.
 - If Stage‑A sampling uses `scoring_backend: fimo`, ensure `fimo` is on PATH (e.g., via `pixi run`).
 - If the workspace already has run outputs (e.g., `outputs/tables/*.parquet` or
   `outputs/meta/run_state.json`), you must choose `--resume` or `--fresh`.

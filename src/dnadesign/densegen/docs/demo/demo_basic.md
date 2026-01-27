@@ -139,9 +139,9 @@ The DenseGen workspace stays config‑centric (one runtime config); Cruncher kee
 
 Review the resolved outputs, Stage‑A sampling settings, fixed elements, and Stage‑B sampling policy.
 
-Stage‑A sampling: the pipeline can mine hundreds of binding sites per TF from the MEME‑derived PWM artifacts. The motif JSONs specify widths (LexA 15 bp, CpxR 11 bp), and `length_policy: range` with `length_range: [15, 20]` chooses a target length and pads flanks to it while retaining the top‑scoring TFBS by FIMO log‑odds (`best_hit_score > 0`, top‑`n_sites` by score). Increase `n_sites` if you need a larger pool.
+Stage‑A sampling: the pipeline can mine hundreds of binding sites per TF from the MEME‑derived PWM artifacts. The motif JSONs specify widths (LexA 15 bp, CpxR 11 bp), and `length_policy: range` with `length_range: [15, 20]` chooses a target length and pads flanks to it while retaining the top‑scoring TFBS by FIMO log‑odds (`best_hit_score > 0`, top‑`n_sites` by score). The demo uses `dedupe_by: core` so near‑duplicate flank variants collapse to a single core; diagnostic tiers are 0.1% / 1% / 9% / rest by score rank. Increase `n_sites` or `oversample_factor` if you need a larger pool.
 
-Stage‑B sampling: the Stage‑A pool is subsampled into candidate libraries (`pool_strategy: subsample`, `library_size: 20`) with coverage weighting so each library contains the specified TFs (`cover_all_regulators: true`). Each library is offered to the solver, which assembles 60‑bp sequences by selecting a subset; new libraries are sampled as needed.
+Stage‑B sampling: the Stage‑A pool is subsampled into candidate libraries (`pool_strategy: subsample`, `library_size: 20`) with coverage weighting so each library contains the specified TFs (`cover_all_regulators: true`). The demo keeps libraries core‑unique (`unique_binding_cores: true`) to avoid near‑duplicate flank variants. Each library is offered to the solver, which assembles 60‑bp sequences by selecting a subset; new libraries are sampled as needed.
 
 Fixed promoter: this demo fixes a strong σ70 promoter pair (`TTGACA`/`TATAAT`) with a 15–19 bp spacer; the `placement_map` plot overlays these fixed sites as binding‑site types (`-35`/`-10`). To keep the 60‑bp sequence length feasible alongside ~11–15 bp TFBS, the plan sets `min_required_regulators: 1` while listing both motif IDs (`lexA_CTGTATAWAWWHACA`, `cpxR_MANWWHTTTAM`), so each sequence includes at least one of them. Use the Stage‑A plan output (`dense stage-a build-pool`) or pool manifest to confirm the regulator labels if you customize inputs.
 
@@ -161,31 +161,7 @@ dense stage-a build-pool --fresh
 
 **Note:** `stage-a build-pool` appends new unique TFBS into existing pools by default. Use `--fresh` when re‑running if you want to avoid cumulative pools and candidate logs.
 
-Optional: confirm the regulator labels (used by `required_regulators`) and tier cutoffs:
-
-```bash
-uv run python - <<'PY'
-import json
-from pathlib import Path
-manifest = json.loads(Path("outputs/pools/pool_manifest.json").read_text())
-hist = manifest["inputs"][0]["stage_a_sampling"]["eligible_score_hist"]
-for row in hist:
-    print(f"{row['regulator']}: tier0={row.get('tier0_score')} tier1={row.get('tier1_score')}")
-PY
-```
-
-If you use pixi instead of uv, run the same snippet with:
-
-```bash
-pixi run python - <<'PY'
-import json
-from pathlib import Path
-manifest = json.loads(Path("outputs/pools/pool_manifest.json").read_text())
-hist = manifest["inputs"][0]["stage_a_sampling"]["eligible_score_hist"]
-for row in hist:
-    print(f"{row['regulator']}: tier0={row.get('tier0_score')} tier1={row.get('tier1_score')}")
-PY
-```
+The CLI recap includes tier boundary scores per TF, so you can confirm tier cutoffs without scripting.
 
 Optional: visualize Stage‑A score strata and retained lengths (per regulator) right after sampling:
 
@@ -213,11 +189,13 @@ dense stage-b build-libraries --overwrite
 
 ### 7. Run generation
 
-Execute Stage‑A sampling (if needed), Stage‑B sampling, and solver optimization.
+Execute Stage‑B sampling and solver optimization using the existing Stage‑A pools.
 
 ```bash
 dense run
 ```
+
+If pools are missing or stale, `dense run` will fail fast. Rebuild them with `dense stage-a build-pool --fresh` or rerun with `dense run --rebuild-stage-a`.
 
 This demo config also enables plot generation from the run (`plots.default`) and saves plots in `outputs/plots/` using `plots.format` (switch to `pdf` or `svg` in `config.yaml` if desired). Plots are generated from canonical artifacts (Parquet tables + manifests). The run also writes `outputs/tables/run_metrics.parquet` for additional diagnostics. Reports do not generate plots; they can optionally link the existing plot manifest.
 

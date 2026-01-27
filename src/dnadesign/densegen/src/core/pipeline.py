@@ -12,6 +12,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import atexit
 import hashlib
 import importlib.metadata
 import json
@@ -29,7 +30,11 @@ from typing import Callable, Iterable, List
 
 import numpy as np
 import pandas as pd
+from rich import box
 from rich.console import Console
+from rich.live import Live
+from rich.panel import Panel
+from rich.table import Table
 
 from ..adapters.optimizer import DenseArraysAdapter, OptimizerAdapter
 from ..adapters.outputs import OutputRecord, SinkBase, build_sinks, load_records_from_config, resolve_bio_alphabet
@@ -917,6 +922,90 @@ def _summarize_diversity(
     )
 
 
+def _summarize_tfbs_usage_stats(usage_counts: dict[tuple[str, str], int]) -> str:
+    if not usage_counts:
+        return "unique=0"
+    counts = np.array(list(usage_counts.values()), dtype=int)
+    if counts.size == 0:
+        return "unique=0"
+    unique = int(counts.size)
+    min_val = int(counts.min())
+    med_val = float(np.median(counts))
+    max_val = int(counts.max())
+    top_vals = sorted(counts.tolist(), reverse=True)[:3]
+    top_label = ",".join(str(int(v)) for v in top_vals)
+    med_label = f"{med_val:.1f}" if med_val % 1 else str(int(med_val))
+    return f"unique={unique} min/med/max={min_val}/{med_label}/{max_val} top={top_label}"
+
+
+class _ScreenDashboard:
+    def __init__(self, *, console: Console, refresh_seconds: float) -> None:
+        refresh_rate = max(1.0, 1.0 / max(refresh_seconds, 0.1))
+        self._live = Live(console=console, refresh_per_second=refresh_rate, transient=False)
+        self._started = False
+        atexit.register(self.close)
+
+    def update(self, renderable) -> None:
+        if not self._started:
+            self._live.start()
+            self._started = True
+        self._live.update(renderable, refresh=True)
+
+    def close(self) -> None:
+        if self._started:
+            self._live.stop()
+            self._started = False
+
+
+def _build_screen_dashboard(
+    *,
+    source_label: str,
+    plan_name: str,
+    bar: str,
+    generated: int,
+    quota: int,
+    pct: float,
+    local_generated: int,
+    local_target: int,
+    library_index: int,
+    cr_now: float | None,
+    cr_avg: float | None,
+    resamples: int,
+    dup_out: int,
+    dup_sol: int,
+    fails: int,
+    stalls: int,
+    failure_totals: str | None,
+    tf_usage: dict[str, int],
+    tfbs_usage: dict[tuple[str, str], int],
+    diversity_label: str,
+    show_tfbs: bool,
+    show_solutions: bool,
+    sequence_preview: str | None,
+) -> Panel:
+    table = Table(show_header=False, box=box.SIMPLE, expand=True)
+    header = f"{source_label}/{plan_name}"
+    table.add_row("run", header)
+    table.add_row("progress", f"{bar} {generated}/{quota} ({pct:.2f}%)")
+    table.add_row("library", f"index={library_index} local={local_generated}/{local_target}")
+    if cr_now is not None:
+        if cr_avg is not None:
+            table.add_row("compression", f"now={cr_now:.3f} avg={cr_avg:.3f}")
+        else:
+            table.add_row("compression", f"now={cr_now:.3f}")
+    table.add_row("counts", f"resamples={resamples} dup_out={dup_out} dup_sol={dup_sol} fails={fails} stalls={stalls}")
+    if failure_totals:
+        table.add_row("failures", failure_totals)
+    if tf_usage:
+        table.add_row("TF usage", _summarize_leaderboard(tf_usage, top=5))
+    tfbs_label = _summarize_leaderboard(tfbs_usage, top=5) if show_tfbs else _summarize_tfbs_usage_stats(tfbs_usage)
+    table.add_row("TFBS usage", tfbs_label)
+    table.add_row("diversity", diversity_label)
+    if show_solutions and sequence_preview:
+        table.add_row("sequence", sequence_preview)
+    return Panel(table, title="DenseGen progress")
+
+
 def _diversity_snapshot(
     usage_counts: dict[tuple[str, str], int],
     tf_usage_counts: dict[str, int],
@@ -1035,6 +1124,7 @@ def build_library_for_plan(
     library_sampling_strategy = str(getattr(sampling_cfg, "library_sampling_strategy", "tf_balanced"))
     cover_all_tfs = bool(getattr(sampling_cfg, "cover_all_regulators", True))
     unique_binding_sites = bool(getattr(sampling_cfg, "unique_binding_sites", True))
+    unique_binding_cores = bool(getattr(sampling_cfg, "unique_binding_cores", True))
     max_sites_per_tf = getattr(sampling_cfg, "max_sites_per_regulator", None)
     relax_on_exhaustion = bool(getattr(sampling_cfg, "relax_on_exhaustion", False))
     allow_incomplete_coverage = bool(getattr(sampling_cfg, "allow_incomplete_coverage", False))
@@ -1082,9 +1172,20 @@ def build_library_for_plan(
         return library, parts, reg_labels, info
 
     if meta_df is not None and isinstance(meta_df, pd.DataFrame):
+        if unique_binding_cores and "tfbs_core" not in meta_df.columns:
+            raise ValueError(
+                "generation.sampling.unique_binding_cores=true requires tfbs_core in the Stage-A pool. "
+                "Rebuild pools with core-aware sampling or disable unique_binding_cores."
+            )
         available_tfs = set(meta_df["tf"].tolist())
         tfbs_counts = (
-            meta_df.groupby("tf")["tfbs"].nunique() if unique_binding_sites else meta_df.groupby("tf")["tfbs"].size()
+            meta_df.groupby("tf")["tfbs_core"].nunique()
+            if unique_binding_cores
+            else (
+                meta_df.groupby("tf")["tfbs"].nunique()
+                if unique_binding_sites
+                else meta_df.groupby("tf")["tfbs"].size()
+            )
         )
         missing = [t for t in required_regulators if t not in available_tfs]
         if missing:
@@ -1107,7 +1208,7 @@ def build_library_for_plan(
                 if int(min_count) > max_allowed:
                     raise ValueError(
                         f"min_count_by_regulator[{tf}]={min_count} exceeds available sites ({max_allowed}). "
-                        "Increase library_size, relax min_count_by_regulator, or allow non-unique binding sites."
+                        "Increase library_size, relax min_count_by_regulator, or allow non-unique binding sites/cores."
                     )
         if min_required_regulators is not None:
             if not required_regulators and min_required_regulators > len(available_tfs):
@@ -1127,6 +1228,8 @@ def build_library_for_plan(
             lib_df = meta_df.copy()
             if unique_binding_sites:
                 lib_df = lib_df.drop_duplicates(["tf", "tfbs"])
+            if unique_binding_cores:
+                lib_df = lib_df.drop_duplicates(["tf", "tfbs_core"])
             if required_bias_motifs:
                 missing_bias = [m for m in required_bias_motifs if m not in set(lib_df["tfbs"])]
                 if missing_bias:
@@ -1207,6 +1310,7 @@ def build_library_for_plan(
             required_tfs=required_tfs_for_library,
             cover_all_tfs=cover_all_tfs,
             unique_binding_sites=unique_binding_sites,
+            unique_binding_cores=unique_binding_cores,
             max_sites_per_tf=max_sites_per_tf,
             relax_on_exhaustion=relax_on_exhaustion,
             allow_incomplete_coverage=allow_incomplete_coverage,
@@ -1874,6 +1978,8 @@ def _process_plan_for_source(
     random_seed: int,
     dense_arrays_version: str | None,
     dense_arrays_version_source: str,
+    show_tfbs: bool,
+    show_solutions: bool,
     output_bio_type: str,
     output_alphabet: str,
     one_subsample_only: bool = False,
@@ -2066,6 +2172,15 @@ def _process_plan_for_source(
     screen_console = Console() if progress_style == "screen" else None
     last_screen_refresh = 0.0
     latest_failure_totals: str | None = None
+    show_tfbs = bool(show_tfbs or getattr(log_cfg, "show_tfbs", False))
+    show_solutions = bool(show_solutions or getattr(log_cfg, "show_solutions", False))
+    dashboard = (
+        _ScreenDashboard(console=screen_console, refresh_seconds=progress_refresh_seconds)
+        if progress_style == "screen" and screen_console is not None
+        else None
+    )
+    cr_sum = 0.0
+    cr_count = 0
 
     policy_pad = str(pad_mode)
     policy_sampling = pool_strategy
@@ -3121,45 +3236,56 @@ def _process_plan_for_source(
                 pct = 100.0 * (global_generated / max(1, quota))
                 bar = _format_progress_bar(global_generated, quota, width=24)
                 cr = getattr(sol, "compression_ratio", float("nan"))
+                cr_now = float(cr) if isinstance(cr, (int, float)) and math.isfinite(cr) else None
+                if cr_now is not None:
+                    cr_sum += cr_now
+                    cr_count += 1
+                cr_avg = (cr_sum / cr_count) if cr_count else None
                 should_log = progress_every > 0 and global_generated % max(1, progress_every) == 0
                 if progress_style == "screen":
-                    if should_log and screen_console is not None:
+                    if should_log and dashboard is not None:
                         now = time.monotonic()
                         if (now - last_screen_refresh) >= progress_refresh_seconds:
-                            screen_console.clear()
-                            seq_preview = final_seq if len(final_seq) <= 120 else f"{final_seq[:117]}..."
-                            screen_console.print(
-                                f"[bold]{source_label}/{plan_name}[/] {bar} {global_generated}/{quota} ({pct:.2f}%)"
-                            )
-                            screen_console.print(
-                                f"local {local_generated}/{max_per_subsample} | CR={cr:.3f} | "
-                                f"resamples={total_resamples} dup_out={duplicate_records} "
-                                f"dup_sol={duplicate_solutions} fails={failed_solutions} stalls={stall_events}"
-                            )
-                            if latest_failure_totals:
-                                screen_console.print(f"failures: {latest_failure_totals}")
-                            if tf_usage_counts:
-                                screen_console.print(
-                                    f"TF leaderboard: {_summarize_leaderboard(tf_usage_counts, top=5)}"
-                                )
-                            if usage_counts:
-                                screen_console.print(f"TFBS leaderboard: {_summarize_leaderboard(usage_counts, top=5)}")
                             diversity_label = _summarize_diversity(
                                 usage_counts,
                                 tf_usage_counts,
                                 library_tfs=library_tfs,
                                 library_tfbs=library_tfbs,
                             )
-                            screen_console.print(f"Diversity: {diversity_label}")
-                            if print_visual:
-                                screen_console.print(derived["visual"])
-                            screen_console.print(f"sequence {seq_preview}")
+                            seq_preview = _short_seq(final_seq, max_len=120) if show_solutions else None
+                            dashboard.update(
+                                _build_screen_dashboard(
+                                    source_label=source_label,
+                                    plan_name=plan_name,
+                                    bar=bar,
+                                    generated=global_generated,
+                                    quota=quota,
+                                    pct=pct,
+                                    local_generated=local_generated,
+                                    local_target=max_per_subsample,
+                                    library_index=int(sampling_library_index),
+                                    cr_now=cr_now,
+                                    cr_avg=cr_avg,
+                                    resamples=total_resamples,
+                                    dup_out=duplicate_records,
+                                    dup_sol=duplicate_solutions,
+                                    fails=failed_solutions,
+                                    stalls=stall_events,
+                                    failure_totals=latest_failure_totals,
+                                    tf_usage=tf_usage_counts,
+                                    tfbs_usage=usage_counts,
+                                    diversity_label=diversity_label,
+                                    show_tfbs=show_tfbs,
+                                    show_solutions=show_solutions,
+                                    sequence_preview=seq_preview,
+                                )
+                            )
                             last_screen_refresh = now
                 elif progress_style == "summary":
                     pass
                 else:
                     if should_log:
-                        if print_visual:
+                        if show_solutions and print_visual:
                             log.info(
                                 "╭─ %s/%s  %s  %d/%d (%.2f%%) — local %d/%d — CR=%.3f\n"
                                 "%s\nsequence %s\n"
@@ -3172,11 +3298,11 @@ def _process_plan_for_source(
                                 pct,
                                 local_generated,
                                 max_per_subsample,
-                                cr,
+                                cr_now if cr_now is not None else float("nan"),
                                 derived["visual"],
                                 final_seq,
                             )
-                        else:
+                        elif show_solutions:
                             log.info(
                                 "[%s/%s] %s %d/%d (%.2f%%) (local %d/%d) CR=%.3f | seq %s",
                                 source_label,
@@ -3187,8 +3313,21 @@ def _process_plan_for_source(
                                 pct,
                                 local_generated,
                                 max_per_subsample,
-                                cr,
+                                cr_now if cr_now is not None else float("nan"),
                                 final_seq,
+                            )
+                        else:
+                            log.info(
+                                "[%s/%s] %s %d/%d (%.2f%%) (local %d/%d) CR=%.3f",
+                                source_label,
+                                plan_name,
+                                bar,
+                                global_generated,
+                                quota,
+                                pct,
+                                local_generated,
+                                max_per_subsample,
+                                cr_now if cr_now is not None else float("nan"),
                             )
 
                 if leaderboard_every > 0 and global_generated % max(1, leaderboard_every) == 0:
@@ -3221,12 +3360,20 @@ def _process_plan_for_source(
                             plan_name,
                             _summarize_leaderboard(tf_usage_counts, top=5),
                         )
-                        log.info(
-                            "[%s/%s] Leaderboard (TFBS): %s",
-                            source_label,
-                            plan_name,
-                            _summarize_leaderboard(usage_counts, top=5),
-                        )
+                        if show_tfbs:
+                            log.info(
+                                "[%s/%s] Leaderboard (TFBS): %s",
+                                source_label,
+                                plan_name,
+                                _summarize_leaderboard(usage_counts, top=5),
+                            )
+                        else:
+                            log.info(
+                                "[%s/%s] TFBS usage: %s",
+                                source_label,
+                                plan_name,
+                                _summarize_tfbs_usage_stats(usage_counts),
+                            )
                         log.info(
                             "[%s/%s] Failed TFBS: %s",
                             source_label,
@@ -3249,12 +3396,13 @@ def _process_plan_for_source(
                                 library_tfbs=library_tfbs,
                             ),
                         )
-                    log.info(
-                        "[%s/%s] Example: %s",
-                        source_label,
-                        plan_name,
-                        final_seq,
-                    )
+                    if show_solutions:
+                        log.info(
+                            "[%s/%s] Example: %s",
+                            source_label,
+                            plan_name,
+                            final_seq,
+                        )
 
                 if local_generated >= max_per_subsample or global_generated >= quota:
                     break
@@ -3451,6 +3599,8 @@ def _process_plan_for_source(
             snapshot = _current_leaderboard_snapshot()
             if global_generated >= quota and (usage_counts or tf_usage_counts or failure_counts):
                 _log_leaderboard_snapshot()
+            if dashboard is not None:
+                dashboard.close()
             return produced_total_this_call, {
                 "generated": produced_total_this_call,
                 "duplicates_skipped": duplicate_records,
@@ -3477,6 +3627,8 @@ def _process_plan_for_source(
     snapshot = _current_leaderboard_snapshot()
     if usage_counts or tf_usage_counts or failure_counts:
         _log_leaderboard_snapshot()
+    if dashboard is not None:
+        dashboard.close()
     return produced_total_this_call, {
         "generated": produced_total_this_call,
         "duplicates_skipped": duplicate_records,
@@ -3498,6 +3650,8 @@ def run_pipeline(
     *,
     resume: bool,
     build_stage_a: bool = False,
+    show_tfbs: bool = False,
+    show_solutions: bool = False,
     deps: PipelineDeps | None = None,
 ) -> RunSummary:
     deps = deps or default_deps()
@@ -3918,6 +4072,8 @@ def run_pipeline(
                     random_seed=seed,
                     dense_arrays_version=dense_arrays_version,
                     dense_arrays_version_source=dense_arrays_version_source,
+                    show_tfbs=show_tfbs,
+                    show_solutions=show_solutions,
                     output_bio_type=output_bio_type,
                     output_alphabet=output_alphabet,
                     one_subsample_only=False,
@@ -3975,6 +4131,8 @@ def run_pipeline(
                         random_seed=seed,
                         dense_arrays_version=dense_arrays_version,
                         dense_arrays_version_source=dense_arrays_version_source,
+                        show_tfbs=show_tfbs,
+                        show_solutions=show_solutions,
                         output_bio_type=output_bio_type,
                         output_alphabet=output_alphabet,
                         one_subsample_only=True,

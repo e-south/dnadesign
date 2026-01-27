@@ -18,10 +18,12 @@ class _DummyRng:
 
 
 def test_failure_weighting_reduces_weight_for_failed_sites() -> None:
+    tfbs = ["AAAA", "CCCC"]
     df = pd.DataFrame(
         {
             "tf": ["TF1", "TF1"],
-            "tfbs": ["AAAA", "CCCC"],
+            "tfbs": tfbs,
+            "tfbs_core": tfbs,
         }
     )
     rng = _DummyRng()

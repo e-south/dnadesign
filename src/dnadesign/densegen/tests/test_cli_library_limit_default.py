@@ -22,7 +22,7 @@ def test_inspect_run_library_default_limit(tmp_path: Path) -> None:
     run_manifest = {
         "run_id": "demo",
         "created_at": "2026-01-14T00:00:00+00:00",
-        "schema_version": "2.5",
+        "schema_version": "2.6",
         "config_sha256": "dummy",
         "run_root": ".",
         "random_seed": 0,

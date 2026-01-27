@@ -113,6 +113,9 @@ Per‑field guide (what it does → when to use → failure modes → artifacts 
   `outputs/tables/attempts.parquet`, `outputs/meta/run_manifest.json`.
 - `unique_binding_sites` — Stage‑B uniqueness filter at the TF+TFBS pair level. Use to avoid duplicate sites. Failure: can under‑fill libraries when pools are small. Artifacts: `outputs/libraries/*`,
   `outputs/tables/attempts.parquet`, `outputs/meta/run_manifest.json`.
+- `unique_binding_cores` — Stage‑B uniqueness filter at the TF+core level (default true). Use to avoid near‑duplicate flanks. Failure: can under‑fill libraries when pools are small or cores are missing. Artifacts: `outputs/libraries/*`,
+  `outputs/tables/attempts.parquet`, `outputs/meta/run_manifest.json`.
+  - PWM inputs derive cores from motif-aligned matches; binding-site tables default cores to the full TFBS sequence.
 - `max_sites_per_regulator` — Stage‑B cap per TF. Use to prevent dominance by a single TF. Failure: too low can make libraries infeasible for constraint plans. Artifacts: `outputs/libraries/*`,
   `outputs/tables/attempts.parquet`, `outputs/meta/run_manifest.json`.
 - `relax_on_exhaustion` — Stage‑B relaxation toggle when sampling can’t fill a library. Use with small pools to avoid hard failures. Failure: relaxed libraries can violate intended coverage. Artifacts: `outputs/libraries/*`, `outputs/tables/attempts.parquet`, `outputs/meta/run_manifest.json`.
@@ -135,8 +138,9 @@ Stage‑B library sampling still uses the same policy per plan, but round‑robi
 Stage‑B library rebuilds when `pool_strategy: iterative_subsample` is used. Expect extra compute if many
 plans are active.
 
-Stage‑A PWM sampling is performed **once per run** and cached across round‑robin passes. If you need a
-fresh Stage‑A sample, start a new run with `dense run --fresh` (or stage a new workspace).
+Stage‑A PWM sampling is performed by `dense stage-a build-pool` and cached under `outputs/pools/`. `dense run`
+reuses those pools by default; rebuild them with `dense stage-a build-pool --fresh` or run with
+`dense run --rebuild-stage-a` when pools are missing or stale.
 
 ---
 

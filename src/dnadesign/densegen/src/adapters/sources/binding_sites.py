@@ -107,8 +107,8 @@ class BindingSitesDataSource(BaseDataSource):
             dup_count = int(dup_mask.sum())
             log.warning(
                 "Binding sites input contains %d duplicate regulator/binding-site pairs in %s. "
-                "Duplicates are retained; set generation.sampling.unique_binding_sites=true to dedupe at "
-                "Stage-B sampling.",
+                "Duplicates are retained; set generation.sampling.unique_binding_sites=true or "
+                "generation.sampling.unique_binding_cores=true to dedupe at Stage-B sampling.",
                 dup_count,
                 data_path,
             )
@@ -122,6 +122,7 @@ class BindingSitesDataSource(BaseDataSource):
             )
 
         out = pd.DataFrame({"tf": tf_clean, "tfbs": seq_clean})
+        out["tfbs_core"] = seq_clean
         if site_id_col:
             out["site_id"] = df[site_id_col].astype(str).str.strip()
         if source_col:

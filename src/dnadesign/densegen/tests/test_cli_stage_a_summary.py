@@ -45,7 +45,7 @@ def _write_stage_a_config(tmp_path: Path) -> Path:
         textwrap.dedent(
             f"""
             densegen:
-              schema_version: "2.5"
+              schema_version: "2.6"
               run:
                 id: demo
                 root: "."
@@ -112,7 +112,7 @@ def _write_pwm_stage_a_config(tmp_path: Path) -> Path:
         textwrap.dedent(
             f"""
             densegen:
-              schema_version: "2.5"
+              schema_version: "2.6"
               run:
                 id: demo
                 root: "."

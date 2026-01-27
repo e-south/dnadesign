@@ -1866,6 +1866,7 @@ def inspect_config(
     )
     sampling_table.add_row("cover_all_regulators", str(sampling.cover_all_regulators))
     sampling_table.add_row("unique_binding_sites", str(sampling.unique_binding_sites))
+    sampling_table.add_row("unique_binding_cores", str(sampling.unique_binding_cores))
     sampling_table.add_row("max_sites_per_regulator", str(sampling.max_sites_per_regulator))
     sampling_table.add_row("relax_on_exhaustion", str(sampling.relax_on_exhaustion))
     sampling_table.add_row("allow_incomplete_coverage", str(sampling.allow_incomplete_coverage))
@@ -1894,7 +1895,18 @@ def inspect_config(
     console.print(f"[bold]Pad[/]: mode={pad.mode} end={pad.end} gc={gc_label} max_tries={pad.max_tries}")
     log_dir = resolve_outputs_scoped_path(loaded.path, run_root, cfg.logging.log_dir, label="logging.log_dir")
     log_dir_label = _display_path(log_dir, run_root, absolute=absolute)
-    console.print(f"[bold]Logging[/]: dir={log_dir_label} level={cfg.logging.level}")
+    log_table = Table("setting", "value")
+    log_table.add_row("dir", log_dir_label)
+    log_table.add_row("level", str(cfg.logging.level))
+    log_table.add_row("progress_style", str(cfg.logging.progress_style))
+    log_table.add_row("progress_every", str(cfg.logging.progress_every))
+    log_table.add_row("progress_refresh_seconds", str(cfg.logging.progress_refresh_seconds))
+    log_table.add_row("print_visual", str(cfg.logging.print_visual))
+    log_table.add_row("show_tfbs", str(cfg.logging.show_tfbs))
+    log_table.add_row("show_solutions", str(cfg.logging.show_solutions))
+    log_table.add_row("suppress_solver_stderr", str(cfg.logging.suppress_solver_stderr))
+    console.print("[bold]Logging[/]")
+    console.print(log_table)
 
     if root.plots:
         out_dir = resolve_outputs_scoped_path(loaded.path, run_root, root.plots.out_dir, label="plots.out_dir")
@@ -2496,6 +2508,8 @@ def run(
         None,
         help="Override logfile path (must be inside outputs/ under the run root).",
     ),
+    show_tfbs: bool = typer.Option(False, "--show-tfbs", help="Show TFBS sequences in progress output."),
+    show_solutions: bool = typer.Option(False, "--show-solutions", help="Show full solution sequences in output."),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
     cfg_path, is_default = _resolve_config_path(ctx, config)
@@ -2569,7 +2583,13 @@ def run(
     pl = resolve_plan(loaded)
     console.print("[bold]Quota plan[/]: " + ", ".join(f"{p.name}={p.quota}" for p in pl))
     try:
-        run_pipeline(loaded, resume=resume_run, build_stage_a=rebuild_stage_a)
+        run_pipeline(
+            loaded,
+            resume=resume_run,
+            build_stage_a=rebuild_stage_a,
+            show_tfbs=show_tfbs,
+            show_solutions=show_solutions,
+        )
     except FileNotFoundError as exc:
         _render_missing_input_hint(cfg_path, loaded, exc)
         raise typer.Exit(code=1)

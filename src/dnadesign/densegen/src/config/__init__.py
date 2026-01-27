@@ -603,7 +603,7 @@ class SamplingConfig(BaseModel):
     failure_penalty_power: float = 1.0
     cover_all_regulators: bool = True
     unique_binding_sites: bool = True
-    unique_binding_cores: bool = False
+    unique_binding_cores: bool = True
     max_sites_per_regulator: Optional[int] = None
     relax_on_exhaustion: bool = False
     allow_incomplete_coverage: bool = False
@@ -983,10 +983,12 @@ class LoggingConfig(BaseModel):
     log_dir: str
     level: str = "INFO"
     suppress_solver_stderr: bool = True
-    print_visual: bool = True
-    progress_style: Literal["stream", "summary", "screen"] = "stream"
+    print_visual: bool = False
+    progress_style: Literal["stream", "summary", "screen"] = "screen"
     progress_every: int = 1
     progress_refresh_seconds: float = 1.0
+    show_tfbs: bool = False
+    show_solutions: bool = False
 
     @field_validator("log_dir")
     @classmethod

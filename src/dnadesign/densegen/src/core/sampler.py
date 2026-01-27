@@ -76,6 +76,7 @@ class TFSampler:
         required_tfs: list[str] | None = None,
         cover_all_tfs: bool = False,
         unique_binding_sites: bool = True,
+        unique_binding_cores: bool = True,
         max_sites_per_tf: int | None = None,
         relax_on_exhaustion: bool = True,
         allow_incomplete_coverage: bool = False,
@@ -102,12 +103,19 @@ class TFSampler:
         df = self.df
         if unique_binding_sites:
             df = df.drop_duplicates(["tf", "tfbs"]).reset_index(drop=True)
+        if unique_binding_cores:
+            if "tfbs_core" not in df.columns:
+                raise ValueError(
+                    "unique_binding_cores=true requires a 'tfbs_core' column in the input data. "
+                    "Provide tfbs_core in the pool or disable unique_binding_cores."
+                )
 
         has_site_id = "site_id" in df.columns
         has_source = "source" in df.columns
         has_tfbs_id = "tfbs_id" in df.columns
         has_motif_id = "motif_id" in df.columns
         total_unique_tfbs = len(df.drop_duplicates(["tf", "tfbs"]))
+        total_unique_cores = len(df.drop_duplicates(["tf", "tfbs_core"])) if unique_binding_cores else total_unique_tfbs
 
         unique_tfs = sorted(df["tf"].unique().tolist())
         if not unique_tfs:
@@ -172,6 +180,7 @@ class TFSampler:
         tfbs_ids: list[str | None] = []
         motif_ids: list[str | None] = []
         seen_tfbs = set()
+        seen_cores = set()
         used_per_tf: dict[str, int] = {}
 
         def _append_row(row, reason: str) -> bool:
@@ -180,11 +189,18 @@ class TFSampler:
             key = (tf, tfbs)
             if unique_binding_sites and key in seen_tfbs:
                 return False
+            if unique_binding_cores:
+                core = str(row["tfbs_core"])
+                core_key = (tf, core)
+                if core_key in seen_cores:
+                    return False
             sites.append(tfbs)
             meta.append(f"{tf}:{tfbs}")
             labels.append(tf)
             reasons.append(reason)
             seen_tfbs.add(key)
+            if unique_binding_cores:
+                seen_cores.add((tf, str(row["tfbs_core"])))
             used_per_tf[tf] = used_per_tf.get(tf, 0) + 1
             site_ids.append(str(row["site_id"]) if has_site_id else None)
             sources.append(str(row["source"]) if has_source else None)
@@ -211,6 +227,10 @@ class TFSampler:
                     key = (str(row["tf"]), str(row["tfbs"]))
                     if unique_binding_sites and key in seen_tfbs:
                         continue
+                    if unique_binding_cores:
+                        core_key = (str(row["tf"]), str(row["tfbs_core"]))
+                        if core_key in seen_cores:
+                            continue
                     count = int(usage_counts.get(key, 0)) if usage_counts else 0
                     weight = 1.0 + float(coverage_boost_alpha) / ((1.0 + count) ** float(coverage_boost_power))
                     if avoid_failed_motifs and failure_counts is not None:
@@ -247,6 +267,10 @@ class TFSampler:
                 key = (str(row["tf"]), str(row["tfbs"]))
                 if unique_binding_sites and key in seen_tfbs:
                     continue
+                if unique_binding_cores:
+                    core_key = (str(row["tf"]), str(row["tfbs_core"]))
+                    if core_key in seen_cores:
+                        continue
                 if _append_row(row, reason):
                     return True
             return False
@@ -257,7 +281,11 @@ class TFSampler:
             if rows.empty:
                 raise ValueError(f"Required TFBS motif not found in input: {motif}")
             row = rows.sort_values(["tf", "tfbs"]).iloc[0]
-            _append_row(row, "required_tfbs")
+            if not _append_row(row, "required_tfbs"):
+                raise ValueError(
+                    "Required TFBS motifs conflict with uniqueness constraints. "
+                    "Disable unique_binding_cores or remove duplicate cores from required_tfbs."
+                )
 
         # Required regulators (at least one per TF)
         for tf in required_tf_list:
@@ -317,6 +345,11 @@ class TFSampler:
                         "Unique TFBS pool exhausted before reaching library_size. "
                         "Reduce library_size or allow duplicates."
                     )
+                if unique_binding_cores and len(seen_cores) >= total_unique_cores:
+                    raise ValueError(
+                        "Unique TFBS core pool exhausted before reaching library_size. "
+                        "Reduce library_size, disable unique_binding_cores, or add more input sites."
+                    )
                 if relax_on_exhaustion and cap is not None:
                     cap += 1
                     relaxed_cap = True
@@ -354,6 +387,11 @@ class TFSampler:
                     raise ValueError(
                         "Unique TFBS pool exhausted before reaching library_size. "
                         "Reduce library_size or allow duplicates."
+                    )
+                if unique_binding_cores and len(seen_cores) >= total_unique_cores:
+                    raise ValueError(
+                        "Unique TFBS core pool exhausted before reaching library_size. "
+                        "Reduce library_size, disable unique_binding_cores, or add more input sites."
                     )
                 if relax_on_exhaustion and cap is not None:
                     cap += 1

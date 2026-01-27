@@ -40,6 +40,9 @@ Optional (supported):
   (files named `candidates__<label>.parquet`) and aggregate to
   `outputs/pools/candidates/candidates.parquet` + `outputs/pools/candidates/candidates_summary.parquet`
 - `include_matched_sequence`
+- `dedupe_by`: `sequence | core` (default `core` when `length_policy: range`); this uniqueness key is designed
+  to be extensible as new strategies are added
+- `min_core_hamming_distance` (optional int >= 0; requires `dedupe_by: core`)
 - `length_policy`: `exact | range` (default `exact`)
 - `length_range`: `[min, max]` (required when `length_policy: range`)
 - `trim_window_length` (optional int > 0)
@@ -52,7 +55,7 @@ Strict validation behavior:
 
 FIMO score-based behavior:
 - Eligibility is `best_hit_score > 0` and requires at least one FIMO hit.
-- Tiering is 1% / 9% / 90% by score rank; retention is top‑`n_sites` by score (tie‑break by sequence).
+- Tiering is 0.1% / 1% / 9% / rest by score rank; retention is top‑`n_sites` by score (tie‑break by sequence).
 - FIMO runs with `--thresh 1.0` so score‑based eligibility is applied consistently.
 
 Minimal Stage‑A PWM example (score‑based FIMO):
@@ -87,6 +90,7 @@ Supported optional fields:
 Strict validation:
 - Regulator + sequence must be non‑empty.
 - Sequences must be A/C/G/T only.
+Binding site inputs derive `tfbs_core` as the full binding‑site sequence for core‑level uniqueness checks.
 
 Minimal example:
 

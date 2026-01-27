@@ -12,7 +12,7 @@ def _write_config(path: Path, *, meme_path: Path) -> None:
     payload = textwrap.dedent(
         f"""
         densegen:
-          schema_version: "2.5"
+          schema_version: "2.6"
           run:
             id: demo
             root: "."

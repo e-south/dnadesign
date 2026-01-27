@@ -21,7 +21,7 @@ This is the YAML schema for DenseGen. Unknown keys are errors and all paths reso
 ### Top-level
 
 - `densegen` (required)
-- `densegen.schema_version` (required; supported: `2.5`)
+- `densegen.schema_version` (required; supported: `2.6`)
 - `densegen.run` (required; run-scoped I/O root)
 - `plots` (optional; required `source` when `output.targets` has multiple sinks)
 
@@ -43,8 +43,10 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
   - `columns.site_id` (optional)
   - `columns.source` (optional)
   - Empty regulator/sequence rows are errors
-  - Duplicate regulator+sequence rows are allowed (use Stage‑B `generation.sampling.unique_binding_sites` to dedupe)
+  - Duplicate regulator+sequence rows are allowed (use Stage‑B `generation.sampling.unique_binding_sites` or
+    `generation.sampling.unique_binding_cores` to dedupe)
   - Sequences must be A/C/G/T only
+  - `tfbs_core` is derived as the full binding-site sequence for core-level uniqueness checks
 - `type: sequence_library`
   - `path` - CSV or Parquet file
   - `format` - `csv | parquet` (optional if extension is `.csv`/`.parquet`)
@@ -68,6 +70,11 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
       `outputs/pools/candidates/` for inspection (overwritten by `dense run` or
       `stage-a build-pool --fresh`)
     - `include_matched_sequence` (bool, default false) - include `fimo_matched_sequence` in TFBS outputs
+    - `dedupe_by` (optional; `sequence | core`) - Stage‑A uniqueness key for TFBS retention (default `core` for
+      `length_policy: range`, otherwise `sequence`). This key is intended to be extensible as new uniqueness
+      strategies are added.
+    - `min_core_hamming_distance` (optional int >= 0) - minimum Hamming distance between retained cores
+      (requires `dedupe_by: core`)
     - `length_policy`: `exact | range` (default: `exact`)
     - `length_range`: `[min, max]` (required when `length_policy=range`; `min` >= motif length)
     - `trim_window_length` (optional int > 0; trims PWM to a max‑information window before Stage‑A sampling)
@@ -76,7 +83,7 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     - `background` samples cores from the PWM background distribution before padding
     - FIMO resolves `fimo` via `MEME_BIN` or PATH; pixi users should run `pixi run dense ...` so it is available.
     - Eligibility is `best_hit_score > 0` and requires a FIMO hit.
-    - Tiering is 1% / 9% / 90% by score rank; retention is top‑`n_sites` by score (tie‑break by sequence).
+- Tiering is 0.1% / 1% / 9% / rest by score rank; retention is top‑`n_sites` by score (tie‑break by sequence).
     - FIMO runs with `--thresh 1.0` so score‑based eligibility is applied consistently.
 - `type: pwm_meme_set`
   - `paths` - list of MEME PWM files (merged into a single TF pool)
@@ -179,6 +186,7 @@ offered to the solver for binding-site and PWM-sampled inputs.
 - `subsample_over_length_budget_by` (>= 0; reported as a target bp length)
 - `cover_all_regulators` (bool)
 - `unique_binding_sites` (bool)
+- `unique_binding_cores` (bool; requires `tfbs_core` in pools)
 - `max_sites_per_regulator` (int > 0 or null)
 - `relax_on_exhaustion` (bool)
 - `allow_incomplete_coverage` (bool)
@@ -243,13 +251,15 @@ Notes:
   `outputs/` under `densegen.run.root`).
 - `level` (e.g., `INFO`)
 - `suppress_solver_stderr` (bool)
-- `print_visual` (bool)
-- `progress_style`: `stream | summary | screen` (default `stream`)
+- `print_visual` (bool; controls ASCII placement visuals when `show_solutions` is enabled)
+- `progress_style`: `stream | summary | screen` (default `screen`)
   - `stream`: per‑sequence logs (controlled by `progress_every`)
   - `summary`: suppress per‑sequence logs; keep periodic leaderboard summaries
-  - `screen`: clear and redraw a compact dashboard at `progress_refresh_seconds`
+  - `screen`: redraw a compact dashboard at `progress_refresh_seconds`
 - `progress_every` (int >= 0) - log/refresh interval in sequences (`0` disables per‑sequence logging)
 - `progress_refresh_seconds` (float > 0) - minimum seconds between screen refreshes
+- `show_tfbs` (bool) - include TFBS sequences in progress output
+- `show_solutions` (bool) - include full solution sequences in progress output
 
 ---
 
@@ -270,7 +280,7 @@ Notes:
 
 ```yaml
 densegen:
-  schema_version: "2.5"
+  schema_version: "2.6"
   run:
     id: demo
     root: "."
@@ -335,7 +345,7 @@ densegen:
     log_dir: outputs/logs
     level: INFO
     suppress_solver_stderr: true
-    print_visual: true
+    print_visual: false
 ```
 
 ---
