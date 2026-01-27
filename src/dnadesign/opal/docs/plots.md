@@ -107,13 +107,13 @@ These plots reuse shared SFXI math and are safe to run without retraining.
   - params: `size_by` (default `obj__effect_scaled`), `sample_n`, `seed`, `top_k`, `include_labels`, `rasterize_at`
 - **`sfxi_setpoint_decomposition`**: per-state residuals + intensity contribution for a single record.
   - params: `record_id` (required), `delta`
-- **`sfxi_setpoint_sweep`**: objective landscape across discrete setpoints.
+- **`sfxi_setpoint_sweep`**: objective landscape across discrete setpoints (current-round labels).
   - params: `y_col` (default `y_obs`), `top_k`, `tau`, `percentile`, `min_n`, `eps`, `delta`
 - **`sfxi_support_diagnostics`**: distance-to-labeled-logic vs score (OOD check).
   - params: `y_axis`, `hue`, `sample_n`, `seed`, `batch_size`
 - **`sfxi_uncertainty`**: uncertainty vs score (artifact model; RF variance).
   - params: `kind` (`score|y_hat`), `components`, `reduction`, `y_axis`, `hue`, `sample_n`, `seed`
-- **`sfxi_intensity_scaling`**: denom + clip fractions + E_raw distribution.
+- **`sfxi_intensity_scaling`**: denom + clip fractions + E_raw distribution (current-round labels).
   - params: `y_col` (default `y_obs`), `percentile`, `min_n`, `eps`, `delta`, `include_pool`
 
 ### Example YAML

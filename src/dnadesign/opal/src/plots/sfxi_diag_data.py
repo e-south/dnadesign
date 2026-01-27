@@ -71,6 +71,14 @@ def labels_asof_round(labels_df: pl.DataFrame, *, round_k: int) -> pl.DataFrame:
     return labels_df.filter(pl.col("observed_round") <= int(round_k))
 
 
+def labels_current_round(labels_df: pl.DataFrame, *, round_k: int) -> pl.DataFrame:
+    if labels_df.is_empty():
+        return labels_df
+    if "observed_round" not in labels_df.columns:
+        raise OpalError("labels.parquet missing observed_round.", ExitCodes.CONTRACT_VIOLATION)
+    return labels_df.filter(pl.col("observed_round") == int(round_k))
+
+
 def parse_setpoint_from_runs(runs_df: pl.DataFrame) -> Sequence[float]:
     if "objective__params" not in runs_df.columns:
         raise OpalError("runs.parquet missing objective__params (setpoint unavailable).", ExitCodes.BAD_ARGS)

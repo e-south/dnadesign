@@ -2319,17 +2319,9 @@ def _(
         )
         uncertainty_panel = fig_to_image(fig)
 
-    sweep_panel = mo.md("Setpoint sweep unavailable.")
-    intensity_panel = mo.md("Intensity scaling unavailable.")
-    sweep_note_md = mo.md("")
+    sweep_panel = mo.md("Setpoint sweep unavailable (current-round labels missing).")
+    intensity_panel = mo.md("Intensity scaling unavailable (current-round labels missing).")
     labels_df = opal_labels_current_df if opal_labels_current_df is not None else pl.DataFrame()
-    used_asof_labels = False
-    if labels_df.is_empty():
-        labels_df = opal_labels_asof_df if opal_labels_asof_df is not None else pl.DataFrame()
-        if labels_df is not None and not labels_df.is_empty():
-            used_asof_labels = True
-    if used_asof_labels:
-        sweep_note_md = mo.md("Setpoint sweep uses labels-as-of (current-round labels unavailable).")
     if labels_df is not None and not labels_df.is_empty():
         diag_labels_y_col = None
         if opal_campaign_info is not None and opal_campaign_info.y_column in labels_df.columns:
@@ -2409,7 +2401,6 @@ def _(
             uncertainty_color_dropdown,
             uncertainty_panel,
             mo.md("### Setpoint sweep (objective landscape)"),
-            sweep_note_md,
             sweep_panel,
             mo.md("### Intensity scaling diagnostics"),
             intensity_panel,

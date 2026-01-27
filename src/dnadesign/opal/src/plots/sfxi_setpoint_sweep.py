@@ -22,7 +22,7 @@ from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
 from ._param_utils import get_float, get_int, get_str
-from .sfxi_diag_data import labels_asof_round, parse_setpoint_from_runs, resolve_single_round
+from .sfxi_diag_data import labels_current_round, parse_setpoint_from_runs, resolve_single_round
 
 
 @register_plot(
@@ -39,7 +39,7 @@ from .sfxi_diag_data import labels_asof_round, parse_setpoint_from_runs, resolve
             "delta": "Log2 intensity offset delta (default 0.0).",
         },
         requires=["labels.parquet", "runs.parquet"],
-        notes=["Uses labels-as-of round for denom/logic metrics."],
+        notes=["Uses current-round labels for denom/logic metrics (objective-consistent)."],
     ),
 )
 def render(context, params: dict) -> None:
@@ -56,7 +56,7 @@ def render(context, params: dict) -> None:
     delta = get_float(params, ["delta", "intensity_log2_offset_delta"], 0.0)
 
     labels_df = read_labels(outputs_dir / "ledger" / "labels.parquet")
-    labels_df = labels_asof_round(labels_df, round_k=round_k)
+    labels_df = labels_current_round(labels_df, round_k=round_k)
     if labels_df.is_empty():
         raise OpalError("No labels available for setpoint sweep.", ExitCodes.BAD_ARGS)
     if y_col not in labels_df.columns:

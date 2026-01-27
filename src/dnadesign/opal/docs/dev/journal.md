@@ -86,3 +86,4 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Removed unused intensity median/IQR helpers from dashboard SFXI view.
 - Demo doc updated for non-interactive ingest-y (`--yes`).
 - Demo doc notes `opal notebook generate --force` when rerunning.
+- Setpoint sweep/intensity scaling plots now use current-round labels (objective-consistent); prom60_eda no longer falls back to labels-as-of.

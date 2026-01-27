@@ -23,7 +23,7 @@ from ..objectives import sfxi_math
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
 from ._param_utils import get_bool, get_float, get_int, get_str
-from .sfxi_diag_data import labels_asof_round, parse_setpoint_from_runs, resolve_run_id, resolve_single_round
+from .sfxi_diag_data import labels_current_round, parse_setpoint_from_runs, resolve_run_id, resolve_single_round
 
 
 @register_plot(
@@ -39,7 +39,7 @@ from .sfxi_diag_data import labels_asof_round, parse_setpoint_from_runs, resolve
             "include_pool": "Compute pool clip fractions (default false).",
         },
         requires=["labels.parquet", "runs.parquet"],
-        notes=["Uses labels-as-of round for scaling; pool optional."],
+        notes=["Uses current-round labels for scaling; pool optional."],
     ),
 )
 def render(context, params: dict) -> None:
@@ -56,7 +56,7 @@ def render(context, params: dict) -> None:
     include_pool = get_bool(params, ["include_pool", "pool"], False)
 
     labels_df = read_labels(outputs_dir / "ledger" / "labels.parquet")
-    labels_df = labels_asof_round(labels_df, round_k=round_k)
+    labels_df = labels_current_round(labels_df, round_k=round_k)
     if labels_df.is_empty():
         raise OpalError("No labels available for intensity scaling diagnostics.", ExitCodes.BAD_ARGS)
     if y_col not in labels_df.columns:
