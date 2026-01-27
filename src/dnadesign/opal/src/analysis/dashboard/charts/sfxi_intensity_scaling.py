@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
-from ....plots._mpl_utils import ensure_mpl_config_dir
+from ....plots._mpl_utils import apply_plot_style
 
 
 def make_intensity_scaling_figure(
@@ -45,10 +45,15 @@ def make_intensity_scaling_figure(
         if pool_raw.size == 0 or not np.all(np.isfinite(pool_raw)):
             raise ValueError("pool_effect_raw must be finite when provided.")
 
-    ensure_mpl_config_dir()
+    apply_plot_style()
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(1, 3, figsize=(max(7.0, 0.6 * len(labels)), 3.0))
+    fig, axes = plt.subplots(
+        1,
+        3,
+        figsize=(max(7.5, 0.65 * len(labels)), 3.2),
+        constrained_layout=True,
+    )
     ax_denom, ax_clip, ax_hist = axes
 
     x = np.arange(len(labels))
@@ -57,6 +62,7 @@ def make_intensity_scaling_figure(
     ax_denom.set_xticks(x)
     ax_denom.set_xticklabels(labels, rotation=45, ha="right")
     ax_denom.set_ylabel("denom_used")
+    ax_denom.tick_params(axis="x", labelsize=8)
 
     width = 0.35
     ax_clip.bar(x - width / 2, clip_lo, width=width, color="#F58518", alpha=0.85, label="clip_lo")
@@ -66,6 +72,7 @@ def make_intensity_scaling_figure(
     ax_clip.set_xticklabels(labels, rotation=45, ha="right")
     ax_clip.set_ylabel("fraction")
     ax_clip.legend(loc="best", fontsize=8)
+    ax_clip.tick_params(axis="x", labelsize=8)
 
     ax_hist.hist(label_raw, bins=20, color="#54A24B", alpha=0.7, label="labels")
     if pool_raw is not None:
@@ -79,5 +86,4 @@ def make_intensity_scaling_figure(
         fig.suptitle(f"{title}\n{subtitle}")
     else:
         fig.suptitle(title)
-    fig.tight_layout()
     return fig

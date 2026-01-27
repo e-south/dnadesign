@@ -16,7 +16,7 @@ from typing import Sequence
 import numpy as np
 
 from ....objectives import sfxi_math
-from ....plots._mpl_utils import ensure_mpl_config_dir
+from ....plots._mpl_utils import apply_plot_style
 from ...sfxi.state_order import STATE_ORDER, assert_state_order
 
 
@@ -58,10 +58,10 @@ def make_setpoint_decomposition_figure(
         contrib = np.zeros_like(residuals)
         note = "all-OFF setpoint ⇒ intensity ignored"
 
-    ensure_mpl_config_dir()
+    apply_plot_style()
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(1, 2, figsize=(6.4, 2.8))
+    fig, axes = plt.subplots(1, 2, figsize=(6.8, 3.0), constrained_layout=True)
     ax_res, ax_contrib = axes
 
     res_grid = _to_grid(residuals)
@@ -90,5 +90,4 @@ def make_setpoint_decomposition_figure(
         fig.suptitle(f"{title}\n{subtitle}")
     else:
         fig.suptitle(title)
-    fig.tight_layout()
     return fig

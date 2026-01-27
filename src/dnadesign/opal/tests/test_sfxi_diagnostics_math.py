@@ -13,10 +13,12 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import numpy as np
+import polars as pl
 
 from dnadesign.opal.src.analysis.sfxi.factorial_effects import compute_factorial_effects
 from dnadesign.opal.src.analysis.sfxi.gates import nearest_gate
 from dnadesign.opal.src.analysis.sfxi.intensity_scaling import summarize_intensity_scaling
+from dnadesign.opal.src.analysis.sfxi.setpoint_sweep import sweep_setpoints
 from dnadesign.opal.src.analysis.sfxi.support import dist_to_labeled_logic
 from dnadesign.opal.src.objectives import sfxi_math
 
@@ -128,3 +130,40 @@ def test_effect_raw_from_y_star_matches_manual():
     manual_raw = sfxi_math.effect_raw(manual_lin, manual_weights)
     assert np.allclose(weights, manual_weights)
     assert np.allclose(effect_raw, manual_raw)
+
+
+def test_setpoint_sweep_pool_clip_uses_label_denom():
+    labels_vec8 = np.array(
+        [
+            [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 2.0],
+        ],
+        dtype=float,
+    )
+    pool_vec8 = np.array(
+        [
+            [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 4.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 5.0],
+        ],
+        dtype=float,
+    )
+
+    sweep_df = sweep_setpoints(
+        labels_vec8=labels_vec8,
+        current_setpoint=np.array([0.0, 0.0, 0.0, 1.0], dtype=float),
+        percentile=50,
+        min_n=1,
+        eps=1e-8,
+        delta=0.0,
+        top_k=1,
+        tau=0.5,
+        pool_vec8=pool_vec8,
+        state_order=sfxi_math.STATE_ORDER,
+    )
+    target = sweep_df.filter(pl.col("setpoint_name") == "0001")
+    assert target.height == 1
+    pool_clip_hi = float(target.get_column("pool_clip_hi_fraction").item())
+    pool_clip_lo = float(target.get_column("pool_clip_lo_fraction").item())
+    assert np.isclose(pool_clip_hi, 1.0)
+    assert np.isclose(pool_clip_lo, 0.0)

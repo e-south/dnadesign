@@ -72,7 +72,8 @@ score   = (F_logic^beta) * (E_scaled^gamma)
 ## Required inputs & invariants (strict)
 
 **Core columns** (predictions):
-- `pred_y_hat` (vec8, objective space, length 8)
+- `pred_y_hat` (vec8, objective space, length 8; dashboard view)
+- `pred__y_hat_model` (vec8, objective space, length 8; ledger/CLI)
 - `pred_score` or `opal__view__score`
 - `pred_logic_fidelity`, `pred_effect_raw`, `pred_effect_scaled` (or overlay equivalents)
 
@@ -111,6 +112,7 @@ Library = **16 truth tables + current setpoint**. For each setpoint:
 - fraction `F_logic > tau`
 - `denom_used` from current‑round labels
 - clip fractions for `E_scaled` (labels; optional pool sample)
+  - pool clip fractions must use the **label-derived denom** (objective‑consistent scaling)
 
 ### D) Logic support diagnostics
 Scatter: x=`dist_to_labeled_logic`, y=`score` (or `F_logic`), color=`E_scaled` or `F_logic`.

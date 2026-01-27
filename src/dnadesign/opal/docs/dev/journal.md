@@ -79,3 +79,9 @@ Note: freeform working notes; prune/merge as they become cruft.
 - SFXI plot helpers: setpoint parsing fixed for tuple/list values; added unit test.
 - sfxi_setpoint_decomposition no longer requests derived setpoint column; added plot test.
 - sfxi_uncertainty now coerces polars Series y_ops to list; added unit test.
+- Fixed setpoint sweep pool clip fractions to use label-derived denom; added regression test.
+- prom60_eda now flags setpoint sweep when it falls back to labels-as-of.
+- SFXI diagnostic charts now share a compact plot style + constrained layout to reduce label overlap.
+- Setpoint sweep + intensity scaling subtitles include denom definition for clarity.
+- Removed unused intensity median/IQR helpers from dashboard SFXI view.
+- Demo doc updated for non-interactive ingest-y (`--yes`).

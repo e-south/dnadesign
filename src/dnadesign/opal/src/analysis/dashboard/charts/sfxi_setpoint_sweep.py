@@ -16,7 +16,7 @@ from typing import Sequence
 import numpy as np
 import polars as pl
 
-from ....plots._mpl_utils import ensure_mpl_config_dir
+from ....plots._mpl_utils import apply_plot_style
 
 
 def make_setpoint_sweep_figure(
@@ -39,21 +39,30 @@ def make_setpoint_sweep_figure(
         row = [metric] + [f"{float(v):.3f}" if v is not None and np.isfinite(v) else "NA" for v in values]
         table_rows.append(row)
 
-    ensure_mpl_config_dir()
+    apply_plot_style()
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(max(6.0, 0.7 * len(setpoint_labels)), 2.4 + 0.4 * len(metrics)))
+    fig, ax = plt.subplots(
+        figsize=(max(6.5, 0.75 * len(setpoint_labels)), 2.6 + 0.45 * len(metrics)),
+        constrained_layout=True,
+    )
     ax.axis("off")
 
     col_labels = ["metric"] + [str(s) for s in setpoint_labels]
     table = ax.table(cellText=table_rows, colLabels=col_labels, loc="center")
     table.auto_set_font_size(False)
-    table.set_fontsize(8)
+    n_cols = len(col_labels)
+    if n_cols <= 10:
+        font_size = 9
+    elif n_cols <= 16:
+        font_size = 8
+    else:
+        font_size = 7
+    table.set_fontsize(font_size)
     table.scale(1.0, 1.2)
 
     if subtitle:
         ax.set_title(f"{title}\n{subtitle}")
     else:
         ax.set_title(title)
-    fig.tight_layout()
     return fig

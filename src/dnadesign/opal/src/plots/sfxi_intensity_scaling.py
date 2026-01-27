@@ -112,11 +112,12 @@ def render(context, params: dict) -> None:
             state_order=STATE_ORDER,
         )
 
+    denom_note = f"denom={percentile}th pct E_raw (min_n={min_n})"
     fig = sfxi_intensity_scaling.make_intensity_scaling_figure(
         sweep_df,
         label_effect_raw=label_effect_raw,
         pool_effect_raw=pool_effect_raw,
-        subtitle=f"R={round_k} · labels={labels_vec.shape[0]}",
+        subtitle=f"R={round_k} · labels={labels_vec.shape[0]} · {denom_note}",
     )
     out_dir = context.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)

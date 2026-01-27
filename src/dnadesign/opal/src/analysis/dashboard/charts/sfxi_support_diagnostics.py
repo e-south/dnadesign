@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
-from ....plots._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir, scale_to_sizes, scatter_smart
+from ....plots._mpl_utils import annotate_plot_meta, apply_plot_style, scale_to_sizes, scatter_smart
 
 
 def make_support_diagnostics_figure(
@@ -57,10 +57,10 @@ def make_support_diagnostics_figure(
             raise ValueError(f"Missing hue column: {hue_col}")
         c = df.select(pl.col(hue_col).cast(pl.Float64, strict=False)).to_numpy().ravel()
 
-    ensure_mpl_config_dir()
+    apply_plot_style()
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(4.6, 4.2))
+    fig, ax = plt.subplots(figsize=(4.8, 4.4), constrained_layout=True)
     sc = scatter_smart(
         ax,
         x,
@@ -111,5 +111,4 @@ def make_support_diagnostics_figure(
         ax.set_title(f"{title}\n{subtitle}")
     else:
         ax.set_title(title)
-    fig.tight_layout()
     return fig

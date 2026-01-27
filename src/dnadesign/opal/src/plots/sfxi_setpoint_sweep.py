@@ -80,6 +80,7 @@ def render(context, params: dict) -> None:
         state_order=STATE_ORDER,
     )
 
+    denom_note = f"denom={percentile}th pct E_raw (min_n={min_n})"
     fig = sfxi_setpoint_sweep.make_setpoint_sweep_figure(
         sweep_df,
         metrics=[
@@ -89,7 +90,7 @@ def render(context, params: dict) -> None:
             "denom_used",
             "clip_hi_fraction",
         ],
-        subtitle=f"R={round_k} · labels={labels_vec.shape[0]}",
+        subtitle=f"R={round_k} · labels={labels_vec.shape[0]} · {denom_note}",
     )
     out_dir = context.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)

@@ -2321,9 +2321,15 @@ def _(
 
     sweep_panel = mo.md("Setpoint sweep unavailable.")
     intensity_panel = mo.md("Intensity scaling unavailable.")
+    sweep_note_md = mo.md("")
     labels_df = opal_labels_current_df if opal_labels_current_df is not None else pl.DataFrame()
+    used_asof_labels = False
     if labels_df.is_empty():
         labels_df = opal_labels_asof_df if opal_labels_asof_df is not None else pl.DataFrame()
+        if labels_df is not None and not labels_df.is_empty():
+            used_asof_labels = True
+    if used_asof_labels:
+        sweep_note_md = mo.md("Setpoint sweep uses labels-as-of (current-round labels unavailable).")
     if labels_df is not None and not labels_df.is_empty():
         diag_labels_y_col = None
         if opal_campaign_info is not None and opal_campaign_info.y_column in labels_df.columns:
@@ -2348,6 +2354,7 @@ def _(
                     pool_vec8=pool_vec,
                     state_order=sfxi_math.STATE_ORDER,
                 )
+                denom_note = f"denom={int(sfxi_params.p)}th pct E_raw (min_n={int(sfxi_params.min_n)})"
                 fig = make_setpoint_sweep_figure(
                     sweep_df,
                     metrics=[
@@ -2357,7 +2364,7 @@ def _(
                         "denom_used",
                         "clip_hi_fraction",
                     ],
-                    subtitle=f"labels={diag_labels_vec8.shape[0]}",
+                    subtitle=f"labels={diag_labels_vec8.shape[0]} · {denom_note}",
                 )
                 sweep_panel = fig_to_image(fig)
 
@@ -2381,7 +2388,7 @@ def _(
                     sweep_df,
                     label_effect_raw=label_effect_raw,
                     pool_effect_raw=pool_effect_raw,
-                    subtitle="E_raw distribution",
+                    subtitle=denom_note,
                 )
                 intensity_panel = fig_to_image(fig)
 
@@ -2402,6 +2409,7 @@ def _(
             uncertainty_color_dropdown,
             uncertainty_panel,
             mo.md("### Setpoint sweep (objective landscape)"),
+            sweep_note_md,
             sweep_panel,
             mo.md("### Intensity scaling diagnostics"),
             intensity_panel,

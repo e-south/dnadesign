@@ -27,7 +27,8 @@ uv run opal validate -c configs/campaign.yaml
 uv run opal ingest-y -c configs/campaign.yaml --round 0 \
   --csv inputs/r0/vec8-b0.xlsx \
   --unknown-sequences drop \
-  --if-exists replace
+  --if-exists replace \
+  --yes
 
 # 3) Train, score, select (round 0)
 uv run opal run -c configs/campaign.yaml --round 0
@@ -51,6 +52,7 @@ uv run opal notebook run
 - The demo `records.parquet` already includes round-0 label history for the 19 known
   sequences in `inputs/r0/vec8-b0.xlsx`. Use `--if-exists replace` to ensure the
   ledger labels sink is populated even if the labels are already present.
+- `ingest-y` prompts for confirmation when no TTY is available; pass `--yes` for scripted runs.
 - Demo plots live in `configs/plots.yaml` and include SFXI diagnostics (factorial effects,
   setpoint decomposition, setpoint sweep, logic support, uncertainty, intensity scaling).
   If you swap datasets, update the `record_id` in the setpoint decomposition plot entry.

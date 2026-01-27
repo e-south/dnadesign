@@ -16,7 +16,7 @@ from typing import Sequence
 import numpy as np
 import polars as pl
 
-from ....plots._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir, scale_to_sizes, scatter_smart
+from ....plots._mpl_utils import annotate_plot_meta, apply_plot_style, scale_to_sizes, scatter_smart
 from ...sfxi.factorial_effects import compute_factorial_effects
 from ...sfxi.state_order import STATE_ORDER, assert_state_order
 from ..util import list_series_to_numpy
@@ -58,10 +58,10 @@ def make_factorial_effects_figure(
         size_vals = df.select(pl.col(size_col).cast(pl.Float64, strict=False)).to_numpy().ravel()
         sizes = scale_to_sizes(size_vals, s_min=size_min, s_max=size_max)
 
-    ensure_mpl_config_dir()
+    apply_plot_style()
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(4.6, 4.2))
+    fig, ax = plt.subplots(figsize=(4.8, 4.4), constrained_layout=True)
     sc = scatter_smart(
         ax,
         a_eff,
@@ -127,5 +127,4 @@ def make_factorial_effects_figure(
         ax.set_title(f"{title}\n{subtitle}")
     else:
         ax.set_title(title)
-    fig.tight_layout()
     return fig

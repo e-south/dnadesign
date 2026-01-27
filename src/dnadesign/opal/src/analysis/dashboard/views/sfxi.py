@@ -25,36 +25,6 @@ from ..labels import observed_event_ids
 from ..util import list_series_to_numpy
 
 
-def fit_intensity_median_iqr(y, *, min_labels: int, eps: float):
-    if y.ndim != 2 or y.shape[1] < 8:
-        raise ValueError("intensity_median_iqr expects y with shape (n, 8+).")
-    if y.shape[0] < int(min_labels):
-        return np.zeros(4, dtype=float), np.ones(4, dtype=float), False
-    block = y[:, 4:8]
-    med = np.median(block, axis=0)
-    q75 = np.percentile(block, 75, axis=0)
-    q25 = np.percentile(block, 25, axis=0)
-    iqr = q75 - q25
-    iqr = np.where(iqr <= 0, float(eps), iqr)
-    return med, iqr, True
-
-
-def apply_intensity_median_iqr(y, med, iqr, *, eps: float, enabled: bool):
-    if not enabled:
-        return y
-    out = y.copy()
-    out[:, 4:8] = (out[:, 4:8] - med[None, :]) / np.maximum(iqr[None, :], float(eps))
-    return out
-
-
-def invert_intensity_median_iqr(y, med, iqr, *, enabled: bool):
-    if not enabled:
-        return y
-    out = y.copy()
-    out[:, 4:8] = out[:, 4:8] * iqr[None, :] + med[None, :]
-    return out
-
-
 @dataclass(frozen=True)
 class SFXIParams:
     setpoint: tuple[float, float, float, float]

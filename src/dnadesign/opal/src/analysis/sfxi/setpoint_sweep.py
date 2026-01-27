@@ -121,17 +121,21 @@ def sweep_setpoints(
         }
         if pool is not None:
             pool_y_star = pool[:, 4:8]
-            pool_scaling = summarize_intensity_scaling(
+            pool_effect_raw, _ = sfxi_math.effect_raw_from_y_star(
                 pool_y_star,
-                setpoint=p,
+                p,
                 delta=delta,
-                percentile=percentile,
-                min_n=min_n,
                 eps=eps,
                 state_order=order,
             )
-            row["pool_clip_lo_fraction"] = float(pool_scaling.clip_lo_fraction)
-            row["pool_clip_hi_fraction"] = float(pool_scaling.clip_hi_fraction)
+            if scaling.intensity_disabled:
+                pool_effect_scaled = np.ones(pool_effect_raw.shape[0], dtype=float)
+            else:
+                pool_effect_scaled = sfxi_math.effect_scaled(pool_effect_raw, float(scaling.denom))
+            pool_clip_lo = float(np.mean(pool_effect_scaled <= 0.0 + 1e-12)) if pool_effect_scaled.size else 0.0
+            pool_clip_hi = float(np.mean(pool_effect_scaled >= 1.0 - 1e-12)) if pool_effect_scaled.size else 0.0
+            row["pool_clip_lo_fraction"] = pool_clip_lo
+            row["pool_clip_hi_fraction"] = pool_clip_hi
         rows.append(row)
 
     return pl.DataFrame(rows)
