@@ -118,7 +118,7 @@ from .stage_b import (
     _max_fixed_element_len,
     _merge_min_counts,
     _min_count_by_regulator,
-    _min_required_length_for_constraints,
+    assess_library_feasibility,
     build_library_for_plan,
 )
 from .versioning import _resolve_dense_arrays_version
@@ -856,19 +856,20 @@ def _process_plan_for_source(
     library_sources = list(source_by_index) if source_by_index else []
     library_tfbs_ids = list(tfbs_id_by_index) if tfbs_id_by_index else []
     library_motif_ids = list(motif_id_by_index) if motif_id_by_index else []
-    min_required_len, min_breakdown = _min_required_length_for_constraints(
+    min_required_len, min_breakdown, feasibility = assess_library_feasibility(
         library_tfbs=library_tfbs,
         library_tfs=library_tfs,
-        fixed_elements_dump=fixed_elements_dump,
+        fixed_elements=plan_item.fixed_elements,
         required_regulators=required_regulators,
         min_required_regulators=min_required_regulators,
         min_count_by_regulator=plan_min_count_by_regulator,
         min_count_per_tf=min_count_per_tf,
+        sequence_length=seq_len,
     )
-    fixed_bp = int(min_breakdown["fixed_elements_min"])
-    min_required_bp = int(min_required_len) - fixed_bp
-    slack_bp = int(seq_len) - int(min_required_len)
-    infeasible = slack_bp < 0
+    fixed_bp = int(feasibility["fixed_bp"])
+    min_required_bp = int(feasibility["min_required_bp"])
+    slack_bp = int(feasibility["slack_bp"])
+    infeasible = bool(feasibility["infeasible"])
     _record_library_build(
         sampling_info=sampling_info,
         library_tfbs=library_tfbs,
@@ -1905,19 +1906,20 @@ def _process_plan_for_source(
             library_sources = list(source_by_index) if source_by_index else []
             library_tfbs_ids = list(tfbs_id_by_index) if tfbs_id_by_index else []
             library_motif_ids = list(motif_id_by_index) if motif_id_by_index else []
-            min_required_len, min_breakdown = _min_required_length_for_constraints(
+            min_required_len, min_breakdown, feasibility = assess_library_feasibility(
                 library_tfbs=library_tfbs,
                 library_tfs=library_tfs,
-                fixed_elements_dump=fixed_elements_dump,
+                fixed_elements=plan_item.fixed_elements,
                 required_regulators=required_regulators,
                 min_required_regulators=min_required_regulators,
                 min_count_by_regulator=plan_min_count_by_regulator,
                 min_count_per_tf=min_count_per_tf,
+                sequence_length=seq_len,
             )
-            fixed_bp = int(min_breakdown["fixed_elements_min"])
-            min_required_bp = int(min_required_len) - fixed_bp
-            slack_bp = int(seq_len) - int(min_required_len)
-            infeasible = slack_bp < 0
+            fixed_bp = int(feasibility["fixed_bp"])
+            min_required_bp = int(feasibility["min_required_bp"])
+            slack_bp = int(feasibility["slack_bp"])
+            infeasible = bool(feasibility["infeasible"])
             _record_library_build(
                 sampling_info=sampling_info,
                 library_tfbs=library_tfbs,

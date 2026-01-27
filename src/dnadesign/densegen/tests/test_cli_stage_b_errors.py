@@ -85,6 +85,7 @@ def _write_pool_manifest(tmp_path: Path) -> Path:
             "input_name": ["demo_input"] * 2,
             "tf": ["TF_A", "TF_B"],
             "tfbs": ["AAAA", "CCCC"],
+            "tfbs_core": ["AAAA", "CCCC"],
             "best_hit_score": [5.0, 4.0],
             "tier": [0, 1],
             "rank_within_regulator": [1, 1],

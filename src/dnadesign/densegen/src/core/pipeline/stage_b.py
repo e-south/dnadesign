@@ -191,6 +191,44 @@ def _min_required_length_for_constraints(
     }
 
 
+def assess_library_feasibility(
+    *,
+    library_tfbs: list[str],
+    library_tfs: list[str],
+    fixed_elements,
+    required_regulators: list[str] | None,
+    min_required_regulators: int | None,
+    min_count_by_regulator: dict[str, int] | None,
+    min_count_per_tf: int,
+    sequence_length: int,
+) -> tuple[int, dict[str, int], dict[str, int | bool]]:
+    fixed_elements_dump = _fixed_elements_dump(fixed_elements)
+    min_required_len, min_breakdown = _min_required_length_for_constraints(
+        library_tfbs=library_tfbs,
+        library_tfs=library_tfs,
+        fixed_elements_dump=fixed_elements_dump,
+        required_regulators=required_regulators,
+        min_required_regulators=min_required_regulators,
+        min_count_by_regulator=min_count_by_regulator,
+        min_count_per_tf=min_count_per_tf,
+    )
+    fixed_bp = int(min_breakdown["fixed_elements_min"])
+    min_required_bp = int(min_required_len) - fixed_bp
+    slack_bp = int(sequence_length) - int(min_required_len)
+    infeasible = slack_bp < 0
+    return (
+        min_required_len,
+        min_breakdown,
+        {
+            "fixed_bp": fixed_bp,
+            "min_required_bp": min_required_bp,
+            "slack_bp": slack_bp,
+            "infeasible": infeasible,
+            "sequence_length": int(sequence_length),
+        },
+    )
+
+
 def _hash_library(
     library_for_opt: list[str],
     regulator_labels: list[str] | None,

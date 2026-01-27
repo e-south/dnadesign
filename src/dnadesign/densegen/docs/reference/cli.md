@@ -77,12 +77,9 @@ Options:
 - `--config` — config path (used to resolve run root when `--run` is not set).
 - `--absolute` — show absolute paths instead of workspace‑relative.
 - `--verbose` — show failure breakdown columns (constraint filters + duplicate solutions).
-- `--library` — include Stage‑B offered‑vs‑used summaries (TF/TFBS usage).
-- `--library-limit` — limit library builds shown in per‑library summaries (`0` = all).
-- `--top` — number of rows to show in library summaries.
-- `--by-library/--no-by-library` — group library summaries per build attempt.
-- `--top-per-tf` — limit TFBS rows per TF when summarizing.
-- `--show-library-hash/--short-library-hash` — toggle full vs short library hashes.
+- `--library` — include Stage‑B offered‑vs‑used summaries aggregated across all libraries.
+- `--top` — number of rows to show in library summaries (0 = all rows).
+- `--show-motif-ids` — show full motif IDs instead of short TF labels.
 - `--events` — show event summary (stalls/resamples, library rebuilds).
 
 ---
@@ -177,6 +174,7 @@ Generate plots from existing outputs.
 
 Options:
 - `--only NAME1,NAME2` — run a subset of plots by name.
+- `--absolute` — show absolute paths instead of workspace‑relative.
 
 ---
 

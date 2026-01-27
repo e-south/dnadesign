@@ -205,10 +205,10 @@ The demo quota is intentionally small (`generation.quota: 12` with `runtime.max_
 
 ### 8. Inspect run summary
 
-Why: inspect Stage‑B library usage and runtime events.
+Why: inspect aggregated Stage‑B library usage and runtime events.
 
 ```bash
-dense inspect run --library --events --library-limit 5
+dense inspect run --library --events
 ```
 
 ---

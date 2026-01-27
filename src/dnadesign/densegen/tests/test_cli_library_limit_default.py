@@ -10,7 +10,7 @@ from dnadesign.densegen.src.cli import app
 from dnadesign.densegen.tests.config_fixtures import write_minimal_config
 
 
-def test_inspect_run_library_default_limit(tmp_path: Path) -> None:
+def test_inspect_run_library_summary_is_aggregated(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.yaml"
     write_minimal_config(cfg_path)
     (tmp_path / "inputs.csv").write_text("tf,tfbs\nTF1,AAA\n")
@@ -52,7 +52,7 @@ def test_inspect_run_library_default_limit(tmp_path: Path) -> None:
     (meta_root / "run_manifest.json").write_text(json.dumps(run_manifest))
     attempts_rows = []
     hashes = []
-    for idx in range(1, 12):
+    for idx in range(1, 4):
         lib_hash = f"hash{idx:02d}"
         hashes.append(lib_hash)
         attempts_rows.append(
@@ -77,5 +77,7 @@ def test_inspect_run_library_default_limit(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["inspect", "run", "--library", "-c", str(cfg_path)])
     assert result.exit_code == 0
-    assert hashes[9] in result.output
-    assert hashes[10] not in result.output
+    assert "TF usage summary" in result.output
+    assert "Library build summary" not in result.output
+    for lib_hash in hashes:
+        assert lib_hash not in result.output

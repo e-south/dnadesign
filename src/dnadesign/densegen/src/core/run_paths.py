@@ -49,9 +49,9 @@ META_BLOCKING_FILES = {
     INPUTS_MANIFEST_NAME,
     RUN_STATE_NAME,
     "effective_config.json",
-    "events.jsonl",
     ID_INDEX_NAME,
 }
+META_NON_BLOCKING_FILES = {"events.jsonl"}
 
 
 def run_outputs_root(run_root: Path) -> Path:
@@ -147,6 +147,8 @@ def _meta_has_run_artifacts(meta_dir: Path) -> bool:
         return False
     for entry in meta_dir.iterdir():
         if entry.name in IGNORED_OUTPUT_ENTRIES:
+            continue
+        if entry.name in META_NON_BLOCKING_FILES:
             continue
         if entry.name in META_BLOCKING_FILES:
             return True

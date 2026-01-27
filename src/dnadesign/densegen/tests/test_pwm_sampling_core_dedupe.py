@@ -33,7 +33,7 @@ def test_core_sequence_uses_start_stop_slice() -> None:
 
 def test_core_sequence_invalid_bounds_raises() -> None:
     cand = FimoCandidate(seq="TTTAAA", score=5.0, start=7, stop=8, strand="+")
-    with pytest.raises(ValueError, match="core sequence bounds"):
+    with pytest.raises(ValueError, match="Core sequence bounds"):
         _core_sequence(cand)
 
 

@@ -158,9 +158,9 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["inspect", "run", "--run", str(run_root), "--library"])
     assert result.exit_code == 0, result.output
-    assert "Library build summary" in result.output
-    assert "abc123" in result.output
-    assert "Library 1" in result.output
+    assert "TF usage summary" in result.output
+    assert "Library build summary" not in result.output
+    assert "abc123" not in result.output
 
 
 def test_summarize_library_limit_truncates(tmp_path: Path) -> None:
@@ -309,19 +309,7 @@ def test_summarize_library_limit_truncates(tmp_path: Path) -> None:
     manifest.write_json(run_manifest_path(run_root))
 
     runner = CliRunner()
-    result = runner.invoke(
-        app,
-        [
-            "inspect",
-            "run",
-            "--run",
-            str(run_root),
-            "--library",
-            "--library-limit",
-            "1",
-        ],
-    )
+    result = runner.invoke(app, ["inspect", "run", "--run", str(run_root), "--library", "--top", "1"])
     assert result.exit_code == 0, result.output
-    assert "Showing 1 of 2 libraries" in result.output
-    assert "abc123" in result.output
-    assert "def456" not in result.output
+    assert "TF usage summary" in result.output
+    assert "Library build summary" not in result.output

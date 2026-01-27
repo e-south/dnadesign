@@ -37,3 +37,11 @@ def test_existing_outputs_detects_meta_run_state(tmp_path: Path) -> None:
     meta_root.mkdir(parents=True)
     (meta_root / "run_state.json").write_text("{}")
     assert has_existing_run_outputs(run_root)
+
+
+def test_existing_outputs_ignores_events_log(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    meta_root = run_meta_root(run_root)
+    meta_root.mkdir(parents=True)
+    (meta_root / "events.jsonl").write_text("{}")
+    assert not has_existing_run_outputs(run_root)

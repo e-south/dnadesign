@@ -65,6 +65,29 @@ def _style(style: Optional[dict]) -> dict:
     return s
 
 
+def _format_plot_path(path: Path, run_root: Path, absolute: bool) -> str:
+    if absolute:
+        return str(path)
+    try:
+        return str(path.relative_to(run_root))
+    except ValueError:
+        return str(path)
+
+
+def _format_source_label(label: str, run_root: Path, absolute: bool) -> str:
+    if ":" not in label:
+        return label
+    prefix, raw = label.split(":", 1)
+    raw = raw.strip()
+    if not raw:
+        return label
+    try:
+        path = Path(raw)
+    except Exception:
+        return label
+    return f"{prefix}:{_format_plot_path(path, run_root, absolute)}"
+
+
 def _apply_style(ax, style: dict):
     if style.get("seaborn_style", True):
         applied = False
@@ -1333,6 +1356,7 @@ def run_plots_from_config(
     *,
     only: Optional[str] = None,
     source: str = "plot",
+    absolute: bool = False,
 ) -> None:
     plots_cfg = root_cfg.plots
     run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
@@ -1359,40 +1383,47 @@ def run_plots_from_config(
 
     if "outputs" in required_sources:
         df, src_label = load_records_from_config(root_cfg, cfg_path, columns=cols, max_rows=max_rows)
+        src_label = _format_source_label(src_label, run_root, absolute)
         row_count = len(df)
     if "composition" in required_sources:
         composition_df = _load_composition(run_root)
         if row_count == 0:
             row_count = len(composition_df)
-            src_label = f"composition:{run_root / 'outputs' / 'tables' / 'composition.parquet'}"
+            src_label = _format_source_label(
+                f"composition:{run_root / 'outputs' / 'tables' / 'composition.parquet'}", run_root, absolute
+            )
     if "libraries" in required_sources:
         library_builds_df, library_members_df = _load_libraries(run_root)
         if row_count == 0:
             row_count = len(library_members_df)
-            src_label = f"libraries:{run_root / 'outputs' / 'libraries'}"
+            src_label = _format_source_label(f"libraries:{run_root / 'outputs' / 'libraries'}", run_root, absolute)
     if "config" in required_sources:
         cfg_effective = _load_effective_config(run_root)
         if row_count == 0:
             row_count = 1
-            src_label = f"config:{run_root / 'outputs' / 'meta' / 'effective_config.json'}"
+            src_label = _format_source_label(
+                f"config:{run_root / 'outputs' / 'meta' / 'effective_config.json'}", run_root, absolute
+            )
     if "attempts" in required_sources:
         attempts_df = _load_attempts(run_root)
         if row_count == 0:
             row_count = len(attempts_df)
-            src_label = f"attempts:{run_root / 'outputs' / 'tables' / 'attempts.parquet'}"
+            src_label = _format_source_label(
+                f"attempts:{run_root / 'outputs' / 'tables' / 'attempts.parquet'}", run_root, absolute
+            )
         events_path = run_root / "outputs" / "meta" / "events.jsonl"
         if events_path.exists():
             events_df = _load_events(run_root)
             if row_count == 0:
                 row_count = len(events_df)
-                src_label = f"events:{events_path}"
+                src_label = _format_source_label(f"events:{events_path}", run_root, absolute)
     pools: dict[str, pd.DataFrame] | None = None
     pool_manifest: TFBSPoolArtifact | None = None
     if "pools" in required_sources:
         pool_manifest, pools = _load_stage_a_pools(run_root)
         if row_count == 0:
             row_count = sum(len(pool_df) for pool_df in pools.values())
-            src_label = f"pools:{run_root / 'outputs' / 'pools'}"
+            src_label = _format_source_label(f"pools:{run_root / 'outputs' / 'pools'}", run_root, absolute)
     if "tfbs_usage" in selected and pools is None:
         pool_manifest, pools = _maybe_load_stage_a_pools(run_root)
     if "tfbs_usage" in selected and library_members_df is None:
@@ -1400,9 +1431,10 @@ def run_plots_from_config(
         if libs is not None:
             library_builds_df, library_members_df = libs
 
+    out_label = _format_plot_path(out_dir, run_root, absolute)
     _console.print(
         Panel.fit(
-            f"DenseGen plotting • source: {src_label} • rows: {row_count:,}\nOutput: {out_dir}",
+            f"DenseGen plotting • source: {src_label} • rows: {row_count:,}\nOutput: {out_label}",
             border_style="blue",
         )
     )
@@ -1467,7 +1499,9 @@ def run_plots_from_config(
                 paths = [Path(p) for p in result]
             else:
                 paths = [Path(result)]
-            saved_label = str(paths[0]) if len(paths) == 1 else f"{paths[0]} (+{len(paths) - 1})"
+            saved_label = _format_plot_path(paths[0], run_root, absolute)
+            if len(paths) > 1:
+                saved_label = f"{saved_label} (+{len(paths) - 1})"
             summary.add_row(name, saved_label, "[green]ok[/]")
             created_at = datetime.now(timezone.utc).isoformat()
             for path in paths:

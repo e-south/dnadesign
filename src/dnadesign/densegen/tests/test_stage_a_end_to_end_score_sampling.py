@@ -18,6 +18,7 @@ import pandas as pd
 import pytest
 import yaml
 
+from dnadesign.densegen.src.adapters.sources import pwm_sampling
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.artifacts.pool import build_pool_artifact
 from dnadesign.densegen.src.core.pipeline import default_deps
@@ -95,12 +96,21 @@ def _write_config(tmp_path: Path) -> Path:
 
 
 def _top_scoring_sequences(candidates: pd.DataFrame, count: int) -> list[str]:
-    ranked = (
-        candidates.groupby("sequence", as_index=False)["best_hit_score"]
-        .max()
-        .sort_values(["best_hit_score", "sequence"], ascending=[False, True])
-    )
-    return ranked.head(count)["sequence"].tolist()
+    ranked_rows = candidates.sort_values(["best_hit_score", "sequence"], ascending=[False, True])
+    ranked: list[pwm_sampling.FimoCandidate] = []
+    for row in ranked_rows.itertuples():
+        ranked.append(
+            pwm_sampling.FimoCandidate(
+                seq=str(row.sequence),
+                score=float(row.best_hit_score),
+                start=int(row.start),
+                stop=int(row.stop),
+                strand=str(row.strand or "+"),
+                matched_sequence=str(row.matched_sequence) if row.matched_sequence else None,
+            )
+        )
+    deduped = pwm_sampling._dedupe_by_core(ranked, min_core_hamming_distance=None)
+    return [cand.seq for cand in deduped[:count]]
 
 
 @pytest.mark.skipif(

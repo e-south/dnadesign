@@ -178,16 +178,22 @@ class _TtyBuffer(io.StringIO):
 
 
 def test_pwm_progress_dedupes_identical_updates() -> None:
+    prev_enabled = logging_utils.is_progress_enabled()
+    logging_utils.set_progress_enabled(True)
     stream = _TtyBuffer()
-    progress = pwm_sampling._PwmSamplingProgress(
-        motif_id="M1",
-        backend="densegen",
-        target=10,
-        accepted_target=None,
-        stream=stream,
-    )
-    progress.update(generated=5, accepted=None, force=True)
-    progress.update(generated=5, accepted=None, force=True)
-    progress.finish()
-    output = stream.getvalue()
-    assert output.count("PWM M1") == 1
+    try:
+        progress = pwm_sampling._PwmSamplingProgress(
+            motif_id="M1",
+            backend="densegen",
+            target=10,
+            accepted_target=None,
+            stream=stream,
+        )
+        progress.update(generated=5, accepted=None, force=True)
+        progress.update(generated=5, accepted=None, force=True)
+        progress.finish()
+        output = stream.getvalue()
+        assert output.count("PWM M1") == 1
+    finally:
+        logging_utils.set_progress_enabled(prev_enabled)
+        logging_utils.set_progress_active(False)

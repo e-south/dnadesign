@@ -80,7 +80,7 @@ from .core.artifacts.pool import (
 from .core.pipeline import default_deps, resolve_plan, run_pipeline
 from .core.pipeline.attempts import _load_existing_library_index, _load_failure_counts_from_attempts
 from .core.pipeline.outputs import _emit_event
-from .core.pipeline.stage_b import build_library_for_plan
+from .core.pipeline.stage_b import assess_library_feasibility, build_library_for_plan
 from .core.reporting import collect_report_data, write_report
 from .core.run_manifest import load_run_manifest
 from .core.run_paths import (
@@ -1264,22 +1264,16 @@ def inspect_run(
     absolute: bool = typer.Option(False, "--absolute", help="Show absolute paths instead of workspace-relative."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show failure breakdown columns."),
     library: bool = typer.Option(False, "--library", help="Include offered-vs-used library summaries."),
-    library_limit: int = typer.Option(10, "--library-limit", help="Limit libraries shown in summaries (0 = all)."),
     top: int = typer.Option(10, "--top", help="Rows to show for library summaries."),
-    by_library: bool = typer.Option(True, "--by-library/--no-by-library", help="Group library summaries per build."),
-    top_per_tf: Optional[int] = typer.Option(None, "--top-per-tf", help="Limit TFBS rows per TF when summarizing."),
-    show_library_hash: bool = typer.Option(
-        True,
-        "--show-library-hash/--short-library-hash",
-        help="Show full library hash (or short hash if disabled).",
+    show_motif_ids: bool = typer.Option(
+        False,
+        "--show-motif-ids",
+        help="Show full motif IDs instead of TF display names in summaries.",
     ),
     events: bool = typer.Option(False, "--events", help="Show events summary (stalls/resamples)."),
 ):
     if root is not None and run is not None:
         console.print("[bold red]Choose either --root or --run, not both.[/]")
-        raise typer.Exit(code=1)
-    if library_limit < 0:
-        console.print("[bold red]--library-limit must be >= 0.[/]")
         raise typer.Exit(code=1)
     if root is not None:
         workspaces_root = root.resolve()
@@ -1441,190 +1435,81 @@ def inspect_run(
 
         offered_vs_used_tf = bundle.tables.get("offered_vs_used_tf")
         offered_vs_used_tfbs = bundle.tables.get("offered_vs_used_tfbs")
-        library_summary = bundle.tables.get("library_summary", pd.DataFrame())
-
-        library_hashes = set()
-        if isinstance(library_summary, pd.DataFrame) and not library_summary.empty:
-            library_hashes = set(library_summary.get("library_hash", []))
-        elif isinstance(offered_vs_used_tf, pd.DataFrame):
-            library_hashes = set(offered_vs_used_tf.get("library_hash", []))
-
-        total_libraries = 0
-        display_count = 0
-        truncated_libraries = False
-        display_library_summary = library_summary
-        display_hashes: list[str] = []
-        if isinstance(library_summary, pd.DataFrame) and not library_summary.empty:
-            display_library_summary = library_summary.sort_values("library_index")
-            total_libraries = len(display_library_summary)
-            if library_limit > 0 and total_libraries > library_limit:
-                display_library_summary = display_library_summary.head(library_limit)
-                truncated_libraries = True
-            display_count = len(display_library_summary)
-            display_hashes = [str(val) for val in display_library_summary.get("library_hash", [])]
-        elif library_hashes:
-            display_hashes = sorted(library_hashes)
-            total_libraries = len(display_hashes)
-            if library_limit > 0 and total_libraries > library_limit:
-                display_hashes = display_hashes[:library_limit]
-                truncated_libraries = True
-            display_count = len(display_hashes)
-
-        lib_table = Table(
-            "library_index",
-            "library_hash",
-            "input",
-            "plan",
-            "size",
-            "achieved/target",
-            "outputs",
-        )
-        sampling_cfg = loaded.root.densegen.generation.sampling
-        target_len = loaded.root.densegen.generation.sequence_length + int(sampling_cfg.subsample_over_length_budget_by)
-
-        if isinstance(display_library_summary, pd.DataFrame) and not display_library_summary.empty:
-            for _, row in display_library_summary.iterrows():
-                lib_hash = str(row.get("library_hash") or "")
-                lib_hash_disp = lib_hash if show_library_hash else _short_hash(lib_hash)
-                achieved = row.get("total_bp")
-                achieved_label = f"{int(achieved)}/{target_len}" if achieved is not None else f"-/{target_len}"
-                lib_table.add_row(
-                    str(int(row.get("library_index") or 0)),
-                    lib_hash_disp or "-",
-                    str(row.get("input_name") or "-"),
-                    str(row.get("plan_name") or "-"),
-                    str(int(row.get("size") or 0)),
-                    achieved_label,
-                    str(int(row.get("outputs") or 0)),
-                )
-        elif display_hashes:
-            for lib_hash in display_hashes:
-                lib_hash_disp = lib_hash if show_library_hash else _short_hash(lib_hash)
-                lib_table.add_row("-", lib_hash_disp, "-", "-", "-", f"-/{target_len}", "0")
-        else:
-            console.print("[yellow]No library attempts found (outputs/tables/attempts.parquet missing).[/]")
-            entries = _list_dir_entries(run_root, limit=8)
-            if entries:
-                console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
-            console.print("[bold]Next steps[/]:")
-            console.print(f"  - {_workspace_command('dense run', cfg_path=cfg_path, run_root=run_root)}")
-        console.print("[bold]Library build summary[/]")
-        console.print(lib_table)
-        if truncated_libraries:
-            console.print(
-                f"[yellow]Showing {display_count} of {total_libraries} libraries. Use --library-limit 0 to show all.[/]"
-            )
-
         if not isinstance(offered_vs_used_tf, pd.DataFrame) or offered_vs_used_tf.empty:
-            console.print("[yellow]No offered/used TF data found (attempts missing).[/]")
-            return
-
-        def _fmt_hash(val: str) -> str:
-            return val if show_library_hash else _short_hash(val)
-
-        def _render_tf_tables(lib_hash: str) -> None:
-            sub_tf = offered_vs_used_tf[offered_vs_used_tf["library_hash"] == lib_hash]
-            if sub_tf.empty:
-                return
-            tf_table = Table("library", "tf", "offered", "used", "utilization_any")
-            top_rows = sub_tf.sort_values("used_placements", ascending=False).head(top)
-            for _, row in top_rows.iterrows():
-                tf_table.add_row(
-                    _fmt_hash(lib_hash),
-                    str(row.get("tf")),
-                    str(int(row.get("offered_instances", 0))),
-                    str(int(row.get("used_placements", 0))),
-                    f"{float(row.get('utilization_any', 0.0)):.2f}",
-                )
-            console.print(f"[bold]Top {top} TFs by used placements (per library)[/]")
-            console.print(tf_table)
-
-        def _render_tfbs_tables(lib_hash: str) -> None:
             if not isinstance(offered_vs_used_tfbs, pd.DataFrame) or offered_vs_used_tfbs.empty:
+                console.print("[yellow]No library usage summaries found (attempts missing).[/]")
                 return
-            sub_tfbs = offered_vs_used_tfbs[offered_vs_used_tfbs["library_hash"] == lib_hash]
-            if sub_tfbs.empty:
-                return
-            if top_per_tf:
-                top_tf = offered_vs_used_tf[offered_vs_used_tf["library_hash"] == lib_hash]
-                top_tf = top_tf.sort_values("used_placements", ascending=False).head(top)
-                top_tf_names = set(top_tf["tf"].tolist())
-                tfbs_table = Table("library", "tf", "tfbs", "offered", "used", "note")
-                for tf, group in sub_tfbs.groupby("tf"):
-                    if tf not in top_tf_names:
-                        continue
-                    group_sorted = group.sort_values("used_placements", ascending=False)
-                    head = group_sorted.head(top_per_tf)
-                    omitted = max(0, len(group_sorted) - len(head))
-                    for i, (_, row) in enumerate(head.iterrows()):
-                        note = ""
-                        if i == len(head) - 1 and omitted > 0:
-                            note = f"(+{omitted} more)"
-                        tfbs_table.add_row(
-                            _fmt_hash(lib_hash),
-                            str(tf),
-                            str(row.get("tfbs")),
-                            str(int(row.get("offered_instances", 0))),
-                            str(int(row.get("used_placements", 0))),
-                            note,
-                        )
-                console.print(f"[bold]Top TFBS per TF (per library; top={top} TFs, top_per_tf={top_per_tf})[/]")
-                console.print(tfbs_table)
-            else:
-                tfbs_table = Table("library", "tf", "tfbs", "offered", "used")
-                top_tfbs = sub_tfbs.sort_values("used_placements", ascending=False).head(top)
-                for _, row in top_tfbs.iterrows():
-                    tfbs_table.add_row(
-                        _fmt_hash(lib_hash),
-                        str(row.get("tf")),
-                        str(row.get("tfbs")),
-                        str(int(row.get("offered_instances", 0))),
-                        str(int(row.get("used_placements", 0))),
-                    )
-                console.print(f"[bold]Top {top} TFBS by used placements (per library)[/]")
-                console.print(tfbs_table)
 
-        if by_library and isinstance(display_library_summary, pd.DataFrame) and not display_library_summary.empty:
-            for _, row in display_library_summary.iterrows():
-                lib_hash = str(row.get("library_hash") or "")
-                lib_index = int(row.get("library_index") or 0)
-                console.print(f"[bold]Library {lib_index}[/]: {_fmt_hash(lib_hash)}")
-                _render_tf_tables(lib_hash)
-                _render_tfbs_tables(lib_hash)
-        elif by_library and display_hashes:
-            for lib_hash in display_hashes:
-                console.print(f"[bold]Library[/]: {_fmt_hash(lib_hash)}")
-                _render_tf_tables(lib_hash)
-                _render_tfbs_tables(lib_hash)
-        else:
-            tf_table = Table("library_hash", "tf", "offered", "used", "utilization_any")
-            top_rows = offered_vs_used_tf.sort_values("used_placements", ascending=False).head(top)
-            for _, row in top_rows.iterrows():
-                lib_hash = str(row.get("library_hash") or "")
+        display_map: dict[str, str] = {}
+        for inp in loaded.root.densegen.inputs:
+            for motif_id, name in _input_motifs(inp, cfg_path):
+                if motif_id and name and motif_id not in display_map:
+                    display_map[motif_id] = name
+
+        def _display_tf_label(label: str) -> str:
+            if show_motif_ids:
+                return label
+            return display_map.get(label, label)
+
+        if isinstance(offered_vs_used_tf, pd.DataFrame) and not offered_vs_used_tf.empty:
+            agg_tf = (
+                offered_vs_used_tf.groupby("tf")
+                .agg(
+                    offered_instances=("offered_instances", "sum"),
+                    offered_unique_tfbs=("offered_unique_tfbs", "sum"),
+                    used_placements=("used_placements", "sum"),
+                    used_unique_tfbs=("used_unique_tfbs", "sum"),
+                    used_sequences=("used_sequences", "sum"),
+                    total_sequences=("total_sequences", "sum"),
+                )
+                .reset_index()
+            )
+            agg_tf["utilization_any"] = agg_tf.apply(
+                lambda r: (r["used_sequences"] / r["total_sequences"]) if r["total_sequences"] else 0.0, axis=1
+            )
+            agg_tf["utilization_placements_per_offered"] = agg_tf.apply(
+                lambda r: (r["used_placements"] / r["offered_instances"]) if r["offered_instances"] else 0.0,
+                axis=1,
+            )
+            agg_tf = agg_tf.sort_values(["used_placements", "offered_instances"], ascending=False)
+            if top > 0:
+                agg_tf = agg_tf.head(top)
+            tf_table = Table("tf", "offered", "used", "util_any", "util_per_offered")
+            for _, row in agg_tf.iterrows():
                 tf_table.add_row(
-                    _fmt_hash(lib_hash),
-                    str(row.get("tf")),
+                    _display_tf_label(str(row.get("tf") or "-")),
                     str(int(row.get("offered_instances", 0))),
                     str(int(row.get("used_placements", 0))),
                     f"{float(row.get('utilization_any', 0.0)):.2f}",
+                    f"{float(row.get('utilization_placements_per_offered', 0.0)):.2f}",
                 )
-            console.print(f"[bold]Top {top} TFs by used placements (all libraries)[/]")
+            console.print("[bold]TF usage summary (all libraries)[/]")
             console.print(tf_table)
+            console.print("Legend: offered=instances across all libraries; util_any=used_sequences/total_sequences.")
 
-            if isinstance(offered_vs_used_tfbs, pd.DataFrame) and not offered_vs_used_tfbs.empty:
-                tfbs_table = Table("library_hash", "tf", "tfbs", "offered", "used")
-                top_tfbs = offered_vs_used_tfbs.sort_values("used_placements", ascending=False).head(top)
-                for _, row in top_tfbs.iterrows():
-                    lib_hash = str(row.get("library_hash") or "")
-                    tfbs_table.add_row(
-                        _fmt_hash(lib_hash),
-                        str(row.get("tf")),
-                        str(row.get("tfbs")),
-                        str(int(row.get("offered_instances", 0))),
-                        str(int(row.get("used_placements", 0))),
-                    )
-                console.print(f"[bold]Top {top} TFBS by used placements (all libraries)[/]")
-                console.print(tfbs_table)
+        if isinstance(offered_vs_used_tfbs, pd.DataFrame) and not offered_vs_used_tfbs.empty:
+            agg_tfbs = (
+                offered_vs_used_tfbs.groupby(["tf", "tfbs"])
+                .agg(
+                    offered_instances=("offered_instances", "sum"),
+                    used_placements=("used_placements", "sum"),
+                    used_sequences=("used_sequences", "sum"),
+                )
+                .reset_index()
+            )
+            agg_tfbs = agg_tfbs.sort_values(["used_placements", "offered_instances"], ascending=False)
+            if top > 0:
+                agg_tfbs = agg_tfbs.head(top)
+            tfbs_table = Table("tf", "tfbs", "offered", "used")
+            for _, row in agg_tfbs.iterrows():
+                tfbs_table.add_row(
+                    _display_tf_label(str(row.get("tf") or "-")),
+                    str(row.get("tfbs") or "-"),
+                    str(int(row.get("offered_instances", 0))),
+                    str(int(row.get("used_placements", 0))),
+                )
+            console.print("[bold]TFBS usage summary (all libraries)[/]")
+            console.print(tfbs_table)
 
 
 @app.command(help="Generate audit-grade report summary for a run.")
@@ -2394,6 +2279,18 @@ def stage_b_build_libraries(
                 library_id = library_hash
                 tfbs_id_by_index = info.get("tfbs_id_by_index") or []
                 motif_id_by_index = info.get("motif_id_by_index") or []
+                library_tfbs = list(library)
+                library_tfs = list(reg_labels) if reg_labels else []
+                _min_required_len, _min_breakdown, feasibility = assess_library_feasibility(
+                    library_tfbs=library_tfbs,
+                    library_tfs=library_tfs,
+                    fixed_elements=plan_item.fixed_elements,
+                    required_regulators=list(dict.fromkeys(plan_item.required_regulators or [])),
+                    min_required_regulators=plan_item.min_required_regulators,
+                    min_count_by_regulator=dict(plan_item.min_count_by_regulator or {}),
+                    min_count_per_tf=int(cfg.runtime.min_count_per_tf),
+                    sequence_length=int(cfg.generation.sequence_length),
+                )
                 row = {
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "input_name": inp.name,
@@ -2402,8 +2299,8 @@ def stage_b_build_libraries(
                     "library_index": int(info.get("library_index") or 0),
                     "library_id": library_id,
                     "library_hash": library_hash,
-                    "library_tfbs": list(library),
-                    "library_tfs": list(reg_labels) if reg_labels else [],
+                    "library_tfbs": library_tfbs,
+                    "library_tfs": library_tfs,
                     "library_site_ids": list(info.get("site_id_by_index") or []),
                     "library_sources": list(info.get("source_by_index") or []),
                     "library_tfbs_ids": list(tfbs_id_by_index),
@@ -2418,6 +2315,11 @@ def stage_b_build_libraries(
                     "iterative_max_libraries": int(info.get("iterative_max_libraries") or 0),
                     "iterative_min_new_solutions": int(info.get("iterative_min_new_solutions") or 0),
                     "required_regulators_selected": info.get("required_regulators_selected"),
+                    "fixed_bp": int(feasibility["fixed_bp"]),
+                    "min_required_bp": int(feasibility["min_required_bp"]),
+                    "slack_bp": int(feasibility["slack_bp"]),
+                    "infeasible": bool(feasibility["infeasible"]),
+                    "sequence_length": int(feasibility["sequence_length"]),
                 }
                 build_rows.append(row)
                 try:
@@ -2706,6 +2608,7 @@ def campaign_reset(
 def plot(
     ctx: typer.Context,
     only: Optional[str] = typer.Option(None, help="Comma-separated plot names (subset of available plots)."),
+    absolute: bool = typer.Option(False, "--absolute", help="Show absolute paths instead of workspace-relative."),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
     cfg_path, is_default = _resolve_config_path(ctx, config)
@@ -2723,7 +2626,7 @@ def plot(
     install_native_stderr_filters(suppress_solver_messages=False)
     from .viz.plotting import run_plots_from_config
 
-    run_plots_from_config(loaded.root, loaded.path, only=only, source="plot")
+    run_plots_from_config(loaded.root, loaded.path, only=only, source="plot", absolute=absolute)
     console.print(":bar_chart: [bold green]Plots written.[/]")
 
 
