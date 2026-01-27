@@ -58,6 +58,13 @@ class _SweepData:
     note: str | None
 
 
+@dataclass(frozen=True)
+class ActiveVec8:
+    vec8: np.ndarray | None
+    source: str | None
+    note: str | None
+
+
 def _note_panel(message: str) -> ChartPanel:
     return ChartPanel(chart=None, note=message, kind="mpl")
 
@@ -74,6 +81,49 @@ def _has_duplicate_key(df: pl.DataFrame, key: str) -> bool:
     if key not in df.columns or df.is_empty():
         return False
     return bool(df.select(pl.col(key).is_duplicated().any()).item())
+
+
+def resolve_active_vec8(
+    *,
+    active_record_id: str | None,
+    pred_events_df: pl.DataFrame | None,
+    label_events_df: pl.DataFrame | None,
+    y_col: str,
+    pred_vec_col: str = "pred_y_hat",
+) -> ActiveVec8:
+    if not active_record_id:
+        return ActiveVec8(vec8=None, source=None, note="Active record id missing.")
+    active_id = str(active_record_id)
+
+    if pred_events_df is not None and not pred_events_df.is_empty():
+        if "id" in pred_events_df.columns and pred_vec_col in pred_events_df.columns:
+            pred_rows = pred_events_df.filter(pl.col("id").cast(pl.Utf8) == active_id)
+            if not pred_rows.is_empty():
+                pred_series = pred_rows.get_column(pred_vec_col).drop_nulls()
+                pred_vec = list_series_to_numpy(pred_series, expected_len=8)
+                if pred_vec is not None and pred_vec.shape[0] > 0:
+                    return ActiveVec8(vec8=pred_vec[0], source="pred_history", note=None)
+                return ActiveVec8(vec8=None, source=None, note="Invalid pred_y_hat for active record.")
+
+    if label_events_df is None or label_events_df.is_empty():
+        return ActiveVec8(vec8=None, source=None, note="Label history missing.")
+    if "id" not in label_events_df.columns or y_col not in label_events_df.columns:
+        return ActiveVec8(vec8=None, source=None, note="Label history missing required columns.")
+    label_rows = label_events_df.filter(pl.col("id").cast(pl.Utf8) == active_id)
+    if label_rows.is_empty():
+        return ActiveVec8(vec8=None, source=None, note="Active record missing from label history.")
+    sort_cols = []
+    if "observed_round" in label_rows.columns:
+        sort_cols.append("observed_round")
+    if "label_ts" in label_rows.columns:
+        sort_cols.append("label_ts")
+    if sort_cols:
+        label_rows = label_rows.sort(sort_cols, descending=True)
+    label_series = label_rows.get_column(y_col).drop_nulls()
+    label_vec = list_series_to_numpy(label_series, expected_len=8)
+    if label_vec is None or label_vec.shape[0] == 0:
+        return ActiveVec8(vec8=None, source=None, note="Invalid label vector for active record.")
+    return ActiveVec8(vec8=label_vec[0], source="label_history", note=None)
 
 
 def _build_diag_view(

@@ -15,8 +15,10 @@ import json
 from pathlib import Path
 
 import altair as alt
+import numpy as np
 import polars as pl
 import pytest
+from sklearn.ensemble import RandomForestRegressor
 
 from dnadesign.opal.src.analysis.dashboard import (
     datasets,
@@ -29,9 +31,11 @@ from dnadesign.opal.src.analysis.dashboard import (
     ui,
     util,
 )
+from dnadesign.opal.src.analysis.dashboard import models as dashboard_models
 from dnadesign.opal.src.analysis.dashboard.charts import diagnostics_guidance, plots
 from dnadesign.opal.src.analysis.dashboard.views import sfxi
 from dnadesign.opal.src.analysis.sfxi.state_order import STATE_ORDER
+from dnadesign.opal.src.analysis.sfxi.uncertainty import supports_uncertainty
 
 
 def test_find_repo_root(tmp_path: Path) -> None:
@@ -607,6 +611,17 @@ def test_sfxi_metrics_deterministic() -> None:
     assert abs(row_dict["effect_raw"] - 2.0) < 1e-6
     assert abs(row_dict["effect_scaled"] - 1.0) < 1e-6
     assert abs(row_dict["score"] - 1.0) < 1e-6
+
+
+def test_unwrap_artifact_model_wraps_random_forest() -> None:
+    X = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=float)
+    Y = np.array([[0.1, 0.2], [0.2, 0.3]], dtype=float)
+    est = RandomForestRegressor(n_estimators=2, random_state=0)
+    est.fit(X, Y)
+
+    wrapped = dashboard_models.unwrap_artifact_model(est)
+    assert wrapped is not None
+    assert supports_uncertainty(model=wrapped)
 
 
 def test_compute_label_sfxi_view_preview() -> None:

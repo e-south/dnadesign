@@ -109,3 +109,5 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Diagnostics and SFXI plot artifacts now render full datasets; sampling params removed and rejected.
 - Support diagnostics default hue now prefers nearest gate class; added clearer factorial math + uncertainty provenance notes.
 - Setpoint sweep default view omits denom to preserve heatmap contrast.
+- Refactored RF uncertainty to streaming ensemble score std (no `predict_per_tree`, no `y_hat` modes), added
+  ensemble protocol under `analysis/sfxi`, and moved y-ops inverse helper out of dashboard.

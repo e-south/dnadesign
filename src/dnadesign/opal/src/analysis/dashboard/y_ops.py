@@ -11,33 +11,14 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
 import numpy as np
 
 from ...core.round_context import PluginRegistryView, RoundCtx
 from ...registries.transforms_y import run_y_ops_pipeline
+from ...runtime.y_ops_inverse import normalize_y_ops_config
 from .datasets import CampaignInfo
-
-
-@dataclass(frozen=True)
-class YOpEntry:
-    name: str
-    params: dict
-
-
-def normalize_y_ops_config(y_ops: Sequence[Mapping[str, Any]]) -> list[YOpEntry]:
-    out: list[YOpEntry] = []
-    for entry in y_ops or []:
-        if not isinstance(entry, Mapping):
-            continue
-        name = entry.get("name")
-        if not name:
-            continue
-        params = dict(entry.get("params") or {})
-        out.append(YOpEntry(name=str(name), params=params))
-    return out
 
 
 def build_round_ctx_for_notebook(
@@ -82,13 +63,3 @@ def apply_y_ops_fit_transform(
 ) -> np.ndarray:
     entries = normalize_y_ops_config(y_ops)
     return run_y_ops_pipeline(stage="fit_transform", y_ops=entries, Y=y, ctx=ctx)
-
-
-def apply_y_ops_inverse(
-    *,
-    y_ops: Sequence[Mapping[str, Any]],
-    y: np.ndarray,
-    ctx: RoundCtx,
-) -> np.ndarray:
-    entries = normalize_y_ops_config(y_ops)
-    return run_y_ops_pipeline(stage="inverse", y_ops=entries, Y=y, ctx=ctx)

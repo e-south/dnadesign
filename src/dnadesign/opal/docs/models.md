@@ -85,7 +85,7 @@ model:
 **Backend:** `sklearn.ensemble.RandomForestRegressor`
 
 **Implements (contract):** `fit`, `predict`, `save`, `load`
-**Also provides:** `predict_per_tree(X)->(T,N,D)`, `feature_importances()`, `get_params()`
+**Also provides:** `iter_ensemble_predictions(...)`, `feature_importances()`, `get_params()`
 
 **Shapes**
 
@@ -94,7 +94,8 @@ model:
 
 **Features**
 
-* **Uncertainty:** `predict_per_tree` returns per-tree predictions; compute `std_vec = per_tree.std(axis=0, ddof=1)`.
+* **Uncertainty:** `iter_ensemble_predictions` streams per-estimator predictions for
+  ensemble score std (heuristic spread; `ddof=0`).
 * **OOB diagnostics:** with `bootstrap: true` and `oob_score: true`, returns `FitMetrics(oob_r2, oob_mse)`.
 * **No target scaling inside the model:** apply any label scaling via **training `y_ops`** (e.g., `intensity_median_iqr`), which the runner fits/applies and inverts at prediction time.
 

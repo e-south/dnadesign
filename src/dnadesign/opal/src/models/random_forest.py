@@ -138,24 +138,37 @@ class RandomForestModel:
             y = y.reshape(-1, 1)
         return y
 
-    def predict_per_tree(self, X: np.ndarray) -> Optional[np.ndarray]:
+    def iter_ensemble_predictions(
+        self,
+        X: np.ndarray,
+        *,
+        batch_size: int,
+    ):
         """
-        Return per-tree predictions with shape (T, N, D) where
-          T = number of trees, N = rows, D = y-dim
+        Stream per-estimator predictions as (estimator_index, row_start, row_end, y_pred_batch).
         """
         if self._est is None:
-            raise RuntimeError("[random_forest] predict_per_tree() before fit().")
+            raise RuntimeError("[random_forest] iter_ensemble_predictions() before fit().")
+        X_arr = np.asarray(X, dtype=float)
+        if X_arr.ndim != 2:
+            raise ValueError("[random_forest] X must be a 2D numpy array.")
+        if not isinstance(batch_size, int) or batch_size <= 0:
+            raise ValueError("[random_forest] batch_size must be a positive integer.")
         ests = getattr(self._est, "estimators_", None)
         if not ests:
-            return None
-        preds = []
-        for t in ests:
-            y = t.predict(X)
-            y = np.asarray(y, dtype=float)
-            if y.ndim == 1:
-                y = y.reshape(-1, 1)
-            preds.append(y)
-        return np.stack(preds, axis=0)
+            raise ValueError("[random_forest] estimators_ missing for ensemble predictions.")
+        n_rows = int(X_arr.shape[0])
+        for idx, est in enumerate(ests):
+            for start in range(0, n_rows, batch_size):
+                end = min(start + batch_size, n_rows)
+                y = np.asarray(est.predict(X_arr[start:end]), dtype=float)
+                if y.ndim == 1:
+                    y = y.reshape(-1, 1)
+                if y.shape[0] != (end - start):
+                    raise ValueError("[random_forest] estimator prediction batch has invalid row count.")
+                if not np.all(np.isfinite(y)):
+                    raise ValueError("[random_forest] estimator predictions contain non-finite values.")
+                yield idx, start, end, y
 
     def feature_importances(self) -> Optional[np.ndarray]:
         """Return 1-D array of feature importances if available."""
@@ -181,6 +194,18 @@ class RandomForestModel:
         m = cls(params=resolved)
         m._est = est
         return m
+
+    @classmethod
+    def from_artifact(cls, obj: Any) -> Optional["RandomForestModel"]:
+        if isinstance(obj, cls):
+            return obj
+        if isinstance(obj, RandomForestRegressor):
+            params = getattr(obj, "get_params", lambda **_: {})()
+            m = cls(params=params)
+            m._est = obj
+            m._x_dim = int(getattr(obj, "n_features_in_", 0) or 0) or None
+            return m
+        return None
 
     # ---- optional artifact hook --------------------------------------------
     def model_artifacts(self) -> Dict[str, pd.DataFrame]:

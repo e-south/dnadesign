@@ -1851,24 +1851,15 @@ def _(mo):
     support_color_state, set_support_color_state = mo.state(None)
     sweep_metric_state, set_sweep_metric_state = mo.state(None)
     uncertainty_color_state, set_uncertainty_color_state = mo.state(None)
-    uncertainty_kind_state, set_uncertainty_kind_state = mo.state(None)
-    uncertainty_components_state, set_uncertainty_components_state = mo.state(None)
-    uncertainty_reduction_state, set_uncertainty_reduction_state = mo.state(None)
     return (
         set_support_color_state,
         set_support_y_state,
         set_sweep_metric_state,
         set_uncertainty_color_state,
-        set_uncertainty_components_state,
-        set_uncertainty_kind_state,
-        set_uncertainty_reduction_state,
         support_color_state,
         support_y_state,
         sweep_metric_state,
         uncertainty_color_state,
-        uncertainty_components_state,
-        uncertainty_kind_state,
-        uncertainty_reduction_state,
     )
 
 
@@ -1878,9 +1869,6 @@ def _(
     mo,
     support_y_state,
     sweep_metric_state,
-    uncertainty_components_state,
-    uncertainty_kind_state,
-    uncertainty_reduction_state,
 ):
     support_y_options = ["Score", "Logic fidelity"]
     support_y_default = (
@@ -1914,52 +1902,9 @@ def _(
         label="Sweep metric",
         full_width=True,
     )
-    uncertainty_kind_options = ["score", "y_hat"]
-    uncertainty_kind_default = (
-        choose_dropdown_value(uncertainty_kind_options, current=uncertainty_kind_state(), preferred="score") or "score"
-    )
-    uncertainty_kind_dropdown = mo.ui.dropdown(
-        options=uncertainty_kind_options,
-        value=uncertainty_kind_default,
-        label="Uncertainty kind",
-        full_width=True,
-    )
-    uncertainty_components_options = ["all", "logic", "intensity"]
-    uncertainty_components_default = (
-        choose_dropdown_value(
-            uncertainty_components_options,
-            current=uncertainty_components_state(),
-            preferred="all",
-        )
-        or "all"
-    )
-    uncertainty_components_dropdown = mo.ui.dropdown(
-        options=uncertainty_components_options,
-        value=uncertainty_components_default,
-        label="Y-hat components",
-        full_width=True,
-    )
-    uncertainty_reduction_options = ["mean", "max"]
-    uncertainty_reduction_default = (
-        choose_dropdown_value(
-            uncertainty_reduction_options,
-            current=uncertainty_reduction_state(),
-            preferred="mean",
-        )
-        or "mean"
-    )
-    uncertainty_reduction_dropdown = mo.ui.dropdown(
-        options=uncertainty_reduction_options,
-        value=uncertainty_reduction_default,
-        label="Y-hat reduction",
-        full_width=True,
-    )
     return (
         support_y_dropdown,
         sweep_metric_dropdown,
-        uncertainty_components_dropdown,
-        uncertainty_kind_dropdown,
-        uncertainty_reduction_dropdown,
     )
 
 
@@ -2002,9 +1947,6 @@ def _(
     set_support_y_state,
     set_sweep_metric_state,
     set_uncertainty_color_state,
-    set_uncertainty_components_state,
-    set_uncertainty_kind_state,
-    set_uncertainty_reduction_state,
     state_value_changed,
     support_color_dropdown,
     support_color_state,
@@ -2014,12 +1956,6 @@ def _(
     sweep_metric_state,
     uncertainty_color_dropdown,
     uncertainty_color_state,
-    uncertainty_components_dropdown,
-    uncertainty_components_state,
-    uncertainty_kind_dropdown,
-    uncertainty_kind_state,
-    uncertainty_reduction_dropdown,
-    uncertainty_reduction_state,
 ):
     if support_y_dropdown is not None:
         _next_value = support_y_dropdown.value
@@ -2037,18 +1973,6 @@ def _(
         _next_value = uncertainty_color_dropdown.value
         if state_value_changed(uncertainty_color_state(), _next_value):
             set_uncertainty_color_state(_next_value)
-    if uncertainty_kind_dropdown is not None:
-        _next_value = uncertainty_kind_dropdown.value
-        if state_value_changed(uncertainty_kind_state(), _next_value):
-            set_uncertainty_kind_state(_next_value)
-    if uncertainty_components_dropdown is not None:
-        _next_value = uncertainty_components_dropdown.value
-        if state_value_changed(uncertainty_components_state(), _next_value):
-            set_uncertainty_components_state(_next_value)
-    if uncertainty_reduction_dropdown is not None:
-        _next_value = uncertainty_reduction_dropdown.value
-        if state_value_changed(uncertainty_reduction_state(), _next_value):
-            set_uncertainty_reduction_state(_next_value)
     return ()
 
 
@@ -2551,8 +2475,9 @@ def _(
             mo.md("### Uncertainty diagnostics"),
             mo.md(
                 "Model uncertainty vs score to highlight risky candidates. "
-                "Contract is model‑agnostic; for RF this is per‑tree prediction variance "
-                "(estimators_ / predict_per_tree) aggregated to a scalar. "
+                "Contract is model‑agnostic; for RF this is ensemble score std "
+                "(std over per‑tree objective scores). "
+                "Tree spread is a heuristic proxy (not calibrated). "
                 "Only scalar uncertainty is visualized here."
             ),
             uncertainty_color_dropdown,
@@ -3408,9 +3333,6 @@ def _(
     sfxi_params,
     sfxi_support,
     sfxi_uncertainty,
-    uncertainty_components_dropdown,
-    uncertainty_kind_dropdown,
-    uncertainty_reduction_dropdown,
 ):
     observed_ids = set()
     if opal_labels_asof_df is not None and not opal_labels_asof_df.is_empty() and "id" in opal_labels_asof_df.columns:
@@ -3550,13 +3472,6 @@ def _(
                 dist_x = sfxi_support.dist_to_labeled_x(cand, lab)
                 df_view = df_view.with_columns(pl.Series("opal__sfxi__dist_to_labeled_x", dist_x))
 
-    uncertainty_kind = uncertainty_kind_dropdown.value if uncertainty_kind_dropdown is not None else "score"
-    uncertainty_components = (
-        uncertainty_components_dropdown.value if uncertainty_components_dropdown is not None else "all"
-    )
-    uncertainty_reduction = (
-        uncertainty_reduction_dropdown.value if uncertainty_reduction_dropdown is not None else "mean"
-    )
     if opal_campaign_info is None or not opal_campaign_info.x_column:
         derived_notes.append("uncertainty unavailable (x_column missing).")
     elif opal_pred_selected_round is None:
@@ -3572,7 +3487,7 @@ def _(
         if uncertainty_artifact is None or not uncertainty_artifact.use_artifact or uncertainty_artifact.model is None:
             derived_notes.append("uncertainty unavailable (artifact model missing).")
         elif not sfxi_uncertainty.supports_uncertainty(model=uncertainty_artifact.model):
-            derived_notes.append("uncertainty unavailable (model lacks per-tree predictions).")
+            derived_notes.append("uncertainty unavailable (model lacks ensemble predictions).")
         else:
             X = list_series_to_numpy(df_view.get_column(opal_campaign_info.x_column), expected_len=None)
             if X is None:
@@ -3620,10 +3535,8 @@ def _(
                     result = sfxi_uncertainty.compute_uncertainty(
                         uncertainty_artifact.model,
                         X,
-                        kind=uncertainty_kind,
                         ctx=ctx,
-                        components=str(uncertainty_components),
-                        reduction=str(uncertainty_reduction),
+                        batch_size=2048,
                     )
                 except Exception as exc:
                     derived_notes.append(f"uncertainty unavailable ({exc})")

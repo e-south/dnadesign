@@ -133,10 +133,14 @@ This is a support visualization only (no objective math).
 Scatter `uncertainty` vs `score` (color by `F_logic` or `E_scaled`).
 The dashboard currently renders the score view only; a `dist_to_labeled_logic` variant is a future extension.
 
-**Contract**: uncertainty supports `kind="score"` and `kind="y_hat"` (default `score`).
+**Contract**: uncertainty reports **ensemble score std** (heuristic spread) only.
 If unsupported, the UI errors explicitly.
-RF implementation uses per‑tree prediction variance (via `estimators_` / `predict_per_tree`) and is reduced
-to a scalar; component‑level uncertainty is not visualized here.
+RF implementation streams per‑estimator predictions and computes
+`uncertainty = std_t(objective(y_hat_t))` with `ddof=0`. Component‑level uncertainty
+is not visualized here.
+Computation is streaming (Welford) with row batching; no `(T,N,D)` stacking.
+Tree spread is a heuristic proxy (trees are correlated and not posterior samples);
+use it for ranking/triage, not calibrated confidence.
 
 ### F) Intensity scaling diagnostics
 Per‑setpoint:
@@ -164,6 +168,7 @@ under‑scaled intensity.
 - `intensity_scaling.py`
 - `setpoint_sweep.py`
 - `uncertainty.py` (model‑agnostic contract + RF adapter)
+- `ensemble.py` (streamed per‑estimator prediction contract)
 
 **Chart builders (Altair + matplotlib, no marimo)**
 `src/dnadesign/opal/src/analysis/dashboard/charts/sfxi_*.py`
@@ -181,7 +186,7 @@ under‑scaled intensity.
 1) **Intensity proxy for factorial size**: default `effect_scaled` (chosen).
 2) **Setpoint sweep library**: 16 truth tables + current setpoint (chosen).
 3) **Denom source of truth**: confirm **current‑round labels** (aligned with `sfxi_v1`).
-4) **Uncertainty kind**: support `score` + `y_hat` (default `score`).
+4) **Uncertainty kind**: scalar score std only; no component‑level views.
 5) **Derived metrics placement**: in‑memory only; export toggle TBD.
 6) **UMAP support distance**: `dist_to_labeled_x` uses UMAP coords only.
 
@@ -191,5 +196,5 @@ under‑scaled intensity.
 - [ ] Nearest gate assignment (truth table self‑match, near‑match)
 - [ ] dist_to_labeled_logic (min L2 distance)
 - [ ] Setpoint sweep denom + clip fractions
-- [ ] RF uncertainty shape + non‑negativity (`score` + `y_hat`)
+- [ ] RF uncertainty shape + non‑negativity (score std)
 - [ ] prom60 notebook smoke test still passes

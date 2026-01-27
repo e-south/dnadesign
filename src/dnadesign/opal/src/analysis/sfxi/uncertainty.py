@@ -17,7 +17,8 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 from ...objectives import sfxi_math
-from ..dashboard.y_ops import apply_y_ops_inverse
+from ...runtime.y_ops_inverse import apply_y_ops_inverse
+from .ensemble import SupportsEnsemblePredictions
 
 
 @dataclass(frozen=True)
@@ -35,108 +36,33 @@ class UncertaintyContext:
 class UncertaintyResult:
     values: np.ndarray
     kind: str
-    components: str | None
-    reduction: str | None
+    statistic: str
+    semantics: str
     detail: dict[str, Any]
 
 
 def supports_uncertainty(*, model: object | None) -> bool:
     if model is None:
         return False
-    if hasattr(model, "predict_per_tree"):
-        return True
-    if hasattr(model, "estimators_"):
-        return True
-    return False
-
-
-def _predict_per_tree(model: object, X: np.ndarray) -> np.ndarray:
-    if hasattr(model, "predict_per_tree"):
-        preds = model.predict_per_tree(X)
-        if preds is None:
-            raise ValueError("predict_per_tree returned None.")
-        return np.asarray(preds, dtype=float)
-    ests = getattr(model, "estimators_", None)
-    if not ests:
-        raise ValueError("Model does not expose per-tree estimators.")
-    preds = []
-    for t in ests:
-        y = t.predict(X)
-        y = np.asarray(y, dtype=float)
-        if y.ndim == 1:
-            y = y.reshape(-1, 1)
-        preds.append(y)
-    return np.stack(preds, axis=0)
-
-
-def _invert_y_ops(
-    preds: np.ndarray,
-    *,
-    y_ops: Sequence[Mapping[str, Any]],
-    round_ctx: Any | None,
-) -> np.ndarray:
-    if not y_ops:
-        return preds
-    if round_ctx is None:
-        raise ValueError("round_ctx is required to invert y-ops for uncertainty.")
-    out = []
-    for t in range(preds.shape[0]):
-        out.append(apply_y_ops_inverse(y_ops=y_ops, y=preds[t], ctx=round_ctx))
-    return np.stack(out, axis=0)
+    return isinstance(model, SupportsEnsemblePredictions)
 
 
 def compute_uncertainty(
-    model: object,
+    model: SupportsEnsemblePredictions,
     X: np.ndarray,
     *,
-    kind: str,
     ctx: UncertaintyContext,
-    components: str = "all",
-    reduction: str = "mean",
+    batch_size: int,
 ) -> UncertaintyResult:
     if not supports_uncertainty(model=model):
-        raise ValueError("Model does not support uncertainty (no per-tree predictions).")
+        raise ValueError("Model does not support ensemble uncertainty predictions.")
     X_arr = np.asarray(X, dtype=float)
     if X_arr.ndim != 2:
         raise ValueError("X must be a 2D numpy array.")
-
-    preds = _predict_per_tree(model, X_arr)
-    if preds.ndim != 3:
-        raise ValueError("Per-tree predictions must have shape (T, N, D).")
-
-    preds = _invert_y_ops(preds, y_ops=ctx.y_ops, round_ctx=ctx.round_ctx)
-    if preds.shape[2] < 4:
-        raise ValueError("Per-tree predictions must have at least 4 outputs for logic.")
-
-    kind_val = str(kind or "").strip().lower()
-    if kind_val not in {"score", "y_hat"}:
-        raise ValueError("kind must be 'score' or 'y_hat'.")
-
-    if kind_val == "y_hat":
-        if components not in {"all", "logic", "intensity"}:
-            raise ValueError("components must be 'all', 'logic', or 'intensity'.")
-        if components == "logic":
-            idx = slice(0, 4)
-        elif components == "intensity":
-            if preds.shape[2] < 8:
-                raise ValueError("Predictions missing intensity components (need 8 outputs).")
-            idx = slice(4, 8)
-        else:
-            idx = slice(0, preds.shape[2])
-        var = np.var(preds[:, :, idx], axis=0)
-        if reduction == "mean":
-            values = np.mean(var, axis=1)
-        elif reduction == "max":
-            values = np.max(var, axis=1)
-        else:
-            raise ValueError("reduction must be 'mean' or 'max'.")
-        return UncertaintyResult(
-            values=np.asarray(values, dtype=float).ravel(),
-            kind="y_hat",
-            components=components,
-            reduction=reduction,
-            detail={"n_trees": int(preds.shape[0])},
-        )
+    if X_arr.shape[0] == 0:
+        raise ValueError("X must contain at least one row.")
+    if not isinstance(batch_size, int) or batch_size <= 0:
+        raise ValueError("batch_size must be a positive integer.")
 
     setpoint = np.asarray(ctx.setpoint, dtype=float).ravel()
     if setpoint.size != 4:
@@ -147,9 +73,46 @@ def compute_uncertainty(
     if not intensity_disabled and (denom is None or not np.isfinite(denom) or denom <= 0.0):
         raise ValueError("denom is required and must be positive to score uncertainty when intensity is enabled.")
 
-    scores = []
-    for t in range(preds.shape[0]):
-        y_hat = preds[t]
+    if ctx.y_ops and ctx.round_ctx is None:
+        raise ValueError("round_ctx is required to invert y-ops for uncertainty.")
+
+    n_rows = int(X_arr.shape[0])
+    mean = np.zeros(n_rows, dtype=float)
+    m2 = np.zeros(n_rows, dtype=float)
+    n_estimators = 0
+    current_estimator = None
+    seen: set[int] = set()
+
+    for est_idx, row_start, row_end, y_pred in model.iter_ensemble_predictions(
+        X_arr,
+        batch_size=batch_size,
+    ):
+        if row_start < 0 or row_end > n_rows or row_end <= row_start:
+            raise ValueError("Invalid row slice from ensemble predictions.")
+        if not isinstance(est_idx, int) or est_idx < 0:
+            raise ValueError("Estimator index must be a non-negative integer.")
+        if current_estimator is None or est_idx != current_estimator:
+            if est_idx in seen:
+                raise ValueError("Ensemble predictions must be grouped by estimator.")
+            seen.add(est_idx)
+            current_estimator = est_idx
+            n_estimators += 1
+        k = float(n_estimators)
+
+        y_hat = np.asarray(y_pred, dtype=float)
+        if y_hat.ndim == 1:
+            y_hat = y_hat.reshape(-1, 1)
+        if y_hat.shape[0] != (row_end - row_start):
+            raise ValueError("Ensemble prediction batch has invalid row count.")
+        if ctx.y_ops:
+            y_hat = apply_y_ops_inverse(y_ops=ctx.y_ops, y=y_hat, ctx=ctx.round_ctx)
+            if y_hat.ndim == 1:
+                y_hat = y_hat.reshape(-1, 1)
+            if not np.all(np.isfinite(y_hat)):
+                raise ValueError("Non-finite values after y-ops inversion in uncertainty.")
+        if y_hat.shape[1] < 4:
+            raise ValueError("Predictions must have at least 4 outputs for logic.")
+
         v_hat = np.clip(y_hat[:, 0:4], 0.0, 1.0)
         F_logic = sfxi_math.logic_fidelity(v_hat, setpoint)
         if intensity_disabled:
@@ -167,14 +130,32 @@ def compute_uncertainty(
             )
             E_scaled = sfxi_math.effect_scaled(E_raw, float(denom))
             score = np.power(F_logic, float(ctx.beta)) * np.power(E_scaled, float(ctx.gamma))
-        scores.append(score)
+        if not np.all(np.isfinite(score)):
+            raise ValueError("Non-finite scores encountered during uncertainty computation.")
 
-    score_stack = np.stack(scores, axis=0)
-    values = np.var(score_stack, axis=0)
+        batch_slice = slice(row_start, row_end)
+        delta = score - mean[batch_slice]
+        mean[batch_slice] = mean[batch_slice] + delta / k
+        m2[batch_slice] = m2[batch_slice] + delta * (score - mean[batch_slice])
+
+    if n_estimators <= 0:
+        raise ValueError("No ensemble estimators yielded predictions.")
+
+    var = m2 / float(n_estimators)
+    if np.any(var < -1e-12):
+        raise ValueError("Negative variance encountered in uncertainty calculation.")
+    var = np.clip(var, 0.0, None)
+    values = np.sqrt(var)
     return UncertaintyResult(
         values=np.asarray(values, dtype=float).ravel(),
         kind="score",
-        components=None,
-        reduction="variance",
-        detail={"n_trees": int(preds.shape[0])},
+        statistic="std",
+        semantics="ensemble_spread",
+        detail={
+            "n_estimators": int(n_estimators),
+            "ddof": 0,
+            "batch_size": int(batch_size),
+            "intensity_disabled": bool(intensity_disabled),
+            "denom_fixed": bool(not intensity_disabled),
+        },
     )

@@ -21,6 +21,7 @@ import numpy as np
 import polars as pl
 
 from ...core.round_context import RoundCtx
+from ...models.random_forest import RandomForestModel
 from .artifacts import resolve_round_artifacts
 from .datasets import CampaignInfo
 
@@ -37,16 +38,21 @@ def load_model_artifact(path: Path):
 def unwrap_artifact_model(obj):
     if obj is None:
         return None
+    rf_wrapped = RandomForestModel.from_artifact(obj)
+    if rf_wrapped is not None:
+        return rf_wrapped
     if hasattr(obj, "predict"):
         return obj
     model_attr = getattr(obj, "model", None)
     if model_attr is not None and hasattr(model_attr, "predict"):
-        return model_attr
+        rf_wrapped = RandomForestModel.from_artifact(model_attr)
+        return rf_wrapped if rf_wrapped is not None else model_attr
     if isinstance(obj, dict):
         for key in ("model", "estimator", "rf", "random_forest"):
             candidate = obj.get(key)
             if candidate is not None and hasattr(candidate, "predict"):
-                return candidate
+                rf_wrapped = RandomForestModel.from_artifact(candidate)
+                return rf_wrapped if rf_wrapped is not None else candidate
     return None
 
 

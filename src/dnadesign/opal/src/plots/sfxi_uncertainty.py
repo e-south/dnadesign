@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/plots/sfxi_uncertainty.py
 
-Uncertainty diagnostics using artifact model variance (RF).
+Uncertainty diagnostics using artifact model ensemble spread (RF).
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -54,9 +54,6 @@ def _coerce_y_ops(value: object) -> list[dict]:
     meta=PlotMeta(
         summary="Uncertainty vs score diagnostics (artifact model).",
         params={
-            "kind": "score|y_hat (default score).",
-            "components": "all|logic|intensity (y_hat only; default all).",
-            "reduction": "mean|max for y_hat (default mean).",
             "y_axis": "Metric for Y-axis (default score).",
             "hue": "Metric for color (default logic_fidelity).",
         },
@@ -70,12 +67,13 @@ def render(context, params: dict) -> None:
     round_k = resolve_single_round(runs_df, round_selector=context.rounds)
     run_id = resolve_run_id(runs_df, round_k=round_k, run_id=context.run_id)
 
-    kind = get_str(params, ["kind"], "score")
-    components = get_str(params, ["components"], "all")
-    reduction = get_str(params, ["reduction"], "mean")
     y_axis = normalize_metric_field(get_str(params, ["y_axis", "y_field", "y"], "score"))
     hue = normalize_metric_field(get_str(params, ["hue", "color", "color_by"], "logic_fidelity"))
-    reject_params(params, ["sample_n", "sample", "n", "seed"], ctx="sfxi_uncertainty")
+    reject_params(
+        params,
+        ["sample_n", "sample", "n", "seed", "kind", "components", "reduction"],
+        ctx="sfxi_uncertainty",
+    )
 
     run_sel = runs_df.filter(pl.col("as_of_round") == int(round_k))
     if run_id is not None and "run_id" in run_sel.columns:
@@ -158,10 +156,8 @@ def render(context, params: dict) -> None:
     result = compute_uncertainty(
         model,
         X,
-        kind=kind,
         ctx=ctx,
-        components=components,
-        reduction=reduction,
+        batch_size=2048,
     )
 
     df_plot = df_joined.with_columns(pl.Series("uncertainty", result.values))

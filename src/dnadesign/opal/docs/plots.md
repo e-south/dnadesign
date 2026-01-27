@@ -112,8 +112,8 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
   - params: `y_col` (default `y_obs`), `top_k`, `tau`, `percentile`, `min_n`, `eps`, `delta`
 - **`sfxi_support_diagnostics`**: distance-to-labeled-logic vs score (OOD check).
   - params: `y_axis`, `hue`, `batch_size`
-- **`sfxi_uncertainty`**: uncertainty vs score (artifact model; RF variance).
-  - params: `kind` (`score|y_hat`), `components`, `reduction`, `y_axis`, `hue`
+- **`sfxi_uncertainty`**: uncertainty vs score (artifact model; RF ensemble score std).
+  - params: `y_axis`, `hue`
 - **`sfxi_intensity_scaling`**: denom + clip fractions + E_raw distribution (current-round labels).
   - params: `y_col` (default `y_obs`), `percentile`, `min_n`, `eps`, `delta`, `include_pool`
 
@@ -140,8 +140,6 @@ plots:
 
   - name: sfxi_uncertainty
     kind: sfxi_uncertainty
-    params:
-      kind: score
 
   - name: sfxi_intensity_scaling
     kind: sfxi_intensity_scaling

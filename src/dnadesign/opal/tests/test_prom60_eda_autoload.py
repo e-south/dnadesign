@@ -61,9 +61,6 @@ def test_prom60_eda_persists_dropdown_state() -> None:
         "support_color_state",
         "sweep_metric_state",
         "uncertainty_color_state",
-        "uncertainty_kind_state",
-        "uncertainty_components_state",
-        "uncertainty_reduction_state",
     ]
     for name in expected_states:
         assert name in text

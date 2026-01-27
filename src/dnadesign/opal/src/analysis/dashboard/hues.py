@@ -267,7 +267,7 @@ def default_view_hues() -> list[HueOption]:
         ),
         HueOption(
             key="opal__sfxi__uncertainty",
-            label="Uncertainty",
+            label="Ensemble score std (heuristic)",
             kind="numeric",
             dtype=pl.Float64,
         ),
