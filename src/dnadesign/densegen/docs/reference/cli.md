@@ -78,7 +78,7 @@ Options:
 - `--absolute` — show absolute paths instead of workspace‑relative.
 - `--verbose` — show failure breakdown columns (constraint filters + duplicate solutions).
 - `--library` — include Stage‑B offered‑vs‑used summaries aggregated across all libraries.
-- `--top` — number of rows to show in library summaries (0 = all rows).
+- `--show-tfbs` — include TFBS sequences in library summaries.
 - `--show-motif-ids` — show full motif IDs instead of short TF labels.
 - `--events` — show event summary (stalls/resamples, library rebuilds).
 
@@ -110,8 +110,10 @@ Options:
 - `--input/-i` — input name(s) to build (defaults to all).
 - `--plan/-p` — plan item name(s) to build (defaults to all).
 - `--overwrite` — overwrite existing library artifacts.
-- `--show-hash` — include full library hashes in output.
-- `--show-motif-ids` — show full motif IDs instead of short TF labels.
+
+Output summary:
+- CLI output aggregates libraries per input/plan and reports min/median/max for sites, TF counts, and bp totals.
+- Per-library details are written to the Parquet artifacts under `outputs/libraries/`.
 
 Outputs:
 - `library_builds.parquet`

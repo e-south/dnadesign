@@ -179,6 +179,8 @@ Preview solver libraries without running the optimizer.
 dense stage-b build-libraries
 ```
 
+The CLI output summarizes libraries per input/plan (min/median/max); per‑library details live in `outputs/libraries/`.
+
 If library artifacts already exist under `outputs/libraries`, re-run with `--overwrite` or reset the demo first:
 
 ```bash

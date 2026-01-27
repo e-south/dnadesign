@@ -40,7 +40,6 @@ import re
 import shutil
 import sys
 import tempfile
-from collections import Counter
 from datetime import datetime, timezone
 from importlib import resources
 from pathlib import Path
@@ -1818,7 +1817,7 @@ def stage_a_build_pool(
     show_motif_ids: bool = typer.Option(
         False,
         "--show-motif-ids",
-        help="Show full motif IDs instead of TF display names in tables.",
+        help="Show full motif IDs instead of TF names.",
     ),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
@@ -2056,7 +2055,6 @@ def stage_b_build_libraries(
         help="Plan item name(s) to build (defaults to all plans).",
     ),
     overwrite: bool = typer.Option(False, help="Overwrite existing library_builds.parquet."),
-    show_hash: bool = typer.Option(False, "--show-hash", help="Show full library hash in the table."),
     show_motif_ids: bool = typer.Option(
         False,
         "--show-motif-ids",
@@ -2120,17 +2118,8 @@ def stage_b_build_libraries(
         console.print("  - ensure --pool points to the outputs/pools directory for this workspace")
         raise typer.Exit(code=1)
 
-    display_map_by_input: dict[str, dict[str, str]] = {}
-    for inp in cfg.inputs:
-        motifs = input_motifs(inp, cfg_path)
-        display_map_by_input[inp.name] = {motif_id: name for motif_id, name in motifs}
-
     build_rows = []
     member_rows = []
-    headers = ["input", "plan", "build", "sites", "TF counts", "bp total/budget", "sampling strategy"]
-    if show_hash:
-        headers.insert(3, "hash")
-    table = Table(*headers)
     with _suppress_pyarrow_sysctl_warnings():
         for inp in cfg.inputs:
             if selected_inputs and inp.name not in selected_inputs:
@@ -2214,6 +2203,7 @@ def stage_b_build_libraries(
                     "library_hash": library_hash,
                     "library_tfbs": library_tfbs,
                     "library_tfs": library_tfs,
+                    "unique_tf_count": len(set(library_tfs)),
                     "library_site_ids": list(info.get("site_id_by_index") or []),
                     "library_sources": list(info.get("source_by_index") or []),
                     "library_tfbs_ids": list(tfbs_id_by_index),
@@ -2288,36 +2278,6 @@ def stage_b_build_libraries(
                             else None,
                         }
                     )
-                tf_counts = Counter(reg_labels or [])
-                tf_counts_label = "-"
-                if tf_counts:
-                    parts = []
-                    for tf, count in sorted(tf_counts.items(), key=lambda kv: kv[0]):
-                        label = tf
-                        if not show_motif_ids:
-                            label = display_map_by_input.get(inp.name, {}).get(tf, tf)
-                        parts.append(f"{label}={int(count)}")
-                    tf_counts_label = " ".join(parts)
-                over_budget = achieved_len - target_len
-                over_label = f"{over_budget:+d}" if target_len > 0 else "n/a"
-                bp_label = f"{achieved_len} / {target_len} ({over_label})" if target_len > 0 else f"{achieved_len} / -"
-
-                row_items = [
-                    inp.name,
-                    plan_item.name,
-                    str(row["library_index"]),
-                ]
-                if show_hash:
-                    row_items.append(str(library_hash))
-                row_items.extend(
-                    [
-                        str(len(library)),
-                        tf_counts_label,
-                        bp_label,
-                        str(sampling_strategy),
-                    ]
-                )
-                table.add_row(*row_items)
 
         if not build_rows:
             console.print("[yellow]No libraries built (no matching inputs/plans).[/]")
@@ -2337,12 +2297,62 @@ def stage_b_build_libraries(
             console.print(f"[bold red]{exc}[/]")
             console.print("[bold]Tip[/]: rerun with --overwrite to replace existing library artifacts.")
             raise typer.Exit(code=1)
+
+    summary_df = pd.DataFrame(build_rows)
+
+    def _format_min_median_max(series: pd.Series) -> str:
+        values = pd.to_numeric(series, errors="coerce").dropna()
+        if values.empty:
+            return "-"
+        return f"{values.min():.0f}/{values.median():.0f}/{values.max():.0f}"
+
+    def _format_budget(series: pd.Series) -> str:
+        values = pd.to_numeric(series, errors="coerce").dropna()
+        if values.empty:
+            return "-"
+        uniq = sorted({int(val) for val in values})
+        if len(uniq) == 1:
+            return str(uniq[0])
+        return f"{uniq[0]}-{uniq[-1]}"
+
+    def _format_strategy(series: pd.Series) -> str:
+        values = [str(val).strip() for val in series.tolist() if val and str(val).strip()]
+        uniq = sorted(set(values))
+        if not uniq:
+            return "-"
+        if len(uniq) == 1:
+            return uniq[0]
+        return "mixed"
+
+    summary_table = Table(
+        "input",
+        "plan",
+        "libraries",
+        "sites (min/med/max)",
+        "TFs (min/med/max)",
+        "bp total (min/med/max)",
+        "bp budget",
+        "sampling strategy",
+    )
+    for (input_name, plan_name), group in summary_df.groupby(["input_name", "plan_name"]):
+        summary_table.add_row(
+            str(input_name),
+            str(plan_name),
+            str(len(group)),
+            _format_min_median_max(group["library_size"]),
+            _format_min_median_max(group["unique_tf_count"]),
+            _format_min_median_max(group["achieved_length"]),
+            _format_budget(group["target_length"]),
+            _format_strategy(group["library_sampling_strategy"]),
+        )
+
     console.print("[bold]Stage-B libraries (solver inputs)[/]")
-    console.print(table)
+    console.print(summary_table)
     console.print(
         "Stage-B builds solver libraries from Stage-A pools (cached for `dense run`). "
-        "bp budget = sequence_length + subsample_over_length_budget_by."
+        "Sites/TFs/bp totals summarize min/median/max across libraries."
     )
+    console.print("bp budget = sequence_length + subsample_over_length_budget_by.")
     console.print(
         f":sparkles: [bold green]Library builds written[/]: "
         f"{_display_path(artifact.builds_path, run_root, absolute=False)}"
