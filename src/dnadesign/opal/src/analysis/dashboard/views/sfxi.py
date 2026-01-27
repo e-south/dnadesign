@@ -35,7 +35,6 @@ class SFXIParams:
     gamma: float
     delta: float
     p: float
-    fallback_p: float
     min_n: int
     eps: float
 
@@ -109,7 +108,6 @@ def compute_sfxi_params(
     gamma: float,
     delta: float,
     p: float,
-    fallback_p: float,
     min_n: int,
     eps: float,
     state_order: Sequence[str] | None,
@@ -117,14 +115,13 @@ def compute_sfxi_params(
     if state_order is None:
         raise ValueError("state_order is required and must be [00, 10, 01, 11].")
     sfxi_math.assert_state_order(state_order)
-    if len(setpoint) != 4:
-        raise ValueError("setpoint must have length 4")
-    p0, p1, p2, p3 = (float(x) for x in setpoint)
-    weights_arr = sfxi_math.weights_from_setpoint(np.array([p0, p1, p2, p3], dtype=float), eps=eps)
+    parsed_setpoint = sfxi_math.parse_setpoint_vector({"setpoint_vector": list(setpoint)})
+    p0, p1, p2, p3 = (float(x) for x in parsed_setpoint.tolist())
+    weights_arr = sfxi_math.weights_from_setpoint(parsed_setpoint, eps=eps)
     weights = tuple(float(x) for x in weights_arr.tolist())
-    d = float(sfxi_math.worst_corner_distance(np.array([p0, p1, p2, p3], dtype=float)))
+    d = float(sfxi_math.worst_corner_distance(parsed_setpoint))
     if not math.isfinite(d) or d <= 0:
-        d = float(eps)
+        raise ValueError("setpoint produced invalid distance; check setpoint values.")
     return SFXIParams(
         setpoint=(p0, p1, p2, p3),
         weights=weights,
@@ -134,7 +131,6 @@ def compute_sfxi_params(
         gamma=float(gamma),
         delta=float(delta),
         p=float(p),
-        fallback_p=float(fallback_p),
         min_n=int(min_n),
         eps=float(eps),
     )

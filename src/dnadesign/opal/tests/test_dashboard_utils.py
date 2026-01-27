@@ -516,10 +516,23 @@ def test_compute_sfxi_params_requires_state_order() -> None:
             gamma=1.0,
             delta=0.0,
             p=95.0,
-            fallback_p=75.0,
             min_n=1,
             eps=1e-6,
             state_order=None,
+        )
+
+
+def test_compute_sfxi_params_rejects_invalid_setpoint() -> None:
+    with pytest.raises(ValueError, match="setpoint_vector"):
+        sfxi.compute_sfxi_params(
+            setpoint=[-0.1, 0.25, 0.25, 1.1],
+            beta=1.0,
+            gamma=1.0,
+            delta=0.0,
+            p=95.0,
+            min_n=1,
+            eps=1e-6,
+            state_order=STATE_ORDER,
         )
 
 
@@ -531,7 +544,6 @@ def test_sfxi_metrics_deterministic() -> None:
         gamma=1.0,
         delta=0.0,
         p=95.0,
-        fallback_p=75.0,
         min_n=1,
         eps=1e-6,
         state_order=STATE_ORDER,
@@ -560,7 +572,6 @@ def test_compute_label_sfxi_view_preview() -> None:
         gamma=1.0,
         delta=0.0,
         p=95.0,
-        fallback_p=75.0,
         min_n=1,
         eps=1e-6,
         state_order=STATE_ORDER,
@@ -593,7 +604,6 @@ def test_sfxi_metrics_edge_cases() -> None:
         gamma=1.0,
         delta=10.0,
         p=95.0,
-        fallback_p=75.0,
         min_n=2,
         eps=1e-6,
         state_order=STATE_ORDER,
@@ -630,7 +640,6 @@ def test_sfxi_metrics_edge_cases() -> None:
         gamma=1.0,
         delta=10.0,
         p=95.0,
-        fallback_p=75.0,
         min_n=2,
         eps=1e-6,
         state_order=STATE_ORDER,
@@ -691,7 +700,6 @@ def test_integration_smoke(tmp_path: Path) -> None:
         gamma=1.0,
         delta=0.0,
         p=95.0,
-        fallback_p=75.0,
         min_n=1,
         eps=1e-6,
         state_order=STATE_ORDER,
@@ -850,7 +858,6 @@ def test_overlay_provenance_on_early_exit() -> None:
         gamma=1.0,
         delta=0.0,
         p=95.0,
-        fallback_p=75.0,
         min_n=1,
         eps=1e-6,
         state_order=STATE_ORDER,
@@ -880,7 +887,6 @@ def test_build_pred_sfxi_view_canonical() -> None:
         gamma=1.0,
         delta=0.0,
         p=50.0,
-        fallback_p=50.0,
         min_n=1,
         eps=1.0e-8,
         state_order=STATE_ORDER,
@@ -913,7 +919,6 @@ def test_build_pred_sfxi_view_overlay() -> None:
         gamma=1.0,
         delta=0.0,
         p=50.0,
-        fallback_p=50.0,
         min_n=1,
         eps=1.0e-8,
         state_order=STATE_ORDER,
@@ -947,7 +952,6 @@ def test_build_pred_sfxi_view_overlay_object_vectors() -> None:
         gamma=1.0,
         delta=0.0,
         p=50.0,
-        fallback_p=50.0,
         min_n=1,
         eps=1.0e-8,
         state_order=STATE_ORDER,

@@ -1296,7 +1296,6 @@ def _(
                             pl.lit(float(sfxi_params.gamma)).alias("gamma"),
                             pl.lit(float(sfxi_params.delta)).alias("delta"),
                             pl.lit(float(sfxi_params.p)).alias("p"),
-                            pl.lit(float(sfxi_params.fallback_p)).alias("fallback_p"),
                             pl.lit(int(sfxi_params.min_n)).alias("min_n"),
                             pl.lit(float(sfxi_params.eps)).alias("eps"),
                         ]
@@ -1775,7 +1774,6 @@ def _(mo, opal_campaign_info):
     p_default = float(scaling.get("percentile", 95.0))
     min_n_default = int(scaling.get("min_n", 5))
     eps_default = float(scaling.get("eps", 1.0e-8))
-    fallback_default = float(scaling.get("fallback_percentile", p_default))
     sfxi_default_values = {
         "p00": p00,
         "p10": p10,
@@ -1794,7 +1792,6 @@ def _(mo, opal_campaign_info):
     sfxi_fixed_params = {
         "delta": delta_default,
         "percentile": p_default,
-        "fallback_percentile": fallback_default,
         "min_n": min_n_default,
         "eps": eps_default,
     }
@@ -3012,7 +3009,6 @@ def _(
 
     delta = float(sfxi_fixed_params.get("delta", 0.0))
     p = float(sfxi_fixed_params.get("percentile", 95.0))
-    fallback_p = float(sfxi_fixed_params.get("fallback_percentile", p))
     min_n = int(sfxi_fixed_params.get("min_n", 5))
     eps = float(sfxi_fixed_params.get("eps", 1.0e-8))
 
@@ -3041,7 +3037,6 @@ def _(
         gamma=gamma,
         delta=delta,
         p=p,
-        fallback_p=fallback_p,
         min_n=min_n,
         eps=eps,
         state_order=sfxi_math.STATE_ORDER,
