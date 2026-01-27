@@ -44,7 +44,7 @@ uv run opal plot -c configs/campaign.yaml
 
 # 6) Notebook (marimo)
 uv run opal notebook
-uv run opal notebook generate --round latest
+uv run opal notebook generate --round latest  # add --force if rerunning
 uv run opal notebook run
 ```
 
