@@ -2231,6 +2231,7 @@ def stage_b_build_libraries(
             )
         except FileExistsError as exc:
             console.print(f"[bold red]{exc}[/]")
+            console.print("[bold]Tip[/]: rerun with --overwrite to replace existing library artifacts.")
             raise typer.Exit(code=1)
     console.print(table)
     console.print(f":sparkles: [bold green]Library builds written[/]: {artifact.builds_path}")

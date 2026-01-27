@@ -164,7 +164,20 @@ dense stage-a build-pool --fresh
 Optional: confirm the regulator labels (used by `required_regulators`) and tier cutoffs:
 
 ```bash
-python - <<'PY'
+uv run python - <<'PY'
+import json
+from pathlib import Path
+manifest = json.loads(Path("outputs/pools/pool_manifest.json").read_text())
+hist = manifest["inputs"][0]["stage_a_sampling"]["eligible_score_hist"]
+for row in hist:
+    print(f"{row['regulator']}: tier0={row.get('tier0_score')} tier1={row.get('tier1_score')}")
+PY
+```
+
+If you use pixi instead of uv, run the same snippet with:
+
+```bash
+pixi run python - <<'PY'
 import json
 from pathlib import Path
 manifest = json.loads(Path("outputs/pools/pool_manifest.json").read_text())

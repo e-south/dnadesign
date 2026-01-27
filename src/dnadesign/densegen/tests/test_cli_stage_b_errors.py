@@ -158,3 +158,39 @@ def test_stage_b_emits_sampling_pressure_events(tmp_path: Path) -> None:
     assert events_path.exists()
     rows = [json.loads(line) for line in events_path.read_text().splitlines()]
     assert any(row.get("event") == "LIBRARY_SAMPLING_PRESSURE" for row in rows)
+
+
+def test_stage_b_requires_overwrite_when_artifacts_exist(tmp_path: Path) -> None:
+    cfg_path = _write_stage_b_config(
+        tmp_path,
+        required_regulators=["TF_A", "TF_B"],
+        library_sampling_strategy="coverage_weighted",
+    )
+    pool_dir = _write_pool_manifest(tmp_path)
+    runner = CliRunner()
+    first = runner.invoke(
+        app,
+        [
+            "stage-b",
+            "build-libraries",
+            "-c",
+            str(cfg_path),
+            "--pool",
+            str(pool_dir),
+            "--overwrite",
+        ],
+    )
+    assert first.exit_code == 0, first.output
+    second = runner.invoke(
+        app,
+        [
+            "stage-b",
+            "build-libraries",
+            "-c",
+            str(cfg_path),
+            "--pool",
+            str(pool_dir),
+        ],
+    )
+    assert second.exit_code != 0, second.output
+    assert "overwrite" in second.output.lower()

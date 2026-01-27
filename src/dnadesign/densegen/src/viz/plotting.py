@@ -1385,8 +1385,16 @@ def _build_stage_a_strata_overview_figure(
     eligible_score_hist = sampling.get("eligible_score_hist") or []
     if not eligible_score_hist:
         raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
-    if "tf" not in pool_df.columns or "tfbs" not in pool_df.columns:
-        raise ValueError(f"Stage-A pool missing tf/tfbs columns for input '{input_name}'.")
+    if "regulator_id" in pool_df.columns and "tfbs_sequence" in pool_df.columns:
+        tf_col = "regulator_id"
+        tfbs_col = "tfbs_sequence"
+    elif "tf" in pool_df.columns and "tfbs" in pool_df.columns:
+        tf_col = "tf"
+        tfbs_col = "tfbs"
+    else:
+        raise ValueError(
+            f"Stage-A pool missing regulator_id/tfbs_sequence or tf/tfbs columns for input '{input_name}'."
+        )
     if "best_hit_score" not in pool_df.columns:
         raise ValueError(f"Stage-A pool missing best_hit_score for input '{input_name}'.")
 
@@ -1420,7 +1428,7 @@ def _build_stage_a_strata_overview_figure(
             continue
         heights = np.log10(np.asarray(counts, dtype=float) + 1.0)
         retained_vals = pd.to_numeric(
-            pool_df.loc[pool_df["tf"].astype(str) == reg, "best_hit_score"],
+            pool_df.loc[pool_df[tf_col].astype(str) == reg, "best_hit_score"],
             errors="coerce",
         ).dropna()
         retained_heights = None
@@ -1497,14 +1505,17 @@ def _build_stage_a_strata_overview_figure(
     ax_left.set_ylabel("Regulator tracks")
 
     lengths_by_reg: dict[str, list[int]] = {}
-    for reg, seq in pool_df[["tf", "tfbs"]].itertuples(index=False):
+    for reg, seq in pool_df[[tf_col, tfbs_col]].itertuples(index=False):
         reg_label = str(reg)
         lengths_by_reg.setdefault(reg_label, []).append(len(str(seq)))
     all_lengths = [val for vals in lengths_by_reg.values() for val in vals]
+    max_len = 35
+    tick_max = 35
     if not all_lengths:
         ax_right.text(0.5, 0.5, "No retained sequences", ha="center", va="center", transform=ax_right.transAxes)
     else:
-        max_len = 35
+        max_len = max(35, max(all_lengths))
+        tick_max = int(math.ceil(max_len / 5) * 5)
         for reg, lengths in lengths_by_reg.items():
             if not lengths:
                 continue
@@ -1541,8 +1552,8 @@ def _build_stage_a_strata_overview_figure(
                 linewidth=1.6,
                 warn_singular=False,
             )
-    ax_right.set_xlim(0, 35)
-    ax_right.set_xticks(list(range(0, 36, 5)))
+    ax_right.set_xlim(0, tick_max)
+    ax_right.set_xticks(list(range(0, tick_max + 1, 5)))
     ax_right.set_xlabel("TFBS length (nt)")
     ax_right.set_ylabel("Density")
 

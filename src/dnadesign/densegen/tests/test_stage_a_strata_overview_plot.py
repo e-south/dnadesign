@@ -73,3 +73,82 @@ def test_stage_a_strata_overview_axes_and_legend() -> None:
         assert max_points > 100
     finally:
         fig.clf()
+
+
+def test_stage_a_strata_overview_accepts_regulator_id_columns() -> None:
+    matplotlib.use("Agg", force=True)
+    sampling = {
+        "backend": "fimo",
+        "tier_scheme": "pct_1_9_90",
+        "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
+        "retention_rule": "top_n_sites_by_best_hit_score",
+        "fimo_thresh": 1.0,
+        "eligible_score_hist": [
+            {
+                "regulator": "regA",
+                "edges": [0.0, 2.0, 4.0],
+                "counts": [1, 1],
+                "tier0_score": 4.0,
+                "tier1_score": 2.0,
+            }
+        ],
+    }
+    pool_df = pd.DataFrame(
+        {
+            "regulator_id": ["regA"],
+            "tfbs_sequence": ["AAAAAA"],
+            "best_hit_score": [3.5],
+        }
+    )
+
+    fig, _, _ = _build_stage_a_strata_overview_figure(
+        input_name="demo_input",
+        pool_df=pool_df,
+        sampling=sampling,
+        style={},
+    )
+
+    try:
+        assert fig.axes
+    finally:
+        fig.clf()
+
+
+def test_stage_a_strata_overview_length_axis_expands_for_long_tfbs() -> None:
+    matplotlib.use("Agg", force=True)
+    sampling = {
+        "backend": "fimo",
+        "tier_scheme": "pct_1_9_90",
+        "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
+        "retention_rule": "top_n_sites_by_best_hit_score",
+        "fimo_thresh": 1.0,
+        "eligible_score_hist": [
+            {
+                "regulator": "regA",
+                "edges": [0.0, 1.0, 2.0],
+                "counts": [1, 1],
+                "tier0_score": 2.0,
+                "tier1_score": 1.0,
+            }
+        ],
+    }
+    long_tfbs = "A" * 80
+    pool_df = pd.DataFrame(
+        {
+            "tf": ["regA"],
+            "tfbs": [long_tfbs],
+            "best_hit_score": [1.5],
+        }
+    )
+
+    fig, _, ax_right = _build_stage_a_strata_overview_figure(
+        input_name="demo_input",
+        pool_df=pool_df,
+        sampling=sampling,
+        style={},
+    )
+
+    try:
+        assert ax_right.get_xlim()[1] >= len(long_tfbs)
+    finally:
+        fig.clf()
