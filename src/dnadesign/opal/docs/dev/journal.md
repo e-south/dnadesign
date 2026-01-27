@@ -92,3 +92,4 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Notebook template now escapes gallery newline literals; added AST-parse test to prevent invalid Python output.
 - Notebook template removed the tri-plot Altair panel in favor of a single plot gallery dropdown; simplified UI controls.
 - Plot gallery avoids marimo variable redefinition errors by using unique loop variable names.
+- Plot gallery cells now avoid early returns, use unique tag variables, and pass marimo check.

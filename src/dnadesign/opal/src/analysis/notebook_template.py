@@ -220,11 +220,19 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                     )
                     if not enabled:
                         continue
-                    tags = []
+                    _plot_tags_list = []
                     if preset_name:
-                        tags += parse_tags(preset.get("tags"), ctx=f"plot_presets.{preset_name}")
-                    tags += parse_tags(plot_entry_item.get("tags"), ctx=f"plot {name}")
-                    plot_entries.append({"name": name, "kind": kind, "tags": tags})
+                        _plot_tags_list += parse_tags(
+                            preset.get("tags"),
+                            ctx=f"plot_presets.{preset_name}",
+                        )
+                    _plot_tags_list += parse_tags(
+                        plot_entry_item.get("tags"),
+                        ctx=f"plot {name}",
+                    )
+                    plot_entries.append(
+                        {"name": name, "kind": kind, "tags": _plot_tags_list}
+                    )
             objective_is_sfxi = str(objective_name).lower().startswith("sfxi")
 
             def _is_sfxi_kind(kind: str) -> bool:
@@ -304,39 +312,41 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
         @app.cell
         def _(mo, plot_choices, plot_gallery_note, plot_ui):
             if plot_ui is None:
-                mo.md(plot_gallery_note)
-                return
-            selected = str(plot_ui.value)
-            choice = next(
-                (plot_choice for plot_choice in plot_choices if plot_choice["label"] == selected),
-                None,
-            )
-            if choice is None:
-                raise ValueError(f"Plot selection not found: {selected}")
-            plot_entry_selected = choice["entry"]
-            tags = (
-                ", ".join(plot_entry_selected["tags"])
-                if plot_entry_selected["tags"]
-                else "none"
-            )
-            details = [
-                plot_gallery_note,
-                "",
-                f"**Plot**: `{plot_entry_selected['name']}`",
-                f"Kind: `{plot_entry_selected['kind']}`",
-                f"Tags: `{tags}`",
-                f"File: `{choice['path']}`",
-            ]
-            mo.vstack(
-                [
-                    mo.md("\\n".join(details)),
-                    plot_ui,
-                    mo.image(choice["path"].read_bytes()),
+                panel = mo.md(plot_gallery_note)
+            else:
+                selected = str(plot_ui.value)
+                choice = next(
+                    (
+                        plot_choice
+                        for plot_choice in plot_choices
+                        if plot_choice["label"] == selected
+                    ),
+                    None,
+                )
+                if choice is None:
+                    raise ValueError(f"Plot selection not found: {selected}")
+                plot_entry_selected = choice["entry"]
+                _plot_tags_str = (
+                    ", ".join(plot_entry_selected["tags"])
+                    if plot_entry_selected["tags"]
+                    else "none"
+                )
+                details = [
+                    plot_gallery_note,
+                    "",
+                    f"**Plot**: `{plot_entry_selected['name']}`",
+                    f"Kind: `{plot_entry_selected['kind']}`",
+                    f"Tags: `{_plot_tags_str}`",
+                    f"File: `{choice['path']}`",
                 ]
-            )
-            return
-
-
+                panel = mo.vstack(
+                    [
+                        mo.md("\\n".join(details)),
+                        plot_ui,
+                        mo.image(choice["path"].read_bytes()),
+                    ]
+                )
+            panel
         @app.cell
         def _():
             pred_columns = [
