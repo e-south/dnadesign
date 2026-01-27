@@ -99,6 +99,9 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Added diagnostics sizing helpers and tightened Matplotlib diagnostics styling for white backgrounds + black text.
 - Added Altair-based diagnostics scatter charts (factorial/support/uncertainty) with overlay-aware hue options.
 - prom60_eda dropdowns now persist in-session state for diagnostics, UMAP, cluster plots, and dataset explorer.
+- Diagnostics now resolve active-record vec8s from label history (pred history first), with explicit source notes.
+- Setpoint sweep output now includes setpoint vector labels and renders as a heatmap (metrics × setpoints).
+- Diagnostics panel text now includes didactic explanations for each plot.
 - Notebook template now emits `marimo.App(width="medium", strict=False)` to avoid strictness mismatches.
 - Dashboard SFXI params now validate setpoints via `sfxi_math.parse_setpoint_vector` (invalid values raise).
 - Removed unused `fallback_percentile` plumbing from prom60_eda and SFXI params/export.

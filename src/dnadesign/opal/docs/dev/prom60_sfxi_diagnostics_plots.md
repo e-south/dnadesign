@@ -80,6 +80,11 @@ score   = (F_logic^beta) * (E_scaled^gamma)
 **Labels (observed)**:
 - `y_obs` (vec8, length 8) for logic support and denom computation
 
+**Label history is canonical**:
+- `opal__<slug>__label_hist` is the **source of truth** for observed and predicted vec8s.
+- Diagnostics should resolve active‑record vectors from **prediction history** (run‑aware) and fall back to
+  **label history** only when no pred entry exists for that record.
+
 **Run/objective params**:
 - setpoint vector `p` in `[0,1]^4`
 - `beta`, `gamma`, `delta`
@@ -105,6 +110,8 @@ Per‑state intensity contribution: `w_i * y_hat_linear_i`.
 If `sum(p) == 0`, intensity panel is **all zeros** and explicitly labeled
 “all‑OFF setpoint ⇒ intensity ignored”.
 
+**Data source**: resolve the active record from label history (pred entries first, then observed labels).
+
 ### C) Setpoint sweep (objective landscape)
 Library = **16 truth tables + current setpoint**. For each setpoint:
 - median `F_logic` on labels‑as‑of
@@ -113,6 +120,8 @@ Library = **16 truth tables + current setpoint**. For each setpoint:
 - `denom_used` from current‑round labels
 - clip fractions for `E_scaled` (labels; optional pool sample)
   - pool clip fractions must use the **label-derived denom** (objective‑consistent scaling)
+
+Rendered as a **heatmap**: columns are setpoint vectors, rows are diagnostic metrics.
 
 ### D) Logic support diagnostics
 Scatter: x=`dist_to_labeled_logic`, y=`score` (or `F_logic`), color=`E_scaled` or `F_logic`.
