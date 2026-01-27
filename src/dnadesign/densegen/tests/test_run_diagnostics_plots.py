@@ -17,6 +17,7 @@ import matplotlib
 import pandas as pd
 
 from dnadesign.densegen.src.viz.plotting import (
+    _plot_required_columns,
     plot_run_failure_pareto,
     plot_run_timeline_funnel,
     plot_stage_a_score_traceability,
@@ -160,6 +161,12 @@ def _metrics_df() -> pd.DataFrame:
             },
         ]
     )
+
+
+def test_plot_required_columns_for_positional_occupancy_excludes_plain_length() -> None:
+    cols = _plot_required_columns(["tfbs_positional_occupancy"], {})
+    assert "length" not in cols
+    assert "densegen__sequence_length" in cols or "densegen__length" in cols
 
 
 def _attempts_df() -> pd.DataFrame:

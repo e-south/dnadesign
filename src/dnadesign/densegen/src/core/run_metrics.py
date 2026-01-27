@@ -405,7 +405,7 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
             & (members_df["library_index"].astype(int) == library_index)
         ]
         if library_hash:
-            members = members[members_df["library_hash"].astype(str) == library_hash]
+            members = members[members["library_hash"].astype(str) == library_hash]
         if members.empty:
             raise RuntimeError(
                 f"library_members.parquet missing rows for {input_name}/{plan_name} library_index={library_index}."

@@ -190,6 +190,12 @@ Preview solver libraries without running the optimizer.
 dense stage-b build-libraries
 ```
 
+If library artifacts already exist under `outputs/libraries`, re-run with `--overwrite` or reset the demo first:
+
+```bash
+dense stage-b build-libraries --overwrite
+```
+
 ---
 
 ### 7. Run generation

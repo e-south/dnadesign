@@ -1511,10 +1511,46 @@ def _flush_solutions(tables_root: Path, buffer: list[dict]) -> None:
     buffer.clear()
 
 
+def _coerce_attempt_list(value: object, *, field: str, input_name: str, plan_name: str) -> list:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except Exception as exc:
+            raise RuntimeError(
+                f"attempts.parquet {field} JSON parse failed for {input_name}/{plan_name}: {exc}"
+            ) from exc
+        if isinstance(parsed, list):
+            return parsed
+        raise RuntimeError(f"attempts.parquet {field} JSON did not yield a list for {input_name}/{plan_name}.")
+    if isinstance(value, float) and math.isnan(value):
+        return []
+    try:
+        if pd.isna(value):
+            return []
+    except Exception:
+        pass
+    raise RuntimeError(
+        f"attempts.parquet {field} expected list-like values for {input_name}/{plan_name} "
+        f"but found {type(value).__name__}."
+    )
+
+
 def _load_failure_counts_from_attempts(
     tables_root: Path,
 ) -> dict[tuple[str, str, str, str, str | None], dict[str, int]]:
     attempts_path = tables_root / "attempts.parquet"
+    if not attempts_path.exists():
+        alt_path = tables_root / "tables" / "attempts.parquet"
+        if alt_path.exists():
+            attempts_path = alt_path
     if not attempts_path.exists():
         return {}
     try:
@@ -1531,25 +1567,25 @@ def _load_failure_counts_from_attempts(
         reason = str(row.get("reason") or "unknown")
         input_name = str(row.get("input_name") or "")
         plan_name = str(row.get("plan_name") or "")
-        library_tfbs = row.get("library_tfbs") or []
-        library_tfs = row.get("library_tfs") or []
-        library_site_ids = row.get("library_site_ids") or []
-        if isinstance(library_tfbs, str):
-            try:
-                library_tfbs = json.loads(library_tfbs)
-            except Exception:
-                library_tfbs = []
-        if isinstance(library_tfs, str):
-            try:
-                library_tfs = json.loads(library_tfs)
-            except Exception:
-                library_tfs = []
-        if isinstance(library_site_ids, str):
-            try:
-                library_site_ids = json.loads(library_site_ids)
-            except Exception:
-                library_site_ids = []
-        for idx, tfbs in enumerate(library_tfbs or []):
+        library_tfbs = _coerce_attempt_list(
+            row.get("library_tfbs"),
+            field="library_tfbs",
+            input_name=input_name,
+            plan_name=plan_name,
+        )
+        library_tfs = _coerce_attempt_list(
+            row.get("library_tfs"),
+            field="library_tfs",
+            input_name=input_name,
+            plan_name=plan_name,
+        )
+        library_site_ids = _coerce_attempt_list(
+            row.get("library_site_ids"),
+            field="library_site_ids",
+            input_name=input_name,
+            plan_name=plan_name,
+        )
+        for idx, tfbs in enumerate(library_tfbs):
             tf = str(library_tfs[idx]) if idx < len(library_tfs) else ""
             site_id_raw = library_site_ids[idx] if idx < len(library_site_ids) else None
             site_id = None

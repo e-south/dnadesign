@@ -77,6 +77,7 @@ from .core.artifacts.pool import (
     load_pool_artifact,
 )
 from .core.pipeline import (
+    _emit_event,
     _load_existing_library_index,
     _load_failure_counts_from_attempts,
     build_library_for_plan,
@@ -2028,6 +2029,7 @@ def stage_b_build_libraries(
     np_rng = np.random.default_rng(seeds["stage_b"])
     sampling_cfg = cfg.generation.sampling
     outputs_root = run_root / "outputs"
+    events_path = outputs_root / "meta" / "events.jsonl"
     failure_counts = _load_failure_counts_from_attempts(outputs_root)
     libraries_built = _load_existing_library_index(outputs_root) if outputs_root.exists() else 0
 
@@ -2149,6 +2151,38 @@ def stage_b_build_libraries(
                     "required_regulators_selected": info.get("required_regulators_selected"),
                 }
                 build_rows.append(row)
+                try:
+                    _emit_event(
+                        events_path,
+                        event="LIBRARY_BUILT",
+                        payload={
+                            "input_name": inp.name,
+                            "plan_name": plan_item.name,
+                            "library_index": int(info.get("library_index") or 0),
+                            "library_hash": library_hash,
+                            "library_size": int(info.get("library_size") or len(library)),
+                        },
+                    )
+                    if info.get("sampling_weight_by_tf"):
+                        _emit_event(
+                            events_path,
+                            event="LIBRARY_SAMPLING_PRESSURE",
+                            payload={
+                                "input_name": inp.name,
+                                "plan_name": plan_item.name,
+                                "library_index": int(info.get("library_index") or 0),
+                                "library_hash": library_hash,
+                                "sampling_strategy": sampling_strategy,
+                                "weight_by_tf": info.get("sampling_weight_by_tf"),
+                                "weight_fraction_by_tf": info.get("sampling_weight_fraction_by_tf"),
+                                "usage_count_by_tf": info.get("sampling_usage_count_by_tf"),
+                                "failure_count_by_tf": info.get("sampling_failure_count_by_tf"),
+                            },
+                        )
+                except Exception as exc:
+                    raise RuntimeError(
+                        f"Failed to write Stage-B events for {inp.name}/{plan_item.name}: {exc}"
+                    ) from exc
                 for idx, tfbs in enumerate(list(library)):
                     member_rows.append(
                         {

@@ -2266,7 +2266,7 @@ def _plot_required_columns(selected: Iterable[str], options: Dict[str, Dict[str,
             cols.update({_dg("used_tfbs"), _dg("used_tfbs_detail")})
         elif name == "tfbs_positional_occupancy":
             cols.update({_dg("used_tfbs_detail"), _dg("input_name"), _dg("plan")})
-            cols.update({"length", _dg("sequence_length"), "sequence"})
+            cols.update({_dg("sequence_length"), "sequence"})
     return sorted(cols)
 
 

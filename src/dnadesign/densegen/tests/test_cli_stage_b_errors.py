@@ -21,7 +21,12 @@ from typer.testing import CliRunner
 from dnadesign.densegen.src.cli import app
 
 
-def _write_stage_b_config(tmp_path: Path, *, required_regulators: list[str]) -> Path:
+def _write_stage_b_config(
+    tmp_path: Path,
+    *,
+    required_regulators: list[str],
+    library_sampling_strategy: str = "tf_balanced",
+) -> Path:
     inputs_dir = tmp_path / "inputs"
     inputs_dir.mkdir()
     sites_path = inputs_dir / "sites.csv"
@@ -51,6 +56,11 @@ def _write_stage_b_config(tmp_path: Path, *, required_regulators: list[str]) -> 
               generation:
                 sequence_length: 30
                 quota: 1
+                sampling:
+                  pool_strategy: subsample
+                  library_size: 2
+                  library_sampling_strategy: {library_sampling_strategy}
+                  cover_all_regulators: true
                 plan:
                   - name: default
                     quota: 1
@@ -121,3 +131,30 @@ def test_stage_b_reports_missing_required_regulators(tmp_path: Path) -> None:
     assert "Stage-B sampling failed" in result.output
     assert "Required regulators not found in input" in result.output
     assert "Available regulators" in result.output
+
+
+def test_stage_b_emits_sampling_pressure_events(tmp_path: Path) -> None:
+    cfg_path = _write_stage_b_config(
+        tmp_path,
+        required_regulators=["TF_A", "TF_B"],
+        library_sampling_strategy="coverage_weighted",
+    )
+    pool_dir = _write_pool_manifest(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "stage-b",
+            "build-libraries",
+            "-c",
+            str(cfg_path),
+            "--pool",
+            str(pool_dir),
+            "--overwrite",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    events_path = tmp_path / "outputs" / "meta" / "events.jsonl"
+    assert events_path.exists()
+    rows = [json.loads(line) for line in events_path.read_text().splitlines()]
+    assert any(row.get("event") == "LIBRARY_SAMPLING_PRESSURE" for row in rows)
