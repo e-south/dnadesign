@@ -17,6 +17,7 @@ import numpy as np
 import polars as pl
 
 from ....plots._mpl_utils import apply_plot_style
+from ...sfxi.setpoint_sweep import format_setpoint_label
 from .diagnostics_style import diagnostics_table_figsize
 
 
@@ -29,38 +30,56 @@ def make_setpoint_sweep_figure(
 ):
     if df.is_empty():
         raise ValueError("Setpoint sweep plot requires non-empty data.")
+    if not metrics:
+        raise ValueError("Setpoint sweep metrics must be non-empty.")
     for col in ("setpoint_name", *metrics):
         if col not in df.columns:
             raise ValueError(f"Setpoint sweep missing required column: {col}")
 
-    setpoint_labels = df.get_column("setpoint_name").to_list()
-    table_rows = []
-    for metric in metrics:
-        values = df.get_column(metric).to_list()
-        row = [metric] + [f"{float(v):.3f}" if v is not None and np.isfinite(v) else "NA" for v in values]
-        table_rows.append(row)
+    if "setpoint_label" in df.columns:
+        setpoint_labels = df.get_column("setpoint_label").to_list()
+    elif "setpoint_vector" in df.columns:
+        setpoint_labels = [format_setpoint_label(v) for v in df.get_column("setpoint_vector").to_list()]
+    else:
+        setpoint_labels = df.get_column("setpoint_name").to_list()
+
+    values = np.zeros((len(metrics), len(setpoint_labels)), dtype=float)
+    values[:] = np.nan
+    for i, metric in enumerate(metrics):
+        col_vals = df.get_column(metric).to_list()
+        for j, val in enumerate(col_vals):
+            if val is None or not np.isfinite(val):
+                continue
+            values[i, j] = float(val)
 
     apply_plot_style()
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(
-        figsize=diagnostics_table_figsize(n_cols=len(setpoint_labels) + 1, n_rows=len(metrics)),
+        figsize=diagnostics_table_figsize(n_cols=len(setpoint_labels), n_rows=len(metrics)),
         constrained_layout=True,
     )
-    ax.axis("off")
+    mask = np.ma.masked_invalid(values)
+    cmap = plt.cm.viridis.copy()
+    cmap.set_bad(color="#DDDDDD")
+    im = ax.imshow(mask, aspect="auto", cmap=cmap)
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
-    col_labels = ["metric"] + [str(s) for s in setpoint_labels]
-    table = ax.table(cellText=table_rows, colLabels=col_labels, loc="center")
-    table.auto_set_font_size(False)
-    n_cols = len(col_labels)
-    if n_cols <= 10:
-        font_size = 9
-    elif n_cols <= 16:
-        font_size = 8
-    else:
-        font_size = 7
-    table.set_fontsize(font_size)
-    table.scale(1.0, 1.2)
+    ax.set_xticks(np.arange(len(setpoint_labels)))
+    ax.set_yticks(np.arange(len(metrics)))
+    ax.set_xticklabels([str(s) for s in setpoint_labels], rotation=45, ha="right", fontsize=8)
+    ax.set_yticklabels([str(m).replace("_", " ") for m in metrics], fontsize=9)
+
+    show_text = len(setpoint_labels) <= 16 and len(metrics) <= 6
+    if show_text:
+        for i in range(len(metrics)):
+            for j in range(len(setpoint_labels)):
+                val = values[i, j]
+                if not np.isfinite(val):
+                    label = "NA"
+                else:
+                    label = f"{val:.3f}"
+                ax.text(j, i, label, ha="center", va="center", fontsize=7, color="black")
 
     if subtitle:
         ax.set_title(f"{title}\n{subtitle}")

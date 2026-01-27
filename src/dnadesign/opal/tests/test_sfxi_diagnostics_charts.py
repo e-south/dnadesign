@@ -16,6 +16,7 @@ import polars as pl
 
 from dnadesign.opal.src.analysis.dashboard.charts import (
     sfxi_intensity_scaling,
+    sfxi_setpoint_sweep,
     sfxi_support_diagnostics,
     sfxi_uncertainty,
 )
@@ -69,5 +70,20 @@ def test_intensity_scaling_chart_smoke() -> None:
         sweep_df,
         label_effect_raw=label_effect_raw,
         pool_effect_raw=None,
+    )
+    assert fig is not None
+
+
+def test_setpoint_sweep_heatmap_smoke() -> None:
+    df = pl.DataFrame(
+        {
+            "setpoint_name": ["0001", "1111"],
+            "setpoint_label": ["[0, 0, 0, 1]", "[1, 1, 1, 1]"],
+            "median_logic_fidelity": [0.5, 0.9],
+        }
+    )
+    fig = sfxi_setpoint_sweep.make_setpoint_sweep_figure(
+        df,
+        metrics=["median_logic_fidelity"],
     )
     assert fig is not None

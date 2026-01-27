@@ -1849,6 +1849,7 @@ def _(build_sfxi_hue_registry, choose_dropdown_value, df_sfxi_scatter, mo, sfxi_
 def _(mo):
     support_y_state, set_support_y_state = mo.state(None)
     support_color_state, set_support_color_state = mo.state(None)
+    sweep_metric_state, set_sweep_metric_state = mo.state(None)
     uncertainty_color_state, set_uncertainty_color_state = mo.state(None)
     uncertainty_kind_state, set_uncertainty_kind_state = mo.state(None)
     uncertainty_components_state, set_uncertainty_components_state = mo.state(None)
@@ -1856,12 +1857,14 @@ def _(mo):
     return (
         set_support_color_state,
         set_support_y_state,
+        set_sweep_metric_state,
         set_uncertainty_color_state,
         set_uncertainty_components_state,
         set_uncertainty_kind_state,
         set_uncertainty_reduction_state,
         support_color_state,
         support_y_state,
+        sweep_metric_state,
         uncertainty_color_state,
         uncertainty_components_state,
         uncertainty_kind_state,
@@ -1874,6 +1877,7 @@ def _(
     choose_dropdown_value,
     mo,
     support_y_state,
+    sweep_metric_state,
     uncertainty_components_state,
     uncertainty_kind_state,
     uncertainty_reduction_state,
@@ -1888,6 +1892,28 @@ def _(
         options=support_y_options,
         value=support_y_default,
         label="Support Y-axis",
+        full_width=True,
+    )
+    sweep_metric_options = [
+        "All metrics",
+        "Median logic fidelity",
+        "Top-K logic fidelity",
+        "Frac logic fidelity > tau",
+        "Denom used",
+        "Clip high fraction",
+    ]
+    sweep_metric_default = (
+        choose_dropdown_value(
+            sweep_metric_options,
+            current=sweep_metric_state(),
+            preferred="All metrics",
+        )
+        or "All metrics"
+    )
+    sweep_metric_dropdown = mo.ui.dropdown(
+        options=sweep_metric_options,
+        value=sweep_metric_default,
+        label="Sweep metric",
         full_width=True,
     )
     uncertainty_kind_options = ["score", "y_hat"]
@@ -1934,6 +1960,7 @@ def _(
         diagnostics_sample_slider,
         diagnostics_seed_slider,
         support_y_dropdown,
+        sweep_metric_dropdown,
         uncertainty_components_dropdown,
         uncertainty_kind_dropdown,
         uncertainty_reduction_dropdown,
@@ -1974,6 +2001,7 @@ def _(choose_dropdown_value, hue_registry, mo, support_color_state, uncertainty_
 def _(
     set_support_color_state,
     set_support_y_state,
+    set_sweep_metric_state,
     set_uncertainty_color_state,
     set_uncertainty_components_state,
     set_uncertainty_kind_state,
@@ -1983,6 +2011,8 @@ def _(
     support_color_state,
     support_y_dropdown,
     support_y_state,
+    sweep_metric_dropdown,
+    sweep_metric_state,
     uncertainty_color_dropdown,
     uncertainty_color_state,
     uncertainty_components_dropdown,
@@ -1996,6 +2026,10 @@ def _(
         _next_value = support_y_dropdown.value
         if state_value_changed(support_y_state(), _next_value):
             set_support_y_state(_next_value)
+    if sweep_metric_dropdown is not None:
+        _next_value = sweep_metric_dropdown.value
+        if state_value_changed(sweep_metric_state(), _next_value):
+            set_sweep_metric_state(_next_value)
     if support_color_dropdown is not None:
         _next_value = support_color_dropdown.value
         if state_value_changed(support_color_state(), _next_value):
@@ -2422,7 +2456,6 @@ def _(
 
 @app.cell(column=8)
 def _(
-    active_record,
     active_record_id,
     build_diagnostics_panels,
     diagnostics_sample_slider,
@@ -2434,10 +2467,12 @@ def _(
     hue_registry,
     mo,
     opal_campaign_info,
+    opal_labels_asof_df,
     opal_labels_current_df,
     sfxi_params,
     support_color_dropdown,
     support_y_dropdown,
+    sweep_metric_dropdown,
     uncertainty_available,
     uncertainty_color_dropdown,
 ):
@@ -2451,15 +2486,32 @@ def _(
     support_y_col = support_y_map.get(support_y_dropdown.value, "opal__view__score")
     support_color = hue_registry.get(support_color_dropdown.value)
     uncertainty_color = hue_registry.get(uncertainty_color_dropdown.value)
+    sweep_metric_map = {
+        "All metrics": [
+            "median_logic_fidelity",
+            "top_k_logic_fidelity",
+            "frac_logic_fidelity_gt_tau",
+            "denom_used",
+            "clip_hi_fraction",
+        ],
+        "Median logic fidelity": ["median_logic_fidelity"],
+        "Top-K logic fidelity": ["top_k_logic_fidelity"],
+        "Frac logic fidelity > tau": ["frac_logic_fidelity_gt_tau"],
+        "Denom used": ["denom_used"],
+        "Clip high fraction": ["clip_hi_fraction"],
+    }
+    _sweep_choice = sweep_metric_dropdown.value if sweep_metric_dropdown is not None else "All metrics"
+    sweep_metrics = sweep_metric_map.get(_sweep_choice, sweep_metric_map["All metrics"])
 
     panels = build_diagnostics_panels(
         df_pred_selected=df_pred_selected,
         df_view=df_view,
-        active_record=active_record,
         active_record_id=active_record_id,
         opal_campaign_info=opal_campaign_info,
+        label_events_df=opal_labels_asof_df,
         opal_labels_current_df=opal_labels_current_df,
         sfxi_params=sfxi_params,
+        sweep_metrics=sweep_metrics,
         support_y_col=support_y_col,
         support_color=support_color,
         uncertainty_color=uncertainty_color,
@@ -2489,19 +2541,49 @@ def _(
             mo.md("## Diagnostics / AL Guidance"),
             derived_metrics_note_md,
             sample_note,
+            mo.md(
+                "Diagnostics use label history as the canonical source for observed/predicted vec8s. "
+                "Overlay mode recomputes SFXI metrics with the current setpoint/exponents."
+                " Vector sources stay fixed."
+            ),
             mo.md("### Factorial-effects map"),
+            mo.md(
+                "Projects each predicted logic vector onto A/B effects and AB interaction. "
+                "Color encodes interaction strength; outlines mark labeled/top‑k candidates."
+            ),
             factorial_panel,
             mo.md("### Setpoint decomposition (active record)"),
+            mo.md(
+                "Left: per‑state residual |v̂ − p| (logic mismatch). "
+                "Right: setpoint‑weighted intensity contributions (which states drive brightness)."
+            ),
             decomp_panel,
             mo.md("### Logic support diagnostics"),
+            mo.md(
+                "Distance from each candidate’s predicted logic to the nearest labeled logic profile. "
+                "Low distance = in‑support; high distance = extrapolation."
+            ),
             mo.vstack([support_y_dropdown, support_color_dropdown]),
             support_panel,
             mo.md("### Uncertainty diagnostics"),
+            mo.md(
+                "Model uncertainty vs score to highlight risky candidates. "
+                "High uncertainty + high score can indicate unstable improvements."
+            ),
             uncertainty_color_dropdown,
             uncertainty_panel,
             mo.md("### Setpoint sweep (objective landscape)"),
+            mo.md(
+                "Heatmap over candidate setpoints using labeled data. Columns are setpoint vectors; "
+                "rows/metric choice summarize logic fidelity and intensity scaling behavior."
+            ),
+            sweep_metric_dropdown,
             sweep_panel,
             mo.md("### Intensity scaling diagnostics"),
+            mo.md(
+                "Shows denom calibration and clipping rates for intensity scaling. "
+                "Use to spot saturation or under‑scaled effects."
+            ),
             intensity_panel,
         ]
     )

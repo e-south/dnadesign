@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Sequence
 
 import numpy as np
 import polars as pl
@@ -58,6 +59,64 @@ class _SweepData:
     pool_effect_raw: np.ndarray | None
     subtitle: str | None
     note: str | None
+
+
+@dataclass(frozen=True)
+class ResolvedVec8:
+    vec8: np.ndarray | None
+    source: str | None
+    note: str | None
+
+
+def resolve_active_vec8(
+    *,
+    active_record_id: str | None,
+    pred_events_df: pl.DataFrame | None,
+    label_events_df: pl.DataFrame | None,
+    y_col: str | None,
+) -> ResolvedVec8:
+    if not active_record_id:
+        return ResolvedVec8(vec8=None, source=None, note="Select an active record to view setpoint decomposition.")
+    if pred_events_df is not None and not pred_events_df.is_empty():
+        if "id" not in pred_events_df.columns or "pred_y_hat" not in pred_events_df.columns:
+            return ResolvedVec8(
+                vec8=None,
+                source="pred_history",
+                note="Prediction history missing required columns for decomposition.",
+            )
+        df_pred = pred_events_df.filter(pl.col("id") == str(active_record_id))
+        if not df_pred.is_empty():
+            sort_cols = [col for col in ["as_of_round", "pred_ts"] if col in df_pred.columns]
+            if sort_cols:
+                df_pred = df_pred.sort(sort_cols)
+            pred_vec = list_series_to_numpy(df_pred.get_column("pred_y_hat"), expected_len=8)
+            if pred_vec is None:
+                return ResolvedVec8(
+                    vec8=None,
+                    source="pred_history",
+                    note="Prediction history vec8 is invalid for active record.",
+                )
+            return ResolvedVec8(vec8=pred_vec[-1], source="pred_history", note="Source: prediction history.")
+    if label_events_df is None or label_events_df.is_empty():
+        return ResolvedVec8(vec8=None, source=None, note="No label history available for active record.")
+    if "id" not in label_events_df.columns:
+        return ResolvedVec8(vec8=None, source="label_history", note="Label history missing id column.")
+    if not y_col or y_col not in label_events_df.columns:
+        return ResolvedVec8(vec8=None, source="label_history", note="Label history missing label vector column.")
+    df_labels = label_events_df.filter(pl.col("id") == str(active_record_id))
+    if df_labels.is_empty():
+        return ResolvedVec8(vec8=None, source="label_history", note="No label history for active record.")
+    sort_cols = [col for col in ["observed_round", "label_ts"] if col in df_labels.columns]
+    if sort_cols:
+        df_labels = df_labels.sort(sort_cols)
+    label_vec = list_series_to_numpy(df_labels.get_column(y_col), expected_len=8)
+    if label_vec is None:
+        return ResolvedVec8(vec8=None, source="label_history", note="Label history vec8 is invalid for active record.")
+    return ResolvedVec8(
+        vec8=label_vec[-1],
+        source="label_history",
+        note="Source: label history (no pred history for active record).",
+    )
 
 
 def _note_panel(message: str) -> ChartPanel:
@@ -132,42 +191,35 @@ def _build_factorial_panel(
 
 def _build_decomposition_panel(
     *,
-    active_record: pl.DataFrame | None,
     active_record_id: str | None,
-    opal_campaign_info: CampaignInfo | None,
+    pred_events_df: pl.DataFrame | None,
+    label_events_df: pl.DataFrame | None,
+    y_col: str | None,
     sfxi_params: SFXIParams,
 ) -> ChartPanel:
-    if active_record is None or active_record.is_empty():
-        return _note_panel("Select an active record to view setpoint decomposition.")
-
-    vec_col = None
-    if "pred_y_hat" in active_record.columns:
-        vec_col = "pred_y_hat"
-    elif opal_campaign_info is not None and opal_campaign_info.y_column in active_record.columns:
-        vec_col = opal_campaign_info.y_column
-    elif "y_obs" in active_record.columns:
-        vec_col = "y_obs"
-    if vec_col is None:
-        return _note_panel("Setpoint decomposition unavailable (missing vec8).")
-
-    diag_vec = list_series_to_numpy(active_record.get_column(vec_col), expected_len=None)
-    if diag_vec is None:
-        return _note_panel("Setpoint decomposition unavailable (invalid vec8).")
-    if diag_vec.shape[1] < 8:
+    resolved = resolve_active_vec8(
+        active_record_id=active_record_id,
+        pred_events_df=pred_events_df,
+        label_events_df=label_events_df,
+        y_col=y_col,
+    )
+    if resolved.vec8 is None:
+        return _note_panel(resolved.note or "Setpoint decomposition unavailable (missing vec8).")
+    if resolved.vec8.shape[0] < 8:
         return _note_panel("Setpoint decomposition unavailable (vec8 too short).")
 
-    y_hat = diag_vec[0]
+    y_hat = resolved.vec8
     try:
         fig = make_setpoint_decomposition_figure(
             v_hat=y_hat[0:4],
             y_star=y_hat[4:8],
             setpoint=np.array(sfxi_params.setpoint, dtype=float),
             delta=float(sfxi_params.delta),
-            subtitle=f"id={active_record_id or 'n/a'}",
+            subtitle=f"id={active_record_id or 'n/a'} · {resolved.source or 'unknown'}",
         )
     except Exception as exc:
         return _note_panel(f"Setpoint decomposition unavailable ({exc}).")
-    return ChartPanel(chart=fig, note=None, kind="mpl")
+    return ChartPanel(chart=fig, note=resolved.note, kind="mpl")
 
 
 def _build_support_panel(
@@ -313,11 +365,12 @@ def build_diagnostics_panels(
     *,
     df_pred_selected: pl.DataFrame | None,
     df_view: pl.DataFrame | None,
-    active_record: pl.DataFrame | None,
     active_record_id: str | None,
     opal_campaign_info: CampaignInfo | None,
+    label_events_df: pl.DataFrame | None,
     opal_labels_current_df: pl.DataFrame | None,
     sfxi_params: SFXIParams,
+    sweep_metrics: Sequence[str],
     support_y_col: str,
     support_color: HueOption | None,
     uncertainty_color: HueOption | None,
@@ -336,9 +389,10 @@ def build_diagnostics_panels(
         seed=seed,
     )
     decomposition = _build_decomposition_panel(
-        active_record=active_record,
         active_record_id=active_record_id,
-        opal_campaign_info=opal_campaign_info,
+        pred_events_df=df_pred_selected,
+        label_events_df=label_events_df,
+        y_col=opal_campaign_info.y_column if opal_campaign_info is not None else None,
         sfxi_params=sfxi_params,
     )
     support = _build_support_panel(
@@ -370,13 +424,7 @@ def build_diagnostics_panels(
         try:
             fig = make_setpoint_sweep_figure(
                 sweep_data.sweep_df,
-                metrics=[
-                    "median_logic_fidelity",
-                    "top_k_logic_fidelity",
-                    "frac_logic_fidelity_gt_tau",
-                    "denom_used",
-                    "clip_hi_fraction",
-                ],
+                metrics=list(sweep_metrics),
                 subtitle=f"labels={sweep_data.label_effect_raw.shape[0]} · {sweep_data.subtitle}",
             )
         except Exception as exc:

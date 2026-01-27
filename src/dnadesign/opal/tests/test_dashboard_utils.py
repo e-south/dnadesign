@@ -29,7 +29,7 @@ from dnadesign.opal.src.analysis.dashboard import (
     ui,
     util,
 )
-from dnadesign.opal.src.analysis.dashboard.charts import plots
+from dnadesign.opal.src.analysis.dashboard.charts import diagnostics_guidance, plots
 from dnadesign.opal.src.analysis.dashboard.views import sfxi
 from dnadesign.opal.src.analysis.sfxi.state_order import STATE_ORDER
 
@@ -534,6 +534,51 @@ def test_compute_sfxi_params_rejects_invalid_setpoint() -> None:
             eps=1e-6,
             state_order=STATE_ORDER,
         )
+
+
+def test_resolve_active_vec8_prefers_pred_history() -> None:
+    pred_df = pl.DataFrame(
+        {
+            "id": ["a"],
+            "pred_y_hat": [[0.0, 0.0, 0.0, 1.0, 0.2, 0.2, 0.2, 0.2]],
+        }
+    )
+    label_df = pl.DataFrame(
+        {
+            "id": ["a"],
+            "observed_round": [0],
+            "label_ts": ["t0"],
+            "sfxi_8_vector_y_label": [[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+        }
+    )
+    resolved = diagnostics_guidance.resolve_active_vec8(
+        active_record_id="a",
+        pred_events_df=pred_df,
+        label_events_df=label_df,
+        y_col="sfxi_8_vector_y_label",
+    )
+    assert resolved.vec8 is not None
+    assert resolved.source == "pred_history"
+
+
+def test_resolve_active_vec8_uses_label_history_when_pred_missing() -> None:
+    pred_df = pl.DataFrame(schema={"id": pl.Utf8, "pred_y_hat": pl.Object})
+    label_df = pl.DataFrame(
+        {
+            "id": ["a"],
+            "observed_round": [1],
+            "label_ts": ["t1"],
+            "sfxi_8_vector_y_label": [[0.1, 0.2, 0.3, 0.4, 1.0, 1.0, 1.0, 1.0]],
+        }
+    )
+    resolved = diagnostics_guidance.resolve_active_vec8(
+        active_record_id="a",
+        pred_events_df=pred_df,
+        label_events_df=label_df,
+        y_col="sfxi_8_vector_y_label",
+    )
+    assert resolved.vec8 is not None
+    assert resolved.source == "label_history"
 
 
 def test_sfxi_metrics_deterministic() -> None:

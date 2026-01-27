@@ -23,6 +23,19 @@ from .intensity_scaling import summarize_intensity_scaling
 from .state_order import require_state_order
 
 
+def format_setpoint_label(setpoint: Sequence[float], *, precision: int = 2) -> str:
+    vec = np.asarray(setpoint, dtype=float).ravel()
+    if vec.size != 4:
+        raise ValueError("setpoint must have length 4.")
+    vals = []
+    for v in vec.tolist():
+        text = f"{float(v):.{int(precision)}f}"
+        if "." in text:
+            text = text.rstrip("0").rstrip(".")
+        vals.append(text)
+    return "[" + ",".join(vals) + "]"
+
+
 @dataclass(frozen=True)
 class SetpointSpec:
     name: str
@@ -111,6 +124,8 @@ def sweep_setpoints(
         row = {
             "setpoint_name": spec.name,
             "setpoint_source": spec.source,
+            "setpoint_vector": p.tolist(),
+            "setpoint_label": format_setpoint_label(p),
             "median_logic_fidelity": median_logic,
             "top_k_logic_fidelity": top_k_val,
             "frac_logic_fidelity_gt_tau": frac_gt_tau,
