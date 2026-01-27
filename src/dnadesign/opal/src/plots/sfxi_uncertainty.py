@@ -28,7 +28,7 @@ from ..objectives import sfxi_math
 from ..registries.plots import PlotMeta, register_plot
 from ..storage.parquet_io import read_parquet_df
 from ._events_util import resolve_outputs_dir
-from ._param_utils import get_int, get_str, normalize_metric_field
+from ._param_utils import get_str, normalize_metric_field, reject_params
 from .sfxi_diag_data import resolve_run_id, resolve_single_round
 
 
@@ -59,8 +59,6 @@ def _coerce_y_ops(value: object) -> list[dict]:
             "reduction": "mean|max for y_hat (default mean).",
             "y_axis": "Metric for Y-axis (default score).",
             "hue": "Metric for color (default logic_fidelity).",
-            "sample_n": "Optional sample size for plotting.",
-            "seed": "Random seed for sampling (default 0).",
         },
         requires=["model artifact", "predictions", "records"],
         notes=["Loads artifact model from outputs/rounds/round_<r>/model/model.joblib."],
@@ -77,8 +75,7 @@ def render(context, params: dict) -> None:
     reduction = get_str(params, ["reduction"], "mean")
     y_axis = normalize_metric_field(get_str(params, ["y_axis", "y_field", "y"], "score"))
     hue = normalize_metric_field(get_str(params, ["hue", "color", "color_by"], "logic_fidelity"))
-    sample_n = get_int(params, ["sample_n", "n", "sample"], 0)
-    seed = get_int(params, ["seed"], 0)
+    reject_params(params, ["sample_n", "sample", "n", "seed"], ctx="sfxi_uncertainty")
 
     run_sel = runs_df.filter(pl.col("as_of_round") == int(round_k))
     if run_id is not None and "run_id" in run_sel.columns:
@@ -139,12 +136,6 @@ def render(context, params: dict) -> None:
     if pred_df.is_empty():
         raise OpalError("No predictions available for uncertainty plot.", ExitCodes.BAD_ARGS)
 
-    total = pred_df.height
-    subtitle = None
-    if sample_n > 0 and total > sample_n:
-        pred_df = pred_df.sample(n=sample_n, seed=seed, shuffle=True)
-        subtitle = f"sampled {pred_df.height}/{total}"
-
     records = read_parquet_df(records_path, columns=["id", x_col])
     rec_df = pl.from_pandas(records)
     df_joined = pred_df.join(rec_df, on="id", how="left")
@@ -184,7 +175,7 @@ def render(context, params: dict) -> None:
         x_col="uncertainty",
         y_col=y_axis,
         hue_col=hue,
-        subtitle=subtitle,
+        subtitle=None,
     )
     out_dir = context.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)

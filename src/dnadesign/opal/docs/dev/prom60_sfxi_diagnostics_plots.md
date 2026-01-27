@@ -9,10 +9,9 @@ title: Prom60 SFXI Diagnostics + Uncertainty (Developer Notes)
 These diagnostics extend the prom60 dashboard to make **active learning choices** more transparent:
 
 1) **Verify logic shape**: inspect factorial effects and nearest-gate class to confirm predicted logic matches the desired gate family.
-2) **Understand failure modes**: decompose distance-to-setpoint to see which states drive mismatch.
-3) **Check support / extrapolation**: quantify distance to labeled logic (and UMAP-space neighbors) before selecting risky candidates.
-4) **Assess uncertainty**: identify high-score but high-uncertainty candidates that warrant cautious exploration.
-5) **Tune setpoint safely**: sweep alternative setpoints without retraining to assess sensitivity and intensity scaling.
+2) **Check support / extrapolation**: quantify distance to labeled logic (and UMAP-space neighbors) before selecting risky candidates.
+3) **Assess uncertainty**: identify high-score but high-uncertainty candidates that warrant cautious exploration.
+4) **Tune setpoint safely**: sweep alternative setpoints without retraining to assess sensitivity and intensity scaling.
 
 ## Mathematical definitions
 
@@ -82,8 +81,6 @@ score   = (F_logic^beta) * (E_scaled^gamma)
 
 **Label history is canonical**:
 - `opal__<slug>__label_hist` is the **source of truth** for observed and predicted vec8s.
-- Diagnostics should resolve active‑record vectors from **prediction history** (run‑aware) and fall back to
-  **label history** only when no pred entry exists for that record.
 
 **Run/objective params**:
 - setpoint vector `p` in `[0,1]^4`
@@ -97,53 +94,59 @@ score   = (F_logic^beta) * (E_scaled^gamma)
 
 ## Plot semantics & interpretation
 
+Diagnostics render full datasets; sampling is intentionally disabled for these plots.
+
 ### A) Factorial‑effects map
 - **x:** `A_effect`, **y:** `B_effect`, **color:** `AB_interaction`
 - Optional size: `effect_scaled` (default)
-- Overlay markers: labeled, selected, top‑k (if available)
-- Sampling + rasterization are explicit; annotate the number of points shown.
+- Overlay markers: labeled + top‑k (current view)
+- The formulae are:
+  - $A = \frac{(v_{10}+v_{11})-(v_{00}+v_{01})}{2}$
+  - $B = \frac{(v_{01}+v_{11})-(v_{00}+v_{10})}{2}$
+  - $AB = \frac{(v_{11}+v_{00})-(v_{10}+v_{01})}{2}$
 
-### B) Setpoint decomposition
-Per‑state residuals: `|v_hat - p|` (2×2 heatmap aligned to state order).
-Per‑state intensity contribution: `w_i * y_hat_linear_i`.
-
-If `sum(p) == 0`, intensity panel is **all zeros** and explicitly labeled
-“all‑OFF setpoint ⇒ intensity ignored”.
-
-**Data source**: resolve the active record from label history (pred entries first, then observed labels).
-
-### C) Setpoint sweep (objective landscape)
+### B) Setpoint sweep (objective landscape)
 Library = **16 truth tables + current setpoint**. For each setpoint:
 - median `F_logic` on labels‑as‑of
 - **top‑k mean** `F_logic` (k configurable)
 - fraction `F_logic > tau`
 - `denom_used` from current‑round labels
-- clip fractions for `E_scaled` (labels; optional pool sample)
+- clip fractions for `E_scaled` (labels; optional pool if provided)
   - pool clip fractions must use the **label-derived denom** (objective‑consistent scaling)
 
 Rendered as a **heatmap**: columns are setpoint vectors, rows are diagnostic metrics.
+Default view omits `denom_used` to preserve contrast; `denom_used` is available as a single‑metric view.
 
-### D) Logic support diagnostics
-Scatter: x=`dist_to_labeled_logic`, y=`score` (or `F_logic`), color=`E_scaled` or `F_logic`.
+### C) Logic support diagnostics
+Scatter: x=`dist_to_labeled_logic`, y=`score` (or `F_logic`), color=`nearest_gate_class` or other hue.
+Distance is to the **nearest labeled logic vector** (labels‑as‑of). This does **not** identify which label is
+nearest; it only measures closeness to any observed logic profile. Use `nearest_gate_class` to interpret
+where a candidate sits relative to the 16 truth tables.
+Conservative campaigns can restrict to low distance (in‑support); exploratory campaigns can intentionally
+sample higher distances.
 
-### E) X‑space support (UMAP)
+### D) X‑space support (UMAP)
 Scatter in UMAP space; overlay labeled + selected. Color by score or `nearest_gate_class`.
 This is a support visualization only (no objective math).
 
-### F) Uncertainty views
+### E) Uncertainty views
 Scatter `uncertainty` vs `score` (color by `F_logic` or `E_scaled`).
-Optional scatter `uncertainty` vs `dist_to_labeled_logic`.
+The dashboard currently renders the score view only; a `dist_to_labeled_logic` variant is a future extension.
 
 **Contract**: uncertainty supports `kind="score"` and `kind="y_hat"` (default `score`).
 If unsupported, the UI errors explicitly.
+RF implementation uses per‑tree prediction variance (via `estimators_` / `predict_per_tree`) and is reduced
+to a scalar; component‑level uncertainty is not visualized here.
 
-### G) Intensity scaling diagnostics
+### F) Intensity scaling diagnostics
 Per‑setpoint:
 - `denom_used` vs setpoint
 - clip fractions vs setpoint
-- distribution of `E_raw` (labels, optional pool sample)
+- distribution of `E_raw` (labels, optional pool if provided)
 
 Denom definition must be explicit (e.g., “95th percentile of `E_raw` on current‑round labels”).
+These plots validate scaling stability: high clip fractions indicate saturation, while very low denom suggests
+under‑scaled intensity.
 
 ## Architecture plan (extensible + DRY)
 
@@ -162,9 +165,9 @@ Denom definition must be explicit (e.g., “95th percentile of `E_raw` on curren
 - `setpoint_sweep.py`
 - `uncertainty.py` (model‑agnostic contract + RF adapter)
 
-**Chart builders (matplotlib, no marimo)**
+**Chart builders (Altair + matplotlib, no marimo)**
 `src/dnadesign/opal/src/analysis/dashboard/charts/sfxi_*.py`
-- Each exports `make_<plot>_figure(...) -> matplotlib.figure.Figure`
+- Each exports `make_<plot>_figure(...) -> matplotlib.figure.Figure` (mpl) or an Altair chart builder.
 
 **Notebook UI only orchestrates**
 `notebooks/prom60_eda.py`:

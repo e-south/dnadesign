@@ -1882,8 +1882,6 @@ def _(
     uncertainty_kind_state,
     uncertainty_reduction_state,
 ):
-    diagnostics_sample_slider = mo.ui.slider(0, 5000, value=1500, step=100, label="Diagnostics sample (n)")
-    diagnostics_seed_slider = mo.ui.slider(0, 10000, value=0, step=1, label="Diagnostics seed")
     support_y_options = ["Score", "Logic fidelity"]
     support_y_default = (
         choose_dropdown_value(support_y_options, current=support_y_state(), preferred="Score") or "Score"
@@ -1895,20 +1893,20 @@ def _(
         full_width=True,
     )
     sweep_metric_options = [
-        "All metrics",
+        "Core metrics",
         "Median logic fidelity",
         "Top-K logic fidelity",
         "Frac logic fidelity > tau",
-        "Denom used",
         "Clip high fraction",
+        "Denom used",
     ]
     sweep_metric_default = (
         choose_dropdown_value(
             sweep_metric_options,
             current=sweep_metric_state(),
-            preferred="All metrics",
+            preferred="Core metrics",
         )
-        or "All metrics"
+        or "Core metrics"
     )
     sweep_metric_dropdown = mo.ui.dropdown(
         options=sweep_metric_options,
@@ -1957,8 +1955,6 @@ def _(
         full_width=True,
     )
     return (
-        diagnostics_sample_slider,
-        diagnostics_seed_slider,
         support_y_dropdown,
         sweep_metric_dropdown,
         uncertainty_components_dropdown,
@@ -1970,7 +1966,10 @@ def _(
 @app.cell
 def _(choose_dropdown_value, hue_registry, mo, support_color_state, uncertainty_color_state):
     _diag_hue_options = ["(none)"] + hue_registry.labels()
-    support_color_preferred = "Effect scaled" if "Effect scaled" in _diag_hue_options else "Score"
+    if "Nearest gate class" in _diag_hue_options:
+        support_color_preferred = "Nearest gate class"
+    else:
+        support_color_preferred = "Effect scaled" if "Effect scaled" in _diag_hue_options else "Score"
     support_color_default = (
         choose_dropdown_value(_diag_hue_options, current=support_color_state(), preferred=support_color_preferred)
         or "(none)"
@@ -2456,10 +2455,7 @@ def _(
 
 @app.cell(column=8)
 def _(
-    active_record_id,
     build_diagnostics_panels,
-    diagnostics_sample_slider,
-    diagnostics_seed_slider,
     derived_metrics_note_md,
     df_pred_selected,
     df_view,
@@ -2467,7 +2463,6 @@ def _(
     hue_registry,
     mo,
     opal_campaign_info,
-    opal_labels_asof_df,
     opal_labels_current_df,
     sfxi_params,
     support_color_dropdown,
@@ -2476,9 +2471,6 @@ def _(
     uncertainty_available,
     uncertainty_color_dropdown,
 ):
-    diag_sample_n = int(diagnostics_sample_slider.value) if diagnostics_sample_slider is not None else 0
-    diag_seed = int(diagnostics_seed_slider.value) if diagnostics_seed_slider is not None else 0
-
     support_y_map = {
         "Score": "opal__view__score",
         "Logic fidelity": "opal__view__logic_fidelity",
@@ -2487,11 +2479,10 @@ def _(
     support_color = hue_registry.get(support_color_dropdown.value)
     uncertainty_color = hue_registry.get(uncertainty_color_dropdown.value)
     sweep_metric_map = {
-        "All metrics": [
+        "Core metrics": [
             "median_logic_fidelity",
             "top_k_logic_fidelity",
             "frac_logic_fidelity_gt_tau",
-            "denom_used",
             "clip_hi_fraction",
         ],
         "Median logic fidelity": ["median_logic_fidelity"],
@@ -2500,15 +2491,13 @@ def _(
         "Denom used": ["denom_used"],
         "Clip high fraction": ["clip_hi_fraction"],
     }
-    _sweep_choice = sweep_metric_dropdown.value if sweep_metric_dropdown is not None else "All metrics"
-    sweep_metrics = sweep_metric_map.get(_sweep_choice, sweep_metric_map["All metrics"])
+    _sweep_choice = sweep_metric_dropdown.value if sweep_metric_dropdown is not None else "Core metrics"
+    sweep_metrics = sweep_metric_map.get(_sweep_choice, sweep_metric_map["Core metrics"])
 
     panels = build_diagnostics_panels(
         df_pred_selected=df_pred_selected,
         df_view=df_view,
-        active_record_id=active_record_id,
         opal_campaign_info=opal_campaign_info,
-        label_events_df=opal_labels_asof_df,
         opal_labels_current_df=opal_labels_current_df,
         sfxi_params=sfxi_params,
         sweep_metrics=sweep_metrics,
@@ -2516,8 +2505,6 @@ def _(
         support_color=support_color,
         uncertainty_color=uncertainty_color,
         uncertainty_available=uncertainty_available,
-        sample_n=diag_sample_n,
-        seed=diag_seed,
     )
 
     def _render_panel(panel, *, default_note: str):
@@ -2528,9 +2515,7 @@ def _(
             return mo.vstack([mo.md(panel.note), element])
         return element
 
-    sample_note = mo.md(panels.sample_note) if panels.sample_note else mo.md("")
     factorial_panel = _render_panel(panels.factorial, default_note="Factorial effects unavailable.")
-    decomp_panel = _render_panel(panels.decomposition, default_note="Setpoint decomposition unavailable.")
     support_panel = _render_panel(panels.support, default_note="Support diagnostics unavailable.")
     uncertainty_panel = _render_panel(panels.uncertainty, default_note="Uncertainty plot unavailable.")
     sweep_panel = _render_panel(panels.sweep, default_note="Setpoint sweep unavailable.")
@@ -2540,49 +2525,50 @@ def _(
         [
             mo.md("## Diagnostics / AL Guidance"),
             derived_metrics_note_md,
-            sample_note,
             mo.md(
                 "Diagnostics use label history as the canonical source for observed/predicted vec8s. "
                 "Overlay mode recomputes SFXI metrics with the current setpoint/exponents."
-                " Vector sources stay fixed."
+                " Vector sources stay fixed. Diagnostics render the full dataset (no sampling)."
             ),
             mo.md("### Factorial-effects map"),
             mo.md(
                 "Projects each predicted logic vector onto A/B effects and AB interaction. "
+                r"$A = \frac{(v_{10}+v_{11})-(v_{00}+v_{01})}{2}$, "
+                r"$B = \frac{(v_{01}+v_{11})-(v_{00}+v_{10})}{2}$, "
+                r"$AB = \frac{(v_{11}+v_{00})-(v_{10}+v_{01})}{2}$. "
                 "Color encodes interaction strength; outlines mark labeled/top‑k candidates."
             ),
             factorial_panel,
-            mo.md("### Setpoint decomposition (active record)"),
-            mo.md(
-                "Left: per‑state residual |v̂ − p| (logic mismatch). "
-                "Right: setpoint‑weighted intensity contributions (which states drive brightness)."
-            ),
-            decomp_panel,
             mo.md("### Logic support diagnostics"),
             mo.md(
-                "Distance from each candidate’s predicted logic to the nearest labeled logic profile. "
-                "Low distance = in‑support; high distance = extrapolation."
+                "Distance from each candidate’s predicted logic to the nearest labeled logic profile "
+                "(labels‑as‑of). The nearest label can live in any truth‑table region; use "
+                "`nearest_gate_class` to see which truth‑table class each candidate resembles. "
+                "Conservative campaigns favor low distance; exploratory campaigns sample some higher distances."
             ),
             mo.vstack([support_y_dropdown, support_color_dropdown]),
             support_panel,
             mo.md("### Uncertainty diagnostics"),
             mo.md(
                 "Model uncertainty vs score to highlight risky candidates. "
-                "High uncertainty + high score can indicate unstable improvements."
+                "Contract is model‑agnostic; for RF this is per‑tree prediction variance "
+                "(estimators_ / predict_per_tree) aggregated to a scalar. "
+                "Only scalar uncertainty is visualized here."
             ),
             uncertainty_color_dropdown,
             uncertainty_panel,
             mo.md("### Setpoint sweep (objective landscape)"),
             mo.md(
                 "Heatmap over candidate setpoints using labeled data. Columns are setpoint vectors; "
-                "rows/metric choice summarize logic fidelity and intensity scaling behavior."
+                "rows/metric choice summarize logic fidelity and intensity scaling behavior. "
+                "Denom is shown as a single‑metric view to avoid washing out other rows."
             ),
             sweep_metric_dropdown,
             sweep_panel,
             mo.md("### Intensity scaling diagnostics"),
             mo.md(
-                "Shows denom calibration and clipping rates for intensity scaling. "
-                "Use to spot saturation or under‑scaled effects."
+                "Shows denom calibration, clipping rates, and E_raw distributions. "
+                "Use to spot saturation (over‑scaled) or under‑scaled intensity effects."
             ),
             intensity_panel,
         ]
@@ -3403,8 +3389,6 @@ def _(
     df_active,
     df_pred_selected,
     df_sfxi,
-    diagnostics_sample_slider,
-    diagnostics_seed_slider,
     diagnostics_to_lines,
     list_series_to_numpy,
     load_round_ctx_from_dir,
@@ -3464,7 +3448,6 @@ def _(
     df_view = view_bundle.df
     derived_notes = []
     uncertainty_available = False
-    uncertainty_sample_info = None
 
     pred_join_key = None
     if df_pred_selected is not None:
@@ -3574,9 +3557,6 @@ def _(
     uncertainty_reduction = (
         uncertainty_reduction_dropdown.value if uncertainty_reduction_dropdown is not None else "mean"
     )
-    uncertainty_sample_n = diagnostics_sample_slider.value if diagnostics_sample_slider is not None else 0
-    uncertainty_seed = diagnostics_seed_slider.value if diagnostics_seed_slider is not None else 0
-
     if opal_campaign_info is None or not opal_campaign_info.x_column:
         derived_notes.append("uncertainty unavailable (x_column missing).")
     elif opal_pred_selected_round is None:
@@ -3594,15 +3574,7 @@ def _(
         elif not sfxi_uncertainty.supports_uncertainty(model=uncertainty_artifact.model):
             derived_notes.append("uncertainty unavailable (model lacks per-tree predictions).")
         else:
-            uncertainty_df = df_view
-            if uncertainty_sample_n and df_view.height > int(uncertainty_sample_n):
-                uncertainty_df = df_view.sample(
-                    n=int(uncertainty_sample_n),
-                    seed=int(uncertainty_seed),
-                    shuffle=True,
-                )
-                uncertainty_sample_info = f"sampled {uncertainty_df.height}/{df_view.height}"
-            X = list_series_to_numpy(uncertainty_df.get_column(opal_campaign_info.x_column), expected_len=None)
+            X = list_series_to_numpy(df_view.get_column(opal_campaign_info.x_column), expected_len=None)
             if X is None:
                 derived_notes.append("uncertainty unavailable (invalid X vectors).")
             else:
@@ -3657,15 +3629,15 @@ def _(
                     derived_notes.append(f"uncertainty unavailable ({exc})")
                 else:
                     uncertainty_available = True
-                    uncertainty_join_key = "id" if "id" in uncertainty_df.columns else "__row_id"
-                    uncertainty_values_df = uncertainty_df.select([uncertainty_join_key]).with_columns(
+                    uncertainty_join_key = "id" if "id" in df_view.columns else "__row_id"
+                    uncertainty_values_df = df_view.select([uncertainty_join_key]).with_columns(
                         pl.Series("opal__sfxi__uncertainty", result.values)
                     )
                     df_view = df_view.join(uncertainty_values_df, on=uncertainty_join_key, how="left")
     view_notice_lines = diagnostics_to_lines(view_bundle.diagnostics)
     view_notice_md = mo.md("\n".join(view_notice_lines)) if view_notice_lines else mo.md("")
     derived_metrics_note_md = mo.md("\n".join(derived_notes)) if derived_notes else mo.md("")
-    return df_view, derived_metrics_note_md, uncertainty_available, uncertainty_sample_info, view_notice_md
+    return df_view, derived_metrics_note_md, uncertainty_available, view_notice_md
 
 
 @app.cell

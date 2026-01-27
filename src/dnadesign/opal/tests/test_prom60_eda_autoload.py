@@ -39,6 +39,13 @@ def test_prom60_eda_includes_sfxi_diagnostics_column() -> None:
     assert "Diagnostics / AL Guidance" in text
 
 
+def test_prom60_eda_has_no_diagnostics_sampling_controls() -> None:
+    nb_path = Path("src/dnadesign/opal/notebooks/prom60_eda.py")
+    text = nb_path.read_text()
+    assert "Diagnostics sample" not in text
+    assert "diagnostics_sample_slider" not in text
+
+
 def test_prom60_eda_persists_dropdown_state() -> None:
     nb_path = Path("src/dnadesign/opal/notebooks/prom60_eda.py")
     text = nb_path.read_text()

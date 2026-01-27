@@ -54,8 +54,7 @@ uv run opal notebook run
   ledger labels sink is populated even if the labels are already present.
 - `ingest-y` prompts for confirmation when no TTY is available; pass `--yes` for scripted runs.
 - Demo plots live in `configs/plots.yaml` and include SFXI diagnostics (factorial effects,
-  setpoint decomposition, setpoint sweep, logic support, uncertainty, intensity scaling).
-  If you swap datasets, update the `record_id` in the setpoint decomposition plot entry.
+  setpoint sweep, logic support, uncertainty, intensity scaling).
 - Use `uv run opal ...` to ensure the correct environment.
 - If `outputs/rounds/round_0/` already exists from a prior run, `opal run` will refuse to overwrite
   unless you pass `--resume` (which wipes the round directory) or delete the existing artifacts first.

@@ -66,8 +66,8 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Uncertainty contract will support both `score` and `y_hat` kinds (default `score`).
 - dist_to_labeled_x will use UMAP embedding distance (X-space visualization only).
 - Added SFXI diagnostic chart builders (support, uncertainty, intensity scaling) and CLI plot plugins.
-- prom60_eda now includes a Diagnostics / AL Guidance column with factorial, setpoint decomposition, sweep, support,
-  uncertainty, and intensity scaling panels plus derived-metrics status.
+- prom60_eda now includes a Diagnostics / AL Guidance column with factorial, sweep, support, uncertainty,
+  and intensity scaling panels plus derived-metrics status.
 - Derived metrics (nearest gate, dist-to-labeled logic/X, uncertainty) are attached to df_view for hue options.
 - UMAP explorer overlays labeled points; tests cover hue registry and chart layering.
 
@@ -77,7 +77,6 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Demo plots config expanded to include all SFXI diagnostics; DEMO doc updated for setpoint plot + ingest-y replace.
 - Facade read_predictions now filters before projection; added test for round filtering without as_of_round column.
 - SFXI plot helpers: setpoint parsing fixed for tuple/list values; added unit test.
-- sfxi_setpoint_decomposition no longer requests derived setpoint column; added plot test.
 - sfxi_uncertainty now coerces polars Series y_ops to list; added unit test.
 - Fixed setpoint sweep pool clip fractions to use label-derived denom; added regression test.
 - prom60_eda now flags setpoint sweep when it falls back to labels-as-of.
@@ -106,3 +105,7 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Dashboard SFXI params now validate setpoints via `sfxi_math.parse_setpoint_vector` (invalid values raise).
 - Removed unused `fallback_percentile` plumbing from prom60_eda and SFXI params/export.
 - Added test coverage for invalid SFXI setpoint values in dashboard utils.
+- Removed setpoint decomposition plot from dashboard + CLI; docs/demo config updated accordingly.
+- Diagnostics and SFXI plot artifacts now render full datasets; sampling params removed and rejected.
+- Support diagnostics default hue now prefers nearest gate class; added clearer factorial math + uncertainty provenance notes.
+- Setpoint sweep default view omits denom to preserve heatmap contrast.

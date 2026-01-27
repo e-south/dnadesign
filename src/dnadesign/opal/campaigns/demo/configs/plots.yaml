@@ -61,16 +61,7 @@ plots:
     tags: [diagnostic]
     params:
       size_by: obj__effect_scaled
-      sample_n: 1500
-      seed: 7
       top_k: 10
-
-  - name: sfxi_setpoint_decomposition
-    kind: sfxi_setpoint_decomposition
-    tags: [diagnostic]
-    params:
-      record_id: "e153ebc49fd3b253592d97c448df4e2f10ab126e"
-      delta: 0.0
 
   - name: sfxi_setpoint_sweep
     kind: sfxi_setpoint_sweep
@@ -85,8 +76,6 @@ plots:
     params:
       y_axis: score
       hue: effect_scaled
-      sample_n: 1500
-      seed: 7
 
   - name: sfxi_uncertainty
     kind: sfxi_uncertainty
@@ -95,8 +84,6 @@ plots:
       kind: score
       y_axis: score
       hue: logic_fidelity
-      sample_n: 1500
-      seed: 7
 
   - name: sfxi_intensity_scaling
     kind: sfxi_intensity_scaling

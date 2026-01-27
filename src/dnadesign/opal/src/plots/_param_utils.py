@@ -55,6 +55,12 @@ def get_bool(d: Mapping[str, Any], keys: Sequence[str], default: bool) -> bool:
     raise ValueError(f"Expected boolean for {keys}, got {v!r}")
 
 
+def reject_params(d: Mapping[str, Any], keys: Sequence[str], *, ctx: str) -> None:
+    for k in keys:
+        if k in d:
+            raise ValueError(f"{ctx} does not accept parameter '{k}'.")
+
+
 # -------------------------------
 # Metric aliasing / field helpers
 # -------------------------------

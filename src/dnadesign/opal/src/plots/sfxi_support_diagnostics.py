@@ -22,7 +22,7 @@ from ..analysis.sfxi.support import dist_to_labeled_logic
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
-from ._param_utils import get_int, get_str, normalize_metric_field
+from ._param_utils import get_int, get_str, normalize_metric_field, reject_params
 from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_round
 
 
@@ -33,8 +33,6 @@ from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_ro
         params={
             "y_axis": "Metric for Y-axis (default score).",
             "hue": "Metric for color (default effect_scaled).",
-            "sample_n": "Optional sample size for plotting.",
-            "seed": "Random seed for sampling (default 0).",
             "batch_size": "Batch size for distance computation (default 2048).",
         },
         requires=["pred__y_hat_model", "pred__y_obj_scalar"],
@@ -49,9 +47,8 @@ def render(context, params: dict) -> None:
 
     y_axis = normalize_metric_field(get_str(params, ["y_axis", "y_field", "y"], "score"))
     hue = normalize_metric_field(get_str(params, ["hue", "color", "color_by"], "effect_scaled"))
-    sample_n = get_int(params, ["sample_n", "n", "sample"], 0)
-    seed = get_int(params, ["seed"], 0)
     batch_size = get_int(params, ["batch_size"], 2048)
+    reject_params(params, ["sample_n", "sample", "n", "seed"], ctx="sfxi_support_diagnostics")
 
     need = {"id", "pred__y_hat_model", "pred__y_obj_scalar", "sel__is_selected"}
     if y_axis:
@@ -98,19 +95,13 @@ def render(context, params: dict) -> None:
     )
     df_plot = pred_df.with_columns(pl.Series("dist_to_labeled_logic", distances))
 
-    total = df_plot.height
-    subtitle = None
-    if sample_n > 0 and total > sample_n:
-        df_plot = df_plot.sample(n=sample_n, seed=seed, shuffle=True)
-        subtitle = f"sampled {df_plot.height}/{total}"
-
     fig = sfxi_support_diagnostics.make_support_diagnostics_figure(
         df_plot,
         x_col="dist_to_labeled_logic",
         y_col=y_axis,
         hue_col=hue,
         selected_col="sel__is_selected",
-        subtitle=subtitle,
+        subtitle=None,
     )
     out_dir = context.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)

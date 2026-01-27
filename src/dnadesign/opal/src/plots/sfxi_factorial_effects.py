@@ -18,7 +18,7 @@ from ..analysis.facade import load_predictions_with_setpoint, read_labels, read_
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
-from ._param_utils import get_bool, get_int, get_str
+from ._param_utils import get_bool, get_int, get_str, reject_params
 from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_round
 
 
@@ -28,8 +28,6 @@ from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_ro
         summary="Factorial-effects map from predicted SFXI logic vectors.",
         params={
             "size_by": "Column for point size (default obj__effect_scaled).",
-            "sample_n": "Optional sample size for plotting.",
-            "seed": "Random seed for sampling (default 0).",
             "top_k": "Optional Top-K threshold for overlay (default 10).",
             "include_labels": "Overlay labeled records (default true).",
             "rasterize_at": "Rasterize scatter above this count (default None).",
@@ -45,13 +43,12 @@ def render(context, params: dict) -> None:
     run_id = resolve_run_id(runs_df, round_k=round_k, run_id=context.run_id)
 
     size_by = get_str(params, ["size_by", "size", "size_field"], "obj__effect_scaled")
-    sample_n = get_int(params, ["sample_n", "n", "sample"], 0)
-    seed = get_int(params, ["seed"], 0)
     top_k = get_int(params, ["top_k"], 10)
     include_labels = get_bool(params, ["include_labels", "labels"], True)
     rasterize_at = params.get("rasterize_at", None)
     if rasterize_at is not None:
         rasterize_at = int(rasterize_at)
+    reject_params(params, ["sample_n", "sample", "n", "seed"], ctx="sfxi_factorial_effects")
 
     need = {"id", "pred__y_hat_model", "sel__is_selected", "sel__rank_competition"}
     if size_by:
@@ -82,12 +79,6 @@ def render(context, params: dict) -> None:
 
     df = df.with_columns((pl.col("sel__rank_competition") <= int(top_k)).alias("__is_top_k"))
 
-    total = df.height
-    subtitle = None
-    if sample_n > 0 and total > sample_n:
-        df = df.sample(n=sample_n, seed=seed, shuffle=True)
-        subtitle = f"sampled {df.height}/{total}"
-
     fig = sfxi_factorial_effects.make_factorial_effects_figure(
         df,
         logic_col="pred__y_hat_model",
@@ -95,7 +86,7 @@ def render(context, params: dict) -> None:
         label_col="__is_labeled",
         selected_col="sel__is_selected",
         top_k_col="__is_top_k",
-        subtitle=subtitle,
+        subtitle=None,
         rasterize_at=rasterize_at,
     )
 

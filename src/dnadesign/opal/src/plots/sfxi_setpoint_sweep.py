@@ -87,7 +87,6 @@ def render(context, params: dict) -> None:
             "median_logic_fidelity",
             "top_k_logic_fidelity",
             "frac_logic_fidelity_gt_tau",
-            "denom_used",
             "clip_hi_fraction",
         ],
         subtitle=f"R={round_k} · labels={labels_vec.shape[0]} · {denom_note}",

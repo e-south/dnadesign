@@ -100,20 +100,20 @@ Ledger sinks always live under `context.workspace.outputs_dir` (e.g., `outputs/l
 ## SFXI diagnostics plots
 
 These plots reuse shared SFXI math and are safe to run without retraining.
+Diagnostic plots always render the full dataset; sampling parameters are not supported.
 
 ### Plot kinds + params
 
 - **`sfxi_factorial_effects`**: factorial-effects map from predicted logic vectors.
-  - params: `size_by` (default `obj__effect_scaled`), `sample_n`, `seed`, `top_k`, `include_labels`, `rasterize_at`
-- **`sfxi_setpoint_decomposition`**: per-state residuals + intensity contribution for a single record.
-  - params: `record_id` (required), `delta`
+  - params: `size_by` (default `obj__effect_scaled`), `top_k`, `include_labels`, `rasterize_at`
 - **`sfxi_setpoint_sweep`**: objective landscape across discrete setpoints (current-round labels).
   - rendered as a heatmap with setpoints as columns (vector labels) and diagnostic metrics as rows.
+  - default heatmap omits `denom_used` to preserve contrast.
   - params: `y_col` (default `y_obs`), `top_k`, `tau`, `percentile`, `min_n`, `eps`, `delta`
 - **`sfxi_support_diagnostics`**: distance-to-labeled-logic vs score (OOD check).
-  - params: `y_axis`, `hue`, `sample_n`, `seed`, `batch_size`
+  - params: `y_axis`, `hue`, `batch_size`
 - **`sfxi_uncertainty`**: uncertainty vs score (artifact model; RF variance).
-  - params: `kind` (`score|y_hat`), `components`, `reduction`, `y_axis`, `hue`, `sample_n`, `seed`
+  - params: `kind` (`score|y_hat`), `components`, `reduction`, `y_axis`, `hue`
 - **`sfxi_intensity_scaling`**: denom + clip fractions + E_raw distribution (current-round labels).
   - params: `y_col` (default `y_obs`), `percentile`, `min_n`, `eps`, `delta`, `include_pool`
 
@@ -125,14 +125,6 @@ plots:
     kind: sfxi_factorial_effects
     params:
       size_by: obj__effect_scaled
-      sample_n: 2000
-      seed: 7
-
-  - name: sfxi_setpoint_record
-    kind: sfxi_setpoint_decomposition
-    params:
-      record_id: "rec_001"
-      delta: 0.0
 
   - name: sfxi_setpoint_sweep
     kind: sfxi_setpoint_sweep
@@ -145,13 +137,11 @@ plots:
     params:
       y_axis: score
       hue: effect_scaled
-      sample_n: 1500
 
   - name: sfxi_uncertainty
     kind: sfxi_uncertainty
     params:
       kind: score
-      sample_n: 1000
 
   - name: sfxi_intensity_scaling
     kind: sfxi_intensity_scaling
