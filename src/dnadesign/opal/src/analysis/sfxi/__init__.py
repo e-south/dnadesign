@@ -9,6 +9,6 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from .state_order import STATE_ORDER, assert_state_order
+from .state_order import STATE_ORDER, assert_state_order, require_state_order
 
-__all__ = ["STATE_ORDER", "assert_state_order"]
+__all__ = ["STATE_ORDER", "assert_state_order", "require_state_order"]

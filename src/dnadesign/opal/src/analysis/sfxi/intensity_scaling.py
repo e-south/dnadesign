@@ -17,7 +17,7 @@ from typing import Sequence
 import numpy as np
 
 from ...objectives import sfxi_math
-from .state_order import STATE_ORDER, assert_state_order
+from .state_order import require_state_order
 
 
 @dataclass(frozen=True)
@@ -38,9 +38,9 @@ def summarize_intensity_scaling(
     percentile: int,
     min_n: int,
     eps: float,
-    state_order: Sequence[str] = STATE_ORDER,
+    state_order: Sequence[str] | None = None,
 ) -> IntensityScalingSummary:
-    assert_state_order(state_order)
+    order = require_state_order(state_order)
     y_star = np.asarray(y_star_labels, dtype=float)
     if y_star.ndim == 1:
         y_star = y_star.reshape(1, -1)
@@ -53,10 +53,15 @@ def summarize_intensity_scaling(
     if p.size != 4:
         raise ValueError("setpoint must have length 4.")
 
-    w = sfxi_math.weights_from_setpoint(p, eps=1e-12)
-    intensity_disabled = not np.any(w)
+    effect_raw, weights = sfxi_math.effect_raw_from_y_star(
+        y_star,
+        p,
+        delta=delta,
+        eps=eps,
+        state_order=order,
+    )
+    intensity_disabled = not np.any(weights)
     if intensity_disabled:
-        effect_raw = np.zeros(y_star.shape[0], dtype=float)
         effect_scaled = np.ones(y_star.shape[0], dtype=float)
         return IntensityScalingSummary(
             denom=1.0,
@@ -67,8 +72,6 @@ def summarize_intensity_scaling(
             intensity_disabled=True,
         )
 
-    y_lin = sfxi_math.recover_linear_intensity(y_star, delta=delta)
-    effect_raw = sfxi_math.effect_raw(y_lin, w)
     denom = sfxi_math.denom_from_pool(effect_raw, percentile=percentile, min_n=min_n, eps=eps)
     effect_scaled = sfxi_math.effect_scaled(effect_raw, denom)
     clip_lo_fraction = float(np.mean(effect_scaled <= 0.0 + 1e-12)) if effect_scaled.size else 0.0

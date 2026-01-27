@@ -2346,6 +2346,7 @@ def _(
                     top_k=5,
                     tau=0.8,
                     pool_vec8=pool_vec,
+                    state_order=sfxi_math.STATE_ORDER,
                 )
                 fig = make_setpoint_sweep_figure(
                     sweep_df,
@@ -2360,13 +2361,22 @@ def _(
                 )
                 sweep_panel = fig_to_image(fig)
 
-                weights = sfxi_math.weights_from_setpoint(np.array(sfxi_params.setpoint, dtype=float), eps=1.0e-12)
-                y_lin = sfxi_math.recover_linear_intensity(diag_labels_vec8[:, 4:8], delta=float(sfxi_params.delta))
-                label_effect_raw = sfxi_math.effect_raw(y_lin, weights)
+                label_effect_raw, _ = sfxi_math.effect_raw_from_y_star(
+                    diag_labels_vec8[:, 4:8],
+                    np.array(sfxi_params.setpoint, dtype=float),
+                    delta=float(sfxi_params.delta),
+                    eps=float(sfxi_params.eps),
+                    state_order=sfxi_math.STATE_ORDER,
+                )
                 pool_effect_raw = None
                 if pool_vec is not None:
-                    pool_lin = sfxi_math.recover_linear_intensity(pool_vec[:, 4:8], delta=float(sfxi_params.delta))
-                    pool_effect_raw = sfxi_math.effect_raw(pool_lin, weights)
+                    pool_effect_raw, _ = sfxi_math.effect_raw_from_y_star(
+                        pool_vec[:, 4:8],
+                        np.array(sfxi_params.setpoint, dtype=float),
+                        delta=float(sfxi_params.delta),
+                        eps=float(sfxi_params.eps),
+                        state_order=sfxi_math.STATE_ORDER,
+                    )
                 fig = make_intensity_scaling_figure(
                     sweep_df,
                     label_effect_raw=label_effect_raw,
@@ -2885,6 +2895,7 @@ def _(
     sfxi_default_values,
     sfxi_fixed_params,
     sfxi_gamma_input,
+    sfxi_math,
     sfxi_p00_slider,
     sfxi_p01_slider,
     sfxi_p10_slider,
@@ -2932,6 +2943,7 @@ def _(
         fallback_p=fallback_p,
         min_n=min_n,
         eps=eps,
+        state_order=sfxi_math.STATE_ORDER,
     )
 
     label_view = build_label_sfxi_view(
@@ -3292,7 +3304,10 @@ def _(
         if pred_vec8 is None:
             derived_notes.append("Nearest gate unavailable (invalid pred_y_hat vectors).")
         else:
-            gate_cls, gate_dist = sfxi_gates.nearest_gate(pred_vec8[:, 0:4])
+            gate_cls, gate_dist = sfxi_gates.nearest_gate(
+                pred_vec8[:, 0:4],
+                state_order=sfxi_math.STATE_ORDER,
+            )
             gate_df = df_pred_selected.select([pred_join_key]).with_columns(
                 [
                     pl.Series("opal__sfxi__nearest_gate_class", gate_cls),
@@ -3337,7 +3352,11 @@ def _(
             if pred_vec is None:
                 derived_notes.append("dist_to_labeled_logic unavailable (invalid pred_y_hat vectors).")
             else:
-                dists = sfxi_support.dist_to_labeled_logic(pred_vec[:, 0:4], label_logic)
+                dists = sfxi_support.dist_to_labeled_logic(
+                    pred_vec[:, 0:4],
+                    label_logic,
+                    state_order=sfxi_math.STATE_ORDER,
+                )
                 dist_df = df_pred_selected.select([pred_join_key]).with_columns(
                     pl.Series("opal__sfxi__dist_to_labeled_logic", dists)
                 )
@@ -3434,6 +3453,7 @@ def _(
                                     percentile=int(sfxi_params.p),
                                     min_n=int(sfxi_params.min_n),
                                     eps=float(sfxi_params.eps),
+                                    state_order=sfxi_math.STATE_ORDER,
                                 )
                             except Exception as exc:
                                 derived_notes.append(f"uncertainty denom failed: {exc}")

@@ -17,6 +17,7 @@ from ..analysis.dashboard.charts import sfxi_setpoint_sweep
 from ..analysis.dashboard.util import list_series_to_numpy
 from ..analysis.facade import read_labels, read_runs
 from ..analysis.sfxi.setpoint_sweep import sweep_setpoints
+from ..analysis.sfxi.state_order import STATE_ORDER
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
@@ -76,6 +77,7 @@ def render(context, params: dict) -> None:
         delta=delta,
         top_k=top_k,
         tau=tau,
+        state_order=STATE_ORDER,
     )
 
     fig = sfxi_setpoint_sweep.make_setpoint_sweep_figure(

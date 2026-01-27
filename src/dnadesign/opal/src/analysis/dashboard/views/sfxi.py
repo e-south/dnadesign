@@ -59,6 +59,7 @@ def invert_intensity_median_iqr(y, med, iqr, *, enabled: bool):
 class SFXIParams:
     setpoint: tuple[float, float, float, float]
     weights: tuple[float, float, float, float]
+    state_order: tuple[str, str, str, str]
     d: float
     beta: float
     gamma: float
@@ -141,7 +142,11 @@ def compute_sfxi_params(
     fallback_p: float,
     min_n: int,
     eps: float,
+    state_order: Sequence[str] | None,
 ) -> SFXIParams:
+    if state_order is None:
+        raise ValueError("state_order is required and must be [00, 10, 01, 11].")
+    sfxi_math.assert_state_order(state_order)
     if len(setpoint) != 4:
         raise ValueError("setpoint must have length 4")
     p0, p1, p2, p3 = (float(x) for x in setpoint)
@@ -153,6 +158,7 @@ def compute_sfxi_params(
     return SFXIParams(
         setpoint=(p0, p1, p2, p3),
         weights=weights,
+        state_order=tuple(state_order),
         d=d,
         beta=float(beta),
         gamma=float(gamma),
@@ -197,6 +203,7 @@ def compute_sfxi_metrics(
     params: SFXIParams,
     denom_pool_df: pl.DataFrame,
 ) -> SFXIResult:
+    sfxi_math.assert_state_order(params.state_order)
     df = _coerce_vec8_column(df, vec_col)
     denom_pool_df = _coerce_vec8_column(denom_pool_df, vec_col)
     if vec_col not in df.columns:
@@ -229,7 +236,6 @@ def compute_sfxi_metrics(
     v_hat = np.clip(vec[:, 0:4], 0.0, 1.0)
     y_star = vec[:, 4:8]
     setpoint = np.array([p0, p1, p2, p3], dtype=float)
-    weights = np.array(params.weights, dtype=float)
     F_logic = sfxi_math.logic_fidelity(v_hat, setpoint)
 
     if intensity_disabled:
@@ -279,10 +285,16 @@ def compute_sfxi_metrics(
         percentile=int(params.p),
         min_n=int(params.min_n),
         eps=float(params.eps),
+        state_order=params.state_order,
     )
 
-    y_lin = sfxi_math.recover_linear_intensity(y_star, delta=params.delta)
-    E_raw = sfxi_math.effect_raw(y_lin, weights)
+    E_raw, _weights = sfxi_math.effect_raw_from_y_star(
+        y_star,
+        setpoint,
+        delta=params.delta,
+        eps=params.eps,
+        state_order=params.state_order,
+    )
     E_scaled = sfxi_math.effect_scaled(E_raw, float(denom))
     score = np.power(F_logic, params.beta) * np.power(E_scaled, params.gamma)
 

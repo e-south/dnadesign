@@ -17,6 +17,7 @@ import polars as pl
 from ..analysis.dashboard.charts import sfxi_support_diagnostics
 from ..analysis.dashboard.util import list_series_to_numpy
 from ..analysis.facade import load_predictions_with_setpoint, read_labels, read_runs
+from ..analysis.sfxi.state_order import STATE_ORDER
 from ..analysis.sfxi.support import dist_to_labeled_logic
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
@@ -89,7 +90,12 @@ def render(context, params: dict) -> None:
         raise OpalError("Invalid prediction vectors (expected length-8 values).", ExitCodes.CONTRACT_VIOLATION)
     pred_logic = np.asarray(pred_vec[:, 0:4], dtype=float)
 
-    distances = dist_to_labeled_logic(pred_logic, label_logic, batch_size=batch_size)
+    distances = dist_to_labeled_logic(
+        pred_logic,
+        label_logic,
+        state_order=STATE_ORDER,
+        batch_size=batch_size,
+    )
     df_plot = pred_df.with_columns(pl.Series("dist_to_labeled_logic", distances))
 
     total = df_plot.height

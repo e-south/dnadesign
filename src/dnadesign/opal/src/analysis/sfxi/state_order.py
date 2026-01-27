@@ -23,6 +23,13 @@ def assert_state_order(order: Sequence[str]) -> None:
     _assert_state_order(order)
 
 
+def require_state_order(order: Sequence[str] | None) -> Sequence[str]:
+    if order is None:
+        raise ValueError("state_order is required and must be [00, 10, 01, 11].")
+    assert_state_order(order)
+    return order
+
+
 def index_for_state(state: str, *, order: Sequence[str] = STATE_ORDER) -> int:
     assert_state_order(order)
     try:

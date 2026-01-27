@@ -20,7 +20,7 @@ import polars as pl
 from ...objectives import sfxi_math
 from .gates import GATE_LIBRARY
 from .intensity_scaling import summarize_intensity_scaling
-from .state_order import STATE_ORDER, assert_state_order
+from .state_order import require_state_order
 
 
 @dataclass(frozen=True)
@@ -35,9 +35,9 @@ def build_setpoint_library(
     *,
     include_truth_tables: bool = True,
     include_current: bool = True,
-    state_order: Sequence[str] = STATE_ORDER,
+    state_order: Sequence[str] | None = None,
 ) -> list[SetpointSpec]:
-    assert_state_order(state_order)
+    require_state_order(state_order)
     library: list[SetpointSpec] = []
     if include_truth_tables:
         for gate in GATE_LIBRARY:
@@ -60,10 +60,10 @@ def sweep_setpoints(
     delta: float,
     top_k: int,
     tau: float,
-    state_order: Sequence[str] = STATE_ORDER,
+    state_order: Sequence[str] | None = None,
     pool_vec8: np.ndarray | None = None,
 ) -> pl.DataFrame:
-    assert_state_order(state_order)
+    order = require_state_order(state_order)
     labels = np.asarray(labels_vec8, dtype=float)
     if labels.ndim == 1:
         labels = labels.reshape(1, -1)
@@ -85,7 +85,7 @@ def sweep_setpoints(
         if not np.all(np.isfinite(pool)):
             raise ValueError("pool_vec8 must be finite.")
 
-    library = build_setpoint_library(current_setpoint, state_order=state_order)
+    library = build_setpoint_library(current_setpoint, state_order=order)
     rows: list[dict] = []
     for spec in library:
         p = np.asarray(spec.vector, dtype=float).ravel()
@@ -106,7 +106,7 @@ def sweep_setpoints(
             percentile=percentile,
             min_n=min_n,
             eps=eps,
-            state_order=state_order,
+            state_order=order,
         )
         row = {
             "setpoint_name": spec.name,
@@ -128,7 +128,7 @@ def sweep_setpoints(
                 percentile=percentile,
                 min_n=min_n,
                 eps=eps,
-                state_order=state_order,
+                state_order=order,
             )
             row["pool_clip_lo_fraction"] = float(pool_scaling.clip_lo_fraction)
             row["pool_clip_hi_fraction"] = float(pool_scaling.clip_hi_fraction)

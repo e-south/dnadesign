@@ -17,6 +17,7 @@ from ..analysis.dashboard.charts import sfxi_intensity_scaling
 from ..analysis.dashboard.util import list_series_to_numpy
 from ..analysis.facade import load_predictions_with_setpoint, read_labels, read_runs
 from ..analysis.sfxi.setpoint_sweep import sweep_setpoints
+from ..analysis.sfxi.state_order import STATE_ORDER
 from ..core.utils import ExitCodes, OpalError
 from ..objectives import sfxi_math
 from ..registries.plots import PlotMeta, register_plot
@@ -90,16 +91,26 @@ def render(context, params: dict) -> None:
         top_k=1,
         tau=0.5,
         pool_vec8=pool_vec,
+        state_order=STATE_ORDER,
     )
 
-    weights = sfxi_math.weights_from_setpoint(setpoint, eps=1.0e-12)
-    y_lin_labels = sfxi_math.recover_linear_intensity(labels_vec[:, 4:8], delta=delta)
-    label_effect_raw = sfxi_math.effect_raw(y_lin_labels, weights)
+    label_effect_raw, _ = sfxi_math.effect_raw_from_y_star(
+        labels_vec[:, 4:8],
+        setpoint,
+        delta=delta,
+        eps=eps,
+        state_order=STATE_ORDER,
+    )
 
     pool_effect_raw = None
     if pool_vec is not None:
-        y_lin_pool = sfxi_math.recover_linear_intensity(pool_vec[:, 4:8], delta=delta)
-        pool_effect_raw = sfxi_math.effect_raw(y_lin_pool, weights)
+        pool_effect_raw, _ = sfxi_math.effect_raw_from_y_star(
+            pool_vec[:, 4:8],
+            setpoint,
+            delta=delta,
+            eps=eps,
+            state_order=STATE_ORDER,
+        )
 
     fig = sfxi_intensity_scaling.make_intensity_scaling_figure(
         sweep_df,

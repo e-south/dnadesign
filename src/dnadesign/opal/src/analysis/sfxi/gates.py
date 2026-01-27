@@ -17,7 +17,7 @@ from typing import Sequence
 
 import numpy as np
 
-from .state_order import STATE_ORDER, assert_state_order
+from .state_order import require_state_order
 
 
 @dataclass(frozen=True)
@@ -38,9 +38,9 @@ def truth_table_vectors() -> np.ndarray:
 def nearest_gate(
     v: np.ndarray,
     *,
-    state_order: Sequence[str] = STATE_ORDER,
+    state_order: Sequence[str] | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    assert_state_order(state_order)
+    require_state_order(state_order)
     arr = np.asarray(v, dtype=float)
     if arr.ndim == 1:
         arr = arr.reshape(1, -1)

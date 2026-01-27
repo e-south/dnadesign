@@ -15,7 +15,7 @@ from typing import Sequence
 
 import numpy as np
 
-from .state_order import STATE_ORDER, assert_state_order
+from .state_order import require_state_order
 
 
 def _validate_matrix(arr: np.ndarray, *, name: str, n_cols: int) -> np.ndarray:
@@ -55,10 +55,10 @@ def dist_to_labeled_logic(
     candidates: np.ndarray,
     labels: np.ndarray,
     *,
-    state_order: Sequence[str] = STATE_ORDER,
+    state_order: Sequence[str] | None = None,
     batch_size: int = 2048,
 ) -> np.ndarray:
-    assert_state_order(state_order)
+    require_state_order(state_order)
     cand = _validate_matrix(candidates, name="candidates", n_cols=4)
     lab = _validate_matrix(labels, name="labels", n_cols=4)
     return _min_l2_distance(cand, lab, batch_size=batch_size)

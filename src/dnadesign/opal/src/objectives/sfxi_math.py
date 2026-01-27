@@ -75,6 +75,35 @@ def recover_linear_intensity(y_star: np.ndarray, delta: float) -> np.ndarray:
     return np.maximum(0.0, np.power(2.0, y) - float(delta))
 
 
+def effect_raw_from_y_star(
+    y_star: np.ndarray,
+    setpoint: np.ndarray,
+    *,
+    delta: float,
+    eps: float,
+    state_order: Sequence[str],
+) -> tuple[np.ndarray, np.ndarray]:
+    assert_state_order(state_order)
+    if not np.isfinite(eps) or eps <= 0.0:
+        raise ValueError(f"[sfxi_math] eps must be positive and finite; got {eps}.")
+    y = np.asarray(y_star, dtype=float)
+    if y.ndim == 1:
+        y = y.reshape(1, -1)
+    if y.shape[1] != 4:
+        raise ValueError("[sfxi_math] y_star must have shape (n, 4).")
+    if not np.all(np.isfinite(y)):
+        raise ValueError("[sfxi_math] y_star must be finite.")
+    p = np.asarray(setpoint, dtype=float).ravel()
+    if p.size != 4:
+        raise ValueError("[sfxi_math] setpoint must have length 4.")
+    if not np.all(np.isfinite(p)):
+        raise ValueError("[sfxi_math] setpoint must be finite.")
+    weights = weights_from_setpoint(p, eps=eps)
+    y_lin = recover_linear_intensity(y, delta=delta)
+    raw = effect_raw(y_lin, weights)
+    return raw, weights
+
+
 def effect_raw(y_linear: np.ndarray, weights: np.ndarray) -> np.ndarray:
     y = np.asarray(y_linear, dtype=float)
     if y.ndim == 1:
@@ -118,15 +147,15 @@ def denom_from_labels(
     percentile: int,
     min_n: int,
     eps: float,
+    state_order: Sequence[str],
 ) -> float:
-    y_star = np.asarray(y_star_labels, dtype=float)
-    if y_star.ndim == 1:
-        y_star = y_star.reshape(1, -1)
-    if y_star.shape[1] != 4:
-        raise ValueError("[sfxi_math] y_star must have shape (n, 4).")
-    w = weights_from_setpoint(setpoint, eps=1e-12)
-    if not np.any(w):
+    raw, weights = effect_raw_from_y_star(
+        y_star_labels,
+        setpoint,
+        delta=delta,
+        eps=eps,
+        state_order=state_order,
+    )
+    if not np.any(weights):
         return 1.0
-    y_lin = recover_linear_intensity(y_star, delta=delta)
-    pool = effect_raw(y_lin, w)
-    return denom_from_pool(pool, percentile=percentile, min_n=min_n, eps=eps)
+    return denom_from_pool(raw, percentile=percentile, min_n=min_n, eps=eps)

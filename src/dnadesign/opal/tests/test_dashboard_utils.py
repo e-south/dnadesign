@@ -31,6 +31,7 @@ from dnadesign.opal.src.analysis.dashboard import (
 )
 from dnadesign.opal.src.analysis.dashboard.charts import plots
 from dnadesign.opal.src.analysis.dashboard.views import sfxi
+from dnadesign.opal.src.analysis.sfxi.state_order import STATE_ORDER
 
 
 def test_find_repo_root(tmp_path: Path) -> None:
@@ -507,6 +508,21 @@ def test_numeric_rule_builder() -> None:
     assert filtered_null["a"].to_list() == [None]
 
 
+def test_compute_sfxi_params_requires_state_order() -> None:
+    with pytest.raises(ValueError, match="state_order"):
+        sfxi.compute_sfxi_params(
+            setpoint=[0.25, 0.25, 0.25, 0.25],
+            beta=1.0,
+            gamma=1.0,
+            delta=0.0,
+            p=95.0,
+            fallback_p=75.0,
+            min_n=1,
+            eps=1e-6,
+            state_order=None,
+        )
+
+
 def test_sfxi_metrics_deterministic() -> None:
     df = pl.DataFrame({"sfxi_8_vector_y_label": [[0.25, 0.25, 0.25, 0.25, 1.0, 1.0, 1.0, 1.0]]})
     params = sfxi.compute_sfxi_params(
@@ -518,6 +534,7 @@ def test_sfxi_metrics_deterministic() -> None:
         fallback_p=75.0,
         min_n=1,
         eps=1e-6,
+        state_order=STATE_ORDER,
     )
     result = sfxi.compute_sfxi_metrics(
         df=df,
@@ -546,6 +563,7 @@ def test_compute_label_sfxi_view_preview() -> None:
         fallback_p=75.0,
         min_n=1,
         eps=1e-6,
+        state_order=STATE_ORDER,
     )
     view = sfxi.compute_label_sfxi_view(
         labels_view_df=df,
@@ -578,6 +596,7 @@ def test_sfxi_metrics_edge_cases() -> None:
         fallback_p=75.0,
         min_n=2,
         eps=1e-6,
+        state_order=STATE_ORDER,
     )
     empty_pool = pl.DataFrame({"sfxi_8_vector_y_label": []})
     result = sfxi.compute_sfxi_metrics(
@@ -614,6 +633,7 @@ def test_sfxi_metrics_edge_cases() -> None:
         fallback_p=75.0,
         min_n=2,
         eps=1e-6,
+        state_order=STATE_ORDER,
     )
     with pytest.raises(ValueError, match="min_n"):
         sfxi.compute_sfxi_metrics(
@@ -674,6 +694,7 @@ def test_integration_smoke(tmp_path: Path) -> None:
         fallback_p=75.0,
         min_n=1,
         eps=1e-6,
+        state_order=STATE_ORDER,
     )
     sfxi_result = sfxi.compute_sfxi_metrics(
         df=loaded,
@@ -832,6 +853,7 @@ def test_overlay_provenance_on_early_exit() -> None:
         fallback_p=75.0,
         min_n=1,
         eps=1e-6,
+        state_order=STATE_ORDER,
     )
     result = transient.compute_transient_overlay(
         df_base=df_base,
@@ -861,6 +883,7 @@ def test_build_pred_sfxi_view_canonical() -> None:
         fallback_p=50.0,
         min_n=1,
         eps=1.0e-8,
+        state_order=STATE_ORDER,
     )
     pred_df = pl.DataFrame(
         {
@@ -893,6 +916,7 @@ def test_build_pred_sfxi_view_overlay() -> None:
         fallback_p=50.0,
         min_n=1,
         eps=1.0e-8,
+        state_order=STATE_ORDER,
     )
     pred_df = pl.DataFrame(
         {
@@ -926,6 +950,7 @@ def test_build_pred_sfxi_view_overlay_object_vectors() -> None:
         fallback_p=50.0,
         min_n=1,
         eps=1.0e-8,
+        state_order=STATE_ORDER,
     )
     vec = [0.0, 0.0, 0.0, 1.0, 0.2, 0.2, 0.2, 0.2]
     pred_df = pl.DataFrame(

@@ -16,12 +16,12 @@ import numpy as np
 from ..core.round_context import PluginCtx, roundctx_contract
 from ..registries.objectives import register_objective
 from .sfxi_math import (
+    STATE_ORDER,
     denom_from_pool,
-    effect_raw,
+    effect_raw_from_y_star,
     effect_scaled,
     logic_fidelity,
     parse_setpoint_vector,
-    recover_linear_intensity,
     weights_from_setpoint,
 )
 
@@ -43,14 +43,19 @@ def _compute_train_effect_pool(train_view, setpoint: np.ndarray, delta: float, *
     """
     Use *current round* labels only for round-calibrated scaling.
     """
-    w = weights_from_setpoint(setpoint)
 
     def _dot_effect(y):
         y = np.asarray(y, dtype=float).ravel()
         if y.size < 8:
             return None
-        ylin = recover_linear_intensity(y[4:8], delta)
-        return float(effect_raw(ylin, w))
+        raw, _ = effect_raw_from_y_star(
+            y[4:8],
+            setpoint,
+            delta=delta,
+            eps=1e-12,
+            state_order=STATE_ORDER,
+        )
+        return float(raw[0])
 
     if not hasattr(train_view, "iter_labels_y_current_round"):
         raise ValueError("[sfxi_v1] train_view must expose iter_labels_y_current_round() for round-calibrated scaling.")
@@ -156,8 +161,13 @@ def sfxi_v1(
         E_scaled = np.ones(v_hat.shape[0], dtype=float)
         score = np.power(F_logic, beta)
     else:
-        y_lin = recover_linear_intensity(y_star, delta=delta)
-        E_raw = effect_raw(y_lin, w)
+        E_raw, _ = effect_raw_from_y_star(
+            y_star,
+            setpoint,
+            delta=delta,
+            eps=1e-12,
+            state_order=STATE_ORDER,
+        )
         E_scaled = effect_scaled(E_raw, float(denom))
         score = np.power(F_logic, beta) * np.power(E_scaled, gamma)
 

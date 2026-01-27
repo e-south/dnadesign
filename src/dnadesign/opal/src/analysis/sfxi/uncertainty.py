@@ -158,8 +158,13 @@ def compute_uncertainty(
             if y_hat.shape[1] < 8:
                 raise ValueError("Predictions missing intensity components (need 8 outputs).")
             y_star = y_hat[:, 4:8]
-            y_lin = sfxi_math.recover_linear_intensity(y_star, delta=float(ctx.delta))
-            E_raw = sfxi_math.effect_raw(y_lin, w)
+            E_raw, _ = sfxi_math.effect_raw_from_y_star(
+                y_star,
+                setpoint,
+                delta=float(ctx.delta),
+                eps=1e-12,
+                state_order=sfxi_math.STATE_ORDER,
+            )
             E_scaled = sfxi_math.effect_scaled(E_raw, float(denom))
             score = np.power(F_logic, float(ctx.beta)) * np.power(E_scaled, float(ctx.gamma))
         scores.append(score)
