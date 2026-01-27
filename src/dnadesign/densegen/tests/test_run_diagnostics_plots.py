@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/densegen/tests/test_run_diagnostics_plots.py
 
-Diagnostics plot coverage for run-level metrics and Stage-B sampling health.
+Coverage for the canonical DenseGen plot set after the scalability refactor.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -11,162 +11,64 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import matplotlib
 import pandas as pd
 
+from dnadesign.densegen.src.core.artifacts.pool import TFBSPoolArtifact
 from dnadesign.densegen.src.viz.plotting import (
     _plot_required_columns,
-    plot_run_failure_pareto,
-    plot_run_timeline_funnel,
-    plot_stage_a_score_traceability,
-    plot_stage_b_library_health,
-    plot_stage_b_library_slack,
-    plot_stage_b_offered_vs_used,
-    plot_stage_b_sampling_pressure,
-    plot_tfbs_positional_occupancy,
+    plot_placement_map,
+    plot_run_health,
+    plot_stage_a_summary,
+    plot_stage_b_summary,
+    plot_tfbs_usage,
 )
 
 
-def _metrics_df() -> pd.DataFrame:
+def _composition_df() -> pd.DataFrame:
     return pd.DataFrame(
         [
             {
-                "metric_group": "library_health",
-                "run_id": "demo",
-                "input_name": "demo_input",
-                "plan_name": "demo_plan",
-                "library_index": 1,
-                "library_hash": "hash1",
-                "library_size": 3,
-                "unique_tf_count": 2,
-                "unique_tfbs_count": 3,
-                "tf_entropy": 0.9,
-                "max_tf_dominance": 0.67,
-                "score_mean": 7.0,
-                "score_median": 7.0,
-                "tfbs_length_sum": 15,
-                "required_min_length": 10,
-                "fixed_bp_min": 0,
-                "slack_bp": 10,
-                "sequence_length": 20,
-                "target_length": 40,
-                "achieved_length": 15,
-                "never_used_tfbs_fraction": 0.3,
-            },
-            {
-                "metric_group": "offered_vs_used_tf",
-                "run_id": "demo",
+                "solution_id": "s1",
                 "input_name": "demo_input",
                 "plan_name": "demo_plan",
                 "library_index": 1,
                 "library_hash": "hash1",
                 "tf": "TF_A",
-                "offered_count": 2,
-                "used_count": 1,
-                "used_fraction": 0.5,
+                "tfbs": "AAAA",
+                "offset": 0,
+                "length": 4,
+                "end": 4,
             },
             {
-                "metric_group": "offered_vs_used_tf",
-                "run_id": "demo",
+                "solution_id": "s1",
                 "input_name": "demo_input",
                 "plan_name": "demo_plan",
                 "library_index": 1,
                 "library_hash": "hash1",
                 "tf": "TF_B",
-                "offered_count": 1,
-                "used_count": 1,
-                "used_fraction": 1.0,
+                "tfbs": "CCCCCC",
+                "offset": 8,
+                "length": 6,
+                "end": 14,
             },
             {
-                "metric_group": "tier_enrichment",
-                "run_id": "demo",
-                "input_name": "demo_input",
-                "tf": "TF_A",
-                "tier": 0,
-                "pool_tfbs_count": 1,
-                "used_tfbs_count": 1,
-                "usage_rate": 1.0,
-            },
-            {
-                "metric_group": "tier_enrichment",
-                "run_id": "demo",
-                "input_name": "demo_input",
-                "tf": "TF_A",
-                "tier": 1,
-                "pool_tfbs_count": 1,
-                "used_tfbs_count": 0,
-                "usage_rate": 0.0,
-            },
-            {
-                "metric_group": "tier_enrichment",
-                "run_id": "demo",
-                "input_name": "demo_input",
-                "tf": "TF_B",
-                "tier": 2,
-                "pool_tfbs_count": 1,
-                "used_tfbs_count": 1,
-                "usage_rate": 1.0,
-            },
-            {
-                "metric_group": "quantile_enrichment",
-                "run_id": "demo",
-                "input_name": "demo_input",
-                "tf": "TF_A",
-                "quantile": 1,
-                "pool_tfbs_count": 1,
-                "used_tfbs_count": 1,
-                "pool_fraction": 0.5,
-                "used_fraction": 1.0,
-                "enrichment": 2.0,
-            },
-            {
-                "metric_group": "quantile_enrichment",
-                "run_id": "demo",
-                "input_name": "demo_input",
-                "tf": "TF_A",
-                "quantile": 2,
-                "pool_tfbs_count": 1,
-                "used_tfbs_count": 0,
-                "pool_fraction": 0.5,
-                "used_fraction": 0.0,
-                "enrichment": 0.0,
-            },
-            {
-                "metric_group": "sampling_pressure",
-                "run_id": "demo",
+                "solution_id": "s2",
                 "input_name": "demo_input",
                 "plan_name": "demo_plan",
-                "library_index": 1,
-                "library_hash": "hash1",
+                "library_index": 2,
+                "library_hash": "hash2",
                 "tf": "TF_A",
-                "weight": 1.5,
-                "weight_fraction": 0.75,
-                "usage_count": 3,
-                "failure_count": 1,
-            },
-            {
-                "metric_group": "sampling_pressure",
-                "run_id": "demo",
-                "input_name": "demo_input",
-                "plan_name": "demo_plan",
-                "library_index": 1,
-                "library_hash": "hash1",
-                "tf": "TF_B",
-                "weight": 0.5,
-                "weight_fraction": 0.25,
-                "usage_count": 1,
-                "failure_count": 0,
+                "tfbs": "AAAA",
+                "offset": 1,
+                "length": 4,
+                "end": 5,
             },
         ]
     )
-
-
-def test_plot_required_columns_for_positional_occupancy_excludes_plain_length() -> None:
-    cols = _plot_required_columns(["tfbs_positional_occupancy"], {})
-    assert "length" not in cols
-    assert "densegen__sequence_length" in cols or "densegen__length" in cols
 
 
 def _attempts_df() -> pd.DataFrame:
@@ -215,10 +117,159 @@ def _events_df() -> pd.DataFrame:
     )
 
 
-def test_plot_run_timeline_funnel(tmp_path: Path) -> None:
+def _library_builds_df() -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "input_name": "demo_input",
+                "plan_name": "demo_plan",
+                "library_index": 1,
+                "library_hash": "hash1",
+                "library_size": 2,
+                "sequence_length": 20,
+                "fixed_bp": 6,
+                "min_required_bp": 6,
+                "slack_bp": 8,
+                "infeasible": False,
+            },
+            {
+                "input_name": "demo_input",
+                "plan_name": "demo_plan",
+                "library_index": 2,
+                "library_hash": "hash2",
+                "library_size": 2,
+                "sequence_length": 20,
+                "fixed_bp": 6,
+                "min_required_bp": 8,
+                "slack_bp": 6,
+                "infeasible": False,
+            },
+        ]
+    )
+
+
+def _library_members_df() -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "input_name": "demo_input",
+                "plan_name": "demo_plan",
+                "library_index": 1,
+                "library_hash": "hash1",
+                "position": 0,
+                "tf": "TF_A",
+                "tfbs": "AAAA",
+            },
+            {
+                "input_name": "demo_input",
+                "plan_name": "demo_plan",
+                "library_index": 1,
+                "library_hash": "hash1",
+                "position": 1,
+                "tf": "TF_B",
+                "tfbs": "CCCCCC",
+            },
+            {
+                "input_name": "demo_input",
+                "plan_name": "demo_plan",
+                "library_index": 2,
+                "library_hash": "hash2",
+                "position": 0,
+                "tf": "TF_A",
+                "tfbs": "AAAA",
+            },
+            {
+                "input_name": "demo_input",
+                "plan_name": "demo_plan",
+                "library_index": 2,
+                "library_hash": "hash2",
+                "position": 1,
+                "tf": "TF_B",
+                "tfbs": "GGGG",
+            },
+        ]
+    )
+
+
+def _cfg() -> dict:
+    return {
+        "generation": {
+            "sequence_length": 20,
+            "plan": [
+                {
+                    "name": "demo_plan",
+                    "fixed_elements": {
+                        "promoter_constraints": [
+                            {
+                                "upstream_pos": [0, 6],
+                                "downstream_pos": [10, 16],
+                                "upstream": "TTGACA",
+                                "downstream": "TATAAT",
+                            }
+                        ]
+                    },
+                }
+            ],
+        }
+    }
+
+
+def _pool_manifest(tmp_path: Path) -> TFBSPoolArtifact:
+    pools_dir = tmp_path / "pools"
+    pools_dir.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "schema_version": "1.3",
+        "run_id": "demo",
+        "run_root": ".",
+        "config_path": "config.yaml",
+        "inputs": [
+            {
+                "name": "demo_input",
+                "type": "binding_sites",
+                "pool_path": "demo_input__pool.parquet",
+                "rows": 2,
+                "columns": ["input_name", "tf", "tfbs_sequence", "best_hit_score", "tier", "rank_within_regulator"],
+                "pool_mode": "tfbs",
+                "stage_a_sampling": {
+                    "backend": "fimo",
+                    "tier_scheme": "pct_1_9_90",
+                    "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
+                    "retention_rule": "top_n_sites_by_best_hit_score",
+                    "fimo_thresh": 1.0,
+                    "bgfile": None,
+                    "background_source": "motif_background",
+                    "eligible_score_hist": [
+                        {
+                            "regulator": "TF_A",
+                            "edges": [0.0, 1.0, 2.0],
+                            "counts": [1, 1],
+                            "tier0_score": 2.0,
+                            "tier1_score": 1.0,
+                            "generated": 10,
+                            "candidates_with_hit": 8,
+                            "eligible": 6,
+                            "unique_eligible": 4,
+                            "retained": 2,
+                        }
+                    ],
+                },
+            }
+        ],
+    }
+    path = pools_dir / "pool_manifest.json"
+    path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
+    return TFBSPoolArtifact.load(path)
+
+
+def test_plot_required_columns_for_new_plots() -> None:
+    cols = _plot_required_columns(["placement_map", "tfbs_usage", "run_health"], {})
+    assert cols == []
+
+
+def test_plot_run_health(tmp_path: Path) -> None:
     matplotlib.use("Agg", force=True)
-    out_path = tmp_path / "timeline.png"
-    plot_run_timeline_funnel(
+    out_path = tmp_path / "run_health.png"
+    plot_run_health(
         pd.DataFrame(),
         out_path,
         attempts_df=_attempts_df(),
@@ -228,109 +279,70 @@ def test_plot_run_timeline_funnel(tmp_path: Path) -> None:
     assert out_path.exists()
 
 
-def test_plot_run_failure_pareto(tmp_path: Path) -> None:
+def test_plot_placement_map(tmp_path: Path) -> None:
     matplotlib.use("Agg", force=True)
-    out_path = tmp_path / "pareto.png"
-    plot_run_failure_pareto(
+    out_path = tmp_path / "placement_map.png"
+    paths = plot_placement_map(
         pd.DataFrame(),
         out_path,
-        attempts_df=_attempts_df(),
-        style={},
-    )
-    assert out_path.exists()
-
-
-def test_plot_stage_b_library_health(tmp_path: Path) -> None:
-    matplotlib.use("Agg", force=True)
-    out_path = tmp_path / "health.png"
-    paths = plot_stage_b_library_health(
-        pd.DataFrame(),
-        out_path,
-        run_metrics_df=_metrics_df(),
+        composition_df=_composition_df(),
+        cfg=_cfg(),
         style={},
     )
     assert paths
     assert Path(paths[0]).exists()
 
 
-def test_plot_stage_a_score_traceability(tmp_path: Path) -> None:
+def test_plot_tfbs_usage(tmp_path: Path) -> None:
     matplotlib.use("Agg", force=True)
-    out_path = tmp_path / "trace.png"
-    paths = plot_stage_a_score_traceability(
+    out_path = tmp_path / "tfbs_usage.png"
+    paths = plot_tfbs_usage(
         pd.DataFrame(),
         out_path,
-        run_metrics_df=_metrics_df(),
+        composition_df=_composition_df(),
         style={},
     )
     assert paths
     assert Path(paths[0]).exists()
 
 
-def test_plot_stage_b_offered_vs_used(tmp_path: Path) -> None:
+def test_plot_stage_b_summary(tmp_path: Path) -> None:
     matplotlib.use("Agg", force=True)
-    out_path = tmp_path / "offered.png"
-    paths = plot_stage_b_offered_vs_used(
+    out_path = tmp_path / "stage_b_summary.png"
+    paths = plot_stage_b_summary(
         pd.DataFrame(),
         out_path,
-        run_metrics_df=_metrics_df(),
+        library_builds_df=_library_builds_df(),
+        library_members_df=_library_members_df(),
+        composition_df=_composition_df(),
+        cfg=_cfg(),
         style={},
     )
     assert paths
     assert Path(paths[0]).exists()
 
 
-def test_plot_stage_b_library_slack(tmp_path: Path) -> None:
+def test_plot_stage_a_summary(tmp_path: Path) -> None:
     matplotlib.use("Agg", force=True)
-    out_path = tmp_path / "slack.png"
-    paths = plot_stage_b_library_slack(
-        pd.DataFrame(),
-        out_path,
-        run_metrics_df=_metrics_df(),
-        style={},
-    )
-    assert paths
-    assert Path(paths[0]).exists()
-
-
-def test_plot_stage_b_sampling_pressure(tmp_path: Path) -> None:
-    matplotlib.use("Agg", force=True)
-    out_path = tmp_path / "pressure.png"
-    paths = plot_stage_b_sampling_pressure(
-        pd.DataFrame(),
-        out_path,
-        run_metrics_df=_metrics_df(),
-        style={},
-    )
-    assert paths
-    assert Path(paths[0]).exists()
-
-
-def test_plot_tfbs_positional_occupancy(tmp_path: Path) -> None:
-    matplotlib.use("Agg", force=True)
-    out_path = tmp_path / "occupancy.png"
-    df = pd.DataFrame(
-        [
-            {
-                "densegen__input_name": "demo_input",
-                "densegen__plan": "demo_plan",
-                "densegen__used_tfbs_detail": [
-                    {"tf": "TF_A", "tfbs": "AAAA", "offset": 0},
-                    {"tf": "TF_B", "tfbs": "CCCCCC", "offset": 10},
-                ],
-                "length": 20,
-            }
-        ]
-    )
-    cfg = {
-        "generation": {
-            "plan": [
-                {
-                    "name": "demo_plan",
-                    "fixed_elements": {"promoter_constraints": [{"upstream_pos": [0, 5], "downstream_pos": [10, 15]}]},
-                }
-            ]
+    out_path = tmp_path / "stage_a_summary.png"
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["demo_input", "demo_input"],
+            "tf": ["TF_A", "TF_A"],
+            "tfbs_sequence": ["AAAA", "AAAAT"],
+            "best_hit_score": [2.0, 1.5],
+            "tier": [0, 1],
+            "rank_within_regulator": [1, 2],
         }
-    }
-    paths = plot_tfbs_positional_occupancy(df, out_path, cfg=cfg, style={})
+    )
+    pools = {"demo_input": pool_df}
+    manifest = _pool_manifest(tmp_path)
+    paths = plot_stage_a_summary(
+        pd.DataFrame(),
+        out_path,
+        pools=pools,
+        pool_manifest=manifest,
+        style={},
+    )
     assert paths
     assert Path(paths[0]).exists()

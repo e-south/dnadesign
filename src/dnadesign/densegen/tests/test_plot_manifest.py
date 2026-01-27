@@ -18,10 +18,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from dnadesign.densegen.src.adapters.outputs import OutputRecord, ParquetSink
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.viz.plotting import run_plots_from_config
-from dnadesign.densegen.tests.meta_fixtures import output_meta
 
 
 def _write_config(path: Path, *, plots_default: list[str]) -> None:
@@ -68,22 +66,6 @@ def _write_config(path: Path, *, plots_default: list[str]) -> None:
     )
 
 
-def _write_output_record(run_root: Path) -> None:
-    out_file = run_root / "outputs" / "tables" / "dense_arrays.parquet"
-    sink = ParquetSink(path=str(out_file), chunk_size=1)
-    meta = output_meta(library_hash="abc123", library_index=1)
-    meta["compression_ratio"] = 1.0
-    rec = OutputRecord.from_sequence(
-        sequence="ATGCATGCAT",
-        meta=meta,
-        source="densegen:demo",
-        bio_type="dna",
-        alphabet="dna_4",
-    )
-    sink.add(rec)
-    sink.finalize()
-
-
 def _write_pool_manifest(run_root: Path) -> None:
     pools_dir = run_root / "outputs" / "pools"
     pools_dir.mkdir(parents=True, exist_ok=True)
@@ -120,6 +102,8 @@ def _write_pool_manifest(run_root: Path) -> None:
                     "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
                     "retention_rule": "top_n_sites_by_best_hit_score",
                     "fimo_thresh": 1.0,
+                    "bgfile": None,
+                    "background_source": "motif_background",
                     "eligible_score_hist": [
                         {
                             "regulator": "tfA",
@@ -127,6 +111,11 @@ def _write_pool_manifest(run_root: Path) -> None:
                             "counts": [0, 1, 1],
                             "tier0_score": 9.0,
                             "tier1_score": 7.0,
+                            "generated": 10,
+                            "candidates_with_hit": 9,
+                            "eligible": 8,
+                            "unique_eligible": 3,
+                            "retained": 2,
                         },
                         {
                             "regulator": "tfB",
@@ -134,6 +123,11 @@ def _write_pool_manifest(run_root: Path) -> None:
                             "counts": [1, 0],
                             "tier0_score": 5.5,
                             "tier1_score": None,
+                            "generated": 5,
+                            "candidates_with_hit": 4,
+                            "eligible": 3,
+                            "unique_eligible": 2,
+                            "retained": 1,
                         },
                     ],
                 },
@@ -147,9 +141,9 @@ def test_plot_manifest_written(tmp_path: Path) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
     cfg_path = run_root / "config.yaml"
-    _write_config(cfg_path, plots_default=["compression_ratio"])
+    _write_config(cfg_path, plots_default=["stage_a_summary"])
     (run_root / "inputs.csv").write_text("tf,tfbs\n")
-    _write_output_record(run_root)
+    _write_pool_manifest(run_root)
 
     loaded = load_config(cfg_path)
     run_plots_from_config(loaded.root, cfg_path)
@@ -158,16 +152,16 @@ def test_plot_manifest_written(tmp_path: Path) -> None:
     assert manifest_path.exists()
     payload = json.loads(manifest_path.read_text())
     names = {item["name"] for item in payload.get("plots", [])}
-    assert "compression_ratio" in names
+    assert "stage_a_summary" in names
     paths = {item["path"] for item in payload.get("plots", [])}
-    assert "compression_ratio.png" in paths
+    assert "stage_a_summary__demo_input.png" in paths
 
 
 def test_stage_a_plots_without_outputs(tmp_path: Path) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
     cfg_path = run_root / "config.yaml"
-    _write_config(cfg_path, plots_default=["stage_a_strata_overview"])
+    _write_config(cfg_path, plots_default=["stage_a_summary"])
     (run_root / "inputs.csv").write_text("tf,tfbs\n")
     _write_pool_manifest(run_root)
 
@@ -175,5 +169,5 @@ def test_stage_a_plots_without_outputs(tmp_path: Path) -> None:
     run_plots_from_config(loaded.root, cfg_path)
 
     plots_dir = run_root / "outputs" / "plots"
-    overview_plot = plots_dir / "stage_a_strata_overview__demo_input.png"
+    overview_plot = plots_dir / "stage_a_summary__demo_input.png"
     assert overview_plot.exists()

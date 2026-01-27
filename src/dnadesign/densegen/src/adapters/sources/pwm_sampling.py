@@ -214,6 +214,8 @@ class PWMSamplingSummary:
     generated: int
     target: int
     target_sites: Optional[int]
+    candidates_with_hit: Optional[int]
+    eligible_total: Optional[int]
     eligible: int
     retained: int
     retained_len_min: Optional[int]
@@ -357,6 +359,8 @@ def _build_summary(
     generated: int,
     target: int,
     target_sites: Optional[int],
+    candidates_with_hit: Optional[int],
+    eligible_total: Optional[int],
     eligible: Sequence[str],
     retained: Sequence[str],
     retained_scores: Optional[Sequence[float]] = None,
@@ -380,6 +384,8 @@ def _build_summary(
         generated=int(generated),
         target=int(target),
         target_sites=int(target_sites) if target_sites is not None else None,
+        candidates_with_hit=int(candidates_with_hit) if candidates_with_hit is not None else None,
+        eligible_total=int(eligible_total) if eligible_total is not None else None,
         eligible=int(len(eligible)),
         retained=int(len(retained)),
         retained_len_min=min_len,
@@ -684,6 +690,8 @@ def sample_pwm_sites(
             return sequences, lengths, time_limited
 
         candidates_by_seq: dict[str, FimoCandidate] = {}
+        candidates_with_hit = 0
+        eligible_total = 0
         lengths_all: list[int] = []
         generated_total = 0
         time_limited = False
@@ -762,6 +770,7 @@ def sample_pwm_sites(
                             reject_reason="no_hit",
                         )
                         continue
+                    candidates_with_hit += 1
                     if hit.score <= 0:
                         _record_candidate(
                             seq=seq,
@@ -770,6 +779,7 @@ def sample_pwm_sites(
                             reject_reason="score_non_positive",
                         )
                         continue
+                    eligible_total += 1
                     _record_candidate(
                         seq=seq,
                         hit=hit,
@@ -837,6 +847,7 @@ def sample_pwm_sites(
                                 reject_reason="no_hit",
                             )
                             continue
+                        candidates_with_hit += 1
                         if hit.score <= 0:
                             _record_candidate(
                                 seq=seq,
@@ -845,6 +856,7 @@ def sample_pwm_sites(
                                 reject_reason="score_non_positive",
                             )
                             continue
+                        eligible_total += 1
                         _record_candidate(
                             seq=seq,
                             hit=hit,
@@ -1002,6 +1014,8 @@ def sample_pwm_sites(
                 generated=generated_total,
                 target=requested,
                 target_sites=n_sites,
+                candidates_with_hit=candidates_with_hit,
+                eligible_total=eligible_total,
                 eligible=list(candidates_by_seq.keys()),
                 retained=[c.seq for c in picked],
                 retained_scores=[cand.score for cand in picked],

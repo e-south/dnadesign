@@ -45,6 +45,8 @@ class _DummySource(BaseDataSource):
             generated=10,
             target=10,
             target_sites=2,
+            candidates_with_hit=9,
+            eligible_total=3,
             eligible=2,
             retained=1,
             retained_len_min=4,
@@ -157,3 +159,8 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert hist[0]["counts"] == [1, 1]
     assert hist[0]["tier0_score"] == 2.0
     assert hist[0]["tier1_score"] == 1.5
+    assert hist[0]["generated"] == 10
+    assert hist[0]["candidates_with_hit"] == 9
+    assert hist[0]["eligible"] == 3
+    assert hist[0]["unique_eligible"] == 2
+    assert hist[0]["retained"] == 1

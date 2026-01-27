@@ -143,7 +143,7 @@ Stage‑A sampling: the pipeline can mine hundreds of binding sites per TF from 
 
 Stage‑B sampling: the Stage‑A pool is subsampled into candidate libraries (`pool_strategy: subsample`, `library_size: 20`) with coverage weighting so each library contains the specified TFs (`cover_all_regulators: true`). Each library is offered to the solver, which assembles 60‑bp sequences by selecting a subset; new libraries are sampled as needed.
 
-Fixed promoter: this demo fixes a strong σ70 promoter pair (`TTGACA`/`TATAAT`) with a 15–19 bp spacer; if `plots.options.tf_coverage.include_promoter_sites` is true, the `tf_coverage` plot overlays these sites. To keep the 60‑bp sequence length feasible alongside ~11–15 bp TFBS, the plan sets `min_required_regulators: 1` while listing both motif IDs (`lexA_CTGTATAWAWWHACA`, `cpxR_MANWWHTTTAM`), so each sequence includes at least one of them. Use the Stage‑A plan output (`dense stage-a build-pool`) or pool manifest to confirm the regulator labels if you customize inputs.
+Fixed promoter: this demo fixes a strong σ70 promoter pair (`TTGACA`/`TATAAT`) with a 15–19 bp spacer; the `placement_map` plot overlays these fixed sites as binding‑site types (`-35`/`-10`). To keep the 60‑bp sequence length feasible alongside ~11–15 bp TFBS, the plan sets `min_required_regulators: 1` while listing both motif IDs (`lexA_CTGTATAWAWWHACA`, `cpxR_MANWWHTTTAM`), so each sequence includes at least one of them. Use the Stage‑A plan output (`dense stage-a build-pool`) or pool manifest to confirm the regulator labels if you customize inputs.
 
 ```bash
 dense inspect config
@@ -190,7 +190,7 @@ PY
 Optional: visualize Stage‑A score strata and retained lengths (per regulator) right after sampling:
 
 ```bash
-dense plot --only stage_a_strata_overview
+dense plot --only stage_a_summary
 ```
 
 ---
@@ -219,7 +219,7 @@ Execute Stage‑A sampling (if needed), Stage‑B sampling, and solver optimizat
 dense run
 ```
 
-This demo config also enables plot generation from the run (`plots.default`) and saves plots in `outputs/plots/` using `plots.format` (switch to `pdf` or `svg` in `config.yaml` if desired). The run also writes `outputs/tables/run_metrics.parquet`, which powers the diagnostics plots. Reports do not generate plots; they can optionally link the existing plot manifest.
+This demo config also enables plot generation from the run (`plots.default`) and saves plots in `outputs/plots/` using `plots.format` (switch to `pdf` or `svg` in `config.yaml` if desired). Plots are generated from canonical artifacts (Parquet tables + manifests). The run also writes `outputs/tables/run_metrics.parquet` for additional diagnostics. Reports do not generate plots; they can optionally link the existing plot manifest.
 
 The demo quota is intentionally small (`generation.quota: 12` with `runtime.max_seconds_per_plan: 60`) to keep the end‑to‑end run fast; scale these up for production runs. The demo uses `solver.strategy: iterate` for full solver runs; switch to `diverse` or `optimal` as needed for exploration. If run outputs already exist (e.g., `outputs/tables/*.parquet` or `outputs/meta/run_state.json`), choose `--resume` to continue or `--fresh` to clear outputs. Use `dense run --no-plot` to skip auto‑plots when re‑running.
 
@@ -247,16 +247,16 @@ dense ls-plots
 
 ### 10. Plot
 
-Why: render selected plots from existing outputs and diagnostics metrics.
+Why: render selected plots from existing outputs.
 
 ```bash
-dense plot --only stage_a_strata_overview,run_timeline_funnel,run_failure_pareto,stage_b_library_health,stage_b_library_slack,stage_b_sampling_pressure,stage_a_score_traceability,stage_b_offered_vs_used,tfbs_positional_occupancy
+dense plot --only stage_a_summary,stage_b_summary
 ```
 
-Optional: include the standard TF usage/coverage plots alongside diagnostics:
+Optional: include the Stage‑A/Stage‑B summaries alongside the default run plots:
 
 ```bash
-dense plot --only tf_usage,tf_coverage,stage_a_strata_overview,run_timeline_funnel,run_failure_pareto,stage_b_library_health,stage_b_library_slack,stage_b_sampling_pressure,stage_a_score_traceability,stage_b_offered_vs_used,tfbs_positional_occupancy
+dense plot --only placement_map,tfbs_usage,run_health,stage_a_summary,stage_b_summary
 ```
 
 If Matplotlib complains about cache permissions, set a workspace‑scoped cache:

@@ -22,7 +22,7 @@ from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.artifacts.pool import build_pool_artifact
 from dnadesign.densegen.src.core.pipeline import default_deps
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
-from dnadesign.densegen.src.viz.plotting import plot_stage_a_strata_overview
+from dnadesign.densegen.src.viz.plotting import plot_stage_a_summary
 
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
@@ -161,15 +161,20 @@ def test_stage_a_end_to_end_score_sampling(tmp_path: Path) -> None:
     for row in sampling.get("eligible_score_hist") or []:
         assert "tier0_score" in row
         assert "tier1_score" in row
+        assert "generated" in row
+        assert "candidates_with_hit" in row
+        assert "eligible" in row
+        assert "unique_eligible" in row
+        assert "retained" in row
 
     plot_dir = tmp_path / "plots"
     plot_dir.mkdir(parents=True, exist_ok=True)
-    out_path = plot_dir / "stage_a_strata_overview.png"
-    paths = plot_stage_a_strata_overview(
+    out_path = plot_dir / "stage_a_summary.png"
+    paths = plot_stage_a_summary(
         df=pd.DataFrame(),
         out_path=out_path,
         pools={"demo_pwm": df},
         pool_manifest=artifact,
     )
-    assert len(paths) == 1
+    assert len(paths) == 2
     assert paths[0].exists()

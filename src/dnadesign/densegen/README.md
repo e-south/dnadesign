@@ -50,7 +50,7 @@ dense report --format md
 
 # 10) List plots and render a subset.
 dense ls-plots
-dense plot --only tf_usage,tf_coverage
+dense plot --only placement_map,tfbs_usage,run_health
 ```
 
 If you rerun a workspace that already has run outputs (e.g., `outputs/tables/attempts.parquet` or `outputs/meta/run_state.json`), choose `--resume` (continue) or `--fresh` (clear outputs and start over).

@@ -1,5 +1,13 @@
 """
+--------------------------------------------------------------------------------
+<dnadesign project>
+dnadesign/densegen/core/artifacts/pool.py
+
 Stage-A TFBS pool artifacts.
+
+Module Author(s): Eric J. South
+Dunlop Lab
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -172,6 +180,8 @@ def _build_stage_a_sampling_manifest(
         if summary.eligible_score_hist_edges:
             if len(summary.eligible_score_hist_counts) != len(summary.eligible_score_hist_edges) - 1:
                 raise ValueError("Stage-A eligible score histogram length mismatch.")
+        if summary.candidates_with_hit is None or summary.eligible_total is None:
+            raise ValueError("Stage-A sampling summaries missing yield counters.")
         reg_bgfile = bgfile_by_regulator.get(summary.regulator, bgfile)
         reg_bgfiles.append(reg_bgfile)
         eligible_score_hist.append(
@@ -183,6 +193,11 @@ def _build_stage_a_sampling_manifest(
                 "tier1_score": summary.tier1_score,
                 "bgfile": reg_bgfile,
                 "background_source": "bgfile" if reg_bgfile else "motif_background",
+                "generated": int(summary.generated),
+                "candidates_with_hit": int(summary.candidates_with_hit),
+                "eligible": int(summary.eligible_total),
+                "unique_eligible": int(summary.eligible),
+                "retained": int(summary.retained),
             }
         )
     unique_bgfiles = {val for val in reg_bgfiles}

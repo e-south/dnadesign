@@ -4,14 +4,11 @@
 dnadesign/densegen/viz/plotting.py
 
 Plots:
-- compression_ratio         : histogram
-- tf_usage                  : usage per TF (stacked by length | TFBS | totals)
-- tfbs_usage                : counts by promoter pair (skips unmapped/None)
-- plan_counts               : stacked by day with UP-DN label
-- tf_coverage               : 1-nt bars, solid edges, tunable palette/edges
-- tfbs_length_density       : KDEs filled by default
-- tfbs_positional_frequency : line plot of TFBS positional frequency
-- tfbs_positional_histogram : overlaid histogram of TFBS positions
+- placement_map   : 1-nt occupancy map across binding-site types
+- tfbs_usage      : rank-frequency + distribution summary of TFBS usage
+- run_health      : run outcomes, failures, and duplicate pressure
+- stage_a_summary : Stage-A pool quality + yield + bias checks
+- stage_b_summary : Stage-B feasibility + composition + utilization summary
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -399,974 +396,380 @@ def _load_stage_a_pools(run_root: Path) -> tuple[TFBSPoolArtifact, dict[str, pd.
 # ---------------------- Plots ----------------------
 
 
-def plot_compression_ratio(df: pd.DataFrame, out_path: Path, *, bins: int = 30, style: Optional[dict] = None) -> None:
-    col = _dg("compression_ratio")
-    vals = pd.to_numeric(df[col], errors="coerce").dropna()
-    style = _style(style)
-    fig, ax = _fig_ax(style)
-    ax.hist(vals, bins=bins)
-    ax.set_xlabel("Compression Ratio")
-    ax.set_ylabel("Count")
-    ax.set_title("DenseGen: Compression Ratio")
-    _apply_style(ax, style)
-    fig.tight_layout()
-    fig.savefig(out_path)
-    plt.close(fig)
+def _maybe_load_stage_a_pools(run_root: Path) -> tuple[TFBSPoolArtifact | None, dict[str, pd.DataFrame] | None]:
+    pools_dir = run_root / "outputs" / "pools"
+    if not pools_dir.exists():
+        return None, None
+    return _load_stage_a_pools(run_root)
 
 
-def plot_tf_usage(
+def _load_composition(run_root: Path) -> pd.DataFrame:
+    path = run_root / "outputs" / "tables" / "composition.parquet"
+    if not path.exists():
+        raise ValueError(f"composition.parquet not found: {path}")
+    return pd.read_parquet(path)
+
+
+def _maybe_load_composition(run_root: Path) -> pd.DataFrame | None:
+    path = run_root / "outputs" / "tables" / "composition.parquet"
+    if not path.exists():
+        return None
+    return pd.read_parquet(path)
+
+
+def _load_libraries(run_root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+    libs_dir = run_root / "outputs" / "libraries"
+    builds_path = libs_dir / "library_builds.parquet"
+    members_path = libs_dir / "library_members.parquet"
+    if not builds_path.exists():
+        raise ValueError(f"library_builds.parquet not found: {builds_path}")
+    if not members_path.exists():
+        raise ValueError(f"library_members.parquet not found: {members_path}")
+    return pd.read_parquet(builds_path), pd.read_parquet(members_path)
+
+
+def _maybe_load_libraries(run_root: Path) -> tuple[pd.DataFrame, pd.DataFrame] | None:
+    libs_dir = run_root / "outputs" / "libraries"
+    builds_path = libs_dir / "library_builds.parquet"
+    members_path = libs_dir / "library_members.parquet"
+    if not builds_path.exists() or not members_path.exists():
+        return None
+    return pd.read_parquet(builds_path), pd.read_parquet(members_path)
+
+
+def _load_effective_config(run_root: Path) -> dict:
+    path = run_root / "outputs" / "meta" / "effective_config.json"
+    if not path.exists():
+        raise ValueError(f"effective_config.json not found: {path}")
+    return json.loads(path.read_text())
+
+
+def _sequence_length_from_cfg(cfg: dict) -> int:
+    gen = cfg.get("generation") if cfg else None
+    if not isinstance(gen, dict):
+        raise ValueError("Plot config missing generation block.")
+    length = gen.get("sequence_length")
+    if length is None:
+        raise ValueError("Plot config missing generation.sequence_length.")
+    return int(length)
+
+
+def _fixed_element_alias(label: str) -> str:
+    text = str(label or "").lower()
+    if "upstream" in text or "promoter_upstream" in text:
+        return "-35"
+    if "downstream" in text or "promoter_downstream" in text:
+        return "-10"
+    return str(label)
+
+
+def _bin_attempts(values: np.ndarray, bins: int) -> tuple[np.ndarray, np.ndarray]:
+    if values.size == 0:
+        return np.array([]), np.array([])
+    lo = float(values.min())
+    hi = float(values.max())
+    if hi <= lo:
+        hi = lo + 1.0
+    edges = np.linspace(lo, hi, num=int(bins) + 1)
+    centers = (edges[:-1] + edges[1:]) / 2.0
+    return edges, centers
+
+
+def _axis_pixel_width(ax) -> float:
+    fig = ax.figure
+    width = fig.get_figwidth() * fig.dpi
+    return max(1.0, width * ax.get_position().width)
+
+
+def _resolution_bins(ax, n_points: int, *, min_bins: int = 25) -> int:
+    if n_points <= 0:
+        return int(min_bins)
+    px = _axis_pixel_width(ax)
+    return max(min_bins, min(int(px), int(n_points)))
+
+
+def _gc_fraction(seq: str) -> float:
+    if not seq:
+        return 0.0
+    seq = str(seq).upper()
+    gc = sum(1 for ch in seq if ch in {"G", "C"})
+    return float(gc) / float(len(seq))
+
+
+def plot_placement_map(
     df: pd.DataFrame,
     out_path: Path,
     *,
-    mode: str = "stack_lengths",  # stack_lengths | stack_tfbs | totals
-    max_segments: Optional[int] = 20,
-    top_k_tfs: Optional[int] = None,
-    exclude_tfbs: Optional[Iterable[str]] = None,
+    composition_df: pd.DataFrame,
+    cfg: dict,
     style: Optional[dict] = None,
-) -> None:
+) -> list[Path]:
+    if composition_df is None or composition_df.empty:
+        raise ValueError("placement_map requires composition.parquet with placements.")
+    required = {"solution_id", "input_name", "plan_name", "tf", "tfbs"}
+    missing = required - set(composition_df.columns)
+    if missing:
+        raise ValueError(f"composition.parquet missing required columns: {sorted(missing)}")
+    start_col = "offset" if "offset" in composition_df.columns else None
+    length_col = "length" if "length" in composition_df.columns else None
+    end_col = "end" if "end" in composition_df.columns else None
+    if start_col is None and end_col is None:
+        raise ValueError("composition.parquet requires offset or end columns.")
+    if length_col is None and end_col is None:
+        raise ValueError("composition.parquet requires length or end columns.")
     style = _style(style)
-    fig, ax = _fig_ax(style)
-    no_repeat = bool(style.get("palette_no_repeat", False))
-
-    if mode == "totals":
-        col = _dg("used_tf_counts")
-        ser = df[col].dropna()
-        counts: Dict[str, int] = {}
-        for row in ser:
-            for tf, n in _ensure_tf_counts(row):
-                counts[tf] = counts.get(tf, 0) + int(n)
-        items = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
-        if top_k_tfs:
-            items = items[:top_k_tfs]
-        labels = [k for k, _ in items]
-        values = [v for _, v in items]
-        ax.bar(labels, values, color=_palette(style, len(labels), no_repeat=no_repeat))
-        ax.tick_params(axis="x", labelrotation=45)
-        ax.set_ylabel("Total placements")
-        ax.set_title("TF usage (totals)")
+    seq_len = _sequence_length_from_cfg(cfg)
+    paths: list[Path] = []
+    for (input_name, plan_name), sub in composition_df.groupby(["input_name", "plan_name"]):
+        sub = sub.copy()
+        n_solutions = sub["solution_id"].astype(str).nunique()
+        if n_solutions <= 0:
+            raise ValueError(f"placement_map has no solutions for {input_name}/{plan_name}.")
+        fixed_ranges = _extract_fixed_element_ranges(cfg, str(plan_name))
+        fixed_labels = [_fixed_element_alias(label) for label, _lo, _hi in fixed_ranges]
+        tf_labels = sorted({str(tf) for tf in sub["tf"].astype(str).tolist() if str(tf).strip()})
+        labels = tf_labels + [lab for lab in fixed_labels if lab not in tf_labels]
+        if not labels:
+            raise ValueError(f"placement_map has no binding-site labels for {input_name}/{plan_name}.")
+        occupancy = {label: np.zeros(seq_len, dtype=float) for label in labels}
+        for _sol_id, sol_df in sub.groupby("solution_id"):
+            for label, group in sol_df.groupby("tf"):
+                label = str(label)
+                if label not in occupancy:
+                    continue
+                diff = np.zeros(seq_len + 1, dtype=float)
+                for _, row in group.iterrows():
+                    start = int(row.get(start_col) or 0)
+                    if length_col is not None and row.get(length_col) is not None:
+                        length = int(row.get(length_col))
+                        end = start + length
+                    else:
+                        end = int(row.get(end_col) or 0)
+                        length = end - start
+                    if length <= 0:
+                        continue
+                    lo = max(0, min(start, seq_len))
+                    hi = max(lo, min(end, seq_len))
+                    if hi <= lo:
+                        continue
+                    diff[lo] += 1.0
+                    diff[hi] -= 1.0
+                covered = np.cumsum(diff[:-1]) > 0
+                occupancy[label] += covered.astype(float)
+        for label, lo, hi in fixed_ranges:
+            alias = _fixed_element_alias(label)
+            if alias not in occupancy:
+                occupancy[alias] = np.zeros(seq_len, dtype=float)
+                labels.append(alias)
+            lo = max(0, min(int(lo), seq_len))
+            hi = max(lo, min(int(hi), seq_len))
+            if hi > lo:
+                occupancy[alias][lo:hi] = float(n_solutions)
+        mat = np.vstack([occupancy[label] for label in labels]) / float(n_solutions)
+        fig, ax = _fig_ax(style)
+        im = ax.imshow(mat, aspect="auto", cmap="viridis", vmin=0.0, vmax=1.0)
+        ax.set_yticks(np.arange(len(labels)))
+        ax.set_yticklabels(labels)
+        xticks = np.linspace(0, max(0, seq_len - 1), num=min(seq_len, 8), dtype=int)
+        ax.set_xticks(xticks)
+        ax.set_xticklabels([str(x + 1) for x in xticks])
+        ax.set_xlabel("Position (nt)")
+        ax.set_ylabel("Binding-site type")
+        ax.set_title(f"Placement map — {input_name}/{plan_name}")
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="Fraction of solutions")
         _apply_style(ax, style)
         fig.tight_layout()
-        fig.savefig(out_path)
+        fname = f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}{out_path.suffix}"
+        path = out_path.parent / fname
+        fig.savefig(path)
         plt.close(fig)
-        return
-
-    det_col = _dg("used_tfbs_detail")
-    excl = {str(x).strip().upper() for x in (exclude_tfbs or []) if str(x).strip()}
-
-    if mode == "stack_lengths":
-        by_tf_len: Dict[str, Dict[int, int]] = {}
-        for row in df[det_col].dropna():
-            for d in _ensure_list_of_dicts(row):
-                tf = str(d.get("tf") or "").strip()
-                tfbs = str(d.get("tfbs") or "").strip().upper()
-                if not (tf and tfbs) or tfbs in excl:
-                    continue
-                by_tf_len.setdefault(tf, {}).setdefault(len(tfbs), 0)
-                by_tf_len[tf][len(tfbs)] += 1
-        tf_totals = sorted(
-            ((tf, sum(v.values())) for tf, v in by_tf_len.items()),
-            key=lambda kv: kv[1],
-            reverse=True,
-        )
-        if top_k_tfs:
-            tf_totals = tf_totals[:top_k_tfs]
-        tf_order = [tf for tf, _ in tf_totals]
-        len_global: Dict[int, int] = {}
-        for v in by_tf_len.values():
-            for L, n in v.items():
-                len_global[L] = len_global.get(L, 0) + n
-        segs_sorted = sorted(len_global.items(), key=lambda kv: (-kv[1], kv[0]))
-        if max_segments and len(segs_sorted) > max_segments:
-            chosen = [L for L, _ in segs_sorted[:max_segments]]
-            remaining = {L for L, _ in segs_sorted[max_segments:]}
-            segments = chosen + ["OTHER"]
-        else:
-            remaining, segments = set(), [L for L, _ in segs_sorted]
-        x = np.arange(len(tf_order))
-        bottom = np.zeros_like(x, dtype=float)
-        # Sequential colormap by increasing motif length; OTHER → neutral gray
-        length_bins = [int(s) for s in segments if s != "OTHER"]
-        length_bins_sorted = sorted(set(length_bins))
-        cmap_name = style.get("length_cmap", "cividis")
-        cmap = plt.get_cmap(cmap_name)
-
-        def _seq_color(i, n):
-            return cmap(i / max(1, n - 1))
-
-        seq_colors = {L: _seq_color(i, len(length_bins_sorted)) for i, L in enumerate(length_bins_sorted)}
-        seg_to_color = {seg: (seq_colors[int(seg)] if seg != "OTHER" else "#B0B0B0") for seg in segments}
-        for seg in segments:
-            heights = []
-            for tf in tf_order:
-                val = (
-                    sum(n for L, n in by_tf_len.get(tf, {}).items() if L in remaining)
-                    if seg == "OTHER"
-                    else int(by_tf_len.get(tf, {}).get(int(seg), 0))
-                )
-                heights.append(float(val))
-            ax.bar(
-                x,
-                heights,
-                bottom=bottom,
-                color=seg_to_color[seg],
-                linewidth=0,
-                label=f"len={seg}" if seg != "OTHER" else "OTHER",
-            )
-            bottom += np.array(heights, dtype=float)
-        ax.set_xticks(x)
-        ax.set_xticklabels(tf_order)
-        ax.tick_params(axis="x", labelrotation=45)
-        ax.set_ylabel("Occurrences")
-        ax.set_title("TF usage (stacked by TFBS length)")
-        ax.legend(
-            loc="center left",
-            bbox_to_anchor=(1.02, 0.5),
-            frameon=bool(style.get("legend_frame", False)),
-        )
-        _apply_style(ax, style)
-        fig.tight_layout(rect=[0, 0, 0.82, 1.0])
-        fig.savefig(out_path)
-        plt.close(fig)
-        return
-
-    if mode == "stack_tfbs":
-        by_tf_tfbs: Dict[str, Dict[str, int]] = {}
-        for row in df[det_col].dropna():
-            for d in _ensure_list_of_dicts(row):
-                tf = str(d.get("tf") or "").strip()
-                tfbs = str(d.get("tfbs") or "").strip().upper()
-                if not (tf and tfbs) or tfbs in excl:
-                    continue
-                by_tf_tfbs.setdefault(tf, {}).setdefault(tfbs, 0)
-                by_tf_tfbs[tf][tfbs] += 1
-        tf_totals = sorted(
-            ((tf, sum(v.values())) for tf, v in by_tf_tfbs.items()),
-            key=lambda kv: kv[1],
-            reverse=True,
-        )
-        if top_k_tfs:
-            tf_totals = tf_totals[:top_k_tfs]
-        tf_order = [tf for tf, _ in tf_totals]
-        tfbs_global: Dict[str, int] = {}
-        for v in by_tf_tfbs.values():
-            for s, n in v.items():
-                tfbs_global[s] = tfbs_global.get(s, 0) + n
-        segs_sorted = sorted(tfbs_global.items(), key=lambda kv: kv[1], reverse=True)
-        if max_segments and len(segs_sorted) > max_segments:
-            chosen = [s for s, _ in segs_sorted[:max_segments]]
-            remaining = {s for s, _ in segs_sorted[max_segments:]}
-            segments = chosen + ["OTHER"]
-        else:
-            remaining, segments = set(), [s for s, _ in segs_sorted]
-        x = np.arange(len(tf_order))
-        bottom = np.zeros_like(x, dtype=float)
-        colors = _palette(style, len(segments), no_repeat=no_repeat)
-        seg_to_color = {segments[i]: colors[i] for i in range(len(segments))}
-        for seg in segments:
-            heights = []
-            for tf in tf_order:
-                inner = by_tf_tfbs.get(tf, {})
-                val = sum(n for s, n in inner.items() if s in remaining) if seg == "OTHER" else int(inner.get(seg, 0))
-                heights.append(float(val))
-            ax.bar(
-                x,
-                heights,
-                bottom=bottom,
-                color=seg_to_color[seg],
-                linewidth=0,
-                label=seg,
-            )
-            bottom += np.array(heights, dtype=float)
-        ax.set_xticks(x)
-        ax.set_xticklabels(tf_order)
-        ax.tick_params(axis="x", labelrotation=45)
-        ax.set_ylabel("Occurrences")
-        ax.set_title("TF usage (stacked by TFBS)")
-        ax.legend(
-            loc="center left",
-            bbox_to_anchor=(1.02, 0.5),
-            frameon=bool(style.get("legend_frame", False)),
-        )
-        _apply_style(ax, style)
-        fig.tight_layout(rect=[0, 0, 0.82, 1.0])
-        fig.savefig(out_path)
-        plt.close(fig)
-        return
-
-    raise ValueError("tf_usage.mode must be one of: stack_lengths, stack_tfbs, totals")
-
-
-def plot_pad_gc(df: pd.DataFrame, out_path: Path, *, style: Optional[dict] = None) -> None:
-    used_col, gc_col, b_col = (
-        _dg("pad_used"),
-        _dg("pad_gc_actual"),
-        _dg("pad_bases"),
-    )
-    mask = df[used_col] == True  # noqa: E712
-    x = pd.to_numeric(df.loc[mask, gc_col], errors="coerce")
-    y = pd.to_numeric(df.loc[mask, b_col], errors="coerce")
-    keep = x.notna() & y.notna()
-    x, y = x[keep], y[keep]
-    style = _style(style)
-    fig, ax = _fig_ax(style)
-    ax.scatter(x.values, y.values, alpha=0.35, s=12)
-    ax.set_xlabel("Pad GC fraction")
-    ax.set_ylabel("Pad bases")
-    ax.set_title("Pad: bases vs GC fraction (padded only)")
-    _apply_style(ax, style)
-    fig.tight_layout()
-    fig.savefig(out_path)
-    plt.close(fig)
-
-
-def plot_plan_counts(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    style: Optional[dict] = None,
-    stacked_by_day: bool = True,
-    created_at_col: str = "densegen__created_at",
-    cfg: Optional[dict] = None,
-) -> None:
-    plan_col = _dg("plan")
-    if cfg is None:
-        raise ValueError("plan_counts requires cfg for UP–DN labels.")
-    df = df[df[plan_col].notna()].copy()
-    df = df[df[plan_col].astype(str).str.strip().str.lower() != "none"].copy()
-    style = _style(style)
-    fig, ax = _fig_ax(style)
-    pmap = _plan_to_pair_label_map(cfg)
-
-    df_local = df[[plan_col] + ([created_at_col] if stacked_by_day else [])].copy()
-    df_local["_plan"] = df_local[plan_col].astype(str)
-
-    if stacked_by_day:
-        dt = pd.to_datetime(df_local[created_at_col], errors="coerce")
-        df_local = df_local[dt.notna()].copy()
-        df_local["_day"] = dt[dt.notna()].dt.floor("D")
-        pivot = df_local.groupby(["_plan", "_day"]).size().unstack(fill_value=0).sort_index(axis=1)
-        days = list(pivot.columns)
-        x = np.arange(len(pivot.index))
-        bottom = np.zeros(len(x), dtype=float)
-        cols = _palette(style, len(days))
-        for i, d in enumerate(days):
-            vals = pivot[d].to_numpy(dtype=float)
-            ax.bar(
-                x,
-                vals,
-                bottom=bottom,
-                color=cols[i],
-                linewidth=0,
-                label=str(getattr(d, "date", lambda: d)()),
-            )
-            bottom += vals
-        ax.legend(loc="best", frameon=bool(style.get("legend_frame", False)))
-        labels = pivot.index.tolist()
-    else:
-        counts = df_local["_plan"].value_counts()
-        x = np.arange(len(counts.index))
-        ax.bar(x, counts.values, linewidth=0)
-        labels = counts.index.tolist()
-
-    xticks = [f"{p}\n{pmap[p]}" if p in pmap and pmap[p] else p for p in labels]
-    ax.set_xticks(x)
-    ax.set_xticklabels(xticks)
-    ax.tick_params(axis="x", labelrotation=0)
-    ax.set_ylabel("Appearances")
-    ax.set_title("Counts per plan (σ70 UP–DN; stacked by day)")
-    _apply_style(ax, style)
-    fig.tight_layout()
-    fig.savefig(out_path)
-    plt.close(fig)
-
-
-def plot_tf_coverage(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    top_k: int = 20,
-    normalize: bool = True,
-    stacked: bool = False,
-    include_promoter_sites: bool = True,  # default on
-    cfg: Optional[dict] = None,  # required when include_promoter_sites=True
-    alpha: float = 0.35,
-    edge_alpha: float = 0.85,
-    edge_width: float = 0.6,
-    edge_color: Optional[str] = "auto",
-    promoter_edge_alpha: Optional[float] = None,
-    promoter_edge_style: str = "solid",
-    promoter_on_top: bool = True,
-    promoter_zorder: float = 4.0,
-    edge_on: bool = True,
-    edge_dark_factor: float = 0.80,
-    style: Optional[dict] = None,
-) -> None:
-    """
-    Adds two distinct categories scanned from config:
-    - '35 site'  (upstream)
-    - '10 site'  (downstream)
-    Top-strand exact matches only (no reverse complement).
-    """
-    det_col = _dg("used_tfbs_detail")
-    if "length" in df.columns:
-        L = int(pd.to_numeric(df["length"], errors="coerce").dropna().max())
-    elif _dg("sequence_length") in df.columns:
-        L = int(pd.to_numeric(df[_dg("sequence_length")], errors="coerce").dropna().max())
-    elif "sequence" in df.columns:
-        L = int(df["sequence"].astype(str).map(len).max())
-    else:
-        raise ValueError("Cannot infer sequence length for tf_coverage.")
-    details = df[det_col].dropna()
-
-    # accumulate coverage per TF
-    coverages: Dict[str, np.ndarray] = {}
-    n_seqs = len(details)
-    for row in details:
-        for d in _ensure_list_of_dicts(row):
-            tf = str(d.get("tf") or "").strip()
-            tfbs = str(d.get("tfbs") or "")
-            if not tf or not tfbs:
-                continue
-            start = int(float(d.get("offset", 0)))
-            span = len(tfbs)
-            if span <= 0:
-                continue
-            start = max(0, min(start, L))
-            end = min(L, start + span)
-            if end <= start:
-                continue
-            coverages.setdefault(tf, np.zeros(L, dtype=float))[start:end] += 1.0
-
-    # upstream/downstream overlays from cfg (top strand only)
-    if include_promoter_sites:
-        if cfg is None:
-            raise ValueError("tf_coverage(include_promoter_sites=True) requires cfg.")
-        if "sequence" not in df.columns:
-            raise ValueError("tf_coverage(include_promoter_sites=True) requires 'sequence'.")
-        seqs = df["sequence"].astype(str).tolist()
-        prom = _extract_promoter_site_motifs_from_cfg(cfg)  # {'35 site': {...}, '10 site': {...}}
-        for label, motif_set in prom.items():
-            if motif_set:
-                arr = _scan_motif_coverage_top_strand(seqs, motif_set, L)
-                coverages[label] = coverages.get(label, np.zeros(L, dtype=float)) + arr
-        n_seqs = max(n_seqs, len(seqs))
-
-    if not coverages:
-        raise ValueError("No coverage tracks available.")
-
-    # top_k by total coverage
-    order = sorted(coverages.items(), key=lambda kv: kv[1].sum(), reverse=True)[:top_k]
-    names = [k for k, _ in order]
-    style = _style(style)
-    fig, ax = _fig_ax(style)
-
-    # base colors, then override promoter categories
-    colors = _palette(style, len(order))
-    name_to_color = {names[i]: colors[i] for i in range(len(names))}
-    default_promoter_colors = {"35 site": "#D55E00", "10 site": "#0072B2"}
-
-    def _prom_color(label: str, default: str):
-        pc = style.get("promoter_colors") or {}
-        if label in pc:
-            return pc[label]
-        return default
-
-    for key, default in default_promoter_colors.items():
-        if key in name_to_color:
-            name_to_color[key] = _prom_color(key, default)
-
-    xs = np.arange(L)
-    base = np.zeros(L, dtype=float)
-    prom_keys = {"35 site", "10 site"}
-    main = [(k, v) for k, v in order if k not in prom_keys]
-    prom = [(k, v) for k, v in order if k in prom_keys]
-    if not promoter_on_top:
-        main, prom = (prom + main, [])
-
-    lw = float(edge_width) if (edge_on and edge_width and edge_alpha) else 0.0
-
-    def _edge_rgba(face_color, a):
-        if lw == 0.0:
-            return "none"
-        base_c = (
-            _darker(face_color, float(edge_dark_factor))
-            if (edge_color is None or str(edge_color).lower() == "auto")
-            else edge_color
-        )
-        return _with_alpha(base_c, float(a))
-
-    # main bars
-    for tf, arr in main:
-        y = arr.astype(float)
-        if normalize and n_seqs > 0:
-            y = y / float(n_seqs)
-        face = name_to_color[tf]
-        ax.bar(
-            xs,
-            y,
-            bottom=(base if stacked else None),
-            width=1.0,
-            align="edge",
-            color=_with_alpha(face, alpha),
-            edgecolor=_edge_rgba(face, edge_alpha),
-            linewidth=lw,
-            linestyle="solid",
-            label=tf,
-            zorder=2.0,
-        )
-        if stacked:
-            base += y
-
-    # promoter overlays
-    if prom:
-        pa = max(edge_alpha, 0.95) if promoter_edge_alpha is None else float(promoter_edge_alpha)
-        for tf, arr in prom:
-            y = arr.astype(float)
-            if normalize and n_seqs > 0:
-                y = y / float(n_seqs)
-            face = name_to_color[tf]
-            ax.bar(
-                xs,
-                y,
-                bottom=(base if stacked else None),
-                width=1.0,
-                align="edge",
-                color=_with_alpha(face, alpha),
-                edgecolor=_edge_rgba(face, pa),
-                linewidth=lw,
-                linestyle=promoter_edge_style,
-                label=tf,
-                zorder=float(promoter_zorder),
-            )
-            if stacked:
-                base += y
-
-    ax.set_xlabel("Nucleotide Position")
-    ax.set_ylabel("Coverage" + (" (fraction)" if normalize else " (count)"))
-    ax.set_title("TFBS coverage along the sequence")
-    ax.legend(loc="best", frameon=bool(style.get("legend_frame", False)))
-    _apply_style(ax, style)
-    fig.tight_layout()
-    fig.savefig(out_path)
-    plt.close(fig)
-
-
-def _kde_gaussian(x: np.ndarray, grid: np.ndarray, bandwidth: Optional[float] = None) -> np.ndarray:
-    x = np.asarray(x, dtype=float)
-    x = x[np.isfinite(x)]
-    n = x.size
-    if n == 0:
-        return np.zeros_like(grid)
-    std = np.std(x) or 1.0
-    if not bandwidth or not np.isfinite(bandwidth) or bandwidth <= 0:
-        bandwidth = 1.06 * std * (n ** (-1 / 5))
-        if bandwidth <= 0:
-            bandwidth = max(0.1, std * 0.2)
-    z = (grid[:, None] - x[None, :]) / bandwidth
-    dens = np.exp(-0.5 * z * z) / np.sqrt(2 * np.pi)
-    return dens.sum(axis=1) / (n * bandwidth)
-
-
-def _ensure_list(val) -> list:
-    if val is None or (isinstance(val, float) and pd.isna(val)):
-        return []
-    if isinstance(val, str):
-        s = val.strip()
-        if (s.startswith("[") and s.endswith("]")) or (s.startswith("{") and s.endswith("}")):
-            try:
-                parsed = json.loads(s)
-                if isinstance(parsed, list):
-                    return list(parsed)
-            except Exception:
-                return []
-        return []
-    if isinstance(val, (list, tuple, np.ndarray)):
-        return list(val)
-    return []
-
-
-def plot_tfbs_length_density(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    attempts_df: Optional[pd.DataFrame] = None,
-    bins: int | str = "auto",
-    kde: bool = True,
-    kde_bandwidth: Optional[float] = None,
-    kde_points: int = 256,
-    fill_alpha: float = 0.35,
-    include_promoter_sites: bool = False,  # retained for forward-compat; no RC scanning here
-    promoter_site_motifs: Optional[Dict[str, set[str]]] = None,  # optional explicit overlay sets
-    style: Optional[dict] = None,
-) -> None:
-    by_tf: Dict[str, list[int]] = {}
-    if attempts_df is None or attempts_df.empty:
-        raise ValueError(
-            "outputs/tables/attempts.parquet is required for tfbs_length_density. "
-            "Run `dense run -c <config.yaml>` to generate attempts."
-        )
-    if attempts_df is not None and not attempts_df.empty:
-        seen_libs: set[tuple[str, int]] = set()
-        for _, row in attempts_df.iterrows():
-            lib_hash = str(row.get("sampling_library_hash") or "")
-            lib_idx = int(row.get("sampling_library_index") or 0)
-            key = (lib_hash, lib_idx)
-            if key in seen_libs:
-                continue
-            seen_libs.add(key)
-            tfbs_list = _ensure_list(row.get("library_tfbs"))
-            tf_list = _ensure_list(row.get("library_tfs"))
-            for idx, tfbs in enumerate(tfbs_list):
-                tf = str(tf_list[idx]) if idx < len(tf_list) else ""
-                if tf and tfbs:
-                    by_tf.setdefault(tf, []).append(len(str(tfbs)))
-    # Optional: if explicit promoter_site_motifs provided, include their motif lengths
-    if include_promoter_sites and promoter_site_motifs:
-        for label, motif_set in (promoter_site_motifs or {}).items():
-            lengths: list[int] = []
-            for m in motif_set or []:
-                m = str(m).strip().upper()
-                if not _valid_dna_string(m):
-                    continue
-                lengths.append(len(m))
-            if lengths:
-                by_tf.setdefault(label, []).extend(lengths)
-
-    if not by_tf:
-        raise ValueError("No TFBS lengths available.")
-    style = _style(style)
-    fig, ax = _fig_ax(style)
-    tfs = sorted(by_tf.keys())
-    cols = _palette(style, len(tfs))
-    for tf, color in zip(tfs, cols):
-        vals = np.array(by_tf[tf], dtype=float)
-        if vals.size == 0:
-            continue
-        if kde:
-            xmin, xmax = float(vals.min()), float(vals.max())
-            pad = max(1.0, 0.05 * (xmax - xmin if xmax > xmin else 2.0))
-            grid = np.linspace(xmin - pad, xmax + pad, max(64, int(kde_points)))
-            dens = _kde_gaussian(vals, grid, bandwidth=kde_bandwidth)
-            if float(fill_alpha) > 0:
-                ax.fill_between(
-                    grid,
-                    0,
-                    dens,
-                    color=color,
-                    alpha=float(fill_alpha),
-                    linewidth=0,
-                    zorder=1,
-                )
-            ax.plot(grid, dens, linewidth=2, color=color, label=tf, zorder=2)
-        else:
-            ax.hist(
-                vals,
-                bins=bins,
-                density=True,
-                histtype="step",
-                linewidth=2,
-                color=color,
-                label=tf,
-            )
-    ax.set_xlabel("Motif length (nt)")
-    ax.set_ylabel("Density")
-    ax.set_title("Library TFBS length distribution")
-    ax.legend(loc="best", frameon=bool(style.get("legend_frame", False)))
-    _apply_style(ax, style)
-    fig.tight_layout()
-    fig.savefig(out_path)
-    plt.close(fig)
-
-
-def plot_tfbs_positional_frequency(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    top_k: int = 10,
-    normalize: bool = True,
-    include_promoter_sites: bool = True,
-    cfg: Optional[dict] = None,
-    style: Optional[dict] = None,
-) -> None:
-    det_col = _dg("used_tfbs_detail")
-    if "length" in df.columns:
-        L = int(pd.to_numeric(df["length"], errors="coerce").dropna().max())
-    elif _dg("sequence_length") in df.columns:
-        L = int(pd.to_numeric(df[_dg("sequence_length")], errors="coerce").dropna().max())
-    elif "sequence" in df.columns:
-        L = int(df["sequence"].astype(str).map(len).max())
-    else:
-        raise ValueError("Cannot infer sequence length for tfbs_positional_frequency.")
-    details = df[det_col].dropna()
-    coverages: Dict[str, np.ndarray] = {}
-    n_seqs = len(details)
-    for row in details:
-        for d in _ensure_list_of_dicts(row):
-            tf = str(d.get("tf") or "").strip()
-            tfbs = str(d.get("tfbs") or "")
-            if not tf or not tfbs:
-                continue
-            start = int(float(d.get("offset", 0)))
-            span = len(tfbs)
-            if span <= 0:
-                continue
-            start = max(0, min(start, L))
-            end = min(L, start + span)
-            if end <= start:
-                continue
-            coverages.setdefault(tf, np.zeros(L, dtype=float))[start:end] += 1.0
-
-    if include_promoter_sites:
-        if cfg is None:
-            raise ValueError("tfbs_positional_frequency(include_promoter_sites=True) requires cfg.")
-        if "sequence" not in df.columns:
-            raise ValueError("tfbs_positional_frequency(include_promoter_sites=True) requires 'sequence'.")
-        seqs = df["sequence"].astype(str).tolist()
-        prom = _extract_promoter_site_motifs_from_cfg(cfg)
-        for label, motif_set in prom.items():
-            if motif_set:
-                arr = _scan_motif_coverage_top_strand(seqs, motif_set, L)
-                coverages[label] = coverages.get(label, np.zeros(L, dtype=float)) + arr
-        n_seqs = max(n_seqs, len(seqs))
-
-    if not coverages:
-        raise ValueError("No positional TFBS coverage available.")
-
-    order = sorted(coverages.items(), key=lambda kv: kv[1].sum(), reverse=True)[: max(1, int(top_k))]
-    style = _style(style)
-    fig, ax = _fig_ax(style)
-    colors = _palette(style, len(order))
-    xs = np.arange(L)
-    for (tf, arr), color in zip(order, colors):
-        y = arr.astype(float)
-        if normalize and n_seqs > 0:
-            y = y / float(n_seqs)
-        ax.plot(xs, y, linewidth=2.0, label=tf, color=color)
-    ax.set_xlabel("Position (nt)")
-    ax.set_ylabel("Frequency" + (" (normalized)" if normalize else ""))
-    ax.set_title("TFBS positional frequency")
-    ax.legend(loc="best", frameon=bool(style.get("legend_frame", False)))
-    _apply_style(ax, style)
-    fig.tight_layout()
-    fig.savefig(out_path)
-    plt.close(fig)
+        paths.append(path)
+    return paths
 
 
 def plot_tfbs_usage(
     df: pd.DataFrame,
     out_path: Path,
     *,
-    max_sites: Optional[int] = None,  # applies to TFBS strings (pairs always included)
-    couple_sigma_pairs: bool = True,  # when True -> combined: pairs + TFBS strings
-    exclude_tfbs: Optional[Iterable[str]] = None,
-    cfg: Optional[dict] = None,
+    composition_df: pd.DataFrame,
+    pools: dict[str, pd.DataFrame] | None = None,
+    library_members_df: pd.DataFrame | None = None,
     style: Optional[dict] = None,
-) -> None:
-    """
-    Plot only unique TFBS strings (ranked).
-    Colors: TFBS bars are colored by dominant TF. The strings ACCGCG and TATAAT
-    are excluded by default.
-    """
+) -> list[Path]:
+    if composition_df is None or composition_df.empty:
+        raise ValueError("tfbs_usage requires composition.parquet with placements.")
+    required = {"input_name", "plan_name", "tf", "tfbs"}
+    missing = required - set(composition_df.columns)
+    if missing:
+        raise ValueError(f"composition.parquet missing required columns: {sorted(missing)}")
     style = _style(style)
-    fig, ax = _fig_ax(style)
-    used_col, det_col = _dg("used_tfbs"), _dg("used_tfbs_detail")
-    excl: set[str] = set(str(x).strip().upper() for x in (exclude_tfbs or []) if str(x).strip())
-    if exclude_tfbs is None:
-        excl.add("G")  # default drop lone 'G'
-    # Always exclude promoter elements from this plot
-    excl.update({"ACCGCG", "TATAAT"})
+    paths: list[Path] = []
+    for (input_name, plan_name), sub in composition_df.groupby(["input_name", "plan_name"]):
+        counts = sub.groupby(["tf", "tfbs"]).size().sort_values(ascending=False)
+        if counts.empty:
+            raise ValueError(f"tfbs_usage found no TFBS counts for {input_name}/{plan_name}.")
+        ranks = np.arange(1, len(counts) + 1)
+        values = counts.to_numpy(dtype=float)
+        fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=style["figsize"])
+        ax_left.plot(ranks, values, color="#4c78a8", linewidth=1.8)
+        ax_left.set_xlabel("TFBS rank (by usage)")
+        ax_left.set_ylabel("Usage count")
+        ax_left.set_title("TFBS rank–frequency")
 
-    if couple_sigma_pairs:
-        # Show only unique TFBS strings (no UP–DN pair bars)
-        counts_tfbs: Dict[str, int] = {}
-        tf_for_tfbs: Dict[str, str] = {}
-        if used_col in df.columns:
-            for row in df[used_col].dropna():
-                for s in _ensure_list_of_strs(row):
-                    tf = s.split(":", 1)[0].strip() if ":" in s else ""
-                    tfbs = (s.split(":", 1)[1] if ":" in s else s).strip().upper()
-                    if not tfbs or tfbs in excl:
-                        continue
-                    counts_tfbs[tfbs] = counts_tfbs.get(tfbs, 0) + 1
-                    if tf and tfbs not in tf_for_tfbs:
-                        tf_for_tfbs[tfbs] = tf
-        elif det_col in df.columns:
-            for row in df[det_col].dropna():
-                for d in _ensure_list_of_dicts(row):
-                    tf = str(d.get("tf") or "").strip()
-                    tfbs = str(d.get("tfbs") or "").strip().upper()
-                    if not tfbs or tfbs in excl:
-                        continue
-                    counts_tfbs[tfbs] = counts_tfbs.get(tfbs, 0) + 1
-                    if tf and tfbs not in tf_for_tfbs:
-                        tf_for_tfbs[tfbs] = tf
-        else:
-            raise KeyError("missing TFBS columns")
+        ax_right.hist(values, bins="fd", color="#4c78a8", alpha=0.75)
+        ax_right.set_xlabel("Usage count")
+        ax_right.set_ylabel("Count")
+        ax_right.set_title("TFBS usage distribution")
+        ax_ecdf = ax_right.twinx()
+        sorted_vals = np.sort(values)
+        ax_ecdf.plot(sorted_vals, np.arange(1, len(sorted_vals) + 1) / len(sorted_vals), color="#f28e2b")
+        ax_ecdf.set_ylabel("ECDF")
 
-        if not counts_tfbs:
-            raise ValueError("No TFBS usage after filtering.")
-        ranked_tfbs = sorted(counts_tfbs.items(), key=lambda kv: kv[1], reverse=True)
-        if max_sites:
-            ranked_tfbs = ranked_tfbs[:max_sites]
-        labels = [s for s, _ in ranked_tfbs]
-        values = [v for _, v in ranked_tfbs]
-        present_tfs = sorted({tf_for_tfbs.get(s, "") for s in labels if tf_for_tfbs.get(s, "")})
-        tf_colors = {tf: c for tf, c in zip(present_tfs, _palette(style, len(present_tfs)))}
-        colors = [tf_colors.get(tf_for_tfbs.get(s, ""), "#BBBBBB") for s in labels]
-        x = np.arange(len(labels))
-        ax.bar(x, values, color=colors, linewidth=0)
-        ax.set_xticks(x)
-        ax.set_xticklabels(labels)
-        ax.tick_params(axis="x", labelrotation=90)
-        if present_tfs:
-            ax.legend(
-                handles=[Patch(facecolor=tf_colors[tf], label=tf) for tf in present_tfs],
-                loc="best",
-                frameon=bool(style.get("legend_frame", False)),
-            )
-        ax.set_ylabel("Occurrences")
-        ax.set_title("TFBS usage: unique binding sites (pairs excluded)")
-        _apply_style(ax, style)
+        annotations = []
+        used_unique = int(len(counts))
+        if pools and input_name in pools:
+            pool_df = pools[input_name]
+            if "tfbs_sequence" in pool_df.columns:
+                tfbs_col = "tfbs_sequence"
+            else:
+                tfbs_col = "tfbs"
+            pool_unique = pool_df.assign(tf=pool_df["tf"].astype(str), tfbs=pool_df[tfbs_col].astype(str))
+            pool_unique = pool_unique.drop_duplicates(subset=["tf", "tfbs"])
+            pool_count = int(len(pool_unique))
+            if pool_count > 0:
+                annotations.append(f"pool used ≥1: {used_unique}/{pool_count} ({used_unique / pool_count:.2%})")
+        if library_members_df is not None and not library_members_df.empty:
+            offered = library_members_df[
+                (library_members_df["input_name"].astype(str) == str(input_name))
+                & (library_members_df["plan_name"].astype(str) == str(plan_name))
+            ]
+            if not offered.empty:
+                offered_unique = offered.drop_duplicates(subset=["tf", "tfbs"])
+                offered_count = int(len(offered_unique))
+                if offered_count > 0:
+                    annotations.append(
+                        f"offered used ≥1: {used_unique}/{offered_count} ({used_unique / offered_count:.2%})"
+                    )
+        if annotations:
+            ax_right.text(0.98, 0.98, "\n".join(annotations), transform=ax_right.transAxes, ha="right", va="top")
+        _apply_style(ax_left, style)
+        _apply_style(ax_right, style)
         fig.tight_layout()
-        fig.savefig(out_path)
+        fname = f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}{out_path.suffix}"
+        path = out_path.parent / fname
+        fig.savefig(path)
         plt.close(fig)
-        return
-
-    # If couple_sigma_pairs=False -> classic per-TFBS ranking colored by TF
-    counts: Dict[str, int] = {}
-    tf_for_tfbs: Dict[str, str] = {}
-    if used_col in df.columns:
-        for row in df[used_col].dropna():
-            for s in _ensure_list_of_strs(row):
-                tf = s.split(":", 1)[0].strip() if ":" in s else ""
-                tfbs = (s.split(":", 1)[1] if ":" in s else s).strip().upper()
-                if not tfbs or tfbs in excl:
-                    continue
-                counts[tfbs] = counts.get(tfbs, 0) + 1
-                if tf:
-                    tf_for_tfbs.setdefault(tfbs, tf)
-    elif det_col in df.columns:
-        for row in df[det_col].dropna():
-            for d in _ensure_list_of_dicts(row):
-                tf = str(d.get("tf") or "").strip()
-                tfbs = str(d.get("tfbs") or "").strip().upper()
-                if not tfbs or tfbs in excl:
-                    continue
-                counts[tfbs] = counts.get(tfbs, 0) + 1
-                if tf:
-                    tf_for_tfbs.setdefault(tfbs, tf)
-    else:
-        raise KeyError("missing TFBS columns")
-    if not counts:
-        raise ValueError("No TFBS usage after filtering.")
-    ranked = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
-    if max_sites:
-        ranked = ranked[:max_sites]
-    labels = [k for k, _ in ranked]
-    values = [v for _, v in ranked]
-    present_tfs = sorted({tf_for_tfbs.get(b, "") for b in labels if tf_for_tfbs.get(b, "")})
-    tf_colors = {tf: c for tf, c in zip(present_tfs, _palette(style, len(present_tfs)))}
-    bar_colors = [tf_colors.get(tf_for_tfbs.get(b, ""), "#BBBBBB") for b in labels]
-    ax.bar(labels, values, color=bar_colors)
-    if present_tfs:
-        ax.legend(
-            handles=[Patch(facecolor=tf_colors[tf], label=tf) for tf in present_tfs],
-            loc="best",
-            frameon=bool(style.get("legend_frame", False)),
-        )
-    ax.tick_params(axis="x", labelrotation=90)
-    ax.set_ylabel("Occurrences")
-    ax.set_title("TFBS usage by TF (ranked)")
-    _apply_style(ax, style)
-    fig.tight_layout()
-    fig.savefig(out_path)
-    plt.close(fig)
+        paths.append(path)
+    return paths
 
 
-def _normalized_entropy(counts: dict[str, int]) -> float:
-    total = float(sum(counts.values()))
-    if total <= 0 or len(counts) <= 1:
-        return 0.0
-    ent = 0.0
-    for val in counts.values():
-        p = float(val) / total
-        if p <= 0:
-            continue
-        ent -= p * np.log(p)
-    return float(ent / np.log(len(counts)))
-
-
-def plot_diversity_health(
+def plot_run_health(
     df: pd.DataFrame,
     out_path: Path,
     *,
-    created_at_col: Optional[str] = None,
-    normalize: bool = True,
-    show_unique_tfs: bool = True,
-    show_unique_tfbs: bool = True,
-    show_entropy: bool = True,
+    attempts_df: pd.DataFrame,
+    events_df: pd.DataFrame | None = None,
     style: Optional[dict] = None,
 ) -> None:
-    det_col = _dg("used_tfbs_detail")
-    if det_col not in df.columns:
-        raise ValueError("diversity_health requires used_tfbs_detail.")
-    created_col = created_at_col or _dg("created_at")
-    ordered = df
-    if created_col in df.columns:
-        ordered = df.sort_values(created_col, kind="mergesort")
-
-    counts_tf: dict[str, int] = {}
-    counts_tfbs: dict[str, int] = {}
-    uniq_tf: list[float] = []
-    uniq_tfbs: list[float] = []
-    entropy: list[float] = []
-
-    def _is_missing(value) -> bool:
-        if value is None:
-            return True
-        if isinstance(value, float):
-            return bool(np.isnan(value))
-        return False
-
-    for row in ordered[det_col]:
-        if _is_missing(row):
-            continue
-        for entry in _ensure_list_of_dicts(row):
-            tf = str(entry.get("tf") or "").strip()
-            tfbs = str(entry.get("tfbs") or "").strip()
-            if tf:
-                counts_tf[tf] = counts_tf.get(tf, 0) + 1
-            if tfbs:
-                counts_tfbs[tfbs] = counts_tfbs.get(tfbs, 0) + 1
-        uniq_tf.append(float(len(counts_tf)))
-        uniq_tfbs.append(float(len(counts_tfbs)))
-        entropy.append(_normalized_entropy(counts_tfbs))
-
-    if not uniq_tfbs:
-        raise ValueError("No TFBS placements found for diversity_health.")
-
-    if normalize:
-        tf_denom = max(1.0, uniq_tf[-1] if uniq_tf else 1.0)
-        tfbs_denom = max(1.0, uniq_tfbs[-1])
-        uniq_tf = [val / tf_denom for val in uniq_tf]
-        uniq_tfbs = [val / tfbs_denom for val in uniq_tfbs]
-
+    if attempts_df is None or attempts_df.empty:
+        raise ValueError("run_health requires attempts.parquet.")
+    required = {"attempt_index", "status", "reason", "plan_name"}
+    missing = required - set(attempts_df.columns)
+    if missing:
+        raise ValueError(f"attempts.parquet missing required columns: {sorted(missing)}")
     style = _style(style)
-    fig, ax = _fig_ax(style)
-    x = np.arange(1, len(uniq_tfbs) + 1)
-    colors = _palette(style, 3)
-    handles = []
-    if show_unique_tfs:
-        handles.append(ax.plot(x, uniq_tf, label="unique TFs", color=colors[0], linewidth=2)[0])
-    if show_unique_tfbs:
-        handles.append(ax.plot(x, uniq_tfbs, label="unique TFBS", color=colors[1], linewidth=2)[0])
-    ax.set_xlabel("Sequence index")
-    ax.set_ylabel("Coverage (normalized)" if normalize else "Unique count")
-    ax.set_title("Diversity health")
-
-    if show_entropy:
-        ax2 = ax.twinx()
-        handles.append(
-            ax2.plot(
-                x,
-                entropy,
-                label="TFBS entropy",
-                color=colors[2],
-                linewidth=2,
-                linestyle="--",
-            )[0]
-        )
-        ax2.set_ylabel("Normalized entropy")
-    ax.legend(handles=handles, loc="best", frameon=bool(style.get("legend_frame", False)))
-    _apply_style(ax, style)
-    fig.tight_layout()
-    fig.savefig(out_path)
-    plt.close(fig)
-
-
-def plot_tfbs_positional_histogram(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    top_k: int = 10,
-    normalize: bool = True,
-    include_promoter_sites: bool = True,
-    alpha: float = 0.35,
-    edge_alpha: float = 0.8,
-    edge_width: float = 0.5,
-    cfg: Optional[dict] = None,
-    style: Optional[dict] = None,
-) -> None:
-    det_col = _dg("used_tfbs_detail")
-    if "length" in df.columns:
-        L = int(pd.to_numeric(df["length"], errors="coerce").dropna().max())
-    elif _dg("sequence_length") in df.columns:
-        L = int(pd.to_numeric(df[_dg("sequence_length")], errors="coerce").dropna().max())
-    elif "sequence" in df.columns:
-        L = int(df["sequence"].astype(str).map(len).max())
+    attempts_df = attempts_df.copy()
+    attempts_df["attempt_index"] = pd.to_numeric(attempts_df["attempt_index"], errors="coerce").fillna(0).astype(int)
+    attempts_df["created_at"] = pd.to_datetime(attempts_df.get("created_at"), errors="coerce")
+    statuses = ["success", "duplicate", "failed"]
+    plan_names = sorted({str(p) for p in attempts_df["plan_name"].astype(str).tolist() if str(p).strip()})
+    show_plans = len(plan_names) > 1
+    if show_plans:
+        fig, axes = plt.subplots(2, 2, figsize=style["figsize"])
+        ax_outcome, ax_dup, ax_fail, ax_plan = axes.flatten()
     else:
-        raise ValueError("Cannot infer sequence length for tfbs_positional_histogram.")
-    details = df[det_col].dropna()
-    coverages: Dict[str, np.ndarray] = {}
-    n_seqs = len(details)
-    for row in details:
-        for d in _ensure_list_of_dicts(row):
-            tf = str(d.get("tf") or "").strip()
-            tfbs = str(d.get("tfbs") or "").strip()
-            label = tf or tfbs
-            if not label:
-                continue
-            start = int(float(d.get("offset", 0)))
-            span = int(d.get("length", len(tfbs)))
-            if span <= 0:
-                continue
-            start = max(0, min(start, L))
-            end = min(L, start + span)
-            if end <= start:
-                continue
-            coverages.setdefault(label, np.zeros(L, dtype=float))[start:end] += 1.0
+        fig, axes = plt.subplots(1, 3, figsize=style["figsize"])
+        ax_outcome, ax_dup, ax_fail = axes
+        ax_plan = None
 
-    if include_promoter_sites:
-        if cfg is None:
-            raise ValueError("tfbs_positional_histogram(include_promoter_sites=True) requires cfg.")
-        if "sequence" not in df.columns:
-            raise ValueError("tfbs_positional_histogram(include_promoter_sites=True) requires 'sequence'.")
-        seqs = df["sequence"].astype(str).tolist()
-        prom = _extract_promoter_site_motifs_from_cfg(cfg)
-        for label, motif_set in prom.items():
-            if motif_set:
-                arr = _scan_motif_coverage_top_strand(seqs, motif_set, L)
-                coverages[label] = coverages.get(label, np.zeros(L, dtype=float)) + arr
-        n_seqs = max(n_seqs, len(seqs))
+    bins = _resolution_bins(ax_outcome, len(attempts_df))
+    edges, centers = _bin_attempts(attempts_df["attempt_index"].to_numpy(dtype=float), bins)
+    if centers.size == 0:
+        raise ValueError("run_health cannot bin attempts without attempt_index values.")
+    counts_by_status: dict[str, np.ndarray] = {}
+    for status in statuses:
+        sub = attempts_df[attempts_df["status"].astype(str) == status]
+        counts, _ = np.histogram(sub["attempt_index"].to_numpy(dtype=float), bins=edges)
+        counts_by_status[status] = counts.astype(float)
 
-    if not coverages:
-        raise ValueError("No positional TFBS coverage available.")
+    ax_outcome.stackplot(centers, [counts_by_status[s] for s in statuses], labels=statuses)
+    ax_outcome.set_xlabel("Attempt index (binned)")
+    ax_outcome.set_ylabel("Count")
+    ax_outcome.set_title("Outcome mix")
+    ax_outcome.legend(loc="upper right", frameon=bool(style.get("legend_frame", False)))
 
-    order = sorted(coverages.items(), key=lambda kv: kv[1].sum(), reverse=True)[: max(1, int(top_k))]
-    style = _style(style)
-    fig, ax = _fig_ax(style)
-    colors = _palette(style, len(order))
-    xs = np.arange(L)
-    for (label, arr), color in zip(order, colors):
-        y = arr.astype(float)
-        if normalize and n_seqs > 0:
-            y = y / float(n_seqs)
-        edge = _with_alpha(_darker(color), float(edge_alpha))
-        ax.bar(
-            xs,
-            y,
-            width=1.0,
-            alpha=float(alpha),
-            color=color,
-            edgecolor=edge,
-            linewidth=float(edge_width),
-            label=label,
-        )
-    ax.set_xlabel("Position (nt)")
-    ax.set_ylabel("Frequency" + (" (normalized)" if normalize else ""))
-    ax.set_title("TFBS positional histogram")
-    ax.legend(loc="best", frameon=bool(style.get("legend_frame", False)))
-    _apply_style(ax, style)
+    totals = sum(counts_by_status.values())
+    dup_rate = np.divide(counts_by_status.get("duplicate", np.zeros_like(totals)), np.where(totals > 0, totals, 1.0))
+    ax_dup.plot(centers, dup_rate, color="#e15759")
+    ax_dup.set_xlabel("Attempt index (binned)")
+    ax_dup.set_ylabel("Duplicate rate")
+    ax_dup.set_ylim(0.0, min(1.0, max(0.05, float(np.nanmax(dup_rate)) + 0.05)))
+    ax_dup.set_title("Duplicate pressure")
+
+    failed = attempts_df[attempts_df["status"].astype(str) == "failed"]
+    if failed.empty:
+        ax_fail.text(0.5, 0.5, "No failures", ha="center", va="center", transform=ax_fail.transAxes)
+        ax_fail.set_axis_off()
+    else:
+        reason_counts = failed["reason"].astype(str).value_counts()
+        if len(reason_counts) <= 8:
+            positions = np.arange(len(reason_counts))
+            ax_fail.bar(positions, reason_counts.values.tolist(), color="#4c78a8")
+            ax_fail.set_xticks(positions)
+            ax_fail.set_xticklabels(reason_counts.index.tolist(), rotation=45, ha="right")
+            ax_fail.set_ylabel("Count")
+            ax_fail.set_title("Failure reasons")
+        else:
+            ranks = np.arange(1, len(reason_counts) + 1)
+            ax_fail.plot(ranks, reason_counts.values, color="#4c78a8", linewidth=1.6)
+            ax_fail.set_xlabel("Reason rank")
+            ax_fail.set_ylabel("Count")
+            ax_fail.set_title("Failure rank–frequency")
+
+    if show_plans and ax_plan is not None:
+        for plan in plan_names:
+            sub = attempts_df[(attempts_df["plan_name"].astype(str) == plan) & (attempts_df["status"] == "success")]
+            counts, _ = np.histogram(sub["attempt_index"].to_numpy(dtype=float), bins=edges)
+            cumulative = np.cumsum(counts)
+            ax_plan.plot(centers, cumulative, label=plan)
+        ax_plan.set_xlabel("Attempt index (binned)")
+        ax_plan.set_ylabel("Cumulative successes")
+        ax_plan.set_title("Plan progress")
+        ax_plan.legend(loc="upper left", frameon=bool(style.get("legend_frame", False)))
+
+    if events_df is not None and not events_df.empty and "created_at" in attempts_df.columns:
+        event_times = pd.to_datetime(events_df.get("created_at"), errors="coerce").dropna()
+        if not event_times.empty:
+            attempt_times = attempts_df.dropna(subset=["created_at"]).sort_values("created_at")
+            if not attempt_times.empty:
+                idx_values = attempt_times["attempt_index"].to_numpy()
+                time_values = attempt_times["created_at"].to_numpy()
+                for evt_time in event_times.to_numpy():
+                    insert = np.searchsorted(time_values, evt_time)
+                    if insert <= 0:
+                        event_idx = idx_values[0]
+                    elif insert >= len(idx_values):
+                        event_idx = idx_values[-1]
+                    else:
+                        before = time_values[insert - 1]
+                        after = time_values[insert]
+                        use_prev = (evt_time - before) <= (after - evt_time)
+                        event_idx = idx_values[insert - 1] if use_prev else idx_values[insert]
+                    ax_outcome.axvline(event_idx, color="#999999", linestyle="--", linewidth=1)
+
+    for ax in [ax_outcome, ax_dup, ax_fail] + ([ax_plan] if ax_plan is not None else []):
+        if ax is not None:
+            _apply_style(ax, style)
     fig.tight_layout()
     fig.savefig(out_path)
     plt.close(fig)
@@ -1385,16 +788,18 @@ def _build_stage_a_strata_overview_figure(
     eligible_score_hist = sampling.get("eligible_score_hist") or []
     if not eligible_score_hist:
         raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
-    if "regulator_id" in pool_df.columns and "tfbs_sequence" in pool_df.columns:
+    if "regulator_id" in pool_df.columns:
         tf_col = "regulator_id"
-        tfbs_col = "tfbs_sequence"
-    elif "tf" in pool_df.columns and "tfbs" in pool_df.columns:
+    elif "tf" in pool_df.columns:
         tf_col = "tf"
+    else:
+        raise ValueError(f"Stage-A pool missing regulator_id or tf column for input '{input_name}'.")
+    if "tfbs_sequence" in pool_df.columns:
+        tfbs_col = "tfbs_sequence"
+    elif "tfbs" in pool_df.columns:
         tfbs_col = "tfbs"
     else:
-        raise ValueError(
-            f"Stage-A pool missing regulator_id/tfbs_sequence or tf/tfbs columns for input '{input_name}'."
-        )
+        raise ValueError(f"Stage-A pool missing tfbs_sequence or tfbs column for input '{input_name}'.")
     if "best_hit_score" not in pool_df.columns:
         raise ValueError(f"Stage-A pool missing best_hit_score for input '{input_name}'.")
 
@@ -1578,7 +983,7 @@ def _build_stage_a_strata_overview_figure(
     return fig, ax_left, ax_right
 
 
-def plot_stage_a_strata_overview(
+def plot_stage_a_summary(
     df: pd.DataFrame,
     out_path: Path,
     *,
@@ -1587,7 +992,7 @@ def plot_stage_a_strata_overview(
     style: Optional[dict] = None,
 ) -> list[Path]:
     if pools is None or pool_manifest is None:
-        raise ValueError("Stage-A plots require pool manifests; run stage-a build-pool first.")
+        raise ValueError("Stage-A summary requires pool manifests; run stage-a build-pool first.")
     raw_style = style or {}
     style = _style(raw_style)
     if "figsize" not in raw_style:
@@ -1609,520 +1014,221 @@ def plot_stage_a_strata_overview(
         fig.savefig(path)
         plt.close(fig)
         paths.append(path)
+
+        eligible_hist = sampling.get("eligible_score_hist") or []
+        if not eligible_hist:
+            raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
+        regs = []
+        ratios = []
+        for row in eligible_hist:
+            reg = str(row.get("regulator") or "")
+            generated = row.get("generated")
+            hit = row.get("candidates_with_hit")
+            eligible = row.get("eligible")
+            unique = row.get("unique_eligible")
+            retained = row.get("retained")
+            if generated in (None, 0):
+                raise ValueError(f"Stage-A sampling missing generated counts for input '{input_name}'.")
+            if any(val is None for val in (hit, eligible, unique, retained)):
+                raise ValueError(f"Stage-A sampling missing yield counters for input '{input_name}'.")
+            regs.append(reg)
+            ratios.append(
+                [
+                    float(hit) / float(generated),
+                    float(eligible) / float(generated),
+                    float(unique) / float(generated),
+                    float(retained) / float(generated),
+                ]
+            )
+
+        fig2, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(11, 4.2))
+        heat = np.asarray(ratios, dtype=float) if ratios else np.zeros((0, 4), dtype=float)
+        if heat.size == 0:
+            ax_left.text(0.5, 0.5, "No yield data", ha="center", va="center", transform=ax_left.transAxes)
+            ax_left.set_axis_off()
+        else:
+            sns.heatmap(
+                heat,
+                ax=ax_left,
+                cmap="Blues",
+                cbar=True,
+                vmin=0.0,
+                vmax=1.0,
+                xticklabels=["hit/gen", "eligible/gen", "unique/gen", "retained/gen"],
+                yticklabels=regs,
+            )
+            ax_left.set_title("Yield + dedupe ratios")
+            ax_left.set_xlabel("Stage")
+            ax_left.set_ylabel("Regulator")
+
+        if "tfbs_sequence" in pool_df.columns:
+            tfbs_col = "tfbs_sequence"
+        elif "tfbs" in pool_df.columns:
+            tfbs_col = "tfbs"
+        else:
+            raise ValueError(f"Stage-A pool missing tfbs_sequence or tfbs for input '{input_name}'.")
+        scores = pd.to_numeric(pool_df.get("best_hit_score"), errors="coerce")
+        if scores is None or scores.dropna().empty:
+            raise ValueError(f"Stage-A pool missing best_hit_score for input '{input_name}'.")
+        seqs = pool_df[tfbs_col].astype(str)
+        lengths = seqs.map(len)
+        gc = seqs.map(_gc_fraction)
+        ax_right.scatter(lengths, scores, c=gc, cmap="viridis", alpha=0.6, s=18)
+        ax_right.set_xlabel("TFBS length (nt)")
+        ax_right.set_ylabel("Best-hit score")
+        ax_right.set_title("Score vs length (GC-colored)")
+        sm = plt.cm.ScalarMappable(cmap="viridis", norm=mpl.colors.Normalize(vmin=0.0, vmax=1.0))
+        fig2.colorbar(sm, ax=ax_right, fraction=0.046, pad=0.04, label="GC fraction")
+        _apply_style(ax_left, style)
+        _apply_style(ax_right, style)
+        fig2.tight_layout()
+        fname = f"{out_path.stem}__{_safe_filename(input_name)}__yield_bias{out_path.suffix}"
+        path2 = out_path.parent / fname
+        fig2.savefig(path2)
+        plt.close(fig2)
+        paths.append(path2)
     return paths
 
 
-def plot_run_timeline_funnel(
+def plot_stage_b_summary(
     df: pd.DataFrame,
     out_path: Path,
     *,
-    attempts_df: pd.DataFrame | None = None,
-    events_df: pd.DataFrame | None = None,
+    library_builds_df: pd.DataFrame,
+    library_members_df: pd.DataFrame,
+    composition_df: pd.DataFrame,
+    cfg: dict | None = None,
     style: Optional[dict] = None,
-    bins: int = 50,
-) -> None:
-    if attempts_df is None or attempts_df.empty:
-        raise ValueError("Run timeline funnel requires attempts.parquet data.")
-    if events_df is None or events_df.empty:
-        raise ValueError("Run timeline funnel requires events.jsonl data.")
-    raw_style = style or {}
-    style = _style(raw_style)
-    if "figsize" not in raw_style:
-        style["figsize"] = (11, 4)
-    required_attempt_cols = {"created_at", "status", "attempt_index"}
-    missing_attempts = required_attempt_cols - set(attempts_df.columns)
-    if missing_attempts:
-        raise ValueError(f"Run timeline funnel requires attempts columns: {sorted(missing_attempts)}")
-    required_event_cols = {"created_at", "event"}
-    missing_events = required_event_cols - set(events_df.columns)
-    if missing_events:
-        raise ValueError(f"Run timeline funnel requires events columns: {sorted(missing_events)}")
-    attempts = attempts_df.copy()
-    attempts["created_at"] = pd.to_datetime(attempts["created_at"], utc=True, errors="coerce")
-    attempts = attempts.dropna(subset=["created_at"])
-    if attempts.empty:
-        raise ValueError("Run timeline funnel requires valid attempt timestamps.")
-    attempts["attempt_index"] = pd.to_numeric(attempts["attempt_index"], errors="coerce")
-    attempts = attempts.dropna(subset=["attempt_index"])
-    if attempts.empty:
-        raise ValueError("Run timeline funnel requires valid attempt_index values.")
-    t_min = attempts["created_at"].min()
-    t_max = attempts["created_at"].max()
-    duration = max(0.0, (t_max - t_min).total_seconds())
-    bin_count = max(1, min(int(bins), len(attempts)))
-    bin_seconds = max(1, int(math.ceil(duration / bin_count))) if duration > 0 else 1
-    attempts["bucket"] = attempts["created_at"].dt.floor(f"{bin_seconds}s")
-    counts = attempts.groupby(["bucket", "status"]).size().unstack(fill_value=0)
-    statuses = ["success", "duplicate", "failed", "rejected"]
-    for status in statuses:
-        if status not in counts.columns:
-            counts[status] = 0
-    counts = counts[statuses]
-    idx_min = int(attempts["attempt_index"].min())
-    idx_max = int(attempts["attempt_index"].max())
-    idx_span = max(0, idx_max - idx_min)
-    idx_bins = max(1, min(int(bins), len(attempts)))
-    idx_bin_size = max(1, int(math.ceil(idx_span / idx_bins))) if idx_span > 0 else 1
-    attempts["index_bucket"] = ((attempts["attempt_index"] - idx_min) // idx_bin_size) * idx_bin_size + idx_min
-    counts_idx = attempts.groupby(["index_bucket", "status"]).size().unstack(fill_value=0)
-    for status in statuses:
-        if status not in counts_idx.columns:
-            counts_idx[status] = 0
-    counts_idx = counts_idx[statuses]
-
-    fig, (ax_time, ax_idx) = plt.subplots(1, 2, figsize=style["figsize"])
-    ax_time.stackplot(
-        counts.index,
-        [counts[col].to_numpy() for col in statuses],
-        labels=statuses,
-        alpha=0.7,
-    )
-    ax_idx.stackplot(
-        counts_idx.index,
-        [counts_idx[col].to_numpy() for col in statuses],
-        labels=statuses,
-        alpha=0.7,
-    )
-
-    events = events_df.copy()
-    events["created_at"] = pd.to_datetime(events["created_at"], utc=True, errors="coerce")
-    events = events.dropna(subset=["created_at"])
-    if not events.empty:
-        for _, row in events.iterrows():
-            label = str(row.get("event"))
-            style_map = {
-                "RESAMPLE_TRIGGERED": ("--", "#333333"),
-                "STALL_DETECTED": (":", "#666666"),
-            }
-            linestyle, color = style_map.get(label, ("-.", "#999999"))
-            ax_time.axvline(row["created_at"], color=color, linestyle=linestyle, linewidth=1)
-    ax_time.set_title("Run timeline (time)")
-    ax_time.set_xlabel("Time")
-    ax_time.set_ylabel("Attempts per bin")
-    ax_idx.set_title("Run timeline (attempt index)")
-    ax_idx.set_xlabel("Attempt index")
-    ax_idx.set_ylabel("Attempts per bin")
-    _apply_style(ax_time, style)
-    _apply_style(ax_idx, style)
-    fig.tight_layout()
-    fig.savefig(out_path)
-    plt.close(fig)
-
-
-def plot_run_failure_pareto(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    attempts_df: pd.DataFrame | None = None,
-    style: Optional[dict] = None,
-    top_n: int = 8,
-) -> None:
-    if attempts_df is None or attempts_df.empty:
-        raise ValueError("Failure Pareto requires attempts.parquet data.")
-    raw_style = style or {}
-    style = _style(raw_style)
-    if "figsize" not in raw_style:
-        style["figsize"] = (12, 4.5)
-    required_cols = {"status", "reason", "plan_name", "sampling_library_index"}
-    missing = required_cols - set(attempts_df.columns)
+) -> list[Path]:
+    if library_builds_df is None or library_builds_df.empty:
+        raise ValueError("stage_b_summary requires library_builds.parquet data.")
+    if library_members_df is None or library_members_df.empty:
+        raise ValueError("stage_b_summary requires library_members.parquet data.")
+    if composition_df is None or composition_df.empty:
+        raise ValueError("stage_b_summary requires composition.parquet data.")
+    required_build_cols = {"input_name", "plan_name", "library_index", "library_hash", "slack_bp"}
+    missing = required_build_cols - set(library_builds_df.columns)
     if missing:
-        raise ValueError(f"Failure Pareto requires attempts columns: {sorted(missing)}")
-    failures = attempts_df[attempts_df["status"].astype(str) != "success"]
-    if failures.empty:
-        raise ValueError("Failure Pareto requires non-success attempts.")
-    counts = failures["reason"].astype(str).value_counts().head(int(top_n))
-    if counts.empty:
-        raise ValueError("Failure Pareto requires failure reasons.")
-    cum = counts.cumsum() / counts.sum()
-    fig, (ax_left, ax_mid, ax_right) = plt.subplots(1, 3, figsize=style["figsize"])
-    ax_left.bar(counts.index, counts.values, color="#4c78a8")
-    ax_left.set_title("Failure reasons (Pareto)")
-    ax_left.set_xlabel("Reason")
-    ax_left.set_ylabel("Count")
-    ax_left.tick_params(axis="x", rotation=30)
-    ax_left_twin = ax_left.twinx()
-    ax_left_twin.plot(counts.index, cum.values, color="#e45756", marker="o")
-    ax_left_twin.set_ylabel("Cumulative share")
-    ax_left_twin.set_ylim(0, 1.05)
-
-    by_plan = failures.groupby(["plan_name", "reason"]).size().unstack(fill_value=0)
-    by_plan = by_plan.loc[:, counts.index]
-    sns.heatmap(by_plan, ax=ax_mid, cmap="Blues", cbar=False, annot=True, fmt="d")
-    ax_mid.set_title("Failures by plan")
-    ax_mid.set_xlabel("Reason")
-    ax_mid.set_ylabel("Plan")
-
-    by_library = failures.groupby(["sampling_library_index", "reason"]).size().unstack(fill_value=0)
-    by_library = by_library.loc[:, counts.index]
-    sns.heatmap(by_library, ax=ax_right, cmap="Purples", cbar=False, annot=True, fmt="d")
-    ax_right.set_title("Failures by library")
-    ax_right.set_xlabel("Reason")
-    ax_right.set_ylabel("Library index")
-    _apply_style(ax_left, style)
-    _apply_style(ax_mid, style)
-    _apply_style(ax_right, style)
-    fig.tight_layout()
-    fig.savefig(out_path)
-    plt.close(fig)
-
-
-def plot_stage_b_library_health(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    run_metrics_df: pd.DataFrame | None = None,
-    style: Optional[dict] = None,
-) -> list[Path]:
-    if run_metrics_df is None or run_metrics_df.empty:
-        raise ValueError("Stage-B library health requires run_metrics.parquet data.")
-    health = run_metrics_df[run_metrics_df["metric_group"] == "library_health"]
-    if health.empty:
-        raise ValueError("Stage-B library health metrics missing from run_metrics.parquet.")
+        raise ValueError(f"library_builds.parquet missing required columns: {sorted(missing)}")
+    required_member_cols = {"input_name", "plan_name", "library_index", "tf", "tfbs"}
+    missing = required_member_cols - set(library_members_df.columns)
+    if missing:
+        raise ValueError(f"library_members.parquet missing required columns: {sorted(missing)}")
+    required_comp_cols = {"input_name", "plan_name", "solution_id", "tf", "tfbs"}
+    missing = required_comp_cols - set(composition_df.columns)
+    if missing:
+        raise ValueError(f"composition.parquet missing required columns: {sorted(missing)}")
     raw_style = style or {}
     style = _style(raw_style)
     if "figsize" not in raw_style:
-        style["figsize"] = (12, 8)
-    metrics = [
-        ("unique_tf_count", "Unique TFs"),
-        ("unique_tfbs_count", "Unique TFBS"),
-        ("tf_entropy", "TF entropy"),
-        ("max_tf_dominance", "Max TF dominance"),
-        ("score_median", "Median score"),
-        ("score_mean", "Mean score"),
-        ("tfbs_length_sum", "TFBS length sum"),
-        ("slack_bp", "Slack bp"),
-    ]
+        style["figsize"] = (14, 7)
     paths: list[Path] = []
-    for (input_name, plan_name), sub in health.groupby(["input_name", "plan_name"]):
-        sub = sub.sort_values("library_index")
-        fig, axes = plt.subplots(2, 4, figsize=style["figsize"])
-        axes = axes.flatten()
-        for ax, (col, label) in zip(axes, metrics):
-            series = pd.to_numeric(sub[col], errors="coerce")
-            if series.dropna().empty:
-                ax.text(0.5, 0.5, "n/a", ha="center", va="center", transform=ax.transAxes)
-                ax.set_title(label)
-                ax.set_xticks([])
-                ax.set_yticks([])
-                continue
-            ax.plot(sub["library_index"], series, marker="o")
-            if col == "slack_bp":
-                ax.axhline(0.0, color="#444444", linewidth=1, linestyle="--")
-            ax.set_title(label)
-            ax.set_xlabel("library_index")
-        fig.suptitle(f"Stage-B library health — {input_name}/{plan_name}")
-        for ax in axes:
-            _apply_style(ax, style)
-        fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-        fname = f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}{out_path.suffix}"
-        path = out_path.parent / fname
-        fig.savefig(path)
-        plt.close(fig)
-        paths.append(path)
-    return paths
 
-
-def plot_stage_a_score_traceability(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    run_metrics_df: pd.DataFrame | None = None,
-    style: Optional[dict] = None,
-) -> list[Path]:
-    if run_metrics_df is None or run_metrics_df.empty:
-        raise ValueError("Stage-A score traceability requires run_metrics.parquet data.")
-    tiers = run_metrics_df[run_metrics_df["metric_group"] == "tier_enrichment"]
-    quantiles = run_metrics_df[run_metrics_df["metric_group"] == "quantile_enrichment"]
-    if tiers.empty or quantiles.empty:
-        raise ValueError("Stage-A score traceability metrics missing from run_metrics.parquet.")
-    raw_style = style or {}
-    style = _style(raw_style)
-    if "figsize" not in raw_style:
-        style["figsize"] = (12, 4.5)
-    paths: list[Path] = []
-    for input_name, tier_df in tiers.groupby("input_name"):
-        quant_df = quantiles[quantiles["input_name"] == input_name]
-        fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=style["figsize"])
-        tier_order = sorted(tier_df["tier"].dropna().unique().tolist())
-        tf_labels = sorted(tier_df["tf"].dropna().unique().tolist())
-        width = 0.8 / max(1, len(tier_order))
-        x = np.arange(len(tf_labels))
-        for idx, tier in enumerate(tier_order):
-            subset = tier_df[tier_df["tier"] == tier]
-            rates = []
-            for tf in tf_labels:
-                tf_subset = subset[subset["tf"] == tf]
-                if tf_subset.empty:
-                    rates.append(0.0)
-                else:
-                    rates.append(float(tf_subset["usage_rate"].iloc[0]))
-            ax_left.bar(x + idx * width, rates, width=width, label=f"tier {tier}")
-        ax_left.set_xticks(x + width * (len(tier_order) - 1) / 2)
-        ax_left.set_xticklabels(tf_labels, rotation=30)
-        ax_left.set_ylabel("Usage rate")
-        ax_left.set_title("Tier usage rate")
-        ax_left.legend()
-
-        for tf, sub in quant_df.groupby("tf"):
-            sub = sub.sort_values("quantile")
-            ax_right.plot(sub["quantile"], sub["enrichment"], marker="o", label=str(tf))
-        ax_right.axhline(1.0, color="#444444", linestyle="--", linewidth=1)
-        ax_right.set_xlabel("Score quantile")
-        ax_right.set_ylabel("Enrichment (used vs pool)")
-        ax_right.set_title("Score quantile enrichment")
-        ax_right.legend()
-
-        fig.suptitle(f"Stage-A score traceability — {input_name}")
-        _apply_style(ax_left, style)
-        _apply_style(ax_right, style)
-        fig.tight_layout(rect=[0, 0.05, 1, 0.92])
-        fname = f"{out_path.stem}__{_safe_filename(input_name)}{out_path.suffix}"
-        path = out_path.parent / fname
-        fig.savefig(path)
-        plt.close(fig)
-        paths.append(path)
-    return paths
-
-
-def plot_stage_b_offered_vs_used(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    run_metrics_df: pd.DataFrame | None = None,
-    style: Optional[dict] = None,
-) -> list[Path]:
-    if run_metrics_df is None or run_metrics_df.empty:
-        raise ValueError("Stage-B offered vs used requires run_metrics.parquet data.")
-    offered = run_metrics_df[run_metrics_df["metric_group"] == "offered_vs_used_tf"]
-    health = run_metrics_df[run_metrics_df["metric_group"] == "library_health"]
-    if offered.empty:
-        raise ValueError("Stage-B offered vs used metrics missing from run_metrics.parquet.")
-    raw_style = style or {}
-    style = _style(raw_style)
-    if "figsize" not in raw_style:
-        style["figsize"] = (11, 4.5)
-    paths: list[Path] = []
-    for (input_name, plan_name), sub in offered.groupby(["input_name", "plan_name"]):
-        pivot = sub.pivot_table(
-            index="library_index",
-            columns="tf",
-            values="used_fraction",
-            aggfunc="mean",
-        ).fillna(0.0)
-        fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=style["figsize"])
-        sns.heatmap(pivot, ax=ax_left, cmap="viridis", cbar=True)
-        ax_left.set_title("Used fraction (offered vs used)")
-        ax_left.set_xlabel("TF")
-        ax_left.set_ylabel("Library index")
-
-        health_sub = health[(health["input_name"] == input_name) & (health["plan_name"] == plan_name)]
-        if not health_sub.empty:
-            ax_right.bar(
-                health_sub["library_index"].astype(int),
-                pd.to_numeric(health_sub["never_used_tfbs_fraction"], errors="coerce").fillna(0.0),
-                color="#e45756",
+    for (input_name, plan_name), builds in library_builds_df.groupby(["input_name", "plan_name"]):
+        members = library_members_df[
+            (library_members_df["input_name"].astype(str) == str(input_name))
+            & (library_members_df["plan_name"].astype(str) == str(plan_name))
+        ]
+        if members.empty:
+            raise ValueError(f"library_members.parquet missing rows for {input_name}/{plan_name}.")
+        metrics = members.groupby(["library_index", "library_hash"]).agg(
+            library_size=("tfbs", "size"),
+            unique_tfbs_count=("tfbs", pd.Series.nunique),
+            total_bp=("tfbs", lambda x: int(sum(len(str(v)) for v in x))),
+        )
+        metrics = metrics.reset_index()
+        merged = builds.merge(metrics, on=["library_index", "library_hash"], how="left")
+        if "library_size_x" in merged.columns and "library_size_y" in merged.columns:
+            merged["library_size"] = pd.to_numeric(merged["library_size_x"], errors="coerce").fillna(
+                pd.to_numeric(merged["library_size_y"], errors="coerce")
             )
-        ax_right.set_title("Never-used TFBS fraction")
-        ax_right.set_xlabel("Library index")
-        ax_right.set_ylabel("Fraction")
+        elif "library_size_x" in merged.columns:
+            merged["library_size"] = merged["library_size_x"]
+        elif "library_size_y" in merged.columns:
+            merged["library_size"] = merged["library_size_y"]
 
-        fig.suptitle(f"Stage-B offered vs used — {input_name}/{plan_name}")
-        _apply_style(ax_left, style)
-        _apply_style(ax_right, style)
-        fig.tight_layout(rect=[0, 0.05, 1, 0.92])
-        fname = f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}{out_path.suffix}"
-        path = out_path.parent / fname
-        fig.savefig(path)
-        plt.close(fig)
-        paths.append(path)
-
-        for library_index, lib_sub in sub.groupby("library_index"):
-            fig, ax = _fig_ax(style)
-            tf_labels = sorted(lib_sub["tf"].astype(str).unique().tolist())
-            offered_counts = [
-                int(lib_sub[lib_sub["tf"] == tf]["offered_count"].iloc[0])
-                if not lib_sub[lib_sub["tf"] == tf].empty
-                else 0
-                for tf in tf_labels
+        offered_counts = members.groupby(["tf", "tfbs"])["library_index"].nunique().rename("offered_count")
+        used_counts = (
+            composition_df[
+                (composition_df["input_name"].astype(str) == str(input_name))
+                & (composition_df["plan_name"].astype(str) == str(plan_name))
             ]
-            used_counts = [
-                int(lib_sub[lib_sub["tf"] == tf]["used_count"].iloc[0]) if not lib_sub[lib_sub["tf"] == tf].empty else 0
-                for tf in tf_labels
-            ]
-            x = np.arange(len(tf_labels))
-            width = 0.35
-            ax.bar(x - width / 2, offered_counts, width=width, label="offered")
-            ax.bar(x + width / 2, used_counts, width=width, label="used")
-            ax.set_xticks(x)
-            ax.set_xticklabels(tf_labels, rotation=30)
-            ax.set_ylabel("Count")
-            never_used = health[
-                (health["input_name"] == input_name)
-                & (health["plan_name"] == plan_name)
-                & (health["library_index"] == library_index)
-            ]
-            never_label = ""
-            if not never_used.empty:
-                frac = pd.to_numeric(never_used["never_used_tfbs_fraction"], errors="coerce").iloc[0]
-                if pd.notna(frac):
-                    never_label = f" • never-used TFBS={float(frac):.2f}"
-            ax.set_title(f"Offered vs used — lib {library_index}{never_label}")
-            ax.legend(loc="best", frameon=bool(style.get("legend_frame", False)))
-            _apply_style(ax, style)
-            fig.tight_layout()
-            fname = (
-                f"{out_path.stem}__{_safe_filename(input_name)}"
-                f"__{_safe_filename(plan_name)}__lib{int(library_index)}{out_path.suffix}"
-            )
-            path = out_path.parent / fname
-            fig.savefig(path)
-            plt.close(fig)
-            paths.append(path)
-    return paths
+            .groupby(["tf", "tfbs"])["solution_id"]
+            .nunique()
+            .rename("used_count")
+        )
+        offered_vs_used = pd.concat([offered_counts, used_counts], axis=1).fillna(0)
+        offered_vs_used["ratio"] = offered_vs_used.apply(
+            lambda row: float(row["used_count"]) / float(row["offered_count"]) if row["offered_count"] > 0 else 0.0,
+            axis=1,
+        )
 
+        fig, axes = plt.subplots(2, 3, figsize=style["figsize"])
+        ax_slack, ax_size, ax_unique, ax_bp, ax_scatter, ax_ratio = axes.flatten()
 
-def plot_stage_b_library_slack(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    run_metrics_df: pd.DataFrame | None = None,
-    style: Optional[dict] = None,
-) -> list[Path]:
-    if run_metrics_df is None or run_metrics_df.empty:
-        raise ValueError("Stage-B library slack requires run_metrics.parquet data.")
-    health = run_metrics_df[run_metrics_df["metric_group"] == "library_health"]
-    if health.empty:
-        raise ValueError("Stage-B library slack metrics missing from run_metrics.parquet.")
-    raw_style = style or {}
-    style = _style(raw_style)
-    if "figsize" not in raw_style:
-        style["figsize"] = (7, 4)
-    paths: list[Path] = []
-    for (input_name, plan_name), sub in health.groupby(["input_name", "plan_name"]):
-        slack = pd.to_numeric(sub["slack_bp"], errors="coerce").dropna()
+        slack = pd.to_numeric(merged["slack_bp"], errors="coerce").dropna()
         if slack.empty:
-            raise ValueError("Stage-B library slack requires numeric slack_bp values.")
-        fig, ax = _fig_ax(style)
-        ax.hist(slack, bins="auto", color="#4c78a8", alpha=0.8)
-        ax.axvline(0.0, color="#e45756", linestyle="--", linewidth=1)
-        ax.set_title(f"Library slack distribution — {input_name}/{plan_name}")
-        ax.set_xlabel("Slack bp (sequence length - fixed bp - TFBS bp)")
-        ax.set_ylabel("Library count")
-        _apply_style(ax, style)
-        fig.tight_layout()
-        fname = f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}{out_path.suffix}"
-        path = out_path.parent / fname
-        fig.savefig(path)
-        plt.close(fig)
-        paths.append(path)
-    return paths
+            ax_slack.text(0.5, 0.5, "No slack data", ha="center", va="center", transform=ax_slack.transAxes)
+        else:
+            ax_slack.hist(slack, bins="auto", color="#4c78a8", alpha=0.8)
+            ax_slack.axvline(0.0, color="#e15759", linestyle="--", linewidth=1)
+        ax_slack.set_title("Slack distribution")
+        ax_slack.set_xlabel("Slack bp")
+        ax_slack.set_ylabel("Libraries")
 
+        sizes = pd.to_numeric(merged["library_size"], errors="coerce").dropna()
+        if sizes.empty:
+            ax_size.text(0.5, 0.5, "No size data", ha="center", va="center", transform=ax_size.transAxes)
+        else:
+            ax_size.hist(sizes, bins="auto", color="#59a14f", alpha=0.8)
+        ax_size.set_title("Library size")
+        ax_size.set_xlabel("TFBS per library")
+        ax_size.set_ylabel("Libraries")
 
-def plot_stage_b_sampling_pressure(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    run_metrics_df: pd.DataFrame | None = None,
-    style: Optional[dict] = None,
-) -> list[Path]:
-    if run_metrics_df is None or run_metrics_df.empty:
-        raise ValueError("Stage-B sampling pressure requires run_metrics.parquet data.")
-    pressure = run_metrics_df[run_metrics_df["metric_group"] == "sampling_pressure"]
-    if pressure.empty:
-        raise ValueError("Stage-B sampling pressure metrics missing from run_metrics.parquet.")
-    raw_style = style or {}
-    style = _style(raw_style)
-    if "figsize" not in raw_style:
-        style["figsize"] = (10, 4.5)
-    paths: list[Path] = []
-    for (input_name, plan_name), sub in pressure.groupby(["input_name", "plan_name"]):
-        pivot = sub.pivot_table(
-            index="library_index",
-            columns="tf",
-            values="weight_fraction",
-            aggfunc="mean",
-        ).fillna(0.0)
-        fig, ax = _fig_ax(style)
-        sns.heatmap(pivot, ax=ax, cmap="viridis", cbar=True)
-        ax.set_title(f"Sampling pressure — {input_name}/{plan_name}")
-        ax.set_xlabel("TF")
-        ax.set_ylabel("Library index")
-        _apply_style(ax, style)
-        fig.tight_layout()
-        fname = f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}{out_path.suffix}"
-        path = out_path.parent / fname
-        fig.savefig(path)
-        plt.close(fig)
-        paths.append(path)
-    return paths
+        uniques = pd.to_numeric(merged["unique_tfbs_count"], errors="coerce").dropna()
+        if uniques.empty:
+            ax_unique.text(0.5, 0.5, "No TFBS counts", ha="center", va="center", transform=ax_unique.transAxes)
+        else:
+            ax_unique.hist(uniques, bins="auto", color="#f28e2b", alpha=0.8)
+        ax_unique.set_title("Unique TFBS count")
+        ax_unique.set_xlabel("Unique TFBS per library")
+        ax_unique.set_ylabel("Libraries")
 
+        total_bp = pd.to_numeric(merged["total_bp"], errors="coerce").dropna()
+        if total_bp.empty:
+            ax_bp.text(0.5, 0.5, "No bp data", ha="center", va="center", transform=ax_bp.transAxes)
+        else:
+            ax_bp.hist(total_bp, bins="auto", color="#edc949", alpha=0.8)
+        ax_bp.set_title("Total TFBS bp")
+        ax_bp.set_xlabel("Total TFBS bp")
+        ax_bp.set_ylabel("Libraries")
 
-def plot_tfbs_positional_occupancy(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    top_k: int = 10,
-    normalize: bool = True,
-    cfg: Optional[dict] = None,
-    style: Optional[dict] = None,
-) -> list[Path]:
-    if cfg is None:
-        raise ValueError("tfbs_positional_occupancy requires cfg.")
-    det_col = _dg("used_tfbs_detail")
-    if det_col not in df.columns:
-        raise ValueError("tfbs_positional_occupancy requires densegen__used_tfbs_detail.")
-    if "length" in df.columns:
-        L = int(pd.to_numeric(df["length"], errors="coerce").dropna().max())
-    elif _dg("sequence_length") in df.columns:
-        L = int(pd.to_numeric(df[_dg("sequence_length")], errors="coerce").dropna().max())
-    elif "sequence" in df.columns:
-        L = int(df["sequence"].astype(str).map(len).max())
-    else:
-        raise ValueError("Cannot infer sequence length for tfbs_positional_occupancy.")
-    input_col = _dg("input_name")
-    plan_col = _dg("plan")
-    if input_col not in df.columns or plan_col not in df.columns:
-        raise ValueError("tfbs_positional_occupancy requires densegen__input_name and densegen__plan.")
-    paths: list[Path] = []
-    for (input_name, plan_name), sub in df.groupby([input_col, plan_col]):
-        coverages: Dict[str, np.ndarray] = {}
-        n_seqs = len(sub)
-        for row in sub[det_col].dropna():
-            for d in _ensure_list_of_dicts(row):
-                tf = str(d.get("tf") or "").strip()
-                tfbs = str(d.get("tfbs") or "")
-                if not tf or not tfbs:
-                    continue
-                start = int(float(d.get("offset", 0)))
-                span = len(tfbs)
-                if span <= 0:
-                    continue
-                start = max(0, min(start, L))
-                end = min(L, start + span)
-                if end <= start:
-                    continue
-                coverages.setdefault(tf, np.zeros(L, dtype=float))[start:end] += 1.0
-        if not coverages:
-            raise ValueError("No positional TFBS occupancy available.")
-        order = sorted(coverages.items(), key=lambda kv: kv[1].sum(), reverse=True)[: max(1, int(top_k))]
-        style = _style(style)
-        fig, ax = _fig_ax(style)
-        colors = _palette(style, len(order))
-        xs = np.arange(L)
-        for (tf, arr), color in zip(order, colors):
-            y = arr.astype(float)
-            if normalize and n_seqs > 0:
-                y = y / float(n_seqs)
-            ax.plot(xs, y, linewidth=2.0, label=tf, color=color)
-        ranges = _extract_fixed_element_ranges(cfg, str(plan_name))
-        for label, lo, hi in ranges:
-            ax.axvspan(lo, hi, color="#cccccc", alpha=0.25, label=label)
-        ax.set_xlabel("Position (nt)")
-        ax.set_ylabel("Occupancy" + (" (normalized)" if normalize else ""))
-        ax.set_title(f"TFBS positional occupancy — {input_name}/{plan_name}")
-        ax.legend(loc="best", frameon=bool(style.get("legend_frame", False)))
-        _apply_style(ax, style)
-        fig.tight_layout()
+        if offered_vs_used.empty:
+            ax_scatter.text(0.5, 0.5, "No offered/used data", ha="center", va="center", transform=ax_scatter.transAxes)
+        else:
+            x = offered_vs_used["offered_count"].to_numpy(dtype=float)
+            y = offered_vs_used["used_count"].to_numpy(dtype=float)
+            if len(offered_vs_used) > 200:
+                ax_scatter.hexbin(x, y, gridsize=35, cmap="Blues", mincnt=1)
+            else:
+                ax_scatter.scatter(x, y, alpha=0.6, s=18, color="#4c78a8")
+        ax_scatter.set_title("Offered vs used (TFBS)")
+        ax_scatter.set_xlabel("Offered count")
+        ax_scatter.set_ylabel("Used count")
+
+        ratios = pd.to_numeric(offered_vs_used["ratio"], errors="coerce").dropna()
+        if ratios.empty:
+            ax_ratio.text(0.5, 0.5, "No ratio data", ha="center", va="center", transform=ax_ratio.transAxes)
+        else:
+            ax_ratio.hist(ratios, bins="auto", color="#af7aa1", alpha=0.8)
+        ax_ratio.set_title("Used / offered ratio")
+        ax_ratio.set_xlabel("Used / offered")
+        ax_ratio.set_ylabel("TFBS count")
+
+        for ax in axes.flatten():
+            _apply_style(ax, style)
+        fig.suptitle(f"Stage-B summary — {input_name}/{plan_name}")
+        fig.tight_layout(rect=[0, 0.03, 1, 0.92])
         fname = f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}{out_path.suffix}"
         path = out_path.parent / fname
         fig.savefig(path)
@@ -2148,68 +1254,11 @@ for _name, _spec in PLOT_SPECS.items():
 
 # Options explicitly supported by each plot; unknown options raise errors (strict).
 _ALLOWED_OPTIONS = {
-    "compression_ratio": {"bins"},
-    "tf_usage": {"mode", "max_segments", "top_k_tfs", "exclude_tfbs", "length_cmap"},
-    "tfbs_usage": {"max_sites", "couple_sigma_pairs", "exclude_tfbs"},
-    "plan_counts": {"stacked_by_day", "created_at_col"},
-    "tf_coverage": {
-        "top_k",
-        "normalize",
-        "stacked",
-        "include_promoter_sites",
-        "alpha",
-        "edge_alpha",
-        "edge_width",
-        "edge_color",
-        "promoter_edge_alpha",
-        "promoter_edge_style",
-        "promoter_on_top",
-        "promoter_zorder",
-        "edge_on",
-        "edge_dark_factor",
-        # 'cfg' and 'style' are injected, not read from options
-    },
-    "tfbs_positional_frequency": {
-        "top_k",
-        "normalize",
-        "include_promoter_sites",
-        # 'cfg' and 'style' are injected, not read from options
-    },
-    "tfbs_positional_histogram": {
-        "top_k",
-        "normalize",
-        "include_promoter_sites",
-        "alpha",
-        "edge_alpha",
-        "edge_width",
-        # 'cfg' and 'style' are injected, not read from options
-    },
-    "diversity_health": {
-        "created_at_col",
-        "normalize",
-        "show_unique_tfs",
-        "show_unique_tfbs",
-        "show_entropy",
-    },
-    "tfbs_length_density": {
-        "bins",
-        "kde",
-        "kde_bandwidth",
-        "kde_points",
-        "fill_alpha",
-        "include_promoter_sites",
-        "promoter_site_motifs",
-    },
-    "pad_gc": set(),
-    "stage_a_strata_overview": set(),
-    "run_timeline_funnel": set(),
-    "run_failure_pareto": set(),
-    "stage_b_library_health": set(),
-    "stage_b_library_slack": set(),
-    "stage_a_score_traceability": set(),
-    "stage_b_offered_vs_used": set(),
-    "stage_b_sampling_pressure": set(),
-    "tfbs_positional_occupancy": {"top_k", "normalize"},
+    "placement_map": set(),
+    "tfbs_usage": set(),
+    "run_health": set(),
+    "stage_a_summary": set(),
+    "stage_b_summary": set(),
 }
 
 
@@ -2228,57 +1277,7 @@ def _filter_kwargs(name: str, kwargs: dict) -> dict:
 
 
 def _plot_required_columns(selected: Iterable[str], options: Dict[str, Dict[str, object]]) -> list[str]:
-    cols: set[str] = set()
-    for name in selected:
-        raw = options.get(name, {}) if options else {}
-        if name in {
-            "stage_a_strata_overview",
-            "run_timeline_funnel",
-            "run_failure_pareto",
-            "stage_b_library_health",
-            "stage_b_library_slack",
-            "stage_a_score_traceability",
-            "stage_b_offered_vs_used",
-            "stage_b_sampling_pressure",
-        }:
-            continue
-        if name == "compression_ratio":
-            cols.add(_dg("compression_ratio"))
-        elif name == "tf_usage":
-            cols.update({_dg("used_tf_counts"), _dg("used_tfbs_detail")})
-        elif name == "pad_gc":
-            cols.update({_dg("pad_used"), _dg("pad_gc_actual"), _dg("pad_bases")})
-        elif name == "plan_counts":
-            cols.add(_dg("plan"))
-            created_col = str(raw.get("created_at_col", _dg("created_at")))
-            cols.add(created_col)
-        elif name == "tf_coverage":
-            cols.update({_dg("used_tfbs_detail"), _dg("length"), _dg("sequence_length")})
-            include_promoter = bool(raw.get("include_promoter_sites", True))
-            if include_promoter:
-                cols.add("sequence")
-        elif name == "tfbs_positional_frequency":
-            cols.update({_dg("used_tfbs_detail"), _dg("length"), _dg("sequence_length")})
-            include_promoter = bool(raw.get("include_promoter_sites", True))
-            if include_promoter:
-                cols.add("sequence")
-        elif name == "tfbs_positional_histogram":
-            cols.update({_dg("used_tfbs_detail"), _dg("length"), _dg("sequence_length")})
-            include_promoter = bool(raw.get("include_promoter_sites", True))
-            if include_promoter:
-                cols.add("sequence")
-        elif name == "diversity_health":
-            cols.add(_dg("used_tfbs_detail"))
-            created_col = str(raw.get("created_at_col", _dg("created_at")))
-            cols.add(created_col)
-        elif name == "tfbs_length_density":
-            cols.add(_dg("used_tfbs_detail"))
-        elif name == "tfbs_usage":
-            cols.update({_dg("used_tfbs"), _dg("used_tfbs_detail")})
-        elif name == "tfbs_positional_occupancy":
-            cols.update({_dg("used_tfbs_detail"), _dg("input_name"), _dg("plan")})
-            cols.update({_dg("sequence_length"), "sequence"})
-    return sorted(cols)
+    return []
 
 
 def _plot_required_sources(selected: Iterable[str]) -> set[str]:
@@ -2304,7 +1303,9 @@ def run_plots_from_config(
     run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
     out_dir = _ensure_out_dir(plots_cfg, cfg_path, run_root)
     plot_format = plots_cfg.format if plots_cfg and getattr(plots_cfg, "format", None) else "png"
-    default_list = plots_cfg.default if (plots_cfg and plots_cfg.default) else list(AVAILABLE_PLOTS.keys())
+    default_list = (
+        plots_cfg.default if (plots_cfg and plots_cfg.default) else ["placement_map", "tfbs_usage", "run_health"]
+    )
     selected = [p.strip() for p in (only.split(",") if only else default_list)]
     options = plots_cfg.options if plots_cfg else {}
     global_style = plots_cfg.style if plots_cfg else {}
@@ -2316,25 +1317,40 @@ def run_plots_from_config(
     row_count = 0
     attempts_df: pd.DataFrame | None = None
     events_df: pd.DataFrame | None = None
-    run_metrics_df: pd.DataFrame | None = None
+    composition_df: pd.DataFrame | None = None
+    library_builds_df: pd.DataFrame | None = None
+    library_members_df: pd.DataFrame | None = None
+    cfg_effective: dict | None = None
+
     if "outputs" in required_sources:
         df, src_label = load_records_from_config(root_cfg, cfg_path, columns=cols, max_rows=max_rows)
         row_count = len(df)
+    if "composition" in required_sources:
+        composition_df = _load_composition(run_root)
+        if row_count == 0:
+            row_count = len(composition_df)
+            src_label = f"composition:{run_root / 'outputs' / 'tables' / 'composition.parquet'}"
+    if "libraries" in required_sources:
+        library_builds_df, library_members_df = _load_libraries(run_root)
+        if row_count == 0:
+            row_count = len(library_members_df)
+            src_label = f"libraries:{run_root / 'outputs' / 'libraries'}"
+    if "config" in required_sources:
+        cfg_effective = _load_effective_config(run_root)
+        if row_count == 0:
+            row_count = 1
+            src_label = f"config:{run_root / 'outputs' / 'meta' / 'effective_config.json'}"
     if "attempts" in required_sources:
         attempts_df = _load_attempts(run_root)
         if row_count == 0:
             row_count = len(attempts_df)
             src_label = f"attempts:{run_root / 'outputs' / 'tables' / 'attempts.parquet'}"
-    if "events" in required_sources:
-        events_df = _load_events(run_root)
-        if row_count == 0:
-            row_count = len(events_df)
-            src_label = f"events:{run_root / 'outputs' / 'meta' / 'events.jsonl'}"
-    if "metrics" in required_sources:
-        run_metrics_df = _load_run_metrics(run_root)
-        if row_count == 0:
-            row_count = len(run_metrics_df)
-            src_label = f"metrics:{run_root / 'outputs' / 'tables' / 'run_metrics.parquet'}"
+        events_path = run_root / "outputs" / "meta" / "events.jsonl"
+        if events_path.exists():
+            events_df = _load_events(run_root)
+            if row_count == 0:
+                row_count = len(events_df)
+                src_label = f"events:{events_path}"
     pools: dict[str, pd.DataFrame] | None = None
     pool_manifest: TFBSPoolArtifact | None = None
     if "pools" in required_sources:
@@ -2342,6 +1358,12 @@ def run_plots_from_config(
         if row_count == 0:
             row_count = sum(len(pool_df) for pool_df in pools.values())
             src_label = f"pools:{run_root / 'outputs' / 'pools'}"
+    if "tfbs_usage" in selected and pools is None:
+        pool_manifest, pools = _maybe_load_stage_a_pools(run_root)
+    if "tfbs_usage" in selected and library_members_df is None:
+        libs = _maybe_load_libraries(run_root)
+        if libs is not None:
+            library_builds_df, library_members_df = libs
 
     _console.print(
         Panel.fit(
@@ -2375,41 +1397,33 @@ def run_plots_from_config(
 
         out_path = out_dir / f"{name}.{plot_format}"
         try:
-            # pass cfg only to plots that need it
-            if name in {
-                "tfbs_usage",
-                "plan_counts",
-                "tf_coverage",
-                "tfbs_positional_frequency",
-                "tfbs_positional_histogram",
-                "tfbs_positional_occupancy",
-            }:
-                result = fn(df, out_path, style=style, cfg=root_cfg.densegen.model_dump(), **kwargs)
-            elif name == "tfbs_length_density":
-                if attempts_df is None:
-                    attempts_df = _load_attempts(run_root)
-                result = fn(df, out_path, style=style, attempts_df=attempts_df, **kwargs)
-            elif name == "stage_a_strata_overview":
-                result = fn(df, out_path, style=style, pools=pools, pool_manifest=pool_manifest, **kwargs)
-            elif name == "run_timeline_funnel":
+            if name == "placement_map":
+                result = fn(df, out_path, style=style, composition_df=composition_df, cfg=cfg_effective, **kwargs)
+            elif name == "tfbs_usage":
                 result = fn(
                     df,
                     out_path,
                     style=style,
-                    attempts_df=attempts_df,
-                    events_df=events_df,
+                    composition_df=composition_df,
+                    pools=pools,
+                    library_members_df=library_members_df,
                     **kwargs,
                 )
-            elif name == "run_failure_pareto":
-                result = fn(df, out_path, style=style, attempts_df=attempts_df, **kwargs)
-            elif name in {
-                "stage_b_library_health",
-                "stage_b_library_slack",
-                "stage_a_score_traceability",
-                "stage_b_offered_vs_used",
-                "stage_b_sampling_pressure",
-            }:
-                result = fn(df, out_path, style=style, run_metrics_df=run_metrics_df, **kwargs)
+            elif name == "run_health":
+                result = fn(df, out_path, style=style, attempts_df=attempts_df, events_df=events_df, **kwargs)
+            elif name == "stage_a_summary":
+                result = fn(df, out_path, style=style, pools=pools, pool_manifest=pool_manifest, **kwargs)
+            elif name == "stage_b_summary":
+                result = fn(
+                    df,
+                    out_path,
+                    style=style,
+                    library_builds_df=library_builds_df,
+                    library_members_df=library_members_df,
+                    composition_df=composition_df,
+                    cfg=cfg_effective,
+                    **kwargs,
+                )
             else:
                 result = fn(df, out_path, style=style, **kwargs)
             if result is None:

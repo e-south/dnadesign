@@ -28,3 +28,8 @@
 - Follow-up: added sampling pressure events + run_metrics aggregation, failure breakdown by library, library slack distribution, positional occupancy plot with fixed-element overlay, and dense_arrays placement fallback for traceability; updated docs/demo and added tests.
 - Audit follow-up: fixed resume crash from numpy array truthiness in attempts parsing; allow outputs/ root for failure counts; removed run_metrics boolean reindex warning; fixed positional occupancy plot column selection; Stage-B build-libraries now emits sampling-pressure events; demo doc notes --overwrite for libraries; added tests for failure counts, required columns, and Stage-B events.
 - Audit follow-up: Stage-A strata overview now accepts regulator_id/tfbs_sequence columns and expands length axis for long TFBS; Stage-B build-libraries error suggests --overwrite; demo doc snippet uses uv/pixi python; added tests for Stage-A plot columns/length axis and Stage-B overwrite hint.
+
+### 2026-01-27
+- Task: plot refactor to scalable canonical set (placement_map, tfbs_usage, run_health, stage_a_summary, stage_b_summary) and delete per-subsample plots.
+- Changes: plot registry + plotting overhaul, new Stage-A yield/bias panels, Stage-B feasibility/utilization summary, updated demo configs/docs + tests; added Stage-B feasibility fields to library_builds and Stage-A yield counters in pool manifest.
+- Tests: updated plot registry/manifest and run diagnostics tests; fixed run_health tick labeling warning; adjusted Stage-A summary expectations.

@@ -109,7 +109,4 @@ plots:
   source: parquet
   out_dir: outputs/plots
   format: png
-  default: [tf_usage, tf_coverage]
-  options:
-    tf_coverage:
-      include_promoter_sites: true
+  default: [placement_map, tfbs_usage, run_health]

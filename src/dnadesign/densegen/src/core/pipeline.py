@@ -1912,6 +1912,11 @@ def _process_plan_for_source(
         library_motif_ids: list[str],
         library_site_ids: list[str | None],
         library_sources: list[str | None],
+        fixed_bp: int,
+        min_required_bp: int,
+        slack_bp: int,
+        infeasible: bool,
+        sequence_length: int,
     ) -> None:
         if str(getattr(sampling_cfg, "library_source", "build")).lower() == "artifact":
             return
@@ -1937,6 +1942,11 @@ def _process_plan_for_source(
             "iterative_max_libraries": sampling_info.get("iterative_max_libraries"),
             "iterative_min_new_solutions": sampling_info.get("iterative_min_new_solutions"),
             "required_regulators_selected": sampling_info.get("required_regulators_selected"),
+            "fixed_bp": int(fixed_bp),
+            "min_required_bp": int(min_required_bp),
+            "slack_bp": int(slack_bp),
+            "infeasible": bool(infeasible),
+            "sequence_length": int(sequence_length),
         }
         library_build_rows.append(row)
         if events_path is not None:
@@ -2341,6 +2351,19 @@ def _process_plan_for_source(
     library_sources = list(source_by_index) if source_by_index else []
     library_tfbs_ids = list(tfbs_id_by_index) if tfbs_id_by_index else []
     library_motif_ids = list(motif_id_by_index) if motif_id_by_index else []
+    min_required_len, min_breakdown = _min_required_length_for_constraints(
+        library_tfbs=library_tfbs,
+        library_tfs=library_tfs,
+        fixed_elements_dump=fixed_elements_dump,
+        required_regulators=required_regulators,
+        min_required_regulators=min_required_regulators,
+        min_count_by_regulator=plan_min_count_by_regulator,
+        min_count_per_tf=min_count_per_tf,
+    )
+    fixed_bp = int(min_breakdown["fixed_elements_min"])
+    min_required_bp = int(min_required_len) - fixed_bp
+    slack_bp = int(seq_len) - int(min_required_len)
+    infeasible = slack_bp < 0
     _record_library_build(
         sampling_info=sampling_info,
         library_tfbs=library_tfbs,
@@ -2349,6 +2372,11 @@ def _process_plan_for_source(
         library_motif_ids=library_motif_ids,
         library_site_ids=library_site_ids,
         library_sources=library_sources,
+        fixed_bp=fixed_bp,
+        min_required_bp=min_required_bp,
+        slack_bp=slack_bp,
+        infeasible=infeasible,
+        sequence_length=seq_len,
     )
     max_tfbs_len = max((len(str(m)) for m in library_tfbs), default=0)
     required_len = max(max_tfbs_len, fixed_elements_max_len)
@@ -2360,15 +2388,6 @@ def _process_plan_for_source(
             "Increase densegen.generation.sequence_length or reduce motif lengths "
             "(e.g., adjust Stage-A PWM sampling length_range or fixed-element motifs)."
         )
-    min_required_len, min_breakdown = _min_required_length_for_constraints(
-        library_tfbs=library_tfbs,
-        library_tfs=library_tfs,
-        fixed_elements_dump=fixed_elements_dump,
-        required_regulators=required_regulators,
-        min_required_regulators=min_required_regulators,
-        min_count_by_regulator=plan_min_count_by_regulator,
-        min_count_per_tf=min_count_per_tf,
-    )
     if min_required_len > 0 and seq_len < min_required_len:
         raise ValueError(
             "generation.sequence_length is shorter than the minimum required length for constraints "
@@ -3348,6 +3367,19 @@ def _process_plan_for_source(
             library_sources = list(source_by_index) if source_by_index else []
             library_tfbs_ids = list(tfbs_id_by_index) if tfbs_id_by_index else []
             library_motif_ids = list(motif_id_by_index) if motif_id_by_index else []
+            min_required_len, min_breakdown = _min_required_length_for_constraints(
+                library_tfbs=library_tfbs,
+                library_tfs=library_tfs,
+                fixed_elements_dump=fixed_elements_dump,
+                required_regulators=required_regulators,
+                min_required_regulators=min_required_regulators,
+                min_count_by_regulator=plan_min_count_by_regulator,
+                min_count_per_tf=min_count_per_tf,
+            )
+            fixed_bp = int(min_breakdown["fixed_elements_min"])
+            min_required_bp = int(min_required_len) - fixed_bp
+            slack_bp = int(seq_len) - int(min_required_len)
+            infeasible = slack_bp < 0
             _record_library_build(
                 sampling_info=sampling_info,
                 library_tfbs=library_tfbs,
@@ -3356,6 +3388,11 @@ def _process_plan_for_source(
                 library_motif_ids=library_motif_ids,
                 library_site_ids=library_site_ids,
                 library_sources=library_sources,
+                fixed_bp=fixed_bp,
+                min_required_bp=min_required_bp,
+                slack_bp=slack_bp,
+                infeasible=infeasible,
+                sequence_length=seq_len,
             )
             # Alignment (7): sampling_fraction uses unique TFBS strings and is bounded.
             sampling_fraction = _compute_sampling_fraction(

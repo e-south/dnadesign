@@ -122,19 +122,15 @@ These summarize run scope and link to the canonical outputs (`outputs/tables/den
 
 `dense plot` writes plot images under `outputs/plots/` (format controlled by `plots.format`). `outputs/plots/plot_manifest.json` records the plot inventory for reports.
 
-Run diagnostics metrics are summarized in `outputs/tables/run_metrics.parquet` (aggregated from pools, libraries, attempts, and composition). These metrics power the run‑level diagnostics plots below.
+Run diagnostics metrics are summarized in `outputs/tables/run_metrics.parquet` (aggregated from pools, libraries, attempts, and composition). Plots below are generated directly from canonical artifacts (Parquet + manifests), not candidate/debug logs.
 
-Core diagnostics plots (non‑exhaustive):
+Core diagnostics plots (canonical set):
 
-- `stage_a_strata_overview` — eligible score distribution with retained region + TFBS length density (Stage‑A quality check).
-- `run_timeline_funnel` — attempts over time with resample/stall markers (are we sampling‑bound or solver‑bound?).
-- `run_failure_pareto` — dominant failure reasons overall, by plan, and by library (what’s breaking?).
-- `stage_b_library_health` — library health metrics over build index (coverage, entropy, slack, scores).
-- `stage_b_library_slack` — feasibility slack distribution (how close are libraries to length budget?).
-- `stage_a_score_traceability` — tier/quantile enrichment in final solutions (are top scores used?).
-- `stage_b_offered_vs_used` — offered vs used TF utilization per library (what the solver actually consumes).
-- `stage_b_sampling_pressure` — coverage‑weighted sampling pressure over builds (weights + penalties).
-- `tfbs_positional_occupancy` — positional occupancy with fixed‑element overlays (placement artifacts).
+- `placement_map` — 1‑nt occupancy map across binding‑site types (regulators + fixed elements).
+- `tfbs_usage` — TFBS allocation summary (rank–frequency + distribution across all TFBS).
+- `run_health` — attempts outcomes + failure composition + duplicate pressure (binned for scale).
+- `stage_a_summary` — Stage‑A pool quality, yield/dedupe, and score/length bias checks.
+- `stage_b_summary` — Stage‑B feasibility + composition distributions + offered‑vs‑used utilization.
 
 ---
 
