@@ -163,7 +163,7 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
     assert "abc123" not in result.output
 
 
-def test_summarize_library_limit_truncates(tmp_path: Path) -> None:
+def test_summarize_library_show_tfbs_flag(tmp_path: Path) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
     cfg_path = run_root / "config.yaml"
@@ -309,7 +309,12 @@ def test_summarize_library_limit_truncates(tmp_path: Path) -> None:
     manifest.write_json(run_manifest_path(run_root))
 
     runner = CliRunner()
-    result = runner.invoke(app, ["inspect", "run", "--run", str(run_root), "--library", "--top", "1"])
+    result = runner.invoke(app, ["inspect", "run", "--run", str(run_root), "--library"])
     assert result.exit_code == 0, result.output
     assert "TF usage summary" in result.output
     assert "Library build summary" not in result.output
+    assert "AAA" not in result.output
+
+    result = runner.invoke(app, ["inspect", "run", "--run", str(run_root), "--library", "--show-tfbs"])
+    assert result.exit_code == 0, result.output
+    assert "AAA" in result.output
