@@ -218,7 +218,7 @@ def _pool_manifest(tmp_path: Path) -> TFBSPoolArtifact:
     pools_dir = tmp_path / "pools"
     pools_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "schema_version": "1.3",
+        "schema_version": "1.4",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",
@@ -232,7 +232,7 @@ def _pool_manifest(tmp_path: Path) -> TFBSPoolArtifact:
                 "pool_mode": "tfbs",
                 "stage_a_sampling": {
                     "backend": "fimo",
-                    "tier_scheme": "pct_1_9_90",
+                    "tier_scheme": "pct_0.1_1_9",
                     "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
                     "retention_rule": "top_n_sites_by_best_hit_score",
                     "fimo_thresh": 1.0,
@@ -245,6 +245,7 @@ def _pool_manifest(tmp_path: Path) -> TFBSPoolArtifact:
                             "counts": [1, 1],
                             "tier0_score": 2.0,
                             "tier1_score": 1.0,
+                            "tier2_score": 0.5,
                             "generated": 10,
                             "candidates_with_hit": 8,
                             "eligible": 6,

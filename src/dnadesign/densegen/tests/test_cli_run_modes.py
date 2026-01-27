@@ -59,6 +59,53 @@ def _write_inputs(run_root: Path) -> None:
     (run_root / "inputs.csv").write_text("tf,sequence\nlexA,ATGC\n")
 
 
+def _write_pwm_config(run_root: Path) -> Path:
+    cfg_path = run_root / "config.yaml"
+    cfg_path.write_text(
+        """
+        densegen:
+          schema_version: "2.5"
+          run:
+            id: demo
+            root: "."
+          inputs:
+            - name: demo_pwm
+              type: pwm_matrix_csv
+              path: pwm.csv
+              motif_id: demo_motif
+              sampling:
+                strategy: stochastic
+                scoring_backend: fimo
+                n_sites: 2
+                oversample_factor: 2
+                mining:
+                  batch_size: 10
+                  max_seconds: 1
+                length_policy: exact
+          output:
+            targets: [parquet]
+            schema:
+              bio_type: dna
+              alphabet: dna_4
+            parquet:
+              path: outputs/tables/dense_arrays.parquet
+          generation:
+            sequence_length: 10
+            quota: 1
+            plan:
+              - name: demo_plan
+                quota: 1
+          solver:
+            backend: CBC
+            strategy: iterate
+          logging:
+            log_dir: outputs/logs
+        """.strip()
+        + "\n"
+    )
+    return cfg_path
+
+
 def test_run_requires_explicit_mode_when_outputs_exist(tmp_path: Path) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
@@ -108,3 +155,17 @@ def test_campaign_reset_removes_outputs(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert not outputs_dir.exists()
     assert (run_root / "inputs.csv").exists()
+
+
+def test_run_requires_stage_a_pool_when_pwm_inputs_present(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    (run_root / "pwm.csv").write_text("A,C,G,T\n0.25,0.25,0.25,0.25\n")
+    cfg_path = _write_pwm_config(run_root)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "--fresh", "-c", str(cfg_path)])
+
+    assert result.exit_code != 0, result.output
+    assert "Stage-A pools" in result.output
+    assert "stage-a build-pool" in result.output

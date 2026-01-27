@@ -1,6 +1,6 @@
 ## DenseGen Architecture
 
-DenseGen is a strict, staged pipeline. Each stage consumes typed config and produces well-defined artifacts, enabling decoupling and easy replacement of individual components.
+DenseGen is a staged pipeline. Each stage consumes typed config and produces artifacts, enabling decoupling and replacement of individual components.
 
 ### Contents
 - [Pipeline (data flow)](#pipeline-data-flow) - high-level stage order.
@@ -10,16 +10,16 @@ DenseGen is a strict, staged pipeline. Each stage consumes typed config and prod
 
 ---
 
-### Pipeline (data flow)
+### Pipeline
 
 ```
 YAML config
   -> config schema (validation + defaults)
-  -> Stage‑A sampling (input ingestion + PWM mining → pools)
-  -> Stage‑B sampling (library construction / resampling → libraries)
+  -> Stage‑A sampling (input ingestion + PWM mining → TFBS pools)
+  -> Stage‑B sampling (TFBS library construction / resampling → subset TFBS libraries)
   -> optimization (dense-arrays ILP)
   -> postprocess (pad, policies)
-  -> outputs (tables + manifests)
+  -> outputs (dense-array tables + manifests)
   -> plots (outputs/plots)
 ```
 

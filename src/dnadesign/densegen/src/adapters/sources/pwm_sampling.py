@@ -160,6 +160,57 @@ class FimoCandidate:
     matched_sequence: Optional[str] = None
 
 
+def _core_sequence(candidate: FimoCandidate) -> str:
+    if candidate.matched_sequence:
+        return str(candidate.matched_sequence)
+    start = int(candidate.start)
+    stop = int(candidate.stop)
+    if start <= 0 or stop <= 0:
+        raise ValueError("Core sequence bounds must be positive.")
+    start_idx = start - 1
+    stop_idx = stop
+    if start_idx < 0 or stop_idx > len(candidate.seq) or start_idx >= stop_idx:
+        raise ValueError("Core sequence bounds are invalid for candidate sequence.")
+    return candidate.seq[start_idx:stop_idx]
+
+
+def _hamming_distance(left: str, right: str) -> int:
+    if len(left) != len(right):
+        raise ValueError("Hamming distance requires equal-length sequences.")
+    return sum(1 for a, b in zip(left, right) if a != b)
+
+
+def _dedupe_by_core(
+    ranked: Sequence[FimoCandidate],
+    *,
+    min_core_hamming_distance: Optional[int],
+) -> list[FimoCandidate]:
+    if min_core_hamming_distance is None:
+        min_core_hamming_distance = 0
+    if min_core_hamming_distance < 0:
+        raise ValueError("min_core_hamming_distance must be >= 0")
+    selected: list[FimoCandidate] = []
+    selected_cores: list[str] = []
+    seen: set[str] = set()
+    for cand in ranked:
+        core = _core_sequence(cand)
+        if min_core_hamming_distance == 0:
+            if core in seen:
+                continue
+            seen.add(core)
+        else:
+            too_close = False
+            for prior in selected_cores:
+                if _hamming_distance(core, prior) < min_core_hamming_distance:
+                    too_close = True
+                    break
+            if too_close:
+                continue
+        selected.append(cand)
+        selected_cores.append(core)
+    return selected
+
+
 def _write_candidate_records(
     records: list[dict],
     *,
@@ -211,6 +262,8 @@ class PWMSamplingSummary:
     input_name: Optional[str]
     regulator: str
     backend: str
+    dedupe_by: Optional[str]
+    min_core_hamming_distance: Optional[int]
     generated: int
     target: int
     target_sites: Optional[int]
@@ -230,6 +283,7 @@ class PWMSamplingSummary:
     retained_tier_counts: Optional[List[int]]
     tier0_score: Optional[float]
     tier1_score: Optional[float]
+    tier2_score: Optional[float]
     eligible_score_hist_edges: Optional[List[float]] = None
     eligible_score_hist_counts: Optional[List[int]] = None
 
@@ -318,21 +372,23 @@ def _ranked_sequence_positions(ranked: Sequence[tuple[str, float]]) -> dict[str,
     return {seq: idx + 1 for idx, (seq, _score) in enumerate(ranked)}
 
 
-def _score_tier_counts(total: int) -> tuple[int, int, int]:
+def _score_tier_counts(total: int) -> tuple[int, int, int, int]:
     return score_tier_counts(total)
 
 
 def _assign_score_tiers(ranked: Sequence[tuple[str, float]]) -> list[int]:
     total = len(ranked)
-    n0, n1, _n2 = _score_tier_counts(total)
+    n0, n1, n2, _n3 = _score_tier_counts(total)
     tiers: list[int] = []
     for idx in range(total):
         if idx < n0:
             tiers.append(0)
         elif idx < n0 + n1:
             tiers.append(1)
-        else:
+        elif idx < n0 + n1 + n2:
             tiers.append(2)
+        else:
+            tiers.append(3)
     return tiers
 
 
@@ -364,10 +420,13 @@ def _build_summary(
     eligible: Sequence[str],
     retained: Sequence[str],
     retained_scores: Optional[Sequence[float]] = None,
+    dedupe_by: Optional[str] = None,
+    min_core_hamming_distance: Optional[int] = None,
     eligible_tier_counts: Optional[Sequence[int]] = None,
     retained_tier_counts: Optional[Sequence[int]] = None,
     tier0_score: Optional[float] = None,
     tier1_score: Optional[float] = None,
+    tier2_score: Optional[float] = None,
     eligible_score_hist_edges: Optional[Sequence[float]] = None,
     eligible_score_hist_counts: Optional[Sequence[int]] = None,
     input_name: Optional[str] = None,
@@ -381,6 +440,8 @@ def _build_summary(
         input_name=input_name,
         regulator=str(regulator or ""),
         backend=str(backend or ""),
+        dedupe_by=str(dedupe_by) if dedupe_by is not None else None,
+        min_core_hamming_distance=int(min_core_hamming_distance) if min_core_hamming_distance is not None else None,
         generated=int(generated),
         target=int(target),
         target_sites=int(target_sites) if target_sites is not None else None,
@@ -400,6 +461,7 @@ def _build_summary(
         retained_tier_counts=list(retained_tier_counts) if retained_tier_counts is not None else None,
         tier0_score=float(tier0_score) if tier0_score is not None else None,
         tier1_score=float(tier1_score) if tier1_score is not None else None,
+        tier2_score=float(tier2_score) if tier2_score is not None else None,
         eligible_score_hist_edges=list(eligible_score_hist_edges) if eligible_score_hist_edges is not None else None,
         eligible_score_hist_counts=list(eligible_score_hist_counts) if eligible_score_hist_counts is not None else None,
     )
@@ -490,6 +552,8 @@ def sample_pwm_sites(
     bgfile: Optional[str | Path] = None,
     keep_all_candidates_debug: bool = False,
     include_matched_sequence: bool = False,
+    dedupe_by: str = "sequence",
+    min_core_hamming_distance: Optional[int] = None,
     debug_output_dir: Optional[Path] = None,
     debug_label: Optional[str] = None,
     length_policy: str = "exact",
@@ -511,6 +575,13 @@ def sample_pwm_sites(
     scoring_backend = str(scoring_backend or "fimo").lower()
     if scoring_backend != "fimo":
         raise ValueError(f"Stage-A PWM sampling requires scoring_backend='fimo', got '{scoring_backend}'.")
+    dedupe_by = str(dedupe_by or "sequence").lower()
+    if dedupe_by not in {"sequence", "core"}:
+        raise ValueError(f"Stage-A PWM sampling dedupe_by must be 'sequence' or 'core', got '{dedupe_by}'.")
+    if min_core_hamming_distance is not None and min_core_hamming_distance < 0:
+        raise ValueError("Stage-A PWM sampling min_core_hamming_distance must be >= 0.")
+    if min_core_hamming_distance is not None and dedupe_by != "core":
+        raise ValueError("Stage-A PWM sampling min_core_hamming_distance requires dedupe_by='core'.")
     if keep_all_candidates_debug and run_id is None:
         raise ValueError("Stage-A PWM sampling keep_all_candidates_debug requires run_id to be set.")
     if strategy == "consensus" and n_sites != 1:
@@ -901,7 +972,6 @@ def sample_pwm_sites(
             debug_path.write_text("\n".join(tsv_lines) + "\n")
             log.info("FIMO debug TSV written: %s", debug_path)
 
-        eligible_hits = len(candidates_by_seq)
         length_obs = "-"
         if lengths_all:
             length_obs = (
@@ -915,15 +985,18 @@ def sample_pwm_sites(
         context["mining_max_seconds"] = mining_max_seconds
         context["mining_time_limited"] = mining_time_limited
         ranked = sorted(candidates_by_seq.values(), key=lambda cand: (-cand.score, cand.seq))
+        if dedupe_by == "core":
+            ranked = _dedupe_by_core(ranked, min_core_hamming_distance=min_core_hamming_distance)
+        eligible_hits = len(ranked)
         ranked_pairs = [(cand.seq, cand.score) for cand in ranked]
         tiers = _assign_score_tiers(ranked_pairs)
         rank_by_seq = _ranked_sequence_positions(ranked_pairs)
         tier_by_seq = {cand.seq: tiers[idx] for idx, cand in enumerate(ranked)}
-        eligible_tier_counts = [0, 0, 0]
+        eligible_tier_counts = [0, 0, 0, 0]
         for tier in tiers:
             eligible_tier_counts[tier] += 1
         picked = ranked[: int(n_sites)]
-        retained_tier_counts = [0, 0, 0]
+        retained_tier_counts = [0, 0, 0, 0]
         for cand in picked:
             retained_tier_counts[tier_by_seq[cand.seq]] += 1
         if len(ranked) < n_sites:
@@ -955,9 +1028,10 @@ def sample_pwm_sites(
                 suggestions.append("try length_policy=range with a longer length_range")
             msg_lines.append("Try next: " + "; ".join(suggestions) + ".")
             log.warning(" ".join(msg_lines))
-        n0, n1, _n2 = _score_tier_counts(len(ranked))
+        n0, n1, n2, _n3 = _score_tier_counts(len(ranked))
         tier0_score = ranked[n0 - 1].score if n0 > 0 else None
         tier1_score = ranked[n0 + n1 - 1].score if n1 > 0 else None
+        tier2_score = ranked[n0 + n1 + n2 - 1].score if n2 > 0 else None
         eligible_scores = [cand.score for cand in ranked]
         hist_edges, hist_counts = _build_score_hist(eligible_scores)
         if progress is not None:
@@ -986,6 +1060,7 @@ def sample_pwm_sites(
                 "fimo_stop": cand.stop,
                 "fimo_strand": cand.strand,
             }
+            meta["tfbs_core"] = _core_sequence(cand)
             if cand.matched_sequence:
                 meta["fimo_matched_sequence"] = cand.matched_sequence
             meta_by_seq[cand.seq] = meta
@@ -1016,13 +1091,16 @@ def sample_pwm_sites(
                 target_sites=n_sites,
                 candidates_with_hit=candidates_with_hit,
                 eligible_total=eligible_total,
-                eligible=list(candidates_by_seq.keys()),
+                eligible=[cand.seq for cand in ranked],
                 retained=[c.seq for c in picked],
                 retained_scores=[cand.score for cand in picked],
+                dedupe_by=dedupe_by,
+                min_core_hamming_distance=min_core_hamming_distance,
                 eligible_tier_counts=eligible_tier_counts,
                 retained_tier_counts=retained_tier_counts,
                 tier0_score=tier0_score,
                 tier1_score=tier1_score,
+                tier2_score=tier2_score,
                 eligible_score_hist_edges=hist_edges,
                 eligible_score_hist_counts=hist_counts,
                 input_name=input_name,

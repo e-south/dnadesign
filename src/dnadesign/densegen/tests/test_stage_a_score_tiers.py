@@ -15,14 +15,14 @@ from dnadesign.densegen.src.adapters.sources import pwm_sampling
 
 
 def test_score_tier_counts_partition() -> None:
-    assert pwm_sampling._score_tier_counts(0) == (0, 0, 0)
-    assert pwm_sampling._score_tier_counts(1) == (1, 0, 0)
-    assert pwm_sampling._score_tier_counts(99) == (1, 9, 89)
-    assert pwm_sampling._score_tier_counts(100) == (1, 9, 90)
+    assert pwm_sampling._score_tier_counts(0) == (0, 0, 0, 0)
+    assert pwm_sampling._score_tier_counts(1) == (1, 0, 0, 0)
+    assert pwm_sampling._score_tier_counts(99) == (1, 1, 9, 88)
+    assert pwm_sampling._score_tier_counts(100) == (1, 1, 9, 89)
     for total in (1, 5, 42, 99, 100, 101):
-        n0, n1, n2 = pwm_sampling._score_tier_counts(total)
+        n0, n1, n2, n3 = pwm_sampling._score_tier_counts(total)
         assert n0 >= 1
-        assert n0 + n1 + n2 == total
+        assert n0 + n1 + n2 + n3 == total
 
 
 def test_assign_score_tiers_partitions_ranked_list() -> None:
@@ -30,9 +30,10 @@ def test_assign_score_tiers_partitions_ranked_list() -> None:
     tiers = pwm_sampling._assign_score_tiers(ranked)
     assert len(tiers) == len(ranked)
     assert tiers.count(0) == 1
-    assert tiers.count(1) == 9
-    assert tiers.count(2) == 90
-    assert set(tiers) == {0, 1, 2}
+    assert tiers.count(1) == 1
+    assert tiers.count(2) == 9
+    assert tiers.count(3) == 89
+    assert set(tiers) == {0, 1, 2, 3}
 
 
 def test_rank_scored_sequences_dedup_and_tiebreak() -> None:

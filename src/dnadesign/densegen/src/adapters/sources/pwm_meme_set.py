@@ -89,6 +89,8 @@ class PWMMemeSetDataSource(BaseDataSource):
         bgfile = sampling.get("bgfile")
         keep_all_candidates_debug = bool(sampling.get("keep_all_candidates_debug", False))
         include_matched_sequence = bool(sampling.get("include_matched_sequence", False))
+        dedupe_by = sampling.get("dedupe_by")
+        min_core_hamming_distance = sampling.get("min_core_hamming_distance")
         bgfile_path: Path | None = None
         if bgfile is not None:
             bgfile_path = resolve_path(self.cfg_path, str(bgfile))
@@ -128,6 +130,8 @@ class PWMMemeSetDataSource(BaseDataSource):
                 bgfile=bgfile_path,
                 keep_all_candidates_debug=keep_all_candidates_debug,
                 include_matched_sequence=include_matched_sequence,
+                dedupe_by=dedupe_by,
+                min_core_hamming_distance=min_core_hamming_distance,
                 debug_output_dir=debug_output_dir,
                 debug_label=f"{Path(path).stem}__{pwm.motif_id}",
                 length_policy=length_policy,

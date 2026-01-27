@@ -135,10 +135,10 @@ def test_resume_uses_existing_pool_without_inputs(tmp_path: Path) -> None:
         pad=lambda *args, **kwargs: "",
     )
 
-    run_pipeline(loaded, deps=deps, resume=False)
+    run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
 
     csv_path.unlink()
-    run_pipeline(loaded, deps=deps, resume=True)
+    run_pipeline(loaded, deps=deps, resume=True, build_stage_a=False)
 
 
 def test_load_failure_counts_handles_numpy_arrays(tmp_path: Path) -> None:

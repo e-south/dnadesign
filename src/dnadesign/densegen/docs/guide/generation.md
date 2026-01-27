@@ -24,7 +24,8 @@ plan:
     required_regulators: ["LexA", "CpxR"]
     min_required_regulators: 2
     min_count_by_regulator:
-      LexA: 2
+      LexA: 1
+      CpxR: 1
     fixed_elements:
       promoter_constraints:
         - upstream: "TTGACA"
@@ -122,6 +123,8 @@ Per‑field guide (what it does → when to use → failure modes → artifacts 
 - `iterative_min_new_solutions` — Stage‑B threshold to decide whether a new library “worked.” Use to prevent wasteful **Stage‑B resampling**. Failure: too high can force endless resamples. Artifacts:
   `outputs/libraries/*`, `outputs/tables/attempts.parquet`, `outputs/meta/run_manifest.json`.
 
+---
+
 ### Run scheduling (round‑robin)
 
 `runtime.round_robin` controls **scheduling**, not Stage‑B sampling. When enabled, DenseGen interleaves
@@ -134,6 +137,8 @@ plans are active.
 
 Stage‑A PWM sampling is performed **once per run** and cached across round‑robin passes. If you need a
 fresh Stage‑A sample, start a new run with `dense run --fresh` (or stage a new workspace).
+
+---
 
 ### Runtime policy knobs (Stage‑B resampling + stop conditions)
 

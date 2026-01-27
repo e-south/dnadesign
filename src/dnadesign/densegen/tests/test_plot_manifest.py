@@ -84,7 +84,7 @@ def _write_pool_manifest(run_root: Path) -> None:
     pool_path = pools_dir / "demo_input__pool.parquet"
     df.to_parquet(pool_path, index=False)
     manifest = {
-        "schema_version": "1.3",
+        "schema_version": "1.4",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",
@@ -98,7 +98,7 @@ def _write_pool_manifest(run_root: Path) -> None:
                 "pool_mode": "tfbs",
                 "stage_a_sampling": {
                     "backend": "fimo",
-                    "tier_scheme": "pct_1_9_90",
+                    "tier_scheme": "pct_0.1_1_9",
                     "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
                     "retention_rule": "top_n_sites_by_best_hit_score",
                     "fimo_thresh": 1.0,
@@ -111,6 +111,7 @@ def _write_pool_manifest(run_root: Path) -> None:
                             "counts": [0, 1, 1],
                             "tier0_score": 9.0,
                             "tier1_score": 7.0,
+                            "tier2_score": 6.0,
                             "generated": 10,
                             "candidates_with_hit": 9,
                             "eligible": 8,
@@ -123,6 +124,7 @@ def _write_pool_manifest(run_root: Path) -> None:
                             "counts": [1, 0],
                             "tier0_score": 5.5,
                             "tier1_score": None,
+                            "tier2_score": None,
                             "generated": 5,
                             "candidates_with_hit": 4,
                             "eligible": 3,

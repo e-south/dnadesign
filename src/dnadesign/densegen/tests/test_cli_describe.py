@@ -56,3 +56,4 @@ def test_describe_outputs_summary(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert "Config" in result.output
     assert "Pad" in result.output
+    assert "See `dense inspect inputs`" in result.output

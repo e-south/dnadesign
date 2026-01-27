@@ -40,7 +40,7 @@ def _construct_mapping(loader, node, deep: bool = False):
 _StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
 
 
-LATEST_SCHEMA_VERSION = "2.5"
+LATEST_SCHEMA_VERSION = "2.6"
 SUPPORTED_SCHEMA_VERSIONS = {LATEST_SCHEMA_VERSION}
 
 
@@ -189,6 +189,8 @@ class PWMSamplingConfig(BaseModel):
     bgfile: Optional[str] = None
     keep_all_candidates_debug: bool = False
     include_matched_sequence: bool = False
+    dedupe_by: Optional[Literal["sequence", "core"]] = None
+    min_core_hamming_distance: Optional[int] = None
     length_policy: Literal["exact", "range"] = "exact"
     length_range: Optional[tuple[int, int]] = None
     trim_window_length: Optional[int] = None
@@ -252,6 +254,12 @@ class PWMSamplingConfig(BaseModel):
             raise ValueError("pwm.sampling.length_range is not allowed when length_policy=exact")
         if self.length_policy == "range" and self.length_range is None:
             raise ValueError("pwm.sampling.length_range is required when length_policy=range")
+        if self.dedupe_by is None:
+            self.dedupe_by = "core" if self.length_policy == "range" else "sequence"
+        if self.min_core_hamming_distance is not None and self.min_core_hamming_distance < 0:
+            raise ValueError("pwm.sampling.min_core_hamming_distance must be >= 0 when set")
+        if self.min_core_hamming_distance is not None and self.dedupe_by != "core":
+            raise ValueError("pwm.sampling.min_core_hamming_distance requires dedupe_by=core")
         return self
 
 
@@ -595,6 +603,7 @@ class SamplingConfig(BaseModel):
     failure_penalty_power: float = 1.0
     cover_all_regulators: bool = True
     unique_binding_sites: bool = True
+    unique_binding_cores: bool = False
     max_sites_per_regulator: Optional[int] = None
     relax_on_exhaustion: bool = False
     allow_incomplete_coverage: bool = False

@@ -136,7 +136,7 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
         pad=lambda *args, **kwargs: "",
     )
     with pytest.raises(ValueError, match="sequence_length"):
-        run_pipeline(loaded, deps=deps, resume=False)
+        run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
 
 
 def test_sequence_length_guard_required_regulators_min_length(tmp_path: Path) -> None:
@@ -212,7 +212,7 @@ def test_sequence_length_guard_required_regulators_min_length(tmp_path: Path) ->
         pad=lambda *args, **kwargs: "",
     )
     with pytest.raises(ValueError, match="minimum required length"):
-        run_pipeline(loaded, deps=deps, resume=False)
+        run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
 
 
 def test_sequence_length_guard_promoter_constraints_min_length(tmp_path: Path) -> None:
@@ -296,4 +296,4 @@ def test_sequence_length_guard_promoter_constraints_min_length(tmp_path: Path) -
         pad=lambda *args, **kwargs: "",
     )
     with pytest.raises(ValueError, match="minimum required length"):
-        run_pipeline(loaded, deps=deps, resume=False)
+        run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)

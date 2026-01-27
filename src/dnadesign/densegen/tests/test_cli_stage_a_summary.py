@@ -157,11 +157,10 @@ def test_stage_a_build_pool_reports_sampling_recap(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert "Stage-A sampling recap" in result.output
     assert "Input: toy_sites" in result.output
-    assert "candidates" in result.output
-    assert "tiers" in result.output
+    assert "generated" in result.output
+    assert "tier fill" in result.output
     assert "score" in result.output
     assert "retained" in result.output
-    assert "provided:" in result.output
 
 
 def test_stage_a_build_pool_accepts_fresh_flag(tmp_path: Path) -> None:
@@ -192,5 +191,5 @@ def test_stage_a_build_pool_reports_plan(tmp_path: Path) -> None:
 
 
 def test_tier_rows_include_zero_counts() -> None:
-    label = _format_tier_counts([2, 0, 1], [1, 0, 0])
-    assert label == "t0 2/1 | t1 0/0 | t2 1/0"
+    label = _format_tier_counts([2, 0, 1, 0], [1, 0, 0, 0])
+    assert label == "t0 2/1 | t1 0/0 | t2 1/0 | t3 0/0"

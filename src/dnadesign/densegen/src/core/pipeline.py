@@ -53,7 +53,14 @@ from .artifacts.library import (
     load_library_records,
     write_library_artifact,
 )
-from .artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData, build_pool_artifact, load_pool_data
+from .artifacts.pool import (
+    POOL_MODE_SEQUENCE,
+    POOL_MODE_TFBS,
+    PoolData,
+    build_pool_artifact,
+    load_pool_data,
+    pool_status_by_input,
+)
 from .artifacts.records import AttemptRecord, SolutionRecord
 from .metadata import build_metadata
 from .postprocess import generate_pad
@@ -2172,7 +2179,7 @@ def _process_plan_for_source(
             if length_range is not None:
                 length_range = list(length_range)
             score_label = "best_hit_score>0"
-            tiers_label = "pct_1_9_90"
+            tiers_label = "pct_0.1_1_9"
             length_label = str(length_policy)
             if length_policy == "range" and length_range:
                 length_label = f"{length_policy}({length_range[0]}..{length_range[1]})"
@@ -3486,7 +3493,13 @@ def _process_plan_for_source(
     }
 
 
-def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | None = None) -> RunSummary:
+def run_pipeline(
+    loaded: LoadedConfig,
+    *,
+    resume: bool,
+    build_stage_a: bool = False,
+    deps: PipelineDeps | None = None,
+) -> RunSummary:
     deps = deps or default_deps()
     cfg = loaded.root.densegen
     install_native_stderr_filters(suppress_solver_messages=bool(cfg.logging.suppress_solver_stderr))
@@ -3562,37 +3575,20 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
     pool_dir = outputs_root / "pools"
     pool_manifest = pool_dir / "pool_manifest.json"
     pool_data: dict[str, PoolData] | None = None
-    if pool_manifest.exists():
-        try:
-            _pool_artifact, pool_data = load_pool_data(pool_dir)
-        except Exception as exc:
-            raise RuntimeError(f"Failed to load existing Stage-A pool artifacts: {exc}") from exc
-        log.info(
-            "Using existing Stage-A pools from %s "
-            "(use dense stage-a build-pool --fresh or dense run --fresh to rebuild).",
-            pool_dir,
-        )
 
-    if resume and pool_data is None:
-        raise RuntimeError(
-            "resume=True requires existing Stage-A pools. Run dense stage-a build-pool first or rerun without resume."
-        )
-
-    build_pools = pool_data is None
-    if build_pools and candidate_logging:
-        try:
-            existed = prepare_candidates_dir(candidates_dir, overwrite=False)
-        except Exception as exc:
-            raise RuntimeError(f"Failed to prepare candidate artifacts directory: {exc}") from exc
-        if existed:
-            log.info(
-                "Appending candidate artifacts under %s (use dense run --fresh to reset).",
-                candidates_dir,
-            )
-        else:
-            log.info("Candidate mining artifacts will be written to %s", candidates_dir)
-
-    if build_pools:
+    if build_stage_a:
+        if candidate_logging:
+            try:
+                existed = prepare_candidates_dir(candidates_dir, overwrite=False)
+            except Exception as exc:
+                raise RuntimeError(f"Failed to prepare candidate artifacts directory: {exc}") from exc
+            if existed:
+                log.info(
+                    "Appending candidate artifacts under %s (use dense run --fresh to reset).",
+                    candidates_dir,
+                )
+            else:
+                log.info("Candidate mining artifacts will be written to %s", candidates_dir)
         try:
             _pool_artifact, pool_data = build_pool_artifact(
                 cfg=cfg,
@@ -3601,7 +3597,7 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
                 rng=np_rng_stage_a,
                 outputs_root=outputs_root,
                 out_dir=pool_dir,
-                overwrite=False,
+                overwrite=True,
             )
         except Exception as exc:
             raise RuntimeError(f"Failed to build Stage-A TFBS pools: {exc}") from exc
@@ -3623,11 +3619,33 @@ def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | Non
             )
         except Exception:
             log.debug("Failed to emit POOL_BUILT event.", exc_info=True)
-    if pool_data is None:
-        raise RuntimeError("Stage-A pool loading failed unexpectedly; no pools are available.")
+
+    if not pool_manifest.exists():
+        raise RuntimeError(
+            "Stage-A pools missing or stale. Run `dense stage-a build-pool --fresh` to regenerate pools."
+        )
+    if not build_stage_a:
+        statuses = pool_status_by_input(cfg, loaded.path, run_root)
+        stale = [status for status in statuses.values() if status.state != "present"]
+        if stale:
+            labels = ", ".join(sorted({status.name for status in stale}))
+            raise RuntimeError(
+                "Stage-A pools missing or stale for: "
+                f"{labels}. Run `dense stage-a build-pool --fresh` to regenerate pools."
+            )
+    try:
+        _pool_artifact, pool_data = load_pool_data(pool_dir)
+    except Exception as exc:
+        raise RuntimeError(f"Failed to load existing Stage-A pool artifacts: {exc}") from exc
+    log.info("Using Stage-A pools from %s", pool_dir)
+
+    if resume and pool_data is None:
+        raise RuntimeError(
+            "resume=True requires existing Stage-A pools. Run dense stage-a build-pool first or rerun without resume."
+        )
     for name, pool in pool_data.items():
         source_cache[name] = pool
-    if candidate_logging and build_pools:
+    if candidate_logging and build_stage_a:
         candidate_files = find_candidate_files(candidates_dir)
         if candidate_files:
             try:

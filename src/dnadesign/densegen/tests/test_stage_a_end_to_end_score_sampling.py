@@ -161,6 +161,7 @@ def test_stage_a_end_to_end_score_sampling(tmp_path: Path) -> None:
     for row in sampling.get("eligible_score_hist") or []:
         assert "tier0_score" in row
         assert "tier1_score" in row
+        assert "tier2_score" in row
         assert "generated" in row
         assert "candidates_with_hit" in row
         assert "eligible" in row

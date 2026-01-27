@@ -21,7 +21,7 @@ def test_stage_a_strata_overview_axes_and_legend() -> None:
     matplotlib.use("Agg", force=True)
     sampling = {
         "backend": "fimo",
-        "tier_scheme": "pct_1_9_90",
+        "tier_scheme": "pct_0.1_1_9",
         "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
         "retention_rule": "top_n_sites_by_best_hit_score",
         "fimo_thresh": 1.0,
@@ -32,6 +32,7 @@ def test_stage_a_strata_overview_axes_and_legend() -> None:
                 "counts": [1, 2, 1],
                 "tier0_score": 6.0,
                 "tier1_score": 4.0,
+                "tier2_score": 2.0,
             },
             {
                 "regulator": "regB",
@@ -39,6 +40,7 @@ def test_stage_a_strata_overview_axes_and_legend() -> None:
                 "counts": [0, 1],
                 "tier0_score": 2.0,
                 "tier1_score": 1.0,
+                "tier2_score": 0.5,
             },
         ],
     }
@@ -79,7 +81,7 @@ def test_stage_a_strata_overview_accepts_regulator_id_columns() -> None:
     matplotlib.use("Agg", force=True)
     sampling = {
         "backend": "fimo",
-        "tier_scheme": "pct_1_9_90",
+        "tier_scheme": "pct_0.1_1_9",
         "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
         "retention_rule": "top_n_sites_by_best_hit_score",
         "fimo_thresh": 1.0,
@@ -90,6 +92,7 @@ def test_stage_a_strata_overview_accepts_regulator_id_columns() -> None:
                 "counts": [1, 1],
                 "tier0_score": 4.0,
                 "tier1_score": 2.0,
+                "tier2_score": 1.0,
             }
         ],
     }
@@ -118,7 +121,7 @@ def test_stage_a_strata_overview_length_axis_expands_for_long_tfbs() -> None:
     matplotlib.use("Agg", force=True)
     sampling = {
         "backend": "fimo",
-        "tier_scheme": "pct_1_9_90",
+        "tier_scheme": "pct_0.1_1_9",
         "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
         "retention_rule": "top_n_sites_by_best_hit_score",
         "fimo_thresh": 1.0,
@@ -129,6 +132,7 @@ def test_stage_a_strata_overview_length_axis_expands_for_long_tfbs() -> None:
                 "counts": [1, 1],
                 "tier0_score": 2.0,
                 "tier1_score": 1.0,
+                "tier2_score": 0.5,
             }
         ],
     }

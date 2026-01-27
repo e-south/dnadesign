@@ -62,7 +62,6 @@ If you want to scaffold a new workspace from a packaged template, run `dense wor
 
 ### More documentation
 
-Docs live in `docs/`:
 - [Demo walkthrough](docs/demo/demo_basic.md) - progressive end‑to‑end tour of all commands.
 - [Guide: workspace layout](docs/guide/workspace.md) - workspace-first structure and rationale.
 - [Guide: inputs (Stage‑A)](docs/guide/inputs.md) - input ingestion + Stage‑A sampling.

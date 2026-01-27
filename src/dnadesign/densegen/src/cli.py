@@ -40,6 +40,7 @@ import re
 import shutil
 import sys
 import tempfile
+from collections import Counter
 from datetime import datetime, timezone
 from importlib import resources
 from pathlib import Path
@@ -55,7 +56,6 @@ from rich.traceback import install as rich_traceback
 
 from dnadesign.cruncher.io.parsers.meme import parse_meme_file
 
-from .adapters.sources.pwm_artifact import load_artifact
 from .adapters.sources.pwm_jaspar import _parse_jaspar
 from .adapters.sources.pwm_sampling import PWMSamplingSummary
 from .config import (
@@ -75,6 +75,7 @@ from .core.artifacts.pool import (
     PoolData,
     build_pool_artifact,
     load_pool_artifact,
+    pool_status_by_input,
 )
 from .core.pipeline import (
     _emit_event,
@@ -380,106 +381,197 @@ def _short_hash(val: str, *, n: int = 8) -> str:
     return val[:n]
 
 
-def _print_inputs_summary(loaded) -> None:
-    cfg = loaded.root.densegen
-    inputs = Table("name", "type", "inputs")
-    for inp in cfg.inputs:
-        if hasattr(inp, "path"):
-            resolved = resolve_relative_path(loaded.path, inp.path)
-            src = f"file={resolved}"
-        elif hasattr(inp, "paths"):
-            resolved = [str(resolve_relative_path(loaded.path, p)) for p in getattr(inp, "paths") or []]
-            src = f"files={len(resolved)}"
-            if resolved:
-                parents = {str(Path(p).parent) for p in resolved}
-                root = parents.pop() if len(parents) == 1 else "multiple"
-                src = f"{src}; dir={root}; first={resolved[0]}"
-        elif hasattr(inp, "dataset"):
-            src = f"dataset={inp.dataset}; root={resolve_relative_path(loaded.path, inp.root)}"
-        else:
-            src = "-"
-        inputs.add_row(inp.name, inp.type, src)
-    console.print(inputs)
+def _display_path(path: Path, run_root: Path, *, absolute: bool) -> str:
+    if absolute:
+        return str(path)
+    try:
+        return str(path.relative_to(run_root))
+    except ValueError:
+        return os.path.relpath(path, run_root)
 
-    pwm_inputs = [
-        inp
-        for inp in cfg.inputs
-        if getattr(inp, "type", "")
-        in {
-            "pwm_meme",
-            "pwm_meme_set",
-            "pwm_jaspar",
-            "pwm_matrix_csv",
-            "pwm_artifact",
-            "pwm_artifact_set",
-        }
-    ]
-    if not pwm_inputs:
-        return
-    pwm_table = Table(
-        "name",
-        "motifs",
-        "n_sites",
-        "strategy",
-        "backend",
-        "mining",
-        "bgfile",
-        "oversample",
-        "length",
-    )
-    for inp in pwm_inputs:
-        sampling = getattr(inp, "sampling", None)
-        if sampling is None:
+
+def _input_kind_label(input_type: str) -> str:
+    labels = {
+        "binding_sites": "Binding sites table",
+        "sequence_library": "Sequence library",
+        "pwm_meme": "PWM MEME",
+        "pwm_meme_set": "PWM MEME set",
+        "pwm_jaspar": "PWM JASPAR",
+        "pwm_matrix_csv": "PWM matrix CSV",
+        "pwm_artifact": "PWM artifacts",
+        "pwm_artifact_set": "PWM artifacts",
+    }
+    return labels.get(input_type, input_type.replace("_", " "))
+
+
+def _motif_display_name(motif_id: str, tf_name: str | None) -> str:
+    if tf_name and str(tf_name).strip():
+        return str(tf_name).strip()
+    if "_" in motif_id:
+        return motif_id.split("_", 1)[0]
+    return motif_id
+
+
+def _unique_preserve(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for val in values:
+        if val in seen:
             continue
-        if inp.type == "pwm_matrix_csv":
-            motif_label = str(getattr(inp, "motif_id", "-"))
-        elif inp.type in {"pwm_meme", "pwm_meme_set", "pwm_jaspar"}:
-            motif_ids = getattr(inp, "motif_ids", None) or []
-            motif_label = ", ".join(motif_ids) if motif_ids else "all"
-            if inp.type == "pwm_meme_set":
-                file_count = len(getattr(inp, "paths", []) or [])
-                motif_label = f"{motif_label} (files={file_count})"
-        elif inp.type == "pwm_artifact_set":
-            motif_label = f"artifacts={len(getattr(inp, 'paths', []) or [])}"
-        else:
-            motif_label = "from artifact"
-        backend = getattr(sampling, "scoring_backend", "fimo")
-        mining_label = "-"
-        mining_cfg = getattr(sampling, "mining", None)
-        if mining_cfg is not None:
-            parts = [f"batch={mining_cfg.batch_size}"]
-            if mining_cfg.max_seconds is not None:
-                parts.append(f"max_seconds={mining_cfg.max_seconds}")
-            if mining_cfg.log_every_batches is not None:
-                parts.append(f"log_every={mining_cfg.log_every_batches}")
-            mining_label = ", ".join(parts)
-        bgfile_label = getattr(sampling, "bgfile", None) or "-"
-        length_label = str(sampling.length_policy)
-        if sampling.length_policy == "range" and sampling.length_range is not None:
-            length_label = f"range({sampling.length_range[0]}..{sampling.length_range[1]})"
-        pwm_table.add_row(
-            inp.name,
-            motif_label,
-            str(sampling.n_sites),
-            str(sampling.strategy),
-            str(backend),
-            str(mining_label),
-            str(bgfile_label),
-            str(sampling.oversample_factor),
-            length_label,
+        seen.add(val)
+        out.append(val)
+    return out
+
+
+def _artifact_motif_metadata(path: Path) -> tuple[str, str | None]:
+    raw = json.loads(path.read_text())
+    motif_id = raw.get("motif_id")
+    if not motif_id or not str(motif_id).strip():
+        raise ValueError(f"PWM artifact missing motif_id: {path}")
+    tf_name = raw.get("tf_name")
+    tf_name = str(tf_name).strip() if tf_name and str(tf_name).strip() else None
+    return str(motif_id).strip(), tf_name
+
+
+def _meme_motif_ids(path: Path, motif_ids: list[str] | None) -> list[str]:
+    result = parse_meme_file(path)
+    motifs = _filter_meme_motifs(result.motifs, motif_ids)
+    labels: list[str] = []
+    for motif in motifs:
+        label = (
+            getattr(motif, "motif_id", None)
+            or getattr(motif, "motif_name", None)
+            or getattr(motif, "motif_label", None)
         )
-    console.print("[bold]Stage-A PWM sampling[/]")
-    console.print(pwm_table)
-    console.print(
-        "  -> Produces the realized TFBS pool (input_tfbs_count), captured in outputs/meta/inputs_manifest.json."
-    )
-    console.print("  eligibility/retention is score-based (best_hit_score > 0; retain top-N by score).")
+        if label:
+            labels.append(str(label))
+    return labels
+
+
+def _input_motifs(
+    inp,
+    cfg_path: Path,
+) -> list[tuple[str, str]]:
+    input_type = str(inp.type)
+    motifs: list[tuple[str, str]] = []
+    if input_type == "pwm_meme":
+        path = resolve_relative_path(cfg_path, getattr(inp, "path"))
+        for motif_id in _meme_motif_ids(path, getattr(inp, "motif_ids", None)):
+            motifs.append((motif_id, _motif_display_name(motif_id, None)))
+    elif input_type == "pwm_meme_set":
+        for raw in getattr(inp, "paths", []) or []:
+            path = resolve_relative_path(cfg_path, raw)
+            for motif_id in _meme_motif_ids(path, getattr(inp, "motif_ids", None)):
+                motifs.append((motif_id, _motif_display_name(motif_id, None)))
+    elif input_type == "pwm_jaspar":
+        path = resolve_relative_path(cfg_path, getattr(inp, "path"))
+        for motif in _jaspar_motif_labels(path, getattr(inp, "motif_ids", None)):
+            motifs.append((motif, _motif_display_name(motif, None)))
+    elif input_type == "pwm_matrix_csv":
+        motif_id = getattr(inp, "motif_id", None)
+        if motif_id:
+            motif_id = str(motif_id)
+            motifs.append((motif_id, _motif_display_name(motif_id, None)))
+    elif input_type == "pwm_artifact":
+        path = resolve_relative_path(cfg_path, getattr(inp, "path"))
+        motif_id, tf_name = _artifact_motif_metadata(path)
+        motifs.append((motif_id, _motif_display_name(motif_id, tf_name)))
+    elif input_type == "pwm_artifact_set":
+        for raw in getattr(inp, "paths", []) or []:
+            path = resolve_relative_path(cfg_path, raw)
+            motif_id, tf_name = _artifact_motif_metadata(path)
+            motifs.append((motif_id, _motif_display_name(motif_id, tf_name)))
+    return motifs
+
+
+def _print_inputs_summary(
+    loaded,
+    *,
+    verbose: bool,
+    absolute: bool,
+    show_motif_ids: bool,
+) -> None:
+    cfg = loaded.root.densegen
+    run_root = _run_root_for(loaded)
+    statuses = pool_status_by_input(cfg, loaded.path, run_root)
+
+    table = Table("input", "kind", "motifs", "source", "stage-a pool")
+    for inp in cfg.inputs:
+        input_type = str(inp.type)
+        kind = _input_kind_label(input_type)
+        motifs = _input_motifs(inp, loaded.path)
+        if show_motif_ids:
+            motif_labels = _unique_preserve([m_id for m_id, _name in motifs if m_id])
+        else:
+            motif_labels = _unique_preserve([_name for _m_id, _name in motifs if _name])
+        motif_summary = "-"
+        if motif_labels:
+            if verbose or len(motif_labels) <= 6:
+                motif_summary = f"{len(motif_labels)} ({','.join(motif_labels)})"
+            else:
+                motif_summary = f"{len(motif_labels)} motifs"
+
+        source_label = "-"
+        if hasattr(inp, "path"):
+            resolved = resolve_relative_path(loaded.path, getattr(inp, "path"))
+            source_label = _display_path(resolved, run_root, absolute=absolute)
+        elif hasattr(inp, "paths"):
+            resolved = [resolve_relative_path(loaded.path, p) for p in getattr(inp, "paths") or []]
+            parents = {p.parent for p in resolved} if resolved else set()
+            if parents:
+                root = parents.pop() if len(parents) == 1 else None
+                if root is not None:
+                    prefix = _display_path(root, run_root, absolute=absolute)
+                    if verbose:
+                        names = ", ".join(sorted(p.name for p in resolved))
+                        source_label = f"{prefix} ({len(resolved)} files): {names}"
+                    else:
+                        source_label = f"{prefix} ({len(resolved)} files)"
+                else:
+                    source_label = f"{len(resolved)} files (multiple dirs)"
+            else:
+                source_label = "0 files"
+        elif hasattr(inp, "dataset"):
+            root_path = resolve_relative_path(loaded.path, getattr(inp, "root"))
+            root_label = _display_path(root_path, run_root, absolute=absolute)
+            source_label = f"{inp.dataset} (root={root_label})"
+        status = statuses.get(inp.name)
+        if status is None:
+            status_label = "-"
+        else:
+            if status.state == "present":
+                status_label = "present ✓"
+            elif status.state == "stale":
+                status_label = "stale !"
+            else:
+                status_label = "missing"
+        table.add_row(str(inp.name), kind, motif_summary, source_label, status_label)
+    console.print("[bold]Stage-A input sources[/]")
+    console.print(table)
+    console.print("Legend: motifs = TF display names; source is workspace-relative.")
+    console.print("Legend: stage-a pool reflects whether the pool matches the current config.")
+    console.print("Tip: run `dense stage-a build-pool --fresh` to rebuild pools.")
 
 
 def _format_sampling_ratio(value: int, target: int | None) -> str:
     if target is None or target <= 0:
         return str(int(value))
     return f"{int(value)}/{int(target)}"
+
+
+def _format_count(value: int | None) -> str:
+    if value is None:
+        return "-"
+    return f"{int(value):,}"
+
+
+def _format_eligible(eligible: int | None, generated: int | None) -> str:
+    if eligible is None:
+        return "-"
+    if generated is None or generated <= 0:
+        return _format_count(eligible)
+    pct = 100.0 * float(eligible) / float(generated)
+    return f"{_format_count(eligible)} ({pct:.0f}%)"
 
 
 def _format_sampling_lengths(
@@ -510,18 +602,18 @@ def _format_score_stats(
 
 
 def _format_tier_counts(eligible: list[int] | None, retained: list[int] | None) -> str:
-    if not eligible or not retained or len(eligible) != 3 or len(retained) != 3:
+    if not eligible or not retained or len(eligible) != len(retained):
         return "-"
     parts = []
-    for idx in range(3):
+    for idx in range(len(eligible)):
         parts.append(f"t{idx} {int(eligible[idx])}/{int(retained[idx])}")
     return " | ".join(parts)
 
 
 def _stage_a_sampling_rows(
     pool_data: dict[str, PoolData],
-) -> list[tuple[str, str, str, str, str, str, str, str, str]]:
-    rows: list[tuple[str, str, str, str, str, str, str, str, str]] = []
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
     for pool in pool_data.values():
         summaries = pool.summaries or []
         if summaries:
@@ -530,11 +622,18 @@ def _stage_a_sampling_rows(
                     continue
                 input_name = summary.input_name or pool.name
                 regulator = summary.regulator or "-"
-                backend = summary.backend or "-"
-                candidates = _format_sampling_ratio(summary.generated, summary.target)
-                eligible = _format_sampling_ratio(summary.eligible, summary.generated)
-                retained = _format_sampling_ratio(summary.retained, summary.target_sites)
-                tiers_label = _format_tier_counts(summary.eligible_tier_counts, summary.retained_tier_counts)
+                candidates = _format_count(summary.generated)
+                eligible = _format_eligible(summary.eligible, summary.generated)
+                retained = _format_count(summary.retained)
+                tier_counts = _format_tier_counts(summary.eligible_tier_counts, summary.retained_tier_counts)
+                tier_fill = "-"
+                if summary.retained_tier_counts:
+                    last_idx = None
+                    for idx, val in enumerate(summary.retained_tier_counts):
+                        if int(val) > 0:
+                            last_idx = idx
+                    if last_idx is not None:
+                        tier_fill = {0: "0.1%", 1: "1%", 2: "9%", 3: "rest"}.get(last_idx, "-")
                 length_label = _format_sampling_lengths(
                     min_len=summary.retained_len_min,
                     median_len=summary.retained_len_median,
@@ -549,17 +648,20 @@ def _stage_a_sampling_rows(
                     max_score=summary.retained_score_max,
                 )
                 rows.append(
-                    (
-                        str(input_name),
-                        str(regulator),
-                        str(backend),
-                        candidates,
-                        eligible,
-                        retained,
-                        tiers_label,
-                        score_label,
-                        length_label,
-                    )
+                    {
+                        "input_name": str(input_name),
+                        "regulator": str(regulator),
+                        "generated": candidates,
+                        "eligible": eligible,
+                        "retained": retained,
+                        "tier_fill": tier_fill,
+                        "tier_counts": tier_counts,
+                        "score": score_label,
+                        "length": length_label,
+                        "tier0_score": summary.tier0_score,
+                        "tier1_score": summary.tier1_score,
+                        "tier2_score": summary.tier2_score,
+                    }
                 )
             continue
         total = len(pool.sequences)
@@ -582,19 +684,22 @@ def _stage_a_sampling_rows(
                 count=int(total),
             )
         rows.append(
-            (
-                str(pool.name),
-                "-",
-                "provided",
-                _format_sampling_ratio(total, None),
-                "-",
-                _format_sampling_ratio(total, None),
-                "-",
-                "-",
-                length_label,
-            )
+            {
+                "input_name": str(pool.name),
+                "regulator": "-",
+                "generated": _format_count(total),
+                "eligible": _format_eligible(total, total),
+                "retained": _format_count(total),
+                "tier_fill": "-",
+                "tier_counts": "-",
+                "score": "-",
+                "length": length_label,
+                "tier0_score": None,
+                "tier1_score": None,
+                "tier2_score": None,
+            }
         )
-    rows.sort(key=lambda row: (row[0], row[1]))
+    rows.sort(key=lambda row: (row["input_name"], row["regulator"]))
     return rows
 
 
@@ -638,8 +743,14 @@ def _jaspar_motif_labels(path: Path, motif_ids: list[str] | None) -> list[str]:
     return [m.motif_id for m in motifs if m.motif_id]
 
 
-def _stage_a_plan_rows(cfg, cfg_path: Path, selected_inputs: set[str] | None) -> list[tuple[str, str, str, str, str]]:
-    rows: list[tuple[str, str, str, str, str]] = []
+def _stage_a_plan_rows(
+    cfg,
+    cfg_path: Path,
+    selected_inputs: set[str] | None,
+    *,
+    show_motif_ids: bool,
+) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
     for inp in cfg.inputs:
         if selected_inputs and inp.name not in selected_inputs:
             continue
@@ -650,53 +761,42 @@ def _stage_a_plan_rows(cfg, cfg_path: Path, selected_inputs: set[str] | None) ->
         backend = str(getattr(sampling, "scoring_backend", "fimo")).lower() if sampling else "fimo"
         base_n_sites = getattr(sampling, "n_sites", None) if sampling else None
         base_oversample = getattr(sampling, "oversample_factor", None) if sampling else None
+        length_policy = str(getattr(sampling, "length_policy", "-")) if sampling else "-"
+        length_range = getattr(sampling, "length_range", None) if sampling else None
+        length_label = length_policy
+        if length_policy == "range" and length_range:
+            length_label = f"range({length_range[0]}..{length_range[1]})"
 
-        regulators: list[str] = []
-        if input_type == "pwm_meme":
-            path = resolve_relative_path(cfg_path, getattr(inp, "path"))
-            regulators = _meme_motif_labels(path, getattr(inp, "motif_ids", None))
-        elif input_type == "pwm_meme_set":
-            for raw in getattr(inp, "paths", []) or []:
-                path = resolve_relative_path(cfg_path, raw)
-                regulators.extend(_meme_motif_labels(path, getattr(inp, "motif_ids", None)))
-        elif input_type == "pwm_jaspar":
-            path = resolve_relative_path(cfg_path, getattr(inp, "path"))
-            regulators = _jaspar_motif_labels(path, getattr(inp, "motif_ids", None))
-        elif input_type == "pwm_matrix_csv":
-            motif_id = getattr(inp, "motif_id", None)
-            if motif_id:
-                regulators = [str(motif_id)]
-        elif input_type == "pwm_artifact":
-            path = resolve_relative_path(cfg_path, getattr(inp, "path"))
-            regulators = [load_artifact(path).motif_id]
-        elif input_type == "pwm_artifact_set":
-            for raw in getattr(inp, "paths", []) or []:
-                path = resolve_relative_path(cfg_path, raw)
-                regulators.append(load_artifact(path).motif_id)
-
+        motifs = _input_motifs(inp, cfg_path)
         overrides = getattr(inp, "overrides_by_motif_id", None) if input_type == "pwm_artifact_set" else None
-        for reg in regulators:
+        for motif_id, display_name in motifs:
             reg_backend = backend
             reg_n_sites = base_n_sites
             reg_oversample = base_oversample
-            if overrides and reg in overrides:
-                override = overrides.get(reg) or {}
+            if overrides and motif_id in overrides:
+                override = overrides.get(motif_id) or {}
                 if "scoring_backend" in override:
                     reg_backend = str(override.get("scoring_backend", reg_backend)).lower()
                 if "n_sites" in override:
                     reg_n_sites = override.get("n_sites")
                 if "oversample_factor" in override:
                     reg_oversample = override.get("oversample_factor")
+            label = motif_id if show_motif_ids else display_name
+            candidates = "-"
+            if reg_n_sites is not None and reg_oversample is not None:
+                candidates = f"{int(reg_n_sites) * int(reg_oversample)}"
             rows.append(
-                (
-                    str(inp.name),
-                    str(reg),
-                    str(reg_backend),
-                    str(reg_n_sites) if reg_n_sites is not None else "-",
-                    str(reg_oversample) if reg_oversample is not None else "-",
-                )
+                {
+                    "input": str(inp.name),
+                    "tf": str(label),
+                    "retain": str(reg_n_sites) if reg_n_sites is not None else "-",
+                    "candidates": candidates,
+                    "eligibility": "best_hit_score>0",
+                    "backend": str(reg_backend),
+                    "length": length_label,
+                }
             )
-    rows.sort(key=lambda row: (row[0], row[1]))
+    rows.sort(key=lambda row: (row["input"], row["tf"]))
     return rows
 
 
@@ -1602,11 +1702,12 @@ def inspect_plan(
     console.print(table)
 
 
-@inspect_app.command("config", help="Describe resolved config, inputs, outputs, and solver details.")
+@inspect_app.command("config", help="Describe resolved config, outputs, and pipeline settings.")
 def inspect_config(
     ctx: typer.Context,
     show_constraints: bool = typer.Option(False, help="Print full fixed elements per plan item."),
     probe_solver: bool = typer.Option(False, help="Probe the solver backend before reporting."),
+    absolute: bool = typer.Option(False, "--absolute", help="Show absolute paths instead of workspace-relative."),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
     cfg_path, is_default = _resolve_config_path(ctx, config)
@@ -1616,7 +1717,6 @@ def inspect_config(
     )
     root = loaded.root
     cfg = root.densegen
-    _ensure_fimo_available(cfg, strict=True)
     run_root = _run_root_for(loaded)
 
     if probe_solver:
@@ -1629,13 +1729,12 @@ def inspect_config(
             strategy=str(cfg.solver.strategy),
         )
 
-    console.print(f"[bold]Config[/]: {cfg_path}")
-    console.print(f"[bold]Run[/]: id={cfg.run.id} root={run_root}")
+    console.print(f"[bold]Config[/]: {_display_path(loaded.path, run_root, absolute=absolute)}")
+    console.print(f"[bold]Run[/]: id={cfg.run.id} root={_display_path(run_root, run_root, absolute=absolute)}")
     effective_path = run_root / "outputs" / "meta" / "effective_config.json"
     if effective_path.exists():
-        console.print(f"[bold]Effective config[/]: {effective_path}")
-
-    _print_inputs_summary(loaded)
+        console.print(f"[bold]Effective config[/]: {_display_path(effective_path, run_root, absolute=absolute)}")
+    console.print("See `dense inspect inputs` for resolved input sources.")
 
     plan_table = Table(
         "name",
@@ -1683,8 +1782,46 @@ def inspect_config(
                     console.print(f"  side_biases.left: {', '.join(sb.left)}")
                 if sb.right:
                     console.print(f"  side_biases.right: {', '.join(sb.right)}")
-            if item.required_regulators:
-                console.print(f"  required_regulators: {', '.join(item.required_regulators)}")
+                if item.required_regulators:
+                    console.print(f"  required_regulators: {', '.join(item.required_regulators)}")
+
+    pwm_inputs = [inp for inp in cfg.inputs if str(getattr(inp, "type", "")).startswith("pwm_")]
+    if pwm_inputs:
+        stage_a_table = Table("input", "backend", "n_sites", "oversample", "candidates", "mining", "length")
+        for inp in pwm_inputs:
+            sampling = getattr(inp, "sampling", None)
+            if sampling is None:
+                continue
+            backend = str(getattr(sampling, "scoring_backend", "fimo")).lower()
+            n_sites = getattr(sampling, "n_sites", None)
+            oversample = getattr(sampling, "oversample_factor", None)
+            candidates = "-"
+            if n_sites is not None and oversample is not None:
+                candidates = str(int(n_sites) * int(oversample))
+            mining_cfg = getattr(sampling, "mining", None)
+            mining_label = "-"
+            if mining_cfg is not None:
+                parts = [f"batch={mining_cfg.batch_size}"]
+                if mining_cfg.max_seconds is not None:
+                    parts.append(f"max_seconds={mining_cfg.max_seconds}")
+                if mining_cfg.log_every_batches is not None:
+                    parts.append(f"log_every={mining_cfg.log_every_batches}")
+                mining_label = ", ".join(parts)
+            length_label = str(sampling.length_policy)
+            if sampling.length_policy == "range" and sampling.length_range is not None:
+                length_label = f"range({sampling.length_range[0]}..{sampling.length_range[1]})"
+            stage_a_table.add_row(
+                str(inp.name),
+                backend,
+                str(n_sites) if n_sites is not None else "-",
+                str(oversample) if oversample is not None else "-",
+                candidates,
+                mining_label,
+                length_label,
+            )
+        console.print("[bold]Stage-A sampling[/]")
+        console.print(stage_a_table)
+        console.print("Legend: candidates = n_sites * oversample_factor; eligibility = best_hit_score > 0.")
 
     outputs = Table("target", "path")
     for target in cfg.output.targets:
@@ -1697,11 +1834,12 @@ def inspect_config(
             )
             outputs.add_row(
                 "parquet",
-                str(parquet_path),
+                _display_path(parquet_path, run_root, absolute=absolute),
             )
         elif target == "usr":
             usr_root = resolve_outputs_scoped_path(loaded.path, run_root, cfg.output.usr.root, label="output.usr.root")
-            outputs.add_row("usr", f"{cfg.output.usr.dataset} (root={usr_root})")
+            usr_root_label = _display_path(usr_root, run_root, absolute=absolute)
+            outputs.add_row("usr", f"{cfg.output.usr.dataset} (root={usr_root_label})")
         else:
             outputs.add_row(target, "-")
     console.print(outputs)
@@ -1755,18 +1893,23 @@ def inspect_config(
         )
     console.print(f"[bold]Pad[/]: mode={pad.mode} end={pad.end} gc={gc_label} max_tries={pad.max_tries}")
     log_dir = resolve_outputs_scoped_path(loaded.path, run_root, cfg.logging.log_dir, label="logging.log_dir")
-    console.print(f"[bold]Logging[/]: dir={log_dir} level={cfg.logging.level}")
+    log_dir_label = _display_path(log_dir, run_root, absolute=absolute)
+    console.print(f"[bold]Logging[/]: dir={log_dir_label} level={cfg.logging.level}")
 
     if root.plots:
         out_dir = resolve_outputs_scoped_path(loaded.path, run_root, root.plots.out_dir, label="plots.out_dir")
-        console.print(f"[bold]Plots[/]: source={root.plots.source} out_dir={out_dir}")
+        out_dir_label = _display_path(out_dir, run_root, absolute=absolute)
+        console.print(f"[bold]Plots[/]: source={root.plots.source} out_dir={out_dir_label}")
     else:
         console.print("[bold]Plots[/]: none")
 
 
-@inspect_app.command("inputs", help="Show resolved inputs and Stage-A PWM sampling summary.")
+@inspect_app.command("inputs", help="Show resolved inputs and Stage-A pool status.")
 def inspect_inputs(
     ctx: typer.Context,
+    verbose: bool = typer.Option(False, "--verbose", help="Show full source file lists."),
+    absolute: bool = typer.Option(False, "--absolute", help="Show absolute paths instead of workspace-relative."),
+    show_motif_ids: bool = typer.Option(False, "--show-motif-ids", help="Show full motif IDs instead of TF names."),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
     cfg_path, is_default = _resolve_config_path(ctx, config)
@@ -1774,9 +1917,12 @@ def inspect_inputs(
         cfg_path,
         missing_message=DEFAULT_CONFIG_MISSING_MESSAGE if is_default else None,
     )
-    console.print(f"[bold]Config[/]: {cfg_path}")
-    _ensure_fimo_available(loaded.root.densegen, strict=True)
-    _print_inputs_summary(loaded)
+    run_root = _run_root_for(loaded)
+    cfg_label = _display_path(loaded.path, run_root, absolute=absolute)
+    run_root_label = _display_path(run_root, run_root, absolute=absolute)
+    console.print(f"[bold]Config[/]: {cfg_label}")
+    console.print(f"[bold]Run[/]: id={loaded.root.densegen.run.id} root={run_root_label}")
+    _print_inputs_summary(loaded, verbose=verbose, absolute=absolute, show_motif_ids=show_motif_ids)
 
 
 @stage_a_app.command("build-pool", help="Build Stage-A TFBS pools from inputs.")
@@ -1817,6 +1963,11 @@ def stage_a_build_pool(
         False,
         "--fresh",
         help="Start from scratch and replace existing pool files.",
+    ),
+    show_motif_ids: bool = typer.Option(
+        False,
+        "--show-motif-ids",
+        help="Show full motif IDs instead of TF display names in tables.",
     ),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
@@ -1881,22 +2032,40 @@ def stage_a_build_pool(
             console.print(f"[bold red]{exc}[/]")
             raise typer.Exit(code=1)
         if existed and fresh:
-            console.print(f"[yellow]Cleared prior candidate artifacts at {candidates_dir} to avoid mixing runs.[/]")
+            console.print(
+                f"[yellow]Cleared prior candidate artifacts at "
+                f"{_display_path(candidates_dir, run_root, absolute=False)} to avoid mixing runs.[/]"
+            )
         elif existed and not fresh:
             console.print(
                 f"[yellow]Appending to existing candidate artifacts under {candidates_dir} (use --fresh to reset).[/]"
             )
 
-    plan_rows = _stage_a_plan_rows(cfg, cfg_path, selected if selected else None)
+    plan_rows = _stage_a_plan_rows(
+        cfg,
+        cfg_path,
+        selected if selected else None,
+        show_motif_ids=show_motif_ids,
+    )
     if plan_rows:
         plan_table = Table()
         plan_table.add_column("input", overflow="fold")
-        plan_table.add_column("reg", overflow="fold")
+        plan_table.add_column("TF", overflow="fold")
+        plan_table.add_column("retain")
+        plan_table.add_column("candidates")
+        plan_table.add_column("eligibility")
         plan_table.add_column("backend")
-        plan_table.add_column("n_sites")
-        plan_table.add_column("oversample")
+        plan_table.add_column("length")
         for row in plan_rows:
-            plan_table.add_row(*row)
+            plan_table.add_row(
+                row["input"],
+                row["tf"],
+                row["retain"],
+                row["candidates"],
+                row["eligibility"],
+                row["backend"],
+                row["length"],
+            )
         console.print("[bold]Stage-A plan[/]")
         console.print(plan_table)
 
@@ -1937,35 +2106,73 @@ def stage_a_build_pool(
                     f"[yellow]Candidate logging enabled but no candidate records found under {candidates_dir}.[/]"
                 )
 
+    display_map_by_input: dict[str, dict[str, str]] = {}
+    for inp in cfg.inputs:
+        motifs = _input_motifs(inp, cfg_path)
+        display_map_by_input[inp.name] = {motif_id: name for motif_id, name in motifs}
+
     recap_rows = _stage_a_sampling_rows(pool_data)
     if recap_rows:
         console.print("[bold]Stage-A sampling recap[/]")
-        grouped: dict[str, list[tuple[str, str, str, str, str, str, str, str]]] = {}
+        grouped: dict[str, list[dict[str, object]]] = {}
         for row in recap_rows:
-            grouped.setdefault(row[0], []).append(row)
+            grouped.setdefault(str(row["input_name"]), []).append(row)
         for input_name in sorted(grouped):
             recap_table = Table()
-            recap_table.add_column("reg", overflow="fold")
-            recap_table.add_column("candidates")
+            recap_table.add_column("TF", overflow="fold")
+            recap_table.add_column("generated")
             recap_table.add_column("eligible")
             recap_table.add_column("retained")
-            recap_table.add_column("tiers", overflow="fold")
+            recap_table.add_column("tier fill")
             recap_table.add_column("score(min/med/avg/max)")
             recap_table.add_column("len(n/min/med/avg/max)")
-            for row in sorted(grouped[input_name], key=lambda item: item[1]):
-                recap_table.add_row(row[1], row[3], row[4], row[5], row[6], row[7], row[8])
+            for row in sorted(grouped[input_name], key=lambda item: str(item["regulator"])):
+                reg_label = str(row["regulator"])
+                if not show_motif_ids:
+                    reg_label = display_map_by_input.get(input_name, {}).get(reg_label, reg_label)
+                recap_table.add_row(
+                    reg_label,
+                    str(row["generated"]),
+                    str(row["eligible"]),
+                    str(row["retained"]),
+                    str(row["tier_fill"]),
+                    str(row["score"]),
+                    str(row["length"]),
+                )
             console.print(f"[bold]Input: {input_name}[/]")
             console.print(recap_table)
-        backends = {row[2] for row in recap_rows}
-        if "fimo" in backends:
-            console.print(
-                "  eligibility/retention is score-based (best_hit_score > 0; retain top-N by score). "
-                "tiers=t0 e/r | t1 e/r | t2 e/r; score=min/med/avg/max (retained); "
-                "len=n/min/med/avg/max (retained)"
-            )
-        if "provided" in backends:
-            console.print("  provided: candidates=total; retained=total; tiers=-; score=-; len=n/min/med/avg/max")
-    console.print(f":sparkles: [bold green]Pool manifest written[/]: {artifact.manifest_path}")
+
+            tier_rows = [
+                row
+                for row in grouped[input_name]
+                if row.get("tier0_score") is not None
+                or row.get("tier1_score") is not None
+                or row.get("tier2_score") is not None
+            ]
+            if tier_rows:
+                boundary_table = Table("TF", "tier0.1% score", "tier1% score", "tier9% score")
+                for row in sorted(tier_rows, key=lambda item: str(item["regulator"])):
+                    reg_label = str(row["regulator"])
+                    if not show_motif_ids:
+                        reg_label = display_map_by_input.get(input_name, {}).get(reg_label, reg_label)
+                    t0 = row.get("tier0_score")
+                    t1 = row.get("tier1_score")
+                    t2 = row.get("tier2_score")
+                    boundary_table.add_row(
+                        reg_label,
+                        f"{float(t0):.2f}" if t0 is not None else "-",
+                        f"{float(t1):.2f}" if t1 is not None else "-",
+                        f"{float(t2):.2f}" if t2 is not None else "-",
+                    )
+                console.print(boundary_table)
+        console.print(
+            "Legend: generated=PWM candidates; eligible=best_hit_score>0 with hit; "
+            "retained=top-N by score after dedupe; tier fill=deepest diagnostic tier used."
+        )
+    console.print(
+        f":sparkles: [bold green]Pool manifest written[/]: "
+        f"{_display_path(artifact.manifest_path, run_root, absolute=False)}"
+    )
 
 
 @stage_b_app.command("build-libraries", help="Build Stage-B libraries from pools or inputs.")
@@ -1997,6 +2204,12 @@ def stage_b_build_libraries(
         help="Plan item name(s) to build (defaults to all plans).",
     ),
     overwrite: bool = typer.Option(False, help="Overwrite existing library_builds.parquet."),
+    show_hash: bool = typer.Option(False, "--show-hash", help="Show full library hash in the table."),
+    show_motif_ids: bool = typer.Option(
+        False,
+        "--show-motif-ids",
+        help="Show full motif IDs instead of TF display names in tables.",
+    ),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
     cfg_path, is_default = _resolve_config_path(ctx, config)
@@ -2053,18 +2266,17 @@ def stage_b_build_libraries(
         console.print("  - ensure --pool points to the outputs/pools directory for this workspace")
         raise typer.Exit(code=1)
 
+    display_map_by_input: dict[str, dict[str, str]] = {}
+    for inp in cfg.inputs:
+        motifs = _input_motifs(inp, cfg_path)
+        display_map_by_input[inp.name] = {motif_id: name for motif_id, name in motifs}
+
     build_rows = []
     member_rows = []
-    table = Table(
-        "input",
-        "plan",
-        "library_index",
-        "library_hash",
-        "size",
-        "achieved/target",
-        "pool",
-        "Stage-B sampling",
-    )
+    headers = ["input", "plan", "build", "sites", "TF counts", "bp total/budget", "sampling strategy"]
+    if show_hash:
+        headers.insert(3, "hash")
+    table = Table(*headers)
     with _suppress_pyarrow_sysctl_warnings():
         for inp in cfg.inputs:
             if selected_inputs and inp.name not in selected_inputs:
@@ -2204,16 +2416,36 @@ def stage_b_build_libraries(
                             else None,
                         }
                     )
-                table.add_row(
+                tf_counts = Counter(reg_labels or [])
+                tf_counts_label = "-"
+                if tf_counts:
+                    parts = []
+                    for tf, count in sorted(tf_counts.items(), key=lambda kv: kv[0]):
+                        label = tf
+                        if not show_motif_ids:
+                            label = display_map_by_input.get(inp.name, {}).get(tf, tf)
+                        parts.append(f"{label}={int(count)}")
+                    tf_counts_label = " ".join(parts)
+                over_budget = achieved_len - target_len
+                over_label = f"{over_budget:+d}" if target_len > 0 else "n/a"
+                bp_label = f"{achieved_len} / {target_len} ({over_label})" if target_len > 0 else f"{achieved_len} / -"
+
+                row_items = [
                     inp.name,
                     plan_item.name,
                     str(row["library_index"]),
-                    _short_hash(library_hash),
-                    str(len(library)),
-                    f"{achieved_len}/{target_len}",
-                    pool_strategy,
-                    sampling_strategy,
+                ]
+                if show_hash:
+                    row_items.append(str(library_hash))
+                row_items.extend(
+                    [
+                        str(len(library)),
+                        tf_counts_label,
+                        bp_label,
+                        str(sampling_strategy),
+                    ]
                 )
+                table.add_row(*row_items)
 
         if not build_rows:
             console.print("[yellow]No libraries built (no matching inputs/plans).[/]")
@@ -2233,9 +2465,20 @@ def stage_b_build_libraries(
             console.print(f"[bold red]{exc}[/]")
             console.print("[bold]Tip[/]: rerun with --overwrite to replace existing library artifacts.")
             raise typer.Exit(code=1)
+    console.print("[bold]Stage-B libraries (solver inputs)[/]")
     console.print(table)
-    console.print(f":sparkles: [bold green]Library builds written[/]: {artifact.builds_path}")
-    console.print(f":sparkles: [bold green]Library members written[/]: {artifact.members_path}")
+    console.print(
+        "Stage-B builds solver libraries from Stage-A pools (cached for `dense run`). "
+        "bp budget = sequence_length + subsample_over_length_budget_by."
+    )
+    console.print(
+        f":sparkles: [bold green]Library builds written[/]: "
+        f"{_display_path(artifact.builds_path, run_root, absolute=False)}"
+    )
+    console.print(
+        f":sparkles: [bold green]Library members written[/]: "
+        f"{_display_path(artifact.members_path, run_root, absolute=False)}"
+    )
 
 
 @app.command(help="Run generation for the job. Optionally auto-run plots declared in YAML.")
@@ -2244,6 +2487,11 @@ def run(
     no_plot: bool = typer.Option(False, help="Do not auto-run plots even if configured."),
     fresh: bool = typer.Option(False, "--fresh", help="Clear outputs and start a new run."),
     resume: bool = typer.Option(False, "--resume", help="Resume from existing outputs."),
+    rebuild_stage_a: bool = typer.Option(
+        False,
+        "--rebuild-stage-a",
+        help="Rebuild Stage-A pools before running (required if pools are missing or stale).",
+    ),
     log_file: Optional[Path] = typer.Option(
         None,
         help="Override logfile path (must be inside outputs/ under the run root).",
@@ -2258,7 +2506,8 @@ def run(
     root = loaded.root
     cfg = root.densegen
     run_root = _run_root_for(loaded)
-    _ensure_fimo_available(cfg, strict=True)
+    if rebuild_stage_a:
+        _ensure_fimo_available(cfg, strict=True)
 
     if fresh and resume:
         console.print("[bold red]Choose either --fresh or --resume, not both.[/]")
@@ -2272,14 +2521,17 @@ def run(
             except Exception as exc:
                 console.print(f"[bold red]Failed to clear outputs:[/] {exc}")
                 raise typer.Exit(code=1)
-            console.print(f":broom: [bold yellow]Cleared outputs[/]: {outputs_root}")
+            console.print(
+                f":broom: [bold yellow]Cleared outputs[/]: {_display_path(outputs_root, run_root, absolute=False)}"
+            )
         else:
             console.print("[yellow]No outputs directory found; starting fresh.[/]")
         resume_run = False
     elif resume:
         if not existing_outputs:
             console.print(
-                f"[bold red]--resume requested but no outputs were found under[/] {outputs_root}. "
+                f"[bold red]--resume requested but no outputs were found under[/] "
+                f"{_display_path(outputs_root, run_root, absolute=False)}. "
                 "Run without --resume or use --fresh to reset the workspace."
             )
             raise typer.Exit(code=1)
@@ -2287,7 +2539,8 @@ def run(
     else:
         if existing_outputs:
             console.print(
-                f"[bold red]Existing outputs found under[/] {outputs_root}. "
+                f"[bold red]Existing outputs found under[/] "
+                f"{_display_path(outputs_root, run_root, absolute=False)}. "
                 "Use --resume to continue or --fresh to clear outputs."
             )
             raise typer.Exit(code=1)
@@ -2316,12 +2569,24 @@ def run(
     pl = resolve_plan(loaded)
     console.print("[bold]Quota plan[/]: " + ", ".join(f"{p.name}={p.quota}" for p in pl))
     try:
-        run_pipeline(loaded, resume=resume_run)
+        run_pipeline(loaded, resume=resume_run, build_stage_a=rebuild_stage_a)
     except FileNotFoundError as exc:
         _render_missing_input_hint(cfg_path, loaded, exc)
         raise typer.Exit(code=1)
     except RuntimeError as exc:
         if _render_output_schema_hint(exc):
+            raise typer.Exit(code=1)
+        message = str(exc)
+        if "Stage-A pools missing or stale" in message:
+            console.print(f"[bold red]{message}[/]")
+            console.print("[bold]Next steps[/]:")
+            rebuild_cmd = _workspace_command(
+                "dense stage-a build-pool --fresh",
+                cfg_path=cfg_path,
+                run_root=run_root,
+            )
+            console.print(f"  - {rebuild_cmd}")
+            console.print("  - or rerun with --rebuild-stage-a to bootstrap pools")
             raise typer.Exit(code=1)
         raise
 

@@ -28,7 +28,7 @@ from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from ...utils.logging_utils import install_native_stderr_filters
 from .ids import hash_tfbs_id
 
-POOL_SCHEMA_VERSION = "1.3"
+POOL_SCHEMA_VERSION = "1.4"
 POOL_MODE_TFBS = "tfbs"
 POOL_MODE_SEQUENCE = "sequence"
 _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -99,6 +99,13 @@ class PoolInputEntry:
 
 
 @dataclass(frozen=True)
+class PoolInputStatus:
+    name: str
+    state: str
+    reason: str | None = None
+
+
+@dataclass(frozen=True)
 class PoolData:
     name: str
     input_type: str
@@ -157,6 +164,66 @@ class TFBSPoolArtifact:
         return self.inputs[input_name]
 
 
+def pool_status_by_input(cfg, cfg_path: Path, run_root: Path) -> dict[str, PoolInputStatus]:
+    pool_dir = run_root / "outputs" / "pools"
+    manifest_path = _pool_manifest_path(pool_dir)
+    statuses: dict[str, PoolInputStatus] = {}
+    inputs = list(cfg.inputs)
+    if not manifest_path.exists():
+        for inp in inputs:
+            statuses[inp.name] = PoolInputStatus(name=inp.name, state="missing", reason="manifest_missing")
+        return statuses
+
+    try:
+        artifact = TFBSPoolArtifact.load(manifest_path)
+    except Exception as exc:
+        for inp in inputs:
+            statuses[inp.name] = PoolInputStatus(name=inp.name, state="stale", reason=f"manifest_invalid:{exc}")
+        return statuses
+
+    config_hash = _hash_pool_config(cfg)
+    if not artifact.config_hash or artifact.config_hash != config_hash:
+        for inp in inputs:
+            statuses[inp.name] = PoolInputStatus(name=inp.name, state="stale", reason="config_changed")
+        return statuses
+
+    current_inputs = {inp.name for inp in inputs}
+    stale_manifest = sorted(set(artifact.inputs) - current_inputs)
+    if stale_manifest:
+        for inp in inputs:
+            statuses[inp.name] = PoolInputStatus(name=inp.name, state="stale", reason="inputs_changed")
+        return statuses
+
+    fingerprints_by_input: dict[str, list[dict]] = {}
+    for inp in inputs:
+        try:
+            fingerprints_by_input[inp.name] = _resolve_input_fingerprints(cfg_path, inp)
+        except Exception as exc:
+            statuses[inp.name] = PoolInputStatus(name=inp.name, state="stale", reason=f"inputs_unreadable:{exc}")
+
+    for inp in inputs:
+        if inp.name in statuses:
+            continue
+        entry = artifact.inputs.get(inp.name)
+        if entry is None:
+            statuses[inp.name] = PoolInputStatus(name=inp.name, state="stale", reason="manifest_missing_entry")
+            continue
+        pool_path = pool_dir / entry.pool_path
+        if not pool_path.exists():
+            statuses[inp.name] = PoolInputStatus(name=inp.name, state="stale", reason="pool_file_missing")
+            continue
+        existing_fps = entry.fingerprints
+        if existing_fps is None:
+            statuses[inp.name] = PoolInputStatus(name=inp.name, state="stale", reason="fingerprints_missing")
+            continue
+        current_fps = fingerprints_by_input.get(inp.name, [])
+        if _normalize_fingerprints(existing_fps) != _normalize_fingerprints(current_fps):
+            statuses[inp.name] = PoolInputStatus(name=inp.name, state="stale", reason="inputs_changed")
+            continue
+        statuses[inp.name] = PoolInputStatus(name=inp.name, state="present", reason=None)
+    return statuses
+
+
 def _build_stage_a_sampling_manifest(
     summaries: list[object] | None,
     *,
@@ -191,6 +258,7 @@ def _build_stage_a_sampling_manifest(
                 "counts": [int(v) for v in summary.eligible_score_hist_counts],
                 "tier0_score": summary.tier0_score,
                 "tier1_score": summary.tier1_score,
+                "tier2_score": summary.tier2_score,
                 "bgfile": reg_bgfile,
                 "background_source": "bgfile" if reg_bgfile else "motif_background",
                 "generated": int(summary.generated),
@@ -209,7 +277,7 @@ def _build_stage_a_sampling_manifest(
         background_source = "mixed"
     return {
         "backend": "fimo",
-        "tier_scheme": "pct_1_9_90",
+        "tier_scheme": "pct_0.1_1_9",
         "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
         "retention_rule": "top_n_sites_by_best_hit_score",
         "fimo_thresh": FIMO_REPORT_THRESH,

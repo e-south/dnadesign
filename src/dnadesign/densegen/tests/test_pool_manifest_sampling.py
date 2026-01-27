@@ -57,10 +57,11 @@ class _DummySource(BaseDataSource):
             retained_score_median=1.0,
             retained_score_mean=1.0,
             retained_score_max=1.0,
-            eligible_tier_counts=[1, 1, 0],
-            retained_tier_counts=[1, 0, 0],
+            eligible_tier_counts=[1, 1, 0, 0],
+            retained_tier_counts=[1, 0, 0, 0],
             tier0_score=2.0,
             tier1_score=1.5,
+            tier2_score=1.0,
             eligible_score_hist_edges=[0.0, 1.0, 2.0],
             eligible_score_hist_counts=[1, 1],
         )
@@ -147,7 +148,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     stage_a_sampling = entry.get("stage_a_sampling")
     assert stage_a_sampling is not None
     assert stage_a_sampling["backend"] == "fimo"
-    assert stage_a_sampling["tier_scheme"] == "pct_1_9_90"
+    assert stage_a_sampling["tier_scheme"] == "pct_0.1_1_9"
     assert stage_a_sampling["eligibility_rule"].startswith("best_hit_score")
     assert stage_a_sampling["retention_rule"] == "top_n_sites_by_best_hit_score"
     assert stage_a_sampling["fimo_thresh"] == 1.0
@@ -159,6 +160,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert hist[0]["counts"] == [1, 1]
     assert hist[0]["tier0_score"] == 2.0
     assert hist[0]["tier1_score"] == 1.5
+    assert hist[0]["tier2_score"] == 1.0
     assert hist[0]["generated"] == 10
     assert hist[0]["candidates_with_hit"] == 9
     assert hist[0]["eligible"] == 3

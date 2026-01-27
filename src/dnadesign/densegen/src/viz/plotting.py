@@ -818,13 +818,14 @@ def _build_stage_a_strata_overview_figure(
         raise ValueError(f"Stage-A pool missing best_hit_score for input '{input_name}'.")
 
     regulators = [str(row.get("regulator")) for row in eligible_score_hist]
-    hist_by_reg: dict[str, tuple[list[float], list[int], float | None, float | None]] = {}
+    hist_by_reg: dict[str, tuple[list[float], list[int], float | None, float | None, float | None]] = {}
     for row in eligible_score_hist:
         reg = str(row.get("regulator"))
         edges = [float(v) for v in (row.get("edges") or [])]
         counts = [int(v) for v in (row.get("counts") or [])]
         tier0_score = row.get("tier0_score")
         tier1_score = row.get("tier1_score")
+        tier2_score = row.get("tier2_score")
         if edges and len(counts) != len(edges) - 1:
             raise ValueError(f"Eligible score histogram length mismatch for '{input_name}' ({reg}).")
         hist_by_reg[reg] = (
@@ -832,6 +833,7 @@ def _build_stage_a_strata_overview_figure(
             counts,
             float(tier0_score) if tier0_score is not None else None,
             float(tier1_score) if tier1_score is not None else None,
+            float(tier2_score) if tier2_score is not None else None,
         )
 
     colors = _palette(style, len(regulators), no_repeat=bool(style.get("palette_no_repeat", False)))
@@ -840,9 +842,19 @@ def _build_stage_a_strata_overview_figure(
     fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=style["figsize"])
 
     max_height = 0.0
-    height_by_reg: dict[str, tuple[list[float], np.ndarray, np.ndarray | None, float | None, float | None]] = {}
+    height_by_reg: dict[
+        str,
+        tuple[
+            list[float],
+            np.ndarray,
+            np.ndarray | None,
+            float | None,
+            float | None,
+            float | None,
+        ],
+    ] = {}
     for reg in regulators:
-        edges, counts, tier0_score, tier1_score = hist_by_reg.get(reg, ([], [], None, None))
+        edges, counts, tier0_score, tier1_score, tier2_score = hist_by_reg.get(reg, ([], [], None, None, None))
         if not edges:
             continue
         heights = np.log10(np.asarray(counts, dtype=float) + 1.0)
@@ -854,7 +866,7 @@ def _build_stage_a_strata_overview_figure(
         if not retained_vals.empty:
             retained_counts, _ = np.histogram(retained_vals.to_numpy(dtype=float), bins=np.asarray(edges))
             retained_heights = np.log10(retained_counts.astype(float) + 1.0)
-        height_by_reg[reg] = (edges, heights, retained_heights, tier0_score, tier1_score)
+        height_by_reg[reg] = (edges, heights, retained_heights, tier0_score, tier1_score, tier2_score)
         if heights.size:
             max_height = max(max_height, float(heights.max()))
     if not height_by_reg:
@@ -865,8 +877,8 @@ def _build_stage_a_strata_overview_figure(
         step = track_height + gap
         baselines = []
         for idx, reg in enumerate(regulators):
-            edges, heights, retained_heights, tier0_score, tier1_score = height_by_reg.get(
-                reg, ([], np.array([]), None, None, None)
+            edges, heights, retained_heights, tier0_score, tier1_score, tier2_score = height_by_reg.get(
+                reg, ([], np.array([]), None, None, None, None)
             )
             baseline = idx * step
             baselines.append(baseline)
@@ -915,6 +927,15 @@ def _build_stage_a_strata_overview_figure(
                         baseline + track_height,
                         color="#222222",
                         linestyle=":",
+                        linewidth=1,
+                    )
+                if tier2_score is not None:
+                    ax_left.vlines(
+                        float(tier2_score),
+                        baseline,
+                        baseline + track_height,
+                        color="#222222",
+                        linestyle="-.",
                         linewidth=1,
                     )
         ax_left.set_yticks(baselines)
