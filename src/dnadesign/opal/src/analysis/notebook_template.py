@@ -37,7 +37,7 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
         __generated_with = "__GENERATED_WITH__"
 
-        app = marimo.App(width="medium")
+        app = marimo.App(width="medium", strict=False)
 
 
         @app.cell

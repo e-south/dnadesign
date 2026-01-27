@@ -14,7 +14,7 @@ def test_notebook_template_data_source_options() -> None:
 
 def test_notebook_template_uses_medium_width() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
-    assert 'marimo.App(width="medium")' in text
+    assert 'marimo.App(width="medium", strict=False)' in text
 
 
 def test_notebook_template_removes_extra_tables() -> None:
