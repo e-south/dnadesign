@@ -318,8 +318,20 @@ def _scan_motif_coverage_top_strand(seqs: Iterable[str], motifs: Iterable[str], 
     return arr
 
 
+def _plot_config(cfg: dict) -> dict:
+    if not isinstance(cfg, dict):
+        return {}
+    if isinstance(cfg.get("generation"), dict):
+        return cfg
+    nested = cfg.get("config")
+    if isinstance(nested, dict):
+        return nested
+    return cfg
+
+
 def _extract_promoter_site_motifs_from_cfg(cfg: dict) -> Dict[str, set[str]]:
     """Collect upstream/downstream motifs across all plan items; returns {'35 site': {...}, '10 site': {...}}."""
+    cfg = _plot_config(cfg)
     ups, dns = set(), set()
     for item in (cfg.get("generation", {}) or {}).get("plan", []) or []:
         pc = ((item or {}).get("fixed_elements", {}) or {}).get("promoter_constraints")
@@ -335,6 +347,7 @@ def _extract_promoter_site_motifs_from_cfg(cfg: dict) -> Dict[str, set[str]]:
 
 def _extract_fixed_element_ranges(cfg: dict, plan_name: str) -> list[tuple[str, int, int]]:
     ranges: list[tuple[str, int, int]] = []
+    cfg = _plot_config(cfg)
     gen = cfg.get("generation", {}) if cfg else {}
     for item in gen.get("plan", []) or []:
         name = str(item.get("name") or "").strip()
@@ -445,6 +458,7 @@ def _load_effective_config(run_root: Path) -> dict:
 
 
 def _sequence_length_from_cfg(cfg: dict) -> int:
+    cfg = _plot_config(cfg)
     gen = cfg.get("generation") if cfg else None
     if not isinstance(gen, dict):
         raise ValueError("Plot config missing generation block.")

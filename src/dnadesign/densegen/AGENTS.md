@@ -36,7 +36,8 @@ uv run dense stage-b build-libraries
 uv run dense run
 uv run dense inspect run --library --events
 uv run dense ls-plots
-uv run dense plot --only tf_usage,tf_coverage
+uv run dense plot --only placement_map,tfbs_usage,run_health
+uv run dense plot --only stage_a_summary,stage_b_summary
 ```
 
 ### MEME Suite / FIMO pressure testing
@@ -51,6 +52,8 @@ pixi run dense run --fresh
 ```
 
 Pixi includes a `dense` task alias in `pixi.toml`, so `pixi run dense ...` works without `uv run`.
+Pixi tasks run from the repo root, so pass `-c /abs/path/to/workspace/config.yaml` (or set a shell
+alias) when operating on a workspace.
 If `fimo` is not found, either use `pixi run ...` or set `MEME_BIN` to the MEME bin directory
 (`.pixi/envs/<env>/bin`).
 

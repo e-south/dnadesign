@@ -293,6 +293,20 @@ def test_plot_placement_map(tmp_path: Path) -> None:
     assert Path(paths[0]).exists()
 
 
+def test_plot_placement_map_accepts_effective_config(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    out_path = tmp_path / "placement_map_effective.png"
+    paths = plot_placement_map(
+        pd.DataFrame(),
+        out_path,
+        composition_df=_composition_df(),
+        cfg={"config": _cfg()},
+        style={},
+    )
+    assert paths
+    assert Path(paths[0]).exists()
+
+
 def test_plot_tfbs_usage(tmp_path: Path) -> None:
     matplotlib.use("Agg", force=True)
     out_path = tmp_path / "tfbs_usage.png"

@@ -33,3 +33,4 @@
 - Task: plot refactor to scalable canonical set (placement_map, tfbs_usage, run_health, stage_a_summary, stage_b_summary) and delete per-subsample plots.
 - Changes: plot registry + plotting overhaul, new Stage-A yield/bias panels, Stage-B feasibility/utilization summary, updated demo configs/docs + tests; added Stage-B feasibility fields to library_builds and Stage-A yield counters in pool manifest.
 - Tests: updated plot registry/manifest and run diagnostics tests; fixed run_health tick labeling warning; adjusted Stage-A summary expectations.
+- Follow-up: placement_map now accepts effective_config.json structure (nested config), with test coverage; demo run uses pixi with -c path due to pixi running from repo root.
