@@ -22,7 +22,7 @@ from ...sfxi import setpoint_sweep as sfxi_setpoint_sweep
 from ..datasets import CampaignInfo
 from ..hues import HueOption
 from ..theme import DNAD_DIAGNOSTICS_PLOT_SIZE
-from ..util import list_series_to_numpy
+from ..util import list_series_to_numpy, safe_is_numeric
 from ..views.sfxi import SFXIParams
 from .sfxi_diagnostics_altair import (
     make_factorial_effects_chart,
@@ -76,6 +76,43 @@ def _has_duplicate_key(df: pl.DataFrame, key: str) -> bool:
     return bool(df.select(pl.col(key).is_duplicated().any()).item())
 
 
+def _build_diag_view(
+    *,
+    df_pred_selected: pl.DataFrame | None,
+    df_view: pl.DataFrame | None,
+    required_cols: Sequence[str],
+    ctx: str,
+) -> tuple[pl.DataFrame | None, str | None]:
+    if df_pred_selected is None or df_pred_selected.is_empty():
+        return None, f"{ctx} unavailable (missing predictions)."
+    if df_view is None or df_view.is_empty():
+        return None, f"{ctx} unavailable (dashboard view missing)."
+    join_key = _resolve_join_key(df_pred_selected, df_view)
+    if join_key is None:
+        return None, f"{ctx} unavailable (missing join key: id or __row_id)."
+    if _has_duplicate_key(df_view, join_key):
+        return None, f"{ctx} unavailable (join key is not unique in view)."
+
+    required = [col for col in required_cols if col]
+    missing = [col for col in required if col not in df_view.columns]
+    if missing:
+        return None, f"{ctx} unavailable (missing view columns: {', '.join(missing)})."
+
+    df_diag = df_pred_selected.join(
+        df_view.select([join_key, *required]),
+        on=join_key,
+        how="left",
+    )
+    for col in required:
+        dtype = df_diag.schema.get(col, pl.Null)
+        if safe_is_numeric(dtype):
+            expr = pl.col(col).cast(pl.Float64, strict=False).is_finite().fill_null(False)
+            bad = int(df_diag.select((~expr).sum()).item())
+            if bad:
+                return None, f"{ctx} unavailable ({col} must be finite)."
+    return df_diag, None
+
+
 def _build_factorial_panel(
     *,
     df_pred_selected: pl.DataFrame | None,
@@ -120,19 +157,22 @@ def _build_factorial_panel(
 def _build_support_panel(
     *,
     df_view: pl.DataFrame | None,
+    df_pred_selected: pl.DataFrame | None,
     y_col: str,
     hue: HueOption | None,
 ) -> ChartPanel:
-    if df_view is None or df_view.is_empty():
-        return _note_panel("Support diagnostics unavailable (dashboard view missing).")
-    if "opal__sfxi__dist_to_labeled_logic" not in df_view.columns:
-        return _note_panel("Support diagnostics unavailable (dist_to_labeled_logic missing).")
-    if y_col not in df_view.columns:
-        return _note_panel(f"Support diagnostics unavailable (missing y column: {y_col}).")
-    if hue is not None and hue.key not in df_view.columns:
-        return _note_panel(f"Support diagnostics unavailable (missing hue column: {hue.key}).")
+    required_cols = ["opal__sfxi__dist_to_labeled_logic", y_col]
+    if hue is not None:
+        required_cols.append(hue.key)
+    df_support, note = _build_diag_view(
+        df_pred_selected=df_pred_selected,
+        df_view=df_view,
+        required_cols=required_cols,
+        ctx="Support diagnostics",
+    )
+    if note:
+        return _note_panel(note)
 
-    df_support = df_view
     try:
         chart = make_support_diagnostics_chart(
             df_support,
@@ -152,19 +192,24 @@ def _build_support_panel(
 def _build_uncertainty_panel(
     *,
     df_view: pl.DataFrame | None,
+    df_pred_selected: pl.DataFrame | None,
     uncertainty_available: bool,
     hue: HueOption | None,
 ) -> ChartPanel:
     if not uncertainty_available:
         return _note_panel("Uncertainty plot unavailable.")
-    if df_view is None or df_view.is_empty():
-        return _note_panel("Uncertainty plot unavailable (dashboard view missing).")
-    if "opal__sfxi__uncertainty" not in df_view.columns:
-        return _note_panel("Uncertainty plot unavailable (missing uncertainty column).")
-    if hue is not None and hue.key not in df_view.columns:
-        return _note_panel(f"Uncertainty plot unavailable (missing hue column: {hue.key}).")
+    required_cols = ["opal__sfxi__uncertainty", "opal__view__score"]
+    if hue is not None:
+        required_cols.append(hue.key)
+    df_unc, note = _build_diag_view(
+        df_pred_selected=df_pred_selected,
+        df_view=df_view,
+        required_cols=required_cols,
+        ctx="Uncertainty plot",
+    )
+    if note:
+        return _note_panel(note)
 
-    df_unc = df_view.filter(pl.col("opal__sfxi__uncertainty").is_not_null())
     try:
         chart = make_uncertainty_chart(
             df_unc,
@@ -270,11 +315,13 @@ def build_diagnostics_panels(
     )
     support = _build_support_panel(
         df_view=df_view,
+        df_pred_selected=df_pred_selected,
         y_col=support_y_col,
         hue=support_color,
     )
     uncertainty = _build_uncertainty_panel(
         df_view=df_view,
+        df_pred_selected=df_pred_selected,
         uncertainty_available=uncertainty_available,
         hue=uncertainty_color,
     )
