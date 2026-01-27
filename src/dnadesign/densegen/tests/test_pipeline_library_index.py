@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from dnadesign.densegen.src.core.pipeline import _load_existing_library_index
+from dnadesign.densegen.src.core.pipeline.attempts import _load_existing_library_index
 
 
 def test_load_existing_library_index_reads_parts(tmp_path: Path) -> None:

@@ -4,13 +4,15 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 import yaml
 
 from dnadesign.densegen.src.adapters.optimizer import OptimizerRun
 from dnadesign.densegen.src.adapters.outputs import ParquetSink
 from dnadesign.densegen.src.adapters.sources import data_source_factory
 from dnadesign.densegen.src.config import load_config
-from dnadesign.densegen.src.core.pipeline import PipelineDeps, _load_failure_counts_from_attempts, run_pipeline
+from dnadesign.densegen.src.core.pipeline.attempts import _load_failure_counts_from_attempts
+from dnadesign.densegen.src.core.pipeline.orchestrator import PipelineDeps, run_pipeline
 
 
 class _DummyOpt:
@@ -138,7 +140,8 @@ def test_resume_uses_existing_pool_without_inputs(tmp_path: Path) -> None:
     run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
 
     csv_path.unlink()
-    run_pipeline(loaded, deps=deps, resume=True, build_stage_a=False)
+    with pytest.raises(RuntimeError, match="Stage-A pools missing or stale"):
+        run_pipeline(loaded, deps=deps, resume=True, build_stage_a=False)
 
 
 def test_load_failure_counts_handles_numpy_arrays(tmp_path: Path) -> None:

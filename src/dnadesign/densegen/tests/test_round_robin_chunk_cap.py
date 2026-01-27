@@ -11,7 +11,7 @@ from dnadesign.densegen.src.adapters.optimizer import OptimizerRun
 from dnadesign.densegen.src.adapters.outputs.base import SinkBase
 from dnadesign.densegen.src.adapters.sources import data_source_factory
 from dnadesign.densegen.src.config import load_config
-from dnadesign.densegen.src.core.pipeline import PipelineDeps, _process_plan_for_source
+from dnadesign.densegen.src.core.pipeline.orchestrator import PipelineDeps, _process_plan_for_source
 
 
 class _DummySink(SinkBase):
@@ -165,6 +165,8 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
         random_seed=1,
         dense_arrays_version=None,
         dense_arrays_version_source="test",
+        show_tfbs=False,
+        show_solutions=False,
         output_bio_type="dna",
         output_alphabet="dna_4",
         one_subsample_only=True,
@@ -297,6 +299,8 @@ def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
         random_seed=1,
         dense_arrays_version=None,
         dense_arrays_version_source="test",
+        show_tfbs=False,
+        show_solutions=False,
         output_bio_type="dna",
         output_alphabet="dna_4",
         one_subsample_only=True,

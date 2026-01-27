@@ -77,15 +77,10 @@ from .core.artifacts.pool import (
     load_pool_artifact,
     pool_status_by_input,
 )
-from .core.pipeline import (
-    _emit_event,
-    _load_existing_library_index,
-    _load_failure_counts_from_attempts,
-    build_library_for_plan,
-    default_deps,
-    resolve_plan,
-    run_pipeline,
-)
+from .core.pipeline import default_deps, resolve_plan, run_pipeline
+from .core.pipeline.attempts import _load_existing_library_index, _load_failure_counts_from_attempts
+from .core.pipeline.outputs import _emit_event
+from .core.pipeline.stage_b import build_library_for_plan
 from .core.reporting import collect_report_data, write_report
 from .core.run_manifest import load_run_manifest
 from .core.run_paths import (
