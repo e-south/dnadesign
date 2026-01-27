@@ -89,3 +89,6 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Setpoint sweep/intensity scaling plots now use current-round labels (objective-consistent); prom60_eda no longer falls back to labels-as-of.
 - Notebook template now includes a plot gallery dropdown for outputs/plots, filtered by objective (SFXI-only when relevant).
 - campaign-reset removes generated notebooks; opal campaign notebooks are gitignored explicitly.
+- Notebook template now escapes gallery newline literals; added AST-parse test to prevent invalid Python output.
+- Notebook template removed the tri-plot Altair panel in favor of a single plot gallery dropdown; simplified UI controls.
+- Plot gallery avoids marimo variable redefinition errors by using unique loop variable names.
