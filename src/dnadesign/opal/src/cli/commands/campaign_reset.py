@@ -108,6 +108,7 @@ def cmd_campaign_reset(
 
         workdir = Path(cfg.campaign.workdir)
         outputs_dir = workdir / "outputs"
+        notebooks_dir = workdir / "notebooks"
         state_path = workdir / "state.json"
 
         df = read_parquet_df(rec_path)
@@ -129,6 +130,9 @@ def cmd_campaign_reset(
             "columns_to_prune": len(to_delete),
             "outputs_dir": str(outputs_dir.resolve()),
             "outputs_exists": outputs_dir.exists(),
+            "notebooks_dir": str(notebooks_dir.resolve()),
+            "notebooks_exists": notebooks_dir.exists(),
+            "notebooks_count": len(list(notebooks_dir.glob("*.py"))) if notebooks_dir.exists() else 0,
             "state_path": str(state_path.resolve()),
             "state_exists": state_path.exists(),
             "backup_records": bool(backup),
@@ -144,7 +148,7 @@ def cmd_campaign_reset(
             warning = "\n".join(
                 [
                     "",
-                    "⚠️  WARNING: campaign-reset rewrites records.parquet and removes outputs/state.json.",
+                    "⚠️  WARNING: campaign-reset rewrites records.parquet and removes outputs/notebooks/state.json.",
                     "   • Essentials and your X column are protected.",
                     "   • Use --backup if you want a copy of records.parquet.",
                 ]
@@ -164,6 +168,7 @@ def cmd_campaign_reset(
                 raise typer.Exit(code=ExitCodes.BAD_ARGS)
 
         outputs_existed = outputs_dir.exists()
+        notebooks_existed = notebooks_dir.exists()
         state_existed = state_path.exists()
 
         with CampaignLock(workdir):
@@ -178,6 +183,8 @@ def cmd_campaign_reset(
 
             if outputs_dir.exists():
                 shutil.rmtree(outputs_dir)
+            if notebooks_dir.exists():
+                shutil.rmtree(notebooks_dir)
             if state_path.exists():
                 state_path.unlink()
 
@@ -185,6 +192,7 @@ def cmd_campaign_reset(
             "ok": True,
             "columns_pruned": len(to_delete),
             "outputs_removed": bool(outputs_existed),
+            "notebooks_removed": bool(notebooks_existed),
             "state_removed": bool(state_existed),
         }
         if json:

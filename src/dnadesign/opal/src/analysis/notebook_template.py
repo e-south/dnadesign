@@ -54,6 +54,7 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                 latest_run_id,
                 require_columns,
             )
+            from dnadesign.opal.src.plots.config import load_plot_config, parse_enabled, parse_tags
             setup_altair_theme()
             return (
                 mo,
@@ -66,6 +67,9 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                 latest_round,
                 latest_run_id,
                 require_columns,
+                load_plot_config,
+                parse_enabled,
+                parse_tags,
             )
 
 
@@ -176,6 +180,152 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
         @app.cell
         def _(mo, run_summary):
             mo.md(run_summary)
+            return
+
+
+        @app.cell
+        def _(campaign, config_path, load_plot_config):
+            plot_cfg = None
+            plot_cfg_error = None
+            try:
+                plot_cfg = load_plot_config(
+                    campaign_cfg=campaign.read_config_dict(),
+                    campaign_yaml=config_path,
+                    campaign_dir=campaign.workspace.workdir,
+                    plot_config_opt=None,
+                )
+            except Exception as exc:
+                plot_cfg_error = str(exc)
+            return plot_cfg, plot_cfg_error
+
+
+        @app.cell
+        def _(objective_name, parse_enabled, parse_tags, plot_cfg):
+            plot_entries = []
+            if plot_cfg is not None:
+                for entry in plot_cfg.plots:
+                    if not isinstance(entry, dict):
+                        raise ValueError(
+                            f"Plot entry must be a mapping (got {type(entry).__name__})."
+                        )
+                    name = entry.get("name")
+                    if not name:
+                        raise ValueError("Plot entry missing name.")
+                    preset_name = entry.get("preset")
+                    preset = plot_cfg.plot_presets.get(preset_name) if preset_name else {}
+                    kind = entry.get("kind") or preset.get("kind")
+                    if not kind:
+                        raise ValueError(f"Plot '{name}' missing kind.")
+                    enabled = parse_enabled(
+                        entry.get("enabled") if "enabled" in entry else preset.get("enabled"),
+                        ctx=name,
+                    )
+                    if not enabled:
+                        continue
+                    tags = []
+                    if preset_name:
+                        tags += parse_tags(preset.get("tags"), ctx=f"plot_presets.{preset_name}")
+                    tags += parse_tags(entry.get("tags"), ctx=f"plot {name}")
+                    plot_entries.append({"name": name, "kind": kind, "tags": tags})
+            objective_is_sfxi = str(objective_name).lower().startswith("sfxi")
+
+            def _is_sfxi_kind(kind: str) -> bool:
+                return str(kind).lower().startswith("sfxi_")
+
+            if objective_is_sfxi:
+                plot_entries_filtered = [
+                    entry for entry in plot_entries if _is_sfxi_kind(entry["kind"])
+                ]
+            else:
+                plot_entries_filtered = [
+                    entry for entry in plot_entries if not _is_sfxi_kind(entry["kind"])
+                ]
+            return objective_is_sfxi, plot_entries_filtered
+
+
+        @app.cell
+        def _(campaign, plot_entries_filtered):
+            plots_dir = campaign.workspace.workdir / "outputs" / "plots"
+            plot_files = []
+            if plots_dir.exists():
+                plot_files = sorted(plots_dir.glob("*.png"))
+
+            def _latest_match(name: str):
+                candidates = [path for path in plot_files if path.name.startswith(name)]
+                if not candidates:
+                    return None
+                return max(candidates, key=lambda p: p.stat().st_mtime)
+
+            plot_choices = []
+            missing_outputs = []
+            for entry in plot_entries_filtered:
+                path = _latest_match(entry["name"])
+                if path is None:
+                    missing_outputs.append(entry["name"])
+                    continue
+                label = f"{entry['name']} ({path.name})"
+                plot_choices.append({"label": label, "path": path, "entry": entry})
+            return plots_dir, plot_choices, missing_outputs
+
+
+        @app.cell
+        def _(mo, objective_is_sfxi, plot_cfg_error, plot_choices, plots_dir, missing_outputs):
+            plot_ui = None
+            filter_note = "SFXI plots only." if objective_is_sfxi else "Non-SFXI plots only."
+            if plot_cfg_error:
+                plot_gallery_note = (
+                    "### Plot gallery (outputs/plots)\n\n"
+                    f"Plot config unavailable: `{plot_cfg_error}`"
+                )
+            elif not plot_choices:
+                lines = [
+                    "### Plot gallery (outputs/plots)",
+                    "",
+                    f"No plot outputs found in `{plots_dir}`.",
+                    "Run `uv run opal plot -c <campaign.yaml>` to generate plots.",
+                ]
+                lines.append(filter_note)
+                if missing_outputs:
+                    lines.append(
+                        f"Configured plots without outputs: {', '.join(missing_outputs)}"
+                    )
+                plot_gallery_note = "\n".join(lines)
+            else:
+                labels = [entry["label"] for entry in plot_choices]
+                plot_ui = mo.ui.dropdown(labels, value=labels[0], label="Plot")
+                plot_gallery_note = "### Plot gallery (outputs/plots)\n\n" + filter_note
+            return plot_ui, plot_gallery_note
+
+
+        @app.cell
+        def _(mo, plot_choices, plot_gallery_note, plot_ui):
+            if plot_ui is None:
+                mo.md(plot_gallery_note)
+                return
+            selected = str(plot_ui.value)
+            choice = next(
+                (entry for entry in plot_choices if entry["label"] == selected),
+                None,
+            )
+            if choice is None:
+                raise ValueError(f"Plot selection not found: {selected}")
+            entry = choice["entry"]
+            tags = ", ".join(entry["tags"]) if entry["tags"] else "none"
+            details = [
+                plot_gallery_note,
+                "",
+                f"**Plot**: `{entry['name']}`",
+                f"Kind: `{entry['kind']}`",
+                f"Tags: `{tags}`",
+                f"File: `{choice['path']}`",
+            ]
+            mo.vstack(
+                [
+                    mo.md("\n".join(details)),
+                    plot_ui,
+                    mo.image(choice["path"].read_bytes()),
+                ]
+            )
             return
 
 

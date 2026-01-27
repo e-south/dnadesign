@@ -74,6 +74,8 @@ uv run opal campaign-reset -c configs/campaign.yaml --yes --no-backup
 uv run opal prune-source -c configs/campaign.yaml --scope any --yes --no-backup
 ```
 
+The reset removes `outputs/`, `notebooks/`, and `state.json`, and prunes OPAL columns from `records.parquet`.
+
 ---
 
 ### Data used here

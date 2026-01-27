@@ -177,6 +177,8 @@ src/dnadesign/opal/campaigns/**
 !src/dnadesign/opal/campaigns/**/opal.yml
 !src/dnadesign/opal/campaigns/**/plots.yaml
 !src/dnadesign/opal/campaigns/**/plots.yml
+src/dnadesign/opal/campaigns/**/notebooks/
+src/dnadesign/opal/campaigns/**/notebooks/**
 src/dnadesign/opal/campaigns/**/inputs/
 !src/dnadesign/opal/campaigns/demo/inputs/
 !src/dnadesign/opal/campaigns/demo/inputs/**

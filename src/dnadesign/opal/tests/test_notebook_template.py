@@ -61,3 +61,9 @@ def test_notebook_template_removes_extra_tables() -> None:
     assert "mo.ui.dataframe(summary_df)" not in text
     assert "mo.ui.dataframe(labels_df)" not in text
     assert "mo.ui.data_explorer(filtered_df)" not in text
+
+
+def test_notebook_template_has_plot_gallery() -> None:
+    text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+    assert "Plot gallery" in text
+    assert "outputs/plots" in text

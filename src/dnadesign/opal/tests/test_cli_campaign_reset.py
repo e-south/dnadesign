@@ -35,6 +35,9 @@ def test_campaign_reset_prunes_and_clears(tmp_path: Path) -> None:
     ctx_path = outputs / "metadata" / "round_ctx.json"
     ctx_path.parent.mkdir(parents=True, exist_ok=True)
     ctx_path.write_text("{}")
+    notebooks_dir = workdir / "notebooks"
+    notebooks_dir.mkdir(parents=True, exist_ok=True)
+    (notebooks_dir / "demo.py").write_text("import marimo\nmarimo.App()")
     state_path = workdir / "state.json"
     state_path.write_text("{}")
 
@@ -45,6 +48,7 @@ def test_campaign_reset_prunes_and_clears(tmp_path: Path) -> None:
 
     assert not (workdir / "outputs").exists()
     assert not state_path.exists()
+    assert not notebooks_dir.exists()
 
     df = pd.read_parquet(records)
     assert "opal__demo__label_hist" not in df.columns
