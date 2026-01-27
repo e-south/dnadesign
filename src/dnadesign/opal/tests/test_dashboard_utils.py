@@ -119,6 +119,37 @@ def test_namespace_summary() -> None:
     assert summary_dict["cluster"]["count"] == 1
 
 
+def test_default_view_hues_include_sfxi_diagnostics() -> None:
+    keys = {option.key for option in hues.default_view_hues()}
+    assert "opal__sfxi__nearest_gate_class" in keys
+    assert "opal__sfxi__nearest_gate_dist" in keys
+    assert "opal__sfxi__dist_to_labeled_logic" in keys
+    assert "opal__sfxi__dist_to_labeled_x" in keys
+    assert "opal__sfxi__uncertainty" in keys
+
+
+def test_umap_explorer_chart_overlays_observed_labels() -> None:
+    df = pl.DataFrame(
+        {
+            "id": ["a", "b"],
+            "cluster__ldn_v1__umap_x": [0.0, 1.0],
+            "cluster__ldn_v1__umap_y": [0.0, 1.0],
+            "opal__view__observed": [True, False],
+        }
+    )
+    result = plots.build_umap_explorer_chart(
+        df=df,
+        x_col="cluster__ldn_v1__umap_x",
+        y_col="cluster__ldn_v1__umap_y",
+        hue=None,
+        point_size=20,
+        opacity=0.5,
+        plot_size=200,
+        dataset_name="demo",
+    )
+    assert isinstance(result.chart, alt.LayerChart)
+
+
 def test_choose_dropdown_value_prefers_current_then_preferred() -> None:
     options = ["a", "b"]
     assert util.choose_dropdown_value(options, current="b", preferred="a") == "b"

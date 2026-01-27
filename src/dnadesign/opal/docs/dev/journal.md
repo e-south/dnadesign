@@ -65,3 +65,8 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Decisions: setpoint sweep library uses 16 truth tables + current setpoint; factorial size uses `effect_scaled`.
 - Uncertainty contract will support both `score` and `y_hat` kinds (default `score`).
 - dist_to_labeled_x will use UMAP embedding distance (X-space visualization only).
+- Added SFXI diagnostic chart builders (support, uncertainty, intensity scaling) and CLI plot plugins.
+- prom60_eda now includes a Diagnostics / AL Guidance column with factorial, setpoint decomposition, sweep, support,
+  uncertainty, and intensity scaling panels plus derived-metrics status.
+- Derived metrics (nearest gate, dist-to-labeled logic/X, uncertainty) are attached to df_view for hue options.
+- UMAP explorer overlays labeled points; tests cover hue registry and chart layering.

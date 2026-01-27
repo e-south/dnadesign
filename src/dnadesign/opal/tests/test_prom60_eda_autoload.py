@@ -31,3 +31,9 @@ def test_prom60_eda_includes_sfxi_brush_pool_option() -> None:
     text = nb_path.read_text()
     assert "SFXI brush selection" in text
     assert "sfxi_brush" in text
+
+
+def test_prom60_eda_includes_sfxi_diagnostics_column() -> None:
+    nb_path = Path("src/dnadesign/opal/notebooks/prom60_eda.py")
+    text = nb_path.read_text()
+    assert "Diagnostics / AL Guidance" in text

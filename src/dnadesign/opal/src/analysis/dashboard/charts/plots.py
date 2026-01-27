@@ -121,6 +121,25 @@ def build_umap_explorer_chart(
         .add_params(brush)
         .properties(width=plot_size, height=plot_size)
     )
+    if "opal__view__observed" in df.columns and view.x_col in df.columns and view.y_col in df.columns:
+        df_obs = df.select([view.x_col, view.y_col, "opal__view__observed"]).filter(pl.col("opal__view__observed"))
+        if df_obs.height:
+            obs_layer = (
+                alt.Chart(df_obs)
+                .mark_circle(
+                    size=point_size * 1.6,
+                    stroke="#000000",
+                    strokeWidth=1.3,
+                    fillOpacity=0.0,
+                    opacity=1.0,
+                )
+                .encode(
+                    x=alt.X(view.x_col, title=view.x_col),
+                    y=alt.Y(view.y_col, title=view.y_col),
+                    tooltip=tooltip_cols,
+                )
+            )
+            chart = chart + obs_layer
     if "opal__view__top_k" in view.df_plot.columns:
         df_top = view.df_plot.filter(pl.col("opal__view__top_k"))
         if df_top.height:

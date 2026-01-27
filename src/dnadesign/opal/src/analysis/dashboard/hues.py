@@ -241,4 +241,34 @@ def default_view_hues() -> list[HueOption]:
             kind="numeric",
             dtype=pl.Float64,
         ),
+        HueOption(
+            key="opal__sfxi__nearest_gate_class",
+            label="Nearest gate class",
+            kind="categorical",
+            dtype=pl.Utf8,
+        ),
+        HueOption(
+            key="opal__sfxi__nearest_gate_dist",
+            label="Nearest gate distance",
+            kind="numeric",
+            dtype=pl.Float64,
+        ),
+        HueOption(
+            key="opal__sfxi__dist_to_labeled_logic",
+            label="Dist. to labeled (logic)",
+            kind="numeric",
+            dtype=pl.Float64,
+        ),
+        HueOption(
+            key="opal__sfxi__dist_to_labeled_x",
+            label="Dist. to labeled (X-space)",
+            kind="numeric",
+            dtype=pl.Float64,
+        ),
+        HueOption(
+            key="opal__sfxi__uncertainty",
+            label="Uncertainty",
+            kind="numeric",
+            dtype=pl.Float64,
+        ),
     ]
