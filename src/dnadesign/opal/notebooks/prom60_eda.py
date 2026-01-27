@@ -347,12 +347,35 @@ def _(df_prelim, mo):
 
 
 @app.cell
+def _(mo):
+    dataset_explorer_plot_type_state, set_dataset_explorer_plot_type_state = mo.state(None)
+    dataset_explorer_x_state, set_dataset_explorer_x_state = mo.state(None)
+    dataset_explorer_y_state, set_dataset_explorer_y_state = mo.state(None)
+    dataset_explorer_color_state, set_dataset_explorer_color_state = mo.state(None)
+    return (
+        dataset_explorer_color_state,
+        dataset_explorer_plot_type_state,
+        dataset_explorer_x_state,
+        dataset_explorer_y_state,
+        set_dataset_explorer_color_state,
+        set_dataset_explorer_plot_type_state,
+        set_dataset_explorer_x_state,
+        set_dataset_explorer_y_state,
+    )
+
+
+@app.cell
 def _(
     build_explorer_hue_registry,
     choose_axis_defaults,
+    choose_dropdown_value,
     data_ready,
     dashboard_defaults,
     default_view_hues,
+    dataset_explorer_color_state,
+    dataset_explorer_plot_type_state,
+    dataset_explorer_x_state,
+    dataset_explorer_y_state,
     df_view,
     mo,
     safe_is_numeric,
@@ -372,20 +395,33 @@ def _(
         preferred_y=_preferred_y,
     )
 
+    plot_type_options = ["scatter", "histogram"]
+    plot_type_default = (
+        choose_dropdown_value(plot_type_options, current=dataset_explorer_plot_type_state(), preferred="scatter")
+        or "scatter"
+    )
     plot_type_dropdown = mo.ui.dropdown(
-        options=["scatter", "histogram"],
-        value="scatter",
+        options=plot_type_options,
+        value=plot_type_default,
         label="Plot type",
     )
+    x_options = numeric_cols or ["(none)"]
+    x_default = (
+        choose_dropdown_value(x_options, current=dataset_explorer_x_state(), preferred=_x_default) or x_options[0]
+    )
     x_dropdown = mo.ui.dropdown(
-        options=numeric_cols or ["(none)"],
-        value=_x_default,
+        options=x_options,
+        value=x_default,
         label="X column",
         full_width=True,
     )
+    y_options = numeric_cols or ["(none)"]
+    y_default = (
+        choose_dropdown_value(y_options, current=dataset_explorer_y_state(), preferred=_y_default) or y_options[0]
+    )
     y_dropdown = mo.ui.dropdown(
-        options=numeric_cols or ["(none)"],
-        value=_y_default,
+        options=y_options,
+        value=y_default,
         label="Y column (scatter only)",
         full_width=True,
     )
@@ -398,11 +434,19 @@ def _(
     color_options = ["(none)"] + hue_registry.labels()
     _default_color = defaults.get("color")
     if _default_color in color_options:
-        color_default = _default_color
+        preferred_color = _default_color
     elif "Score" in hue_registry.labels():
-        color_default = "Score"
+        preferred_color = "Score"
     else:
-        color_default = "(none)"
+        preferred_color = "(none)"
+    color_default = (
+        choose_dropdown_value(
+            color_options,
+            current=dataset_explorer_color_state(),
+            preferred=preferred_color,
+        )
+        or "(none)"
+    )
     dataset_explorer_color_dropdown = mo.ui.dropdown(
         options=color_options,
         value=color_default,
@@ -643,6 +687,41 @@ def _(
 
 @app.cell
 def _(
+    dataset_explorer_color_dropdown,
+    dataset_explorer_color_state,
+    dataset_explorer_plot_type_state,
+    dataset_explorer_x_state,
+    dataset_explorer_y_state,
+    plot_type_dropdown,
+    set_dataset_explorer_color_state,
+    set_dataset_explorer_plot_type_state,
+    set_dataset_explorer_x_state,
+    set_dataset_explorer_y_state,
+    state_value_changed,
+    x_dropdown,
+    y_dropdown,
+):
+    if plot_type_dropdown is not None:
+        _next_value = plot_type_dropdown.value
+        if state_value_changed(dataset_explorer_plot_type_state(), _next_value):
+            set_dataset_explorer_plot_type_state(_next_value)
+    if x_dropdown is not None:
+        _next_value = x_dropdown.value
+        if state_value_changed(dataset_explorer_x_state(), _next_value):
+            set_dataset_explorer_x_state(_next_value)
+    if y_dropdown is not None:
+        _next_value = y_dropdown.value
+        if state_value_changed(dataset_explorer_y_state(), _next_value):
+            set_dataset_explorer_y_state(_next_value)
+    if dataset_explorer_color_dropdown is not None:
+        _next_value = dataset_explorer_color_dropdown.value
+        if state_value_changed(dataset_explorer_color_state(), _next_value):
+            set_dataset_explorer_color_state(_next_value)
+    return ()
+
+
+@app.cell
+def _(
     coerce_selection_dataframe,
     data_ready,
     dataset_explorer_chart_ui,
@@ -692,14 +771,34 @@ def _(df_active, mo):
 
 
 @app.cell
-def _(hue_registry, mo):
+def _(mo):
+    cluster_metric_state, set_cluster_metric_state = mo.state(None)
+    cluster_hue_state, set_cluster_hue_state = mo.state(None)
+    return (
+        cluster_hue_state,
+        cluster_metric_state,
+        set_cluster_hue_state,
+        set_cluster_metric_state,
+    )
+
+
+@app.cell
+def _(choose_dropdown_value, cluster_hue_state, cluster_metric_state, hue_registry, mo):
     metric_options = [opt.label for opt in hue_registry.options if opt.kind == "numeric"]
     if not metric_options:
         metric_options = ["(none)"]
     default_metric = "Score" if "Score" in metric_options else metric_options[0]
+    metric_default = (
+        choose_dropdown_value(
+            metric_options,
+            current=cluster_metric_state(),
+            preferred=default_metric,
+        )
+        or metric_options[0]
+    )
     transient_cluster_metric_dropdown = mo.ui.dropdown(
         options=metric_options,
-        value=default_metric,
+        value=metric_default,
         label="Cluster plot metric",
         full_width=True,
     )
@@ -709,13 +808,42 @@ def _(hue_registry, mo):
         if candidate in hue_registry.labels():
             default_hue = candidate
             break
+    hue_default = (
+        choose_dropdown_value(
+            hue_options,
+            current=cluster_hue_state(),
+            preferred=default_hue,
+        )
+        or "(none)"
+    )
     transient_cluster_hue_dropdown = mo.ui.dropdown(
         options=hue_options,
-        value=default_hue,
+        value=hue_default,
         label="Color by (hue)",
         full_width=True,
     )
     return transient_cluster_hue_dropdown, transient_cluster_metric_dropdown
+
+
+@app.cell
+def _(
+    cluster_hue_state,
+    cluster_metric_state,
+    set_cluster_hue_state,
+    set_cluster_metric_state,
+    state_value_changed,
+    transient_cluster_hue_dropdown,
+    transient_cluster_metric_dropdown,
+):
+    if transient_cluster_metric_dropdown is not None:
+        _next_value = transient_cluster_metric_dropdown.value
+        if state_value_changed(cluster_metric_state(), _next_value):
+            set_cluster_metric_state(_next_value)
+    if transient_cluster_hue_dropdown is not None:
+        _next_value = transient_cluster_hue_dropdown.value
+        if state_value_changed(cluster_hue_state(), _next_value):
+            set_cluster_hue_state(_next_value)
+    return ()
 
 
 @app.cell(column=1)
@@ -764,12 +892,19 @@ def _(missingness_table, mo, namespace_table):
 
 
 @app.cell
-def _(build_umap_controls, df_view, hue_registry, mo):
+def _(mo):
+    umap_color_state, set_umap_color_state = mo.state(None)
+    return set_umap_color_state, umap_color_state
+
+
+@app.cell
+def _(build_umap_controls, df_view, hue_registry, mo, umap_color_state):
     controls = build_umap_controls(
         mo=mo,
         df_active=df_view,
         hue_registry=hue_registry,
         default_hue_key="opal__view__score",
+        current_color=umap_color_state(),
     )
     umap_color_dropdown = controls.umap_color_dropdown
     umap_x_input = controls.umap_x_input
@@ -838,6 +973,15 @@ def _(
     umap_chart_note_md = mo.md(_result.note) if _result.note else mo.md("")
     umap_chart_ui = mo.ui.altair_chart(_result.chart)
     return df_umap_plot, umap_chart_note_md, umap_chart_ui, umap_valid
+
+
+@app.cell
+def _(set_umap_color_state, state_value_changed, umap_color_dropdown, umap_color_state):
+    if umap_color_dropdown is not None:
+        _next_value = umap_color_dropdown.value
+        if state_value_changed(umap_color_state(), _next_value):
+            set_umap_color_state(_next_value)
+    return ()
 
 
 @app.cell
@@ -1706,54 +1850,176 @@ def _(build_sfxi_hue_registry, choose_dropdown_value, df_sfxi_scatter, mo, sfxi_
 
 @app.cell
 def _(mo):
+    support_y_state, set_support_y_state = mo.state(None)
+    support_color_state, set_support_color_state = mo.state(None)
+    uncertainty_color_state, set_uncertainty_color_state = mo.state(None)
+    uncertainty_kind_state, set_uncertainty_kind_state = mo.state(None)
+    uncertainty_components_state, set_uncertainty_components_state = mo.state(None)
+    uncertainty_reduction_state, set_uncertainty_reduction_state = mo.state(None)
+    return (
+        set_support_color_state,
+        set_support_y_state,
+        set_uncertainty_color_state,
+        set_uncertainty_components_state,
+        set_uncertainty_kind_state,
+        set_uncertainty_reduction_state,
+        support_color_state,
+        support_y_state,
+        uncertainty_color_state,
+        uncertainty_components_state,
+        uncertainty_kind_state,
+        uncertainty_reduction_state,
+    )
+
+
+@app.cell
+def _(
+    choose_dropdown_value,
+    mo,
+    support_y_state,
+    uncertainty_components_state,
+    uncertainty_kind_state,
+    uncertainty_reduction_state,
+):
     diagnostics_sample_slider = mo.ui.slider(0, 5000, value=1500, step=100, label="Diagnostics sample (n)")
     diagnostics_seed_slider = mo.ui.slider(0, 10000, value=0, step=1, label="Diagnostics seed")
+    support_y_options = ["Score", "Logic fidelity"]
+    support_y_default = (
+        choose_dropdown_value(support_y_options, current=support_y_state(), preferred="Score") or "Score"
+    )
     support_y_dropdown = mo.ui.dropdown(
-        options=["Score", "Logic fidelity"],
-        value="Score",
+        options=support_y_options,
+        value=support_y_default,
         label="Support Y-axis",
         full_width=True,
     )
-    support_color_dropdown = mo.ui.dropdown(
-        options=["Effect scaled", "Logic fidelity", "Score"],
-        value="Effect scaled",
-        label="Support color",
-        full_width=True,
-    )
-    uncertainty_color_dropdown = mo.ui.dropdown(
-        options=["Logic fidelity", "Effect scaled", "Score"],
-        value="Logic fidelity",
-        label="Uncertainty color",
-        full_width=True,
+    uncertainty_kind_options = ["score", "y_hat"]
+    uncertainty_kind_default = (
+        choose_dropdown_value(uncertainty_kind_options, current=uncertainty_kind_state(), preferred="score") or "score"
     )
     uncertainty_kind_dropdown = mo.ui.dropdown(
-        options=["score", "y_hat"],
-        value="score",
+        options=uncertainty_kind_options,
+        value=uncertainty_kind_default,
         label="Uncertainty kind",
         full_width=True,
     )
+    uncertainty_components_options = ["all", "logic", "intensity"]
+    uncertainty_components_default = (
+        choose_dropdown_value(
+            uncertainty_components_options,
+            current=uncertainty_components_state(),
+            preferred="all",
+        )
+        or "all"
+    )
     uncertainty_components_dropdown = mo.ui.dropdown(
-        options=["all", "logic", "intensity"],
-        value="all",
+        options=uncertainty_components_options,
+        value=uncertainty_components_default,
         label="Y-hat components",
         full_width=True,
     )
+    uncertainty_reduction_options = ["mean", "max"]
+    uncertainty_reduction_default = (
+        choose_dropdown_value(
+            uncertainty_reduction_options,
+            current=uncertainty_reduction_state(),
+            preferred="mean",
+        )
+        or "mean"
+    )
     uncertainty_reduction_dropdown = mo.ui.dropdown(
-        options=["mean", "max"],
-        value="mean",
+        options=uncertainty_reduction_options,
+        value=uncertainty_reduction_default,
         label="Y-hat reduction",
         full_width=True,
     )
     return (
         diagnostics_sample_slider,
         diagnostics_seed_slider,
-        support_color_dropdown,
         support_y_dropdown,
-        uncertainty_color_dropdown,
         uncertainty_components_dropdown,
         uncertainty_kind_dropdown,
         uncertainty_reduction_dropdown,
     )
+
+
+@app.cell
+def _(choose_dropdown_value, hue_registry, mo, support_color_state, uncertainty_color_state):
+    _diag_hue_options = ["(none)"] + hue_registry.labels()
+    support_color_preferred = "Effect scaled" if "Effect scaled" in _diag_hue_options else "Score"
+    support_color_default = (
+        choose_dropdown_value(_diag_hue_options, current=support_color_state(), preferred=support_color_preferred)
+        or "(none)"
+    )
+    support_color_dropdown = mo.ui.dropdown(
+        options=_diag_hue_options,
+        value=support_color_default,
+        label="Support color",
+        full_width=True,
+    )
+    uncertainty_color_preferred = "Logic fidelity" if "Logic fidelity" in _diag_hue_options else "Score"
+    uncertainty_color_default = (
+        choose_dropdown_value(
+            _diag_hue_options, current=uncertainty_color_state(), preferred=uncertainty_color_preferred
+        )
+        or "(none)"
+    )
+    uncertainty_color_dropdown = mo.ui.dropdown(
+        options=_diag_hue_options,
+        value=uncertainty_color_default,
+        label="Uncertainty color",
+        full_width=True,
+    )
+    return support_color_dropdown, uncertainty_color_dropdown
+
+
+@app.cell
+def _(
+    set_support_color_state,
+    set_support_y_state,
+    set_uncertainty_color_state,
+    set_uncertainty_components_state,
+    set_uncertainty_kind_state,
+    set_uncertainty_reduction_state,
+    state_value_changed,
+    support_color_dropdown,
+    support_color_state,
+    support_y_dropdown,
+    support_y_state,
+    uncertainty_color_dropdown,
+    uncertainty_color_state,
+    uncertainty_components_dropdown,
+    uncertainty_components_state,
+    uncertainty_kind_dropdown,
+    uncertainty_kind_state,
+    uncertainty_reduction_dropdown,
+    uncertainty_reduction_state,
+):
+    if support_y_dropdown is not None:
+        _next_value = support_y_dropdown.value
+        if state_value_changed(support_y_state(), _next_value):
+            set_support_y_state(_next_value)
+    if support_color_dropdown is not None:
+        _next_value = support_color_dropdown.value
+        if state_value_changed(support_color_state(), _next_value):
+            set_support_color_state(_next_value)
+    if uncertainty_color_dropdown is not None:
+        _next_value = uncertainty_color_dropdown.value
+        if state_value_changed(uncertainty_color_state(), _next_value):
+            set_uncertainty_color_state(_next_value)
+    if uncertainty_kind_dropdown is not None:
+        _next_value = uncertainty_kind_dropdown.value
+        if state_value_changed(uncertainty_kind_state(), _next_value):
+            set_uncertainty_kind_state(_next_value)
+    if uncertainty_components_dropdown is not None:
+        _next_value = uncertainty_components_dropdown.value
+        if state_value_changed(uncertainty_components_state(), _next_value):
+            set_uncertainty_components_state(_next_value)
+    if uncertainty_reduction_dropdown is not None:
+        _next_value = uncertainty_reduction_dropdown.value
+        if state_value_changed(uncertainty_reduction_state(), _next_value):
+            set_uncertainty_reduction_state(_next_value)
+    return ()
 
 
 @app.cell
@@ -2168,6 +2434,7 @@ def _(
     df_pred_selected,
     df_view,
     fig_to_image,
+    hue_registry,
     mo,
     opal_campaign_info,
     opal_labels_current_df,
@@ -2184,20 +2451,9 @@ def _(
         "Score": "opal__view__score",
         "Logic fidelity": "opal__view__logic_fidelity",
     }
-    support_color_map = {
-        "Effect scaled": "opal__view__effect_scaled",
-        "Logic fidelity": "opal__view__logic_fidelity",
-        "Score": "opal__view__score",
-    }
     support_y_col = support_y_map.get(support_y_dropdown.value, "opal__view__score")
-    support_color_col = support_color_map.get(support_color_dropdown.value, "opal__view__effect_scaled")
-
-    uncertainty_color_map = {
-        "Logic fidelity": "opal__view__logic_fidelity",
-        "Effect scaled": "opal__view__effect_scaled",
-        "Score": "opal__view__score",
-    }
-    uncertainty_color_col = uncertainty_color_map.get(uncertainty_color_dropdown.value, "opal__view__logic_fidelity")
+    support_color = hue_registry.get(support_color_dropdown.value)
+    uncertainty_color = hue_registry.get(uncertainty_color_dropdown.value)
 
     panels = build_diagnostics_panels(
         df_pred_selected=df_pred_selected,
@@ -2208,8 +2464,8 @@ def _(
         opal_labels_current_df=opal_labels_current_df,
         sfxi_params=sfxi_params,
         support_y_col=support_y_col,
-        support_color_col=support_color_col,
-        uncertainty_color_col=uncertainty_color_col,
+        support_color=support_color,
+        uncertainty_color=uncertainty_color,
         uncertainty_available=uncertainty_available,
         sample_n=diag_sample_n,
         seed=diag_seed,

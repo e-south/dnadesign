@@ -19,14 +19,18 @@ import polars as pl
 from ....objectives import sfxi_math
 from ...sfxi import setpoint_sweep as sfxi_setpoint_sweep
 from ..datasets import CampaignInfo
+from ..hues import HueOption
+from ..theme import DNAD_DIAGNOSTICS_PLOT_SIZE
 from ..util import list_series_to_numpy
 from ..views.sfxi import SFXIParams
-from .sfxi_factorial_effects import make_factorial_effects_figure
+from .sfxi_diagnostics_altair import (
+    make_factorial_effects_chart,
+    make_support_diagnostics_chart,
+    make_uncertainty_chart,
+)
 from .sfxi_intensity_scaling import make_intensity_scaling_figure
 from .sfxi_setpoint_decomposition import make_setpoint_decomposition_figure
 from .sfxi_setpoint_sweep import make_setpoint_sweep_figure
-from .sfxi_support_diagnostics import make_support_diagnostics_figure
-from .sfxi_uncertainty import make_uncertainty_figure
 
 
 @dataclass(frozen=True)
@@ -112,19 +116,18 @@ def _build_factorial_panel(
     )
     df_plot = _sample_df(df_plot, sample_n=sample_n, seed=seed)
     try:
-        fig = make_factorial_effects_figure(
+        chart = make_factorial_effects_chart(
             df_plot,
             logic_col="pred_y_hat",
             size_col="opal__view__effect_scaled",
             label_col="opal__view__observed",
             selected_col="opal__view__top_k",
-            top_k_col=None,
-            rasterize_at=20000,
             subtitle="Predicted logic vectors",
+            plot_size=DNAD_DIAGNOSTICS_PLOT_SIZE,
         )
     except Exception as exc:
         return _note_panel(f"Factorial effects unavailable ({exc}).")
-    return ChartPanel(chart=fig, note=None, kind="mpl")
+    return ChartPanel(chart=chart, note=None, kind="altair")
 
 
 def _build_decomposition_panel(
@@ -173,7 +176,7 @@ def _build_support_panel(
     sample_n: int,
     seed: int,
     y_col: str,
-    hue_col: str,
+    hue: HueOption | None,
 ) -> ChartPanel:
     if df_view is None or df_view.is_empty():
         return _note_panel("Support diagnostics unavailable (dashboard view missing).")
@@ -181,23 +184,24 @@ def _build_support_panel(
         return _note_panel("Support diagnostics unavailable (dist_to_labeled_logic missing).")
     if y_col not in df_view.columns:
         return _note_panel(f"Support diagnostics unavailable (missing y column: {y_col}).")
-    if hue_col not in df_view.columns:
-        return _note_panel(f"Support diagnostics unavailable (missing hue column: {hue_col}).")
+    if hue is not None and hue.key not in df_view.columns:
+        return _note_panel(f"Support diagnostics unavailable (missing hue column: {hue.key}).")
 
     df_support = _sample_df(df_view, sample_n=sample_n, seed=seed)
     try:
-        fig = make_support_diagnostics_figure(
+        chart = make_support_diagnostics_chart(
             df_support,
             x_col="opal__sfxi__dist_to_labeled_logic",
             y_col=y_col,
-            hue_col=hue_col,
+            hue=hue,
+            label_col="opal__view__observed",
             selected_col="opal__view__top_k",
             subtitle="Logic-space support",
-            rasterize_at=20000,
+            plot_size=DNAD_DIAGNOSTICS_PLOT_SIZE,
         )
     except Exception as exc:
         return _note_panel(f"Support diagnostics unavailable ({exc}).")
-    return ChartPanel(chart=fig, note=None, kind="mpl")
+    return ChartPanel(chart=chart, note=None, kind="altair")
 
 
 def _build_uncertainty_panel(
@@ -206,7 +210,7 @@ def _build_uncertainty_panel(
     uncertainty_available: bool,
     sample_n: int,
     seed: int,
-    hue_col: str,
+    hue: HueOption | None,
 ) -> ChartPanel:
     if not uncertainty_available:
         return _note_panel("Uncertainty plot unavailable.")
@@ -214,23 +218,25 @@ def _build_uncertainty_panel(
         return _note_panel("Uncertainty plot unavailable (dashboard view missing).")
     if "opal__sfxi__uncertainty" not in df_view.columns:
         return _note_panel("Uncertainty plot unavailable (missing uncertainty column).")
-    if hue_col not in df_view.columns:
-        return _note_panel(f"Uncertainty plot unavailable (missing hue column: {hue_col}).")
+    if hue is not None and hue.key not in df_view.columns:
+        return _note_panel(f"Uncertainty plot unavailable (missing hue column: {hue.key}).")
 
     df_unc = df_view.filter(pl.col("opal__sfxi__uncertainty").is_not_null())
     df_unc = _sample_df(df_unc, sample_n=sample_n, seed=seed)
     try:
-        fig = make_uncertainty_figure(
+        chart = make_uncertainty_chart(
             df_unc,
             x_col="opal__sfxi__uncertainty",
             y_col="opal__view__score",
-            hue_col=hue_col,
+            hue=hue,
+            label_col="opal__view__observed",
+            selected_col="opal__view__top_k",
             subtitle="Uncertainty vs score",
-            rasterize_at=20000,
+            plot_size=DNAD_DIAGNOSTICS_PLOT_SIZE,
         )
     except Exception as exc:
         return _note_panel(f"Uncertainty plot unavailable ({exc}).")
-    return ChartPanel(chart=fig, note=None, kind="mpl")
+    return ChartPanel(chart=chart, note=None, kind="altair")
 
 
 def _build_sweep_data(
@@ -313,8 +319,8 @@ def build_diagnostics_panels(
     opal_labels_current_df: pl.DataFrame | None,
     sfxi_params: SFXIParams,
     support_y_col: str,
-    support_color_col: str,
-    uncertainty_color_col: str,
+    support_color: HueOption | None,
+    uncertainty_color: HueOption | None,
     uncertainty_available: bool,
     sample_n: int,
     seed: int,
@@ -340,14 +346,14 @@ def build_diagnostics_panels(
         sample_n=sample_n,
         seed=seed,
         y_col=support_y_col,
-        hue_col=support_color_col,
+        hue=support_color,
     )
     uncertainty = _build_uncertainty_panel(
         df_view=df_view,
         uncertainty_available=uncertainty_available,
         sample_n=sample_n,
         seed=seed,
-        hue_col=uncertainty_color_col,
+        hue=uncertainty_color,
     )
 
     try:

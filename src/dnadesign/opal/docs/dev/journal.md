@@ -97,3 +97,5 @@ Note: freeform working notes; prune/merge as they become cruft.
 - prom60_eda column layout updated so OPAL artifact model, Diagnostics, and Export are in columns 7/8/9 respectively.
 - Diagnostics panel no longer renders the derived-metrics status markdown; derived-metrics notes remain.
 - Added diagnostics sizing helpers and tightened Matplotlib diagnostics styling for white backgrounds + black text.
+- Added Altair-based diagnostics scatter charts (factorial/support/uncertainty) with overlay-aware hue options.
+- prom60_eda dropdowns now persist in-session state for diagnostics, UMAP, cluster plots, and dataset explorer.
