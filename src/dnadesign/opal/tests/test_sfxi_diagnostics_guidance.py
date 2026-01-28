@@ -28,6 +28,7 @@ def test_support_and_uncertainty_ignore_non_pred_rows() -> None:
         {
             "id": ["a", "b", "c"],
             "opal__view__score": [0.5, 0.6, None],
+            "opal__view__effect_scaled": [0.4, 0.3, None],
             "opal__view__observed": [False, True, False],
             "opal__view__top_k": [False, True, False],
             "opal__sfxi__dist_to_labeled_logic": [0.1, 0.2, None],
@@ -62,6 +63,7 @@ def test_uncertainty_hue_matches_x_column() -> None:
         {
             "id": ["a", "b"],
             "opal__view__score": [0.5, 0.6],
+            "opal__view__effect_scaled": [0.4, 0.3],
             "opal__view__observed": [False, True],
             "opal__view__top_k": [False, True],
             "opal__sfxi__dist_to_labeled_logic": [0.1, 0.2],

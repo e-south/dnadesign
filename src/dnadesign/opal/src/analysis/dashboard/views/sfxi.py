@@ -180,25 +180,14 @@ def compute_sfxi_metrics(
     df = _coerce_vec8_column(df, vec_col)
     denom_pool_df = _coerce_vec8_column(denom_pool_df, vec_col)
     if vec_col not in df.columns:
-        return SFXIResult(
-            df=df.head(0),
-            denom=params.eps,
-            weights=params.weights,
-            d=params.d,
-            pool_size=0,
-            denom_source="empty",
-        )
+        raise ValueError(f"Missing SFXI vector column: `{vec_col}`.")
+    if df.is_empty():
+        raise ValueError("No rows available for SFXI metrics.")
     valid_mask = valid_vec8_mask_expr(vec_col)
-    df_valid = df.filter(valid_mask)
-    if df_valid.is_empty():
-        return SFXIResult(
-            df=df.head(0),
-            denom=params.eps,
-            weights=params.weights,
-            d=params.d,
-            pool_size=0,
-            denom_source="empty",
-        )
+    invalid_count = int(df.select((~valid_mask).sum()).item())
+    if invalid_count:
+        raise ValueError(f"SFXI vectors in `{vec_col}` must be length-8 finite values (invalid rows: {invalid_count}).")
+    df_valid = df
 
     p0, p1, p2, p3 = params.setpoint
     setpoint_sum = p0 + p1 + p2 + p3
@@ -228,28 +217,23 @@ def compute_sfxi_metrics(
             denom=1.0,
             weights=params.weights,
             d=params.d,
-            pool_size=0,
+            pool_size=df_valid.height,
             denom_source="disabled",
         )
 
-    pool_size = 0
-    denom_source = "p"
-    if vec_col not in denom_pool_df.columns or denom_pool_df.is_empty():
-        raise ValueError(f"Need at least min_n={params.min_n} labels in current round to scale intensity; got 0.")
-
-    pool_dtype = denom_pool_df.schema.get(vec_col, pl.Null)
-    if pool_dtype == pl.Null:
-        raise ValueError(f"Need at least min_n={params.min_n} labels in current round to scale intensity; got 0.")
-
-    pool_valid = denom_pool_df.filter(valid_vec8_mask_expr(vec_col))
-    pool_vec = list_series_to_numpy(pool_valid.get_column(vec_col), expected_len=8)
+    if vec_col not in denom_pool_df.columns:
+        raise ValueError(f"Denom pool missing vector column: `{vec_col}`.")
+    if denom_pool_df.is_empty():
+        raise ValueError("Denom pool is empty.")
+    pool_invalid = int(denom_pool_df.select((~valid_mask).sum()).item())
+    if pool_invalid:
+        raise ValueError(
+            f"Denom pool vectors in `{vec_col}` must be length-8 finite values (invalid rows: {pool_invalid})."
+        )
+    pool_vec = list_series_to_numpy(denom_pool_df.get_column(vec_col), expected_len=8)
     if pool_vec is None:
         raise ValueError("Invalid SFXI label vectors: expected length-8 lists of finite values.")
     pool_size = int(pool_vec.shape[0])
-    if pool_size < params.min_n:
-        raise ValueError(
-            f"Need at least min_n={params.min_n} labels in current round to scale intensity; got {pool_size}."
-        )
 
     denom = sfxi_math.denom_from_labels(
         pool_vec[:, 4:8],
@@ -286,7 +270,7 @@ def compute_sfxi_metrics(
         weights=params.weights,
         d=params.d,
         pool_size=pool_size,
-        denom_source=denom_source,
+        denom_source="labels",
     )
 
 
@@ -297,30 +281,17 @@ def compute_label_sfxi_view(
     y_col: str | None,
     params: SFXIParams,
 ) -> LabelSfxiView:
-    notice = None
-    df_sfxi = labels_view_df.head(0)
     if y_col is None or y_col not in labels_view_df.columns:
-        notice = f"Missing SFXI labels: `{y_col}` not found." if y_col else "Missing SFXI labels."
-    elif labels_view_df.is_empty():
-        notice = "No label events available for the selected filters."
-    else:
-        try:
-            sfxi_result = compute_sfxi_metrics(
-                df=labels_view_df,
-                vec_col=y_col,
-                params=params,
-                denom_pool_df=labels_current_df,
-            )
-        except ValueError as exc:
-            notice = str(exc)
-        else:
-            df_sfxi = sfxi_result.df
-            if sfxi_result.denom_source != "disabled" and sfxi_result.pool_size < params.min_n:
-                notice = (
-                    f"Insufficient labels in current round for scaling; denom source: `{sfxi_result.denom_source}`."
-                )
-            elif df_sfxi.is_empty():
-                notice = "No valid SFXI vectors after filtering."
+        raise ValueError(f"Missing SFXI label column: `{y_col}`.")
+    if labels_view_df.is_empty():
+        raise ValueError("No label events available for the selected filters.")
+    sfxi_result = compute_sfxi_metrics(
+        df=labels_view_df,
+        vec_col=y_col,
+        params=params,
+        denom_pool_df=labels_current_df,
+    )
+    df_sfxi = sfxi_result.df
 
     table_df = df_sfxi
     display_col = y_col
@@ -354,7 +325,7 @@ def compute_label_sfxi_view(
         ]
         if col and col in table_df.columns
     ]
-    return LabelSfxiView(df=df_sfxi, notice=notice, table_df=table_df, table_cols=table_cols)
+    return LabelSfxiView(df=df_sfxi, notice=None, table_df=table_df, table_cols=table_cols)
 
 
 def build_label_sfxi_view(
@@ -366,32 +337,15 @@ def build_label_sfxi_view(
     params: SFXIParams,
 ) -> LabelSfxiView:
     if not readiness.ready:
-        notice = readiness.notice or "SFXI disabled."
-        empty_df = labels_view_df.head(0)
-        return LabelSfxiView(df=empty_df, notice=notice, table_df=empty_df, table_cols=[])
+        raise ValueError(readiness.notice or "SFXI disabled.")
     if selected_round is None:
-        if labels_view_df.is_empty():
-            empty_df = labels_view_df.head(0)
-            return LabelSfxiView(
-                df=empty_df,
-                notice="No label events available for the selected filters.",
-                table_df=empty_df,
-                table_cols=[],
-            )
         sfxi_view = compute_label_sfxi_view(
             labels_view_df=labels_view_df,
             labels_current_df=labels_view_df,
             y_col=readiness.y_col,
             params=params,
         )
-        if sfxi_view.notice:
-            return sfxi_view
-        return LabelSfxiView(
-            df=sfxi_view.df,
-            notice="Using all rounds for SFXI scaling.",
-            table_df=sfxi_view.table_df,
-            table_cols=sfxi_view.table_cols,
-        )
+        return sfxi_view
     return compute_label_sfxi_view(
         labels_view_df=labels_view_df,
         labels_current_df=labels_current_df,
@@ -409,19 +363,15 @@ def build_pred_sfxi_view(
     mode: str,
     y_hat_col: str = "pred_y_hat",
 ) -> PredSfxiView:
-    notice = None
     if pred_df is None or pred_df.is_empty():
-        return PredSfxiView(df=pl.DataFrame(), notice="No stored predictions available.")
+        raise ValueError("No stored predictions available.")
 
     mode_val = str(mode or "canonical").strip().lower()
     if mode_val == "canonical":
         required = ["pred_score", "pred_logic_fidelity", "pred_effect_scaled"]
         missing = [c for c in required if c not in pred_df.columns]
         if missing:
-            return PredSfxiView(
-                df=pred_df.head(0),
-                notice=f"Prediction history missing required metrics: {sorted(missing)}.",
-            )
+            raise ValueError(f"Prediction history missing required metrics: {sorted(missing)}.")
         df_out = pred_df.with_columns(
             [
                 pl.col("pred_logic_fidelity").cast(pl.Float64).alias("logic_fidelity"),
@@ -429,42 +379,35 @@ def build_pred_sfxi_view(
                 pl.col("pred_score").cast(pl.Float64).alias("score"),
             ]
         )
-        mask = (
-            pl.col("pred_score").is_not_null()
-            & pl.col("pred_logic_fidelity").is_not_null()
-            & pl.col("pred_effect_scaled").is_not_null()
+        invalid_count = int(
+            df_out.select(
+                (~pl.col("logic_fidelity").is_finite()).sum()
+                + (~pl.col("effect_scaled").is_finite()).sum()
+                + (~pl.col("score").is_finite()).sum()
+            ).item()
         )
-        df_out = df_out.filter(mask)
-        if df_out.is_empty():
-            notice = "No valid prediction metrics available for the selected run."
-        return PredSfxiView(df=df_out, notice=notice)
+        if invalid_count:
+            raise ValueError("Prediction metrics must be finite for all rows.")
+        return PredSfxiView(df=df_out, notice=None)
 
+    if mode_val != "overlay":
+        raise ValueError(f"Unknown SFXI mode: {mode}.")
     if y_hat_col not in pred_df.columns:
-        return PredSfxiView(
-            df=pred_df.head(0),
-            notice=f"Missing prediction vector column `{y_hat_col}`.",
-        )
+        raise ValueError(f"Missing prediction vector column `{y_hat_col}`.")
     if y_col is None or y_col not in labels_current_df.columns:
-        return PredSfxiView(
-            df=pred_df.head(0),
-            notice=f"Missing label column `{y_col}` for overlay scoring.",
-        )
+        raise ValueError(f"Missing label column `{y_col}` for overlay scoring.")
     if labels_current_df.is_empty():
-        return PredSfxiView(df=pred_df.head(0), notice="No labels available for overlay scoring.")
+        raise ValueError("No labels available for overlay scoring.")
 
     vec_col = "__overlay_vec"
     df_pred = pred_df.select([c for c in ["id", "__row_id", y_hat_col] if c in pred_df.columns]).rename(
         {y_hat_col: vec_col}
     )
     denom_pool = labels_current_df.select(pl.col(y_col).alias(vec_col))
-    try:
-        result = compute_sfxi_metrics(df=df_pred, vec_col=vec_col, params=params, denom_pool_df=denom_pool)
-    except Exception as exc:
-        notice = f"SFXI overlay failed: {exc}"
-        return PredSfxiView(df=pred_df.head(0), notice=notice)
+    result = compute_sfxi_metrics(df=df_pred, vec_col=vec_col, params=params, denom_pool_df=denom_pool)
     if result.df.is_empty():
-        notice = "No valid predictions after overlay scoring."
-    return PredSfxiView(df=result.df, notice=notice)
+        raise ValueError("No valid predictions after overlay scoring.")
+    return PredSfxiView(df=result.df, notice=None)
 
 
 def apply_overlay_label_flags(
@@ -505,37 +448,22 @@ def build_nearest_2_factor_counts(
     pred_vec_col: str = "pred_y_hat",
 ) -> Nearest2FactorCounts:
     if y_col is None:
-        return Nearest2FactorCounts(df=pl.DataFrame(), note="Nearest-logic counts unavailable (label vector missing).")
+        raise ValueError("Nearest-logic counts require a label vector column.")
     if label_events_df is None or label_events_df.is_empty():
-        return Nearest2FactorCounts(df=pl.DataFrame(), note="Nearest-logic counts unavailable (label history missing).")
+        raise ValueError("Nearest-logic counts require label history.")
     if y_col not in label_events_df.columns:
-        return Nearest2FactorCounts(
-            df=pl.DataFrame(),
-            note=f"Nearest-logic counts unavailable (label history missing `{y_col}`).",
-        )
+        raise ValueError(f"Nearest-logic counts require `{y_col}` in label history.")
     if pred_events_df is None or pred_events_df.is_empty():
-        return Nearest2FactorCounts(
-            df=pl.DataFrame(),
-            note="Nearest-logic counts unavailable (prediction history missing).",
-        )
+        raise ValueError("Nearest-logic counts require prediction history.")
     if pred_vec_col not in pred_events_df.columns:
-        return Nearest2FactorCounts(
-            df=pl.DataFrame(),
-            note=f"Nearest-logic counts unavailable (prediction history missing `{pred_vec_col}`).",
-        )
+        raise ValueError(f"Nearest-logic counts require `{pred_vec_col}` in prediction history.")
 
     labels_vec8 = list_series_to_numpy(label_events_df.get_column(y_col), expected_len=8)
     if labels_vec8 is None:
-        return Nearest2FactorCounts(
-            df=pl.DataFrame(),
-            note="Nearest-logic counts unavailable (invalid label vectors).",
-        )
+        raise ValueError("Nearest-logic counts require valid label vectors.")
     pred_vec8 = list_series_to_numpy(pred_events_df.get_column(pred_vec_col), expected_len=8)
     if pred_vec8 is None:
-        return Nearest2FactorCounts(
-            df=pl.DataFrame(),
-            note="Nearest-logic counts unavailable (invalid pred_y_hat vectors).",
-        )
+        raise ValueError("Nearest-logic counts require valid pred_y_hat vectors.")
 
     label_classes, _ = nearest_gate(labels_vec8[:, 0:4], state_order=sfxi_math.STATE_ORDER)
     pred_classes, _ = nearest_gate(pred_vec8[:, 0:4], state_order=sfxi_math.STATE_ORDER)

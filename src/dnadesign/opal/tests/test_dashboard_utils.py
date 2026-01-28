@@ -701,7 +701,7 @@ def test_compute_label_sfxi_view_preview() -> None:
 
 
 def test_sfxi_metrics_edge_cases() -> None:
-    df = pl.DataFrame(
+    df_invalid = pl.DataFrame(
         {
             "sfxi_8_vector_y_label": [
                 [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
@@ -722,30 +722,23 @@ def test_sfxi_metrics_edge_cases() -> None:
         state_order=STATE_ORDER,
     )
     empty_pool = pl.DataFrame({"sfxi_8_vector_y_label": []})
-    result = sfxi.compute_sfxi_metrics(
-        df=df,
-        vec_col="sfxi_8_vector_y_label",
-        params=params,
-        denom_pool_df=empty_pool,
-    )
-    assert result.df.height == 1
-    assert result.weights == (0.0, 0.0, 0.0, 0.0)
-    assert result.denom == 1.0
-    assert result.denom_source == "disabled"
-    row = result.df.row(0)
-    row_dict = dict(zip(result.df.columns, row))
-    assert abs(row_dict["effect_scaled"] - 1.0) < 1e-6
-    assert abs(row_dict["score"] - 1.0) < 1e-6
+    with pytest.raises(ValueError, match="invalid rows"):
+        sfxi.compute_sfxi_metrics(
+            df=df_invalid,
+            vec_col="sfxi_8_vector_y_label",
+            params=params,
+            denom_pool_df=empty_pool,
+        )
 
     pool = pl.DataFrame({"sfxi_8_vector_y_label": [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]})
-    result_fallback = sfxi.compute_sfxi_metrics(
+    result = sfxi.compute_sfxi_metrics(
         df=pool,
         vec_col="sfxi_8_vector_y_label",
         params=params,
         denom_pool_df=pool,
     )
-    assert result_fallback.denom == 1.0
-    assert result_fallback.denom_source == "disabled"
+    assert result.denom == 1.0
+    assert result.denom_source == "disabled"
 
     params_strict = sfxi.compute_sfxi_params(
         setpoint=[0.25, 0.25, 0.25, 0.25],

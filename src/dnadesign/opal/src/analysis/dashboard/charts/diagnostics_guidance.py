@@ -63,10 +63,6 @@ class ActiveVec8:
     note: str | None
 
 
-def _note_panel(message: str) -> ChartPanel:
-    return ChartPanel(chart=None, note=message, kind="mpl")
-
-
 def _resolve_join_key(df_left: pl.DataFrame, df_right: pl.DataFrame) -> str | None:
     if "id" in df_left.columns and "id" in df_right.columns:
         return "id"
@@ -143,19 +139,19 @@ def _build_diag_view(
     ctx: str,
 ) -> tuple[pl.DataFrame | None, str | None]:
     if df_pred_selected is None or df_pred_selected.is_empty():
-        return None, f"{ctx} unavailable (missing predictions)."
+        raise ValueError(f"{ctx} requires prediction history.")
     if df_view is None or df_view.is_empty():
-        return None, f"{ctx} unavailable (dashboard view missing)."
+        raise ValueError(f"{ctx} requires a non-empty dashboard view.")
     join_key = _resolve_join_key(df_pred_selected, df_view)
     if join_key is None:
-        return None, f"{ctx} unavailable (missing join key: id or __row_id)."
+        raise ValueError(f"{ctx} requires a join key: id or __row_id.")
     if _has_duplicate_key(df_view, join_key):
-        return None, f"{ctx} unavailable (join key is not unique in view)."
+        raise ValueError(f"{ctx} requires a unique join key in view.")
 
     required = _dedupe_cols([col for col in required_cols if col])
     missing = [col for col in required if col not in df_view.columns]
     if missing:
-        return None, f"{ctx} unavailable (missing view columns: {', '.join(missing)})."
+        raise ValueError(f"{ctx} missing view columns: {', '.join(missing)}.")
 
     df_diag = df_pred_selected.join(
         df_view.select(_dedupe_cols([join_key, *required])),
@@ -168,7 +164,7 @@ def _build_diag_view(
             expr = pl.col(col).cast(pl.Float64, strict=False).is_finite().fill_null(False)
             bad = int(df_diag.select((~expr).sum()).item())
             if bad:
-                return None, f"{ctx} unavailable ({col} must be finite)."
+                raise ValueError(f"{ctx} requires `{col}` to be finite for all rows (invalid: {bad}).")
     return df_diag, None
 
 
@@ -178,37 +174,34 @@ def _build_factorial_panel(
     df_view: pl.DataFrame | None,
 ) -> ChartPanel:
     if df_pred_selected is None or df_pred_selected.is_empty():
-        return _note_panel("Factorial effects unavailable (missing predictions).")
+        raise ValueError("Factorial effects require prediction history.")
     if df_view is None or df_view.is_empty():
-        return _note_panel("Factorial effects unavailable (dashboard view missing).")
+        raise ValueError("Factorial effects require a dashboard view.")
     if "pred_y_hat" not in df_pred_selected.columns:
-        return _note_panel("Factorial effects unavailable (missing pred_y_hat).")
+        raise ValueError("Factorial effects require pred_y_hat.")
     join_key = _resolve_join_key(df_pred_selected, df_view)
     if join_key is None:
-        return _note_panel("Factorial effects unavailable (missing join key: id or __row_id).")
+        raise ValueError("Factorial effects require a join key: id or __row_id.")
     required_view_cols = ["opal__view__effect_scaled", "opal__view__observed"]
     missing = [col for col in required_view_cols if col not in df_view.columns]
     if missing:
-        return _note_panel(f"Factorial effects unavailable (missing view columns: {', '.join(missing)}).")
+        raise ValueError(f"Factorial effects missing view columns: {', '.join(missing)}.")
     if _has_duplicate_key(df_view, join_key):
-        return _note_panel("Factorial effects unavailable (join key is not unique in view).")
+        raise ValueError("Factorial effects require a unique join key in view.")
 
     df_plot = df_pred_selected.join(
         df_view.select([join_key, *required_view_cols]),
         on=join_key,
         how="left",
     )
-    try:
-        chart = make_factorial_effects_chart(
-            df_plot,
-            logic_col="pred_y_hat",
-            size_col="opal__view__effect_scaled",
-            label_col="opal__view__observed",
-            subtitle="Predicted logic vectors",
-            plot_size=DNAD_DIAGNOSTICS_PLOT_SIZE,
-        )
-    except Exception as exc:
-        return _note_panel(f"Factorial effects unavailable ({exc}).")
+    chart = make_factorial_effects_chart(
+        df_plot,
+        logic_col="pred_y_hat",
+        size_col="opal__view__effect_scaled",
+        label_col="opal__view__observed",
+        subtitle="Predicted logic vectors",
+        plot_size=DNAD_DIAGNOSTICS_PLOT_SIZE,
+    )
     return ChartPanel(chart=chart, note=None, kind="altair")
 
 
@@ -222,27 +215,21 @@ def _build_support_panel(
     required_cols = ["opal__sfxi__dist_to_labeled_logic", y_col]
     if hue is not None:
         required_cols.append(hue.key)
-    df_support, note = _build_diag_view(
+    df_support, _note = _build_diag_view(
         df_pred_selected=df_pred_selected,
         df_view=df_view,
         required_cols=required_cols,
         ctx="Support diagnostics",
     )
-    if note:
-        return _note_panel(note)
-
-    try:
-        chart = make_support_diagnostics_chart(
-            df_support,
-            x_col="opal__sfxi__dist_to_labeled_logic",
-            y_col=y_col,
-            hue=hue,
-            label_col="opal__view__observed",
-            subtitle="Logic-space support",
-            plot_size=DNAD_DIAGNOSTICS_PLOT_SIZE,
-        )
-    except Exception as exc:
-        return _note_panel(f"Support diagnostics unavailable ({exc}).")
+    chart = make_support_diagnostics_chart(
+        df_support,
+        x_col="opal__sfxi__dist_to_labeled_logic",
+        y_col=y_col,
+        hue=hue,
+        label_col="opal__view__observed",
+        subtitle="Logic-space support",
+        plot_size=DNAD_DIAGNOSTICS_PLOT_SIZE,
+    )
     return ChartPanel(chart=chart, note=None, kind="altair")
 
 
@@ -254,31 +241,25 @@ def _build_uncertainty_panel(
     hue: HueOption | None,
 ) -> ChartPanel:
     if not uncertainty_available:
-        return _note_panel("Uncertainty plot unavailable.")
+        raise ValueError("Uncertainty plot requires available uncertainty data.")
     required_cols = ["opal__sfxi__uncertainty", "opal__view__score"]
     if hue is not None:
         required_cols.append(hue.key)
-    df_unc, note = _build_diag_view(
+    df_unc, _note = _build_diag_view(
         df_pred_selected=df_pred_selected,
         df_view=df_view,
         required_cols=required_cols,
         ctx="Uncertainty plot",
     )
-    if note:
-        return _note_panel(note)
-
-    try:
-        chart = make_uncertainty_chart(
-            df_unc,
-            x_col="opal__sfxi__uncertainty",
-            y_col="opal__view__score",
-            hue=hue,
-            label_col="opal__view__observed",
-            subtitle="Uncertainty vs score",
-            plot_size=DNAD_DIAGNOSTICS_PLOT_SIZE,
-        )
-    except Exception as exc:
-        return _note_panel(f"Uncertainty plot unavailable ({exc}).")
+    chart = make_uncertainty_chart(
+        df_unc,
+        x_col="opal__sfxi__uncertainty",
+        y_col="opal__view__score",
+        hue=hue,
+        label_col="opal__view__observed",
+        subtitle="Uncertainty vs score",
+        plot_size=DNAD_DIAGNOSTICS_PLOT_SIZE,
+    )
     return ChartPanel(chart=chart, note=None, kind="altair")
 
 
@@ -305,12 +286,13 @@ def _build_sweep_data(
     if labels_vec8 is None:
         raise ValueError("Setpoint sweep unavailable (invalid label vectors).")
 
-    pool_vec = None
-    pool_note = None
-    if df_pred_selected is not None and not df_pred_selected.is_empty() and "pred_y_hat" in df_pred_selected.columns:
-        pool_vec = list_series_to_numpy(df_pred_selected.get_column("pred_y_hat"), expected_len=8)
-        if pool_vec is None:
-            pool_note = "Pool effect_raw omitted (invalid pred_y_hat vectors)."
+    if df_pred_selected is None or df_pred_selected.is_empty():
+        raise ValueError("Setpoint sweep requires prediction history for pool effect_raw.")
+    if "pred_y_hat" not in df_pred_selected.columns:
+        raise ValueError("Setpoint sweep requires pred_y_hat in prediction history.")
+    pool_vec = list_series_to_numpy(df_pred_selected.get_column("pred_y_hat"), expected_len=8)
+    if pool_vec is None:
+        raise ValueError("Setpoint sweep requires valid pred_y_hat vectors.")
 
     sweep_df = sfxi_setpoint_sweep.sweep_setpoints(
         labels_vec8=labels_vec8,
@@ -348,7 +330,7 @@ def _build_sweep_data(
         label_effect_raw=label_effect_raw,
         pool_effect_raw=pool_effect_raw,
         subtitle=denom_note,
-        note=pool_note,
+        note=None,
     )
 
 
@@ -359,39 +341,26 @@ def build_sweep_panels(
     opal_labels_current_df: pl.DataFrame | None,
     sfxi_params: SFXIParams,
 ) -> tuple[ChartPanel, ChartPanel]:
-    try:
-        sweep_data = _build_sweep_data(
-            df_pred_selected=df_pred_selected,
-            opal_campaign_info=opal_campaign_info,
-            opal_labels_current_df=opal_labels_current_df,
-            sfxi_params=sfxi_params,
-        )
-    except Exception as exc:
-        sweep = _note_panel(str(exc))
-        intensity = _note_panel(str(exc))
-    else:
-        try:
-            fig = make_setpoint_sweep_figure(
-                sweep_data.sweep_df,
-                metrics=["logic_fidelity", "effect_scaled", "score"],
-                subtitle=f"labels={sweep_data.label_effect_raw.shape[0]} · {sweep_data.subtitle}",
-            )
-        except Exception as exc:
-            sweep = _note_panel(f"Setpoint sweep unavailable ({exc}).")
-        else:
-            sweep = ChartPanel(chart=fig, note=sweep_data.note, kind="mpl")
+    sweep_data = _build_sweep_data(
+        df_pred_selected=df_pred_selected,
+        opal_campaign_info=opal_campaign_info,
+        opal_labels_current_df=opal_labels_current_df,
+        sfxi_params=sfxi_params,
+    )
+    fig = make_setpoint_sweep_figure(
+        sweep_data.sweep_df,
+        metrics=["logic_fidelity", "effect_scaled", "score"],
+        subtitle=f"labels={sweep_data.label_effect_raw.shape[0]} · {sweep_data.subtitle}",
+    )
+    sweep = ChartPanel(chart=fig, note=sweep_data.note, kind="mpl")
 
-        try:
-            fig = make_intensity_scaling_figure(
-                sweep_data.sweep_df,
-                label_effect_raw=sweep_data.label_effect_raw,
-                pool_effect_raw=sweep_data.pool_effect_raw,
-                subtitle=sweep_data.subtitle,
-            )
-        except Exception as exc:
-            intensity = _note_panel(f"Intensity scaling unavailable ({exc}).")
-        else:
-            intensity = ChartPanel(chart=fig, note=sweep_data.note, kind="mpl")
+    fig = make_intensity_scaling_figure(
+        sweep_data.sweep_df,
+        label_effect_raw=sweep_data.label_effect_raw,
+        pool_effect_raw=sweep_data.pool_effect_raw,
+        subtitle=sweep_data.subtitle,
+    )
+    intensity = ChartPanel(chart=fig, note=sweep_data.note, kind="mpl")
 
     return sweep, intensity
 

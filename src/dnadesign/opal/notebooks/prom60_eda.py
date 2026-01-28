@@ -13,14 +13,13 @@ def _():
 
     import altair as alt
     import marimo as mo
-    import numpy as np
     import polars as pl
 
     from dnadesign.opal.src.analysis.dashboard.theme import setup_altair_theme, with_title
 
     setup_altair_theme()
 
-    return Path, alt, dedent, mo, np, pl, with_title
+    return Path, alt, dedent, mo, pl, with_title
 
 
 @app.cell(hide_code=True)
@@ -42,10 +41,8 @@ def _():
     from dnadesign.opal.src.analysis.dashboard import util as dash_util
     from dnadesign.opal.src.analysis.dashboard.charts import diagnostics_guidance as dash_diag_guidance
     from dnadesign.opal.src.analysis.dashboard.charts import plots as dash_plots
+    from dnadesign.opal.src.analysis.dashboard.views import derived_metrics as dash_derived
     from dnadesign.opal.src.analysis.dashboard.views import sfxi as dash_sfxi
-    from dnadesign.opal.src.analysis.sfxi import gates as sfxi_gates
-    from dnadesign.opal.src.analysis.sfxi import support as sfxi_support
-    from dnadesign.opal.src.analysis.sfxi import uncertainty as sfxi_uncertainty
     from dnadesign.opal.src.objectives import sfxi_math
 
     build_mode_view = dash_scores.build_mode_view
@@ -57,6 +54,7 @@ def _():
     build_label_sfxi_view = dash_sfxi.build_label_sfxi_view
     build_nearest_2_factor_counts = dash_sfxi.build_nearest_2_factor_counts
     build_pred_sfxi_view = dash_sfxi.build_pred_sfxi_view
+    attach_diagnostics_metrics = dash_derived.attach_diagnostics_metrics
     build_umap_controls = dash_ui.build_umap_controls
     build_diagnostics_panels = dash_diag_guidance.build_diagnostics_panels
     build_sweep_panels = dash_diag_guidance.build_sweep_panels
@@ -76,7 +74,6 @@ def _():
     attach_namespace_columns = dash_util.attach_namespace_columns
     choose_axis_defaults = dash_util.choose_axis_defaults
     choose_dropdown_value = dash_util.choose_dropdown_value
-    list_series_to_numpy = dash_util.list_series_to_numpy
     column_non_null_counts = dash_util.column_non_null_counts
     state_value_changed = dash_util.state_value_changed
     dedupe_exprs = dash_util.dedupe_exprs
@@ -85,7 +82,6 @@ def _():
     is_altair_undefined = dash_util.is_altair_undefined
     list_campaign_paths = dash_datasets.list_campaign_paths
     load_campaign_selection = dash_datasets.load_campaign_selection
-    load_round_ctx_from_dir = dash_models.load_round_ctx_from_dir
     resolve_artifact_state = dash_models.resolve_artifact_state
     get_feature_importances = dash_models.get_feature_importances
     load_feature_importances_from_artifact = dash_models.load_feature_importances_from_artifact
@@ -108,6 +104,7 @@ def _():
         build_label_sfxi_view,
         build_nearest_2_factor_counts,
         build_pred_sfxi_view,
+        attach_diagnostics_metrics,
         build_mode_view,
         build_pred_events,
         build_round_options_from_label_hist,
@@ -127,10 +124,8 @@ def _():
         diagnostics_to_lines,
         find_repo_root,
         get_feature_importances,
-        list_series_to_numpy,
         load_parquet_cached,
         load_feature_importances_from_artifact,
-        load_round_ctx_from_dir,
         is_altair_undefined,
         list_campaign_paths,
         load_campaign_selection,
@@ -141,10 +136,7 @@ def _():
         resolve_sfxi_readiness,
         safe_is_numeric,
         state_value_changed,
-        sfxi_gates,
         sfxi_math,
-        sfxi_support,
-        sfxi_uncertainty,
     )
 
 
@@ -2417,14 +2409,10 @@ def _(build_nearest_2_factor_counts, mo, opal_label_events_df, opal_pred_events_
         pred_events_df=opal_pred_events_df,
         y_col=y_col,
     )
+    if counts.df.is_empty():
+        raise ValueError("Nearest-logic counts are empty.")
     nearest_2_factor_counts_note_md = mo.md("")
-    nearest_2_factor_counts_ui = mo.md("")
-    if counts.note:
-        nearest_2_factor_counts_note_md = mo.md(counts.note)
-    elif counts.df.is_empty():
-        nearest_2_factor_counts_note_md = mo.md("Nearest-logic counts unavailable.")
-    else:
-        nearest_2_factor_counts_ui = mo.ui.table(counts.df, page_size=min(16, counts.df.height))
+    nearest_2_factor_counts_ui = mo.ui.table(counts.df, page_size=min(16, counts.df.height))
     return nearest_2_factor_counts_note_md, nearest_2_factor_counts_ui
 
 
@@ -2432,7 +2420,7 @@ def _(build_nearest_2_factor_counts, mo, opal_label_events_df, opal_pred_events_
 def _(fig_to_image, mo):
     def render_chart_panel(panel, *, default_note: str):
         if panel.chart is None:
-            return mo.md(panel.note or default_note)
+            raise ValueError(default_note)
         element = fig_to_image(panel.chart) if panel.kind != "altair" else mo.ui.altair_chart(panel.chart)
         if panel.note:
             return mo.vstack([mo.md(panel.note), element])
@@ -2444,7 +2432,6 @@ def _(fig_to_image, mo):
 @app.cell(column=8)
 def _(
     build_diagnostics_panels,
-    derived_metrics_note_md,
     df_pred_selected,
     df_view,
     hue_registry,
@@ -2481,7 +2468,6 @@ def _(
     mo.vstack(
         [
             mo.md("## Diagnostic plots & guidance"),
-            derived_metrics_note_md,
             mo.md(
                 "Diagnostics use label history as the canonical source for observed/predicted vec8s. "
                 "Overlay mode recomputes SFXI metrics with the current setpoint/exponents."
@@ -3019,11 +3005,10 @@ def _(
 ):
     df_sfxi = opal_labels_view_df.head(0)
     sfxi_meta_md = mo.md("")
-    sfxi_notice_md = mo.md("")
 
     readiness = resolve_sfxi_readiness(opal_campaign_info)
-    if readiness.notice:
-        sfxi_notice_md = mo.md(readiness.notice)
+    if not readiness.ready:
+        raise ValueError(readiness.notice or "SFXI disabled.")
 
     delta = float(sfxi_fixed_params.get("delta", 0.0))
     p = float(sfxi_fixed_params.get("percentile", 95.0))
@@ -3067,11 +3052,10 @@ def _(
         labels_current_df=opal_labels_current_df,
         params=sfxi_params,
     )
-    if label_view.notice:
-        sfxi_notice_md = mo.md(label_view.notice)
     df_sfxi = label_view.df
     if not df_sfxi.is_empty():
         sfxi_meta_md = mo.md("Label-level SFXI metrics are shown in the Labels table.")
+    sfxi_notice_md = mo.md("")
     return df_sfxi, readiness, sfxi_meta_md, sfxi_notice_md, sfxi_params
 
 
@@ -3092,8 +3076,7 @@ def _(
         mode=mode_dropdown.value,
     )
     df_sfxi_pred = pred_view.df
-    sfxi_pred_notice = pred_view.notice
-    return df_sfxi_pred, sfxi_pred_notice
+    return (df_sfxi_pred,)
 
 
 @app.cell
@@ -3104,7 +3087,6 @@ def _(
     df_view,
     mo,
     pl,
-    sfxi_pred_notice,
     sfxi_source_dropdown,
 ):
     df_obs = df_sfxi.with_columns(pl.lit("Observed").alias("sfxi_source")) if df_sfxi is not None else pl.DataFrame()
@@ -3132,10 +3114,6 @@ def _(
     )
 
     sfxi_source_notice_md = mo.md("")
-    if _sfxi_source in {"Predicted", "Both"} and df_pred.is_empty():
-        sfxi_source_notice_md = (
-            mo.md(sfxi_pred_notice) if sfxi_pred_notice else mo.md("No predicted SFXI data available.")
-        )
     return df_sfxi_scatter, sfxi_source_notice_md
 
 
@@ -3335,16 +3313,14 @@ def _(diagnostics_to_lines, mo, transient_diag):
 
 @app.cell
 def _(
+    attach_diagnostics_metrics,
     build_mode_view,
     df_active,
     df_pred_selected,
     df_sfxi,
     diagnostics_to_lines,
-    list_series_to_numpy,
-    load_round_ctx_from_dir,
     mo,
     mode_dropdown,
-    np,
     opal_campaign_info,
     opal_labels_asof_df,
     opal_labels_current_df,
@@ -3352,12 +3328,7 @@ def _(
     opal_pred_selected_run_id,
     overlay_result,
     pl,
-    resolve_artifact_state,
-    sfxi_gates,
-    sfxi_math,
     sfxi_params,
-    sfxi_support,
-    sfxi_uncertainty,
 ):
     observed_ids = set()
     if opal_labels_asof_df is not None and not opal_labels_asof_df.is_empty() and "id" in opal_labels_asof_df.columns:
@@ -3392,157 +3363,21 @@ def _(
         rank_col=rank_col,
         top_k_col=top_k_col,
     )
-    df_view = view_bundle.df
-    derived_notes = []
-    uncertainty_available = False
-
-    pred_join_key = None
-    if df_pred_selected is not None:
-        if "id" in df_pred_selected.columns and "id" in df_view.columns:
-            pred_join_key = "id"
-        elif "__row_id" in df_pred_selected.columns and "__row_id" in df_view.columns:
-            pred_join_key = "__row_id"
-
-    pred_vec8 = None
-    pred_vec8_note = None
-    if pred_join_key is None or df_pred_selected is None or df_pred_selected.is_empty():
-        derived_notes.append("Nearest logic table unavailable (missing predictions).")
-        pred_vec8_note = "dist_to_labeled_logic unavailable (no predictions)."
-    elif "pred_y_hat" not in df_pred_selected.columns:
-        derived_notes.append("Nearest logic table unavailable (missing pred_y_hat).")
-        pred_vec8_note = "dist_to_labeled_logic unavailable (missing pred_y_hat)."
-    else:
-        pred_vec8 = list_series_to_numpy(df_pred_selected.get_column("pred_y_hat"), expected_len=8)
-        if pred_vec8 is None:
-            derived_notes.append("Nearest logic table unavailable (invalid pred_y_hat vectors).")
-            pred_vec8_note = "dist_to_labeled_logic unavailable (invalid pred_y_hat vectors)."
-        else:
-            gate_cls, _ = sfxi_gates.nearest_gate(
-                pred_vec8[:, 0:4],
-                state_order=sfxi_math.STATE_ORDER,
-            )
-            gate_cls = np.asarray([str(code).zfill(4) for code in gate_cls], dtype=object)
-            gate_df = df_pred_selected.select([pred_join_key]).with_columns(
-                [
-                    pl.Series("opal__nearest_2_factor_logic", gate_cls),
-                ]
-            )
-            df_view = df_view.join(gate_df, on=pred_join_key, how="left")
-
-    label_logic = None
-    if opal_labels_asof_df is None or opal_labels_asof_df.is_empty():
-        derived_notes.append("dist_to_labeled_logic unavailable (no labels-as-of).")
-    else:
-        labels_y_col = None
-        if opal_campaign_info is not None and opal_campaign_info.y_column in opal_labels_asof_df.columns:
-            labels_y_col = opal_campaign_info.y_column
-        elif "y_obs" in opal_labels_asof_df.columns:
-            labels_y_col = "y_obs"
-            if opal_campaign_info is not None and opal_campaign_info.y_column not in opal_labels_asof_df.columns:
-                derived_notes.append("Using y_obs for labels (campaign y_column missing).")
-        if labels_y_col is None:
-            derived_notes.append("dist_to_labeled_logic unavailable (label vectors missing).")
-        else:
-            label_vec8 = list_series_to_numpy(opal_labels_asof_df.get_column(labels_y_col), expected_len=8)
-            if label_vec8 is None:
-                derived_notes.append("dist_to_labeled_logic unavailable (invalid label vectors).")
-            else:
-                label_logic = label_vec8[:, 0:4]
-
-    if label_logic is not None:
-        if pred_vec8 is None:
-            if pred_vec8_note:
-                derived_notes.append(pred_vec8_note)
-        else:
-            dists = sfxi_support.dist_to_labeled_logic(
-                pred_vec8[:, 0:4],
-                label_logic,
-                state_order=sfxi_math.STATE_ORDER,
-            )
-            dist_df = df_pred_selected.select([pred_join_key]).with_columns(
-                pl.Series("opal__sfxi__dist_to_labeled_logic", dists)
-            )
-            df_view = df_view.join(dist_df, on=pred_join_key, how="left")
-
-    if opal_campaign_info is None or not opal_campaign_info.x_column:
-        derived_notes.append("uncertainty unavailable (x_column missing).")
-    elif opal_pred_selected_round is None:
-        derived_notes.append("uncertainty unavailable (no selected round).")
-    elif opal_campaign_info.x_column not in df_view.columns:
-        derived_notes.append("uncertainty unavailable (X column missing in view).")
-    else:
-        uncertainty_artifact = resolve_artifact_state(
-            campaign_info=opal_campaign_info,
-            as_of_round=opal_pred_selected_round,
-            run_id=opal_pred_selected_run_id,
-        )
-        if uncertainty_artifact is None or not uncertainty_artifact.use_artifact or uncertainty_artifact.model is None:
-            derived_notes.append("uncertainty unavailable (artifact model missing).")
-        elif not sfxi_uncertainty.supports_uncertainty(model=uncertainty_artifact.model):
-            derived_notes.append("uncertainty unavailable (model lacks ensemble predictions).")
-        else:
-            X = list_series_to_numpy(df_view.get_column(opal_campaign_info.x_column), expected_len=None)
-            if X is None:
-                derived_notes.append("uncertainty unavailable (invalid X vectors).")
-            else:
-                y_ops = opal_campaign_info.y_ops or []
-                round_ctx = None
-                if y_ops:
-                    if uncertainty_artifact.round_dir is None:
-                        derived_notes.append("uncertainty unavailable (round_ctx missing).")
-                    else:
-                        round_ctx, ctx_err = load_round_ctx_from_dir(uncertainty_artifact.round_dir)
-                        if round_ctx is None:
-                            derived_notes.append(f"uncertainty unavailable ({ctx_err}).")
-                denom = None
-                if opal_labels_current_df is not None and not opal_labels_current_df.is_empty():
-                    labels_y_col = opal_campaign_info.y_column
-                    if labels_y_col in opal_labels_current_df.columns:
-                        labels_vec8 = list_series_to_numpy(
-                            opal_labels_current_df.get_column(labels_y_col), expected_len=8
-                        )
-                        if labels_vec8 is not None:
-                            try:
-                                denom = sfxi_math.denom_from_labels(
-                                    labels_vec8[:, 4:8],
-                                    np.array(sfxi_params.setpoint, dtype=float),
-                                    delta=float(sfxi_params.delta),
-                                    percentile=int(sfxi_params.p),
-                                    min_n=int(sfxi_params.min_n),
-                                    eps=float(sfxi_params.eps),
-                                    state_order=sfxi_math.STATE_ORDER,
-                                )
-                            except Exception as exc:
-                                derived_notes.append(f"uncertainty denom failed: {exc}")
-                try:
-                    ctx = sfxi_uncertainty.UncertaintyContext(
-                        setpoint=np.array(sfxi_params.setpoint, dtype=float),
-                        beta=float(sfxi_params.beta),
-                        gamma=float(sfxi_params.gamma),
-                        delta=float(sfxi_params.delta),
-                        denom=denom,
-                        y_ops=y_ops,
-                        round_ctx=round_ctx,
-                    )
-                    result = sfxi_uncertainty.compute_uncertainty(
-                        uncertainty_artifact.model,
-                        X,
-                        ctx=ctx,
-                        batch_size=2048,
-                    )
-                except Exception as exc:
-                    derived_notes.append(f"uncertainty unavailable ({exc})")
-                else:
-                    uncertainty_available = True
-                    uncertainty_join_key = "id" if "id" in df_view.columns else "__row_id"
-                    uncertainty_values_df = df_view.select([uncertainty_join_key]).with_columns(
-                        pl.Series("opal__sfxi__uncertainty", result.values)
-                    )
-                    df_view = df_view.join(uncertainty_values_df, on=uncertainty_join_key, how="left")
+    derived_result = attach_diagnostics_metrics(
+        df_view=view_bundle.df,
+        df_pred_selected=df_pred_selected,
+        labels_asof_df=opal_labels_asof_df,
+        labels_current_df=opal_labels_current_df,
+        campaign_info=opal_campaign_info,
+        pred_selected_round=opal_pred_selected_round,
+        pred_selected_run_id=opal_pred_selected_run_id,
+        sfxi_params=sfxi_params,
+    )
+    df_view = derived_result.df
+    uncertainty_available = derived_result.uncertainty_available
     view_notice_lines = diagnostics_to_lines(view_bundle.diagnostics)
     view_notice_md = mo.md("\n".join(view_notice_lines)) if view_notice_lines else mo.md("")
-    derived_metrics_note_md = mo.md("\n".join(derived_notes)) if derived_notes else mo.md("")
-    return df_view, derived_metrics_note_md, uncertainty_available, view_notice_md
+    return df_view, uncertainty_available, view_notice_md
 
 
 @app.cell

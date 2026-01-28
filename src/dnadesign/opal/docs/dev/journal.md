@@ -116,3 +116,6 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Added column non-null count helper and threaded it through hue registries to reduce repeated scans.
 - Reduced redundant pred_y_hat vector conversion in prom60_eda diagnostics derivations.
 - Added dashboard util test coverage for non-null count driven hue registry inclusion.
+- Enforced fail-fast SFXI view contracts (no empty returns or silent invalid filtering).
+- Moved derived diagnostics metrics (nearest logic, support distance, uncertainty attach) into a view helper.
+- Removed diagnostics fallback panels; missing required inputs now raise explicit errors.
