@@ -2503,6 +2503,7 @@ def _(
     build_diagnostics_panels,
     df_pred_selected,
     df_view,
+    headless_mode,
     hue_registry,
     intensity_panel,
     mo,
@@ -2520,65 +2521,73 @@ def _(
     support_color = hue_registry.get(support_color_dropdown.value)
     uncertainty_color = hue_registry.get(uncertainty_color_dropdown.value)
 
-    panels = build_diagnostics_panels(
-        df_pred_selected=df_pred_selected,
-        df_view=df_view,
-        support_y_col=support_y_col,
-        support_color=support_color,
-        uncertainty_color=uncertainty_color,
-        uncertainty_available=uncertainty_available,
-    )
+    if headless_mode:
+        diagnostics_content = mo.vstack(
+            [
+                mo.md("## Diagnostic plots & guidance"),
+                mo.md("Headless mode: diagnostics disabled."),
+            ]
+        )
+    else:
+        panels = build_diagnostics_panels(
+            df_pred_selected=df_pred_selected,
+            df_view=df_view,
+            support_y_col=support_y_col,
+            support_color=support_color,
+            uncertainty_color=uncertainty_color,
+            uncertainty_available=uncertainty_available,
+        )
 
-    factorial_panel = render_chart_panel(panels.factorial, default_note="Factorial effects unavailable.")
-    support_panel = render_chart_panel(panels.support, default_note="Support diagnostics unavailable.")
-    uncertainty_panel = render_chart_panel(panels.uncertainty, default_note="Uncertainty plot unavailable.")
-    intensity_panel_ui = render_chart_panel(intensity_panel, default_note="Intensity scaling unavailable.")
+        factorial_panel = render_chart_panel(panels.factorial, default_note="Factorial effects unavailable.")
+        support_panel = render_chart_panel(panels.support, default_note="Support diagnostics unavailable.")
+        uncertainty_panel = render_chart_panel(panels.uncertainty, default_note="Uncertainty plot unavailable.")
+        intensity_panel_ui = render_chart_panel(intensity_panel, default_note="Intensity scaling unavailable.")
 
-    mo.vstack(
-        [
-            mo.md("## Diagnostic plots & guidance"),
-            mo.md(
-                "Diagnostics use label history as the canonical source for observed/predicted vec8s. "
-                "Overlay mode recomputes SFXI metrics with the current setpoint/exponents."
-                " Vector sources stay fixed. Diagnostics render the full dataset (no sampling)."
-            ),
-            mo.md("### Factorial-effects map"),
-            mo.md(
-                "Projects each predicted logic vector onto A/B effects and AB interaction. "
-                r"$A = \frac{(v_{10}+v_{11})-(v_{00}+v_{01})}{2}$, "
-                r"$B = \frac{(v_{01}+v_{11})-(v_{00}+v_{10})}{2}$, "
-                r"$AB = \frac{(v_{11}+v_{00})-(v_{10}+v_{01})}{2}$. "
-                "Color encodes interaction strength; outlines mark labeled candidates."
-            ),
-            factorial_panel,
-            mo.md("### Logic support diagnostics"),
-            mo.md(
-                "Distance from each candidate’s predicted logic to the nearest labeled logic profile "
-                "(labels‑as‑of). The nearest label can live in any truth‑table region; use "
-                "`opal__nearest_2_factor_logic` to see which truth‑table class each candidate resembles. "
-                "Conservative campaigns favor low distance; exploratory campaigns sample some higher distances."
-            ),
-            mo.hstack([support_y_dropdown, support_color_dropdown]),
-            support_panel,
-            mo.md("### Uncertainty diagnostics"),
-            mo.md(
-                "Model uncertainty vs score to highlight risky candidates. "
-                "Contract is model‑agnostic; for RF this is ensemble score std "
-                "(std over per‑tree objective scores). "
-                "Tree spread is a heuristic proxy (not calibrated). "
-                "Only scalar uncertainty is visualized here."
-            ),
-            uncertainty_color_dropdown,
-            uncertainty_panel,
-            mo.md("### Intensity scaling diagnostics"),
-            mo.md(
-                "Shows denom calibration, clipping rates, and E_raw distributions. "
-                "Use to spot saturation (over‑scaled) or under‑scaled intensity effects."
-            ),
-            intensity_panel_ui,
-        ]
-    )
-    return
+        diagnostics_content = mo.vstack(
+            [
+                mo.md("## Diagnostic plots & guidance"),
+                mo.md(
+                    "Diagnostics use label history as the canonical source for observed/predicted vec8s. "
+                    "Overlay mode recomputes SFXI metrics with the current setpoint/exponents."
+                    " Vector sources stay fixed. Diagnostics render the full dataset (no sampling)."
+                ),
+                mo.md("### Factorial-effects map"),
+                mo.md(
+                    "Projects each predicted logic vector onto A/B effects and AB interaction. "
+                    r"$A = \frac{(v_{10}+v_{11})-(v_{00}+v_{01})}{2}$, "
+                    r"$B = \frac{(v_{01}+v_{11})-(v_{00}+v_{10})}{2}$, "
+                    r"$AB = \frac{(v_{11}+v_{00})-(v_{10}+v_{01})}{2}$. "
+                    "Color encodes interaction strength; outlines mark labeled candidates."
+                ),
+                factorial_panel,
+                mo.md("### Logic support diagnostics"),
+                mo.md(
+                    "Distance from each candidate’s predicted logic to the nearest labeled logic profile "
+                    "(labels‑as‑of). The nearest label can live in any truth‑table region; use "
+                    "`opal__nearest_2_factor_logic` to see which truth‑table class each candidate resembles. "
+                    "Conservative campaigns favor low distance; exploratory campaigns sample some higher distances."
+                ),
+                mo.hstack([support_y_dropdown, support_color_dropdown]),
+                support_panel,
+                mo.md("### Uncertainty diagnostics"),
+                mo.md(
+                    "Model uncertainty vs score to highlight risky candidates. "
+                    "Contract is model‑agnostic; for RF this is ensemble score std "
+                    "(std over per‑tree objective scores). "
+                    "Tree spread is a heuristic proxy (not calibrated). "
+                    "Only scalar uncertainty is visualized here."
+                ),
+                uncertainty_color_dropdown,
+                uncertainty_panel,
+                mo.md("### Intensity scaling diagnostics"),
+                mo.md(
+                    "Shows denom calibration, clipping rates, and E_raw distributions. "
+                    "Use to spot saturation (over‑scaled) or under‑scaled intensity effects."
+                ),
+                intensity_panel_ui,
+            ]
+        )
+    diagnostics_content
 
 
 @app.cell
@@ -3411,6 +3420,9 @@ def _(
     pl,
     sfxi_params,
 ):
+    import os
+
+    headless_mode = os.getenv("DNADESIGN_HEADLESS", "").strip() == "1"
     observed_ids = set()
     if opal_labels_asof_df is not None and not opal_labels_asof_df.is_empty() and "id" in opal_labels_asof_df.columns:
         observed_ids = set(
@@ -3453,12 +3465,13 @@ def _(
         pred_selected_round=opal_pred_selected_round,
         pred_selected_run_id=opal_pred_selected_run_id,
         sfxi_params=sfxi_params,
+        require_uncertainty=not headless_mode,
     )
     df_view = derived_result.df
     uncertainty_available = derived_result.uncertainty_available
     view_notice_lines = diagnostics_to_lines(view_bundle.diagnostics)
     view_notice_md = mo.md("\n".join(view_notice_lines)) if view_notice_lines else mo.md("")
-    return df_view, uncertainty_available, view_notice_md
+    return df_view, uncertainty_available, view_notice_md, headless_mode
 
 
 @app.cell

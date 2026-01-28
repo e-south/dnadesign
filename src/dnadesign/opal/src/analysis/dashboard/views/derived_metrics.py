@@ -79,6 +79,7 @@ def attach_diagnostics_metrics(
     pred_selected_run_id: str | None,
     sfxi_params: SFXIParams,
     pred_vec_col: str = "pred_y_hat",
+    require_uncertainty: bool = True,
 ) -> DerivedMetricsResult:
     if df_view.is_empty():
         raise ValueError("Dashboard view is empty; cannot attach derived metrics.")
@@ -144,6 +145,9 @@ def attach_diagnostics_metrics(
         pl.Series("opal__sfxi__dist_to_labeled_logic", dists),
     )
     df_view = df_view.join(dist_df, on=join_key, how="left")
+
+    if not require_uncertainty:
+        return DerivedMetricsResult(df=df_view, uncertainty_available=False)
 
     if campaign_info.x_column is None or campaign_info.x_column not in df_view.columns:
         raise ValueError("Uncertainty requires the campaign x_column in the dashboard view.")
