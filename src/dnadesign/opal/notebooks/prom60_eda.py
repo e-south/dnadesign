@@ -369,29 +369,44 @@ def _(mo):
 @app.cell
 def _(
     build_explorer_hue_registry,
+    data_ready,
+    default_view_hues,
+    df_view_non_null_counts,
+    df_view,
+    safe_is_numeric,
+):
+    df_explorer_base = df_view if data_ready else df_view.head(0)
+    explorer_numeric_cols = [name for name, dtype in df_explorer_base.schema.items() if safe_is_numeric(dtype)]
+    hue_registry = build_explorer_hue_registry(
+        df_explorer_base,
+        preferred=default_view_hues(),
+        include_columns=True,
+        denylist={"__row_id", "id", "id_", "id__"},
+        non_null_counts=df_view_non_null_counts,
+    )
+    return explorer_numeric_cols, hue_registry
+
+
+@app.cell
+def _(
     choose_axis_defaults,
     choose_dropdown_value,
-    data_ready,
     dashboard_defaults,
-    default_view_hues,
     dataset_explorer_color_state,
     dataset_explorer_plot_type_state,
     dataset_explorer_x_state,
     dataset_explorer_y_state,
-    df_view_non_null_counts,
-    df_view,
+    explorer_numeric_cols,
+    hue_registry,
     mo,
-    safe_is_numeric,
 ):
-    df_explorer = df_view if data_ready else df_view.head(0)
-    numeric_cols = [name for name, dtype in df_explorer.schema.items() if safe_is_numeric(dtype)]
     defaults = dashboard_defaults or {}
     _default_x = defaults.get("x")
     _default_y = defaults.get("y")
     _preferred_x = "opal__view__score"
     _preferred_y = "opal__view__effect_scaled"
     _x_default, _y_default = choose_axis_defaults(
-        numeric_cols=numeric_cols,
+        numeric_cols=explorer_numeric_cols,
         default_x=_default_x,
         default_y=_default_y,
         preferred_x=_preferred_x,
@@ -408,7 +423,7 @@ def _(
         value=plot_type_default,
         label="Plot type",
     )
-    x_options = numeric_cols or ["(none)"]
+    x_options = explorer_numeric_cols or ["(none)"]
     x_default = (
         choose_dropdown_value(x_options, current=dataset_explorer_x_state(), preferred=_x_default) or x_options[0]
     )
@@ -418,7 +433,7 @@ def _(
         label="X column",
         full_width=True,
     )
-    y_options = numeric_cols or ["(none)"]
+    y_options = explorer_numeric_cols or ["(none)"]
     y_default = (
         choose_dropdown_value(y_options, current=dataset_explorer_y_state(), preferred=_y_default) or y_options[0]
     )
@@ -427,13 +442,6 @@ def _(
         value=y_default,
         label="Y column (scatter only)",
         full_width=True,
-    )
-    hue_registry = build_explorer_hue_registry(
-        df_explorer,
-        preferred=default_view_hues(),
-        include_columns=True,
-        denylist={"__row_id", "id", "id_", "id__"},
-        non_null_counts=df_view_non_null_counts,
     )
     color_options = ["(none)"] + hue_registry.labels()
     _default_color = defaults.get("color")
@@ -1844,12 +1852,9 @@ def _(mo):
 @app.cell
 def _(
     build_sfxi_hue_registry,
-    choose_dropdown_value,
     column_non_null_counts,
-    df_sfxi_scatter,
-    mo,
-    sfxi_color_state,
     default_view_hues,
+    df_sfxi_scatter,
 ):
     sfxi_non_null_counts = column_non_null_counts(df_sfxi_scatter)
     sfxi_hue_registry = build_sfxi_hue_registry(
@@ -1859,6 +1864,16 @@ def _(
         denylist={"__row_id", "id", "id_"},
         non_null_counts=sfxi_non_null_counts,
     )
+    return (sfxi_hue_registry,)
+
+
+@app.cell
+def _(
+    choose_dropdown_value,
+    mo,
+    sfxi_color_state,
+    sfxi_hue_registry,
+):
     hue_labels = sfxi_hue_registry.labels()
     if not hue_labels:
         options = ["(none)"]
@@ -1911,8 +1926,22 @@ def _(
 
 
 @app.cell
-def _(choose_dropdown_value, hue_registry, mo, support_color_state, uncertainty_color_state):
-    _diag_hue_options = ["(none)"] + hue_registry.labels()
+def _(
+    choose_dropdown_value,
+    df_view,
+    df_view_non_null_counts,
+    hue_registry,
+    mo,
+    support_color_state,
+    uncertainty_color_state,
+):
+    _total_rows = int(df_view.height) if df_view is not None else 0
+    _complete_labels: list[str] = []
+    if _total_rows > 0:
+        for opt in hue_registry.options:
+            if df_view_non_null_counts.get(opt.key, 0) == _total_rows:
+                _complete_labels.append(opt.label)
+    _diag_hue_options = ["(none)"] + _complete_labels
     if "opal__nearest_2_factor_logic" in _diag_hue_options:
         support_color_preferred = "opal__nearest_2_factor_logic"
     else:

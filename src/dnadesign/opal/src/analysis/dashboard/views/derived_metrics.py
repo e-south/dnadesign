@@ -88,19 +88,53 @@ def attach_diagnostics_metrics(
     join_key = _resolve_join_key(df_pred_selected, df_view)
     pred_vec8 = _require_vec8(df_pred_selected, pred_vec_col, label="Derived metrics")
 
-    gate_cls, _ = nearest_gate(pred_vec8[:, 0:4], state_order=sfxi_math.STATE_ORDER)
-    gate_cls = np.asarray([str(code).zfill(4) for code in gate_cls], dtype=object)
-    gate_df = df_pred_selected.select([join_key]).with_columns(
-        pl.Series("opal__nearest_2_factor_logic", gate_cls, dtype=pl.Utf8),
+    if "opal__view__observed" not in df_view.columns:
+        raise ValueError("Derived metrics require `opal__view__observed` in view.")
+    if "id" not in df_view.columns:
+        raise ValueError("Derived metrics require `id` in view for observed logic mapping.")
+
+    gate_cls_pred, _ = nearest_gate(pred_vec8[:, 0:4], state_order=sfxi_math.STATE_ORDER)
+    gate_cls_pred = np.asarray([str(code).zfill(4) for code in gate_cls_pred], dtype=object)
+    gate_pred_df = df_pred_selected.select([join_key]).with_columns(
+        pl.Series("opal__nearest_2_factor_logic_pred", gate_cls_pred, dtype=pl.Utf8),
     )
-    df_view = df_view.join(gate_df, on=join_key, how="left")
+    df_view = df_view.join(gate_pred_df, on=join_key, how="left")
+
+    if labels_asof_df.is_empty():
+        raise ValueError("Derived metrics require labels-as-of data.")
+    if "id" not in labels_asof_df.columns:
+        raise ValueError("Derived metrics require `id` in labels-as-of for observed logic mapping.")
+    if not _is_unique(labels_asof_df, "id"):
+        raise ValueError("Derived metrics require unique `id` in labels-as-of for observed logic mapping.")
+    labels_y_col = campaign_info.y_column if campaign_info.y_column in labels_asof_df.columns else None
+    if labels_y_col is None:
+        raise ValueError("Derived metrics require label vectors in labels-as-of.")
+    label_vec8 = _require_vec8(labels_asof_df, labels_y_col, label="Derived metrics (observed logic)")
+    gate_cls_obs, _ = nearest_gate(label_vec8[:, 0:4], state_order=sfxi_math.STATE_ORDER)
+    gate_cls_obs = np.asarray([str(code).zfill(4) for code in gate_cls_obs], dtype=object)
+    gate_obs_df = labels_asof_df.select([pl.col("id").cast(pl.Utf8)]).with_columns(
+        pl.Series("opal__nearest_2_factor_logic_obs", gate_cls_obs, dtype=pl.Utf8),
+    )
+    df_view = df_view.join(gate_obs_df, on="id", how="left")
+    df_view = df_view.with_columns(
+        pl.when(pl.col("opal__view__observed").fill_null(False))
+        .then(pl.col("opal__nearest_2_factor_logic_obs"))
+        .otherwise(pl.col("opal__nearest_2_factor_logic_pred"))
+        .alias("opal__nearest_2_factor_logic")
+    )
+    missing_gate = int(df_view.select(pl.col("opal__nearest_2_factor_logic").is_null().sum()).item())
+    if missing_gate:
+        raise ValueError(
+            "Derived metrics require nearest 2-factor logic for all rows; "
+            f"missing for {missing_gate} rows. Ensure predictions cover all rows "
+            "and labels-as-of cover observed rows."
+        )
+    df_view = df_view.drop(["opal__nearest_2_factor_logic_pred", "opal__nearest_2_factor_logic_obs"])
 
     if labels_asof_df.is_empty():
         raise ValueError("dist_to_labeled_logic requires labels-as-of data.")
-    labels_y_col = campaign_info.y_column if campaign_info.y_column in labels_asof_df.columns else None
     if labels_y_col is None:
         raise ValueError("dist_to_labeled_logic requires label vectors in labels-as-of.")
-    label_vec8 = _require_vec8(labels_asof_df, labels_y_col, label="dist_to_labeled_logic")
     dists = dist_to_labeled_logic(
         pred_vec8[:, 0:4],
         label_vec8[:, 0:4],

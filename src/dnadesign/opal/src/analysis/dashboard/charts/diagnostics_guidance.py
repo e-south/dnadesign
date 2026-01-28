@@ -153,11 +153,13 @@ def _build_diag_view(
     if missing:
         raise ValueError(f"{ctx} missing view columns: {', '.join(missing)}.")
 
-    df_diag = df_pred_selected.join(
-        df_view.select(_dedupe_cols([join_key, *required])),
-        on=join_key,
-        how="left",
-    )
+    df_keys = df_pred_selected.select([join_key])
+    if _has_duplicate_key(df_keys, join_key):
+        raise ValueError(f"{ctx} requires a unique join key in predictions.")
+
+    extra_cols = [col for col in ["id", "__row_id"] if col in df_view.columns and col != join_key]
+    df_view_slice = df_view.select(_dedupe_cols([join_key, *extra_cols, *required]))
+    df_diag = df_view_slice.join(df_keys, on=join_key, how="inner")
     for col in required:
         dtype = df_diag.schema.get(col, pl.Null)
         if safe_is_numeric(dtype):

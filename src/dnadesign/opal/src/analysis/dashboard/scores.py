@@ -107,16 +107,53 @@ def build_mode_view(
     if observed_scores_df is not None and not observed_scores_df.is_empty():
         if id_col not in observed_scores_df.columns or "score" not in observed_scores_df.columns:
             raise ValueError("Observed scores missing id/score columns.")
-        df_obs = observed_scores_df.select([id_col, "score"]).rename({"score": "opal__view__observed_score"})
+        obs_cols = [id_col, "score"]
+        if "logic_fidelity" in observed_scores_df.columns:
+            obs_cols.append("logic_fidelity")
+        if "effect_scaled" in observed_scores_df.columns:
+            obs_cols.append("effect_scaled")
+        rename_obs = {
+            "score": "opal__view__observed_score",
+            "logic_fidelity": "opal__view__observed_logic_fidelity",
+            "effect_scaled": "opal__view__observed_effect_scaled",
+        }
+        df_obs = observed_scores_df.select(obs_cols).rename(rename_obs)
         df_view = df_view.join(df_obs, on=id_col, how="left")
+        df_view = _ensure_view_cols(
+            df_view,
+            [
+                "opal__view__observed_score",
+                "opal__view__observed_logic_fidelity",
+                "opal__view__observed_effect_scaled",
+            ],
+        )
     else:
-        df_view = _ensure_view_cols(df_view, ["opal__view__observed_score"])
+        df_view = _ensure_view_cols(
+            df_view,
+            [
+                "opal__view__observed_score",
+                "opal__view__observed_logic_fidelity",
+                "opal__view__observed_effect_scaled",
+            ],
+        )
 
     df_view = df_view.with_columns(
         pl.when(pl.col("opal__view__observed") & pl.col("opal__view__score").is_null())
         .then(pl.col("opal__view__observed_score"))
         .otherwise(pl.col("opal__view__score"))
         .alias("opal__view__score")
+    )
+    df_view = df_view.with_columns(
+        pl.when(pl.col("opal__view__observed") & pl.col("opal__view__logic_fidelity").is_null())
+        .then(pl.col("opal__view__observed_logic_fidelity"))
+        .otherwise(pl.col("opal__view__logic_fidelity"))
+        .alias("opal__view__logic_fidelity")
+    )
+    df_view = df_view.with_columns(
+        pl.when(pl.col("opal__view__observed") & pl.col("opal__view__effect_scaled").is_null())
+        .then(pl.col("opal__view__observed_effect_scaled"))
+        .otherwise(pl.col("opal__view__effect_scaled"))
+        .alias("opal__view__effect_scaled")
     )
     df_view = df_view.with_columns(
         pl.when(pl.col("opal__view__observed") & pl.col("opal__view__top_k").is_null())
@@ -146,6 +183,14 @@ def build_mode_view(
             raise ValueError(
                 "Missing values in `opal__view__logic_fidelity` for unlabeled rows; predictions must populate all rows."
             )
+        missing_observed = df_view.filter(
+            pl.col("opal__view__observed") & pl.col("opal__view__logic_fidelity").is_null()
+        ).height
+        if missing_observed:
+            raise ValueError(
+                f"Missing observed logic fidelity for {missing_observed} labeled rows; "
+                "ensure label scoring includes logic_fidelity."
+            )
     if effect_col is not None:
         missing_unlabeled = df_view.filter(
             ~pl.col("opal__view__observed") & pl.col("opal__view__effect_scaled").is_null()
@@ -153,6 +198,14 @@ def build_mode_view(
         if missing_unlabeled:
             raise ValueError(
                 "Missing values in `opal__view__effect_scaled` for unlabeled rows; predictions must populate all rows."
+            )
+        missing_observed = df_view.filter(
+            pl.col("opal__view__observed") & pl.col("opal__view__effect_scaled").is_null()
+        ).height
+        if missing_observed:
+            raise ValueError(
+                f"Missing observed effect_scaled for {missing_observed} labeled rows; "
+                "ensure label scoring includes effect_scaled."
             )
     if rank_col is not None:
         missing_unlabeled = df_view.filter(

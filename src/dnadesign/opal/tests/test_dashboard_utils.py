@@ -191,7 +191,7 @@ def test_build_predicted_logic_pools() -> None:
     df = pl.DataFrame(
         {
             "id": ["a", "b", "c", "d"],
-            "opal__nearest_2_factor_logic": ["0001", "0001", "0010", None],
+            "opal__nearest_2_factor_logic": ["0001", "0001", "0010", "1111"],
             "opal__view__observed": [False, False, False, True],
         }
     )
@@ -395,10 +395,19 @@ def test_build_mode_view_allows_missing_observed_predictions() -> None:
         {
             "id": ["a", "b"],
             "score": [0.2, 0.4],
+            "logic_fidelity": [0.1, 0.2],
+            "effect_scaled": [0.3, 0.4],
             "top_k": [True, False],
         }
     )
-    observed_scores = pl.DataFrame({"id": ["c"], "score": [0.7]})
+    observed_scores = pl.DataFrame(
+        {
+            "id": ["c"],
+            "score": [0.7],
+            "logic_fidelity": [0.9],
+            "effect_scaled": [0.8],
+        }
+    )
     out = scores.build_mode_view(
         df_base=df_base,
         metrics_df=metrics_df,
@@ -406,13 +415,15 @@ def test_build_mode_view_allows_missing_observed_predictions() -> None:
         observed_ids={"c"},
         observed_scores_df=observed_scores,
         score_col="score",
-        logic_col=None,
-        effect_col=None,
+        logic_col="logic_fidelity",
+        effect_col="effect_scaled",
         rank_col=None,
         top_k_col="top_k",
     )
     df_view = out.df
     assert df_view.filter(pl.col("id") == "c")["opal__view__score"].item() == 0.7
+    assert df_view.filter(pl.col("id") == "c")["opal__view__logic_fidelity"].item() == 0.9
+    assert df_view.filter(pl.col("id") == "c")["opal__view__effect_scaled"].item() == 0.8
     assert df_view.filter(pl.col("id") == "c")["opal__view__top_k"].item() is False
 
 
