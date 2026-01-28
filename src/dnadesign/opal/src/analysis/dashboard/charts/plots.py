@@ -99,22 +99,7 @@ def build_umap_explorer_chart(
 ) -> UmapExplorerResult:
     view = prepare_umap_explorer_view(df=df, x_col=x_col, y_col=y_col, hue=hue)
     if not view.valid:
-        chart = (
-            alt.Chart(view.df_plot)
-            .mark_circle(stroke=None, strokeWidth=0)
-            .encode(
-                x=alt.X(view.x_col),
-                y=alt.Y(view.y_col),
-                tooltip=_tooltip_fields(view.df_plot, ["id", "__row_id", view.x_col, view.y_col]),
-            )
-            .properties(width=plot_size, height=plot_size)
-        )
-        chart = with_title(
-            chart,
-            "UMAP explorer (Evo2 embedding)",
-            f"{dataset_name or 'dataset'} · color=none",
-        )
-        return UmapExplorerResult(chart=chart, df_plot=df, valid=False, note=view.note)
+        raise ValueError(view.note or "UMAP explorer missing: invalid inputs.")
 
     color_encoding = _color_encoding(view.color_spec)
     brush = alt.selection_interval(name="umap_brush", encodings=["x", "y"])
@@ -157,7 +142,7 @@ def build_umap_chart(
     size: int = 40,
     opacity: float = 0.7,
     plot_size: int = 420,
-) -> alt.Chart | None:
+) -> alt.Chart:
     view = prepare_umap_chart_view(
         df=df,
         x_col=x_col,
@@ -166,9 +151,6 @@ def build_umap_chart(
         color_title=color_title,
         tooltip_cols=tooltip_cols,
     )
-    if view is None:
-        return None
-
     tooltip_fields = _tooltip_fields(view.df_plot, view.tooltip_cols)
     enc = {
         "x": alt.X(view.x_col, title="UMAP X"),
@@ -200,7 +182,7 @@ def build_cluster_chart(
     id_col: str,
     title: str,
     plot_height: int = 240,
-) -> alt.Chart | None:
+) -> alt.Chart:
     view = prepare_cluster_view(
         df=df,
         cluster_col=cluster_col,
@@ -208,8 +190,6 @@ def build_cluster_chart(
         hue=hue,
         id_col=id_col,
     )
-    if view is None:
-        return None
 
     sort_field = alt.SortField(field=view.sort_field, order="ascending")
     tooltip_cols = [
@@ -286,7 +266,7 @@ def build_umap_overlay_charts(
     umap_x_col: str = "cluster__ldn_v1__umap_x",
     umap_y_col: str = "cluster__ldn_v1__umap_y",
     cluster_col: str = "cluster__ldn_v1",
-) -> tuple[alt.Chart | None, alt.Chart | None]:
+) -> tuple[alt.Chart, alt.Chart]:
     view = prepare_umap_overlay_view(
         df=df,
         id_col=id_col,
@@ -295,37 +275,29 @@ def build_umap_overlay_charts(
         cluster_col=cluster_col,
     )
 
-    cluster_chart = None
-    if view.df_cluster is not None:
-        chart = build_umap_chart(
-            df=view.df_cluster,
-            x_col=umap_x_col,
-            y_col=umap_y_col,
-            color_col=cluster_col,
-            color_title="Leiden cluster",
-            title="UMAP colored by Leiden cluster",
-            subtitle=f"{dataset_name or 'dataset'} · n={view.df_cluster.height}",
-            tooltip_cols=[c for c in [id_col, cluster_col] if c in view.df_cluster.columns],
-            plot_size=plot_size,
-        )
-        if chart is not None:
-            cluster_chart = chart
+    cluster_chart = build_umap_chart(
+        df=view.df_cluster,
+        x_col=umap_x_col,
+        y_col=umap_y_col,
+        color_col=cluster_col,
+        color_title="Leiden cluster",
+        title="UMAP colored by Leiden cluster",
+        subtitle=f"{dataset_name or 'dataset'} · n={view.df_cluster.height}",
+        tooltip_cols=[c for c in [id_col, cluster_col] if c in view.df_cluster.columns],
+        plot_size=plot_size,
+    )
 
-    score_col = "opal__view__score" if "opal__view__score" in df.columns else None
-    score_chart = None
-    if view.df_score is not None and score_col is not None:
-        chart = build_umap_chart(
-            df=view.df_score,
-            x_col=umap_x_col,
-            y_col=umap_y_col,
-            color_col=score_col,
-            color_title="Score",
-            title="UMAP colored by score",
-            subtitle=f"{dataset_name or 'dataset'} · n={view.df_score.height}",
-            tooltip_cols=[c for c in [id_col, score_col] if c in view.df_score.columns],
-            plot_size=plot_size,
-        )
-        if chart is not None:
-            score_chart = chart
+    score_col = "opal__view__score"
+    score_chart = build_umap_chart(
+        df=view.df_score,
+        x_col=umap_x_col,
+        y_col=umap_y_col,
+        color_col=score_col,
+        color_title="Score",
+        title="UMAP colored by score",
+        subtitle=f"{dataset_name or 'dataset'} · n={view.df_score.height}",
+        tooltip_cols=[c for c in [id_col, score_col] if c in view.df_score.columns],
+        plot_size=plot_size,
+    )
 
     return cluster_chart, score_chart

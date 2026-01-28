@@ -380,62 +380,58 @@ def test_build_umap_explorer_chart_cases() -> None:
     assert ok.note is not None and "Plotting full dataset" in ok.note
     assert isinstance(ok.chart, alt.Chart)
 
-    missing_id = plots.build_umap_explorer_chart(
-        df=base.drop("id"),
-        x_col="x",
-        y_col="y",
-        hue=None,
-        point_size=40,
-        opacity=0.7,
-        plot_size=420,
-        dataset_name="demo",
-    )
-    assert missing_id.valid is False
-    assert missing_id.note is not None and "required column `id`" in missing_id.note
+    with pytest.raises(ValueError, match="required column `id`"):
+        plots.build_umap_explorer_chart(
+            df=base.drop("id"),
+            x_col="x",
+            y_col="y",
+            hue=None,
+            point_size=40,
+            opacity=0.7,
+            plot_size=420,
+            dataset_name="demo",
+        )
 
-    missing_xy = plots.build_umap_explorer_chart(
-        df=base,
-        x_col="",
-        y_col="",
-        hue=None,
-        point_size=40,
-        opacity=0.7,
-        plot_size=420,
-        dataset_name="demo",
-    )
-    assert missing_xy.valid is False
-    assert missing_xy.note is not None and "provide x/y columns" in missing_xy.note
+    with pytest.raises(ValueError, match="provide x/y columns"):
+        plots.build_umap_explorer_chart(
+            df=base,
+            x_col="",
+            y_col="",
+            hue=None,
+            point_size=40,
+            opacity=0.7,
+            plot_size=420,
+            dataset_name="demo",
+        )
 
-    non_numeric = plots.build_umap_explorer_chart(
-        df=pl.DataFrame({"id": ["a"], "x": ["na"], "y": ["nb"]}),
-        x_col="x",
-        y_col="y",
-        hue=None,
-        point_size=40,
-        opacity=0.7,
-        plot_size=420,
-        dataset_name="demo",
-    )
-    assert non_numeric.valid is False
-    assert non_numeric.note is not None and "must be numeric" in non_numeric.note
+    with pytest.raises(ValueError, match="must be numeric"):
+        plots.build_umap_explorer_chart(
+            df=pl.DataFrame({"id": ["a"], "x": ["na"], "y": ["nb"]}),
+            x_col="x",
+            y_col="y",
+            hue=None,
+            point_size=40,
+            opacity=0.7,
+            plot_size=420,
+            dataset_name="demo",
+        )
 
-    no_non_null = plots.build_umap_explorer_chart(
-        df=base.with_columns(pl.lit(None).alias("all_null")),
-        x_col="x",
-        y_col="y",
-        hue=hues.HueOption(
-            key="all_null",
-            label="All null",
-            kind="numeric",
-            dtype=pl.Float64,
-        ),
-        point_size=40,
-        opacity=0.7,
-        plot_size=420,
-        dataset_name="demo",
-    )
-    assert no_non_null.valid is True
-    assert no_non_null.note is not None and "no non-null values" in no_non_null.note
+    with pytest.raises(ValueError, match="no non-null values"):
+        plots.build_umap_explorer_chart(
+            df=base.with_columns(pl.lit(None).alias("all_null")),
+            x_col="x",
+            y_col="y",
+            hue=hues.HueOption(
+                key="all_null",
+                label="All null",
+                kind="numeric",
+                dtype=pl.Float64,
+            ),
+            point_size=40,
+            opacity=0.7,
+            plot_size=420,
+            dataset_name="demo",
+        )
 
 
 def test_score_histogram_lollipop_includes_id() -> None:

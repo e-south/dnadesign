@@ -3396,27 +3396,35 @@ def _(
     transient_cluster_hue_dropdown,
     transient_cluster_metric_dropdown,
 ):
-    _transient_cluster_chart = None
     metric_label = transient_cluster_metric_dropdown.value
     metric_option = hue_registry.get(metric_label)
     hue_label = transient_cluster_hue_dropdown.value
+    if metric_option is None:
+        raise ValueError(f"Cluster plot missing: unknown metric option `{metric_label}`.")
+    if "cluster__ldn_v1" not in df_view.columns:
+        raise ValueError("Cluster plot missing: `cluster__ldn_v1` column is absent.")
+    if metric_option.key not in df_view.columns:
+        raise ValueError(f"Cluster plot missing: `{metric_option.key}` column is absent.")
+    if "id" in df_view.columns:
+        _id_col = "id"
+    elif "__row_id" in df_view.columns:
+        _id_col = "__row_id"
+    else:
+        raise ValueError("Cluster plot missing: `id` or `__row_id` column is required.")
     _hue = None if hue_label == "(none)" else hue_registry.get(hue_label)
-    if metric_option is not None and "cluster__ldn_v1" in df_view.columns and metric_option.key in df_view.columns:
-        _id_col = "id" if "id" in df_view.columns else "__row_id"
-        _cluster_chart = build_cluster_chart(
-            df=df_view,
-            cluster_col="cluster__ldn_v1",
-            metric_col=metric_option.key,
-            metric_label=metric_option.label,
-            hue=_hue,
-            dataset_name=dataset_name,
-            id_col=_id_col,
-            title="Metric by Leiden cluster",
-        )
-        if _cluster_chart is not None:
-            _transient_cluster_chart = mo.ui.altair_chart(_cluster_chart)
-
-    transient_cluster_chart = _transient_cluster_chart
+    if hue_label != "(none)" and _hue is None:
+        raise ValueError(f"Cluster plot missing: unknown hue option `{hue_label}`.")
+    _cluster_chart = build_cluster_chart(
+        df=df_view,
+        cluster_col="cluster__ldn_v1",
+        metric_col=metric_option.key,
+        metric_label=metric_option.label,
+        hue=_hue,
+        dataset_name=dataset_name,
+        id_col=_id_col,
+        title="Metric by Leiden cluster",
+    )
+    transient_cluster_chart = mo.ui.altair_chart(_cluster_chart)
     return (transient_cluster_chart,)
 
 
