@@ -168,9 +168,23 @@ def make_support_diagnostics_chart(
     if hue is not None and hue.key not in df.columns:
         raise ValueError(f"Missing hue column: {hue.key}")
 
+    hue_spec = hue
     tooltip_cols = ["id", "__row_id", x_col, y_col]
     if hue is not None:
-        tooltip_cols.append(hue.key)
+        if hue.key == "opal__nearest_2_factor_logic":
+            label_key = f"{hue.key}__label"
+            df = df.with_columns(
+                pl.col(hue.key).cast(pl.Utf8, strict=False).str.zfill(4).alias(label_key),
+            )
+            hue_spec = HueOption(
+                key=label_key,
+                label=hue.label,
+                kind="categorical",
+                dtype=pl.Utf8,
+            )
+            tooltip_cols.append(label_key)
+        else:
+            tooltip_cols.append(hue.key)
 
     base = (
         alt.Chart(df)
@@ -178,7 +192,7 @@ def make_support_diagnostics_chart(
         .encode(
             x=alt.X(f"{x_col}:Q", title=x_col),
             y=alt.Y(f"{y_col}:Q", title=y_col),
-            color=_color_encoding(hue),
+            color=_color_encoding(hue_spec),
             tooltip=_tooltip_fields(df, tooltip_cols),
         )
         .properties(width=plot_size, height=plot_size)

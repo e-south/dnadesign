@@ -467,6 +467,8 @@ def build_nearest_2_factor_counts(
 
     label_classes, _ = nearest_gate(labels_vec8[:, 0:4], state_order=sfxi_math.STATE_ORDER)
     pred_classes, _ = nearest_gate(pred_vec8[:, 0:4], state_order=sfxi_math.STATE_ORDER)
+    label_classes = np.asarray([str(code).zfill(4) for code in label_classes], dtype=object)
+    pred_classes = np.asarray([str(code).zfill(4) for code in pred_classes], dtype=object)
     label_unique, label_counts = np.unique(label_classes, return_counts=True)
     pred_unique, pred_counts = np.unique(pred_classes, return_counts=True)
     label_map = {str(k): int(v) for k, v in zip(label_unique.tolist(), label_counts.tolist())}

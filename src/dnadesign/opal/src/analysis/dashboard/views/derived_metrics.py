@@ -91,7 +91,7 @@ def attach_diagnostics_metrics(
     gate_cls, _ = nearest_gate(pred_vec8[:, 0:4], state_order=sfxi_math.STATE_ORDER)
     gate_cls = np.asarray([str(code).zfill(4) for code in gate_cls], dtype=object)
     gate_df = df_pred_selected.select([join_key]).with_columns(
-        pl.Series("opal__nearest_2_factor_logic", gate_cls),
+        pl.Series("opal__nearest_2_factor_logic", gate_cls, dtype=pl.Utf8),
     )
     df_view = df_view.join(gate_df, on=join_key, how="left")
 
