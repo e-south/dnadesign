@@ -8,10 +8,10 @@ title: Prom60 SFXI Diagnostics + Uncertainty (Developer Notes)
 
 These diagnostics extend the prom60 dashboard to make **active learning choices** more transparent:
 
-1) **Verify logic shape**: inspect factorial effects and nearest-gate class to confirm predicted logic matches the desired gate family.
-2) **Check support / extrapolation**: quantify distance to labeled logic (and UMAP-space neighbors) before selecting risky candidates.
+1) **Verify logic shape**: inspect factorial effects and `opal__nearest_2_factor_logic` to confirm predicted logic matches the desired gate family.
+2) **Check support / extrapolation**: quantify distance to labeled logic before selecting risky candidates.
 3) **Assess uncertainty**: identify high-score but high-uncertainty candidates that warrant cautious exploration.
-4) **Tune setpoint safely**: sweep alternative setpoints without retraining to assess sensitivity and intensity scaling.
+4) **Tune setpoint safely**: sweep alternative setpoints (observed labels only) without retraining to assess sensitivity and intensity scaling.
 
 ## Mathematical definitions
 
@@ -32,8 +32,7 @@ AB_interaction = ((v11 + v00) - (v10 + v01)) / 2
 Let `G` be the 16 binary truth tables (vectors in `{0,1}^4` in state order). For each candidate:
 
 ```
-nearest_gate_class = argmin_g ||v_hat - g||_2
-nearest_gate_dist  = min_g ||v_hat - g||_2
+opal__nearest_2_factor_logic = argmin_g ||v_hat - g||_2
 ```
 
 ### Distance to labeled logic (support)
@@ -43,16 +42,6 @@ Use **observed** label logic (`v_obs`) for support:
 ```
 dist_to_labeled_logic = min_j ||v_hat(candidate) - v_obs(label_j)||_2
 ```
-
-### Distance to labeled X (UMAP space)
-
-If UMAP coordinates exist:
-
-```
-dist_to_labeled_x = min_j ||x_umap(candidate) - x_umap(label_j)||_2
-```
-
-This is a **visual support diagnostic** only (no objective coupling).
 
 ### SFXI objective components (reused from `sfxi_v1`)
 
@@ -99,34 +88,35 @@ Diagnostics render full datasets; sampling is intentionally disabled for these p
 ### A) Factorial‑effects map
 - **x:** `A_effect`, **y:** `B_effect`, **color:** `AB_interaction`
 - Optional size: `effect_scaled` (default)
-- Overlay markers: labeled + top‑k (current view)
+- Overlay markers: labeled only (current view)
 - The formulae are:
   - $A = \frac{(v_{10}+v_{11})-(v_{00}+v_{01})}{2}$
   - $B = \frac{(v_{01}+v_{11})-(v_{00}+v_{10})}{2}$
   - $AB = \frac{(v_{11}+v_{00})-(v_{10}+v_{01})}{2}$
 
-### B) Setpoint sweep (objective landscape)
+### B) Setpoint sweep (objective landscape, observed labels only)
 Library = **16 truth tables + current setpoint**. For each setpoint:
 - median `F_logic` on labels‑as‑of
 - **top‑k mean** `F_logic` (k configurable)
 - fraction `F_logic > tau`
 - `denom_used` from current‑round labels
-- clip fractions for `E_scaled` (labels; optional pool if provided)
-  - pool clip fractions must use the **label-derived denom** (objective‑consistent scaling)
+- clip fractions for `E_scaled` (labels only)
 
 Rendered as a **heatmap**: columns are setpoint vectors, rows are diagnostic metrics.
 Default view omits `denom_used` to preserve contrast; `denom_used` is available as a single‑metric view.
+The dashboard renders this panel under **Labels (observed events)** and labels the source as
+canonical vs overlay mode.
 
 ### C) Logic support diagnostics
-Scatter: x=`dist_to_labeled_logic`, y=`score` (or `F_logic`), color=`nearest_gate_class` or other hue.
+Scatter: x=`dist_to_labeled_logic`, y=`score` (or `F_logic`), color=`opal__nearest_2_factor_logic` or other hue.
 Distance is to the **nearest labeled logic vector** (labels‑as‑of). This does **not** identify which label is
-nearest; it only measures closeness to any observed logic profile. Use `nearest_gate_class` to interpret
+nearest; it only measures closeness to any observed logic profile. Use `opal__nearest_2_factor_logic` to interpret
 where a candidate sits relative to the 16 truth tables.
 Conservative campaigns can restrict to low distance (in‑support); exploratory campaigns can intentionally
 sample higher distances.
 
 ### D) X‑space support (UMAP)
-Scatter in UMAP space; overlay labeled + selected. Color by score or `nearest_gate_class`.
+Scatter in UMAP space; overlay labeled + selected. Color by score or `opal__nearest_2_factor_logic`.
 This is a support visualization only (no objective math).
 
 ### E) Uncertainty views
@@ -164,7 +154,7 @@ under‑scaled intensity.
 - `state_order.py` (single source of truth for `[00,10,01,11]`)
 - `factorial_effects.py`
 - `gates.py` (16 truth tables + nearest gate)
-- `support.py` (dist to labeled logic / UMAP)
+- `support.py` (dist to labeled logic)
 - `intensity_scaling.py`
 - `setpoint_sweep.py`
 - `uncertainty.py` (model‑agnostic contract + RF adapter)
@@ -188,7 +178,7 @@ under‑scaled intensity.
 3) **Denom source of truth**: confirm **current‑round labels** (aligned with `sfxi_v1`).
 4) **Uncertainty kind**: scalar score std only; no component‑level views.
 5) **Derived metrics placement**: in‑memory only; export toggle TBD.
-6) **UMAP support distance**: `dist_to_labeled_x` uses UMAP coords only.
+6) **UMAP support distance**: removed in favor of categorical truth-table hue.
 
 ## Testing checklist
 

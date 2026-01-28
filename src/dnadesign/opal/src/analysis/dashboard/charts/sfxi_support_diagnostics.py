@@ -26,8 +26,6 @@ def make_support_diagnostics_figure(
     hue_col: str | None = None,
     size_col: str | None = None,
     label_col: str | None = None,
-    selected_col: str | None = None,
-    top_k_col: str | None = None,
     title: str = "Logic support diagnostics",
     subtitle: str | None = None,
     alpha: float = 0.7,
@@ -94,12 +92,6 @@ def make_support_diagnostics_figure(
     if label_col and label_col in df.columns:
         mask = df.select(pl.col(label_col).fill_null(False)).to_numpy().ravel().astype(bool)
         _overlay(mask, scale=1.4, marker="o", edge="#000000")
-    if selected_col and selected_col in df.columns:
-        mask = df.select(pl.col(selected_col).fill_null(False)).to_numpy().ravel().astype(bool)
-        _overlay(mask, scale=1.8, marker="*", edge="#000000")
-    if top_k_col and top_k_col in df.columns:
-        mask = df.select(pl.col(top_k_col).fill_null(False)).to_numpy().ravel().astype(bool)
-        _overlay(mask, scale=1.6, marker="o", edge="#D55E00")
 
     annotate_plot_meta(
         ax,

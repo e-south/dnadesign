@@ -29,8 +29,6 @@ def make_factorial_effects_figure(
     logic_col: str,
     size_col: str | None = None,
     label_col: str | None = None,
-    selected_col: str | None = None,
-    top_k_col: str | None = None,
     title: str = "Factorial effects map",
     subtitle: str | None = None,
     alpha: float = 0.7,
@@ -90,30 +88,6 @@ def make_factorial_effects_figure(
                 facecolors="none",
                 edgecolors="#000000",
                 linewidths=1.2,
-                alpha=1.0,
-            )
-    if selected_col and selected_col in df.columns:
-        mask = df.select(pl.col(selected_col).fill_null(False)).to_numpy().ravel().astype(bool)
-        if np.any(mask):
-            ax.scatter(
-                a_eff[mask],
-                b_eff[mask],
-                s=sizes[mask] * 1.8,
-                marker="*",
-                edgecolors="#000000",
-                linewidths=0.8,
-                alpha=1.0,
-            )
-    if top_k_col and top_k_col in df.columns:
-        mask = df.select(pl.col(top_k_col).fill_null(False)).to_numpy().ravel().astype(bool)
-        if np.any(mask):
-            ax.scatter(
-                a_eff[mask],
-                b_eff[mask],
-                s=sizes[mask] * 1.6,
-                facecolors="none",
-                edgecolors="#D55E00",
-                linewidths=1.4,
                 alpha=1.0,
             )
 

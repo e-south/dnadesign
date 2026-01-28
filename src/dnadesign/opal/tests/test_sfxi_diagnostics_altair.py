@@ -35,7 +35,6 @@ def test_factorial_effects_altair_smoke() -> None:
         logic_col="pred_y_hat",
         size_col="opal__view__effect_scaled",
         label_col="opal__view__observed",
-        selected_col="opal__view__top_k",
         plot_size=320,
     )
     assert isinstance(chart, alt.TopLevelMixin)
@@ -53,7 +52,7 @@ def test_support_diagnostics_altair_smoke() -> None:
     )
     hue = HueOption(
         key="opal__view__effect_scaled",
-        label="Effect scaled",
+        label="opal__view__effect_scaled",
         kind="numeric",
         dtype=pl.Float64,
     )
@@ -63,7 +62,6 @@ def test_support_diagnostics_altair_smoke() -> None:
         y_col="score",
         hue=hue,
         label_col="opal__view__observed",
-        selected_col="opal__view__top_k",
         plot_size=320,
     )
     assert isinstance(chart, alt.TopLevelMixin)
@@ -81,7 +79,7 @@ def test_uncertainty_altair_smoke() -> None:
     )
     hue = HueOption(
         key="opal__view__logic_fidelity",
-        label="Logic fidelity",
+        label="opal__view__logic_fidelity",
         kind="numeric",
         dtype=pl.Float64,
     )
@@ -91,7 +89,6 @@ def test_uncertainty_altair_smoke() -> None:
         y_col="score",
         hue=hue,
         label_col="opal__view__observed",
-        selected_col="opal__view__top_k",
         plot_size=320,
     )
     assert isinstance(chart, alt.TopLevelMixin)

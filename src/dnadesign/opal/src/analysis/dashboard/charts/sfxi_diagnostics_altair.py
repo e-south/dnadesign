@@ -69,7 +69,6 @@ def make_factorial_effects_chart(
     logic_col: str,
     size_col: str | None = None,
     label_col: str | None = None,
-    selected_col: str | None = None,
     title: str = "Factorial effects map",
     subtitle: str | None = None,
     plot_size: int = DNAD_DIAGNOSTICS_PLOT_SIZE,
@@ -100,8 +99,6 @@ def make_factorial_effects_chart(
         plot_df = plot_df.with_columns(df.get_column(size_col).alias(size_col))
     if label_col and label_col in df.columns:
         plot_df = plot_df.with_columns(df.get_column(label_col).alias(label_col))
-    if selected_col and selected_col in df.columns:
-        plot_df = plot_df.with_columns(df.get_column(selected_col).alias(selected_col))
     if "id" in df.columns:
         plot_df = plot_df.with_columns(df.get_column("id").alias("id"))
     if "__row_id" in df.columns:
@@ -149,19 +146,6 @@ def make_factorial_effects_chart(
                 )
                 .encode(x=alt.X("a_effect:Q"), y=alt.Y("b_effect:Q"), tooltip=_tooltip_fields(df_obs, tooltip_cols))
             )
-    if selected_col and selected_col in plot_df.columns:
-        df_sel = plot_df.filter(pl.col(selected_col).fill_null(False))
-        if df_sel.height:
-            layers.append(
-                alt.Chart(df_sel)
-                .mark_circle(
-                    size=_POINT_SIZE_RANGE[1] * 1.1,
-                    stroke="#D55E00",
-                    strokeWidth=1.4,
-                    fillOpacity=0.0,
-                )
-                .encode(x=alt.X("a_effect:Q"), y=alt.Y("b_effect:Q"), tooltip=_tooltip_fields(df_sel, tooltip_cols))
-            )
     chart = alt.layer(*layers)
     return with_title(chart, title, subtitle)
 
@@ -173,7 +157,6 @@ def make_support_diagnostics_chart(
     y_col: str,
     hue: HueOption | None = None,
     label_col: str | None = None,
-    selected_col: str | None = None,
     title: str = "Logic support diagnostics",
     subtitle: str | None = None,
     plot_size: int = DNAD_DIAGNOSTICS_PLOT_SIZE,
@@ -213,18 +196,6 @@ def make_support_diagnostics_chart(
                     tooltip=_tooltip_fields(df_obs, tooltip_cols),
                 )
             )
-    if selected_col and selected_col in df.columns:
-        df_sel = df.filter(pl.col(selected_col).fill_null(False))
-        if df_sel.height:
-            layers.append(
-                alt.Chart(df_sel)
-                .mark_circle(size=_POINT_SIZE_RANGE[1] * 1.1, stroke="#D55E00", strokeWidth=1.4, fillOpacity=0.0)
-                .encode(
-                    x=alt.X(f"{x_col}:Q", title=x_col),
-                    y=alt.Y(f"{y_col}:Q", title=y_col),
-                    tooltip=_tooltip_fields(df_sel, tooltip_cols),
-                )
-            )
     chart = alt.layer(*layers)
     return with_title(chart, title, subtitle)
 
@@ -236,7 +207,6 @@ def make_uncertainty_chart(
     y_col: str,
     hue: HueOption | None = None,
     label_col: str | None = None,
-    selected_col: str | None = None,
     title: str = "Uncertainty diagnostics",
     subtitle: str | None = None,
     plot_size: int = DNAD_DIAGNOSTICS_PLOT_SIZE,
@@ -274,18 +244,6 @@ def make_uncertainty_chart(
                     x=alt.X(f"{x_col}:Q", title=x_col),
                     y=alt.Y(f"{y_col}:Q", title=y_col),
                     tooltip=_tooltip_fields(df_obs, tooltip_cols),
-                )
-            )
-    if selected_col and selected_col in df.columns:
-        df_sel = df.filter(pl.col(selected_col).fill_null(False))
-        if df_sel.height:
-            layers.append(
-                alt.Chart(df_sel)
-                .mark_circle(size=_POINT_SIZE_RANGE[1] * 1.1, stroke="#D55E00", strokeWidth=1.4, fillOpacity=0.0)
-                .encode(
-                    x=alt.X(f"{x_col}:Q", title=x_col),
-                    y=alt.Y(f"{y_col}:Q", title=y_col),
-                    tooltip=_tooltip_fields(df_sel, tooltip_cols),
                 )
             )
     chart = alt.layer(*layers)

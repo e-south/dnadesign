@@ -45,8 +45,6 @@ class DiagnosticsPanels:
     factorial: ChartPanel
     support: ChartPanel
     uncertainty: ChartPanel
-    sweep: ChartPanel
-    intensity: ChartPanel
 
 
 @dataclass(frozen=True)
@@ -188,7 +186,7 @@ def _build_factorial_panel(
     join_key = _resolve_join_key(df_pred_selected, df_view)
     if join_key is None:
         return _note_panel("Factorial effects unavailable (missing join key: id or __row_id).")
-    required_view_cols = ["opal__view__effect_scaled", "opal__view__observed", "opal__view__top_k"]
+    required_view_cols = ["opal__view__effect_scaled", "opal__view__observed"]
     missing = [col for col in required_view_cols if col not in df_view.columns]
     if missing:
         return _note_panel(f"Factorial effects unavailable (missing view columns: {', '.join(missing)}).")
@@ -206,7 +204,6 @@ def _build_factorial_panel(
             logic_col="pred_y_hat",
             size_col="opal__view__effect_scaled",
             label_col="opal__view__observed",
-            selected_col="opal__view__top_k",
             subtitle="Predicted logic vectors",
             plot_size=DNAD_DIAGNOSTICS_PLOT_SIZE,
         )
@@ -241,7 +238,6 @@ def _build_support_panel(
             y_col=y_col,
             hue=hue,
             label_col="opal__view__observed",
-            selected_col="opal__view__top_k",
             subtitle="Logic-space support",
             plot_size=DNAD_DIAGNOSTICS_PLOT_SIZE,
         )
@@ -278,7 +274,6 @@ def _build_uncertainty_panel(
             y_col="opal__view__score",
             hue=hue,
             label_col="opal__view__observed",
-            selected_col="opal__view__top_k",
             subtitle="Uncertainty vs score",
             plot_size=DNAD_DIAGNOSTICS_PLOT_SIZE,
         )
@@ -326,7 +321,7 @@ def _build_sweep_data(
         delta=float(sfxi_params.delta),
         top_k=5,
         tau=0.8,
-        pool_vec8=pool_vec,
+        pool_vec8=None,
         state_order=sfxi_math.STATE_ORDER,
     )
     denom_note = f"denom={int(sfxi_params.p)}th pct E_raw (min_n={int(sfxi_params.min_n)})"
@@ -357,36 +352,14 @@ def _build_sweep_data(
     )
 
 
-def build_diagnostics_panels(
+def build_sweep_panels(
     *,
     df_pred_selected: pl.DataFrame | None,
-    df_view: pl.DataFrame | None,
     opal_campaign_info: CampaignInfo | None,
     opal_labels_current_df: pl.DataFrame | None,
     sfxi_params: SFXIParams,
     sweep_metrics: Sequence[str],
-    support_y_col: str,
-    support_color: HueOption | None,
-    uncertainty_color: HueOption | None,
-    uncertainty_available: bool,
-) -> DiagnosticsPanels:
-    factorial = _build_factorial_panel(
-        df_pred_selected=df_pred_selected,
-        df_view=df_view,
-    )
-    support = _build_support_panel(
-        df_view=df_view,
-        df_pred_selected=df_pred_selected,
-        y_col=support_y_col,
-        hue=support_color,
-    )
-    uncertainty = _build_uncertainty_panel(
-        df_view=df_view,
-        df_pred_selected=df_pred_selected,
-        uncertainty_available=uncertainty_available,
-        hue=uncertainty_color,
-    )
-
+) -> tuple[ChartPanel, ChartPanel]:
     try:
         sweep_data = _build_sweep_data(
             df_pred_selected=df_pred_selected,
@@ -421,10 +394,37 @@ def build_diagnostics_panels(
         else:
             intensity = ChartPanel(chart=fig, note=sweep_data.note, kind="mpl")
 
+    return sweep, intensity
+
+
+def build_diagnostics_panels(
+    *,
+    df_pred_selected: pl.DataFrame | None,
+    df_view: pl.DataFrame | None,
+    support_y_col: str,
+    support_color: HueOption | None,
+    uncertainty_color: HueOption | None,
+    uncertainty_available: bool,
+) -> DiagnosticsPanels:
+    factorial = _build_factorial_panel(
+        df_pred_selected=df_pred_selected,
+        df_view=df_view,
+    )
+    support = _build_support_panel(
+        df_view=df_view,
+        df_pred_selected=df_pred_selected,
+        y_col=support_y_col,
+        hue=support_color,
+    )
+    uncertainty = _build_uncertainty_panel(
+        df_view=df_view,
+        df_pred_selected=df_pred_selected,
+        uncertainty_available=uncertainty_available,
+        hue=uncertainty_color,
+    )
+
     return DiagnosticsPanels(
         factorial=factorial,
         support=support,
         uncertainty=uncertainty,
-        sweep=sweep,
-        intensity=intensity,
     )

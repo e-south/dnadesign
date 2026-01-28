@@ -18,7 +18,7 @@ from ..analysis.facade import load_predictions_with_setpoint, read_labels, read_
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
-from ._param_utils import get_bool, get_int, get_str, reject_params
+from ._param_utils import get_bool, get_str, reject_params
 from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_round
 
 
@@ -28,11 +28,10 @@ from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_ro
         summary="Factorial-effects map from predicted SFXI logic vectors.",
         params={
             "size_by": "Column for point size (default obj__effect_scaled).",
-            "top_k": "Optional Top-K threshold for overlay (default 10).",
             "include_labels": "Overlay labeled records (default true).",
             "rasterize_at": "Rasterize scatter above this count (default None).",
         },
-        requires=["pred__y_hat_model", "sel__is_selected", "sel__rank_competition"],
+        requires=["pred__y_hat_model"],
         notes=["Reads outputs/ledger/predictions and labels.parquet (optional) for overlays."],
     ),
 )
@@ -43,14 +42,13 @@ def render(context, params: dict) -> None:
     run_id = resolve_run_id(runs_df, round_k=round_k, run_id=context.run_id)
 
     size_by = get_str(params, ["size_by", "size", "size_field"], "obj__effect_scaled")
-    top_k = get_int(params, ["top_k"], 10)
     include_labels = get_bool(params, ["include_labels", "labels"], True)
     rasterize_at = params.get("rasterize_at", None)
     if rasterize_at is not None:
         rasterize_at = int(rasterize_at)
     reject_params(params, ["sample_n", "sample", "n", "seed"], ctx="sfxi_factorial_effects")
 
-    need = {"id", "pred__y_hat_model", "sel__is_selected", "sel__rank_competition"}
+    need = {"id", "pred__y_hat_model"}
     if size_by:
         need.add(size_by)
     df = load_predictions_with_setpoint(
@@ -77,15 +75,11 @@ def render(context, params: dict) -> None:
     else:
         df = df.with_columns(pl.lit(False).alias("__is_labeled"))
 
-    df = df.with_columns((pl.col("sel__rank_competition") <= int(top_k)).alias("__is_top_k"))
-
     fig = sfxi_factorial_effects.make_factorial_effects_figure(
         df,
         logic_col="pred__y_hat_model",
         size_col=size_by,
         label_col="__is_labeled",
-        selected_col="sel__is_selected",
-        top_k_col="__is_top_k",
         subtitle=None,
         rasterize_at=rasterize_at,
     )

@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/analysis/sfxi/support.py
 
-Support and extrapolation diagnostics for SFXI logic and embedding spaces.
+Support and extrapolation diagnostics for SFXI logic space.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -61,21 +61,4 @@ def dist_to_labeled_logic(
     require_state_order(state_order)
     cand = _validate_matrix(candidates, name="candidates", n_cols=4)
     lab = _validate_matrix(labels, name="labels", n_cols=4)
-    return _min_l2_distance(cand, lab, batch_size=batch_size)
-
-
-def dist_to_labeled_x(
-    candidates: np.ndarray,
-    labels: np.ndarray,
-    *,
-    batch_size: int = 2048,
-) -> np.ndarray:
-    cand_raw = np.asarray(candidates)
-    lab_raw = np.asarray(labels)
-    cand_cols = cand_raw.shape[0] if cand_raw.ndim == 1 else cand_raw.shape[1]
-    lab_cols = lab_raw.shape[0] if lab_raw.ndim == 1 else lab_raw.shape[1]
-    cand = _validate_matrix(candidates, name="candidates", n_cols=int(cand_cols))
-    lab = _validate_matrix(labels, name="labels", n_cols=int(lab_cols))
-    if cand.shape[1] != lab.shape[1]:
-        raise ValueError("candidates and labels must have matching dimensions.")
     return _min_l2_distance(cand, lab, batch_size=batch_size)

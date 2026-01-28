@@ -105,7 +105,7 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
 ### Plot kinds + params
 
 - **`sfxi_factorial_effects`**: factorial-effects map from predicted logic vectors.
-  - params: `size_by` (default `obj__effect_scaled`), `top_k`, `include_labels`, `rasterize_at`
+  - params: `size_by` (default `obj__effect_scaled`), `include_labels`, `rasterize_at`
 - **`sfxi_setpoint_sweep`**: objective landscape across discrete setpoints (current-round labels).
   - rendered as a heatmap with setpoints as columns (vector labels) and diagnostic metrics as rows.
   - default heatmap omits `denom_used` to preserve contrast.

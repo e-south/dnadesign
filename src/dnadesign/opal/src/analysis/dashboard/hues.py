@@ -48,6 +48,12 @@ _DENY_PREFIXES = (
     "opal__overlay__y_hat",
     "opal__overlay__y_vec",
 )
+_DENY_NAMES = (
+    "opal__sfxi__nearest_gate_class",
+    "opal__sfxi__nearest_gate_dist",
+    "opal__sfxi__dist_to_labeled_logic",
+    "opal__sfxi__dist_to_labeled_x",
+)
 _DENY_SUBSTRINGS = ("ledger", "cache")
 
 
@@ -85,6 +91,8 @@ def _infer_kind(df: pl.DataFrame, col: str, dtype: pl.DataType, *, max_unique: i
 
 
 def _should_skip(name: str, *, denylist: Iterable[str], deny_prefixes: Iterable[str]) -> bool:
+    if name in _DENY_NAMES:
+        return True
     if name in denylist:
         return True
     if any(name.startswith(prefix) for prefix in deny_prefixes):
@@ -201,73 +209,55 @@ def build_sfxi_hue_registry(
 
 def default_view_hues() -> list[HueOption]:
     return [
-        HueOption(key="opal__view__score", label="Score", kind="numeric", dtype=pl.Float64),
+        HueOption(key="opal__view__score", label="opal__view__score", kind="numeric", dtype=pl.Float64),
         HueOption(
             key="opal__view__logic_fidelity",
-            label="Logic fidelity",
+            label="opal__view__logic_fidelity",
             kind="numeric",
             dtype=pl.Float64,
         ),
         HueOption(
             key="opal__view__effect_scaled",
-            label="Effect scaled",
+            label="opal__view__effect_scaled",
             kind="numeric",
             dtype=pl.Float64,
         ),
-        HueOption(key="opal__view__rank", label="Rank", kind="numeric", dtype=pl.Float64),
+        HueOption(key="opal__view__rank", label="opal__view__rank", kind="numeric", dtype=pl.Float64),
         HueOption(
             key="opal__view__top_k",
-            label="Top-K",
+            label="opal__view__top_k",
             kind="categorical",
             dtype=pl.Boolean,
             category_labels=("Top-K", "Not Top-K"),
         ),
         HueOption(
             key="opal__view__observed",
-            label="Observed (labeled)",
+            label="opal__view__observed",
             kind="categorical",
             dtype=pl.Boolean,
             category_labels=("Observed", "Unlabeled"),
         ),
         HueOption(
             key="opal__view__pred_score_unlabeled",
-            label="Predicted score (unlabeled)",
+            label="opal__view__pred_score_unlabeled",
             kind="numeric",
             dtype=pl.Float64,
         ),
         HueOption(
             key="opal__view__observed_score",
-            label="Observed score",
+            label="opal__view__observed_score",
             kind="numeric",
             dtype=pl.Float64,
         ),
         HueOption(
-            key="opal__sfxi__nearest_gate_class",
-            label="Nearest gate class",
+            key="opal__nearest_2_factor_logic",
+            label="opal__nearest_2_factor_logic",
             kind="categorical",
             dtype=pl.Utf8,
         ),
         HueOption(
-            key="opal__sfxi__nearest_gate_dist",
-            label="Nearest gate distance",
-            kind="numeric",
-            dtype=pl.Float64,
-        ),
-        HueOption(
-            key="opal__sfxi__dist_to_labeled_logic",
-            label="Dist. to labeled (logic)",
-            kind="numeric",
-            dtype=pl.Float64,
-        ),
-        HueOption(
-            key="opal__sfxi__dist_to_labeled_x",
-            label="Dist. to labeled (X-space)",
-            kind="numeric",
-            dtype=pl.Float64,
-        ),
-        HueOption(
             key="opal__sfxi__uncertainty",
-            label="Ensemble score std (heuristic)",
+            label="opal__sfxi__uncertainty",
             kind="numeric",
             dtype=pl.Float64,
         ),

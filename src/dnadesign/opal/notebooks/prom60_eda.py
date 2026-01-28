@@ -58,6 +58,7 @@ def _():
     build_pred_sfxi_view = dash_sfxi.build_pred_sfxi_view
     build_umap_controls = dash_ui.build_umap_controls
     build_diagnostics_panels = dash_diag_guidance.build_diagnostics_panels
+    build_sweep_panels = dash_diag_guidance.build_sweep_panels
     campaign_label_from_path = dash_datasets.campaign_label_from_path
     build_explorer_hue_registry = dash_hues.build_explorer_hue_registry
     build_hue_registry = dash_hues.build_hue_registry
@@ -95,6 +96,7 @@ def _():
         attach_namespace_columns,
         build_cluster_chart,
         build_diagnostics_panels,
+        build_sweep_panels,
         build_explorer_hue_registry,
         build_feature_importance_chart,
         build_hue_registry,
@@ -435,8 +437,8 @@ def _(
     _default_color = defaults.get("color")
     if _default_color in color_options:
         preferred_color = _default_color
-    elif "Score" in hue_registry.labels():
-        preferred_color = "Score"
+    elif "opal__view__score" in hue_registry.labels():
+        preferred_color = "opal__view__score"
     else:
         preferred_color = "(none)"
     color_default = (
@@ -570,9 +572,9 @@ def _(
                     )
                     _color_title = _hue.label
                     _color_tooltip = _label_col
-                    if "observed" in _hue.key:
+                    if "top_k" in _hue.key:
                         _highlight_color = _okabe_ito[5]
-                    elif "top_k" in _hue.key:
+                    elif "observed" in _hue.key:
                         _highlight_color = _okabe_ito[2]
                     else:
                         _highlight_color = _okabe_ito[0]
@@ -787,7 +789,7 @@ def _(choose_dropdown_value, cluster_hue_state, cluster_metric_state, hue_regist
     metric_options = [opt.label for opt in hue_registry.options if opt.kind == "numeric"]
     if not metric_options:
         metric_options = ["(none)"]
-    default_metric = "Score" if "Score" in metric_options else metric_options[0]
+    default_metric = "opal__view__score" if "opal__view__score" in metric_options else metric_options[0]
     metric_default = (
         choose_dropdown_value(
             metric_options,
@@ -804,7 +806,7 @@ def _(choose_dropdown_value, cluster_hue_state, cluster_metric_state, hue_regist
     )
     hue_options = ["(none)"] + hue_registry.labels()
     default_hue = "(none)"
-    for candidate in ["Top-K", "Observed (labeled)"]:
+    for candidate in ["opal__view__top_k", "opal__view__observed"]:
         if candidate in hue_registry.labels():
             default_hue = candidate
             break
@@ -1822,19 +1824,19 @@ def _(mo):
 
 
 @app.cell
-def _(build_sfxi_hue_registry, choose_dropdown_value, df_sfxi_scatter, mo, sfxi_color_state):
+def _(build_sfxi_hue_registry, choose_dropdown_value, df_sfxi_scatter, mo, sfxi_color_state, default_view_hues):
     sfxi_hue_registry = build_sfxi_hue_registry(
         df_sfxi_scatter,
-        preferred=[],
-        include_columns=True,
+        preferred=default_view_hues(),
+        include_columns=False,
         denylist={"__row_id", "id", "id_"},
     )
     hue_labels = sfxi_hue_registry.labels()
     if not hue_labels:
-        options = ["score"] if "score" in df_sfxi_scatter.columns else ["(none)"]
+        options = ["(none)"]
     else:
         options = hue_labels
-    preferred = "score" if "score" in options else None
+    preferred = "opal__view__score" if "opal__view__score" in options else None
     default = choose_dropdown_value(options, current=sfxi_color_state(), preferred=preferred) or options[0]
     sfxi_color_dropdown = mo.ui.dropdown(
         options=options,
@@ -1870,9 +1872,10 @@ def _(
     support_y_state,
     sweep_metric_state,
 ):
-    support_y_options = ["Score", "Logic fidelity"]
+    support_y_options = ["opal__view__score", "opal__view__logic_fidelity"]
     support_y_default = (
-        choose_dropdown_value(support_y_options, current=support_y_state(), preferred="Score") or "Score"
+        choose_dropdown_value(support_y_options, current=support_y_state(), preferred="opal__view__score")
+        or "opal__view__score"
     )
     support_y_dropdown = mo.ui.dropdown(
         options=support_y_options,
@@ -1881,20 +1884,20 @@ def _(
         full_width=True,
     )
     sweep_metric_options = [
-        "Core metrics",
-        "Median logic fidelity",
-        "Top-K logic fidelity",
-        "Frac logic fidelity > tau",
-        "Clip high fraction",
-        "Denom used",
+        "Observed logic (core)",
+        "Median logic fidelity (labels)",
+        "Top-K logic fidelity (labels)",
+        "Frac logic fidelity > tau (labels)",
+        "Clip high fraction (labels)",
+        "Denom used (labels)",
     ]
     sweep_metric_default = (
         choose_dropdown_value(
             sweep_metric_options,
             current=sweep_metric_state(),
-            preferred="Core metrics",
+            preferred="Observed logic (core)",
         )
-        or "Core metrics"
+        or "Observed logic (core)"
     )
     sweep_metric_dropdown = mo.ui.dropdown(
         options=sweep_metric_options,
@@ -1911,10 +1914,12 @@ def _(
 @app.cell
 def _(choose_dropdown_value, hue_registry, mo, support_color_state, uncertainty_color_state):
     _diag_hue_options = ["(none)"] + hue_registry.labels()
-    if "Nearest gate class" in _diag_hue_options:
-        support_color_preferred = "Nearest gate class"
+    if "opal__nearest_2_factor_logic" in _diag_hue_options:
+        support_color_preferred = "opal__nearest_2_factor_logic"
     else:
-        support_color_preferred = "Effect scaled" if "Effect scaled" in _diag_hue_options else "Score"
+        support_color_preferred = (
+            "opal__view__effect_scaled" if "opal__view__effect_scaled" in _diag_hue_options else "opal__view__score"
+        )
     support_color_default = (
         choose_dropdown_value(_diag_hue_options, current=support_color_state(), preferred=support_color_preferred)
         or "(none)"
@@ -1925,7 +1930,9 @@ def _(choose_dropdown_value, hue_registry, mo, support_color_state, uncertainty_
         label="Support color",
         full_width=True,
     )
-    uncertainty_color_preferred = "Logic fidelity" if "Logic fidelity" in _diag_hue_options else "Score"
+    uncertainty_color_preferred = (
+        "opal__view__logic_fidelity" if "opal__view__logic_fidelity" in _diag_hue_options else "opal__view__score"
+    )
     uncertainty_color_default = (
         choose_dropdown_value(
             _diag_hue_options, current=uncertainty_color_state(), preferred=uncertainty_color_preferred
@@ -2208,7 +2215,11 @@ def _(
     pred_diag_md,
     pred_notice_md,
     round_notice_md,
+    render_chart_panel,
     sfxi_source_dropdown,
+    sweep_metric_dropdown,
+    sweep_mode_md,
+    sweep_panel,
     view_notice_md,
 ):
     _opal_references_md = mo.Html(
@@ -2230,6 +2241,7 @@ def _(
     label_controls = [c for c in [label_src_multiselect, opal_label_view_dropdown] if c is not None]
     label_controls_row = mo.hstack(label_controls) if label_controls else mo.md("")
 
+    sweep_panel_ui = render_chart_panel(sweep_panel, default_note="Setpoint sweep unavailable.")
     sfxi_panel = mo.vstack(
         [
             mo.md("## Characterizing promoters by their SFXI score"),
@@ -2257,6 +2269,16 @@ def _(
             opal_labels_table_note_md,
             opal_round_notice_md,
             opal_labels_table_ui,
+            mo.md("### Setpoint sweep (observed labels)"),
+            mo.md(
+                "Heatmap summary of how observed label logic aligns with candidate setpoints. "
+                "Each column is a 4-vector setpoint; rows summarize logic fidelity and intensity scaling "
+                "for observed labels only. Use the metric dropdown to switch views; denom is shown "
+                "as a single-metric view to preserve contrast."
+            ),
+            sweep_mode_md,
+            sweep_metric_dropdown,
+            sweep_panel_ui,
         ]
     )
     sfxi_panel
@@ -2377,61 +2399,48 @@ def _(
     return
 
 
-@app.cell(column=8)
+@app.cell
 def _(
-    build_diagnostics_panels,
-    derived_metrics_note_md,
+    build_sweep_panels,
     df_pred_selected,
-    df_view,
-    fig_to_image,
-    hue_registry,
+    mode_dropdown,
     mo,
     opal_campaign_info,
     opal_labels_current_df,
     sfxi_params,
-    support_color_dropdown,
-    support_y_dropdown,
     sweep_metric_dropdown,
-    uncertainty_available,
-    uncertainty_color_dropdown,
 ):
-    support_y_map = {
-        "Score": "opal__view__score",
-        "Logic fidelity": "opal__view__logic_fidelity",
-    }
-    support_y_col = support_y_map.get(support_y_dropdown.value, "opal__view__score")
-    support_color = hue_registry.get(support_color_dropdown.value)
-    uncertainty_color = hue_registry.get(uncertainty_color_dropdown.value)
     sweep_metric_map = {
-        "Core metrics": [
+        "Observed logic (core)": [
             "median_logic_fidelity",
             "top_k_logic_fidelity",
             "frac_logic_fidelity_gt_tau",
             "clip_hi_fraction",
         ],
-        "Median logic fidelity": ["median_logic_fidelity"],
-        "Top-K logic fidelity": ["top_k_logic_fidelity"],
-        "Frac logic fidelity > tau": ["frac_logic_fidelity_gt_tau"],
-        "Denom used": ["denom_used"],
-        "Clip high fraction": ["clip_hi_fraction"],
+        "Median logic fidelity (labels)": ["median_logic_fidelity"],
+        "Top-K logic fidelity (labels)": ["top_k_logic_fidelity"],
+        "Frac logic fidelity > tau (labels)": ["frac_logic_fidelity_gt_tau"],
+        "Clip high fraction (labels)": ["clip_hi_fraction"],
+        "Denom used (labels)": ["denom_used"],
     }
-    _sweep_choice = sweep_metric_dropdown.value if sweep_metric_dropdown is not None else "Core metrics"
-    sweep_metrics = sweep_metric_map.get(_sweep_choice, sweep_metric_map["Core metrics"])
+    _sweep_choice = sweep_metric_dropdown.value if sweep_metric_dropdown is not None else "Observed logic (core)"
+    sweep_metrics = sweep_metric_map.get(_sweep_choice, sweep_metric_map["Observed logic (core)"])
 
-    panels = build_diagnostics_panels(
+    sweep_panel, intensity_panel = build_sweep_panels(
         df_pred_selected=df_pred_selected,
-        df_view=df_view,
         opal_campaign_info=opal_campaign_info,
         opal_labels_current_df=opal_labels_current_df,
         sfxi_params=sfxi_params,
         sweep_metrics=sweep_metrics,
-        support_y_col=support_y_col,
-        support_color=support_color,
-        uncertainty_color=uncertainty_color,
-        uncertainty_available=uncertainty_available,
     )
+    sweep_mode = "Overlay" if mode_dropdown.value == "Overlay" else "Canonical"
+    sweep_mode_md = mo.md(f"Setpoint sweep source: **{sweep_mode}** (observed labels only).")
+    return intensity_panel, sweep_panel, sweep_mode_md
 
-    def _render_panel(panel, *, default_note: str):
+
+@app.cell
+def _(fig_to_image, mo):
+    def render_chart_panel(panel, *, default_note: str):
         if panel.chart is None:
             return mo.md(panel.note or default_note)
         element = fig_to_image(panel.chart) if panel.kind != "altair" else mo.ui.altair_chart(panel.chart)
@@ -2439,15 +2448,49 @@ def _(
             return mo.vstack([mo.md(panel.note), element])
         return element
 
-    factorial_panel = _render_panel(panels.factorial, default_note="Factorial effects unavailable.")
-    support_panel = _render_panel(panels.support, default_note="Support diagnostics unavailable.")
-    uncertainty_panel = _render_panel(panels.uncertainty, default_note="Uncertainty plot unavailable.")
-    sweep_panel = _render_panel(panels.sweep, default_note="Setpoint sweep unavailable.")
-    intensity_panel = _render_panel(panels.intensity, default_note="Intensity scaling unavailable.")
+    return (render_chart_panel,)
+
+
+@app.cell(column=8)
+def _(
+    build_diagnostics_panels,
+    derived_metrics_note_md,
+    df_pred_selected,
+    df_view,
+    hue_registry,
+    intensity_panel,
+    mo,
+    render_chart_panel,
+    support_color_dropdown,
+    support_y_dropdown,
+    uncertainty_available,
+    uncertainty_color_dropdown,
+):
+    support_y_map = {
+        "opal__view__score": "opal__view__score",
+        "opal__view__logic_fidelity": "opal__view__logic_fidelity",
+    }
+    support_y_col = support_y_map.get(support_y_dropdown.value, "opal__view__score")
+    support_color = hue_registry.get(support_color_dropdown.value)
+    uncertainty_color = hue_registry.get(uncertainty_color_dropdown.value)
+
+    panels = build_diagnostics_panels(
+        df_pred_selected=df_pred_selected,
+        df_view=df_view,
+        support_y_col=support_y_col,
+        support_color=support_color,
+        uncertainty_color=uncertainty_color,
+        uncertainty_available=uncertainty_available,
+    )
+
+    factorial_panel = render_chart_panel(panels.factorial, default_note="Factorial effects unavailable.")
+    support_panel = render_chart_panel(panels.support, default_note="Support diagnostics unavailable.")
+    uncertainty_panel = render_chart_panel(panels.uncertainty, default_note="Uncertainty plot unavailable.")
+    intensity_panel_ui = render_chart_panel(intensity_panel, default_note="Intensity scaling unavailable.")
 
     mo.vstack(
         [
-            mo.md("## Diagnostics / AL Guidance"),
+            mo.md("## Diagnostic plots & guidance"),
             derived_metrics_note_md,
             mo.md(
                 "Diagnostics use label history as the canonical source for observed/predicted vec8s. "
@@ -2460,17 +2503,17 @@ def _(
                 r"$A = \frac{(v_{10}+v_{11})-(v_{00}+v_{01})}{2}$, "
                 r"$B = \frac{(v_{01}+v_{11})-(v_{00}+v_{10})}{2}$, "
                 r"$AB = \frac{(v_{11}+v_{00})-(v_{10}+v_{01})}{2}$. "
-                "Color encodes interaction strength; outlines mark labeled/top‑k candidates."
+                "Color encodes interaction strength; outlines mark labeled candidates."
             ),
             factorial_panel,
             mo.md("### Logic support diagnostics"),
             mo.md(
                 "Distance from each candidate’s predicted logic to the nearest labeled logic profile "
                 "(labels‑as‑of). The nearest label can live in any truth‑table region; use "
-                "`nearest_gate_class` to see which truth‑table class each candidate resembles. "
+                "`opal__nearest_2_factor_logic` to see which truth‑table class each candidate resembles. "
                 "Conservative campaigns favor low distance; exploratory campaigns sample some higher distances."
             ),
-            mo.vstack([support_y_dropdown, support_color_dropdown]),
+            mo.hstack([support_y_dropdown, support_color_dropdown]),
             support_panel,
             mo.md("### Uncertainty diagnostics"),
             mo.md(
@@ -2482,20 +2525,12 @@ def _(
             ),
             uncertainty_color_dropdown,
             uncertainty_panel,
-            mo.md("### Setpoint sweep (objective landscape)"),
-            mo.md(
-                "Heatmap over candidate setpoints using labeled data. Columns are setpoint vectors; "
-                "rows/metric choice summarize logic fidelity and intensity scaling behavior. "
-                "Denom is shown as a single‑metric view to avoid washing out other rows."
-            ),
-            sweep_metric_dropdown,
-            sweep_panel,
             mo.md("### Intensity scaling diagnostics"),
             mo.md(
                 "Shows denom calibration, clipping rates, and E_raw distributions. "
                 "Use to spot saturation (over‑scaled) or under‑scaled intensity effects."
             ),
-            intensity_panel,
+            intensity_panel_ui,
         ]
     )
     return
@@ -3103,7 +3138,7 @@ def _(
     df_sfxi_scatter = attach_namespace_columns(
         df=df_sfxi_scatter,
         df_base=df_view,
-        prefixes=("cluster__", "densegen__", "opal__sfxi__"),
+        prefixes=("cluster__", "densegen__", "opal__view__", "opal__sfxi__", "opal__nearest_2_factor_logic"),
     )
 
     sfxi_source_notice_md = mo.md("")
@@ -3379,36 +3414,30 @@ def _(
             pred_join_key = "__row_id"
 
     if pred_join_key is None or df_pred_selected is None or df_pred_selected.is_empty():
-        derived_notes.append("Nearest gate unavailable (missing predictions).")
+        derived_notes.append("Nearest logic table unavailable (missing predictions).")
     elif "pred_y_hat" not in df_pred_selected.columns:
-        derived_notes.append("Nearest gate unavailable (missing pred_y_hat).")
+        derived_notes.append("Nearest logic table unavailable (missing pred_y_hat).")
     else:
         pred_vec8 = list_series_to_numpy(df_pred_selected.get_column("pred_y_hat"), expected_len=8)
         if pred_vec8 is None:
-            derived_notes.append("Nearest gate unavailable (invalid pred_y_hat vectors).")
+            derived_notes.append("Nearest logic table unavailable (invalid pred_y_hat vectors).")
         else:
-            gate_cls, gate_dist = sfxi_gates.nearest_gate(
+            gate_cls, _ = sfxi_gates.nearest_gate(
                 pred_vec8[:, 0:4],
                 state_order=sfxi_math.STATE_ORDER,
             )
+            gate_cls = np.asarray([str(code).zfill(4) for code in gate_cls], dtype=object)
             gate_df = df_pred_selected.select([pred_join_key]).with_columns(
                 [
-                    pl.Series("opal__sfxi__nearest_gate_class", gate_cls),
-                    pl.Series("opal__sfxi__nearest_gate_dist", gate_dist),
+                    pl.Series("opal__nearest_2_factor_logic", gate_cls),
                 ]
             )
             df_view = df_view.join(gate_df, on=pred_join_key, how="left")
 
     label_logic = None
-    label_ids = []
     if opal_labels_asof_df is None or opal_labels_asof_df.is_empty():
         derived_notes.append("dist_to_labeled_logic unavailable (no labels-as-of).")
     else:
-        label_ids = (
-            opal_labels_asof_df.select(pl.col("id").cast(pl.Utf8).drop_nulls().unique()).to_series().to_list()
-            if "id" in opal_labels_asof_df.columns
-            else []
-        )
         labels_y_col = None
         if opal_campaign_info is not None and opal_campaign_info.y_column in opal_labels_asof_df.columns:
             labels_y_col = opal_campaign_info.y_column
@@ -3444,33 +3473,6 @@ def _(
                     pl.Series("opal__sfxi__dist_to_labeled_logic", dists)
                 )
                 df_view = df_view.join(dist_df, on=pred_join_key, how="left")
-
-    umap_x = "cluster__ldn_v1__umap_x" if "cluster__ldn_v1__umap_x" in df_view.columns else None
-    umap_y = "cluster__ldn_v1__umap_y" if "cluster__ldn_v1__umap_y" in df_view.columns else None
-    if umap_x is None:
-        umap_x = next((col for col in df_view.columns if col.endswith("__umap_x")), None)
-    if umap_y is None:
-        umap_y = next((col for col in df_view.columns if col.endswith("__umap_y")), None)
-    if umap_x is None or umap_y is None:
-        derived_notes.append("dist_to_labeled_x unavailable (UMAP columns missing).")
-    elif not label_ids:
-        derived_notes.append("dist_to_labeled_x unavailable (no label ids).")
-    else:
-        label_coords_df = df_view.filter(pl.col("id").cast(pl.Utf8).is_in(label_ids))
-        if label_coords_df.is_empty():
-            derived_notes.append("dist_to_labeled_x unavailable (no label coords in view).")
-        else:
-            cand = df_view.select(
-                [pl.col(umap_x).cast(pl.Float64, strict=False), pl.col(umap_y).cast(pl.Float64, strict=False)]
-            ).to_numpy()
-            lab = label_coords_df.select(
-                [pl.col(umap_x).cast(pl.Float64, strict=False), pl.col(umap_y).cast(pl.Float64, strict=False)]
-            ).to_numpy()
-            if not np.all(np.isfinite(cand)) or not np.all(np.isfinite(lab)):
-                derived_notes.append("dist_to_labeled_x unavailable (non-finite UMAP coords).")
-            else:
-                dist_x = sfxi_support.dist_to_labeled_x(cand, lab)
-                df_view = df_view.with_columns(pl.Series("opal__sfxi__dist_to_labeled_x", dist_x))
 
     if opal_campaign_info is None or not opal_campaign_info.x_column:
         derived_notes.append("uncertainty unavailable (x_column missing).")

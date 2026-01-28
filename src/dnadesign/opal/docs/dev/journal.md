@@ -64,7 +64,6 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Starting prom60 SFXI diagnostics + uncertainty work on branch `opal-dashboard-extend`.
 - Decisions: setpoint sweep library uses 16 truth tables + current setpoint; factorial size uses `effect_scaled`.
 - Uncertainty contract will support both `score` and `y_hat` kinds (default `score`).
-- dist_to_labeled_x will use UMAP embedding distance (X-space visualization only).
 - Added SFXI diagnostic chart builders (support, uncertainty, intensity scaling) and CLI plot plugins.
 - prom60_eda now includes a Diagnostics / AL Guidance column with factorial, sweep, support, uncertainty,
   and intensity scaling panels plus derived-metrics status.

@@ -50,7 +50,7 @@ def render(context, params: dict) -> None:
     batch_size = get_int(params, ["batch_size"], 2048)
     reject_params(params, ["sample_n", "sample", "n", "seed"], ctx="sfxi_support_diagnostics")
 
-    need = {"id", "pred__y_hat_model", "pred__y_obj_scalar", "sel__is_selected"}
+    need = {"id", "pred__y_hat_model", "pred__y_obj_scalar"}
     if y_axis:
         need.add(y_axis)
     if hue:
@@ -100,7 +100,6 @@ def render(context, params: dict) -> None:
         x_col="dist_to_labeled_logic",
         y_col=y_axis,
         hue_col=hue,
-        selected_col="sel__is_selected",
         subtitle=None,
     )
     out_dir = context.output_dir

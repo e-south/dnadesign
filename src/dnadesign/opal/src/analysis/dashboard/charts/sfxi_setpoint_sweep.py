@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/analysis/dashboard/charts/sfxi_setpoint_sweep.py
 
-Setpoint sweep summary table/heatmap for SFXI diagnostics.
+Setpoint sweep heatmap for SFXI diagnostics.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -18,7 +18,7 @@ import polars as pl
 
 from ....plots._mpl_utils import apply_plot_style
 from ...sfxi.setpoint_sweep import format_setpoint_label
-from .diagnostics_style import diagnostics_table_figsize
+from .diagnostics_style import DNAD_DIAGNOSTICS_PLOT_SIZE
 
 
 def make_setpoint_sweep_figure(
@@ -55,14 +55,16 @@ def make_setpoint_sweep_figure(
     apply_plot_style()
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(
-        figsize=diagnostics_table_figsize(n_cols=len(setpoint_labels), n_rows=len(metrics)),
-        constrained_layout=True,
-    )
+    n_cols = len(setpoint_labels)
+    n_rows = len(metrics)
+    cell = float(DNAD_DIAGNOSTICS_PLOT_SIZE) * 0.22
+    width = max(float(DNAD_DIAGNOSTICS_PLOT_SIZE) * 1.2, cell * max(n_cols, 1))
+    height = max(float(DNAD_DIAGNOSTICS_PLOT_SIZE) * 1.2, cell * max(n_rows, 1))
+    fig, ax = plt.subplots(figsize=(width, height), constrained_layout=True)
     mask = np.ma.masked_invalid(values)
     cmap = plt.cm.viridis.copy()
     cmap.set_bad(color="#DDDDDD")
-    im = ax.imshow(mask, aspect="auto", cmap=cmap)
+    im = ax.imshow(mask, aspect="equal", cmap=cmap)
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
     ax.set_xticks(np.arange(len(setpoint_labels)))

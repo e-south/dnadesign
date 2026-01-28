@@ -154,26 +154,6 @@ def build_umap_explorer_chart(
                 )
             )
             chart = chart + obs_layer
-    if "opal__view__top_k" in view.df_plot.columns:
-        df_top = view.df_plot.filter(pl.col("opal__view__top_k"))
-        if df_top.height:
-            top_layer = (
-                alt.Chart(df_top)
-                .mark_circle(
-                    size=point_size * 1.8,
-                    stroke="#000000",
-                    strokeWidth=1.5,
-                    fillOpacity=0.0,
-                    opacity=1.0,
-                )
-                .encode(
-                    x=alt.X(view.x_col, title=view.x_col),
-                    y=alt.Y(view.y_col, title=view.y_col),
-                    tooltip=tooltip_fields,
-                )
-            )
-            chart = chart + top_layer
-
     color_context = (view.color_spec.title if view.color_spec else None) or "none"
     chart = with_title(
         chart,

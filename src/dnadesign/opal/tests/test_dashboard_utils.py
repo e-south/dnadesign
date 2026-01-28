@@ -126,11 +126,12 @@ def test_namespace_summary() -> None:
 
 def test_default_view_hues_include_sfxi_diagnostics() -> None:
     keys = {option.key for option in hues.default_view_hues()}
-    assert "opal__sfxi__nearest_gate_class" in keys
-    assert "opal__sfxi__nearest_gate_dist" in keys
-    assert "opal__sfxi__dist_to_labeled_logic" in keys
-    assert "opal__sfxi__dist_to_labeled_x" in keys
+    assert "opal__nearest_2_factor_logic" in keys
     assert "opal__sfxi__uncertainty" in keys
+    assert "opal__sfxi__nearest_gate_class" not in keys
+    assert "opal__sfxi__nearest_gate_dist" not in keys
+    assert "opal__sfxi__dist_to_labeled_logic" not in keys
+    assert "opal__sfxi__dist_to_labeled_x" not in keys
 
 
 def test_umap_explorer_chart_overlays_observed_labels() -> None:
@@ -438,8 +439,8 @@ def test_build_umap_controls_uses_raw_column_names() -> None:
             "opal__view__score": [0.3],
         }
     )
-    opt = hues.HueOption(key="opal__view__score", label="Score", kind="numeric", dtype=pl.Float64)
-    registry = hues.HueRegistry(options=[opt], label_map={"Score": opt})
+    opt = hues.HueOption(key="opal__view__score", label="opal__view__score", kind="numeric", dtype=pl.Float64)
+    registry = hues.HueRegistry(options=[opt], label_map={"opal__view__score": opt})
     controls = ui.build_umap_controls(
         mo=_DummyMo(),
         df_active=df,

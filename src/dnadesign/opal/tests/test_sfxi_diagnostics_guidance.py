@@ -12,22 +12,6 @@ from __future__ import annotations
 import polars as pl
 
 from dnadesign.opal.src.analysis.dashboard.charts import diagnostics_guidance as diag
-from dnadesign.opal.src.analysis.dashboard.views.sfxi import SFXIParams
-
-
-def _params() -> SFXIParams:
-    return SFXIParams(
-        setpoint=(1.0, 0.0, 0.0, 0.0),
-        weights=(1.0, 0.0, 0.0, 0.0),
-        state_order=("00", "10", "01", "11"),
-        d=1.0,
-        beta=1.0,
-        gamma=1.0,
-        delta=0.0,
-        p=95.0,
-        min_n=1,
-        eps=1.0e-8,
-    )
 
 
 def test_support_and_uncertainty_ignore_non_pred_rows() -> None:
@@ -54,10 +38,6 @@ def test_support_and_uncertainty_ignore_non_pred_rows() -> None:
     panels = diag.build_diagnostics_panels(
         df_pred_selected=df_pred,
         df_view=df_view,
-        opal_campaign_info=None,
-        opal_labels_current_df=pl.DataFrame(),
-        sfxi_params=_params(),
-        sweep_metrics=["median_logic_fidelity"],
         support_y_col="opal__view__score",
         support_color=None,
         uncertainty_color=None,
@@ -90,7 +70,7 @@ def test_uncertainty_hue_matches_x_column() -> None:
     )
     hue = diag.HueOption(
         key="opal__sfxi__uncertainty",
-        label="Uncertainty",
+        label="opal__sfxi__uncertainty",
         kind="numeric",
         dtype=pl.Float64,
     )
@@ -98,10 +78,6 @@ def test_uncertainty_hue_matches_x_column() -> None:
     panels = diag.build_diagnostics_panels(
         df_pred_selected=df_pred,
         df_view=df_view,
-        opal_campaign_info=None,
-        opal_labels_current_df=pl.DataFrame(),
-        sfxi_params=_params(),
-        sweep_metrics=["median_logic_fidelity"],
         support_y_col="opal__view__score",
         support_color=None,
         uncertainty_color=hue,
