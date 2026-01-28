@@ -107,13 +107,16 @@ def parse_setpoint_from_runs(runs_df: pl.DataFrame) -> Sequence[float]:
 
 def parse_exponents_from_runs(runs_df: pl.DataFrame) -> tuple[float, float]:
     if "objective__params" not in runs_df.columns:
-        raise OpalError("runs.parquet missing objective__params (beta/gamma unavailable).", ExitCodes.BAD_ARGS)
+        raise OpalError(
+            "runs.parquet missing objective__params (logic_exponent_beta/intensity_exponent_gamma unavailable).",
+            ExitCodes.BAD_ARGS,
+        )
 
     def _extract(obj):
         if not isinstance(obj, dict):
             return None
-        beta = obj.get("beta")
-        gamma = obj.get("gamma")
+        beta = obj.get("logic_exponent_beta")
+        gamma = obj.get("intensity_exponent_gamma")
         if beta is None or gamma is None:
             return None
         try:
@@ -125,11 +128,61 @@ def parse_exponents_from_runs(runs_df: pl.DataFrame) -> tuple[float, float]:
         pl.col("objective__params").map_elements(_extract, return_dtype=pl.Object).alias("exponents")
     )["exponents"].drop_nulls()
     if vals.is_empty():
-        raise OpalError("No beta/gamma found in runs.parquet.", ExitCodes.BAD_ARGS)
+        raise OpalError(
+            "No logic_exponent_beta/intensity_exponent_gamma found in runs.parquet.",
+            ExitCodes.BAD_ARGS,
+        )
     unique = {tuple(v) for v in vals.to_list()}
     if len(unique) > 1:
-        raise OpalError(f"Multiple beta/gamma pairs found: {sorted(unique)}.", ExitCodes.CONTRACT_VIOLATION)
+        raise OpalError(
+            f"Multiple logic_exponent_beta/intensity_exponent_gamma pairs found: {sorted(unique)}.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
     beta, gamma = list(unique)[0]
     if not (np.isfinite(beta) and np.isfinite(gamma)):
-        raise OpalError("beta/gamma must be finite.", ExitCodes.CONTRACT_VIOLATION)
+        raise OpalError(
+            "logic_exponent_beta/intensity_exponent_gamma must be finite.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
     return float(beta), float(gamma)
+
+
+def parse_delta_from_runs(runs_df: pl.DataFrame) -> float:
+    if "objective__params" not in runs_df.columns:
+        raise OpalError(
+            "runs.parquet missing objective__params (intensity_log2_offset_delta unavailable).",
+            ExitCodes.BAD_ARGS,
+        )
+
+    def _extract(obj):
+        if not isinstance(obj, dict):
+            return None
+        delta = obj.get("intensity_log2_offset_delta")
+        if delta is None:
+            return None
+        try:
+            return float(delta)
+        except Exception:
+            return None
+
+    vals = runs_df.select(pl.col("objective__params").map_elements(_extract, return_dtype=pl.Float64).alias("delta"))[
+        "delta"
+    ].drop_nulls()
+    if vals.is_empty():
+        raise OpalError(
+            "No intensity_log2_offset_delta found in runs.parquet.",
+            ExitCodes.BAD_ARGS,
+        )
+    unique = {float(v) for v in vals.to_list()}
+    if len(unique) > 1:
+        raise OpalError(
+            f"Multiple intensity_log2_offset_delta values found: {sorted(unique)}.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    delta = list(unique)[0]
+    if not np.isfinite(delta) or delta < 0.0:
+        raise OpalError(
+            "intensity_log2_offset_delta must be finite and >= 0.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    return float(delta)

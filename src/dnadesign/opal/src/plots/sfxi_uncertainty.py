@@ -24,12 +24,17 @@ from ..analysis.dashboard.util import list_series_to_numpy
 from ..analysis.facade import load_predictions_with_setpoint, read_runs
 from ..analysis.sfxi.uncertainty import UncertaintyContext, compute_uncertainty, supports_uncertainty
 from ..core.utils import ExitCodes, OpalError
-from ..objectives import sfxi_math
 from ..registries.plots import PlotMeta, register_plot
 from ..storage.parquet_io import read_parquet_df
 from ._events_util import resolve_outputs_dir
 from ._param_utils import get_str, normalize_metric_field, reject_params
-from .sfxi_diag_data import resolve_run_id, resolve_single_round
+from .sfxi_diag_data import (
+    parse_delta_from_runs,
+    parse_exponents_from_runs,
+    parse_setpoint_from_runs,
+    resolve_run_id,
+    resolve_single_round,
+)
 
 
 def _coerce_y_ops(value: object) -> list[dict]:
@@ -54,6 +59,7 @@ def _coerce_y_ops(value: object) -> list[dict]:
     meta=PlotMeta(
         summary="Uncertainty vs score diagnostics (artifact model).",
         params={
+            "kind": "Uncertainty kind (score only).",
             "y_axis": "Metric for Y-axis (default score).",
             "hue": "Metric for color (default logic_fidelity).",
         },
@@ -67,13 +73,16 @@ def render(context, params: dict) -> None:
     round_k = resolve_single_round(runs_df, round_selector=context.rounds)
     run_id = resolve_run_id(runs_df, round_k=round_k, run_id=context.run_id)
 
+    kind = get_str(params, ["kind"], "score")
     y_axis = normalize_metric_field(get_str(params, ["y_axis", "y_field", "y"], "score"))
     hue = normalize_metric_field(get_str(params, ["hue", "color", "color_by"], "logic_fidelity"))
     reject_params(
         params,
-        ["sample_n", "sample", "n", "seed", "kind", "components", "reduction"],
+        ["sample_n", "sample", "n", "seed", "components", "reduction"],
         ctx="sfxi_uncertainty",
     )
+    if kind != "score":
+        raise ValueError("sfxi_uncertainty only supports kind=score.")
 
     run_sel = runs_df.filter(pl.col("as_of_round") == int(round_k))
     if run_id is not None and "run_id" in run_sel.columns:
@@ -82,11 +91,9 @@ def render(context, params: dict) -> None:
         raise OpalError("No run metadata found for requested round/run.", ExitCodes.BAD_ARGS)
 
     run_row = run_sel.head(1)
-    obj_params = run_row["objective__params"][0] if "objective__params" in run_row.columns else {}
-    setpoint = sfxi_math.parse_setpoint_vector(obj_params or {})
-    beta = float((obj_params or {}).get("beta", 1.0))
-    gamma = float((obj_params or {}).get("gamma", 1.0))
-    delta = float((obj_params or {}).get("delta", 0.0))
+    setpoint = parse_setpoint_from_runs(run_sel)
+    beta, gamma = parse_exponents_from_runs(run_sel)
+    delta = parse_delta_from_runs(run_sel)
     denom = run_row["objective__denom_value"][0] if "objective__denom_value" in run_row.columns else None
     y_ops_raw = run_row["training__y_ops"][0] if "training__y_ops" in run_row.columns else []
     y_ops = _coerce_y_ops(y_ops_raw)
