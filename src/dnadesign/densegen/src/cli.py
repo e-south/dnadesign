@@ -1901,7 +1901,9 @@ def stage_a_build_pool(
         logfile=str(logfile),
         suppress_solver_stderr=bool(log_cfg.suppress_solver_stderr),
     )
-    logging_utils.set_progress_enabled(str(log_cfg.progress_style) == "stream")
+    progress_style = str(log_cfg.progress_style)
+    logging_utils.set_progress_style(progress_style)
+    logging_utils.set_progress_enabled(progress_style in {"stream", "screen"})
     out_dir = _resolve_outputs_path_or_exit(cfg_path, run_root, out, label="stage-a.out")
     out_dir.mkdir(parents=True, exist_ok=True)
 

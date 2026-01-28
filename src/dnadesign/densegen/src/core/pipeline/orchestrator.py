@@ -577,7 +577,8 @@ def _process_plan_for_source(
     progress_style = str(getattr(log_cfg, "progress_style", "stream"))
     progress_every = int(getattr(log_cfg, "progress_every", 1))
     progress_refresh_seconds = float(getattr(log_cfg, "progress_refresh_seconds", 1.0))
-    logging_utils.set_progress_enabled(progress_style == "stream")
+    logging_utils.set_progress_style(progress_style)
+    logging_utils.set_progress_enabled(progress_style in {"stream", "screen"})
     screen_console = Console() if progress_style == "screen" else None
     last_screen_refresh = 0.0
     latest_failure_totals: str | None = None

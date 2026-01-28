@@ -99,8 +99,6 @@ Fail fast on schema issues and confirm the solver backend is available.
 dense validate-config --probe-solver
 ```
 
-If this fails, fix it before moving on—everything else depends on a valid config and a working solver.
-
 ---
 
 ### 3. Inspect inputs

@@ -39,6 +39,14 @@ def _format_rate(rate: float) -> str:
     return f"{rate:.1f}/s"
 
 
+def _format_progress_bar(current: int, total: int, *, width: int = 12) -> str:
+    if total <= 0:
+        return "[?]"
+    filled = int(width * (current / max(1, total)))
+    filled = min(width, max(0, filled))
+    return "[" + ("#" * filled) + ("-" * (width - filled)) + "]"
+
+
 def _format_pwm_progress_line(
     *,
     motif_id: str,
@@ -50,10 +58,20 @@ def _format_pwm_progress_line(
     batch_index: Optional[int],
     batch_total: Optional[int],
     elapsed: float,
+    target_fraction: Optional[float],
 ) -> str:
     safe_target = max(1, int(target))
     gen_pct = min(100, int(100 * generated / safe_target))
-    parts = [f"PWM {motif_id}", backend, f"gen {gen_pct}% ({generated}/{safe_target})"]
+    gen_bar = _format_progress_bar(int(generated), int(safe_target))
+    parts = [f"PWM {motif_id}", backend, f"gen {gen_pct}% {gen_bar} ({generated}/{safe_target})"]
+    if accepted is not None:
+        if accepted_target is not None and int(accepted_target) > 0:
+            acc_pct = min(100, int(100 * int(accepted) / max(1, int(accepted_target))))
+            parts.append(f"eligible {acc_pct}% ({accepted}/{accepted_target})")
+        else:
+            parts.append(f"eligible {accepted}")
+    if target_fraction is not None:
+        parts.append(f"tier {float(target_fraction) * 100:.3f}%")
     if batch_index is not None:
         total_label = "-" if batch_total is None else str(int(batch_total))
         parts.append(f"batch {int(batch_index)}/{total_label}")
@@ -71,19 +89,31 @@ class _PwmSamplingProgress:
     target: int
     accepted_target: Optional[int]
     stream: TextIO
+    target_fraction: Optional[float] = None
     min_interval: float = 0.2
 
     def __post_init__(self) -> None:
         self._enabled = bool(logging_utils.is_progress_enabled()) and bool(
             getattr(self.stream, "isatty", lambda: False)()
         )
+        self._mode = str(logging_utils.get_progress_style())
+        self._use_live = self._enabled and self._mode == "screen"
+        self._console = None
+        self._live = None
         self._start = time.monotonic()
         self._last_update = self._start
         self._last_len = 0
-        self._last_state: tuple[int, Optional[int], Optional[int]] | None = None
+        self._last_state: tuple[int, Optional[int], Optional[int], Optional[int], int, Optional[int]] | None = None
         self._shown = False
         if self._enabled:
             logging_utils.set_progress_active(True)
+        if self._use_live:
+            from rich.console import Console
+            from rich.live import Live
+
+            self._console = Console()
+            self._live = Live(console=self._console, refresh_per_second=4, transient=False)
+            self._live.start()
 
     def update(
         self,
@@ -99,37 +129,107 @@ class _PwmSamplingProgress:
         now = time.monotonic()
         if not force and (now - self._last_update) < float(self.min_interval):
             return
-        state = (int(generated), batch_index, batch_total)
+        state = (
+            int(generated),
+            int(accepted) if accepted is not None else None,
+            batch_index,
+            batch_total,
+            int(self.target),
+            int(self.accepted_target) if self.accepted_target is not None else None,
+        )
         if self._shown and state == self._last_state and logging_utils.is_progress_line_visible():
             self._last_update = now
             return
-        line = _format_pwm_progress_line(
-            motif_id=self.motif_id,
-            backend=self.backend,
-            generated=int(generated),
-            target=int(self.target),
-            accepted=accepted,
-            accepted_target=self.accepted_target,
-            batch_index=batch_index,
-            batch_total=batch_total,
-            elapsed=now - self._start,
-        )
-        padded = line.ljust(self._last_len)
-        self._last_len = max(self._last_len, len(line))
-        self.stream.write(f"\r{padded}")
-        self.stream.flush()
+        if self._use_live and self._live is not None:
+            renderable = self._build_live_render(
+                generated=int(generated),
+                accepted=accepted,
+                batch_index=batch_index,
+                batch_total=batch_total,
+                elapsed=now - self._start,
+            )
+            self._live.update(renderable, refresh=True)
+        else:
+            line = _format_pwm_progress_line(
+                motif_id=self.motif_id,
+                backend=self.backend,
+                generated=int(generated),
+                target=int(self.target),
+                accepted=accepted,
+                accepted_target=self.accepted_target,
+                batch_index=batch_index,
+                batch_total=batch_total,
+                elapsed=now - self._start,
+                target_fraction=self.target_fraction,
+            )
+            padded = line.ljust(self._last_len)
+            self._last_len = max(self._last_len, len(line))
+            self.stream.write(f"\r{padded}")
+            self.stream.flush()
+            logging_utils.mark_progress_line_visible()
         self._last_update = now
         self._last_state = state
         self._shown = True
-        logging_utils.mark_progress_line_visible()
 
     def finish(self) -> None:
         if self._enabled:
             logging_utils.set_progress_active(False)
+        if self._use_live and self._live is not None:
+            self._live.stop()
+            self._live = None
         if not self._shown:
             return
-        self.stream.write("\n")
-        self.stream.flush()
+        if not self._use_live:
+            self.stream.write("\n")
+            self.stream.flush()
+
+    def _build_live_render(
+        self,
+        *,
+        generated: int,
+        accepted: Optional[int],
+        batch_index: Optional[int],
+        batch_total: Optional[int],
+        elapsed: float,
+    ):
+        from rich import box
+        from rich.panel import Panel
+        from rich.table import Table
+
+        table = Table(show_header=True, box=box.SIMPLE, pad_edge=False)
+        table.add_column("motif")
+        table.add_column("generated")
+        table.add_column("eligible")
+        table.add_column("tier target")
+        table.add_column("elapsed")
+        table.add_column("rate")
+
+        gen_target = max(1, int(self.target))
+        gen_pct = min(100, int(100 * generated / gen_target))
+        gen_bar = _format_progress_bar(int(generated), int(gen_target))
+        gen_label = f"{generated}/{gen_target} {gen_bar} ({gen_pct}%)"
+        if accepted is None:
+            eligible_label = "-"
+        elif self.accepted_target is not None and int(self.accepted_target) > 0:
+            acc_pct = min(100, int(100 * int(accepted) / max(1, int(self.accepted_target))))
+            eligible_label = f"{accepted}/{self.accepted_target} ({acc_pct}%)"
+        else:
+            eligible_label = str(accepted)
+        tier_label = "-"
+        if self.target_fraction is not None:
+            tier_label = f"{float(self.target_fraction) * 100:.3f}%"
+        elapsed_label = f"{max(0.0, float(elapsed)):.1f}s"
+        rate = generated / elapsed if elapsed > 0 else 0.0
+        rate_label = _format_rate(rate)
+        table.add_row(
+            str(self.motif_id),
+            gen_label,
+            eligible_label,
+            tier_label,
+            elapsed_label,
+            rate_label,
+        )
+        return Panel(table, title="Stage-A mining", border_style="cyan")
 
 
 def _safe_label(text: str) -> str:
@@ -936,6 +1036,12 @@ def sample_pwm_sites(
         if budget_max_candidates is None and budget_max_seconds is None:
             raise ValueError("pwm.sampling.mining.budget.mode=tier_target requires max_candidates or max_seconds.")
 
+    progress_target_fraction = None
+    progress_accepted_target = None
+    if budget_mode == "tier_target" and budget_target_tier_fraction is not None:
+        progress_target_fraction = float(budget_target_tier_fraction)
+        progress_accepted_target = int(np.ceil(float(n_sites) / progress_target_fraction))
+
     def _cap_label(cap_applied: bool, time_limited: bool) -> str:
         cap_label = ""
         if time_limited and budget_max_seconds is not None:
@@ -1576,8 +1682,9 @@ def sample_pwm_sites(
             motif_id=motif.motif_id,
             backend=scoring_backend,
             target=1,
-            accepted_target=n_sites,
+            accepted_target=progress_accepted_target,
             stream=sys.stdout,
+            target_fraction=progress_target_fraction,
         )
         seq = "".join(max(row.items(), key=lambda kv: kv[1])[0] for row in matrix)
         target_len = _resolve_length()
@@ -1609,8 +1716,9 @@ def sample_pwm_sites(
         motif_id=motif.motif_id,
         backend=scoring_backend,
         target=requested_candidates,
-        accepted_target=n_sites,
+        accepted_target=progress_accepted_target,
         stream=sys.stdout,
+        target_fraction=progress_target_fraction,
     )
     selected, meta, summary = _score_with_fimo(
         requested=requested_candidates,

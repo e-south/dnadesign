@@ -27,6 +27,7 @@ _PROGRESS_LOCK = threading.Lock()
 _PROGRESS_ENABLED = True
 _PROGRESS_ACTIVE = False
 _PROGRESS_VISIBLE = False
+_PROGRESS_STYLE = "stream"
 
 
 def set_progress_enabled(enabled: bool) -> None:
@@ -36,6 +37,17 @@ def set_progress_enabled(enabled: bool) -> None:
         if not _PROGRESS_ENABLED:
             _PROGRESS_ACTIVE = False
             _PROGRESS_VISIBLE = False
+
+
+def set_progress_style(style: str) -> None:
+    global _PROGRESS_STYLE
+    with _PROGRESS_LOCK:
+        _PROGRESS_STYLE = str(style)
+
+
+def get_progress_style() -> str:
+    with _PROGRESS_LOCK:
+        return str(_PROGRESS_STYLE)
 
 
 def is_progress_enabled() -> bool:
