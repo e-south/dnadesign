@@ -374,6 +374,33 @@ def test_build_mode_view_requires_full_predictions() -> None:
         )
 
 
+def test_build_mode_view_allows_missing_observed_predictions() -> None:
+    df_base = pl.DataFrame({"id": ["a", "b", "c"]})
+    metrics_df = pl.DataFrame(
+        {
+            "id": ["a", "b"],
+            "score": [0.2, 0.4],
+            "top_k": [True, False],
+        }
+    )
+    observed_scores = pl.DataFrame({"id": ["c"], "score": [0.7]})
+    out = scores.build_mode_view(
+        df_base=df_base,
+        metrics_df=metrics_df,
+        id_col="id",
+        observed_ids={"c"},
+        observed_scores_df=observed_scores,
+        score_col="score",
+        logic_col=None,
+        effect_col=None,
+        rank_col=None,
+        top_k_col="top_k",
+    )
+    df_view = out.df
+    assert df_view.filter(pl.col("id") == "c")["opal__view__score"].item() == 0.7
+    assert df_view.filter(pl.col("id") == "c")["opal__view__top_k"].item() is False
+
+
 def test_build_mode_view_requires_columns() -> None:
     df_base = pl.DataFrame({"id": ["a"]})
     metrics_df = pl.DataFrame({"id": ["a"], "score": [0.2]})

@@ -79,19 +79,6 @@ def build_mode_view(
     df_metrics = metrics_df.select(select_cols).rename(rename_map)
     df_view = df_view.join(df_metrics, on=id_col, how="left")
 
-    missing_scores = df_view.filter(pl.col("opal__view__score").is_null()).height
-    if missing_scores:
-        raise ValueError(
-            f"Missing predictions for {missing_scores} of {df_view.height} rows "
-            "in `opal__view__score`. Ensure predictions cover the full dataset "
-            "for the selected run."
-        )
-    for view_col in ["opal__view__logic_fidelity", "opal__view__effect_scaled", "opal__view__rank"]:
-        if df_view.select(pl.col(view_col).is_null().any()).item():
-            raise ValueError(f"Missing values in `{view_col}`; predictions must populate all rows.")
-    if df_view.select(pl.col("opal__view__top_k").is_null().any()).item():
-        raise ValueError("Missing values in `opal__view__top_k`; predictions must populate all rows.")
-
     df_view = _ensure_view_cols(
         df_view,
         [
@@ -124,5 +111,62 @@ def build_mode_view(
         df_view = df_view.join(df_obs, on=id_col, how="left")
     else:
         df_view = _ensure_view_cols(df_view, ["opal__view__observed_score"])
+
+    df_view = df_view.with_columns(
+        pl.when(pl.col("opal__view__observed") & pl.col("opal__view__score").is_null())
+        .then(pl.col("opal__view__observed_score"))
+        .otherwise(pl.col("opal__view__score"))
+        .alias("opal__view__score")
+    )
+    df_view = df_view.with_columns(
+        pl.when(pl.col("opal__view__observed") & pl.col("opal__view__top_k").is_null())
+        .then(pl.lit(False))
+        .otherwise(pl.col("opal__view__top_k"))
+        .alias("opal__view__top_k")
+    )
+
+    missing_scores = df_view.filter(~pl.col("opal__view__observed") & pl.col("opal__view__score").is_null()).height
+    if missing_scores:
+        raise ValueError(
+            f"Missing predictions for {missing_scores} of {df_view.height} rows "
+            "in `opal__view__score`. Ensure predictions cover all unlabeled records "
+            "for the selected run."
+        )
+    missing_observed = df_view.filter(pl.col("opal__view__observed") & pl.col("opal__view__score").is_null()).height
+    if missing_observed:
+        raise ValueError(
+            f"Missing observed scores for {missing_observed} labeled rows. "
+            "Ensure label scoring is available for observed records."
+        )
+    if logic_col is not None:
+        missing_unlabeled = df_view.filter(
+            ~pl.col("opal__view__observed") & pl.col("opal__view__logic_fidelity").is_null()
+        ).height
+        if missing_unlabeled:
+            raise ValueError(
+                "Missing values in `opal__view__logic_fidelity` for unlabeled rows; predictions must populate all rows."
+            )
+    if effect_col is not None:
+        missing_unlabeled = df_view.filter(
+            ~pl.col("opal__view__observed") & pl.col("opal__view__effect_scaled").is_null()
+        ).height
+        if missing_unlabeled:
+            raise ValueError(
+                "Missing values in `opal__view__effect_scaled` for unlabeled rows; predictions must populate all rows."
+            )
+    if rank_col is not None:
+        missing_unlabeled = df_view.filter(
+            ~pl.col("opal__view__observed") & pl.col("opal__view__rank").is_null()
+        ).height
+        if missing_unlabeled:
+            raise ValueError(
+                "Missing values in `opal__view__rank` for unlabeled rows; predictions must populate all rows."
+            )
+    if top_k_col is not None:
+        missing_top_k = df_view.filter(~pl.col("opal__view__observed") & pl.col("opal__view__top_k").is_null()).height
+        if missing_top_k:
+            raise ValueError(
+                "Missing values in `opal__view__top_k` for unlabeled rows; predictions must populate all rows."
+            )
 
     return ViewBundle(df=df_view, diagnostics=diag, ready=True)
