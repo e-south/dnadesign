@@ -53,3 +53,5 @@
 - Follow-up: updated demo configs and docs to new Stage-A sampling schema (mining budget, length/selection/uniqueness blocks), refreshed CLI Stage-A plan/recap columns for tier-target and selection policy, and added config migration test coverage.
 - Follow-up: centralized Stage-A/Stage-B sampling narrative into docs/guide/sampling.md, replaced demo prose with links, added placement_map fixed-element note, and fixed MMR tier-widening selection to avoid empty shortlist crashes with a regression test.
 - Follow-up: fixed fixed_candidates mining to stop at the requested budget (prevented long-running FIMO tests), updated mining shortfall/core dedupe tests, and confirmed full densegen test suite passes.
+- Task: Stage-A summary visual redesign (publication-quality layout).
+- Decisions: dedicated header row via GridSpec, yield/dedupe funnel plot, anchored tier summary box, shared axes cleanup, and Okabe-Ito color mapping with lexA/cpxR overrides.
