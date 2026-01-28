@@ -57,39 +57,83 @@ def _mining_attr(mining, name: str, default=None):
     return default
 
 
+def _budget_attr(mining, name: str, default=None):
+    if mining is None:
+        return default
+    budget = None
+    if hasattr(mining, "budget"):
+        budget = getattr(mining, "budget")
+    elif isinstance(mining, dict):
+        budget = mining.get("budget")
+    if budget is None:
+        return default
+    if hasattr(budget, name):
+        return getattr(budget, name)
+    if isinstance(budget, dict):
+        return budget.get(name, default)
+    return default
+
+
 def _extract_pwm_sampling_config(source_cfg) -> dict | None:
     sampling = getattr(source_cfg, "sampling", None)
     if sampling is None:
         return None
-    n_sites = _sampling_attr(sampling, "n_sites")
-    oversample = _sampling_attr(sampling, "oversample_factor")
-    requested = None
-    generated = None
-    if isinstance(n_sites, int) and isinstance(oversample, int):
-        requested = int(n_sites) * int(oversample)
-        generated = requested
-    length_range = _sampling_attr(sampling, "length_range")
+    mining = _sampling_attr(sampling, "mining")
+    budget_mode = _budget_attr(mining, "mode")
+    budget_candidates = _budget_attr(mining, "candidates")
+    budget_target_tier_fraction = _budget_attr(mining, "target_tier_fraction")
+    budget_max_candidates = _budget_attr(mining, "max_candidates")
+    budget_max_seconds = _budget_attr(mining, "max_seconds")
+    budget_min_candidates = _budget_attr(mining, "min_candidates")
+    budget_growth_factor = _budget_attr(mining, "growth_factor")
+    length_cfg = _sampling_attr(sampling, "length")
+    length_policy = _sampling_attr(length_cfg, "policy")
+    length_range = _sampling_attr(length_cfg, "range")
     if length_range is not None:
         length_range = list(length_range)
-    mining = _sampling_attr(sampling, "mining")
-    scoring_backend = _sampling_attr(sampling, "scoring_backend")
+    trimming_cfg = _sampling_attr(sampling, "trimming")
+    trim_window_length = _sampling_attr(trimming_cfg, "window_length")
+    trim_window_strategy = _sampling_attr(trimming_cfg, "window_strategy")
+    uniqueness_cfg = _sampling_attr(sampling, "uniqueness")
+    uniqueness_key = _sampling_attr(uniqueness_cfg, "key")
+    selection_cfg = _sampling_attr(sampling, "selection")
+    selection_policy = _sampling_attr(selection_cfg, "policy")
+    selection_alpha = _sampling_attr(selection_cfg, "alpha")
+    selection_shortlist_factor = _sampling_attr(selection_cfg, "shortlist_factor")
+    selection_shortlist_min = _sampling_attr(selection_cfg, "shortlist_min")
+    selection_shortlist_max = _sampling_attr(selection_cfg, "shortlist_max")
+    selection_tier_widening = _sampling_attr(selection_cfg, "tier_widening")
     mining_batch_size = _mining_attr(mining, "batch_size")
-    mining_max_seconds = _mining_attr(mining, "max_seconds")
     mining_log_every_batches = _mining_attr(mining, "log_every_batches")
     return {
         "strategy": _sampling_attr(sampling, "strategy"),
-        "scoring_backend": scoring_backend,
         "n_sites": _sampling_attr(sampling, "n_sites"),
-        "oversample_factor": _sampling_attr(sampling, "oversample_factor"),
-        "requested_candidates": requested,
-        "generated_candidates": generated,
+        "mining_budget": {
+            "mode": budget_mode,
+            "candidates": budget_candidates,
+            "target_tier_fraction": budget_target_tier_fraction,
+            "max_candidates": budget_max_candidates,
+            "max_seconds": budget_max_seconds,
+            "min_candidates": budget_min_candidates,
+            "growth_factor": budget_growth_factor,
+        }
+        if mining is not None
+        else None,
         "bgfile": _sampling_attr(sampling, "bgfile"),
         "keep_all_candidates_debug": _sampling_attr(sampling, "keep_all_candidates_debug"),
-        "length_policy": _sampling_attr(sampling, "length_policy"),
+        "length_policy": length_policy,
         "length_range": length_range,
+        "trim_window_length": trim_window_length,
+        "trim_window_strategy": trim_window_strategy,
+        "uniqueness_key": uniqueness_key,
+        "selection_policy": selection_policy,
+        "selection_alpha": selection_alpha,
+        "selection_shortlist_factor": selection_shortlist_factor,
+        "selection_shortlist_min": selection_shortlist_min,
+        "selection_shortlist_max": selection_shortlist_max,
+        "selection_tier_widening": selection_tier_widening,
         "mining": {
             "batch_size": mining_batch_size,
-            "max_seconds": mining_max_seconds,
             "log_every_batches": mining_log_every_batches,
         }
         if mining is not None
@@ -169,16 +213,28 @@ def _input_metadata(source_cfg, cfg_path: Path) -> dict:
         sampling = getattr(source_cfg, "sampling", None)
         if sampling is not None:
             meta["input_pwm_strategy"] = getattr(sampling, "strategy", None)
-            meta["input_pwm_scoring_backend"] = getattr(sampling, "scoring_backend", None)
             mining_cfg = getattr(sampling, "mining", None)
             meta["input_pwm_mining_batch_size"] = _mining_attr(mining_cfg, "batch_size")
-            meta["input_pwm_mining_max_seconds"] = _mining_attr(mining_cfg, "max_seconds")
             meta["input_pwm_mining_log_every_batches"] = _mining_attr(mining_cfg, "log_every_batches")
+            meta["input_pwm_budget_mode"] = _budget_attr(mining_cfg, "mode")
+            meta["input_pwm_budget_candidates"] = _budget_attr(mining_cfg, "candidates")
+            meta["input_pwm_budget_target_tier_fraction"] = _budget_attr(mining_cfg, "target_tier_fraction")
+            meta["input_pwm_budget_max_candidates"] = _budget_attr(mining_cfg, "max_candidates")
+            meta["input_pwm_budget_max_seconds"] = _budget_attr(mining_cfg, "max_seconds")
+            meta["input_pwm_budget_min_candidates"] = _budget_attr(mining_cfg, "min_candidates")
+            meta["input_pwm_budget_growth_factor"] = _budget_attr(mining_cfg, "growth_factor")
             meta["input_pwm_bgfile"] = getattr(sampling, "bgfile", None)
             meta["input_pwm_keep_all_candidates_debug"] = getattr(sampling, "keep_all_candidates_debug", None)
             meta["input_pwm_include_matched_sequence"] = getattr(sampling, "include_matched_sequence", None)
             meta["input_pwm_n_sites"] = getattr(sampling, "n_sites", None)
-            meta["input_pwm_oversample_factor"] = getattr(sampling, "oversample_factor", None)
+            uniqueness = getattr(sampling, "uniqueness", None)
+            meta["input_pwm_uniqueness_key"] = _sampling_attr(uniqueness, "key")
+            selection = getattr(sampling, "selection", None)
+            meta["input_pwm_selection_policy"] = _sampling_attr(selection, "policy")
+            meta["input_pwm_selection_alpha"] = _sampling_attr(selection, "alpha")
+            meta["input_pwm_selection_shortlist_min"] = _sampling_attr(selection, "shortlist_min")
+            meta["input_pwm_selection_shortlist_factor"] = _sampling_attr(selection, "shortlist_factor")
+            meta["input_pwm_selection_shortlist_max"] = _sampling_attr(selection, "shortlist_max")
     else:
         meta["input_mode"] = source_type
         meta["input_pwm_ids"] = []

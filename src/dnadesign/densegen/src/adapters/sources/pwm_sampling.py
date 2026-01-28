@@ -152,6 +152,64 @@ def _mining_attr(mining, name: str, default=None):
     return default
 
 
+def _selection_attr(selection, name: str, default=None):
+    if selection is None:
+        return default
+    if hasattr(selection, name):
+        return getattr(selection, name)
+    if isinstance(selection, dict):
+        return selection.get(name, default)
+    return default
+
+
+def _budget_attr(mining, name: str, default=None):
+    if mining is None:
+        return default
+    budget = None
+    if hasattr(mining, "budget"):
+        budget = getattr(mining, "budget")
+    elif isinstance(mining, dict):
+        budget = mining.get("budget")
+    if budget is None:
+        return default
+    if hasattr(budget, name):
+        return getattr(budget, name)
+    if isinstance(budget, dict):
+        return budget.get(name, default)
+    return default
+
+
+def _cfg_attr(obj, name: str, default=None):
+    if obj is None:
+        return default
+    if hasattr(obj, name):
+        return getattr(obj, name)
+    if isinstance(obj, dict):
+        return obj.get(name, default)
+    return default
+
+
+def sampling_kwargs_from_config(sampling: object) -> dict:
+    mining = _cfg_attr(sampling, "mining")
+    length_cfg = _cfg_attr(sampling, "length", {}) or {}
+    trimming_cfg = _cfg_attr(sampling, "trimming", {}) or {}
+    uniqueness_cfg = _cfg_attr(sampling, "uniqueness", {}) or {}
+    return {
+        "strategy": _cfg_attr(sampling, "strategy", "stochastic"),
+        "n_sites": int(_cfg_attr(sampling, "n_sites")),
+        "mining": mining,
+        "bgfile": _cfg_attr(sampling, "bgfile"),
+        "keep_all_candidates_debug": bool(_cfg_attr(sampling, "keep_all_candidates_debug", False)),
+        "include_matched_sequence": bool(_cfg_attr(sampling, "include_matched_sequence", False)),
+        "uniqueness_key": _cfg_attr(uniqueness_cfg, "key"),
+        "selection": _cfg_attr(sampling, "selection"),
+        "length_policy": _cfg_attr(length_cfg, "policy", "exact"),
+        "length_range": _cfg_attr(length_cfg, "range"),
+        "trim_window_length": _cfg_attr(trimming_cfg, "window_length"),
+        "trim_window_strategy": _cfg_attr(trimming_cfg, "window_strategy", "max_info"),
+    }
+
+
 @dataclass(frozen=True)
 class FimoCandidate:
     seq: str
@@ -165,15 +223,7 @@ class FimoCandidate:
 def _core_sequence(candidate: FimoCandidate) -> str:
     if candidate.matched_sequence:
         return str(candidate.matched_sequence)
-    start = int(candidate.start)
-    stop = int(candidate.stop)
-    if start <= 0 or stop <= 0:
-        raise ValueError("Core sequence bounds must be positive.")
-    start_idx = start - 1
-    stop_idx = stop
-    if start_idx < 0 or stop_idx > len(candidate.seq) or start_idx >= stop_idx:
-        raise ValueError("Core sequence bounds are invalid for candidate sequence.")
-    return candidate.seq[start_idx:stop_idx]
+    raise ValueError("FIMO matched_sequence is required to derive the TFBS core.")
 
 
 def _hamming_distance(left: str, right: str) -> int:
@@ -182,35 +232,188 @@ def _hamming_distance(left: str, right: str) -> int:
     return sum(1 for a, b in zip(left, right) if a != b)
 
 
-def _dedupe_by_core(
+def _evaluate_tier_target(*, n_sites: int, target_tier_fraction: float, eligible_unique: int) -> tuple[int, bool]:
+    if target_tier_fraction <= 0 or target_tier_fraction > 1:
+        raise ValueError("target_tier_fraction must be in (0, 1].")
+    required_unique = int(np.ceil(float(n_sites) / float(target_tier_fraction)))
+    return required_unique, int(eligible_unique) >= required_unique
+
+
+def _contrib_vector(core: str, log_odds: Sequence[dict[str, float]]) -> np.ndarray:
+    if len(core) != len(log_odds):
+        raise ValueError("TFBS core length must match PWM log-odds length.")
+    contrib = []
+    for base, row in zip(core, log_odds):
+        val = float(row.get(base, float("nan")))
+        if not np.isfinite(val):
+            raise ValueError("Non-finite log-odds contribution encountered for core sequence.")
+        contrib.append(val)
+    return np.asarray(contrib, dtype=float)
+
+
+def _score_norm(values: Sequence[float]) -> dict[float, float]:
+    if not values:
+        return {}
+    lo = float(min(values))
+    hi = float(max(values))
+    if hi == lo:
+        return {float(v): 1.0 for v in values}
+    return {float(v): (float(v) - lo) / (hi - lo) for v in values}
+
+
+def _similarity_from_distance(distance: float) -> float:
+    return 1.0 / (1.0 + float(distance))
+
+
+def _select_by_mmr(
     ranked: Sequence[FimoCandidate],
     *,
-    min_core_hamming_distance: Optional[int],
-) -> list[FimoCandidate]:
-    if min_core_hamming_distance is None:
-        min_core_hamming_distance = 0
-    if min_core_hamming_distance < 0:
-        raise ValueError("min_core_hamming_distance must be >= 0")
-    selected: list[FimoCandidate] = []
-    selected_cores: list[str] = []
-    seen: set[str] = set()
+    motif: PWMMotif,
+    n_sites: int,
+    alpha: float,
+    shortlist_min: int,
+    shortlist_factor: int,
+    shortlist_max: Optional[int],
+    tier_widening: Optional[Sequence[float]],
+) -> tuple[list[FimoCandidate], dict[str, dict], dict]:
+    if not ranked or n_sites <= 0:
+        return [], {}, {"shortlist_k": 0, "tier_fraction_used": None, "tier_limit": 0}
+    if alpha <= 0.0 or alpha > 1.0:
+        raise ValueError("selection.alpha must be in (0, 1].")
+    log_odds = motif.log_odds or build_log_odds(motif.matrix, motif.background)
+    core_by_seq = {cand.seq: _core_sequence(cand) for cand in ranked}
+    contrib_by_seq = {seq: _contrib_vector(core, log_odds) for seq, core in core_by_seq.items()}
+    scores = [cand.score for cand in ranked]
+    norm_by_score = _score_norm(scores)
+    tier_fractions = list(tier_widening) if tier_widening else [1.0]
+    total = len(ranked)
+
+    def _best_candidate(
+        candidates: Sequence[FimoCandidate],
+        selected: list[FimoCandidate],
+    ) -> tuple[FimoCandidate, float, float]:
+        best = None
+        best_utility = None
+        best_score = None
+        best_core = None
+        best_seq = None
+        best_sim = None
+        selected_vectors = [contrib_by_seq[c.seq] for c in selected]
+        for cand in candidates:
+            if cand in selected:
+                continue
+            score_norm = norm_by_score.get(float(cand.score), 1.0)
+            if not selected_vectors:
+                max_sim = 0.0
+            else:
+                dists = [float(np.abs(contrib_by_seq[cand.seq] - vec).sum()) for vec in selected_vectors]
+                max_sim = _similarity_from_distance(min(dists))
+            utility = float(alpha * score_norm - (1.0 - alpha) * max_sim)
+            cand_core = core_by_seq[cand.seq]
+            if best is None:
+                best = cand
+                best_utility = utility
+                best_score = cand.score
+                best_core = cand_core
+                best_seq = cand.seq
+                best_sim = max_sim
+                continue
+            if utility > float(best_utility):
+                pass
+            elif utility == float(best_utility):
+                if cand.score > float(best_score):
+                    pass
+                elif cand.score == float(best_score):
+                    if cand_core < str(best_core):
+                        pass
+                    elif cand_core == str(best_core):
+                        if cand.seq >= str(best_seq):
+                            continue
+                    else:
+                        continue
+                else:
+                    continue
+            else:
+                continue
+            best = cand
+            best_utility = utility
+            best_score = cand.score
+            best_core = cand_core
+            best_seq = cand.seq
+            best_sim = max_sim
+        if best is None or best_utility is None or best_sim is None:
+            raise ValueError("MMR selection failed to identify a candidate.")
+        return best, float(best_utility), float(best_sim)
+
+    def _select_from_slice(candidates: Sequence[FimoCandidate]) -> tuple[list[FimoCandidate], dict[str, dict], int]:
+        if not candidates:
+            return [], {}, 0
+        max_k = len(candidates) if shortlist_max is None else min(len(candidates), int(shortlist_max))
+        base_k = max(int(shortlist_min), int(shortlist_factor) * int(n_sites))
+        k = min(max_k, max(1, base_k))
+        if k <= 0:
+            k = min(len(candidates), int(n_sites))
+        shortlist = list(candidates[:k])
+        selected: list[FimoCandidate] = []
+        meta: dict[str, dict] = {}
+        while shortlist and len(selected) < int(n_sites):
+            pick, utility, max_sim = _best_candidate(shortlist, selected)
+            selected.append(pick)
+            meta[pick.seq] = {
+                "selection_rank": len(selected),
+                "selection_utility": float(utility),
+                "nearest_selected_similarity": float(max_sim),
+            }
+        if len(selected) < int(n_sites) and k < max_k:
+            shortlist = list(candidates[:max_k])
+            selected = []
+            meta = {}
+            while shortlist and len(selected) < int(n_sites):
+                pick, utility, max_sim = _best_candidate(shortlist, selected)
+                selected.append(pick)
+                meta[pick.seq] = {
+                    "selection_rank": len(selected),
+                    "selection_utility": float(utility),
+                    "nearest_selected_similarity": float(max_sim),
+                }
+            return selected, meta, int(max_k)
+        return selected, meta, int(k)
+
+    last_selected: list[FimoCandidate] = []
+    last_meta: dict[str, dict] = {}
+    last_shortlist = 0
+    fraction_used = None
+    tier_limit = total
+    for fraction in tier_fractions:
+        if fraction <= 0:
+            continue
+        tier_limit = min(total, max(1, int(np.floor(float(fraction) * total))))
+        subset = ranked[:tier_limit]
+        selected, meta, shortlist_k = _select_from_slice(subset)
+        last_selected = selected
+        last_meta = meta
+        last_shortlist = shortlist_k
+        fraction_used = float(fraction)
+        if len(selected) >= int(n_sites):
+            break
+    diag = {
+        "shortlist_k": int(last_shortlist),
+        "tier_fraction_used": fraction_used,
+        "tier_limit": int(tier_limit),
+    }
+    return last_selected, last_meta, diag
+
+
+def _collapse_by_core_identity(ranked: Sequence[FimoCandidate]) -> tuple[list[FimoCandidate], int]:
+    best_by_core: dict[str, FimoCandidate] = {}
     for cand in ranked:
         core = _core_sequence(cand)
-        if min_core_hamming_distance == 0:
-            if core in seen:
-                continue
-            seen.add(core)
-        else:
-            too_close = False
-            for prior in selected_cores:
-                if _hamming_distance(core, prior) < min_core_hamming_distance:
-                    too_close = True
-                    break
-            if too_close:
-                continue
-        selected.append(cand)
-        selected_cores.append(core)
-    return selected
+        prev = best_by_core.get(core)
+        if prev is None or cand.score > prev.score or (cand.score == prev.score and cand.seq < prev.seq):
+            best_by_core[core] = cand
+    collapsed = max(0, len(ranked) - len(best_by_core))
+    kept = sorted(best_by_core.values(), key=lambda item: (-item.score, item.seq))
+    return kept, collapsed
 
 
 def _write_candidate_records(
@@ -264,8 +467,8 @@ class PWMSamplingSummary:
     input_name: Optional[str]
     regulator: str
     backend: str
-    dedupe_by: Optional[str]
-    min_core_hamming_distance: Optional[int]
+    uniqueness_key: Optional[str]
+    collapsed_by_core_identity: Optional[int]
     generated: int
     target: int
     target_sites: Optional[int]
@@ -288,6 +491,21 @@ class PWMSamplingSummary:
     tier2_score: Optional[float]
     eligible_score_hist_edges: Optional[List[float]] = None
     eligible_score_hist_counts: Optional[List[int]] = None
+    tier_target_fraction: Optional[float] = None
+    tier_target_required_unique: Optional[int] = None
+    tier_target_met: Optional[bool] = None
+    selection_policy: Optional[str] = None
+    selection_alpha: Optional[float] = None
+    selection_similarity: Optional[str] = None
+    selection_shortlist_k: Optional[int] = None
+    selection_shortlist_min: Optional[int] = None
+    selection_shortlist_factor: Optional[int] = None
+    selection_shortlist_max: Optional[int] = None
+    selection_tier_fraction_used: Optional[float] = None
+    selection_tier_limit: Optional[int] = None
+    diversity_nearest_distance_mean: Optional[float] = None
+    diversity_nearest_distance_min: Optional[float] = None
+    diversity_nearest_similarity_mean: Optional[float] = None
 
 
 def normalize_background(bg: Optional[dict[str, float]]) -> dict[str, float]:
@@ -422,8 +640,8 @@ def _build_summary(
     eligible: Sequence[str],
     retained: Sequence[str],
     retained_scores: Optional[Sequence[float]] = None,
-    dedupe_by: Optional[str] = None,
-    min_core_hamming_distance: Optional[int] = None,
+    uniqueness_key: Optional[str] = None,
+    collapsed_by_core_identity: Optional[int] = None,
     eligible_tier_counts: Optional[Sequence[int]] = None,
     retained_tier_counts: Optional[Sequence[int]] = None,
     tier0_score: Optional[float] = None,
@@ -431,6 +649,21 @@ def _build_summary(
     tier2_score: Optional[float] = None,
     eligible_score_hist_edges: Optional[Sequence[float]] = None,
     eligible_score_hist_counts: Optional[Sequence[int]] = None,
+    tier_target_fraction: Optional[float] = None,
+    tier_target_required_unique: Optional[int] = None,
+    tier_target_met: Optional[bool] = None,
+    selection_policy: Optional[str] = None,
+    selection_alpha: Optional[float] = None,
+    selection_similarity: Optional[str] = None,
+    selection_shortlist_k: Optional[int] = None,
+    selection_shortlist_min: Optional[int] = None,
+    selection_shortlist_factor: Optional[int] = None,
+    selection_shortlist_max: Optional[int] = None,
+    selection_tier_fraction_used: Optional[float] = None,
+    selection_tier_limit: Optional[int] = None,
+    diversity_nearest_distance_mean: Optional[float] = None,
+    diversity_nearest_distance_min: Optional[float] = None,
+    diversity_nearest_similarity_mean: Optional[float] = None,
     input_name: Optional[str] = None,
     regulator: Optional[str] = None,
     backend: Optional[str] = None,
@@ -442,8 +675,8 @@ def _build_summary(
         input_name=input_name,
         regulator=str(regulator or ""),
         backend=str(backend or ""),
-        dedupe_by=str(dedupe_by) if dedupe_by is not None else None,
-        min_core_hamming_distance=int(min_core_hamming_distance) if min_core_hamming_distance is not None else None,
+        uniqueness_key=str(uniqueness_key) if uniqueness_key is not None else None,
+        collapsed_by_core_identity=int(collapsed_by_core_identity) if collapsed_by_core_identity is not None else None,
         generated=int(generated),
         target=int(target),
         target_sites=int(target_sites) if target_sites is not None else None,
@@ -466,6 +699,31 @@ def _build_summary(
         tier2_score=float(tier2_score) if tier2_score is not None else None,
         eligible_score_hist_edges=list(eligible_score_hist_edges) if eligible_score_hist_edges is not None else None,
         eligible_score_hist_counts=list(eligible_score_hist_counts) if eligible_score_hist_counts is not None else None,
+        tier_target_fraction=float(tier_target_fraction) if tier_target_fraction is not None else None,
+        tier_target_required_unique=int(tier_target_required_unique)
+        if tier_target_required_unique is not None
+        else None,
+        tier_target_met=bool(tier_target_met) if tier_target_met is not None else None,
+        selection_policy=str(selection_policy) if selection_policy is not None else None,
+        selection_alpha=float(selection_alpha) if selection_alpha is not None else None,
+        selection_similarity=str(selection_similarity) if selection_similarity is not None else None,
+        selection_shortlist_k=int(selection_shortlist_k) if selection_shortlist_k is not None else None,
+        selection_shortlist_min=int(selection_shortlist_min) if selection_shortlist_min is not None else None,
+        selection_shortlist_factor=int(selection_shortlist_factor) if selection_shortlist_factor is not None else None,
+        selection_shortlist_max=int(selection_shortlist_max) if selection_shortlist_max is not None else None,
+        selection_tier_fraction_used=float(selection_tier_fraction_used)
+        if selection_tier_fraction_used is not None
+        else None,
+        selection_tier_limit=int(selection_tier_limit) if selection_tier_limit is not None else None,
+        diversity_nearest_distance_mean=float(diversity_nearest_distance_mean)
+        if diversity_nearest_distance_mean is not None
+        else None,
+        diversity_nearest_distance_min=float(diversity_nearest_distance_min)
+        if diversity_nearest_distance_min is not None
+        else None,
+        diversity_nearest_similarity_mean=float(diversity_nearest_similarity_mean)
+        if diversity_nearest_similarity_mean is not None
+        else None,
     )
 
 
@@ -548,14 +806,12 @@ def sample_pwm_sites(
     run_id: str | None = None,
     strategy: str,
     n_sites: int,
-    oversample_factor: int,
-    scoring_backend: str = "fimo",
     mining: Optional[object] = None,
     bgfile: Optional[str | Path] = None,
     keep_all_candidates_debug: bool = False,
     include_matched_sequence: bool = False,
-    dedupe_by: str = "sequence",
-    min_core_hamming_distance: Optional[int] = None,
+    uniqueness_key: str = "sequence",
+    selection: Optional[object] = None,
     debug_output_dir: Optional[Path] = None,
     debug_label: Optional[str] = None,
     length_policy: str = "exact",
@@ -572,18 +828,10 @@ def sample_pwm_sites(
 ]:
     if n_sites <= 0:
         raise ValueError("n_sites must be > 0")
-    if oversample_factor <= 0:
-        raise ValueError("oversample_factor must be > 0")
-    scoring_backend = str(scoring_backend or "fimo").lower()
-    if scoring_backend != "fimo":
-        raise ValueError(f"Stage-A PWM sampling requires scoring_backend='fimo', got '{scoring_backend}'.")
-    dedupe_by = str(dedupe_by or "sequence").lower()
-    if dedupe_by not in {"sequence", "core"}:
-        raise ValueError(f"Stage-A PWM sampling dedupe_by must be 'sequence' or 'core', got '{dedupe_by}'.")
-    if min_core_hamming_distance is not None and min_core_hamming_distance < 0:
-        raise ValueError("Stage-A PWM sampling min_core_hamming_distance must be >= 0.")
-    if min_core_hamming_distance is not None and dedupe_by != "core":
-        raise ValueError("Stage-A PWM sampling min_core_hamming_distance requires dedupe_by='core'.")
+    scoring_backend = "fimo"
+    uniqueness_key = str(uniqueness_key or "sequence").lower()
+    if uniqueness_key not in {"sequence", "core"}:
+        raise ValueError(f"Stage-A PWM sampling uniqueness.key must be 'sequence' or 'core', got '{uniqueness_key}'.")
     if keep_all_candidates_debug and run_id is None:
         raise ValueError("Stage-A PWM sampling keep_all_candidates_debug requires run_id to be set.")
     if strategy == "consensus" and n_sites != 1:
@@ -620,19 +868,86 @@ def sample_pwm_sites(
     if length_policy == "range" and length_range is not None and len(length_range) == 2:
         length_label = f"{length_policy}({length_range[0]}..{length_range[1]})"
 
-    def _cap_label(
-        cap_applied: bool,
-        time_limited: bool,
-    ) -> str:
+    selection_policy = str(_selection_attr(selection, "policy", "top_score") or "top_score").lower()
+    if selection_policy not in {"top_score", "mmr"}:
+        raise ValueError(f"Stage-A selection.policy must be 'top_score' or 'mmr', got '{selection_policy}'.")
+    selection_alpha = _selection_attr(selection, "alpha", 0.9)
+    selection_shortlist_min = _selection_attr(selection, "shortlist_min", 50)
+    selection_shortlist_factor = _selection_attr(selection, "shortlist_factor", 5)
+    selection_shortlist_max = _selection_attr(selection, "shortlist_max", None)
+    selection_tier_widening = _selection_attr(selection, "tier_widening", None)
+    if selection_policy == "mmr":
+        selection_alpha = float(selection_alpha)
+        if selection_alpha <= 0.0 or selection_alpha > 1.0:
+            raise ValueError("selection.alpha must be in (0, 1].")
+        if int(selection_shortlist_min) <= 0:
+            raise ValueError("selection.shortlist_min must be > 0.")
+        if int(selection_shortlist_factor) <= 0:
+            raise ValueError("selection.shortlist_factor must be > 0.")
+        if selection_shortlist_max is not None and int(selection_shortlist_max) <= 0:
+            raise ValueError("selection.shortlist_max must be > 0 when set.")
+        if selection_shortlist_max is not None and int(selection_shortlist_max) < int(selection_shortlist_min):
+            raise ValueError("selection.shortlist_max must be >= selection.shortlist_min.")
+
+    if selection_tier_widening is not None:
+        if hasattr(selection_tier_widening, "enabled"):
+            enabled = bool(getattr(selection_tier_widening, "enabled"))
+            ladder = getattr(selection_tier_widening, "ladder", None)
+            selection_tier_widening = ladder if enabled else None
+        elif isinstance(selection_tier_widening, dict):
+            enabled = bool(selection_tier_widening.get("enabled", False))
+            selection_tier_widening = selection_tier_widening.get("ladder") if enabled else None
+
+    include_matched_sequence = bool(include_matched_sequence or uniqueness_key == "core" or selection_policy == "mmr")
+
+    budget_mode = str(_budget_attr(mining, "mode", "fixed_candidates") or "fixed_candidates").lower()
+    if budget_mode not in {"tier_target", "fixed_candidates"}:
+        raise ValueError(
+            f"pwm.sampling.mining.budget.mode must be 'tier_target' or 'fixed_candidates', got '{budget_mode}'."
+        )
+    budget_target_tier_fraction = _budget_attr(mining, "target_tier_fraction", None)
+    budget_candidates = _budget_attr(mining, "candidates", None)
+    budget_max_candidates = _budget_attr(mining, "max_candidates", None)
+    budget_min_candidates = _budget_attr(mining, "min_candidates", None)
+    budget_max_seconds = _budget_attr(mining, "max_seconds", None)
+    budget_growth_factor = float(_budget_attr(mining, "growth_factor", 1.25))
+    if budget_max_candidates is not None and int(budget_max_candidates) <= 0:
+        raise ValueError("pwm.sampling.mining.budget.max_candidates must be > 0 when set.")
+    if budget_min_candidates is not None and int(budget_min_candidates) <= 0:
+        raise ValueError("pwm.sampling.mining.budget.min_candidates must be > 0 when set.")
+    if (
+        budget_min_candidates is not None
+        and budget_max_candidates is not None
+        and int(budget_min_candidates) > int(budget_max_candidates)
+    ):
+        raise ValueError("pwm.sampling.mining.budget.min_candidates must be <= max_candidates.")
+    if budget_max_seconds is not None and float(budget_max_seconds) <= 0:
+        raise ValueError("pwm.sampling.mining.budget.max_seconds must be > 0 when set.")
+    if budget_growth_factor <= 1.0:
+        raise ValueError("pwm.sampling.mining.budget.growth_factor must be > 1.0")
+    if budget_mode == "fixed_candidates":
+        if budget_candidates is None:
+            raise ValueError("pwm.sampling.mining.budget.candidates must be set when mode=fixed_candidates.")
+        if int(budget_candidates) <= 0:
+            raise ValueError("pwm.sampling.mining.budget.candidates must be > 0.")
+    else:
+        if budget_target_tier_fraction is None:
+            raise ValueError("pwm.sampling.mining.budget.target_tier_fraction is required for mode=tier_target.")
+        if float(budget_target_tier_fraction) <= 0 or float(budget_target_tier_fraction) > 1:
+            raise ValueError("pwm.sampling.mining.budget.target_tier_fraction must be in (0, 1].")
+        if budget_max_candidates is None and budget_max_seconds is None:
+            raise ValueError("pwm.sampling.mining.budget.mode=tier_target requires max_candidates or max_seconds.")
+
+    def _cap_label(cap_applied: bool, time_limited: bool) -> str:
         cap_label = ""
-        if time_limited:
-            mining_max_seconds = _mining_attr(mining, "max_seconds")
-            if mining_max_seconds is not None:
-                cap_label = (
-                    f"{cap_label}; max_seconds={mining_max_seconds}"
-                    if cap_label
-                    else (f" (max_seconds={mining_max_seconds})")
-                )
+        if time_limited and budget_max_seconds is not None:
+            cap_label = f" (max_seconds={budget_max_seconds})"
+        if cap_applied and budget_max_candidates is not None:
+            cap_label = (
+                f"{cap_label}; max_candidates={budget_max_candidates}"
+                if cap_label
+                else (f" (max_candidates={budget_max_candidates})")
+            )
         return cap_label
 
     def _context(length_obs: str, cap_applied: bool, requested: int, generated: int, time_limited: bool) -> dict:
@@ -645,14 +960,15 @@ def sample_pwm_sites(
             "length_observed": length_obs,
             "score_label": score_label,
             "n_sites": n_sites,
-            "oversample_factor": oversample_factor,
+            "budget_mode": budget_mode,
+            "target_tier_fraction": budget_target_tier_fraction,
             "requested_candidates": requested,
             "generated_candidates": generated,
             "cap_applied": cap_applied,
             "cap_label": _cap_label(cap_applied, time_limited),
             "time_limited": time_limited,
             "mining_batch_size": _mining_attr(mining, "batch_size"),
-            "mining_max_seconds": _mining_attr(mining, "max_seconds"),
+            "mining_max_seconds": budget_max_seconds,
             "mining_log_every_batches": _mining_attr(mining, "log_every_batches"),
         }
 
@@ -685,7 +1001,6 @@ def sample_pwm_sites(
     def _score_with_fimo(
         *,
         n_candidates: int,
-        cap_applied: bool,
         requested: int,
         sequences: Optional[List[str]] = None,
     ) -> tuple[List[str], dict[str, dict]]:
@@ -700,14 +1015,16 @@ def sample_pwm_sites(
         )
 
         mining_batch_size = int(_mining_attr(mining, "batch_size", n_candidates))
-        mining_max_seconds = _mining_attr(mining, "max_seconds")
+        mining_max_seconds = budget_max_seconds
         mining_log_every = int(_mining_attr(mining, "log_every_batches", 1))
         log.info(
-            "FIMO mining config for %s: target=%d batch=%d max_seconds=%s thresh=%s",
+            "FIMO mining config for %s: mode=%s target=%d batch=%d max_seconds=%s max_candidates=%s thresh=%s",
             motif.motif_id,
+            budget_mode,
             n_candidates,
             mining_batch_size,
             str(mining_max_seconds) if mining_max_seconds is not None else "-",
+            str(budget_max_candidates) if budget_max_candidates is not None else "-",
             FIMO_REPORT_THRESH,
             extra={"suppress_stdout": True},
         )
@@ -769,9 +1086,11 @@ def sample_pwm_sites(
         generated_total = 0
         time_limited = False
         mining_time_limited = False
+        cap_applied = False
         batches = 0
         tsv_lines: list[str] = []
         provided_sequences = sequences
+        requested_final = int(requested)
         candidate_records: list[dict] | None = [] if keep_all_candidates_debug else None
 
         def _record_candidate(
@@ -879,15 +1198,55 @@ def sample_pwm_sites(
                     progress.update(generated=generated_total, accepted=len(candidates_by_seq), force=True)
             else:
                 mining_start = time.monotonic()
-                while generated_total < n_candidates:
-                    if mining_max_seconds is not None and (time.monotonic() - mining_start) >= float(
-                        mining_max_seconds
+                target_candidates = int(n_candidates)
+                cap_applied = False
+                core_by_seq: dict[str, str] = {}
+                core_counts: dict[str, int] = {}
+
+                def _eligible_unique_count() -> int:
+                    if uniqueness_key == "core":
+                        return int(len(core_counts))
+                    return int(len(candidates_by_seq))
+
+                def _record_core(seq: str, cand: FimoCandidate) -> None:
+                    core = _core_sequence(cand)
+                    prev_core = core_by_seq.get(seq)
+                    if prev_core is not None:
+                        core_counts[prev_core] = core_counts.get(prev_core, 0) - 1
+                        if core_counts.get(prev_core) == 0:
+                            core_counts.pop(prev_core, None)
+                    core_by_seq[seq] = core
+                    core_counts[core] = core_counts.get(core, 0) + 1
+
+                while True:
+                    if budget_max_seconds is not None and (time.monotonic() - mining_start) >= float(
+                        budget_max_seconds
                     ):
                         mining_time_limited = True
                         break
-                    remaining = int(n_candidates) - generated_total
+                    if generated_total >= target_candidates:
+                        if budget_mode == "tier_target":
+                            if budget_min_candidates is None or generated_total >= int(budget_min_candidates):
+                                if budget_target_tier_fraction is not None:
+                                    required_unique = int(np.ceil(float(n_sites) / float(budget_target_tier_fraction)))
+                                    if _eligible_unique_count() >= required_unique:
+                                        break
+                        if budget_max_candidates is not None and generated_total >= int(budget_max_candidates):
+                            cap_applied = True
+                            break
+                        next_target = int(np.ceil(target_candidates * budget_growth_factor))
+                        if budget_max_candidates is not None:
+                            next_target = min(next_target, int(budget_max_candidates))
+                        if next_target <= target_candidates:
+                            cap_applied = True
+                            break
+                        target_candidates = next_target
+                        if progress is not None:
+                            progress.target = target_candidates
+                        continue
+                    remaining = int(target_candidates) - generated_total
                     if remaining <= 0:
-                        break
+                        continue
                     batch_target = min(int(mining_batch_size), remaining)
                     sequences, lengths, batch_limited = _generate_batch(batch_target)
                     if batch_limited:
@@ -942,7 +1301,7 @@ def sample_pwm_sites(
                             or hit.score > prev.score
                             or (hit.score == prev.score and (hit.start, hit.stop) < (prev.start, prev.stop))
                         ):
-                            candidates_by_seq[seq] = FimoCandidate(
+                            cand = FimoCandidate(
                                 seq=seq,
                                 score=hit.score,
                                 start=hit.start,
@@ -950,12 +1309,15 @@ def sample_pwm_sites(
                                 strand=hit.strand,
                                 matched_sequence=hit.matched_sequence,
                             )
+                            candidates_by_seq[seq] = cand
+                            if uniqueness_key == "core":
+                                _record_core(seq, cand)
                     generated_total += len(sequences)
                     batches += 1
                     if progress is not None:
                         progress.update(
                             generated=generated_total,
-                            accepted=len(candidates_by_seq),
+                            accepted=_eligible_unique_count(),
                             batch_index=batches,
                             batch_total=None,
                         )
@@ -966,9 +1328,15 @@ def sample_pwm_sites(
                             batches,
                             "-",
                             generated_total,
-                            n_candidates,
-                            len(candidates_by_seq),
+                            target_candidates,
+                            _eligible_unique_count(),
                         )
+                    if budget_mode == "tier_target" and budget_target_tier_fraction is not None:
+                        if budget_min_candidates is None or generated_total >= int(budget_min_candidates):
+                            required_unique = int(np.ceil(float(n_sites) / float(budget_target_tier_fraction)))
+                            if _eligible_unique_count() >= required_unique:
+                                break
+                requested_final = int(target_candidates)
 
         if debug_path is not None and tsv_lines:
             debug_path.write_text("\n".join(tsv_lines) + "\n")
@@ -982,13 +1350,20 @@ def sample_pwm_sites(
                 else str(lengths_all[0])
             )
 
-        context = _context(length_obs, cap_applied, requested, generated_total, time_limited)
+        context = _context(
+            length_obs,
+            cap_applied,
+            requested_final,
+            generated_total,
+            time_limited or mining_time_limited,
+        )
         context["mining_batch_size"] = mining_batch_size
         context["mining_max_seconds"] = mining_max_seconds
         context["mining_time_limited"] = mining_time_limited
         ranked = sorted(candidates_by_seq.values(), key=lambda cand: (-cand.score, cand.seq))
-        if dedupe_by == "core":
-            ranked = _dedupe_by_core(ranked, min_core_hamming_distance=min_core_hamming_distance)
+        collapsed_by_core_identity = 0
+        if uniqueness_key == "core":
+            ranked, collapsed_by_core_identity = _collapse_by_core_identity(ranked)
         eligible_hits = len(ranked)
         ranked_pairs = [(cand.seq, cand.score) for cand in ranked]
         tiers = _assign_score_tiers(ranked_pairs)
@@ -997,7 +1372,28 @@ def sample_pwm_sites(
         eligible_tier_counts = [0, 0, 0, 0]
         for tier in tiers:
             eligible_tier_counts[tier] += 1
-        picked = ranked[: int(n_sites)]
+        selection_meta: dict[str, dict] = {}
+        selection_diag: dict = {}
+        if selection_policy == "mmr":
+            picked, selection_meta, selection_diag = _select_by_mmr(
+                ranked,
+                motif=motif,
+                n_sites=int(n_sites),
+                alpha=float(selection_alpha),
+                shortlist_min=int(selection_shortlist_min),
+                shortlist_factor=int(selection_shortlist_factor),
+                shortlist_max=int(selection_shortlist_max) if selection_shortlist_max is not None else None,
+                tier_widening=selection_tier_widening,
+            )
+        else:
+            picked = ranked[: int(n_sites)]
+            for idx, cand in enumerate(picked):
+                selection_meta[cand.seq] = {
+                    "selection_rank": idx + 1,
+                    "selection_utility": None,
+                    "nearest_selected_similarity": None,
+                }
+            selection_diag = {"shortlist_k": None, "tier_fraction_used": None, "tier_limit": None}
         retained_tier_counts = [0, 0, 0, 0]
         for cand in picked:
             retained_tier_counts[tier_by_seq[cand.seq]] += 1
@@ -1011,7 +1407,7 @@ def sample_pwm_sites(
                     f"score={context.get('score_label')})."
                 ),
                 (
-                    f"Requested n_sites={context.get('n_sites')} oversample_factor={context.get('oversample_factor')} "
+                    f"Requested n_sites={context.get('n_sites')} "
                     f"-> candidates requested={context.get('requested_candidates')} "
                     f"generated={context.get('generated_candidates')}"
                     f"{context.get('cap_label')}."
@@ -1022,14 +1418,32 @@ def sample_pwm_sites(
                 msg_lines.append(f"Observed candidate lengths={context.get('length_observed')}.")
             suggestions = [
                 "reduce n_sites",
-                "increase oversample_factor",
+                "increase mining.budget.max_candidates",
             ]
             if context.get("mining_max_seconds") is not None and context.get("mining_time_limited"):
-                suggestions.append("increase mining.max_seconds")
+                suggestions.append("increase mining.budget.max_seconds")
             if context.get("width") is not None and int(context.get("width")) <= 6:
                 suggestions.append("try length_policy=range with a longer length_range")
             msg_lines.append("Try next: " + "; ".join(suggestions) + ".")
             log.warning(" ".join(msg_lines))
+        tier_target_required_unique = None
+        tier_target_met = None
+        if budget_mode == "tier_target" and budget_target_tier_fraction is not None:
+            tier_target_required_unique, tier_target_met = _evaluate_tier_target(
+                n_sites=int(n_sites),
+                target_tier_fraction=float(budget_target_tier_fraction),
+                eligible_unique=len(ranked),
+            )
+            if not tier_target_met:
+                warn_lines = [
+                    f"Stage-A tier target unmet for motif '{motif.motif_id}': "
+                    f"eligible_unique={len(ranked)} < required_unique={tier_target_required_unique} "
+                    f"for target_tier_fraction={budget_target_tier_fraction}.",
+                    "Retained set will spill beyond the target tier.",
+                    "Try next: increase mining.budget.max_candidates; relax "
+                    "mining.budget.target_tier_fraction; reduce n_sites.",
+                ]
+                log.warning(" ".join(warn_lines))
         n0, n1, n2, _n3 = _score_tier_counts(len(ranked))
         tier0_score = ranked[n0 - 1].score if n0 > 0 else None
         tier1_score = ranked[n0 + n1 - 1].score if n1 > 0 else None
@@ -1039,7 +1453,7 @@ def sample_pwm_sites(
         if progress is not None:
             progress.update(
                 generated=generated_total,
-                accepted=len(candidates_by_seq),
+                accepted=eligible_hits,
                 batch_index=batches if batches > 0 else None,
                 batch_total=None,
                 force=True,
@@ -1065,6 +1479,22 @@ def sample_pwm_sites(
             meta["tfbs_core"] = _core_sequence(cand)
             if cand.matched_sequence:
                 meta["fimo_matched_sequence"] = cand.matched_sequence
+            selection_meta_row = selection_meta.get(cand.seq, {})
+            meta["selection_rank"] = selection_meta_row.get("selection_rank")
+            meta["selection_utility"] = selection_meta_row.get("selection_utility")
+            meta["nearest_selected_similarity"] = selection_meta_row.get("nearest_selected_similarity")
+            meta["selection_policy"] = selection_policy
+            meta["selection_alpha"] = selection_alpha if selection_policy == "mmr" else None
+            meta["selection_similarity"] = "contribution_l1" if selection_policy == "mmr" else None
+            meta["selection_shortlist_min"] = selection_shortlist_min if selection_policy == "mmr" else None
+            meta["selection_shortlist_factor"] = selection_shortlist_factor if selection_policy == "mmr" else None
+            meta["selection_shortlist_max"] = selection_shortlist_max if selection_policy == "mmr" else None
+            meta["selection_tier_fraction_used"] = selection_diag.get("tier_fraction_used")
+            meta["selection_tier_limit"] = selection_diag.get("tier_limit")
+            meta["shortlist_k"] = selection_diag.get("shortlist_k")
+            meta["tier_target_fraction"] = budget_target_tier_fraction
+            meta["tier_target_required_unique"] = tier_target_required_unique
+            meta["tier_target_met"] = tier_target_met
             meta_by_seq[cand.seq] = meta
         if candidate_records is not None and debug_dir is not None:
             selected_set = {c.seq for c in picked}
@@ -1085,6 +1515,20 @@ def sample_pwm_sites(
                 log.info("FIMO candidate records written: %s", path)
             except Exception:
                 log.warning("Failed to write FIMO candidate records.", exc_info=True)
+        nearest_sims = [
+            float(meta.get("nearest_selected_similarity"))
+            for meta in selection_meta.values()
+            if meta.get("selection_rank") is not None
+            and int(meta.get("selection_rank")) > 1
+            and meta.get("nearest_selected_similarity") is not None
+        ]
+        diversity_nearest_similarity_mean = None
+        diversity_nearest_distance_mean = None
+        diversity_nearest_distance_min = None
+        if nearest_sims:
+            diversity_nearest_similarity_mean = float(np.mean(nearest_sims))
+            diversity_nearest_distance_mean = float(np.mean([(1.0 / sim) - 1.0 for sim in nearest_sims if sim > 0]))
+            diversity_nearest_distance_min = float(min((1.0 / sim) - 1.0 for sim in nearest_sims if sim > 0))
         summary = None
         if return_summary:
             summary = _build_summary(
@@ -1096,8 +1540,8 @@ def sample_pwm_sites(
                 eligible=[cand.seq for cand in ranked],
                 retained=[c.seq for c in picked],
                 retained_scores=[cand.score for cand in picked],
-                dedupe_by=dedupe_by,
-                min_core_hamming_distance=min_core_hamming_distance,
+                uniqueness_key=uniqueness_key,
+                collapsed_by_core_identity=collapsed_by_core_identity,
                 eligible_tier_counts=eligible_tier_counts,
                 retained_tier_counts=retained_tier_counts,
                 tier0_score=tier0_score,
@@ -1105,6 +1549,21 @@ def sample_pwm_sites(
                 tier2_score=tier2_score,
                 eligible_score_hist_edges=hist_edges,
                 eligible_score_hist_counts=hist_counts,
+                tier_target_fraction=budget_target_tier_fraction,
+                tier_target_required_unique=tier_target_required_unique,
+                tier_target_met=tier_target_met,
+                selection_policy=selection_policy,
+                selection_alpha=selection_alpha if selection_policy == "mmr" else None,
+                selection_similarity="contribution_l1" if selection_policy == "mmr" else None,
+                selection_shortlist_k=selection_diag.get("shortlist_k"),
+                selection_shortlist_min=selection_shortlist_min if selection_policy == "mmr" else None,
+                selection_shortlist_factor=selection_shortlist_factor if selection_policy == "mmr" else None,
+                selection_shortlist_max=selection_shortlist_max if selection_policy == "mmr" else None,
+                selection_tier_fraction_used=selection_diag.get("tier_fraction_used"),
+                selection_tier_limit=selection_diag.get("tier_limit"),
+                diversity_nearest_similarity_mean=diversity_nearest_similarity_mean,
+                diversity_nearest_distance_mean=diversity_nearest_distance_mean,
+                diversity_nearest_distance_min=diversity_nearest_distance_min,
                 input_name=input_name,
                 regulator=motif.motif_id,
                 backend=scoring_backend,
@@ -1124,7 +1583,6 @@ def sample_pwm_sites(
         full_seq = _embed_with_background(seq, target_len)
         selected, meta, summary = _score_with_fimo(
             n_candidates=1,
-            cap_applied=False,
             requested=1,
             sequences=[full_seq],
         )
@@ -1136,9 +1594,16 @@ def sample_pwm_sites(
             return selected, summary
         return selected
 
-    requested_candidates = max(1, n_sites * oversample_factor)
+    if budget_mode == "fixed_candidates":
+        requested_candidates = max(1, int(budget_candidates))
+    else:
+        base_target = _mining_attr(mining, "batch_size", n_sites)
+        if budget_min_candidates is not None:
+            base_target = max(int(base_target), int(budget_min_candidates))
+        requested_candidates = max(1, int(base_target))
+        if budget_max_candidates is not None:
+            requested_candidates = min(requested_candidates, int(budget_max_candidates))
     n_candidates = max(1, int(requested_candidates))
-    cap_applied = False
     progress = _PwmSamplingProgress(
         motif_id=motif.motif_id,
         backend=scoring_backend,
@@ -1147,7 +1612,6 @@ def sample_pwm_sites(
         stream=sys.stdout,
     )
     selected, meta, summary = _score_with_fimo(
-        cap_applied=cap_applied,
         requested=requested_candidates,
         n_candidates=n_candidates,
     )

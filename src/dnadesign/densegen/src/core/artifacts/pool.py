@@ -241,8 +241,14 @@ def _build_stage_a_sampling_manifest(
     eligible_score_hist = []
     bgfile_by_regulator = bgfile_by_regulator or {}
     reg_bgfiles = []
-    dedupe_values = {summary.dedupe_by for summary in fimo_summaries}
-    min_core_values = {summary.min_core_hamming_distance for summary in fimo_summaries}
+    uniqueness_values = {summary.uniqueness_key for summary in fimo_summaries}
+    selection_policies = {summary.selection_policy for summary in fimo_summaries}
+    selection_alphas = {summary.selection_alpha for summary in fimo_summaries}
+    selection_similarity = {summary.selection_similarity for summary in fimo_summaries}
+    selection_shortlist_min = {summary.selection_shortlist_min for summary in fimo_summaries}
+    selection_shortlist_factor = {summary.selection_shortlist_factor for summary in fimo_summaries}
+    selection_shortlist_max = {summary.selection_shortlist_max for summary in fimo_summaries}
+    tier_target_fraction = {summary.tier_target_fraction for summary in fimo_summaries}
     for summary in fimo_summaries:
         if summary.eligible_score_hist_edges is None or summary.eligible_score_hist_counts is None:
             raise ValueError("Stage-A sampling summaries missing eligible score histogram.")
@@ -268,6 +274,22 @@ def _build_stage_a_sampling_manifest(
                 "eligible": int(summary.eligible_total),
                 "unique_eligible": int(summary.eligible),
                 "retained": int(summary.retained),
+                "tier_target_fraction": summary.tier_target_fraction,
+                "tier_target_required_unique": summary.tier_target_required_unique,
+                "tier_target_met": summary.tier_target_met,
+                "selection_policy": summary.selection_policy,
+                "selection_alpha": summary.selection_alpha,
+                "selection_similarity": summary.selection_similarity,
+                "selection_shortlist_k": summary.selection_shortlist_k,
+                "selection_shortlist_min": summary.selection_shortlist_min,
+                "selection_shortlist_factor": summary.selection_shortlist_factor,
+                "selection_shortlist_max": summary.selection_shortlist_max,
+                "selection_tier_fraction_used": summary.selection_tier_fraction_used,
+                "selection_tier_limit": summary.selection_tier_limit,
+                "collapsed_by_core_identity": summary.collapsed_by_core_identity,
+                "diversity_nearest_distance_mean": summary.diversity_nearest_distance_mean,
+                "diversity_nearest_distance_min": summary.diversity_nearest_distance_min,
+                "diversity_nearest_similarity_mean": summary.diversity_nearest_similarity_mean,
             }
         )
     unique_bgfiles = {val for val in reg_bgfiles}
@@ -277,21 +299,33 @@ def _build_stage_a_sampling_manifest(
     else:
         base_bgfile = None
         background_source = "mixed"
-    if len(dedupe_values) == 1:
-        dedupe_by = next(iter(dedupe_values))
+    if len(uniqueness_values) == 1:
+        uniqueness_key = next(iter(uniqueness_values))
     else:
-        dedupe_by = "mixed"
-    min_core_hamming_distance = None
-    if len(min_core_values) == 1:
-        min_core_hamming_distance = next(iter(min_core_values))
+        uniqueness_key = "mixed"
+    selection_policy = next(iter(selection_policies)) if len(selection_policies) == 1 else "mixed"
+    selection_alpha_value = next(iter(selection_alphas)) if len(selection_alphas) == 1 else None
+    selection_similarity_value = next(iter(selection_similarity)) if len(selection_similarity) == 1 else None
+    selection_shortlist_min_value = next(iter(selection_shortlist_min)) if len(selection_shortlist_min) == 1 else None
+    selection_shortlist_factor_value = (
+        next(iter(selection_shortlist_factor)) if len(selection_shortlist_factor) == 1 else None
+    )
+    selection_shortlist_max_value = next(iter(selection_shortlist_max)) if len(selection_shortlist_max) == 1 else None
+    tier_target_fraction_value = next(iter(tier_target_fraction)) if len(tier_target_fraction) == 1 else None
     return {
         "backend": "fimo",
         "tier_scheme": "pct_0.1_1_9",
         "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
         "retention_rule": "top_n_sites_by_best_hit_score",
         "fimo_thresh": FIMO_REPORT_THRESH,
-        "dedupe_by": dedupe_by,
-        "min_core_hamming_distance": min_core_hamming_distance,
+        "uniqueness_key": uniqueness_key,
+        "selection_policy": selection_policy,
+        "selection_alpha": selection_alpha_value,
+        "selection_similarity": selection_similarity_value,
+        "selection_shortlist_min": selection_shortlist_min_value,
+        "selection_shortlist_factor": selection_shortlist_factor_value,
+        "selection_shortlist_max": selection_shortlist_max_value,
+        "tier_target_fraction": tier_target_fraction_value,
         "bgfile": base_bgfile,
         "background_source": background_source,
         "eligible_score_hist": eligible_score_hist,

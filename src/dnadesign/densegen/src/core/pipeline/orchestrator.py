@@ -88,6 +88,7 @@ from .attempts import (
 )
 from .inputs import (
     PWM_INPUT_TYPES,
+    _budget_attr,
     _build_input_manifest_entry,
     _input_metadata,
     _mining_attr,
@@ -692,14 +693,17 @@ def _process_plan_for_source(
         if inputs_manifest is not None and source_label not in inputs_manifest:
             input_sampling_cfg = getattr(source_cfg, "sampling", None)
             strategy = _sampling_attr(input_sampling_cfg, "strategy")
-            oversample = _sampling_attr(input_sampling_cfg, "oversample_factor")
-            scoring_backend = _sampling_attr(input_sampling_cfg, "scoring_backend") or "fimo"
-            length_policy = _sampling_attr(input_sampling_cfg, "length_policy")
-            length_range = _sampling_attr(input_sampling_cfg, "length_range")
+            length_cfg = _sampling_attr(input_sampling_cfg, "length")
+            length_policy = _sampling_attr(length_cfg, "policy")
+            length_range = _sampling_attr(length_cfg, "range")
             mining_cfg = _sampling_attr(input_sampling_cfg, "mining")
             mining_batch_size = _mining_attr(mining_cfg, "batch_size")
-            mining_max_seconds = _mining_attr(mining_cfg, "max_seconds")
             mining_log_every = _mining_attr(mining_cfg, "log_every_batches")
+            budget_mode = _budget_attr(mining_cfg, "mode")
+            budget_candidates = _budget_attr(mining_cfg, "candidates")
+            budget_target_tier_fraction = _budget_attr(mining_cfg, "target_tier_fraction")
+            budget_max_candidates = _budget_attr(mining_cfg, "max_candidates")
+            budget_max_seconds = _budget_attr(mining_cfg, "max_seconds")
             if length_range is not None:
                 length_range = list(length_range)
             score_label = "best_hit_score>0"
@@ -713,24 +717,33 @@ def _process_plan_for_source(
                 parts = []
                 if mining_batch_size is not None:
                     parts.append(f"batch={mining_batch_size}")
-                if mining_max_seconds is not None:
-                    parts.append(f"max_seconds={mining_max_seconds}s")
+                if budget_max_seconds is not None:
+                    parts.append(f"max_seconds={budget_max_seconds}s")
                 if mining_log_every is not None:
                     parts.append(f"log_every={mining_log_every}")
                 mining_label = ", ".join(parts) if parts else "enabled"
+            budget_label = "-"
+            if budget_mode == "fixed_candidates":
+                budget_label = f"fixed={budget_candidates}"
+            elif budget_mode == "tier_target":
+                budget_label = (
+                    f"tier={budget_target_tier_fraction} max_candidates={budget_max_candidates}"
+                    if budget_target_tier_fraction is not None
+                    else "tier=unset"
+                )
             if progress_style != "screen":
                 log.info(
                     "Stage-A PWM sampling for %s: motifs=%d | sites=%s | strategy=%s | backend=%s | "
-                    "eligibility=%s | tiers=%s | mining=%s | oversample=%s | length=%s",
+                    "eligibility=%s | tiers=%s | mining=%s | budget=%s | length=%s",
                     source_label,
                     len(input_meta.get("input_pwm_ids") or []),
                     counts_label or "-",
                     strategy,
-                    scoring_backend,
+                    "fimo",
                     score_label,
                     tiers_label,
                     mining_label,
-                    oversample,
+                    budget_label,
                     length_label,
                 )
             inputs_manifest[source_label] = _build_input_manifest_entry(

@@ -42,3 +42,11 @@
 - Follow-up: added motif display name helper module, switched CLI/reporting/pipeline logs to short TF labels by default, and introduced workspace-relative path helper; updated tests for inspect run library summary (hide TFBS sequences) and Stage-B build-libraries summary (no per-library rows); refined library summary aggregation in reports. Commit: bb36164.
 - Follow-up: Stage-B build-libraries CLI output now aggregates per input/plan (min/med/max), removes per-library rows and show-hash flag; docs updated to match; demo note added.
 - Follow-up: updated inspect run library CLI test to cover --show-tfbs flag after removing --top; full pytest passes.
+
+### 2026-01-28
+- Task: Implement Stage-A "score + diversity" selection policy (MMR), core-identity collapse via matched sequence, adaptive tier-target mining, schema bump to 2.7 with deprecation rewrite, update pool manifest/parquet metadata, CLI recap, tests, and docs.
+- Decisions:
+  - Uniqueness defaults to core for PWM inputs; min_core_hamming_distance deprecated/ignored with warning.
+  - Tier targeting via mining.budget.mode=tier_target with required_unique tracking + explicit warnings when unmet.
+  - Selection policy defaults to top_score; MMR optional with alpha=0.9 and shortlist controls.
+  - No Stage-B changes.

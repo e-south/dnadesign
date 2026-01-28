@@ -20,7 +20,7 @@ from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
 from ...core.run_paths import candidates_root
 from .base import BaseDataSource, resolve_path
 from .pwm_artifact import load_artifact
-from .pwm_sampling import sample_pwm_sites
+from .pwm_sampling import sample_pwm_sites, sampling_kwargs_from_config
 
 
 @dataclass
@@ -68,20 +68,9 @@ class PWMArtifactSetDataSource(BaseDataSource):
             override = overrides.get(motif.motif_id)
             if override:
                 sampling_cfg = {**sampling, **dict(override)}
-            strategy = str(sampling_cfg.get("strategy", "stochastic"))
-            n_sites = int(sampling_cfg.get("n_sites"))
-            oversample_factor = int(sampling_cfg.get("oversample_factor", 10))
-            length_policy = str(sampling_cfg.get("length_policy", "exact"))
-            length_range = sampling_cfg.get("length_range")
-            trim_window_length = sampling_cfg.get("trim_window_length")
-            trim_window_strategy = sampling_cfg.get("trim_window_strategy", "max_info")
-            scoring_backend = str(sampling_cfg.get("scoring_backend", "fimo")).lower()
-            mining = sampling_cfg.get("mining")
-            bgfile = sampling_cfg.get("bgfile")
-            keep_all_candidates_debug = bool(sampling_cfg.get("keep_all_candidates_debug", False))
-            include_matched_sequence = bool(sampling_cfg.get("include_matched_sequence", False))
-            dedupe_by = sampling_cfg.get("dedupe_by")
-            min_core_hamming_distance = sampling_cfg.get("min_core_hamming_distance")
+            sampling_kwargs = sampling_kwargs_from_config(sampling_cfg)
+            bgfile = sampling_kwargs.get("bgfile")
+            keep_all_candidates_debug = bool(sampling_kwargs.get("keep_all_candidates_debug", False))
             bgfile_path: Path | None = None
             if bgfile is not None:
                 bgfile_path = resolve_path(self.cfg_path, str(bgfile))
@@ -101,24 +90,22 @@ class PWMArtifactSetDataSource(BaseDataSource):
                 input_name=self.input_name,
                 motif_hash=motif_hash,
                 run_id=run_id,
-                strategy=strategy,
-                n_sites=n_sites,
-                oversample_factor=oversample_factor,
-                scoring_backend=scoring_backend,
-                mining=mining,
+                mining=sampling_kwargs.get("mining"),
                 bgfile=bgfile_path,
                 keep_all_candidates_debug=keep_all_candidates_debug,
-                include_matched_sequence=include_matched_sequence,
-                dedupe_by=dedupe_by,
-                min_core_hamming_distance=min_core_hamming_distance,
+                include_matched_sequence=sampling_kwargs.get("include_matched_sequence", False),
+                uniqueness_key=sampling_kwargs.get("uniqueness_key"),
+                selection=sampling_kwargs.get("selection"),
                 debug_output_dir=debug_output_dir,
                 debug_label=f"{Path(path).stem}__{motif.motif_id}",
-                length_policy=length_policy,
-                length_range=length_range,
-                trim_window_length=trim_window_length,
-                trim_window_strategy=str(trim_window_strategy),
+                length_policy=sampling_kwargs.get("length_policy", "exact"),
+                length_range=sampling_kwargs.get("length_range"),
+                trim_window_length=sampling_kwargs.get("trim_window_length"),
+                trim_window_strategy=str(sampling_kwargs.get("trim_window_strategy", "max_info")),
                 return_metadata=return_meta,
                 return_summary=True,
+                strategy=str(sampling_kwargs.get("strategy", "stochastic")),
+                n_sites=int(sampling_kwargs.get("n_sites")),
             )
             if return_meta:
                 selected, meta_by_seq, summary = result  # type: ignore[misc]
@@ -137,7 +124,7 @@ class PWMArtifactSetDataSource(BaseDataSource):
                 tfbs_id = hash_tfbs_id(
                     motif_id=motif_hash,
                     sequence=seq,
-                    scoring_backend=scoring_backend,
+                    scoring_backend="fimo",
                     matched_start=int(start) if start is not None else None,
                     matched_stop=int(stop) if stop is not None else None,
                     matched_strand=str(strand) if strand is not None else None,

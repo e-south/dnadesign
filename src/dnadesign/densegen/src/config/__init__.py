@@ -12,6 +12,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +21,8 @@ from typing import Annotated, Any, Dict, List, Optional, Union
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from typing_extensions import Literal
+
+log = logging.getLogger(__name__)
 
 
 # ---- Strict YAML loader (duplicate keys fail) ----
@@ -40,7 +43,7 @@ def _construct_mapping(loader, node, deep: bool = False):
 _StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
 
 
-LATEST_SCHEMA_VERSION = "2.6"
+LATEST_SCHEMA_VERSION = "2.7"
 SUPPORTED_SCHEMA_VERSIONS = {LATEST_SCHEMA_VERSION}
 
 
@@ -149,10 +152,56 @@ class SequenceLibraryInput(BaseModel):
     sequence_column: str = "sequence"
 
 
+class PWMMiningBudgetConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mode: Literal["tier_target", "fixed_candidates"]
+    target_tier_fraction: Optional[float] = None
+    candidates: Optional[int] = None
+    max_candidates: Optional[int] = None
+    max_seconds: Optional[float] = None
+    min_candidates: Optional[int] = None
+    growth_factor: float = 1.25
+
+    @field_validator("growth_factor")
+    @classmethod
+    def _growth_factor_ok(cls, v: float):
+        if float(v) <= 1.0:
+            raise ValueError("pwm.sampling.mining.budget.growth_factor must be > 1.0")
+        return float(v)
+
+    @model_validator(mode="after")
+    def _budget_rules(self):
+        if self.mode == "fixed_candidates":
+            if self.candidates is None:
+                raise ValueError("pwm.sampling.mining.budget.candidates is required when mode=fixed_candidates")
+            if int(self.candidates) <= 0:
+                raise ValueError("pwm.sampling.mining.budget.candidates must be > 0")
+        else:
+            if self.target_tier_fraction is None:
+                raise ValueError("pwm.sampling.mining.budget.target_tier_fraction is required for tier_target")
+            if float(self.target_tier_fraction) <= 0 or float(self.target_tier_fraction) > 1:
+                raise ValueError("pwm.sampling.mining.budget.target_tier_fraction must be in (0, 1]")
+            if self.max_candidates is None and self.max_seconds is None:
+                raise ValueError("pwm.sampling.mining.budget requires max_candidates or max_seconds for tier_target")
+        if self.max_candidates is not None and int(self.max_candidates) <= 0:
+            raise ValueError("pwm.sampling.mining.budget.max_candidates must be > 0 when set")
+        if self.min_candidates is not None and int(self.min_candidates) <= 0:
+            raise ValueError("pwm.sampling.mining.budget.min_candidates must be > 0 when set")
+        if self.max_seconds is not None and float(self.max_seconds) <= 0:
+            raise ValueError("pwm.sampling.mining.budget.max_seconds must be > 0 when set")
+        if (
+            self.min_candidates is not None
+            and self.max_candidates is not None
+            and int(self.min_candidates) > int(self.max_candidates)
+        ):
+            raise ValueError("pwm.sampling.mining.budget.min_candidates must be <= max_candidates")
+        return self
+
+
 class PWMMiningConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    batch_size: int = 100000
-    max_seconds: Optional[float] = 60.0
+    batch_size: int
+    budget: PWMMiningBudgetConfig
     log_every_batches: int = 1
 
     @field_validator("batch_size")
@@ -162,15 +211,6 @@ class PWMMiningConfig(BaseModel):
             raise ValueError("pwm.sampling.mining.batch_size must be > 0")
         return v
 
-    @field_validator("max_seconds")
-    @classmethod
-    def _max_seconds_ok(cls, v: Optional[float]):
-        if v is None:
-            return v
-        if not isinstance(v, (int, float)) or float(v) <= 0:
-            raise ValueError("pwm.sampling.mining.max_seconds must be > 0 when set")
-        return float(v)
-
     @field_validator("log_every_batches")
     @classmethod
     def _log_every_batches_ok(cls, v: int):
@@ -179,58 +219,123 @@ class PWMMiningConfig(BaseModel):
         return v
 
 
+class PWMLengthConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    policy: Literal["exact", "range"] = "exact"
+    range: Optional[tuple[int, int]] = None
+
+    @field_validator("range")
+    @classmethod
+    def _range_ok(cls, v: Optional[tuple[int, int]]):
+        if v is None:
+            return v
+        if len(v) != 2:
+            raise ValueError("pwm.sampling.length.range must be a 2-tuple (min, max)")
+        lo, hi = v
+        if lo <= 0 or hi <= 0:
+            raise ValueError("pwm.sampling.length.range values must be > 0")
+        if lo > hi:
+            raise ValueError("pwm.sampling.length.range must be min <= max")
+        return v
+
+
+class PWMTrimmingConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    window_length: Optional[int] = None
+    window_strategy: Literal["max_info"] = "max_info"
+
+    @field_validator("window_length")
+    @classmethod
+    def _trim_length_ok(cls, v: Optional[int]):
+        if v is None:
+            return v
+        if not isinstance(v, int) or v <= 0:
+            raise ValueError("pwm.sampling.trimming.window_length must be a positive integer")
+        return v
+
+
+class PWMUniquenessConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    key: Literal["sequence", "core"] = "core"
+
+
+class PWMSelectionTierWidening(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    ladder: List[float] = Field(default_factory=list)
+
+    @field_validator("ladder")
+    @classmethod
+    def _ladder_ok(cls, v: List[float]):
+        cleaned: List[float] = []
+        for frac in v:
+            val = float(frac)
+            if val <= 0 or val > 1:
+                raise ValueError("pwm.sampling.selection.tier_widening.ladder values must be in (0, 1]")
+            cleaned.append(val)
+        return cleaned
+
+
+class PWMSelectionConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    policy: Literal["top_score", "mmr"] = "top_score"
+    alpha: float = 0.9
+    shortlist_factor: int = 5
+    shortlist_min: int = 50
+    shortlist_max: Optional[int] = None
+    tier_widening: Optional[PWMSelectionTierWidening] = None
+
+    @field_validator("alpha")
+    @classmethod
+    def _alpha_ok(cls, v: float):
+        if float(v) <= 0 or float(v) > 1:
+            raise ValueError("pwm.sampling.selection.alpha must be in (0, 1]")
+        return float(v)
+
+    @field_validator("shortlist_factor", "shortlist_min")
+    @classmethod
+    def _shortlist_positive(cls, v: int, info):
+        if int(v) <= 0:
+            raise ValueError(f"pwm.sampling.selection.{info.field_name} must be > 0")
+        return int(v)
+
+    @field_validator("shortlist_max")
+    @classmethod
+    def _shortlist_max_ok(cls, v: Optional[int]):
+        if v is None:
+            return v
+        if int(v) <= 0:
+            raise ValueError("pwm.sampling.selection.shortlist_max must be > 0 when set")
+        return int(v)
+
+    @model_validator(mode="after")
+    def _defaults_for_policy(self):
+        if self.policy == "mmr" and self.tier_widening is None:
+            self.tier_widening = PWMSelectionTierWidening(
+                enabled=True,
+                ladder=[0.001, 0.01, 0.09, 1.0],
+            )
+        return self
+
+
 class PWMSamplingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     strategy: Literal["consensus", "stochastic", "background"] = "stochastic"
     n_sites: int
-    oversample_factor: int = 10
-    scoring_backend: Literal["fimo"] = "fimo"
-    mining: Optional[PWMMiningConfig] = None
+    mining: PWMMiningConfig
     bgfile: Optional[str] = None
     keep_all_candidates_debug: bool = False
     include_matched_sequence: bool = False
-    dedupe_by: Optional[Literal["sequence", "core"]] = None
-    min_core_hamming_distance: Optional[int] = None
-    length_policy: Literal["exact", "range"] = "exact"
-    length_range: Optional[tuple[int, int]] = None
-    trim_window_length: Optional[int] = None
-    trim_window_strategy: Literal["max_info"] = "max_info"
+    length: PWMLengthConfig = Field(default_factory=PWMLengthConfig)
+    trimming: PWMTrimmingConfig = Field(default_factory=PWMTrimmingConfig)
+    uniqueness: PWMUniquenessConfig = Field(default_factory=PWMUniquenessConfig)
+    selection: PWMSelectionConfig = Field(default_factory=PWMSelectionConfig)
 
     @field_validator("n_sites")
     @classmethod
     def _n_sites_ok(cls, v: int):
         if v <= 0:
             raise ValueError("pwm.sampling.n_sites must be > 0")
-        return v
-
-    @field_validator("oversample_factor")
-    @classmethod
-    def _oversample_ok(cls, v: int):
-        if v <= 0:
-            raise ValueError("pwm.sampling.oversample_factor must be > 0")
-        return v
-
-    @field_validator("length_range")
-    @classmethod
-    def _length_range_ok(cls, v: Optional[tuple[int, int]]):
-        if v is None:
-            return v
-        if len(v) != 2:
-            raise ValueError("pwm.sampling.length_range must be a 2-tuple (min, max)")
-        lo, hi = v
-        if lo <= 0 or hi <= 0:
-            raise ValueError("pwm.sampling.length_range values must be > 0")
-        if lo > hi:
-            raise ValueError("pwm.sampling.length_range must be min <= max")
-        return v
-
-    @field_validator("trim_window_length")
-    @classmethod
-    def _trim_length_ok(cls, v: Optional[int]):
-        if v is None:
-            return v
-        if not isinstance(v, int) or v <= 0:
-            raise ValueError("pwm.sampling.trim_window_length must be a positive integer")
         return v
 
     @field_validator("bgfile")
@@ -243,23 +348,15 @@ class PWMSamplingConfig(BaseModel):
         return str(v).strip()
 
     @model_validator(mode="after")
-    def _score_mode(self):
-        if self.scoring_backend != "fimo":
-            raise ValueError("pwm.sampling.scoring_backend must be 'fimo'")
-        if self.mining is None:
-            self.mining = PWMMiningConfig()
+    def _sampling_rules(self):
         if self.strategy == "consensus" and int(self.n_sites) != 1:
             raise ValueError("pwm.sampling.strategy=consensus requires n_sites=1")
-        if self.length_policy == "exact" and self.length_range is not None:
-            raise ValueError("pwm.sampling.length_range is not allowed when length_policy=exact")
-        if self.length_policy == "range" and self.length_range is None:
-            raise ValueError("pwm.sampling.length_range is required when length_policy=range")
-        if self.dedupe_by is None:
-            self.dedupe_by = "core" if self.length_policy == "range" else "sequence"
-        if self.min_core_hamming_distance is not None and self.min_core_hamming_distance < 0:
-            raise ValueError("pwm.sampling.min_core_hamming_distance must be >= 0 when set")
-        if self.min_core_hamming_distance is not None and self.dedupe_by != "core":
-            raise ValueError("pwm.sampling.min_core_hamming_distance requires dedupe_by=core")
+        if self.length.policy == "exact" and self.length.range is not None:
+            raise ValueError("pwm.sampling.length.range is not allowed when policy=exact")
+        if self.length.policy == "range" and self.length.range is None:
+            raise ValueError("pwm.sampling.length.range is required when policy=range")
+        if self.selection.policy == "mmr" and self.uniqueness.key not in {"core", "sequence"}:
+            raise ValueError("pwm.sampling.uniqueness.key must be 'core' or 'sequence'")
         return self
 
 
@@ -1152,10 +1249,78 @@ def _reject_removed_solver_options(raw: object) -> None:
         raise ConfigError("solver.allow_unknown_options has been removed.")
 
 
+def _rewrite_pwm_sampling_dict(sampling: dict, warnings: list[str]) -> None:
+    if "scoring_backend" in sampling:
+        sampling.pop("scoring_backend", None)
+        warnings.append("pwm.sampling.scoring_backend (removed; FIMO-only)")
+    if "dedupe_by" in sampling:
+        uniqueness = sampling.setdefault("uniqueness", {})
+        uniqueness.setdefault("key", sampling.pop("dedupe_by"))
+        warnings.append("pwm.sampling.dedupe_by -> pwm.sampling.uniqueness.key")
+    if "min_core_hamming_distance" in sampling:
+        sampling.pop("min_core_hamming_distance", None)
+        warnings.append("pwm.sampling.min_core_hamming_distance (deprecated; ignored)")
+    if "length_policy" in sampling or "length_range" in sampling:
+        length = sampling.setdefault("length", {})
+        if "length_policy" in sampling:
+            length.setdefault("policy", sampling.pop("length_policy"))
+        if "length_range" in sampling:
+            length.setdefault("range", sampling.pop("length_range"))
+        warnings.append("pwm.sampling.length_policy/length_range -> pwm.sampling.length")
+    if "trim_window_length" in sampling or "trim_window_strategy" in sampling:
+        trimming = sampling.setdefault("trimming", {})
+        if "trim_window_length" in sampling:
+            trimming.setdefault("window_length", sampling.pop("trim_window_length"))
+        if "trim_window_strategy" in sampling:
+            trimming.setdefault("window_strategy", sampling.pop("trim_window_strategy"))
+        warnings.append("pwm.sampling.trim_window_* -> pwm.sampling.trimming")
+    oversample = sampling.pop("oversample_factor", None)
+    if oversample is not None:
+        n_sites = sampling.get("n_sites")
+        if n_sites is None:
+            raise ConfigError("pwm.sampling.oversample_factor requires n_sites to be set for migration")
+        mining = sampling.setdefault("mining", {})
+        budget = mining.setdefault("budget", {})
+        budget.setdefault("mode", "fixed_candidates")
+        budget.setdefault("candidates", int(n_sites) * int(oversample))
+        warnings.append("pwm.sampling.oversample_factor -> pwm.sampling.mining.budget (fixed_candidates)")
+    if "mining" in sampling and isinstance(sampling["mining"], dict):
+        mining = sampling["mining"]
+        mining.setdefault("batch_size", 100000)
+        mining.setdefault("log_every_batches", 1)
+
+
+def _rewrite_deprecated_config(raw: object) -> list[str]:
+    if not isinstance(raw, dict):
+        return []
+    densegen = raw.get("densegen")
+    if not isinstance(densegen, dict):
+        return []
+    warnings: list[str] = []
+    inputs = densegen.get("inputs") or []
+    if not isinstance(inputs, list):
+        return []
+    for entry in inputs:
+        if not isinstance(entry, dict):
+            continue
+        if "sampling" in entry and isinstance(entry["sampling"], dict):
+            _rewrite_pwm_sampling_dict(entry["sampling"], warnings)
+        overrides = entry.get("overrides_by_motif_id")
+        if isinstance(overrides, dict):
+            for _, override in overrides.items():
+                if isinstance(override, dict):
+                    _rewrite_pwm_sampling_dict(override, warnings)
+    return warnings
+
+
 def load_config(path: Path | str) -> LoadedConfig:
     cfg_path = Path(path).resolve()
     raw = yaml.load(cfg_path.read_text(), Loader=_StrictLoader)
     _reject_removed_solver_options(raw)
+    rewrites = _rewrite_deprecated_config(raw)
+    if rewrites:
+        joined = "; ".join(sorted(set(rewrites)))
+        log.warning("Deprecated DenseGen config keys rewritten: %s", joined)
     try:
         root = RootConfig.model_validate(raw)
     except ValidationError as e:

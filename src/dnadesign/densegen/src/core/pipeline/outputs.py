@@ -68,17 +68,16 @@ def _effective_sampling_caps(input_cfg, cfg_path: Path) -> dict | None:
     sampling = getattr(input_cfg, "sampling", None)
     if sampling is None:
         return None
-    n_sites = getattr(sampling, "n_sites", None)
-    oversample = getattr(sampling, "oversample_factor", None)
-    requested = None
-    if isinstance(n_sites, int) and isinstance(oversample, int):
-        requested = int(n_sites) * int(oversample)
-    backend = str(getattr(sampling, "scoring_backend", "fimo"))
     mining = getattr(sampling, "mining", None)
+    budget = getattr(mining, "budget", None) if mining is not None else None
     return {
-        "scoring_backend": backend,
-        "requested_candidates": requested,
-        "cap_seconds": getattr(mining, "max_seconds", None),
+        "budget_mode": getattr(budget, "mode", None) if budget is not None else None,
+        "budget_candidates": getattr(budget, "candidates", None) if budget is not None else None,
+        "budget_target_tier_fraction": getattr(budget, "target_tier_fraction", None) if budget is not None else None,
+        "budget_max_candidates": getattr(budget, "max_candidates", None) if budget is not None else None,
+        "budget_max_seconds": getattr(budget, "max_seconds", None) if budget is not None else None,
+        "budget_min_candidates": getattr(budget, "min_candidates", None) if budget is not None else None,
+        "budget_growth_factor": getattr(budget, "growth_factor", None) if budget is not None else None,
     }
 
 

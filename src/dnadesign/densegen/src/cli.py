@@ -57,7 +57,6 @@ from .adapters.sources.pwm_sampling import PWMSamplingSummary
 from .config import (
     LATEST_SCHEMA_VERSION,
     ConfigError,
-    PWMMiningConfig,
     load_config,
     resolve_outputs_scoped_path,
     resolve_relative_path,
@@ -232,6 +231,8 @@ def _apply_stage_a_overrides(
 ) -> None:
     if n_sites is None and oversample_factor is None and batch_size is None and max_seconds is None:
         return
+    if oversample_factor is not None:
+        log.warning("Stage-A oversample_factor override is deprecated; mapping to mining.budget.fixed_candidates.")
     for inp in cfg.inputs:
         if selected is not None and inp.name not in selected:
             continue
@@ -241,17 +242,32 @@ def _apply_stage_a_overrides(
         if sampling is None:
             continue
         sampling_updates: dict = {}
+        budget_updates: dict = {}
         if n_sites is not None:
             sampling_updates["n_sites"] = n_sites
         if oversample_factor is not None:
-            sampling_updates["oversample_factor"] = oversample_factor
+            base_sites = n_sites if n_sites is not None else getattr(sampling, "n_sites", None)
+            if base_sites is None:
+                raise typer.BadParameter("--oversample-factor requires n_sites to be set")
+            budget_updates["mode"] = "fixed_candidates"
+            budget_updates["candidates"] = int(base_sites) * int(oversample_factor)
         mining_updates: dict = {}
         if batch_size is not None:
             mining_updates["batch_size"] = batch_size
         if max_seconds is not None:
-            mining_updates["max_seconds"] = max_seconds
+            budget_updates["max_seconds"] = max_seconds
         if mining_updates:
-            mining = sampling.mining or PWMMiningConfig()
+            mining = sampling.mining
+            if mining is None:
+                raise typer.BadParameter("Stage-A sampling mining config is required for overrides")
+            sampling_updates["mining"] = mining.model_copy(update=mining_updates)
+        if budget_updates:
+            mining = sampling_updates.get("mining", sampling.mining)
+            if mining is None or getattr(mining, "budget", None) is None:
+                raise typer.BadParameter("Stage-A sampling mining.budget is required for overrides")
+            budget = mining.budget
+            mining_updates = dict(getattr(mining, "model_dump", lambda **_: {})()) or {}
+            mining_updates["budget"] = budget.model_copy(update=budget_updates)
             sampling_updates["mining"] = mining.model_copy(update=mining_updates)
         if sampling_updates:
             inp.sampling = sampling.model_copy(update=sampling_updates)
@@ -260,12 +276,27 @@ def _apply_stage_a_overrides(
             new_overrides = {}
             for motif_id, override in overrides.items():
                 override_updates: dict = {}
+                override_budget_updates: dict = {}
                 if n_sites is not None:
                     override_updates["n_sites"] = n_sites
                 if oversample_factor is not None:
-                    override_updates["oversample_factor"] = oversample_factor
+                    base_sites = n_sites if n_sites is not None else getattr(override, "n_sites", None)
+                    if base_sites is None:
+                        raise typer.BadParameter("--oversample-factor requires n_sites to be set")
+                    override_budget_updates["mode"] = "fixed_candidates"
+                    override_budget_updates["candidates"] = int(base_sites) * int(oversample_factor)
                 if mining_updates:
-                    mining = override.mining or PWMMiningConfig()
+                    mining = override.mining
+                    if mining is None:
+                        raise typer.BadParameter("Stage-A sampling mining config is required for overrides")
+                    override_updates["mining"] = mining.model_copy(update=mining_updates)
+                if override_budget_updates:
+                    mining = override_updates.get("mining", override.mining)
+                    if mining is None or getattr(mining, "budget", None) is None:
+                        raise typer.BadParameter("Stage-A sampling mining.budget is required for overrides")
+                    budget = mining.budget
+                    mining_updates = dict(getattr(mining, "model_dump", lambda **_: {})()) or {}
+                    mining_updates["budget"] = budget.model_copy(update=override_budget_updates)
                     override_updates["mining"] = mining.model_copy(update=mining_updates)
                 if override_updates:
                     override = override.model_copy(update=override_updates)
@@ -654,41 +685,53 @@ def _stage_a_plan_rows(
         if not input_type.startswith("pwm_"):
             continue
         sampling = getattr(inp, "sampling", None)
-        backend = str(getattr(sampling, "scoring_backend", "fimo")).lower() if sampling else "fimo"
         base_n_sites = getattr(sampling, "n_sites", None) if sampling else None
-        base_oversample = getattr(sampling, "oversample_factor", None) if sampling else None
-        length_policy = str(getattr(sampling, "length_policy", "-")) if sampling else "-"
-        length_range = getattr(sampling, "length_range", None) if sampling else None
-        length_label = length_policy
-        if length_policy == "range" and length_range:
-            length_label = f"range({length_range[0]}..{length_range[1]})"
 
         motifs = input_motifs(inp, cfg_path)
         overrides = getattr(inp, "overrides_by_motif_id", None) if input_type == "pwm_artifact_set" else None
         for motif_id, display_name in motifs:
-            reg_backend = backend
-            reg_n_sites = base_n_sites
-            reg_oversample = base_oversample
+            effective_sampling = sampling
             if overrides and motif_id in overrides:
-                override = overrides.get(motif_id) or {}
-                if "scoring_backend" in override:
-                    reg_backend = str(override.get("scoring_backend", reg_backend)).lower()
-                if "n_sites" in override:
-                    reg_n_sites = override.get("n_sites")
-                if "oversample_factor" in override:
-                    reg_oversample = override.get("oversample_factor")
+                override = overrides.get(motif_id)
+                if override is not None:
+                    effective_sampling = override
+            reg_n_sites = getattr(effective_sampling, "n_sites", base_n_sites) if effective_sampling else base_n_sites
+            length_cfg = getattr(effective_sampling, "length", None) if effective_sampling else None
+            length_policy = str(getattr(length_cfg, "policy", "-")) if length_cfg else "-"
+            length_range = getattr(length_cfg, "range", None) if length_cfg else None
+            length_label = length_policy
+            if length_policy == "range" and length_range:
+                length_label = f"range({length_range[0]}..{length_range[1]})"
+            mining_cfg = getattr(effective_sampling, "mining", None) if effective_sampling else None
+            budget = getattr(mining_cfg, "budget", None) if mining_cfg else None
+            budget_label = "-"
+            if budget is not None:
+                mode = getattr(budget, "mode", None)
+                if mode == "fixed_candidates":
+                    budget_label = f"fixed={getattr(budget, 'candidates', '-')}"
+                elif mode == "tier_target":
+                    budget_label = (
+                        f"tier={getattr(budget, 'target_tier_fraction', '-')}"
+                        f" max_candidates={getattr(budget, 'max_candidates', '-')}"
+                    )
+            uniqueness_cfg = getattr(effective_sampling, "uniqueness", None) if effective_sampling else None
+            uniqueness_label = str(getattr(uniqueness_cfg, "key", "-"))
+            selection_cfg = getattr(effective_sampling, "selection", None) if effective_sampling else None
+            selection_policy = str(getattr(selection_cfg, "policy", "top_score"))
+            selection_alpha = getattr(selection_cfg, "alpha", None)
+            selection_label = selection_policy
+            if selection_policy == "mmr" and selection_alpha is not None:
+                selection_label = f"mmr(alpha={selection_alpha})"
             label = motif_id if show_motif_ids else display_name
-            candidates = "-"
-            if reg_n_sites is not None and reg_oversample is not None:
-                candidates = f"{int(reg_n_sites) * int(reg_oversample)}"
             rows.append(
                 {
                     "input": str(inp.name),
                     "tf": str(label),
                     "retain": str(reg_n_sites) if reg_n_sites is not None else "-",
-                    "candidates": candidates,
+                    "budget": budget_label,
                     "eligibility": "best_hit_score>0",
-                    "backend": str(reg_backend),
+                    "selection": selection_label,
+                    "uniqueness": uniqueness_label,
                     "length": length_label,
                 }
             )
@@ -1628,41 +1671,60 @@ def inspect_config(
 
     pwm_inputs = [inp for inp in cfg.inputs if str(getattr(inp, "type", "")).startswith("pwm_")]
     if pwm_inputs:
-        stage_a_table = Table("input", "backend", "n_sites", "oversample", "candidates", "mining", "length")
+        stage_a_table = Table("input", "n_sites", "budget", "mining", "length", "uniqueness", "selection")
         for inp in pwm_inputs:
             sampling = getattr(inp, "sampling", None)
             if sampling is None:
                 continue
-            backend = str(getattr(sampling, "scoring_backend", "fimo")).lower()
             n_sites = getattr(sampling, "n_sites", None)
-            oversample = getattr(sampling, "oversample_factor", None)
-            candidates = "-"
-            if n_sites is not None and oversample is not None:
-                candidates = str(int(n_sites) * int(oversample))
             mining_cfg = getattr(sampling, "mining", None)
             mining_label = "-"
             if mining_cfg is not None:
                 parts = [f"batch={mining_cfg.batch_size}"]
-                if mining_cfg.max_seconds is not None:
-                    parts.append(f"max_seconds={mining_cfg.max_seconds}")
+                budget = getattr(mining_cfg, "budget", None)
+                if budget is not None and getattr(budget, "max_seconds", None) is not None:
+                    parts.append(f"max_seconds={budget.max_seconds}")
                 if mining_cfg.log_every_batches is not None:
                     parts.append(f"log_every={mining_cfg.log_every_batches}")
                 mining_label = ", ".join(parts)
-            length_label = str(sampling.length_policy)
-            if sampling.length_policy == "range" and sampling.length_range is not None:
-                length_label = f"range({sampling.length_range[0]}..{sampling.length_range[1]})"
+            length_cfg = getattr(sampling, "length", None)
+            length_policy = getattr(length_cfg, "policy", "exact")
+            length_range = getattr(length_cfg, "range", None)
+            length_label = str(length_policy)
+            if length_policy == "range" and length_range is not None:
+                length_label = f"range({length_range[0]}..{length_range[1]})"
+            uniqueness_cfg = getattr(sampling, "uniqueness", None)
+            uniqueness_label = str(getattr(uniqueness_cfg, "key", "-"))
+            selection_cfg = getattr(sampling, "selection", None)
+            selection_policy = str(getattr(selection_cfg, "policy", "top_score"))
+            selection_alpha = getattr(selection_cfg, "alpha", None)
+            selection_label = selection_policy
+            if selection_policy == "mmr" and selection_alpha is not None:
+                selection_label = f"mmr(alpha={selection_alpha})"
+            budget_label = "-"
+            if mining_cfg is not None:
+                budget = getattr(mining_cfg, "budget", None)
+                if budget is not None:
+                    mode = getattr(budget, "mode", None)
+                    if mode == "fixed_candidates":
+                        budget_label = f"fixed={getattr(budget, 'candidates', '-')}"
+                    elif mode == "tier_target":
+                        budget_label = (
+                            f"tier={getattr(budget, 'target_tier_fraction', '-')}"
+                            f" max_candidates={getattr(budget, 'max_candidates', '-')}"
+                        )
             stage_a_table.add_row(
                 str(inp.name),
-                backend,
                 str(n_sites) if n_sites is not None else "-",
-                str(oversample) if oversample is not None else "-",
-                candidates,
+                budget_label,
                 mining_label,
                 length_label,
+                uniqueness_label,
+                selection_label,
             )
         console.print("[bold]Stage-A sampling[/]")
         console.print(stage_a_table)
-        console.print("Legend: candidates = n_sites * oversample_factor; eligibility = best_hit_score > 0.")
+        console.print("Legend: eligibility = best_hit_score > 0.")
 
     outputs = Table("target", "path")
     for target in cfg.output.targets:
@@ -1794,7 +1856,7 @@ def stage_a_build_pool(
     oversample_factor: Optional[int] = typer.Option(
         None,
         "--oversample-factor",
-        help="Override Stage-A PWM sampling oversample_factor for all PWM inputs.",
+        help="Deprecated: map to mining.budget fixed_candidates via n_sites * oversample_factor.",
     ),
     batch_size: Optional[int] = typer.Option(
         None,
@@ -1804,7 +1866,7 @@ def stage_a_build_pool(
     max_seconds: Optional[float] = typer.Option(
         None,
         "--max-seconds",
-        help="Override Stage-A PWM mining max_seconds for all PWM inputs.",
+        help="Override Stage-A PWM mining budget max_seconds for all PWM inputs.",
     ),
     input_name: Optional[list[str]] = typer.Option(
         None,
