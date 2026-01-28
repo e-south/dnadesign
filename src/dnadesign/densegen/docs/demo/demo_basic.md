@@ -206,7 +206,7 @@ Notes:
 * The CLI recap includes per‑TF tier boundary scores, so you can sanity-check tier cutoffs without scripting.
 * The resulting pools are cached under `outputs/pools/` and reused by default in subsequent runs.
 
-Optional: immediately visualize Stage‑A yield/tiering/length effects:
+Optional: view Stage‑A yield/tiering/length effects:
 
 ```bash
 dense plot --only stage_a_summary

@@ -39,6 +39,13 @@ def _format_rate(rate: float) -> str:
     return f"{rate:.1f}/s"
 
 
+def _format_tier_yield(eligible_unique: int) -> str:
+    if eligible_unique <= 0:
+        return "-"
+    n0, n1, n2, _n3 = score_tier_counts(int(eligible_unique))
+    return f"{n0}/{n1}/{n2}"
+
+
 def _format_progress_bar(current: int, total: int, *, width: int = 12) -> str:
     if total <= 0:
         return "[?]"
@@ -59,6 +66,7 @@ def _format_pwm_progress_line(
     batch_total: Optional[int],
     elapsed: float,
     target_fraction: Optional[float],
+    tier_yield: Optional[str],
 ) -> str:
     safe_target = max(1, int(target))
     gen_pct = min(100, int(100 * generated / safe_target))
@@ -72,6 +80,8 @@ def _format_pwm_progress_line(
             parts.append(f"eligible {accepted}")
     if target_fraction is not None:
         parts.append(f"tier {float(target_fraction) * 100:.3f}%")
+    if tier_yield:
+        parts.append(f"tiers 0.1/1/9={tier_yield}")
     if batch_index is not None:
         total_label = "-" if batch_total is None else str(int(batch_total))
         parts.append(f"batch {int(batch_index)}/{total_label}")
@@ -161,6 +171,7 @@ class _PwmSamplingProgress:
                 batch_total=batch_total,
                 elapsed=now - self._start,
                 target_fraction=self.target_fraction,
+                tier_yield=_format_tier_yield(int(accepted)) if accepted is not None else None,
             )
             padded = line.ljust(self._last_len)
             self._last_len = max(self._last_len, len(line))
@@ -201,6 +212,7 @@ class _PwmSamplingProgress:
         table.add_column("generated")
         table.add_column("eligible")
         table.add_column("tier target")
+        table.add_column("tier yield (0.1/1/9%)")
         table.add_column("elapsed")
         table.add_column("rate")
 
@@ -218,6 +230,7 @@ class _PwmSamplingProgress:
         tier_label = "-"
         if self.target_fraction is not None:
             tier_label = f"{float(self.target_fraction) * 100:.3f}%"
+        tier_yield = _format_tier_yield(int(accepted)) if accepted is not None else "-"
         elapsed_label = f"{max(0.0, float(elapsed)):.1f}s"
         rate = generated / elapsed if elapsed > 0 else 0.0
         rate_label = _format_rate(rate)
@@ -226,6 +239,7 @@ class _PwmSamplingProgress:
             gen_label,
             eligible_label,
             tier_label,
+            tier_yield,
             elapsed_label,
             rate_label,
         )
