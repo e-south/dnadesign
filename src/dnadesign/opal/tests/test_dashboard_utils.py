@@ -26,6 +26,7 @@ from dnadesign.opal.src.analysis.dashboard import (
     filters,
     hues,
     labels,
+    scores,
     selection,
     transient,
     ui,
@@ -347,6 +348,48 @@ def test_build_umap_overlay_charts() -> None:
     )
     assert isinstance(cluster_chart, alt.Chart)
     assert isinstance(score_chart, alt.Chart)
+
+
+def test_build_mode_view_requires_full_predictions() -> None:
+    df_base = pl.DataFrame({"id": ["a", "b", "c"]})
+    metrics_df = pl.DataFrame(
+        {
+            "id": ["a", "b"],
+            "score": [0.2, 0.4],
+            "top_k": [True, False],
+        }
+    )
+    with pytest.raises(ValueError, match="Missing predictions for 1 of 3 rows"):
+        scores.build_mode_view(
+            df_base=df_base,
+            metrics_df=metrics_df,
+            id_col="id",
+            observed_ids=set(),
+            observed_scores_df=None,
+            score_col="score",
+            logic_col=None,
+            effect_col=None,
+            rank_col=None,
+            top_k_col="top_k",
+        )
+
+
+def test_build_mode_view_requires_columns() -> None:
+    df_base = pl.DataFrame({"id": ["a"]})
+    metrics_df = pl.DataFrame({"id": ["a"], "score": [0.2]})
+    with pytest.raises(ValueError, match="Missing prediction columns"):
+        scores.build_mode_view(
+            df_base=df_base,
+            metrics_df=metrics_df,
+            id_col="id",
+            observed_ids=set(),
+            observed_scores_df=None,
+            score_col="score",
+            logic_col=None,
+            effect_col=None,
+            rank_col=None,
+            top_k_col="top_k",
+        )
 
 
 def test_build_umap_explorer_chart_cases() -> None:
