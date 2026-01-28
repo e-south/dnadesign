@@ -1552,13 +1552,19 @@ def sample_pwm_sites(
                 eligible_unique=len(ranked),
             )
             if not tier_target_met:
+                suggestions = [
+                    "increase mining.budget.max_candidates",
+                    "relax mining.budget.target_tier_fraction",
+                    "reduce n_sites",
+                ]
+                if mining_time_limited and budget_max_seconds is not None:
+                    suggestions.insert(1, "increase mining.budget.max_seconds")
                 warn_lines = [
                     f"Stage-A tier target unmet for motif '{motif.motif_id}': "
                     f"eligible_unique={len(ranked)} < required_unique={tier_target_required_unique} "
                     f"for target_tier_fraction={budget_target_tier_fraction}.",
                     "Retained set will spill beyond the target tier.",
-                    "Try next: increase mining.budget.max_candidates; relax "
-                    "mining.budget.target_tier_fraction; reduce n_sites.",
+                    "Try next: " + "; ".join(suggestions) + ".",
                 ]
                 log.warning(" ".join(warn_lines))
         n0, n1, n2, _n3 = _score_tier_counts(len(ranked))

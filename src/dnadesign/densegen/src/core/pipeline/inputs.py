@@ -103,6 +103,16 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
     selection_shortlist_min = _sampling_attr(selection_cfg, "shortlist_min")
     selection_shortlist_max = _sampling_attr(selection_cfg, "shortlist_max")
     selection_tier_widening = _sampling_attr(selection_cfg, "tier_widening")
+    if selection_tier_widening is not None:
+        if hasattr(selection_tier_widening, "model_dump"):
+            selection_tier_widening = selection_tier_widening.model_dump()
+        elif hasattr(selection_tier_widening, "enabled") or hasattr(selection_tier_widening, "ladder"):
+            selection_tier_widening = {
+                "enabled": bool(getattr(selection_tier_widening, "enabled", True)),
+                "ladder": list(getattr(selection_tier_widening, "ladder", []) or []),
+            }
+        elif isinstance(selection_tier_widening, (list, tuple)):
+            selection_tier_widening = list(selection_tier_widening)
     mining_batch_size = _mining_attr(mining, "batch_size")
     mining_log_every_batches = _mining_attr(mining, "log_every_batches")
     return {

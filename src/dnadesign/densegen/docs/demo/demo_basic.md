@@ -167,7 +167,7 @@ If you want the full semantics behind these terms (eligibility, tier targeting m
 * [Stage‑A sampling (PWM mining → TFBS pools)](../guide/sampling.md#stage-a-sampling)
 * [Stage‑B sampling (TFBS pools → solver libraries)](../guide/sampling.md#stage-b-sampling)
 
-What this demo config is doing (quick read):
+What this demo config is doing:
 
 * **Stage‑A (`densegen.inputs[].sampling`)**
   Mine `n_sites=200` per motif using FIMO score eligibility (`best_hit_score > 0`), collapse near‑duplicates

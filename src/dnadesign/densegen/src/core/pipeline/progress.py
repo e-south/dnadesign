@@ -20,7 +20,7 @@ from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
 
-from ..utils.rich_style import make_panel, make_table
+from ...utils.rich_style import make_panel, make_table
 
 
 def _summarize_tf_counts(labels: list[str], max_items: int = 6) -> str:

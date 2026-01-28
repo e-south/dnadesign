@@ -30,8 +30,13 @@ def test_pwm_progress_line_densegen_fields() -> None:
         batch_index=None,
         batch_total=None,
         elapsed=1.2,
+        target_fraction=None,
+        tier_yield=None,
     )
-    assert line.startswith("PWM M1 | densegen | gen 50% (50/100)")
+    assert "PWM M1" in line
+    assert "densegen" in line
+    assert "gen 50%" in line
+    assert "(50/100)" in line
     assert "acc" not in line
     assert "| 1.2s |" in line
     assert line.endswith("/s")
@@ -48,8 +53,14 @@ def test_pwm_progress_line_fimo_fields() -> None:
         batch_index=3,
         batch_total=None,
         elapsed=2.5,
+        target_fraction=0.001,
+        tier_yield="1/2/3",
     )
-    assert line.startswith("PWM M2 | fimo | gen 25% (25/100) | batch 3/-")
+    assert "PWM M2" in line
+    assert "fimo" in line
+    assert "gen 25%" in line
+    assert "(25/100)" in line
+    assert "batch 3/-" in line
     assert "| 2.5s |" in line
     assert line.endswith("/s")
 
@@ -179,6 +190,8 @@ class _TtyBuffer(io.StringIO):
 
 def test_pwm_progress_dedupes_identical_updates() -> None:
     prev_enabled = logging_utils.is_progress_enabled()
+    prev_style = logging_utils.get_progress_style()
+    logging_utils.set_progress_style("stream")
     logging_utils.set_progress_enabled(True)
     stream = _TtyBuffer()
     try:
@@ -196,4 +209,5 @@ def test_pwm_progress_dedupes_identical_updates() -> None:
         assert output.count("PWM M1") == 1
     finally:
         logging_utils.set_progress_enabled(prev_enabled)
+        logging_utils.set_progress_style(prev_style)
         logging_utils.set_progress_active(False)

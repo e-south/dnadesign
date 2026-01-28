@@ -121,6 +121,8 @@ class ProgressAwareRichHandler(RichHandler):
         if _FIMO_STDOUT_SUPPRESS_RE.search(message):
             return
         stream = self.console.file if self.console is not None else sys.stdout
+        if getattr(stream, "closed", False):
+            return
         _maybe_clear_progress_line(stream)
         super().emit(record)
 
