@@ -61,14 +61,11 @@ plots:
     tags: [diagnostic]
     params:
       size_by: obj__effect_scaled
-      top_k: 10
 
   - name: sfxi_setpoint_sweep
     kind: sfxi_setpoint_sweep
     tags: [diagnostic]
-    params:
-      top_k: 5
-      tau: 0.8
+    params: {}
 
   - name: sfxi_support_diagnostics
     kind: sfxi_support_diagnostics

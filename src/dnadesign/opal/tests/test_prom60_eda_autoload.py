@@ -36,7 +36,7 @@ def test_prom60_eda_includes_sfxi_brush_pool_option() -> None:
 def test_prom60_eda_includes_sfxi_diagnostics_column() -> None:
     nb_path = Path("src/dnadesign/opal/notebooks/prom60_eda.py")
     text = nb_path.read_text()
-    assert "Diagnostics / AL Guidance" in text
+    assert "Diagnostic plots & guidance" in text
 
 
 def test_prom60_eda_has_no_diagnostics_sampling_controls() -> None:
@@ -59,7 +59,6 @@ def test_prom60_eda_persists_dropdown_state() -> None:
         "cluster_hue_state",
         "support_y_state",
         "support_color_state",
-        "sweep_metric_state",
         "uncertainty_color_state",
     ]
     for name in expected_states:

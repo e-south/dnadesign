@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
+import numpy as np
 import polars as pl
 
 from ..analysis.facade import latest_round
@@ -102,3 +103,33 @@ def parse_setpoint_from_runs(runs_df: pl.DataFrame) -> Sequence[float]:
         raise OpalError(f"Multiple setpoints found: {sorted(unique)}.", ExitCodes.CONTRACT_VIOLATION)
     setpoint = list(unique)[0]
     return sfxi_math.parse_setpoint_vector({"setpoint_vector": list(setpoint)})
+
+
+def parse_exponents_from_runs(runs_df: pl.DataFrame) -> tuple[float, float]:
+    if "objective__params" not in runs_df.columns:
+        raise OpalError("runs.parquet missing objective__params (beta/gamma unavailable).", ExitCodes.BAD_ARGS)
+
+    def _extract(obj):
+        if not isinstance(obj, dict):
+            return None
+        beta = obj.get("beta")
+        gamma = obj.get("gamma")
+        if beta is None or gamma is None:
+            return None
+        try:
+            return float(beta), float(gamma)
+        except Exception:
+            return None
+
+    vals = runs_df.select(
+        pl.col("objective__params").map_elements(_extract, return_dtype=pl.Object).alias("exponents")
+    )["exponents"].drop_nulls()
+    if vals.is_empty():
+        raise OpalError("No beta/gamma found in runs.parquet.", ExitCodes.BAD_ARGS)
+    unique = {tuple(v) for v in vals.to_list()}
+    if len(unique) > 1:
+        raise OpalError(f"Multiple beta/gamma pairs found: {sorted(unique)}.", ExitCodes.CONTRACT_VIOLATION)
+    beta, gamma = list(unique)[0]
+    if not (np.isfinite(beta) and np.isfinite(gamma)):
+        raise OpalError("beta/gamma must be finite.", ExitCodes.CONTRACT_VIOLATION)
+    return float(beta), float(gamma)

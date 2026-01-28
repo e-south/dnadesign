@@ -108,8 +108,8 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
   - params: `size_by` (default `obj__effect_scaled`), `include_labels`, `rasterize_at`
 - **`sfxi_setpoint_sweep`**: objective landscape across discrete setpoints (current-round labels).
   - rendered as a heatmap with setpoints as columns (vector labels) and diagnostic metrics as rows.
-  - default heatmap omits `denom_used` to preserve contrast.
-  - params: `y_col` (default `y_obs`), `top_k`, `tau`, `percentile`, `min_n`, `eps`, `delta`
+  - rows report median `logic_fidelity`, median `effect_scaled`, and median `score` over observed labels.
+  - params: `y_col` (default `y_obs`), `percentile`, `min_n`, `eps`, `delta`
 - **`sfxi_support_diagnostics`**: distance-to-labeled-logic vs score (OOD check).
   - params: `y_axis`, `hue`, `batch_size`
 - **`sfxi_uncertainty`**: uncertainty vs score (artifact model; RF ensemble score std).
@@ -128,9 +128,7 @@ plots:
 
   - name: sfxi_setpoint_sweep
     kind: sfxi_setpoint_sweep
-    params:
-      top_k: 5
-      tau: 0.8
+    params: {}
 
   - name: sfxi_support_diag
     kind: sfxi_support_diagnostics

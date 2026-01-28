@@ -134,7 +134,40 @@ def test_default_view_hues_include_sfxi_diagnostics() -> None:
     assert "opal__sfxi__dist_to_labeled_x" not in keys
 
 
-def test_umap_explorer_chart_overlays_observed_labels() -> None:
+def test_build_nearest_2_factor_counts() -> None:
+    label_df = pl.DataFrame(
+        {
+            "id": ["a", "b"],
+            "y_obs": [
+                [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+                [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+            ],
+        }
+    )
+    pred_df = pl.DataFrame(
+        {
+            "id": ["a", "c"],
+            "pred_y_hat": [
+                [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ],
+        }
+    )
+    result = sfxi.build_nearest_2_factor_counts(
+        label_events_df=label_df,
+        pred_events_df=pred_df,
+        y_col="y_obs",
+        pred_vec_col="pred_y_hat",
+    )
+    assert result.note is None
+    counts = {row["opal__nearest_2_factor_logic"]: row for row in result.df.to_dicts()}
+    assert counts["0001"]["observed_count"] == 1
+    assert counts["1111"]["observed_count"] == 1
+    assert counts["0001"]["predicted_count"] == 1
+    assert counts["0010"]["predicted_count"] == 1
+
+
+def test_umap_explorer_chart_no_overlay_layers() -> None:
     df = pl.DataFrame(
         {
             "id": ["a", "b"],
@@ -153,7 +186,7 @@ def test_umap_explorer_chart_overlays_observed_labels() -> None:
         plot_size=200,
         dataset_name="demo",
     )
-    assert isinstance(result.chart, alt.LayerChart)
+    assert isinstance(result.chart, alt.Chart)
 
 
 def test_choose_dropdown_value_prefers_current_then_preferred() -> None:

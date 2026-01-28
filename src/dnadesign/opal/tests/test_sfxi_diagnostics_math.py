@@ -156,13 +156,16 @@ def test_setpoint_sweep_pool_clip_uses_label_denom():
         min_n=1,
         eps=1e-8,
         delta=0.0,
-        top_k=1,
-        tau=0.5,
+        beta=1.0,
+        gamma=1.0,
         pool_vec8=pool_vec8,
         state_order=sfxi_math.STATE_ORDER,
     )
     assert "setpoint_label" in sweep_df.columns
     assert "setpoint_vector" in sweep_df.columns
+    assert "logic_fidelity" in sweep_df.columns
+    assert "effect_scaled" in sweep_df.columns
+    assert "score" in sweep_df.columns
     target = sweep_df.filter(pl.col("setpoint_name") == "0001")
     assert target.height == 1
     pool_clip_hi = float(target.get_column("pool_clip_hi_fraction").item())

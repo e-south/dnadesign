@@ -22,7 +22,12 @@ from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
 from ._param_utils import get_float, get_int, get_str
-from .sfxi_diag_data import labels_current_round, parse_setpoint_from_runs, resolve_single_round
+from .sfxi_diag_data import (
+    labels_current_round,
+    parse_exponents_from_runs,
+    parse_setpoint_from_runs,
+    resolve_single_round,
+)
 
 
 @register_plot(
@@ -31,8 +36,6 @@ from .sfxi_diag_data import labels_current_round, parse_setpoint_from_runs, reso
         summary="Setpoint sweep diagnostics for labels.",
         params={
             "y_col": "Label vector column (default y_obs).",
-            "top_k": "Top-K used for sweep metrics (default 5).",
-            "tau": "Threshold for logic_fidelity fraction (default 0.8).",
             "percentile": "Denom percentile (default 95).",
             "min_n": "Min labels required (default 5).",
             "eps": "Epsilon for denom (default 1e-8).",
@@ -48,8 +51,6 @@ def render(context, params: dict) -> None:
     round_k = resolve_single_round(runs_df, round_selector=context.rounds)
 
     y_col = get_str(params, ["y_col", "y_column"], "y_obs")
-    top_k = get_int(params, ["top_k"], 5)
-    tau = get_float(params, ["tau"], 0.8)
     percentile = get_int(params, ["percentile", "p"], 95)
     min_n = get_int(params, ["min_n"], 5)
     eps = get_float(params, ["eps"], 1.0e-8)
@@ -67,6 +68,7 @@ def render(context, params: dict) -> None:
         raise OpalError("Invalid label vectors (expected length-8 values).", ExitCodes.CONTRACT_VIOLATION)
 
     setpoint = parse_setpoint_from_runs(runs_df.filter(pl.col("as_of_round") == int(round_k)))
+    beta, gamma = parse_exponents_from_runs(runs_df.filter(pl.col("as_of_round") == int(round_k)))
 
     sweep_df = sweep_setpoints(
         labels_vec8=labels_vec,
@@ -75,8 +77,8 @@ def render(context, params: dict) -> None:
         min_n=min_n,
         eps=eps,
         delta=delta,
-        top_k=top_k,
-        tau=tau,
+        beta=beta,
+        gamma=gamma,
         state_order=STATE_ORDER,
     )
 
@@ -84,10 +86,9 @@ def render(context, params: dict) -> None:
     fig = sfxi_setpoint_sweep.make_setpoint_sweep_figure(
         sweep_df,
         metrics=[
-            "median_logic_fidelity",
-            "top_k_logic_fidelity",
-            "frac_logic_fidelity_gt_tau",
-            "clip_hi_fraction",
+            "logic_fidelity",
+            "effect_scaled",
+            "score",
         ],
         subtitle=f"R={round_k} · labels={labels_vec.shape[0]} · {denom_note}",
     )

@@ -71,12 +71,18 @@ def sweep_setpoints(
     min_n: int,
     eps: float,
     delta: float,
-    top_k: int,
-    tau: float,
+    beta: float,
+    gamma: float,
     state_order: Sequence[str] | None = None,
     pool_vec8: np.ndarray | None = None,
 ) -> pl.DataFrame:
     order = require_state_order(state_order)
+    beta_val = float(beta)
+    gamma_val = float(gamma)
+    if not np.isfinite(beta_val):
+        raise ValueError("beta must be finite.")
+    if not np.isfinite(gamma_val):
+        raise ValueError("gamma must be finite.")
     labels = np.asarray(labels_vec8, dtype=float)
     if labels.ndim == 1:
         labels = labels.reshape(1, -1)
@@ -103,14 +109,6 @@ def sweep_setpoints(
     for spec in library:
         p = np.asarray(spec.vector, dtype=float).ravel()
         F_logic = sfxi_math.logic_fidelity(v_obs, p)
-        median_logic = float(np.nanmedian(F_logic)) if F_logic.size else float("nan")
-        top_k_val = float("nan")
-        if F_logic.size:
-            k = min(int(top_k), int(F_logic.size))
-            if k <= 0:
-                raise ValueError("top_k must be >= 1.")
-            top_k_val = float(np.mean(np.sort(F_logic)[-k:]))
-        frac_gt_tau = float(np.mean(F_logic > float(tau))) if F_logic.size else 0.0
 
         scaling = summarize_intensity_scaling(
             y_star,
@@ -121,14 +119,18 @@ def sweep_setpoints(
             eps=eps,
             state_order=order,
         )
+        effect_scaled = np.asarray(scaling.effect_scaled, dtype=float)
+        score = np.power(F_logic, beta_val)
+        if not scaling.intensity_disabled:
+            score = score * np.power(effect_scaled, gamma_val)
         row = {
             "setpoint_name": spec.name,
             "setpoint_source": spec.source,
             "setpoint_vector": p.tolist(),
             "setpoint_label": format_setpoint_label(p),
-            "median_logic_fidelity": median_logic,
-            "top_k_logic_fidelity": top_k_val,
-            "frac_logic_fidelity_gt_tau": frac_gt_tau,
+            "logic_fidelity": float(np.nanmedian(F_logic)) if F_logic.size else float("nan"),
+            "effect_scaled": float(np.nanmedian(effect_scaled)) if effect_scaled.size else float("nan"),
+            "score": float(np.nanmedian(score)) if score.size else float("nan"),
             "denom_used": float(scaling.denom),
             "clip_lo_fraction": float(scaling.clip_lo_fraction),
             "clip_hi_fraction": float(scaling.clip_hi_fraction),

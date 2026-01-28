@@ -20,6 +20,7 @@ import numpy as np
 import polars as pl
 
 from ....objectives import sfxi_math
+from ...sfxi.gates import nearest_gate
 from ..datasets import CampaignInfo
 from ..labels import observed_event_ids
 from ..util import list_series_to_numpy
@@ -61,6 +62,12 @@ class LabelSfxiView:
 class PredSfxiView:
     df: pl.DataFrame
     notice: str | None
+
+
+@dataclass(frozen=True)
+class Nearest2FactorCounts:
+    df: pl.DataFrame
+    note: str | None
 
 
 @dataclass(frozen=True)
@@ -488,3 +495,66 @@ def apply_overlay_label_flags(
     elif sfxi_scored_col not in df_overlay.columns:
         df_overlay = df_overlay.with_columns(pl.lit(False).alias(sfxi_scored_col))
     return df_overlay
+
+
+def build_nearest_2_factor_counts(
+    *,
+    label_events_df: pl.DataFrame | None,
+    pred_events_df: pl.DataFrame | None,
+    y_col: str | None,
+    pred_vec_col: str = "pred_y_hat",
+) -> Nearest2FactorCounts:
+    if y_col is None:
+        return Nearest2FactorCounts(df=pl.DataFrame(), note="Nearest-logic counts unavailable (label vector missing).")
+    if label_events_df is None or label_events_df.is_empty():
+        return Nearest2FactorCounts(df=pl.DataFrame(), note="Nearest-logic counts unavailable (label history missing).")
+    if y_col not in label_events_df.columns:
+        return Nearest2FactorCounts(
+            df=pl.DataFrame(),
+            note=f"Nearest-logic counts unavailable (label history missing `{y_col}`).",
+        )
+    if pred_events_df is None or pred_events_df.is_empty():
+        return Nearest2FactorCounts(
+            df=pl.DataFrame(),
+            note="Nearest-logic counts unavailable (prediction history missing).",
+        )
+    if pred_vec_col not in pred_events_df.columns:
+        return Nearest2FactorCounts(
+            df=pl.DataFrame(),
+            note=f"Nearest-logic counts unavailable (prediction history missing `{pred_vec_col}`).",
+        )
+
+    labels_vec8 = list_series_to_numpy(label_events_df.get_column(y_col), expected_len=8)
+    if labels_vec8 is None:
+        return Nearest2FactorCounts(
+            df=pl.DataFrame(),
+            note="Nearest-logic counts unavailable (invalid label vectors).",
+        )
+    pred_vec8 = list_series_to_numpy(pred_events_df.get_column(pred_vec_col), expected_len=8)
+    if pred_vec8 is None:
+        return Nearest2FactorCounts(
+            df=pl.DataFrame(),
+            note="Nearest-logic counts unavailable (invalid pred_y_hat vectors).",
+        )
+
+    label_classes, _ = nearest_gate(labels_vec8[:, 0:4], state_order=sfxi_math.STATE_ORDER)
+    pred_classes, _ = nearest_gate(pred_vec8[:, 0:4], state_order=sfxi_math.STATE_ORDER)
+    label_unique, label_counts = np.unique(label_classes, return_counts=True)
+    pred_unique, pred_counts = np.unique(pred_classes, return_counts=True)
+    label_map = {str(k): int(v) for k, v in zip(label_unique.tolist(), label_counts.tolist())}
+    pred_map = {str(k): int(v) for k, v in zip(pred_unique.tolist(), pred_counts.tolist())}
+    all_classes = sorted(set(label_map) | set(pred_map))
+    rows = []
+    for cls in all_classes:
+        obs_count = int(label_map.get(cls, 0))
+        pred_count = int(pred_map.get(cls, 0))
+        if obs_count == 0 and pred_count == 0:
+            continue
+        rows.append(
+            {
+                "opal__nearest_2_factor_logic": cls,
+                "observed_count": obs_count,
+                "predicted_count": pred_count,
+            }
+        )
+    return Nearest2FactorCounts(df=pl.DataFrame(rows), note=None)

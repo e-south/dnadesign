@@ -96,16 +96,16 @@ Diagnostics render full datasets; sampling is intentionally disabled for these p
 
 ### B) Setpoint sweep (objective landscape, observed labels only)
 Library = **16 truth tables + current setpoint**. For each setpoint:
-- median `F_logic` on labels‑as‑of
-- **top‑k mean** `F_logic` (k configurable)
-- fraction `F_logic > tau`
-- `denom_used` from current‑round labels
-- clip fractions for `E_scaled` (labels only)
+- median `logic_fidelity` on labels‑as‑of
+- median `effect_scaled` on labels‑as‑of
+- median `score` on labels‑as‑of
+- `denom_used` from current‑round labels (used for intensity scaling diagnostics)
 
-Rendered as a **heatmap**: columns are setpoint vectors, rows are diagnostic metrics.
-Default view omits `denom_used` to preserve contrast; `denom_used` is available as a single‑metric view.
+Rendered as a **heatmap**: columns are setpoint vectors, rows are the three median metrics above.
 The dashboard renders this panel under **Labels (observed events)** and labels the source as
 canonical vs overlay mode.
+Below the heatmap, the dashboard reports **nearest 2‑factor logic counts** for observed vs
+predicted label history (counts by truth‑table class).
 
 ### C) Logic support diagnostics
 Scatter: x=`dist_to_labeled_logic`, y=`score` (or `F_logic`), color=`opal__nearest_2_factor_logic` or other hue.
@@ -185,6 +185,6 @@ under‑scaled intensity.
 - [ ] Factorial effects math (exact expected values)
 - [ ] Nearest gate assignment (truth table self‑match, near‑match)
 - [ ] dist_to_labeled_logic (min L2 distance)
-- [ ] Setpoint sweep denom + clip fractions
+- [ ] Setpoint sweep summary metrics (logic/effect/score medians)
 - [ ] RF uncertainty shape + non‑negativity (score std)
 - [ ] prom60 notebook smoke test still passes

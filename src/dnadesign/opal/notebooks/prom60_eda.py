@@ -55,6 +55,7 @@ def _():
     build_pred_events = dash_labels.build_pred_events
     build_round_options_from_label_hist = dash_labels.build_round_options_from_label_hist
     build_label_sfxi_view = dash_sfxi.build_label_sfxi_view
+    build_nearest_2_factor_counts = dash_sfxi.build_nearest_2_factor_counts
     build_pred_sfxi_view = dash_sfxi.build_pred_sfxi_view
     build_umap_controls = dash_ui.build_umap_controls
     build_diagnostics_panels = dash_diag_guidance.build_diagnostics_panels
@@ -103,6 +104,7 @@ def _():
         build_sfxi_hue_registry,
         build_label_events,
         build_label_sfxi_view,
+        build_nearest_2_factor_counts,
         build_pred_sfxi_view,
         build_mode_view,
         build_pred_events,
@@ -1828,7 +1830,7 @@ def _(build_sfxi_hue_registry, choose_dropdown_value, df_sfxi_scatter, mo, sfxi_
     sfxi_hue_registry = build_sfxi_hue_registry(
         df_sfxi_scatter,
         preferred=default_view_hues(),
-        include_columns=False,
+        include_columns=True,
         denylist={"__row_id", "id", "id_"},
     )
     hue_labels = sfxi_hue_registry.labels()
@@ -1851,16 +1853,13 @@ def _(build_sfxi_hue_registry, choose_dropdown_value, df_sfxi_scatter, mo, sfxi_
 def _(mo):
     support_y_state, set_support_y_state = mo.state(None)
     support_color_state, set_support_color_state = mo.state(None)
-    sweep_metric_state, set_sweep_metric_state = mo.state(None)
     uncertainty_color_state, set_uncertainty_color_state = mo.state(None)
     return (
         set_support_color_state,
         set_support_y_state,
-        set_sweep_metric_state,
         set_uncertainty_color_state,
         support_color_state,
         support_y_state,
-        sweep_metric_state,
         uncertainty_color_state,
     )
 
@@ -1870,7 +1869,6 @@ def _(
     choose_dropdown_value,
     mo,
     support_y_state,
-    sweep_metric_state,
 ):
     support_y_options = ["opal__view__score", "opal__view__logic_fidelity"]
     support_y_default = (
@@ -1883,32 +1881,7 @@ def _(
         label="Support Y-axis",
         full_width=True,
     )
-    sweep_metric_options = [
-        "Observed logic (core)",
-        "Median logic fidelity (labels)",
-        "Top-K logic fidelity (labels)",
-        "Frac logic fidelity > tau (labels)",
-        "Clip high fraction (labels)",
-        "Denom used (labels)",
-    ]
-    sweep_metric_default = (
-        choose_dropdown_value(
-            sweep_metric_options,
-            current=sweep_metric_state(),
-            preferred="Observed logic (core)",
-        )
-        or "Observed logic (core)"
-    )
-    sweep_metric_dropdown = mo.ui.dropdown(
-        options=sweep_metric_options,
-        value=sweep_metric_default,
-        label="Sweep metric",
-        full_width=True,
-    )
-    return (
-        support_y_dropdown,
-        sweep_metric_dropdown,
-    )
+    return (support_y_dropdown,)
 
 
 @app.cell
@@ -1952,15 +1925,12 @@ def _(choose_dropdown_value, hue_registry, mo, support_color_state, uncertainty_
 def _(
     set_support_color_state,
     set_support_y_state,
-    set_sweep_metric_state,
     set_uncertainty_color_state,
     state_value_changed,
     support_color_dropdown,
     support_color_state,
     support_y_dropdown,
     support_y_state,
-    sweep_metric_dropdown,
-    sweep_metric_state,
     uncertainty_color_dropdown,
     uncertainty_color_state,
 ):
@@ -1968,10 +1938,6 @@ def _(
         _next_value = support_y_dropdown.value
         if state_value_changed(support_y_state(), _next_value):
             set_support_y_state(_next_value)
-    if sweep_metric_dropdown is not None:
-        _next_value = sweep_metric_dropdown.value
-        if state_value_changed(sweep_metric_state(), _next_value):
-            set_sweep_metric_state(_next_value)
     if support_color_dropdown is not None:
         _next_value = support_color_dropdown.value
         if state_value_changed(support_color_state(), _next_value):
@@ -2204,6 +2170,8 @@ def _(
     label_src_multiselect,
     mo,
     mode_dropdown,
+    nearest_2_factor_counts_note_md,
+    nearest_2_factor_counts_ui,
     opal_campaign_notice_md,
     opal_label_view_dropdown,
     opal_labels_table_note_md,
@@ -2217,7 +2185,6 @@ def _(
     round_notice_md,
     render_chart_panel,
     sfxi_source_dropdown,
-    sweep_metric_dropdown,
     sweep_mode_md,
     sweep_panel,
     view_notice_md,
@@ -2272,13 +2239,19 @@ def _(
             mo.md("### Setpoint sweep (observed labels)"),
             mo.md(
                 "Heatmap summary of how observed label logic aligns with candidate setpoints. "
-                "Each column is a 4-vector setpoint; rows summarize logic fidelity and intensity scaling "
-                "for observed labels only. Use the metric dropdown to switch views; denom is shown "
-                "as a single-metric view to preserve contrast."
+                "Each column is a 4-vector setpoint; rows report median logic fidelity, median scaled "
+                "effect, and median score over observed labels only."
             ),
             sweep_mode_md,
-            sweep_metric_dropdown,
             sweep_panel_ui,
+            mo.md("**Nearest 2-factor logic counts (observed vs predicted label history)**"),
+            mo.md(
+                "Counts are computed from label history vectors: observed uses the label 8-vector, "
+                "predicted uses stored `pred_y_hat`. Each record is assigned to the nearest 2-factor "
+                "truth-table class in logic space (first four components)."
+            ),
+            nearest_2_factor_counts_note_md,
+            nearest_2_factor_counts_ui,
         ]
     )
     sfxi_panel
@@ -2408,34 +2381,35 @@ def _(
     opal_campaign_info,
     opal_labels_current_df,
     sfxi_params,
-    sweep_metric_dropdown,
 ):
-    sweep_metric_map = {
-        "Observed logic (core)": [
-            "median_logic_fidelity",
-            "top_k_logic_fidelity",
-            "frac_logic_fidelity_gt_tau",
-            "clip_hi_fraction",
-        ],
-        "Median logic fidelity (labels)": ["median_logic_fidelity"],
-        "Top-K logic fidelity (labels)": ["top_k_logic_fidelity"],
-        "Frac logic fidelity > tau (labels)": ["frac_logic_fidelity_gt_tau"],
-        "Clip high fraction (labels)": ["clip_hi_fraction"],
-        "Denom used (labels)": ["denom_used"],
-    }
-    _sweep_choice = sweep_metric_dropdown.value if sweep_metric_dropdown is not None else "Observed logic (core)"
-    sweep_metrics = sweep_metric_map.get(_sweep_choice, sweep_metric_map["Observed logic (core)"])
-
     sweep_panel, intensity_panel = build_sweep_panels(
         df_pred_selected=df_pred_selected,
         opal_campaign_info=opal_campaign_info,
         opal_labels_current_df=opal_labels_current_df,
         sfxi_params=sfxi_params,
-        sweep_metrics=sweep_metrics,
     )
     sweep_mode = "Overlay" if mode_dropdown.value == "Overlay" else "Canonical"
     sweep_mode_md = mo.md(f"Setpoint sweep source: **{sweep_mode}** (observed labels only).")
     return intensity_panel, sweep_panel, sweep_mode_md
+
+
+@app.cell
+def _(build_nearest_2_factor_counts, mo, opal_label_events_df, opal_pred_events_df, readiness):
+    y_col = readiness.y_col if readiness is not None else None
+    counts = build_nearest_2_factor_counts(
+        label_events_df=opal_label_events_df,
+        pred_events_df=opal_pred_events_df,
+        y_col=y_col,
+    )
+    nearest_2_factor_counts_note_md = mo.md("")
+    nearest_2_factor_counts_ui = mo.md("")
+    if counts.note:
+        nearest_2_factor_counts_note_md = mo.md(counts.note)
+    elif counts.df.is_empty():
+        nearest_2_factor_counts_note_md = mo.md("Nearest-logic counts unavailable.")
+    else:
+        nearest_2_factor_counts_ui = mo.ui.table(counts.df, page_size=min(16, counts.df.height))
+    return nearest_2_factor_counts_note_md, nearest_2_factor_counts_ui
 
 
 @app.cell

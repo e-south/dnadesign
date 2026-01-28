@@ -79,11 +79,13 @@ def test_setpoint_sweep_heatmap_smoke() -> None:
         {
             "setpoint_name": ["0001", "1111"],
             "setpoint_label": ["[0, 0, 0, 1]", "[1, 1, 1, 1]"],
-            "median_logic_fidelity": [0.5, 0.9],
+            "logic_fidelity": [0.5, 0.9],
+            "effect_scaled": [0.2, 0.8],
+            "score": [0.1, 0.7],
         }
     )
     fig = sfxi_setpoint_sweep.make_setpoint_sweep_figure(
         df,
-        metrics=["median_logic_fidelity"],
+        metrics=["logic_fidelity", "effect_scaled", "score"],
     )
     assert fig is not None

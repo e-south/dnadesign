@@ -319,8 +319,8 @@ def _build_sweep_data(
         min_n=int(sfxi_params.min_n),
         eps=float(sfxi_params.eps),
         delta=float(sfxi_params.delta),
-        top_k=5,
-        tau=0.8,
+        beta=float(sfxi_params.beta),
+        gamma=float(sfxi_params.gamma),
         pool_vec8=None,
         state_order=sfxi_math.STATE_ORDER,
     )
@@ -358,7 +358,6 @@ def build_sweep_panels(
     opal_campaign_info: CampaignInfo | None,
     opal_labels_current_df: pl.DataFrame | None,
     sfxi_params: SFXIParams,
-    sweep_metrics: Sequence[str],
 ) -> tuple[ChartPanel, ChartPanel]:
     try:
         sweep_data = _build_sweep_data(
@@ -374,7 +373,7 @@ def build_sweep_panels(
         try:
             fig = make_setpoint_sweep_figure(
                 sweep_data.sweep_df,
-                metrics=list(sweep_metrics),
+                metrics=["logic_fidelity", "effect_scaled", "score"],
                 subtitle=f"labels={sweep_data.label_effect_raw.shape[0]} · {sweep_data.subtitle}",
             )
         except Exception as exc:

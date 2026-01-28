@@ -23,7 +23,13 @@ from ..objectives import sfxi_math
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
 from ._param_utils import get_bool, get_float, get_int, get_str
-from .sfxi_diag_data import labels_current_round, parse_setpoint_from_runs, resolve_run_id, resolve_single_round
+from .sfxi_diag_data import (
+    labels_current_round,
+    parse_exponents_from_runs,
+    parse_setpoint_from_runs,
+    resolve_run_id,
+    resolve_single_round,
+)
 
 
 @register_plot(
@@ -67,6 +73,7 @@ def render(context, params: dict) -> None:
         raise OpalError("Invalid label vectors (expected length-8 values).", ExitCodes.CONTRACT_VIOLATION)
 
     setpoint = parse_setpoint_from_runs(runs_df.filter(pl.col("as_of_round") == int(round_k)))
+    beta, gamma = parse_exponents_from_runs(runs_df.filter(pl.col("as_of_round") == int(round_k)))
 
     pool_vec = None
     if include_pool:
@@ -88,8 +95,8 @@ def render(context, params: dict) -> None:
         min_n=min_n,
         eps=eps,
         delta=delta,
-        top_k=1,
-        tau=0.5,
+        beta=beta,
+        gamma=gamma,
         pool_vec8=pool_vec,
         state_order=STATE_ORDER,
     )
