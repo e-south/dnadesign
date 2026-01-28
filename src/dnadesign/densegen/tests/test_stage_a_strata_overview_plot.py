@@ -12,9 +12,11 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import matplotlib
+import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.offsetbox import AnchoredText
 
-from dnadesign.densegen.src.viz.plotting import _build_stage_a_strata_overview_figure
+from dnadesign.densegen.src.viz.plotting import _build_stage_a_strata_overview_figure, _draw_tier_markers
 
 
 def test_stage_a_strata_overview_axes_and_legend() -> None:
@@ -64,15 +66,15 @@ def test_stage_a_strata_overview_axes_and_legend() -> None:
         left_xlim = ax_left.get_xlim()
         assert left_xlim[0] < left_xlim[1]
         assert "score" in ax_left.get_xlabel().lower()
-        left_labels = [label.get_text() for label in ax_left.get_yticklabels() if label.get_text()]
-        assert "regA" in left_labels
-        assert "regB" in left_labels
+        label_texts = []
+        for axis in fig.axes:
+            for text in axis.texts:
+                label_texts.append(text.get_text())
+        assert any("regA" in text for text in label_texts)
+        assert any("regB" in text for text in label_texts)
         assert ax_right.get_xlim()[1] > ax_right.get_xlim()[0]
-        assert fig.legends
-        assert ax_left.get_legend() is None
-        assert len(ax_right.collections) > 0
-        max_points = max(len(line.get_xdata()) for line in ax_right.lines)
-        assert max_points > 100
+        assert len(fig.axes) == 4
+        assert len(ax_right.patches) > 0
     finally:
         fig.clf()
 
@@ -154,5 +156,27 @@ def test_stage_a_strata_overview_length_axis_expands_for_long_tfbs() -> None:
 
     try:
         assert ax_right.get_xlim()[1] >= len(long_tfbs)
+    finally:
+        fig.clf()
+
+
+def test_draw_tier_markers_caps_height_and_adds_box() -> None:
+    matplotlib.use("Agg", force=True)
+    fig, ax = plt.subplots()
+    ax.set_ylim(0.0, 1.0)
+
+    _draw_tier_markers(
+        ax,
+        [("0.1%", 1.0, "5"), ("1%", 0.5, "12")],
+        ymax_fraction=0.58,
+        label_mode="box",
+    )
+
+    try:
+        assert ax.lines
+        for line in ax.lines:
+            ydata = line.get_ydata()
+            assert max(ydata) <= 0.58 + 1e-6
+        assert any(isinstance(artist, AnchoredText) for artist in ax.artists)
     finally:
         fig.clf()
