@@ -32,12 +32,11 @@ import seaborn as sns
 from matplotlib.colors import to_rgba
 from matplotlib.patches import Patch
 from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
 
 from ..adapters.outputs import load_records_from_config
 from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
 from ..core.artifacts.pool import POOL_MODE_TFBS, TFBSPoolArtifact, load_pool_artifact
+from ..utils.rich_style import make_panel, make_table
 from .plot_registry import PLOT_SPECS
 
 # Embed TrueType fonts for clean text in vector exports
@@ -1433,12 +1432,12 @@ def run_plots_from_config(
 
     out_label = _format_plot_path(out_dir, run_root, absolute)
     _console.print(
-        Panel.fit(
-            f"DenseGen plotting • source: {src_label} • rows: {row_count:,}\nOutput: {out_label}",
-            border_style="blue",
+        make_panel(
+            f"source: {src_label} • rows: {row_count:,}\nOutput: {out_label}",
+            title="DenseGen plotting",
         )
     )
-    summary = Table("plot", "saved to", "status")
+    summary = make_table("plot", "saved to", "status")
     errors: list[tuple[str, Exception]] = []
     manifest_entries: list[dict] = []
 

@@ -16,11 +16,11 @@ import math
 from collections import Counter
 
 import numpy as np
-from rich import box
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
-from rich.table import Table
+
+from ..utils.rich_style import make_panel, make_table
 
 
 def _summarize_tf_counts(labels: list[str], max_items: int = 6) -> str:
@@ -291,7 +291,7 @@ def _build_screen_dashboard(
     show_solutions: bool,
     sequence_preview: str | None,
 ) -> Panel:
-    table = Table(show_header=False, box=box.SIMPLE, expand=True)
+    table = make_table(show_header=False, expand=True)
     header = f"{source_label}/{plan_name}"
     table.add_row("run", header)
     table.add_row("progress", f"{bar} {generated}/{quota} ({pct:.2f}%)")
@@ -311,7 +311,7 @@ def _build_screen_dashboard(
     table.add_row("diversity", diversity_label)
     if show_solutions and sequence_preview:
         table.add_row("sequence", sequence_preview)
-    return Panel(table, title="DenseGen progress")
+    return make_panel(table, title="DenseGen progress")
 
 
 def _diversity_snapshot(

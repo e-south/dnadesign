@@ -20,6 +20,9 @@ import threading
 from pathlib import Path
 from typing import Iterable, Optional, TextIO
 
+from rich.console import Console
+from rich.logging import RichHandler
+
 _NATIVE_STDERR_PATTERNS: list[tuple[str, re.Pattern, str | None]] = []
 _NATIVE_STDERR_LOCK = threading.Lock()
 _FIMO_STDOUT_SUPPRESS_RE = re.compile(r"^\s*FIMO (mining|yield)\b")
@@ -108,6 +111,18 @@ class ProgressAwareStreamHandler(logging.StreamHandler):
             if getattr(self.stream, "closed", False):
                 return
             raise
+
+
+class ProgressAwareRichHandler(RichHandler):
+    def emit(self, record: logging.LogRecord) -> None:
+        if getattr(record, "suppress_stdout", False):
+            return
+        message = record.getMessage()
+        if _FIMO_STDOUT_SUPPRESS_RE.search(message):
+            return
+        stream = self.console.file if self.console is not None else sys.stdout
+        _maybe_clear_progress_line(stream)
+        super().emit(record)
 
 
 def _register_native_stderr_patterns(patterns: Iterable[tuple[str, str | None]]) -> None:
@@ -252,9 +267,16 @@ def setup_logging(
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    sh = ProgressAwareStreamHandler(stream=sys.stdout)
+    console = Console(file=sys.stdout)
+    sh = ProgressAwareRichHandler(
+        console=console,
+        show_time=True,
+        show_level=True,
+        show_path=False,
+        markup=False,
+        log_time_format="%Y-%m-%d %H:%M:%S",
+    )
     sh.setLevel(lvl)
-    sh.setFormatter(fmt)
     sh.addFilter(FimoMiningBatchLogFilter())
     root.addHandler(sh)
 

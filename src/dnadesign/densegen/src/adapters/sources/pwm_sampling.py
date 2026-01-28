@@ -26,6 +26,7 @@ from ...core.artifacts.ids import hash_candidate_id
 from ...core.score_tiers import score_tier_counts
 from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from ...utils import logging_utils
+from ...utils.rich_style import make_panel, make_table
 
 SMOOTHING_ALPHA = 1e-6
 SCORE_HIST_BINS = 60
@@ -203,11 +204,7 @@ class _PwmSamplingProgress:
         batch_total: Optional[int],
         elapsed: float,
     ):
-        from rich import box
-        from rich.panel import Panel
-        from rich.table import Table
-
-        table = Table(show_header=True, box=box.SIMPLE, pad_edge=False)
+        table = make_table(show_header=True, pad_edge=False)
         table.add_column("motif")
         table.add_column("generated")
         table.add_column("eligible")
@@ -243,7 +240,7 @@ class _PwmSamplingProgress:
             elapsed_label,
             rate_label,
         )
-        return Panel(table, title="Stage-A mining", border_style="cyan")
+        return make_panel(table, title="Stage-A mining")
 
 
 def _safe_label(text: str) -> str:

@@ -93,6 +93,7 @@ from .integrations.meme_suite import require_executable
 from .utils import logging_utils
 from .utils.logging_utils import install_native_stderr_filters, setup_logging
 from .utils.mpl_utils import ensure_mpl_cache_dir
+from .utils.rich_style import make_table
 
 rich_traceback(show_locals=False)
 console = Console()
@@ -436,7 +437,7 @@ def _print_inputs_summary(
     run_root = _run_root_for(loaded)
     statuses = pool_status_by_input(cfg, loaded.path, run_root)
 
-    table = Table("input", "kind", "motifs", "source", "stage-a pool")
+    table = make_table("input", "kind", "motifs", "source", "stage-a pool")
     for inp in cfg.inputs:
         input_type = str(inp.type)
         kind = _input_kind_label(input_type)
@@ -917,7 +918,7 @@ def _list_workspaces_table(
     if limit and limit > 0:
         workspace_dirs = workspace_dirs[: int(limit)]
 
-    table = Table("workspace", "id", "config", "parquet", "plots", "logs", "status")
+    table = make_table("workspace", "id", "config", "parquet", "plots", "logs", "status")
     for run_dir in workspace_dirs:
         cfg_path = run_dir / "config.yaml"
         if not show_all and not cfg_path.exists():
@@ -1055,7 +1056,7 @@ def validate_config(
 def ls_plots():
     from .viz.plot_registry import PLOT_SPECS
 
-    table = Table("plot", "description")
+    table = make_table("plot", "description")
     for name, meta in PLOT_SPECS.items():
         table.add_row(name, meta["description"])
     console.print(table)
@@ -1247,7 +1248,7 @@ def inspect_run(
                 f"[bold]Run:[/] {state.run_id}  [bold]Root:[/] {root_label}  "
                 f"[bold]Schema:[/] {state.schema_version}  [bold]Config:[/] {state.config_sha256[:8]}…"
             )
-            table = Table("input", "plan", "generated")
+            table = make_table("input", "plan", "generated")
             for item in state.items:
                 table.add_row(item.input_name, item.plan_name, str(item.generated))
             console.print(table)
@@ -1277,7 +1278,7 @@ def inspect_run(
         f"[bold]Schema:[/] {schema_label}  [bold]dense-arrays:[/] {dense_arrays_label}"
     )
     if verbose:
-        table = Table(
+        table = make_table(
             "input",
             "plan",
             "generated",
@@ -1293,7 +1294,7 @@ def inspect_run(
             "stalls",
         )
     else:
-        table = Table("input", "plan", "generated", "duplicates", "failed", "resamples", "libraries", "stalls")
+        table = make_table("input", "plan", "generated", "duplicates", "failed", "resamples", "libraries", "stalls")
     for item in manifest.items:
         if verbose:
             table.add_row(
@@ -1340,7 +1341,7 @@ def inspect_run(
                     prev = last_seen.get(name)
                     if prev is None or created > prev:
                         last_seen[name] = created
-            events_table = Table("event", "count", "last_created_at")
+            events_table = make_table("event", "count", "last_created_at")
             for name, count in sorted(counts.items(), key=lambda kv: kv[1], reverse=True):
                 events_table.add_row(name, str(count), last_seen.get(name, "-"))
             console.print(events_table)
@@ -1400,7 +1401,7 @@ def inspect_run(
                 axis=1,
             )
             agg_tf = agg_tf.sort_values(["used_placements", "offered_instances"], ascending=False)
-            tf_table = Table("tf", "offered", "used", "util_any", "util_per_offered")
+            tf_table = make_table("tf", "offered", "used", "util_any", "util_per_offered")
             for _, row in agg_tf.iterrows():
                 tf_table.add_row(
                     _display_tf_label(str(row.get("tf") or "-")),
@@ -1425,7 +1426,7 @@ def inspect_run(
             )
             agg_tfbs = agg_tfbs.sort_values(["used_placements", "offered_instances"], ascending=False)
             if show_tfbs:
-                tfbs_table = Table("tf", "tfbs", "offered", "used")
+                tfbs_table = make_table("tf", "tfbs", "offered", "used")
                 for _, row in agg_tfbs.iterrows():
                     tfbs_table.add_row(
                         _display_tf_label(str(row.get("tf") or "-")),
@@ -1448,7 +1449,7 @@ def inspect_run(
                     min_used = f"{float(used_vals.min()):.0f}"
                     med_used = f"{float(used_vals.median()):.0f}"
                     max_used = f"{float(used_vals.max()):.0f}"
-                summary_table = Table(
+                summary_table = make_table(
                     "unique_offered",
                     "unique_used",
                     "usage_rate",
@@ -1577,7 +1578,7 @@ def inspect_plan(
     )
     _warn_full_pool_strategy(loaded)
     pl = resolve_plan(loaded)
-    table = Table("name", "quota", "has promoter_constraints")
+    table = make_table("name", "quota", "has promoter_constraints")
     for item in pl:
         pcs = item.fixed_elements.promoter_constraints
         table.add_row(item.name, str(item.quota), "yes" if pcs else "no")
@@ -1618,7 +1619,7 @@ def inspect_config(
         console.print(f"[bold]Effective config[/]: {_display_path(effective_path, run_root, absolute=absolute)}")
     console.print("See `dense inspect inputs` for resolved input sources.")
 
-    plan_table = Table(
+    plan_table = make_table(
         "name",
         "quota/fraction",
         "promoter_constraints",
@@ -1669,7 +1670,7 @@ def inspect_config(
 
     pwm_inputs = [inp for inp in cfg.inputs if str(getattr(inp, "type", "")).startswith("pwm_")]
     if pwm_inputs:
-        stage_a_table = Table("input", "n_sites", "budget", "mining", "length", "uniqueness", "selection")
+        stage_a_table = make_table("input", "n_sites", "budget", "mining", "length", "uniqueness", "selection")
         for inp in pwm_inputs:
             sampling = getattr(inp, "sampling", None)
             if sampling is None:
@@ -1725,7 +1726,7 @@ def inspect_config(
         console.print(stage_a_table)
         console.print("Legend: eligibility = best_hit_score > 0.")
 
-    outputs = Table("target", "path")
+    outputs = make_table("target", "path")
     for target in cfg.output.targets:
         if target == "parquet":
             parquet_path = resolve_outputs_scoped_path(
@@ -1746,7 +1747,7 @@ def inspect_config(
             outputs.add_row(target, "-")
     console.print(outputs)
 
-    solver = Table("backend", "strategy", "time_limit_s", "threads", "strands")
+    solver = make_table("backend", "strategy", "time_limit_s", "threads", "strands")
     backend_display = str(cfg.solver.backend) if cfg.solver.backend is not None else "-"
     time_limit = "-" if cfg.solver.time_limit_seconds is None else str(cfg.solver.time_limit_seconds)
     threads = "-" if cfg.solver.threads is None else str(cfg.solver.threads)
@@ -1754,7 +1755,7 @@ def inspect_config(
     console.print(solver)
 
     sampling = cfg.generation.sampling
-    sampling_table = Table("setting", "value")
+    sampling_table = make_table("setting", "value")
     target_length = cfg.generation.sequence_length + int(sampling.subsample_over_length_budget_by)
     sampling_table.add_row("pool_strategy", str(sampling.pool_strategy))
     sampling_table.add_row("library_source", str(sampling.library_source))
@@ -1797,7 +1798,7 @@ def inspect_config(
     console.print(f"[bold]Pad[/]: mode={pad.mode} end={pad.end} gc={gc_label} max_tries={pad.max_tries}")
     log_dir = resolve_outputs_scoped_path(loaded.path, run_root, cfg.logging.log_dir, label="logging.log_dir")
     log_dir_label = _display_path(log_dir, run_root, absolute=absolute)
-    log_table = Table("setting", "value")
+    log_table = make_table("setting", "value")
     log_table.add_row("dir", log_dir_label)
     log_table.add_row("level", str(cfg.logging.level))
     log_table.add_row("progress_style", str(cfg.logging.progress_style))
@@ -1957,7 +1958,7 @@ def stage_a_build_pool(
         show_motif_ids=show_motif_ids,
     )
     if plan_rows:
-        plan_table = Table()
+        plan_table = make_table()
         plan_table.add_column("input", overflow="fold")
         plan_table.add_column("TF", overflow="fold")
         plan_table.add_column("retain")
@@ -2029,7 +2030,7 @@ def stage_a_build_pool(
         for row in recap_rows:
             grouped.setdefault(str(row["input_name"]), []).append(row)
         for input_name in sorted(grouped):
-            recap_table = Table()
+            recap_table = make_table()
             recap_table.add_column("TF", overflow="fold")
             recap_table.add_column("generated")
             recap_table.add_column("eligible")
@@ -2065,7 +2066,7 @@ def stage_a_build_pool(
                 or row.get("tier2_score") is not None
             ]
             if tier_rows:
-                boundary_table = Table("TF", "tier0.1% score", "tier1% score", "tier9% score")
+                boundary_table = make_table("TF", "tier0.1% score", "tier1% score", "tier9% score")
                 for row in sorted(tier_rows, key=lambda item: str(item["regulator"])):
                     reg_label = str(row["regulator"])
                     if not show_motif_ids:
@@ -2389,7 +2390,7 @@ def stage_b_build_libraries(
             return uniq[0]
         return "mixed"
 
-    summary_table = Table(
+    summary_table = make_table(
         "input",
         "plan",
         "libraries",
