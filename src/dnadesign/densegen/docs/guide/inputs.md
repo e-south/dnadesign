@@ -67,10 +67,10 @@ Strict validation behavior:
 - Unknown keys are errors (extra fields are rejected).
 - `consensus` requires `n_sites: 1`.
 
-FIMO score-based behavior:
-- Eligibility is `best_hit_score > 0` and requires at least one FIMO hit.
-- Tiering is 0.1% / 1% / 9% / rest by score rank; retention is top‑`n_sites` by score (tie‑break by sequence).
-- FIMO runs with `--thresh 1.0` so score‑based eligibility is applied consistently.
+Algorithm note:
+Stage-A PWM mining and retention (FIMO score semantics, tier targeting math, MMR diversity, and core dedupe)
+are documented in the canonical sampling guide:
+- [Sampling (Stage-A + Stage-B)](sampling.md#stage-a-sampling)
 
 Minimal Stage‑A PWM example (score‑based FIMO):
 

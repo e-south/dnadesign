@@ -134,6 +134,16 @@ Core diagnostics plots (canonical set):
 
 ---
 
+#### `placement_map` overlays fixed elements
+
+`placement_map` visualizes 1-nt occupancy across binding-site types (regulators and fixed elements).
+
+When your plan includes `fixed_elements.promoter_constraints`, `placement_map` renders the promoter
+as fixed-element bands overlaid alongside TFBS usage so you can see how fixed constraints
+consume positional budget relative to sampled regulator sites.
+
+---
+
 ### Stage helper outputs (optional)
 
 DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solver:

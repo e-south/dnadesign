@@ -90,6 +90,9 @@ DenseGen fails fast if the solver cannot apply requested time limits or thread c
 
 ### Stage‑B sampling controls
 
+For the conceptual Stage‑B narrative (libraries, coverage, uniqueness, resampling), see:
+- [Sampling (Stage‑B)](sampling.md#stage-b-sampling)
+
 Stage‑B reminder: Stage‑A sampling lives under `densegen.inputs[].sampling` and produces TFBS pools. Stage‑B sampling below selects solver libraries from those pools (or from library artifacts) and is the only place resampling happens. Stage‑B outcomes are recorded in `outputs/libraries/*`, `outputs/tables/attempts.parquet`, and `outputs/meta/run_manifest.json`.
 
 Per‑field guide (what it does → when to use → failure modes → artifacts impacted):

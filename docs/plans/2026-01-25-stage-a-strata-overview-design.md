@@ -3,6 +3,9 @@
 Date: 2026-01-25
 Status: accepted
 
+Note: This plan is historical and includes legacy p-value-based semantics. The current
+Stage-A behavior is score-only and documented in src/dnadesign/densegen/docs/guide/sampling.md.
+
 ## Context
 Stage-A PWM sampling (FIMO backend) already records per-regulator p-value strata and retention, but the CLI output and plots are hard to interpret. Users need immediate, low-noise feedback on the configured strata/retain depth before sampling begins, and a canonical visualization that shows eligible-vs-retained behavior without relying on debug logs. Existing plots (`stage_a_pvalue_strat_hist`, `stage_a_length_hist`) are partial, redundant, and not aligned with the desired narrative.
 

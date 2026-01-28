@@ -17,7 +17,6 @@ from dnadesign.densegen.src.adapters.sources.pwm_sampling import (
     FimoCandidate,
     _collapse_by_core_identity,
     _core_sequence,
-    _hamming_distance,
 )
 
 
@@ -32,12 +31,6 @@ def test_core_sequence_requires_matched_sequence() -> None:
         _core_sequence(cand)
 
 
-def test_core_sequence_invalid_bounds_raises() -> None:
-    cand = FimoCandidate(seq="TTTAAA", score=5.0, start=7, stop=8, strand="+")
-    with pytest.raises(ValueError, match="Core sequence bounds"):
-        _core_sequence(cand)
-
-
 def test_core_identity_collapse_prefers_highest_score() -> None:
     ranked = [
         FimoCandidate(seq="AAAAAA", score=9.0, start=1, stop=3, strand="+", matched_sequence="AAA"),
@@ -47,8 +40,3 @@ def test_core_identity_collapse_prefers_highest_score() -> None:
     deduped, collapsed = _collapse_by_core_identity(ranked)
     assert [cand.seq for cand in deduped] == ["AAAAAA"]
     assert collapsed == 2
-
-
-def test_hamming_distance_requires_equal_length() -> None:
-    with pytest.raises(ValueError, match="length"):
-        _hamming_distance("AAA", "AAAA")

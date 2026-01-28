@@ -1,36 +1,47 @@
 ## DenseGen demo
 
-This walkthrough uses the packaged demo workspace. The staged workspace contains **DenseGen PWM artifacts** in `inputs/motif_artifacts/` (lexA + cpxR), and Stage‑A sampling uses those JSON files directly.
+This walkthrough runs DenseGen end‑to‑end in a packaged workspace. The workspace already includes two **DenseGen PWM artifact** JSONs (LexA + CpxR) under `inputs/motif_artifacts/`, so you can run Stage‑A immediately without building inputs elsewhere.
+
+What you will do:
+
+- **Stage‑A**: mine and score TFBS per motif → write a cached TFBS pool under `outputs/pools/`.
+- **Stage‑B**: sample small libraries from those pools → offer each library to the solver.
+- **Solver**: assemble 60‑bp sequences (with fixed promoter constraints) and write Parquet outputs.
+- **Inspect + plot + report**: verify what happened using canonical artifacts.
+
+If you want deeper detail on the sampling semantics while reading the demo, jump to:
+- [Stage‑A sampling (PWM mining → TFBS pools)](../guide/sampling.md#stage-a-sampling)
+- [Stage‑B sampling (TFBS pools → solver libraries)](../guide/sampling.md#stage-b-sampling)
 
 ### Contents
-0. [Prereqs](#0-prereqs) - sync deps and ensure solver tools.
-1. [Stage a workspace](#1-stage-a-workspace) - scaffold a self‑contained workspace.
-2. [Validate config](#2-validate-config) - schema + solver probe.
-3. [Inspect inputs](#3-inspect-inputs) - Stage‑A inputs + sampling summary.
-3b. [(Optional) Build inputs via Cruncher (external workspace)](#3b-optional-build-inputs-via-cruncher-external-workspace)
-4. [Inspect config](#4-inspect-config) - resolved outputs + Stage‑A/Stage‑B settings.
-5. [Stage‑A build‑pool](#5-stage-a-build-pool) - materialize TFBS pools.
-6. [Stage‑B build‑libraries](#6-stage-b-build-libraries) - materialize solver libraries.
-7. [Run generation](#7-run-generation) - execute Stage‑B sampling + optimization.
-8. [Inspect run summary](#8-inspect-run-summary) - library + events.
-9. [List plots](#9-list-plots) - available plot names.
-10. [Plot](#10-plot) - render plots.
-11. [Report](#11-report) - write audit report.
-12. [Reset the demo](#12-reset-the-demo) - wipe outputs for a clean rerun.
+0. [Prereqs](#0-prereqs) — sync deps and ensure solver + MEME tools.
+1. [Enter the demo workspace](#1-enter-the-demo-workspace) — run from the workspace so paths resolve.
+2. [Validate the config](#2-validate-the-config) — schema + solver probe (fail fast).
+3. [Inspect inputs](#3-inspect-inputs) — confirm Stage‑A sources and knobs.
+3b. [(Optional) Refresh inputs via Cruncher](#3b-optional-refresh-inputs-via-cruncher-external-workspace)
+4. [Inspect config](#4-inspect-config) — quick read of Stage‑A/Stage‑B + fixed elements.
+5. [Stage‑A build‑pool](#5-stage-a-build-pool) — materialize TFBS pools (cached).
+6. [Stage‑B build‑libraries](#6-stage-b-build-libraries) — preview solver libraries (optional but useful).
+7. [Run generation](#7-run-generation) — Stage‑B sampling + optimization + outputs.
+8. [Inspect run summary](#8-inspect-run-summary) — library utilization + events.
+9. [List plots](#9-list-plots) — discover plot names.
+10. [Plot](#10-plot) — render canonical diagnostics plots.
+11. [Report](#11-report) — write an audit summary (optionally linking plots).
+12. [Reset the demo](#12-reset-the-demo) — wipe outputs for a clean rerun.
 
 ---
 
 ### 0. Prereqs
 
-If you have not synced dependencies yet:
+Install Python deps:
 
 ```bash
 uv sync --locked
 ```
 
-Stage‑A FIMO sampling requires MEME Suite (`fimo` on PATH).
+Stage‑A PWM sampling uses **MEME Suite FIMO**, so `fimo` must be available on PATH.
 
-Here we use pixi, install the environment and smoke test that MEME + DenseGen are reachable:
+This demo assumes `pixi` for a reproducible environment:
 
 ```bash
 pixi install
@@ -38,19 +49,19 @@ pixi run fimo --version
 pixi run dense --help
 ```
 
-Optional convenience alias for MEME tools when using pixi:
+Optional convenience alias (lets DenseGen find `fimo` reliably under pixi):
 
 ```bash
 alias fimo="pixi run fimo"
 ```
 
-If you are running from source without pixi, ensure MEME Suite is on PATH:
+If you are not using pixi, confirm MEME is visible:
 
 ```bash
 fimo --version
 ```
 
-When running commands without aliases, prefix DenseGen commands with `uv run`:
+If you run DenseGen from source without a `dense` wrapper, prefix with `uv run`:
 
 ```bash
 uv run dense --help
@@ -58,22 +69,21 @@ uv run dense --help
 
 ---
 
-### 1. Stage a workspace
+### 1. Enter the demo workspace
 
-Navigate to the demo workspace and run commands from its directory so relative paths resolve correctly.
+Run commands from the demo workspace directory so relative paths in `config.yaml` resolve correctly.
 
 ```bash
 cd src/dnadesign/densegen/workspaces/demo_meme_two_tf
 ```
 
-If you use pixi tasks for DenseGen, define an alias that pins the config path in this workspace
-(pixi tasks run from the repo root, so relative `-c` paths will not resolve):
+If you use pixi to run DenseGen, pin the config path via an alias. (This matters because pixi tasks run from the repo root, not from the workspace.)
 
 ```bash
 alias dense="pixi run dense -c $PWD/config.yaml"
 ```
 
-If outputs already exist and you want a clean run, reset them now:
+If this workspace has existing outputs and you want a clean start:
 
 ```bash
 dense campaign-reset
@@ -81,48 +91,60 @@ dense campaign-reset
 
 ---
 
-### 2. Validate config
+### 2. Validate the config
 
-Fail fast on schema issues and confirm solver availability.
+Fail fast on schema issues and confirm the solver backend is available.
 
 ```bash
 dense validate-config --probe-solver
 ```
 
+If this fails, fix it before moving on—everything else depends on a valid config and a working solver.
+
 ---
 
 ### 3. Inspect inputs
 
-Confirm Stage‑A inputs and sampling settings.
+Confirm what Stage‑A will read and how it will sample.
 
 ```bash
 dense inspect inputs
 ```
 
-The demo uses DenseGen PWM artifacts in `inputs/motif_artifacts/` (`lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json`, `cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json`).
+You should see a PWM input pointing at the packaged artifacts under `inputs/motif_artifacts/`, for example:
+
+* `lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json`
+* `cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json`
+
+At this point you’ve verified: inputs resolve, paths exist, and Stage‑A sampling is configured.
 
 ---
 
-### 3b. (Optional) Build inputs via Cruncher (external workspace)
+### 3b. (Optional) Refresh inputs via Cruncher (external workspace)
 
-Refresh the demo motifs by exporting **DenseGen PWM artifacts** from Cruncher, then copy them into this DenseGen workspace. This is optional as the demo already ships with artifacts.
+The demo ships with PWM artifacts, so you can skip this. Do this only if you want to regenerate the LexA/CpxR artifacts from Cruncher.
 
-Follow the Cruncher demo (see `cruncher/docs/demos/demo_basics_two_tf.md`) in its own workspace. From the Cruncher workspace directory, export DenseGen artifacts into the target DenseGen workspace name or path.
+In a Cruncher workspace (follow `cruncher/docs/demos/demo_basics_two_tf.md`), export DenseGen artifacts directly into this DenseGen workspace:
 
 ```bash
 cd <cruncher_workspace>
 cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_two_tf
 ```
 
-Tip: `--densegen-workspace` accepts a workspace name (resolved under `src/dnadesign/densegen/workspaces`) or an absolute path. Cruncher fails fast if it cannot find `config.yaml` + `inputs/`.
+Tip: `--densegen-workspace` accepts either:
 
-If you also want to drive Stage‑A from binding sites instead of PWM sampling, export them too:
+* a workspace name (resolved under `src/dnadesign/densegen/workspaces`), or
+* an absolute path.
+
+Cruncher fails fast if it can’t find `config.yaml` and `inputs/` in the target workspace.
+
+If you also want to drive Stage‑A from explicit binding sites (instead of PWM mining), export them too:
 
 ```bash
 cruncher catalog export-sites --set 1 --densegen-workspace demo_meme_two_tf
 ```
 
-Then update `config.yaml` inputs to point at the exported binding sites (optional), for example:
+Then point a DenseGen input at the exported table (optional):
 
 ```yaml
 inputs:
@@ -131,19 +153,40 @@ inputs:
     path: inputs/densegen_sites.parquet
 ```
 
-The DenseGen workspace stays config‑centric (one runtime config); Cruncher keeps its own workspace + config.
-
 ---
 
-### 4. Inspect the config
+### 4. Inspect config
 
-Review the resolved outputs, Stage‑A sampling settings, fixed elements, and Stage‑B sampling policy.
+`dense inspect config` is your “what will happen” checkpoint: resolved outputs, Stage‑A sampling knobs, Stage‑B sampling policy, and fixed elements.
 
-Stage‑A sampling: the pipeline mines binding sites per TF from the MEME‑derived PWM artifacts using FIMO log‑odds (`best_hit_score > 0`, top‑`n_sites` by score). The motif JSONs specify widths (LexA 15 bp, CpxR 11 bp), and `length.policy: range` with `length.range: [15, 20]` chooses a target length and pads flanks to it. The demo uses `uniqueness.key: core` so near‑duplicate flank variants collapse to a single core and `selection.policy: mmr` (alpha 0.9) to bias toward diversity while staying score‑first. Diagnostic tiers are 0.1% / 1% / 9% / rest by score rank. The mining budget targets the 0.1% tier via `mining.budget.mode: tier_target`; if the target isn’t met, the CLI warns and the pool manifest records the shortfall. Increase `mining.budget.max_candidates`, relax `target_tier_fraction`, or reduce `n_sites` to satisfy the tier target.
+DenseGen sampling is staged:
 
-Stage‑B sampling: the Stage‑A pool is subsampled into candidate libraries (`pool_strategy: subsample`, `library_size: 20`) with coverage weighting so each library contains the specified TFs (`cover_all_regulators: true`). The demo keeps libraries core‑unique (`unique_binding_cores: true`) to avoid near‑duplicate flank variants. Each library is offered to the solver, which assembles 60‑bp sequences by selecting a subset; new libraries are sampled as needed.
+* **Stage‑A** materializes per‑TF pools from the PWM artifacts in `inputs/motif_artifacts/`.
+* **Stage‑B** repeatedly samples **small solver libraries** from those pools during generation.
 
-Fixed promoter: this demo fixes a strong σ70 promoter pair (`TTGACA`/`TATAAT`) with a 15–19 bp spacer; the `placement_map` plot overlays these fixed sites as binding‑site types (`-35`/`-10`). To keep the 60‑bp sequence length feasible alongside ~11–15 bp TFBS, the plan sets `min_required_regulators: 1` while listing both motif IDs (`lexA_CTGTATAWAWWHACA`, `cpxR_MANWWHTTTAM`), so each sequence includes at least one of them. Use the Stage‑A plan output (`dense stage-a build-pool`) or pool manifest to confirm the regulator labels if you customize inputs.
+If you want the full semantics behind these terms (eligibility, tier targeting math, MMR diversity, coverage weighting), see:
+
+* [Stage‑A sampling (PWM mining → TFBS pools)](../guide/sampling.md#stage-a-sampling)
+* [Stage‑B sampling (TFBS pools → solver libraries)](../guide/sampling.md#stage-b-sampling)
+
+What this demo config is doing (quick read):
+
+* **Stage‑A (`densegen.inputs[].sampling`)**
+  Mine `n_sites=200` per motif using FIMO score eligibility (`best_hit_score > 0`), collapse near‑duplicates
+  by core (`uniqueness.key: core`), and retain a score-first but diversity-biased set via MMR
+  (`selection.policy: mmr`, `alpha=0.9`). Sites are length-normalized with `length.policy: range` (`[15, 20]`).
+
+* **Stage‑B (`densegen.generation.sampling`)**
+  Build `library_size=20` subsampled libraries using `library_sampling_strategy: coverage_weighted`, requiring
+  regulator coverage (`cover_all_regulators: true`) and enforcing core uniqueness inside each library
+  (`unique_binding_cores: true`).
+
+Also helpful for interpreting outputs later:
+
+* Fixed promoter constraints: see [Promoter constraints](../guide/generation.md#promoter-constraints).
+* `placement_map` overlay semantics: see [Plots](../reference/outputs.md#plots).
+
+Now run:
 
 ```bash
 dense inspect config
@@ -151,19 +194,21 @@ dense inspect config
 
 ---
 
-### 5. Stage-A build-pool
+### 5. Stage‑A build‑pool
 
-Materialize TFBS pools for inspection and for deterministic Stage‑B previews.
+Materialize the TFBS pools. This is the canonical Stage‑A artifact step and is typically what you want for reproducible runs and debugging.
 
 ```bash
 dense stage-a build-pool --fresh
 ```
 
-**Note:** `stage-a build-pool` appends new unique TFBS into existing pools by default. Use `--fresh` when re‑running if you want to avoid cumulative pools and candidate logs.
+Notes:
 
-The CLI recap includes tier boundary scores per TF, so you can confirm tier cutoffs without scripting.
+* By default, `stage-a build-pool` appends new unique TFBS into existing pools; `--fresh` rebuilds from scratch.
+* The CLI recap includes per‑TF tier boundary scores, so you can sanity-check tier cutoffs without scripting.
+* The resulting pools are cached under `outputs/pools/` and reused by default in subsequent runs.
 
-Optional: visualize Stage‑A score strata and retained lengths (per regulator) right after sampling:
+Optional: immediately visualize Stage‑A yield/tiering/length effects:
 
 ```bash
 dense plot --only stage_a_summary
@@ -171,17 +216,21 @@ dense plot --only stage_a_summary
 
 ---
 
-### 6. Stage-B build-libraries
+### 6. Stage‑B build‑libraries
 
-Preview solver libraries without running the optimizer.
+This step previews solver libraries without running optimization. It’s optional, but it’s the fastest way to validate that Stage‑B can build feasible libraries from your pools.
 
 ```bash
 dense stage-b build-libraries
 ```
 
-The CLI output summarizes libraries per input/plan (min/median/max); per‑library details live in `outputs/libraries/`.
+What to look for:
 
-If library artifacts already exist under `outputs/libraries`, re-run with `--overwrite` or reset the demo first:
+* Libraries should contain both regulators when `cover_all_regulators: true`.
+* Library feasibility fields (bp accounting and slack) help you catch “can’t fit” problems early.
+* The CLI output summarizes libraries per input/plan (min/median/max); details live in `outputs/libraries/`.
+
+If library artifacts already exist and you want to rebuild them:
 
 ```bash
 dense stage-b build-libraries --overwrite
@@ -191,33 +240,53 @@ dense stage-b build-libraries --overwrite
 
 ### 7. Run generation
 
-Execute Stage‑B sampling and solver optimization using the existing Stage‑A pools.
+Run Stage‑B sampling + solver optimization using the existing Stage‑A pools.
 
 ```bash
 dense run
 ```
 
-If pools are missing or stale, `dense run` will fail fast. Rebuild them with `dense stage-a build-pool --fresh` or rerun with `dense run --rebuild-stage-a`.
+Important behavior:
 
-This demo config also enables plot generation from the run (`plots.default`) and saves plots in `outputs/plots/` using `plots.format` (switch to `pdf` or `svg` in `config.yaml` if desired). Plots are generated from canonical artifacts (Parquet tables + manifests). The run also writes `outputs/tables/run_metrics.parquet` for additional diagnostics. Reports do not generate plots; they can optionally link the existing plot manifest.
+* If pools are missing or stale, `dense run` fails fast.
+  Fix by rebuilding: `dense stage-a build-pool --fresh`, or run once with: `dense run --rebuild-stage-a`.
 
-The demo quota is intentionally small (`generation.quota: 12` with `runtime.max_seconds_per_plan: 60`) to keep the end‑to‑end run fast; scale these up for production runs. The demo uses `solver.strategy: iterate` for full solver runs; switch to `diverse` or `optimal` as needed for exploration. If run outputs already exist (e.g., `outputs/tables/*.parquet` or `outputs/meta/run_state.json`), choose `--resume` to continue or `--fresh` to clear outputs. Use `dense run --no-plot` to skip auto‑plots when re‑running.
+This demo config also auto-generates plots during the run (`plots.default`) and writes them to `outputs/plots/` using `plots.format`. Plots are generated from canonical artifacts (Parquet tables + manifests), not from debug logs.
+
+Core outputs to know about:
+
+* `outputs/tables/dense_arrays.parquet` — final sequences (+ metadata)
+* `outputs/tables/attempts.parquet` — solver attempt audit log
+* `outputs/tables/run_metrics.parquet` — aggregated diagnostics that power run plots
+* `outputs/meta/run_manifest.json` + `outputs/meta/events.jsonl` — run summary + structured events
+
+Rerun behavior:
+
+* If run outputs already exist (e.g., `outputs/tables/*.parquet` or `outputs/meta/run_state.json`), choose:
+
+  * `dense run --resume` to continue, or
+  * `dense run --fresh` to clear outputs and restart.
+* Use `dense run --no-plot` to skip auto-plots on a rerun.
+
+The demo quota is intentionally small (`generation.quota: 12`) with a short per-plan time cap (`runtime.max_seconds_per_plan: 60`) so the end‑to‑end flow stays quick. Scale these up for real runs.
 
 ---
 
 ### 8. Inspect run summary
 
-Why: inspect aggregated Stage‑B library usage and runtime events.
+Inspect aggregated Stage‑B library usage and runtime events (stalls/resamples/library rebuilds).
 
 ```bash
 dense inspect run --library --events
 ```
 
+This is the best single command to answer: “did Stage‑B sample what we expected, and did the run stall?”
+
 ---
 
 ### 9. List plots
 
-Why: see available plot names before selecting a subset.
+See the available plot names (useful before choosing subsets).
 
 ```bash
 dense ls-plots
@@ -227,19 +296,21 @@ dense ls-plots
 
 ### 10. Plot
 
-Why: render selected plots from existing outputs.
+Render selected diagnostics plots from existing outputs.
+
+Stage summaries only:
 
 ```bash
 dense plot --only stage_a_summary,stage_b_summary
 ```
 
-Optional: include the Stage‑A/Stage‑B summaries alongside the default run plots:
+Or include the default run plots plus stage summaries:
 
 ```bash
 dense plot --only placement_map,tfbs_usage,run_health,stage_a_summary,stage_b_summary
 ```
 
-If Matplotlib complains about cache permissions, set a workspace‑scoped cache:
+If Matplotlib complains about cache permissions, set a workspace-scoped cache:
 
 ```bash
 export MPLCONFIGDIR=outputs/.mpl-cache
@@ -249,7 +320,7 @@ export MPLCONFIGDIR=outputs/.mpl-cache
 
 ### 11. Report
 
-Why: generate a human‑readable audit summary.
+Generate a human-readable audit summary. Reports don’t generate plots; they can link existing ones.
 
 ```bash
 dense report --format md --plots include
@@ -265,7 +336,7 @@ dense plot
 
 ### 12. Reset the demo
 
-Why: wipe run outputs and state so you can re-run the demo cleanly.
+Wipe outputs and state so you can rerun cleanly.
 
 ```bash
 dense campaign-reset

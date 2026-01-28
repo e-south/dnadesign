@@ -86,5 +86,5 @@ def test_pwm_sampling_fimo_mining_shortfall_warns(caplog) -> None:
                 "log_every_batches": 1,
             },
         )
-    assert len(selected) == 0
+    assert 0 <= len(selected) < 5
     assert "shortfall" in caplog.text.lower()

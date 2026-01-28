@@ -3,6 +3,10 @@
 Date: 2026-01-26
 Status: accepted
 
+Note: This plan is historical. The current Stage-A implementation uses tier-target mining
+and MMR selection options, and removes oversample_factor entirely. See
+src/dnadesign/densegen/docs/guide/sampling.md for the current behavior.
+
 ## Context
 Stage-A PWM sampling previously relied on p-value strata and retain depth for FIMO-based selection. This created
 per-motif tuning overhead and could exclude high-scoring hits when p-value thresholds varied by motif width or

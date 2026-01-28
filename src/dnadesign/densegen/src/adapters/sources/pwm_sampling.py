@@ -348,9 +348,10 @@ def _select_by_mmr(
         if k <= 0:
             k = min(len(candidates), int(n_sites))
         shortlist = list(candidates[:k])
+        target_n = min(int(n_sites), len(shortlist))
         selected: list[FimoCandidate] = []
         meta: dict[str, dict] = {}
-        while shortlist and len(selected) < int(n_sites):
+        while len(selected) < target_n:
             pick, utility, max_sim = _best_candidate(shortlist, selected)
             selected.append(pick)
             meta[pick.seq] = {
@@ -360,9 +361,10 @@ def _select_by_mmr(
             }
         if len(selected) < int(n_sites) and k < max_k:
             shortlist = list(candidates[:max_k])
+            target_n = min(int(n_sites), len(shortlist))
             selected = []
             meta = {}
-            while shortlist and len(selected) < int(n_sites):
+            while len(selected) < target_n:
                 pick, utility, max_sim = _best_candidate(shortlist, selected)
                 selected.append(pick)
                 meta[pick.seq] = {
@@ -882,6 +884,8 @@ def sample_pwm_sites(
             raise ValueError("selection.shortlist_max must be > 0 when set.")
         if selection_shortlist_max is not None and int(selection_shortlist_max) < int(selection_shortlist_min):
             raise ValueError("selection.shortlist_max must be >= selection.shortlist_min.")
+        if selection_shortlist_max is not None and int(selection_shortlist_max) < int(n_sites):
+            raise ValueError("selection.shortlist_max must be >= n_sites when selection.policy=mmr.")
 
     if selection_tier_widening is not None:
         if hasattr(selection_tier_widening, "enabled"):
@@ -1219,6 +1223,8 @@ def sample_pwm_sites(
                         mining_time_limited = True
                         break
                     if generated_total >= target_candidates:
+                        if budget_mode == "fixed_candidates":
+                            break
                         if budget_mode == "tier_target":
                             if budget_min_candidates is None or generated_total >= int(budget_min_candidates):
                                 if budget_target_tier_fraction is not None:
