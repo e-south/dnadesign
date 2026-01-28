@@ -14,7 +14,7 @@ def _write_config(path: Path) -> None:
     path.write_text(
         """
         densegen:
-          schema_version: "2.6"
+          schema_version: "2.7"
           run:
             id: demo
             root: "."

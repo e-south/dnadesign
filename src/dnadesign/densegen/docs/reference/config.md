@@ -21,7 +21,7 @@ This is the YAML schema for DenseGen. Unknown keys are errors and all paths reso
 ### Top-level
 
 - `densegen` (required)
-- `densegen.schema_version` (required; supported: `2.6`)
+- `densegen.schema_version` (required; supported: `2.7`)
 - `densegen.run` (required; run-scoped I/O root)
 - `plots` (optional; required `source` when `output.targets` has multiple sinks)
 
@@ -59,32 +59,45 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
   - `sampling` (required Stage‑A config):
     - `strategy`: `consensus | stochastic | background`
     - `n_sites` (int > 0)
-    - `oversample_factor` (int > 0)
-    - `scoring_backend`: `fimo`
-    - `mining` - batch/time controls for mining via FIMO:
+    - `mining` - batch controls for FIMO mining:
       - `batch_size` (int > 0; default 100000) - candidates per FIMO batch
-      - `max_seconds` (optional float > 0; default 60s) - max seconds per motif mining loop
-      - `log_every_batches` (int > 0; default 1) - log yield summaries every N batches
+      - `budget` (required)
+        - `mode`: `tier_target | fixed_candidates`
+        - `target_tier_fraction` (float in (0, 1]; required when `mode=tier_target`)
+        - `candidates` (int > 0; required when `mode=fixed_candidates`)
+        - `max_candidates` (optional int > 0; hard cap for tier_target)
+        - `max_seconds` (optional float > 0; escape hatch for tier_target)
+        - `min_candidates` (optional int > 0; floor before tier_target can stop)
+        - `growth_factor` (float > 1; default 1.25)
+      - `log_every_batches` (int > 0; default 1)
     - `bgfile` (optional path) - MEME bfile-format background model for FIMO
     - `keep_all_candidates_debug` (bool, default false) - write candidate Parquet logs to
       `outputs/pools/candidates/` for inspection (overwritten by `stage-a build-pool --fresh`
       or `dense run --rebuild-stage-a`)
     - `include_matched_sequence` (bool, default false) - include `fimo_matched_sequence` in TFBS outputs
-    - `dedupe_by` (optional; `sequence | core`) - Stage‑A uniqueness key for TFBS retention (default `core` for
-      `length_policy: range`, otherwise `sequence`). This key is intended to be extensible as new uniqueness
-      strategies are added.
-    - `min_core_hamming_distance` (optional int >= 0) - minimum Hamming distance between retained cores
-      (requires `dedupe_by: core`)
-    - `length_policy`: `exact | range` (default: `exact`)
-    - `length_range`: `[min, max]` (required when `length_policy=range`; `min` >= motif length)
-    - `trim_window_length` (optional int > 0; trims PWM to a max‑information window before Stage‑A sampling)
-    - `trim_window_strategy`: `max_info` (window selection strategy)
+    - `length`
+      - `policy`: `exact | range` (default: `exact`)
+      - `range`: `[min, max]` (required when `policy=range`; `min` >= motif length)
+    - `trimming`
+      - `window_length` (optional int > 0; trims PWM to a max‑information window before Stage‑A sampling)
+      - `window_strategy`: `max_info` (window selection strategy)
+    - `uniqueness`
+      - `key`: `sequence | core` (default `core` for PWM inputs)
+    - `selection`
+      - `policy`: `top_score | mmr` (default `top_score`)
+      - `alpha` (float in (0, 1]; MMR score weight)
+      - `shortlist_factor` (int > 0)
+      - `shortlist_min` (int > 0)
+      - `shortlist_max` (optional int > 0)
+      - `tier_widening` (optional)
+        - `enabled` (bool)
+        - `ladder` (fractions in (0, 1], e.g. `[0.001, 0.01, 0.09, 1.0]`)
     - `consensus` requires `n_sites: 1`
     - `background` samples cores from the PWM background distribution before padding
     - FIMO resolves `fimo` via `MEME_BIN` or PATH; pixi users should run `pixi run dense ...` so it is available.
     - Eligibility is `best_hit_score > 0` and requires a FIMO hit.
 - Tiering is 0.1% / 1% / 9% / rest by score rank; retention is top‑`n_sites` by score (tie‑break by sequence).
-    - FIMO runs with `--thresh 1.0` so score‑based eligibility is applied consistently.
+  - FIMO runs with `--thresh 1.0` so score‑based eligibility is applied consistently.
 - `type: pwm_meme_set`
   - `paths` - list of MEME PWM files (merged into a single TF pool)
   - `motif_ids` (optional list) - choose motifs by ID across files
@@ -280,7 +293,7 @@ Notes:
 
 ```yaml
 densegen:
-  schema_version: "2.6"
+  schema_version: "2.7"
   run:
     id: demo
     root: "."

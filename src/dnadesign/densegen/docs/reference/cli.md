@@ -28,7 +28,7 @@ DenseGen exposes a Typer CLI via `dense`. This page is an operator manual (comma
   “No config found. cd into a workspace containing config.yaml, or pass -c path/to/config.yaml.”
 - Input paths resolve against the config file directory.
 - Outputs/tables/logs/plots/report must resolve inside `outputs/` under `densegen.run.root`.
-- Config files must include `densegen.schema_version` (currently `2.6`) and `densegen.run`.
+- Config files must include `densegen.schema_version` (currently `2.7`) and `densegen.run`.
 
 ---
 
@@ -152,7 +152,7 @@ Options:
 Notes:
 - `dense run` requires Stage‑A pools under `outputs/pools` by default. If they are missing or stale,
   run `dense stage-a build-pool --fresh` or pass `--rebuild-stage-a`.
-- If Stage‑A sampling uses `scoring_backend: fimo`, ensure `fimo` is on PATH (e.g., via `pixi run`).
+- Stage‑A sampling uses FIMO; ensure `fimo` is on PATH (e.g., via `pixi run`).
 - If the workspace already has run outputs (e.g., `outputs/tables/*.parquet` or
   `outputs/meta/run_state.json`), you must choose `--resume` or `--fresh`.
   Stage‑A/Stage‑B artifacts in `outputs/pools` or `outputs/libraries` do not trigger this guard.

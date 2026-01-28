@@ -46,8 +46,7 @@ def test_pwm_jaspar_sampling(tmp_path: Path) -> None:
         sampling={
             "strategy": "stochastic",
             "n_sites": 4,
-            "oversample_factor": 3,
-            "scoring_backend": "fimo",
+            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 80}},
         },
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
@@ -71,8 +70,7 @@ def test_pwm_matrix_csv_sampling(tmp_path: Path) -> None:
         sampling={
             "strategy": "consensus",
             "n_sites": 1,
-            "oversample_factor": 2,
-            "scoring_backend": "fimo",
+            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 10}},
         },
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(1))

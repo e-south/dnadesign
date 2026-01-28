@@ -841,7 +841,7 @@ def sample_pwm_sites(
     if width <= 0:
         raise ValueError(f"PWM motif '{motif.motif_id}' has zero width.")
     if length_policy not in {"exact", "range"}:
-        raise ValueError(f"Unsupported pwm length_policy: {length_policy}")
+        raise ValueError(f"Unsupported pwm length.policy: {length_policy}")
     log_odds = motif.log_odds or build_log_odds(motif.matrix, motif.background)
     window_label = "full"
     if trim_window_length is not None:
@@ -976,14 +976,14 @@ def sample_pwm_sites(
         if length_policy == "exact":
             return width
         if length_range is None or len(length_range) != 2:
-            raise ValueError("pwm.sampling.length_range must be provided when length_policy=range")
+            raise ValueError("pwm.sampling.length.range must be provided when length.policy=range")
         lo, hi = int(length_range[0]), int(length_range[1])
         if lo <= 0 or hi <= 0:
-            raise ValueError("pwm.sampling.length_range values must be > 0")
+            raise ValueError("pwm.sampling.length.range values must be > 0")
         if lo > hi:
-            raise ValueError("pwm.sampling.length_range must be min <= max")
+            raise ValueError("pwm.sampling.length.range must be min <= max")
         if lo < width:
-            raise ValueError(f"pwm.sampling.length_range min must be >= motif width ({width}), got {lo}")
+            raise ValueError(f"pwm.sampling.length.range min must be >= motif width ({width}), got {lo}")
         return int(rng.integers(lo, hi + 1))
 
     def _embed_with_background(seq: str, target_len: int) -> str:
@@ -1423,7 +1423,7 @@ def sample_pwm_sites(
             if context.get("mining_max_seconds") is not None and context.get("mining_time_limited"):
                 suggestions.append("increase mining.budget.max_seconds")
             if context.get("width") is not None and int(context.get("width")) <= 6:
-                suggestions.append("try length_policy=range with a longer length_range")
+                suggestions.append("try length.policy=range with a longer length.range")
             msg_lines.append("Try next: " + "; ".join(suggestions) + ".")
             log.warning(" ".join(msg_lines))
         tier_target_required_unique = None

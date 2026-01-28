@@ -95,17 +95,19 @@ inputs:
     path: inputs/artifacts/lexA.json
     sampling:  # Stage‑A sampling
       strategy: stochastic
-      scoring_backend: fimo
       n_sites: 200
-      oversample_factor: 50
       mining:
         batch_size: 5000
-        max_seconds: 60
-      length_policy: exact
+        budget:
+          mode: tier_target
+          target_tier_fraction: 0.001
+          max_candidates: 200000
+      length:
+        policy: exact
 ```
 
-Exact length is the default. To enable variable length, set `length_policy: range` and
-provide `length_range: [min, max]` where `min >= motif_length`.
+Exact length is the default. To enable variable length, set `length.policy: range` and
+provide `length.range: [min, max]` where `min >= motif_length`.
 
 ---
 

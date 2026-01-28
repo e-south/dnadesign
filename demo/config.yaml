@@ -1,5 +1,5 @@
 densegen:
-  schema_version: '2.6'
+  schema_version: '2.7'
   run:
     id: demo
     root: .
@@ -12,17 +12,28 @@ densegen:
     sampling:
       strategy: stochastic
       n_sites: 200
-      oversample_factor: 1000
-      scoring_backend: fimo
       mining:
         batch_size: 5000
-        max_seconds: 60
+        budget:
+          mode: tier_target
+          target_tier_fraction: 0.001
+          max_candidates: 400000
+          max_seconds: 60
+          growth_factor: 1.25
         log_every_batches: 1
-      length_policy: range
-      length_range:
-      - 15
-      - 20
-      dedupe_by: core
+      length:
+        policy: range
+        range: [15, 20]
+      uniqueness:
+        key: core
+      selection:
+        policy: mmr
+        alpha: 0.9
+        shortlist_factor: 5
+        shortlist_min: 50
+        tier_widening:
+          enabled: true
+          ladder: [0.001, 0.01, 0.09, 1.0]
   output:
     targets:
     - parquet

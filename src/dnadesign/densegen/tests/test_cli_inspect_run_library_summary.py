@@ -66,7 +66,7 @@ def test_inspect_run_library_summary_hides_tfbs_sequences(tmp_path: Path) -> Non
     run_manifest = {
         "run_id": "demo",
         "created_at": "2026-01-14T00:00:00+00:00",
-        "schema_version": "2.6",
+        "schema_version": "2.7",
         "config_sha256": "dummy",
         "run_root": str(tmp_path),
         "random_seed": 0,

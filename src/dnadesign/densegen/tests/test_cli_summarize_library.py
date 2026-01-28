@@ -16,7 +16,7 @@ def _write_config(path: Path) -> None:
     path.write_text(
         """
         densegen:
-          schema_version: "2.6"
+          schema_version: "2.7"
           run:
             id: demo
             root: "."
@@ -125,7 +125,7 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
     manifest = RunManifest(
         run_id="demo",
         created_at="2026-01-14T00:00:00+00:00",
-        schema_version="2.6",
+        schema_version="2.7",
         config_sha256="dummy",
         run_root=str(run_root),
         random_seed=123,
@@ -278,7 +278,7 @@ def test_summarize_library_show_tfbs_flag(tmp_path: Path) -> None:
     manifest = RunManifest(
         run_id="demo",
         created_at="2026-01-14T00:00:00+00:00",
-        schema_version="2.6",
+        schema_version="2.7",
         config_sha256="dummy",
         run_root=str(run_root),
         random_seed=123,

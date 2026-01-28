@@ -21,7 +21,7 @@ from dnadesign.densegen.src.config import ConfigError, load_config
 
 MIN_CONFIG = {
     "densegen": {
-        "schema_version": "2.6",
+        "schema_version": "2.7",
         "run": {"id": "demo", "root": "."},
         "inputs": [
             {
@@ -109,7 +109,7 @@ def test_pad_config_accepts(tmp_path: Path) -> None:
 def test_pad_mode_off_accepts_yaml_boolean(tmp_path: Path) -> None:
     cfg_text = """
     densegen:
-      schema_version: "2.6"
+      schema_version: "2.7"
       run:
         id: demo
         root: "."
@@ -334,10 +334,8 @@ def test_fimo_rejects_max_candidates(tmp_path: Path) -> None:
             "sampling": {
                 "strategy": "stochastic",
                 "n_sites": 2,
-                "oversample_factor": 2,
-                "scoring_backend": "fimo",
                 "max_candidates": 100,
-                "mining": {"batch_size": 10},
+                "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 20}},
             },
         }
     ]
@@ -356,10 +354,8 @@ def test_fimo_rejects_legacy_pvalue_threshold(tmp_path: Path) -> None:
             "sampling": {
                 "strategy": "stochastic",
                 "n_sites": 2,
-                "oversample_factor": 2,
-                "scoring_backend": "fimo",
                 "pvalue_threshold": 1e-8,
-                "mining": {"batch_size": 10},
+                "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 20}},
             },
         }
     ]
@@ -378,9 +374,11 @@ def test_fimo_rejects_legacy_retain_bin_ids(tmp_path: Path) -> None:
             "sampling": {
                 "strategy": "stochastic",
                 "n_sites": 2,
-                "oversample_factor": 2,
-                "scoring_backend": "fimo",
-                "mining": {"batch_size": 10, "retain_bin_ids": [0]},
+                "mining": {
+                    "batch_size": 10,
+                    "budget": {"mode": "fixed_candidates", "candidates": 20},
+                    "retain_bin_ids": [0],
+                },
             },
         }
     ]

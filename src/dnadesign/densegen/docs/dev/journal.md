@@ -50,3 +50,4 @@
   - Tier targeting via mining.budget.mode=tier_target with required_unique tracking + explicit warnings when unmet.
   - Selection policy defaults to top_score; MMR optional with alpha=0.9 and shortlist controls.
   - No Stage-B changes.
+- Follow-up: updated demo configs and docs to new Stage-A sampling schema (mining budget, length/selection/uniqueness blocks), refreshed CLI Stage-A plan/recap columns for tier-target and selection policy, and added config migration test coverage.

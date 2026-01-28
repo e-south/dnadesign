@@ -46,9 +46,11 @@ def test_pwm_log_odds_smoothing_finite() -> None:
         motif,
         strategy="stochastic",
         n_sites=1,
-        oversample_factor=3,
-        scoring_backend="fimo",
-        mining={"batch_size": 5, "max_seconds": 5, "log_every_batches": 1},
+        mining={
+            "batch_size": 5,
+            "budget": {"mode": "fixed_candidates", "candidates": 5},
+            "log_every_batches": 1,
+        },
     )
     assert len(sites) == 1
     core = sites[0][: len(matrix)]

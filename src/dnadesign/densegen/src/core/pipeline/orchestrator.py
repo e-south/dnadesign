@@ -932,7 +932,7 @@ def _process_plan_for_source(
             f"(sequence_length={seq_len}, max_library_motif={max_tfbs_len}, "
             f"max_fixed_element={fixed_elements_max_len}). "
             "Increase densegen.generation.sequence_length or reduce motif lengths "
-            "(e.g., adjust Stage-A PWM sampling length_range or fixed-element motifs)."
+            "(e.g., adjust Stage-A PWM sampling length.range or fixed-element motifs)."
         )
     if min_required_len > 0 and seq_len < min_required_len:
         raise ValueError(

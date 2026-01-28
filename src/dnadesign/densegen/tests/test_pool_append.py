@@ -20,7 +20,7 @@ class _Deps:
 def _write_config(path: Path, input_path: Path) -> None:
     cfg = {
         "densegen": {
-            "schema_version": "2.6",
+            "schema_version": "2.7",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {

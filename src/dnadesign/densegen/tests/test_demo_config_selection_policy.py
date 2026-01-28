@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/densegen/tests/test_demo_config_selection_policy.py
 
-Ensures the demo config hides selection policy for FIMO sampling.
+Ensures the demo config declares Stage-A selection policy explicitly.
 Dunlop Lab.
 
 Module Author(s): Eric J. South
@@ -21,7 +21,7 @@ def _demo_config_path() -> Path:
     return Path(__file__).resolve().parents[1] / "workspaces" / "demo_meme_two_tf" / "config.yaml"
 
 
-def test_demo_config_hides_selection_policy_for_fimo() -> None:
+def test_demo_config_declares_selection_policy() -> None:
     cfg_path = _demo_config_path()
     loaded = load_config(cfg_path)
     cfg = loaded.root.densegen
@@ -29,7 +29,9 @@ def test_demo_config_hides_selection_policy_for_fimo() -> None:
         sampling = getattr(inp, "sampling", None)
         if sampling is None:
             continue
-        backend = str(getattr(sampling, "scoring_backend", "") or "").lower()
-        if backend != "fimo":
-            continue
-        assert not hasattr(sampling, "selection_policy"), f"{inp.name} should not expose selection_policy"
+        selection = getattr(sampling, "selection", None)
+        uniqueness = getattr(sampling, "uniqueness", None)
+        assert selection is not None, f"{inp.name} should declare selection settings"
+        assert selection.policy == "mmr", f"{inp.name} should use mmr selection in the demo"
+        assert uniqueness is not None
+        assert uniqueness.key == "core"

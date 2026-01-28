@@ -192,20 +192,9 @@ def _resolve_template_dir(
 
 
 def _input_uses_fimo(input_cfg) -> bool:
-    sampling = getattr(input_cfg, "sampling", None)
-    backend = str(getattr(sampling, "scoring_backend", "densegen")).lower() if sampling is not None else ""
-    if backend == "fimo":
-        return True
-    overrides = getattr(input_cfg, "overrides_by_motif_id", None)
-    if isinstance(overrides, dict):
-        for override in overrides.values():
-            try:
-                override_backend = str(override.get("scoring_backend", "")).lower()
-            except Exception:
-                continue
-            if override_backend == "fimo":
-                return True
-    return False
+    if not str(getattr(input_cfg, "type", "")).startswith("pwm_"):
+        return False
+    return True
 
 
 def _candidate_logging_enabled(cfg, *, selected: set[str] | None = None) -> bool:
@@ -592,6 +581,25 @@ def _stage_a_sampling_rows(
                 candidates = _format_count(summary.generated)
                 eligible = _format_eligible(summary.eligible, summary.generated)
                 retained = _format_count(summary.retained)
+                tier_target = "-"
+                if summary.tier_target_fraction is not None:
+                    frac = float(summary.tier_target_fraction)
+                    frac_label = f"{frac:.3%}"
+                    if summary.tier_target_met is True:
+                        tier_target = f"{frac_label} met"
+                    elif summary.tier_target_met is False:
+                        required = summary.tier_target_required_unique
+                        if required is not None:
+                            tier_target = f"{frac_label} unmet (need {required})"
+                        else:
+                            tier_target = f"{frac_label} unmet"
+                selection_label = summary.selection_policy or "-"
+                if summary.selection_policy == "mmr":
+                    alpha = summary.selection_alpha
+                    shortlist = summary.selection_shortlist_k
+                    alpha_label = f"{float(alpha):.2f}" if alpha is not None else "-"
+                    shortlist_label = f"{int(shortlist)}" if shortlist is not None else "-"
+                    selection_label = f"mmr a={alpha_label} k={shortlist_label}"
                 tier_counts = _format_tier_counts(summary.eligible_tier_counts, summary.retained_tier_counts)
                 tier_fill = "-"
                 if summary.retained_tier_counts:
@@ -623,6 +631,8 @@ def _stage_a_sampling_rows(
                         "retained": retained,
                         "tier_fill": tier_fill,
                         "tier_counts": tier_counts,
+                        "tier_target": tier_target,
+                        "selection": selection_label,
                         "score": score_label,
                         "length": length_label,
                         "tier0_score": summary.tier0_score,
@@ -659,6 +669,8 @@ def _stage_a_sampling_rows(
                 "retained": _format_count(total),
                 "tier_fill": "-",
                 "tier_counts": "-",
+                "tier_target": "-",
+                "selection": "-",
                 "score": "-",
                 "length": length_label,
                 "tier0_score": None,
@@ -713,6 +725,7 @@ def _stage_a_plan_rows(
                     budget_label = (
                         f"tier={getattr(budget, 'target_tier_fraction', '-')}"
                         f" max_candidates={getattr(budget, 'max_candidates', '-')}"
+                        f" max_seconds={getattr(budget, 'max_seconds', '-')}"
                     )
             uniqueness_cfg = getattr(effective_sampling, "uniqueness", None) if effective_sampling else None
             uniqueness_label = str(getattr(uniqueness_cfg, "key", "-"))
@@ -880,7 +893,7 @@ def _warn_pwm_sampling_configs(loaded, cfg_path: Path) -> None:
                 if width <= 6 and n_sites > 200:
                     warnings.append(
                         f"{getattr(inp, 'name', src_type)}:{motif_id} width={width} with n_sites={n_sites} "
-                        "may fail uniqueness; consider reducing n_sites or using length_policy=range."
+                        "may fail uniqueness; consider reducing n_sites or using length.policy=range."
                     )
     if warnings:
         console.print("[yellow]Stage-A PWM sampling warnings:[/]")
@@ -1712,6 +1725,7 @@ def inspect_config(
                         budget_label = (
                             f"tier={getattr(budget, 'target_tier_fraction', '-')}"
                             f" max_candidates={getattr(budget, 'max_candidates', '-')}"
+                            f" max_seconds={getattr(budget, 'max_seconds', '-')}"
                         )
             stage_a_table.add_row(
                 str(inp.name),
@@ -1968,18 +1982,20 @@ def stage_a_build_pool(
         plan_table.add_column("input", overflow="fold")
         plan_table.add_column("TF", overflow="fold")
         plan_table.add_column("retain")
-        plan_table.add_column("candidates")
+        plan_table.add_column("budget")
         plan_table.add_column("eligibility")
-        plan_table.add_column("backend")
+        plan_table.add_column("selection")
+        plan_table.add_column("uniqueness")
         plan_table.add_column("length")
         for row in plan_rows:
             plan_table.add_row(
                 row["input"],
                 row["tf"],
                 row["retain"],
-                row["candidates"],
+                row["budget"],
                 row["eligibility"],
-                row["backend"],
+                row["selection"],
+                row["uniqueness"],
                 row["length"],
             )
         console.print("[bold]Stage-A plan[/]")
@@ -2039,7 +2055,9 @@ def stage_a_build_pool(
             recap_table.add_column("generated")
             recap_table.add_column("eligible")
             recap_table.add_column("retained")
+            recap_table.add_column("tier target")
             recap_table.add_column("tier fill")
+            recap_table.add_column("selection")
             recap_table.add_column("score(min/med/avg/max)")
             recap_table.add_column("len(n/min/med/avg/max)")
             for row in sorted(grouped[input_name], key=lambda item: str(item["regulator"])):
@@ -2051,7 +2069,9 @@ def stage_a_build_pool(
                     str(row["generated"]),
                     str(row["eligible"]),
                     str(row["retained"]),
+                    str(row.get("tier_target", "-")),
                     str(row["tier_fill"]),
+                    str(row.get("selection", "-")),
                     str(row["score"]),
                     str(row["length"]),
                 )
@@ -2083,7 +2103,8 @@ def stage_a_build_pool(
                 console.print(boundary_table)
         console.print(
             "Legend: generated=PWM candidates; eligible=best_hit_score>0 with hit; "
-            "retained=top-N by score after dedupe; tier fill=deepest diagnostic tier used."
+            "retained=top-N by score after dedupe; tier target=diagnostic tier target status; "
+            "tier fill=deepest diagnostic tier used; selection=Stage-A selection policy."
         )
     console.print(
         f":sparkles: [bold green]Pool manifest written[/]: "

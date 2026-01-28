@@ -42,8 +42,8 @@ class _DummySource(BaseDataSource):
             input_name="demo_pwm",
             regulator="regA",
             backend="fimo",
-            dedupe_by="core",
-            min_core_hamming_distance=None,
+            uniqueness_key="core",
+            collapsed_by_core_identity=0,
             generated=10,
             target=10,
             target_sites=2,
@@ -66,6 +66,10 @@ class _DummySource(BaseDataSource):
             tier2_score=1.0,
             eligible_score_hist_edges=[0.0, 1.0, 2.0],
             eligible_score_hist_counts=[1, 1],
+            tier_target_fraction=0.001,
+            tier_target_required_unique=2000,
+            tier_target_met=True,
+            selection_policy="top_score",
         )
         return [("regA", "AAAA", "dummy")], df, [summary]
 
@@ -76,7 +80,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
         yaml.safe_dump(
             {
                 "densegen": {
-                    "schema_version": "2.6",
+                    "schema_version": "2.7",
                     "run": {"id": "demo", "root": "."},
                     "inputs": [
                         {
@@ -84,9 +88,14 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
                             "type": "pwm_meme",
                             "path": str(tmp_path / "motifs.meme"),
                             "sampling": {
-                                "scoring_backend": "fimo",
                                 "n_sites": 2,
-                                "oversample_factor": 2,
+                                "mining": {
+                                    "batch_size": 1000,
+                                    "budget": {
+                                        "mode": "fixed_candidates",
+                                        "candidates": 4,
+                                    },
+                                },
                                 "bgfile": "inputs/bg.txt",
                             },
                         }
@@ -154,8 +163,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert stage_a_sampling["eligibility_rule"].startswith("best_hit_score")
     assert stage_a_sampling["retention_rule"] == "top_n_sites_by_best_hit_score"
     assert stage_a_sampling["fimo_thresh"] == 1.0
-    assert stage_a_sampling["dedupe_by"] == "core"
-    assert stage_a_sampling["min_core_hamming_distance"] is None
+    assert stage_a_sampling["uniqueness_key"] == "core"
     assert stage_a_sampling["bgfile"] == "inputs/bg.txt"
     assert stage_a_sampling["background_source"] == "bgfile"
     hist = stage_a_sampling["eligible_score_hist"]

@@ -27,7 +27,7 @@ class MetaField:
 
 
 META_FIELDS: list[MetaField] = [
-    MetaField("schema_version", (str,), "DenseGen schema version (e.g., 2.6)."),
+    MetaField("schema_version", (str,), "DenseGen schema version (e.g., 2.7)."),
     MetaField("created_at", (str,), "UTC ISO8601 timestamp for record creation."),
     MetaField("run_id", (str,), "Run identifier (densegen.run.id)."),
     MetaField("run_root", (str,), "Resolved run root path (densegen.run.root)."),

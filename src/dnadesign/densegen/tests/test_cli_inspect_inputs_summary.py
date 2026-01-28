@@ -12,7 +12,7 @@ def _write_config(path: Path, *, meme_path: Path) -> None:
     payload = textwrap.dedent(
         f"""
         densegen:
-          schema_version: "2.6"
+          schema_version: "2.7"
           run:
             id: demo
             root: "."
@@ -25,13 +25,14 @@ def _write_config(path: Path, *, meme_path: Path) -> None:
               path: {meme_path.as_posix()}
               sampling:
                 strategy: stochastic
-                scoring_backend: fimo
                 n_sites: 2
-                oversample_factor: 2
                 mining:
                   batch_size: 50
-                  max_seconds: 1
-                length_policy: exact
+                  budget:
+                    mode: fixed_candidates
+                    candidates: 100
+                length:
+                  policy: exact
           output:
             targets: [parquet]
             schema:

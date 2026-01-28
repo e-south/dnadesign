@@ -63,9 +63,8 @@ def test_pwm_artifact_set_sampling(tmp_path: Path) -> None:
         sampling={
             "strategy": "stochastic",
             "n_sites": 4,
-            "oversample_factor": 3,
-            "scoring_backend": "fimo",
-            "length_policy": "exact",
+            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 80}},
+            "length": {"policy": "exact"},
         },
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
@@ -87,9 +86,8 @@ def test_pwm_artifact_set_rejects_duplicate_ids(tmp_path: Path) -> None:
         sampling={
             "strategy": "stochastic",
             "n_sites": 2,
-            "oversample_factor": 2,
-            "scoring_backend": "fimo",
-            "length_policy": "exact",
+            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 40}},
+            "length": {"policy": "exact"},
         },
     )
     with pytest.raises(ValueError, match="Duplicate motif_id"):
@@ -112,17 +110,15 @@ def test_pwm_artifact_set_overrides_by_motif_id(tmp_path: Path) -> None:
         sampling={
             "strategy": "stochastic",
             "n_sites": 2,
-            "oversample_factor": 3,
-            "scoring_backend": "fimo",
-            "length_policy": "exact",
+            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 60}},
+            "length": {"policy": "exact"},
         },
         overrides_by_motif_id={
             "M2": {
                 "strategy": "stochastic",
                 "n_sites": 1,
-                "oversample_factor": 3,
-                "scoring_backend": "fimo",
-                "length_policy": "exact",
+                "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 30}},
+                "length": {"policy": "exact"},
             }
         },
     )

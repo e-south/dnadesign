@@ -44,11 +44,9 @@ def test_pwm_sampling_fimo_mining_consensus_includes_score_metadata() -> None:
         motif,
         strategy="consensus",
         n_sites=1,
-        oversample_factor=1,
-        scoring_backend="fimo",
         mining={
             "batch_size": 1,
-            "max_seconds": 5,
+            "budget": {"mode": "fixed_candidates", "candidates": 1},
             "log_every_batches": 1,
         },
         include_matched_sequence=True,
@@ -64,6 +62,8 @@ def test_pwm_sampling_fimo_mining_consensus_includes_score_metadata() -> None:
 
 
 def test_pwm_sampling_fimo_mining_shortfall_warns(caplog) -> None:
+    if _FIMO_MISSING:
+        pytest.skip("fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).")
     motif = PWMMotif(
         motif_id="M2",
         matrix=[
@@ -80,9 +80,11 @@ def test_pwm_sampling_fimo_mining_shortfall_warns(caplog) -> None:
             motif,
             strategy="stochastic",
             n_sites=5,
-            oversample_factor=1,
-            scoring_backend="fimo",
-            mining={"batch_size": 2, "max_seconds": 0, "log_every_batches": 1},
+            mining={
+                "batch_size": 2,
+                "budget": {"mode": "fixed_candidates", "candidates": 2},
+                "log_every_batches": 1,
+            },
         )
     assert len(selected) == 0
     assert "shortfall" in caplog.text.lower()

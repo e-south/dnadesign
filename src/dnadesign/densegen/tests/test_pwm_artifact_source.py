@@ -61,9 +61,8 @@ def test_pwm_artifact_sampling_exact(tmp_path: Path) -> None:
         sampling={
             "strategy": "stochastic",
             "n_sites": 5,
-            "oversample_factor": 3,
-            "scoring_backend": "fimo",
-            "length_policy": "exact",
+            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 60}},
+            "length": {"policy": "exact"},
         },
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
@@ -87,10 +86,8 @@ def test_pwm_artifact_sampling_range(tmp_path: Path) -> None:
         sampling={
             "strategy": "stochastic",
             "n_sites": 6,
-            "oversample_factor": 3,
-            "scoring_backend": "fimo",
-            "length_policy": "range",
-            "length_range": (3, 5),
+            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 80}},
+            "length": {"policy": "range", "range": (3, 5)},
         },
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(1))
@@ -128,9 +125,8 @@ def test_pwm_artifact_rejects_nonfinite_log_odds(tmp_path: Path) -> None:
         sampling={
             "strategy": "stochastic",
             "n_sites": 2,
-            "oversample_factor": 2,
-            "scoring_backend": "fimo",
-            "length_policy": "exact",
+            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 20}},
+            "length": {"policy": "exact"},
         },
     )
     with pytest.raises(ValueError, match="log_odds\\[0\\]\\[A\\].*finite"):
@@ -147,10 +143,12 @@ def test_pwm_sampling_shortfall_includes_motif_id(tmp_path: Path, caplog: pytest
         sampling={
             "strategy": "stochastic",
             "n_sites": 2,
-            "oversample_factor": 1,
-            "scoring_backend": "fimo",
-            "mining": {"batch_size": 2, "max_seconds": 0, "log_every_batches": 1},
-            "length_policy": "exact",
+            "mining": {
+                "batch_size": 2,
+                "budget": {"mode": "fixed_candidates", "candidates": 1},
+                "log_every_batches": 1,
+            },
+            "length": {"policy": "exact"},
         },
     )
     with caplog.at_level("WARNING"):

@@ -18,7 +18,7 @@ def test_build_pool_artifact_binding_sites(tmp_path: Path) -> None:
         yaml.safe_dump(
             {
                 "densegen": {
-                    "schema_version": "2.6",
+                    "schema_version": "2.7",
                     "run": {"id": "demo", "root": "."},
                     "inputs": [
                         {

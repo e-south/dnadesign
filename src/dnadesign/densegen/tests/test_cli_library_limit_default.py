@@ -22,7 +22,7 @@ def test_inspect_run_library_summary_is_aggregated(tmp_path: Path) -> None:
     run_manifest = {
         "run_id": "demo",
         "created_at": "2026-01-14T00:00:00+00:00",
-        "schema_version": "2.6",
+        "schema_version": "2.7",
         "config_sha256": "dummy",
         "run_root": ".",
         "random_seed": 0,

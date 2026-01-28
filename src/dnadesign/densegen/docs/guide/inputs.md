@@ -29,28 +29,42 @@ Required (always):
 
 Optional (supported):
 - `strategy`: `consensus | stochastic | background` (default `stochastic`)
-- `oversample_factor` (int > 0; default `10`)
-- `scoring_backend`: `fimo` (only supported value)
 - `mining`:
   - `batch_size` (int > 0)
-  - `max_seconds` (optional float > 0; default 60s)
+  - `budget`:
+    - `mode`: `tier_target | fixed_candidates`
+    - `target_tier_fraction` (required when `mode=tier_target`)
+    - `candidates` (required when `mode=fixed_candidates`)
+    - `max_candidates` (optional)
+    - `max_seconds` (optional)
+    - `min_candidates` (optional)
+    - `growth_factor` (float > 1; default 1.25)
   - `log_every_batches` (int > 0)
 - `bgfile`: MEME background file
 - `keep_all_candidates_debug` (bool): write candidate‑level Parquet under `outputs/pools/candidates/`
   (files named `candidates__<label>.parquet`) and aggregate to
   `outputs/pools/candidates/candidates.parquet` + `outputs/pools/candidates/candidates_summary.parquet`
 - `include_matched_sequence`
-- `dedupe_by`: `sequence | core` (default `core` when `length_policy: range`); this uniqueness key is designed
-  to be extensible as new strategies are added
-- `min_core_hamming_distance` (optional int >= 0; requires `dedupe_by: core`)
-- `length_policy`: `exact | range` (default `exact`)
-- `length_range`: `[min, max]` (required when `length_policy: range`)
-- `trim_window_length` (optional int > 0)
-- `trim_window_strategy`: `max_info`
+- `length`:
+  - `policy`: `exact | range` (default `exact`)
+  - `range`: `[min, max]` (required when `policy: range`)
+- `trimming`:
+  - `window_length` (optional int > 0)
+  - `window_strategy`: `max_info`
+- `uniqueness`:
+  - `key`: `sequence | core` (default `core`)
+- `selection`:
+  - `policy`: `top_score | mmr` (default `top_score`)
+  - `alpha` (float in (0, 1]; MMR score weight)
+  - `shortlist_factor` (int > 0)
+  - `shortlist_min` (int > 0)
+  - `shortlist_max` (optional int > 0)
+  - `tier_widening` (optional):
+    - `enabled` (bool)
+    - `ladder` (fractions in (0, 1])
 
 Strict validation behavior:
 - Unknown keys are errors (extra fields are rejected).
-- `scoring_backend` must be `fimo`.
 - `consensus` requires `n_sites: 1`.
 
 FIMO score-based behavior:
@@ -66,12 +80,13 @@ inputs:
     type: pwm_meme
     path: inputs/lexA.txt
     sampling:  # Stage‑A sampling
-      scoring_backend: fimo
       n_sites: 80
-      oversample_factor: 50
       mining:
         batch_size: 5000
-        max_seconds: 60
+        budget:
+          mode: tier_target
+          target_tier_fraction: 0.001
+          max_candidates: 200000
 ```
 
 ---
@@ -148,12 +163,13 @@ inputs:
     path: inputs/lexA.txt
     motif_ids: [lexA]
     sampling:  # Stage‑A sampling
-      scoring_backend: fimo
       n_sites: 80
-      oversample_factor: 50
       mining:
         batch_size: 5000
-        max_seconds: 60
+        budget:
+          mode: tier_target
+          target_tier_fraction: 0.001
+          max_candidates: 200000
 ```
 
 ---
@@ -178,12 +194,13 @@ inputs:
     type: pwm_meme_set
     paths: [inputs/lexA.txt, inputs/cpxR.txt]
     sampling:  # Stage‑A sampling
-      scoring_backend: fimo
       n_sites: 80
-      oversample_factor: 50
       mining:
         batch_size: 5000
-        max_seconds: 60
+        budget:
+          mode: tier_target
+          target_tier_fraction: 0.001
+          max_candidates: 200000
 ```
 
 ---
@@ -207,12 +224,13 @@ inputs:
     type: pwm_jaspar
     path: inputs/motifs.jaspar
     sampling:  # Stage‑A sampling
-      scoring_backend: fimo
       n_sites: 80
-      oversample_factor: 50
       mining:
         batch_size: 5000
-        max_seconds: 60
+        budget:
+          mode: tier_target
+          target_tier_fraction: 0.001
+          max_candidates: 200000
 ```
 
 ---
@@ -237,12 +255,13 @@ inputs:
     path: inputs/lexA_matrix.csv
     motif_id: lexA
     sampling:  # Stage‑A sampling
-      scoring_backend: fimo
       n_sites: 80
-      oversample_factor: 50
       mining:
         batch_size: 5000
-        max_seconds: 60
+        budget:
+          mode: tier_target
+          target_tier_fraction: 0.001
+          max_candidates: 200000
 ```
 
 ---
@@ -266,12 +285,13 @@ inputs:
     type: pwm_artifact
     path: inputs/motif_artifacts/lexA.json
     sampling:  # Stage‑A sampling
-      scoring_backend: fimo
       n_sites: 80
-      oversample_factor: 50
       mining:
         batch_size: 5000
-        max_seconds: 60
+        budget:
+          mode: tier_target
+          target_tier_fraction: 0.001
+          max_candidates: 200000
 ```
 
 ---
@@ -298,12 +318,13 @@ inputs:
       - inputs/motif_artifacts/lexA.json
       - inputs/motif_artifacts/cpxR.json
     sampling:  # Stage‑A sampling
-      scoring_backend: fimo
       n_sites: 80
-      oversample_factor: 50
       mining:
         batch_size: 5000
-        max_seconds: 60
+        budget:
+          mode: tier_target
+          target_tier_fraction: 0.001
+          max_candidates: 200000
 ```
 
 ---

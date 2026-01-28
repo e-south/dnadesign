@@ -45,7 +45,7 @@ def _write_stage_a_config(tmp_path: Path) -> Path:
         textwrap.dedent(
             f"""
             densegen:
-              schema_version: "2.6"
+              schema_version: "2.7"
               run:
                 id: demo
                 root: "."
@@ -112,7 +112,7 @@ def _write_pwm_stage_a_config(tmp_path: Path) -> Path:
         textwrap.dedent(
             f"""
             densegen:
-              schema_version: "2.6"
+              schema_version: "2.7"
               run:
                 id: demo
                 root: "."
@@ -123,8 +123,11 @@ def _write_pwm_stage_a_config(tmp_path: Path) -> Path:
                   sampling:
                     strategy: consensus
                     n_sites: 1
-                    oversample_factor: 1
-                    scoring_backend: fimo
+                    mining:
+                      batch_size: 1
+                      budget:
+                        mode: fixed_candidates
+                        candidates: 1
               output:
                 targets: [parquet]
                 schema:

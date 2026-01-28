@@ -42,7 +42,7 @@ def _write_config(tmp_path: Path) -> Path:
         yaml.safe_dump(
             {
                 "densegen": {
-                    "schema_version": "2.6",
+                    "schema_version": "2.7",
                     "run": {"id": "stage_a_e2e", "root": "."},
                     "inputs": [
                         {
@@ -52,11 +52,12 @@ def _write_config(tmp_path: Path) -> Path:
                             "sampling": {
                                 "strategy": "stochastic",
                                 "n_sites": 5,
-                                "oversample_factor": 20,
-                                "scoring_backend": "fimo",
-                                "mining": {"batch_size": 200, "max_seconds": 10, "log_every_batches": 1},
-                                "length_policy": "range",
-                                "length_range": [15, 20],
+                                "mining": {
+                                    "batch_size": 200,
+                                    "budget": {"mode": "fixed_candidates", "candidates": 2000},
+                                    "log_every_batches": 1,
+                                },
+                                "length": {"policy": "range", "range": [15, 20]},
                                 "keep_all_candidates_debug": True,
                             },
                         }
@@ -109,7 +110,7 @@ def _top_scoring_sequences(candidates: pd.DataFrame, count: int) -> list[str]:
                 matched_sequence=str(row.matched_sequence) if row.matched_sequence else None,
             )
         )
-    deduped = pwm_sampling._dedupe_by_core(ranked, min_core_hamming_distance=None)
+    deduped, _collapsed = pwm_sampling._collapse_by_core_identity(ranked)
     return [cand.seq for cand in deduped[:count]]
 
 
