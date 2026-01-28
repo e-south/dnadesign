@@ -18,6 +18,7 @@ from typing import Any
 import polars as pl
 
 from .hues import HueRegistry
+from .util import choose_dropdown_value
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,7 @@ def build_umap_controls(
     df_active: pl.DataFrame,
     hue_registry: HueRegistry,
     default_hue_key: str | None = None,
+    current_color: str | None = None,
 ) -> UmapControls:
     default_x = None
     default_y = None
@@ -61,7 +63,9 @@ def build_umap_controls(
         full_width=True,
     )
     options = ["(none)"] + [option.key for option in hue_registry.options]
-    default_label = default_hue_key if default_hue_key in options else None
+    preferred = default_hue_key if default_hue_key in options else None
+    current = current_color if current_color in options else None
+    default_label = choose_dropdown_value(options, current=current, preferred=preferred) or "(none)"
     umap_color_dropdown = mo.ui.dropdown(
         options=options,
         value=default_label or "(none)",

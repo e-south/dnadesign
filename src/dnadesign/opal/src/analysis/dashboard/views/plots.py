@@ -107,54 +107,36 @@ def prepare_umap_explorer_view(
 ) -> UmapExplorerView:
     _x_col = (x_col or "").strip()
     _y_col = (y_col or "").strip()
-    x_name = _x_col or "umap_x"
-    y_name = _y_col or "umap_y"
-    valid = True
-    note: str | None = None
-
+    if df.is_empty():
+        raise ValueError("UMAP missing: dataset is empty.")
     if "id" not in df.columns:
-        note = "UMAP missing: required column `id` is absent."
-        valid = False
-    elif not _x_col or not _y_col:
-        note = (
+        raise ValueError("UMAP missing: required column `id` is absent.")
+    if not _x_col or not _y_col:
+        raise ValueError(
             "UMAP missing: provide x/y columns. "
             "To attach coords: `uv run cluster umap --dataset <dataset> "
             "--name ldn_v1 --attach-coords --write --allow-overwrite`"
         )
-        valid = False
-    elif _x_col not in df.columns or _y_col not in df.columns:
-        note = (
+    if _x_col not in df.columns or _y_col not in df.columns:
+        raise ValueError(
             "UMAP missing: x/y columns must exist. "
             "To attach coords: `uv run cluster umap --dataset <dataset> "
             "--name ldn_v1 --attach-coords --write --allow-overwrite`"
         )
-        valid = False
-    elif not (safe_is_numeric(df.schema[_x_col]) and safe_is_numeric(df.schema[_y_col])):
-        note = (
+    if not (safe_is_numeric(df.schema[_x_col]) and safe_is_numeric(df.schema[_y_col])):
+        raise ValueError(
             "UMAP missing: x/y columns must be numeric. "
             "To attach coords: `uv run cluster umap --dataset <dataset> "
             "--name ldn_v1 --attach-coords --write --allow-overwrite`"
         )
-        valid = False
 
-    if not valid:
-        df_chart = pl.DataFrame(
-            schema={
-                "__row_id": pl.Int64,
-                "id": pl.Utf8,
-                x_name: pl.Float64,
-                y_name: pl.Float64,
-            }
-        )
-        return UmapExplorerView(
-            df_plot=df_chart,
-            valid=False,
-            note=note,
-            x_col=x_name,
-            y_col=y_name,
-            color_spec=None,
-            color_tooltip=None,
-        )
+    if (
+        not df.select(pl.col(_x_col).is_not_null().all()).item()
+        or not df.select(pl.col(_y_col).is_not_null().all()).item()
+    ):
+        raise ValueError("UMAP missing: x/y columns must be non-null for all rows.")
+    if not df.select(pl.col(_x_col).is_finite().all()).item() or not df.select(pl.col(_y_col).is_finite().all()).item():
+        raise ValueError("UMAP missing: x/y columns must be finite for all rows.")
 
     note = f"Plotting full dataset: `{df.height}` points."
     okabe_ito = [
@@ -172,23 +154,27 @@ def prepare_umap_explorer_view(
     color_spec: ColorSpec | None = None
     color_tooltip = None
     plot_cols = _dedupe([col for col in ["__row_id", "id", _x_col, _y_col] if col in df.columns])
-    if hue is not None and hue.key in df.columns and hue.key not in plot_cols:
-        plot_cols.append(hue.key)
+    if hue is not None:
+        if hue.key not in df.columns:
+            raise ValueError(f"UMAP missing: hue column `{hue.key}` not found.")
+        if hue.key not in plot_cols:
+            plot_cols.append(hue.key)
     df_chart = df.select(plot_cols)
 
-    if hue is not None and hue.key in df_chart.columns:
+    if hue is not None:
         color_field = hue.key
         color_title = hue.label
         color_tooltip = hue.key
-        non_null_count = df_chart.select(pl.col(hue.key).count()).item() if df_chart.height else 0
+        non_null_count = df_chart.select(pl.col(hue.key).is_not_null().sum()).item()
         if non_null_count == 0:
-            note = (
-                f"Plotting full dataset: `{df.height}` points. "
-                f"Color `{hue.key}` has no non-null values; rendering without color."
-            )
-            color_spec = None
-            color_tooltip = None
-        elif hue.kind == "categorical" and hue.category_labels:
+            raise ValueError(f"UMAP missing: color `{hue.key}` has no non-null values.")
+        if safe_is_numeric(df_chart.schema.get(hue.key, pl.Null)):
+            if not df_chart.select(pl.col(hue.key).is_finite().all()).item():
+                raise ValueError(f"UMAP missing: color `{hue.key}` must be finite for all rows.")
+        elif not df_chart.select(pl.col(hue.key).is_not_null().all()).item():
+            raise ValueError(f"UMAP missing: color `{hue.key}` must be non-null for all rows.")
+
+        if hue.kind == "categorical" and hue.category_labels:
             label_col = f"{hue.key}__label"
             yes_label, no_label = hue.category_labels
             df_chart = df_chart.with_columns(
@@ -253,15 +239,32 @@ def prepare_umap_chart_view(
     color_col: str | None,
     color_title: str | None,
     tooltip_cols: Iterable[str] | None = None,
-) -> UmapChartView | None:
-    if df.is_empty() or x_col not in df.columns or y_col not in df.columns:
-        return None
+) -> UmapChartView:
+    if df.is_empty():
+        raise ValueError("UMAP chart missing: dataset is empty.")
+    if x_col not in df.columns or y_col not in df.columns:
+        raise ValueError("UMAP chart missing: required x/y columns are absent.")
+    if not (safe_is_numeric(df.schema.get(x_col, pl.Null)) and safe_is_numeric(df.schema.get(y_col, pl.Null))):
+        raise ValueError("UMAP chart missing: x/y columns must be numeric.")
+    if (
+        not df.select(pl.col(x_col).is_not_null().all()).item()
+        or not df.select(pl.col(y_col).is_not_null().all()).item()
+    ):
+        raise ValueError("UMAP chart missing: x/y columns must be non-null for all rows.")
+    if not df.select(pl.col(x_col).is_finite().all()).item() or not df.select(pl.col(y_col).is_finite().all()).item():
+        raise ValueError("UMAP chart missing: x/y columns must be finite for all rows.")
+    if color_col is not None and color_col not in df.columns:
+        raise ValueError(f"UMAP chart missing: color column `{color_col}` is absent.")
     base_cols = _dedupe([x_col, y_col, *(tooltip_cols or [])])
-    df_plot = df.select([c for c in base_cols if c in df.columns]).filter(
-        pl.col(x_col).is_not_null() & pl.col(y_col).is_not_null()
-    )
+    df_plot = df.select([c for c in base_cols if c in df.columns])
     if df_plot.is_empty():
-        return None
+        raise ValueError("UMAP chart missing: no rows available after selection.")
+    if color_col is not None and color_col in df_plot.columns:
+        if safe_is_numeric(df_plot.schema.get(color_col, pl.Null)):
+            if not df_plot.select(pl.col(color_col).is_finite().all()).item():
+                raise ValueError(f"UMAP chart missing: color `{color_col}` must be finite for all rows.")
+        elif not df_plot.select(pl.col(color_col).is_not_null().all()).item():
+            raise ValueError(f"UMAP chart missing: color `{color_col}` must be non-null for all rows.")
     color_kind = None
     if color_col and color_col in df_plot.columns:
         color_kind = "numeric" if safe_is_numeric(df_plot.schema.get(color_col, pl.Null)) else "categorical"
@@ -283,14 +286,26 @@ def prepare_cluster_view(
     metric_col: str,
     hue: HueOption | None,
     id_col: str,
-) -> ClusterView | None:
-    if df.is_empty() or cluster_col not in df.columns or metric_col not in df.columns:
-        return None
+) -> ClusterView:
+    if df.is_empty():
+        raise ValueError("Cluster plot missing: dataset is empty.")
+    if id_col not in df.columns:
+        raise ValueError(f"Cluster plot missing: required column `{id_col}` is absent.")
+    if cluster_col not in df.columns:
+        raise ValueError(f"Cluster plot missing: required column `{cluster_col}` is absent.")
+    if metric_col not in df.columns:
+        raise ValueError(f"Cluster plot missing: required column `{metric_col}` is absent.")
+    if not df.select(pl.col(id_col).is_not_null().all()).item():
+        raise ValueError(f"Cluster plot missing: `{id_col}` must be non-null for all rows.")
+    if not df.select(pl.col(cluster_col).is_not_null().all()).item():
+        raise ValueError(f"Cluster plot missing: `{cluster_col}` must be non-null for all rows.")
+    if not df.select(pl.col(metric_col).is_not_null().all()).item():
+        raise ValueError(f"Cluster plot missing: `{metric_col}` must be non-null for all rows.")
     hue_key = hue.key if hue is not None else ""
     cols = _dedupe([cluster_col, metric_col, id_col, hue_key])
-    df_points = df.select([c for c in cols if c in df.columns]).filter(pl.col(metric_col).is_not_null())
+    df_points = df.select([c for c in cols if c in df.columns])
     if df_points.is_empty():
-        return None
+        raise ValueError("Cluster plot missing: no rows available after selection.")
 
     df_points = df_points.with_columns(
         pl.col(cluster_col).cast(pl.Int64, strict=False).alias(f"{cluster_col}__ord"),
@@ -322,7 +337,11 @@ def prepare_cluster_view(
     yes_label = None
     no_label = None
 
-    if hue is not None and hue.key in df_points.columns:
+    if hue is not None:
+        if hue.key not in df_points.columns:
+            raise ValueError(f"Cluster plot missing: hue column `{hue.key}` is absent.")
+        if not df_points.select(pl.col(hue.key).is_not_null().all()).item():
+            raise ValueError(f"Cluster plot missing: hue column `{hue.key}` has null values.")
         if hue.kind == "categorical" and hue.category_labels:
             label_col = f"{hue.key}__label"
             yes_label, no_label = hue.category_labels
@@ -379,24 +398,41 @@ def prepare_umap_overlay_view(
     umap_y_col: str,
     cluster_col: str,
 ) -> UmapOverlayView:
-    if df.is_empty() or umap_x_col not in df.columns or umap_y_col not in df.columns:
-        return UmapOverlayView(df_cluster=None, df_score=None)
+    if df.is_empty():
+        raise ValueError("UMAP overlay missing: dataset is empty.")
+    if id_col not in df.columns:
+        raise ValueError(f"UMAP overlay missing: required column `{id_col}` is absent.")
+    if umap_x_col not in df.columns or umap_y_col not in df.columns:
+        raise ValueError("UMAP overlay missing: required UMAP x/y columns are absent.")
+    if not (
+        safe_is_numeric(df.schema.get(umap_x_col, pl.Null)) and safe_is_numeric(df.schema.get(umap_y_col, pl.Null))
+    ):
+        raise ValueError("UMAP overlay missing: UMAP x/y columns must be numeric.")
+    if (
+        not df.select(pl.col(umap_x_col).is_not_null().all()).item()
+        or not df.select(pl.col(umap_y_col).is_not_null().all()).item()
+    ):
+        raise ValueError("UMAP overlay missing: UMAP x/y columns must be non-null for all rows.")
+    if (
+        not df.select(pl.col(umap_x_col).is_finite().all()).item()
+        or not df.select(pl.col(umap_y_col).is_finite().all()).item()
+    ):
+        raise ValueError("UMAP overlay missing: UMAP x/y columns must be finite for all rows.")
 
     base_cols = [umap_x_col, umap_y_col]
-    if id_col in df.columns:
-        base_cols.append(id_col)
+    base_cols.append(id_col)
 
-    df_cluster = None
-    if cluster_col in df.columns:
-        df_cluster = df.select(_dedupe(base_cols + [cluster_col])).filter(pl.col(cluster_col).is_not_null())
-        if df_cluster.is_empty():
-            df_cluster = None
+    if cluster_col not in df.columns:
+        raise ValueError(f"UMAP overlay missing: cluster column `{cluster_col}` is absent.")
+    df_cluster = df.select(_dedupe(base_cols + [cluster_col]))
+    if not df_cluster.select(pl.col(cluster_col).is_not_null().all()).item():
+        raise ValueError("UMAP overlay missing: cluster column has null values.")
 
-    score_col = "opal__view__score" if "opal__view__score" in df.columns else None
-    df_score = None
-    if score_col is not None:
-        df_score = df.select(_dedupe(base_cols + [score_col])).filter(pl.col(score_col).is_not_null())
-        if df_score.is_empty():
-            df_score = None
+    score_col = "opal__view__score"
+    if score_col not in df.columns:
+        raise ValueError("UMAP overlay missing: `opal__view__score` column is absent.")
+    df_score = df.select(_dedupe(base_cols + [score_col]))
+    if not df_score.select(pl.col(score_col).is_not_null().all()).item():
+        raise ValueError("UMAP overlay missing: score column has null values.")
 
     return UmapOverlayView(df_cluster=df_cluster, df_score=df_score)

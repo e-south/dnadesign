@@ -53,6 +53,40 @@ def _apply_perf_rcparams() -> None:
     plt.rcParams["path.simplify_threshold"] = 0.0  # keep geometry intact
 
 
+def apply_plot_style(*, variant: str = "diagnostic") -> None:
+    """
+    Apply consistent plot styling for OPAL diagnostics.
+    """
+    ensure_mpl_config_dir()
+    import matplotlib.pyplot as plt
+
+    if variant != "diagnostic":
+        raise ValueError(f"Unknown plot style variant: {variant}")
+
+    plt.rcParams.update(
+        {
+            "font.size": 10,
+            "axes.titlesize": 11,
+            "axes.labelsize": 10,
+            "xtick.labelsize": 9,
+            "ytick.labelsize": 9,
+            "legend.fontsize": 9,
+            "figure.titlesize": 12,
+            "axes.titlepad": 6,
+            "figure.facecolor": "white",
+            "axes.facecolor": "white",
+            "savefig.facecolor": "white",
+            "text.color": "#111111",
+            "axes.labelcolor": "#111111",
+            "axes.titlecolor": "#111111",
+            "xtick.color": "#111111",
+            "ytick.color": "#111111",
+            "axes.edgecolor": "#111111",
+            "legend.frameon": False,
+        }
+    )
+
+
 def scatter_smart(ax, x, y, *, s=16, alpha=0.85, rasterize_at=None, edgecolors="none", **kw):
     """
     Always deterministic; switches to rasterized draw above 'rasterize_at' points

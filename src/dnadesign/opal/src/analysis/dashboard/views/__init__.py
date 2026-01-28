@@ -10,6 +10,6 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from . import plots, sfxi
+from . import derived_metrics, plots, sfxi
 
-__all__ = ["plots", "sfxi"]
+__all__ = ["derived_metrics", "plots", "sfxi"]

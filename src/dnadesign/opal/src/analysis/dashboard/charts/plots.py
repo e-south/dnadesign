@@ -20,6 +20,7 @@ import polars as pl
 from altair.utils.schemapi import UndefinedType
 
 from ..hues import HueOption
+from ..util import safe_is_numeric
 from ..views.plots import (
     ColorSpec,
     prepare_cluster_view,
@@ -65,6 +66,18 @@ def _color_encoding(spec: ColorSpec | None) -> alt.Color | UndefinedType:
     return alt.Undefined
 
 
+def _tooltip_fields(df: pl.DataFrame, cols: Iterable[str]) -> list[alt.Tooltip]:
+    seen: set[str] = set()
+    tooltips: list[alt.Tooltip] = []
+    for col in cols:
+        if not col or col in seen or col not in df.columns:
+            continue
+        seen.add(col)
+        kind = "Q" if safe_is_numeric(df.schema.get(col, pl.Null)) else "N"
+        tooltips.append(alt.Tooltip(f"{col}:{kind}", title=col))
+    return tooltips
+
+
 @dataclass(frozen=True)
 class UmapExplorerResult:
     chart: alt.Chart
@@ -86,61 +99,43 @@ def build_umap_explorer_chart(
 ) -> UmapExplorerResult:
     view = prepare_umap_explorer_view(df=df, x_col=x_col, y_col=y_col, hue=hue)
     if not view.valid:
-        chart = (
-            alt.Chart(view.df_plot)
-            .mark_circle(stroke=None, strokeWidth=0)
-            .encode(
-                x=alt.X(view.x_col),
-                y=alt.Y(view.y_col),
-                tooltip=[c for c in ["id", "__row_id", view.x_col, view.y_col] if c in view.df_plot.columns],
-            )
-            .properties(width=plot_size, height=plot_size)
-        )
-        chart = with_title(
-            chart,
-            "UMAP explorer (Evo2 embedding)",
-            f"{dataset_name or 'dataset'} · color=none",
-        )
-        return UmapExplorerResult(chart=chart, df_plot=df, valid=False, note=view.note)
+        raise ValueError(view.note or "UMAP explorer missing: invalid inputs.")
 
     color_encoding = _color_encoding(view.color_spec)
     brush = alt.selection_interval(name="umap_brush", encodings=["x", "y"])
-    tooltip_cols = [c for c in ["id", "__row_id", view.x_col, view.y_col] if c in view.df_plot.columns]
-    if view.color_tooltip and view.color_tooltip in view.df_plot.columns and view.color_tooltip not in tooltip_cols:
-        tooltip_cols.append(view.color_tooltip)
+    tooltip_candidates = ["id", "__row_id", view.x_col, view.y_col]
+    if view.color_tooltip:
+        tooltip_candidates.append(view.color_tooltip)
+    tooltip_fields = _tooltip_fields(view.df_plot, tooltip_candidates)
 
-    chart = (
+    chart_base = (
         alt.Chart(view.df_plot)
         .mark_circle(size=point_size, opacity=opacity, stroke=None, strokeWidth=0)
         .encode(
             x=alt.X(view.x_col, title=view.x_col),
             y=alt.Y(view.y_col, title=view.y_col),
             color=color_encoding,
-            tooltip=tooltip_cols,
+            tooltip=tooltip_fields,
         )
         .add_params(brush)
         .properties(width=plot_size, height=plot_size)
     )
-    if "opal__view__top_k" in view.df_plot.columns:
-        df_top = view.df_plot.filter(pl.col("opal__view__top_k"))
-        if df_top.height:
-            top_layer = (
-                alt.Chart(df_top)
-                .mark_circle(
-                    size=point_size * 1.8,
-                    stroke="#000000",
-                    strokeWidth=1.5,
-                    fillOpacity=0.0,
-                    opacity=1.0,
-                )
+    chart = chart_base
+    edge_keys = {"opal__view__top_k", "opal__view__observed"}
+    if hue is not None and hue.key in edge_keys and hue.key in view.df_plot.columns:
+        df_edge = view.df_plot.filter(pl.col(hue.key).cast(pl.Boolean, strict=False).fill_null(False))
+        if not df_edge.is_empty():
+            edge_chart = (
+                alt.Chart(df_edge)
+                .mark_circle(size=point_size, opacity=opacity, fillOpacity=0, stroke="black", strokeWidth=1)
                 .encode(
                     x=alt.X(view.x_col, title=view.x_col),
                     y=alt.Y(view.y_col, title=view.y_col),
-                    tooltip=tooltip_cols,
+                    tooltip=tooltip_fields,
                 )
+                .properties(width=plot_size, height=plot_size)
             )
-            chart = chart + top_layer
-
+            chart = chart_base + edge_chart
     color_context = (view.color_spec.title if view.color_spec else None) or "none"
     chart = with_title(
         chart,
@@ -163,7 +158,7 @@ def build_umap_chart(
     size: int = 40,
     opacity: float = 0.7,
     plot_size: int = 420,
-) -> alt.Chart | None:
+) -> alt.Chart:
     view = prepare_umap_chart_view(
         df=df,
         x_col=x_col,
@@ -172,13 +167,11 @@ def build_umap_chart(
         color_title=color_title,
         tooltip_cols=tooltip_cols,
     )
-    if view is None:
-        return None
-
+    tooltip_fields = _tooltip_fields(view.df_plot, view.tooltip_cols)
     enc = {
         "x": alt.X(view.x_col, title="UMAP X"),
         "y": alt.Y(view.y_col, title="UMAP Y"),
-        "tooltip": view.tooltip_cols,
+        "tooltip": tooltip_fields,
     }
     if view.color_col:
         kind = "Q" if view.color_kind == "numeric" else "N"
@@ -205,7 +198,7 @@ def build_cluster_chart(
     id_col: str,
     title: str,
     plot_height: int = 240,
-) -> alt.Chart | None:
+) -> alt.Chart:
     view = prepare_cluster_view(
         df=df,
         cluster_col=cluster_col,
@@ -213,13 +206,12 @@ def build_cluster_chart(
         hue=hue,
         id_col=id_col,
     )
-    if view is None:
-        return None
 
     sort_field = alt.SortField(field=view.sort_field, order="ascending")
     tooltip_cols = [
         c for c in [cluster_col, metric_col, id_col, view.color_tooltip] if c and c in view.df_points.columns
     ]
+    tooltip_fields = _tooltip_fields(view.df_points, tooltip_cols)
 
     color_encoding = _color_encoding(view.color_spec)
 
@@ -239,11 +231,11 @@ def build_cluster_chart(
                 xOffset="__jitter:Q",
                 y=alt.Y(f"{metric_col}:{view.metric_type}", title=metric_label),
                 color=color_encoding,
-                tooltip=tooltip_cols,
+                tooltip=tooltip_fields,
             )
         ) + (
             alt.Chart(df_top)
-            .mark_circle(size=36, opacity=0.85)
+            .mark_circle(size=36, opacity=0.85, stroke="black", strokeWidth=1)
             .encode(
                 x=alt.X(
                     f"{cluster_col}:N",
@@ -254,7 +246,7 @@ def build_cluster_chart(
                 xOffset="__jitter:Q",
                 y=alt.Y(f"{metric_col}:{view.metric_type}", title=metric_label),
                 color=color_encoding,
-                tooltip=tooltip_cols,
+                tooltip=tooltip_fields,
             )
         )
     else:
@@ -271,9 +263,29 @@ def build_cluster_chart(
                 xOffset="__jitter:Q",
                 y=alt.Y(f"{metric_col}:{view.metric_type}", title=metric_label),
                 color=color_encoding if color_encoding is not alt.Undefined else alt.value(view.okabe_ito[4]),
-                tooltip=tooltip_cols,
+                tooltip=tooltip_fields,
             )
         )
+        edge_keys = {"opal__view__top_k", "opal__view__observed"}
+        if hue is not None and hue.key in edge_keys and view.label_col and view.yes_label:
+            df_edge = view.df_points.filter(pl.col(view.label_col) == view.yes_label)
+            if not df_edge.is_empty():
+                edge = (
+                    alt.Chart(df_edge)
+                    .mark_circle(size=26, opacity=0.8, fillOpacity=0, stroke="black", strokeWidth=1)
+                    .encode(
+                        x=alt.X(
+                            f"{cluster_col}:N",
+                            sort=sort_field,
+                            title="Leiden cluster",
+                            axis=alt.Axis(labelAngle=90, labelFontSize=8),
+                        ),
+                        xOffset="__jitter:Q",
+                        y=alt.Y(f"{metric_col}:{view.metric_type}", title=metric_label),
+                        tooltip=tooltip_fields,
+                    )
+                )
+                base = base + edge
 
     subtitle = f"{dataset_name or 'dataset'} · y={metric_label} · hue={view.hue_label} · n={view.df_points.height}"
     return (
@@ -290,7 +302,7 @@ def build_umap_overlay_charts(
     umap_x_col: str = "cluster__ldn_v1__umap_x",
     umap_y_col: str = "cluster__ldn_v1__umap_y",
     cluster_col: str = "cluster__ldn_v1",
-) -> tuple[alt.Chart | None, alt.Chart | None]:
+) -> tuple[alt.Chart, alt.Chart]:
     view = prepare_umap_overlay_view(
         df=df,
         id_col=id_col,
@@ -299,37 +311,29 @@ def build_umap_overlay_charts(
         cluster_col=cluster_col,
     )
 
-    cluster_chart = None
-    if view.df_cluster is not None:
-        chart = build_umap_chart(
-            df=view.df_cluster,
-            x_col=umap_x_col,
-            y_col=umap_y_col,
-            color_col=cluster_col,
-            color_title="Leiden cluster",
-            title="UMAP colored by Leiden cluster",
-            subtitle=f"{dataset_name or 'dataset'} · n={view.df_cluster.height}",
-            tooltip_cols=[c for c in [id_col, cluster_col] if c in view.df_cluster.columns],
-            plot_size=plot_size,
-        )
-        if chart is not None:
-            cluster_chart = chart
+    cluster_chart = build_umap_chart(
+        df=view.df_cluster,
+        x_col=umap_x_col,
+        y_col=umap_y_col,
+        color_col=cluster_col,
+        color_title="Leiden cluster",
+        title="UMAP colored by Leiden cluster",
+        subtitle=f"{dataset_name or 'dataset'} · n={view.df_cluster.height}",
+        tooltip_cols=[c for c in [id_col, cluster_col] if c in view.df_cluster.columns],
+        plot_size=plot_size,
+    )
 
-    score_col = "opal__view__score" if "opal__view__score" in df.columns else None
-    score_chart = None
-    if view.df_score is not None and score_col is not None:
-        chart = build_umap_chart(
-            df=view.df_score,
-            x_col=umap_x_col,
-            y_col=umap_y_col,
-            color_col=score_col,
-            color_title="Score",
-            title="UMAP colored by score",
-            subtitle=f"{dataset_name or 'dataset'} · n={view.df_score.height}",
-            tooltip_cols=[c for c in [id_col, score_col] if c in view.df_score.columns],
-            plot_size=plot_size,
-        )
-        if chart is not None:
-            score_chart = chart
+    score_col = "opal__view__score"
+    score_chart = build_umap_chart(
+        df=view.df_score,
+        x_col=umap_x_col,
+        y_col=umap_y_col,
+        color_col=score_col,
+        color_title="Score",
+        title="UMAP colored by score",
+        subtitle=f"{dataset_name or 'dataset'} · n={view.df_score.height}",
+        tooltip_cols=[c for c in [id_col, score_col] if c in view.df_score.columns],
+        plot_size=plot_size,
+    )
 
     return cluster_chart, score_chart

@@ -95,6 +95,60 @@ plots:
 
 Ledger sinks always live under `context.workspace.outputs_dir` (e.g., `outputs/ledger/`).
 
+---
+
+## SFXI diagnostics plots
+
+These plots reuse shared SFXI math and are safe to run without retraining.
+Diagnostic plots always render the full dataset; sampling parameters are not supported.
+
+### Plot kinds + params
+
+- **`sfxi_factorial_effects`**: factorial-effects map from predicted logic vectors.
+  - params: `size_by` (default `obj__effect_scaled`), `include_labels`, `rasterize_at`
+- **`sfxi_setpoint_sweep`**: objective landscape across discrete setpoints (current-round labels).
+  - rendered as a heatmap with setpoints as columns (vector labels) and diagnostic metrics as rows.
+  - rows report median `logic_fidelity`, median `effect_scaled`, and median `score` over observed labels.
+  - uses `logic_exponent_beta`, `intensity_exponent_gamma`, and `intensity_log2_offset_delta` from `objective__params`.
+  - params: `y_col` (default `y_obs`), `percentile`, `min_n`, `eps`, `delta`
+- **`sfxi_support_diagnostics`**: distance-to-labeled-logic vs score (OOD check).
+  - params: `y_axis`, `hue`, `batch_size`
+- **`sfxi_uncertainty`**: uncertainty vs score (artifact model; RF ensemble score std).
+  - uses `logic_exponent_beta`, `intensity_exponent_gamma`, and `intensity_log2_offset_delta` from `objective__params`.
+  - params: `kind` (score), `y_axis`, `hue`
+- **`sfxi_intensity_scaling`**: denom + clip fractions + E_raw distribution (current-round labels).
+  - params: `y_col` (default `y_obs`), `percentile`, `min_n`, `eps`, `delta`, `include_pool`
+
+### Example YAML
+
+```yaml
+plots:
+  - name: sfxi_factorial_map
+    kind: sfxi_factorial_effects
+    params:
+      size_by: obj__effect_scaled
+
+  - name: sfxi_setpoint_sweep
+    kind: sfxi_setpoint_sweep
+    params: {}
+
+  - name: sfxi_support_diag
+    kind: sfxi_support_diagnostics
+    params:
+      y_axis: score
+      hue: effect_scaled
+
+  - name: sfxi_uncertainty
+    kind: sfxi_uncertainty
+    params:
+      kind: score
+
+  - name: sfxi_intensity_scaling
+    kind: sfxi_intensity_scaling
+    params:
+      include_pool: true
+```
+
 
 ### Writing a new plot
 

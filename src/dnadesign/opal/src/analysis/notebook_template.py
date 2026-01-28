@@ -44,9 +44,7 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
         def _():
             import marimo as mo
             import polars as pl
-            import altair as alt
             from pathlib import Path
-            from dnadesign.opal.src.analysis.dashboard.theme import setup_altair_theme
             from dnadesign.opal.src.analysis.facade import (
                 CampaignAnalysis,
                 available_rounds,
@@ -54,18 +52,19 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
                 latest_run_id,
                 require_columns,
             )
-            setup_altair_theme()
+            from dnadesign.opal.src.plots.config import load_plot_config, parse_enabled, parse_tags
             return (
                 mo,
                 pl,
-                alt,
                 Path,
-                setup_altair_theme,
                 CampaignAnalysis,
                 available_rounds,
                 latest_round,
                 latest_run_id,
                 require_columns,
+                load_plot_config,
+                parse_enabled,
+                parse_tags,
             )
 
 
@@ -180,6 +179,175 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
+        def _(campaign, config_path, load_plot_config):
+            plot_cfg = None
+            plot_cfg_error = None
+            try:
+                plot_cfg = load_plot_config(
+                    campaign_cfg=campaign.read_config_dict(),
+                    campaign_yaml=config_path,
+                    campaign_dir=campaign.workspace.workdir,
+                    plot_config_opt=None,
+                )
+            except Exception as exc:
+                plot_cfg_error = str(exc)
+            return plot_cfg, plot_cfg_error
+
+
+        @app.cell
+        def _(objective_name, parse_enabled, parse_tags, plot_cfg):
+            plot_entries = []
+            if plot_cfg is not None:
+                for plot_entry_item in plot_cfg.plots:
+                    if not isinstance(plot_entry_item, dict):
+                        raise ValueError(
+                            "Plot entry must be a mapping (got "
+                            f"{type(plot_entry_item).__name__})."
+                        )
+                    name = plot_entry_item.get("name")
+                    if not name:
+                        raise ValueError("Plot entry missing name.")
+                    preset_name = plot_entry_item.get("preset")
+                    preset = plot_cfg.plot_presets.get(preset_name) if preset_name else {}
+                    kind = plot_entry_item.get("kind") or preset.get("kind")
+                    if not kind:
+                        raise ValueError(f"Plot '{name}' missing kind.")
+                    enabled = parse_enabled(
+                        plot_entry_item.get("enabled")
+                        if "enabled" in plot_entry_item
+                        else preset.get("enabled"),
+                        ctx=name,
+                    )
+                    if not enabled:
+                        continue
+                    _plot_tags_list = []
+                    if preset_name:
+                        _plot_tags_list += parse_tags(
+                            preset.get("tags"),
+                            ctx=f"plot_presets.{preset_name}",
+                        )
+                    _plot_tags_list += parse_tags(
+                        plot_entry_item.get("tags"),
+                        ctx=f"plot {name}",
+                    )
+                    plot_entries.append(
+                        {"name": name, "kind": kind, "tags": _plot_tags_list}
+                    )
+            objective_is_sfxi = str(objective_name).lower().startswith("sfxi")
+
+            def _is_sfxi_kind(kind: str) -> bool:
+                return str(kind).lower().startswith("sfxi_")
+
+            if objective_is_sfxi:
+                plot_entries_filtered = [
+                    plot_entry_filter
+                    for plot_entry_filter in plot_entries
+                    if _is_sfxi_kind(plot_entry_filter["kind"])
+                ]
+            else:
+                plot_entries_filtered = [
+                    plot_entry_filter
+                    for plot_entry_filter in plot_entries
+                    if not _is_sfxi_kind(plot_entry_filter["kind"])
+                ]
+            return objective_is_sfxi, plot_entries_filtered
+
+
+        @app.cell
+        def _(campaign, plot_entries_filtered):
+            plots_dir = campaign.workspace.workdir / "outputs" / "plots"
+            plot_files = []
+            if plots_dir.exists():
+                plot_files = sorted(plots_dir.glob("*.png"))
+
+            def _latest_match(name: str):
+                candidates = [path for path in plot_files if path.name.startswith(name)]
+                if not candidates:
+                    return None
+                return max(candidates, key=lambda p: p.stat().st_mtime)
+
+            plot_choices = []
+            missing_outputs = []
+            for plot_entry_choice in plot_entries_filtered:
+                path = _latest_match(plot_entry_choice["name"])
+                if path is None:
+                    missing_outputs.append(plot_entry_choice["name"])
+                    continue
+                label = f"{plot_entry_choice['name']} ({path.name})"
+                plot_choices.append(
+                    {"label": label, "path": path, "entry": plot_entry_choice}
+                )
+            return plots_dir, plot_choices, missing_outputs
+
+
+        @app.cell
+        def _(mo, objective_is_sfxi, plot_cfg_error, plot_choices, plots_dir, missing_outputs):
+            plot_ui = None
+            filter_note = "SFXI plots only." if objective_is_sfxi else "Non-SFXI plots only."
+            if plot_cfg_error:
+                plot_gallery_note = (
+                    "### Plot gallery (outputs/plots)\\n\\n"
+                    f"Plot config unavailable: `{plot_cfg_error}`"
+                )
+            elif not plot_choices:
+                lines = [
+                    "### Plot gallery (outputs/plots)",
+                    "",
+                    f"No plot outputs found in `{plots_dir}`.",
+                    "Run `uv run opal plot -c <campaign.yaml>` to generate plots.",
+                ]
+                lines.append(filter_note)
+                if missing_outputs:
+                    lines.append(
+                        f"Configured plots without outputs: {', '.join(missing_outputs)}"
+                    )
+                plot_gallery_note = "\\n".join(lines)
+            else:
+                labels = [plot_choice["label"] for plot_choice in plot_choices]
+                plot_ui = mo.ui.dropdown(labels, value=labels[0], label="Plot")
+                plot_gallery_note = "### Plot gallery (outputs/plots)\\n\\n" + filter_note
+            return plot_ui, plot_gallery_note
+
+
+        @app.cell
+        def _(mo, plot_choices, plot_gallery_note, plot_ui):
+            if plot_ui is None:
+                panel = mo.md(plot_gallery_note)
+            else:
+                selected = str(plot_ui.value)
+                choice = next(
+                    (
+                        plot_choice
+                        for plot_choice in plot_choices
+                        if plot_choice["label"] == selected
+                    ),
+                    None,
+                )
+                if choice is None:
+                    raise ValueError(f"Plot selection not found: {selected}")
+                plot_entry_selected = choice["entry"]
+                _plot_tags_str = (
+                    ", ".join(plot_entry_selected["tags"])
+                    if plot_entry_selected["tags"]
+                    else "none"
+                )
+                details = [
+                    plot_gallery_note,
+                    "",
+                    f"**Plot**: `{plot_entry_selected['name']}`",
+                    f"Kind: `{plot_entry_selected['kind']}`",
+                    f"Tags: `{_plot_tags_str}`",
+                    f"File: `{choice['path']}`",
+                ]
+                panel = mo.vstack(
+                    [
+                        mo.md("\\n".join(details)),
+                        plot_ui,
+                        mo.image(choice["path"].read_bytes()),
+                    ]
+                )
+            panel
+        @app.cell
         def _():
             pred_columns = [
                 "id",
@@ -245,19 +413,6 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
 
         @app.cell
-        def _(mo, pred_df):
-            plot_max = max(200, int(pred_df.height))
-            plot_rows_ui = mo.ui.slider(
-                200,
-                plot_max,
-                value=min(plot_max, 5000),
-                step=200,
-                label="Plot rows",
-            )
-            return plot_rows_ui
-
-
-        @app.cell
         def _(
             campaign,
             data_source_ui,
@@ -301,243 +456,6 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
         @app.cell
         def _(data_source_ui, data_table, mo):
             mo.vstack([data_source_ui, data_table])
-            return
-
-
-        @app.cell
-        def _(mo):
-            show_selected_ui = mo.ui.checkbox(label="Selected only", value=False)
-            return show_selected_ui
-
-
-        @app.cell
-        def _(mo, pred_df):
-            color_candidates = []
-            for col in pred_df.columns:
-                if col in ("id", "sequence"):
-                    continue
-                dtype = pred_df.schema.get(col)
-                if dtype is None:
-                    continue
-                if dtype.is_numeric() or str(dtype) in ("Boolean", "String", "Categorical"):
-                    color_candidates.append(col)
-            default_color = (
-                "sel__is_selected"
-                if "sel__is_selected" in color_candidates
-                else (color_candidates[0] if color_candidates else None)
-            )
-            mo.stop(default_color is None, mo.md("No columns available for color."))
-            color_by_ui = mo.ui.dropdown(
-                color_candidates, value=default_color, label="Color by"
-            )
-            return color_candidates, default_color, color_by_ui
-
-
-        @app.cell
-        def _(pl, pred_df, show_selected_ui):
-            filtered_df = pred_df
-            if show_selected_ui.value and "sel__is_selected" in filtered_df.columns:
-                filtered_df = filtered_df.filter(pl.col("sel__is_selected") == True)
-            return filtered_df
-
-
-        @app.cell
-        def _(mo, filtered_df):
-            mo.stop(filtered_df.is_empty(), mo.md("No rows matched the current filters."))
-            return
-
-
-        @app.cell
-        def _(mo, pred_df):
-            schema = pred_df.schema
-            candidates = [
-                c
-                for c in pred_df.columns
-                if (c.startswith("pred__") or c.startswith("obj__"))
-                and (schema.get(c) is not None)
-                and schema.get(c).is_numeric()
-            ]
-            default_field = "pred__y_obj_scalar" if "pred__y_obj_scalar" in candidates else None
-            if default_field is None:
-                default_field = candidates[0] if candidates else None
-            mo.stop(default_field is None, mo.md("No score fields available."))
-            score_field_ui = mo.ui.dropdown(
-                candidates, value=default_field, label="Score field"
-            )
-            return candidates, default_field, score_field_ui
-
-
-        @app.cell
-        def _(color_by_ui, mo, plot_rows_ui, score_field_ui, show_selected_ui):
-            mo.vstack([score_field_ui, color_by_ui, show_selected_ui, plot_rows_ui])
-            return
-
-
-        @app.cell
-        def _(pl, filtered_df, score_field_ui):
-            score_field = str(score_field_ui.value)
-            try:
-                scores = filtered_df.get_column(score_field).cast(pl.Float64, strict=False)
-            except Exception as exc:
-                raise ValueError(f"Score field '{score_field}' could not be cast to float.") from exc
-            finite_mask = scores.is_finite().fill_null(False)
-            scores = scores.filter(finite_mask)
-            if len(scores) == 0:
-                raise ValueError(f"Score field '{score_field}' has no finite values after filtering.")
-            return score_field, scores
-
-
-        @app.cell
-        def _(mo, objective_name):
-            is_sfxi = objective_name.lower().startswith("sfxi")
-            mo.md("SFXI diagnostics enabled." if is_sfxi else "SFXI diagnostics not applicable.")
-            return is_sfxi
-
-
-        @app.cell
-        def _(alt, color_by_ui, filtered_df, is_sfxi, mo, pl, plot_rows_ui, score_field):
-            plot_limit = int(plot_rows_ui.value)
-            plot_total_rows = filtered_df.height
-            plot_limit = min(plot_limit, plot_total_rows)
-            if plot_total_rows > plot_limit:
-                plot_df = filtered_df.sample(n=plot_limit, seed=0, shuffle=True)
-                plot_note = (
-                    f"Plotting a random sample of {plot_limit} of {plot_total_rows} rows. "
-                    "Increase Plot rows to include more data. Large charts may exceed Marimo output limits."
-                )
-            else:
-                plot_df = filtered_df
-                plot_note = (
-                    f"Plotting all {plot_total_rows} rows. "
-                    "Large charts may exceed Marimo output limits; lower Plot rows if needed."
-                )
-            mo.md(plot_note)
-            color_field = str(color_by_ui.value)
-            if color_field not in plot_df.columns:
-                raise ValueError(f"Color field '{color_field}' not found in data.")
-            color_dtype = plot_df.schema.get(color_field)
-            color_type = "Q" if color_dtype is not None and color_dtype.is_numeric() else "N"
-            color_enc = alt.Color(
-                f"{color_field}:{color_type}",
-                legend=alt.Legend(title=color_field),
-            )
-
-            select_cols = ["id", "sel__rank_competition", score_field, color_field]
-            select_cols = list(dict.fromkeys(select_cols))
-            base = plot_df.select(select_cols).with_columns(
-                pl.col("sel__rank_competition").cast(pl.Int64),
-                pl.col(score_field).cast(pl.Float64, strict=False),
-            )
-            base = base.filter(
-                pl.col("sel__rank_competition").is_not_null()
-                & pl.col(score_field).is_finite()
-            )
-            if base.is_empty():
-                raise ValueError("No finite rank/score pairs after filtering.")
-            base_data = base.to_pandas()
-
-            hist = (
-                alt.Chart(base_data, title="Score distribution")
-                .mark_bar(opacity=0.75)
-                .encode(
-                    x=alt.X(
-                        f"{score_field}:Q",
-                        bin=alt.Bin(maxbins=40),
-                        title=score_field,
-                    ),
-                    y=alt.Y("count():Q", title="Count"),
-                    color=color_enc,
-                    tooltip=[alt.Tooltip("count():Q", title="Count")],
-                )
-                .properties(width=260, height=240)
-            )
-
-            scatter = (
-                alt.Chart(base_data, title="Score vs rank")
-                .mark_circle(size=60, opacity=0.7)
-                .encode(
-                    x=alt.X("sel__rank_competition:Q", title="Rank (competition)"),
-                    y=alt.Y(f"{score_field}:Q", title=score_field),
-                    color=color_enc,
-                    tooltip=[
-                        alt.Tooltip("id:N", title="id"),
-                        alt.Tooltip("sel__rank_competition:Q", title="rank"),
-                        alt.Tooltip(f"{score_field}:Q", title=score_field),
-                        alt.Tooltip(f"{color_field}:{color_type}", title=color_field),
-                    ],
-                )
-                .properties(width=260, height=240)
-            )
-
-            if not is_sfxi:
-                sfxi_chart = (
-                    alt.Chart([{"note": "SFXI diagnostics not applicable."}])
-                    .mark_text(color="black")
-                    .encode(text="note:N")
-                    .properties(width=260, height=240)
-                )
-            else:
-                needed = ["obj__logic_fidelity", "obj__effect_scaled"]
-                missing = [c for c in needed if c not in filtered_df.columns]
-                if missing:
-                    sfxi_chart = (
-                        alt.Chart([{"note": f"Missing columns: {missing}"}])
-                        .mark_text(color="black")
-                        .encode(text="note:N")
-                        .properties(width=260, height=240)
-                    )
-                else:
-                    sfxi_cols = [
-                        "id",
-                        "obj__logic_fidelity",
-                        "obj__effect_scaled",
-                        color_field,
-                    ]
-                    sfxi_cols = list(dict.fromkeys(sfxi_cols))
-                    sfxi_df = plot_df.select(sfxi_cols).with_columns(
-                        pl.col("obj__logic_fidelity").cast(pl.Float64, strict=False),
-                        pl.col("obj__effect_scaled").cast(pl.Float64, strict=False),
-                    )
-                    sfxi_df = sfxi_df.filter(
-                        pl.col("obj__logic_fidelity").is_finite()
-                        & pl.col("obj__effect_scaled").is_finite()
-                    )
-                    sfxi_data = sfxi_df.to_pandas()
-                    sfxi_chart = (
-                        alt.Chart(sfxi_data, title="SFXI: effect_scaled vs logic_fidelity")
-                        .mark_circle(size=60, opacity=0.7)
-                        .encode(
-                            x=alt.X("obj__logic_fidelity:Q", title="logic_fidelity"),
-                            y=alt.Y("obj__effect_scaled:Q", title="effect_scaled"),
-                            color=color_enc,
-                            tooltip=[
-                                alt.Tooltip("id:N", title="id"),
-                                alt.Tooltip("obj__logic_fidelity:Q", title="logic_fidelity"),
-                                alt.Tooltip("obj__effect_scaled:Q", title="effect_scaled"),
-                                alt.Tooltip(f"{color_field}:{color_type}", title=color_field),
-                            ],
-                        )
-                        .properties(width=260, height=240)
-                    )
-
-            charts = alt.hconcat(hist, scatter, sfxi_chart).properties(
-                background="white"
-            ).configure_view(
-                fill="white",
-                stroke="black",
-            ).configure_axis(
-                labelColor="black",
-                titleColor="black",
-                tickColor="black",
-                domainColor="black",
-                grid=False,
-            ).configure_legend(
-                labelColor="black",
-                titleColor="black",
-            ).configure_title(
-                color="black",
-            )
-            mo.ui.altair_chart(charts)
             return
 
 

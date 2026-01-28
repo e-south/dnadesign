@@ -157,6 +157,21 @@ def missingness_summary(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def column_non_null_counts(df: pl.DataFrame, *, columns: Sequence[str] | None = None) -> dict[str, int]:
+    if df.is_empty():
+        return {}
+    cols = list(columns or [])
+    if not cols:
+        cols = list(df.columns)
+    counts_exprs = [pl.col(name).is_not_null().sum().cast(pl.Int64).alias(name) for name in cols if name in df.columns]
+    if not counts_exprs:
+        return {}
+    row = df.select(counts_exprs).to_dicts()
+    if not row:
+        return {}
+    return {key: int(value) for key, value in row[0].items()}
+
+
 def safe_is_numeric(dtype: pl.DataType) -> bool:
     if dtype in (pl.Null, pl.Object):
         return False

@@ -15,8 +15,10 @@ import json
 from pathlib import Path
 
 import altair as alt
+import numpy as np
 import polars as pl
 import pytest
+from sklearn.ensemble import RandomForestRegressor
 
 from dnadesign.opal.src.analysis.dashboard import (
     datasets,
@@ -24,13 +26,17 @@ from dnadesign.opal.src.analysis.dashboard import (
     filters,
     hues,
     labels,
+    scores,
     selection,
     transient,
     ui,
     util,
 )
-from dnadesign.opal.src.analysis.dashboard.charts import plots
+from dnadesign.opal.src.analysis.dashboard import models as dashboard_models
+from dnadesign.opal.src.analysis.dashboard.charts import diagnostics_guidance, plots
 from dnadesign.opal.src.analysis.dashboard.views import sfxi
+from dnadesign.opal.src.analysis.sfxi.state_order import STATE_ORDER
+from dnadesign.opal.src.analysis.sfxi.uncertainty import supports_uncertainty
 
 
 def test_find_repo_root(tmp_path: Path) -> None:
@@ -117,6 +123,105 @@ def test_namespace_summary() -> None:
     assert summary_dict["densegen"]["count"] == 1
     assert summary_dict["opal"]["count"] == 1
     assert summary_dict["cluster"]["count"] == 1
+
+
+def test_default_view_hues_include_sfxi_diagnostics() -> None:
+    keys = {option.key for option in hues.default_view_hues()}
+    assert "opal__nearest_2_factor_logic" in keys
+    assert "opal__sfxi__uncertainty" in keys
+    assert "opal__sfxi__nearest_gate_class" not in keys
+    assert "opal__sfxi__nearest_gate_dist" not in keys
+    assert "opal__sfxi__dist_to_labeled_logic" not in keys
+    assert "opal__sfxi__dist_to_labeled_x" not in keys
+
+
+def test_column_non_null_counts_feed_hue_registry() -> None:
+    df = pl.DataFrame(
+        {
+            "a": [1.0, None],
+            "b": ["x", None],
+            "c": [None, None],
+        }
+    )
+    counts = util.column_non_null_counts(df, columns=["a", "b", "c"])
+    assert counts["a"] == 1
+    assert counts["b"] == 1
+    assert counts["c"] == 0
+    registry = hues.build_hue_registry(df, include_columns=True, non_null_counts=counts)
+    labels = registry.labels()
+    assert "a" in labels
+    assert "b" in labels
+    assert "c" not in labels
+
+
+def test_build_nearest_2_factor_counts() -> None:
+    label_df = pl.DataFrame(
+        {
+            "id": ["a", "b"],
+            "y_obs": [
+                [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+                [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+            ],
+        }
+    )
+    pred_df = pl.DataFrame(
+        {
+            "id": ["a", "c"],
+            "pred_y_hat": [
+                [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ],
+        }
+    )
+    result = sfxi.build_nearest_2_factor_counts(
+        label_events_df=label_df,
+        pred_events_df=pred_df,
+        y_col="y_obs",
+        pred_vec_col="pred_y_hat",
+    )
+    assert result.note is None
+    counts = {row["opal__nearest_2_factor_logic"]: row for row in result.df.to_dicts()}
+    assert counts["0001"]["observed_count"] == 1
+    assert counts["1111"]["observed_count"] == 1
+    assert counts["0001"]["predicted_count"] == 1
+    assert counts["0010"]["predicted_count"] == 1
+
+
+def test_build_predicted_logic_pools() -> None:
+    df = pl.DataFrame(
+        {
+            "id": ["a", "b", "c", "d"],
+            "opal__nearest_2_factor_logic": ["0001", "0001", "0010", "1111"],
+            "opal__view__observed": [False, False, False, True],
+        }
+    )
+    pools = sfxi.build_predicted_logic_pools(df)
+    assert pools == {
+        "Nearest 2-factor logic = 0001": "0001",
+        "Nearest 2-factor logic = 0010": "0010",
+    }
+
+
+def test_umap_explorer_chart_no_overlay_layers() -> None:
+    df = pl.DataFrame(
+        {
+            "id": ["a", "b"],
+            "cluster__ldn_v1__umap_x": [0.0, 1.0],
+            "cluster__ldn_v1__umap_y": [0.0, 1.0],
+            "opal__view__observed": [True, False],
+        }
+    )
+    result = plots.build_umap_explorer_chart(
+        df=df,
+        x_col="cluster__ldn_v1__umap_x",
+        y_col="cluster__ldn_v1__umap_y",
+        hue=None,
+        point_size=20,
+        opacity=0.5,
+        plot_size=200,
+        dataset_name="demo",
+    )
+    assert isinstance(result.chart, alt.Chart)
 
 
 def test_choose_dropdown_value_prefers_current_then_preferred() -> None:
@@ -260,6 +365,86 @@ def test_build_umap_overlay_charts() -> None:
     assert isinstance(score_chart, alt.Chart)
 
 
+def test_build_mode_view_requires_full_predictions() -> None:
+    df_base = pl.DataFrame({"id": ["a", "b", "c"]})
+    metrics_df = pl.DataFrame(
+        {
+            "id": ["a", "b"],
+            "score": [0.2, 0.4],
+            "top_k": [True, False],
+        }
+    )
+    with pytest.raises(ValueError, match="Missing predictions for 1 of 3 rows"):
+        scores.build_mode_view(
+            df_base=df_base,
+            metrics_df=metrics_df,
+            id_col="id",
+            observed_ids=set(),
+            observed_scores_df=None,
+            score_col="score",
+            logic_col=None,
+            effect_col=None,
+            rank_col=None,
+            top_k_col="top_k",
+        )
+
+
+def test_build_mode_view_allows_missing_observed_predictions() -> None:
+    df_base = pl.DataFrame({"id": ["a", "b", "c"]})
+    metrics_df = pl.DataFrame(
+        {
+            "id": ["a", "b"],
+            "score": [0.2, 0.4],
+            "logic_fidelity": [0.1, 0.2],
+            "effect_scaled": [0.3, 0.4],
+            "top_k": [True, False],
+        }
+    )
+    observed_scores = pl.DataFrame(
+        {
+            "id": ["c"],
+            "score": [0.7],
+            "logic_fidelity": [0.9],
+            "effect_scaled": [0.8],
+        }
+    )
+    out = scores.build_mode_view(
+        df_base=df_base,
+        metrics_df=metrics_df,
+        id_col="id",
+        observed_ids={"c"},
+        observed_scores_df=observed_scores,
+        score_col="score",
+        logic_col="logic_fidelity",
+        effect_col="effect_scaled",
+        rank_col=None,
+        top_k_col="top_k",
+    )
+    df_view = out.df
+    assert df_view.filter(pl.col("id") == "c")["opal__view__score"].item() == 0.7
+    assert df_view.filter(pl.col("id") == "c")["opal__view__logic_fidelity"].item() == 0.9
+    assert df_view.filter(pl.col("id") == "c")["opal__view__effect_scaled"].item() == 0.8
+    assert df_view.filter(pl.col("id") == "c")["opal__view__top_k"].item() is False
+
+
+def test_build_mode_view_requires_columns() -> None:
+    df_base = pl.DataFrame({"id": ["a"]})
+    metrics_df = pl.DataFrame({"id": ["a"], "score": [0.2]})
+    with pytest.raises(ValueError, match="Missing prediction columns"):
+        scores.build_mode_view(
+            df_base=df_base,
+            metrics_df=metrics_df,
+            id_col="id",
+            observed_ids=set(),
+            observed_scores_df=None,
+            score_col="score",
+            logic_col=None,
+            effect_col=None,
+            rank_col=None,
+            top_k_col="top_k",
+        )
+
+
 def test_build_umap_explorer_chart_cases() -> None:
     base = pl.DataFrame(
         {
@@ -291,62 +476,58 @@ def test_build_umap_explorer_chart_cases() -> None:
     assert ok.note is not None and "Plotting full dataset" in ok.note
     assert isinstance(ok.chart, alt.Chart)
 
-    missing_id = plots.build_umap_explorer_chart(
-        df=base.drop("id"),
-        x_col="x",
-        y_col="y",
-        hue=None,
-        point_size=40,
-        opacity=0.7,
-        plot_size=420,
-        dataset_name="demo",
-    )
-    assert missing_id.valid is False
-    assert missing_id.note is not None and "required column `id`" in missing_id.note
+    with pytest.raises(ValueError, match="required column `id`"):
+        plots.build_umap_explorer_chart(
+            df=base.drop("id"),
+            x_col="x",
+            y_col="y",
+            hue=None,
+            point_size=40,
+            opacity=0.7,
+            plot_size=420,
+            dataset_name="demo",
+        )
 
-    missing_xy = plots.build_umap_explorer_chart(
-        df=base,
-        x_col="",
-        y_col="",
-        hue=None,
-        point_size=40,
-        opacity=0.7,
-        plot_size=420,
-        dataset_name="demo",
-    )
-    assert missing_xy.valid is False
-    assert missing_xy.note is not None and "provide x/y columns" in missing_xy.note
+    with pytest.raises(ValueError, match="provide x/y columns"):
+        plots.build_umap_explorer_chart(
+            df=base,
+            x_col="",
+            y_col="",
+            hue=None,
+            point_size=40,
+            opacity=0.7,
+            plot_size=420,
+            dataset_name="demo",
+        )
 
-    non_numeric = plots.build_umap_explorer_chart(
-        df=pl.DataFrame({"id": ["a"], "x": ["na"], "y": ["nb"]}),
-        x_col="x",
-        y_col="y",
-        hue=None,
-        point_size=40,
-        opacity=0.7,
-        plot_size=420,
-        dataset_name="demo",
-    )
-    assert non_numeric.valid is False
-    assert non_numeric.note is not None and "must be numeric" in non_numeric.note
+    with pytest.raises(ValueError, match="must be numeric"):
+        plots.build_umap_explorer_chart(
+            df=pl.DataFrame({"id": ["a"], "x": ["na"], "y": ["nb"]}),
+            x_col="x",
+            y_col="y",
+            hue=None,
+            point_size=40,
+            opacity=0.7,
+            plot_size=420,
+            dataset_name="demo",
+        )
 
-    no_non_null = plots.build_umap_explorer_chart(
-        df=base.with_columns(pl.lit(None).alias("all_null")),
-        x_col="x",
-        y_col="y",
-        hue=hues.HueOption(
-            key="all_null",
-            label="All null",
-            kind="numeric",
-            dtype=pl.Float64,
-        ),
-        point_size=40,
-        opacity=0.7,
-        plot_size=420,
-        dataset_name="demo",
-    )
-    assert no_non_null.valid is True
-    assert no_non_null.note is not None and "no non-null values" in no_non_null.note
+    with pytest.raises(ValueError, match="no non-null values"):
+        plots.build_umap_explorer_chart(
+            df=base.with_columns(pl.lit(None).alias("all_null")),
+            x_col="x",
+            y_col="y",
+            hue=hues.HueOption(
+                key="all_null",
+                label="All null",
+                kind="numeric",
+                dtype=pl.Float64,
+            ),
+            point_size=40,
+            opacity=0.7,
+            plot_size=420,
+            dataset_name="demo",
+        )
 
 
 def test_score_histogram_lollipop_includes_id() -> None:
@@ -402,8 +583,8 @@ def test_build_umap_controls_uses_raw_column_names() -> None:
             "opal__view__score": [0.3],
         }
     )
-    opt = hues.HueOption(key="opal__view__score", label="Score", kind="numeric", dtype=pl.Float64)
-    registry = hues.HueRegistry(options=[opt], label_map={"Score": opt})
+    opt = hues.HueOption(key="opal__view__score", label="opal__view__score", kind="numeric", dtype=pl.Float64)
+    registry = hues.HueRegistry(options=[opt], label_map={"opal__view__score": opt})
     controls = ui.build_umap_controls(
         mo=_DummyMo(),
         df_active=df,
@@ -476,6 +657,79 @@ def test_numeric_rule_builder() -> None:
     assert filtered_null["a"].to_list() == [None]
 
 
+def test_compute_sfxi_params_requires_state_order() -> None:
+    with pytest.raises(ValueError, match="state_order"):
+        sfxi.compute_sfxi_params(
+            setpoint=[0.25, 0.25, 0.25, 0.25],
+            beta=1.0,
+            gamma=1.0,
+            delta=0.0,
+            p=95.0,
+            min_n=1,
+            eps=1e-6,
+            state_order=None,
+        )
+
+
+def test_compute_sfxi_params_rejects_invalid_setpoint() -> None:
+    with pytest.raises(ValueError, match="setpoint_vector"):
+        sfxi.compute_sfxi_params(
+            setpoint=[-0.1, 0.25, 0.25, 1.1],
+            beta=1.0,
+            gamma=1.0,
+            delta=0.0,
+            p=95.0,
+            min_n=1,
+            eps=1e-6,
+            state_order=STATE_ORDER,
+        )
+
+
+def test_resolve_active_vec8_prefers_pred_history() -> None:
+    pred_df = pl.DataFrame(
+        {
+            "id": ["a"],
+            "pred_y_hat": [[0.0, 0.0, 0.0, 1.0, 0.2, 0.2, 0.2, 0.2]],
+        }
+    )
+    label_df = pl.DataFrame(
+        {
+            "id": ["a"],
+            "observed_round": [0],
+            "label_ts": ["t0"],
+            "sfxi_8_vector_y_label": [[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+        }
+    )
+    resolved = diagnostics_guidance.resolve_active_vec8(
+        active_record_id="a",
+        pred_events_df=pred_df,
+        label_events_df=label_df,
+        y_col="sfxi_8_vector_y_label",
+    )
+    assert resolved.vec8 is not None
+    assert resolved.source == "pred_history"
+
+
+def test_resolve_active_vec8_uses_label_history_when_pred_missing() -> None:
+    pred_df = pl.DataFrame(schema={"id": pl.Utf8, "pred_y_hat": pl.Object})
+    label_df = pl.DataFrame(
+        {
+            "id": ["a"],
+            "observed_round": [1],
+            "label_ts": ["t1"],
+            "sfxi_8_vector_y_label": [[0.1, 0.2, 0.3, 0.4, 1.0, 1.0, 1.0, 1.0]],
+        }
+    )
+    resolved = diagnostics_guidance.resolve_active_vec8(
+        active_record_id="a",
+        pred_events_df=pred_df,
+        label_events_df=label_df,
+        y_col="sfxi_8_vector_y_label",
+    )
+    assert resolved.vec8 is not None
+    assert resolved.source == "label_history"
+
+
 def test_sfxi_metrics_deterministic() -> None:
     df = pl.DataFrame({"sfxi_8_vector_y_label": [[0.25, 0.25, 0.25, 0.25, 1.0, 1.0, 1.0, 1.0]]})
     params = sfxi.compute_sfxi_params(
@@ -484,9 +738,9 @@ def test_sfxi_metrics_deterministic() -> None:
         gamma=1.0,
         delta=0.0,
         p=95.0,
-        fallback_p=75.0,
         min_n=1,
         eps=1e-6,
+        state_order=STATE_ORDER,
     )
     result = sfxi.compute_sfxi_metrics(
         df=df,
@@ -504,6 +758,17 @@ def test_sfxi_metrics_deterministic() -> None:
     assert abs(row_dict["score"] - 1.0) < 1e-6
 
 
+def test_unwrap_artifact_model_wraps_random_forest() -> None:
+    X = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=float)
+    Y = np.array([[0.1, 0.2], [0.2, 0.3]], dtype=float)
+    est = RandomForestRegressor(n_estimators=2, random_state=0)
+    est.fit(X, Y)
+
+    wrapped = dashboard_models.unwrap_artifact_model(est)
+    assert wrapped is not None
+    assert supports_uncertainty(model=wrapped)
+
+
 def test_compute_label_sfxi_view_preview() -> None:
     df = pl.DataFrame({"sfxi_8_vector_y_label": [[0.25, 0.25, 0.25, 0.25, 1.0, 1.0, 1.0, 1.0]]})
     params = sfxi.compute_sfxi_params(
@@ -512,9 +777,9 @@ def test_compute_label_sfxi_view_preview() -> None:
         gamma=1.0,
         delta=0.0,
         p=95.0,
-        fallback_p=75.0,
         min_n=1,
         eps=1e-6,
+        state_order=STATE_ORDER,
     )
     view = sfxi.compute_label_sfxi_view(
         labels_view_df=df,
@@ -528,7 +793,7 @@ def test_compute_label_sfxi_view_preview() -> None:
 
 
 def test_sfxi_metrics_edge_cases() -> None:
-    df = pl.DataFrame(
+    df_invalid = pl.DataFrame(
         {
             "sfxi_8_vector_y_label": [
                 [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
@@ -544,35 +809,28 @@ def test_sfxi_metrics_edge_cases() -> None:
         gamma=1.0,
         delta=10.0,
         p=95.0,
-        fallback_p=75.0,
         min_n=2,
         eps=1e-6,
+        state_order=STATE_ORDER,
     )
     empty_pool = pl.DataFrame({"sfxi_8_vector_y_label": []})
-    result = sfxi.compute_sfxi_metrics(
-        df=df,
-        vec_col="sfxi_8_vector_y_label",
-        params=params,
-        denom_pool_df=empty_pool,
-    )
-    assert result.df.height == 1
-    assert result.weights == (0.0, 0.0, 0.0, 0.0)
-    assert result.denom == 1.0
-    assert result.denom_source == "disabled"
-    row = result.df.row(0)
-    row_dict = dict(zip(result.df.columns, row))
-    assert abs(row_dict["effect_scaled"] - 1.0) < 1e-6
-    assert abs(row_dict["score"] - 1.0) < 1e-6
+    with pytest.raises(ValueError, match="invalid rows"):
+        sfxi.compute_sfxi_metrics(
+            df=df_invalid,
+            vec_col="sfxi_8_vector_y_label",
+            params=params,
+            denom_pool_df=empty_pool,
+        )
 
     pool = pl.DataFrame({"sfxi_8_vector_y_label": [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]})
-    result_fallback = sfxi.compute_sfxi_metrics(
+    result = sfxi.compute_sfxi_metrics(
         df=pool,
         vec_col="sfxi_8_vector_y_label",
         params=params,
         denom_pool_df=pool,
     )
-    assert result_fallback.denom == 1.0
-    assert result_fallback.denom_source == "disabled"
+    assert result.denom == 1.0
+    assert result.denom_source == "disabled"
 
     params_strict = sfxi.compute_sfxi_params(
         setpoint=[0.25, 0.25, 0.25, 0.25],
@@ -580,9 +838,9 @@ def test_sfxi_metrics_edge_cases() -> None:
         gamma=1.0,
         delta=10.0,
         p=95.0,
-        fallback_p=75.0,
         min_n=2,
         eps=1e-6,
+        state_order=STATE_ORDER,
     )
     with pytest.raises(ValueError, match="min_n"):
         sfxi.compute_sfxi_metrics(
@@ -640,9 +898,9 @@ def test_integration_smoke(tmp_path: Path) -> None:
         gamma=1.0,
         delta=0.0,
         p=95.0,
-        fallback_p=75.0,
         min_n=1,
         eps=1e-6,
+        state_order=STATE_ORDER,
     )
     sfxi_result = sfxi.compute_sfxi_metrics(
         df=loaded,
@@ -798,9 +1056,9 @@ def test_overlay_provenance_on_early_exit() -> None:
         gamma=1.0,
         delta=0.0,
         p=95.0,
-        fallback_p=75.0,
         min_n=1,
         eps=1e-6,
+        state_order=STATE_ORDER,
     )
     result = transient.compute_transient_overlay(
         df_base=df_base,
@@ -827,9 +1085,9 @@ def test_build_pred_sfxi_view_canonical() -> None:
         gamma=1.0,
         delta=0.0,
         p=50.0,
-        fallback_p=50.0,
         min_n=1,
         eps=1.0e-8,
+        state_order=STATE_ORDER,
     )
     pred_df = pl.DataFrame(
         {
@@ -859,9 +1117,9 @@ def test_build_pred_sfxi_view_overlay() -> None:
         gamma=1.0,
         delta=0.0,
         p=50.0,
-        fallback_p=50.0,
         min_n=1,
         eps=1.0e-8,
+        state_order=STATE_ORDER,
     )
     pred_df = pl.DataFrame(
         {
@@ -892,9 +1150,9 @@ def test_build_pred_sfxi_view_overlay_object_vectors() -> None:
         gamma=1.0,
         delta=0.0,
         p=50.0,
-        fallback_p=50.0,
         min_n=1,
         eps=1.0e-8,
+        state_order=STATE_ORDER,
     )
     vec = [0.0, 0.0, 0.0, 1.0, 0.2, 0.2, 0.2, 0.2]
     pred_df = pl.DataFrame(

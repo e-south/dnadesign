@@ -67,7 +67,7 @@ def test_notebook_generate_smoke(tmp_path: Path) -> None:
     assert "Data source" in txt
     assert "mo.ui.table" in txt
     assert "__generated_with" in txt
-    assert "strict=False" in txt
+    assert 'marimo.App(width="medium")' in txt
 
     # Optional import check if marimo is installed
     if importlib.util.find_spec("marimo") is not None:

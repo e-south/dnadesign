@@ -320,6 +320,7 @@ def read_predictions(
         run_id=run_id,
         require_run_id=require_run_id,
     )
+    want: list[str] | None = None
     if columns:
         want = [c for c in columns if c]
         try:
@@ -334,10 +335,11 @@ def read_predictions(
             )
         if allow_missing:
             want = [c for c in want if c in schema_cols]
-        lf = lf.select(want)
     lf = _apply_round_filter(lf, round_selector=round_selector, runs_df=runs_df)
     if run_id is not None:
         lf = lf.filter(pl.col("run_id") == str(run_id))
+    if want is not None:
+        lf = lf.select(want)
     return lf.collect()
 
 

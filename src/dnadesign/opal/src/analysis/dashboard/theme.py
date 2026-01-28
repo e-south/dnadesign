@@ -14,6 +14,9 @@ from __future__ import annotations
 
 import altair as alt
 
+DNAD_PLOT_SIZE = 420
+DNAD_DIAGNOSTICS_PLOT_SIZE = 320
+
 
 def setup_altair_theme() -> None:
     alt.data_transformers.disable_max_rows()

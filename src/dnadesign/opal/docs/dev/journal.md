@@ -59,3 +59,63 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Guarded SFXI color state updates to avoid reactive rerun loops when opening prom60_eda.
 - Dataset explorer hue registry now allows higher-cardinality categories (max_unique=100) for cluster labels.
 - SFXI hue registry now allows higher-cardinality categories so cluster labels appear in color-by options.
+
+## 2026-01-26
+- Starting prom60 SFXI diagnostics + uncertainty work on branch `opal-dashboard-extend`.
+- Decisions: setpoint sweep library uses 16 truth tables + current setpoint; factorial size uses `effect_scaled`.
+- Uncertainty contract will support both `score` and `y_hat` kinds (default `score`).
+- Added SFXI diagnostic chart builders (support, uncertainty, intensity scaling) and CLI plot plugins.
+- prom60_eda now includes a Diagnostics / AL Guidance column with factorial, sweep, support, uncertainty,
+  and intensity scaling panels plus derived-metrics status.
+- Derived metrics (nearest gate, dist-to-labeled logic/X, uncertainty) are attached to df_view for hue options.
+- UMAP explorer overlays labeled points; tests cover hue registry and chart layering.
+
+## 2026-01-27
+- prom60_eda headless marimo errors fixed (duplicate variable names, UI value access in creation cell).
+- Dashboard UMAP tooltips now typed to avoid empty-data Altair errors.
+- Demo plots config expanded to include all SFXI diagnostics; DEMO doc updated for setpoint plot + ingest-y replace.
+- Facade read_predictions now filters before projection; added test for round filtering without as_of_round column.
+- SFXI plot helpers: setpoint parsing fixed for tuple/list values; added unit test.
+- sfxi_uncertainty now coerces polars Series y_ops to list; added unit test.
+- Fixed setpoint sweep pool clip fractions to use label-derived denom; added regression test.
+- prom60_eda now flags setpoint sweep when it falls back to labels-as-of.
+- SFXI diagnostic charts now share a compact plot style + constrained layout to reduce label overlap.
+- Setpoint sweep + intensity scaling subtitles include denom definition for clarity.
+- Removed unused intensity median/IQR helpers from dashboard SFXI view.
+- Demo doc updated for non-interactive ingest-y (`--yes`).
+- Demo doc notes `opal notebook generate --force` when rerunning.
+- Setpoint sweep/intensity scaling plots now use current-round labels (objective-consistent); prom60_eda no longer falls back to labels-as-of.
+- Notebook template now includes a plot gallery dropdown for outputs/plots, filtered by objective (SFXI-only when relevant).
+- campaign-reset removes generated notebooks; opal campaign notebooks are gitignored explicitly.
+- Notebook template now escapes gallery newline literals; added AST-parse test to prevent invalid Python output.
+- Notebook template removed the tri-plot Altair panel in favor of a single plot gallery dropdown; simplified UI controls.
+- Plot gallery avoids marimo variable redefinition errors by using unique loop variable names.
+- Plot gallery cells now avoid early returns, use unique tag variables, and pass marimo check.
+- prom60_eda diagnostics refactored into `analysis/dashboard/charts/diagnostics_guidance.py` with structured panel outputs and overlay-aware view joins.
+- prom60_eda column layout updated so OPAL artifact model, Diagnostics, and Export are in columns 7/8/9 respectively.
+- Diagnostics panel no longer renders the derived-metrics status markdown; derived-metrics notes remain.
+- Added diagnostics sizing helpers and tightened Matplotlib diagnostics styling for white backgrounds + black text.
+- Added Altair-based diagnostics scatter charts (factorial/support/uncertainty) with overlay-aware hue options.
+- prom60_eda dropdowns now persist in-session state for diagnostics, UMAP, cluster plots, and dataset explorer.
+- Diagnostics now resolve active-record vec8s from label history (pred history first), with explicit source notes.
+- Setpoint sweep output now includes setpoint vector labels and renders as a heatmap (metrics × setpoints).
+- Diagnostics panel text now includes didactic explanations for each plot.
+- Notebook template now emits `marimo.App(width="medium", strict=False)` to avoid strictness mismatches.
+- Dashboard SFXI params now validate setpoints via `sfxi_math.parse_setpoint_vector` (invalid values raise).
+- Removed unused `fallback_percentile` plumbing from prom60_eda and SFXI params/export.
+- Added test coverage for invalid SFXI setpoint values in dashboard utils.
+- Removed setpoint decomposition plot from dashboard + CLI; docs/demo config updated accordingly.
+- Diagnostics and SFXI plot artifacts now render full datasets; sampling params removed and rejected.
+- Support diagnostics default hue now prefers nearest gate class; added clearer factorial math + uncertainty provenance notes.
+- Setpoint sweep default view omits denom to preserve heatmap contrast.
+- Refactored RF uncertainty to streaming ensemble score std (no `predict_per_tree`, no `y_hat` modes), added
+  ensemble protocol under `analysis/sfxi`, and moved y-ops inverse helper out of dashboard.
+
+## 2026-01-28
+- Cached parquet loads for dashboards using a path+mtime key to avoid repeated reads.
+- Added column non-null count helper and threaded it through hue registries to reduce repeated scans.
+- Reduced redundant pred_y_hat vector conversion in prom60_eda diagnostics derivations.
+- Added dashboard util test coverage for non-null count driven hue registry inclusion.
+- Enforced fail-fast SFXI view contracts (no empty returns or silent invalid filtering).
+- Moved derived diagnostics metrics (nearest logic, support distance, uncertainty attach) into a view helper.
+- Removed diagnostics fallback panels; missing required inputs now raise explicit errors.

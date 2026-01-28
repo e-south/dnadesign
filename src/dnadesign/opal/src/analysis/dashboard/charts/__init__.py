@@ -10,6 +10,6 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from . import plots
+from . import plots, sfxi_diagnostics_altair
 
-__all__ = ["plots"]
+__all__ = ["plots", "sfxi_diagnostics_altair"]

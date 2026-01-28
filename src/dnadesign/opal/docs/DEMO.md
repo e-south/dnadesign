@@ -26,7 +26,9 @@ uv run opal validate -c configs/campaign.yaml
 # 2) Ingest round-0 labels
 uv run opal ingest-y -c configs/campaign.yaml --round 0 \
   --csv inputs/r0/vec8-b0.xlsx \
-  --unknown-sequences drop
+  --unknown-sequences drop \
+  --if-exists replace \
+  --yes
 
 # 3) Train, score, select (round 0)
 uv run opal run -c configs/campaign.yaml --round 0
@@ -42,11 +44,17 @@ uv run opal plot -c configs/campaign.yaml
 
 # 6) Notebook (marimo)
 uv run opal notebook
-uv run opal notebook generate --round latest
+uv run opal notebook generate --round latest  # add --force if rerunning
 uv run opal notebook run
 ```
 
 **Notes:**
+- The demo `records.parquet` already includes round-0 label history for the 19 known
+  sequences in `inputs/r0/vec8-b0.xlsx`. Use `--if-exists replace` to ensure the
+  ledger labels sink is populated even if the labels are already present.
+- `ingest-y` prompts for confirmation when no TTY is available; pass `--yes` for scripted runs.
+- Demo plots live in `configs/plots.yaml` and include SFXI diagnostics (factorial effects,
+  setpoint sweep, logic support, uncertainty, intensity scaling).
 - Use `uv run opal ...` to ensure the correct environment.
 - If `outputs/rounds/round_0/` already exists from a prior run, `opal run` will refuse to overwrite
   unless you pass `--resume` (which wipes the round directory) or delete the existing artifacts first.
@@ -64,6 +72,8 @@ uv run opal campaign-reset -c configs/campaign.yaml --yes --no-backup
 # Manual fallback (if you want to keep outputs/)
 uv run opal prune-source -c configs/campaign.yaml --scope any --yes --no-backup
 ```
+
+The reset removes `outputs/`, `notebooks/`, and `state.json`, and prunes OPAL columns from `records.parquet`.
 
 ---
 

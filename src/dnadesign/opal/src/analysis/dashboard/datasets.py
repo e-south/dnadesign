@@ -13,8 +13,10 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
+import polars as pl
 import yaml
 
 from ...core.config_resolve import resolve_campaign_root
@@ -171,6 +173,19 @@ def list_campaign_dataset_refs(repo_root: Path | None) -> list[CampaignDatasetRe
             )
         )
     return refs
+
+
+def load_parquet_cached(path: Path) -> pl.DataFrame:
+    if not path.exists():
+        raise ValueError(f"Parquet path does not exist: {path}")
+    stat = path.stat()
+    return _read_parquet_cached(str(path), int(stat.st_mtime_ns))
+
+
+@lru_cache(maxsize=4)
+def _read_parquet_cached(path_str: str, mtime_ns: int) -> pl.DataFrame:
+    _unused = mtime_ns
+    return pl.read_parquet(path_str)
 
 
 def resolve_campaign_records_path(*, raw: dict, campaign_path: Path) -> Path:

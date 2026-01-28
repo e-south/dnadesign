@@ -48,6 +48,12 @@ _DENY_PREFIXES = (
     "opal__overlay__y_hat",
     "opal__overlay__y_vec",
 )
+_DENY_NAMES = (
+    "opal__sfxi__nearest_gate_class",
+    "opal__sfxi__nearest_gate_dist",
+    "opal__sfxi__dist_to_labeled_logic",
+    "opal__sfxi__dist_to_labeled_x",
+)
 _DENY_SUBSTRINGS = ("ledger", "cache")
 
 
@@ -58,9 +64,11 @@ def _is_nested(dtype: pl.DataType) -> bool:
         return False
 
 
-def _has_any_value(df: pl.DataFrame, col: str) -> bool:
+def _has_any_value(df: pl.DataFrame, col: str, *, non_null_counts: dict[str, int] | None = None) -> bool:
     if df.is_empty() or col not in df.columns:
         return False
+    if non_null_counts is not None and col in non_null_counts:
+        return int(non_null_counts[col]) > 0
     try:
         return df.select(pl.col(col).drop_nulls().head(1)).height > 0
     except Exception:
@@ -85,6 +93,8 @@ def _infer_kind(df: pl.DataFrame, col: str, dtype: pl.DataType, *, max_unique: i
 
 
 def _should_skip(name: str, *, denylist: Iterable[str], deny_prefixes: Iterable[str]) -> bool:
+    if name in _DENY_NAMES:
+        return True
     if name in denylist:
         return True
     if any(name.startswith(prefix) for prefix in deny_prefixes):
@@ -103,6 +113,7 @@ def build_hue_registry(
     denylist: Iterable[str] = (),
     deny_prefixes: Iterable[str] = (),
     max_unique: int = 30,
+    non_null_counts: dict[str, int] | None = None,
 ) -> HueRegistry:
     options: list[HueOption] = []
     label_map: dict[str, HueOption] = {}
@@ -117,7 +128,7 @@ def build_hue_registry(
         dtype = df.schema.get(option.key, pl.Null)
         if _is_nested(dtype) or dtype in (pl.Object, pl.Null):
             return
-        if not _has_any_value(df, option.key):
+        if not _has_any_value(df, option.key, non_null_counts=non_null_counts):
             return
         label = option.label
         if label in label_map:
@@ -146,7 +157,7 @@ def build_hue_registry(
                 continue
             if _is_nested(dtype) or dtype in (pl.Object, pl.Null):
                 continue
-            if not _has_any_value(df, name):
+            if not _has_any_value(df, name, non_null_counts=non_null_counts):
                 continue
             kind = _infer_kind(df, name, dtype, max_unique=max_unique)
             if kind is None:
@@ -169,6 +180,7 @@ def build_explorer_hue_registry(
     denylist: Iterable[str] = (),
     deny_prefixes: Iterable[str] = (),
     max_unique: int = 100,
+    non_null_counts: dict[str, int] | None = None,
 ) -> HueRegistry:
     return build_hue_registry(
         df,
@@ -177,6 +189,7 @@ def build_explorer_hue_registry(
         denylist=denylist,
         deny_prefixes=deny_prefixes,
         max_unique=max_unique,
+        non_null_counts=non_null_counts,
     )
 
 
@@ -188,6 +201,7 @@ def build_sfxi_hue_registry(
     denylist: Iterable[str] = (),
     deny_prefixes: Iterable[str] = (),
     max_unique: int = 100,
+    non_null_counts: dict[str, int] | None = None,
 ) -> HueRegistry:
     return build_explorer_hue_registry(
         df,
@@ -196,48 +210,61 @@ def build_sfxi_hue_registry(
         denylist=denylist,
         deny_prefixes=deny_prefixes,
         max_unique=max_unique,
+        non_null_counts=non_null_counts,
     )
 
 
 def default_view_hues() -> list[HueOption]:
     return [
-        HueOption(key="opal__view__score", label="Score", kind="numeric", dtype=pl.Float64),
+        HueOption(key="opal__view__score", label="opal__view__score", kind="numeric", dtype=pl.Float64),
         HueOption(
             key="opal__view__logic_fidelity",
-            label="Logic fidelity",
+            label="opal__view__logic_fidelity",
             kind="numeric",
             dtype=pl.Float64,
         ),
         HueOption(
             key="opal__view__effect_scaled",
-            label="Effect scaled",
+            label="opal__view__effect_scaled",
             kind="numeric",
             dtype=pl.Float64,
         ),
-        HueOption(key="opal__view__rank", label="Rank", kind="numeric", dtype=pl.Float64),
+        HueOption(key="opal__view__rank", label="opal__view__rank", kind="numeric", dtype=pl.Float64),
         HueOption(
             key="opal__view__top_k",
-            label="Top-K",
+            label="opal__view__top_k",
             kind="categorical",
             dtype=pl.Boolean,
             category_labels=("Top-K", "Not Top-K"),
         ),
         HueOption(
             key="opal__view__observed",
-            label="Observed (labeled)",
+            label="opal__view__observed",
             kind="categorical",
             dtype=pl.Boolean,
             category_labels=("Observed", "Unlabeled"),
         ),
         HueOption(
             key="opal__view__pred_score_unlabeled",
-            label="Predicted score (unlabeled)",
+            label="opal__view__pred_score_unlabeled",
             kind="numeric",
             dtype=pl.Float64,
         ),
         HueOption(
             key="opal__view__observed_score",
-            label="Observed score",
+            label="opal__view__observed_score",
+            kind="numeric",
+            dtype=pl.Float64,
+        ),
+        HueOption(
+            key="opal__nearest_2_factor_logic",
+            label="opal__nearest_2_factor_logic",
+            kind="categorical",
+            dtype=pl.Utf8,
+        ),
+        HueOption(
+            key="opal__sfxi__uncertainty",
+            label="opal__sfxi__uncertainty",
             kind="numeric",
             dtype=pl.Float64,
         ),

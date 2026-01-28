@@ -39,8 +39,11 @@ def _():
     from dnadesign.opal.src.analysis.dashboard import transient as dash_transient
     from dnadesign.opal.src.analysis.dashboard import ui as dash_ui
     from dnadesign.opal.src.analysis.dashboard import util as dash_util
+    from dnadesign.opal.src.analysis.dashboard.charts import diagnostics_guidance as dash_diag_guidance
     from dnadesign.opal.src.analysis.dashboard.charts import plots as dash_plots
+    from dnadesign.opal.src.analysis.dashboard.views import derived_metrics as dash_derived
     from dnadesign.opal.src.analysis.dashboard.views import sfxi as dash_sfxi
+    from dnadesign.opal.src.objectives import sfxi_math
 
     build_mode_view = dash_scores.build_mode_view
     build_cluster_chart = dash_plots.build_cluster_chart
@@ -49,9 +52,15 @@ def _():
     build_pred_events = dash_labels.build_pred_events
     build_round_options_from_label_hist = dash_labels.build_round_options_from_label_hist
     build_label_sfxi_view = dash_sfxi.build_label_sfxi_view
+    build_nearest_2_factor_counts = dash_sfxi.build_nearest_2_factor_counts
+    build_predicted_logic_pools = dash_sfxi.build_predicted_logic_pools
     build_pred_sfxi_view = dash_sfxi.build_pred_sfxi_view
+    attach_diagnostics_metrics = dash_derived.attach_diagnostics_metrics
     build_umap_controls = dash_ui.build_umap_controls
+    build_diagnostics_panels = dash_diag_guidance.build_diagnostics_panels
+    build_sweep_panels = dash_diag_guidance.build_sweep_panels
     campaign_label_from_path = dash_datasets.campaign_label_from_path
+    load_parquet_cached = dash_datasets.load_parquet_cached
     build_explorer_hue_registry = dash_hues.build_explorer_hue_registry
     build_hue_registry = dash_hues.build_hue_registry
     build_sfxi_hue_registry = dash_hues.build_sfxi_hue_registry
@@ -66,6 +75,7 @@ def _():
     attach_namespace_columns = dash_util.attach_namespace_columns
     choose_axis_defaults = dash_util.choose_axis_defaults
     choose_dropdown_value = dash_util.choose_dropdown_value
+    column_non_null_counts = dash_util.column_non_null_counts
     state_value_changed = dash_util.state_value_changed
     dedupe_exprs = dash_util.dedupe_exprs
     dedup_latest_labels = dash_labels.dedup_latest_labels
@@ -85,13 +95,18 @@ def _():
         Diagnostics,
         attach_namespace_columns,
         build_cluster_chart,
+        build_diagnostics_panels,
+        build_sweep_panels,
         build_explorer_hue_registry,
         build_feature_importance_chart,
         build_hue_registry,
         build_sfxi_hue_registry,
         build_label_events,
         build_label_sfxi_view,
+        build_nearest_2_factor_counts,
+        build_predicted_logic_pools,
         build_pred_sfxi_view,
+        attach_diagnostics_metrics,
         build_mode_view,
         build_pred_events,
         build_round_options_from_label_hist,
@@ -99,6 +114,7 @@ def _():
         build_umap_controls,
         build_umap_explorer_chart,
         campaign_label_from_path,
+        column_non_null_counts,
         choose_axis_defaults,
         choose_dropdown_value,
         coerce_selection_dataframe,
@@ -110,6 +126,7 @@ def _():
         diagnostics_to_lines,
         find_repo_root,
         get_feature_importances,
+        load_parquet_cached,
         load_feature_importances_from_artifact,
         is_altair_undefined,
         list_campaign_paths,
@@ -121,6 +138,7 @@ def _():
         resolve_sfxi_readiness,
         safe_is_numeric,
         state_value_changed,
+        sfxi_math,
     )
 
 
@@ -249,7 +267,7 @@ def _(mo):
 
 
 @app.cell
-def _(campaign_selection, dataset_mode, dataset_path, load_button, mo, pl):
+def _(campaign_selection, dataset_mode, dataset_path, load_button, load_parquet_cached, mo, pl):
     _unused = load_button
     df_raw = pl.DataFrame()
     dataset_name = None
@@ -267,7 +285,7 @@ def _(campaign_selection, dataset_mode, dataset_path, load_button, mo, pl):
         status_lines.append(f"Mode: `{dataset_mode}`")
     if dataset_path is not None and dataset_path.exists():
         try:
-            df_raw = pl.read_parquet(dataset_path)
+            df_raw = load_parquet_cached(dataset_path)
             status_lines.append(f"Rows: `{df_raw.height}`")
             status_lines.append(f"Columns: `{len(df_raw.columns)}`")
             dataset_name = dataset_path.parent.name if dataset_path.name == "records.parquet" else dataset_path.stem
@@ -331,62 +349,116 @@ def _(df_prelim, mo):
 
 
 @app.cell
+def _(mo):
+    dataset_explorer_plot_type_state, set_dataset_explorer_plot_type_state = mo.state(None)
+    dataset_explorer_x_state, set_dataset_explorer_x_state = mo.state(None)
+    dataset_explorer_y_state, set_dataset_explorer_y_state = mo.state(None)
+    dataset_explorer_color_state, set_dataset_explorer_color_state = mo.state(None)
+    return (
+        dataset_explorer_color_state,
+        dataset_explorer_plot_type_state,
+        dataset_explorer_x_state,
+        dataset_explorer_y_state,
+        set_dataset_explorer_color_state,
+        set_dataset_explorer_plot_type_state,
+        set_dataset_explorer_x_state,
+        set_dataset_explorer_y_state,
+    )
+
+
+@app.cell
 def _(
     build_explorer_hue_registry,
-    choose_axis_defaults,
     data_ready,
-    dashboard_defaults,
     default_view_hues,
+    df_view_non_null_counts,
     df_view,
-    mo,
     safe_is_numeric,
 ):
-    df_explorer = df_view if data_ready else df_view.head(0)
-    numeric_cols = [name for name, dtype in df_explorer.schema.items() if safe_is_numeric(dtype)]
+    df_explorer_base = df_view if data_ready else df_view.head(0)
+    explorer_numeric_cols = [name for name, dtype in df_explorer_base.schema.items() if safe_is_numeric(dtype)]
+    hue_registry = build_explorer_hue_registry(
+        df_explorer_base,
+        preferred=default_view_hues(),
+        include_columns=True,
+        denylist={"__row_id", "id", "id_", "id__"},
+        non_null_counts=df_view_non_null_counts,
+    )
+    return explorer_numeric_cols, hue_registry
+
+
+@app.cell
+def _(
+    choose_axis_defaults,
+    choose_dropdown_value,
+    dashboard_defaults,
+    dataset_explorer_color_state,
+    dataset_explorer_plot_type_state,
+    dataset_explorer_x_state,
+    dataset_explorer_y_state,
+    explorer_numeric_cols,
+    hue_registry,
+    mo,
+):
     defaults = dashboard_defaults or {}
     _default_x = defaults.get("x")
     _default_y = defaults.get("y")
     _preferred_x = "opal__view__score"
     _preferred_y = "opal__view__effect_scaled"
     _x_default, _y_default = choose_axis_defaults(
-        numeric_cols=numeric_cols,
+        numeric_cols=explorer_numeric_cols,
         default_x=_default_x,
         default_y=_default_y,
         preferred_x=_preferred_x,
         preferred_y=_preferred_y,
     )
 
+    plot_type_options = ["scatter", "histogram"]
+    plot_type_default = (
+        choose_dropdown_value(plot_type_options, current=dataset_explorer_plot_type_state(), preferred="scatter")
+        or "scatter"
+    )
     plot_type_dropdown = mo.ui.dropdown(
-        options=["scatter", "histogram"],
-        value="scatter",
+        options=plot_type_options,
+        value=plot_type_default,
         label="Plot type",
     )
+    x_options = explorer_numeric_cols or ["(none)"]
+    x_default = (
+        choose_dropdown_value(x_options, current=dataset_explorer_x_state(), preferred=_x_default) or x_options[0]
+    )
     x_dropdown = mo.ui.dropdown(
-        options=numeric_cols or ["(none)"],
-        value=_x_default,
+        options=x_options,
+        value=x_default,
         label="X column",
         full_width=True,
     )
+    y_options = explorer_numeric_cols or ["(none)"]
+    y_default = (
+        choose_dropdown_value(y_options, current=dataset_explorer_y_state(), preferred=_y_default) or y_options[0]
+    )
     y_dropdown = mo.ui.dropdown(
-        options=numeric_cols or ["(none)"],
-        value=_y_default,
+        options=y_options,
+        value=y_default,
         label="Y column (scatter only)",
         full_width=True,
-    )
-    hue_registry = build_explorer_hue_registry(
-        df_explorer,
-        preferred=default_view_hues(),
-        include_columns=True,
-        denylist={"__row_id", "id", "id_", "id__"},
     )
     color_options = ["(none)"] + hue_registry.labels()
     _default_color = defaults.get("color")
     if _default_color in color_options:
-        color_default = _default_color
-    elif "Score" in hue_registry.labels():
-        color_default = "Score"
+        preferred_color = _default_color
+    elif "opal__view__score" in hue_registry.labels():
+        preferred_color = "opal__view__score"
     else:
-        color_default = "(none)"
+        preferred_color = "(none)"
+    color_default = (
+        choose_dropdown_value(
+            color_options,
+            current=dataset_explorer_color_state(),
+            preferred=preferred_color,
+        )
+        or "(none)"
+    )
     dataset_explorer_color_dropdown = mo.ui.dropdown(
         options=color_options,
         value=color_default,
@@ -510,9 +582,9 @@ def _(
                     )
                     _color_title = _hue.label
                     _color_tooltip = _label_col
-                    if "observed" in _hue.key:
+                    if "top_k" in _hue.key:
                         _highlight_color = _okabe_ito[5]
-                    elif "top_k" in _hue.key:
+                    elif "observed" in _hue.key:
                         _highlight_color = _okabe_ito[2]
                     else:
                         _highlight_color = _okabe_ito[0]
@@ -571,6 +643,22 @@ def _(
                 )
                 .add_params(_brush)
             )
+            _edge_keys = {"opal__view__top_k", "opal__view__observed"}
+            if _hue is not None and _hue.key in _edge_keys and _hue.key in df_plot.columns:
+                _edge_size = _size_encoding if _size_encoding is not alt.Undefined else alt.value(60)
+                _edge_df = df_plot.filter(pl.col(_hue.key).cast(pl.Boolean, strict=False).fill_null(False))
+                if not _edge_df.is_empty():
+                    _edge_chart = (
+                        alt.Chart(_edge_df)
+                        .mark_circle(opacity=0.7, fillOpacity=0, stroke="black", strokeWidth=1)
+                        .encode(
+                            x=alt.X(_x_col, title=_x_col),
+                            y=alt.Y(y_col_plot, title=_y_col),
+                            size=_edge_size,
+                            tooltip=_tooltip_cols,
+                        )
+                    )
+                    chart = chart + _edge_chart
     else:
         if _x_col not in _df_explorer_source.columns or not safe_is_numeric(_df_explorer_source.schema[_x_col]):
             _note_lines.append("Select a numeric column for the histogram.")
@@ -627,6 +715,41 @@ def _(
 
 @app.cell
 def _(
+    dataset_explorer_color_dropdown,
+    dataset_explorer_color_state,
+    dataset_explorer_plot_type_state,
+    dataset_explorer_x_state,
+    dataset_explorer_y_state,
+    plot_type_dropdown,
+    set_dataset_explorer_color_state,
+    set_dataset_explorer_plot_type_state,
+    set_dataset_explorer_x_state,
+    set_dataset_explorer_y_state,
+    state_value_changed,
+    x_dropdown,
+    y_dropdown,
+):
+    if plot_type_dropdown is not None:
+        _next_value = plot_type_dropdown.value
+        if state_value_changed(dataset_explorer_plot_type_state(), _next_value):
+            set_dataset_explorer_plot_type_state(_next_value)
+    if x_dropdown is not None:
+        _next_value = x_dropdown.value
+        if state_value_changed(dataset_explorer_x_state(), _next_value):
+            set_dataset_explorer_x_state(_next_value)
+    if y_dropdown is not None:
+        _next_value = y_dropdown.value
+        if state_value_changed(dataset_explorer_y_state(), _next_value):
+            set_dataset_explorer_y_state(_next_value)
+    if dataset_explorer_color_dropdown is not None:
+        _next_value = dataset_explorer_color_dropdown.value
+        if state_value_changed(dataset_explorer_color_state(), _next_value):
+            set_dataset_explorer_color_state(_next_value)
+    return ()
+
+
+@app.cell
+def _(
     coerce_selection_dataframe,
     data_ready,
     dataset_explorer_chart_ui,
@@ -676,30 +799,79 @@ def _(df_active, mo):
 
 
 @app.cell
-def _(hue_registry, mo):
+def _(mo):
+    cluster_metric_state, set_cluster_metric_state = mo.state(None)
+    cluster_hue_state, set_cluster_hue_state = mo.state(None)
+    return (
+        cluster_hue_state,
+        cluster_metric_state,
+        set_cluster_hue_state,
+        set_cluster_metric_state,
+    )
+
+
+@app.cell
+def _(choose_dropdown_value, cluster_hue_state, cluster_metric_state, hue_registry, mo):
     metric_options = [opt.label for opt in hue_registry.options if opt.kind == "numeric"]
     if not metric_options:
         metric_options = ["(none)"]
-    default_metric = "Score" if "Score" in metric_options else metric_options[0]
+    default_metric = "opal__view__score" if "opal__view__score" in metric_options else metric_options[0]
+    metric_default = (
+        choose_dropdown_value(
+            metric_options,
+            current=cluster_metric_state(),
+            preferred=default_metric,
+        )
+        or metric_options[0]
+    )
     transient_cluster_metric_dropdown = mo.ui.dropdown(
         options=metric_options,
-        value=default_metric,
+        value=metric_default,
         label="Cluster plot metric",
         full_width=True,
     )
     hue_options = ["(none)"] + hue_registry.labels()
     default_hue = "(none)"
-    for candidate in ["Top-K", "Observed (labeled)"]:
+    for candidate in ["opal__view__top_k", "opal__view__observed"]:
         if candidate in hue_registry.labels():
             default_hue = candidate
             break
+    hue_default = (
+        choose_dropdown_value(
+            hue_options,
+            current=cluster_hue_state(),
+            preferred=default_hue,
+        )
+        or "(none)"
+    )
     transient_cluster_hue_dropdown = mo.ui.dropdown(
         options=hue_options,
-        value=default_hue,
+        value=hue_default,
         label="Color by (hue)",
         full_width=True,
     )
     return transient_cluster_hue_dropdown, transient_cluster_metric_dropdown
+
+
+@app.cell
+def _(
+    cluster_hue_state,
+    cluster_metric_state,
+    set_cluster_hue_state,
+    set_cluster_metric_state,
+    state_value_changed,
+    transient_cluster_hue_dropdown,
+    transient_cluster_metric_dropdown,
+):
+    if transient_cluster_metric_dropdown is not None:
+        _next_value = transient_cluster_metric_dropdown.value
+        if state_value_changed(cluster_metric_state(), _next_value):
+            set_cluster_metric_state(_next_value)
+    if transient_cluster_hue_dropdown is not None:
+        _next_value = transient_cluster_hue_dropdown.value
+        if state_value_changed(cluster_hue_state(), _next_value):
+            set_cluster_hue_state(_next_value)
+    return ()
 
 
 @app.cell(column=1)
@@ -748,12 +920,19 @@ def _(missingness_table, mo, namespace_table):
 
 
 @app.cell
-def _(build_umap_controls, df_view, hue_registry, mo):
+def _(mo):
+    umap_color_state, set_umap_color_state = mo.state(None)
+    return set_umap_color_state, umap_color_state
+
+
+@app.cell
+def _(build_umap_controls, df_view, hue_registry, mo, umap_color_state):
     controls = build_umap_controls(
         mo=mo,
         df_active=df_view,
         hue_registry=hue_registry,
         default_hue_key="opal__view__score",
+        current_color=umap_color_state(),
     )
     umap_color_dropdown = controls.umap_color_dropdown
     umap_x_input = controls.umap_x_input
@@ -767,6 +946,21 @@ def _(alt, pl):
     if not hasattr(alt, "_DNAD_PLOT_SIZE"):
         alt._DNAD_PLOT_SIZE = 420
     return
+
+
+@app.cell
+def _(mo):
+    from io import BytesIO
+
+    def fig_to_image(fig, *, dpi: int = 150):
+        buf = BytesIO()
+        fig.savefig(buf, format="png", dpi=int(dpi), bbox_inches="tight")
+        import matplotlib.pyplot as plt
+
+        plt.close(fig)
+        return mo.image(buf.getvalue())
+
+    return (fig_to_image,)
 
 
 @app.cell
@@ -807,6 +1001,15 @@ def _(
     umap_chart_note_md = mo.md(_result.note) if _result.note else mo.md("")
     umap_chart_ui = mo.ui.altair_chart(_result.chart)
     return df_umap_plot, umap_chart_note_md, umap_chart_ui, umap_valid
+
+
+@app.cell
+def _(set_umap_color_state, state_value_changed, umap_color_dropdown, umap_color_state):
+    if umap_color_dropdown is not None:
+        _next_value = umap_color_dropdown.value
+        if state_value_changed(umap_color_state(), _next_value):
+            set_umap_color_state(_next_value)
+    return ()
 
 
 @app.cell
@@ -1121,7 +1324,6 @@ def _(
                             pl.lit(float(sfxi_params.gamma)).alias("gamma"),
                             pl.lit(float(sfxi_params.delta)).alias("delta"),
                             pl.lit(float(sfxi_params.p)).alias("p"),
-                            pl.lit(float(sfxi_params.fallback_p)).alias("fallback_p"),
                             pl.lit(int(sfxi_params.min_n)).alias("min_n"),
                             pl.lit(float(sfxi_params.eps)).alias("eps"),
                         ]
@@ -1600,7 +1802,6 @@ def _(mo, opal_campaign_info):
     p_default = float(scaling.get("percentile", 95.0))
     min_n_default = int(scaling.get("min_n", 5))
     eps_default = float(scaling.get("eps", 1.0e-8))
-    fallback_default = float(scaling.get("fallback_percentile", p_default))
     sfxi_default_values = {
         "p00": p00,
         "p10": p10,
@@ -1619,7 +1820,6 @@ def _(mo, opal_campaign_info):
     sfxi_fixed_params = {
         "delta": delta_default,
         "percentile": p_default,
-        "fallback_percentile": fallback_default,
         "min_n": min_n_default,
         "eps": eps_default,
     }
@@ -1650,19 +1850,36 @@ def _(mo):
 
 
 @app.cell
-def _(build_sfxi_hue_registry, choose_dropdown_value, df_sfxi_scatter, mo, sfxi_color_state):
+def _(
+    build_sfxi_hue_registry,
+    column_non_null_counts,
+    default_view_hues,
+    df_sfxi_scatter,
+):
+    sfxi_non_null_counts = column_non_null_counts(df_sfxi_scatter)
     sfxi_hue_registry = build_sfxi_hue_registry(
         df_sfxi_scatter,
-        preferred=[],
+        preferred=default_view_hues(),
         include_columns=True,
         denylist={"__row_id", "id", "id_"},
+        non_null_counts=sfxi_non_null_counts,
     )
+    return (sfxi_hue_registry,)
+
+
+@app.cell
+def _(
+    choose_dropdown_value,
+    mo,
+    sfxi_color_state,
+    sfxi_hue_registry,
+):
     hue_labels = sfxi_hue_registry.labels()
     if not hue_labels:
-        options = ["score"] if "score" in df_sfxi_scatter.columns else ["(none)"]
+        options = ["(none)"]
     else:
         options = hue_labels
-    preferred = "score" if "score" in options else None
+    preferred = "opal__view__score" if "opal__view__score" in options else None
     default = choose_dropdown_value(options, current=sfxi_color_state(), preferred=preferred) or options[0]
     sfxi_color_dropdown = mo.ui.dropdown(
         options=options,
@@ -1671,6 +1888,120 @@ def _(build_sfxi_hue_registry, choose_dropdown_value, df_sfxi_scatter, mo, sfxi_
         full_width=True,
     )
     return sfxi_color_dropdown, sfxi_hue_registry
+
+
+@app.cell
+def _(mo):
+    support_y_state, set_support_y_state = mo.state(None)
+    support_color_state, set_support_color_state = mo.state(None)
+    uncertainty_color_state, set_uncertainty_color_state = mo.state(None)
+    return (
+        set_support_color_state,
+        set_support_y_state,
+        set_uncertainty_color_state,
+        support_color_state,
+        support_y_state,
+        uncertainty_color_state,
+    )
+
+
+@app.cell
+def _(
+    choose_dropdown_value,
+    mo,
+    support_y_state,
+):
+    support_y_options = ["opal__view__score", "opal__view__logic_fidelity"]
+    support_y_default = (
+        choose_dropdown_value(support_y_options, current=support_y_state(), preferred="opal__view__score")
+        or "opal__view__score"
+    )
+    support_y_dropdown = mo.ui.dropdown(
+        options=support_y_options,
+        value=support_y_default,
+        label="Support Y-axis",
+        full_width=True,
+    )
+    return (support_y_dropdown,)
+
+
+@app.cell
+def _(
+    choose_dropdown_value,
+    df_view,
+    df_view_non_null_counts,
+    hue_registry,
+    mo,
+    support_color_state,
+    uncertainty_color_state,
+):
+    _total_rows = int(df_view.height) if df_view is not None else 0
+    _complete_labels: list[str] = []
+    if _total_rows > 0:
+        for opt in hue_registry.options:
+            if df_view_non_null_counts.get(opt.key, 0) == _total_rows:
+                _complete_labels.append(opt.label)
+    _diag_hue_options = ["(none)"] + _complete_labels
+    if "opal__nearest_2_factor_logic" in _diag_hue_options:
+        support_color_preferred = "opal__nearest_2_factor_logic"
+    else:
+        support_color_preferred = (
+            "opal__view__effect_scaled" if "opal__view__effect_scaled" in _diag_hue_options else "opal__view__score"
+        )
+    support_color_default = (
+        choose_dropdown_value(_diag_hue_options, current=support_color_state(), preferred=support_color_preferred)
+        or "(none)"
+    )
+    support_color_dropdown = mo.ui.dropdown(
+        options=_diag_hue_options,
+        value=support_color_default,
+        label="Support color",
+        full_width=True,
+    )
+    uncertainty_color_preferred = (
+        "opal__view__logic_fidelity" if "opal__view__logic_fidelity" in _diag_hue_options else "opal__view__score"
+    )
+    uncertainty_color_default = (
+        choose_dropdown_value(
+            _diag_hue_options, current=uncertainty_color_state(), preferred=uncertainty_color_preferred
+        )
+        or "(none)"
+    )
+    uncertainty_color_dropdown = mo.ui.dropdown(
+        options=_diag_hue_options,
+        value=uncertainty_color_default,
+        label="Uncertainty color",
+        full_width=True,
+    )
+    return support_color_dropdown, uncertainty_color_dropdown
+
+
+@app.cell
+def _(
+    set_support_color_state,
+    set_support_y_state,
+    set_uncertainty_color_state,
+    state_value_changed,
+    support_color_dropdown,
+    support_color_state,
+    support_y_dropdown,
+    support_y_state,
+    uncertainty_color_dropdown,
+    uncertainty_color_state,
+):
+    if support_y_dropdown is not None:
+        _next_value = support_y_dropdown.value
+        if state_value_changed(support_y_state(), _next_value):
+            set_support_y_state(_next_value)
+    if support_color_dropdown is not None:
+        _next_value = support_color_dropdown.value
+        if state_value_changed(support_color_state(), _next_value):
+            set_support_color_state(_next_value)
+    if uncertainty_color_dropdown is not None:
+        _next_value = uncertainty_color_dropdown.value
+        if state_value_changed(uncertainty_color_state(), _next_value):
+            set_uncertainty_color_state(_next_value)
+    return ()
 
 
 @app.cell
@@ -1862,6 +2193,28 @@ def _(
             )
             .add_params(_sfxi_brush)
         )
+        _edge_keys = {"opal__view__top_k", "opal__view__observed"}
+        if _hue is not None and _hue.key in _edge_keys and _hue.key in df_sfxi_plot.columns:
+            _edge_df = df_sfxi_plot.filter(pl.col(_hue.key).cast(pl.Boolean, strict=False).fill_null(False))
+            if not _edge_df.is_empty():
+                _edge_chart = (
+                    alt.Chart(_edge_df)
+                    .mark_circle(opacity=0.7, fillOpacity=0, stroke="black", strokeWidth=1, size=110)
+                    .encode(
+                        x=alt.X(
+                            "logic_fidelity",
+                            title="Logic fidelity",
+                            scale=alt.Scale(domain=[0, 1.02]),
+                        ),
+                        y=alt.Y(
+                            "effect_scaled",
+                            title="Effect (scaled)",
+                            scale=alt.Scale(domain=[0, 1.02]),
+                        ),
+                        tooltip=tooltip_cols,
+                    )
+                )
+                _chart = _chart + _edge_chart
         _color_subtitle = _base_subtitle
         if _color_title:
             _color_subtitle = f"{_color_subtitle} · color={_color_title}"
@@ -1894,6 +2247,8 @@ def _(
     label_src_multiselect,
     mo,
     mode_dropdown,
+    nearest_2_factor_counts_note_md,
+    nearest_2_factor_counts_ui,
     opal_campaign_notice_md,
     opal_label_view_dropdown,
     opal_labels_table_note_md,
@@ -1905,7 +2260,10 @@ def _(
     pred_diag_md,
     pred_notice_md,
     round_notice_md,
+    render_chart_panel,
     sfxi_source_dropdown,
+    sweep_mode_md,
+    sweep_panel,
     view_notice_md,
 ):
     _opal_references_md = mo.Html(
@@ -1927,6 +2285,7 @@ def _(
     label_controls = [c for c in [label_src_multiselect, opal_label_view_dropdown] if c is not None]
     label_controls_row = mo.hstack(label_controls) if label_controls else mo.md("")
 
+    sweep_panel_ui = render_chart_panel(sweep_panel, default_note="Setpoint sweep unavailable.")
     sfxi_panel = mo.vstack(
         [
             mo.md("## Characterizing promoters by their SFXI score"),
@@ -1954,6 +2313,22 @@ def _(
             opal_labels_table_note_md,
             opal_round_notice_md,
             opal_labels_table_ui,
+            mo.md("### Setpoint sweep (observed labels)"),
+            mo.md(
+                "Heatmap summary of how observed label logic aligns with candidate setpoints. "
+                "Each column is a 4-vector setpoint; rows report median logic fidelity, median scaled "
+                "effect, and median score over observed labels only."
+            ),
+            sweep_mode_md,
+            sweep_panel_ui,
+            mo.md("**Nearest 2-factor logic counts (observed vs predicted label history)**"),
+            mo.md(
+                "Counts are computed from label history vectors: observed uses the label 8-vector, "
+                "predicted uses stored `pred_y_hat`. Each record is assigned to the nearest 2-factor "
+                "truth-table class in logic space (first four components)."
+            ),
+            nearest_2_factor_counts_note_md,
+            nearest_2_factor_counts_ui,
         ]
     )
     sfxi_panel
@@ -2075,6 +2450,147 @@ def _(
 
 
 @app.cell
+def _(
+    build_sweep_panels,
+    df_pred_selected,
+    mode_dropdown,
+    mo,
+    opal_campaign_info,
+    opal_labels_current_df,
+    sfxi_params,
+):
+    sweep_panel, intensity_panel = build_sweep_panels(
+        df_pred_selected=df_pred_selected,
+        opal_campaign_info=opal_campaign_info,
+        opal_labels_current_df=opal_labels_current_df,
+        sfxi_params=sfxi_params,
+    )
+    sweep_mode = "Overlay" if mode_dropdown.value == "Overlay" else "Canonical"
+    sweep_mode_md = mo.md(f"Setpoint sweep source: **{sweep_mode}** (observed labels only).")
+    return intensity_panel, sweep_panel, sweep_mode_md
+
+
+@app.cell
+def _(build_nearest_2_factor_counts, mo, opal_label_events_df, opal_pred_events_df, readiness):
+    y_col = readiness.y_col if readiness is not None else None
+    counts = build_nearest_2_factor_counts(
+        label_events_df=opal_label_events_df,
+        pred_events_df=opal_pred_events_df,
+        y_col=y_col,
+    )
+    if counts.df.is_empty():
+        raise ValueError("Nearest-logic counts are empty.")
+    nearest_2_factor_counts_note_md = mo.md("")
+    nearest_2_factor_counts_ui = mo.ui.table(counts.df, page_size=min(16, counts.df.height))
+    return nearest_2_factor_counts_note_md, nearest_2_factor_counts_ui
+
+
+@app.cell
+def _(fig_to_image, mo):
+    def render_chart_panel(panel, *, default_note: str):
+        if panel.chart is None:
+            raise ValueError(default_note)
+        element = fig_to_image(panel.chart) if panel.kind != "altair" else mo.ui.altair_chart(panel.chart)
+        if panel.note:
+            return mo.vstack([mo.md(panel.note), element])
+        return element
+
+    return (render_chart_panel,)
+
+
+@app.cell(column=8)
+def _(
+    build_diagnostics_panels,
+    df_pred_selected,
+    df_view,
+    headless_mode,
+    hue_registry,
+    intensity_panel,
+    mo,
+    render_chart_panel,
+    support_color_dropdown,
+    support_y_dropdown,
+    uncertainty_available,
+    uncertainty_color_dropdown,
+):
+    support_y_map = {
+        "opal__view__score": "opal__view__score",
+        "opal__view__logic_fidelity": "opal__view__logic_fidelity",
+    }
+    support_y_col = support_y_map.get(support_y_dropdown.value, "opal__view__score")
+    support_color = hue_registry.get(support_color_dropdown.value)
+    uncertainty_color = hue_registry.get(uncertainty_color_dropdown.value)
+
+    if headless_mode:
+        diagnostics_content = mo.vstack(
+            [
+                mo.md("## Diagnostic plots & guidance"),
+                mo.md("Headless mode: diagnostics disabled."),
+            ]
+        )
+    else:
+        panels = build_diagnostics_panels(
+            df_pred_selected=df_pred_selected,
+            df_view=df_view,
+            support_y_col=support_y_col,
+            support_color=support_color,
+            uncertainty_color=uncertainty_color,
+            uncertainty_available=uncertainty_available,
+        )
+
+        factorial_panel = render_chart_panel(panels.factorial, default_note="Factorial effects unavailable.")
+        support_panel = render_chart_panel(panels.support, default_note="Support diagnostics unavailable.")
+        uncertainty_panel = render_chart_panel(panels.uncertainty, default_note="Uncertainty plot unavailable.")
+        intensity_panel_ui = render_chart_panel(intensity_panel, default_note="Intensity scaling unavailable.")
+
+        diagnostics_content = mo.vstack(
+            [
+                mo.md("## Diagnostic plots & guidance"),
+                mo.md(
+                    "Diagnostics use label history as the canonical source for observed/predicted vec8s. "
+                    "Overlay mode recomputes SFXI metrics with the current setpoint/exponents."
+                    " Vector sources stay fixed. Diagnostics render the full dataset (no sampling)."
+                ),
+                mo.md("### Factorial-effects map"),
+                mo.md(
+                    "Projects each predicted logic vector onto A/B effects and AB interaction. "
+                    r"$A = \frac{(v_{10}+v_{11})-(v_{00}+v_{01})}{2}$, "
+                    r"$B = \frac{(v_{01}+v_{11})-(v_{00}+v_{10})}{2}$, "
+                    r"$AB = \frac{(v_{11}+v_{00})-(v_{10}+v_{01})}{2}$. "
+                    "Color encodes interaction strength; outlines mark labeled candidates."
+                ),
+                factorial_panel,
+                mo.md("### Logic support diagnostics"),
+                mo.md(
+                    "Distance from each candidate’s predicted logic to the nearest labeled logic profile "
+                    "(labels‑as‑of). The nearest label can live in any truth‑table region; use "
+                    "`opal__nearest_2_factor_logic` to see which truth‑table class each candidate resembles. "
+                    "Conservative campaigns favor low distance; exploratory campaigns sample some higher distances."
+                ),
+                mo.hstack([support_y_dropdown, support_color_dropdown]),
+                support_panel,
+                mo.md("### Uncertainty diagnostics"),
+                mo.md(
+                    "Model uncertainty vs score to highlight risky candidates. "
+                    "Contract is model‑agnostic; for RF this is ensemble score std "
+                    "(std over per‑tree objective scores). "
+                    "Tree spread is a heuristic proxy (not calibrated). "
+                    "Only scalar uncertainty is visualized here."
+                ),
+                uncertainty_color_dropdown,
+                uncertainty_panel,
+                mo.md("### Intensity scaling diagnostics"),
+                mo.md(
+                    "Shows denom calibration, clipping rates, and E_raw distributions. "
+                    "Use to spot saturation (over‑scaled) or under‑scaled intensity effects."
+                ),
+                intensity_panel_ui,
+            ]
+        )
+    diagnostics_content
+
+
+@app.cell
 def _(df_view, mode_dropdown, pl):
     df_overlay_top_k_pool = df_view.head(0)
     df_score_top_k_pool = df_view.head(0)
@@ -2086,7 +2602,8 @@ def _(df_view, mode_dropdown, pl):
 
 
 @app.cell
-def _(mo):
+def _(build_predicted_logic_pools, df_view, mo):
+    predicted_logic_pools = build_predicted_logic_pools(df_view)
     inspect_pool_label_map = {
         "Full dataset (all rows)": "df_active",
         "UMAP brush selection": "df_umap_selected",
@@ -2094,6 +2611,7 @@ def _(mo):
         "SFXI scored labels (current view)": "df_sfxi_selected",
         "Selected score Top-K": "df_score_top_k_pool",
         "Overlay Top-K": "df_overlay_top_k_pool",
+        **predicted_logic_pools,
     }
     inspect_pool_dropdown = mo.ui.dropdown(
         options=list(inspect_pool_label_map.keys()),
@@ -2107,6 +2625,7 @@ def _(mo):
 @app.cell
 def _(
     df_active,
+    df_view,
     df_overlay_top_k_pool,
     df_score_top_k_pool,
     df_sfxi_brush_selected,
@@ -2114,6 +2633,7 @@ def _(
     df_umap_selected,
     inspect_pool_dropdown,
     inspect_pool_label_map,
+    pl,
 ):
     pool_choice = inspect_pool_label_map.get(inspect_pool_dropdown.value, inspect_pool_dropdown.value)
     if pool_choice == "df_umap_selected":
@@ -2126,8 +2646,16 @@ def _(
         df_pool = df_overlay_top_k_pool
     elif pool_choice == "df_score_top_k_pool":
         df_pool = df_score_top_k_pool
-    else:
+    elif pool_choice in {"df_active", "df_view", "df_active_full"}:
         df_pool = df_active
+    else:
+        if "opal__nearest_2_factor_logic" not in df_view.columns:
+            raise ValueError("Nearest-logic pool requires `opal__nearest_2_factor_logic` in the dashboard view.")
+        if "opal__view__observed" not in df_view.columns:
+            raise ValueError("Nearest-logic pool requires `opal__view__observed` in the dashboard view.")
+        df_pool = df_view.filter(
+            (~pl.col("opal__view__observed")) & (pl.col("opal__nearest_2_factor_logic") == pool_choice)
+        )
     return (df_pool,)
 
 
@@ -2474,7 +3002,7 @@ def _(
     return save_pdf_status_md, save_pdf_target_md
 
 
-@app.cell(column=8)
+@app.cell(column=9)
 def _(
     export_button,
     export_format_dropdown,
@@ -2559,6 +3087,7 @@ def _(
     sfxi_default_values,
     sfxi_fixed_params,
     sfxi_gamma_input,
+    sfxi_math,
     sfxi_p00_slider,
     sfxi_p01_slider,
     sfxi_p10_slider,
@@ -2566,15 +3095,13 @@ def _(
 ):
     df_sfxi = opal_labels_view_df.head(0)
     sfxi_meta_md = mo.md("")
-    sfxi_notice_md = mo.md("")
 
     readiness = resolve_sfxi_readiness(opal_campaign_info)
-    if readiness.notice:
-        sfxi_notice_md = mo.md(readiness.notice)
+    if not readiness.ready:
+        raise ValueError(readiness.notice or "SFXI disabled.")
 
     delta = float(sfxi_fixed_params.get("delta", 0.0))
     p = float(sfxi_fixed_params.get("percentile", 95.0))
-    fallback_p = float(sfxi_fixed_params.get("fallback_percentile", p))
     min_n = int(sfxi_fixed_params.get("min_n", 5))
     eps = float(sfxi_fixed_params.get("eps", 1.0e-8))
 
@@ -2603,9 +3130,9 @@ def _(
         gamma=gamma,
         delta=delta,
         p=p,
-        fallback_p=fallback_p,
         min_n=min_n,
         eps=eps,
+        state_order=sfxi_math.STATE_ORDER,
     )
 
     label_view = build_label_sfxi_view(
@@ -2615,11 +3142,10 @@ def _(
         labels_current_df=opal_labels_current_df,
         params=sfxi_params,
     )
-    if label_view.notice:
-        sfxi_notice_md = mo.md(label_view.notice)
     df_sfxi = label_view.df
     if not df_sfxi.is_empty():
         sfxi_meta_md = mo.md("Label-level SFXI metrics are shown in the Labels table.")
+    sfxi_notice_md = mo.md("")
     return df_sfxi, readiness, sfxi_meta_md, sfxi_notice_md, sfxi_params
 
 
@@ -2640,12 +3166,19 @@ def _(
         mode=mode_dropdown.value,
     )
     df_sfxi_pred = pred_view.df
-    sfxi_pred_notice = pred_view.notice
-    return df_sfxi_pred, sfxi_pred_notice
+    return (df_sfxi_pred,)
 
 
 @app.cell
-def _(attach_namespace_columns, df_active, df_sfxi, df_sfxi_pred, mo, pl, sfxi_pred_notice, sfxi_source_dropdown):
+def _(
+    attach_namespace_columns,
+    df_sfxi,
+    df_sfxi_pred,
+    df_view,
+    mo,
+    pl,
+    sfxi_source_dropdown,
+):
     df_obs = df_sfxi.with_columns(pl.lit("Observed").alias("sfxi_source")) if df_sfxi is not None else pl.DataFrame()
     df_pred = (
         df_sfxi_pred.with_columns(pl.lit("Predicted").alias("sfxi_source"))
@@ -2666,15 +3199,11 @@ def _(attach_namespace_columns, df_active, df_sfxi, df_sfxi_pred, mo, pl, sfxi_p
         df_sfxi_scatter = df_obs
     df_sfxi_scatter = attach_namespace_columns(
         df=df_sfxi_scatter,
-        df_base=df_active,
-        prefixes=("cluster__", "densegen__"),
+        df_base=df_view,
+        prefixes=("cluster__", "densegen__", "opal__view__", "opal__sfxi__", "opal__nearest_2_factor_logic"),
     )
 
     sfxi_source_notice_md = mo.md("")
-    if _sfxi_source in {"Predicted", "Both"} and df_pred.is_empty():
-        sfxi_source_notice_md = (
-            mo.md(sfxi_pred_notice) if sfxi_pred_notice else mo.md("No predicted SFXI data available.")
-        )
     return df_sfxi_scatter, sfxi_source_notice_md
 
 
@@ -2874,6 +3403,7 @@ def _(diagnostics_to_lines, mo, transient_diag):
 
 @app.cell
 def _(
+    attach_diagnostics_metrics,
     build_mode_view,
     df_active,
     df_pred_selected,
@@ -2881,10 +3411,18 @@ def _(
     diagnostics_to_lines,
     mo,
     mode_dropdown,
+    opal_campaign_info,
     opal_labels_asof_df,
+    opal_labels_current_df,
+    opal_pred_selected_round,
+    opal_pred_selected_run_id,
     overlay_result,
     pl,
+    sfxi_params,
 ):
+    import os
+
+    headless_mode = os.getenv("DNADESIGN_HEADLESS", "").strip() == "1"
     observed_ids = set()
     if opal_labels_asof_df is not None and not opal_labels_asof_df.is_empty() and "id" in opal_labels_asof_df.columns:
         observed_ids = set(
@@ -2918,10 +3456,28 @@ def _(
         rank_col=rank_col,
         top_k_col=top_k_col,
     )
-    df_view = view_bundle.df
+    derived_result = attach_diagnostics_metrics(
+        df_view=view_bundle.df,
+        df_pred_selected=df_pred_selected,
+        labels_asof_df=opal_labels_asof_df,
+        labels_current_df=opal_labels_current_df,
+        campaign_info=opal_campaign_info,
+        pred_selected_round=opal_pred_selected_round,
+        pred_selected_run_id=opal_pred_selected_run_id,
+        sfxi_params=sfxi_params,
+        require_uncertainty=not headless_mode,
+    )
+    df_view = derived_result.df
+    uncertainty_available = derived_result.uncertainty_available
     view_notice_lines = diagnostics_to_lines(view_bundle.diagnostics)
     view_notice_md = mo.md("\n".join(view_notice_lines)) if view_notice_lines else mo.md("")
-    return df_view, view_notice_md
+    return df_view, uncertainty_available, view_notice_md, headless_mode
+
+
+@app.cell
+def _(column_non_null_counts, df_view):
+    df_view_non_null_counts = column_non_null_counts(df_view)
+    return (df_view_non_null_counts,)
 
 
 @app.cell
@@ -2934,27 +3490,35 @@ def _(
     transient_cluster_hue_dropdown,
     transient_cluster_metric_dropdown,
 ):
-    _transient_cluster_chart = None
     metric_label = transient_cluster_metric_dropdown.value
     metric_option = hue_registry.get(metric_label)
     hue_label = transient_cluster_hue_dropdown.value
+    if metric_option is None:
+        raise ValueError(f"Cluster plot missing: unknown metric option `{metric_label}`.")
+    if "cluster__ldn_v1" not in df_view.columns:
+        raise ValueError("Cluster plot missing: `cluster__ldn_v1` column is absent.")
+    if metric_option.key not in df_view.columns:
+        raise ValueError(f"Cluster plot missing: `{metric_option.key}` column is absent.")
+    if "id" in df_view.columns:
+        _id_col = "id"
+    elif "__row_id" in df_view.columns:
+        _id_col = "__row_id"
+    else:
+        raise ValueError("Cluster plot missing: `id` or `__row_id` column is required.")
     _hue = None if hue_label == "(none)" else hue_registry.get(hue_label)
-    if metric_option is not None and "cluster__ldn_v1" in df_view.columns and metric_option.key in df_view.columns:
-        _id_col = "id" if "id" in df_view.columns else "__row_id"
-        _cluster_chart = build_cluster_chart(
-            df=df_view,
-            cluster_col="cluster__ldn_v1",
-            metric_col=metric_option.key,
-            metric_label=metric_option.label,
-            hue=_hue,
-            dataset_name=dataset_name,
-            id_col=_id_col,
-            title="Metric by Leiden cluster",
-        )
-        if _cluster_chart is not None:
-            _transient_cluster_chart = mo.ui.altair_chart(_cluster_chart)
-
-    transient_cluster_chart = _transient_cluster_chart
+    if hue_label != "(none)" and _hue is None:
+        raise ValueError(f"Cluster plot missing: unknown hue option `{hue_label}`.")
+    _cluster_chart = build_cluster_chart(
+        df=df_view,
+        cluster_col="cluster__ldn_v1",
+        metric_col=metric_option.key,
+        metric_label=metric_option.label,
+        hue=_hue,
+        dataset_name=dataset_name,
+        id_col=_id_col,
+        title="Metric by Leiden cluster",
+    )
+    transient_cluster_chart = mo.ui.altair_chart(_cluster_chart)
     return (transient_cluster_chart,)
 
 
