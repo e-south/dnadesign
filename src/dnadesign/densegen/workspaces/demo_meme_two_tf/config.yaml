@@ -14,13 +14,13 @@ densegen:
         - inputs/motif_artifacts/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json
       sampling:
         strategy: stochastic
-        n_sites: 200
+        n_sites: 500
         mining:
           batch_size: 5000
           budget:
             mode: tier_target
             target_tier_fraction: 0.001
-            max_candidates: 400000
+            max_candidates: 500000
             max_seconds: 300
             growth_factor: 1.25
           log_every_batches: 1

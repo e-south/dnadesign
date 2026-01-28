@@ -170,7 +170,7 @@ If you want the full semantics behind these terms (eligibility, tier targeting m
 What this demo config is doing:
 
 * **Stage‑A (`densegen.inputs[].sampling`)**
-  Mine `n_sites=200` per motif using FIMO score eligibility (`best_hit_score > 0`), collapse near‑duplicates
+  Mine `n_sites=500` per motif using FIMO score eligibility (`best_hit_score > 0`), collapse near‑duplicates
   by core (`uniqueness.key: core`), and retain a score-first but diversity-biased set via MMR
   (`selection.policy: mmr`, `alpha=0.9`). Sites are length-normalized with `length.policy: range` (`[15, 20]`).
 
