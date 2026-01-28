@@ -64,9 +64,11 @@ def _is_nested(dtype: pl.DataType) -> bool:
         return False
 
 
-def _has_any_value(df: pl.DataFrame, col: str) -> bool:
+def _has_any_value(df: pl.DataFrame, col: str, *, non_null_counts: dict[str, int] | None = None) -> bool:
     if df.is_empty() or col not in df.columns:
         return False
+    if non_null_counts is not None and col in non_null_counts:
+        return int(non_null_counts[col]) > 0
     try:
         return df.select(pl.col(col).drop_nulls().head(1)).height > 0
     except Exception:
@@ -111,6 +113,7 @@ def build_hue_registry(
     denylist: Iterable[str] = (),
     deny_prefixes: Iterable[str] = (),
     max_unique: int = 30,
+    non_null_counts: dict[str, int] | None = None,
 ) -> HueRegistry:
     options: list[HueOption] = []
     label_map: dict[str, HueOption] = {}
@@ -125,7 +128,7 @@ def build_hue_registry(
         dtype = df.schema.get(option.key, pl.Null)
         if _is_nested(dtype) or dtype in (pl.Object, pl.Null):
             return
-        if not _has_any_value(df, option.key):
+        if not _has_any_value(df, option.key, non_null_counts=non_null_counts):
             return
         label = option.label
         if label in label_map:
@@ -154,7 +157,7 @@ def build_hue_registry(
                 continue
             if _is_nested(dtype) or dtype in (pl.Object, pl.Null):
                 continue
-            if not _has_any_value(df, name):
+            if not _has_any_value(df, name, non_null_counts=non_null_counts):
                 continue
             kind = _infer_kind(df, name, dtype, max_unique=max_unique)
             if kind is None:
@@ -177,6 +180,7 @@ def build_explorer_hue_registry(
     denylist: Iterable[str] = (),
     deny_prefixes: Iterable[str] = (),
     max_unique: int = 100,
+    non_null_counts: dict[str, int] | None = None,
 ) -> HueRegistry:
     return build_hue_registry(
         df,
@@ -185,6 +189,7 @@ def build_explorer_hue_registry(
         denylist=denylist,
         deny_prefixes=deny_prefixes,
         max_unique=max_unique,
+        non_null_counts=non_null_counts,
     )
 
 
@@ -196,6 +201,7 @@ def build_sfxi_hue_registry(
     denylist: Iterable[str] = (),
     deny_prefixes: Iterable[str] = (),
     max_unique: int = 100,
+    non_null_counts: dict[str, int] | None = None,
 ) -> HueRegistry:
     return build_explorer_hue_registry(
         df,
@@ -204,6 +210,7 @@ def build_sfxi_hue_registry(
         denylist=denylist,
         deny_prefixes=deny_prefixes,
         max_unique=max_unique,
+        non_null_counts=non_null_counts,
     )
 
 

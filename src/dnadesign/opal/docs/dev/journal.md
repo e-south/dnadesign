@@ -110,3 +110,9 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Setpoint sweep default view omits denom to preserve heatmap contrast.
 - Refactored RF uncertainty to streaming ensemble score std (no `predict_per_tree`, no `y_hat` modes), added
   ensemble protocol under `analysis/sfxi`, and moved y-ops inverse helper out of dashboard.
+
+## 2026-01-28
+- Cached parquet loads for dashboards using a path+mtime key to avoid repeated reads.
+- Added column non-null count helper and threaded it through hue registries to reduce repeated scans.
+- Reduced redundant pred_y_hat vector conversion in prom60_eda diagnostics derivations.
+- Added dashboard util test coverage for non-null count driven hue registry inclusion.

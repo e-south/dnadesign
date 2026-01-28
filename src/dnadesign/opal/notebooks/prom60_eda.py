@@ -61,6 +61,7 @@ def _():
     build_diagnostics_panels = dash_diag_guidance.build_diagnostics_panels
     build_sweep_panels = dash_diag_guidance.build_sweep_panels
     campaign_label_from_path = dash_datasets.campaign_label_from_path
+    load_parquet_cached = dash_datasets.load_parquet_cached
     build_explorer_hue_registry = dash_hues.build_explorer_hue_registry
     build_hue_registry = dash_hues.build_hue_registry
     build_sfxi_hue_registry = dash_hues.build_sfxi_hue_registry
@@ -76,6 +77,7 @@ def _():
     choose_axis_defaults = dash_util.choose_axis_defaults
     choose_dropdown_value = dash_util.choose_dropdown_value
     list_series_to_numpy = dash_util.list_series_to_numpy
+    column_non_null_counts = dash_util.column_non_null_counts
     state_value_changed = dash_util.state_value_changed
     dedupe_exprs = dash_util.dedupe_exprs
     dedup_latest_labels = dash_labels.dedup_latest_labels
@@ -113,6 +115,7 @@ def _():
         build_umap_controls,
         build_umap_explorer_chart,
         campaign_label_from_path,
+        column_non_null_counts,
         choose_axis_defaults,
         choose_dropdown_value,
         coerce_selection_dataframe,
@@ -125,6 +128,7 @@ def _():
         find_repo_root,
         get_feature_importances,
         list_series_to_numpy,
+        load_parquet_cached,
         load_feature_importances_from_artifact,
         load_round_ctx_from_dir,
         is_altair_undefined,
@@ -269,7 +273,7 @@ def _(mo):
 
 
 @app.cell
-def _(campaign_selection, dataset_mode, dataset_path, load_button, mo, pl):
+def _(campaign_selection, dataset_mode, dataset_path, load_button, load_parquet_cached, mo, pl):
     _unused = load_button
     df_raw = pl.DataFrame()
     dataset_name = None
@@ -287,7 +291,7 @@ def _(campaign_selection, dataset_mode, dataset_path, load_button, mo, pl):
         status_lines.append(f"Mode: `{dataset_mode}`")
     if dataset_path is not None and dataset_path.exists():
         try:
-            df_raw = pl.read_parquet(dataset_path)
+            df_raw = load_parquet_cached(dataset_path)
             status_lines.append(f"Rows: `{df_raw.height}`")
             status_lines.append(f"Columns: `{len(df_raw.columns)}`")
             dataset_name = dataset_path.parent.name if dataset_path.name == "records.parquet" else dataset_path.stem
@@ -380,6 +384,7 @@ def _(
     dataset_explorer_plot_type_state,
     dataset_explorer_x_state,
     dataset_explorer_y_state,
+    df_view_non_null_counts,
     df_view,
     mo,
     safe_is_numeric,
@@ -434,6 +439,7 @@ def _(
         preferred=default_view_hues(),
         include_columns=True,
         denylist={"__row_id", "id", "id_", "id__"},
+        non_null_counts=df_view_non_null_counts,
     )
     color_options = ["(none)"] + hue_registry.labels()
     _default_color = defaults.get("color")
@@ -1826,12 +1832,22 @@ def _(mo):
 
 
 @app.cell
-def _(build_sfxi_hue_registry, choose_dropdown_value, df_sfxi_scatter, mo, sfxi_color_state, default_view_hues):
+def _(
+    build_sfxi_hue_registry,
+    choose_dropdown_value,
+    column_non_null_counts,
+    df_sfxi_scatter,
+    mo,
+    sfxi_color_state,
+    default_view_hues,
+):
+    sfxi_non_null_counts = column_non_null_counts(df_sfxi_scatter)
     sfxi_hue_registry = build_sfxi_hue_registry(
         df_sfxi_scatter,
         preferred=default_view_hues(),
         include_columns=True,
         denylist={"__row_id", "id", "id_"},
+        non_null_counts=sfxi_non_null_counts,
     )
     hue_labels = sfxi_hue_registry.labels()
     if not hue_labels:
@@ -3387,14 +3403,19 @@ def _(
         elif "__row_id" in df_pred_selected.columns and "__row_id" in df_view.columns:
             pred_join_key = "__row_id"
 
+    pred_vec8 = None
+    pred_vec8_note = None
     if pred_join_key is None or df_pred_selected is None or df_pred_selected.is_empty():
         derived_notes.append("Nearest logic table unavailable (missing predictions).")
+        pred_vec8_note = "dist_to_labeled_logic unavailable (no predictions)."
     elif "pred_y_hat" not in df_pred_selected.columns:
         derived_notes.append("Nearest logic table unavailable (missing pred_y_hat).")
+        pred_vec8_note = "dist_to_labeled_logic unavailable (missing pred_y_hat)."
     else:
         pred_vec8 = list_series_to_numpy(df_pred_selected.get_column("pred_y_hat"), expected_len=8)
         if pred_vec8 is None:
             derived_notes.append("Nearest logic table unavailable (invalid pred_y_hat vectors).")
+            pred_vec8_note = "dist_to_labeled_logic unavailable (invalid pred_y_hat vectors)."
         else:
             gate_cls, _ = sfxi_gates.nearest_gate(
                 pred_vec8[:, 0:4],
@@ -3429,24 +3450,19 @@ def _(
                 label_logic = label_vec8[:, 0:4]
 
     if label_logic is not None:
-        if pred_join_key is None or df_pred_selected is None or df_pred_selected.is_empty():
-            derived_notes.append("dist_to_labeled_logic unavailable (no predictions).")
-        elif "pred_y_hat" not in df_pred_selected.columns:
-            derived_notes.append("dist_to_labeled_logic unavailable (missing pred_y_hat).")
+        if pred_vec8 is None:
+            if pred_vec8_note:
+                derived_notes.append(pred_vec8_note)
         else:
-            pred_vec = list_series_to_numpy(df_pred_selected.get_column("pred_y_hat"), expected_len=8)
-            if pred_vec is None:
-                derived_notes.append("dist_to_labeled_logic unavailable (invalid pred_y_hat vectors).")
-            else:
-                dists = sfxi_support.dist_to_labeled_logic(
-                    pred_vec[:, 0:4],
-                    label_logic,
-                    state_order=sfxi_math.STATE_ORDER,
-                )
-                dist_df = df_pred_selected.select([pred_join_key]).with_columns(
-                    pl.Series("opal__sfxi__dist_to_labeled_logic", dists)
-                )
-                df_view = df_view.join(dist_df, on=pred_join_key, how="left")
+            dists = sfxi_support.dist_to_labeled_logic(
+                pred_vec8[:, 0:4],
+                label_logic,
+                state_order=sfxi_math.STATE_ORDER,
+            )
+            dist_df = df_pred_selected.select([pred_join_key]).with_columns(
+                pl.Series("opal__sfxi__dist_to_labeled_logic", dists)
+            )
+            df_view = df_view.join(dist_df, on=pred_join_key, how="left")
 
     if opal_campaign_info is None or not opal_campaign_info.x_column:
         derived_notes.append("uncertainty unavailable (x_column missing).")
@@ -3527,6 +3543,12 @@ def _(
     view_notice_md = mo.md("\n".join(view_notice_lines)) if view_notice_lines else mo.md("")
     derived_metrics_note_md = mo.md("\n".join(derived_notes)) if derived_notes else mo.md("")
     return df_view, derived_metrics_note_md, uncertainty_available, view_notice_md
+
+
+@app.cell
+def _(column_non_null_counts, df_view):
+    df_view_non_null_counts = column_non_null_counts(df_view)
+    return (df_view_non_null_counts,)
 
 
 @app.cell

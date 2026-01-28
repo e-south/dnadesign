@@ -134,6 +134,25 @@ def test_default_view_hues_include_sfxi_diagnostics() -> None:
     assert "opal__sfxi__dist_to_labeled_x" not in keys
 
 
+def test_column_non_null_counts_feed_hue_registry() -> None:
+    df = pl.DataFrame(
+        {
+            "a": [1.0, None],
+            "b": ["x", None],
+            "c": [None, None],
+        }
+    )
+    counts = util.column_non_null_counts(df, columns=["a", "b", "c"])
+    assert counts["a"] == 1
+    assert counts["b"] == 1
+    assert counts["c"] == 0
+    registry = hues.build_hue_registry(df, include_columns=True, non_null_counts=counts)
+    labels = registry.labels()
+    assert "a" in labels
+    assert "b" in labels
+    assert "c" not in labels
+
+
 def test_build_nearest_2_factor_counts() -> None:
     label_df = pl.DataFrame(
         {
