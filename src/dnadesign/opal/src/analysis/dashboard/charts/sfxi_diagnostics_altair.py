@@ -18,6 +18,7 @@ import numpy as np
 import polars as pl
 
 from ...sfxi.factorial_effects import compute_factorial_effects
+from ...sfxi.gates import GATE_LIBRARY
 from ...sfxi.state_order import STATE_ORDER, assert_state_order
 from ..hues import HueOption
 from ..theme import DNAD_DIAGNOSTICS_PLOT_SIZE, with_title
@@ -186,13 +187,23 @@ def make_support_diagnostics_chart(
         else:
             tooltip_cols.append(hue.key)
 
+    color_encoding = _color_encoding(hue_spec)
+    if hue_spec is not None and hue_spec.key == "opal__nearest_2_factor_logic__label":
+        gate_domain = [gate.code for gate in GATE_LIBRARY]
+        color_encoding = alt.Color(
+            f"{hue_spec.key}:N",
+            title=hue_spec.label,
+            scale=alt.Scale(domain=gate_domain),
+            legend=alt.Legend(title=hue_spec.label),
+        )
+
     base = (
         alt.Chart(df)
         .mark_circle(opacity=0.7, stroke=None, strokeWidth=0)
         .encode(
             x=alt.X(f"{x_col}:Q", title=x_col),
             y=alt.Y(f"{y_col}:Q", title=y_col),
-            color=_color_encoding(hue_spec),
+            color=color_encoding,
             tooltip=_tooltip_fields(df, tooltip_cols),
         )
         .properties(width=plot_size, height=plot_size)
