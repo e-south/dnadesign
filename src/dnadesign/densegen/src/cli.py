@@ -292,18 +292,21 @@ def _default_config_path() -> Path:
 
 def _workspace_command(command: str, *, cfg_path: Path | None = None, run_root: Path | None = None) -> str:
     root = run_root or (cfg_path.parent if cfg_path is not None else None)
+    base = Path.cwd()
     if root is not None:
         try:
             root_resolved = root.resolve()
         except Exception:
             root_resolved = root
-        if root_resolved == Path.cwd().resolve():
+        if root_resolved == base.resolve():
             return command
         candidate = root / DEFAULT_CONFIG_FILENAME
         if candidate.exists():
-            return f"cd {root} && {command}"
+            root_label = display_path(root, base, absolute=False)
+            return f"cd {root_label} && {command}"
     if cfg_path is not None:
-        return f"{command} -c {cfg_path}"
+        cfg_label = display_path(cfg_path, base, absolute=False)
+        return f"{command} -c {cfg_label}"
     return command
 
 

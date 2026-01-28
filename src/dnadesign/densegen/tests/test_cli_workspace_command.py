@@ -24,7 +24,7 @@ def test_workspace_command_uses_cd_when_config_present(tmp_path: Path) -> None:
 
     with _chdir(tmp_path):
         cmd = _workspace_command("dense run", run_root=workspace)
-        assert cmd == f"cd {workspace} && dense run"
+    assert cmd == "cd ws && dense run"
 
 
 def test_workspace_command_omits_cd_when_already_in_workspace(tmp_path: Path) -> None:
@@ -45,4 +45,4 @@ def test_workspace_command_falls_back_to_config_path(tmp_path: Path) -> None:
 
     with _chdir(tmp_path):
         cmd = _workspace_command("dense run", cfg_path=cfg_path, run_root=other)
-        assert cmd == f"dense run -c {cfg_path}"
+        assert cmd == "dense run -c config.yaml"

@@ -15,11 +15,11 @@ densegen:
       sampling:
         strategy: stochastic
         n_sites: 200
-        oversample_factor: 1000
+        oversample_factor: 8000
         scoring_backend: fimo
         mining:
           batch_size: 5000
-          max_seconds: 60
+          max_seconds: 300
           log_every_batches: 1
         length_policy: range
         length_range: [15, 20]

@@ -109,4 +109,5 @@ def test_stage_b_reports_missing_pool_manifest(tmp_path: Path) -> None:
     )
     assert result.exit_code != 0, result.output
     assert "Pool manifest not found" in result.output
-    assert "dense stage-a build-pool" in result.output
+    normalized = " ".join(result.output.split())
+    assert "dense stage-a build-pool" in normalized

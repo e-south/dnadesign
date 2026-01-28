@@ -675,16 +675,17 @@ def _process_plan_for_source(
         }
     )
     pair_label = str(input_tf_tfbs_pair_count) if input_tf_tfbs_pair_count is not None else "-"
-    log.info(
-        "[%s/%s] Input summary: mode=%s rows=%d tfs=%d tfbs=%d pairs=%s",
-        source_label,
-        plan_name,
-        input_meta.get("input_mode"),
-        input_row_count,
-        input_tf_count,
-        input_tfbs_count,
-        pair_label,
-    )
+    if progress_style != "screen":
+        log.info(
+            "[%s/%s] Input summary: mode=%s rows=%d tfs=%d tfbs=%d pairs=%s",
+            source_label,
+            plan_name,
+            input_meta.get("input_mode"),
+            input_row_count,
+            input_tf_count,
+            input_tfbs_count,
+            pair_label,
+        )
     source_type = getattr(source_cfg, "type", None)
     if source_type in PWM_INPUT_TYPES and meta_df is not None and "tf" in meta_df.columns:
         input_meta["input_pwm_ids"] = sorted(set(meta_df["tf"].tolist()))
@@ -943,6 +944,8 @@ def _process_plan_for_source(
         )
 
     def _log_leaderboard_snapshot() -> None:
+        if progress_style == "screen":
+            return
         tf_usage_display = _map_tf_usage(tf_usage_counts)
         tfbs_usage_display = _map_tfbs_usage(usage_counts) if show_tfbs else usage_counts
         log.info(
@@ -2771,7 +2774,10 @@ def run_pipeline(
         }
         inputs_manifest = inputs_manifest_path(run_root)
         inputs_manifest.write_text(json.dumps(payload, indent=2, sort_keys=True))
-        log.info("Inputs manifest written: %s", inputs_manifest)
+        log.info(
+            "Inputs manifest written: %s",
+            display_path(inputs_manifest, run_root, absolute=False),
+        )
 
     _write_state()
 
