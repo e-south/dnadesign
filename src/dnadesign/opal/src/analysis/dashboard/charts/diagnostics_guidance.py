@@ -77,6 +77,17 @@ def _resolve_join_key(df_left: pl.DataFrame, df_right: pl.DataFrame) -> str | No
     return None
 
 
+def _dedupe_cols(cols: Sequence[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for col in cols:
+        if not col or col in seen:
+            continue
+        seen.add(col)
+        ordered.append(col)
+    return ordered
+
+
 def _has_duplicate_key(df: pl.DataFrame, key: str) -> bool:
     if key not in df.columns or df.is_empty():
         return False
@@ -143,13 +154,13 @@ def _build_diag_view(
     if _has_duplicate_key(df_view, join_key):
         return None, f"{ctx} unavailable (join key is not unique in view)."
 
-    required = [col for col in required_cols if col]
+    required = _dedupe_cols([col for col in required_cols if col])
     missing = [col for col in required if col not in df_view.columns]
     if missing:
         return None, f"{ctx} unavailable (missing view columns: {', '.join(missing)})."
 
     df_diag = df_pred_selected.join(
-        df_view.select([join_key, *required]),
+        df_view.select(_dedupe_cols([join_key, *required])),
         on=join_key,
         how="left",
     )
