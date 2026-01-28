@@ -35,8 +35,9 @@ def _chunked(items: List[str], size: int) -> Iterable[List[str]]:
 
 
 class IdIndex:
-    def __init__(self, root: Path):
-        self.db_path = Path(root) / INDEX_FILENAME
+    def __init__(self, db_path: Path):
+        self.db_path = Path(db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.db_path)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")

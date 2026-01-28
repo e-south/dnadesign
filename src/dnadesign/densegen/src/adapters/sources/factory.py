@@ -58,6 +58,7 @@ def data_source_factory(cfg, cfg_path: Path) -> BaseDataSource:
             cfg_path=cfg_path,
             motif_ids=cfg.motif_ids,
             sampling=cfg.sampling.model_dump(),
+            input_name=cfg.name,
         )
     if isinstance(cfg, PWMMemeSetInput):
         return PWMMemeSetDataSource(
@@ -65,6 +66,7 @@ def data_source_factory(cfg, cfg_path: Path) -> BaseDataSource:
             cfg_path=cfg_path,
             motif_ids=cfg.motif_ids,
             sampling=cfg.sampling.model_dump(),
+            input_name=cfg.name,
         )
     if isinstance(cfg, PWMJasparInput):
         return PWMJasparDataSource(
@@ -72,6 +74,7 @@ def data_source_factory(cfg, cfg_path: Path) -> BaseDataSource:
             cfg_path=cfg_path,
             motif_ids=cfg.motif_ids,
             sampling=cfg.sampling.model_dump(),
+            input_name=cfg.name,
         )
     if isinstance(cfg, PWMMatrixCSVInput):
         return PWMMatrixCSVDataSource(
@@ -80,12 +83,14 @@ def data_source_factory(cfg, cfg_path: Path) -> BaseDataSource:
             motif_id=cfg.motif_id,
             columns=cfg.columns.model_dump(),
             sampling=cfg.sampling.model_dump(),
+            input_name=cfg.name,
         )
     if isinstance(cfg, PWMArtifactInput):
         return PWMArtifactDataSource(
             path=cfg.path,
             cfg_path=cfg_path,
             sampling=cfg.sampling.model_dump(),
+            input_name=cfg.name,
         )
     if isinstance(cfg, PWMArtifactSetInput):
         return PWMArtifactSetDataSource(
@@ -93,6 +98,7 @@ def data_source_factory(cfg, cfg_path: Path) -> BaseDataSource:
             cfg_path=cfg_path,
             sampling=cfg.sampling.model_dump(),
             overrides_by_motif_id={k: v.model_dump() for k, v in cfg.overrides_by_motif_id.items()},
+            input_name=cfg.name,
         )
     if isinstance(cfg, USRSequencesInput):
         return USRSequencesDataSource(dataset=cfg.dataset, cfg_path=cfg_path, root=cfg.root, limit=cfg.limit)

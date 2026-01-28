@@ -3,7 +3,7 @@
 <dnadesign project>
 dnadesign/densegen/adapters/sources/pwm_jaspar.py
 
-PWM input source (JASPAR PFM format) with explicit sampling policies.
+PWM input source (JASPAR PFM format) with explicit Stage-A sampling policies.
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
+from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
+from ...core.run_paths import candidates_root
 from .base import BaseDataSource, resolve_path
 from .pwm_sampling import PWMMotif, normalize_background, sample_pwm_sites
 
@@ -86,10 +88,11 @@ class PWMJasparDataSource(BaseDataSource):
     cfg_path: Path
     motif_ids: Optional[List[str]]
     sampling: dict
+    input_name: str
 
-    def load_data(self, *, rng=None):
+    def load_data(self, *, rng=None, outputs_root: Path | None = None, run_id: str | None = None):
         if rng is None:
-            raise ValueError("PWM sampling requires an RNG; pass the pipeline RNG explicitly.")
+            raise ValueError("Stage-A PWM sampling requires an RNG; pass the pipeline RNG explicitly.")
         jaspar_path = resolve_path(self.cfg_path, self.path)
         if not (jaspar_path.exists() and jaspar_path.is_file()):
             raise FileNotFoundError(f"PWM JASPAR file not found. Looked here:\n  - {jaspar_path}")
@@ -113,13 +116,43 @@ class PWMJasparDataSource(BaseDataSource):
         length_range = sampling.get("length_range")
         trim_window_length = sampling.get("trim_window_length")
         trim_window_strategy = sampling.get("trim_window_strategy", "max_info")
+        scoring_backend = str(sampling.get("scoring_backend", "densegen")).lower()
+        pvalue_strata = sampling.get("pvalue_strata")
+        retain_depth = sampling.get("retain_depth")
+        mining = sampling.get("mining")
+        bgfile = sampling.get("bgfile")
+        keep_all_candidates_debug = bool(sampling.get("keep_all_candidates_debug", False))
+        include_matched_sequence = bool(sampling.get("include_matched_sequence", False))
+        bgfile_path: Path | None = None
+        if bgfile is not None:
+            bgfile_path = resolve_path(self.cfg_path, str(bgfile))
+            if not (bgfile_path.exists() and bgfile_path.is_file()):
+                raise FileNotFoundError(f"Stage-A PWM sampling bgfile not found. Looked here:\n  - {bgfile_path}")
+        debug_output_dir: Path | None = None
+        if keep_all_candidates_debug:
+            if outputs_root is None:
+                raise ValueError("keep_all_candidates_debug requires outputs_root to be set.")
+            if run_id is None:
+                raise ValueError("keep_all_candidates_debug requires run_id to be set.")
+            debug_output_dir = candidates_root(Path(outputs_root), run_id) / self.input_name
 
         entries = []
         all_rows = []
+        summaries = []
         for motif in motifs:
-            selected = sample_pwm_sites(
+            motif_hash = hash_pwm_motif(
+                motif_label=motif.motif_id,
+                matrix=motif.matrix,
+                background=motif.background,
+                source_kind="pwm_jaspar",
+            )
+            return_meta = scoring_backend == "fimo"
+            result = sample_pwm_sites(
                 rng,
                 motif,
+                input_name=self.input_name,
+                motif_hash=motif_hash,
+                run_id=run_id,
                 strategy=strategy,
                 n_sites=n_sites,
                 oversample_factor=oversample_factor,
@@ -127,16 +160,55 @@ class PWMJasparDataSource(BaseDataSource):
                 max_seconds=max_seconds,
                 score_threshold=threshold,
                 score_percentile=percentile,
+                scoring_backend=scoring_backend,
+                pvalue_strata=pvalue_strata,
+                retain_depth=retain_depth,
+                mining=mining,
+                bgfile=bgfile_path,
+                keep_all_candidates_debug=keep_all_candidates_debug,
+                include_matched_sequence=include_matched_sequence,
+                debug_output_dir=debug_output_dir,
+                debug_label=f"{jaspar_path.stem}__{motif.motif_id}",
                 length_policy=length_policy,
                 length_range=length_range,
                 trim_window_length=trim_window_length,
                 trim_window_strategy=str(trim_window_strategy),
+                return_metadata=return_meta,
+                return_summary=True,
             )
+            if return_meta:
+                selected, meta_by_seq, summary = result  # type: ignore[misc]
+            else:
+                selected, summary = result  # type: ignore[assignment]
+                meta_by_seq = {}
+            if summary is not None:
+                summaries.append(summary)
             for seq in selected:
                 entries.append((motif.motif_id, seq, str(jaspar_path)))
-                all_rows.append({"tf": motif.motif_id, "tfbs": seq, "source": str(jaspar_path)})
+                meta = meta_by_seq.get(seq, {}) if meta_by_seq else {}
+                start = meta.get("fimo_start")
+                stop = meta.get("fimo_stop")
+                strand = meta.get("fimo_strand")
+                tfbs_id = hash_tfbs_id(
+                    motif_id=motif_hash,
+                    sequence=seq,
+                    scoring_backend=scoring_backend,
+                    matched_start=int(start) if start is not None else None,
+                    matched_stop=int(stop) if stop is not None else None,
+                    matched_strand=str(strand) if strand is not None else None,
+                )
+                row = {
+                    "tf": motif.motif_id,
+                    "tfbs": seq,
+                    "source": str(jaspar_path),
+                    "motif_id": motif_hash,
+                    "tfbs_id": tfbs_id,
+                }
+                if meta:
+                    row.update(meta)
+                all_rows.append(row)
 
         import pandas as pd
 
         df = pd.DataFrame(all_rows)
-        return entries, df
+        return entries, df, summaries

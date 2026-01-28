@@ -1,3 +1,16 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_pwm_artifact_source.py
+
+PWM artifact data source sampling tests.
+
+Dunlop Lab.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import json
@@ -37,6 +50,7 @@ def test_pwm_artifact_sampling_exact(tmp_path: Path) -> None:
     ds = PWMArtifactDataSource(
         path=str(artifact_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         sampling={
             "strategy": "stochastic",
             "n_sites": 5,
@@ -46,7 +60,7 @@ def test_pwm_artifact_sampling_exact(tmp_path: Path) -> None:
             "length_policy": "exact",
         },
     )
-    entries, df = ds.load_data(rng=np.random.default_rng(0))
+    entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
     assert len(entries) == 5
     assert df is not None
     assert set(df["tf"].tolist()) == {"M1"}
@@ -59,6 +73,7 @@ def test_pwm_artifact_sampling_range(tmp_path: Path) -> None:
     ds = PWMArtifactDataSource(
         path=str(artifact_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         sampling={
             "strategy": "stochastic",
             "n_sites": 6,
@@ -69,7 +84,7 @@ def test_pwm_artifact_sampling_range(tmp_path: Path) -> None:
             "length_range": (3, 5),
         },
     )
-    entries, df = ds.load_data(rng=np.random.default_rng(1))
+    entries, df, _summaries = ds.load_data(rng=np.random.default_rng(1))
     assert len(entries) == 6
     assert df is not None
     lengths = [len(seq) for seq in df["tfbs"].tolist()]
@@ -100,6 +115,7 @@ def test_pwm_artifact_rejects_nonfinite_log_odds(tmp_path: Path) -> None:
     ds = PWMArtifactDataSource(
         path=str(artifact_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         sampling={
             "strategy": "stochastic",
             "n_sites": 2,
@@ -113,12 +129,13 @@ def test_pwm_artifact_rejects_nonfinite_log_odds(tmp_path: Path) -> None:
         ds.load_data(rng=np.random.default_rng(0))
 
 
-def test_pwm_sampling_error_includes_motif_id(tmp_path: Path) -> None:
+def test_pwm_sampling_shortfall_includes_motif_id(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     artifact_path = tmp_path / "motif.json"
     _write_artifact(artifact_path)
     ds = PWMArtifactDataSource(
         path=str(artifact_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         sampling={
             "strategy": "stochastic",
             "n_sites": 2,
@@ -128,5 +145,7 @@ def test_pwm_sampling_error_includes_motif_id(tmp_path: Path) -> None:
             "length_policy": "exact",
         },
     )
-    with pytest.raises(ValueError, match="motif 'M1'"):
+    with caplog.at_level("WARNING"):
         ds.load_data(rng=np.random.default_rng(1))
+    assert "motif 'M1'" in caplog.text
+    assert "shortfall" in caplog.text.lower()

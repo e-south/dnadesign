@@ -21,6 +21,8 @@ Dunlop Lab
 from __future__ import annotations
 
 import json
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, Optional
 
@@ -35,7 +37,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 from ..adapters.outputs import load_records_from_config
-from ..config import RootConfig, resolve_run_root, resolve_run_scoped_path
+from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
+from ..core.artifacts.pool import POOL_MODE_TFBS, load_pool_artifact
 from .plot_registry import PLOT_SPECS
 
 # Embed TrueType fonts for clean text in vector exports
@@ -43,6 +46,7 @@ mpl.rcParams["pdf.fonttype"] = 42
 mpl.rcParams["ps.fonttype"] = 42
 
 _console = Console()
+_SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 
 # ---------------------- Small helpers ----------------------
 
@@ -95,6 +99,54 @@ def _apply_style(ax, style: dict):
 def _fig_ax(style: dict):
     w, h = style.get("figsize", (8, 4))
     return plt.subplots(figsize=(float(w), float(h)))
+
+
+def _safe_filename(text: str) -> str:
+    cleaned = _SAFE_FILENAME_RE.sub("_", str(text).strip())
+    return cleaned or "densegen"
+
+
+def _plot_manifest_path(out_dir: Path) -> Path:
+    return out_dir / "plot_manifest.json"
+
+
+def _load_plot_manifest(out_dir: Path) -> dict:
+    path = _plot_manifest_path(out_dir)
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text())
+
+
+def _write_plot_manifest(
+    out_dir: Path,
+    *,
+    entries: list[dict],
+    run_root: Path,
+    cfg_path: Path,
+    source: str,
+) -> None:
+    existing = _load_plot_manifest(out_dir)
+    merged: dict[str, dict] = {}
+    for item in existing.get("plots", []):
+        rel_path = str(item.get("path") or "")
+        if not rel_path:
+            continue
+        if (out_dir / rel_path).exists():
+            merged[rel_path] = item
+    for item in entries:
+        rel_path = str(item.get("path") or "")
+        if not rel_path:
+            continue
+        merged[rel_path] = item
+    payload = {
+        "schema_version": "1.0",
+        "run_root": str(run_root),
+        "config_path": str(cfg_path),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "source": str(source),
+        "plots": sorted(merged.values(), key=lambda x: (x.get("name", ""), x.get("path", ""))),
+    }
+    _plot_manifest_path(out_dir).write_text(json.dumps(payload, indent=2, sort_keys=True))
 
 
 # color utils
@@ -272,10 +324,26 @@ def _plan_to_pair_label_map(cfg: dict) -> dict[str, str]:
 
 
 def _ensure_out_dir(plots_cfg, cfg_path: Path, run_root: Path) -> Path:
-    out_dir = plots_cfg.out_dir if plots_cfg else "outputs"
-    out = resolve_run_scoped_path(cfg_path, run_root, out_dir, label="plots.out_dir")
+    out_dir = plots_cfg.out_dir if plots_cfg else "outputs/plots"
+    out = resolve_outputs_scoped_path(cfg_path, run_root, out_dir, label="plots.out_dir")
     out.mkdir(parents=True, exist_ok=True)
     return out
+
+
+def _load_stage_a_pools(run_root: Path) -> dict[str, pd.DataFrame]:
+    pools_dir = run_root / "outputs" / "pools"
+    artifact = load_pool_artifact(pools_dir)
+    pools: dict[str, pd.DataFrame] = {}
+    for entry in artifact.inputs.values():
+        if entry.pool_mode != POOL_MODE_TFBS:
+            continue
+        pool_path = pools_dir / entry.pool_path
+        if not pool_path.exists():
+            raise FileNotFoundError(f"Stage-A pool not found: {pool_path}")
+        pools[entry.name] = pd.read_parquet(pool_path)
+    if not pools:
+        raise ValueError("No TFBS pools available for Stage-A plots.")
+    return pools
 
 
 # ---------------------- Plots ----------------------
@@ -478,11 +546,11 @@ def plot_tf_usage(
     raise ValueError("tf_usage.mode must be one of: stack_lengths, stack_tfbs, totals")
 
 
-def plot_gap_fill_gc(df: pd.DataFrame, out_path: Path, *, style: Optional[dict] = None) -> None:
+def plot_pad_gc(df: pd.DataFrame, out_path: Path, *, style: Optional[dict] = None) -> None:
     used_col, gc_col, b_col = (
-        _dg("gap_fill_used"),
-        _dg("gap_fill_gc_actual"),
-        _dg("gap_fill_bases"),
+        _dg("pad_used"),
+        _dg("pad_gc_actual"),
+        _dg("pad_bases"),
     )
     mask = df[used_col] == True  # noqa: E712
     x = pd.to_numeric(df.loc[mask, gc_col], errors="coerce")
@@ -492,9 +560,9 @@ def plot_gap_fill_gc(df: pd.DataFrame, out_path: Path, *, style: Optional[dict] 
     style = _style(style)
     fig, ax = _fig_ax(style)
     ax.scatter(x.values, y.values, alpha=0.35, s=12)
-    ax.set_xlabel("Gap-fill GC fraction")
-    ax.set_ylabel("Gap-fill bases")
-    ax.set_title("Gap-fill: bases vs GC fraction (filled only)")
+    ax.set_xlabel("Pad GC fraction")
+    ax.set_ylabel("Pad bases")
+    ax.set_title("Pad: bases vs GC fraction (padded only)")
     _apply_style(ax, style)
     fig.tight_layout()
     fig.savefig(out_path)
@@ -651,11 +719,6 @@ def plot_tf_coverage(
         pc = style.get("promoter_colors") or {}
         if label in pc:
             return pc[label]
-        # backward-compatible keys:
-        if label == "35 site":
-            return pc.get("-35 site", default)
-        if label == "10 site":
-            return pc.get("-10 site", default)
         return default
 
     for key, default in default_promoter_colors.items():
@@ -789,7 +852,7 @@ def plot_tfbs_length_density(
     by_tf: Dict[str, list[int]] = {}
     if attempts_df is None or attempts_df.empty:
         raise ValueError(
-            "outputs/attempts.parquet is required for tfbs_length_density. "
+            "outputs/tables/attempts.parquet is required for tfbs_length_density. "
             "Run `dense run -c <config.yaml>` to generate attempts."
         )
     if attempts_df is not None and not attempts_df.empty:
@@ -1259,6 +1322,126 @@ def plot_tfbs_positional_histogram(
     plt.close(fig)
 
 
+def plot_stage_a_pvalue_strat_hist(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    pools: dict[str, pd.DataFrame] | None = None,
+    style: Optional[dict] = None,
+) -> list[Path]:
+    if pools is None:
+        raise ValueError("Stage-A plots require Stage-A pools; run stage-a build-pool first.")
+    raw_style = style or {}
+    style = _style(raw_style)
+    if "figsize" not in raw_style:
+        style["figsize"] = (8, 4)
+    paths: list[Path] = []
+    for input_name, pool_df in pools.items():
+        required = {"fimo_pvalue", "fimo_bin_id", "fimo_bin_low", "fimo_bin_high"}
+        missing = sorted(required - set(pool_df.columns))
+        if missing:
+            raise ValueError(f"Stage-A p-value stratification plot missing columns: {', '.join(missing)}")
+        pvals = pd.to_numeric(pool_df["fimo_pvalue"], errors="coerce").replace(0, np.nan).dropna()
+        if pvals.empty:
+            raise ValueError(f"No FIMO p-values available for input '{input_name}'.")
+        min_p = float(pvals[pvals > 0].min())
+        bin_rows = pool_df[["fimo_bin_id", "fimo_bin_low", "fimo_bin_high"]].dropna().drop_duplicates("fimo_bin_id")
+        if bin_rows.empty:
+            raise ValueError(f"No FIMO bin metadata found for input '{input_name}'.")
+        counts = pool_df.groupby("fimo_bin_id").size().to_dict()
+        bins: list[dict] = []
+        for _, row in bin_rows.iterrows():
+            bin_id = int(row["fimo_bin_id"])
+            low = float(row["fimo_bin_low"])
+            high = float(row["fimo_bin_high"])
+            if high <= 0:
+                raise ValueError(f"FIMO bin high bound must be > 0 (input '{input_name}', bin {bin_id}).")
+            low_val = max(low, min_p)
+            left = -np.log10(high)
+            right = -np.log10(low_val)
+            if not (np.isfinite(left) and np.isfinite(right)):
+                raise ValueError(f"Invalid p-value bin bounds for input '{input_name}', bin {bin_id}.")
+            if right < left:
+                left, right = right, left
+            label = f"({low:.0e},{high:.0e}]"
+            bins.append(
+                {
+                    "left": left,
+                    "right": right,
+                    "count": int(counts.get(bin_id, 0)),
+                    "label": label,
+                }
+            )
+        bins.sort(key=lambda b: b["left"])
+        colors = _palette(style, len(bins), no_repeat=bool(style.get("palette_no_repeat", False)))
+
+        fig, ax = _fig_ax(style)
+        for idx, entry in enumerate(bins):
+            left = entry["left"]
+            right = entry["right"]
+            width = max(1e-6, right - left)
+            ax.bar(
+                left + width / 2,
+                entry["count"],
+                width=width,
+                color=colors[idx],
+                edgecolor="white",
+                label=entry["label"],
+                align="center",
+            )
+        ax.set_xlabel("-log10(p-value) (higher = more significant)")
+        ax.set_ylabel("count")
+        ax.set_title(f"Stage-A FIMO stratification: {input_name}")
+        ax.legend(loc="best", frameon=bool(style.get("legend_frame", False)))
+        _apply_style(ax, style)
+        fig.tight_layout()
+        fname = f"{out_path.stem}__{_safe_filename(input_name)}{out_path.suffix}"
+        path = out_path.parent / fname
+        fig.savefig(path)
+        plt.close(fig)
+        paths.append(path)
+    return paths
+
+
+def plot_stage_a_length_hist(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    pools: dict[str, pd.DataFrame] | None = None,
+    style: Optional[dict] = None,
+) -> list[Path]:
+    if pools is None:
+        raise ValueError("Stage-A plots require Stage-A pools; run stage-a build-pool first.")
+    raw_style = style or {}
+    style = _style(raw_style)
+    if "figsize" not in raw_style:
+        style["figsize"] = (5, 5)
+    paths: list[Path] = []
+    for input_name, pool_df in pools.items():
+        if "tfbs" not in pool_df.columns:
+            raise ValueError(f"Stage-A TFBS length plot missing 'tfbs' column for input '{input_name}'.")
+        lengths = pool_df["tfbs"].astype(str).map(len)
+        if lengths.empty:
+            raise ValueError(f"No TFBS lengths available for input '{input_name}'.")
+        min_len = int(lengths.min())
+        max_len = int(lengths.max())
+        bins = np.arange(min_len, max_len + 2) - 0.5
+        fig, ax = _fig_ax(style)
+        ax.hist(lengths, bins=bins, color="#4c78a8", edgecolor="white")
+        ax.set_xlabel("TFBS length (nt)")
+        ax.set_ylabel("count")
+        ax.set_title(f"Stage-A TFBS lengths: {input_name}")
+        ax.set_xticks(list(range(min_len, max_len + 1)))
+        _apply_style(ax, style)
+        fig.tight_layout()
+        fname = f"{out_path.stem}__{_safe_filename(input_name)}{out_path.suffix}"
+        path = out_path.parent / fname
+        fig.savefig(path)
+        plt.close(fig)
+        paths.append(path)
+    return paths
+
+
 AVAILABLE_PLOTS: Dict[str, Dict[str, object]] = {}
 for _name, _spec in PLOT_SPECS.items():
     _fn_name = _spec.get("fn")
@@ -1268,6 +1451,7 @@ for _name, _spec in PLOT_SPECS.items():
     AVAILABLE_PLOTS[_name] = {
         "fn": _fn,
         "description": _spec.get("description", ""),
+        "requires": _spec.get("requires"),
     }
 
 
@@ -1327,7 +1511,9 @@ _ALLOWED_OPTIONS = {
         "include_promoter_sites",
         "promoter_site_motifs",
     },
-    "gap_fill_gc": set(),
+    "pad_gc": set(),
+    "stage_a_pvalue_strat_hist": set(),
+    "stage_a_length_hist": set(),
 }
 
 
@@ -1349,12 +1535,14 @@ def _plot_required_columns(selected: Iterable[str], options: Dict[str, Dict[str,
     cols: set[str] = set()
     for name in selected:
         raw = options.get(name, {}) if options else {}
+        if name in {"stage_a_pvalue_strat_hist", "stage_a_length_hist"}:
+            continue
         if name == "compression_ratio":
             cols.add(_dg("compression_ratio"))
         elif name == "tf_usage":
             cols.update({_dg("used_tf_counts"), _dg("used_tfbs_detail")})
-        elif name == "gap_fill_gc":
-            cols.update({_dg("gap_fill_used"), _dg("gap_fill_gc_actual"), _dg("gap_fill_bases")})
+        elif name == "pad_gc":
+            cols.update({_dg("pad_used"), _dg("pad_gc_actual"), _dg("pad_bases")})
         elif name == "plan_counts":
             cols.add(_dg("plan"))
             created_col = str(raw.get("created_at_col", _dg("created_at")))
@@ -1385,7 +1573,25 @@ def _plot_required_columns(selected: Iterable[str], options: Dict[str, Dict[str,
     return sorted(cols)
 
 
-def run_plots_from_config(root_cfg: RootConfig, cfg_path: Path, *, only: Optional[str] = None) -> None:
+def _plot_required_sources(selected: Iterable[str]) -> set[str]:
+    sources: set[str] = set()
+    for name in selected:
+        spec = AVAILABLE_PLOTS.get(name, {})
+        requires = spec.get("requires")
+        if requires:
+            sources.update({str(item) for item in requires})
+        else:
+            sources.add("outputs")
+    return sources
+
+
+def run_plots_from_config(
+    root_cfg: RootConfig,
+    cfg_path: Path,
+    *,
+    only: Optional[str] = None,
+    source: str = "plot",
+) -> None:
     plots_cfg = root_cfg.plots
     run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
     out_dir = _ensure_out_dir(plots_cfg, cfg_path, run_root)
@@ -1394,18 +1600,31 @@ def run_plots_from_config(root_cfg: RootConfig, cfg_path: Path, *, only: Optiona
     selected = [p.strip() for p in (only.split(",") if only else default_list)]
     options = plots_cfg.options if plots_cfg else {}
     global_style = plots_cfg.style if plots_cfg else {}
+    required_sources = _plot_required_sources(selected)
     cols = _plot_required_columns(selected, options)
     max_rows = plots_cfg.sample_rows if plots_cfg else None
-    df, src = load_records_from_config(root_cfg, cfg_path, columns=cols, max_rows=max_rows)
+    df = pd.DataFrame()
+    src_label = "none"
+    row_count = 0
+    if "outputs" in required_sources:
+        df, src_label = load_records_from_config(root_cfg, cfg_path, columns=cols, max_rows=max_rows)
+        row_count = len(df)
+    pools: dict[str, pd.DataFrame] | None = None
+    if "pools" in required_sources:
+        pools = _load_stage_a_pools(run_root)
+        if row_count == 0:
+            row_count = sum(len(pool_df) for pool_df in pools.values())
+            src_label = f"pools:{run_root / 'outputs' / 'pools'}"
 
     _console.print(
         Panel.fit(
-            f"DenseGen plotting • source: {src} • rows: {len(df):,}\nOutput: {out_dir}",
+            f"DenseGen plotting • source: {src_label} • rows: {row_count:,}\nOutput: {out_dir}",
             border_style="blue",
         )
     )
     summary = Table("plot", "saved to", "status")
     errors: list[tuple[str, Exception]] = []
+    manifest_entries: list[dict] = []
 
     for name in selected:
         if name not in AVAILABLE_PLOTS:
@@ -1437,16 +1656,37 @@ def run_plots_from_config(root_cfg: RootConfig, cfg_path: Path, *, only: Optiona
                 "tfbs_positional_frequency",
                 "tfbs_positional_histogram",
             }:
-                fn(df, out_path, style=style, cfg=root_cfg.densegen.model_dump(), **kwargs)
+                result = fn(df, out_path, style=style, cfg=root_cfg.densegen.model_dump(), **kwargs)
             elif name == "tfbs_length_density":
                 attempts_df = None
-                attempts_path = run_root / "outputs" / "attempts.parquet"
+                attempts_path = run_root / "outputs" / "tables" / "attempts.parquet"
                 if attempts_path.exists():
                     attempts_df = pd.read_parquet(attempts_path)
-                fn(df, out_path, style=style, attempts_df=attempts_df, **kwargs)
+                result = fn(df, out_path, style=style, attempts_df=attempts_df, **kwargs)
+            elif name in {"stage_a_pvalue_strat_hist", "stage_a_length_hist"}:
+                result = fn(df, out_path, style=style, pools=pools, **kwargs)
             else:
-                fn(df, out_path, style=style, **kwargs)
-            summary.add_row(name, str(out_path), "[green]ok[/]")
+                result = fn(df, out_path, style=style, **kwargs)
+            if result is None:
+                paths = [out_path]
+            elif isinstance(result, (list, tuple, set)):
+                paths = [Path(p) for p in result]
+            else:
+                paths = [Path(result)]
+            saved_label = str(paths[0]) if len(paths) == 1 else f"{paths[0]} (+{len(paths) - 1})"
+            summary.add_row(name, saved_label, "[green]ok[/]")
+            created_at = datetime.now(timezone.utc).isoformat()
+            for path in paths:
+                manifest_entries.append(
+                    {
+                        "name": name,
+                        "path": str(path.relative_to(out_dir)),
+                        "description": AVAILABLE_PLOTS[name]["description"],
+                        "figsize": list(style.get("figsize", [])) if style.get("figsize") else None,
+                        "generated_at": created_at,
+                        "source": str(source),
+                    }
+                )
         except Exception as e:
             summary.add_row(name, "—", f"[red]failed[/] ({e})")
             errors.append((name, e))
@@ -1455,3 +1695,5 @@ def run_plots_from_config(root_cfg: RootConfig, cfg_path: Path, *, only: Optiona
     if errors:
         details = "; ".join(f"{name}: {err}" for name, err in errors)
         raise RuntimeError(f"{len(errors)} plot(s) failed: {details}")
+
+    _write_plot_manifest(out_dir, entries=manifest_entries, run_root=run_root, cfg_path=cfg_path, source=source)

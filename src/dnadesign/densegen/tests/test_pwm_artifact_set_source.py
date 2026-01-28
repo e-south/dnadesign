@@ -1,3 +1,16 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_pwm_artifact_set_source.py
+
+PWM artifact-set data source sampling tests.
+
+Dunlop Lab.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import json
@@ -49,7 +62,7 @@ def test_pwm_artifact_set_sampling(tmp_path: Path) -> None:
             "length_policy": "exact",
         },
     )
-    entries, df = ds.load_data(rng=np.random.default_rng(0))
+    entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
     assert len(entries) == 8
     assert df is not None
     assert set(df["tf"].tolist()) == {"M1", "M2"}
@@ -106,7 +119,7 @@ def test_pwm_artifact_set_overrides_by_motif_id(tmp_path: Path) -> None:
             }
         },
     )
-    _entries, df = ds.load_data(rng=np.random.default_rng(2))
+    _entries, df, _summaries = ds.load_data(rng=np.random.default_rng(2))
     counts = df["tf"].value_counts().to_dict()
     assert counts["M1"] == 2
     assert counts["M2"] == 1

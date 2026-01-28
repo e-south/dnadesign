@@ -50,13 +50,14 @@ class _DummyAdapter:
         sequence_length,
         solver,
         strategy,
-        solver_options,
         fixed_elements,
         strands="double",
         regulator_by_index=None,
         required_regulators=None,
         min_count_by_regulator=None,
         min_required_regulators=None,
+        solver_time_limit_seconds=None,
+        solver_threads=None,
     ):
         opt = _DummyOpt()
         sol1 = _DummySol(sequence="AAA", library=library, used_indices=[0])
@@ -74,7 +75,7 @@ def test_required_regulators_filtering(tmp_path: Path) -> None:
     csv_path.write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
     cfg = {
         "densegen": {
-            "schema_version": "2.1",
+            "schema_version": "2.5",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {
@@ -87,7 +88,7 @@ def test_required_regulators_filtering(tmp_path: Path) -> None:
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": str(tmp_path / "out.parquet")},
+                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
             },
             "generation": {
                 "sequence_length": 3,
@@ -112,7 +113,7 @@ def test_required_regulators_filtering(tmp_path: Path) -> None:
                     }
                 ],
             },
-            "solver": {"backend": "CBC", "strategy": "iterate", "options": []},
+            "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {
                 "round_robin": False,
                 "arrays_generated_before_resample": 10,
@@ -126,8 +127,8 @@ def test_required_regulators_filtering(tmp_path: Path) -> None:
                 "max_failed_solutions": 0,
                 "random_seed": 1,
             },
-            "postprocess": {"gap_fill": {"mode": "off", "end": "5prime", "gc_min": 0.4, "gc_max": 0.6}},
-            "logging": {"log_dir": str(tmp_path / "logs"), "level": "INFO"},
+            "postprocess": {"pad": {"mode": "off"}},
+            "logging": {"log_dir": "outputs/logs", "level": "INFO"},
         }
     }
     cfg_path = tmp_path / "cfg.yaml"
@@ -138,9 +139,9 @@ def test_required_regulators_filtering(tmp_path: Path) -> None:
         source_factory=data_source_factory,
         sink_factory=lambda _cfg, _path: [sink],
         optimizer=_DummyAdapter(),
-        gap_fill=lambda *args, **kwargs: "",
+        pad=lambda *args, **kwargs: "",
     )
-    summary = run_pipeline(loaded, deps=deps)
+    summary = run_pipeline(loaded, deps=deps, resume=False)
     assert summary.total_generated == 1
     assert len(sink.records) == 1
     assert sink.records[0].sequence == "CCC"
@@ -151,7 +152,7 @@ def test_required_regulators_k_of_n(tmp_path: Path) -> None:
     csv_path.write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
     cfg = {
         "densegen": {
-            "schema_version": "2.3",
+            "schema_version": "2.5",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {
@@ -164,7 +165,7 @@ def test_required_regulators_k_of_n(tmp_path: Path) -> None:
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": str(tmp_path / "out.parquet")},
+                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
             },
             "generation": {
                 "sequence_length": 3,
@@ -190,7 +191,7 @@ def test_required_regulators_k_of_n(tmp_path: Path) -> None:
                     }
                 ],
             },
-            "solver": {"backend": "CBC", "strategy": "iterate", "options": []},
+            "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {
                 "round_robin": False,
                 "arrays_generated_before_resample": 10,
@@ -204,8 +205,8 @@ def test_required_regulators_k_of_n(tmp_path: Path) -> None:
                 "max_failed_solutions": 0,
                 "random_seed": 1,
             },
-            "postprocess": {"gap_fill": {"mode": "off", "end": "5prime", "gc_min": 0.4, "gc_max": 0.6}},
-            "logging": {"log_dir": str(tmp_path / "logs"), "level": "INFO"},
+            "postprocess": {"pad": {"mode": "off"}},
+            "logging": {"log_dir": "outputs/logs", "level": "INFO"},
         }
     }
     cfg_path = tmp_path / "cfg.yaml"
@@ -216,9 +217,9 @@ def test_required_regulators_k_of_n(tmp_path: Path) -> None:
         source_factory=data_source_factory,
         sink_factory=lambda _cfg, _path: [sink],
         optimizer=_DummyAdapter(),
-        gap_fill=lambda *args, **kwargs: "",
+        pad=lambda *args, **kwargs: "",
     )
-    summary = run_pipeline(loaded, deps=deps)
+    summary = run_pipeline(loaded, deps=deps, resume=False)
     assert summary.total_generated == 1
     assert len(sink.records) == 1
     assert sink.records[0].sequence == "AAA"

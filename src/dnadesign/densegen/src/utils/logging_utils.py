@@ -1,10 +1,12 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/utils/logging_utils.py
+dnadesign
+src/dnadesign/densegen/src/utils/logging_utils.py
+
+Logging setup and stderr filtering utilities.
+Dunlop Lab.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -16,7 +18,79 @@ import re
 import sys
 import threading
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Optional, TextIO
+
+_NATIVE_STDERR_PATTERNS: list[tuple[str, re.Pattern, str | None]] = []
+_NATIVE_STDERR_LOCK = threading.Lock()
+_FIMO_STDOUT_SUPPRESS_RE = re.compile(r"^\s*FIMO (mining|yield)\b")
+_PROGRESS_LOCK = threading.Lock()
+_PROGRESS_ACTIVE = False
+_PROGRESS_VISIBLE = False
+
+
+def set_progress_active(active: bool) -> None:
+    global _PROGRESS_ACTIVE, _PROGRESS_VISIBLE
+    with _PROGRESS_LOCK:
+        _PROGRESS_ACTIVE = bool(active)
+        if not _PROGRESS_ACTIVE:
+            _PROGRESS_VISIBLE = False
+
+
+def mark_progress_line_visible() -> None:
+    global _PROGRESS_VISIBLE
+    with _PROGRESS_LOCK:
+        if _PROGRESS_ACTIVE:
+            _PROGRESS_VISIBLE = True
+
+
+def is_progress_line_visible() -> bool:
+    with _PROGRESS_LOCK:
+        return bool(_PROGRESS_VISIBLE)
+
+
+def _maybe_clear_progress_line(stream: TextIO) -> None:
+    global _PROGRESS_VISIBLE
+    with _PROGRESS_LOCK:
+        if not (_PROGRESS_ACTIVE and _PROGRESS_VISIBLE):
+            return
+        _PROGRESS_VISIBLE = False
+    stream.write("\n")
+    stream.flush()
+
+
+class FimoMiningBatchLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        if _FIMO_STDOUT_SUPPRESS_RE.search(message):
+            return False
+        return True
+
+
+class ProgressAwareStreamHandler(logging.StreamHandler):
+    def emit(self, record: logging.LogRecord) -> None:
+        if getattr(self.stream, "closed", False):
+            return
+        if getattr(record, "suppress_stdout", False):
+            return
+        if _FIMO_STDOUT_SUPPRESS_RE.search(record.getMessage()):
+            return
+        _maybe_clear_progress_line(self.stream)
+        try:
+            super().emit(record)
+        except ValueError:
+            if getattr(self.stream, "closed", False):
+                return
+            raise
+
+
+def _register_native_stderr_patterns(patterns: Iterable[tuple[str, str | None]]) -> None:
+    with _NATIVE_STDERR_LOCK:
+        existing = {pat for pat, _compiled, _msg in _NATIVE_STDERR_PATTERNS}
+        for pat, msg in patterns:
+            if pat in existing:
+                continue
+            _NATIVE_STDERR_PATTERNS.append((pat, re.compile(pat), msg))
+            existing.add(pat)
 
 
 def _install_native_stderr_deduper(patterns: Iterable[tuple[str, str | None]]) -> None:
@@ -28,11 +102,12 @@ def _install_native_stderr_deduper(patterns: Iterable[tuple[str, str | None]]) -
     This catches warnings printed by OR-Tools/absl from C++ (which bypass Python
     logging). Safe to call once; subsequent calls are no-ops.
     """
+    _register_native_stderr_patterns(patterns)
+
     # If we've already redirected, don't do it again.
     if getattr(_install_native_stderr_deduper, "_installed", False):
         return
 
-    pats = [(re.compile(pat), msg) for pat, msg in patterns]
     log = logging.getLogger("densegen.stderr")
 
     # Duplicate current stderr FD (so we can still forward non-matching lines)
@@ -65,9 +140,11 @@ def _install_native_stderr_deduper(patterns: Iterable[tuple[str, str | None]]) -
                     line, buf = buf.split(b"\n", 1)
                     text = line.decode("utf-8", errors="replace")
                     suppressed = False
-                    for pat, msg in pats:
+                    with _NATIVE_STDERR_LOCK:
+                        pats = list(_NATIVE_STDERR_PATTERNS)
+                    for pat_str, pat, msg in pats:
                         if pat.search(text):
-                            key = pat.pattern
+                            key = pat_str
                             if key not in seen:
                                 seen.add(key)
                                 if msg and log.hasHandlers():
@@ -96,18 +173,24 @@ def _install_native_stderr_deduper(patterns: Iterable[tuple[str, str | None]]) -
     _install_native_stderr_deduper._installed = True  # type: ignore[attr-defined]
 
 
-def install_native_stderr_filters() -> None:
-    _install_native_stderr_deduper(
-        patterns=[
-            (
-                r"SetSolverSpecificParametersAsString\(\) not supported by Cbc",
-                "CBC backend does not support SetSolverSpecificParametersAsString; "
-                "continuing without solver-specific parameter strings.",
-            ),
-            (r"arrow/cpp/src/arrow/util/cpu_info\.cc", None),
-            (r"sysctlbyname failed for 'hw\.", None),
-        ]
-    )
+_PYARROW_STDERR_PATTERNS = [
+    (r"arrow/cpp/src/arrow/util/cpu_info\.cc", None),
+    (r"sysctlbyname failed for 'hw\.", None),
+]
+_SOLVER_STDERR_PATTERNS = [
+    (
+        r"SetSolverSpecificParametersAsString\(\) not supported by Cbc",
+        "CBC backend does not support SetSolverSpecificParametersAsString; "
+        "continuing without solver-specific parameter strings.",
+    ),
+]
+
+
+def install_native_stderr_filters(*, suppress_solver_messages: bool = True) -> None:
+    patterns = list(_PYARROW_STDERR_PATTERNS)
+    if suppress_solver_messages:
+        patterns.extend(_SOLVER_STDERR_PATTERNS)
+    _install_native_stderr_deduper(patterns=patterns)
 
 
 def setup_logging(
@@ -142,9 +225,10 @@ def setup_logging(
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    sh = logging.StreamHandler(stream=sys.stdout)
+    sh = ProgressAwareStreamHandler(stream=sys.stdout)
     sh.setLevel(lvl)
     sh.setFormatter(fmt)
+    sh.addFilter(FimoMiningBatchLogFilter())
     root.addHandler(sh)
 
     if logfile:
@@ -157,5 +241,4 @@ def setup_logging(
     root.setLevel(lvl)
     logging.getLogger(__name__).info("Logging initialized (level=%s)", level)
 
-    if suppress_solver_stderr:
-        install_native_stderr_filters()
+    install_native_stderr_filters(suppress_solver_messages=suppress_solver_stderr)

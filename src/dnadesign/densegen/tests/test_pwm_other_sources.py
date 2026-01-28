@@ -1,3 +1,16 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_pwm_other_sources.py
+
+PWM sampling tests for JASPAR and matrix CSV sources.
+
+Dunlop Lab.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,6 +33,7 @@ def test_pwm_jaspar_sampling(tmp_path: Path) -> None:
     ds = PWMJasparDataSource(
         path=str(jaspar_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         motif_ids=["M1"],
         sampling={
             "strategy": "stochastic",
@@ -29,7 +43,7 @@ def test_pwm_jaspar_sampling(tmp_path: Path) -> None:
             "score_percentile": None,
         },
     )
-    entries, df = ds.load_data(rng=np.random.default_rng(0))
+    entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
     assert len(entries) == 4
     assert set(df["tf"].tolist()) == {"M1"}
 
@@ -40,6 +54,7 @@ def test_pwm_matrix_csv_sampling(tmp_path: Path) -> None:
     ds = PWMMatrixCSVDataSource(
         path=str(csv_path),
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         motif_id="M1",
         columns={"A": "A", "C": "C", "G": "G", "T": "T"},
         sampling={
@@ -50,6 +65,6 @@ def test_pwm_matrix_csv_sampling(tmp_path: Path) -> None:
             "score_percentile": None,
         },
     )
-    entries, df = ds.load_data(rng=np.random.default_rng(1))
+    entries, df, _summaries = ds.load_data(rng=np.random.default_rng(1))
     assert len(entries) == 1
     assert df["tf"].unique().tolist() == ["M1"]

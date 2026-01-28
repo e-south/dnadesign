@@ -4,6 +4,13 @@
 
 **cruncher** scores each TF by the best PWM match anywhere in the candidate sequence on either strand, then optimizes the min/soft‑min across TFs so the weakest TF improves. It explores sequence space with Gibbs + parallel tempering (MCMC) and returns a diverse elite set (unique up to reverse‑complement) plus diagnostics for stability/mixing. Motif overlap is allowed and treated as informative structure in analysis.
 
+Scoring is **FIMO-like** (internal implementation): for each PWM, cruncher builds
+log‑odds scores against a 0‑order background, scans all windows to find the best
+hit (optionally bidirectional), and optionally converts that best hit to a
+p‑value via a DP‑derived null distribution (`score_scale: logp`). For `logp`,
+the tail probability for the best window becomes a sequence‑level p via
+`p_seq = 1 − (1 − p_win)^n_windows`.
+
 **Terminology:**
 
 - **sites** = training binding sequences
@@ -476,11 +483,15 @@ Export the binding-site superset and the selected motifs for DenseGen runs:
 
 ```bash
 # Export binding sites (CSV/Parquet) for DenseGen binding_sites inputs
-cruncher catalog export-sites --set 1 --out /tmp/densegen_sites.csv -c "$CONFIG"
+cruncher catalog export-sites --set 1 --densegen-workspace demo_meme_two_tf -c "$CONFIG"
 
 # Export per-motif JSON artifacts for DenseGen PWM artifact inputs
-cruncher catalog export-densegen --set 1 --out /tmp/densegen_pwms -c "$CONFIG"
+cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_two_tf -c "$CONFIG"
 ```
+
+`--densegen-workspace` accepts a workspace name (resolved under `src/dnadesign/densegen/workspaces`)
+or an absolute path, and writes under that workspace's `inputs/`. You can still provide `--out`,
+but the path must remain inside the target `inputs/` directory.
 
 Then point DenseGen configs at the exported files (`type: binding_sites`) or artifacts
 (`type: pwm_artifact_set`).

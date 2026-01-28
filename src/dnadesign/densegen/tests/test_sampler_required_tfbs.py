@@ -15,7 +15,8 @@ def test_required_tfbs_are_injected() -> None:
     )
     rng = np.random.default_rng(0)
     sampler = TFSampler(df, rng)
-    sites, meta, labels, _info = sampler.generate_binding_site_subsample(
+    sites, meta, labels, _info = sampler.generate_binding_site_library(
+        library_size=2,
         sequence_length=3,
         budget_overhead=0,
         required_tfbs=["CCC"],
@@ -37,7 +38,8 @@ def test_required_tfs_are_injected() -> None:
     )
     rng = np.random.default_rng(1)
     sampler = TFSampler(df, rng)
-    sites, meta, labels, _info = sampler.generate_binding_site_subsample(
+    sites, meta, labels, _info = sampler.generate_binding_site_library(
+        library_size=2,
         sequence_length=3,
         budget_overhead=0,
         required_tfs=["TF2"],

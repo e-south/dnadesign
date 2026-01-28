@@ -29,6 +29,7 @@ from typing import Callable, Iterable, List
 
 import numpy as np
 import pandas as pd
+from rich.console import Console
 
 from ..adapters.optimizer import DenseArraysAdapter, OptimizerAdapter
 from ..adapters.outputs import OutputRecord, SinkBase, build_sinks, load_records_from_config, resolve_bio_alphabet
@@ -38,22 +39,40 @@ from ..config import (
     DenseGenConfig,
     LoadedConfig,
     ResolvedPlanItem,
+    resolve_outputs_scoped_path,
     resolve_relative_path,
     resolve_run_root,
-    schema_version_at_least,
 )
+from ..utils.logging_utils import install_native_stderr_filters
+from .artifacts.candidates import build_candidate_artifact, find_candidate_files, prepare_candidates_dir
+from .artifacts.ids import hash_tfbs_id
+from .artifacts.library import (
+    LibraryArtifact,
+    LibraryRecord,
+    load_library_artifact,
+    load_library_records,
+    write_library_artifact,
+)
+from .artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData, build_pool_artifact, load_pool_data
+from .artifacts.records import AttemptRecord, SolutionRecord
 from .metadata import build_metadata
-from .postprocess import random_fill
+from .postprocess import generate_pad
+from .pvalue_bins import resolve_pvalue_strata
 from .run_manifest import PlanManifest, RunManifest
 from .run_paths import (
+    candidates_root,
     ensure_run_meta_dir,
+    has_existing_run_outputs,
     inputs_manifest_path,
     run_manifest_path,
     run_outputs_root,
     run_state_path,
+    run_tables_root,
 )
 from .run_state import RunState, load_run_state
+from .runtime_policy import RuntimePolicy
 from .sampler import TFSampler
+from .seeding import derive_seed_map
 
 log = logging.getLogger(__name__)
 
@@ -62,6 +81,16 @@ log = logging.getLogger(__name__)
 class RunSummary:
     total_generated: int
     per_plan: dict[tuple[str, str], int]
+
+
+def _candidate_logging_enabled(cfg: DenseGenConfig) -> bool:
+    for inp in cfg.inputs:
+        sampling = getattr(inp, "sampling", None)
+        if sampling is None:
+            continue
+        if getattr(sampling, "keep_all_candidates_debug", False):
+            return True
+    return False
 
 
 def _write_run_state(
@@ -90,7 +119,7 @@ class PipelineDeps:
     source_factory: Callable[[object, Path], BaseDataSource]
     sink_factory: Callable[[DenseGenConfig, Path], Iterable[SinkBase]]
     optimizer: OptimizerAdapter
-    gap_fill: Callable[..., tuple[str, dict] | str]
+    pad: Callable[..., tuple[str, dict] | str]
 
 
 def default_deps() -> PipelineDeps:
@@ -98,7 +127,7 @@ def default_deps() -> PipelineDeps:
         source_factory=data_source_factory,
         sink_factory=build_sinks,
         optimizer=DenseArraysAdapter(),
-        gap_fill=random_fill,
+        pad=generate_pad,
     )
 
 
@@ -106,23 +135,26 @@ def resolve_plan(loaded: LoadedConfig) -> List[ResolvedPlanItem]:
     return loaded.root.densegen.generation.resolve_plan()
 
 
-def select_solver_strict(
+def select_solver(
     preferred: str | None,
     optimizer: OptimizerAdapter,
     *,
     strategy: str,
     test_length: int = 10,
 ) -> str | None:
-    """
-    Probe the requested solver once. If it fails, raise with instructions.
-    No fallback behavior.
-    """
+    """Probe the requested solver once and fail fast if unavailable."""
     if strategy == "approximate":
         return preferred
     if not preferred:
         raise ValueError("solver.backend is required unless strategy=approximate")
-    optimizer.probe_solver(preferred, test_length=test_length)
-    return preferred
+    try:
+        optimizer.probe_solver(preferred, test_length=test_length)
+        return preferred
+    except Exception as exc:
+        raise RuntimeError(
+            f"Requested solver '{preferred}' failed during probe: {exc}\n"
+            "Please install/configure this solver or choose another in solver.backend."
+        ) from exc
 
 
 def _summarize_tf_counts(labels: List[str], max_items: int = 6) -> str:
@@ -164,6 +196,28 @@ def _sampling_attr(sampling, name: str, default=None):
     return default
 
 
+def _mining_attr(mining, name: str, default=None):
+    if mining is None:
+        return default
+    if hasattr(mining, name):
+        return getattr(mining, name)
+    if isinstance(mining, dict):
+        return mining.get(name, default)
+    return default
+
+
+def _resolve_pvalue_strata_meta(sampling) -> list[float] | None:
+    if sampling is None:
+        return None
+    backend = str(_sampling_attr(sampling, "scoring_backend") or "densegen").lower()
+    strata = _sampling_attr(sampling, "pvalue_strata")
+    if backend == "fimo":
+        return resolve_pvalue_strata(strata)
+    if strata is None:
+        return None
+    return [float(v) for v in strata]
+
+
 def _extract_pwm_sampling_config(source_cfg) -> dict | None:
     sampling = getattr(source_cfg, "sampling", None)
     if sampling is None:
@@ -174,22 +228,43 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
     requested = None
     generated = None
     capped = False
+    backend = str(_sampling_attr(sampling, "scoring_backend") or "densegen").lower()
     if isinstance(n_sites, int) and isinstance(oversample, int):
         requested = int(n_sites) * int(oversample)
         generated = requested
-        if max_candidates is not None:
-            try:
-                cap_val = int(max_candidates)
-            except Exception:
-                cap_val = None
-            if cap_val is not None:
-                generated = min(requested, cap_val)
-                capped = generated < requested
+        if backend == "fimo":
+            mining_cfg = _sampling_attr(sampling, "mining")
+            mining_max_candidates = _mining_attr(mining_cfg, "max_candidates")
+            if mining_max_candidates is not None:
+                try:
+                    cap_val = int(mining_max_candidates)
+                except Exception:
+                    cap_val = None
+                if cap_val is not None:
+                    generated = min(requested, cap_val)
+                    capped = generated < requested
+        else:
+            if max_candidates is not None:
+                try:
+                    cap_val = int(max_candidates)
+                except Exception:
+                    cap_val = None
+                if cap_val is not None:
+                    generated = min(requested, cap_val)
+                    capped = generated < requested
     length_range = _sampling_attr(sampling, "length_range")
     if length_range is not None:
         length_range = list(length_range)
+    mining = _sampling_attr(sampling, "mining")
+    scoring_backend = _sampling_attr(sampling, "scoring_backend")
+    mining_batch_size = _mining_attr(mining, "batch_size")
+    mining_max_batches = _mining_attr(mining, "max_batches")
+    mining_max_candidates = _mining_attr(mining, "max_candidates")
+    mining_max_seconds = _mining_attr(mining, "max_seconds")
+    mining_log_every_batches = _mining_attr(mining, "log_every_batches")
     return {
         "strategy": _sampling_attr(sampling, "strategy"),
+        "scoring_backend": scoring_backend,
         "n_sites": _sampling_attr(sampling, "n_sites"),
         "oversample_factor": _sampling_attr(sampling, "oversample_factor"),
         "max_candidates": _sampling_attr(sampling, "max_candidates"),
@@ -199,8 +274,21 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
         "capped": capped,
         "score_threshold": _sampling_attr(sampling, "score_threshold"),
         "score_percentile": _sampling_attr(sampling, "score_percentile"),
+        "pvalue_strata": _resolve_pvalue_strata_meta(sampling),
+        "retain_depth": _sampling_attr(sampling, "retain_depth"),
+        "bgfile": _sampling_attr(sampling, "bgfile"),
+        "keep_all_candidates_debug": _sampling_attr(sampling, "keep_all_candidates_debug"),
         "length_policy": _sampling_attr(sampling, "length_policy"),
         "length_range": length_range,
+        "mining": {
+            "batch_size": mining_batch_size,
+            "max_batches": mining_max_batches,
+            "max_candidates": mining_max_candidates,
+            "max_seconds": mining_max_seconds,
+            "log_every_batches": mining_log_every_batches,
+        }
+        if mining is not None
+        else None,
     }
 
 
@@ -423,6 +511,96 @@ def _max_fixed_element_len(fixed_elements_dump: dict) -> int:
     return max_len
 
 
+def _min_fixed_elements_length(fixed_elements_dump: dict) -> int:
+    total = 0
+    pcs = fixed_elements_dump.get("promoter_constraints") or []
+    for pc in pcs:
+        if not isinstance(pc, dict):
+            continue
+        upstream = str(pc.get("upstream") or "").strip().upper()
+        downstream = str(pc.get("downstream") or "").strip().upper()
+        spacer = pc.get("spacer_length")
+        if isinstance(spacer, (list, tuple)) and spacer:
+            spacer_min = min(int(v) for v in spacer)
+        elif isinstance(spacer, (int, float)):
+            spacer_min = int(spacer)
+        else:
+            spacer_min = 0
+        total += len(upstream) + len(downstream) + max(0, spacer_min)
+    return total
+
+
+def _min_required_length_for_constraints(
+    *,
+    library_tfbs: list[str],
+    library_tfs: list[str],
+    fixed_elements_dump: dict,
+    required_regulators: list[str] | None,
+    min_required_regulators: int | None,
+    min_count_by_regulator: dict[str, int] | None,
+    min_count_per_tf: int,
+) -> tuple[int, dict[str, int]]:
+    lengths_by_tf: dict[str, list[int]] = {}
+    for idx, tfbs in enumerate(library_tfbs):
+        tf = library_tfs[idx] if idx < len(library_tfs) else ""
+        if not tf:
+            continue
+        lengths_by_tf.setdefault(tf, []).append(len(str(tfbs)))
+    for tf in lengths_by_tf:
+        lengths_by_tf[tf].sort()
+
+    per_tf_required: dict[str, int] = {}
+    if required_regulators and min_required_regulators is None:
+        for tf in required_regulators:
+            per_tf_required[tf] = max(per_tf_required.get(tf, 0), 1)
+    if min_count_by_regulator:
+        for tf, count in min_count_by_regulator.items():
+            per_tf_required[tf] = max(per_tf_required.get(tf, 0), int(count))
+    if min_count_per_tf > 0:
+        for tf in lengths_by_tf:
+            per_tf_required[tf] = max(per_tf_required.get(tf, 0), int(min_count_per_tf))
+
+    missing = []
+    per_tf_total = 0
+    for tf, count in per_tf_required.items():
+        lengths = lengths_by_tf.get(tf, [])
+        if len(lengths) < int(count):
+            missing.append(f"{tf}({len(lengths)}/{count})")
+            continue
+        per_tf_total += sum(lengths[: int(count)])
+    if missing:
+        preview = ", ".join(missing[:6])
+        raise ValueError(f"Not enough TFBS to satisfy per-regulator minimums: {preview}")
+
+    k_required_extra = 0
+    if min_required_regulators is not None:
+        candidate_set = set(required_regulators or lengths_by_tf.keys())
+        available = [tf for tf in candidate_set if tf in lengths_by_tf]
+        if len(available) < int(min_required_regulators):
+            raise ValueError(
+                "min_required_regulators exceeds available regulators in the Stage-B library "
+                f"({len(available)} < {int(min_required_regulators)})."
+            )
+        already_required = {tf for tf, count in per_tf_required.items() if count > 0}
+        remaining = max(0, int(min_required_regulators) - len(set(available) & already_required))
+        if remaining > 0:
+            candidates = [lengths_by_tf[tf][0] for tf in available if tf not in already_required]
+            if len(candidates) < remaining:
+                raise ValueError(
+                    "min_required_regulators exceeds available regulators after fixed minimums "
+                    f"({len(candidates)} < {remaining})."
+                )
+            k_required_extra = sum(sorted(candidates)[:remaining])
+
+    fixed_min = _min_fixed_elements_length(fixed_elements_dump)
+    total = fixed_min + per_tf_total + k_required_extra
+    return total, {
+        "fixed_elements_min": fixed_min,
+        "per_tf_min": per_tf_total,
+        "min_required_extra": k_required_extra,
+    }
+
+
 def _input_metadata(source_cfg, cfg_path: Path) -> dict:
     source_type = getattr(source_cfg, "type", "unknown")
     source_name = getattr(source_cfg, "name", "unknown")
@@ -452,18 +630,38 @@ def _input_metadata(source_cfg, cfg_path: Path) -> dict:
         sampling = getattr(source_cfg, "sampling", None)
         if sampling is not None:
             meta["input_pwm_strategy"] = getattr(sampling, "strategy", None)
+            meta["input_pwm_scoring_backend"] = getattr(sampling, "scoring_backend", None)
             meta["input_pwm_score_threshold"] = getattr(sampling, "score_threshold", None)
             meta["input_pwm_score_percentile"] = getattr(sampling, "score_percentile", None)
+            meta["input_pwm_pvalue_strata"] = _resolve_pvalue_strata_meta(sampling)
+            meta["input_pwm_retain_depth"] = getattr(sampling, "retain_depth", None)
+            mining_cfg = getattr(sampling, "mining", None)
+            meta["input_pwm_mining_batch_size"] = _mining_attr(mining_cfg, "batch_size")
+            meta["input_pwm_mining_max_batches"] = _mining_attr(mining_cfg, "max_batches")
+            meta["input_pwm_mining_max_candidates"] = _mining_attr(mining_cfg, "max_candidates")
+            meta["input_pwm_mining_max_seconds"] = _mining_attr(mining_cfg, "max_seconds")
+            meta["input_pwm_mining_log_every_batches"] = _mining_attr(mining_cfg, "log_every_batches")
+            meta["input_pwm_bgfile"] = getattr(sampling, "bgfile", None)
+            meta["input_pwm_keep_all_candidates_debug"] = getattr(sampling, "keep_all_candidates_debug", None)
+            meta["input_pwm_include_matched_sequence"] = getattr(sampling, "include_matched_sequence", None)
             meta["input_pwm_n_sites"] = getattr(sampling, "n_sites", None)
             meta["input_pwm_oversample_factor"] = getattr(sampling, "oversample_factor", None)
-            meta["input_pwm_max_candidates"] = getattr(sampling, "max_candidates", None)
     else:
         meta["input_mode"] = source_type
         meta["input_pwm_ids"] = []
     return meta
 
 
-def _compute_used_tf_info(sol, library_for_opt, regulator_labels, fixed_elements, site_id_by_index, source_by_index):
+def _compute_used_tf_info(
+    sol,
+    library_for_opt,
+    regulator_labels,
+    fixed_elements,
+    site_id_by_index,
+    source_by_index,
+    tfbs_id_by_index,
+    motif_id_by_index,
+):
     promoter_motifs = set()
     if fixed_elements is not None:
         if hasattr(fixed_elements, "promoter_constraints"):
@@ -519,6 +717,14 @@ def _compute_used_tf_info(sol, library_for_opt, regulator_labels, fixed_elements
             source = source_by_index[base_idx]
             if source is not None:
                 entry["source"] = source
+        if tfbs_id_by_index is not None and base_idx < len(tfbs_id_by_index):
+            tfbs_id = tfbs_id_by_index[base_idx]
+            if tfbs_id is not None:
+                entry["tfbs_id"] = tfbs_id
+        if motif_id_by_index is not None and base_idx < len(motif_id_by_index):
+            motif_id = motif_id_by_index[base_idx]
+            if motif_id is not None:
+                entry["motif_id"] = motif_id
         used_detail.append(entry)
         if tf_label:
             counts[tf_label] = counts.get(tf_label, 0) + 1
@@ -808,10 +1014,10 @@ def _leaderboard_snapshot(
     }
 
 
-def _apply_gap_fill_offsets(used_tfbs_detail: list[dict], gap_meta: dict) -> list[dict]:
+def _apply_pad_offsets(used_tfbs_detail: list[dict], pad_meta: dict) -> list[dict]:
     pad_left = 0
-    if gap_meta.get("used") and gap_meta.get("end") == "5prime":
-        pad_left = int(gap_meta.get("bases") or 0)
+    if pad_meta.get("used") and pad_meta.get("end") == "5prime":
+        pad_left = int(pad_meta.get("bases") or 0)
     for entry in used_tfbs_detail:
         offset_raw = int(entry.get("offset_raw", entry.get("offset", 0)))
         length = int(entry.get("length", len(entry.get("tfbs") or "")))
@@ -854,6 +1060,297 @@ def _hash_library(
     return digest
 
 
+def build_library_for_plan(
+    *,
+    source_label: str,
+    plan_item: ResolvedPlanItem,
+    pool: PoolData,
+    sampling_cfg: object,
+    seq_len: int,
+    min_count_per_tf: int,
+    usage_counts: dict[tuple[str, str], int],
+    failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] | None,
+    rng: random.Random,
+    np_rng: np.random.Generator,
+    library_index_start: int,
+) -> tuple[list[str], list[str], list[str], dict]:
+    pool_strategy = str(getattr(sampling_cfg, "pool_strategy", "subsample"))
+    library_size = int(getattr(sampling_cfg, "library_size", 0))
+    subsample_over = int(getattr(sampling_cfg, "subsample_over_length_budget_by", 0))
+    library_sampling_strategy = str(getattr(sampling_cfg, "library_sampling_strategy", "tf_balanced"))
+    cover_all_tfs = bool(getattr(sampling_cfg, "cover_all_regulators", True))
+    unique_binding_sites = bool(getattr(sampling_cfg, "unique_binding_sites", True))
+    max_sites_per_tf = getattr(sampling_cfg, "max_sites_per_regulator", None)
+    relax_on_exhaustion = bool(getattr(sampling_cfg, "relax_on_exhaustion", False))
+    allow_incomplete_coverage = bool(getattr(sampling_cfg, "allow_incomplete_coverage", False))
+    iterative_max_libraries = int(getattr(sampling_cfg, "iterative_max_libraries", 0))
+    iterative_min_new_solutions = int(getattr(sampling_cfg, "iterative_min_new_solutions", 0))
+
+    data_entries = list(pool.sequences or [])
+    meta_df = pool.df if pool.pool_mode == POOL_MODE_TFBS else None
+
+    fixed_elements = plan_item.fixed_elements
+    required_regulators = list(dict.fromkeys(plan_item.required_regulators or []))
+    min_required_regulators = plan_item.min_required_regulators
+    plan_min_count_by_regulator = dict(plan_item.min_count_by_regulator or {})
+    k_required = int(min_required_regulators) if min_required_regulators is not None else None
+    k_of_required = bool(required_regulators) and k_required is not None
+    if k_of_required and k_required > len(required_regulators):
+        raise ValueError(
+            "min_required_regulators cannot exceed required_regulators size "
+            f"({k_required} > {len(required_regulators)})."
+        )
+    side_left, side_right = _extract_side_biases(fixed_elements)
+    required_bias_motifs = list(dict.fromkeys([*side_left, *side_right]))
+
+    libraries_built = int(library_index_start)
+
+    def _finalize(
+        library: list[str],
+        parts: list[str],
+        reg_labels: list[str],
+        info: dict,
+        *,
+        site_id_by_index: list[str | None] | None,
+        source_by_index: list[str | None] | None,
+        tfbs_id_by_index: list[str | None] | None,
+        motif_id_by_index: list[str | None] | None,
+    ) -> tuple[list[str], list[str], list[str], dict]:
+        nonlocal libraries_built
+        libraries_built += 1
+        info["library_index"] = libraries_built
+        info["library_hash"] = _hash_library(library, reg_labels, site_id_by_index, source_by_index)
+        info["site_id_by_index"] = site_id_by_index
+        info["source_by_index"] = source_by_index
+        info["tfbs_id_by_index"] = tfbs_id_by_index
+        info["motif_id_by_index"] = motif_id_by_index
+        return library, parts, reg_labels, info
+
+    if meta_df is not None and isinstance(meta_df, pd.DataFrame):
+        available_tfs = set(meta_df["tf"].tolist())
+        tfbs_counts = (
+            meta_df.groupby("tf")["tfbs"].nunique() if unique_binding_sites else meta_df.groupby("tf")["tfbs"].size()
+        )
+        missing = [t for t in required_regulators if t not in available_tfs]
+        if missing:
+            preview = ", ".join(missing[:10])
+            raise ValueError(f"Required regulators not found in input: {preview}")
+        if plan_min_count_by_regulator:
+            missing_counts = [t for t in plan_min_count_by_regulator if t not in available_tfs]
+            if missing_counts:
+                preview = ", ".join(missing_counts[:10])
+                raise ValueError(f"min_count_by_regulator TFs not found in input: {preview}")
+            for tf, min_count in plan_min_count_by_regulator.items():
+                max_allowed = int(tfbs_counts.get(tf, 0))
+                if max_sites_per_tf is not None:
+                    max_allowed = min(max_allowed, int(max_sites_per_tf))
+                if library_size > 0:
+                    max_allowed = min(max_allowed, int(library_size))
+                if int(min_count) > max_allowed:
+                    raise ValueError(
+                        f"min_count_by_regulator[{tf}]={min_count} exceeds available sites ({max_allowed}). "
+                        "Increase library_size, relax min_count_by_regulator, or allow non-unique binding sites."
+                    )
+        if min_required_regulators is not None:
+            if not required_regulators and min_required_regulators > len(available_tfs):
+                raise ValueError(
+                    f"min_required_regulators={min_required_regulators} exceeds available regulators "
+                    f"({len(available_tfs)})."
+                )
+        if pool_strategy in {"subsample", "iterative_subsample"} and cover_all_tfs and not allow_incomplete_coverage:
+            if library_size > 0 and library_size < len(available_tfs):
+                raise ValueError(
+                    "library_size is too small to cover all regulators. "
+                    f"library_size={library_size} but available_tfs={len(available_tfs)}. "
+                    "Increase library_size or allow_incomplete_coverage."
+                )
+
+        if pool_strategy == "full":
+            lib_df = meta_df.copy()
+            if unique_binding_sites:
+                lib_df = lib_df.drop_duplicates(["tf", "tfbs"])
+            if required_bias_motifs:
+                missing_bias = [m for m in required_bias_motifs if m not in set(lib_df["tfbs"])]
+                if missing_bias:
+                    preview = ", ".join(missing_bias[:10])
+                    raise ValueError(f"Required side-bias motifs not found in input: {preview}")
+            lib_df = lib_df.reset_index(drop=True)
+            library = lib_df["tfbs"].tolist()
+            reg_labels = lib_df["tf"].tolist()
+            parts = [f"{tf}:{tfbs}" for tf, tfbs in zip(reg_labels, lib_df["tfbs"].tolist())]
+            site_id_by_index = lib_df["site_id"].tolist() if "site_id" in lib_df.columns else None
+            source_by_index = lib_df["source"].tolist() if "source" in lib_df.columns else None
+            tfbs_id_by_index = lib_df["tfbs_id"].tolist() if "tfbs_id" in lib_df.columns else None
+            motif_id_by_index = lib_df["motif_id"].tolist() if "motif_id" in lib_df.columns else None
+            info = {
+                "target_length": seq_len + subsample_over,
+                "achieved_length": sum(len(s) for s in library),
+                "relaxed_cap": False,
+                "final_cap": None,
+                "pool_strategy": pool_strategy,
+                "library_size": len(library),
+                "iterative_max_libraries": iterative_max_libraries,
+                "iterative_min_new_solutions": iterative_min_new_solutions,
+            }
+            return _finalize(
+                library,
+                parts,
+                reg_labels,
+                info,
+                site_id_by_index=site_id_by_index,
+                source_by_index=source_by_index,
+                tfbs_id_by_index=tfbs_id_by_index,
+                motif_id_by_index=motif_id_by_index,
+            )
+
+        sampler = TFSampler(meta_df, np_rng)
+        required_regulators_selected = required_regulators
+        if k_of_required:
+            candidates = sorted(required_regulators)
+            if k_required is not None and k_required < len(candidates):
+                chosen = np_rng.choice(len(candidates), size=k_required, replace=False)
+                required_regulators_selected = sorted([candidates[int(i)] for i in chosen])
+            else:
+                required_regulators_selected = candidates
+        required_tfs_for_library = list(
+            dict.fromkeys([*required_regulators_selected, *plan_min_count_by_regulator.keys()])
+        )
+        if min_required_regulators is not None and not required_regulators:
+            if pool_strategy in {"subsample", "iterative_subsample"}:
+                if library_size < int(min_required_regulators):
+                    raise ValueError(
+                        "library_size is too small to satisfy min_required_regulators when "
+                        f"required_regulators is empty. library_size={library_size} "
+                        f"min_required_regulators={min_required_regulators}. "
+                        "Increase library_size or lower min_required_regulators."
+                    )
+        if pool_strategy in {"subsample", "iterative_subsample"}:
+            required_slots = len(required_bias_motifs) + len(required_tfs_for_library)
+            if library_size < required_slots:
+                raise ValueError(
+                    "library_size is too small for required motifs. "
+                    f"library_size={library_size} but required_tfbs={len(required_bias_motifs)} "
+                    f"+ required_tfs={len(required_tfs_for_library)} "
+                    f"(min_required_regulators={min_required_regulators}). "
+                    "Increase library_size or relax required constraints."
+                )
+        failure_counts_by_tfbs: dict[tuple[str, str], int] | None = None
+        if library_sampling_strategy == "coverage_weighted" and getattr(sampling_cfg, "avoid_failed_motifs", False):
+            failure_counts_by_tfbs = _aggregate_failure_counts_for_sampling(
+                failure_counts,
+                input_name=source_label,
+                plan_name=plan_item.name,
+            )
+        library, parts, reg_labels, info = sampler.generate_binding_site_library(
+            library_size,
+            sequence_length=seq_len,
+            budget_overhead=subsample_over,
+            required_tfbs=required_bias_motifs,
+            required_tfs=required_tfs_for_library,
+            cover_all_tfs=cover_all_tfs,
+            unique_binding_sites=unique_binding_sites,
+            max_sites_per_tf=max_sites_per_tf,
+            relax_on_exhaustion=relax_on_exhaustion,
+            allow_incomplete_coverage=allow_incomplete_coverage,
+            sampling_strategy=library_sampling_strategy,
+            usage_counts=usage_counts if library_sampling_strategy == "coverage_weighted" else None,
+            coverage_boost_alpha=float(getattr(sampling_cfg, "coverage_boost_alpha", 0.15)),
+            coverage_boost_power=float(getattr(sampling_cfg, "coverage_boost_power", 1.0)),
+            failure_counts=failure_counts_by_tfbs,
+            avoid_failed_motifs=bool(getattr(sampling_cfg, "avoid_failed_motifs", False)),
+            failure_penalty_alpha=float(getattr(sampling_cfg, "failure_penalty_alpha", 0.5)),
+            failure_penalty_power=float(getattr(sampling_cfg, "failure_penalty_power", 1.0)),
+        )
+        info.update(
+            {
+                "pool_strategy": pool_strategy,
+                "library_size": library_size,
+                "library_sampling_strategy": library_sampling_strategy,
+                "coverage_boost_alpha": float(getattr(sampling_cfg, "coverage_boost_alpha", 0.15)),
+                "coverage_boost_power": float(getattr(sampling_cfg, "coverage_boost_power", 1.0)),
+                "iterative_max_libraries": iterative_max_libraries,
+                "iterative_min_new_solutions": iterative_min_new_solutions,
+                "required_regulators_selected": required_regulators_selected if k_of_required else None,
+            }
+        )
+        site_id_by_index = info.get("site_id_by_index")
+        source_by_index = info.get("source_by_index")
+        tfbs_id_by_index = info.get("tfbs_id_by_index")
+        motif_id_by_index = info.get("motif_id_by_index")
+        return _finalize(
+            library,
+            parts,
+            reg_labels,
+            info,
+            site_id_by_index=site_id_by_index,
+            source_by_index=source_by_index,
+            tfbs_id_by_index=tfbs_id_by_index,
+            motif_id_by_index=motif_id_by_index,
+        )
+
+    if required_regulators or plan_min_count_by_regulator or min_required_regulators is not None:
+        preview = ", ".join(required_regulators[:10]) if required_regulators else "n/a"
+        raise ValueError(
+            "Regulator constraints are set (required/min_count/min_required) "
+            "but the input does not provide regulators. "
+            f"required_regulators={preview}."
+        )
+    all_sequences = [s for s in data_entries]
+    if not all_sequences:
+        raise ValueError(f"No sequences found for source {source_label}")
+    pool = list(dict.fromkeys(all_sequences)) if unique_binding_sites else list(all_sequences)
+    if pool_strategy == "full":
+        if required_bias_motifs:
+            missing = [m for m in required_bias_motifs if m not in pool]
+            if missing:
+                preview = ", ".join(missing[:10])
+                raise ValueError(f"Required side-bias motifs not found in sequences input: {preview}")
+        library = pool
+    else:
+        if library_size > len(pool):
+            raise ValueError(f"library_size={library_size} exceeds available unique sequences ({len(pool)}).")
+        take = min(max(1, int(library_size)), len(pool))
+        if required_bias_motifs:
+            missing = [m for m in required_bias_motifs if m not in pool]
+            if missing:
+                preview = ", ".join(missing[:10])
+                raise ValueError(f"Required side-bias motifs not found in sequences input: {preview}")
+            if take < len(required_bias_motifs):
+                raise ValueError(
+                    f"library_size={take} is smaller than required side_biases ({len(required_bias_motifs)})."
+                )
+            required_set = set(required_bias_motifs)
+            remaining = [s for s in pool if s not in required_set]
+            library = list(required_bias_motifs) + rng.sample(remaining, take - len(required_bias_motifs))
+        else:
+            library = rng.sample(pool, take)
+    tf_parts: list[str] = []
+    reg_labels: list[str] = []
+    info = {
+        "target_length": seq_len + subsample_over,
+        "achieved_length": sum(len(s) for s in library),
+        "relaxed_cap": False,
+        "final_cap": None,
+        "pool_strategy": pool_strategy,
+        "library_size": len(library) if pool_strategy == "full" else library_size,
+        "iterative_max_libraries": iterative_max_libraries,
+        "iterative_min_new_solutions": iterative_min_new_solutions,
+    }
+    tfbs_id_by_index = [
+        hash_tfbs_id(motif_id=None, sequence=seq, scoring_backend="sequence_library") for seq in library
+    ]
+    return _finalize(
+        library,
+        tf_parts,
+        reg_labels,
+        info,
+        site_id_by_index=None,
+        source_by_index=None,
+        tfbs_id_by_index=tfbs_id_by_index,
+        motif_id_by_index=None,
+    )
+
+
 def _compute_sampling_fraction(
     library: list[str],
     *,
@@ -884,8 +1381,8 @@ def _compute_sampling_fraction_pairs(
     return len(pairs) / float(input_pair_count)
 
 
-def _consolidate_parts(outputs_root: Path, *, part_glob: str, final_name: str) -> bool:
-    parts = sorted(outputs_root.glob(part_glob))
+def _consolidate_parts(tables_root: Path, *, part_glob: str, final_name: str) -> bool:
+    parts = sorted(tables_root.glob(part_glob))
     if not parts:
         return False
     try:
@@ -894,12 +1391,12 @@ def _consolidate_parts(outputs_root: Path, *, part_glob: str, final_name: str) -
         import pyarrow.parquet as pq
     except Exception as exc:  # pragma: no cover - optional dependency
         raise RuntimeError("pyarrow is required to consolidate parquet parts.") from exc
-    final_path = outputs_root / final_name
+    final_path = tables_root / final_name
     sources = [str(p) for p in parts]
     if final_path.exists():
         sources.insert(0, str(final_path))
     dataset = ds.dataset(sources, format="parquet")
-    tmp_path = outputs_root / f".{final_name}.tmp"
+    tmp_path = tables_root / f".{final_name}.tmp"
     writer = pq.ParquetWriter(tmp_path, schema=dataset.schema)
     scanner = ds.Scanner.from_dataset(dataset, batch_size=4096)
     for batch in scanner.to_batches():
@@ -913,10 +1410,88 @@ def _consolidate_parts(outputs_root: Path, *, part_glob: str, final_name: str) -
     return True
 
 
+def _emit_event(events_path: Path, *, event: str, payload: dict) -> None:
+    record = {"event": event, "created_at": datetime.now(timezone.utc).isoformat()}
+    record.update(payload)
+    events_path.parent.mkdir(parents=True, exist_ok=True)
+    with events_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+
+def _dump_model(value) -> dict:
+    if hasattr(value, "model_dump"):
+        return value.model_dump(by_alias=True, exclude_none=False)
+    if hasattr(value, "__dict__"):
+        return dict(value.__dict__)
+    return dict(value)
+
+
+def _effective_sampling_caps(input_cfg, cfg_path: Path) -> dict | None:
+    sampling = getattr(input_cfg, "sampling", None)
+    if sampling is None:
+        return None
+    n_sites = getattr(sampling, "n_sites", None)
+    oversample = getattr(sampling, "oversample_factor", None)
+    requested = None
+    if isinstance(n_sites, int) and isinstance(oversample, int):
+        requested = int(n_sites) * int(oversample)
+    backend = str(getattr(sampling, "scoring_backend", "densegen"))
+    mining = getattr(sampling, "mining", None)
+    return {
+        "scoring_backend": backend,
+        "requested_candidates": requested,
+        "cap_candidates": getattr(mining, "max_candidates", None)
+        if backend == "fimo"
+        else getattr(sampling, "max_candidates", None),
+        "cap_seconds": getattr(mining, "max_seconds", None)
+        if backend == "fimo"
+        else getattr(sampling, "max_seconds", None),
+        "cap_batches": getattr(mining, "max_batches", None) if backend == "fimo" else None,
+    }
+
+
+def _write_effective_config(
+    *,
+    cfg,
+    cfg_path: Path,
+    run_root: Path,
+    seeds: dict[str, int],
+    outputs_root: Path,
+) -> Path:
+    resolved_inputs = []
+    for inp in cfg.inputs:
+        entry = {"name": inp.name, "type": getattr(inp, "type", None)}
+        if hasattr(inp, "path"):
+            entry["path"] = str(resolve_relative_path(cfg_path, getattr(inp, "path")))
+        if hasattr(inp, "paths"):
+            paths = getattr(inp, "paths", None)
+            if isinstance(paths, list):
+                entry["paths"] = [str(resolve_relative_path(cfg_path, p)) for p in paths]
+        caps = _effective_sampling_caps(inp, cfg_path)
+        if caps is not None:
+            entry["sampling_caps"] = caps
+        resolved_inputs.append(entry)
+
+    payload = {
+        "schema_version": cfg.schema_version,
+        "run_id": cfg.run.id,
+        "run_root": str(run_root),
+        "config_path": str(cfg_path),
+        "seeds": {k: int(v) for k, v in seeds.items()},
+        "inputs": resolved_inputs,
+        "config": _dump_model(cfg),
+    }
+    out_path = outputs_root / "meta" / "effective_config.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+    return out_path
+
+
 ATTEMPTS_CHUNK_SIZE = 256
+SOLUTIONS_CHUNK_SIZE = 256
 
 
-def _flush_attempts(outputs_root: Path, buffer: list[dict]) -> None:
+def _flush_attempts(tables_root: Path, buffer: list[dict]) -> None:
     if not buffer:
         return
     try:
@@ -928,6 +1503,7 @@ def _flush_attempts(outputs_root: Path, buffer: list[dict]) -> None:
     schema = pa.schema(
         [
             pa.field("attempt_id", pa.string()),
+            pa.field("attempt_index", pa.int64()),
             pa.field("run_id", pa.string()),
             pa.field("input_name", pa.string()),
             pa.field("plan_name", pa.string()),
@@ -937,7 +1513,7 @@ def _flush_attempts(outputs_root: Path, buffer: list[dict]) -> None:
             pa.field("detail_json", pa.string()),
             pa.field("sequence", pa.string()),
             pa.field("sequence_hash", pa.string()),
-            pa.field("output_id", pa.string()),
+            pa.field("solution_id", pa.string()),
             pa.field("used_tf_counts_json", pa.string()),
             pa.field("used_tf_list", pa.list_(pa.string())),
             pa.field("sampling_library_index", pa.int64()),
@@ -954,16 +1530,46 @@ def _flush_attempts(outputs_root: Path, buffer: list[dict]) -> None:
         ]
     )
     table = pa.Table.from_pylist(buffer, schema=schema)
-    outputs_root.mkdir(parents=True, exist_ok=True)
+    tables_root.mkdir(parents=True, exist_ok=True)
     filename = f"attempts_part-{uuid.uuid4().hex}.parquet"
-    pq.write_table(table, outputs_root / filename)
+    pq.write_table(table, tables_root / filename)
+    buffer.clear()
+
+
+def _flush_solutions(tables_root: Path, buffer: list[dict]) -> None:
+    if not buffer:
+        return
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except Exception as exc:
+        raise RuntimeError("pyarrow is required to write solutions logs.") from exc
+
+    schema = pa.schema(
+        [
+            pa.field("solution_id", pa.string()),
+            pa.field("attempt_id", pa.string()),
+            pa.field("run_id", pa.string()),
+            pa.field("input_name", pa.string()),
+            pa.field("plan_name", pa.string()),
+            pa.field("created_at", pa.string()),
+            pa.field("sequence", pa.string()),
+            pa.field("sequence_hash", pa.string()),
+            pa.field("sampling_library_index", pa.int64()),
+            pa.field("sampling_library_hash", pa.string()),
+        ]
+    )
+    table = pa.Table.from_pylist(buffer, schema=schema)
+    tables_root.mkdir(parents=True, exist_ok=True)
+    filename = f"solutions_part-{uuid.uuid4().hex}.parquet"
+    pq.write_table(table, tables_root / filename)
     buffer.clear()
 
 
 def _load_failure_counts_from_attempts(
-    outputs_root: Path,
+    tables_root: Path,
 ) -> dict[tuple[str, str, str, str, str | None], dict[str, int]]:
-    attempts_path = outputs_root / "attempts.parquet"
+    attempts_path = tables_root / "attempts.parquet"
     if not attempts_path.exists():
         return {}
     try:
@@ -1010,28 +1616,101 @@ def _load_failure_counts_from_attempts(
     return counts
 
 
-def _load_existing_library_index(outputs_root: Path) -> int:
-    attempts_path = outputs_root / "attempts.parquet"
-    if not attempts_path.exists():
+def _load_existing_library_index(tables_root: Path) -> int:
+    attempts_path = tables_root / "attempts.parquet"
+    paths: list[Path] = []
+    if attempts_path.exists():
+        paths.append(attempts_path)
+    paths.extend(sorted(tables_root.glob("attempts_part-*.parquet")))
+    if not paths:
         return 0
-    try:
-        df = pd.read_parquet(attempts_path, columns=["sampling_library_index"])
-    except Exception:
-        return 0
-    if df.empty or "sampling_library_index" not in df.columns:
-        return 0
-    try:
-        return int(pd.to_numeric(df["sampling_library_index"], errors="coerce").dropna().max() or 0)
-    except Exception:
-        return 0
+    max_idx = 0
+    for path in paths:
+        try:
+            df = pd.read_parquet(path, columns=["sampling_library_index"])
+        except Exception:
+            continue
+        if df.empty or "sampling_library_index" not in df.columns:
+            continue
+        try:
+            current = int(pd.to_numeric(df["sampling_library_index"], errors="coerce").dropna().max() or 0)
+        except Exception:
+            continue
+        max_idx = max(max_idx, current)
+    return max_idx
+
+
+def _load_existing_library_index_by_plan(
+    tables_root: Path,
+) -> dict[tuple[str, str], int]:
+    attempts_path = tables_root / "attempts.parquet"
+    paths: list[Path] = []
+    if attempts_path.exists():
+        paths.append(attempts_path)
+    paths.extend(sorted(tables_root.glob("attempts_part-*.parquet")))
+    if not paths:
+        return {}
+    max_by_plan: dict[tuple[str, str], int] = {}
+    for path in paths:
+        try:
+            df = pd.read_parquet(path, columns=["input_name", "plan_name", "sampling_library_index"])
+        except Exception:
+            continue
+        if df.empty:
+            continue
+        for _, row in df.iterrows():
+            input_name = str(row.get("input_name") or "")
+            plan_name = str(row.get("plan_name") or "")
+            idx = row.get("sampling_library_index")
+            try:
+                idx_val = int(idx) if idx is not None else 0
+            except Exception:
+                idx_val = 0
+            key = (input_name, plan_name)
+            max_by_plan[key] = max(max_by_plan.get(key, 0), idx_val)
+    return max_by_plan
+
+
+def _load_existing_attempt_index_by_plan(tables_root: Path) -> dict[tuple[str, str], int]:
+    attempts_path = tables_root / "attempts.parquet"
+    paths: list[Path] = []
+    if attempts_path.exists():
+        paths.append(attempts_path)
+    paths.extend(sorted(tables_root.glob("attempts_part-*.parquet")))
+    if not paths:
+        return {}
+    max_by_plan: dict[tuple[str, str], int] = {}
+    for path in paths:
+        try:
+            df = pd.read_parquet(path)
+        except Exception:
+            continue
+        if df.empty:
+            continue
+        if "attempt_index" not in df.columns:
+            raise RuntimeError(
+                f"attempts file missing attempt_index column: {path}. "
+                "Regenerate outputs with the current DenseGen version."
+            )
+        for _, row in df.iterrows():
+            input_name = str(row.get("input_name") or "")
+            plan_name = str(row.get("plan_name") or "")
+            key = (input_name, plan_name)
+            try:
+                idx_val = int(row.get("attempt_index") or 0)
+            except Exception:
+                idx_val = 0
+            max_by_plan[key] = max(max_by_plan.get(key, 0), idx_val)
+    return max_by_plan
 
 
 def _append_attempt(
-    outputs_root: Path,
+    tables_root: Path,
     *,
     run_id: str,
     input_name: str,
     plan_name: str,
+    attempt_index: int,
     status: str,
     reason: str,
     detail: dict | None,
@@ -1045,58 +1724,63 @@ def _append_attempt(
     solver_solve_time_s: float | None,
     dense_arrays_version: str | None,
     dense_arrays_version_source: str,
-    output_id: str | None = None,
+    solution_id: str | None = None,
     library_tfbs: list[str] | None = None,
     library_tfs: list[str] | None = None,
     library_site_ids: list[str | None] | None = None,
     library_sources: list[str | None] | None = None,
     attempts_buffer: list[dict] | None = None,
-) -> None:
+) -> str:
     sequence_val = sequence or ""
     lib_tfbs = [str(x) for x in (library_tfbs or [])]
     lib_tfs = [str(x) for x in (library_tfs or [])]
     lib_site_ids = [str(x) if x is not None else "" for x in (library_site_ids or [])]
     lib_sources = [str(x) if x is not None else "" for x in (library_sources or [])]
-    payload = {
-        "attempt_id": uuid.uuid4().hex,
-        "run_id": run_id,
-        "input_name": input_name,
-        "plan_name": plan_name,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "status": status,
-        "reason": reason,
-        "detail_json": json.dumps(detail or {}),
-        "sequence": sequence_val,
-        "sequence_hash": hashlib.sha256(sequence_val.encode("utf-8")).hexdigest() if sequence_val else "",
-        "output_id": output_id,
-        "used_tf_counts_json": json.dumps(used_tf_counts or {}),
-        "used_tf_list": used_tf_list or [],
-        "sampling_library_index": int(sampling_library_index),
-        "sampling_library_hash": sampling_library_hash,
-        "solver_status": solver_status,
-        "solver_objective": solver_objective,
-        "solver_solve_time_s": solver_solve_time_s,
-        "dense_arrays_version": dense_arrays_version,
-        "dense_arrays_version_source": dense_arrays_version_source,
-        "library_tfbs": lib_tfbs,
-        "library_tfs": lib_tfs,
-        "library_site_ids": lib_site_ids,
-        "library_sources": lib_sources,
-    }
+    created_at = datetime.now(timezone.utc).isoformat()
+    seq_hash = hashlib.sha256(sequence_val.encode("utf-8")).hexdigest() if sequence_val else ""
+    record = AttemptRecord.build(
+        attempt_index=int(attempt_index),
+        run_id=run_id,
+        input_name=input_name,
+        plan_name=plan_name,
+        created_at=created_at,
+        status=status,
+        reason=reason,
+        detail_json=json.dumps(detail or {}),
+        sequence=sequence_val,
+        sequence_hash=seq_hash,
+        solution_id=solution_id,
+        used_tf_counts_json=json.dumps(used_tf_counts or {}),
+        used_tf_list=used_tf_list or [],
+        sampling_library_index=int(sampling_library_index),
+        sampling_library_hash=str(sampling_library_hash),
+        solver_status=solver_status,
+        solver_objective=solver_objective,
+        solver_solve_time_s=solver_solve_time_s,
+        dense_arrays_version=dense_arrays_version,
+        dense_arrays_version_source=dense_arrays_version_source,
+        library_tfbs=lib_tfbs,
+        library_tfs=lib_tfs,
+        library_site_ids=lib_site_ids,
+        library_sources=lib_sources,
+    )
+    payload = record.to_dict()
     if attempts_buffer is not None:
         attempts_buffer.append(payload)
         if len(attempts_buffer) >= ATTEMPTS_CHUNK_SIZE:
-            _flush_attempts(outputs_root, attempts_buffer)
-        return
-    _flush_attempts(outputs_root, [payload])
+            _flush_attempts(tables_root, attempts_buffer)
+        return record.attempt_id
+    _flush_attempts(tables_root, [payload])
+    return record.attempt_id
 
 
 def _log_rejection(
-    outputs_root: Path,
+    tables_root: Path,
     *,
     run_id: str,
     input_name: str,
     plan_name: str,
+    attempt_index: int,
     reason: str,
     detail: dict | None,
     sequence: str,
@@ -1117,10 +1801,11 @@ def _log_rejection(
 ) -> None:
     status = "duplicate" if reason == "output_duplicate" else "rejected"
     _append_attempt(
-        outputs_root,
+        tables_root,
         run_id=run_id,
         input_name=input_name,
         plan_name=plan_name,
+        attempt_index=attempt_index,
         status=status,
         reason=reason,
         detail=detail,
@@ -1134,6 +1819,7 @@ def _log_rejection(
         solver_solve_time_s=solver_solve_time_s,
         dense_arrays_version=dense_arrays_version,
         dense_arrays_version_source=dense_arrays_version_source,
+        solution_id=None,
         library_tfbs=library_tfbs,
         library_tfs=library_tfs,
         library_site_ids=library_site_ids,
@@ -1210,27 +1896,105 @@ def _process_plan_for_source(
     checkpoint_every: int = 0,
     write_state: Callable[[], None] | None = None,
     site_failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] | None = None,
+    source_cache: dict[str, PoolData] | None = None,
+    attempt_counters: dict[tuple[str, str], int] | None = None,
+    library_records: dict[tuple[str, str], list[LibraryRecord]] | None = None,
+    library_cursor: dict[tuple[str, str], int] | None = None,
+    library_source: str | None = None,
+    library_build_rows: list[dict] | None = None,
+    library_member_rows: list[dict] | None = None,
+    solution_rows: list[dict] | None = None,
+    composition_rows: list[dict] | None = None,
+    events_path: Path | None = None,
 ) -> tuple[int, dict]:
     source_label = source_cfg.name
     plan_name = plan_item.name
     quota = int(plan_item.quota)
+    attempt_counters = attempt_counters or {}
+
+    def _next_attempt_index() -> int:
+        key = (source_label, plan_name)
+        current = int(attempt_counters.get(key, 0)) + 1
+        attempt_counters[key] = current
+        return current
 
     gen = global_cfg.generation
     seq_len = int(gen.sequence_length)
     sampling_cfg = gen.sampling
 
+    def _record_library_build(
+        *,
+        sampling_info: dict,
+        library_tfbs: list[str],
+        library_tfs: list[str],
+        library_tfbs_ids: list[str],
+        library_motif_ids: list[str],
+        library_site_ids: list[str | None],
+        library_sources: list[str | None],
+    ) -> None:
+        if str(getattr(sampling_cfg, "library_source", "build")).lower() == "artifact":
+            return
+        if library_build_rows is None or library_member_rows is None:
+            return
+        library_index = int(sampling_info.get("library_index") or 0)
+        library_hash = str(sampling_info.get("library_hash") or "")
+        library_id = library_hash or f"{source_label}:{plan_name}:{library_index}"
+        row = {
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "input_name": source_label,
+            "plan_name": plan_name,
+            "library_index": library_index,
+            "library_id": library_id,
+            "library_hash": library_hash,
+            "pool_strategy": sampling_info.get("pool_strategy"),
+            "library_sampling_strategy": sampling_info.get("library_sampling_strategy"),
+            "library_size": int(sampling_info.get("library_size") or len(library_tfbs)),
+            "target_length": sampling_info.get("target_length"),
+            "achieved_length": sampling_info.get("achieved_length"),
+            "relaxed_cap": sampling_info.get("relaxed_cap"),
+            "final_cap": sampling_info.get("final_cap"),
+            "iterative_max_libraries": sampling_info.get("iterative_max_libraries"),
+            "iterative_min_new_solutions": sampling_info.get("iterative_min_new_solutions"),
+            "required_regulators_selected": sampling_info.get("required_regulators_selected"),
+        }
+        library_build_rows.append(row)
+        if events_path is not None:
+            try:
+                _emit_event(
+                    events_path,
+                    event="LIBRARY_BUILT",
+                    payload={
+                        "input_name": source_label,
+                        "plan_name": plan_name,
+                        "library_index": library_index,
+                        "library_hash": library_hash,
+                        "library_size": int(row.get("library_size") or len(library_tfbs)),
+                    },
+                )
+            except Exception:
+                log.debug("Failed to emit LIBRARY_BUILT event.", exc_info=True)
+        for idx, tfbs in enumerate(library_tfbs):
+            library_member_rows.append(
+                {
+                    "library_id": library_id,
+                    "library_hash": library_hash,
+                    "library_index": library_index,
+                    "input_name": source_label,
+                    "plan_name": plan_name,
+                    "position": int(idx),
+                    "tf": library_tfs[idx] if idx < len(library_tfs) else "",
+                    "tfbs": tfbs,
+                    "tfbs_id": library_tfbs_ids[idx] if idx < len(library_tfbs_ids) else None,
+                    "motif_id": library_motif_ids[idx] if idx < len(library_motif_ids) else None,
+                    "site_id": library_site_ids[idx] if idx < len(library_site_ids) else None,
+                    "source": library_sources[idx] if idx < len(library_sources) else None,
+                }
+            )
+
     pool_strategy = str(sampling_cfg.pool_strategy)
-    library_size = int(sampling_cfg.library_size)
-    subsample_over = int(sampling_cfg.subsample_over_length_budget_by)
     library_sampling_strategy = str(sampling_cfg.library_sampling_strategy)
-    cover_all_tfs = bool(sampling_cfg.cover_all_regulators)
-    unique_binding_sites = bool(sampling_cfg.unique_binding_sites)
-    max_sites_per_tf = sampling_cfg.max_sites_per_regulator
-    relax_on_exhaustion = bool(sampling_cfg.relax_on_exhaustion)
-    allow_incomplete_coverage = bool(sampling_cfg.allow_incomplete_coverage)
     iterative_max_libraries = int(sampling_cfg.iterative_max_libraries)
     iterative_min_new_solutions = int(sampling_cfg.iterative_min_new_solutions)
-    schema_is_22 = schema_version_at_least(global_cfg.schema_version, major=2, minor=2)
 
     runtime_cfg = global_cfg.runtime
     max_per_subsample = int(runtime_cfg.arrays_generated_before_resample)
@@ -1245,24 +2009,48 @@ def _process_plan_for_source(
     leaderboard_every = int(runtime_cfg.leaderboard_every)
     checkpoint_every = int(checkpoint_every or 0)
 
+    policy = RuntimePolicy(
+        pool_strategy=pool_strategy,
+        arrays_generated_before_resample=max_per_subsample,
+        stall_seconds_before_resample=stall_seconds,
+        stall_warning_every_seconds=stall_warn_every,
+        max_resample_attempts=max_resample_attempts,
+        max_total_resamples=max_total_resamples,
+        max_seconds_per_plan=max_seconds_per_plan,
+    )
+
     post = global_cfg.postprocess
-    gap_cfg = post.gap_fill
-    fill_gap = gap_cfg.mode != "off"
-    fill_mode = gap_cfg.mode
-    fill_end = gap_cfg.end
-    fill_gc_min = float(gap_cfg.gc_min)
-    fill_gc_max = float(gap_cfg.gc_max)
-    fill_max_tries = int(gap_cfg.max_tries)
+    pad_cfg = post.pad
+    pad_enabled = pad_cfg.mode != "off"
+    pad_mode = pad_cfg.mode
+    pad_end = pad_cfg.end
+    pad_gc_cfg = pad_cfg.gc
+    pad_gc_mode = pad_gc_cfg.mode
+    pad_gc_min = float(pad_gc_cfg.min)
+    pad_gc_max = float(pad_gc_cfg.max)
+    pad_gc_target = float(pad_gc_cfg.target)
+    pad_gc_tolerance = float(pad_gc_cfg.tolerance)
+    pad_gc_min_length = int(pad_gc_cfg.min_pad_length)
+    pad_max_tries = int(pad_cfg.max_tries)
 
     solver_cfg = global_cfg.solver
-    solver_opts = list(solver_cfg.options)
     solver_strategy = str(solver_cfg.strategy)
     solver_strands = str(solver_cfg.strands)
+    solver_time_limit_seconds = (
+        float(solver_cfg.time_limit_seconds) if solver_cfg.time_limit_seconds is not None else None
+    )
+    solver_threads = int(solver_cfg.threads) if solver_cfg.threads is not None else None
 
     log_cfg = global_cfg.logging
     print_visual = bool(log_cfg.print_visual)
+    progress_style = str(getattr(log_cfg, "progress_style", "stream"))
+    progress_every = int(getattr(log_cfg, "progress_every", 1))
+    progress_refresh_seconds = float(getattr(log_cfg, "progress_refresh_seconds", 1.0))
+    screen_console = Console() if progress_style == "screen" else None
+    last_screen_refresh = 0.0
+    latest_failure_totals: str | None = None
 
-    policy_gc_fill = str(fill_mode)
+    policy_pad = str(pad_mode)
     policy_sampling = pool_strategy
     policy_solver = solver_strategy
 
@@ -1284,12 +2072,45 @@ def _process_plan_for_source(
     failure_counts = site_failure_counts if site_failure_counts is not None else {}
     attempts_buffer: list[dict] = []
     run_root_path = Path(run_root)
-    outputs_root = run_root_path / "outputs"
-    existing_library_builds = _load_existing_library_index(outputs_root)
+    outputs_root = run_outputs_root(run_root_path)
+    tables_root = run_tables_root(run_root_path)
+    existing_library_builds = _load_existing_library_index(tables_root)
 
-    # Load source
-    src_obj = deps.source_factory(source_cfg, cfg_path)
-    data_entries, meta_df = src_obj.load_data(rng=np_rng)
+    # Load source (cache Stage-A PWM sampling results across round-robin passes).
+    cache_key = source_label
+    cached = source_cache.get(cache_key) if source_cache is not None else None
+    if cached is None:
+        src_obj = deps.source_factory(source_cfg, cfg_path)
+        data_entries, meta_df, _summaries = src_obj.load_data(
+            rng=np_rng,
+            outputs_root=outputs_root,
+            run_id=str(run_id),
+        )
+        if meta_df is not None and isinstance(meta_df, pd.DataFrame):
+            sequences = meta_df["tfbs"].tolist() if "tfbs" in meta_df.columns else list(data_entries or [])
+            pool = PoolData(
+                name=source_label,
+                input_type=str(getattr(source_cfg, "type", "")),
+                pool_mode=POOL_MODE_TFBS,
+                df=meta_df,
+                sequences=sequences,
+                pool_path=Path("."),
+            )
+        else:
+            pool = PoolData(
+                name=source_label,
+                input_type=str(getattr(source_cfg, "type", "")),
+                pool_mode=POOL_MODE_SEQUENCE,
+                df=None,
+                sequences=list(data_entries or []),
+                pool_path=Path("."),
+            )
+        if source_cache is not None:
+            source_cache[cache_key] = pool
+    else:
+        pool = cached
+    data_entries = pool.sequences
+    meta_df = pool.df
     input_meta = _input_metadata(source_cfg, cfg_path)
     input_tf_tfbs_pair_count: int | None = None
     if meta_df is not None and isinstance(meta_df, pd.DataFrame):
@@ -1313,6 +2134,17 @@ def _process_plan_for_source(
             "sampling_fraction_pairs": None,
         }
     )
+    pair_label = str(input_tf_tfbs_pair_count) if input_tf_tfbs_pair_count is not None else "-"
+    log.info(
+        "[%s/%s] Input summary: mode=%s rows=%d tfs=%d tfbs=%d pairs=%s",
+        source_label,
+        plan_name,
+        input_meta.get("input_mode"),
+        input_row_count,
+        input_tf_count,
+        input_tfbs_count,
+        pair_label,
+    )
     source_type = getattr(source_cfg, "type", None)
     if source_type in PWM_INPUT_TYPES and meta_df is not None and "tf" in meta_df.columns:
         input_meta["input_pwm_ids"] = sorted(set(meta_df["tf"].tolist()))
@@ -1325,34 +2157,77 @@ def _process_plan_for_source(
             max_seconds = _sampling_attr(input_sampling_cfg, "max_seconds")
             score_threshold = _sampling_attr(input_sampling_cfg, "score_threshold")
             score_percentile = _sampling_attr(input_sampling_cfg, "score_percentile")
+            scoring_backend = _sampling_attr(input_sampling_cfg, "scoring_backend") or "densegen"
+            pvalue_strata = _sampling_attr(input_sampling_cfg, "pvalue_strata")
+            retain_depth = _sampling_attr(input_sampling_cfg, "retain_depth")
             length_policy = _sampling_attr(input_sampling_cfg, "length_policy")
             length_range = _sampling_attr(input_sampling_cfg, "length_range")
+            mining_cfg = _sampling_attr(input_sampling_cfg, "mining")
+            mining_batch_size = _mining_attr(mining_cfg, "batch_size")
+            mining_max_batches = _mining_attr(mining_cfg, "max_batches")
+            mining_max_candidates = _mining_attr(mining_cfg, "max_candidates")
+            mining_max_seconds = _mining_attr(mining_cfg, "max_seconds")
             if length_range is not None:
                 length_range = list(length_range)
             score_label = "-"
-            if score_threshold is not None:
+            if scoring_backend == "fimo" and pvalue_strata:
+                floor = float(resolve_pvalue_strata(pvalue_strata)[-1])
+                comparator = ">=" if str(strategy) == "background" else "<="
+                score_label = f"floor{comparator}{floor:g}"
+            elif score_threshold is not None:
                 score_label = f"threshold={score_threshold}"
             elif score_percentile is not None:
                 score_label = f"percentile={score_percentile}"
+            bins_label = "-"
+            if scoring_backend == "fimo":
+                strata_len = len(pvalue_strata or [])
+                bins_label = f"strata={strata_len}"
+                if retain_depth is not None:
+                    bins_label = f"{bins_label} retain={int(retain_depth)}"
             length_label = str(length_policy)
             if length_policy == "range" and length_range:
                 length_label = f"{length_policy}({length_range[0]}..{length_range[1]})"
             cap_label = "-"
             if isinstance(n_sites, int) and isinstance(oversample, int):
                 requested = n_sites * oversample
-                if max_candidates is not None:
-                    cap_label = f"{max_candidates} (requested={requested})"
-            if max_seconds is not None:
-                cap_label = f"{cap_label}; max_seconds={max_seconds}" if cap_label != "-" else f"{max_seconds}s"
+                if scoring_backend == "fimo":
+                    if mining_max_candidates is not None:
+                        cap_label = f"{mining_max_candidates} (requested={requested})"
+                    if mining_max_seconds is not None:
+                        cap_label = (
+                            f"{cap_label}; max_seconds={mining_max_seconds}s"
+                            if cap_label != "-"
+                            else f"{mining_max_seconds}s"
+                        )
+                else:
+                    if max_candidates is not None:
+                        cap_label = f"{max_candidates} (requested={requested})"
+                    if max_seconds is not None:
+                        cap_label = f"{cap_label}; max_seconds={max_seconds}" if cap_label != "-" else f"{max_seconds}s"
             counts_label = _summarize_tf_counts(meta_df["tf"].tolist())
+            mining_label = "-"
+            if scoring_backend == "fimo" and mining_cfg is not None:
+                parts = []
+                if mining_batch_size is not None:
+                    parts.append(f"batch={mining_batch_size}")
+                if mining_max_batches is not None:
+                    parts.append(f"max_batches={mining_max_batches}")
+                if mining_max_candidates is not None:
+                    parts.append(f"max_candidates={mining_max_candidates}")
+                if mining_max_seconds is not None:
+                    parts.append(f"max_seconds={mining_max_seconds}s")
+                mining_label = ", ".join(parts) if parts else "enabled"
             log.info(
-                "PWM input sampling for %s: motifs=%d | sites=%s | strategy=%s | score=%s | "
-                "oversample=%s | max_candidates=%s | length=%s",
+                "Stage-A PWM sampling for %s: motifs=%d | sites=%s | strategy=%s | backend=%s | score=%s | "
+                "bins=%s | mining=%s | oversample=%s | caps=%s | length=%s",
                 source_label,
                 len(input_meta.get("input_pwm_ids") or []),
                 counts_label or "-",
                 strategy,
+                scoring_backend,
                 score_label,
+                bins_label,
+                mining_label,
                 oversample,
                 cap_label,
                 length_label,
@@ -1390,8 +2265,6 @@ def _process_plan_for_source(
             f"({k_required} > {len(required_regulators)})."
         )
     metadata_min_counts = {tf: max(min_count_per_tf, int(val)) for tf, val in plan_min_count_by_regulator.items()}
-    side_left, side_right = _extract_side_biases(fixed_elements)
-    required_bias_motifs = list(dict.fromkeys([*side_left, *side_right]))
     fixed_elements_dump = _fixed_elements_dump(fixed_elements)
     fixed_elements_max_len = _max_fixed_element_len(fixed_elements_dump)
 
@@ -1400,218 +2273,124 @@ def _process_plan_for_source(
     tfbs_parts: List[str]
     libraries_built = existing_library_builds
     libraries_built_start = existing_library_builds
+    libraries_used = 0
+    library_source_label = str(library_source or getattr(sampling_cfg, "library_source", "build")).lower()
+    if library_source_label not in {"build", "artifact"}:
+        raise ValueError(f"Unsupported Stage-B sampling.library_source: {library_source_label}")
+    if library_source_label == "artifact" and library_cursor is not None:
+        prior_used = int(library_cursor.get((source_label, plan_name), 0))
+        libraries_built = prior_used
+        libraries_built_start = prior_used
+
+    def _select_library_from_artifact() -> tuple[list[str], list[str], list[str], dict]:
+        if library_records is None or library_cursor is None:
+            raise RuntimeError("Library artifacts requested but no library records were provided.")
+        key = (source_label, plan_name)
+        records = library_records.get(key) or []
+        if not records:
+            raise RuntimeError(
+                f"No libraries available in artifact for {source_label}/{plan_name}. "
+                "Build libraries with `dense stage-b build-libraries` and re-run."
+            )
+        cursor = int(library_cursor.get(key, 0))
+        if cursor >= len(records):
+            raise RuntimeError(
+                f"Library artifact exhausted for {source_label}/{plan_name} "
+                f"(requested index={cursor + 1}, available={len(records)}). "
+                "Build more libraries or reduce Stage-B resampling."
+            )
+        record = records[cursor]
+        library_cursor[key] = cursor + 1
+        if record.pool_strategy is None or record.library_sampling_strategy is None:
+            raise RuntimeError(
+                f"Library artifact missing Stage-B sampling metadata for {source_label}/{plan_name} "
+                f"(library_index={record.library_index}). Rebuild libraries with the current version."
+            )
+        if str(record.pool_strategy) != str(pool_strategy):
+            raise RuntimeError(
+                f"Library artifact pool_strategy mismatch for {source_label}/{plan_name}: "
+                f"artifact={record.pool_strategy} config={pool_strategy}."
+            )
+        if str(record.library_sampling_strategy) != str(library_sampling_strategy):
+            raise RuntimeError(
+                f"Library artifact Stage-B sampling strategy mismatch for {source_label}/{plan_name}: "
+                f"artifact={record.library_sampling_strategy} config={library_sampling_strategy}."
+            )
+        if pool_strategy != "full" and record.library_size != int(getattr(sampling_cfg, "library_size", 0)):
+            raise RuntimeError(
+                f"Library artifact size mismatch for {source_label}/{plan_name}: "
+                f"artifact={record.library_size} config={sampling_cfg.library_size}."
+            )
+        tfbs_parts_local = []
+        for idx, tfbs in enumerate(record.library_tfbs):
+            tf = record.library_tfs[idx] if idx < len(record.library_tfs) else ""
+            tfbs_parts_local.append(f"{tf}:{tfbs}" if tf else str(tfbs))
+        if events_path is not None:
+            try:
+                _emit_event(
+                    events_path,
+                    event="LIBRARY_SELECTED",
+                    payload={
+                        "input_name": source_label,
+                        "plan_name": plan_name,
+                        "library_index": int(record.library_index),
+                        "library_hash": str(record.library_hash),
+                        "library_size": int(record.library_size),
+                    },
+                )
+            except Exception:
+                log.debug("Failed to emit LIBRARY_SELECTED event.", exc_info=True)
+        return record.library_tfbs, tfbs_parts_local, record.library_tfs, record.sampling_info()
+
+    def _build_next_library() -> tuple[list[str], list[str], list[str], dict]:
+        nonlocal libraries_built, libraries_used
+        if library_source_label == "artifact":
+            libraries_used += 1
+            libraries_built = libraries_used
+            return _select_library_from_artifact()
+        library_for_opt_local, tfbs_parts_local, regulator_labels_local, sampling_info_local = build_library_for_plan(
+            source_label=source_label,
+            plan_item=plan_item,
+            pool=pool,
+            sampling_cfg=sampling_cfg,
+            seq_len=seq_len,
+            min_count_per_tf=min_count_per_tf,
+            usage_counts=usage_counts,
+            failure_counts=failure_counts if failure_counts else None,
+            rng=rng,
+            np_rng=np_rng,
+            library_index_start=libraries_built,
+        )
+        libraries_built = int(sampling_info_local.get("library_index", libraries_built))
+        libraries_used += 1
+        return library_for_opt_local, tfbs_parts_local, regulator_labels_local, sampling_info_local
 
     if pool_strategy != "iterative_subsample" and not one_subsample_only:
         max_per_subsample = quota
-
-    def _build_library() -> tuple[list[str], list[str], list[str], dict]:
-        nonlocal libraries_built
-        if meta_df is not None and isinstance(meta_df, pd.DataFrame):
-            available_tfs = set(meta_df["tf"].tolist())
-            missing = [t for t in required_regulators if t not in available_tfs]
-            if missing:
-                preview = ", ".join(missing[:10])
-                raise ValueError(f"Required regulators not found in input: {preview}")
-            if plan_min_count_by_regulator:
-                missing_counts = [t for t in plan_min_count_by_regulator if t not in available_tfs]
-                if missing_counts:
-                    preview = ", ".join(missing_counts[:10])
-                    raise ValueError(f"min_count_by_regulator TFs not found in input: {preview}")
-            if min_required_regulators is not None:
-                if not required_regulators and min_required_regulators > len(available_tfs):
-                    raise ValueError(
-                        f"min_required_regulators={min_required_regulators} exceeds available regulators "
-                        f"({len(available_tfs)})."
-                    )
-
-            if pool_strategy == "full":
-                lib_df = meta_df.copy()
-                if unique_binding_sites:
-                    lib_df = lib_df.drop_duplicates(["tf", "tfbs"])
-                if required_bias_motifs:
-                    missing_bias = [m for m in required_bias_motifs if m not in set(lib_df["tfbs"])]
-                    if missing_bias:
-                        preview = ", ".join(missing_bias[:10])
-                        raise ValueError(f"Required side-bias motifs not found in input: {preview}")
-                lib_df = lib_df.reset_index(drop=True)
-                library = lib_df["tfbs"].tolist()
-                reg_labels = lib_df["tf"].tolist()
-                parts = [f"{tf}:{tfbs}" for tf, tfbs in zip(reg_labels, lib_df["tfbs"].tolist())]
-                site_id_by_index = lib_df["site_id"].tolist() if "site_id" in lib_df.columns else None
-                source_by_index = lib_df["source"].tolist() if "source" in lib_df.columns else None
-                info = {
-                    "target_length": seq_len + subsample_over,
-                    "achieved_length": sum(len(s) for s in library),
-                    "relaxed_cap": False,
-                    "final_cap": None,
-                    "pool_strategy": pool_strategy,
-                    "library_size": len(library),
-                    "iterative_max_libraries": iterative_max_libraries,
-                    "iterative_min_new_solutions": iterative_min_new_solutions,
-                }
-                libraries_built += 1
-                info["library_index"] = libraries_built
-                info["library_hash"] = _hash_library(library, reg_labels, site_id_by_index, source_by_index)
-                info["site_id_by_index"] = site_id_by_index
-                info["source_by_index"] = source_by_index
-                return library, parts, reg_labels, info
-
-            sampler = TFSampler(meta_df, np_rng)
-            required_regulators_selected = required_regulators
-            if k_of_required:
-                candidates = sorted(required_regulators)
-                if k_required is not None and k_required < len(candidates):
-                    chosen = np_rng.choice(len(candidates), size=k_required, replace=False)
-                    required_regulators_selected = sorted([candidates[int(i)] for i in chosen])
-                else:
-                    required_regulators_selected = candidates
-            required_tfs_for_library = list(
-                dict.fromkeys([*required_regulators_selected, *plan_min_count_by_regulator.keys()])
-            )
-            if min_required_regulators is not None and not required_regulators:
-                if pool_strategy in {"subsample", "iterative_subsample"}:
-                    if library_size < int(min_required_regulators):
-                        raise ValueError(
-                            "library_size is too small to satisfy min_required_regulators when "
-                            f"required_regulators is empty. library_size={library_size} "
-                            f"min_required_regulators={min_required_regulators}. "
-                            "Increase library_size or lower min_required_regulators."
-                        )
-            if pool_strategy in {"subsample", "iterative_subsample"}:
-                required_slots = len(required_bias_motifs) + len(required_tfs_for_library)
-                if library_size < required_slots:
-                    raise ValueError(
-                        "library_size is too small for required motifs. "
-                        f"library_size={library_size} but required_tfbs={len(required_bias_motifs)} "
-                        f"+ required_tfs={len(required_tfs_for_library)} "
-                        f"(min_required_regulators={min_required_regulators}). "
-                        "Increase library_size or relax required constraints."
-                    )
-            # Alignment (1,4): count-based library sizing with explicit sampling strategy under schema>=2.2.
-            if schema_is_22 and pool_strategy in {"subsample", "iterative_subsample"}:
-                failure_counts_by_tfbs: dict[tuple[str, str], int] | None = None
-                if library_sampling_strategy == "coverage_weighted" and sampling_cfg.avoid_failed_motifs:
-                    failure_counts_by_tfbs = _aggregate_failure_counts_for_sampling(
-                        failure_counts,
-                        input_name=source_label,
-                        plan_name=plan_name,
-                    )
-                library, parts, reg_labels, info = sampler.generate_binding_site_library(
-                    library_size,
-                    sequence_length=seq_len,
-                    budget_overhead=subsample_over,
-                    required_tfbs=required_bias_motifs,
-                    required_tfs=required_tfs_for_library,
-                    cover_all_tfs=cover_all_tfs,
-                    unique_binding_sites=unique_binding_sites,
-                    max_sites_per_tf=max_sites_per_tf,
-                    relax_on_exhaustion=relax_on_exhaustion,
-                    allow_incomplete_coverage=allow_incomplete_coverage,
-                    sampling_strategy=library_sampling_strategy,
-                    usage_counts=usage_counts if library_sampling_strategy == "coverage_weighted" else None,
-                    coverage_boost_alpha=float(sampling_cfg.coverage_boost_alpha),
-                    coverage_boost_power=float(sampling_cfg.coverage_boost_power),
-                    failure_counts=failure_counts_by_tfbs,
-                    avoid_failed_motifs=bool(sampling_cfg.avoid_failed_motifs),
-                    failure_penalty_alpha=float(sampling_cfg.failure_penalty_alpha),
-                    failure_penalty_power=float(sampling_cfg.failure_penalty_power),
-                )
-            else:
-                library, parts, reg_labels, info = sampler.generate_binding_site_subsample(
-                    seq_len,
-                    subsample_over,
-                    required_tfbs=required_bias_motifs,
-                    required_tfs=required_tfs_for_library,
-                    cover_all_tfs=cover_all_tfs,
-                    unique_binding_sites=unique_binding_sites,
-                    max_sites_per_tf=max_sites_per_tf,
-                    relax_on_exhaustion=relax_on_exhaustion,
-                    allow_incomplete_coverage=allow_incomplete_coverage,
-                )
-            info.update(
-                {
-                    "pool_strategy": pool_strategy,
-                    "library_size": library_size,
-                    "library_sampling_strategy": library_sampling_strategy,
-                    "coverage_boost_alpha": float(sampling_cfg.coverage_boost_alpha),
-                    "coverage_boost_power": float(sampling_cfg.coverage_boost_power),
-                    "iterative_max_libraries": iterative_max_libraries,
-                    "iterative_min_new_solutions": iterative_min_new_solutions,
-                    "required_regulators_selected": required_regulators_selected if k_of_required else None,
-                }
-            )
-            libraries_built += 1
-            info["library_index"] = libraries_built
-            site_id_by_index = info.get("site_id_by_index")
-            source_by_index = info.get("source_by_index")
-            info["library_hash"] = _hash_library(library, reg_labels, site_id_by_index, source_by_index)
-            return library, parts, reg_labels, info
-
-        # Sequence library (no regulators)
-        if required_regulators or plan_min_count_by_regulator or min_required_regulators is not None:
-            preview = ", ".join(required_regulators[:10]) if required_regulators else "n/a"
-            raise ValueError(
-                "Regulator constraints are set (required/min_count/min_required) "
-                "but the input does not provide regulators. "
-                f"required_regulators={preview}."
-            )
-        all_sequences = [s for s in data_entries]
-        if not all_sequences:
-            raise ValueError(f"No sequences found for source {source_label}")
-        pool = list(dict.fromkeys(all_sequences)) if unique_binding_sites else list(all_sequences)
-        if pool_strategy == "full":
-            if required_bias_motifs:
-                missing = [m for m in required_bias_motifs if m not in pool]
-                if missing:
-                    preview = ", ".join(missing[:10])
-                    raise ValueError(f"Required side-bias motifs not found in sequences input: {preview}")
-            library = pool
-        else:
-            if library_size > len(pool):
-                raise ValueError(f"library_size={library_size} exceeds available unique sequences ({len(pool)}).")
-            take = min(max(1, int(library_size)), len(pool))
-            if required_bias_motifs:
-                missing = [m for m in required_bias_motifs if m not in pool]
-                if missing:
-                    preview = ", ".join(missing[:10])
-                    raise ValueError(f"Required side-bias motifs not found in sequences input: {preview}")
-                if take < len(required_bias_motifs):
-                    raise ValueError(
-                        f"library_size={take} is smaller than required side_biases ({len(required_bias_motifs)})."
-                    )
-                required_set = set(required_bias_motifs)
-                remaining = [s for s in pool if s not in required_set]
-                library = list(required_bias_motifs) + rng.sample(remaining, take - len(required_bias_motifs))
-            else:
-                library = rng.sample(pool, take)
-        tf_parts: list[str] = []
-        reg_labels: list[str] = []
-        info = {
-            "target_length": seq_len + subsample_over,
-            "achieved_length": sum(len(s) for s in library),
-            "relaxed_cap": False,
-            "final_cap": None,
-            "pool_strategy": pool_strategy,
-            "library_size": len(library) if pool_strategy == "full" else library_size,
-            "iterative_max_libraries": iterative_max_libraries,
-            "iterative_min_new_solutions": iterative_min_new_solutions,
-        }
-        libraries_built += 1
-        info["library_index"] = libraries_built
-        info["library_hash"] = _hash_library(library, reg_labels, None, None)
-        info["site_id_by_index"] = None
-        info["source_by_index"] = None
-        return library, tf_parts, reg_labels, info
-
-    library_for_opt, tfbs_parts, regulator_labels, sampling_info = _build_library()
+    library_for_opt, tfbs_parts, regulator_labels, sampling_info = _build_next_library()
+    if library_source_label != "artifact":
+        libraries_built = int(sampling_info.get("library_index", libraries_built))
     site_id_by_index = sampling_info.get("site_id_by_index")
     source_by_index = sampling_info.get("source_by_index")
+    tfbs_id_by_index = sampling_info.get("tfbs_id_by_index")
+    motif_id_by_index = sampling_info.get("motif_id_by_index")
     sampling_library_index = sampling_info.get("library_index", 0)
     sampling_library_hash = sampling_info.get("library_hash", "")
     library_tfbs = list(library_for_opt)
     library_tfs = list(regulator_labels) if regulator_labels else []
     library_site_ids = list(site_id_by_index) if site_id_by_index else []
     library_sources = list(source_by_index) if source_by_index else []
+    library_tfbs_ids = list(tfbs_id_by_index) if tfbs_id_by_index else []
+    library_motif_ids = list(motif_id_by_index) if motif_id_by_index else []
+    _record_library_build(
+        sampling_info=sampling_info,
+        library_tfbs=library_tfbs,
+        library_tfs=library_tfs,
+        library_tfbs_ids=library_tfbs_ids,
+        library_motif_ids=library_motif_ids,
+        library_site_ids=library_site_ids,
+        library_sources=library_sources,
+    )
     max_tfbs_len = max((len(str(m)) for m in library_tfbs), default=0)
     required_len = max(max_tfbs_len, fixed_elements_max_len)
     if seq_len < required_len:
@@ -1620,7 +2399,26 @@ def _process_plan_for_source(
             f"(sequence_length={seq_len}, max_library_motif={max_tfbs_len}, "
             f"max_fixed_element={fixed_elements_max_len}). "
             "Increase densegen.generation.sequence_length or reduce motif lengths "
-            "(e.g., adjust PWM sampling length_range or fixed-element motifs)."
+            "(e.g., adjust Stage-A PWM sampling length_range or fixed-element motifs)."
+        )
+    min_required_len, min_breakdown = _min_required_length_for_constraints(
+        library_tfbs=library_tfbs,
+        library_tfs=library_tfs,
+        fixed_elements_dump=fixed_elements_dump,
+        required_regulators=required_regulators,
+        min_required_regulators=min_required_regulators,
+        min_count_by_regulator=plan_min_count_by_regulator,
+        min_count_per_tf=min_count_per_tf,
+    )
+    if min_required_len > 0 and seq_len < min_required_len:
+        raise ValueError(
+            "generation.sequence_length is shorter than the minimum required length for constraints "
+            f"(sequence_length={seq_len}, min_required_length={min_required_len}, "
+            f"fixed_elements_min={min_breakdown['fixed_elements_min']}, "
+            f"per_tf_min={min_breakdown['per_tf_min']}, "
+            f"min_required_extra={min_breakdown['min_required_extra']}). "
+            "Increase densegen.generation.sequence_length or relax required_regulators, "
+            "min_required_regulators, min_count_by_regulator, or fixed-element constraints."
         )
 
     def _current_leaderboard_snapshot() -> dict[str, object]:
@@ -1702,26 +2500,34 @@ def _process_plan_for_source(
     input_meta["sampling_fraction_pairs"] = sampling_fraction_pairs
     # Library summary (succinct)
     tf_summary = _summarize_tf_counts(regulator_labels)
+    library_index = sampling_info.get("library_index")
+    strategy_label = sampling_info.get("library_sampling_strategy", library_sampling_strategy)
+    pool_label = sampling_info.get("pool_strategy")
+    target_len = sampling_info.get("target_length")
+    achieved_len = sampling_info.get("achieved_length")
+    header = f"Stage-B library for {source_label}/{plan_name}"
+    if library_index is not None:
+        header = f"{header} (build {library_index})"
     if tf_summary:
         log.info(
-            "Library for %s/%s: %d motifs | TF counts: %s | target=%d achieved=%d pool=%s",
-            source_label,
-            plan_name,
+            "%s: %d motifs | TF counts: %s | target=%s achieved=%s pool=%s stage_b_sampling=%s",
+            header,
             len(library_for_opt),
             tf_summary,
-            sampling_info.get("target_length"),
-            sampling_info.get("achieved_length"),
-            sampling_info.get("pool_strategy"),
+            target_len,
+            achieved_len,
+            pool_label,
+            strategy_label,
         )
     else:
         log.info(
-            "Library for %s/%s: %d motifs | target=%d achieved=%d pool=%s",
-            source_label,
-            plan_name,
+            "%s: %d motifs | target=%s achieved=%s pool=%s stage_b_sampling=%s",
+            header,
             len(library_for_opt),
-            sampling_info.get("target_length"),
-            sampling_info.get("achieved_length"),
-            sampling_info.get("pool_strategy"),
+            target_len,
+            achieved_len,
+            pool_label,
+            strategy_label,
         )
 
     solver_min_counts: dict[str, int] | None = None
@@ -1739,7 +2545,7 @@ def _process_plan_for_source(
             if k_required is not None and len(solver_required_regs) < k_required:
                 raise ValueError(
                     "Required regulator candidate set is smaller than min_required_regulators "
-                    f"after library sampling ({len(solver_required_regs)} < {k_required}). "
+                    f"after Stage-B library sampling ({len(solver_required_regs)} < {k_required}). "
                     "Increase library_size or relax required_regulators/min_required_regulators."
                 )
         if min_required_regulators is not None and not required_regulators:
@@ -1749,13 +2555,14 @@ def _process_plan_for_source(
             sequence_length=seq_len,
             solver=chosen_solver,
             strategy=solver_strategy,
-            solver_options=solver_opts,
             fixed_elements=fe_dict,
             strands=solver_strands,
             regulator_by_index=regulator_by_index,
             required_regulators=solver_required_regs,
             min_count_by_regulator=solver_min_counts,
             min_required_regulators=min_required_regulators,
+            solver_time_limit_seconds=solver_time_limit_seconds,
+            solver_threads=solver_threads,
         )
         return run
 
@@ -1768,7 +2575,7 @@ def _process_plan_for_source(
     produced_total_this_call = 0
 
     while global_generated < quota:
-        if max_seconds_per_plan > 0 and (time.monotonic() - plan_start) > max_seconds_per_plan:
+        if policy.plan_timed_out(now=time.monotonic(), plan_started=plan_start):
             raise RuntimeError(f"[{source_label}/{plan_name}] Exceeded max_seconds_per_plan={max_seconds_per_plan}.")
         local_generated = 0
         resamples_in_try = 0
@@ -1778,22 +2585,51 @@ def _process_plan_for_source(
             consecutive_dup = 0
             subsample_started = time.monotonic()
             last_log_warn = subsample_started
+            last_progress = subsample_started
             produced_this_library = 0
             stall_triggered = False
 
+            def _mark_stall(now: float) -> None:
+                nonlocal stall_events, stall_triggered
+                if stall_triggered:
+                    return
+                log.info(
+                    "[%s/%s] Stall (> %ds) with no solutions; will resample.",
+                    source_label,
+                    plan_name,
+                    stall_seconds,
+                )
+                stall_events += 1
+                if events_path is not None:
+                    try:
+                        _emit_event(
+                            events_path,
+                            event="STALL_DETECTED",
+                            payload={
+                                "input_name": source_label,
+                                "plan_name": plan_name,
+                                "stall_seconds": float(now - last_progress),
+                                "library_index": int(sampling_library_index),
+                                "library_hash": str(sampling_library_hash),
+                            },
+                        )
+                    except Exception:
+                        log.debug("Failed to emit STALL_DETECTED event.", exc_info=True)
+                stall_triggered = True
+
             for sol in generator:
                 now = time.monotonic()
-                if (now - subsample_started >= stall_seconds) and (produced_this_library == 0):
-                    log.info(
-                        "[%s/%s] Stall (> %ds) with no solutions; will resample.",
-                        source_label,
-                        plan_name,
-                        stall_seconds,
-                    )
-                    stall_events += 1
-                    stall_triggered = True
+                if policy.should_trigger_stall(
+                    now=now,
+                    last_progress=last_progress,
+                ):
+                    _mark_stall(now)
                     break
-                if (now - last_log_warn >= stall_warn_every) and (produced_this_library == 0):
+                if policy.should_warn_stall(
+                    now=now,
+                    last_warn=last_log_warn,
+                    last_progress=last_progress,
+                ):
                     log.info(
                         "[%s/%s] Still working... %.1fs on current library.",
                         source_label,
@@ -1801,6 +2637,7 @@ def _process_plan_for_source(
                         now - subsample_started,
                     )
                     last_log_warn = now
+                last_progress = now
 
                 if forbid_each:
                     opt.forbid(sol)
@@ -1827,6 +2664,8 @@ def _process_plan_for_source(
                     fixed_elements,
                     site_id_by_index,
                     source_by_index,
+                    tfbs_id_by_index,
+                    motif_id_by_index,
                 )
                 tf_list_from_library = sorted(set(regulator_labels)) if regulator_labels else []
                 solver_status = getattr(sol, "status", None)
@@ -1850,11 +2689,13 @@ def _process_plan_for_source(
                         failed_solutions += 1
                         failed_min_count_per_tf += 1
                         _record_site_failures("min_count_per_tf")
+                        attempt_index = _next_attempt_index()
                         _log_rejection(
-                            outputs_root,
+                            tables_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
+                            attempt_index=attempt_index,
                             reason="min_count_per_tf",
                             detail={
                                 "min_count_per_tf": min_count_per_tf,
@@ -1889,11 +2730,13 @@ def _process_plan_for_source(
                         failed_solutions += 1
                         failed_required_regulators += 1
                         _record_site_failures("required_regulators")
+                        attempt_index = _next_attempt_index()
                         _log_rejection(
-                            outputs_root,
+                            tables_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
+                            attempt_index=attempt_index,
                             reason="required_regulators",
                             detail={
                                 "required_regulators": required_regulators,
@@ -1931,11 +2774,13 @@ def _process_plan_for_source(
                         failed_solutions += 1
                         failed_min_count_by_regulator += 1
                         _record_site_failures("min_count_by_regulator")
+                        attempt_index = _next_attempt_index()
                         _log_rejection(
-                            outputs_root,
+                            tables_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
+                            attempt_index=attempt_index,
                             reason="min_count_by_regulator",
                             detail={
                                 "min_count_by_regulator": [
@@ -1977,11 +2822,13 @@ def _process_plan_for_source(
                         failed_solutions += 1
                         failed_min_required_regulators += 1
                         _record_site_failures("min_required_regulators")
+                        attempt_index = _next_attempt_index()
                         _log_rejection(
-                            outputs_root,
+                            tables_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
+                            attempt_index=attempt_index,
                             reason="min_required_regulators",
                             detail={
                                 "required_regulators": required_regulators,
@@ -2017,11 +2864,13 @@ def _process_plan_for_source(
                         failed_solutions += 1
                         failed_min_required_regulators += 1
                         _record_site_failures("min_required_regulators")
+                        attempt_index = _next_attempt_index()
                         _log_rejection(
-                            outputs_root,
+                            tables_root,
                             run_id=run_id,
                             input_name=source_label,
                             plan_name=plan_name,
+                            attempt_index=attempt_index,
                             reason="min_required_regulators",
                             detail={
                                 "min_required_regulators": int(min_required_regulators),
@@ -2049,20 +2898,22 @@ def _process_plan_for_source(
                             )
                         continue
 
-                gap_meta = {"used": False}
+                pad_meta = {"used": False}
                 final_seq = seq
-                if not fill_gap and len(final_seq) < seq_len:
-                    raise RuntimeError(
-                        f"[{source_label}/{plan_name}] Sequence shorter than target and gap_fill.mode=off."
-                    )
-                if fill_gap and len(final_seq) < seq_len:
+                if not pad_enabled and len(final_seq) < seq_len:
+                    raise RuntimeError(f"[{source_label}/{plan_name}] Sequence shorter than target and pad.mode=off.")
+                if pad_enabled and len(final_seq) < seq_len:
                     gap = seq_len - len(final_seq)
-                    rf = deps.gap_fill(
-                        gap,
-                        fill_gc_min,
-                        fill_gc_max,
-                        max_tries=fill_max_tries,
-                        mode=fill_mode,
+                    rf = deps.pad(
+                        length=gap,
+                        mode=pad_mode,
+                        gc_mode=pad_gc_mode,
+                        gc_min=pad_gc_min,
+                        gc_max=pad_gc_max,
+                        gc_target=pad_gc_target,
+                        gc_tolerance=pad_gc_tolerance,
+                        gc_min_pad_length=pad_gc_min_length,
+                        max_tries=pad_max_tries,
                         rng=rng,
                     )
                     if isinstance(rf, tuple) and len(rf) == 2:
@@ -2070,21 +2921,23 @@ def _process_plan_for_source(
                         pad_info = pad_info or {}
                     else:
                         pad, pad_info = rf, {}
-                    final_seq = (pad + final_seq) if fill_end == "5prime" else (final_seq + pad)
-                    gap_meta = {
+                    final_seq = (pad + final_seq) if pad_end == "5prime" else (final_seq + pad)
+                    pad_meta = {
                         "used": True,
                         "bases": gap,
-                        "end": fill_end,
-                        "gc_min": pad_info.get("final_gc_min", fill_gc_min),
-                        "gc_max": pad_info.get("final_gc_max", fill_gc_max),
-                        "gc_target_min": pad_info.get("target_gc_min", fill_gc_min),
-                        "gc_target_max": pad_info.get("target_gc_max", fill_gc_max),
+                        "end": pad_end,
+                        "gc_mode": pad_info.get("gc_mode", pad_gc_mode),
+                        "gc_min": pad_info.get("final_gc_min"),
+                        "gc_max": pad_info.get("final_gc_max"),
+                        "gc_target_min": pad_info.get("target_gc_min"),
+                        "gc_target_max": pad_info.get("target_gc_max"),
                         "gc_actual": pad_info.get("gc_actual"),
                         "relaxed": pad_info.get("relaxed"),
+                        "relaxed_reason": pad_info.get("relaxed_reason"),
                         "attempts": pad_info.get("attempts"),
                     }
 
-                used_tfbs_detail = _apply_gap_fill_offsets(used_tfbs_detail, gap_meta)
+                used_tfbs_detail = _apply_pad_offsets(used_tfbs_detail, pad_meta)
                 gc_core = _gc_fraction(seq)
                 gc_total = _gc_fraction(final_seq)
                 created_at = datetime.now(timezone.utc).isoformat()
@@ -2097,11 +2950,12 @@ def _process_plan_for_source(
                     fixed_elements=fixed_elements,
                     chosen_solver=chosen_solver,
                     solver_strategy=solver_strategy,
-                    solver_options=solver_opts,
+                    solver_time_limit_seconds=solver_time_limit_seconds,
+                    solver_threads=solver_threads,
                     solver_strands=solver_strands,
                     seq_len=seq_len,
                     actual_length=len(final_seq),
-                    gap_meta=gap_meta,
+                    pad_meta=pad_meta,
                     sampling_meta=sampling_info,
                     schema_version=str(global_cfg.schema_version),
                     created_at=created_at,
@@ -2110,7 +2964,7 @@ def _process_plan_for_source(
                     run_config_path=run_config_path,
                     run_config_sha256=run_config_sha256,
                     random_seed=random_seed,
-                    policy_gc_fill=policy_gc_fill,
+                    policy_pad=policy_pad,
                     policy_sampling=policy_sampling,
                     policy_solver=policy_solver,
                     input_meta=input_meta,
@@ -2154,11 +3008,13 @@ def _process_plan_for_source(
                 if not accepted:
                     failed_solutions += 1
                     duplicate_records += 1
+                    attempt_index = _next_attempt_index()
                     _log_rejection(
-                        outputs_root,
+                        tables_root,
                         run_id=run_id,
                         input_name=source_label,
                         plan_name=plan_name,
+                        attempt_index=attempt_index,
                         reason="output_duplicate",
                         detail={},
                         sequence=final_seq,
@@ -2188,11 +3044,40 @@ def _process_plan_for_source(
                     )
                     continue
 
-                _append_attempt(
-                    outputs_root,
+                composition_start = None
+                if composition_rows is not None:
+                    composition_start = len(composition_rows)
+                    for placement_index, entry in enumerate(used_tfbs_detail or []):
+                        composition_rows.append(
+                            {
+                                "solution_id": record.id,
+                                "attempt_id": None,
+                                "input_name": source_label,
+                                "plan_name": plan_name,
+                                "library_index": int(sampling_library_index),
+                                "library_hash": str(sampling_library_hash),
+                                "placement_index": int(placement_index),
+                                "tf": entry.get("tf"),
+                                "tfbs": entry.get("tfbs"),
+                                "motif_id": entry.get("motif_id"),
+                                "tfbs_id": entry.get("tfbs_id"),
+                                "orientation": entry.get("orientation"),
+                                "offset": entry.get("offset"),
+                                "length": entry.get("length"),
+                                "end": entry.get("end"),
+                                "pad_left": entry.get("pad_left"),
+                                "site_id": entry.get("site_id"),
+                                "source": entry.get("source"),
+                            }
+                        )
+
+                attempt_index = _next_attempt_index()
+                attempt_id = _append_attempt(
+                    tables_root,
                     run_id=run_id,
                     input_name=source_label,
                     plan_name=plan_name,
+                    attempt_index=attempt_index,
                     status="success",
                     reason="ok",
                     detail={},
@@ -2206,13 +3091,33 @@ def _process_plan_for_source(
                     solver_solve_time_s=solver_solve_time_s,
                     dense_arrays_version=dense_arrays_version,
                     dense_arrays_version_source=dense_arrays_version_source,
-                    output_id=record.id,
+                    solution_id=record.id,
                     library_tfbs=library_tfbs,
                     library_tfs=library_tfs,
                     library_site_ids=library_site_ids,
                     library_sources=library_sources,
                     attempts_buffer=attempts_buffer,
                 )
+                if composition_rows is not None and composition_start is not None:
+                    for idx in range(composition_start, len(composition_rows)):
+                        composition_rows[idx]["attempt_id"] = attempt_id
+                if solution_rows is not None:
+                    solution_rows.append(
+                        SolutionRecord(
+                            solution_id=record.id,
+                            attempt_id=attempt_id,
+                            run_id=str(run_id),
+                            input_name=source_label,
+                            plan_name=plan_name,
+                            created_at=created_at,
+                            sequence=final_seq,
+                            sequence_hash=hashlib.sha256(final_seq.encode("utf-8")).hexdigest(),
+                            sampling_library_index=int(sampling_library_index),
+                            sampling_library_hash=str(sampling_library_hash),
+                        ).to_dict()
+                    )
+                    if len(solution_rows) >= SOLUTIONS_CHUNK_SIZE:
+                        _flush_solutions(tables_root, solution_rows)
 
                 _update_usage_counts(usage_counts, used_tfbs_detail)
                 for tf, count in used_tf_counts.items():
@@ -2231,37 +3136,75 @@ def _process_plan_for_source(
                 pct = 100.0 * (global_generated / max(1, quota))
                 bar = _format_progress_bar(global_generated, quota, width=24)
                 cr = getattr(sol, "compression_ratio", float("nan"))
-                if print_visual:
-                    log.info(
-                        "╭─ %s/%s  %s  %d/%d (%.2f%%) — local %d/%d — CR=%.3f\n"
-                        "%s\nsequence %s\n"
-                        "╰────────────────────────────────────────────────────────",
-                        source_label,
-                        plan_name,
-                        bar,
-                        global_generated,
-                        quota,
-                        pct,
-                        local_generated,
-                        max_per_subsample,
-                        cr,
-                        derived["visual"],
-                        final_seq,
-                    )
+                should_log = progress_every > 0 and global_generated % max(1, progress_every) == 0
+                if progress_style == "screen":
+                    if should_log and screen_console is not None:
+                        now = time.monotonic()
+                        if (now - last_screen_refresh) >= progress_refresh_seconds:
+                            screen_console.clear()
+                            seq_preview = final_seq if len(final_seq) <= 120 else f"{final_seq[:117]}..."
+                            screen_console.print(
+                                f"[bold]{source_label}/{plan_name}[/] {bar} {global_generated}/{quota} ({pct:.2f}%)"
+                            )
+                            screen_console.print(
+                                f"local {local_generated}/{max_per_subsample} | CR={cr:.3f} | "
+                                f"resamples={total_resamples} dup_out={duplicate_records} "
+                                f"dup_sol={duplicate_solutions} fails={failed_solutions} stalls={stall_events}"
+                            )
+                            if latest_failure_totals:
+                                screen_console.print(f"failures: {latest_failure_totals}")
+                            if tf_usage_counts:
+                                screen_console.print(
+                                    f"TF leaderboard: {_summarize_leaderboard(tf_usage_counts, top=5)}"
+                                )
+                            if usage_counts:
+                                screen_console.print(f"TFBS leaderboard: {_summarize_leaderboard(usage_counts, top=5)}")
+                            diversity_label = _summarize_diversity(
+                                usage_counts,
+                                tf_usage_counts,
+                                library_tfs=library_tfs,
+                                library_tfbs=library_tfbs,
+                            )
+                            screen_console.print(f"Diversity: {diversity_label}")
+                            if print_visual:
+                                screen_console.print(derived["visual"])
+                            screen_console.print(f"sequence {seq_preview}")
+                            last_screen_refresh = now
+                elif progress_style == "summary":
+                    pass
                 else:
-                    log.info(
-                        "[%s/%s] %s %d/%d (%.2f%%) (local %d/%d) CR=%.3f | seq %s",
-                        source_label,
-                        plan_name,
-                        bar,
-                        global_generated,
-                        quota,
-                        pct,
-                        local_generated,
-                        max_per_subsample,
-                        cr,
-                        final_seq,
-                    )
+                    if should_log:
+                        if print_visual:
+                            log.info(
+                                "╭─ %s/%s  %s  %d/%d (%.2f%%) — local %d/%d — CR=%.3f\n"
+                                "%s\nsequence %s\n"
+                                "╰────────────────────────────────────────────────────────",
+                                source_label,
+                                plan_name,
+                                bar,
+                                global_generated,
+                                quota,
+                                pct,
+                                local_generated,
+                                max_per_subsample,
+                                cr,
+                                derived["visual"],
+                                final_seq,
+                            )
+                        else:
+                            log.info(
+                                "[%s/%s] %s %d/%d (%.2f%%) (local %d/%d) CR=%.3f | seq %s",
+                                source_label,
+                                plan_name,
+                                bar,
+                                global_generated,
+                                quota,
+                                pct,
+                                local_generated,
+                                max_per_subsample,
+                                cr,
+                                final_seq,
+                            )
 
                 if leaderboard_every > 0 and global_generated % max(1, leaderboard_every) == 0:
                     failure_totals = _summarize_failure_totals(
@@ -2269,56 +3212,58 @@ def _process_plan_for_source(
                         input_name=source_label,
                         plan_name=plan_name,
                     )
-                    log.info(
-                        "[%s/%s] Progress %s %d/%d (%.2f%%) | resamples=%d dup_out=%d "
-                        "dup_sol=%d fails=%d stalls=%d | %s",
-                        source_label,
-                        plan_name,
-                        bar,
-                        global_generated,
-                        quota,
-                        pct,
-                        total_resamples,
-                        duplicate_records,
-                        duplicate_solutions,
-                        failed_solutions,
-                        stall_events,
-                        failure_totals,
-                    )
-                    log.info(
-                        "[%s/%s] Leaderboard (TF): %s",
-                        source_label,
-                        plan_name,
-                        _summarize_leaderboard(tf_usage_counts, top=5),
-                    )
-                    log.info(
-                        "[%s/%s] Leaderboard (TFBS): %s",
-                        source_label,
-                        plan_name,
-                        _summarize_leaderboard(usage_counts, top=5),
-                    )
-                    log.info(
-                        "[%s/%s] Failed TFBS: %s",
-                        source_label,
-                        plan_name,
-                        _summarize_failure_leaderboard(
-                            failure_counts,
-                            input_name=source_label,
-                            plan_name=plan_name,
-                            top=5,
-                        ),
-                    )
-                    log.info(
-                        "[%s/%s] Diversity: %s",
-                        source_label,
-                        plan_name,
-                        _summarize_diversity(
-                            usage_counts,
-                            tf_usage_counts,
-                            library_tfs=library_tfs,
-                            library_tfbs=library_tfbs,
-                        ),
-                    )
+                    latest_failure_totals = failure_totals
+                    if progress_style != "screen":
+                        log.info(
+                            "[%s/%s] Progress %s %d/%d (%.2f%%) | resamples=%d dup_out=%d "
+                            "dup_sol=%d fails=%d stalls=%d | %s",
+                            source_label,
+                            plan_name,
+                            bar,
+                            global_generated,
+                            quota,
+                            pct,
+                            total_resamples,
+                            duplicate_records,
+                            duplicate_solutions,
+                            failed_solutions,
+                            stall_events,
+                            failure_totals,
+                        )
+                        log.info(
+                            "[%s/%s] Leaderboard (TF): %s",
+                            source_label,
+                            plan_name,
+                            _summarize_leaderboard(tf_usage_counts, top=5),
+                        )
+                        log.info(
+                            "[%s/%s] Leaderboard (TFBS): %s",
+                            source_label,
+                            plan_name,
+                            _summarize_leaderboard(usage_counts, top=5),
+                        )
+                        log.info(
+                            "[%s/%s] Failed TFBS: %s",
+                            source_label,
+                            plan_name,
+                            _summarize_failure_leaderboard(
+                                failure_counts,
+                                input_name=source_label,
+                                plan_name=plan_name,
+                                top=5,
+                            ),
+                        )
+                        log.info(
+                            "[%s/%s] Diversity: %s",
+                            source_label,
+                            plan_name,
+                            _summarize_diversity(
+                                usage_counts,
+                                tf_usage_counts,
+                                library_tfs=library_tfs,
+                                library_tfbs=library_tfbs,
+                            ),
+                        )
                     log.info(
                         "[%s/%s] Example: %s",
                         source_label,
@@ -2332,14 +3277,21 @@ def _process_plan_for_source(
             if local_generated >= max_per_subsample or global_generated >= quota:
                 break
 
+            if produced_this_library == 0 and not stall_triggered and stall_seconds > 0:
+                now = time.monotonic()
+                if (now - last_progress) >= stall_seconds:
+                    _mark_stall(now)
+
             if produced_this_library == 0:
                 reason = "stall_no_solution" if stall_triggered else "no_solution"
                 _record_site_failures(reason)
+                attempt_index = _next_attempt_index()
                 _append_attempt(
-                    outputs_root,
+                    tables_root,
                     run_id=run_id,
                     input_name=source_label,
                     plan_name=plan_name,
+                    attempt_index=attempt_index,
                     status="failed",
                     reason=reason,
                     detail={"stall_seconds": stall_seconds} if stall_triggered else {},
@@ -2353,6 +3305,7 @@ def _process_plan_for_source(
                     solver_solve_time_s=None,
                     dense_arrays_version=dense_arrays_version,
                     dense_arrays_version_source=dense_arrays_version_source,
+                    solution_id=None,
                     library_tfbs=library_tfbs,
                     library_tfs=library_tfs,
                     library_site_ids=library_site_ids,
@@ -2363,53 +3316,88 @@ def _process_plan_for_source(
             if pool_strategy == "iterative_subsample" and iterative_min_new_solutions > 0:
                 if produced_this_library < iterative_min_new_solutions:
                     log.info(
-                        "[%s/%s] Library produced %d < iterative_min_new_solutions=%d; resampling.",
+                        "[%s/%s] Library produced %d < iterative_min_new_solutions=%d; Stage-B resampling.",
                         source_label,
                         plan_name,
                         produced_this_library,
                         iterative_min_new_solutions,
                     )
 
+            resample_reason = "resample"
+            if produced_this_library == 0:
+                resample_reason = "stall_no_solution" if stall_triggered else "no_solution"
+            elif pool_strategy == "iterative_subsample" and iterative_min_new_solutions > 0:
+                if produced_this_library < iterative_min_new_solutions:
+                    resample_reason = "min_new_solutions"
+
             # Resample
-            # Alignment (2): allow reactive resampling for subsample under schema>=2.2.
-            allow_resample = pool_strategy == "iterative_subsample" or (schema_is_22 and pool_strategy == "subsample")
-            if not allow_resample:
+            if not policy.allow_resample():
                 raise RuntimeError(
-                    f"[{source_label}/{plan_name}] pool_strategy={pool_strategy!r} does not allow resampling "
-                    f"under schema_version={global_cfg.schema_version}. "
-                    "Reduce quota or use iterative_subsample."
+                    f"[{source_label}/{plan_name}] pool_strategy={pool_strategy!r} does not allow Stage-B "
+                    "resampling. Reduce quota or use iterative_subsample."
                 )
             resamples_in_try += 1
             total_resamples += 1
-            if max_total_resamples > 0 and total_resamples > max_total_resamples:
+            if events_path is not None:
+                try:
+                    _emit_event(
+                        events_path,
+                        event="RESAMPLE_TRIGGERED",
+                        payload={
+                            "input_name": source_label,
+                            "plan_name": plan_name,
+                            "reason": resample_reason,
+                            "produced_this_library": int(produced_this_library),
+                            "library_index": int(sampling_library_index),
+                            "library_hash": str(sampling_library_hash),
+                        },
+                    )
+                except Exception:
+                    log.debug("Failed to emit RESAMPLE_TRIGGERED event.", exc_info=True)
+            if policy.max_total_resamples > 0 and total_resamples > policy.max_total_resamples:
                 raise RuntimeError(f"[{source_label}/{plan_name}] Exceeded max_total_resamples={max_total_resamples}.")
-            if resamples_in_try > max_resample_attempts:
+            if resamples_in_try > policy.max_resample_attempts:
                 log.info(
                     "[%s/%s] Reached max_resample_attempts (%d) for this subsample try "
                     "(produced %d/%d here). Moving on.",
                     source_label,
                     plan_name,
-                    max_resample_attempts,
+                    policy.max_resample_attempts,
                     local_generated,
                     max_per_subsample,
                 )
                 break
 
-            if iterative_max_libraries > 0 and libraries_built >= iterative_max_libraries:
+            if iterative_max_libraries > 0 and libraries_used >= iterative_max_libraries:
                 raise RuntimeError(
                     f"[{source_label}/{plan_name}] Exceeded iterative_max_libraries={iterative_max_libraries}."
                 )
 
             # New library
-            library_for_opt, tfbs_parts, regulator_labels, sampling_info = _build_library()
+            library_for_opt, tfbs_parts, regulator_labels, sampling_info = _build_next_library()
+            if library_source_label != "artifact":
+                libraries_built = int(sampling_info.get("library_index", libraries_built))
             site_id_by_index = sampling_info.get("site_id_by_index")
             source_by_index = sampling_info.get("source_by_index")
+            tfbs_id_by_index = sampling_info.get("tfbs_id_by_index")
+            motif_id_by_index = sampling_info.get("motif_id_by_index")
             sampling_library_index = sampling_info.get("library_index", sampling_library_index)
             sampling_library_hash = sampling_info.get("library_hash", sampling_library_hash)
             library_tfbs = list(library_for_opt)
             library_tfs = list(regulator_labels) if regulator_labels else []
             library_site_ids = list(site_id_by_index) if site_id_by_index else []
             library_sources = list(source_by_index) if source_by_index else []
+            library_tfbs_ids = list(tfbs_id_by_index) if tfbs_id_by_index else []
+            library_motif_ids = list(motif_id_by_index) if motif_id_by_index else []
+            _record_library_build(
+                sampling_info=sampling_info,
+                library_tfbs=library_tfbs,
+                library_tfs=library_tfs,
+                library_tfbs_ids=library_tfbs_ids,
+                library_motif_ids=library_motif_ids,
+                library_site_ids=library_site_ids,
+                library_sources=library_sources,
+            )
             # Alignment (7): sampling_fraction uses unique TFBS strings and is bounded.
             sampling_fraction = _compute_sampling_fraction(
                 library_for_opt,
@@ -2450,7 +3438,9 @@ def _process_plan_for_source(
             sink.flush()
 
         if one_subsample_only:
-            _flush_attempts(outputs_root, attempts_buffer)
+            _flush_attempts(tables_root, attempts_buffer)
+            if solution_rows is not None:
+                _flush_solutions(tables_root, solution_rows)
             if state_counts is not None:
                 state_counts[(source_label, plan_name)] = int(global_generated)
                 if write_state is not None:
@@ -2473,7 +3463,9 @@ def _process_plan_for_source(
                 "leaderboard_latest": snapshot,
             }
 
-    _flush_attempts(outputs_root, attempts_buffer)
+    _flush_attempts(tables_root, attempts_buffer)
+    if solution_rows is not None:
+        _flush_solutions(tables_root, solution_rows)
     log.info("Completed %s/%s: %d/%d", source_label, plan_name, global_generated, quota)
     if state_counts is not None:
         state_counts[(source_label, plan_name)] = int(global_generated)
@@ -2498,9 +3490,10 @@ def _process_plan_for_source(
     }
 
 
-def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> RunSummary:
+def run_pipeline(loaded: LoadedConfig, *, resume: bool, deps: PipelineDeps | None = None) -> RunSummary:
     deps = deps or default_deps()
     cfg = loaded.root.densegen
+    install_native_stderr_filters(suppress_solver_messages=bool(cfg.logging.suppress_solver_stderr))
     run_root = resolve_run_root(loaded.path, cfg.run.root)
     run_root_str = str(run_root)
     config_sha = hashlib.sha256(loaded.path.read_bytes()).hexdigest()
@@ -2509,15 +3502,39 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
     except ValueError:
         run_cfg_path = str(loaded.path)
 
+    outputs_root = run_outputs_root(run_root)
+    tables_root = run_tables_root(run_root)
+    existing_outputs = has_existing_run_outputs(run_root)
+    if resume:
+        if not existing_outputs:
+            raise RuntimeError(
+                f"resume=True requested but no outputs were found under {outputs_root}. "
+                "Start a fresh run or remove resume=True."
+            )
+    else:
+        if existing_outputs:
+            raise RuntimeError(
+                f"Existing outputs found under {outputs_root}. Explicit resume is required to continue this run."
+            )
+
     # Seed
     seed = int(cfg.runtime.random_seed)
-    random.seed(seed)
-    rng = random.Random(seed)
-    np_rng = np.random.default_rng(seed)
+    seeds = derive_seed_map(seed, ["stage_a", "stage_b", "solver"])
+    rng = random.Random(seeds["stage_b"])
+    np_rng_stage_a = np.random.default_rng(seeds["stage_a"])
+    np_rng_stage_b = np.random.default_rng(seeds["stage_b"])
 
     # Plan & solver
     pl = cfg.generation.resolve_plan()
-    chosen_solver = select_solver_strict(cfg.solver.backend, deps.optimizer, strategy=str(cfg.solver.strategy))
+    chosen_solver = select_solver(
+        cfg.solver.backend,
+        deps.optimizer,
+        strategy=str(cfg.solver.strategy),
+    )
+    solver_time_limit_seconds = (
+        float(cfg.solver.time_limit_seconds) if cfg.solver.time_limit_seconds is not None else None
+    )
+    solver_threads = int(cfg.solver.threads) if cfg.solver.threads is not None else None
     dense_arrays_version, dense_arrays_version_source = _resolve_dense_arrays_version(loaded.path)
 
     # Build sinks
@@ -2531,8 +3548,183 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
     plan_order: list[tuple[str, str]] = []
     plan_leaderboards: dict[tuple[str, str], dict] = {}
     inputs_manifest_entries: dict[str, dict] = {}
-    outputs_root = run_outputs_root(run_root)
+    source_cache: dict[str, PoolData] = {}
+    library_build_rows: list[dict] = []
+    library_member_rows: list[dict] = []
+    solution_rows: list[dict] = []
+    composition_rows: list[dict] = []
     outputs_root.mkdir(parents=True, exist_ok=True)
+    candidates_dir = candidates_root(outputs_root, cfg.run.id)
+    candidate_logging = _candidate_logging_enabled(cfg)
+    events_path = outputs_root / "meta" / "events.jsonl"
+    try:
+        _write_effective_config(
+            cfg=cfg, cfg_path=loaded.path, run_root=run_root, seeds=seeds, outputs_root=outputs_root
+        )
+    except Exception:
+        log.debug("Failed to write effective_config.json.", exc_info=True)
+    pool_dir = outputs_root / "pools"
+    pool_manifest = pool_dir / "pool_manifest.json"
+    pool_data: dict[str, PoolData] | None = None
+    if pool_manifest.exists():
+        try:
+            _pool_artifact, pool_data = load_pool_data(pool_dir)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to load existing Stage-A pool artifacts: {exc}") from exc
+        log.info(
+            "Using existing Stage-A pools from %s "
+            "(use dense stage-a build-pool --fresh or dense run --fresh to rebuild).",
+            pool_dir,
+        )
+
+    if resume and pool_data is None:
+        raise RuntimeError(
+            "resume=True requires existing Stage-A pools. Run dense stage-a build-pool first or rerun without resume."
+        )
+
+    build_pools = pool_data is None
+    if build_pools and candidate_logging:
+        try:
+            existed = prepare_candidates_dir(candidates_dir, overwrite=False)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to prepare candidate artifacts directory: {exc}") from exc
+        if existed:
+            log.info(
+                "Appending candidate artifacts under %s (use dense run --fresh to reset).",
+                candidates_dir,
+            )
+        else:
+            log.info("Candidate mining artifacts will be written to %s", candidates_dir)
+
+    if build_pools:
+        try:
+            _pool_artifact, pool_data = build_pool_artifact(
+                cfg=cfg,
+                cfg_path=loaded.path,
+                deps=deps,
+                rng=np_rng_stage_a,
+                outputs_root=outputs_root,
+                out_dir=pool_dir,
+                overwrite=False,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed to build Stage-A TFBS pools: {exc}") from exc
+        try:
+            _emit_event(
+                events_path,
+                event="POOL_BUILT",
+                payload={
+                    "inputs": [
+                        {
+                            "name": pool.name,
+                            "input_type": pool.input_type,
+                            "pool_mode": pool.pool_mode,
+                            "rows": int(pool.df.shape[0]) if pool.df is not None else int(len(pool.sequences)),
+                        }
+                        for pool in pool_data.values()
+                    ]
+                },
+            )
+        except Exception:
+            log.debug("Failed to emit POOL_BUILT event.", exc_info=True)
+    if pool_data is None:
+        raise RuntimeError("Stage-A pool loading failed unexpectedly; no pools are available.")
+    for name, pool in pool_data.items():
+        source_cache[name] = pool
+    if candidate_logging and build_pools:
+        candidate_files = find_candidate_files(candidates_dir)
+        if candidate_files:
+            try:
+                build_candidate_artifact(
+                    candidates_dir=candidates_dir,
+                    cfg_path=loaded.path,
+                    run_id=str(cfg.run.id),
+                    run_root=run_root,
+                    overwrite=True,
+                )
+            except Exception as exc:
+                raise RuntimeError(f"Failed to write candidate artifacts: {exc}") from exc
+        else:
+            log.warning(
+                "Candidate logging enabled but no candidate records were written under %s. "
+                "Check keep_all_candidates_debug and PWM inputs.",
+                candidates_dir,
+            )
+    library_records: dict[tuple[str, str], list[LibraryRecord]] | None = None
+    library_cursor: dict[tuple[str, str], int] | None = None
+    library_artifact: LibraryArtifact | None = None
+    sampling_cfg = cfg.generation.sampling
+    library_source = str(getattr(sampling_cfg, "library_source", "build")).lower()
+    if library_source == "artifact":
+        artifact_path = resolve_outputs_scoped_path(
+            loaded.path,
+            run_root,
+            sampling_cfg.library_artifact_path,
+            label="sampling.library_artifact_path",
+        )
+        if not artifact_path.exists():
+            raise RuntimeError(f"Library artifact directory not found: {artifact_path}")
+        library_artifact = load_library_artifact(artifact_path)
+        library_records = load_library_records(library_artifact)
+        library_cursor = {}
+        existing_library_by_plan = _load_existing_library_index_by_plan(tables_root)
+        for inp in cfg.inputs:
+            for plan_item in pl:
+                key = (inp.name, plan_item.name)
+                records = library_records.get(key)
+                if not records:
+                    raise RuntimeError(
+                        f"Library artifact missing libraries for {inp.name}/{plan_item.name}. "
+                        "Build libraries with `dense stage-b build-libraries` using this config."
+                    )
+                max_used = existing_library_by_plan.get(key, 0)
+                used_count = sum(1 for rec in records if int(rec.library_index) <= int(max_used))
+                if max_used and used_count == 0:
+                    raise RuntimeError(
+                        f"Library artifact indices do not cover previously used library_index={max_used} "
+                        f"for {inp.name}/{plan_item.name}."
+                    )
+                library_cursor[key] = used_count
+                for rec in records:
+                    if int(rec.library_index) <= 0:
+                        raise RuntimeError(
+                            f"Library artifact has non-positive library_index={rec.library_index} "
+                            f"for {inp.name}/{plan_item.name}."
+                        )
+                    if rec.library_sampling_strategy is None or rec.pool_strategy is None:
+                        raise RuntimeError(
+                            f"Library artifact missing Stage-B sampling metadata for {inp.name}/{plan_item.name} "
+                            f"(library_index={rec.library_index})."
+                        )
+                    required = list(dict.fromkeys(plan_item.required_regulators or []))
+                    if required:
+                        present = {tf for tf in rec.library_tfs if tf}
+                        k_required = plan_item.min_required_regulators
+                        if k_required is not None:
+                            if len(present.intersection(required)) < int(k_required):
+                                raise RuntimeError(
+                                    f"Library artifact for {inp.name}/{plan_item.name} "
+                                    f"(library_index={rec.library_index}) cannot satisfy "
+                                    f"min_required_regulators={k_required}."
+                                )
+                        else:
+                            missing = [tf for tf in required if tf not in present]
+                            if missing:
+                                raise RuntimeError(
+                                    f"Library artifact for {inp.name}/{plan_item.name} "
+                                    f"(library_index={rec.library_index}) is missing required regulators: "
+                                    f"{', '.join(missing)}"
+                                )
+                    for tf, min_count in (plan_item.min_count_by_regulator or {}).items():
+                        found = sum(1 for t in rec.library_tfs if t == tf)
+                        if found < int(min_count):
+                            raise RuntimeError(
+                                f"Library artifact for {inp.name}/{plan_item.name} "
+                                f"(library_index={rec.library_index}) has tf={tf} count={found} "
+                                f"< min_count_by_regulator={min_count}."
+                            )
+    elif library_source != "build":
+        raise RuntimeError(f"Unsupported Stage-B sampling.library_source: {library_source}")
     ensure_run_meta_dir(run_root)
     state_path = run_state_path(run_root)
     state_created_at = datetime.now(timezone.utc).isoformat()
@@ -2554,61 +3746,68 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
         if existing_state.created_at:
             state_created_at = existing_state.created_at
 
-    # Resume from existing outputs if present and aligned with config/run.
     existing_counts: dict[tuple[str, str], int] = {}
     existing_usage_by_plan: dict[tuple[str, str], dict[tuple[str, str], int]] = {}
-    site_failure_counts = _load_failure_counts_from_attempts(outputs_root)
-    if cfg.output.targets:
-        try:
-            df_existing, _ = load_records_from_config(
-                loaded.root,
-                loaded.path,
-                columns=[
-                    "densegen__run_config_sha256",
-                    "densegen__run_id",
-                    "densegen__input_name",
-                    "densegen__plan",
-                    "densegen__used_tfbs_detail",
-                ],
-            )
-        except Exception:
-            df_existing = None
-        if df_existing is not None and not df_existing.empty:
-            if "densegen__run_config_sha256" in df_existing.columns:
-                mismatched = df_existing["densegen__run_config_sha256"].dropna().unique().tolist()
-                if mismatched and any(val != config_sha for val in mismatched):
-                    raise RuntimeError(
-                        "Existing outputs were produced with a different config. "
-                        "Remove outputs/ or stage a new run root to start fresh."
-                    )
-            if "densegen__run_id" in df_existing.columns:
-                run_ids = df_existing["densegen__run_id"].dropna().unique().tolist()
-                if run_ids and any(val != cfg.run.id for val in run_ids):
-                    raise RuntimeError(
-                        "Existing outputs were produced with a different run_id. "
-                        "Remove outputs/ or stage a new run root to start fresh."
-                    )
-            if {"densegen__input_name", "densegen__plan"} <= set(df_existing.columns):
-                counts = df_existing.groupby(["densegen__input_name", "densegen__plan"]).size().astype(int).to_dict()
-                existing_counts = {(str(k[0]), str(k[1])): int(v) for k, v in counts.items()}
-            if "densegen__used_tfbs_detail" in df_existing.columns:
-                for _, row in df_existing.iterrows():
-                    input_name = str(row.get("densegen__input_name") or "")
-                    plan_name = str(row.get("densegen__plan") or "")
-                    if not input_name or not plan_name:
-                        continue
-                    key = (input_name, plan_name)
-                    counts = existing_usage_by_plan.setdefault(key, {})
-                    used = _parse_used_tfbs_detail(row.get("densegen__used_tfbs_detail"))
-                    _update_usage_counts(counts, used)
-            if existing_counts:
-                total = sum(existing_counts.values())
-                per_plan = dict(existing_counts)
-                log.info(
-                    "Resuming from existing outputs: %d sequences across %d plan(s).",
-                    total,
-                    len(existing_counts),
+    site_failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] = {}
+    attempt_counters: dict[tuple[str, str], int] = {}
+    if resume:
+        site_failure_counts = _load_failure_counts_from_attempts(tables_root)
+        attempt_counters = _load_existing_attempt_index_by_plan(tables_root)
+        if cfg.output.targets:
+            try:
+                df_existing, _ = load_records_from_config(
+                    loaded.root,
+                    loaded.path,
+                    columns=[
+                        "densegen__run_config_sha256",
+                        "densegen__run_id",
+                        "densegen__input_name",
+                        "densegen__plan",
+                        "densegen__used_tfbs_detail",
+                    ],
                 )
+            except Exception:
+                df_existing = None
+            if df_existing is not None and not df_existing.empty:
+                if "densegen__run_config_sha256" in df_existing.columns:
+                    mismatched = df_existing["densegen__run_config_sha256"].dropna().unique().tolist()
+                    if mismatched and any(val != config_sha for val in mismatched):
+                        raise RuntimeError(
+                            "Existing outputs were produced with a different config. "
+                            "Remove outputs/tables (and outputs/meta if present) "
+                            "or stage a new run root to start fresh."
+                        )
+                if "densegen__run_id" in df_existing.columns:
+                    run_ids = df_existing["densegen__run_id"].dropna().unique().tolist()
+                    if run_ids and any(val != cfg.run.id for val in run_ids):
+                        raise RuntimeError(
+                            "Existing outputs were produced with a different run_id. "
+                            "Remove outputs/tables (and outputs/meta if present) "
+                            "or stage a new run root to start fresh."
+                        )
+                if {"densegen__input_name", "densegen__plan"} <= set(df_existing.columns):
+                    counts = (
+                        df_existing.groupby(["densegen__input_name", "densegen__plan"]).size().astype(int).to_dict()
+                    )
+                    existing_counts = {(str(k[0]), str(k[1])): int(v) for k, v in counts.items()}
+                if "densegen__used_tfbs_detail" in df_existing.columns:
+                    for _, row in df_existing.iterrows():
+                        input_name = str(row.get("densegen__input_name") or "")
+                        plan_name = str(row.get("densegen__plan") or "")
+                        if not input_name or not plan_name:
+                            continue
+                        key = (input_name, plan_name)
+                        counts = existing_usage_by_plan.setdefault(key, {})
+                        used = _parse_used_tfbs_detail(row.get("densegen__used_tfbs_detail"))
+                        _update_usage_counts(counts, used)
+                if existing_counts:
+                    total = sum(existing_counts.values())
+                    per_plan = dict(existing_counts)
+                    log.info(
+                        "Resuming from existing outputs: %d sequences across %d plan(s).",
+                        total,
+                        len(existing_counts),
+                    )
 
     def _accumulate_stats(key: tuple[str, str], stats: dict) -> None:
         if key not in plan_stats:
@@ -2632,6 +3831,11 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
 
     # Round-robin scheduler
     round_robin = bool(cfg.runtime.round_robin)
+    if round_robin and str(cfg.generation.sampling.pool_strategy) == "iterative_subsample":
+        log.warning(
+            "round_robin=true with pool_strategy=iterative_subsample will rebuild libraries more frequently; "
+            "expect higher runtime for multi-plan runs."
+        )
     inputs = cfg.inputs
     checkpoint_every = int(cfg.runtime.checkpoint_every)
     state_counts: dict[tuple[str, str], int] = {}
@@ -2691,7 +3895,7 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                     chosen_solver=chosen_solver,
                     deps=deps,
                     rng=rng,
-                    np_rng=np_rng,
+                    np_rng=np_rng_stage_b,
                     cfg_path=loaded.path,
                     run_id=cfg.run.id,
                     run_root=run_root_str,
@@ -2710,6 +3914,16 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                     checkpoint_every=checkpoint_every,
                     write_state=_write_state,
                     site_failure_counts=site_failure_counts,
+                    source_cache=source_cache,
+                    attempt_counters=attempt_counters,
+                    library_records=library_records,
+                    library_cursor=library_cursor,
+                    library_source=library_source,
+                    library_build_rows=library_build_rows,
+                    library_member_rows=library_member_rows,
+                    solution_rows=solution_rows,
+                    composition_rows=composition_rows,
+                    events_path=events_path,
                 )
                 per_plan[(s.name, item.name)] = per_plan.get((s.name, item.name), 0) + produced
                 total += produced
@@ -2738,7 +3952,7 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                         chosen_solver=chosen_solver,
                         deps=deps,
                         rng=rng,
-                        np_rng=np_rng,
+                        np_rng=np_rng_stage_b,
                         cfg_path=loaded.path,
                         run_id=cfg.run.id,
                         run_root=run_root_str,
@@ -2757,6 +3971,16 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
                         checkpoint_every=checkpoint_every,
                         write_state=_write_state,
                         site_failure_counts=site_failure_counts,
+                        source_cache=source_cache,
+                        attempt_counters=attempt_counters,
+                        library_records=library_records,
+                        library_cursor=library_cursor,
+                        library_source=library_source,
+                        library_build_rows=library_build_rows,
+                        library_member_rows=library_member_rows,
+                        solution_rows=solution_rows,
+                        composition_rows=composition_rows,
+                        events_path=events_path,
                     )
                     produced_counts[key] = current + produced
                     leaderboard_latest = stats.get("leaderboard_latest")
@@ -2770,7 +3994,97 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
         sink.finalize()
 
     outputs_root = run_outputs_root(run_root)
-    _consolidate_parts(outputs_root, part_glob="attempts_part-*.parquet", final_name="attempts.parquet")
+    tables_root = run_tables_root(run_root)
+    _consolidate_parts(tables_root, part_glob="attempts_part-*.parquet", final_name="attempts.parquet")
+    _consolidate_parts(tables_root, part_glob="solutions_part-*.parquet", final_name="solutions.parquet")
+
+    libraries_dir = outputs_root / "libraries"
+    if library_source == "artifact":
+        if library_artifact is None:
+            raise RuntimeError("Stage-B sampling.library_source=artifact but no library artifact was loaded.")
+        try:
+            build_rows = pd.read_parquet(library_artifact.builds_path).to_dict("records")
+            member_rows = pd.read_parquet(library_artifact.members_path).to_dict("records")
+            write_library_artifact(
+                out_dir=libraries_dir,
+                builds=build_rows,
+                members=member_rows,
+                cfg_path=loaded.path,
+                run_id=str(cfg.run.id),
+                run_root=run_root,
+                overwrite=True,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed to write library artifacts: {exc}") from exc
+    elif library_build_rows:
+        existing_builds: list[dict] = []
+        existing_members: list[dict] = []
+        builds_path = libraries_dir / "library_builds.parquet"
+        members_path = libraries_dir / "library_members.parquet"
+        if builds_path.exists():
+            try:
+                existing_builds = pd.read_parquet(builds_path).to_dict("records")
+            except Exception:
+                log.warning("Failed to read existing library_builds.parquet; overwriting.", exc_info=True)
+                existing_builds = []
+        if members_path.exists():
+            try:
+                existing_members = pd.read_parquet(members_path).to_dict("records")
+            except Exception:
+                log.warning("Failed to read existing library_members.parquet; overwriting.", exc_info=True)
+                existing_members = []
+
+        existing_indices = {
+            int(row.get("library_index") or 0) for row in existing_builds if row.get("library_index") is not None
+        }
+        new_builds = [row for row in library_build_rows if int(row.get("library_index") or 0) not in existing_indices]
+        build_rows = existing_builds + new_builds
+
+        existing_member_keys = {
+            (
+                int(row.get("library_index") or 0),
+                int(row.get("position") or 0),
+            )
+            for row in existing_members
+        }
+        new_members = [
+            row
+            for row in library_member_rows
+            if (int(row.get("library_index") or 0), int(row.get("position") or 0)) not in existing_member_keys
+        ]
+        member_rows = existing_members + new_members
+
+        try:
+            write_library_artifact(
+                out_dir=libraries_dir,
+                builds=build_rows,
+                members=member_rows,
+                cfg_path=loaded.path,
+                run_id=str(cfg.run.id),
+                run_root=run_root,
+                overwrite=True,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed to write library artifacts: {exc}") from exc
+
+    if composition_rows:
+        composition_path = tables_root / "composition.parquet"
+        existing_rows: list[dict] = []
+        if composition_path.exists():
+            try:
+                existing_rows = pd.read_parquet(composition_path).to_dict("records")
+            except Exception:
+                log.warning("Failed to read existing composition.parquet; overwriting.", exc_info=True)
+                existing_rows = []
+        existing_keys = {
+            (str(row.get("solution_id") or ""), int(row.get("placement_index") or 0)) for row in existing_rows
+        }
+        new_rows = [
+            row
+            for row in composition_rows
+            if (str(row.get("solution_id") or ""), int(row.get("placement_index") or 0)) not in existing_keys
+        ]
+        pd.DataFrame(existing_rows + new_rows).to_parquet(composition_path, index=False)
 
     manifest_items = [
         PlanManifest(
@@ -2797,9 +4111,14 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
         schema_version=str(cfg.schema_version),
         config_sha256=config_sha,
         run_root=run_root_str,
+        random_seed=seed,
+        seed_stage_a=seeds.get("stage_a"),
+        seed_stage_b=seeds.get("stage_b"),
+        seed_solver=seeds.get("solver"),
         solver_backend=chosen_solver,
         solver_strategy=str(cfg.solver.strategy),
-        solver_options=list(cfg.solver.options),
+        solver_time_limit_seconds=solver_time_limit_seconds,
+        solver_threads=solver_threads,
         solver_strands=str(cfg.solver.strands),
         dense_arrays_version=dense_arrays_version,
         dense_arrays_version_source=dense_arrays_version_source,
@@ -2810,7 +4129,7 @@ def run_pipeline(loaded: LoadedConfig, *, deps: PipelineDeps | None = None) -> R
 
     if inputs_manifest_entries:
         payload = {
-            "schema_version": "1.0",
+            "schema_version": str(cfg.schema_version),
             "run_id": cfg.run.id,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "config_sha256": config_sha,

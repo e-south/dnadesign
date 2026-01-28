@@ -201,6 +201,8 @@ src/dnadesign/densegen/workspaces/**
 !src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/
 !src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/*.txt
 !src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/*.meme
+!src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/motif_artifacts/
+!src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/motif_artifacts/*.json
 
 # Legacy DenseGen runs (ignored to avoid local artifact noise)
 src/dnadesign/densegen/runs/**

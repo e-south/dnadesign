@@ -1,32 +1,30 @@
 # DenseGen demo: two TF motifs (LexA + CpxR) with bounded PWM sampling.
-# Source: Cruncher basic demo MEME files (lexA + cpxR) copied into this demo for
-# reproducibility. Parsing uses Cruncher’s MEME parser (DRY).
-# Motif widths: lexA=22, cpxR=21.
-
 densegen:
-  schema_version: "2.3"
+  schema_version: "2.5"
   run:
     id: demo_meme_two_tf
     root: "."
 
   inputs:
-    # LexA + CpxR MEME motifs from Cruncher demo basics, merged into one TF pool.
-    # Motif ids expected in these files: lexA, cpxR.
-    - name: lexA_cpxR_meme
-      type: pwm_meme_set
+    # LexA + CpxR DenseGen artifacts exported from the Cruncher demo.
+    - name: lexA_cpxR_artifacts
+      type: pwm_artifact_set
       paths:
-        - inputs/lexA.txt
-        - inputs/cpxR.txt
-      motif_ids: [lexA, cpxR]
+        - inputs/motif_artifacts/lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json
+        - inputs/motif_artifacts/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json
       sampling:
         strategy: stochastic
-        n_sites: 80
-        oversample_factor: 12
-        max_candidates: 50000  # bounded candidate generation
-        score_threshold: null
-        score_percentile: 80
+        n_sites: 200
+        oversample_factor: 200
+        scoring_backend: fimo
+        pvalue_strata: [1e-8, 1e-6, 1e-4]
+        retain_depth: 1
+        mining:
+          batch_size: 5000
+          max_seconds: 60
+          log_every_batches: 1
         length_policy: range
-        length_range: [22, 28]
+        length_range: [15, 20]
 
   output:
     targets: [parquet]
@@ -34,16 +32,16 @@ densegen:
       bio_type: dna
       alphabet: dna_4
     parquet:
-      path: outputs/dense_arrays.parquet
+      path: outputs/tables/dense_arrays.parquet
       deduplicate: true
       chunk_size: 64
 
   generation:
     sequence_length: 60
-    quota: 6
+    quota: 12
     sampling:
       pool_strategy: subsample
-      library_size: 24
+      library_size: 20
       subsample_over_length_budget_by: 80
       library_sampling_strategy: coverage_weighted
       coverage_boost_alpha: 0.15
@@ -58,13 +56,21 @@ densegen:
 
     plan:
       - name: meme_demo
-        quota: 6
+        quota: 12
+        fixed_elements:
+          promoter_constraints:
+            - name: sigma70_consensus
+              upstream: TTGACA
+              downstream: TATAAT
+              spacer_length: [15, 19]
+              upstream_pos: [0, 60]
         required_regulators: [lexA, cpxR]
+        min_required_regulators: 1
 
   solver:
     backend: CBC
     strategy: iterate
-    options: []
+    time_limit_seconds: 5
 
   runtime:
     round_robin: true
@@ -75,25 +81,37 @@ densegen:
     stall_warning_every_seconds: 10
     max_resample_attempts: 2
     max_total_resamples: 50
-    max_seconds_per_plan: 0
+    max_seconds_per_plan: 60
     max_failed_solutions: 0
     random_seed: 42
 
   postprocess:
-    gap_fill:
+    pad:
       mode: adaptive
       end: 5prime
-      gc_min: 0.40
-      gc_max: 0.60
+      gc:
+        mode: range
+        min: 0.40
+        max: 0.60
+        target: 0.50
+        tolerance: 0.10
+        min_pad_length: 0
       max_tries: 2000
 
   logging:
     log_dir: outputs/logs
     level: INFO
     suppress_solver_stderr: true
-    print_visual: false
+    print_visual: true
+    progress_style: screen
+    progress_every: 1
+    progress_refresh_seconds: 1.0
 
 plots:
   source: parquet
-  out_dir: outputs
+  out_dir: outputs/plots
   format: png
+  default: [tf_usage, tf_coverage]
+  options:
+    tf_coverage:
+      include_promoter_sites: true

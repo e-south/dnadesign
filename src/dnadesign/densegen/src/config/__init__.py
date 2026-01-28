@@ -40,24 +40,8 @@ def _construct_mapping(loader, node, deep: bool = False):
 _StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
 
 
-LATEST_SCHEMA_VERSION = "2.3"
-SUPPORTED_SCHEMA_VERSIONS = {"2.1", "2.2", LATEST_SCHEMA_VERSION}
-
-
-def parse_schema_version(value: str) -> tuple[int, int]:
-    parts = str(value).strip().split(".")
-    if len(parts) != 2:
-        raise ValueError(f"Invalid schema_version format: {value!r}")
-    try:
-        major = int(parts[0])
-        minor = int(parts[1])
-    except Exception as exc:
-        raise ValueError(f"Invalid schema_version format: {value!r}") from exc
-    return major, minor
-
-
-def schema_version_at_least(value: str, *, major: int, minor: int) -> bool:
-    return parse_schema_version(value) >= (major, minor)
+LATEST_SCHEMA_VERSION = "2.5"
+SUPPORTED_SCHEMA_VERSIONS = {LATEST_SCHEMA_VERSION}
 
 
 class ConfigError(ValueError):
@@ -105,6 +89,14 @@ def resolve_run_scoped_path(cfg_path: Path, run_root: Path, value: str | os.Path
     return resolved
 
 
+def resolve_outputs_scoped_path(cfg_path: Path, run_root: Path, value: str | os.PathLike, *, label: str) -> Path:
+    resolved = resolve_run_scoped_path(cfg_path, run_root, value, label=label)
+    outputs_root = run_root / "outputs"
+    if not _is_relative_to(resolved, outputs_root):
+        raise ConfigError(f"{label} must be within outputs/ under densegen.run.root ({outputs_root}), got: {resolved}")
+    return resolved
+
+
 class RunConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: str
@@ -113,9 +105,14 @@ class RunConfig(BaseModel):
     @field_validator("id")
     @classmethod
     def _id_nonempty(cls, v: str):
-        if not v or not str(v).strip():
+        value = str(v).strip()
+        if not value:
             raise ValueError("run.id must be a non-empty string")
-        return str(v).strip()
+        if "/" in value or "\\" in value:
+            raise ValueError("run.id must not contain path separators")
+        if value in {".", ".."}:
+            raise ValueError("run.id must not be '.' or '..'")
+        return value
 
     @field_validator("root")
     @classmethod
@@ -152,6 +149,52 @@ class SequenceLibraryInput(BaseModel):
     sequence_column: str = "sequence"
 
 
+class PWMMiningConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    batch_size: int = 100000
+    max_batches: Optional[int] = None
+    max_candidates: Optional[int] = None
+    max_seconds: Optional[float] = 60.0
+    log_every_batches: int = 1
+
+    @field_validator("batch_size")
+    @classmethod
+    def _batch_size_ok(cls, v: int):
+        if v <= 0:
+            raise ValueError("pwm.sampling.mining.batch_size must be > 0")
+        return v
+
+    @field_validator("max_batches")
+    @classmethod
+    def _max_batches_ok(cls, v: Optional[int]):
+        if v is not None and v <= 0:
+            raise ValueError("pwm.sampling.mining.max_batches must be > 0 when set")
+        return v
+
+    @field_validator("max_candidates")
+    @classmethod
+    def _max_candidates_ok(cls, v: Optional[int]):
+        if v is not None and v <= 0:
+            raise ValueError("pwm.sampling.mining.max_candidates must be > 0 when set")
+        return v
+
+    @field_validator("max_seconds")
+    @classmethod
+    def _max_seconds_ok(cls, v: Optional[float]):
+        if v is None:
+            return v
+        if not isinstance(v, (int, float)) or float(v) <= 0:
+            raise ValueError("pwm.sampling.mining.max_seconds must be > 0 when set")
+        return float(v)
+
+    @field_validator("log_every_batches")
+    @classmethod
+    def _log_every_batches_ok(cls, v: int):
+        if v <= 0:
+            raise ValueError("pwm.sampling.mining.log_every_batches must be > 0")
+        return v
+
+
 class PWMSamplingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     strategy: Literal["consensus", "stochastic", "background"] = "stochastic"
@@ -161,6 +204,13 @@ class PWMSamplingConfig(BaseModel):
     max_seconds: Optional[float] = None
     score_threshold: Optional[float] = None
     score_percentile: Optional[float] = None
+    scoring_backend: Literal["densegen", "fimo"] = "densegen"
+    pvalue_strata: Optional[List[float]] = None
+    retain_depth: Optional[int] = None
+    mining: Optional[PWMMiningConfig] = None
+    bgfile: Optional[str] = None
+    keep_all_candidates_debug: bool = False
+    include_matched_sequence: bool = False
     length_policy: Literal["exact", "range"] = "exact"
     length_range: Optional[tuple[int, int]] = None
     trim_window_length: Optional[int] = None
@@ -219,15 +269,81 @@ class PWMSamplingConfig(BaseModel):
             raise ValueError("pwm.sampling.trim_window_length must be a positive integer")
         return v
 
+    @field_validator("bgfile")
+    @classmethod
+    def _bgfile_ok(cls, v: Optional[str]):
+        if v is None:
+            return v
+        if not str(v).strip():
+            raise ValueError("pwm.sampling.bgfile must be a non-empty string when set")
+        return str(v).strip()
+
+    @field_validator("pvalue_strata")
+    @classmethod
+    def _pvalue_strata_ok(cls, v: Optional[List[float]]):
+        if v is None:
+            return v
+        if not v:
+            raise ValueError("pwm.sampling.pvalue_strata must be non-empty when set")
+        bins = [float(x) for x in v]
+        prev = 0.0
+        for val in bins:
+            if not (0.0 < val <= 1.0):
+                raise ValueError("pwm.sampling.pvalue_strata values must be in (0, 1]")
+            if val <= prev:
+                raise ValueError("pwm.sampling.pvalue_strata must be strictly increasing")
+            prev = val
+        return bins
+
     @model_validator(mode="after")
     def _score_mode(self):
         has_thresh = self.score_threshold is not None
         has_pct = self.score_percentile is not None
-        if has_thresh == has_pct:
-            raise ValueError("pwm.sampling must set exactly one of score_threshold or score_percentile")
+        if self.scoring_backend == "densegen":
+            if has_thresh == has_pct:
+                raise ValueError("pwm.sampling must set exactly one of score_threshold or score_percentile")
+            if self.pvalue_strata is not None:
+                raise ValueError("pwm.sampling.pvalue_strata is only valid when scoring_backend='fimo'")
+            if self.retain_depth is not None:
+                raise ValueError("pwm.sampling.retain_depth is only valid when scoring_backend='fimo'")
+            if self.mining is not None:
+                raise ValueError("pwm.sampling.mining is only valid when scoring_backend='fimo'")
+            if self.include_matched_sequence:
+                raise ValueError("pwm.sampling.include_matched_sequence is only valid when scoring_backend='fimo'")
+        else:
+            if self.pvalue_strata is None:
+                raise ValueError("pwm.sampling.pvalue_strata is required when scoring_backend='fimo'")
+            if self.retain_depth is None:
+                raise ValueError("pwm.sampling.retain_depth is required when scoring_backend='fimo'")
+            if "max_candidates" in self.model_fields_set and self.max_candidates is not None:
+                raise ValueError(
+                    "pwm.sampling.max_candidates is not used with scoring_backend='fimo'. "
+                    "Use pwm.sampling.mining.max_candidates instead."
+                )
+            if "max_seconds" in self.model_fields_set and self.max_seconds is not None:
+                raise ValueError(
+                    "pwm.sampling.max_seconds is not used with scoring_backend='fimo'. "
+                    "Use pwm.sampling.mining.max_seconds instead."
+                )
+            if "max_candidates" not in self.model_fields_set:
+                self.max_candidates = None
+            if "max_seconds" not in self.model_fields_set:
+                self.max_seconds = None
+            if self.mining is None:
+                self.mining = PWMMiningConfig()
+            if self.mining is not None and self.mining.max_candidates is not None:
+                if int(self.mining.max_candidates) < int(self.n_sites):
+                    raise ValueError("pwm.sampling.mining.max_candidates must be >= n_sites")
+            depth = int(self.retain_depth)
+            if depth <= 0:
+                raise ValueError("pwm.sampling.retain_depth must be >= 1")
+            if self.pvalue_strata is None:
+                raise ValueError("pwm.sampling.pvalue_strata is required when scoring_backend='fimo'")
+            if depth > len(self.pvalue_strata):
+                raise ValueError("pwm.sampling.retain_depth cannot exceed the number of pvalue_strata bins")
         if self.strategy == "consensus" and int(self.n_sites) != 1:
             raise ValueError("pwm.sampling.strategy=consensus requires n_sites=1")
-        if self.score_percentile is not None:
+        if self.scoring_backend == "densegen" and self.score_percentile is not None:
             if not (0.0 < float(self.score_percentile) < 100.0):
                 raise ValueError("pwm.sampling.score_percentile must be between 0 and 100")
         if self.length_policy == "exact" and self.length_range is not None:
@@ -561,6 +677,8 @@ class PlanItem(BaseModel):
 class SamplingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     pool_strategy: Literal["full", "subsample", "iterative_subsample"] = "subsample"
+    library_source: Literal["build", "artifact"] = "build"
+    library_artifact_path: Optional[str] = None
     library_size: int = 16
     subsample_over_length_budget_by: int = 30
     library_sampling_strategy: Literal[
@@ -622,6 +740,16 @@ class SamplingConfig(BaseModel):
     def _pool_strategy_rules(self):
         if self.pool_strategy == "iterative_subsample" and self.iterative_max_libraries <= 0:
             raise ValueError("iterative_max_libraries must be > 0 when pool_strategy=iterative_subsample")
+        return self
+
+    @model_validator(mode="after")
+    def _library_source_rules(self):
+        if self.library_source == "artifact":
+            if self.library_artifact_path is None or not str(self.library_artifact_path).strip():
+                raise ValueError("sampling.library_artifact_path is required when sampling.library_source=artifact")
+        else:
+            if self.library_artifact_path is not None:
+                raise ValueError("sampling.library_artifact_path is only valid when sampling.library_source=artifact")
         return self
 
 
@@ -774,8 +902,9 @@ class SolverConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     backend: Optional[str] = None
     strategy: Literal["iterate", "diverse", "optimal", "approximate"]
-    options: List[str] = Field(default_factory=list)
     strands: Literal["single", "double"] = "double"
+    time_limit_seconds: float | None = None
+    threads: int | None = None
 
     @field_validator("backend")
     @classmethod
@@ -786,12 +915,36 @@ class SolverConfig(BaseModel):
             raise ValueError("solver.backend must be a non-empty string")
         return v
 
+    @field_validator("time_limit_seconds")
+    @classmethod
+    def _time_limit_ok(cls, v: float | None):
+        if v is None:
+            return v
+        value = float(v)
+        if value <= 0:
+            raise ValueError("solver.time_limit_seconds must be > 0")
+        return value
+
+    @field_validator("threads")
+    @classmethod
+    def _threads_ok(cls, v: int | None):
+        if v is None:
+            return v
+        value = int(v)
+        if value <= 0:
+            raise ValueError("solver.threads must be > 0")
+        return value
+
     @model_validator(mode="after")
     def _strategy_backend_consistency(self):
         if self.strategy != "approximate" and not self.backend:
             raise ValueError("solver.backend is required unless strategy=approximate")
-        if self.strategy == "approximate" and self.options:
-            raise ValueError("solver.options must be empty when strategy=approximate")
+        if self.strategy == "approximate" and (self.time_limit_seconds is not None or self.threads is not None):
+            raise ValueError("solver.time_limit_seconds/threads are invalid when strategy=approximate")
+        if self.threads is not None and self.backend:
+            backend = str(self.backend).strip().upper()
+            if backend == "CBC":
+                raise ValueError("solver.threads is not supported for CBC backends.")
         return self
 
 
@@ -840,31 +993,77 @@ class RuntimeConfig(BaseModel):
 
 
 # ---- Postprocess ----
-class GapFillConfig(BaseModel):
+class PadGcConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    mode: Literal["off", "strict", "adaptive"] = "adaptive"
-    end: Literal["5prime", "3prime"] = "5prime"
-    gc_min: float = 0.40
-    gc_max: float = 0.60
-    max_tries: int = 2000
+    mode: Literal["off", "range", "target"] = "range"
+    min: float = 0.40
+    max: float = 0.60
+    target: float = 0.50
+    tolerance: float = 0.10
+    min_pad_length: int = 0
 
-    @field_validator("gc_min", "gc_max")
+    @field_validator("min", "max", "target", "tolerance")
     @classmethod
-    def _gc_ok(cls, v: float):
-        if not (0.0 <= v <= 1.0):
-            raise ValueError("GC fraction must be between 0 and 1")
+    def _gc_ok(cls, v: float, info):
+        if not (0.0 <= float(v) <= 1.0):
+            raise ValueError(f"{info.field_name} must be between 0 and 1")
+        return float(v)
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def _coerce_mode(cls, v):
+        if isinstance(v, bool):
+            if v is False:
+                return "off"
+            raise ValueError("pad.gc.mode must be one of: off, range, target")
         return v
+
+    @field_validator("min_pad_length")
+    @classmethod
+    def _min_pad_length_ok(cls, v: int):
+        if int(v) < 0:
+            raise ValueError("min_pad_length must be >= 0")
+        return int(v)
 
     @model_validator(mode="after")
     def _gc_bounds(self):
-        if self.gc_min > self.gc_max:
-            raise ValueError("gc_min must be <= gc_max")
+        if self.min > self.max:
+            raise ValueError("gc.min must be <= gc.max")
+        if self.mode == "target":
+            target_min = self.target - self.tolerance
+            target_max = self.target + self.tolerance
+            if target_min < 0.0 or target_max > 1.0:
+                raise ValueError("gc.target +/- gc.tolerance must stay within [0, 1]")
         return self
+
+
+class PadConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mode: Literal["off", "strict", "adaptive"] = "adaptive"
+    end: Literal["5prime", "3prime"] = "5prime"
+    gc: PadGcConfig = Field(default_factory=PadGcConfig)
+    max_tries: int = 2000
+
+    @field_validator("max_tries")
+    @classmethod
+    def _max_tries_ok(cls, v: int):
+        if int(v) <= 0:
+            raise ValueError("max_tries must be > 0")
+        return int(v)
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def _coerce_mode(cls, v):
+        if isinstance(v, bool):
+            if v is False:
+                return "off"
+            raise ValueError("pad.mode must be one of: off, strict, adaptive")
+        return v
 
 
 class PostprocessConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    gap_fill: GapFillConfig = Field(default_factory=GapFillConfig)
+    pad: PadConfig = Field(default_factory=PadConfig)
 
 
 # ---- Logging ----
@@ -874,6 +1073,9 @@ class LoggingConfig(BaseModel):
     level: str = "INFO"
     suppress_solver_stderr: bool = True
     print_visual: bool = True
+    progress_style: Literal["stream", "summary", "screen"] = "stream"
+    progress_every: int = 1
+    progress_refresh_seconds: float = 1.0
 
     @field_validator("log_dir")
     @classmethod
@@ -891,11 +1093,25 @@ class LoggingConfig(BaseModel):
             raise ValueError(f"logging.level must be one of {sorted(allowed)}")
         return lv
 
+    @field_validator("progress_every")
+    @classmethod
+    def _progress_every_ok(cls, v: int):
+        if v < 0:
+            raise ValueError("logging.progress_every must be >= 0")
+        return int(v)
+
+    @field_validator("progress_refresh_seconds")
+    @classmethod
+    def _progress_refresh_ok(cls, v: float):
+        if not isinstance(v, (int, float)) or float(v) <= 0:
+            raise ValueError("logging.progress_refresh_seconds must be > 0")
+        return float(v)
+
 
 # ---- Plots ----
 class PlotConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    out_dir: str = "outputs"
+    out_dir: str = "outputs/plots"
     format: Literal["png", "pdf", "svg"] = "png"
     source: Optional[Literal["usr", "parquet"]] = None
     default: List[str] = Field(default_factory=list)
@@ -971,14 +1187,14 @@ def _validate_run_scoped_paths(cfg_path: Path, root_cfg: RootConfig) -> None:
 
     out_cfg = root_cfg.densegen.output
     if out_cfg.parquet is not None:
-        resolve_run_scoped_path(
+        resolve_outputs_scoped_path(
             cfg_path,
             run_root,
             out_cfg.parquet.path,
             label="output.parquet.path",
         )
     if out_cfg.usr is not None:
-        resolve_run_scoped_path(
+        resolve_outputs_scoped_path(
             cfg_path,
             run_root,
             out_cfg.usr.root,
@@ -986,10 +1202,21 @@ def _validate_run_scoped_paths(cfg_path: Path, root_cfg: RootConfig) -> None:
         )
 
     log_dir = root_cfg.densegen.logging.log_dir
-    resolve_run_scoped_path(cfg_path, run_root, log_dir, label="logging.log_dir")
+    resolve_outputs_scoped_path(cfg_path, run_root, log_dir, label="logging.log_dir")
+
+    sampling_cfg = root_cfg.densegen.generation.sampling
+    if getattr(sampling_cfg, "library_source", None) == "artifact" and getattr(
+        sampling_cfg, "library_artifact_path", None
+    ):
+        resolve_outputs_scoped_path(
+            cfg_path,
+            run_root,
+            sampling_cfg.library_artifact_path,
+            label="sampling.library_artifact_path",
+        )
 
     if root_cfg.plots is not None:
-        resolve_run_scoped_path(
+        resolve_outputs_scoped_path(
             cfg_path,
             run_root,
             root_cfg.plots.out_dir,
@@ -997,9 +1224,25 @@ def _validate_run_scoped_paths(cfg_path: Path, root_cfg: RootConfig) -> None:
         )
 
 
+def _reject_removed_solver_options(raw: object) -> None:
+    if not isinstance(raw, dict):
+        return
+    densegen = raw.get("densegen")
+    if not isinstance(densegen, dict):
+        return
+    solver = densegen.get("solver")
+    if not isinstance(solver, dict):
+        return
+    if "options" in solver:
+        raise ConfigError("solver.options has been removed. Use solver.time_limit_seconds or solver.threads instead.")
+    if "allow_unknown_options" in solver:
+        raise ConfigError("solver.allow_unknown_options has been removed.")
+
+
 def load_config(path: Path | str) -> LoadedConfig:
     cfg_path = Path(path).resolve()
     raw = yaml.load(cfg_path.read_text(), Loader=_StrictLoader)
+    _reject_removed_solver_options(raw)
     try:
         root = RootConfig.model_validate(raw)
     except ValidationError as e:

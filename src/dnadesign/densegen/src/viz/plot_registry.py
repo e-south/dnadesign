@@ -21,9 +21,9 @@ PLOT_SPECS = {
         "fn": "plot_tf_usage",
         "description": "TF usage summary (stacked by length/TFBS or totals).",
     },
-    "gap_fill_gc": {
-        "fn": "plot_gap_fill_gc",
-        "description": "GC content target vs actual for gap-fill pads.",
+    "pad_gc": {
+        "fn": "plot_pad_gc",
+        "description": "GC content target vs actual for pad bases.",
     },
     "plan_counts": {
         "fn": "plot_plan_counts",
@@ -52,5 +52,15 @@ PLOT_SPECS = {
     "tfbs_usage": {
         "fn": "plot_tfbs_usage",
         "description": "TFBS usage by TF, ranked by occurrences.",
+    },
+    "stage_a_pvalue_strat_hist": {
+        "fn": "plot_stage_a_pvalue_strat_hist",
+        "description": "Stage-A FIMO p-value stratification histogram (accepted pool).",
+        "requires": ["pools"],
+    },
+    "stage_a_length_hist": {
+        "fn": "plot_stage_a_length_hist",
+        "description": "Stage-A TFBS length histogram (accepted pool).",
+        "requires": ["pools"],
     },
 }
