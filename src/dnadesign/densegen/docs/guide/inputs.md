@@ -44,7 +44,7 @@ Optional (supported):
 - `keep_all_candidates_debug` (bool): write candidate‑level Parquet under `outputs/pools/candidates/`
   (files named `candidates__<label>.parquet`) and aggregate to
   `outputs/pools/candidates/candidates.parquet` + `outputs/pools/candidates/candidates_summary.parquet`
-- `include_matched_sequence`
+- `include_matched_sequence` (default true)
 - `length`:
   - `policy`: `exact | range` (default `exact`)
   - `range`: `[min, max]` (required when `policy: range`)

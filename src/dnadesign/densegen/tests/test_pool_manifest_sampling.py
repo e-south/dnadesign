@@ -176,5 +176,5 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert hist[0]["generated"] == 10
     assert hist[0]["candidates_with_hit"] == 9
     assert hist[0]["eligible"] == 3
-    assert hist[0]["unique_eligible"] == 2
+    assert hist[0]["eligible_unique"] == 2
     assert hist[0]["retained"] == 1

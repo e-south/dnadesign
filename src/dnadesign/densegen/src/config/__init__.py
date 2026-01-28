@@ -12,7 +12,6 @@ Dunlop Lab
 
 from __future__ import annotations
 
-import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,8 +20,6 @@ from typing import Annotated, Any, Dict, List, Optional, Union
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from typing_extensions import Literal
-
-log = logging.getLogger(__name__)
 
 
 # ---- Strict YAML loader (duplicate keys fail) ----
@@ -325,7 +322,7 @@ class PWMSamplingConfig(BaseModel):
     mining: PWMMiningConfig
     bgfile: Optional[str] = None
     keep_all_candidates_debug: bool = False
-    include_matched_sequence: bool = False
+    include_matched_sequence: bool = True
     length: PWMLengthConfig = Field(default_factory=PWMLengthConfig)
     trimming: PWMTrimmingConfig = Field(default_factory=PWMTrimmingConfig)
     uniqueness: PWMUniquenessConfig = Field(default_factory=PWMUniquenessConfig)
@@ -355,6 +352,8 @@ class PWMSamplingConfig(BaseModel):
             raise ValueError("pwm.sampling.length.range is not allowed when policy=exact")
         if self.length.policy == "range" and self.length.range is None:
             raise ValueError("pwm.sampling.length.range is required when policy=range")
+        if not self.include_matched_sequence:
+            raise ValueError("pwm.sampling.include_matched_sequence must be true for PWM sampling.")
         if self.selection.policy == "mmr" and self.uniqueness.key not in {"core", "sequence"}:
             raise ValueError("pwm.sampling.uniqueness.key must be 'core' or 'sequence'")
         return self
@@ -1249,78 +1248,10 @@ def _reject_removed_solver_options(raw: object) -> None:
         raise ConfigError("solver.allow_unknown_options has been removed.")
 
 
-def _rewrite_pwm_sampling_dict(sampling: dict, warnings: list[str]) -> None:
-    if "scoring_backend" in sampling:
-        sampling.pop("scoring_backend", None)
-        warnings.append("pwm.sampling.scoring_backend (removed; FIMO-only)")
-    if "dedupe_by" in sampling:
-        uniqueness = sampling.setdefault("uniqueness", {})
-        uniqueness.setdefault("key", sampling.pop("dedupe_by"))
-        warnings.append("pwm.sampling.dedupe_by -> pwm.sampling.uniqueness.key")
-    if "min_core_hamming_distance" in sampling:
-        sampling.pop("min_core_hamming_distance", None)
-        warnings.append("pwm.sampling.min_core_hamming_distance (deprecated; ignored)")
-    if "length_policy" in sampling or "length_range" in sampling:
-        length = sampling.setdefault("length", {})
-        if "length_policy" in sampling:
-            length.setdefault("policy", sampling.pop("length_policy"))
-        if "length_range" in sampling:
-            length.setdefault("range", sampling.pop("length_range"))
-        warnings.append("pwm.sampling.length_policy/length_range -> pwm.sampling.length")
-    if "trim_window_length" in sampling or "trim_window_strategy" in sampling:
-        trimming = sampling.setdefault("trimming", {})
-        if "trim_window_length" in sampling:
-            trimming.setdefault("window_length", sampling.pop("trim_window_length"))
-        if "trim_window_strategy" in sampling:
-            trimming.setdefault("window_strategy", sampling.pop("trim_window_strategy"))
-        warnings.append("pwm.sampling.trim_window_* -> pwm.sampling.trimming")
-    oversample = sampling.pop("oversample_factor", None)
-    if oversample is not None:
-        n_sites = sampling.get("n_sites")
-        if n_sites is None:
-            raise ConfigError("pwm.sampling.oversample_factor requires n_sites to be set for migration")
-        mining = sampling.setdefault("mining", {})
-        budget = mining.setdefault("budget", {})
-        budget.setdefault("mode", "fixed_candidates")
-        budget.setdefault("candidates", int(n_sites) * int(oversample))
-        warnings.append("pwm.sampling.oversample_factor -> pwm.sampling.mining.budget (fixed_candidates)")
-    if "mining" in sampling and isinstance(sampling["mining"], dict):
-        mining = sampling["mining"]
-        mining.setdefault("batch_size", 100000)
-        mining.setdefault("log_every_batches", 1)
-
-
-def _rewrite_deprecated_config(raw: object) -> list[str]:
-    if not isinstance(raw, dict):
-        return []
-    densegen = raw.get("densegen")
-    if not isinstance(densegen, dict):
-        return []
-    warnings: list[str] = []
-    inputs = densegen.get("inputs") or []
-    if not isinstance(inputs, list):
-        return []
-    for entry in inputs:
-        if not isinstance(entry, dict):
-            continue
-        if "sampling" in entry and isinstance(entry["sampling"], dict):
-            _rewrite_pwm_sampling_dict(entry["sampling"], warnings)
-        overrides = entry.get("overrides_by_motif_id")
-        if isinstance(overrides, dict):
-            for _, override in overrides.items():
-                if isinstance(override, dict):
-                    _rewrite_pwm_sampling_dict(override, warnings)
-    return warnings
-
-
 def load_config(path: Path | str) -> LoadedConfig:
     cfg_path = Path(path).resolve()
     raw = yaml.load(cfg_path.read_text(), Loader=_StrictLoader)
     _reject_removed_solver_options(raw)
-    rewrites = _rewrite_deprecated_config(raw)
-    if rewrites:
-        joined = "; ".join(sorted(set(rewrites)))
-        log.warning("Deprecated DenseGen config keys rewritten: %s", joined)
     try:
         root = RootConfig.model_validate(raw)
     except ValidationError as e:

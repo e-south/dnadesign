@@ -84,7 +84,7 @@ def _write_pool_manifest(run_root: Path) -> None:
     pool_path = pools_dir / "demo_input__pool.parquet"
     df.to_parquet(pool_path, index=False)
     manifest = {
-        "schema_version": "1.4",
+        "schema_version": "1.5",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",
@@ -115,7 +115,7 @@ def _write_pool_manifest(run_root: Path) -> None:
                             "generated": 10,
                             "candidates_with_hit": 9,
                             "eligible": 8,
-                            "unique_eligible": 3,
+                            "eligible_unique": 3,
                             "retained": 2,
                         },
                         {
@@ -128,7 +128,7 @@ def _write_pool_manifest(run_root: Path) -> None:
                             "generated": 5,
                             "candidates_with_hit": 4,
                             "eligible": 3,
-                            "unique_eligible": 2,
+                            "eligible_unique": 2,
                             "retained": 1,
                         },
                     ],

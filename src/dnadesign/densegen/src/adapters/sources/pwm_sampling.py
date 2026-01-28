@@ -200,7 +200,7 @@ def sampling_kwargs_from_config(sampling: object) -> dict:
         "mining": mining,
         "bgfile": _cfg_attr(sampling, "bgfile"),
         "keep_all_candidates_debug": bool(_cfg_attr(sampling, "keep_all_candidates_debug", False)),
-        "include_matched_sequence": bool(_cfg_attr(sampling, "include_matched_sequence", False)),
+        "include_matched_sequence": bool(_cfg_attr(sampling, "include_matched_sequence", True)),
         "uniqueness_key": _cfg_attr(uniqueness_cfg, "key"),
         "selection": _cfg_attr(sampling, "selection"),
         "length_policy": _cfg_attr(length_cfg, "policy", "exact"),
@@ -224,12 +224,6 @@ def _core_sequence(candidate: FimoCandidate) -> str:
     if candidate.matched_sequence:
         return str(candidate.matched_sequence)
     raise ValueError("FIMO matched_sequence is required to derive the TFBS core.")
-
-
-def _hamming_distance(left: str, right: str) -> int:
-    if len(left) != len(right):
-        raise ValueError("Hamming distance requires equal-length sequences.")
-    return sum(1 for a, b in zip(left, right) if a != b)
 
 
 def _evaluate_tier_target(*, n_sites: int, target_tier_fraction: float, eligible_unique: int) -> tuple[int, bool]:
@@ -809,7 +803,7 @@ def sample_pwm_sites(
     mining: Optional[object] = None,
     bgfile: Optional[str | Path] = None,
     keep_all_candidates_debug: bool = False,
-    include_matched_sequence: bool = False,
+    include_matched_sequence: bool = True,
     uniqueness_key: str = "sequence",
     selection: Optional[object] = None,
     debug_output_dir: Optional[Path] = None,
@@ -898,7 +892,7 @@ def sample_pwm_sites(
             enabled = bool(selection_tier_widening.get("enabled", False))
             selection_tier_widening = selection_tier_widening.get("ladder") if enabled else None
 
-    include_matched_sequence = bool(include_matched_sequence or uniqueness_key == "core" or selection_policy == "mmr")
+    include_matched_sequence = bool(include_matched_sequence)
 
     budget_mode = str(_budget_attr(mining, "mode", "fixed_candidates") or "fixed_candidates").lower()
     if budget_mode not in {"tier_target", "fixed_candidates"}:
@@ -1495,6 +1489,7 @@ def sample_pwm_sites(
             meta["tier_target_fraction"] = budget_target_tier_fraction
             meta["tier_target_required_unique"] = tier_target_required_unique
             meta["tier_target_met"] = tier_target_met
+            meta["tier_target_eligible_unique"] = int(len(ranked))
             meta_by_seq[cand.seq] = meta
         if candidate_records is not None and debug_dir is not None:
             selected_set = {c.seq for c in picked}

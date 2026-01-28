@@ -74,7 +74,7 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     - `keep_all_candidates_debug` (bool, default false) - write candidate Parquet logs to
       `outputs/pools/candidates/` for inspection (overwritten by `stage-a build-pool --fresh`
       or `dense run --rebuild-stage-a`)
-    - `include_matched_sequence` (bool, default false) - include `fimo_matched_sequence` in TFBS outputs
+    - `include_matched_sequence` (bool, default true) - include `fimo_matched_sequence` in TFBS outputs
     - `length`
       - `policy`: `exact | range` (default: `exact`)
       - `range`: `[min, max]` (required when `policy=range`; `min` >= motif length)

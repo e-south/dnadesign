@@ -218,7 +218,7 @@ def _pool_manifest(tmp_path: Path) -> TFBSPoolArtifact:
     pools_dir = tmp_path / "pools"
     pools_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "schema_version": "1.4",
+        "schema_version": "1.5",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",
@@ -249,7 +249,7 @@ def _pool_manifest(tmp_path: Path) -> TFBSPoolArtifact:
                             "generated": 10,
                             "candidates_with_hit": 8,
                             "eligible": 6,
-                            "unique_eligible": 4,
+                            "eligible_unique": 4,
                             "retained": 2,
                         }
                     ],

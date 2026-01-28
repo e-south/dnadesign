@@ -197,7 +197,7 @@ class PWMArtifactDataSource(BaseDataSource):
             mining=sampling_kwargs.get("mining"),
             bgfile=bgfile_path,
             keep_all_candidates_debug=keep_all_candidates_debug,
-            include_matched_sequence=sampling_kwargs.get("include_matched_sequence", False),
+            include_matched_sequence=sampling_kwargs.get("include_matched_sequence", True),
             uniqueness_key=sampling_kwargs.get("uniqueness_key"),
             selection=sampling_kwargs.get("selection"),
             debug_output_dir=debug_output_dir,

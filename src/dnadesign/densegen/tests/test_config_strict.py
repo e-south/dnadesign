@@ -77,6 +77,29 @@ def test_schema_version_supported(tmp_path: Path) -> None:
         load_config(cfg_path)
 
 
+def test_legacy_pwm_sampling_keys_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["inputs"] = [
+        {
+            "name": "demo_pwm",
+            "type": "pwm_artifact",
+            "path": "inputs/motif.json",
+            "sampling": {
+                "strategy": "stochastic",
+                "n_sites": 5,
+                "mining": {
+                    "batch_size": 10,
+                    "budget": {"mode": "fixed_candidates", "candidates": 50},
+                },
+                "oversample_factor": 2,
+            },
+        }
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="oversample_factor"):
+        load_config(cfg_path)
+
+
 def test_gap_fill_rejected(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["postprocess"] = {"gap_fill": {"mode": "off"}}

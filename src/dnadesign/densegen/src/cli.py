@@ -214,14 +214,11 @@ def _apply_stage_a_overrides(
     *,
     selected: set[str] | None,
     n_sites: int | None,
-    oversample_factor: int | None,
     batch_size: int | None,
     max_seconds: float | None,
 ) -> None:
-    if n_sites is None and oversample_factor is None and batch_size is None and max_seconds is None:
+    if n_sites is None and batch_size is None and max_seconds is None:
         return
-    if oversample_factor is not None:
-        log.warning("Stage-A oversample_factor override is deprecated; mapping to mining.budget.fixed_candidates.")
     for inp in cfg.inputs:
         if selected is not None and inp.name not in selected:
             continue
@@ -234,12 +231,6 @@ def _apply_stage_a_overrides(
         budget_updates: dict = {}
         if n_sites is not None:
             sampling_updates["n_sites"] = n_sites
-        if oversample_factor is not None:
-            base_sites = n_sites if n_sites is not None else getattr(sampling, "n_sites", None)
-            if base_sites is None:
-                raise typer.BadParameter("--oversample-factor requires n_sites to be set")
-            budget_updates["mode"] = "fixed_candidates"
-            budget_updates["candidates"] = int(base_sites) * int(oversample_factor)
         mining_updates: dict = {}
         if batch_size is not None:
             mining_updates["batch_size"] = batch_size
@@ -268,12 +259,6 @@ def _apply_stage_a_overrides(
                 override_budget_updates: dict = {}
                 if n_sites is not None:
                     override_updates["n_sites"] = n_sites
-                if oversample_factor is not None:
-                    base_sites = n_sites if n_sites is not None else getattr(override, "n_sites", None)
-                    if base_sites is None:
-                        raise typer.BadParameter("--oversample-factor requires n_sites to be set")
-                    override_budget_updates["mode"] = "fixed_candidates"
-                    override_budget_updates["candidates"] = int(base_sites) * int(oversample_factor)
                 if mining_updates:
                     mining = override.mining
                     if mining is None:
@@ -1867,11 +1852,6 @@ def stage_a_build_pool(
         "--n-sites",
         help="Override Stage-A PWM sampling n_sites for all PWM inputs.",
     ),
-    oversample_factor: Optional[int] = typer.Option(
-        None,
-        "--oversample-factor",
-        help="Deprecated: map to mining.budget fixed_candidates via n_sites * oversample_factor.",
-    ),
     batch_size: Optional[int] = typer.Option(
         None,
         "--batch-size",
@@ -1933,8 +1913,6 @@ def stage_a_build_pool(
             raise typer.BadParameter(f"Unknown input name(s): {', '.join(missing)}")
     if n_sites is not None and n_sites <= 0:
         raise typer.BadParameter("--n-sites must be > 0")
-    if oversample_factor is not None and oversample_factor <= 0:
-        raise typer.BadParameter("--oversample-factor must be > 0")
     if batch_size is not None and batch_size <= 0:
         raise typer.BadParameter("--batch-size must be > 0")
     if max_seconds is not None and max_seconds <= 0:
@@ -1943,7 +1921,6 @@ def stage_a_build_pool(
         cfg,
         selected=selected if selected else None,
         n_sites=n_sites,
-        oversample_factor=oversample_factor,
         batch_size=batch_size,
         max_seconds=max_seconds,
     )

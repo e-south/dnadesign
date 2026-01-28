@@ -1083,7 +1083,7 @@ def plot_stage_a_summary(
             generated = row.get("generated")
             hit = row.get("candidates_with_hit")
             eligible = row.get("eligible")
-            unique = row.get("unique_eligible")
+            unique = row.get("eligible_unique")
             retained = row.get("retained")
             if generated in (None, 0):
                 raise ValueError(f"Stage-A sampling missing generated counts for input '{input_name}'.")

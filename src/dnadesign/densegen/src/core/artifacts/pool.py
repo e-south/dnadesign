@@ -28,7 +28,7 @@ from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from ...utils.logging_utils import install_native_stderr_filters
 from .ids import hash_tfbs_id
 
-POOL_SCHEMA_VERSION = "1.4"
+POOL_SCHEMA_VERSION = "1.5"
 POOL_MODE_TFBS = "tfbs"
 POOL_MODE_SEQUENCE = "sequence"
 _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -272,11 +272,11 @@ def _build_stage_a_sampling_manifest(
                 "generated": int(summary.generated),
                 "candidates_with_hit": int(summary.candidates_with_hit),
                 "eligible": int(summary.eligible_total),
-                "unique_eligible": int(summary.eligible),
+                "eligible_unique": int(summary.eligible),
                 "retained": int(summary.retained),
-                "tier_target_fraction": summary.tier_target_fraction,
-                "tier_target_required_unique": summary.tier_target_required_unique,
-                "tier_target_met": summary.tier_target_met,
+                "target_tier_fraction": summary.tier_target_fraction,
+                "required_unique_for_target_tier": summary.tier_target_required_unique,
+                "target_tier_met": summary.tier_target_met,
                 "selection_policy": summary.selection_policy,
                 "selection_alpha": summary.selection_alpha,
                 "selection_similarity": summary.selection_similarity,
@@ -325,7 +325,7 @@ def _build_stage_a_sampling_manifest(
         "selection_shortlist_min": selection_shortlist_min_value,
         "selection_shortlist_factor": selection_shortlist_factor_value,
         "selection_shortlist_max": selection_shortlist_max_value,
-        "tier_target_fraction": tier_target_fraction_value,
+        "target_tier_fraction": tier_target_fraction_value,
         "bgfile": base_bgfile,
         "background_source": background_source,
         "eligible_score_hist": eligible_score_hist,

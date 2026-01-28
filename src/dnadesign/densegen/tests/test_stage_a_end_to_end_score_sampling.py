@@ -138,7 +138,7 @@ def test_stage_a_end_to_end_score_sampling(tmp_path: Path) -> None:
     pool = pool_data["demo_pwm"]
     assert pool.df is not None
     df = pool.df
-    for col in ("best_hit_score", "tier", "rank_within_regulator", "tfbs_sequence"):
+    for col in ("best_hit_score", "tier", "rank_within_regulator", "tfbs_sequence", "tier_target_eligible_unique"):
         assert col in df.columns
 
     regulators = sorted({str(tf) for tf in df["tf"].tolist()})
@@ -176,7 +176,7 @@ def test_stage_a_end_to_end_score_sampling(tmp_path: Path) -> None:
         assert "generated" in row
         assert "candidates_with_hit" in row
         assert "eligible" in row
-        assert "unique_eligible" in row
+        assert "eligible_unique" in row
         assert "retained" in row
 
     plot_dir = tmp_path / "plots"
