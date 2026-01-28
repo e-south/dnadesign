@@ -633,6 +633,22 @@ def _(
                 )
                 .add_params(_brush)
             )
+            _edge_keys = {"opal__view__top_k", "opal__view__observed"}
+            if _hue is not None and _hue.key in _edge_keys and _hue.key in df_plot.columns:
+                _edge_size = _size_encoding if _size_encoding is not alt.Undefined else alt.value(60)
+                _edge_df = df_plot.filter(pl.col(_hue.key).cast(pl.Boolean, strict=False).fill_null(False))
+                if not _edge_df.is_empty():
+                    _edge_chart = (
+                        alt.Chart(_edge_df)
+                        .mark_circle(opacity=0.7, fillOpacity=0, stroke="black", strokeWidth=1)
+                        .encode(
+                            x=alt.X(_x_col, title=_x_col),
+                            y=alt.Y(y_col_plot, title=_y_col),
+                            size=_edge_size,
+                            tooltip=_tooltip_cols,
+                        )
+                    )
+                    chart = chart + _edge_chart
     else:
         if _x_col not in _df_explorer_source.columns or not safe_is_numeric(_df_explorer_source.schema[_x_col]):
             _note_lines.append("Select a numeric column for the histogram.")
@@ -2146,6 +2162,28 @@ def _(
             )
             .add_params(_sfxi_brush)
         )
+        _edge_keys = {"opal__view__top_k", "opal__view__observed"}
+        if _hue is not None and _hue.key in _edge_keys and _hue.key in df_sfxi_plot.columns:
+            _edge_df = df_sfxi_plot.filter(pl.col(_hue.key).cast(pl.Boolean, strict=False).fill_null(False))
+            if not _edge_df.is_empty():
+                _edge_chart = (
+                    alt.Chart(_edge_df)
+                    .mark_circle(opacity=0.7, fillOpacity=0, stroke="black", strokeWidth=1, size=110)
+                    .encode(
+                        x=alt.X(
+                            "logic_fidelity",
+                            title="Logic fidelity",
+                            scale=alt.Scale(domain=[0, 1.02]),
+                        ),
+                        y=alt.Y(
+                            "effect_scaled",
+                            title="Effect (scaled)",
+                            scale=alt.Scale(domain=[0, 1.02]),
+                        ),
+                        tooltip=tooltip_cols,
+                    )
+                )
+                _chart = _chart + _edge_chart
         _color_subtitle = _base_subtitle
         if _color_title:
             _color_subtitle = f"{_color_subtitle} · color={_color_title}"

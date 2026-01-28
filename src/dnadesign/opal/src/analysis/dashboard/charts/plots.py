@@ -108,7 +108,7 @@ def build_umap_explorer_chart(
         tooltip_candidates.append(view.color_tooltip)
     tooltip_fields = _tooltip_fields(view.df_plot, tooltip_candidates)
 
-    chart = (
+    chart_base = (
         alt.Chart(view.df_plot)
         .mark_circle(size=point_size, opacity=opacity, stroke=None, strokeWidth=0)
         .encode(
@@ -120,6 +120,22 @@ def build_umap_explorer_chart(
         .add_params(brush)
         .properties(width=plot_size, height=plot_size)
     )
+    chart = chart_base
+    edge_keys = {"opal__view__top_k", "opal__view__observed"}
+    if hue is not None and hue.key in edge_keys and hue.key in view.df_plot.columns:
+        df_edge = view.df_plot.filter(pl.col(hue.key).cast(pl.Boolean, strict=False).fill_null(False))
+        if not df_edge.is_empty():
+            edge_chart = (
+                alt.Chart(df_edge)
+                .mark_circle(size=point_size, opacity=opacity, fillOpacity=0, stroke="black", strokeWidth=1)
+                .encode(
+                    x=alt.X(view.x_col, title=view.x_col),
+                    y=alt.Y(view.y_col, title=view.y_col),
+                    tooltip=tooltip_fields,
+                )
+                .properties(width=plot_size, height=plot_size)
+            )
+            chart = chart_base + edge_chart
     color_context = (view.color_spec.title if view.color_spec else None) or "none"
     chart = with_title(
         chart,
@@ -219,7 +235,7 @@ def build_cluster_chart(
             )
         ) + (
             alt.Chart(df_top)
-            .mark_circle(size=36, opacity=0.85)
+            .mark_circle(size=36, opacity=0.85, stroke="black", strokeWidth=1)
             .encode(
                 x=alt.X(
                     f"{cluster_col}:N",
@@ -250,6 +266,26 @@ def build_cluster_chart(
                 tooltip=tooltip_fields,
             )
         )
+        edge_keys = {"opal__view__top_k", "opal__view__observed"}
+        if hue is not None and hue.key in edge_keys and view.label_col and view.yes_label:
+            df_edge = view.df_points.filter(pl.col(view.label_col) == view.yes_label)
+            if not df_edge.is_empty():
+                edge = (
+                    alt.Chart(df_edge)
+                    .mark_circle(size=26, opacity=0.8, fillOpacity=0, stroke="black", strokeWidth=1)
+                    .encode(
+                        x=alt.X(
+                            f"{cluster_col}:N",
+                            sort=sort_field,
+                            title="Leiden cluster",
+                            axis=alt.Axis(labelAngle=90, labelFontSize=8),
+                        ),
+                        xOffset="__jitter:Q",
+                        y=alt.Y(f"{metric_col}:{view.metric_type}", title=metric_label),
+                        tooltip=tooltip_fields,
+                    )
+                )
+                base = base + edge
 
     subtitle = f"{dataset_name or 'dataset'} · y={metric_label} · hue={view.hue_label} · n={view.df_points.height}"
     return (
