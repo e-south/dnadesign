@@ -488,3 +488,24 @@ def build_nearest_2_factor_counts(
             }
         )
     return Nearest2FactorCounts(df=pl.DataFrame(rows), note=None)
+
+
+def build_predicted_logic_pools(df_view: pl.DataFrame) -> dict[str, str]:
+    if df_view.is_empty():
+        raise ValueError("Nearest-logic pools require a non-empty dashboard view.")
+    if "opal__nearest_2_factor_logic" not in df_view.columns:
+        raise ValueError("Nearest-logic pools require `opal__nearest_2_factor_logic` in the dashboard view.")
+    if "opal__view__observed" not in df_view.columns:
+        raise ValueError("Nearest-logic pools require `opal__view__observed` in the dashboard view.")
+    df_pred = df_view.filter(~pl.col("opal__view__observed")).select("opal__nearest_2_factor_logic").drop_nulls()
+    if df_pred.is_empty():
+        raise ValueError("Nearest-logic pools require predicted rows in the dashboard view.")
+    counts = df_pred.group_by("opal__nearest_2_factor_logic").len()
+    if counts.is_empty():
+        raise ValueError("Nearest-logic pools require non-zero predicted class counts.")
+    pools: dict[str, str] = {}
+    for row in counts.sort("opal__nearest_2_factor_logic").to_dicts():
+        cls = str(row["opal__nearest_2_factor_logic"])
+        label = f"Nearest 2-factor logic = {cls}"
+        pools[label] = cls
+    return pools

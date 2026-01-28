@@ -53,6 +53,7 @@ def _():
     build_round_options_from_label_hist = dash_labels.build_round_options_from_label_hist
     build_label_sfxi_view = dash_sfxi.build_label_sfxi_view
     build_nearest_2_factor_counts = dash_sfxi.build_nearest_2_factor_counts
+    build_predicted_logic_pools = dash_sfxi.build_predicted_logic_pools
     build_pred_sfxi_view = dash_sfxi.build_pred_sfxi_view
     attach_diagnostics_metrics = dash_derived.attach_diagnostics_metrics
     build_umap_controls = dash_ui.build_umap_controls
@@ -103,6 +104,7 @@ def _():
         build_label_events,
         build_label_sfxi_view,
         build_nearest_2_factor_counts,
+        build_predicted_logic_pools,
         build_pred_sfxi_view,
         attach_diagnostics_metrics,
         build_mode_view,
@@ -2562,7 +2564,8 @@ def _(df_view, mode_dropdown, pl):
 
 
 @app.cell
-def _(mo):
+def _(build_predicted_logic_pools, df_view, mo):
+    predicted_logic_pools = build_predicted_logic_pools(df_view)
     inspect_pool_label_map = {
         "Full dataset (all rows)": "df_active",
         "UMAP brush selection": "df_umap_selected",
@@ -2570,6 +2573,7 @@ def _(mo):
         "SFXI scored labels (current view)": "df_sfxi_selected",
         "Selected score Top-K": "df_score_top_k_pool",
         "Overlay Top-K": "df_overlay_top_k_pool",
+        **predicted_logic_pools,
     }
     inspect_pool_dropdown = mo.ui.dropdown(
         options=list(inspect_pool_label_map.keys()),
@@ -2583,6 +2587,7 @@ def _(mo):
 @app.cell
 def _(
     df_active,
+    df_view,
     df_overlay_top_k_pool,
     df_score_top_k_pool,
     df_sfxi_brush_selected,
@@ -2590,6 +2595,7 @@ def _(
     df_umap_selected,
     inspect_pool_dropdown,
     inspect_pool_label_map,
+    pl,
 ):
     pool_choice = inspect_pool_label_map.get(inspect_pool_dropdown.value, inspect_pool_dropdown.value)
     if pool_choice == "df_umap_selected":
@@ -2602,8 +2608,16 @@ def _(
         df_pool = df_overlay_top_k_pool
     elif pool_choice == "df_score_top_k_pool":
         df_pool = df_score_top_k_pool
-    else:
+    elif pool_choice in {"df_active", "df_view", "df_active_full"}:
         df_pool = df_active
+    else:
+        if "opal__nearest_2_factor_logic" not in df_view.columns:
+            raise ValueError("Nearest-logic pool requires `opal__nearest_2_factor_logic` in the dashboard view.")
+        if "opal__view__observed" not in df_view.columns:
+            raise ValueError("Nearest-logic pool requires `opal__view__observed` in the dashboard view.")
+        df_pool = df_view.filter(
+            (~pl.col("opal__view__observed")) & (pl.col("opal__nearest_2_factor_logic") == pool_choice)
+        )
     return (df_pool,)
 
 

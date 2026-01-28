@@ -187,6 +187,21 @@ def test_build_nearest_2_factor_counts() -> None:
     assert counts["0010"]["predicted_count"] == 1
 
 
+def test_build_predicted_logic_pools() -> None:
+    df = pl.DataFrame(
+        {
+            "id": ["a", "b", "c", "d"],
+            "opal__nearest_2_factor_logic": ["0001", "0001", "0010", None],
+            "opal__view__observed": [False, False, False, True],
+        }
+    )
+    pools = sfxi.build_predicted_logic_pools(df)
+    assert pools == {
+        "Nearest 2-factor logic = 0001": "0001",
+        "Nearest 2-factor logic = 0010": "0010",
+    }
+
+
 def test_umap_explorer_chart_no_overlay_layers() -> None:
     df = pl.DataFrame(
         {
