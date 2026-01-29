@@ -25,6 +25,7 @@ from typing import List, Optional, Sequence, TextIO, Tuple, Union
 import numpy as np
 import pandas as pd
 
+from ...config import PWMSamplingConfig
 from ...core.artifacts.ids import hash_candidate_id
 from ...core.score_tiers import score_tier_counts
 from ...core.stage_a_constants import FIMO_REPORT_THRESH
@@ -414,34 +415,26 @@ def _budget_attr(mining, name: str, default=None):
     return default
 
 
-def _cfg_attr(obj, name: str, default=None):
-    if obj is None:
-        return default
-    if hasattr(obj, name):
-        return getattr(obj, name)
-    if isinstance(obj, dict):
-        return obj.get(name, default)
-    return default
-
-
-def sampling_kwargs_from_config(sampling: object) -> dict:
-    mining = _cfg_attr(sampling, "mining")
-    length_cfg = _cfg_attr(sampling, "length", {}) or {}
-    trimming_cfg = _cfg_attr(sampling, "trimming", {}) or {}
-    uniqueness_cfg = _cfg_attr(sampling, "uniqueness", {}) or {}
+def sampling_kwargs_from_config(sampling: PWMSamplingConfig) -> dict:
+    if not isinstance(sampling, PWMSamplingConfig):
+        raise ValueError("pwm.sampling config must be a PWMSamplingConfig instance.")
+    mining = sampling.mining
+    length_cfg = sampling.length
+    trimming_cfg = sampling.trimming
+    uniqueness_cfg = sampling.uniqueness
     return {
-        "strategy": _cfg_attr(sampling, "strategy", "stochastic"),
-        "n_sites": int(_cfg_attr(sampling, "n_sites")),
+        "strategy": str(sampling.strategy),
+        "n_sites": int(sampling.n_sites),
         "mining": mining,
-        "bgfile": _cfg_attr(sampling, "bgfile"),
-        "keep_all_candidates_debug": bool(_cfg_attr(sampling, "keep_all_candidates_debug", False)),
-        "include_matched_sequence": bool(_cfg_attr(sampling, "include_matched_sequence", True)),
-        "uniqueness_key": _cfg_attr(uniqueness_cfg, "key"),
-        "selection": _cfg_attr(sampling, "selection"),
-        "length_policy": _cfg_attr(length_cfg, "policy", "exact"),
-        "length_range": _cfg_attr(length_cfg, "range"),
-        "trim_window_length": _cfg_attr(trimming_cfg, "window_length"),
-        "trim_window_strategy": _cfg_attr(trimming_cfg, "window_strategy", "max_info"),
+        "bgfile": sampling.bgfile,
+        "keep_all_candidates_debug": bool(sampling.keep_all_candidates_debug),
+        "include_matched_sequence": bool(sampling.include_matched_sequence),
+        "uniqueness_key": str(uniqueness_cfg.key),
+        "selection": sampling.selection,
+        "length_policy": str(length_cfg.policy),
+        "length_range": length_cfg.range,
+        "trim_window_length": trimming_cfg.window_length,
+        "trim_window_strategy": str(trimming_cfg.window_strategy),
     }
 
 
