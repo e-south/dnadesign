@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import sys
 import threading
 import time
@@ -100,6 +101,24 @@ def _format_pwm_progress_line(
     return " | ".join(parts)
 
 
+def _format_stage_a_milestone(
+    *,
+    motif_id: str,
+    phase: str,
+    detail: Optional[str] = None,
+    elapsed: Optional[float] = None,
+) -> str:
+    message = f"Stage-A {phase} for {motif_id}"
+    suffix = []
+    if detail:
+        suffix.append(str(detail))
+    if elapsed is not None:
+        suffix.append(f"elapsed={float(elapsed):.1f}s")
+    if suffix:
+        return message + " | " + " | ".join(suffix)
+    return message
+
+
 def _stage_a_live_render(state: dict[str, dict[str, object]]):
     table = make_table(show_header=True, pad_edge=False)
     table.add_column("motif")
@@ -155,12 +174,17 @@ def _stage_a_live_start(stream: TextIO):
     from rich.console import Console
     from rich.live import Live
 
+    pixi_in_shell = bool(os.environ.get("PIXI_IN_SHELL"))
     tty = bool(getattr(stream, "isatty", lambda: False)())
-    if tty:
-        console = Console(file=stream)
-    else:
+    if not tty or pixi_in_shell:
         width = shutil.get_terminal_size(fallback=(140, 40)).columns
-        console = Console(file=stream, width=int(width))
+        console = Console(file=stream, width=int(width), force_terminal=False)
+        if pixi_in_shell:
+            log.warning(
+                "Stage-A mining live progress disabled because PIXI_IN_SHELL is set; using static table output."
+            )
+        return None, console
+    console = Console(file=stream)
     if not console.is_terminal:
         return None, console
     live = Live(console=console, refresh_per_second=4, transient=False)
@@ -202,6 +226,8 @@ def _stage_a_live_update(
     generated: int,
     accepted: Optional[int],
     elapsed: float,
+    target: Optional[int] = None,
+    accepted_target: Optional[int] = None,
 ) -> None:
     with _STAGE_A_LIVE_LOCK:
         row = _STAGE_A_LIVE_STATE.get(key)
@@ -210,6 +236,10 @@ def _stage_a_live_update(
         row["generated"] = int(generated)
         row["accepted"] = int(accepted) if accepted is not None else None
         row["elapsed"] = float(elapsed)
+        if target is not None:
+            row["target"] = int(target)
+        if accepted_target is not None:
+            row["accepted_target"] = int(accepted_target)
         if _STAGE_A_LIVE is None:
             return
         renderable = _stage_a_live_render(_STAGE_A_LIVE_STATE)
@@ -299,6 +329,8 @@ class _PwmSamplingProgress:
                 generated=int(generated),
                 accepted=accepted,
                 elapsed=now - self._start,
+                target=int(self.target),
+                accepted_target=self.accepted_target,
             )
         else:
             line = _format_pwm_progress_line(
@@ -1868,6 +1900,23 @@ def sample_pwm_sites(
         if uniqueness_key == "core":
             ranked, collapsed_by_core_identity = _collapse_by_core_identity(ranked)
         eligible_hits = len(ranked)
+        if progress is not None:
+            progress.update(
+                generated=generated_total,
+                accepted=eligible_hits,
+                batch_index=batches if batches > 0 else None,
+                batch_total=None,
+                force=True,
+            )
+            progress.finish()
+        postprocess_start = time.monotonic()
+        log.info(
+            _format_stage_a_milestone(
+                motif_id=motif.motif_id,
+                phase="postprocess",
+                detail=f"eligible={eligible_hits} collapsed={collapsed_by_core_identity} selection={selection_policy}",
+            )
+        )
         ranked_pairs = [(cand.seq, cand.score) for cand in ranked]
         tiers = _assign_score_tiers(ranked_pairs)
         rank_by_seq = _ranked_sequence_positions(ranked_pairs)
@@ -1927,6 +1976,18 @@ def sample_pwm_sites(
             candidate_pool_size = selection_diag.get("shortlist_k")
             if candidate_pool_size is None:
                 candidate_pool_size = selection_diag.get("tier_limit")
+        diversity_max_n = 2500
+        log.info(
+            _format_stage_a_milestone(
+                motif_id=motif.motif_id,
+                phase="diversity",
+                detail=(
+                    f"baseline={len(baseline_cores)} actual={len(actual_cores)} "
+                    f"global={len(baseline_global_cores)} cap={diversity_max_n}"
+                ),
+            )
+        )
+        diversity_start = time.monotonic()
         diversity = _diversity_summary(
             baseline_cores=baseline_cores,
             actual_cores=actual_cores,
@@ -1938,6 +1999,14 @@ def sample_pwm_sites(
             candidate_pool_size=int(candidate_pool_size) if candidate_pool_size is not None else None,
             shortlist_target=int(shortlist_target) if shortlist_target is not None else None,
             label=motif.motif_id,
+            max_n=diversity_max_n,
+        )
+        log.info(
+            _format_stage_a_milestone(
+                motif_id=motif.motif_id,
+                phase="diversity complete",
+                elapsed=time.monotonic() - diversity_start,
+            )
         )
         padding_audit = None
         if intended_core_by_seq:
@@ -2022,15 +2091,13 @@ def sample_pwm_sites(
         tier2_score = ranked[n0 + n1 + n2 - 1].score if n2 > 0 else None
         eligible_scores = [cand.score for cand in ranked]
         hist_edges, hist_counts = _build_score_hist(eligible_scores)
-        if progress is not None:
-            progress.update(
-                generated=generated_total,
-                accepted=eligible_hits,
-                batch_index=batches if batches > 0 else None,
-                batch_total=None,
-                force=True,
+        log.info(
+            _format_stage_a_milestone(
+                motif_id=motif.motif_id,
+                phase="postprocess complete",
+                elapsed=time.monotonic() - postprocess_start,
             )
-            progress.finish()
+        )
         log.info(
             "FIMO yield for motif %s: eligible=%d retained=%d",
             motif.motif_id,
