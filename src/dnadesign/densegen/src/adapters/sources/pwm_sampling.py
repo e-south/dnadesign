@@ -35,6 +35,8 @@ SCORE_HIST_BINS = 60
 log = logging.getLogger(__name__)
 _SAFE_LABEL_RE = None
 _STAGE_A_LIVE = None
+_STAGE_A_LIVE_MODE: str | None = None
+_STAGE_A_LIVE_CONSOLE = None
 _STAGE_A_LIVE_STATE: dict[str, dict[str, object]] = {}
 _STAGE_A_LIVE_LOCK = threading.Lock()
 
@@ -147,14 +149,23 @@ def _stage_a_live_render(state: dict[str, dict[str, object]]):
     return make_panel(table, title="Stage-A mining")
 
 
-def _stage_a_live_start():
+def _stage_a_live_start(stream: TextIO):
+    import shutil
+
     from rich.console import Console
     from rich.live import Live
 
-    console = Console()
+    tty = bool(getattr(stream, "isatty", lambda: False)())
+    if tty:
+        console = Console(file=stream)
+    else:
+        width = shutil.get_terminal_size(fallback=(140, 40)).columns
+        console = Console(file=stream, width=int(width))
+    if not console.is_terminal:
+        return None, console
     live = Live(console=console, refresh_per_second=4, transient=False)
     live.start()
-    return live
+    return live, console
 
 
 def _stage_a_live_register(
@@ -164,11 +175,15 @@ def _stage_a_live_register(
     target: int,
     accepted_target: Optional[int],
     target_fraction: Optional[float],
-) -> None:
+    stream: TextIO,
+) -> bool:
     global _STAGE_A_LIVE
+    global _STAGE_A_LIVE_CONSOLE
+    global _STAGE_A_LIVE_MODE
     with _STAGE_A_LIVE_LOCK:
-        if _STAGE_A_LIVE is None:
-            _STAGE_A_LIVE = _stage_a_live_start()
+        if _STAGE_A_LIVE_MODE is None:
+            _STAGE_A_LIVE, _STAGE_A_LIVE_CONSOLE = _stage_a_live_start(stream)
+            _STAGE_A_LIVE_MODE = "live" if _STAGE_A_LIVE is not None else "static"
         _STAGE_A_LIVE_STATE[key] = {
             "motif": motif_id,
             "generated": 0,
@@ -178,6 +193,7 @@ def _stage_a_live_register(
             "target_fraction": target_fraction,
             "elapsed": 0.0,
         }
+        return _STAGE_A_LIVE is not None
 
 
 def _stage_a_live_update(
@@ -188,25 +204,33 @@ def _stage_a_live_update(
     elapsed: float,
 ) -> None:
     with _STAGE_A_LIVE_LOCK:
-        if _STAGE_A_LIVE is None:
-            return
         row = _STAGE_A_LIVE_STATE.get(key)
         if row is None:
             return
         row["generated"] = int(generated)
         row["accepted"] = int(accepted) if accepted is not None else None
         row["elapsed"] = float(elapsed)
+        if _STAGE_A_LIVE is None:
+            return
         renderable = _stage_a_live_render(_STAGE_A_LIVE_STATE)
         _STAGE_A_LIVE.update(renderable, refresh=True)
 
 
 def _stage_a_live_finish(*, key: str) -> None:
     global _STAGE_A_LIVE
+    global _STAGE_A_LIVE_CONSOLE
+    global _STAGE_A_LIVE_MODE
     with _STAGE_A_LIVE_LOCK:
+        snapshot = dict(_STAGE_A_LIVE_STATE)
         _STAGE_A_LIVE_STATE.pop(key, None)
-        if _STAGE_A_LIVE is not None and not _STAGE_A_LIVE_STATE:
-            _STAGE_A_LIVE.stop()
+        if not _STAGE_A_LIVE_STATE:
+            if _STAGE_A_LIVE is not None:
+                _STAGE_A_LIVE.stop()
+            elif _STAGE_A_LIVE_MODE == "static" and _STAGE_A_LIVE_CONSOLE is not None:
+                _STAGE_A_LIVE_CONSOLE.print(_stage_a_live_render(snapshot))
             _STAGE_A_LIVE = None
+            _STAGE_A_LIVE_CONSOLE = None
+            _STAGE_A_LIVE_MODE = None
 
 
 @dataclass
@@ -220,11 +244,11 @@ class _PwmSamplingProgress:
     min_interval: float = 0.2
 
     def __post_init__(self) -> None:
-        self._enabled = bool(logging_utils.is_progress_enabled()) and bool(
-            getattr(self.stream, "isatty", lambda: False)()
-        )
         self._mode = str(logging_utils.get_progress_style())
+        tty = bool(getattr(self.stream, "isatty", lambda: False)())
+        self._enabled = bool(logging_utils.is_progress_enabled()) and (self._mode == "screen" or tty)
         self._use_live = self._enabled and self._mode == "screen"
+        self._use_table = False
         self._live_key = f"{self.motif_id}:{id(self)}"
         self._start = time.monotonic()
         self._last_update = self._start
@@ -234,13 +258,15 @@ class _PwmSamplingProgress:
         if self._enabled:
             logging_utils.set_progress_active(True)
         if self._use_live:
-            _stage_a_live_register(
+            self._use_live = _stage_a_live_register(
                 key=self._live_key,
                 motif_id=self.motif_id,
                 target=int(self.target),
                 accepted_target=self.accepted_target,
                 target_fraction=self.target_fraction,
+                stream=self.stream,
             )
+            self._use_table = not self._use_live
 
     def update(
         self,
@@ -267,7 +293,7 @@ class _PwmSamplingProgress:
         if self._shown and state == self._last_state and logging_utils.is_progress_line_visible():
             self._last_update = now
             return
-        if self._use_live:
+        if self._use_live or self._use_table:
             _stage_a_live_update(
                 key=self._live_key,
                 generated=int(generated),
@@ -300,11 +326,11 @@ class _PwmSamplingProgress:
     def finish(self) -> None:
         if self._enabled:
             logging_utils.set_progress_active(False)
-        if self._use_live:
+        if self._use_live or self._use_table:
             _stage_a_live_finish(key=self._live_key)
         if not self._shown:
             return
-        if not self._use_live:
+        if not self._use_live and not self._use_table:
             self.stream.write("\n")
             self.stream.flush()
 
