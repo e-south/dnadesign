@@ -54,7 +54,7 @@ def test_stage_a_strata_overview_axes_and_legend() -> None:
         }
     )
 
-    fig, ax_left, ax_right = _build_stage_a_strata_overview_figure(
+    fig, axes_left, ax_right = _build_stage_a_strata_overview_figure(
         input_name="demo_input",
         pool_df=pool_df,
         sampling=sampling,
@@ -62,10 +62,12 @@ def test_stage_a_strata_overview_axes_and_legend() -> None:
     )
 
     try:
+        ax_left = axes_left[0]
+        ax_left_bottom = axes_left[-1]
         assert ax_left.get_xscale() == "linear"
         left_xlim = ax_left.get_xlim()
         assert left_xlim[0] < left_xlim[1]
-        assert "score" in ax_left.get_xlabel().lower()
+        assert "score" in ax_left_bottom.get_xlabel().lower()
         label_texts = []
         for axis in fig.axes:
             for text in axis.texts:
@@ -195,7 +197,7 @@ def test_stage_a_strata_overview_xlims_cover_all_regulators() -> None:
         }
     )
 
-    fig, ax_left, _ = _build_stage_a_strata_overview_figure(
+    fig, axes_left, _ = _build_stage_a_strata_overview_figure(
         input_name="demo_input",
         pool_df=pool_df,
         sampling=sampling,
@@ -203,9 +205,9 @@ def test_stage_a_strata_overview_xlims_cover_all_regulators() -> None:
     )
 
     try:
-        xlim = ax_left.get_xlim()
+        xlim = axes_left[0].get_xlim()
         assert xlim[1] >= 15.0
-        dashed = [line for line in ax_left.lines if line.get_linestyle() == "--"]
+        dashed = [line for line in axes_left[0].lines if line.get_linestyle() == "--"]
         assert len(dashed) >= 2
     finally:
         fig.clf()

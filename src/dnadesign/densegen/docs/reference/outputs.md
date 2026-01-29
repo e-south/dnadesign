@@ -136,6 +136,11 @@ Core diagnostics plots (canonical set):
 `stage_a_summary__<input>.png`, `stage_a_summary__<input>__yield_bias.png`,
 and `stage_a_summary__<input>__diversity.png`.
 
+`stage_a_summary` requires diversity metrics in `pool_manifest.json`. If you are using a legacy pool
+manifest that predates diversity, rerun `dense stage-a build-pool --fresh` to regenerate it.
+`stage_b_summary` requires `slack_bp` in `library_builds.parquet` plus non-empty composition rows
+for each input/plan; missing metrics will fail fast.
+
 ---
 
 #### `placement_map` overlays fixed elements

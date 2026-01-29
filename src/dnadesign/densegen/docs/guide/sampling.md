@@ -296,6 +296,8 @@ Plots that map cleanly to the above:
 - `stage_a_summary` — pool quality, yield, tiering, selection, and core diversity diagnostics
 - `stage_b_summary` — library feasibility/utilization and solver interaction
 
+`stage_a_summary` requires the diversity block in `pool_manifest.json` and will fail fast if it is missing.
+
 ---
 
 ### Common footguns and how to avoid them

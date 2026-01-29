@@ -22,6 +22,56 @@ from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.viz.plotting import run_plots_from_config
 
 
+def _diversity_block(core_len: int) -> dict:
+    bins = [0, 1, 2]
+    counts = [0, 2, 0]
+    return {
+        "candidate_pool_size": 2,
+        "shortlist_target": 10,
+        "core_hamming": {
+            "nnd_k1": {
+                "k": 1,
+                "baseline": {
+                    "bins": bins,
+                    "counts": counts,
+                    "median": 1.0,
+                    "p05": 1.0,
+                    "p95": 1.0,
+                    "frac_le_1": 1.0,
+                    "n": 2,
+                    "subsampled": False,
+                },
+                "actual": {
+                    "bins": bins,
+                    "counts": counts,
+                    "median": 1.0,
+                    "p05": 1.0,
+                    "p95": 1.0,
+                    "frac_le_1": 1.0,
+                    "n": 2,
+                    "subsampled": False,
+                },
+            },
+            "nnd_k5": None,
+            "pairwise": {
+                "baseline": {"median": 1.0, "mean": 1.0, "p10": 1.0, "p90": 1.0, "n_pairs": 1, "total_pairs": 1},
+                "actual": {"median": 1.0, "mean": 1.0, "p10": 1.0, "p90": 1.0, "n_pairs": 1, "total_pairs": 1},
+            },
+        },
+        "overlap_actual_fraction": 1.0,
+        "overlap_actual_swaps": 0,
+        "core_entropy": {
+            "baseline": {"values": [0.0] * core_len, "n": 2},
+            "actual": {"values": [0.0] * core_len, "n": 2},
+        },
+        "score_quantiles": {
+            "baseline": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+            "actual": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+            "baseline_global": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+        },
+    }
+
+
 def _write_config(path: Path, *, plots_default: list[str]) -> None:
     path.write_text(
         textwrap.dedent(
@@ -117,6 +167,7 @@ def _write_pool_manifest(run_root: Path) -> None:
                             "eligible": 8,
                             "eligible_unique": 3,
                             "retained": 2,
+                            "diversity": _diversity_block(core_len=4),
                         },
                         {
                             "regulator": "tfB",
@@ -130,6 +181,7 @@ def _write_pool_manifest(run_root: Path) -> None:
                             "eligible": 3,
                             "eligible_unique": 2,
                             "retained": 1,
+                            "diversity": _diversity_block(core_len=6),
                         },
                     ],
                 },

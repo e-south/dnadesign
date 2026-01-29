@@ -30,7 +30,7 @@ PLOT_SPECS = {
     },
     "stage_a_summary": {
         "fn": "plot_stage_a_summary",
-        "description": "Stage-A pool quality + yield + bias summary.",
+        "description": "Stage-A pool quality, yield, bias, and core diversity summary.",
         "requires": ["pools"],
     },
     "stage_b_summary": {

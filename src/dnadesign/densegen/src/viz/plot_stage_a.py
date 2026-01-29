@@ -28,6 +28,7 @@ from .plot_common import (
     _apply_style,
     _draw_tier_markers,
     _format_percent,
+    _palette,
     _safe_filename,
     _shared_axis_cleanup,
     _shared_x_cleanup,
@@ -43,67 +44,6 @@ def _pastelize_color(color: str, amount: float = 0.6) -> tuple[float, float, flo
         base[2] + (1.0 - base[2]) * amount,
         base[3],
     )
-
-
-# color utils
-try:
-    from matplotlib.colors import is_color_like as _mpl_is_color_like
-except Exception:
-    _mpl_is_color_like = None
-
-
-def _is_color_like(x) -> bool:
-    if _mpl_is_color_like is not None:
-        try:
-            return bool(_mpl_is_color_like(x))
-        except Exception:
-            pass
-    try:
-        to_rgba(x)
-        return True
-    except Exception:
-        return False
-
-
-def _palette(style: dict, n: int, *, no_repeat: bool = False):
-    pal = style.get("palette", "okabe_ito")
-    if isinstance(pal, str):
-        key = pal.lower().replace("-", "_")
-        if key in {"okabe_ito", "okabeito", "colorblind", "colorblind2", "colorblind_2"}:
-            base = [
-                "#000000",
-                "#E69F00",
-                "#56B4E9",
-                "#009E73",
-                "#F0E442",
-                "#0072B2",
-                "#D55E00",
-                "#CC79A7",
-            ]
-            if n <= len(base):
-                return base[:n]
-            if no_repeat:
-                raise ValueError(
-                    f"Need {n} unique colors; okabe_ito has {len(base)}. Provide a longer palette or reduce categories."
-                )
-            return [base[i % len(base)] for i in range(n)]
-        if _is_color_like(pal):  # single color
-            if no_repeat and n > 1:
-                raise ValueError(f"Single color '{pal}' cannot provide {n} unique colors.")
-            return [pal] * n
-        try:  # colormap name
-            cmap = plt.get_cmap(pal)
-            return [cmap(i / max(1, n - 1)) for i in range(n)]
-        except Exception:
-            raise ValueError(f"Unknown palette or colormap name: {pal!r}")
-    if isinstance(pal, (list, tuple)):
-        base = list(pal)
-        if len(base) >= n:
-            return base[:n]
-        if no_repeat:
-            raise ValueError(f"Need {n} unique colors; got {len(base)} in explicit list.")
-        return [base[i % len(base)] for i in range(n)]
-    raise ValueError(f"Invalid palette type: {type(pal).__name__}")
 
 
 def _stage_a_text_sizes(style: dict) -> dict[str, float]:
@@ -154,7 +94,7 @@ def _build_stage_a_strata_overview_figure(
     pool_df: pd.DataFrame,
     sampling: dict,
     style: dict,
-) -> tuple[mpl.figure.Figure, mpl.axes.Axes, mpl.axes.Axes]:
+) -> tuple[mpl.figure.Figure, list[mpl.axes.Axes], mpl.axes.Axes]:
     style = _style(style)
     style["seaborn_style"] = False
     rc = stage_a_rcparams(style)
@@ -230,7 +170,7 @@ def _build_stage_a_strata_overview_figure(
         ax_header.text(
             0.5,
             0.86,
-            f"Stage-A pool tiers — {input_name}",
+            f"Stage-A pool tiers -- {input_name}",
             ha="center",
             va="center",
             fontsize=text_sizes["fig_title"],
@@ -415,7 +355,7 @@ def _build_stage_a_strata_overview_figure(
     ax_left.tick_params(axis="x", labelsize=text_sizes["annotation"] * 0.82)
     ax_right.tick_params(axis="x", labelsize=text_sizes["annotation"] * 0.8)
     ax_right.tick_params(axis="y", labelsize=text_sizes["annotation"] * 0.8)
-    return fig, axes_left[0], ax_right
+    return fig, axes_left, ax_right
 
 
 def _build_stage_a_yield_bias_figure(
@@ -527,7 +467,7 @@ def _build_stage_a_yield_bias_figure(
         ax_header.text(
             0.5,
             0.74,
-            f"Stage-A yield & bias — {input_name}",
+            f"Stage-A yield & bias -- {input_name}",
             ha="center",
             va="center",
             fontsize=text_sizes["fig_title"],
@@ -705,7 +645,7 @@ def _build_stage_a_diversity_figure(
         ax_header.text(
             0.5,
             0.76,
-            f"Stage-A core diversity (tfbs_core only; baseline vs actual) — {input_name}",
+            f"Stage-A core diversity (tfbs_core only; baseline vs actual) -- {input_name}",
             ha="center",
             va="center",
             fontsize=text_sizes["fig_title"],

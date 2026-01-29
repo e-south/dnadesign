@@ -1,0 +1,387 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/src/viz/plot_run.py
+
+Run-level plotting for placements, TFBS usage, and run health diagnostics.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Optional
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+from .plot_common import _apply_style, _fig_ax, _safe_filename, _style
+
+
+def _plot_config(cfg: dict) -> dict:
+    if not isinstance(cfg, dict):
+        return {}
+    if isinstance(cfg.get("generation"), dict):
+        return cfg
+    nested = cfg.get("config")
+    if isinstance(nested, dict):
+        return nested
+    return cfg
+
+
+def _sequence_length_from_cfg(cfg: dict) -> int:
+    cfg = _plot_config(cfg)
+    gen = cfg.get("generation") if cfg else None
+    if not isinstance(gen, dict):
+        raise ValueError("Plot config missing generation block.")
+    length = gen.get("sequence_length")
+    if length is None:
+        raise ValueError("Plot config missing generation.sequence_length.")
+    return int(length)
+
+
+def _extract_fixed_element_ranges(cfg: dict, plan_name: str) -> list[tuple[str, int, int]]:
+    ranges: list[tuple[str, int, int]] = []
+    cfg = _plot_config(cfg)
+    gen = cfg.get("generation", {}) if cfg else {}
+    for item in gen.get("plan", []) or []:
+        name = str(item.get("name") or "").strip()
+        if not name or name != plan_name:
+            continue
+        fixed = item.get("fixed_elements") or {}
+        pcs = fixed.get("promoter_constraints")
+        pcs = [pcs] if isinstance(pcs, dict) else (pcs or [])
+        for p in (x for x in pcs if isinstance(x, dict)):
+            upstream_pos = p.get("upstream_pos")
+            downstream_pos = p.get("downstream_pos")
+            if upstream_pos is not None:
+                lo, hi = upstream_pos
+                ranges.append(("promoter_upstream", int(lo), int(hi)))
+            if downstream_pos is not None:
+                lo, hi = downstream_pos
+                ranges.append(("promoter_downstream", int(lo), int(hi)))
+    return ranges
+
+
+def _fixed_element_alias(label: str) -> str:
+    text = str(label or "").lower()
+    if "upstream" in text or "promoter_upstream" in text:
+        return "-35"
+    if "downstream" in text or "promoter_downstream" in text:
+        return "-10"
+    return str(label)
+
+
+def _bin_attempts(values: np.ndarray, bins: int) -> tuple[np.ndarray, np.ndarray]:
+    if values.size == 0:
+        return np.array([]), np.array([])
+    lo = float(values.min())
+    hi = float(values.max())
+    if hi <= lo:
+        hi = lo + 1.0
+    edges = np.linspace(lo, hi, num=int(bins) + 1)
+    centers = (edges[:-1] + edges[1:]) / 2.0
+    return edges, centers
+
+
+def _axis_pixel_width(ax) -> float:
+    fig = ax.figure
+    width = fig.get_figwidth() * fig.dpi
+    return max(1.0, width * ax.get_position().width)
+
+
+def _resolution_bins(ax, n_points: int, *, min_bins: int = 25) -> int:
+    if n_points <= 0:
+        return int(min_bins)
+    px = _axis_pixel_width(ax)
+    return max(min_bins, min(int(px), int(n_points)))
+
+
+def _gc_fraction(seq: str) -> float:
+    if not seq:
+        return 0.0
+    seq = str(seq).upper()
+    gc = sum(1 for ch in seq if ch in {"G", "C"})
+    return float(gc) / float(len(seq))
+
+
+def plot_placement_map(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    composition_df: pd.DataFrame,
+    cfg: dict,
+    style: Optional[dict] = None,
+) -> list[Path]:
+    if composition_df is None or composition_df.empty:
+        raise ValueError("placement_map requires composition.parquet with placements.")
+    required = {"solution_id", "input_name", "plan_name", "tf", "tfbs"}
+    missing = required - set(composition_df.columns)
+    if missing:
+        raise ValueError(f"composition.parquet missing required columns: {sorted(missing)}")
+    start_col = "offset" if "offset" in composition_df.columns else None
+    length_col = "length" if "length" in composition_df.columns else None
+    end_col = "end" if "end" in composition_df.columns else None
+    if start_col is None and end_col is None:
+        raise ValueError("composition.parquet requires offset or end columns.")
+    if length_col is None and end_col is None:
+        raise ValueError("composition.parquet requires length or end columns.")
+    style = _style(style)
+    seq_len = _sequence_length_from_cfg(cfg)
+    paths: list[Path] = []
+    for (input_name, plan_name), sub in composition_df.groupby(["input_name", "plan_name"]):
+        sub = sub.copy()
+        n_solutions = sub["solution_id"].astype(str).nunique()
+        if n_solutions <= 0:
+            raise ValueError(f"placement_map has no solutions for {input_name}/{plan_name}.")
+        fixed_ranges = _extract_fixed_element_ranges(cfg, str(plan_name))
+        fixed_labels = [_fixed_element_alias(label) for label, _lo, _hi in fixed_ranges]
+        tf_labels = sorted({str(tf) for tf in sub["tf"].astype(str).tolist() if str(tf).strip()})
+        labels = tf_labels + [lab for lab in fixed_labels if lab not in tf_labels]
+        if not labels:
+            raise ValueError(f"placement_map has no binding-site labels for {input_name}/{plan_name}.")
+        occupancy = {label: np.zeros(seq_len, dtype=float) for label in labels}
+        for _sol_id, sol_df in sub.groupby("solution_id"):
+            for label, group in sol_df.groupby("tf"):
+                label = str(label)
+                if label not in occupancy:
+                    continue
+                diff = np.zeros(seq_len + 1, dtype=float)
+                for _, row in group.iterrows():
+                    start = int(row.get(start_col) or 0)
+                    if length_col is not None and row.get(length_col) is not None:
+                        length = int(row.get(length_col))
+                        end = start + length
+                    else:
+                        end = int(row.get(end_col) or 0)
+                        length = end - start
+                    if length <= 0:
+                        continue
+                    lo = max(0, min(start, seq_len))
+                    hi = max(lo, min(end, seq_len))
+                    if hi <= lo:
+                        continue
+                    diff[lo] += 1.0
+                    diff[hi] -= 1.0
+                covered = np.cumsum(diff[:-1]) > 0
+                occupancy[label] += covered.astype(float)
+        for label, lo, hi in fixed_ranges:
+            alias = _fixed_element_alias(label)
+            if alias not in occupancy:
+                occupancy[alias] = np.zeros(seq_len, dtype=float)
+                labels.append(alias)
+            lo = max(0, min(int(lo), seq_len))
+            hi = max(lo, min(int(hi), seq_len))
+            if hi > lo:
+                occupancy[alias][lo:hi] = float(n_solutions)
+        mat = np.vstack([occupancy[label] for label in labels]) / float(n_solutions)
+        fig, ax = _fig_ax(style)
+        im = ax.imshow(mat, aspect="auto", cmap="viridis", vmin=0.0, vmax=1.0)
+        ax.set_yticks(np.arange(len(labels)))
+        ax.set_yticklabels(labels)
+        xticks = np.linspace(0, max(0, seq_len - 1), num=min(seq_len, 8), dtype=int)
+        ax.set_xticks(xticks)
+        ax.set_xticklabels([str(x + 1) for x in xticks])
+        ax.set_xlabel("Position (nt)")
+        ax.set_ylabel("Binding-site type")
+        ax.set_title(f"Placement map -- {input_name}/{plan_name}")
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="Fraction of solutions")
+        _apply_style(ax, style)
+        fig.tight_layout()
+        fname = f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}{out_path.suffix}"
+        path = out_path.parent / fname
+        fig.savefig(path)
+        plt.close(fig)
+        paths.append(path)
+    return paths
+
+
+def plot_tfbs_usage(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    composition_df: pd.DataFrame,
+    pools: dict[str, pd.DataFrame] | None = None,
+    library_members_df: pd.DataFrame | None = None,
+    style: Optional[dict] = None,
+) -> list[Path]:
+    if composition_df is None or composition_df.empty:
+        raise ValueError("tfbs_usage requires composition.parquet with placements.")
+    required = {"input_name", "plan_name", "tf", "tfbs"}
+    missing = required - set(composition_df.columns)
+    if missing:
+        raise ValueError(f"composition.parquet missing required columns: {sorted(missing)}")
+    style = _style(style)
+    paths: list[Path] = []
+    for (input_name, plan_name), sub in composition_df.groupby(["input_name", "plan_name"]):
+        counts = sub.groupby(["tf", "tfbs"]).size().sort_values(ascending=False)
+        if counts.empty:
+            raise ValueError(f"tfbs_usage found no TFBS counts for {input_name}/{plan_name}.")
+        ranks = np.arange(1, len(counts) + 1)
+        values = counts.to_numpy(dtype=float)
+        fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=style["figsize"])
+        ax_left.plot(ranks, values, color="#4c78a8", linewidth=1.8)
+        ax_left.set_xlabel("TFBS rank (by usage)")
+        ax_left.set_ylabel("Usage count")
+        ax_left.set_title("TFBS rank-frequency")
+
+        ax_right.hist(values, bins="fd", color="#4c78a8", alpha=0.75)
+        ax_right.set_xlabel("Usage count")
+        ax_right.set_ylabel("Count")
+        ax_right.set_title("TFBS usage distribution")
+        ax_ecdf = ax_right.twinx()
+        sorted_vals = np.sort(values)
+        ax_ecdf.plot(sorted_vals, np.arange(1, len(sorted_vals) + 1) / len(sorted_vals), color="#f28e2b")
+        ax_ecdf.set_ylabel("ECDF")
+
+        annotations = []
+        used_unique = int(len(counts))
+        if pools and input_name in pools:
+            pool_df = pools[input_name]
+            if "tfbs_sequence" in pool_df.columns:
+                tfbs_col = "tfbs_sequence"
+            else:
+                tfbs_col = "tfbs"
+            pool_unique = pool_df.assign(tf=pool_df["tf"].astype(str), tfbs=pool_df[tfbs_col].astype(str))
+            pool_unique = pool_unique.drop_duplicates(subset=["tf", "tfbs"])
+            pool_count = int(len(pool_unique))
+            if pool_count > 0:
+                annotations.append(f"pool used >=1: {used_unique}/{pool_count} ({used_unique / pool_count:.2%})")
+        if library_members_df is not None and not library_members_df.empty:
+            offered = library_members_df[
+                (library_members_df["input_name"].astype(str) == str(input_name))
+                & (library_members_df["plan_name"].astype(str) == str(plan_name))
+            ]
+            if not offered.empty:
+                offered_unique = offered.drop_duplicates(subset=["tf", "tfbs"])
+                offered_count = int(len(offered_unique))
+                if offered_count > 0:
+                    annotations.append(
+                        f"offered used >=1: {used_unique}/{offered_count} ({used_unique / offered_count:.2%})"
+                    )
+        if annotations:
+            ax_right.text(0.98, 0.98, "\n".join(annotations), transform=ax_right.transAxes, ha="right", va="top")
+        _apply_style(ax_left, style)
+        _apply_style(ax_right, style)
+        fig.tight_layout()
+        fname = f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}{out_path.suffix}"
+        path = out_path.parent / fname
+        fig.savefig(path)
+        plt.close(fig)
+        paths.append(path)
+    return paths
+
+
+def plot_run_health(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    attempts_df: pd.DataFrame,
+    events_df: pd.DataFrame | None = None,
+    style: Optional[dict] = None,
+) -> None:
+    if attempts_df is None or attempts_df.empty:
+        raise ValueError("run_health requires attempts.parquet.")
+    required = {"attempt_index", "status", "reason", "plan_name"}
+    missing = required - set(attempts_df.columns)
+    if missing:
+        raise ValueError(f"attempts.parquet missing required columns: {sorted(missing)}")
+    style = _style(style)
+    attempts_df = attempts_df.copy()
+    attempts_df["attempt_index"] = pd.to_numeric(attempts_df["attempt_index"], errors="coerce").fillna(0).astype(int)
+    attempts_df["created_at"] = pd.to_datetime(attempts_df.get("created_at"), errors="coerce")
+    statuses = ["success", "duplicate", "failed"]
+    plan_names = sorted({str(p) for p in attempts_df["plan_name"].astype(str).tolist() if str(p).strip()})
+    show_plans = len(plan_names) > 1
+    if show_plans:
+        fig, axes = plt.subplots(2, 2, figsize=style["figsize"])
+        ax_outcome, ax_dup, ax_fail, ax_plan = axes.flatten()
+    else:
+        fig, axes = plt.subplots(1, 3, figsize=style["figsize"])
+        ax_outcome, ax_dup, ax_fail = axes
+        ax_plan = None
+
+    bins = _resolution_bins(ax_outcome, len(attempts_df))
+    edges, centers = _bin_attempts(attempts_df["attempt_index"].to_numpy(dtype=float), bins)
+    if centers.size == 0:
+        raise ValueError("run_health cannot bin attempts without attempt_index values.")
+    counts_by_status: dict[str, np.ndarray] = {}
+    for status in statuses:
+        sub = attempts_df[attempts_df["status"].astype(str) == status]
+        counts, _ = np.histogram(sub["attempt_index"].to_numpy(dtype=float), bins=edges)
+        counts_by_status[status] = counts.astype(float)
+
+    ax_outcome.stackplot(centers, [counts_by_status[s] for s in statuses], labels=statuses)
+    ax_outcome.set_xlabel("Attempt index (binned)")
+    ax_outcome.set_ylabel("Count")
+    ax_outcome.set_title("Outcome mix")
+    ax_outcome.legend(loc="upper right", frameon=bool(style.get("legend_frame", False)))
+
+    totals = sum(counts_by_status.values())
+    dup_rate = np.divide(counts_by_status.get("duplicate", np.zeros_like(totals)), np.where(totals > 0, totals, 1.0))
+    ax_dup.plot(centers, dup_rate, color="#e15759")
+    ax_dup.set_xlabel("Attempt index (binned)")
+    ax_dup.set_ylabel("Duplicate rate")
+    ax_dup.set_ylim(0.0, min(1.0, max(0.05, float(np.nanmax(dup_rate)) + 0.05)))
+    ax_dup.set_title("Duplicate pressure")
+
+    failed = attempts_df[attempts_df["status"].astype(str) == "failed"]
+    if failed.empty:
+        ax_fail.text(0.5, 0.5, "No failures", ha="center", va="center", transform=ax_fail.transAxes)
+        ax_fail.set_axis_off()
+    else:
+        reason_counts = failed["reason"].astype(str).value_counts()
+        if len(reason_counts) <= 8:
+            positions = np.arange(len(reason_counts))
+            ax_fail.bar(positions, reason_counts.values.tolist(), color="#4c78a8")
+            ax_fail.set_xticks(positions)
+            ax_fail.set_xticklabels(reason_counts.index.tolist(), rotation=45, ha="right")
+            ax_fail.set_ylabel("Count")
+            ax_fail.set_title("Failure reasons")
+        else:
+            ranks = np.arange(1, len(reason_counts) + 1)
+            ax_fail.plot(ranks, reason_counts.values, color="#4c78a8", linewidth=1.6)
+            ax_fail.set_xlabel("Reason rank")
+            ax_fail.set_ylabel("Count")
+            ax_fail.set_title("Failure rank-frequency")
+
+    if show_plans and ax_plan is not None:
+        for plan in plan_names:
+            sub = attempts_df[(attempts_df["plan_name"].astype(str) == plan) & (attempts_df["status"] == "success")]
+            counts, _ = np.histogram(sub["attempt_index"].to_numpy(dtype=float), bins=edges)
+            cumulative = np.cumsum(counts)
+            ax_plan.plot(centers, cumulative, label=plan)
+        ax_plan.set_xlabel("Attempt index (binned)")
+        ax_plan.set_ylabel("Cumulative successes")
+        ax_plan.set_title("Plan progress")
+        ax_plan.legend(loc="upper left", frameon=bool(style.get("legend_frame", False)))
+
+    if events_df is not None and not events_df.empty and "created_at" in attempts_df.columns:
+        event_times = pd.to_datetime(events_df.get("created_at"), errors="coerce").dropna()
+        if not event_times.empty:
+            attempt_times = attempts_df.dropna(subset=["created_at"]).sort_values("created_at")
+            if not attempt_times.empty:
+                idx_values = attempt_times["attempt_index"].to_numpy()
+                time_values = attempt_times["created_at"].to_numpy()
+                for evt_time in event_times.to_numpy():
+                    insert = np.searchsorted(time_values, evt_time)
+                    if insert <= 0:
+                        event_idx = idx_values[0]
+                    elif insert >= len(idx_values):
+                        event_idx = idx_values[-1]
+                    else:
+                        before = time_values[insert - 1]
+                        after = time_values[insert]
+                        use_prev = (evt_time - before) <= (after - evt_time)
+                        event_idx = idx_values[insert - 1] if use_prev else idx_values[insert]
+                    ax_outcome.axvline(event_idx, color="#999999", linestyle="--", linewidth=1)
+
+    for ax in [ax_outcome, ax_dup, ax_fail] + ([ax_plan] if ax_plan is not None else []):
+        if ax is not None:
+            _apply_style(ax, style)
+    fig.tight_layout()
+    fig.savefig(out_path)
+    plt.close(fig)

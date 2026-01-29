@@ -17,6 +17,7 @@ from typing import Optional
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib.colors import to_rgba
 from matplotlib.offsetbox import AnchoredText
 
 # Embed TrueType fonts for clean text in vector exports
@@ -24,6 +25,11 @@ mpl.rcParams["pdf.fonttype"] = 42
 mpl.rcParams["ps.fonttype"] = 42
 
 _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
+
+try:
+    from matplotlib.colors import is_color_like as _mpl_is_color_like
+except Exception:
+    _mpl_is_color_like = None
 
 
 def _dg(col: str) -> str:
@@ -110,6 +116,60 @@ def _format_percent(value: float) -> str:
     if value >= 0.01:
         return f"{value * 100:.1f}%"
     return f"{value * 100:.2f}%"
+
+
+def _is_color_like(value) -> bool:
+    if _mpl_is_color_like is not None:
+        try:
+            return bool(_mpl_is_color_like(value))
+        except Exception:
+            pass
+    try:
+        to_rgba(value)
+        return True
+    except Exception:
+        return False
+
+
+def _palette(style: dict, n: int, *, no_repeat: bool = False):
+    pal = style.get("palette", "okabe_ito")
+    if isinstance(pal, str):
+        key = pal.lower().replace("-", "_")
+        if key in {"okabe_ito", "okabeito", "colorblind", "colorblind2", "colorblind_2"}:
+            base = [
+                "#000000",
+                "#E69F00",
+                "#56B4E9",
+                "#009E73",
+                "#F0E442",
+                "#0072B2",
+                "#D55E00",
+                "#CC79A7",
+            ]
+            if n <= len(base):
+                return base[:n]
+            if no_repeat:
+                raise ValueError(
+                    f"Need {n} unique colors; okabe_ito has {len(base)}. Provide a longer palette or reduce categories."
+                )
+            return [base[i % len(base)] for i in range(n)]
+        if _is_color_like(pal):
+            if no_repeat and n > 1:
+                raise ValueError(f"Single color '{pal}' cannot provide {n} unique colors.")
+            return [pal] * n
+        try:
+            cmap = plt.get_cmap(pal)
+            return [cmap(i / max(1, n - 1)) for i in range(n)]
+        except Exception:
+            raise ValueError(f"Unknown palette or colormap name: {pal!r}")
+    if isinstance(pal, (list, tuple)):
+        base = list(pal)
+        if len(base) >= n:
+            return base[:n]
+        if no_repeat:
+            raise ValueError(f"Need {n} unique colors; got {len(base)} in explicit list.")
+        return [base[i % len(base)] for i in range(n)]
+    raise ValueError(f"Invalid palette type: {type(pal).__name__}")
 
 
 def _add_anchored_box(
