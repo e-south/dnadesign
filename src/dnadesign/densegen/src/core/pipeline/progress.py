@@ -249,20 +249,31 @@ def _summarize_tfbs_usage_stats(usage_counts: dict[tuple[str, str], int]) -> str
 class _ScreenDashboard:
     def __init__(self, *, console: Console, refresh_seconds: float) -> None:
         refresh_rate = max(1.0, 1.0 / max(refresh_seconds, 0.1))
-        self._live = Live(console=console, refresh_per_second=refresh_rate, transient=False)
+        self._console = console
+        self._live = (
+            Live(console=console, refresh_per_second=refresh_rate, transient=False) if console.is_terminal else None
+        )
         self._started = False
+        self._last_renderable = None
+        self._printed = False
         atexit.register(self.close)
 
     def update(self, renderable) -> None:
+        if self._live is None:
+            self._last_renderable = renderable
+            return
         if not self._started:
             self._live.start()
             self._started = True
         self._live.update(renderable, refresh=True)
 
     def close(self) -> None:
-        if self._started:
+        if self._live is not None and self._started:
             self._live.stop()
             self._started = False
+        if self._live is None and self._last_renderable is not None and not self._printed:
+            self._console.print(self._last_renderable)
+            self._printed = True
 
 
 def _build_screen_dashboard(

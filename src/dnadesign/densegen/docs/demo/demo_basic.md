@@ -83,6 +83,15 @@ If you use pixi to run DenseGen, pin the config path via an alias. (This matters
 alias dense="pixi run dense -c $PWD/config.yaml"
 ```
 
+If you do not want an alias, you can set an environment variable instead:
+
+```bash
+export DENSEGEN_CONFIG_PATH="$PWD/config.yaml"
+```
+
+DenseGen will also auto-detect a single workspace config under `src/dnadesign/densegen/workspaces/`
+when running from the repo root; if multiple workspaces exist, you must pass `-c`.
+
 If this workspace has existing outputs and you want a clean start:
 
 ```bash

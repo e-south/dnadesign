@@ -15,7 +15,10 @@ import hashlib
 import json
 import logging
 import math
+import os
 import random
+import shutil
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -579,7 +582,16 @@ def _process_plan_for_source(
     progress_refresh_seconds = float(getattr(log_cfg, "progress_refresh_seconds", 1.0))
     logging_utils.set_progress_style(progress_style)
     logging_utils.set_progress_enabled(progress_style in {"stream", "screen"})
-    screen_console = Console() if progress_style == "screen" else None
+    screen_console = None
+    if progress_style == "screen":
+        tty = bool(getattr(sys.stdout, "isatty", lambda: False)())
+        pixi_shell = os.environ.get("PIXI_IN_SHELL") == "1"
+        if tty and not pixi_shell:
+            screen_console = Console()
+        else:
+            width = shutil.get_terminal_size(fallback=(140, 40)).columns
+            screen_console = Console(file=sys.stdout, width=int(width), force_terminal=False)
+            log.warning("progress_style=screen requires an interactive terminal; using static output.")
     last_screen_refresh = 0.0
     latest_failure_totals: str | None = None
     show_tfbs = bool(show_tfbs or getattr(log_cfg, "show_tfbs", False))

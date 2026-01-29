@@ -95,8 +95,16 @@ from .utils.logging_utils import install_native_stderr_filters, setup_logging
 from .utils.mpl_utils import ensure_mpl_cache_dir
 from .utils.rich_style import make_table
 
+
+def _build_console() -> Console:
+    if getattr(sys.stdout, "isatty", lambda: False)():
+        return Console()
+    width = shutil.get_terminal_size(fallback=(140, 40)).columns
+    return Console(width=int(width))
+
+
 rich_traceback(show_locals=False)
-console = Console()
+console = _build_console()
 _PYARROW_SYSCTL_PATTERN = re.compile(r"sysctlbyname failed for 'hw\.")
 log = logging.getLogger(__name__)
 install_native_stderr_filters(suppress_solver_messages=False)
@@ -296,6 +304,56 @@ def _default_config_path() -> Path:
     return Path.cwd() / DEFAULT_CONFIG_FILENAME
 
 
+def _workspace_search_roots() -> list[Path]:
+    roots: list[Path] = []
+    env_root = os.environ.get("DENSEGEN_WORKSPACE_ROOT")
+    if env_root:
+        roots.append(Path(env_root))
+    pixi_root = os.environ.get("PIXI_PROJECT_ROOT")
+    if pixi_root:
+        roots.append(Path(pixi_root))
+    roots.append(Path.cwd())
+    seen: set[str] = set()
+    unique: list[Path] = []
+    for root in roots:
+        try:
+            key = str(root.resolve())
+        except Exception:
+            key = str(root)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(root)
+    return unique
+
+
+def _auto_config_path() -> tuple[Path | None, list[Path]]:
+    candidates: list[Path] = []
+    for root in _workspace_search_roots():
+        for base in (
+            root / "src" / "dnadesign" / "densegen" / "workspaces",
+            root / "workspaces",
+        ):
+            if not base.exists():
+                continue
+            for path in sorted(base.glob(f"*/{DEFAULT_CONFIG_FILENAME}")):
+                candidates.append(path)
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for path in candidates:
+        try:
+            key = str(path.resolve())
+        except Exception:
+            key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(path)
+    if len(unique) == 1:
+        return unique[0], []
+    return None, unique
+
+
 def _workspace_command(command: str, *, cfg_path: Path | None = None, run_root: Path | None = None) -> str:
     root = run_root or (cfg_path.parent if cfg_path is not None else None)
     base = Path.cwd()
@@ -343,7 +401,26 @@ def _resolve_config_path(ctx: typer.Context, override: Optional[Path]) -> tuple[
         ctx_path = ctx.obj.get("config_path")
         if ctx_path is not None:
             return Path(ctx_path), False
-    return _default_config_path(), True
+    env_path = os.environ.get("DENSEGEN_CONFIG_PATH")
+    if env_path:
+        return Path(env_path), False
+    default_path = _default_config_path()
+    if default_path.exists():
+        return default_path, True
+    auto_path, candidates = _auto_config_path()
+    if auto_path is not None:
+        console.print(
+            f"[bold yellow]Config not found in cwd; using[/] "
+            f"{_display_path(auto_path, Path.cwd(), absolute=False)} (auto-detected). "
+            "Pass -c to select a different workspace."
+        )
+        return auto_path, False
+    if candidates:
+        console.print("[bold red]Multiple workspace configs found; use -c to select one.[/]")
+        for path in candidates:
+            console.print(f" - {_display_path(path, Path.cwd(), absolute=False)}")
+        raise typer.Exit(code=1)
+    return default_path, True
 
 
 def _load_config_or_exit(
