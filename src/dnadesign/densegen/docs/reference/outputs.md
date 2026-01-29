@@ -129,8 +129,12 @@ Core diagnostics plots (canonical set):
 - `placement_map` — 1‑nt occupancy map across binding‑site types (regulators + fixed elements).
 - `tfbs_usage` — TFBS allocation summary (rank–frequency + distribution across all TFBS).
 - `run_health` — attempts outcomes + failure composition + duplicate pressure (binned for scale).
-- `stage_a_summary` — Stage‑A pool quality, yield/dedupe, and score/length bias checks.
+- `stage_a_summary` — Stage‑A pool quality, yield/dedupe, score/length bias, and core diversity checks.
 - `stage_b_summary` — Stage‑B feasibility + composition distributions + offered‑vs‑used utilization.
+
+`stage_a_summary` writes multiple images per input, e.g.:
+`stage_a_summary__<input>.png`, `stage_a_summary__<input>__yield_bias.png`,
+and `stage_a_summary__<input>__diversity.png`.
 
 ---
 
@@ -164,7 +168,10 @@ to rebuild pools from scratch.
 `pool_manifest.json` includes the input config hash plus file fingerprints; append requires they match.
 For FIMO-backed PWM inputs, it also records Stage‑A sampling metadata
 (tier scheme, eligibility/retention rules, FIMO threshold, background source/bgfile, and
-eligible score histograms with tier boundary scores per regulator).
+eligible score histograms with tier boundary scores per regulator), plus per‑TF diversity
+summaries (core nearest‑neighbor distance + core entropy, baseline vs actual; large sets are
+deterministically subsampled to 2500 sequences) and padding audit stats (best‑hit overlap with
+intended core; core offset histogram).
 Stage‑A pool rows include `best_hit_score`, `tier`, `rank_within_regulator` (1‑based rank among
 eligible unique TFBS per regulator), and `tfbs_core` for core‑level uniqueness checks.
 

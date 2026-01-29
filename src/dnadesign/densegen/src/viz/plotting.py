@@ -1579,6 +1579,13 @@ def _build_stage_a_diversity_figure(
                             note_lines.append(f"med {baseline_med:.2f} → {actual_med:.2f}")
                         if actual_frac is not None:
                             note_lines.append(f"p(NND≤1) {float(actual_frac) * 100:.1f}%")
+                        score_block = diversity.get("score_baseline_vs_actual") if isinstance(diversity, dict) else None
+                        if isinstance(score_block, dict):
+                            base_score = score_block.get("baseline_median")
+                            act_score = score_block.get("actual_median")
+                            if base_score is not None and act_score is not None:
+                                note_lines.append(f"score {base_score:.2f} → {act_score:.2f}")
+                        note_lines.append("tfbs_core only")
                         if note_lines:
                             ax_left.text(
                                 0.02,

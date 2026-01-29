@@ -812,10 +812,14 @@ def _core_hamming_nnd(cores: Sequence[str], *, max_n: int = 2500) -> dict[str, o
     max_dist = int(length)
     counts = np.bincount(distances, minlength=max_dist + 1)
     frac_le_1 = float(np.mean(distances <= 1)) if distances.size else 0.0
+    p05 = float(np.percentile(distances, 5)) if distances.size else 0.0
+    p95 = float(np.percentile(distances, 95)) if distances.size else 0.0
     return {
         "bins": list(range(max_dist + 1)),
         "counts": [int(v) for v in counts.tolist()],
         "median": float(np.median(distances)) if distances.size else 0.0,
+        "p05": p05,
+        "p95": p95,
         "frac_le_1": float(frac_le_1),
         "n": int(n),
         "subsampled": bool(subsampled),
@@ -857,6 +861,25 @@ def _diversity_summary(
 
 def _ranges_overlap(a_start: int, a_stop: int, b_start: int, b_stop: int) -> bool:
     return int(a_start) <= int(b_stop) and int(b_start) <= int(a_stop)
+
+
+def _select_diversity_baseline_candidates(
+    ranked: Sequence[FimoCandidate],
+    *,
+    selection_policy: str,
+    selection_diag: dict | None,
+    n_sites: int,
+) -> list[FimoCandidate]:
+    candidate_slice: list[FimoCandidate] = list(ranked)
+    if selection_policy == "mmr" and selection_diag is not None:
+        tier_limit = selection_diag.get("tier_limit")
+        if isinstance(tier_limit, int) and tier_limit > 0:
+            candidate_slice = candidate_slice[:tier_limit]
+        shortlist_k = selection_diag.get("shortlist_k")
+        if isinstance(shortlist_k, int) and shortlist_k > 0:
+            candidate_slice = candidate_slice[:shortlist_k]
+    target_n = min(int(n_sites), len(candidate_slice))
+    return candidate_slice[:target_n]
 
 
 def _rank_scored_sequences(scored: Sequence[tuple[str, float]]) -> list[tuple[str, float]]:
@@ -1701,11 +1724,12 @@ def sample_pwm_sites(
         retained_tier_counts = [0, 0, 0, 0]
         for cand in picked:
             retained_tier_counts[tier_by_seq[cand.seq]] += 1
-        candidate_slice = ranked
-        tier_limit = selection_diag.get("tier_limit")
-        if isinstance(tier_limit, int) and tier_limit > 0:
-            candidate_slice = ranked[:tier_limit]
-        baseline_candidates = candidate_slice[: min(int(n_sites), len(candidate_slice))]
+        baseline_candidates = _select_diversity_baseline_candidates(
+            ranked,
+            selection_policy=selection_policy,
+            selection_diag=selection_diag,
+            n_sites=int(n_sites),
+        )
         baseline_cores = [(_core_sequence(cand)) for cand in baseline_candidates if cand.matched_sequence]
         actual_cores = [(_core_sequence(cand)) for cand in picked if cand.matched_sequence]
         baseline_scores = [float(cand.score) for cand in baseline_candidates]

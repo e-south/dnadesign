@@ -14,9 +14,11 @@ from __future__ import annotations
 import pytest
 
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import (
+    FimoCandidate,
     _core_entropy,
     _core_hamming_nnd,
     _diversity_summary,
+    _select_diversity_baseline_candidates,
 )
 
 
@@ -29,6 +31,8 @@ def test_core_hamming_nnd_counts_and_median() -> None:
     assert counts[1] == 3
     assert summary.get("median") == 1.0
     assert summary.get("frac_le_1") == 1.0
+    assert summary.get("p05") is not None
+    assert summary.get("p95") is not None
 
 
 def test_core_hamming_nnd_subsample_flag() -> None:
@@ -60,3 +64,38 @@ def test_diversity_summary_scores() -> None:
     assert isinstance(score_block, dict)
     assert score_block.get("baseline_median") == 1.5
     assert score_block.get("actual_median") == 1.5
+
+
+def _cand(seq: str, score: float) -> FimoCandidate:
+    return FimoCandidate(
+        seq=seq,
+        score=score,
+        start=1,
+        stop=len(seq),
+        strand="+",
+        matched_sequence=seq,
+    )
+
+
+def test_baseline_candidates_use_shortlist_k() -> None:
+    ranked = [_cand("AAAA", 4.0), _cand("AAAT", 3.0), _cand("AATT", 2.0), _cand("TTTT", 1.0)]
+    diag = {"shortlist_k": 2, "tier_limit": 4}
+    baseline = _select_diversity_baseline_candidates(
+        ranked,
+        selection_policy="mmr",
+        selection_diag=diag,
+        n_sites=3,
+    )
+    assert [cand.seq for cand in baseline] == ["AAAA", "AAAT"]
+
+
+def test_baseline_candidates_use_tier_limit_when_shortlist_missing() -> None:
+    ranked = [_cand("AAAA", 4.0), _cand("AAAT", 3.0), _cand("AATT", 2.0), _cand("TTTT", 1.0)]
+    diag = {"shortlist_k": None, "tier_limit": 2}
+    baseline = _select_diversity_baseline_candidates(
+        ranked,
+        selection_policy="mmr",
+        selection_diag=diag,
+        n_sites=3,
+    )
+    assert [cand.seq for cand in baseline] == ["AAAA", "AAAT"]
