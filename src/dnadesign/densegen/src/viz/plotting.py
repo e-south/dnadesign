@@ -142,13 +142,18 @@ def _add_anchored_box(
     loc: str = "upper right",
     fontsize: float = 9.0,
     alpha: float = 0.9,
+    edgecolor: str | None = "#dddddd",
 ) -> AnchoredText | None:
     if not lines:
         return None
     text = "\n".join(lines)
     box = AnchoredText(text, loc=loc, prop={"size": fontsize}, frameon=True, pad=0.35, borderpad=0.4)
     box.patch.set_alpha(alpha)
-    box.patch.set_edgecolor("#dddddd")
+    if edgecolor is None or str(edgecolor).lower() in {"none", "transparent"}:
+        box.patch.set_edgecolor("none")
+        box.patch.set_linewidth(0.0)
+    else:
+        box.patch.set_edgecolor(edgecolor)
     box.patch.set_facecolor("white")
     ax.add_artist(box)
     return box
@@ -195,7 +200,7 @@ def _draw_tier_markers(
                 color="#222222",
             )
         box_size = fontsize or float(ax.yaxis.label.get_size()) * 0.74
-        _add_anchored_box(ax, lines, loc=loc, fontsize=box_size, alpha=0.9)
+        _add_anchored_box(ax, lines, loc=loc, fontsize=box_size, alpha=0.9, edgecolor="none")
 
 
 def _shared_axis_cleanup(axes: list[mpl.axes.Axes]) -> None:
@@ -1026,7 +1031,7 @@ def _build_stage_a_strata_overview_figure(
         ax_header.set_label("header")
         ax_header.text(
             0.5,
-            0.70,
+            0.78,
             f"Stage-A pool tiers — {input_name}",
             ha="center",
             va="center",
@@ -1093,13 +1098,6 @@ def _build_stage_a_strata_overview_figure(
                         if retained_arr.max() > 0:
                             retained_density = retained_arr / scale
                             ax.fill_between(centers, 0.0, retained_density, color=hue, alpha=0.5)
-                    box_loc = "upper right"
-                    if centers.size:
-                        mid = (centers[0] + centers[-1]) / 2.0
-                        left_mass = float(density[centers <= mid].sum())
-                        right_mass = float(density[centers > mid].sum())
-                        if right_mass > left_mass:
-                            box_loc = "upper left"
                     retained = retained_tiers.get(reg, {})
                     _draw_tier_markers(
                         ax,
@@ -1110,8 +1108,8 @@ def _build_stage_a_strata_overview_figure(
                         ],
                         ymax_fraction=0.58,
                         label_mode="box",
-                        loc=box_loc,
-                        fontsize=text_sizes["annotation"],
+                        loc="lower right",
+                        fontsize=text_sizes["annotation"] * 0.8,
                     )
                 ax.set_yticks([])
                 ax.set_ylim(0, 1.05)
@@ -1151,6 +1149,7 @@ def _build_stage_a_strata_overview_figure(
                 fontsize=text_sizes["annotation"],
                 color="#444444",
                 pad=8,
+                loc="center",
             )
             axes_left[-1].set_xlabel("FIMO log-odds score")
             axes_left[-1].xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
@@ -1207,7 +1206,7 @@ def _build_stage_a_strata_overview_figure(
                 handles=legend_handles,
                 loc="upper left",
                 frameon=False,
-                fontsize=text_sizes["annotation"] * 0.9,
+                fontsize=text_sizes["annotation"] * 0.8,
             )
 
         for ax in axes_left + [ax_right]:
@@ -1322,7 +1321,7 @@ def plot_stage_a_summary(
         fig2_height = max(4.8, base_height, 1.75 * n_regs + 0.8)
         text_sizes = _stage_a_text_sizes(style)
         reg_colors = _stage_a_regulator_colors(reg_order, style)
-        stage_labels = ["generated", "hit", "eligible", "unique", "retained"]
+        stage_labels = ["Generated", "Hit", "Eligible", "Unique", "Retained"]
         counts_by_reg = {reg: counts for reg, counts in zip(regs, stage_counts)}
         max_count = max((max(counts) for counts in stage_counts), default=0)
         with mpl.rc_context(stage_a_rcparams(style)):
@@ -1352,7 +1351,7 @@ def plot_stage_a_summary(
                 ncols=3,
                 width_ratios=[1.55, 1.55, 0.08],
                 hspace=0.32,
-                wspace=0.42,
+                wspace=0.48,
             )
             axes_left: list[mpl.axes.Axes] = []
             axes_right: list[mpl.axes.Axes] = []
@@ -1363,6 +1362,7 @@ def plot_stage_a_summary(
                 axes_right.append(fig2.add_subplot(body[idx, 1], sharex=share_right, sharey=share_right))
             cbar_ax = fig2.add_subplot(body[:, 2])
 
+            subtitle_size = text_sizes["panel_title"] * 0.88
             if not reg_order:
                 axes_left[0].text(0.5, 0.5, "No yield data", ha="center", va="center", transform=axes_left[0].transAxes)
                 axes_left[0].set_axis_off()
@@ -1390,48 +1390,46 @@ def plot_stage_a_summary(
                                 textcoords="offset points",
                                 ha="center",
                                 va="bottom",
-                                fontsize=text_sizes["annotation"] * 0.85,
+                                fontsize=text_sizes["annotation"] * 0.75,
                                 color="#222222",
                             )
                     label = format_regulator_label(reg)
                     ax.set_ylabel("")
                     ax.text(
-                        -0.2,
+                        -0.26,
                         0.64,
                         label,
                         transform=ax.transAxes,
                         ha="right",
                         va="center",
-                        fontsize=text_sizes["regulator_label"] * 0.9,
+                        fontsize=text_sizes["regulator_label"] * 0.88,
                         color="#222222",
                         clip_on=False,
                     )
                     core_len = core_lengths.get(str(reg))
                     if core_len:
                         ax.text(
-                            -0.2,
+                            -0.26,
                             0.34,
                             f"(core {core_len} bp)",
                             transform=ax.transAxes,
                             ha="right",
                             va="center",
-                            fontsize=text_sizes["sublabel"] * 0.9,
+                            fontsize=text_sizes["sublabel"] * 0.88,
                             color="#555555",
                             clip_on=False,
                         )
-                    ax.tick_params(axis="y", pad=1, labelsize=text_sizes["annotation"] * 0.8)
-                    ax.tick_params(axis="x", labelsize=text_sizes["annotation"] * 0.8)
-                    ax.ticklabel_format(axis="y", style="sci", scilimits=(0, 0))
+                    ax.tick_params(axis="y", pad=1, labelsize=text_sizes["annotation"] * 0.75)
+                    ax.tick_params(axis="x", labelsize=text_sizes["annotation"] * 0.75)
+                    ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter("{x:,.0f}"))
                     ax.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
-                    ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=4))
+                    ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=4, integer=True))
 
-                axes_left[0].set_title(
-                    "Stepwise survival and retained score/length bias",
-                    fontsize=text_sizes["panel_title"] * 0.92,
-                    pad=8,
-                )
+                axes_left[0].set_title("Stepwise survival & bias", fontsize=subtitle_size, pad=8)
                 axes_left[-1].set_xticks(x_positions)
                 axes_left[-1].set_xticklabels(stage_labels)
+                for ax in axes_left:
+                    ax.set_xlim(-0.4, len(stage_labels) - 1 + 0.4)
                 _shared_x_cleanup(axes_left)
 
             for idx, reg in enumerate(reg_order):
@@ -1455,14 +1453,14 @@ def plot_stage_a_summary(
                 ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=4))
             axes_right[0].set_title(
                 "Retained sites: score vs length (GC color)",
-                fontsize=text_sizes["panel_title"] * 0.92,
+                fontsize=subtitle_size,
                 pad=8,
             )
             axes_right[-1].set_xlabel("TFBS length (nt)")
             for ax in axes_right:
                 ax.set_ylabel("Best-hit score")
-                ax.tick_params(axis="y", labelsize=text_sizes["annotation"] * 0.8)
-                ax.tick_params(axis="x", labelsize=text_sizes["annotation"] * 0.8)
+                ax.tick_params(axis="y", labelsize=text_sizes["annotation"] * 0.75)
+                ax.tick_params(axis="x", labelsize=text_sizes["annotation"] * 0.75)
             x_min = float(np.nanmin(lengths)) if len(lengths) else 0.0
             x_max = float(np.nanmax(lengths)) if len(lengths) else 0.0
             if x_max > x_min:
@@ -1470,11 +1468,13 @@ def plot_stage_a_summary(
                     ax.set_xlim(x_min - 1.0, x_max + 1.0)
             sm = plt.cm.ScalarMappable(cmap="viridis", norm=mpl.colors.Normalize(vmin=0.0, vmax=1.0))
             cbar = fig2.colorbar(sm, cax=cbar_ax)
-            cbar.set_label("GC fraction", fontsize=text_sizes["annotation"])
-            cbar.ax.tick_params(labelsize=text_sizes["annotation"])
+            cbar.set_label("GC fraction", fontsize=text_sizes["annotation"] * 0.85)
+            cbar.ax.tick_params(labelsize=text_sizes["annotation"] * 0.75)
             _shared_x_cleanup(axes_right)
             for ax in axes_left + axes_right:
                 _apply_style(ax, style)
+            for ax in axes_left + axes_right:
+                ax.tick_params(axis="both", labelsize=text_sizes["annotation"] * 0.75)
         fname = f"{out_path.stem}__{_safe_filename(input_name)}__yield_bias{out_path.suffix}"
         path2 = out_path.parent / fname
         fig2.savefig(path2, bbox_inches="tight", pad_inches=0.1, facecolor="white")

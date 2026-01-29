@@ -233,5 +233,8 @@ def test_draw_tier_markers_caps_height_and_adds_box() -> None:
         labels = [text.get_text() for text in ax.texts]
         assert "0.1%" in labels
         assert "1%" in labels
+        box = next(artist for artist in ax.artists if isinstance(artist, AnchoredText))
+        edge = box.patch.get_edgecolor()
+        assert edge[-1] == 0.0
     finally:
         fig.clf()
