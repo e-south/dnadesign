@@ -109,11 +109,13 @@ def _format_stage_a_milestone(
 def _stage_a_live_render(state: dict[str, dict[str, object]]):
     table = make_table(show_header=True, pad_edge=False)
     table.add_column("motif")
-    table.add_column("generated", no_wrap=True, overflow="ellipsis", min_width=14)
-    table.add_column("progress", no_wrap=True, overflow="ellipsis", min_width=12)
-    table.add_column("eligible", no_wrap=True, overflow="ellipsis", min_width=12)
+    table.add_column("backend")
+    table.add_column("generated/target", no_wrap=True, overflow="ellipsis", min_width=14)
+    table.add_column("gen %", no_wrap=True, overflow="ellipsis", min_width=12)
+    table.add_column("eligible/target", no_wrap=True, overflow="ellipsis", min_width=14)
     table.add_column("tier target")
     table.add_column("tier yield (0.1/1/9%)")
+    table.add_column("batch")
     table.add_column("elapsed")
     table.add_column("rate")
     for key in sorted(state, key=lambda k: str(state[k].get("motif"))):
@@ -124,6 +126,8 @@ def _stage_a_live_render(state: dict[str, dict[str, object]]):
         accepted_target = row.get("accepted_target")
         target_fraction = row.get("target_fraction")
         elapsed = float(row.get("elapsed", 0.0))
+        batch_index = row.get("batch_index")
+        batch_total = row.get("batch_total")
         gen_pct = min(100, int(100 * generated / target))
         gen_bar = _format_progress_bar(int(generated), int(target))
         gen_label = f"{generated}/{target}"
@@ -142,13 +146,19 @@ def _stage_a_live_render(state: dict[str, dict[str, object]]):
         elapsed_label = f"{max(0.0, float(elapsed)):.1f}s"
         rate = generated / elapsed if elapsed > 0 else 0.0
         rate_label = _format_rate(rate)
+        batch_label = "-"
+        if batch_index is not None:
+            total_label = "-" if batch_total is None else str(int(batch_total))
+            batch_label = f"{int(batch_index)}/{total_label}"
         table.add_row(
             str(row.get("motif", "-")),
+            str(row.get("backend", "-")),
             gen_label,
             progress_label,
             eligible_label,
             tier_label,
             tier_yield,
+            batch_label,
             elapsed_label,
             rate_label,
         )
@@ -156,14 +166,17 @@ def _stage_a_live_render(state: dict[str, dict[str, object]]):
 
 
 def _stage_a_live_start(stream: TextIO):
+    import shutil
+
     from rich.console import Console
     from rich.live import Live
 
     pixi_in_shell = bool(os.environ.get("PIXI_IN_SHELL"))
     tty = bool(getattr(stream, "isatty", lambda: False)())
-    if not tty or pixi_in_shell:
+    if not (tty or pixi_in_shell):
         return None, None
-    console = Console(file=stream)
+    width = shutil.get_terminal_size((120, 24)).columns
+    console = Console(file=stream, force_terminal=tty or pixi_in_shell, width=width)
     if not console.is_terminal:
         return None, None
     live = Live(console=console, refresh_per_second=4, transient=False)
@@ -175,6 +188,7 @@ def _stage_a_live_register(
     *,
     key: str,
     motif_id: str,
+    backend: str,
     target: int,
     accepted_target: Optional[int],
     target_fraction: Optional[float],
@@ -191,12 +205,15 @@ def _stage_a_live_register(
             _STAGE_A_LIVE_MODE = "live"
         _STAGE_A_LIVE_STATE[key] = {
             "motif": motif_id,
+            "backend": backend,
             "generated": 0,
             "target": int(target),
             "accepted": None,
             "accepted_target": int(accepted_target) if accepted_target is not None else None,
             "target_fraction": target_fraction,
             "elapsed": 0.0,
+            "batch_index": None,
+            "batch_total": None,
         }
         return True
 
@@ -209,6 +226,8 @@ def _stage_a_live_update(
     elapsed: float,
     target: Optional[int] = None,
     accepted_target: Optional[int] = None,
+    batch_index: Optional[int] = None,
+    batch_total: Optional[int] = None,
 ) -> None:
     with _STAGE_A_LIVE_LOCK:
         row = _STAGE_A_LIVE_STATE.get(key)
@@ -221,6 +240,10 @@ def _stage_a_live_update(
             row["target"] = int(target)
         if accepted_target is not None:
             row["accepted_target"] = int(accepted_target)
+        if batch_index is not None:
+            row["batch_index"] = int(batch_index)
+        if batch_total is not None:
+            row["batch_total"] = int(batch_total)
         if _STAGE_A_LIVE is None:
             return
         renderable = _stage_a_live_render(_STAGE_A_LIVE_STATE)
@@ -263,9 +286,10 @@ class _PwmSamplingProgress:
         tty = bool(getattr(self.stream, "isatty", lambda: False)())
         pixi_in_shell = bool(os.environ.get("PIXI_IN_SHELL"))
         self._enabled = bool(logging_utils.is_progress_enabled())
-        self._use_live = self._enabled and self._mode == "screen" and tty and not pixi_in_shell
+        interactive = tty or pixi_in_shell
+        self._use_live = self._enabled and self._mode == "screen" and interactive
         self._use_table = False
-        self._allow_carriage = self._mode == "screen" and tty
+        self._allow_carriage = self._mode == "screen" and interactive
         self._live_key = f"{self.motif_id}:{id(self)}"
         self._start = time.monotonic()
         self._last_update = self._start
@@ -278,6 +302,7 @@ class _PwmSamplingProgress:
             self._use_live = _stage_a_live_register(
                 key=self._live_key,
                 motif_id=self.motif_id,
+                backend=self.backend,
                 target=int(self.target),
                 accepted_target=self.accepted_target,
                 target_fraction=self.target_fraction,
@@ -318,6 +343,8 @@ class _PwmSamplingProgress:
                 elapsed=now - self._start,
                 target=int(self.target),
                 accepted_target=self.accepted_target,
+                batch_index=batch_index,
+                batch_total=batch_total,
             )
         else:
             line = _format_pwm_progress_line(
