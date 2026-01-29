@@ -160,6 +160,57 @@ def test_stage_a_strata_overview_length_axis_expands_for_long_tfbs() -> None:
         fig.clf()
 
 
+def test_stage_a_strata_overview_xlims_cover_all_regulators() -> None:
+    matplotlib.use("Agg", force=True)
+    sampling = {
+        "backend": "fimo",
+        "tier_scheme": "pct_0.1_1_9",
+        "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
+        "retention_rule": "top_n_sites_by_best_hit_score",
+        "fimo_thresh": 1.0,
+        "eligible_score_hist": [
+            {
+                "regulator": "lexA",
+                "edges": [0.0, 5.0, 10.0, 15.0],
+                "counts": [4, 3, 2],
+                "tier0_score": 14.5,
+                "tier1_score": 11.0,
+                "tier2_score": 6.0,
+            },
+            {
+                "regulator": "cpxR",
+                "edges": [0.0, 2.0, 4.0, 6.0],
+                "counts": [2, 1, 1],
+                "tier0_score": 5.5,
+                "tier1_score": 4.0,
+                "tier2_score": 2.0,
+            },
+        ],
+    }
+    pool_df = pd.DataFrame(
+        {
+            "tf": ["lexA", "lexA", "cpxR"],
+            "tfbs": ["AAAAAA", "AAAAAAA", "CCCCCC"],
+            "best_hit_score": [14.0, 9.0, 5.0],
+        }
+    )
+
+    fig, ax_left, _ = _build_stage_a_strata_overview_figure(
+        input_name="demo_input",
+        pool_df=pool_df,
+        sampling=sampling,
+        style={},
+    )
+
+    try:
+        xlim = ax_left.get_xlim()
+        assert xlim[1] >= 15.0
+        dashed = [line for line in ax_left.lines if line.get_linestyle() == "--"]
+        assert len(dashed) >= 2
+    finally:
+        fig.clf()
+
+
 def test_draw_tier_markers_caps_height_and_adds_box() -> None:
     matplotlib.use("Agg", force=True)
     fig, ax = plt.subplots()
