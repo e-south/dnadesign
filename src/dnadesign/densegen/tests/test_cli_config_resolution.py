@@ -61,3 +61,17 @@ def test_resolve_config_path_prefers_env(tmp_path: Path, monkeypatch) -> None:
     resolved, is_default = cli._resolve_config_path(ctx, None)
     assert resolved == cfg
     assert is_default is False
+
+
+def test_resolve_config_path_prefers_parent_config(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    cfg = root / "config.yaml"
+    cfg.write_text("densegen:\n  schema_version: '2.7'\n")
+    child = root / "outputs"
+    child.mkdir()
+    monkeypatch.chdir(child)
+    ctx = _Ctx()
+    resolved, is_default = cli._resolve_config_path(ctx, None)
+    assert resolved == cfg
+    assert is_default is False

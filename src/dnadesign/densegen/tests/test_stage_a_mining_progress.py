@@ -34,7 +34,7 @@ class _BufferStream:
         return None
 
 
-def test_stage_a_screen_progress_static_table_for_non_tty() -> None:
+def test_stage_a_screen_progress_stream_for_non_tty() -> None:
     prev_enabled = logging_utils.is_progress_enabled()
     prev_style = logging_utils.get_progress_style()
     logging_utils.set_progress_enabled(True)
@@ -52,14 +52,14 @@ def test_stage_a_screen_progress_static_table_for_non_tty() -> None:
         progress.update(generated=10, accepted=5)
         progress.finish()
         output = "".join(stream.data)
-        assert "Stage-A mining" in output
+        assert "PWM demo_motif" in output
         assert "\r" not in output
     finally:
         logging_utils.set_progress_enabled(prev_enabled)
         logging_utils.set_progress_style(prev_style)
 
 
-def test_stage_a_screen_progress_static_table_for_pixi_tty(monkeypatch) -> None:
+def test_stage_a_screen_progress_stream_for_pixi_tty(monkeypatch) -> None:
     prev_enabled = logging_utils.is_progress_enabled()
     prev_style = logging_utils.get_progress_style()
     monkeypatch.setenv("PIXI_IN_SHELL", "1")
@@ -76,11 +76,11 @@ def test_stage_a_screen_progress_static_table_for_pixi_tty(monkeypatch) -> None:
     )
     try:
         assert progress._use_live is False
-        assert progress._use_table is True
+        assert progress._use_table is False
         progress.update(generated=10, accepted=5)
         progress.finish()
         output = "".join(stream.data)
-        assert "Stage-A mining" in output
+        assert "PWM demo_motif" in output
         assert "\r" not in output
     finally:
         logging_utils.set_progress_enabled(prev_enabled)

@@ -54,6 +54,7 @@ from rich.table import Table
 from rich.traceback import install as rich_traceback
 
 from .adapters.sources.pwm_sampling import PWMSamplingSummary
+from .cli_render import stage_a_plan_table, stage_a_recap_tables
 from .config import (
     LATEST_SCHEMA_VERSION,
     ConfigError,
@@ -304,6 +305,18 @@ def _default_config_path() -> Path:
     return Path.cwd() / DEFAULT_CONFIG_FILENAME
 
 
+def _find_config_in_parents(start: Path) -> Path | None:
+    try:
+        cursor = start.resolve()
+    except Exception:
+        cursor = start
+    for root in [cursor, *cursor.parents]:
+        candidate = root / DEFAULT_CONFIG_FILENAME
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def _workspace_search_roots() -> list[Path]:
     roots: list[Path] = []
     env_root = os.environ.get("DENSEGEN_WORKSPACE_ROOT")
@@ -407,6 +420,9 @@ def _resolve_config_path(ctx: typer.Context, override: Optional[Path]) -> tuple[
     default_path = _default_config_path()
     if default_path.exists():
         return default_path, True
+    parent_path = _find_config_in_parents(Path.cwd())
+    if parent_path is not None:
+        return parent_path, False
     auto_path, candidates = _auto_config_path()
     if auto_path is not None:
         console.print(
@@ -2106,28 +2122,8 @@ def stage_a_build_pool(
         show_motif_ids=show_motif_ids,
     )
     if plan_rows:
-        plan_table = make_table()
-        plan_table.add_column("input", overflow="fold")
-        plan_table.add_column("TF", overflow="fold")
-        plan_table.add_column("retain")
-        plan_table.add_column("budget")
-        plan_table.add_column("eligibility")
-        plan_table.add_column("selection")
-        plan_table.add_column("uniqueness")
-        plan_table.add_column("length")
-        for row in plan_rows:
-            plan_table.add_row(
-                row["input"],
-                row["tf"],
-                row["retain"],
-                row["budget"],
-                row["eligibility"],
-                row["selection"],
-                row["uniqueness"],
-                row["length"],
-            )
         console.print("[bold]Stage-A plan[/]")
-        console.print(plan_table)
+        console.print(stage_a_plan_table(plan_rows))
 
     with _suppress_pyarrow_sysctl_warnings():
         try:
@@ -2174,75 +2170,14 @@ def stage_a_build_pool(
     recap_rows = _stage_a_sampling_rows(pool_data)
     if recap_rows:
         console.print("[bold]Stage-A sampling recap[/]")
-        grouped: dict[str, list[dict[str, object]]] = {}
-        for row in recap_rows:
-            grouped.setdefault(str(row["input_name"]), []).append(row)
-        for input_name in sorted(grouped):
-            recap_table = make_table()
-            recap_table.add_column("TF", overflow="fold")
-            recap_table.add_column("generated")
-            recap_table.add_column("eligible")
-            recap_table.add_column("retained")
-            recap_table.add_column("tier target")
-            recap_table.add_column("tier fill")
-            recap_table.add_column("selection")
-            recap_table.add_column("k(pool/target)")
-            recap_table.add_column("div(k5)")
-            recap_table.add_column("Δdiv(k5)")
-            recap_table.add_column("overlap")
-            recap_table.add_column("swaps")
-            recap_table.add_column("Δscore(p10)")
-            recap_table.add_column("Δscore(med)")
-            recap_table.add_column("score(min/med/avg/max)")
-            recap_table.add_column("len(n/min/med/avg/max)")
-            for row in sorted(grouped[input_name], key=lambda item: str(item["regulator"])):
-                reg_label = str(row["regulator"])
-                if not show_motif_ids:
-                    reg_label = display_map_by_input.get(input_name, {}).get(reg_label, reg_label)
-                recap_table.add_row(
-                    reg_label,
-                    str(row["generated"]),
-                    str(row["eligible"]),
-                    str(row["retained"]),
-                    str(row.get("tier_target", "-")),
-                    str(row["tier_fill"]),
-                    str(row.get("selection", "-")),
-                    str(row.get("diversity_pool", "-")),
-                    str(row.get("diversity_med", "-")),
-                    str(row.get("diversity_delta", "-")),
-                    str(row.get("diversity_overlap", "-")),
-                    str(row.get("diversity_swaps", "-")),
-                    str(row.get("diversity_score_p10_delta", "-")),
-                    str(row.get("diversity_score_med_delta", "-")),
-                    str(row["score"]),
-                    str(row["length"]),
-                )
-            console.print(f"[bold]Input: {input_name}[/]")
-            console.print(recap_table)
-
-            tier_rows = [
-                row
-                for row in grouped[input_name]
-                if row.get("tier0_score") is not None
-                or row.get("tier1_score") is not None
-                or row.get("tier2_score") is not None
-            ]
-            if tier_rows:
-                boundary_table = make_table("TF", "tier0.1% score", "tier1% score", "tier9% score")
-                for row in sorted(tier_rows, key=lambda item: str(item["regulator"])):
-                    reg_label = str(row["regulator"])
-                    if not show_motif_ids:
-                        reg_label = display_map_by_input.get(input_name, {}).get(reg_label, reg_label)
-                    t0 = row.get("tier0_score")
-                    t1 = row.get("tier1_score")
-                    t2 = row.get("tier2_score")
-                    boundary_table.add_row(
-                        reg_label,
-                        f"{float(t0):.2f}" if t0 is not None else "-",
-                        f"{float(t1):.2f}" if t1 is not None else "-",
-                        f"{float(t2):.2f}" if t2 is not None else "-",
-                    )
-                console.print(boundary_table)
+        for title, table in stage_a_recap_tables(
+            recap_rows,
+            display_map_by_input=display_map_by_input,
+            show_motif_ids=show_motif_ids,
+        ):
+            if title:
+                console.print(f"[bold]{title}[/]")
+            console.print(table)
         console.print(
             "Legend: generated=PWM candidates; eligible=best_hit_score>0 with hit; "
             "retained=top-N by score after dedupe; tier target=diagnostic tier target status; "

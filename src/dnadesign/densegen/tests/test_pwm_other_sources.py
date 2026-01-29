@@ -20,6 +20,7 @@ import pytest
 
 from dnadesign.densegen.src.adapters.sources import PWMJasparDataSource, PWMMatrixCSVDataSource
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+from dnadesign.densegen.tests.pwm_sampling_fixtures import fixed_candidates_mining, sampling_config
 
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
@@ -43,11 +44,11 @@ def test_pwm_jaspar_sampling(tmp_path: Path) -> None:
         cfg_path=tmp_path / "config.yaml",
         input_name="demo_input",
         motif_ids=["M1"],
-        sampling={
-            "strategy": "stochastic",
-            "n_sites": 4,
-            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 80}},
-        },
+        sampling=sampling_config(
+            n_sites=4,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=80),
+        ),
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
     assert len(entries) == 4
@@ -67,11 +68,11 @@ def test_pwm_matrix_csv_sampling(tmp_path: Path) -> None:
         input_name="demo_input",
         motif_id="M1",
         columns={"A": "A", "C": "C", "G": "G", "T": "T"},
-        sampling={
-            "strategy": "consensus",
-            "n_sites": 1,
-            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 10}},
-        },
+        sampling=sampling_config(
+            n_sites=1,
+            strategy="consensus",
+            mining=fixed_candidates_mining(batch_size=10, candidates=10),
+        ),
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(1))
     assert len(entries) == 1

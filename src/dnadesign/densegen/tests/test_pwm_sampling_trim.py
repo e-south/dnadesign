@@ -5,6 +5,7 @@ import pytest
 
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import PWMMotif, sample_pwm_sites
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+from dnadesign.densegen.tests.pwm_sampling_fixtures import fixed_candidates_mining, selection_top_score
 
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
@@ -28,7 +29,8 @@ def test_pwm_sampling_trim_window_selects_max_info() -> None:
         motif,
         strategy="consensus",
         n_sites=1,
-        mining={"batch_size": 1, "budget": {"mode": "fixed_candidates", "candidates": 1}},
+        mining=fixed_candidates_mining(batch_size=1, candidates=1),
+        selection=selection_top_score(),
         length_policy="exact",
         length_range=None,
         trim_window_length=2,
@@ -53,7 +55,8 @@ def test_pwm_sampling_trim_length_rejects_too_long() -> None:
             motif,
             strategy="consensus",
             n_sites=1,
-            mining={"batch_size": 1, "budget": {"mode": "fixed_candidates", "candidates": 1}},
+            mining=fixed_candidates_mining(batch_size=1, candidates=1),
+            selection=selection_top_score(),
             length_policy="exact",
             length_range=None,
             trim_window_length=3,

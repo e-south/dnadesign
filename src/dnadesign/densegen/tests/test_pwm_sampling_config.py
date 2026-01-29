@@ -11,10 +11,11 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
-from dnadesign.densegen.src.adapters.sources.pwm_sampling import sampling_kwargs_from_config
-from dnadesign.densegen.src.config import PWMSamplingConfig
+from dnadesign.densegen.src.adapters.sources.pwm_sampling import PWMMotif, sample_pwm_sites, sampling_kwargs_from_config
+from dnadesign.densegen.src.config import PWMMiningBudgetConfig, PWMMiningConfig, PWMSamplingConfig, PWMSelectionConfig
 
 
 def test_sampling_kwargs_requires_config_object() -> None:
@@ -37,3 +38,35 @@ def test_sampling_kwargs_from_config_maps_fields() -> None:
     assert kwargs["n_sites"] == 10
     assert kwargs["strategy"] == "stochastic"
     assert kwargs["selection"] is sampling.selection
+
+
+def test_sample_pwm_sites_requires_config_objects() -> None:
+    motif = PWMMotif(
+        motif_id="M1",
+        matrix=[{"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}],
+        background={"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    )
+    rng = np.random.default_rng(0)
+    selection = PWMSelectionConfig(policy="top_score")
+    with pytest.raises(ValueError, match="pwm.sampling.mining"):
+        sample_pwm_sites(
+            rng,
+            motif,
+            strategy="stochastic",
+            n_sites=1,
+            mining={"batch_size": 1, "budget": {"mode": "fixed_candidates", "candidates": 1}},
+            selection=selection,
+        )
+    mining = PWMMiningConfig(
+        batch_size=1,
+        budget=PWMMiningBudgetConfig(mode="fixed_candidates", candidates=1),
+    )
+    with pytest.raises(ValueError, match="pwm.sampling.selection"):
+        sample_pwm_sites(
+            rng,
+            motif,
+            strategy="stochastic",
+            n_sites=1,
+            mining=mining,
+            selection={"policy": "top_score"},
+        )

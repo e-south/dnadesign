@@ -22,7 +22,7 @@ from typing import List, Optional, Sequence, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from ...config import PWMSamplingConfig
+from ...config import PWMMiningConfig, PWMSamplingConfig, PWMSelectionConfig, PWMSelectionTierWidening
 from ...core.artifacts.ids import hash_candidate_id
 from ...core.score_tiers import score_tier_counts
 from ...core.stage_a_constants import FIMO_REPORT_THRESH
@@ -50,43 +50,6 @@ def _safe_label(text: str) -> str:
         _SAFE_LABEL_RE = re.compile(r"[^A-Za-z0-9_.-]+")
     cleaned = _SAFE_LABEL_RE.sub("_", str(text).strip())
     return cleaned or "motif"
-
-
-def _mining_attr(mining, name: str, default=None):
-    if mining is None:
-        return default
-    if hasattr(mining, name):
-        return getattr(mining, name)
-    if isinstance(mining, dict):
-        return mining.get(name, default)
-    return default
-
-
-def _selection_attr(selection, name: str, default=None):
-    if selection is None:
-        return default
-    if hasattr(selection, name):
-        return getattr(selection, name)
-    if isinstance(selection, dict):
-        return selection.get(name, default)
-    return default
-
-
-def _budget_attr(mining, name: str, default=None):
-    if mining is None:
-        return default
-    budget = None
-    if hasattr(mining, "budget"):
-        budget = getattr(mining, "budget")
-    elif isinstance(mining, dict):
-        budget = mining.get("budget")
-    if budget is None:
-        return default
-    if hasattr(budget, name):
-        return getattr(budget, name)
-    if isinstance(budget, dict):
-        return budget.get(name, default)
-    return default
 
 
 def sampling_kwargs_from_config(sampling: PWMSamplingConfig) -> dict:
@@ -579,12 +542,12 @@ def sample_pwm_sites(
     run_id: str | None = None,
     strategy: str,
     n_sites: int,
-    mining: Optional[object] = None,
+    mining: PWMMiningConfig,
     bgfile: Optional[str | Path] = None,
     keep_all_candidates_debug: bool = False,
     include_matched_sequence: bool = True,
     uniqueness_key: str = "sequence",
-    selection: Optional[object] = None,
+    selection: PWMSelectionConfig,
     debug_output_dir: Optional[Path] = None,
     debug_label: Optional[str] = None,
     length_policy: str = "exact",
@@ -601,6 +564,10 @@ def sample_pwm_sites(
 ]:
     if n_sites <= 0:
         raise ValueError("n_sites must be > 0")
+    if not isinstance(mining, PWMMiningConfig):
+        raise ValueError("pwm.sampling.mining must be a PWMMiningConfig instance.")
+    if not isinstance(selection, PWMSelectionConfig):
+        raise ValueError("pwm.sampling.selection must be a PWMSelectionConfig instance.")
     scoring_backend = "fimo"
     uniqueness_key = str(uniqueness_key or "sequence").lower()
     if uniqueness_key not in {"sequence", "core"}:
@@ -643,14 +610,14 @@ def sample_pwm_sites(
     if length_policy == "range" and length_range is not None and len(length_range) == 2:
         length_label = f"{length_policy}({length_range[0]}..{length_range[1]})"
 
-    selection_policy = str(_selection_attr(selection, "policy", "top_score") or "top_score").lower()
+    selection_policy = str(selection.policy or "top_score").lower()
     if selection_policy not in {"top_score", "mmr"}:
         raise ValueError(f"Stage-A selection.policy must be 'top_score' or 'mmr', got '{selection_policy}'.")
-    selection_alpha = _selection_attr(selection, "alpha", 0.9)
-    selection_shortlist_min = _selection_attr(selection, "shortlist_min", 50)
-    selection_shortlist_factor = _selection_attr(selection, "shortlist_factor", 5)
-    selection_shortlist_max = _selection_attr(selection, "shortlist_max", None)
-    selection_tier_widening = _selection_attr(selection, "tier_widening", None)
+    selection_alpha = float(selection.alpha)
+    selection_shortlist_min = int(selection.shortlist_min)
+    selection_shortlist_factor = int(selection.shortlist_factor)
+    selection_shortlist_max = int(selection.shortlist_max) if selection.shortlist_max is not None else None
+    selection_tier_widening: Optional[Sequence[float]] = None
     selection_ensure_shortlist_target = False
     if selection_policy == "mmr":
         selection_alpha = float(selection_alpha)
@@ -667,30 +634,25 @@ def sample_pwm_sites(
         if selection_shortlist_max is not None and int(selection_shortlist_max) < int(n_sites):
             raise ValueError("selection.shortlist_max must be >= n_sites when selection.policy=mmr.")
 
-    if selection_tier_widening is not None:
-        if hasattr(selection_tier_widening, "enabled"):
-            enabled = bool(getattr(selection_tier_widening, "enabled"))
-            ladder = getattr(selection_tier_widening, "ladder", None)
-            selection_ensure_shortlist_target = bool(getattr(selection_tier_widening, "ensure_shortlist_target", False))
-            selection_tier_widening = ladder if enabled else None
-        elif isinstance(selection_tier_widening, dict):
-            enabled = bool(selection_tier_widening.get("enabled", False))
-            selection_ensure_shortlist_target = bool(selection_tier_widening.get("ensure_shortlist_target", False))
-            selection_tier_widening = selection_tier_widening.get("ladder") if enabled else None
+    tier_cfg = selection.tier_widening
+    if isinstance(tier_cfg, PWMSelectionTierWidening) and tier_cfg.enabled:
+        selection_ensure_shortlist_target = bool(tier_cfg.ensure_shortlist_target)
+        selection_tier_widening = list(tier_cfg.ladder)
 
     include_matched_sequence = bool(include_matched_sequence)
 
-    budget_mode = str(_budget_attr(mining, "mode", "fixed_candidates") or "fixed_candidates").lower()
+    budget = mining.budget
+    budget_mode = str(budget.mode or "fixed_candidates").lower()
     if budget_mode not in {"tier_target", "fixed_candidates"}:
         raise ValueError(
             f"pwm.sampling.mining.budget.mode must be 'tier_target' or 'fixed_candidates', got '{budget_mode}'."
         )
-    budget_target_tier_fraction = _budget_attr(mining, "target_tier_fraction", None)
-    budget_candidates = _budget_attr(mining, "candidates", None)
-    budget_max_candidates = _budget_attr(mining, "max_candidates", None)
-    budget_min_candidates = _budget_attr(mining, "min_candidates", None)
-    budget_max_seconds = _budget_attr(mining, "max_seconds", None)
-    budget_growth_factor = float(_budget_attr(mining, "growth_factor", 1.25))
+    budget_target_tier_fraction = budget.target_tier_fraction
+    budget_candidates = budget.candidates
+    budget_max_candidates = budget.max_candidates
+    budget_min_candidates = budget.min_candidates
+    budget_max_seconds = budget.max_seconds
+    budget_growth_factor = float(budget.growth_factor)
     if budget_max_candidates is not None and int(budget_max_candidates) <= 0:
         raise ValueError("pwm.sampling.mining.budget.max_candidates must be > 0 when set.")
     if budget_min_candidates is not None and int(budget_min_candidates) <= 0:
@@ -753,9 +715,9 @@ def sample_pwm_sites(
             "cap_applied": cap_applied,
             "cap_label": _cap_label(cap_applied, time_limited),
             "time_limited": time_limited,
-            "mining_batch_size": _mining_attr(mining, "batch_size"),
+            "mining_batch_size": int(mining.batch_size),
             "mining_max_seconds": budget_max_seconds,
-            "mining_log_every_batches": _mining_attr(mining, "log_every_batches"),
+            "mining_log_every_batches": int(mining.log_every_batches),
         }
 
     def _resolve_length() -> int:
@@ -802,9 +764,9 @@ def sample_pwm_sites(
             write_minimal_meme_motif,
         )
 
-        mining_batch_size = int(_mining_attr(mining, "batch_size", n_candidates))
+        mining_batch_size = int(mining.batch_size)
         mining_max_seconds = budget_max_seconds
-        mining_log_every = int(_mining_attr(mining, "log_every_batches", 1))
+        mining_log_every = int(mining.log_every_batches)
         log.info(
             "FIMO mining config for %s: mode=%s target=%d batch=%d max_seconds=%s max_candidates=%s thresh=%s",
             motif.motif_id,
@@ -1512,7 +1474,7 @@ def sample_pwm_sites(
     if budget_mode == "fixed_candidates":
         requested_candidates = max(1, int(budget_candidates))
     else:
-        base_target = _mining_attr(mining, "batch_size", n_sites)
+        base_target = int(mining.batch_size)
         if budget_min_candidates is not None:
             base_target = max(int(base_target), int(budget_min_candidates))
         requested_candidates = max(1, int(base_target))

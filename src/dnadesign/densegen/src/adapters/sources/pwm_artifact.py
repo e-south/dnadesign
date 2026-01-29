@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List
 
+from ...config import PWMSamplingConfig
 from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
 from ...core.run_paths import candidates_root
 from .base import BaseDataSource, resolve_path
@@ -152,7 +153,7 @@ def load_artifact(path: Path) -> PWMMotif:
 class PWMArtifactDataSource(BaseDataSource):
     path: str
     cfg_path: Path
-    sampling: dict
+    sampling: PWMSamplingConfig
     input_name: str
 
     def load_data(self, *, rng=None, outputs_root: Path | None = None, run_id: str | None = None):
@@ -170,8 +171,7 @@ class PWMArtifactDataSource(BaseDataSource):
             source_kind="pwm_artifact",
         )
 
-        sampling = dict(self.sampling or {})
-        sampling_kwargs = sampling_kwargs_from_config(sampling)
+        sampling_kwargs = sampling_kwargs_from_config(self.sampling)
         bgfile = sampling_kwargs.get("bgfile")
         keep_all_candidates_debug = bool(sampling_kwargs.get("keep_all_candidates_debug", False))
         bgfile_path: Path | None = None
@@ -194,22 +194,22 @@ class PWMArtifactDataSource(BaseDataSource):
             input_name=self.input_name,
             motif_hash=motif_hash,
             run_id=run_id,
-            mining=sampling_kwargs.get("mining"),
+            mining=sampling_kwargs["mining"],
             bgfile=bgfile_path,
             keep_all_candidates_debug=keep_all_candidates_debug,
-            include_matched_sequence=sampling_kwargs.get("include_matched_sequence", True),
-            uniqueness_key=sampling_kwargs.get("uniqueness_key"),
-            selection=sampling_kwargs.get("selection"),
+            include_matched_sequence=sampling_kwargs["include_matched_sequence"],
+            uniqueness_key=sampling_kwargs["uniqueness_key"],
+            selection=sampling_kwargs["selection"],
             debug_output_dir=debug_output_dir,
             debug_label=f"{artifact_path.stem}__{motif.motif_id}",
-            length_policy=sampling_kwargs.get("length_policy", "exact"),
-            length_range=sampling_kwargs.get("length_range"),
-            trim_window_length=sampling_kwargs.get("trim_window_length"),
-            trim_window_strategy=str(sampling_kwargs.get("trim_window_strategy", "max_info")),
+            length_policy=sampling_kwargs["length_policy"],
+            length_range=sampling_kwargs["length_range"],
+            trim_window_length=sampling_kwargs["trim_window_length"],
+            trim_window_strategy=str(sampling_kwargs["trim_window_strategy"]),
             return_metadata=return_meta,
             return_summary=True,
-            strategy=str(sampling_kwargs.get("strategy", "stochastic")),
-            n_sites=int(sampling_kwargs.get("n_sites")),
+            strategy=str(sampling_kwargs["strategy"]),
+            n_sites=int(sampling_kwargs["n_sites"]),
         )
         if return_meta:
             selected, meta_by_seq, summary = result  # type: ignore[misc]

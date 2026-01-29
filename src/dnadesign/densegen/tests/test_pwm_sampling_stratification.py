@@ -20,6 +20,7 @@ import pytest
 
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import PWMMotif, sample_pwm_sites
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+from dnadesign.densegen.tests.pwm_sampling_fixtures import fixed_candidates_mining, selection_top_score
 
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
@@ -45,11 +46,8 @@ def test_fimo_retains_top_scores_with_dedup(tmp_path: Path) -> None:
         motif,
         strategy="stochastic",
         n_sites=3,
-        mining={
-            "batch_size": 10,
-            "budget": {"mode": "fixed_candidates", "candidates": 50},
-            "log_every_batches": 1,
-        },
+        mining=fixed_candidates_mining(batch_size=10, candidates=50, log_every_batches=1),
+        selection=selection_top_score(),
         keep_all_candidates_debug=True,
         run_id="test",
         debug_output_dir=tmp_path,

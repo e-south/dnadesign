@@ -16,6 +16,7 @@ import pytest
 
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import PWMMotif, sample_pwm_sites
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+from dnadesign.densegen.tests.pwm_sampling_fixtures import fixed_candidates_mining, selection_top_score
 
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
@@ -35,8 +36,8 @@ def test_padding_offsets_non_constant_and_reproducible() -> None:
     if _FIMO_MISSING:
         pytest.skip("fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).")
     rng = np.random.default_rng(42)
-    mining = {"batch_size": 20, "budget": {"mode": "fixed_candidates", "candidates": 120}}
-    selection = {"policy": "top_score"}
+    mining = fixed_candidates_mining(batch_size=20, candidates=120)
+    selection = selection_top_score()
     args = dict(
         input_name="demo_input",
         motif=_motif(),

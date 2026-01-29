@@ -57,7 +57,7 @@ def data_source_factory(cfg, cfg_path: Path) -> BaseDataSource:
             path=cfg.path,
             cfg_path=cfg_path,
             motif_ids=cfg.motif_ids,
-            sampling=cfg.sampling.model_dump(),
+            sampling=cfg.sampling,
             input_name=cfg.name,
         )
     if isinstance(cfg, PWMMemeSetInput):
@@ -65,7 +65,7 @@ def data_source_factory(cfg, cfg_path: Path) -> BaseDataSource:
             paths=list(cfg.paths),
             cfg_path=cfg_path,
             motif_ids=cfg.motif_ids,
-            sampling=cfg.sampling.model_dump(),
+            sampling=cfg.sampling,
             input_name=cfg.name,
         )
     if isinstance(cfg, PWMJasparInput):
@@ -73,7 +73,7 @@ def data_source_factory(cfg, cfg_path: Path) -> BaseDataSource:
             path=cfg.path,
             cfg_path=cfg_path,
             motif_ids=cfg.motif_ids,
-            sampling=cfg.sampling.model_dump(),
+            sampling=cfg.sampling,
             input_name=cfg.name,
         )
     if isinstance(cfg, PWMMatrixCSVInput):
@@ -82,22 +82,22 @@ def data_source_factory(cfg, cfg_path: Path) -> BaseDataSource:
             cfg_path=cfg_path,
             motif_id=cfg.motif_id,
             columns=cfg.columns.model_dump(),
-            sampling=cfg.sampling.model_dump(),
+            sampling=cfg.sampling,
             input_name=cfg.name,
         )
     if isinstance(cfg, PWMArtifactInput):
         return PWMArtifactDataSource(
             path=cfg.path,
             cfg_path=cfg_path,
-            sampling=cfg.sampling.model_dump(),
+            sampling=cfg.sampling,
             input_name=cfg.name,
         )
     if isinstance(cfg, PWMArtifactSetInput):
         return PWMArtifactSetDataSource(
             paths=list(cfg.paths),
             cfg_path=cfg_path,
-            sampling=cfg.sampling.model_dump(),
-            overrides_by_motif_id={k: v.model_dump() for k, v in cfg.overrides_by_motif_id.items()},
+            sampling=cfg.sampling,
+            overrides_by_motif_id=dict(cfg.overrides_by_motif_id),
             input_name=cfg.name,
         )
     if isinstance(cfg, USRSequencesInput):

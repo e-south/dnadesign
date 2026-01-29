@@ -22,6 +22,7 @@ import pytest
 from dnadesign.densegen.src.adapters.sources import PWMArtifactSetDataSource
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import build_log_odds
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+from dnadesign.densegen.tests.pwm_sampling_fixtures import fixed_candidates_mining, sampling_config
 
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
@@ -60,12 +61,12 @@ def test_pwm_artifact_set_sampling(tmp_path: Path) -> None:
     ds = PWMArtifactSetDataSource(
         paths=[str(a_path), str(b_path)],
         cfg_path=tmp_path / "config.yaml",
-        sampling={
-            "strategy": "stochastic",
-            "n_sites": 4,
-            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 80}},
-            "length": {"policy": "exact"},
-        },
+        sampling=sampling_config(
+            n_sites=4,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=80),
+            length_policy="exact",
+        ),
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
     assert len(entries) == 8
@@ -83,12 +84,12 @@ def test_pwm_artifact_set_rejects_duplicate_ids(tmp_path: Path) -> None:
     ds = PWMArtifactSetDataSource(
         paths=[str(a_path), str(b_path)],
         cfg_path=tmp_path / "config.yaml",
-        sampling={
-            "strategy": "stochastic",
-            "n_sites": 2,
-            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 40}},
-            "length": {"policy": "exact"},
-        },
+        sampling=sampling_config(
+            n_sites=2,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=40),
+            length_policy="exact",
+        ),
     )
     with pytest.raises(ValueError, match="Duplicate motif_id"):
         ds.load_data(rng=np.random.default_rng(1))
@@ -107,19 +108,19 @@ def test_pwm_artifact_set_overrides_by_motif_id(tmp_path: Path) -> None:
     ds = PWMArtifactSetDataSource(
         paths=[str(a_path), str(b_path)],
         cfg_path=tmp_path / "config.yaml",
-        sampling={
-            "strategy": "stochastic",
-            "n_sites": 2,
-            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 60}},
-            "length": {"policy": "exact"},
-        },
+        sampling=sampling_config(
+            n_sites=2,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=60),
+            length_policy="exact",
+        ),
         overrides_by_motif_id={
-            "M2": {
-                "strategy": "stochastic",
-                "n_sites": 1,
-                "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 30}},
-                "length": {"policy": "exact"},
-            }
+            "M2": sampling_config(
+                n_sites=1,
+                strategy="stochastic",
+                mining=fixed_candidates_mining(batch_size=10, candidates=30),
+                length_policy="exact",
+            )
         },
     )
     _entries, df, _summaries = ds.load_data(rng=np.random.default_rng(2))

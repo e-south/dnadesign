@@ -156,24 +156,16 @@ def _stage_a_live_render(state: dict[str, dict[str, object]]):
 
 
 def _stage_a_live_start(stream: TextIO):
-    import shutil
-
     from rich.console import Console
     from rich.live import Live
 
     pixi_in_shell = bool(os.environ.get("PIXI_IN_SHELL"))
     tty = bool(getattr(stream, "isatty", lambda: False)())
     if not tty or pixi_in_shell:
-        width = shutil.get_terminal_size(fallback=(140, 40)).columns
-        console = Console(file=stream, width=int(width), force_terminal=False)
-        if pixi_in_shell:
-            log.warning(
-                "Stage-A mining live progress disabled because PIXI_IN_SHELL is set; using static table output."
-            )
-        return None, console
+        return None, None
     console = Console(file=stream)
     if not console.is_terminal:
-        return None, console
+        return None, None
     live = Live(console=console, refresh_per_second=4, transient=False)
     live.start()
     return live, console
@@ -189,12 +181,14 @@ def _stage_a_live_register(
     stream: TextIO,
 ) -> bool:
     global _STAGE_A_LIVE
-    global _STAGE_A_LIVE_CONSOLE
     global _STAGE_A_LIVE_MODE
     with _STAGE_A_LIVE_LOCK:
         if _STAGE_A_LIVE_MODE is None:
             _STAGE_A_LIVE, _STAGE_A_LIVE_CONSOLE = _stage_a_live_start(stream)
-            _STAGE_A_LIVE_MODE = "live" if _STAGE_A_LIVE is not None else "static"
+            if _STAGE_A_LIVE is None:
+                _STAGE_A_LIVE_CONSOLE = None
+                return False
+            _STAGE_A_LIVE_MODE = "live"
         _STAGE_A_LIVE_STATE[key] = {
             "motif": motif_id,
             "generated": 0,
@@ -204,7 +198,7 @@ def _stage_a_live_register(
             "target_fraction": target_fraction,
             "elapsed": 0.0,
         }
-        return _STAGE_A_LIVE is not None
+        return True
 
 
 def _stage_a_live_update(
@@ -235,16 +229,12 @@ def _stage_a_live_update(
 
 def _stage_a_live_finish(*, key: str) -> None:
     global _STAGE_A_LIVE
-    global _STAGE_A_LIVE_CONSOLE
     global _STAGE_A_LIVE_MODE
     with _STAGE_A_LIVE_LOCK:
-        snapshot = dict(_STAGE_A_LIVE_STATE)
         _STAGE_A_LIVE_STATE.pop(key, None)
         if not _STAGE_A_LIVE_STATE:
             if _STAGE_A_LIVE is not None:
                 _STAGE_A_LIVE.stop()
-            elif _STAGE_A_LIVE_MODE == "static" and _STAGE_A_LIVE_CONSOLE is not None:
-                _STAGE_A_LIVE_CONSOLE.print(_stage_a_live_render(snapshot))
             _STAGE_A_LIVE = None
             _STAGE_A_LIVE_CONSOLE = None
             _STAGE_A_LIVE_MODE = None
@@ -271,9 +261,11 @@ class _PwmSamplingProgress:
         self.min_interval = float(min_interval)
         self._mode = str(logging_utils.get_progress_style())
         tty = bool(getattr(self.stream, "isatty", lambda: False)())
-        self._enabled = bool(logging_utils.is_progress_enabled()) and (self._mode == "screen" or tty)
-        self._use_live = self._enabled and self._mode == "screen"
+        pixi_in_shell = bool(os.environ.get("PIXI_IN_SHELL"))
+        self._enabled = bool(logging_utils.is_progress_enabled())
+        self._use_live = self._enabled and self._mode == "screen" and tty and not pixi_in_shell
         self._use_table = False
+        self._allow_carriage = self._mode == "screen" and tty and not pixi_in_shell
         self._live_key = f"{self.motif_id}:{id(self)}"
         self._start = time.monotonic()
         self._last_update = self._start
@@ -291,7 +283,6 @@ class _PwmSamplingProgress:
                 target_fraction=self.target_fraction,
                 stream=self.stream,
             )
-            self._use_table = not self._use_live
 
     def update(
         self,
@@ -305,7 +296,7 @@ class _PwmSamplingProgress:
         if not self._enabled:
             return
         now = time.monotonic()
-        if not force and (now - self._last_update) < float(self.min_interval):
+        if not force and self._shown and (now - self._last_update) < float(self.min_interval):
             return
         state = (
             int(generated),
@@ -315,10 +306,11 @@ class _PwmSamplingProgress:
             int(self.target),
             int(self.accepted_target) if self.accepted_target is not None else None,
         )
-        if self._shown and state == self._last_state and logging_utils.is_progress_line_visible():
-            self._last_update = now
-            return
-        if self._use_live or self._use_table:
+        if self._shown and state == self._last_state:
+            if self._mode != "screen" or logging_utils.is_progress_line_visible():
+                self._last_update = now
+                return
+        if self._use_live:
             _stage_a_live_update(
                 key=self._live_key,
                 generated=int(generated),
@@ -341,11 +333,15 @@ class _PwmSamplingProgress:
                 target_fraction=self.target_fraction,
                 tier_yield=_format_tier_yield(int(accepted)) if accepted is not None else None,
             )
-            padded = line.ljust(self._last_len)
-            self._last_len = max(self._last_len, len(line))
-            self.stream.write(f"\r{padded}")
-            self.stream.flush()
-            logging_utils.mark_progress_line_visible()
+            if self._allow_carriage:
+                padded = line.ljust(self._last_len)
+                self._last_len = max(self._last_len, len(line))
+                self.stream.write(f"\r{padded}")
+                self.stream.flush()
+                logging_utils.mark_progress_line_visible()
+            else:
+                self.stream.write(f"{line}\n")
+                self.stream.flush()
         self._last_update = now
         self._last_state = state
         self._shown = True
@@ -353,10 +349,10 @@ class _PwmSamplingProgress:
     def finish(self) -> None:
         if self._enabled:
             logging_utils.set_progress_active(False)
-        if self._use_live or self._use_table:
+        if self._use_live:
             _stage_a_live_finish(key=self._live_key)
         if not self._shown:
             return
-        if not self._use_live and not self._use_table:
+        if not self._use_live and self._allow_carriage:
             self.stream.write("\n")
             self.stream.flush()

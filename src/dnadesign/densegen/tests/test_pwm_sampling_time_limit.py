@@ -7,6 +7,7 @@ import pytest
 
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import PWMMotif, sample_pwm_sites
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+from dnadesign.densegen.tests.pwm_sampling_fixtures import selection_top_score, tier_target_mining
 
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
@@ -31,15 +32,13 @@ def test_pwm_sampling_time_limit_warns(caplog) -> None:
             motif,
             strategy="stochastic",
             n_sites=1,
-            mining={
-                "batch_size": 10,
-                "budget": {
-                    "mode": "tier_target",
-                    "target_tier_fraction": 0.001,
-                    "max_seconds": 0.000001,
-                },
-                "log_every_batches": 1,
-            },
+            mining=tier_target_mining(
+                batch_size=10,
+                target_tier_fraction=0.001,
+                max_seconds=0.000001,
+                log_every_batches=1,
+            ),
+            selection=selection_top_score(),
             length_policy="exact",
             length_range=None,
         )

@@ -20,6 +20,7 @@ import pytest
 
 from dnadesign.densegen.src.adapters.sources import PWMMemeSetDataSource
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+from dnadesign.densegen.tests.pwm_sampling_fixtures import fixed_candidates_mining, sampling_config
 
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
@@ -55,11 +56,11 @@ def test_pwm_meme_set_sampling(tmp_path: Path) -> None:
         cfg_path=tmp_path / "config.yaml",
         input_name="demo_input",
         motif_ids=["lexA", "cpxR"],
-        sampling={
-            "strategy": "stochastic",
-            "n_sites": 3,
-            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 60}},
-        },
+        sampling=sampling_config(
+            n_sites=3,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=60),
+        ),
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
     assert len(entries) == 6
@@ -77,11 +78,11 @@ def test_pwm_meme_set_duplicate_motif_ids(tmp_path: Path) -> None:
         cfg_path=tmp_path / "config.yaml",
         input_name="demo_input",
         motif_ids=None,
-        sampling={
-            "strategy": "stochastic",
-            "n_sites": 1,
-            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 10}},
-        },
+        sampling=sampling_config(
+            n_sites=1,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=10),
+        ),
     )
     with pytest.raises(ValueError, match="Duplicate motif_id"):
         ds.load_data(rng=np.random.default_rng(1))

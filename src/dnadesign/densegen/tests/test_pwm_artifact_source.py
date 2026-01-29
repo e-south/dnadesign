@@ -22,6 +22,7 @@ import pytest
 from dnadesign.densegen.src.adapters.sources import PWMArtifactDataSource
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import build_log_odds
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+from dnadesign.densegen.tests.pwm_sampling_fixtures import fixed_candidates_mining, sampling_config
 
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
@@ -58,12 +59,12 @@ def test_pwm_artifact_sampling_exact(tmp_path: Path) -> None:
         path=str(artifact_path),
         cfg_path=tmp_path / "config.yaml",
         input_name="demo_input",
-        sampling={
-            "strategy": "stochastic",
-            "n_sites": 5,
-            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 60}},
-            "length": {"policy": "exact"},
-        },
+        sampling=sampling_config(
+            n_sites=5,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=60),
+            length_policy="exact",
+        ),
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
     assert len(entries) == 5
@@ -83,12 +84,13 @@ def test_pwm_artifact_sampling_range(tmp_path: Path) -> None:
         path=str(artifact_path),
         cfg_path=tmp_path / "config.yaml",
         input_name="demo_input",
-        sampling={
-            "strategy": "stochastic",
-            "n_sites": 6,
-            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 80}},
-            "length": {"policy": "range", "range": (3, 5)},
-        },
+        sampling=sampling_config(
+            n_sites=6,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=80),
+            length_policy="range",
+            length_range=(3, 5),
+        ),
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(1))
     assert len(entries) == 6
@@ -122,12 +124,12 @@ def test_pwm_artifact_rejects_nonfinite_log_odds(tmp_path: Path) -> None:
         path=str(artifact_path),
         cfg_path=tmp_path / "config.yaml",
         input_name="demo_input",
-        sampling={
-            "strategy": "stochastic",
-            "n_sites": 2,
-            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 20}},
-            "length": {"policy": "exact"},
-        },
+        sampling=sampling_config(
+            n_sites=2,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=20),
+            length_policy="exact",
+        ),
     )
     with pytest.raises(ValueError, match="log_odds\\[0\\]\\[A\\].*finite"):
         ds.load_data(rng=np.random.default_rng(0))
@@ -140,16 +142,12 @@ def test_pwm_sampling_shortfall_includes_motif_id(tmp_path: Path, caplog: pytest
         path=str(artifact_path),
         cfg_path=tmp_path / "config.yaml",
         input_name="demo_input",
-        sampling={
-            "strategy": "stochastic",
-            "n_sites": 2,
-            "mining": {
-                "batch_size": 2,
-                "budget": {"mode": "fixed_candidates", "candidates": 1},
-                "log_every_batches": 1,
-            },
-            "length": {"policy": "exact"},
-        },
+        sampling=sampling_config(
+            n_sites=2,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=2, candidates=1, log_every_batches=1),
+            length_policy="exact",
+        ),
     )
     with caplog.at_level("WARNING"):
         ds.load_data(rng=np.random.default_rng(1))

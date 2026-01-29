@@ -21,6 +21,11 @@ import pytest
 from dnadesign.densegen.src.adapters.sources import PWMMemeDataSource
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import PWMMotif, sample_pwm_sites
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+from dnadesign.densegen.tests.pwm_sampling_fixtures import (
+    fixed_candidates_mining,
+    sampling_config,
+    selection_top_score,
+)
 
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
@@ -57,11 +62,11 @@ def test_pwm_meme_sampling_stochastic(tmp_path: Path) -> None:
         cfg_path=tmp_path / "config.yaml",
         input_name="demo_input",
         motif_ids=["M1"],
-        sampling={
-            "strategy": "stochastic",
-            "n_sites": 5,
-            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 50}},
-        },
+        sampling=sampling_config(
+            n_sites=5,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=50),
+        ),
     )
     entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
     assert len(entries) == 5
@@ -72,19 +77,12 @@ def test_pwm_meme_sampling_stochastic(tmp_path: Path) -> None:
 def test_pwm_meme_consensus_requires_one_site(tmp_path: Path) -> None:
     meme_path = tmp_path / "motifs.meme"
     meme_path.write_text(MEME_TEXT)
-    ds = PWMMemeDataSource(
-        path=str(meme_path),
-        cfg_path=tmp_path / "config.yaml",
-        input_name="demo_input",
-        motif_ids=["M2"],
-        sampling={
-            "strategy": "consensus",
-            "n_sites": 2,
-            "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 10}},
-        },
-    )
     with pytest.raises(ValueError, match="consensus"):
-        ds.load_data(rng=np.random.default_rng(1))
+        sampling_config(
+            n_sites=2,
+            strategy="consensus",
+            mining=fixed_candidates_mining(batch_size=10, candidates=10),
+        )
 
 
 def test_pwm_sampling_shortfall_warns_on_cap(caplog: pytest.LogCaptureFixture) -> None:
@@ -106,11 +104,8 @@ def test_pwm_sampling_shortfall_warns_on_cap(caplog: pytest.LogCaptureFixture) -
             motif,
             strategy="stochastic",
             n_sites=10,
-            mining={
-                "batch_size": 5,
-                "budget": {"mode": "fixed_candidates", "candidates": 5},
-                "log_every_batches": 1,
-            },
+            mining=fixed_candidates_mining(batch_size=5, candidates=5, log_every_batches=1),
+            selection=selection_top_score(),
         )
     assert "shortfall" in caplog.text.lower()
 
@@ -125,15 +120,11 @@ def test_pwm_sampling_shortfall_warns(tmp_path: Path, caplog: pytest.LogCaptureF
         cfg_path=tmp_path / "config.yaml",
         input_name="demo_input",
         motif_ids=["M1"],
-        sampling={
-            "strategy": "stochastic",
-            "n_sites": 5,
-            "mining": {
-                "batch_size": 2,
-                "budget": {"mode": "fixed_candidates", "candidates": 4},
-                "log_every_batches": 1,
-            },
-        },
+        sampling=sampling_config(
+            n_sites=5,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=2, candidates=4, log_every_batches=1),
+        ),
     )
     with caplog.at_level(logging.WARNING):
         ds.load_data(rng=np.random.default_rng(2))
