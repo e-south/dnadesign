@@ -360,4 +360,7 @@ def test_plot_stage_a_summary(tmp_path: Path) -> None:
         style={},
     )
     assert paths
+    assert len(paths) == 3
     assert Path(paths[0]).exists()
+    assert Path(paths[1]).exists()
+    assert Path(paths[2]).exists()

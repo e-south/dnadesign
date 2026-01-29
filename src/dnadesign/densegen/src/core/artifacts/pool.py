@@ -290,6 +290,8 @@ def _build_stage_a_sampling_manifest(
                 "diversity_nearest_distance_mean": summary.diversity_nearest_distance_mean,
                 "diversity_nearest_distance_min": summary.diversity_nearest_distance_min,
                 "diversity_nearest_similarity_mean": summary.diversity_nearest_similarity_mean,
+                "diversity": summary.diversity,
+                "padding_audit": summary.padding_audit,
             }
         )
     unique_bgfiles = {val for val in reg_bgfiles}

@@ -188,5 +188,5 @@ def test_stage_a_end_to_end_score_sampling(tmp_path: Path) -> None:
         pools={"demo_pwm": df},
         pool_manifest=artifact,
     )
-    assert len(paths) == 2
+    assert len(paths) == 3
     assert paths[0].exists()

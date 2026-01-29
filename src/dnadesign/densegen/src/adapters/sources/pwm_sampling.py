@@ -12,8 +12,10 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,6 +34,9 @@ SMOOTHING_ALPHA = 1e-6
 SCORE_HIST_BINS = 60
 log = logging.getLogger(__name__)
 _SAFE_LABEL_RE = None
+_STAGE_A_LIVE = None
+_STAGE_A_LIVE_STATE: dict[str, dict[str, object]] = {}
+_STAGE_A_LIVE_LOCK = threading.Lock()
 
 
 def _format_rate(rate: float) -> str:
@@ -93,6 +98,114 @@ def _format_pwm_progress_line(
     return " | ".join(parts)
 
 
+def _stage_a_live_render(state: dict[str, dict[str, object]]):
+    table = make_table(show_header=True, pad_edge=False)
+    table.add_column("motif")
+    table.add_column("generated")
+    table.add_column("eligible")
+    table.add_column("tier target")
+    table.add_column("tier yield (0.1/1/9%)")
+    table.add_column("elapsed")
+    table.add_column("rate")
+    for key in sorted(state, key=lambda k: str(state[k].get("motif"))):
+        row = state[key]
+        generated = int(row.get("generated", 0))
+        target = max(1, int(row.get("target", 1)))
+        accepted = row.get("accepted")
+        accepted_target = row.get("accepted_target")
+        target_fraction = row.get("target_fraction")
+        elapsed = float(row.get("elapsed", 0.0))
+        gen_pct = min(100, int(100 * generated / target))
+        gen_bar = _format_progress_bar(int(generated), int(target))
+        gen_label = f"{generated}/{target} {gen_bar} ({gen_pct}%)"
+        if accepted is None:
+            eligible_label = "-"
+        elif accepted_target is not None and int(accepted_target) > 0:
+            acc_pct = min(100, int(100 * int(accepted) / max(1, int(accepted_target))))
+            eligible_label = f"{accepted}/{accepted_target} ({acc_pct}%)"
+        else:
+            eligible_label = str(accepted)
+        tier_label = "-"
+        if target_fraction is not None:
+            tier_label = f"{float(target_fraction) * 100:.3f}%"
+        tier_yield = _format_tier_yield(int(accepted)) if accepted is not None else "-"
+        elapsed_label = f"{max(0.0, float(elapsed)):.1f}s"
+        rate = generated / elapsed if elapsed > 0 else 0.0
+        rate_label = _format_rate(rate)
+        table.add_row(
+            str(row.get("motif", "-")),
+            gen_label,
+            eligible_label,
+            tier_label,
+            tier_yield,
+            elapsed_label,
+            rate_label,
+        )
+    return make_panel(table, title="Stage-A mining")
+
+
+def _stage_a_live_start():
+    from rich.console import Console
+    from rich.live import Live
+
+    console = Console()
+    live = Live(console=console, refresh_per_second=4, transient=False)
+    live.start()
+    return live
+
+
+def _stage_a_live_register(
+    *,
+    key: str,
+    motif_id: str,
+    target: int,
+    accepted_target: Optional[int],
+    target_fraction: Optional[float],
+) -> None:
+    global _STAGE_A_LIVE
+    with _STAGE_A_LIVE_LOCK:
+        if _STAGE_A_LIVE is None:
+            _STAGE_A_LIVE = _stage_a_live_start()
+        _STAGE_A_LIVE_STATE[key] = {
+            "motif": motif_id,
+            "generated": 0,
+            "target": int(target),
+            "accepted": None,
+            "accepted_target": int(accepted_target) if accepted_target is not None else None,
+            "target_fraction": target_fraction,
+            "elapsed": 0.0,
+        }
+
+
+def _stage_a_live_update(
+    *,
+    key: str,
+    generated: int,
+    accepted: Optional[int],
+    elapsed: float,
+) -> None:
+    with _STAGE_A_LIVE_LOCK:
+        if _STAGE_A_LIVE is None:
+            return
+        row = _STAGE_A_LIVE_STATE.get(key)
+        if row is None:
+            return
+        row["generated"] = int(generated)
+        row["accepted"] = int(accepted) if accepted is not None else None
+        row["elapsed"] = float(elapsed)
+        renderable = _stage_a_live_render(_STAGE_A_LIVE_STATE)
+        _STAGE_A_LIVE.update(renderable, refresh=True)
+
+
+def _stage_a_live_finish(*, key: str) -> None:
+    global _STAGE_A_LIVE
+    with _STAGE_A_LIVE_LOCK:
+        _STAGE_A_LIVE_STATE.pop(key, None)
+        if _STAGE_A_LIVE is not None and not _STAGE_A_LIVE_STATE:
+            _STAGE_A_LIVE.stop()
+            _STAGE_A_LIVE = None
+
+
 @dataclass
 class _PwmSamplingProgress:
     motif_id: str
@@ -109,8 +222,7 @@ class _PwmSamplingProgress:
         )
         self._mode = str(logging_utils.get_progress_style())
         self._use_live = self._enabled and self._mode == "screen"
-        self._console = None
-        self._live = None
+        self._live_key = f"{self.motif_id}:{id(self)}"
         self._start = time.monotonic()
         self._last_update = self._start
         self._last_len = 0
@@ -119,12 +231,13 @@ class _PwmSamplingProgress:
         if self._enabled:
             logging_utils.set_progress_active(True)
         if self._use_live:
-            from rich.console import Console
-            from rich.live import Live
-
-            self._console = Console()
-            self._live = Live(console=self._console, refresh_per_second=4, transient=False)
-            self._live.start()
+            _stage_a_live_register(
+                key=self._live_key,
+                motif_id=self.motif_id,
+                target=int(self.target),
+                accepted_target=self.accepted_target,
+                target_fraction=self.target_fraction,
+            )
 
     def update(
         self,
@@ -151,15 +264,13 @@ class _PwmSamplingProgress:
         if self._shown and state == self._last_state and logging_utils.is_progress_line_visible():
             self._last_update = now
             return
-        if self._use_live and self._live is not None:
-            renderable = self._build_live_render(
+        if self._use_live:
+            _stage_a_live_update(
+                key=self._live_key,
                 generated=int(generated),
                 accepted=accepted,
-                batch_index=batch_index,
-                batch_total=batch_total,
                 elapsed=now - self._start,
             )
-            self._live.update(renderable, refresh=True)
         else:
             line = _format_pwm_progress_line(
                 motif_id=self.motif_id,
@@ -186,61 +297,13 @@ class _PwmSamplingProgress:
     def finish(self) -> None:
         if self._enabled:
             logging_utils.set_progress_active(False)
-        if self._use_live and self._live is not None:
-            self._live.stop()
-            self._live = None
+        if self._use_live:
+            _stage_a_live_finish(key=self._live_key)
         if not self._shown:
             return
         if not self._use_live:
             self.stream.write("\n")
             self.stream.flush()
-
-    def _build_live_render(
-        self,
-        *,
-        generated: int,
-        accepted: Optional[int],
-        batch_index: Optional[int],
-        batch_total: Optional[int],
-        elapsed: float,
-    ):
-        table = make_table(show_header=True, pad_edge=False)
-        table.add_column("motif")
-        table.add_column("generated")
-        table.add_column("eligible")
-        table.add_column("tier target")
-        table.add_column("tier yield (0.1/1/9%)")
-        table.add_column("elapsed")
-        table.add_column("rate")
-
-        gen_target = max(1, int(self.target))
-        gen_pct = min(100, int(100 * generated / gen_target))
-        gen_bar = _format_progress_bar(int(generated), int(gen_target))
-        gen_label = f"{generated}/{gen_target} {gen_bar} ({gen_pct}%)"
-        if accepted is None:
-            eligible_label = "-"
-        elif self.accepted_target is not None and int(self.accepted_target) > 0:
-            acc_pct = min(100, int(100 * int(accepted) / max(1, int(self.accepted_target))))
-            eligible_label = f"{accepted}/{self.accepted_target} ({acc_pct}%)"
-        else:
-            eligible_label = str(accepted)
-        tier_label = "-"
-        if self.target_fraction is not None:
-            tier_label = f"{float(self.target_fraction) * 100:.3f}%"
-        tier_yield = _format_tier_yield(int(accepted)) if accepted is not None else "-"
-        elapsed_label = f"{max(0.0, float(elapsed)):.1f}s"
-        rate = generated / elapsed if elapsed > 0 else 0.0
-        rate_label = _format_rate(rate)
-        table.add_row(
-            str(self.motif_id),
-            gen_label,
-            eligible_label,
-            tier_label,
-            tier_yield,
-            elapsed_label,
-            rate_label,
-        )
-        return make_panel(table, title="Stage-A mining")
 
 
 def _safe_label(text: str) -> str:
@@ -613,6 +676,8 @@ class PWMSamplingSummary:
     diversity_nearest_distance_mean: Optional[float] = None
     diversity_nearest_distance_min: Optional[float] = None
     diversity_nearest_similarity_mean: Optional[float] = None
+    diversity: Optional[dict[str, object]] = None
+    padding_audit: Optional[dict[str, object]] = None
 
 
 def normalize_background(bg: Optional[dict[str, float]]) -> dict[str, float]:
@@ -682,6 +747,116 @@ def _summarize_scores(
         return None, None, None, None
     arr = np.asarray(scores, dtype=float)
     return float(arr.min()), float(np.median(arr)), float(arr.mean()), float(arr.max())
+
+
+def _stable_subsample(values: Sequence[str], max_size: int) -> tuple[list[str], bool]:
+    if len(values) <= max_size:
+        return list(values), False
+    keyed = []
+    for idx, val in enumerate(values):
+        digest = hashlib.md5(str(val).encode("utf-8")).hexdigest()
+        keyed.append((digest, idx, val))
+    keyed.sort()
+    sampled = [val for _, _, val in keyed[: int(max_size)]]
+    return sampled, True
+
+
+def _core_entropy(cores: Sequence[str]) -> list[float]:
+    if not cores:
+        return []
+    length = len(cores[0])
+    if any(len(core) != length for core in cores):
+        return []
+    counts = np.zeros((length, 4), dtype=float)
+    idx_map = {"A": 0, "C": 1, "G": 2, "T": 3}
+    for core in cores:
+        for pos, base in enumerate(core):
+            idx = idx_map.get(base)
+            if idx is None:
+                continue
+            counts[pos, idx] += 1.0
+    entropies: list[float] = []
+    for row in counts:
+        total = float(row.sum())
+        if total <= 0:
+            entropies.append(0.0)
+            continue
+        probs = row / total
+        mask = probs > 0
+        entropies.append(float(-(probs[mask] * np.log2(probs[mask])).sum()))
+    return entropies
+
+
+def _core_hamming_nnd(cores: Sequence[str], *, max_n: int = 2500) -> dict[str, object] | None:
+    if not cores:
+        return None
+    length = len(cores[0])
+    if length == 0 or any(len(core) != length for core in cores):
+        return None
+    sample, subsampled = _stable_subsample(cores, max_n)
+    n = len(sample)
+    if n == 0:
+        return None
+    idx_map = {"A": 0, "C": 1, "G": 2, "T": 3}
+    encoded = np.full((n, length), 4, dtype=np.int8)
+    for i, core in enumerate(sample):
+        encoded[i] = np.array([idx_map.get(base, 4) for base in core], dtype=np.int8)
+    distances = np.zeros(n, dtype=int)
+    if n == 1:
+        distances[0] = 0
+    else:
+        for i in range(n):
+            diff = (encoded[i] != encoded).sum(axis=1)
+            diff[i] = length + 1
+            distances[i] = int(diff.min())
+    max_dist = int(length)
+    counts = np.bincount(distances, minlength=max_dist + 1)
+    frac_le_1 = float(np.mean(distances <= 1)) if distances.size else 0.0
+    return {
+        "bins": list(range(max_dist + 1)),
+        "counts": [int(v) for v in counts.tolist()],
+        "median": float(np.median(distances)) if distances.size else 0.0,
+        "frac_le_1": float(frac_le_1),
+        "n": int(n),
+        "subsampled": bool(subsampled),
+    }
+
+
+def _diversity_summary(
+    *,
+    baseline_cores: Sequence[str],
+    actual_cores: Sequence[str],
+    baseline_scores: Sequence[float],
+    actual_scores: Sequence[float],
+    max_n: int = 2500,
+) -> dict[str, object] | None:
+    baseline_nnd = _core_hamming_nnd(baseline_cores, max_n=max_n)
+    actual_nnd = _core_hamming_nnd(actual_cores, max_n=max_n)
+    if baseline_nnd is None or actual_nnd is None:
+        return None
+    baseline_entropy = _core_entropy(baseline_cores)
+    actual_entropy = _core_entropy(actual_cores)
+    _, baseline_median, _, _ = _summarize_scores(baseline_scores)
+    _, actual_median, _, _ = _summarize_scores(actual_scores)
+    return {
+        "core_hamming_nnd": {
+            "bins": baseline_nnd.get("bins") or actual_nnd.get("bins"),
+            "baseline": baseline_nnd,
+            "actual": actual_nnd,
+        },
+        "core_entropy": {
+            "baseline": {"values": baseline_entropy, "n": int(len(baseline_cores))},
+            "actual": {"values": actual_entropy, "n": int(len(actual_cores))},
+        },
+        "score_baseline_vs_actual": {
+            "baseline_median": baseline_median,
+            "actual_median": actual_median,
+        },
+    }
+
+
+def _ranges_overlap(a_start: int, a_stop: int, b_start: int, b_stop: int) -> bool:
+    return int(a_start) <= int(b_stop) and int(b_start) <= int(a_stop)
 
 
 def _rank_scored_sequences(scored: Sequence[tuple[str, float]]) -> list[tuple[str, float]]:
@@ -771,6 +946,8 @@ def _build_summary(
     diversity_nearest_distance_mean: Optional[float] = None,
     diversity_nearest_distance_min: Optional[float] = None,
     diversity_nearest_similarity_mean: Optional[float] = None,
+    diversity: Optional[dict[str, object]] = None,
+    padding_audit: Optional[dict[str, object]] = None,
     input_name: Optional[str] = None,
     regulator: Optional[str] = None,
     backend: Optional[str] = None,
@@ -831,6 +1008,8 @@ def _build_summary(
         diversity_nearest_similarity_mean=float(diversity_nearest_similarity_mean)
         if diversity_nearest_similarity_mean is not None
         else None,
+        diversity=dict(diversity) if diversity is not None else None,
+        padding_audit=dict(padding_audit) if padding_audit is not None else None,
     )
 
 
@@ -1101,15 +1280,15 @@ def sample_pwm_sites(
             raise ValueError(f"pwm.sampling.length.range min must be >= motif width ({width}), got {lo}")
         return int(rng.integers(lo, hi + 1))
 
-    def _embed_with_background(seq: str, target_len: int) -> str:
+    def _embed_with_background(seq: str, target_len: int) -> tuple[str, int]:
         if target_len == len(seq):
-            return seq
+            return seq, 0
         extra = target_len - len(seq)
         left_len = int(rng.integers(0, extra + 1))
         right_len = extra - left_len
         left = sample_sequence_from_background(rng, motif.background, left_len)
         right = sample_sequence_from_background(rng, motif.background, right_len)
-        return f"{left}{seq}{right}"
+        return f"{left}{seq}{right}", int(left_len)
 
     progress: _PwmSamplingProgress | None = None
 
@@ -1118,6 +1297,8 @@ def sample_pwm_sites(
         n_candidates: int,
         requested: int,
         sequences: Optional[List[str]] = None,
+        intended_core_by_seq: Optional[dict[str, tuple[int, int]]] = None,
+        core_offset_by_seq: Optional[dict[str, int]] = None,
     ) -> tuple[List[str], dict[str, dict]]:
         import tempfile
 
@@ -1190,7 +1371,11 @@ def sample_pwm_sites(
                     core = sample_sequence_from_background(rng, motif.background, width)
                 else:
                     core = sample_sequence_from_pwm(rng, matrix)
-                full_seq = _embed_with_background(core, target_len)
+                full_seq, left_len = _embed_with_background(core, target_len)
+                intended_start = int(left_len) + 1
+                intended_stop = int(left_len) + int(width)
+                intended_core_by_seq[full_seq] = (intended_start, intended_stop)
+                core_offset_by_seq[full_seq] = int(left_len)
                 sequences.append(full_seq)
             return sequences, lengths, time_limited
 
@@ -1207,6 +1392,8 @@ def sample_pwm_sites(
         provided_sequences = sequences
         requested_final = int(requested)
         candidate_records: list[dict] | None = [] if keep_all_candidates_debug else None
+        intended_core_by_seq = dict(intended_core_by_seq or {})
+        core_offset_by_seq = dict(core_offset_by_seq or {})
 
         def _record_candidate(
             *,
@@ -1514,6 +1701,45 @@ def sample_pwm_sites(
         retained_tier_counts = [0, 0, 0, 0]
         for cand in picked:
             retained_tier_counts[tier_by_seq[cand.seq]] += 1
+        candidate_slice = ranked
+        tier_limit = selection_diag.get("tier_limit")
+        if isinstance(tier_limit, int) and tier_limit > 0:
+            candidate_slice = ranked[:tier_limit]
+        baseline_candidates = candidate_slice[: min(int(n_sites), len(candidate_slice))]
+        baseline_cores = [(_core_sequence(cand)) for cand in baseline_candidates if cand.matched_sequence]
+        actual_cores = [(_core_sequence(cand)) for cand in picked if cand.matched_sequence]
+        baseline_scores = [float(cand.score) for cand in baseline_candidates]
+        actual_scores = [float(cand.score) for cand in picked]
+        diversity = _diversity_summary(
+            baseline_cores=baseline_cores,
+            actual_cores=actual_cores,
+            baseline_scores=baseline_scores,
+            actual_scores=actual_scores,
+        )
+        padding_audit = None
+        if intended_core_by_seq:
+            overlap_total = 0
+            overlap_hits = 0
+            offset_counts: dict[int, int] = {}
+            for seq, cand in candidates_by_seq.items():
+                intended = intended_core_by_seq.get(seq)
+                if intended is None:
+                    continue
+                offset = core_offset_by_seq.get(seq)
+                if offset is None:
+                    continue
+                overlap_total += 1
+                if _ranges_overlap(intended[0], intended[1], int(cand.start), int(cand.stop)):
+                    overlap_hits += 1
+                offset_counts[int(offset)] = offset_counts.get(int(offset), 0) + 1
+            if overlap_total > 0 and offset_counts:
+                bins = sorted(offset_counts)
+                counts = [offset_counts[b] for b in bins]
+                padding_audit = {
+                    "best_hit_overlaps_intended_core_fraction": float(overlap_hits) / float(overlap_total),
+                    "core_offset_histogram": {"bins": bins, "counts": counts},
+                    "core_offset_n": int(overlap_total),
+                }
         if len(ranked) < n_sites:
             msg_lines = [
                 (
@@ -1688,6 +1914,8 @@ def sample_pwm_sites(
                 diversity_nearest_similarity_mean=diversity_nearest_similarity_mean,
                 diversity_nearest_distance_mean=diversity_nearest_distance_mean,
                 diversity_nearest_distance_min=diversity_nearest_distance_min,
+                diversity=diversity,
+                padding_audit=padding_audit,
                 input_name=input_name,
                 regulator=motif.motif_id,
                 backend=scoring_backend,
@@ -1705,11 +1933,15 @@ def sample_pwm_sites(
         )
         seq = "".join(max(row.items(), key=lambda kv: kv[1])[0] for row in matrix)
         target_len = _resolve_length()
-        full_seq = _embed_with_background(seq, target_len)
+        full_seq, left_len = _embed_with_background(seq, target_len)
+        intended_start = int(left_len) + 1
+        intended_stop = int(left_len) + int(width)
         selected, meta, summary = _score_with_fimo(
             n_candidates=1,
             requested=1,
             sequences=[full_seq],
+            intended_core_by_seq={full_seq: (intended_start, intended_stop)},
+            core_offset_by_seq={full_seq: int(left_len)},
         )
         if return_metadata and return_summary:
             return selected, meta, summary

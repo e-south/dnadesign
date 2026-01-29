@@ -157,6 +157,7 @@ def test_plot_manifest_written(tmp_path: Path) -> None:
     assert "stage_a_summary" in names
     paths = {item["path"] for item in payload.get("plots", [])}
     assert "stage_a_summary__demo_input.png" in paths
+    assert "stage_a_summary__demo_input__diversity.png" in paths
 
 
 def test_stage_a_plots_without_outputs(tmp_path: Path) -> None:
@@ -173,3 +174,5 @@ def test_stage_a_plots_without_outputs(tmp_path: Path) -> None:
     plots_dir = run_root / "outputs" / "plots"
     overview_plot = plots_dir / "stage_a_summary__demo_input.png"
     assert overview_plot.exists()
+    diversity_plot = plots_dir / "stage_a_summary__demo_input__diversity.png"
+    assert diversity_plot.exists()

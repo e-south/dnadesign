@@ -1031,7 +1031,7 @@ def _build_stage_a_strata_overview_figure(
         ax_header.set_label("header")
         ax_header.text(
             0.5,
-            0.78,
+            0.86,
             f"Stage-A pool tiers — {input_name}",
             ha="center",
             va="center",
@@ -1109,7 +1109,7 @@ def _build_stage_a_strata_overview_figure(
                         ymax_fraction=0.58,
                         label_mode="box",
                         loc="lower right",
-                        fontsize=text_sizes["annotation"] * 0.8,
+                        fontsize=text_sizes["annotation"] * 0.65,
                     )
                 ax.set_yticks([])
                 ax.set_ylim(0, 1.05)
@@ -1117,7 +1117,7 @@ def _build_stage_a_strata_overview_figure(
                 core_len = core_lengths.get(reg)
                 ax.set_ylabel("")
                 ax.text(
-                    -0.02,
+                    -0.015,
                     0.64,
                     label,
                     transform=ax.transAxes,
@@ -1129,7 +1129,7 @@ def _build_stage_a_strata_overview_figure(
                 )
                 if core_len:
                     ax.text(
-                        -0.02,
+                        -0.015,
                         0.34,
                         f"(core {core_len} bp)",
                         transform=ax.transAxes,
@@ -1148,7 +1148,7 @@ def _build_stage_a_strata_overview_figure(
                 "Eligible score tiers with retained overlays",
                 fontsize=text_sizes["annotation"],
                 color="#444444",
-                pad=8,
+                pad=12,
                 loc="center",
             )
             axes_left[-1].set_xlabel("FIMO log-odds score")
@@ -1189,7 +1189,7 @@ def _build_stage_a_strata_overview_figure(
             "Retained TFBS length counts",
             fontsize=text_sizes["annotation"],
             color="#444444",
-            pad=8,
+            pad=12,
         )
 
         legend_handles = [
@@ -1214,6 +1214,433 @@ def _build_stage_a_strata_overview_figure(
 
     ax_left = axes_left[-1]
     return fig, ax_left, ax_right
+
+
+def _build_stage_a_yield_bias_figure(
+    *,
+    input_name: str,
+    pool_df: pd.DataFrame,
+    sampling: dict,
+    style: dict,
+) -> tuple[mpl.figure.Figure, list[mpl.axes.Axes], list[mpl.axes.Axes], mpl.axes.Axes]:
+    style = _style(style)
+    style["seaborn_style"] = False
+    rc = stage_a_rcparams(style)
+    text_sizes = _stage_a_text_sizes(style)
+    eligible_hist = sampling.get("eligible_score_hist") or []
+    if not eligible_hist:
+        raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
+
+    regs = []
+    stage_counts: list[list[int]] = []
+    for row in eligible_hist:
+        reg = str(row.get("regulator") or "")
+        generated = row.get("generated")
+        hit = row.get("candidates_with_hit")
+        eligible = row.get("eligible")
+        unique = row.get("eligible_unique")
+        retained = row.get("retained")
+        if generated in (None, 0):
+            raise ValueError(f"Stage-A sampling missing generated counts for input '{input_name}'.")
+        if any(val is None for val in (hit, eligible, unique, retained)):
+            raise ValueError(f"Stage-A sampling missing yield counters for input '{input_name}'.")
+        regs.append(reg)
+        stage_counts.append([int(generated), int(hit), int(eligible), int(unique), int(retained)])
+
+    if "tfbs_sequence" in pool_df.columns:
+        tfbs_col = "tfbs_sequence"
+    elif "tfbs" in pool_df.columns:
+        tfbs_col = "tfbs"
+    else:
+        raise ValueError(f"Stage-A pool missing tfbs_sequence or tfbs for input '{input_name}'.")
+    scores = pd.to_numeric(pool_df.get("best_hit_score"), errors="coerce")
+    if scores is None or scores.dropna().empty:
+        raise ValueError(f"Stage-A pool missing best_hit_score for input '{input_name}'.")
+    seqs = pool_df[tfbs_col].astype(str)
+    lengths = seqs.map(len)
+    gc = seqs.map(_gc_fraction)
+    if "regulator_id" in pool_df.columns:
+        tf_col = "regulator_id"
+    elif "tf" in pool_df.columns:
+        tf_col = "tf"
+    else:
+        raise ValueError(f"Stage-A pool missing regulator_id or tf column for input '{input_name}'.")
+
+    lengths = lengths.to_numpy(dtype=float)
+    scores_arr = scores.to_numpy(dtype=float)
+    gc_arr = gc.to_numpy(dtype=float)
+    tf_vals = pool_df[tf_col].astype(str).to_numpy()
+    base_keys = [f"{tf}|{seq}" for tf, seq in zip(tf_vals, seqs.to_list())]
+    core_lengths: dict[str, int] = {}
+    if "tfbs_core" in pool_df.columns:
+        core_series = pool_df["tfbs_core"].astype(str)
+        for reg, core in zip(tf_vals, core_series.to_list()):
+            core_lengths.setdefault(str(reg), []).append(len(core))
+        core_lengths = {reg: int(np.median(vals)) for reg, vals in core_lengths.items() if vals}
+
+    def _stable_jitter(keys: list[str], width: float = 0.18) -> np.ndarray:
+        import hashlib
+
+        values = []
+        for key in keys:
+            digest = hashlib.md5(key.encode("utf-8")).hexdigest()
+            bucket = int(digest[:8], 16) / float(0xFFFFFFFF)
+            values.append((bucket - 0.5) * width + 0.0)
+        return np.asarray(values) if values else np.zeros((0,), dtype=float)
+
+    jitter = _stable_jitter(base_keys)
+    lengths_j = lengths + jitter
+
+    fig_width = float(style.get("figsize", (11, 4.2))[0])
+    base_height = float(style.get("figsize", (11, 4.2))[1])
+    reg_order = [reg for reg in regs if reg]
+    if not reg_order:
+        reg_order = sorted({str(val) for val in tf_vals})
+    n_regs = max(1, len(reg_order))
+    fig_height = max(4.8, base_height, 1.75 * n_regs + 0.8)
+    reg_colors = _stage_a_regulator_colors(reg_order, style)
+    stage_labels = ["Generated", "Hit", "Eligible", "Unique", "Retained"]
+    counts_by_reg = {reg: counts for reg, counts in zip(regs, stage_counts)}
+    max_count = max((max(counts) for counts in stage_counts), default=0)
+    subtitle_size = text_sizes["panel_title"] * 0.88
+    tick_size = text_sizes["annotation"] * 0.65
+    title_pad = 12
+    with mpl.rc_context(rc):
+        fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=False)
+        header_height = min(0.95, fig_height * 0.18)
+        body_height = max(1.0, fig_height - header_height)
+        outer = fig.add_gridspec(
+            nrows=2,
+            ncols=1,
+            height_ratios=[header_height, body_height],
+            hspace=0.05,
+        )
+        ax_header = fig.add_subplot(outer[0, 0])
+        ax_header.set_axis_off()
+        ax_header.set_label("header")
+        ax_header.text(
+            0.5,
+            0.74,
+            f"Stage-A yield & bias — {input_name}",
+            ha="center",
+            va="center",
+            fontsize=text_sizes["fig_title"],
+            color="#111111",
+        )
+        body = outer[1].subgridspec(
+            nrows=1,
+            ncols=2,
+            width_ratios=[1.0, 0.05],
+            wspace=0.12,
+        )
+        main = body[0, 0].subgridspec(
+            nrows=n_regs,
+            ncols=2,
+            width_ratios=[1.0, 1.0],
+            hspace=0.32,
+            wspace=0.52,
+        )
+        axes_left: list[mpl.axes.Axes] = []
+        axes_right: list[mpl.axes.Axes] = []
+        for idx in range(n_regs):
+            share_left = axes_left[0] if axes_left else None
+            share_right = axes_right[0] if axes_right else None
+            axes_left.append(fig.add_subplot(main[idx, 0], sharex=share_left, sharey=share_left))
+            axes_right.append(fig.add_subplot(main[idx, 1], sharex=share_right, sharey=share_right))
+        cbar_ax = fig.add_subplot(body[0, 1])
+
+        if not reg_order:
+            axes_left[0].text(0.5, 0.5, "No yield data", ha="center", va="center", transform=axes_left[0].transAxes)
+            axes_left[0].set_axis_off()
+        else:
+            stage_labels = [label.capitalize() for label in stage_labels]
+            x_positions = np.arange(len(stage_labels))
+            offset = max(1.0, max_count * 0.03) if max_count else 1.0
+            y_limit = max_count * 1.25 + offset if max_count else 1.0
+            for idx, reg in enumerate(reg_order):
+                ax = axes_left[idx]
+                counts = counts_by_reg.get(reg)
+                if not counts:
+                    ax.text(0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes)
+                else:
+                    hue = reg_colors.get(reg, "#4c78a8")
+                    ax.plot(x_positions, counts, color=hue, marker="o", linewidth=1.4, markersize=4)
+                    ax.set_ylim(0.0, y_limit)
+                    for step_idx, cur in enumerate(counts):
+                        prev = counts[step_idx - 1] if step_idx > 0 else cur
+                        frac = float(cur) / float(prev) if prev else 0.0
+                        label = f"{cur:,}\n{_format_percent(frac)}"
+                        ax.annotate(
+                            label,
+                            (x_positions[step_idx], cur),
+                            xytext=(0, 8),
+                            textcoords="offset points",
+                            ha="center",
+                            va="bottom",
+                            fontsize=text_sizes["annotation"] * 0.75,
+                            color="#222222",
+                        )
+                label = format_regulator_label(reg)
+                ax.set_ylabel("")
+                ax.text(
+                    -0.18,
+                    0.64,
+                    label,
+                    transform=ax.transAxes,
+                    ha="right",
+                    va="center",
+                    fontsize=text_sizes["regulator_label"] * 0.84,
+                    color="#222222",
+                    clip_on=False,
+                )
+                core_len = core_lengths.get(str(reg))
+                if core_len:
+                    ax.text(
+                        -0.18,
+                        0.34,
+                        f"(core {core_len} bp)",
+                        transform=ax.transAxes,
+                        ha="right",
+                        va="center",
+                        fontsize=text_sizes["sublabel"] * 0.84,
+                        color="#555555",
+                        clip_on=False,
+                    )
+                ax.tick_params(axis="y", pad=1, labelsize=tick_size)
+                ax.tick_params(axis="x", labelsize=tick_size)
+                ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter("{x:,.0f}"))
+                ax.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
+                ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=4, integer=True))
+
+            axes_left[0].set_title("Stepwise sequence yield", fontsize=subtitle_size, pad=title_pad)
+            axes_left[-1].set_xticks(x_positions)
+            axes_left[-1].set_xticklabels(stage_labels)
+            axes_left[-1].set_xlabel("Stage")
+            for ax in axes_left:
+                ax.set_xlim(-0.5, len(stage_labels) - 1 + 0.5)
+            _shared_x_cleanup(axes_left)
+
+        for idx, reg in enumerate(reg_order):
+            ax = axes_right[idx]
+            mask = tf_vals == reg
+            if not np.any(mask):
+                ax.text(0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes)
+            else:
+                ax.scatter(
+                    lengths_j[mask],
+                    scores_arr[mask],
+                    c=gc_arr[mask],
+                    cmap="viridis",
+                    alpha=0.65,
+                    s=12,
+                    marker="o",
+                    edgecolors="none",
+                )
+            ax.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
+            ax.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True, nbins=5))
+            ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=4))
+        axes_right[0].set_title(
+            "Retained sites: score vs length (GC color)",
+            fontsize=subtitle_size,
+            pad=title_pad,
+        )
+        axes_right[-1].set_xlabel("TFBS length (nt)")
+        for ax in axes_right:
+            ax.set_ylabel("Best-hit score")
+            ax.tick_params(axis="y", labelsize=tick_size, labelleft=True)
+            ax.tick_params(axis="x", labelsize=tick_size)
+        x_min = float(np.nanmin(lengths)) if len(lengths) else 0.0
+        x_max = float(np.nanmax(lengths)) if len(lengths) else 0.0
+        if x_max > x_min:
+            for ax in axes_right:
+                ax.set_xlim(x_min - 1.0, x_max + 1.0)
+        sm = plt.cm.ScalarMappable(cmap="viridis", norm=mpl.colors.Normalize(vmin=0.0, vmax=1.0))
+        cbar = fig.colorbar(sm, cax=cbar_ax)
+        cbar.set_label("GC fraction", fontsize=text_sizes["annotation"] * 0.85)
+        cbar.ax.tick_params(labelsize=tick_size)
+        _shared_x_cleanup(axes_right)
+        for ax in axes_left + axes_right:
+            _apply_style(ax, style)
+            ax.tick_params(axis="both", labelsize=tick_size)
+    return fig, axes_left, axes_right, cbar_ax
+
+
+def _build_stage_a_diversity_figure(
+    *,
+    input_name: str,
+    pool_df: pd.DataFrame,
+    sampling: dict,
+    style: dict,
+) -> tuple[mpl.figure.Figure, list[mpl.axes.Axes], list[mpl.axes.Axes]]:
+    style = _style(style)
+    style["seaborn_style"] = False
+    rc = stage_a_rcparams(style)
+    text_sizes = _stage_a_text_sizes(style)
+    eligible_hist = sampling.get("eligible_score_hist") or []
+    if not eligible_hist:
+        raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
+    regulators = [str(row.get("regulator") or "") for row in eligible_hist]
+    reg_colors = _stage_a_regulator_colors(regulators, style)
+    n_regs = max(1, len(regulators))
+    fig_width = float(style.get("figsize", (11, 4))[0])
+    fig_height = max(4.0, 1.5 * n_regs + 1.1)
+    subtitle_size = text_sizes["panel_title"] * 0.88
+    title_pad = 12
+    with mpl.rc_context(rc):
+        fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=False)
+        header_height = min(0.95, fig_height * 0.18)
+        body_height = max(1.0, fig_height - header_height)
+        outer = fig.add_gridspec(
+            nrows=2,
+            ncols=1,
+            height_ratios=[header_height, body_height],
+            hspace=0.05,
+        )
+        ax_header = fig.add_subplot(outer[0, 0])
+        ax_header.set_axis_off()
+        ax_header.set_label("header")
+        ax_header.text(
+            0.5,
+            0.84,
+            f"Stage-A core diversity — {input_name}",
+            ha="center",
+            va="center",
+            fontsize=text_sizes["fig_title"],
+            color="#111111",
+        )
+        ax_header.text(
+            0.5,
+            0.48,
+            "Core-only diversity metrics (flanks excluded)",
+            ha="center",
+            va="center",
+            fontsize=text_sizes["annotation"],
+            color="#555555",
+        )
+        body = outer[1].subgridspec(
+            nrows=n_regs,
+            ncols=2,
+            width_ratios=[1.15, 1.0],
+            hspace=0.32,
+            wspace=0.35,
+        )
+        axes_left: list[mpl.axes.Axes] = []
+        axes_right: list[mpl.axes.Axes] = []
+        for idx in range(n_regs):
+            share_left = axes_left[0] if axes_left else None
+            share_right = axes_right[0] if axes_right else None
+            axes_left.append(fig.add_subplot(body[idx, 0], sharex=share_left, sharey=share_left))
+            axes_right.append(fig.add_subplot(body[idx, 1], sharex=share_right, sharey=share_right))
+
+        diversity_by_reg = {str(row.get("regulator") or ""): row.get("diversity") for row in eligible_hist}
+        for idx, reg in enumerate(regulators):
+            hue = reg_colors.get(reg, "#4c78a8")
+            label = format_regulator_label(reg)
+            ax_left = axes_left[idx]
+            ax_right = axes_right[idx]
+            diversity = diversity_by_reg.get(reg) if isinstance(diversity_by_reg.get(reg), dict) else None
+            core_nnd = diversity.get("core_hamming_nnd") if isinstance(diversity, dict) else None
+            if not isinstance(core_nnd, dict):
+                ax_left.text(0.5, 0.5, "No diversity data", ha="center", va="center", transform=ax_left.transAxes)
+                ax_right.text(0.5, 0.5, "No diversity data", ha="center", va="center", transform=ax_right.transAxes)
+            else:
+                baseline = core_nnd.get("baseline") if isinstance(core_nnd.get("baseline"), dict) else None
+                actual = core_nnd.get("actual") if isinstance(core_nnd.get("actual"), dict) else None
+                bins = core_nnd.get("bins") if isinstance(core_nnd.get("bins"), list) else None
+                if baseline and actual and bins:
+                    baseline_counts = np.asarray(baseline.get("counts", []), dtype=float)
+                    actual_counts = np.asarray(actual.get("counts", []), dtype=float)
+                    x_vals = np.asarray(bins, dtype=float)
+                    if baseline_counts.size and actual_counts.size:
+                        ax_left.plot(
+                            x_vals,
+                            baseline_counts,
+                            color="#777777",
+                            linewidth=1.2,
+                            drawstyle="steps-mid",
+                            label="baseline",
+                        )
+                        ax_left.plot(
+                            x_vals,
+                            actual_counts,
+                            color=hue,
+                            linewidth=1.4,
+                            drawstyle="steps-mid",
+                            label="actual",
+                        )
+                        ax_left.set_xlim(x_vals.min(), x_vals.max())
+                        ax_left.set_ylabel("Count")
+                        ax_left.legend(loc="upper right", frameon=False, fontsize=text_sizes["annotation"] * 0.8)
+                        baseline_med = baseline.get("median")
+                        actual_med = actual.get("median")
+                        actual_frac = actual.get("frac_le_1")
+                        note_lines = []
+                        if baseline_med is not None and actual_med is not None:
+                            note_lines.append(f"med {baseline_med:.2f} → {actual_med:.2f}")
+                        if actual_frac is not None:
+                            note_lines.append(f"p(NND≤1) {float(actual_frac) * 100:.1f}%")
+                        if note_lines:
+                            ax_left.text(
+                                0.02,
+                                0.95,
+                                "\n".join(note_lines),
+                                transform=ax_left.transAxes,
+                                ha="left",
+                                va="top",
+                                fontsize=text_sizes["annotation"] * 0.8,
+                                color="#333333",
+                            )
+                core_entropy = diversity.get("core_entropy") if isinstance(diversity, dict) else None
+                if isinstance(core_entropy, dict):
+                    base_entropy = core_entropy.get("baseline", {}).get("values", [])
+                    actual_entropy = core_entropy.get("actual", {}).get("values", [])
+                    if actual_entropy:
+                        positions = np.arange(1, len(actual_entropy) + 1)
+                        ax_right.bar(
+                            positions,
+                            actual_entropy,
+                            color=hue,
+                            alpha=0.65,
+                            width=0.8,
+                            label="actual",
+                        )
+                        if base_entropy:
+                            ax_right.plot(
+                                positions,
+                                base_entropy,
+                                color="#777777",
+                                linewidth=1.2,
+                                marker="o",
+                                markersize=2.5,
+                                label="baseline",
+                            )
+                        ax_right.set_ylabel("Entropy (bits)")
+                        ax_right.legend(loc="upper right", frameon=False, fontsize=text_sizes["annotation"] * 0.8)
+            ax_left.text(
+                -0.06,
+                0.64,
+                label,
+                transform=ax_left.transAxes,
+                ha="right",
+                va="center",
+                fontsize=text_sizes["regulator_label"] * 0.9,
+                color="#222222",
+                clip_on=False,
+            )
+            ax_left.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
+            ax_right.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
+
+        if axes_left:
+            axes_left[0].set_title("Core nearest-neighbor distance", fontsize=subtitle_size, pad=title_pad)
+            axes_right[0].set_title("Core positional entropy", fontsize=subtitle_size, pad=title_pad)
+            axes_left[-1].set_xlabel("Nearest-neighbor distance (Hamming)")
+            axes_right[-1].set_xlabel("Core position")
+            _shared_x_cleanup(axes_left)
+            _shared_x_cleanup(axes_right)
+
+        for ax in axes_left + axes_right:
+            _apply_style(ax, style)
+    return fig, axes_left, axes_right
 
 
 def plot_stage_a_summary(
@@ -1249,237 +1676,29 @@ def plot_stage_a_summary(
         plt.close(fig)
         paths.append(path)
 
-        eligible_hist = sampling.get("eligible_score_hist") or []
-        if not eligible_hist:
-            raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
-        regs = []
-        stage_counts: list[list[int]] = []
-        for row in eligible_hist:
-            reg = str(row.get("regulator") or "")
-            generated = row.get("generated")
-            hit = row.get("candidates_with_hit")
-            eligible = row.get("eligible")
-            unique = row.get("eligible_unique")
-            retained = row.get("retained")
-            if generated in (None, 0):
-                raise ValueError(f"Stage-A sampling missing generated counts for input '{input_name}'.")
-            if any(val is None for val in (hit, eligible, unique, retained)):
-                raise ValueError(f"Stage-A sampling missing yield counters for input '{input_name}'.")
-            regs.append(reg)
-            stage_counts.append([int(generated), int(hit), int(eligible), int(unique), int(retained)])
-
-        if "tfbs_sequence" in pool_df.columns:
-            tfbs_col = "tfbs_sequence"
-        elif "tfbs" in pool_df.columns:
-            tfbs_col = "tfbs"
-        else:
-            raise ValueError(f"Stage-A pool missing tfbs_sequence or tfbs for input '{input_name}'.")
-        scores = pd.to_numeric(pool_df.get("best_hit_score"), errors="coerce")
-        if scores is None or scores.dropna().empty:
-            raise ValueError(f"Stage-A pool missing best_hit_score for input '{input_name}'.")
-        seqs = pool_df[tfbs_col].astype(str)
-        lengths = seqs.map(len)
-        gc = seqs.map(_gc_fraction)
-        if "regulator_id" in pool_df.columns:
-            tf_col = "regulator_id"
-        elif "tf" in pool_df.columns:
-            tf_col = "tf"
-        else:
-            raise ValueError(f"Stage-A pool missing regulator_id or tf column for input '{input_name}'.")
-
-        lengths = lengths.to_numpy(dtype=float)
-        scores_arr = scores.to_numpy(dtype=float)
-        gc_arr = gc.to_numpy(dtype=float)
-        tf_vals = pool_df[tf_col].astype(str).to_numpy()
-        base_keys = [f"{tf}|{seq}" for tf, seq in zip(tf_vals, seqs.to_list())]
-        core_lengths: dict[str, int] = {}
-        if "tfbs_core" in pool_df.columns:
-            core_series = pool_df["tfbs_core"].astype(str)
-            for reg, core in zip(tf_vals, core_series.to_list()):
-                core_lengths.setdefault(str(reg), []).append(len(core))
-            core_lengths = {reg: int(np.median(vals)) for reg, vals in core_lengths.items() if vals}
-
-        def _stable_jitter(keys: list[str], width: float = 0.18) -> np.ndarray:
-            import hashlib
-
-            values = []
-            for key in keys:
-                digest = hashlib.md5(key.encode("utf-8")).hexdigest()
-                bucket = int(digest[:8], 16) / float(0xFFFFFFFF)
-                values.append((bucket - 0.5) * width + 0.0)
-            return np.asarray(values) if values else np.zeros((0,), dtype=float)
-
-        jitter = _stable_jitter(base_keys)
-        lengths_j = lengths + jitter
-
-        fig2_width = float(style.get("figsize", (11, 4.2))[0])
-        base_height = float(style.get("figsize", (11, 4.2))[1])
-        reg_order = [reg for reg in regs if reg]
-        if not reg_order:
-            reg_order = sorted({str(val) for val in tf_vals})
-        n_regs = max(1, len(reg_order))
-        fig2_height = max(4.8, base_height, 1.75 * n_regs + 0.8)
-        text_sizes = _stage_a_text_sizes(style)
-        reg_colors = _stage_a_regulator_colors(reg_order, style)
-        stage_labels = ["Generated", "Hit", "Eligible", "Unique", "Retained"]
-        counts_by_reg = {reg: counts for reg, counts in zip(regs, stage_counts)}
-        max_count = max((max(counts) for counts in stage_counts), default=0)
-        with mpl.rc_context(stage_a_rcparams(style)):
-            fig2 = plt.figure(figsize=(fig2_width, fig2_height), constrained_layout=False)
-            header_height = min(0.95, fig2_height * 0.18)
-            body_height = max(1.0, fig2_height - header_height)
-            outer = fig2.add_gridspec(
-                nrows=2,
-                ncols=1,
-                height_ratios=[header_height, body_height],
-                hspace=0.05,
-            )
-            ax_header = fig2.add_subplot(outer[0, 0])
-            ax_header.set_axis_off()
-            ax_header.set_label("header")
-            ax_header.text(
-                0.5,
-                0.70,
-                f"Stage-A yield — {input_name}",
-                ha="center",
-                va="center",
-                fontsize=text_sizes["fig_title"],
-                color="#111111",
-            )
-            body = outer[1].subgridspec(
-                nrows=n_regs,
-                ncols=3,
-                width_ratios=[1.55, 1.55, 0.08],
-                hspace=0.32,
-                wspace=0.48,
-            )
-            axes_left: list[mpl.axes.Axes] = []
-            axes_right: list[mpl.axes.Axes] = []
-            for idx in range(n_regs):
-                share_left = axes_left[0] if axes_left else None
-                share_right = axes_right[0] if axes_right else None
-                axes_left.append(fig2.add_subplot(body[idx, 0], sharex=share_left, sharey=share_left))
-                axes_right.append(fig2.add_subplot(body[idx, 1], sharex=share_right, sharey=share_right))
-            cbar_ax = fig2.add_subplot(body[:, 2])
-
-            subtitle_size = text_sizes["panel_title"] * 0.88
-            if not reg_order:
-                axes_left[0].text(0.5, 0.5, "No yield data", ha="center", va="center", transform=axes_left[0].transAxes)
-                axes_left[0].set_axis_off()
-            else:
-                x_positions = np.arange(len(stage_labels))
-                offset = max(1.0, max_count * 0.03) if max_count else 1.0
-                y_limit = max_count * 1.25 + offset if max_count else 1.0
-                for idx, reg in enumerate(reg_order):
-                    ax = axes_left[idx]
-                    counts = counts_by_reg.get(reg)
-                    if not counts:
-                        ax.text(0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes)
-                    else:
-                        hue = reg_colors.get(reg, "#4c78a8")
-                        ax.plot(x_positions, counts, color=hue, marker="o", linewidth=1.4, markersize=4)
-                        ax.set_ylim(0.0, y_limit)
-                        for step_idx, cur in enumerate(counts):
-                            prev = counts[step_idx - 1] if step_idx > 0 else cur
-                            frac = float(cur) / float(prev) if prev else 0.0
-                            label = f"{cur:,}\n{_format_percent(frac)}"
-                            ax.annotate(
-                                label,
-                                (x_positions[step_idx], cur),
-                                xytext=(0, 8),
-                                textcoords="offset points",
-                                ha="center",
-                                va="bottom",
-                                fontsize=text_sizes["annotation"] * 0.75,
-                                color="#222222",
-                            )
-                    label = format_regulator_label(reg)
-                    ax.set_ylabel("")
-                    ax.text(
-                        -0.26,
-                        0.64,
-                        label,
-                        transform=ax.transAxes,
-                        ha="right",
-                        va="center",
-                        fontsize=text_sizes["regulator_label"] * 0.88,
-                        color="#222222",
-                        clip_on=False,
-                    )
-                    core_len = core_lengths.get(str(reg))
-                    if core_len:
-                        ax.text(
-                            -0.26,
-                            0.34,
-                            f"(core {core_len} bp)",
-                            transform=ax.transAxes,
-                            ha="right",
-                            va="center",
-                            fontsize=text_sizes["sublabel"] * 0.88,
-                            color="#555555",
-                            clip_on=False,
-                        )
-                    ax.tick_params(axis="y", pad=1, labelsize=text_sizes["annotation"] * 0.75)
-                    ax.tick_params(axis="x", labelsize=text_sizes["annotation"] * 0.75)
-                    ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter("{x:,.0f}"))
-                    ax.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
-                    ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=4, integer=True))
-
-                axes_left[0].set_title("Stepwise survival & bias", fontsize=subtitle_size, pad=8)
-                axes_left[-1].set_xticks(x_positions)
-                axes_left[-1].set_xticklabels(stage_labels)
-                for ax in axes_left:
-                    ax.set_xlim(-0.4, len(stage_labels) - 1 + 0.4)
-                _shared_x_cleanup(axes_left)
-
-            for idx, reg in enumerate(reg_order):
-                ax = axes_right[idx]
-                mask = tf_vals == reg
-                if not np.any(mask):
-                    ax.text(0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes)
-                else:
-                    ax.scatter(
-                        lengths_j[mask],
-                        scores_arr[mask],
-                        c=gc_arr[mask],
-                        cmap="viridis",
-                        alpha=0.65,
-                        s=12,
-                        marker="o",
-                        edgecolors="none",
-                    )
-                ax.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
-                ax.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True, nbins=5))
-                ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=4))
-            axes_right[0].set_title(
-                "Retained sites: score vs length (GC color)",
-                fontsize=subtitle_size,
-                pad=8,
-            )
-            axes_right[-1].set_xlabel("TFBS length (nt)")
-            for ax in axes_right:
-                ax.set_ylabel("Best-hit score")
-                ax.tick_params(axis="y", labelsize=text_sizes["annotation"] * 0.75)
-                ax.tick_params(axis="x", labelsize=text_sizes["annotation"] * 0.75)
-            x_min = float(np.nanmin(lengths)) if len(lengths) else 0.0
-            x_max = float(np.nanmax(lengths)) if len(lengths) else 0.0
-            if x_max > x_min:
-                for ax in axes_right:
-                    ax.set_xlim(x_min - 1.0, x_max + 1.0)
-            sm = plt.cm.ScalarMappable(cmap="viridis", norm=mpl.colors.Normalize(vmin=0.0, vmax=1.0))
-            cbar = fig2.colorbar(sm, cax=cbar_ax)
-            cbar.set_label("GC fraction", fontsize=text_sizes["annotation"] * 0.85)
-            cbar.ax.tick_params(labelsize=text_sizes["annotation"] * 0.75)
-            _shared_x_cleanup(axes_right)
-            for ax in axes_left + axes_right:
-                _apply_style(ax, style)
-            for ax in axes_left + axes_right:
-                ax.tick_params(axis="both", labelsize=text_sizes["annotation"] * 0.75)
+        fig2, _, _, _ = _build_stage_a_yield_bias_figure(
+            input_name=input_name,
+            pool_df=pool_df,
+            sampling=sampling,
+            style=style,
+        )
         fname = f"{out_path.stem}__{_safe_filename(input_name)}__yield_bias{out_path.suffix}"
         path2 = out_path.parent / fname
         fig2.savefig(path2, bbox_inches="tight", pad_inches=0.1, facecolor="white")
         plt.close(fig2)
         paths.append(path2)
+
+        fig3, _, _ = _build_stage_a_diversity_figure(
+            input_name=input_name,
+            pool_df=pool_df,
+            sampling=sampling,
+            style=style,
+        )
+        fname = f"{out_path.stem}__{_safe_filename(input_name)}__diversity{out_path.suffix}"
+        path3 = out_path.parent / fname
+        fig3.savefig(path3, bbox_inches="tight", pad_inches=0.1, facecolor="white")
+        plt.close(fig3)
+        paths.append(path3)
     return paths
 
 
