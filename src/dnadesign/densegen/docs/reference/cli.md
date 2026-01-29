@@ -23,9 +23,14 @@ DenseGen exposes a Typer CLI via `dense`. This page is an operator manual (comma
 ### Config resolution
 
 - `-c, --config PATH` — config YAML path (global or per‑command).
-- If `-c/--config` is omitted, DenseGen uses `./config.yaml` in the **current directory** only.
-- If `./config.yaml` is missing, the CLI exits non‑zero with:
-  “No config found. cd into a workspace containing config.yaml, or pass -c path/to/config.yaml.”
+- If `-c/--config` is omitted, DenseGen resolves config in this order:
+  1) `DENSEGEN_CONFIG_PATH` (if set)
+  2) `./config.yaml` in the current directory
+  3) nearest parent directory containing `config.yaml`
+  4) a single auto‑detected workspace (if exactly one match is found)
+- When auto‑detecting, the CLI prints the chosen config path and continues; if multiple workspaces are found,
+  it exits non‑zero and lists the candidates so you can pass `-c`.
+- If no config is found, the CLI exits non‑zero with an actionable error message.
 - Input paths resolve against the config file directory.
 - Outputs/tables/logs/plots/report must resolve inside `outputs/` under `densegen.run.root`.
 - Config files must include `densegen.schema_version` (currently `2.7`) and `densegen.run`.

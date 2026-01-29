@@ -47,8 +47,9 @@ YAML config
 
 ### Architectural contracts
 
-- **Workspace‑first execution:** CLI resolves config from `./config.yaml` in CWD unless `-c` is provided.
-- **No config fallbacks:** missing config exits immediately with an actionable error message.
+- **Workspace‑first execution:** CLI resolves config in this order: `-c`, `DENSEGEN_CONFIG_PATH`, `./config.yaml`,
+  nearest parent `config.yaml`, then a single auto‑detected workspace (explicitly announced).
+- **No silent fallbacks:** missing or ambiguous config exits immediately with an actionable error message.
 - **Strict schema:** unknown keys, mixed quota/fraction plans, or missing required fields are errors.
 - **Run‑scoped I/O:** outputs/tables/logs/plots/report must resolve inside `outputs/` under `densegen.run.root` (enforced).
 - **Stage‑A invariants:** Stage‑A sampling is defined per input and produces pools (plus optional candidate artifacts). Stage‑A pools are cached per run.

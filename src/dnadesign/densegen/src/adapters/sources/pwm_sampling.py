@@ -39,6 +39,7 @@ from .stage_a_selection import (
 SMOOTHING_ALPHA = 1e-6
 SCORE_HIST_BINS = 60
 log = logging.getLogger(__name__)
+_BASES = np.array(["A", "C", "G", "T"])
 _SAFE_LABEL_RE = None
 
 
@@ -277,9 +278,8 @@ def _matrix_cdf(matrix: List[dict[str, float]]) -> np.ndarray:
 
 
 def _sample_from_background_cdf(rng: np.random.Generator, cdf: np.ndarray, length: int) -> str:
-    bases = np.array(["A", "C", "G", "T"])
     idx = np.searchsorted(cdf, rng.random(int(length)))
-    return "".join(bases[idx])
+    return "".join(_BASES[idx])
 
 
 def _sample_pwm_batch(
@@ -288,11 +288,10 @@ def _sample_pwm_batch(
     *,
     count: int,
 ) -> list[str]:
-    bases = np.array(["A", "C", "G", "T"])
     width = int(cdf.shape[0])
     draws = rng.random((int(count), width))
     idx = (draws[:, :, None] <= cdf[None, :, :]).argmax(axis=2)
-    return ["".join(bases[row]) for row in idx]
+    return ["".join(_BASES[row]) for row in idx]
 
 
 def _sample_background_batch(
@@ -302,10 +301,9 @@ def _sample_background_batch(
     count: int,
     length: int,
 ) -> list[str]:
-    bases = np.array(["A", "C", "G", "T"])
     draws = rng.random((int(count), int(length)))
     idx = np.searchsorted(cdf, draws)
-    return ["".join(bases[row]) for row in idx]
+    return ["".join(_BASES[row]) for row in idx]
 
 
 def _ranges_overlap(a_start: int, a_stop: int, b_start: int, b_stop: int) -> bool:

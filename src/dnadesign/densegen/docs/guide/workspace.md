@@ -31,7 +31,8 @@ workspace/
 ### Why this layout
 
 - **Decoupled**: moving a workspace preserves everything needed to reproduce it.
-- **No fallbacks**: config is resolved from `./config.yaml` in CWD unless you pass `-c`.
+- **Explicit config resolution**: CLI checks `./config.yaml`, then parent directories, then a single auto-detected
+  workspace; it prints the chosen path and exits if ambiguous. Use `-c` to pin a workspace.
 - **Scalable**: large runs do not collide in shared output directories.
 - **Predictable logs**: default logs land in `outputs/logs/<run_id>.log` within the workspace.
 - **Resume‑safe (explicit)**: if run outputs already exist (e.g., `outputs/tables/attempts.parquet` or
