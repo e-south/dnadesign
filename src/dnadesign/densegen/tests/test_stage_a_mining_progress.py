@@ -81,7 +81,7 @@ def test_stage_a_screen_progress_stream_for_pixi_tty(monkeypatch) -> None:
         progress.finish()
         output = "".join(stream.data)
         assert "PWM demo_motif" in output
-        assert "\r" not in output
+        assert "\r" in output
     finally:
         logging_utils.set_progress_enabled(prev_enabled)
         logging_utils.set_progress_style(prev_style)

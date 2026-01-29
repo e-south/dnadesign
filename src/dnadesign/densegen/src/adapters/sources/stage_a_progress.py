@@ -265,7 +265,7 @@ class _PwmSamplingProgress:
         self._enabled = bool(logging_utils.is_progress_enabled())
         self._use_live = self._enabled and self._mode == "screen" and tty and not pixi_in_shell
         self._use_table = False
-        self._allow_carriage = self._mode == "screen" and tty and not pixi_in_shell
+        self._allow_carriage = self._mode == "screen" and tty
         self._live_key = f"{self.motif_id}:{id(self)}"
         self._start = time.monotonic()
         self._last_update = self._start
