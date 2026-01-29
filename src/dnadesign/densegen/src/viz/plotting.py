@@ -32,11 +32,9 @@ from .plot_common import (  # noqa: F401
 )
 from .plot_registry import PLOT_SPECS
 from .plot_run import plot_placement_map, plot_run_health, plot_tfbs_usage
-from .plot_stage_a import (  # noqa: F401
-    _build_stage_a_strata_overview_figure,
-    _build_stage_a_yield_bias_figure,
-    plot_stage_a_summary,
-)
+from .plot_stage_a import plot_stage_a_summary  # noqa: F401
+from .plot_stage_a_strata import _build_stage_a_strata_overview_figure  # noqa: F401
+from .plot_stage_a_yield import _build_stage_a_yield_bias_figure  # noqa: F401
 from .plot_stage_b import plot_stage_b_summary
 
 _console = Console()
