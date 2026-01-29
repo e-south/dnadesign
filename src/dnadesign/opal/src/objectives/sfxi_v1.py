@@ -196,22 +196,21 @@ def sfxi_v1(
 
     # ---- creating scalar uncertainty ----
     if var is not None:
-        # REDO INDEXING
         # Starting with effect intensity (because it is a lot easier)
-        placeholder = (np.exp2(y_pred[:, 3:7])*np.log(2))**2
-        ind_var = np.multiply(placeholder, var[:, 3:7])
+        placeholder = (np.exp2(y_pred[:, 4:8])*np.log(2))**2
+        ind_var = np.multiply(placeholder, var[:, 4:8])
         wt_var = np.multiply(ind_var, w)
         effect_var = np.sum(wt_var, axis = 1)
-        effect_exp = np.sum(np.multiply(w, np.exp2(y_pred[:, 3:7])), axis=1)
+        effect_exp = np.sum(np.multiply(w, np.exp2(y_pred[:, 4:8])), axis=1)
         # Now on to logic fidelity
-        # Need to (at some point) convert standard deviation to variance
         c = 1/(_worst_corner_distance(setpoint)**2)
-        ph2 = 4*(y_pred[:,0:3]**2)*var[:,0:3] + 4*(setpoint**2)*var[:,0:3] \
-                + 2(var[:,0:3]**2) - 8*y_pred[:,0:4]*setpoint*var[:,0:3]
+        ph2 = 4*(y_pred[:,0:4]**2)*var[:,0:4] + 4*(setpoint**2)*var[:,0:4] \
+                + 2*(var[:,0:4]**2) - 8*y_pred[:,0:4]*setpoint*var[:,0:4]
         lf_var = c * np.sum(ph2, axis=1)
-        lf_exp = c * np.sum((y_pred[:,0:3]**2 + var[:,0:3] - (2*y_pred[:,0:3] * setpoint ) + setpoint**2), axis=1)
+        lf_exp = c * np.sum((y_pred[:,0:4]**2 + var[:,0:4] - (2*y_pred[:,0:4] * setpoint ) + setpoint**2), axis=1)
         # Combine into scalar uncertainty
         scalar_uncertainty = effect_var * lf_var + effect_var * lf_exp**2 + lf_var * effect_exp**2
+        print(scalar_uncertainty)
     else:
         scalar_uncertainty = None
 

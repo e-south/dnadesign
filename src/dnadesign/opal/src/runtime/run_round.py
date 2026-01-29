@@ -290,6 +290,8 @@ def _stage_fit_predict_score(
     )
     if Y_hat.shape[1] != y_dim:
         raise OpalError(f"Predicted Y dimension mismatch: expected {y_dim}, got {Y_hat.shape[1]}")
+    if cfg.selection.selection.name == "expected_improvement":
+        Y_hat = np.asarray([Y_hat, std_devs])
 
     # --- Objective ---
     rctx.set_core("core/labels_as_of_round", int(req.as_of_round))
